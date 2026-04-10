@@ -19,7 +19,7 @@
 
 ## Workflow
 - [x] Issue moved from `Ready` to the live started state (`In Progress`) before active coding. Evidence: packaged `linear transition --state "In Progress"` succeeded for `CO-144`.
-- [ ] Exactly one persistent `## Codex Workpad` comment is kept current on the issue. Evidence: the final body is synchronized at `out/linear-255030bf-bdda-4594-b503-28639a98b9da/manual/workpad.md` and `/tmp/co-144-workpad.md`; the next step is the issue-side `linear upsert-workpad` retry now that the earlier shared cooldown window has elapsed.
+- [x] Exactly one persistent `## Codex Workpad` comment is kept current on the issue. Evidence: packaged `linear upsert-workpad` updated comment `fb158b05-d7b2-4833-ad02-3ed6d3cbadcb` after the shared cooldown window elapsed; the synchronized source body is `out/linear-255030bf-bdda-4594-b503-28639a98b9da/manual/workpad.md`.
 - [x] This turn's required parallelization decision was recorded truthfully as serial because the control-host intake split overlaps the same core files. Evidence: packaged `linear parallelization --decision stay_serial --reason overlapping_scope` succeeded for `CO-144`.
 - [x] Workspace is on a task branch before repo edits. Evidence: `linear/co-144-webhook-first-targeted-reconcile`.
 
@@ -53,8 +53,8 @@
 - [x] `MCP_RUNNER_TASK_ID=linear-255030bf-bdda-4594-b503-28639a98b9da npx vitest run --config vitest.config.core.ts orchestrator/tests/LinearDispatchSource.test.ts orchestrator/tests/ControlServerPublicLifecycle.test.ts orchestrator/tests/ProviderIssueHandoff.test.ts`. Evidence: passed (`241` focused tests green).
 
 ## Handoff
-- [ ] Workpad refreshed after docs, after implementation, and immediately before any review or merge handoff. Evidence: the final local draft at `out/linear-255030bf-bdda-4594-b503-28639a98b9da/manual/workpad.md` is ready for the issue-side upsert retry.
-- [ ] PR attached to the Linear issue before review-state transition. Evidence: pending.
-- [ ] Latest `origin/main` merged into the branch before review-state transition. Evidence: pending.
+- [x] Workpad refreshed after docs, after implementation, and immediately before any review or merge handoff. Evidence: packaged `linear upsert-workpad` updated comment `fb158b05-d7b2-4833-ad02-3ed6d3cbadcb` from `out/linear-255030bf-bdda-4594-b503-28639a98b9da/manual/workpad.md` once the shared cooldown window cleared.
+- [x] PR attached to the Linear issue before review-state transition. Evidence: packaged `linear attach-pr` confirmed the existing GitHub attachment `c63a64fc-56f7-4bfb-bd62-266353f08422` for `https://github.com/Kbediako/CO/pull/407`.
+- [x] Latest `origin/main` merged into the branch before review-state transition. Evidence: `git fetch origin refs/heads/main:refs/remotes/origin/main` succeeded and `git rev-list --left-right --count origin/main...HEAD` returned `0 2`.
 - [ ] PR checks green and actionable review feedback handled or explicitly pushed back before review-state transition. Evidence: pending.
 - [x] Issue remains active until review handoff prerequisites are complete. Evidence: issue remains `In Progress`.
