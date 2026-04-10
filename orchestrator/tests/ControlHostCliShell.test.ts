@@ -157,6 +157,7 @@ describe('controlHostCliShell manifest discovery', () => {
     ).toEqual({
       cwd: '/repo/.workspaces/provider-task',
       envOverrides: {
+        CODEX_ORCHESTRATOR_NODE_BIN: '/opt/homebrew/bin/node',
         CODEX_ORCHESTRATOR_ROOT: '/repo/.workspaces/provider-task',
         CODEX_ORCHESTRATOR_RUNS_DIR: '/repo/.runs',
         CODEX_ORCHESTRATOR_OUT_DIR: '/repo/out',
@@ -262,9 +263,12 @@ describe('controlHostCliShell manifest discovery', () => {
       buildRemoteProviderEnvValues(
         {
           CO_LINEAR_API_TOKEN: 'lin-token',
+          CO_PROVIDER_WORKER_MAX_TURNS: '12',
           CODEX_CONFIG_OVERRIDES: 'model_reasoning_effort="xhigh"',
+          CODEX_HOME: '/tmp/codex-home',
           CODEX_MCP_CONFIG_OVERRIDES: 'delegation.enabled=true',
           CODEX_ORCHESTRATOR_APPSERVER_SKIP_LOGIN_CHECK: '1',
+          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '24',
           CODEX_ORCHESTRATOR_RUNTIME_FALLBACK: 'deny',
           CODEX_ORCHESTRATOR_RUNTIME_MODE: 'cli',
           CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE: 'cli',
@@ -281,9 +285,12 @@ describe('controlHostCliShell manifest discovery', () => {
       )
     ).toEqual({
       CO_LINEAR_API_TOKEN: 'lin-token',
+      CO_PROVIDER_WORKER_MAX_TURNS: '12',
       CODEX_CONFIG_OVERRIDES: 'model_reasoning_effort="xhigh"',
+      CODEX_HOME: '/tmp/codex-home',
       CODEX_MCP_CONFIG_OVERRIDES: 'delegation.enabled=true',
       CODEX_ORCHESTRATOR_APPSERVER_SKIP_LOGIN_CHECK: '1',
+      CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '24',
       CODEX_ORCHESTRATOR_RUNTIME_FALLBACK: 'deny',
       CODEX_ORCHESTRATOR_RUNTIME_MODE: 'cli',
       CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE: 'cli',
