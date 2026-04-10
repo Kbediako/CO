@@ -53,6 +53,12 @@ import {
 const PROVIDER_LINEAR_WORKER_PIPELINE_TITLE = 'Provider Linear Worker';
 const SYNTHETIC_LINEAR_TASK_ID_PATTERN =
   /^linear-[a-z0-9]+(?:-[a-z0-9]+)*$/i;
+const PROVIDER_LINEAR_CHILD_PIPELINE_IDS = new Set([
+  'docs-review',
+  'implementation-gate',
+  'docs-relevance-advisory',
+  'provider-linear-child-lane'
+]);
 
 export interface SelectedRunManifestSnapshot {
   manifestRecord: Record<string, unknown>;
@@ -1348,13 +1354,20 @@ function providerIntakeClaimMatchesSyntheticFallbackTaskBinding(
   if (claim.task_id !== buildProviderFallbackTaskId({ id: claim.issue_id })) {
     return false;
   }
-  if (
-    snapshot.taskId !== claim.task_id &&
-    !snapshot.taskId.startsWith(`${claim.task_id}-`)
-  ) {
-    return false;
+  if (snapshot.taskId === claim.task_id) {
+    return !hasAuthoritativeProjectionIssueIdentity(snapshot);
   }
-  return !hasAuthoritativeProjectionIssueIdentity(snapshot);
+  return (
+    isProviderLinearChildPipelineId(
+      readStringValue(snapshot.manifestRecord, 'pipeline_id', 'pipelineId') ?? null
+    ) &&
+    snapshot.taskId.startsWith(`${claim.task_id}-`) &&
+    !hasAuthoritativeProjectionIssueIdentity(snapshot)
+  );
+}
+
+function isProviderLinearChildPipelineId(pipelineId: string | null): boolean {
+  return pipelineId !== null && PROVIDER_LINEAR_CHILD_PIPELINE_IDS.has(pipelineId);
 }
 
 function hasAuthoritativeProjectionIssueIdentity(

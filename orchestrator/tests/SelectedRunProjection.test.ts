@@ -1350,6 +1350,7 @@ describe('SelectedRunProjection', () => {
       JSON.stringify({
         run_id: 'run-child',
         task_id: childTaskId,
+        pipeline_id: 'docs-review',
         status: 'in_progress',
         issue_provider: 'linear',
         updated_at: '2026-03-20T01:15:28.970Z',
@@ -1398,6 +1399,7 @@ describe('SelectedRunProjection', () => {
       JSON.stringify({
         run_id: 'run-child',
         task_id: childTaskId,
+        pipeline_id: 'docs-review',
         status: 'in_progress',
         issue_provider: 'linear',
         updated_at: '2026-03-20T01:15:28.970Z',
@@ -1453,6 +1455,7 @@ describe('SelectedRunProjection', () => {
       JSON.stringify({
         run_id: 'run-child',
         task_id: childTaskId,
+        pipeline_id: 'docs-review',
         status: 'in_progress',
         issue_provider: 'linear',
         updated_at: '2026-03-20T01:15:28.970Z',
@@ -1500,6 +1503,7 @@ describe('SelectedRunProjection', () => {
       JSON.stringify({
         run_id: 'run-child',
         task_id: childTaskId,
+        pipeline_id: 'custom-background-pipeline',
         pipeline_title: 'Custom Background Pipeline',
         status: 'in_progress',
         updated_at: '2026-03-20T01:15:28.970Z',
@@ -1545,6 +1549,7 @@ describe('SelectedRunProjection', () => {
       JSON.stringify({
         run_id: 'run-child',
         task_id: childTaskId,
+        pipeline_id: 'docs-review',
         issue_identifier: parentTaskId,
         issue_id: parentTaskId,
         status: 'in_progress',
@@ -1594,6 +1599,7 @@ describe('SelectedRunProjection', () => {
       JSON.stringify({
         run_id: 'run-child',
         task_id: childTaskId,
+        pipeline_id: 'docs-review',
         status: 'in_progress',
         issue_provider: 'github',
         updated_at: '2026-03-20T01:15:28.970Z',
@@ -1626,6 +1632,55 @@ describe('SelectedRunProjection', () => {
       issueId: childTaskId,
       taskId: childTaskId,
       runId: 'run-child'
+    });
+    expect(selected?.lookupAliases).not.toEqual(expect.arrayContaining(['CO-2', 'lin-issue-1']));
+  });
+
+  it('does not treat a longer provider-worker parent task id as a child-prefix match for a shorter claim task id', async () => {
+    const shorterParentTaskId = 'linear-lin-issue-1';
+    const longerParentTaskId = 'linear-lin-issue-1-2';
+    const { paths } = await createHostPaths(undefined, {
+      taskId: longerParentTaskId,
+      runId: 'run-parent-2'
+    });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-parent-2',
+        task_id: longerParentTaskId,
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Another parent provider-worker run should not bind the shorter issue claim.'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Shorter parent issue claim',
+      task_id: shorterParentTaskId,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: null,
+      run_manifest_path: null
+    };
+
+    const selected = await createProjectionReader(
+      paths,
+      paths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: longerParentTaskId,
+      issueId: longerParentTaskId,
+      taskId: longerParentTaskId,
+      runId: 'run-parent-2'
     });
     expect(selected?.lookupAliases).not.toEqual(expect.arrayContaining(['CO-2', 'lin-issue-1']));
   });

@@ -518,7 +518,13 @@ function isAuthoritativeSelectedCurrentRunningSource(
 function isControlHostSelectedFallbackSource(
   source: Pick<
     ControlCompatibilitySourceContext,
-    'issueProvider' | 'taskId' | 'issueIdentifier' | 'issueId' | 'runId'
+    | 'issueProvider'
+    | 'issueIdentifier'
+    | 'issueId'
+    | 'pipelineTitle'
+    | 'providerLinearWorkerProof'
+    | 'taskId'
+    | 'runId'
   >
 ): boolean {
   return (
@@ -532,7 +538,14 @@ function findMatchingProviderIntakeClaim(
   providerIntakeState: ProviderIntakeState,
   source: Pick<
     ControlCompatibilitySourceContext,
-    'issueId' | 'issueIdentifier' | 'taskId' | 'runId' | 'manifestPath'
+    | 'issueId'
+    | 'issueIdentifier'
+    | 'issueProvider'
+    | 'manifestPath'
+    | 'pipelineTitle'
+    | 'providerLinearWorkerProof'
+    | 'taskId'
+    | 'runId'
   >
 ): ProviderIntakeClaimRecord | null {
   let bestClaim: ProviderIntakeClaimRecord | null = null;
@@ -557,7 +570,14 @@ function scoreProviderClaimMatch(
   claim: ProviderIntakeClaimRecord,
   source: Pick<
     ControlCompatibilitySourceContext,
-    'issueId' | 'issueIdentifier' | 'taskId' | 'runId' | 'manifestPath'
+    | 'issueId'
+    | 'issueIdentifier'
+    | 'issueProvider'
+    | 'manifestPath'
+    | 'pipelineTitle'
+    | 'providerLinearWorkerProof'
+    | 'taskId'
+    | 'runId'
   >
 ): number {
   let score = 0;
@@ -591,7 +611,13 @@ function canScoreProviderRunBindingMatch(
   claim: Pick<ProviderIntakeClaimRecord, 'issue_id' | 'issue_identifier'>,
   source: Pick<
     ControlCompatibilitySourceContext,
-    'issueId' | 'issueIdentifier' | 'taskId' | 'runId'
+    | 'issueId'
+    | 'issueIdentifier'
+    | 'issueProvider'
+    | 'pipelineTitle'
+    | 'providerLinearWorkerProof'
+    | 'taskId'
+    | 'runId'
   >
 ): boolean {
   if (source.taskId !== 'local-mcp') {
@@ -605,7 +631,16 @@ function canScoreProviderRunBindingMatch(
 
 function isAuthoritativeProviderTaskIdMatch(
   claim: Pick<ProviderIntakeClaimRecord, 'issue_id' | 'issue_identifier' | 'task_id'>,
-  source: Pick<ControlCompatibilitySourceContext, 'issueId' | 'issueIdentifier' | 'taskId' | 'runId'>
+  source: Pick<
+    ControlCompatibilitySourceContext,
+    | 'issueId'
+    | 'issueIdentifier'
+    | 'issueProvider'
+    | 'pipelineTitle'
+    | 'providerLinearWorkerProof'
+    | 'taskId'
+    | 'runId'
+  >
 ): boolean {
   if (!claim.task_id || !source.taskId || claim.task_id !== source.taskId) {
     return false;
@@ -695,7 +730,16 @@ function isProviderIntakeScopedRunningSource(
 
 function hasMatchingProviderIssueIdentity(
   claim: Pick<ProviderIntakeClaimRecord, 'issue_id' | 'issue_identifier'>,
-  source: Pick<ControlCompatibilitySourceContext, 'issueId' | 'issueIdentifier' | 'taskId' | 'runId'>
+  source: Pick<
+    ControlCompatibilitySourceContext,
+    | 'issueId'
+    | 'issueIdentifier'
+    | 'issueProvider'
+    | 'pipelineTitle'
+    | 'providerLinearWorkerProof'
+    | 'taskId'
+    | 'runId'
+  >
 ): boolean {
   const authoritativeIssueId = readAuthoritativeProviderIssueId(source);
   const authoritativeIssueIdentifier = readAuthoritativeProviderIssueIdentifier(source);
@@ -710,7 +754,10 @@ function hasMatchingProviderIssueIdentity(
 }
 
 function readAuthoritativeProviderIssueId(
-  source: Pick<ControlCompatibilitySourceContext, 'issueId' | 'taskId' | 'runId'>
+  source: Pick<
+    ControlCompatibilitySourceContext,
+    'issueId' | 'issueProvider' | 'pipelineTitle' | 'providerLinearWorkerProof' | 'taskId' | 'runId'
+  >
 ): string | null {
   const issueId = source.issueId ?? null;
   if (!issueId) {
@@ -723,7 +770,15 @@ function readAuthoritativeProviderIssueId(
 }
 
 function readAuthoritativeProviderIssueIdentifier(
-  source: Pick<ControlCompatibilitySourceContext, 'issueIdentifier' | 'taskId' | 'runId'>
+  source: Pick<
+    ControlCompatibilitySourceContext,
+    | 'issueIdentifier'
+    | 'issueProvider'
+    | 'pipelineTitle'
+    | 'providerLinearWorkerProof'
+    | 'taskId'
+    | 'runId'
+  >
 ): string | null {
   const issueIdentifier = source.issueIdentifier ?? null;
   if (!issueIdentifier) {
@@ -737,17 +792,24 @@ function readAuthoritativeProviderIssueIdentifier(
 
 function isFallbackCompatibilityIdentityValue(
   value: string,
-  source: Pick<ControlCompatibilitySourceContext, 'taskId' | 'runId'>
+  source: Pick<
+    ControlCompatibilitySourceContext,
+    'issueProvider' | 'pipelineTitle' | 'providerLinearWorkerProof' | 'taskId' | 'runId'
+  >
 ): boolean {
   return (
-    isFallbackCompatibilityIdentityAlias(value, source.taskId) ||
-    isFallbackCompatibilityIdentityAlias(value, source.runId)
+    isFallbackCompatibilityIdentityAlias(value, source.taskId, source) ||
+    isFallbackCompatibilityIdentityAlias(value, source.runId, source)
   );
 }
 
 function isFallbackCompatibilityIdentityAlias(
   value: string,
-  candidate: string | null
+  candidate: string | null,
+  source: Pick<
+    ControlCompatibilitySourceContext,
+    'issueProvider' | 'pipelineTitle' | 'providerLinearWorkerProof'
+  >
 ): boolean {
   if (!candidate) {
     return false;
@@ -755,11 +817,24 @@ function isFallbackCompatibilityIdentityAlias(
   if (value === candidate) {
     return true;
   }
-  return SYNTHETIC_LINEAR_TASK_ID_PATTERN.test(value) && candidate.startsWith(`${value}-`);
+  return (
+    hasSyntheticLinearFallbackProvenance(source) &&
+    SYNTHETIC_LINEAR_TASK_ID_PATTERN.test(value) &&
+    candidate.startsWith(`${value}-`)
+  );
 }
 
 function hasExplicitCompatibilityIssueIdentity(
-  source: Pick<ControlCompatibilitySourceContext, 'issueIdentifier' | 'issueId' | 'taskId' | 'runId'>
+  source: Pick<
+    ControlCompatibilitySourceContext,
+    | 'issueIdentifier'
+    | 'issueId'
+    | 'issueProvider'
+    | 'pipelineTitle'
+    | 'providerLinearWorkerProof'
+    | 'taskId'
+    | 'runId'
+  >
 ): boolean {
   if (
     source.issueIdentifier &&
@@ -771,6 +846,19 @@ function hasExplicitCompatibilityIssueIdentity(
     return true;
   }
   return false;
+}
+
+function hasSyntheticLinearFallbackProvenance(
+  source: Pick<
+    ControlCompatibilitySourceContext,
+    'issueProvider' | 'pipelineTitle' | 'providerLinearWorkerProof'
+  >
+): boolean {
+  return (
+    source.issueProvider === 'linear' ||
+    source.pipelineTitle === 'Provider Linear Worker' ||
+    source.providerLinearWorkerProof != null
+  );
 }
 
 function isFreshNullProviderRunningSource(

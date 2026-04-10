@@ -1590,6 +1590,39 @@ describe('ControlRuntime', () => {
     }
   });
 
+  it('keeps parent-child linear aliases authoritative when provider-linear-worker provenance is absent', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
+    try {
+      const issueIdentifier = 'linear-lin-issue-1';
+      const taskId = `${issueIdentifier}-docs-review`;
+      const fixture = await createFixture({
+        taskId
+      });
+      await seedManifest(fixture.paths, {
+        task_id: taskId,
+        issue_identifier: issueIdentifier,
+        issue_id: issueIdentifier,
+        pipeline_title: 'Custom Background Worker',
+        status: 'in_progress',
+        started_at: '2026-03-07T00:25:00.000Z',
+        updated_at: '2026-03-07T00:29:00.000Z',
+        summary: 'custom pipeline run with linear-like parent and child aliases'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+
+      expect(compatibilityProjection.running.map((entry) => entry.issue_identifier)).toEqual([
+        issueIdentifier
+      ]);
+      expect(compatibilityProjection.issues.map((issue) => issue.issueIdentifier)).toEqual([
+        issueIdentifier
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps non-linear selected rows visible even when their task id matches the synthetic linear pattern', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
@@ -1792,6 +1825,7 @@ describe('ControlRuntime', () => {
       await seedManifest(fixture.paths, {
         run_id: 'run-1',
         task_id: childTaskId,
+        pipeline_id: 'docs-review',
         issue_provider: 'linear',
         status: 'in_progress',
         started_at: '2026-03-07T00:25:00.000Z',
