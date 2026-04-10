@@ -1439,6 +1439,165 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.resume).not.toHaveBeenCalled();
   });
 
+  it('serializes concurrent direct webhook admissions so only one launch can consume the remaining slot', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    let resolveFirstStart: ((value: { runId: string; manifestPath: string }) => void) | null = null;
+    const launcher = {
+      start: vi.fn(async ({ issueId }: { issueId: string }) => {
+        if (issueId === 'lin-issue-first') {
+          return await new Promise<{ runId: string; manifestPath: string }>((resolve) => {
+            resolveFirstStart = resolve;
+          });
+        }
+        return {
+          runId: 'run-second',
+          manifestPath: '/tmp/provider-run/second.json'
+        };
+      }),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    const firstPromise = service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-first',
+        identifier: 'CO-1',
+        updated_at: '2026-03-19T04:32:00.000Z'
+      }),
+      deliveryId: 'delivery-first',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_320_000
+    });
+
+    await vi.waitFor(() => {
+      expect(launcher.start).toHaveBeenCalledTimes(1);
+    });
+
+    const secondPromise = service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-second',
+        identifier: 'CO-2',
+        updated_at: '2026-03-19T04:32:01.000Z'
+      }),
+      deliveryId: 'delivery-second',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_321_000
+    });
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+
+    if (!resolveFirstStart) {
+      throw new Error('Expected the first launch to be pending.');
+    }
+    resolveFirstStart({
+      runId: 'run-first',
+      manifestPath: '/tmp/provider-run/first.json'
+    });
+
+    const [firstResult, secondResult] = await Promise.all([firstPromise, secondPromise]);
+
+    expect(firstResult).toMatchObject({
+      kind: 'start',
+      reason: 'provider_issue_start_launched',
+      claim: {
+        provider_key: 'linear:lin-issue-first',
+        state: 'starting',
+        run_id: 'run-first',
+        run_manifest_path: '/tmp/provider-run/first.json'
+      }
+    });
+    expect(secondResult).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_start_blocked:max_concurrency',
+      claim: {
+        provider_key: 'linear:lin-issue-second',
+        state: 'accepted',
+        reason: 'provider_issue_start_blocked:max_concurrency'
+      }
+    });
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
+  it('skips unreadable manifests when direct webhook admission computes host capacity', async () => {
+    const { root, paths } = await createHostPaths();
+    const brokenEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-bad-manifest'
+    };
+    const brokenPaths = resolveRunPaths(brokenEnv, 'run-bad-manifest');
+    await mkdir(brokenPaths.runDir, { recursive: true });
+    await writeFile(brokenPaths.manifestPath, '{"run_id":"run-bad-manifest"', 'utf8');
+
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-fresh',
+        manifestPath: '/tmp/provider-run/fresh.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state: createProviderIntakeState(),
+      persist: vi.fn(async () => undefined),
+      launcher,
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-fresh',
+        identifier: 'CO-3',
+        updated_at: '2026-03-19T04:32:00.000Z'
+      }),
+      deliveryId: 'delivery-fresh-after-bad-manifest',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_320_000
+    });
+
+    expect(result).toMatchObject({
+      kind: 'start',
+      reason: 'provider_issue_start_launched',
+      claim: {
+        provider_key: 'linear:lin-issue-fresh',
+        state: 'starting',
+        run_id: 'run-fresh',
+        run_manifest_path: '/tmp/provider-run/fresh.json'
+      }
+    });
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        `[provider-issue-run-discovery] skipping unreadable manifest ${brokenPaths.manifestPath}:`
+      )
+    );
+  });
+
   it('does not treat a stale running claim without a live run as occupied capacity for direct webhook admission', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
@@ -4898,7 +5057,7 @@ describe('createProviderIssueHandoffService', () => {
     expect(persist).toHaveBeenCalledTimes(1);
   });
 
-  it('surfaces manifest parse errors instead of treating them as missing runs', async () => {
+  it('skips manifest parse errors instead of blocking rehydrate', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {
       repoRoot: root,
@@ -4909,6 +5068,7 @@ describe('createProviderIssueHandoffService', () => {
     const childPaths = resolveRunPaths(childEnv, 'run-child');
     await mkdir(childPaths.runDir, { recursive: true });
     await writeFile(childPaths.manifestPath, '{not-json', 'utf8');
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
 
     const service = createProviderIssueHandoffService({
       paths,
@@ -4920,7 +5080,12 @@ describe('createProviderIssueHandoffService', () => {
       }
     });
 
-    await expect(service.rehydrate()).rejects.toThrow();
+    await expect(service.rehydrate()).resolves.toBeUndefined();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        `[provider-issue-run-discovery] skipping unreadable manifest ${childPaths.manifestPath}:`
+      )
+    );
   });
 
   it('leaves a newer active webhook pending refresh when the latest discovered run already succeeded', async () => {

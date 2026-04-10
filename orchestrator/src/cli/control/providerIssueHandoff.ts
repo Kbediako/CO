@@ -267,12 +267,19 @@ export function createProviderIssueHandoffService(
   let refreshLifecycleChain: Promise<void> = Promise.resolve();
   let bestEffortRehydrateTimer: NodeJS.Timeout | null = null;
   const queuedRetryTrackedIssueRefetches = new Map<string, ProviderTrackedIssueRefetch>();
+  const refreshLifecycleScope = new AsyncLocalStorage<boolean>();
   const providerIssueRunDiscoveryScope = new AsyncLocalStorage<{
     discoveredRuns: Promise<ProviderIssueRunRecord[]> | null;
   }>();
 
   const runWithRefreshLifecycleLock = async <T>(operation: () => Promise<T>): Promise<T> => {
-    const nextOperation = refreshLifecycleChain.then(operation, operation);
+    if (refreshLifecycleScope.getStore()) {
+      return await operation();
+    }
+    const nextOperation = refreshLifecycleChain.then(
+      () => refreshLifecycleScope.run(true, operation),
+      () => refreshLifecycleScope.run(true, operation)
+    );
     refreshLifecycleChain = nextOperation.then(
       () => undefined,
       () => undefined
@@ -2550,61 +2557,194 @@ export function createProviderIssueHandoffService(
         }
       }
 
-      const admissionGate = await createProviderAdmissionGate();
-      if (!admissionGate.canDispatch(input.trackedIssue)) {
-        const blockedReason = deriveProviderCapacityBlockedReason('provider_issue_start_launched');
-        const claim = await upsertProviderClaimAndPersist({
-          ...latestClaimBase,
-          task_id: taskId,
-          mapping_source: latestExisting?.mapping_source ?? mappingSource,
-          state: 'accepted',
-          reason: blockedReason,
-          run_id: latestRun?.runId ?? latestExisting?.run_id ?? null,
-          run_manifest_path: latestRun?.manifestPath ?? latestExisting?.run_manifest_path ?? null,
-          launch_source: null,
-          launch_token: null,
-          review_promotion: null,
-          merge_closeout: null,
-          ...(
-            latestExisting?.retry_queued === true
-              ? buildQueuedProviderRetryFields({
-                  claim: latestRetryStateBase,
-                  previousRun: latestRun,
-                  error: latestExisting.retry_error ?? resolveProviderRetryErrorFromRun(latestRun),
-                  preserveCurrentAttempt: true,
-                  delayType: resolveProviderRetryDelayType({
-                    claim: latestExisting,
-                    previousRun: latestRun
-                  })
-                })
-              : clearProviderRetryFields()
-          )
-        });
-        return { kind: 'ignored', reason: claim.reason ?? blockedReason, claim };
-      }
+      const latestHadResumableRun = Boolean(
+        latestRun && latestRun.status && RESUME_ELIGIBLE_STATUSES.has(latestRun.status)
+      );
+      const admissionReservation = await runWithRefreshLifecycleLock(
+        async (): Promise<
+          | { kind: 'retry' }
+          | { kind: 'settled'; result: ProviderIssueHandoffResult }
+          | {
+              kind: 'launch';
+              latestExisting: ProviderIntakeClaimRecord | null;
+              latestRun: ProviderIssueRunRecord | null;
+              latestClaimBase: typeof latestClaimBase;
+              latestRetryStateBase: typeof latestRetryStateBase;
+              inflightClaim: ProviderIntakeClaimRecord;
+              launchToken: string;
+            }
+        > => {
+          const lockedDiscoveredRuns = await discoverProviderIssueRunsForCurrentOperation({
+            provider: 'linear',
+            issueId: input.trackedIssue.id
+          });
+          const lockedAttachableDiscoveredRuns = filterProviderIssueRunsForStartPipeline(
+            lockedDiscoveredRuns,
+            startPipelineId
+          );
+          const lockedExisting = readProviderIntakeClaim(options.state, providerKey);
+          const lockedLatestClaimBase = {
+            ...claimBase,
+            accepted_at: lockedExisting?.accepted_at ?? claimBase.accepted_at
+          };
+          const lockedLatestRetryStateBase: Pick<
+            ProviderIntakeClaimRecord,
+            'retry_queued' | 'retry_attempt' | 'retry_due_at'
+          > = lockedExisting ?? clearProviderRetryFields();
+          const lockedActiveRun =
+            lockedAttachableDiscoveredRuns.find((run) => run.status === 'in_progress') ?? null;
+          const lockedLatestRun = resolveLatestKnownProviderRun(lockedAttachableDiscoveredRuns);
+          const lockedLatestCompletedClaimIssueUpdatedAt =
+            lockedExisting?.state === 'completed' ? lockedExisting.issue_updated_at ?? null : null;
+          const lockedLatestCompletedIssueUpdatedAt = selectMostRecentTrackedIssueUpdatedAt(
+            lockedLatestCompletedClaimIssueUpdatedAt,
+            lockedLatestRun?.issueUpdatedAt ?? lockedLatestRun?.startedAt ?? null
+          );
+          const lockedRetryingFailedRelaunch =
+            lockedLatestRun?.status === 'succeeded' &&
+            lockedExisting?.state === 'handoff_failed' &&
+            lockedExisting.launch_source === PROVIDER_LAUNCH_SOURCE &&
+            hasFailedProviderStartReason(lockedExisting.reason) &&
+            !isTrackedIssueStale({
+              existingIssueUpdatedAt:
+                lockedExisting.issue_updated_at ?? lockedLatestCompletedIssueUpdatedAt,
+              nextIssueUpdatedAt: input.trackedIssue.updated_at
+            });
+          const lockedHasResumableRun = Boolean(
+            lockedLatestRun && lockedLatestRun.status && RESUME_ELIGIBLE_STATUSES.has(lockedLatestRun.status)
+          );
 
-      const launchToken = createProviderLaunchToken();
-      const inflightClaimSnapshot = captureProviderStateSnapshot();
-      const inflightClaim = upsertProviderIntakeClaim(options.state, {
-        ...latestClaimBase,
-        task_id: taskId,
-        mapping_source: mappingSource,
-        state: 'starting',
-        reason: 'provider_issue_start_launched',
-        run_id: null,
-        run_manifest_path: null,
-        launch_source: PROVIDER_LAUNCH_SOURCE,
-        launch_token: launchToken,
-        review_promotion: null,
-        merge_closeout: null,
-        ...buildProviderRetryLaunchFields({
-          claim: latestRetryStateBase,
-          previousRun: latestRun,
-          preserveCurrentAttempt: latestExisting?.retry_queued === true,
-          seedFromPreviousRun: retryingFailedRelaunch
-        })
-      });
-      await persistStateOrRollback(inflightClaimSnapshot);
+          if (
+            (lockedExisting?.state === 'released' && latestExisting?.state !== 'released') ||
+            (lockedHasResumableRun && !latestHadResumableRun) ||
+            (
+              lockedLatestRun?.status === 'succeeded' &&
+              !lockedRetryingFailedRelaunch &&
+              (latestRun?.status !== 'succeeded' || retryingFailedRelaunch)
+            )
+          ) {
+            return { kind: 'retry' };
+          }
+
+          if (lockedActiveRun) {
+            const claim = await upsertProviderClaimAndPersist({
+              ...lockedLatestClaimBase,
+              task_id: lockedActiveRun.taskId,
+              mapping_source: mappingSource,
+              state: 'running',
+              reason: 'provider_issue_run_already_active',
+              run_id: lockedActiveRun.runId,
+              run_manifest_path: lockedActiveRun.manifestPath,
+            });
+            return {
+              kind: 'settled',
+              result: { kind: 'ignored', reason: 'provider_issue_run_already_active', claim }
+            };
+          }
+
+          if (lockedExisting && (lockedExisting.state === 'starting' || lockedExisting.state === 'resuming')) {
+            const claim = await upsertProviderClaimAndPersist({
+              ...lockedLatestClaimBase,
+              task_id: lockedExisting.task_id,
+              mapping_source: lockedExisting.mapping_source,
+              state: lockedExisting.state,
+              reason: 'provider_issue_handoff_inflight',
+              run_id: lockedExisting.run_id,
+              run_manifest_path: lockedExisting.run_manifest_path,
+              accepted_at: lockedExisting.accepted_at,
+              updated_at: lockedExisting.updated_at
+            });
+            return {
+              kind: 'settled',
+              result: { kind: 'ignored', reason: 'provider_issue_handoff_inflight', claim }
+            };
+          }
+
+          const admissionGate = await createProviderAdmissionGate();
+          if (!admissionGate.canDispatch(input.trackedIssue)) {
+            const blockedReason = deriveProviderCapacityBlockedReason('provider_issue_start_launched');
+            const claim = await upsertProviderClaimAndPersist({
+              ...lockedLatestClaimBase,
+              task_id: taskId,
+              mapping_source: lockedExisting?.mapping_source ?? mappingSource,
+              state: 'accepted',
+              reason: blockedReason,
+              run_id: lockedLatestRun?.runId ?? lockedExisting?.run_id ?? null,
+              run_manifest_path:
+                lockedLatestRun?.manifestPath ?? lockedExisting?.run_manifest_path ?? null,
+              launch_source: null,
+              launch_token: null,
+              review_promotion: null,
+              merge_closeout: null,
+              ...(
+                lockedExisting?.retry_queued === true
+                  ? buildQueuedProviderRetryFields({
+                      claim: lockedLatestRetryStateBase,
+                      previousRun: lockedLatestRun,
+                      error: lockedExisting.retry_error ?? resolveProviderRetryErrorFromRun(lockedLatestRun),
+                      preserveCurrentAttempt: true,
+                      delayType: resolveProviderRetryDelayType({
+                        claim: lockedExisting,
+                        previousRun: lockedLatestRun
+                      })
+                    })
+                  : clearProviderRetryFields()
+              )
+            });
+            return {
+              kind: 'settled',
+              result: { kind: 'ignored', reason: claim.reason ?? blockedReason, claim }
+            };
+          }
+
+          const launchToken = createProviderLaunchToken();
+          const inflightClaimSnapshot = captureProviderStateSnapshot();
+          const inflightClaim = upsertProviderIntakeClaim(options.state, {
+            ...lockedLatestClaimBase,
+            task_id: taskId,
+            mapping_source: mappingSource,
+            state: 'starting',
+            reason: 'provider_issue_start_launched',
+            run_id: null,
+            run_manifest_path: null,
+            launch_source: PROVIDER_LAUNCH_SOURCE,
+            launch_token: launchToken,
+            review_promotion: null,
+            merge_closeout: null,
+            ...buildProviderRetryLaunchFields({
+              claim: lockedLatestRetryStateBase,
+              previousRun: lockedLatestRun,
+              preserveCurrentAttempt: lockedExisting?.retry_queued === true,
+              seedFromPreviousRun: lockedRetryingFailedRelaunch
+            })
+          });
+          await persistStateOrRollback(inflightClaimSnapshot);
+          return {
+            kind: 'launch',
+            latestExisting: lockedExisting,
+            latestRun: lockedLatestRun,
+            latestClaimBase: lockedLatestClaimBase,
+            latestRetryStateBase: lockedLatestRetryStateBase,
+            inflightClaim,
+            launchToken
+          };
+        }
+      );
+      if (admissionReservation.kind === 'retry') {
+        resetProviderIssueRunDiscoveryCache();
+        return await processTrackedIssueCandidate(input);
+      }
+      if (admissionReservation.kind === 'settled') {
+        return admissionReservation.result;
+      }
+      const {
+        latestExisting: reservedLatestExisting,
+        latestRun: reservedLatestRun,
+        latestClaimBase: reservedLatestClaimBase,
+        latestRetryStateBase: reservedLatestRetryStateBase,
+        inflightClaim,
+        launchToken
+      } = admissionReservation;
       let startedRun: { runId: string; manifestPath: string } | null = null;
       try {
         startedRun = await options.launcher.start({
@@ -2617,12 +2757,12 @@ export function createProviderIssueHandoffService(
           workspaceId: input.trackedIssue.workspace_id,
           teamId: input.trackedIssue.team_id,
           projectId: input.trackedIssue.project_id,
-          residentSessionSeed: latestRun?.residentSessionSeed ?? null,
+          residentSessionSeed: reservedLatestRun?.residentSessionSeed ?? null,
           launchToken
         });
       } catch (error) {
         const claim = await upsertProviderClaimAndPersist({
-          ...latestClaimBase,
+          ...reservedLatestClaimBase,
           task_id: taskId,
           mapping_source: mappingSource,
           state: 'handoff_failed',
@@ -2634,10 +2774,10 @@ export function createProviderIssueHandoffService(
           review_promotion: null,
           merge_closeout: null,
           ...buildQueuedProviderRetryFields({
-            claim: latestRetryStateBase,
-            previousRun: latestRun,
+            claim: reservedLatestRetryStateBase,
+            previousRun: reservedLatestRun,
             error: (error as Error)?.message ?? String(error),
-            preserveCurrentAttempt: latestExisting?.retry_queued === true,
+            preserveCurrentAttempt: reservedLatestExisting?.retry_queued === true,
             delayType: 'failure'
           })
         }, { rollbackOnPersistFailure: false });
@@ -2645,7 +2785,7 @@ export function createProviderIssueHandoffService(
       }
       const claim = startedRun
         ? upsertProviderIntakeClaim(options.state, {
-            ...latestClaimBase,
+            ...reservedLatestClaimBase,
             task_id: taskId,
             mapping_source: mappingSource,
             state: 'starting',
@@ -2657,9 +2797,9 @@ export function createProviderIssueHandoffService(
             review_promotion: null,
             merge_closeout: null,
             ...buildProviderRetryLaunchFields({
-              claim: latestRetryStateBase,
-              previousRun: latestRun,
-              preserveCurrentAttempt: latestExisting?.retry_queued === true,
+              claim: reservedLatestRetryStateBase,
+              previousRun: reservedLatestRun,
+              preserveCurrentAttempt: reservedLatestExisting?.retry_queued === true,
               seedFromPreviousRun: retryingFailedRelaunch
             })
           })
@@ -3657,7 +3797,17 @@ export async function discoverProviderIssueRuns(
     const runEntries = await readDirectoryNames(cliRoot);
     for (const runEntry of runEntries) {
       const manifestPath = join(cliRoot, runEntry, 'manifest.json');
-      const manifest = await readJsonFile<Record<string, unknown>>(manifestPath);
+      let manifest: Record<string, unknown> | null = null;
+      try {
+        manifest = await readJsonFile<Record<string, unknown>>(manifestPath);
+      } catch (error) {
+        logger.warn(
+          `[provider-issue-run-discovery] skipping unreadable manifest ${manifestPath}: ${
+            (error as Error)?.message ?? String(error)
+          }`
+        );
+        continue;
+      }
       if (!manifest) {
         continue;
       }
