@@ -95,6 +95,21 @@ describe('ExecClient', () => {
 
     await expect(handle.result).rejects.toThrow('Exec command exited without emitting a summary event');
   });
+
+  it('preserves the original spawn error when startup fails before any summary', async () => {
+    const spawnError = Object.assign(new Error('spawn missing-cli ENOENT'), {
+      code: 'ENOENT'
+    });
+    spawnMock.mockImplementationOnce(() => createMockProcess([], { error: spawnError }));
+
+    const client = new ExecClient({ cliPath: 'missing-cli' });
+    const handle = client.run({ command: 'npm' });
+
+    await expect(handle.result).rejects.toMatchObject({
+      code: 'ENOENT',
+      message: 'spawn missing-cli ENOENT'
+    });
+  });
 });
 
 function buildEventStream(overrides: Partial<{ exitCode: number | null; status: 'succeeded' | 'failed' }> = {}): string[] {
@@ -160,7 +175,10 @@ function buildEventStream(overrides: Partial<{ exitCode: number | null; status: 
   return [JSON.stringify(begin), JSON.stringify(summary)];
 }
 
-function createMockProcess(lines: string[]): ChildProcessWithoutNullStreams {
+function createMockProcess(
+  lines: string[],
+  options: { error?: Error } = {}
+): ChildProcessWithoutNullStreams {
   const stdout = new PassThrough();
   const stderr = new PassThrough();
   const child = new EventEmitter() as ChildProcessWithoutNullStreams;
@@ -172,6 +190,13 @@ function createMockProcess(lines: string[]): ChildProcessWithoutNullStreams {
   });
 
   setTimeout(() => {
+    if (options.error) {
+      child.emit('error', options.error);
+      stdout.end();
+      stderr.end();
+      child.emit('close', null, null);
+      return;
+    }
     for (const line of lines) {
       stdout.write(`${line}\n`);
     }

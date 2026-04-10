@@ -228,14 +228,14 @@ export class ExecRunHandle extends EventEmitter {
       this.emit('stderr', text);
     });
 
-    child.once('error', async (error) => {
-      try {
-        await this.closeStreams({ preserveArtifacts: false });
-      } catch {
-        // Preserve the original child-process failure as the terminal result.
+    child.once('error', (error) => {
+      if (this.listenerCount('error') > 0) {
+        this.emit('error', error);
       }
-      this.emit('error', error);
       this.rejectResultOnce(error);
+      void this.closeStreams({ preserveArtifacts: false }).catch(() => {
+        // Preserve the original child-process failure as the terminal result.
+      });
     });
 
     child.once('close', async (code, signal) => {
