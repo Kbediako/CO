@@ -14,7 +14,10 @@ import {
   resolveLinearBudgetPreflight
 } from './linearBudgetState.js';
 import { mapLinearRateLimitedFailure } from './linearRateLimit.js';
-import { isProviderLinearTrackedIssueEligibleForExecution } from './providerLinearWorkflowStates.js';
+import {
+  isProviderLinearTrackedIssueEligibleForExecution,
+  normalizeProviderLinearWorkflowState
+} from './providerLinearWorkflowStates.js';
 
 const LINEAR_RECENT_ACTIVITY_LIMIT = 3;
 const LINEAR_BLOCKER_LIMIT = 50;
@@ -97,6 +100,8 @@ export type LiveLinearTrackedIssuesResolution =
       source_setup: DispatchPilotSourceSetup;
     }
   | LiveLinearFailureResolution;
+
+export type LiveLinearTrackedIssuesQueryMode = 'full' | 'recovery_sweep' | 'fresh_discovery';
 
 interface LinearIssueQueryResponse {
   viewer?: {
@@ -320,6 +325,9 @@ export async function resolveLiveLinearTrackedIssues(input: {
   limit?: number;
   sortForDispatch?: boolean;
   stopWhenEligibleForExecution?: boolean;
+  eligibleIssueTargetCount?: number;
+  eligibleStateSlotCounts?: Record<string, number>;
+  queryMode?: LiveLinearTrackedIssuesQueryMode;
 }): Promise<LiveLinearTrackedIssuesResolution> {
   const env = input.env ?? process.env;
   const fetchImpl = input.fetchImpl ?? fetch;
@@ -334,20 +342,28 @@ export async function resolveLiveLinearTrackedIssues(input: {
     return malformed('dispatch_source_binding_missing');
   }
 
+  const queryMode = resolveLiveLinearTrackedIssuesQueryMode(input.queryMode);
+  const eligibleIssueTargetCount = resolveEligibleIssueTargetCount({
+    stopWhenEligibleForExecution: input.stopWhenEligibleForExecution,
+    eligibleIssueTargetCount: input.eligibleIssueTargetCount
+  });
+  const eligibleStateSlotCounts = normalizeEligibleStateSlotCounts(input.eligibleStateSlotCounts);
   const trackedIssues: LiveLinearTrackedIssue[] = [];
   const seenIssueIds = new Set<string>();
   let workspaceId: string | null = null;
   let afterCursor: string | null = null;
   let hasNextPage = true;
+  let eligibleIssueCount = 0;
+  const consumedEligibleStateSlots = new Map<string, number>();
 
   while (hasNextPage) {
-    const query = buildLinearTrackedIssuesQuery(sourceSetup, input.limit, afterCursor);
+    const query = buildLinearTrackedIssuesQuery(sourceSetup, input.limit, afterCursor, queryMode);
     const queryResult = await executeLinearQuery({
       env,
       token,
       timeoutMs,
       fetchImpl,
-      source: 'dispatch_source_tracked_issues',
+      source: resolveTrackedIssuesQuerySource(queryMode),
       query: query.query,
       variables: query.variables
     });
@@ -385,8 +401,17 @@ export async function resolveLiveLinearTrackedIssues(input: {
       seenIssueIds.add(trackedIssue.id);
       trackedIssues.push(trackedIssue);
       if (
-        input.stopWhenEligibleForExecution === true &&
-        isLiveLinearTrackedIssueEligibleForFreshDispatch(trackedIssue)
+        shouldCountTrackedIssueTowardEligibilityTarget(
+          trackedIssue,
+          eligibleStateSlotCounts,
+          consumedEligibleStateSlots
+        )
+      ) {
+        eligibleIssueCount += 1;
+      }
+      if (
+        eligibleIssueTargetCount !== null &&
+        eligibleIssueCount >= eligibleIssueTargetCount
       ) {
         stopScanning = true;
         break;
@@ -465,7 +490,8 @@ export function isLiveLinearTrackedIssueEligibleForFreshDispatch(
 function buildLinearTrackedIssuesQuery(
   sourceSetup: DispatchPilotSourceSetup,
   limit: number | undefined,
-  afterCursor: string | null
+  afterCursor: string | null,
+  queryMode: LiveLinearTrackedIssuesQueryMode
 ): {
   query: string;
   variables: Record<string, string | number | null>;
@@ -491,6 +517,8 @@ function buildLinearTrackedIssuesQuery(
 
   const variableSection = `(${variableDefinitions.join(', ')})`;
   const filterSection = `, filter: { ${filterParts.join(' ')} }`;
+  const includeRichIssueDetails = queryMode !== 'fresh_discovery';
+  const orderBy = queryMode === 'fresh_discovery' ? 'priority' : 'updatedAt';
 
   return {
     query: `query ResolveLiveLinearTrackedIssues${variableSection} {
@@ -500,16 +528,16 @@ function buildLinearTrackedIssuesQuery(
           id
         }
       }
-      issues(orderBy: updatedAt, first: $limit, after: $after${filterSection}) {
+      issues(orderBy: ${orderBy}, first: $limit, after: $after${filterSection}) {
         nodes {
           id
           identifier
           title
-          description
           url
           priority
           createdAt
           updatedAt
+          ${includeRichIssueDetails ? 'description' : ''}
           assignee {
             id
             name
@@ -541,7 +569,9 @@ function buildLinearTrackedIssuesQuery(
               }
             }
           }
-          history(first: ${LINEAR_RECENT_ACTIVITY_LIMIT}) {
+          ${
+            includeRichIssueDetails
+              ? `history(first: ${LINEAR_RECENT_ACTIVITY_LIMIT}) {
             nodes {
               id
               createdAt
@@ -564,6 +594,8 @@ function buildLinearTrackedIssuesQuery(
               fromTitle
               toTitle
             }
+          }`
+              : ''
           }
         }
         pageInfo {
@@ -574,6 +606,83 @@ function buildLinearTrackedIssuesQuery(
     }`,
     variables
   };
+}
+
+function resolveLiveLinearTrackedIssuesQueryMode(
+  mode: LiveLinearTrackedIssuesQueryMode | undefined
+): LiveLinearTrackedIssuesQueryMode {
+  if (mode === 'recovery_sweep' || mode === 'fresh_discovery') {
+    return mode;
+  }
+  return 'full';
+}
+
+function resolveEligibleIssueTargetCount(input: {
+  stopWhenEligibleForExecution?: boolean;
+  eligibleIssueTargetCount?: number;
+}): number | null {
+  if (
+    typeof input.eligibleIssueTargetCount === 'number' &&
+    Number.isInteger(input.eligibleIssueTargetCount) &&
+    input.eligibleIssueTargetCount > 0
+  ) {
+    return input.eligibleIssueTargetCount;
+  }
+  return input.stopWhenEligibleForExecution === true ? 1 : null;
+}
+
+function normalizeEligibleStateSlotCounts(
+  input: Record<string, number> | undefined
+): Map<string, number> {
+  const normalized = new Map<string, number>();
+  if (!input) {
+    return normalized;
+  }
+  for (const [rawState, rawCount] of Object.entries(input)) {
+    const state = normalizeProviderLinearWorkflowState(rawState);
+    if (!state || !Number.isInteger(rawCount) || rawCount <= 0) {
+      continue;
+    }
+    normalized.set(state, rawCount);
+  }
+  return normalized;
+}
+
+function shouldCountTrackedIssueTowardEligibilityTarget(
+  trackedIssue: Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'blocked_by' | 'viewer_id' | 'assignee_id'>,
+  eligibleStateSlotCounts: Map<string, number>,
+  consumedEligibleStateSlots: Map<string, number>
+): boolean {
+  if (!isLiveLinearTrackedIssueEligibleForFreshDispatch(trackedIssue)) {
+    return false;
+  }
+
+  const normalizedState = normalizeProviderLinearWorkflowState(trackedIssue.state);
+  if (!normalizedState) {
+    return true;
+  }
+
+  const stateLimit = eligibleStateSlotCounts.get(normalizedState);
+  if (stateLimit === undefined) {
+    return true;
+  }
+
+  const consumed = consumedEligibleStateSlots.get(normalizedState) ?? 0;
+  if (consumed >= stateLimit) {
+    return false;
+  }
+  consumedEligibleStateSlots.set(normalizedState, consumed + 1);
+  return true;
+}
+
+function resolveTrackedIssuesQuerySource(queryMode: LiveLinearTrackedIssuesQueryMode): string {
+  if (queryMode === 'recovery_sweep') {
+    return 'dispatch_source_tracked_issues:recovery_sweep';
+  }
+  if (queryMode === 'fresh_discovery') {
+    return 'dispatch_source_tracked_issues:fresh_discovery';
+  }
+  return 'dispatch_source_tracked_issues';
 }
 
 function buildLinearIssueByIdQuery(issueId: string): {

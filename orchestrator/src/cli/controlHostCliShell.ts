@@ -195,7 +195,7 @@ export async function runControlHostCliShell(
           }
           return { kind: 'skip', reason: resolution.reason } as const;
         },
-        resolveTrackedIssues: async () => {
+        resolveTrackedIssues: async (input) => {
           const runtimeEnv = process.env;
           const sourceSetup = resolveLinearWebhookSourceSetup(readFeatureToggles(), runtimeEnv);
           if ('error' in sourceSetup) {
@@ -203,7 +203,10 @@ export async function runControlHostCliShell(
           }
           const resolution = await resolveLiveLinearTrackedIssues({
             sourceSetup: sourceSetup.sourceSetup,
-            env: runtimeEnv
+            env: runtimeEnv,
+            queryMode: input?.mode,
+            eligibleIssueTargetCount: input?.eligibleTargetCount,
+            eligibleStateSlotCounts: input?.eligibleStateSlotCounts
           });
           if (resolution.kind === 'ready') {
             return { kind: 'ready', trackedIssues: resolution.tracked_issues } as const;
