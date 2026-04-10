@@ -480,10 +480,55 @@ async function spawnBackgroundCliOverSsh(
     child.once('error', onError);
     child.once('spawn', () => {
       child.off('error', onError);
-      child.stdin?.end(sshInvocation.remoteScript);
+      void writeRemoteProviderScriptToSshChild(child, sshInvocation.remoteScript).then(resolve, reject);
+    });
+  });
+}
+
+async function writeRemoteProviderScriptToSshChild(
+  child: {
+    stdin?: NodeJS.WritableStream | null;
+    unref(): void;
+  },
+  remoteScript: string
+): Promise<void> {
+  const stdin = child.stdin;
+  if (!stdin) {
+    child.unref();
+    return;
+  }
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const cleanup = () => {
+      stdin.off('error', onError);
+      stdin.off('finish', onFinish);
+    };
+    const settleResolve = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanup();
       child.unref();
       resolve();
-    });
+    };
+    const settleReject = (error: Error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanup();
+      reject(error);
+    };
+    const onError = (error: Error) => settleReject(error);
+    const onFinish = () => settleResolve();
+    stdin.once('error', onError);
+    stdin.once('finish', onFinish);
+    try {
+      stdin.end(remoteScript);
+    } catch (error) {
+      settleReject(error instanceof Error ? error : new Error(String(error)));
+    }
   });
 }
 
@@ -953,7 +998,8 @@ export const __test__ = {
   resolveProviderResumeLaunchSpec,
   resolveProviderResumeTaskId,
   resolveProviderOverridePackageRoot,
-  snapshotRunManifests
+  snapshotRunManifests,
+  writeRemoteProviderScriptToSshChild
 };
 
 function normalizeProviderLinearSourceValue(value: string | null | undefined): string | null {

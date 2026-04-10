@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 import { mkdtemp, mkdir, realpath, rm, symlink, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -32,7 +33,8 @@ const {
   resolveSpawnManifestWaitTimeoutMs,
   resolveProviderResumeLaunchSpec,
   resolveProviderOverridePackageRoot,
-  snapshotRunManifests
+  snapshotRunManifests,
+  writeRemoteProviderScriptToSshChild
 } = controlHostCliShellTest;
 const execFileAsync = promisify(execFile);
 
@@ -70,6 +72,23 @@ async function initializeRepo(repoRoot: string): Promise<void> {
   await writeFile(join(repoRoot, 'package.json'), JSON.stringify({ name: 'control-host-test' }), 'utf8');
   await runGit(repoRoot, ['add', 'package.json']);
   await runGit(repoRoot, ['commit', '-m', 'init']);
+}
+
+class FakeWritable extends EventEmitter {
+  endImpl: ((chunk: string) => void) | null = null;
+
+  end(chunk: string): void {
+    this.endImpl?.(chunk);
+  }
+}
+
+class FakeDetachedChild {
+  stdin: FakeWritable | null;
+  unref = vi.fn();
+
+  constructor(stdin: FakeWritable | null) {
+    this.stdin = stdin;
+  }
 }
 
 describe('controlHostCliShell manifest discovery', () => {
@@ -295,6 +314,21 @@ describe('controlHostCliShell manifest discovery', () => {
     expect(invocation.remoteScript).toContain("LINEAR_API_KEY='lin-secret'");
     expect(invocation.remoteScript).toContain("OPENAI_API_KEY='sk-secret'");
     expect(invocation.remoteScript).toContain("'/opt/homebrew/bin/node'");
+  });
+
+  it('rejects ssh launch stdin EPIPE failures instead of leaving them uncaught', async () => {
+    const stdin = new FakeWritable();
+    const child = new FakeDetachedChild(stdin);
+    const epipe = Object.assign(new Error('write EPIPE'), { code: 'EPIPE' });
+
+    stdin.endImpl = () => {
+      stdin.emit('error', epipe);
+    };
+
+    await expect(writeRemoteProviderScriptToSshChild(child, 'echo ready\n')).rejects.toThrow(
+      'write EPIPE'
+    );
+    expect(child.unref).not.toHaveBeenCalled();
   });
 
   it('does not inherit local process.execArgv in remote worker launch commands', () => {
