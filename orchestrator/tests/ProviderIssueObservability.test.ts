@@ -1392,6 +1392,91 @@ describe('provider issue observability', () => {
     });
   });
 
+  it('projects automatic branch refresh attempts while merge closeout keeps watching', () => {
+    const snapshot = buildProviderIssueDebugSnapshot({
+      tracked_issue: {
+        state: 'Merging',
+        state_type: 'started',
+        updated_at: '2026-04-10T05:15:00.000Z'
+      },
+      claim: {
+        state: 'running',
+        reason: 'provider_issue_merge_closeout_watching',
+        updated_at: '2026-04-10T05:15:00.000Z',
+        run_id: 'run-140-behind',
+        merge_closeout: {
+          recorded_at: '2026-04-10T05:15:05.000Z',
+          status: 'watching',
+          reason: 'branch_refresh_requested',
+          summary:
+            'Requested automatic branch refresh for attached PR #440; waiting for GitHub to recompute merge readiness.',
+          attached_pr_urls: ['https://github.com/asabeko/CO/pull/440'],
+          ignored_historical_pr_urls: [],
+          conflicting_attached_pr_urls: [],
+          pr: {
+            url: 'https://github.com/asabeko/CO/pull/440',
+            owner: 'asabeko',
+            repo: 'CO',
+            number: 440
+          },
+          snapshot: {
+            state: 'OPEN',
+            review_decision: 'APPROVED',
+            merge_state_status: 'BEHIND',
+            ready_to_merge: false,
+            gate_reasons: ['merge_state=BEHIND'],
+            action_required_reasons: ['merge_state=BEHIND'],
+            unresolved_thread_count: 0,
+            checks_pending: 0,
+            checks_failed: 0,
+            required_checks_pending: 0,
+            required_checks_failed: 0,
+            updated_at: '2026-04-10T05:15:05.000Z',
+            merged_at: null
+          },
+          branch_recovery: {
+            attempted_at: '2026-04-10T05:15:04.000Z',
+            recovery_reason: 'merge_state=BEHIND',
+            command: 'gh',
+            args: ['pr', 'update-branch', '440', '--repo', 'asabeko/CO'],
+            exit_code: 0,
+            ok: true,
+            stdout: 'Updated branch',
+            stderr: null,
+            failure_kind: null
+          }
+        }
+      }
+    });
+
+    expect(snapshot).toMatchObject({
+      pull_request: {
+        number: 440,
+        merge_closeout_status: 'watching',
+        reason: 'branch_refresh_requested',
+        branch_recovery: {
+          attempted_at: '2026-04-10T05:15:04.000Z',
+          recovery_reason: 'merge_state=BEHIND',
+          command: 'gh',
+          args: ['pr', 'update-branch', '440', '--repo', 'asabeko/CO'],
+          exit_code: 0,
+          ok: true,
+          stdout: 'Updated branch',
+          failure_kind: null
+        }
+      },
+      progress: {
+        phase: 'watching_merge',
+        kind: 'merge_closeout',
+        status: 'progressing',
+        stall_classification: 'progressing',
+        recovery_recommendation: 'continue_waiting'
+      },
+      stall_classification: 'progressing',
+      recovery_recommendation: 'continue_waiting'
+    });
+  });
+
   it('does not let merge closeout state mask a failed worker proof', () => {
     const snapshot = buildProviderIssueDebugSnapshot({
       tracked_issue: {
