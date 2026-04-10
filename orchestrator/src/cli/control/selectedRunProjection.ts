@@ -357,7 +357,10 @@ function buildProjectionContextFromParts(
     taskId,
     runId
   });
-  const compatibilityState = resolveCompatibilityState(matchedTrackedIssue, providerClaim);
+  const compatibilityState = resolveCompatibilityState(
+    providerClaim?.reason === 'provider_issue_rehydrated_active_run' ? null : matchedTrackedIssue,
+    providerClaim
+  );
   const { displayStatus, statusReason } = resolveSelectedRunDisplayStatus({
     rawStatus,
     latestAction,
@@ -1225,7 +1228,7 @@ function providerIntakeClaimMatchesSelectedRun(
   >,
   snapshot: Pick<
     SelectedRunManifestSnapshot,
-    'issueId' | 'issueIdentifier' | 'issueProvider' | 'manifestPath' | 'runId' | 'taskId'
+    'issueId' | 'issueIdentifier' | 'issueProvider' | 'manifestPath' | 'manifestRecord' | 'runId' | 'taskId'
   >
 ): boolean {
   if (claim.run_manifest_path && claim.run_manifest_path === snapshot.manifestPath) {
@@ -1257,7 +1260,7 @@ function compareProviderIntakeClaimSpecificity(
   >,
   snapshot: Pick<
     SelectedRunManifestSnapshot,
-    'issueId' | 'issueIdentifier' | 'issueProvider' | 'manifestPath' | 'runId' | 'taskId'
+    'issueId' | 'issueIdentifier' | 'issueProvider' | 'manifestPath' | 'manifestRecord' | 'runId' | 'taskId'
   >
 ): number {
   const leftPriority = scoreProviderIntakeClaimSpecificity(left, snapshot);
@@ -1280,7 +1283,7 @@ function scoreProviderIntakeClaimSpecificity(
   >,
   snapshot: Pick<
     SelectedRunManifestSnapshot,
-    'issueId' | 'issueIdentifier' | 'issueProvider' | 'manifestPath' | 'runId' | 'taskId'
+    'issueId' | 'issueIdentifier' | 'issueProvider' | 'manifestPath' | 'manifestRecord' | 'runId' | 'taskId'
   >
 ): number {
   if (claim.run_manifest_path && claim.run_manifest_path === snapshot.manifestPath) {
@@ -1305,7 +1308,7 @@ function providerIntakeClaimCanFallbackByIssue(
   >,
   snapshot: Pick<
     SelectedRunManifestSnapshot,
-    'issueId' | 'issueIdentifier' | 'issueProvider' | 'manifestPath' | 'runId' | 'taskId'
+    'issueId' | 'issueIdentifier' | 'issueProvider' | 'manifestPath' | 'manifestRecord' | 'runId' | 'taskId'
   >
 ): boolean {
   return (

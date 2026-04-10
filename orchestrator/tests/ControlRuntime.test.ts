@@ -1500,6 +1500,7 @@ describe('ControlRuntime', () => {
       const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
 
       expect(compatibilityProjection.running).toEqual([]);
+      expect(compatibilityProjection.codexTotals.seconds_running).toBeGreaterThan(0);
       expect(compatibilityProjection.issues).toEqual([]);
       expect(compatibilityProjection.selected?.issue_identifier).toBe(taskId);
     } finally {
@@ -1527,6 +1528,7 @@ describe('ControlRuntime', () => {
       const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
 
       expect(compatibilityProjection.running).toEqual([]);
+      expect(compatibilityProjection.codexTotals.seconds_running).toBeGreaterThan(0);
       expect(compatibilityProjection.issues).toEqual([]);
       expect(compatibilityProjection.selected?.issue_identifier).toBe(taskId);
     } finally {
@@ -1554,6 +1556,7 @@ describe('ControlRuntime', () => {
       const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
 
       expect(compatibilityProjection.running).toEqual([]);
+      expect(compatibilityProjection.codexTotals.seconds_running).toBeGreaterThan(0);
       expect(compatibilityProjection.issues).toEqual([]);
       expect(compatibilityProjection.selected?.issue_identifier).toBe(taskId);
     } finally {
@@ -1787,7 +1790,7 @@ describe('ControlRuntime', () => {
       });
 
       await seedManifest(fixture.paths, {
-        run_id: 'run-child',
+        run_id: 'run-1',
         task_id: childTaskId,
         issue_provider: 'linear',
         status: 'in_progress',
@@ -2268,7 +2271,7 @@ describe('ControlRuntime', () => {
     });
   });
 
-  it('uses the same preferred same-issue running source for telemetry as the issue projection', async () => {
+  it('keeps same-issue telemetry aggregated across authoritative runtime sources while the issue projection prefers one running row', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
     try {
@@ -2360,10 +2363,10 @@ describe('ControlRuntime', () => {
         turn_count: 1
       });
       expect(compatibilityProjection.codexTotals).toEqual({
-        input_tokens: 5,
-        output_tokens: 3,
-        total_tokens: 8,
-        seconds_running: 300
+        input_tokens: 16,
+        output_tokens: 10,
+        total_tokens: 26,
+        seconds_running: 1500
       });
       expect(compatibilityProjection.rateLimits).toEqual({
         limit_id: 'coding',
@@ -3627,7 +3630,7 @@ describe('ControlRuntime', () => {
     }
   });
 
-  it('uses the same preferred same-issue running source for runtime rows and telemetry totals', async () => {
+  it('keeps runtime rows deduped by preferred same-issue source while telemetry retains all authoritative runtime activity', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
     try {
@@ -3709,10 +3712,10 @@ describe('ControlRuntime', () => {
         }
       });
       expect(compatibilityProjection.codexTotals).toEqual({
-        input_tokens: 100,
-        output_tokens: 200,
-        total_tokens: 300,
-        seconds_running: 600
+        input_tokens: 101,
+        output_tokens: 202,
+        total_tokens: 303,
+        seconds_running: 2400
       });
       expect(compatibilityProjection.rateLimits).toEqual({
         source: 'new'

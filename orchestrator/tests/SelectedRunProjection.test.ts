@@ -1237,6 +1237,62 @@ describe('SelectedRunProjection', () => {
     expect(selected?.tracked).toBeNull();
   });
 
+  it('lets active run-bound claims outrank stale tracked issue state for compatibility state', async () => {
+    const taskId = 'linear-lin-issue-1';
+    const { paths } = await createHostPaths(undefined, { taskId, runId: 'provider-run-1' });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'provider-run-1',
+        task_id: taskId,
+        issue_provider: 'linear',
+        status: 'in_progress',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Tracked issue and provider claim refer to the same issue with different states.'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_id: 'lin-issue-147',
+      issue_identifier: 'CO-147',
+      issue_title: 'Claim-backed issue',
+      issue_state: 'Human Review',
+      issue_state_type: 'started',
+      task_id: taskId,
+      run_id: 'provider-run-1',
+      run_manifest_path: paths.manifestPath,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run'
+    };
+
+    const projectionContext = createProjectionContext(paths, providerIntakeState);
+    projectionContext.linearAdvisoryState = {
+      tracked_issue: {
+        id: 'lin-issue-147',
+        identifier: 'CO-147',
+        title: 'Tracked issue is stale.',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-03-20T01:10:00.000Z'
+      } as never
+    };
+
+    const selected = await createSelectedRunProjectionReader(projectionContext).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: 'CO-147',
+      issueId: 'lin-issue-147',
+      compatibilityState: 'Human Review'
+    });
+    expect(selected?.tracked?.linear).toMatchObject({
+      identifier: 'CO-147',
+      state: 'In Progress'
+    });
+  });
+
   it('rebinds fallback-only synthetic child task ids from the parent claim task prefix', async () => {
     const parentTaskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
     const childTaskId = `${parentTaskId}-docs-review`;

@@ -26,7 +26,6 @@ import {
   type SelectedRunContext,
 } from './observabilityReadModel.js';
 import {
-  buildCompatibilityIssueIndex,
   buildCompatibilityProjectionSnapshot
 } from './compatibilityIssuePresenter.js';
 import { createLiveLinearAdvisoryRuntime } from './liveLinearAdvisoryRuntime.js';
@@ -496,19 +495,15 @@ function isAuthoritativeSelectedCurrentRunningSource(
   if (!source || source.rawStatus !== 'in_progress') {
     return false;
   }
-  const syntheticLinearFallbackOnly = isSyntheticLinearFallbackOnlySource(source);
   if (!providerIntakeState) {
     if (source.taskId !== 'local-mcp') {
-      return !syntheticLinearFallbackOnly;
+      return true;
     }
     return (
       !isControlHostSelectedFallbackSource(source) && isFreshNullProviderRunningSource(source)
     );
   }
   if (source.taskId !== 'local-mcp') {
-    if (syntheticLinearFallbackOnly) {
-      return false;
-    }
     return true;
   }
   const claim = findMatchingProviderIntakeClaim(providerIntakeState, source);
@@ -671,10 +666,9 @@ function isAuthoritativeCurrentRunningSource(
   source: ControlCompatibilitySourceContext,
   providerIntakeState: ProviderIntakeState | undefined
 ): boolean {
-  const syntheticLinearFallbackOnly = isSyntheticLinearFallbackOnlySource(source);
   if (!providerIntakeState) {
     return (
-      (source.issueProvider !== null && !syntheticLinearFallbackOnly) ||
+      source.issueProvider !== null ||
       (hasExplicitCompatibilityIssueIdentity(source) && isFreshNullProviderRunningSource(source))
     );
   }
@@ -689,9 +683,6 @@ function isAuthoritativeCurrentRunningSource(
     );
   }
   if (!isProviderIntakeScopedRunningSource(source)) {
-    if (syntheticLinearFallbackOnly) {
-      return false;
-    }
     return true;
   }
   return claim !== null && isProviderIntakeClaimActiveCurrentActivity(claim);
@@ -781,36 +772,6 @@ function hasExplicitCompatibilityIssueIdentity(
     return true;
   }
   return false;
-}
-
-function isSyntheticLinearFallbackOnlySource(
-  source: Pick<
-    ControlCompatibilitySourceContext,
-    'issueProvider' | 'issueIdentifier' | 'issueId' | 'pipelineTitle' | 'providerLinearWorkerProof' | 'taskId' | 'runId'
-  >
-): boolean {
-  return (
-    hasSyntheticLinearFallbackProvenance(source) &&
-    isSyntheticLinearTaskId(source.taskId) &&
-    !hasExplicitCompatibilityIssueIdentity(source)
-  );
-}
-
-function isSyntheticLinearTaskId(taskId: string | null): boolean {
-  return taskId !== null && SYNTHETIC_LINEAR_TASK_ID_PATTERN.test(taskId);
-}
-
-function hasSyntheticLinearFallbackProvenance(
-  source: Pick<
-    ControlCompatibilitySourceContext,
-    'issueProvider' | 'pipelineTitle' | 'providerLinearWorkerProof'
-  >
-): boolean {
-  return (
-    source.issueProvider === 'linear' ||
-    source.pipelineTitle === PROVIDER_LINEAR_WORKER_PIPELINE_TITLE ||
-    source.providerLinearWorkerProof != null
-  );
 }
 
 function isFreshNullProviderRunningSource(
@@ -933,13 +894,7 @@ function buildCompatibilityTelemetrySources(snapshot: Pick<
   ControlCompatibilityRuntimeSnapshot,
   'selected' | 'running' | 'retrying'
 >): Array<NonNullable<ControlCompatibilityRuntimeSnapshot['selected']>> {
-  const issueIndex = buildCompatibilityIssueIndex({
-    selected: snapshot.selected,
-    running: snapshot.running,
-    retrying: snapshot.retrying,
-    dispatchPilot: null
-  });
-  return issueIndex.issues.flatMap((issue) => (issue.runningSource ? [issue.runningSource] : []));
+  return snapshot.running;
 }
 
 function computeCompatibilityRuntimeSeconds(
