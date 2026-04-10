@@ -33,7 +33,7 @@ describe('CLI exec runtime', () => {
         '-e',
         [
           "const { spawn } = require('node:child_process');",
-          "spawn(process.execPath, ['-e', \"setTimeout(() => { process.stdout.write('after\\\\n'); }, 20)\"], {",
+          "spawn(process.execPath, ['-e', \"setTimeout(() => { process.stdout.write('after\\\\n'); }, 150)\"], {",
           "  detached: true,",
           "  stdio: 'inherit'",
           '}).unref();',

@@ -27,7 +27,7 @@ const sessionManager = new ExecSessionManager<CliExecSessionHandle>({
 
 const privacyGuard = new PrivacyGuard({ mode: resolvePrivacyGuardMode() });
 const handleService = new RemoteExecHandleService({ guard: privacyGuard, now: () => new Date() });
-const POST_EXIT_STDIO_DRAIN_TIMEOUT_MS = 100;
+const POST_EXIT_STDIO_DRAIN_TIMEOUT_MS = 500;
 
 const cliExecutor: ExecCommandExecutor<CliExecSessionHandle> = async (request) => {
   const hasExplicitArgs = Array.isArray(request.args);
