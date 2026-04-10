@@ -469,16 +469,36 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     });
   });
 
-  it('loads the selected worker_host from provider worker env', async () => {
+  it('loads and normalizes the selected worker_host from provider worker env', async () => {
     const { manifestPath } = await createManifestRoot();
 
     const context = await loadProviderLinearWorkerContext({
       CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
       CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
-      CODEX_ORCHESTRATOR_PROVIDER_WORKER_HOST: 'worker-host-01'
+      CODEX_ORCHESTRATOR_PROVIDER_WORKER_HOST: '  worker-host-01  '
     });
 
     expect(context.workerHost).toBe('worker-host-01');
+  });
+
+  it('treats an empty worker_host env value as unset and falls back to the manifest host', async () => {
+    const { manifestPath } = await createManifestRoot();
+    await writeFile(manifestPath, JSON.stringify({
+      run_id: 'run-child',
+      task_id: 'linear-lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      workspace_path: tempRoot,
+      worker_host: 'worker-host-manifest'
+    }), 'utf8');
+
+    const context = await loadProviderLinearWorkerContext({
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+      CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+      CODEX_ORCHESTRATOR_PROVIDER_WORKER_HOST: '   '
+    });
+
+    expect(context.workerHost).toBe('worker-host-manifest');
   });
 
   it('loads provider worker max turns from CODEX_HOME config when env overrides are absent', async () => {

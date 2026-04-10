@@ -129,6 +129,8 @@ interface ProviderIssueRunRecord {
   startedAt: string | null;
   updatedAt: string | null;
   hasFreshWorkerHostContext: boolean;
+  workerHostProofAttemptStartedAt: string | null;
+  workerHostProofUpdatedAt: string | null;
   workerHost: string | null;
   residentSessionSeed: ProviderLinearResidentSessionSeed | null;
 }
@@ -148,14 +150,29 @@ interface ProviderLinearWorkerProofRecord {
 function resolveRehydratedActiveRunWorkerHost(
   run: ProviderIssueRunRecord,
   claim:
-    | Pick<ProviderIntakeClaimRecord, 'run_id' | 'run_manifest_path' | 'worker_host'>
+    | Pick<
+        ProviderIntakeClaimRecord,
+        'launch_started_at' | 'run_id' | 'run_manifest_path' | 'worker_host'
+      >
     | null
     | undefined
 ): string | null {
-  if (run.workerHost) {
+  const hasFreshWorkerHostContext =
+    run.hasFreshWorkerHostContext
+    && (
+      !claim?.launch_started_at
+      || isProviderLinearWorkerProofFreshForStage(
+        {
+          attempt_started_at: run.workerHostProofAttemptStartedAt,
+          updated_at: run.workerHostProofUpdatedAt
+        },
+        claim.launch_started_at
+      )
+    );
+  if (run.workerHost && hasFreshWorkerHostContext) {
     return run.workerHost;
   }
-  if (run.hasFreshWorkerHostContext) {
+  if (hasFreshWorkerHostContext) {
     return null;
   }
   const claimWorkerHost = normalizeProviderWorkerHostName(claim?.worker_host);
@@ -588,8 +605,11 @@ export function createProviderIssueHandoffService(
 
   const resolvePreferredStartWorkerHost = (input: {
     claimWorkerHost?: string | null;
-    previousRun?: Pick<ProviderIssueRunRecord, 'workerHost'> | null;
+    previousRun?: Pick<ProviderIssueRunRecord, 'hasFreshWorkerHostContext' | 'workerHost'> | null;
   }): string | null => {
+    if (input.previousRun?.hasFreshWorkerHostContext === true) {
+      return normalizeProviderWorkerHostName(input.previousRun.workerHost ?? null);
+    }
     return (
       normalizeProviderWorkerHostName(input.previousRun?.workerHost ?? null) ??
       normalizeProviderWorkerHostName(input.claimWorkerHost ?? null)
@@ -1516,12 +1536,14 @@ export function createProviderIssueHandoffService(
           preserveExistingDueAt: claim.retry_queued === true,
           delayType: 'failure'
         });
+        const workerHost = resolveRehydratedActiveRunWorkerHost(resumableRun, claim);
         publishRuntime ||= hasProviderClaimTransitioned(claim, {
           state: 'resumable',
           reason: 'provider_issue_rehydrated_resumable_run',
           task_id: resumableRun.taskId,
           run_id: resumableRun.runId,
           run_manifest_path: resumableRun.manifestPath,
+          worker_host: workerHost,
           ...queuedRetryFields
         });
         upsertProviderIntakeClaim(options.state, {
@@ -1533,6 +1555,7 @@ export function createProviderIssueHandoffService(
           reason: 'provider_issue_rehydrated_resumable_run',
           run_id: resumableRun.runId,
           run_manifest_path: resumableRun.manifestPath,
+          worker_host: workerHost,
           ...queuedRetryFields,
           updated_at: now
         });
@@ -2572,6 +2595,7 @@ export function createProviderIssueHandoffService(
           });
           return { kind: 'ignored', reason: 'provider_issue_release_cancel_inflight', claim };
         }
+        const workerHost = resolveRehydratedActiveRunWorkerHost(latestRun, latestExisting);
         const claim = await upsertProviderClaimAndPersist({
           ...latestClaimBase,
           task_id: latestRun.taskId,
@@ -2580,6 +2604,7 @@ export function createProviderIssueHandoffService(
           reason: 'provider_issue_rehydrated_resumable_run',
           run_id: latestRun.runId,
           run_manifest_path: latestRun.manifestPath,
+          worker_host: workerHost,
           ...buildQueuedProviderRetryFields({
             claim: latestRetryStateBase,
             previousRun: latestRun,
@@ -3180,6 +3205,7 @@ export function createProviderIssueHandoffService(
               error: resolveProviderRetryErrorFromRun(latestRun),
               delayType: 'failure'
             });
+            const workerHost = resolveRehydratedActiveRunWorkerHost(latestRun, currentClaim);
             const transitioned = hasProviderClaimTransitioned(currentClaim, {
               ...buildTrackedIssueClaimFields(resolution.trackedIssue),
               state: 'resumable',
@@ -3187,6 +3213,7 @@ export function createProviderIssueHandoffService(
               task_id: latestRun.taskId,
               run_id: latestRun.runId,
               run_manifest_path: latestRun.manifestPath,
+              worker_host: workerHost,
               ...queuedRetryFields
             });
             const refreshResumableSnapshot = captureProviderStateSnapshot();
@@ -3198,6 +3225,7 @@ export function createProviderIssueHandoffService(
               reason: 'provider_issue_rehydrated_resumable_run',
               run_id: latestRun.runId,
               run_manifest_path: latestRun.manifestPath,
+              worker_host: workerHost,
               ...queuedRetryFields
             });
             if (transitioned) {
@@ -3910,11 +3938,14 @@ export async function discoverProviderIssueRuns(
       const proof = await readBestEffortJsonFile<ProviderLinearWorkerProofRecord>(
         join(cliRoot, runEntry, PROVIDER_LINEAR_WORKER_PROOF_FILENAME)
       );
+      const proofRecord = (proof ?? null) as (ProviderLinearWorkerProofRecord & Record<string, unknown>) | null;
       const manifestStartedAt = readStringValue(manifest, 'started_at');
+      const workerHostProofAttemptStartedAt = readStringValue(proofRecord ?? {}, 'attempt_started_at');
+      const workerHostProofUpdatedAt = readStringValue(proofRecord ?? {}, 'updated_at');
       const hasFreshWorkerHostContext = Boolean(
-        proof
+        proofRecord
         && isProviderLinearWorkerProofFreshForStage(
-          proof as ProviderLinearWorkerProofRecord & Record<string, unknown>,
+          proofRecord,
           manifestStartedAt
         )
       );
@@ -3935,6 +3966,8 @@ export async function discoverProviderIssueRuns(
         startedAt: manifestStartedAt,
         updatedAt: resolveProviderIssueRunUpdatedAt(manifest, proof),
         hasFreshWorkerHostContext,
+        workerHostProofAttemptStartedAt,
+        workerHostProofUpdatedAt,
         workerHost: hasFreshWorkerHostContext
           ? normalizeProviderWorkerHostName(proof?.worker_host)
           : null,
@@ -4843,6 +4876,8 @@ function resolveProviderReleaseRun(
       startedAt: null,
       updatedAt: claim.updated_at,
       hasFreshWorkerHostContext: false,
+      workerHostProofAttemptStartedAt: null,
+      workerHostProofUpdatedAt: null,
       workerHost: claim.worker_host ?? null,
       residentSessionSeed: null
     };

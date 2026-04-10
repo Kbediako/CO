@@ -124,7 +124,8 @@ describe('controlHostCliShell manifest discovery', () => {
         CODEX_ORCHESTRATOR_OUT_DIR: '/repo/out',
         [REPO_CONFIG_PATH_ENV_KEY]:
           '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
-        [REPO_CONFIG_REQUIRED_ENV_KEY]: '1'
+        [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
+        [PROVIDER_WORKER_HOST_ENV_KEY]: ''
       },
       transport: {
         kind: 'local'
@@ -601,6 +602,7 @@ describe('controlHostCliShell manifest discovery', () => {
         CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
         [REPO_CONFIG_PATH_ENV_KEY]: join(tempRoot, 'codex.orchestrator.json'),
         [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
+        [PROVIDER_WORKER_HOST_ENV_KEY]: '',
         CO_LINEAR_WORKSPACE_ID: '',
         CO_LINEAR_TEAM_ID: '',
         CO_LINEAR_PROJECT_ID: ''
@@ -660,6 +662,7 @@ describe('controlHostCliShell manifest discovery', () => {
         CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
         [REPO_CONFIG_PATH_ENV_KEY]: join(tempRoot, 'codex.orchestrator.json'),
         [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
+        [PROVIDER_WORKER_HOST_ENV_KEY]: '',
         CO_LINEAR_WORKSPACE_ID: 'workspace-1',
         CO_LINEAR_TEAM_ID: '',
         CO_LINEAR_PROJECT_ID: 'project-1'
@@ -706,6 +709,7 @@ describe('controlHostCliShell manifest discovery', () => {
         CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
         [REPO_CONFIG_PATH_ENV_KEY]: join(tempRoot, 'codex.orchestrator.json'),
         [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
+        [PROVIDER_WORKER_HOST_ENV_KEY]: '',
         CO_LINEAR_WORKSPACE_ID: '',
         CO_LINEAR_TEAM_ID: '',
         CO_LINEAR_PROJECT_ID: ''
@@ -745,6 +749,7 @@ describe('controlHostCliShell manifest discovery', () => {
         CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
         [REPO_CONFIG_PATH_ENV_KEY]: join(tempRoot, 'codex.orchestrator.json'),
         [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
+        [PROVIDER_WORKER_HOST_ENV_KEY]: '',
         CO_LINEAR_WORKSPACE_ID: '',
         CO_LINEAR_TEAM_ID: '',
         CO_LINEAR_PROJECT_ID: ''
@@ -792,6 +797,7 @@ describe('controlHostCliShell manifest discovery', () => {
         CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
         [REPO_CONFIG_PATH_ENV_KEY]: join(tempRoot, 'codex.orchestrator.json'),
         [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
+        [PROVIDER_WORKER_HOST_ENV_KEY]: '',
         CO_LINEAR_WORKSPACE_ID: '',
         CO_LINEAR_TEAM_ID: '',
         CO_LINEAR_PROJECT_ID: ''
@@ -919,6 +925,7 @@ describe('controlHostCliShell manifest discovery', () => {
             'provider-workflow.last-known-good.json'
           ),
         [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
+        [PROVIDER_WORKER_HOST_ENV_KEY]: '',
         CO_LINEAR_WORKSPACE_ID: '',
         CO_LINEAR_TEAM_ID: '',
         CO_LINEAR_PROJECT_ID: ''
@@ -1004,7 +1011,7 @@ describe('controlHostCliShell manifest discovery', () => {
     expect(spec.transport).toEqual({
       kind: 'local'
     });
-    expect(spec.envOverrides).not.toHaveProperty(PROVIDER_WORKER_HOST_ENV_KEY);
+    expect(spec.envOverrides[PROVIDER_WORKER_HOST_ENV_KEY]).toBe('');
   });
 
   it('prefers the persisted claim worker_host when stale proof metadata is unavailable', async () => {
@@ -1078,6 +1085,92 @@ describe('controlHostCliShell manifest discovery', () => {
       'run-child',
       providerWorkflowConfigStore,
       'worker-host-01'
+    );
+
+    expect(spec.transport).toEqual({
+      kind: 'ssh',
+      host: {
+        name: 'worker-host-01',
+        transport: 'ssh',
+        ssh_destination: 'codex@worker-host-01',
+        ssh_options: [],
+        max_concurrent_agents: 1,
+        node_path: null
+      }
+    });
+    expect(spec.envOverrides[PROVIDER_WORKER_HOST_ENV_KEY]).toBe('worker-host-01');
+  });
+
+  it('keeps legacy proof updated_at freshness when attempt_started_at is absent', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'control-host-cli-shell-'));
+    await initializeRepo(tempRoot);
+    const env: EnvironmentPaths = {
+      repoRoot: tempRoot,
+      runsRoot: join(tempRoot, '.runs'),
+      outRoot: join(tempRoot, 'out'),
+      taskId: 'local-mcp'
+    };
+    const childPaths = resolveRunPaths(
+      {
+        ...env,
+        taskId: 'linear-lin-issue-1'
+      },
+      'run-child'
+    );
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        started_at: '2026-03-30T01:15:00.000Z',
+        workspace_path: join(tempRoot, '.workspaces', 'linear-lin-issue-1')
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        updated_at: '2026-03-30T01:16:00.000Z',
+        worker_host: 'worker-host-01'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(tempRoot, 'codex.orchestrator.json'),
+      JSON.stringify({
+        defaultPipeline: 'provider-linear-worker',
+        pipelines: [
+          {
+            id: 'provider-linear-worker',
+            title: 'Provider worker',
+            metadata: {
+              worker_hosts: {
+                hosts: [
+                  {
+                    name: 'worker-host-01',
+                    ssh_destination: 'codex@worker-host-01',
+                    max_concurrent_agents: 1
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }),
+      'utf8'
+    );
+    const providerWorkflowConfigStore = createProviderWorkflowConfigStore({
+      env,
+      runDir: join(tempRoot, '.runs', 'local-mcp', 'cli', 'control-host'),
+      pipelineId: 'provider-linear-worker'
+    });
+    await providerWorkflowConfigStore.bootstrap();
+
+    const spec = await resolveProviderResumeLaunchSpec(
+      env,
+      'run-child',
+      providerWorkflowConfigStore
     );
 
     expect(spec.transport).toEqual({

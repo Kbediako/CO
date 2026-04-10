@@ -786,8 +786,8 @@ function buildProviderLaunchSpec(
       CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
       [REPO_CONFIG_PATH_ENV_KEY]: repoConfigPath,
       [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
+      [PROVIDER_WORKER_HOST_ENV_KEY]: workerHost?.name ?? '',
       ...(workerHost ? { CODEX_ORCHESTRATOR_NODE_BIN: resolveRemoteProviderNodePath(workerHost) } : {}),
-      ...(workerHost ? { [PROVIDER_WORKER_HOST_ENV_KEY]: workerHost.name } : {})
     },
     transport: workerHost
       ? {
@@ -812,6 +812,7 @@ function shouldReleaseTrackedIssueClaim(reason: string): boolean {
 async function readProviderLinearLaunchContextFromProof(runDir: string): Promise<{
   sourceScope: ProviderLinearSourceScope | null;
   attemptStartedAt: string | null;
+  updatedAt: string | null;
   workerHost: string | null;
 } | null> {
   try {
@@ -826,6 +827,7 @@ async function readProviderLinearLaunchContextFromProof(runDir: string): Promise
 function parseProviderLinearLaunchContextFromProof(input: unknown): {
   sourceScope: ProviderLinearSourceScope | null;
   attemptStartedAt: string | null;
+  updatedAt: string | null;
   workerHost: string | null;
 } | null {
   if (!isRecord(input)) {
@@ -846,6 +848,7 @@ function parseProviderLinearLaunchContextFromProof(input: unknown): {
       : null,
     attemptStartedAt:
       typeof input.attempt_started_at === 'string' ? input.attempt_started_at : null,
+    updatedAt: typeof input.updated_at === 'string' ? input.updated_at : null,
     workerHost: normalizeProviderWorkerHostName(input.worker_host)
   };
 }
@@ -854,6 +857,7 @@ function resolveFreshProviderLaunchContextWorkerHost(
   context:
     | {
         attemptStartedAt: string | null;
+        updatedAt: string | null;
         workerHost: string | null;
       }
     | null
@@ -865,7 +869,8 @@ function resolveFreshProviderLaunchContextWorkerHost(
   }
   return isProviderLinearWorkerProofFreshForStage(
     {
-      attempt_started_at: context.attemptStartedAt
+      attempt_started_at: context.attemptStartedAt,
+      updated_at: context.updatedAt
     },
     manifestStartedAt ?? null
   )

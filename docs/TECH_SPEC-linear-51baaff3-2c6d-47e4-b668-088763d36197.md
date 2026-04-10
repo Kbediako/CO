@@ -78,8 +78,3 @@ last_review: 2026-04-09
   - SSH launch or resume spec construction
   - `worker_host` propagation into observability surfaces
 - full repo validation floor before review handoff
-
-## Approvals
-- Reviewer: `codex-orchestrator docs-review` child stream succeeded after the repo-supported `docs:archive-tasks` trim restored `docs/TASKS.md` to the 450-line budget
-- Date: 2026-04-09
-- Manifest: `.runs/linear-51baaff3-2c6d-47e4-b668-088763d36197-co-90-docs-review/cli/2026-04-09T08-47-13-195Z-773891e2/manifest.json`

@@ -10,6 +10,10 @@ jobs:
   core-lane:
     name: Core Lane
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
     steps:
       - name: Checkout (full history for diffs)
         uses: actions/checkout@v4
@@ -67,6 +71,23 @@ jobs:
           const fs = require('fs');
 
           async function main() {
+            async function fetchJsonWithTimeout(url, options = {}, timeoutMs = 10_000) {
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+              try {
+                const response = await fetch(url, {
+                  ...options,
+                  signal: controller.signal
+                });
+                if (!response.ok) {
+                  throw new Error(`${response.status} ${response.statusText}`);
+                }
+                return await response.json();
+              } finally {
+                clearTimeout(timeoutId);
+              }
+            }
+
             const labelName = process.env.DIFF_BUDGET_OVERRIDE_LABEL;
             const eventPath = process.env.GITHUB_EVENT_PATH;
             if (!labelName || !eventPath) {
@@ -85,17 +106,16 @@ jobs:
             const pullNumber = Number(pullRequest.number ?? 0);
             if (pullNumber > 0 && repository && token) {
               try {
-                const response = await fetch(`${apiBase}/repos/${repository}/issues/${pullNumber}`, {
-                  headers: {
-                    Authorization: `Bearer ${token}`,
-                    Accept: 'application/vnd.github+json',
-                    'User-Agent': 'co-core-lane-diff-budget-override'
+                pullRequest = await fetchJsonWithTimeout(
+                  `${apiBase}/repos/${repository}/issues/${pullNumber}`,
+                  {
+                    headers: {
+                      Authorization: `Bearer ${token}`,
+                      Accept: 'application/vnd.github+json',
+                      'User-Agent': 'co-core-lane-diff-budget-override'
+                    }
                   }
-                });
-                if (!response.ok) {
-                  throw new Error(`${response.status} ${response.statusText}`);
-                }
-                pullRequest = await response.json();
+                );
               } catch (error) {
                 const message = error instanceof Error ? error.message : String(error);
                 console.warn(

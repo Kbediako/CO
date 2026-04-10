@@ -717,11 +717,9 @@ export async function loadProviderLinearWorkerContext(
       Boolean(manifestProviderControlHostTaskId && manifestProviderControlHostRunId),
     providerControlHostMatchesManifest,
     workspacePath: normalizedManifestWorkspacePath ?? repoRoot,
-    workerHost: normalizeProviderWorkerHostName(
-      env[PROVIDER_WORKER_HOST_ENV_KEY] ??
-        manifest.worker_host ??
-        manifest.workerHost
-    ),
+    workerHost:
+      normalizeProviderWorkerHostName(env[PROVIDER_WORKER_HOST_ENV_KEY]) ??
+      normalizeProviderWorkerHostName(manifest.worker_host ?? manifest.workerHost),
     sourceSetup: resolveProviderLinearWorkerSourceSetup(env),
     issueId,
     issueIdentifier,
