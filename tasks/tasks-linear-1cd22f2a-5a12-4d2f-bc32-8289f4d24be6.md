@@ -17,7 +17,7 @@
 - [x] Exactly one same-turn parallelization decision was recorded as `stay_serial` / `review_or_validation_only`.
 - [x] The single Linear workpad comment has been recreated and refreshed for the new rework attempt.
 - [x] The unrelated repo blocker discovered during validation was filed as follow-up `CO-150` instead of widening CO-128 scope.
-- [ ] A fresh PR is attached before review handoff.
+- [x] A fresh PR is attached before review handoff. Evidence: PR `#432` (`https://github.com/Kbediako/CO/pull/432`).
 
 ## Investigation
 - [x] Establish the real fresh-branch status of the failing seam. The original CO-128 failure does not reproduce on current `origin/main`.
