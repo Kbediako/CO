@@ -1139,6 +1139,45 @@ describe('SelectedRunProjection', () => {
     expect(selected?.lookupAliases).not.toEqual(expect.arrayContaining(['CO-146', 'lin-issue-146']));
   });
 
+  it('does not mix a tracked issue id into a manifest with a different canonical identifier', async () => {
+    const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+    const { paths } = await createHostPaths(undefined, { taskId });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'control-host',
+        task_id: taskId,
+        issue_identifier: 'CO-146',
+        issue_provider: 'linear',
+        status: 'in_progress',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Manifest points at a different canonical issue.'
+      }),
+      'utf8'
+    );
+
+    const projectionContext = createProjectionContext(paths, undefined);
+    projectionContext.linearAdvisoryState = {
+      tracked_issue: {
+        id: 'lin-issue-999',
+        identifier: 'CO-999',
+        title: 'Tracked issue is stale.',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-03-20T01:15:28.970Z'
+      } as never
+    };
+
+    const selected = await createSelectedRunProjectionReader(projectionContext).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: 'CO-146',
+      issueId: taskId
+    });
+    expect(selected?.tracked).toBeNull();
+    expect(selected?.lookupAliases).not.toEqual(expect.arrayContaining(['CO-999', 'lin-issue-999']));
+  });
+
   it('prefers a matched provider claim over tracked issue state when fallback identity is rebound', async () => {
     const taskId = 'linear-lin-issue-1';
     const { paths } = await createHostPaths(undefined, { taskId, runId: 'provider-run-1' });

@@ -438,10 +438,15 @@ function resolveProjectionIssueIdentity(
     providerClaim?.issue_identifier ??
     (allowTrackedIssueFallbackIdentityRebinding ? trackedIssue?.identifier : null) ??
     snapshot.issueIdentifier;
+  const trackedIssueId =
+    allowTrackedIssueFallbackIdentityRebinding &&
+    trackedIssue?.identifier === issueIdentifier
+      ? trackedIssue.id
+      : null;
   const issueId =
     manifestIssueId ??
     providerClaim?.issue_id ??
-    (allowTrackedIssueFallbackIdentityRebinding ? trackedIssue?.id : null) ??
+    trackedIssueId ??
     snapshot.issueId;
 
   return {
