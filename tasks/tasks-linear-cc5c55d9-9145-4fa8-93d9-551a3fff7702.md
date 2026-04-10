@@ -22,6 +22,7 @@
 ## Implementation
 - [x] Add a repo-owned helper that preserves global identity inheritance by default and uses `git config --worktree` for explicit alternate identity only. Evidence: `scripts/worktree-git-identity.mjs`.
 - [x] Make the helper own the `extensions.worktreeConfig` precondition explicitly before any first `git config --worktree` identity write. Evidence: `scripts/worktree-git-identity.mjs`.
+- [x] Fail closed on invalid/non-repo worktree paths during the inherited-identity clear path while still treating "nothing to clear yet" as benign. Evidence: `scripts/worktree-git-identity.mjs`, `tests/worktree-git-identity.spec.ts`.
 - [x] Switch the linked-worktree archive automation workflow to the safe helper path. Evidence: `.github/workflows/archive-automation-base.yml`.
 - [x] Add focused regression coverage proving the shared repo git config file remains free of a repo-local `[user]` override after linked-worktree helper execution. Evidence: `tests/worktree-git-identity.spec.ts`.
 - [x] Record the exact verification path that proves the cloud/Codex-upgrade hypothesis is not the root cause of this bug. Evidence: `out/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702/manual/workpad.md`.
@@ -39,6 +40,7 @@
 - [x] `npm run docs:check`
 - [x] `npm run docs:freshness`
 - [x] `node scripts/diff-budget.mjs`
+- [x] The follow-up fix for the live Codex PR comment passed focused regression coverage in `tests/worktree-git-identity.spec.ts`.
 - [x] Manifest-backed standalone review was rerun on the final post-merge diff with `npm run review -- --base origin/main`, and the wrapper again terminated as `review_outcome: failed-boundary` / `termination_boundary.kind: command-intent` after a direct validation-runner launch. Evidence: `/Users/kbediako/Code/CO/.runs/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702/cli/2026-04-10T06-48-53-673Z-ff73033a/review/telemetry.json`.
 - [x] Manual fallback review of the final post-merge diff found no actionable CO-120 defects. Evidence: `out/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702/manual/20260410T100352Z-review-fallback.md`.
 - [x] Explicit elegance/minimality review kept the implementation at one helper, one workflow callsite swap, and one focused regression test file. Evidence: `out/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702/manual/20260410T100352Z-elegance-note.md`.
@@ -47,5 +49,5 @@
 - [x] Fresh PR attached to the issue. Evidence: `linear issue-context`, `https://github.com/Kbediako/CO/pull/416`.
 - [x] Latest `origin/main` merged into the branch before review-state transition. Evidence: `git fetch origin refs/heads/main:refs/remotes/origin/main`, `git merge --no-edit origin/main`.
 - [ ] PR checks green and `pr ready-review` drain clean before review-state transition.
-- [x] Unresolved actionable review threads: `0`. Evidence: `gh api graphql ... reviewThreads(first:100)`, `gh api 'repos/Kbediako/CO/pulls/416/comments?per_page=100'`, `gh api 'repos/Kbediako/CO/issues/416/comments?per_page=100'`.
+- [ ] Unresolved actionable review threads: `0` after the live Codex review comment on `scripts/worktree-git-identity.mjs` is pushed, replied to, and resolved.
 - [ ] Issue moved to `Human Review` or `In Review`.

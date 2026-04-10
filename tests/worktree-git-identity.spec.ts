@@ -205,6 +205,17 @@ describe('worktree-git-identity script', () => {
     expect(worktreeConfig).toBeNull();
   }, integrationTimeoutMs);
 
+  it('fails closed when the inherited-identity path points at an invalid worktree', async () => {
+    const sandboxRoot = await mkdtemp(join(tmpdir(), 'worktree-git-identity-invalid-'));
+    cleanupRoots.push(sandboxRoot);
+
+    const result = await runScript(['--worktree', join(sandboxRoot, 'missing-worktree')]);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('cannot change to');
+    expect(result.stdout).toBe('');
+  }, integrationTimeoutMs);
+
   it('fails when a required flag value is missing', async () => {
     const result = await runScript(['--worktree']);
 

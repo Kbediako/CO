@@ -110,11 +110,38 @@ function writeWorktreeConfig(worktree, key, value) {
   runGit(worktree, ['config', '--worktree', key, value]);
 }
 
+function formatGitError(error) {
+  if (error && typeof error === 'object') {
+    const stderr = typeof error.stderr === 'string' ? error.stderr.trim() : '';
+    if (stderr) {
+      return stderr;
+    }
+  }
+  return error instanceof Error ? error.message : String(error);
+}
+
+function isBenignWorktreeUnsetError(error) {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  if (error.status === 5) {
+    return true;
+  }
+
+  const stderr = typeof error.stderr === 'string' ? error.stderr : '';
+  return stderr.includes('extension worktreeConfig is enabled');
+}
+
 function unsetWorktreeConfig(worktree, key) {
   try {
     runGit(worktree, ['config', '--worktree', '--unset-all', key]);
     return true;
-  } catch {
+  } catch (error) {
+    if (isBenignWorktreeUnsetError(error)) {
+      return false;
+    }
+    fail(formatGitError(error));
     return false;
   }
 }
