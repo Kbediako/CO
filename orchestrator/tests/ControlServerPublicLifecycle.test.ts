@@ -18,7 +18,8 @@ import {
   runProviderIssueHandoffRefresh,
   runProviderIssueHandoffRehydrate,
   startControlServerPublicLifecycle,
-  type ControlServerPublicLifecycleState
+  type ControlServerPublicLifecycleState,
+  type ProviderIssueHandoffRefreshRequestOutcome
 } from '../src/cli/control/controlServerPublicLifecycle.js';
 import {
   readSharedLinearBudgetStatus,

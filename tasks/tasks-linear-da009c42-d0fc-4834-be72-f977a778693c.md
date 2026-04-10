@@ -20,7 +20,7 @@
 
 ## Implementation
 - [x] Return prompt accepted truth for queued/coalesced control-host refresh requests instead of waiting long enough to trigger repeated provider-worker timeouts. Evidence: `orchestrator/src/cli/control/controlServerPublicLifecycle.ts`, `orchestrator/src/cli/control/controlAuthenticatedRouteHandoff.ts`.
-- [x] Preserve explicit `provider_poll_lifecycle_stuck` / `restart_required` truth for actual unhealthy refresh lifecycles. Evidence: `orchestrator/src/cli/control/controlServerPublicLifecycle.ts`, `orchestrator/tests/ControlServerPublicLifecycle.test.ts`.
+- [x] Preserve explicit `provider_refresh_lifecycle_stuck` / `restart_required` truth for actual unhealthy refresh lifecycles. Evidence: `orchestrator/src/cli/control/controlServerPublicLifecycle.ts`, `orchestrator/tests/ControlServerPublicLifecycle.test.ts`.
 - [x] Keep the late-turn recovery path compatible with existing historical attached-PR disambiguation. Evidence: existing selector untouched in `orchestrator/src/cli/control/providerMergeCloseout.ts`, plus focused regression rerun `npm run test -- orchestrator/tests/ControlServerPublicLifecycle.test.ts orchestrator/tests/ProviderLinearWorkerRunner.test.ts orchestrator/tests/ProviderMergeCloseout.test.ts`.
 - [x] Add focused regressions for the archived timeout-heavy late-turn recovery shape. Evidence: `orchestrator/tests/ControlServerPublicLifecycle.test.ts`, plus focused regression rerun `npm run test -- orchestrator/tests/ControlServerPublicLifecycle.test.ts orchestrator/tests/ProviderLinearWorkerRunner.test.ts orchestrator/tests/ProviderMergeCloseout.test.ts`.
 
@@ -35,12 +35,12 @@
 - [x] `npm run docs:check`. Evidence: `✅ docs:check: OK` on 2026-04-10.
 - [x] `npm run docs:freshness` or a truthful repo-baseline fallback note. Evidence: `npm run docs:freshness` failed only on the unrelated repo baseline (`stale docs: 119`; Task Packet stale=85, Task Mirror stale=17, Report Only stale=17) and no CO-119 packet path was reported as missing or malformed.
 - [x] `node scripts/diff-budget.mjs`. Evidence: `✅ Diff budget: OK (scope=working-tree, files=12/25, lines=750/1200, +726/-24)`.
-- [x] Manifest-backed standalone review plus explicit elegance review before any review handoff. Evidence: wrapper review at `../../.runs/linear-da009c42-d0fc-4834-be72-f977a778693c/cli/2026-04-10T05-26-33-984Z-941f68b3/review/telemetry.json` reported `status=failed` / `review_outcome=failed-boundary` with `termination_boundary.kind=startup-anchor`; manual fallback review of `controlAuthenticatedRouteHandoff.ts`, `controlServerPublicLifecycle.ts`, `ControlAuthenticatedRouteHandoff.test.ts`, `ControlServerPublicLifecycle.test.ts`, and `ProviderLinearWorkerRunner.test.ts` found no additional correctness/regression gaps, and the explicit elegance pass kept the solution at one acknowledgement helper plus one test-only `CODEX_HOME` isolation line.
+- [x] Manifest-backed standalone review plus explicit elegance review before any review handoff. Evidence: wrapper review at `.runs/linear-da009c42-d0fc-4834-be72-f977a778693c/cli/2026-04-10T05-26-33-984Z-941f68b3/review/telemetry.json` reported `status=failed` / `review_outcome=failed-boundary` with `termination_boundary.kind=startup-anchor`; manual fallback review of `controlAuthenticatedRouteHandoff.ts`, `controlServerPublicLifecycle.ts`, `ControlAuthenticatedRouteHandoff.test.ts`, `ControlServerPublicLifecycle.test.ts`, and `ProviderLinearWorkerRunner.test.ts` found no additional correctness/regression gaps, and the explicit elegance pass kept the solution at one acknowledgement helper plus one test-only `CODEX_HOME` isolation line.
 - [x] `npm run pack:smoke` if the final diff touches downstream-facing CLI/runtime surfaces. Evidence: `✅ pack smoke passed` on 2026-04-10.
 
 ## Handoff
 - [ ] PR attached to the issue.
-- [ ] Latest `origin/main` merged into the branch before review-state transition.
+- [x] Latest `origin/main` merged into the branch before review-state transition.
 - [ ] PR checks green and `pr ready-review` drain clean before review-state transition.
 - [ ] Unresolved actionable review threads: `0` (or explicit waiver plus evidence recorded here before handoff).
 - [ ] Issue moved to `Human Review` or `In Review`.

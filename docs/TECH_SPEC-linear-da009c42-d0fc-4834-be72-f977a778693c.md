@@ -42,7 +42,7 @@ last_review: 2026-04-10
 - Functional requirements:
   - repeated late-turn refresh requests from `provider-linear-worker` must not time out merely because the control-host already has matching refresh work queued or running
   - the control-host refresh/public lifecycle must return a prompt accepted result for queued/coalesced work while preserving enough metadata for auditability
-  - genuinely stuck control-host lifecycles must still expose `provider_poll_lifecycle_stuck` / `restart_required` truth
+  - genuinely stuck control-host lifecycles must still expose `provider_refresh_lifecycle_stuck` / `restart_required` truth
   - provider-worker claim recovery must continue to the truthful next state once the active PR and issue state are actually ready
   - historical attached PRs must remain disambiguated on the existing bounded path rather than poisoning the recovered flow
   - focused tests must cover queued/coalesced acceptance, explicit stuck truth, and the archived late-turn recovery shape
@@ -87,5 +87,5 @@ last_review: 2026-04-10
 - Resolved 2026-04-09: the bounded fix should target prompt accepted responses for queued/coalesced refresh work, not a generic timeout increase.
 
 ## Approvals
-- Reviewer: `codex-orchestrator docs-review (clean-success)` at `.runs/linear-da009c42-d0fc-4834-be72-f977a778693c-co-119-docs-review/cli/2026-04-09T08-34-19-507Z-042c1cf5/manifest.json`; the review surfaced one concrete packet issue and it was resolved before implementation by switching archived `CO-102` evidence references from workspace-relative `.runs/...` paths to the canonical `/Users/kbediako/Code/CO/.runs/...` paths
+- Reviewer: `codex-orchestrator docs-review (repo docs:freshness baseline; manual fallback accepted)` at `.runs/linear-da009c42-d0fc-4834-be72-f977a778693c-docs-review/cli/2026-04-10T06-30-27-538Z-4c8a90d9/manifest.json`; the rerun passed delegation guard, `spec-guard --dry-run`, and `docs:check`, then failed only on the unrelated repo-wide `docs:freshness` baseline (`stale docs: 119`), so the CO-119 packet was accepted as truthful manual fallback rather than treated as a packet-shape defect.
 - Date: 2026-04-10
