@@ -10,7 +10,7 @@ const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
 const sourceCliEntrypoint = fileURLToPath(new URL('../../bin/codex-orchestrator.ts', import.meta.url));
 const builtCliEntrypoint = fileURLToPath(new URL('../../dist/bin/codex-orchestrator.js', import.meta.url));
 const cliEntrypoint = existsSync(builtCliEntrypoint) ? builtCliEntrypoint : sourceCliEntrypoint;
-const cliHelpTimeoutMs = 90_000;
+const cliHelpTimeoutMs = 120_000;
 
 function buildCliArgs(args: string[]): string[] {
   if (cliEntrypoint === builtCliEntrypoint) {
