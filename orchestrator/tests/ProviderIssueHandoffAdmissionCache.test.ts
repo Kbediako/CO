@@ -117,7 +117,7 @@ function createTrackedIssue() {
 }
 
 describe('createProviderIssueHandoffService admission cache', () => {
-  it('reuses one run-tree discovery snapshot for direct webhook admission and capacity gating', async () => {
+  it('reuses one run-tree discovery snapshot per direct webhook admission phase', async () => {
     const { createProviderIssueHandoffService } = await import(
       '../src/cli/control/providerIssueHandoff.js'
     );
@@ -146,7 +146,167 @@ describe('createProviderIssueHandoffService admission cache', () => {
     expect(launcher.start).toHaveBeenCalledTimes(1);
     expect(
       readdirSpy.mock.calls.filter(([path]) => path === runsRoot).length
-    ).toBe(1);
+    ).toBe(2);
+  });
+
+  it('refreshes direct webhook admission discovery after waiting for the refresh lifecycle lock', async () => {
+    const { mkdir, writeFile } = await import('node:fs/promises');
+    const { createProviderIssueHandoffService } = await import(
+      '../src/cli/control/providerIssueHandoff.js'
+    );
+    const { resolveRunPaths } = await import('../src/cli/run/runPaths.js');
+    const { root, paths } = await createHostPaths();
+    const runsRoot = join(root, '.runs');
+    const state = createProviderIntakeState();
+
+    let persistCallCount = 0;
+    let releaseBlockedPersist: (() => void) | null = null;
+    const persist = vi.fn(async () => {
+      persistCallCount += 1;
+      if (persistCallCount !== 1) {
+        return;
+      }
+      await new Promise<void>((resolve) => {
+        releaseBlockedPersist = resolve;
+      });
+    });
+
+    let resolveFirstStart: ((value: { runId: string; manifestPath: string }) => void) | null = null;
+    const launcher = {
+      start: vi.fn(async ({ issueId }: { issueId: string }) => {
+        if (issueId === 'lin-issue-first') {
+          return await new Promise<{ runId: string; manifestPath: string }>((resolve) => {
+            resolveFirstStart = resolve;
+          });
+        }
+        return {
+          runId: 'run-second',
+          manifestPath: '/tmp/provider-run/second.json'
+        };
+      }),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 2
+        }
+      })
+    });
+
+    const firstPromise = service.handleAcceptedTrackedIssue({
+      trackedIssue: {
+        ...createTrackedIssue(),
+        id: 'lin-issue-first',
+        identifier: 'CO-1',
+        updated_at: '2026-03-19T04:32:00.000Z'
+      },
+      deliveryId: 'delivery-first',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_320_000
+    });
+
+    await vi.waitFor(() => {
+      expect(persist).toHaveBeenCalledTimes(1);
+      expect(
+        state.claims.some(
+          (claim) =>
+            claim.provider_key === 'linear:lin-issue-first' && claim.state === 'starting'
+        )
+      ).toBe(true);
+    });
+
+    const baselineRunDiscoveryCalls = readdirSpy.mock.calls.filter(
+      ([path]) => path === runsRoot
+    ).length;
+
+    const secondPromise = service.handleAcceptedTrackedIssue({
+      trackedIssue: {
+        ...createTrackedIssue(),
+        id: 'lin-issue-second',
+        identifier: 'CO-2',
+        updated_at: '2026-03-19T04:32:01.000Z'
+      },
+      deliveryId: 'delivery-second',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_321_000
+    });
+
+    await vi.waitFor(() => {
+      expect(
+        readdirSpy.mock.calls.filter(([path]) => path === runsRoot).length
+      ).toBeGreaterThanOrEqual(baselineRunDiscoveryCalls + 1);
+    });
+
+    const foreignEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-foreign-active'
+    };
+    const foreignPaths = resolveRunPaths(foreignEnv, 'run-foreign-active');
+    await mkdir(foreignPaths.runDir, { recursive: true });
+    await writeFile(
+      foreignPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-foreign-active',
+        task_id: 'task-foreign-active',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-foreign',
+        issue_identifier: 'CO-9',
+        updated_at: '2026-03-19T04:32:02.000Z'
+      }),
+      'utf8'
+    );
+
+    if (!releaseBlockedPersist) {
+      throw new Error('Expected the first persist to be blocked.');
+    }
+    releaseBlockedPersist();
+
+    const secondResult = await secondPromise;
+    expect(secondResult).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_start_blocked:max_concurrency',
+      claim: {
+        provider_key: 'linear:lin-issue-second',
+        state: 'accepted',
+        reason: 'provider_issue_start_blocked:max_concurrency'
+      }
+    });
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(
+      readdirSpy.mock.calls.filter(([path]) => path === runsRoot).length
+    ).toBeGreaterThanOrEqual(baselineRunDiscoveryCalls + 2);
+
+    if (!resolveFirstStart) {
+      throw new Error('Expected the first launch to be pending.');
+    }
+    resolveFirstStart({
+      runId: 'run-first',
+      manifestPath: '/tmp/provider-run/first.json'
+    });
+
+    await expect(firstPromise).resolves.toMatchObject({
+      kind: 'start',
+      reason: 'provider_issue_start_launched',
+      claim: {
+        provider_key: 'linear:lin-issue-first',
+        state: 'starting',
+        run_id: 'run-first',
+        run_manifest_path: '/tmp/provider-run/first.json'
+      }
+    });
+    expect(launcher.resume).not.toHaveBeenCalled();
   });
 
   it('starts deferred best-effort rehydrate retries with a fresh run-tree discovery snapshot', async () => {

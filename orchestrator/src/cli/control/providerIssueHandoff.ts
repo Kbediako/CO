@@ -2597,7 +2597,20 @@ export function createProviderIssueHandoffService(
               inflightClaim: ProviderIntakeClaimRecord;
               launchToken: string;
             }
-        > => {
+        > =>
+          await runWithFreshProviderIssueRunDiscoveryCache(async (): Promise<
+            | { kind: 'retry' }
+            | { kind: 'settled'; result: ProviderIssueHandoffResult }
+            | {
+                kind: 'launch';
+                latestExisting: ProviderIntakeClaimRecord | null;
+                latestRun: ProviderIssueRunRecord | null;
+                latestClaimBase: typeof latestClaimBase;
+                latestRetryStateBase: typeof latestRetryStateBase;
+                inflightClaim: ProviderIntakeClaimRecord;
+                launchToken: string;
+              }
+          > => {
           const lockedDiscoveredRuns = await discoverProviderIssueRunsForCurrentOperation({
             provider: 'linear',
             issueId: input.trackedIssue.id
@@ -2752,7 +2765,7 @@ export function createProviderIssueHandoffService(
             inflightClaim,
             launchToken
           };
-        }
+          })
       );
       if (admissionReservation.kind === 'retry') {
         resetProviderIssueRunDiscoveryCache();
