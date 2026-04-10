@@ -1235,6 +1235,11 @@ describe('SelectedRunProjection', () => {
     expect(selected?.lookupAliases).not.toEqual(expect.arrayContaining(['CO-146', 'lin-issue-146']));
     expect(selected?.compatibilityState).toBe('Human Review');
     expect(selected?.tracked).toBeNull();
+    expect(selected?.providerDebugSnapshot?.live_linear_state).toEqual({
+      state: null,
+      state_type: null,
+      updated_at: null
+    });
   });
 
   it('rebinds fallback-only parent provider-worker task ids from a canonical claim when only task_id matches', async () => {
@@ -1461,6 +1466,65 @@ describe('SelectedRunProjection', () => {
         updated_at: '2026-03-20T01:15:28.970Z',
         summary: 'Child docs review run is active.'
       }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Parent issue claim',
+      task_id: parentTaskId,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: null,
+      run_manifest_path: null
+    };
+
+    const selected = await createProjectionReader(
+      paths,
+      paths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: 'CO-2',
+      issueId: 'lin-issue-1',
+      taskId: childTaskId,
+      runId: 'run-child'
+    });
+    expect(selected?.lookupAliases).toEqual(
+      expect.arrayContaining(['CO-2', 'lin-issue-1', childTaskId, 'run-child'])
+    );
+  });
+
+  it('rebinds fallback-only synthetic child task ids when only provider-worker proof proves provenance', async () => {
+    const parentTaskId = 'linear-lin-issue-1';
+    const childTaskId = `${parentTaskId}-docs-review`;
+    const { root, paths } = await createHostPaths(undefined, { taskId: childTaskId, runId: 'run-child' });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: childTaskId,
+        pipeline_id: 'docs-review',
+        status: 'in_progress',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Proof-backed child docs review run is active.'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(paths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(
+        buildProviderLinearWorkerProof({
+          owner_phase: 'turn_running',
+          owner_status: 'in_progress',
+          workspace_path: root,
+          updated_at: '2026-03-20T01:15:29.970Z'
+        })
+      ),
       'utf8'
     );
 
@@ -2114,6 +2178,117 @@ describe('SelectedRunProjection', () => {
       event: 'pending_shared_root_reconciliation',
       message:
         'Merged attached PR #82; shared-root reconciliation is pending (shared_root_dirty) before the Linear issue can transition to Done.',
+      reason: 'shared_root_dirty'
+    });
+  });
+
+  it('keeps stale pending shared-root reconciliation visible when a mismatched tracked issue is already terminal', async () => {
+    const taskId = 'linear-lin-issue-1';
+    const { paths } = await createHostPaths(undefined, { taskId, runId: 'run-stale-shared-root-pending' });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-stale-shared-root-pending',
+        task_id: taskId,
+        status: 'succeeded',
+        issue_provider: 'linear',
+        updated_at: '2026-04-05T06:50:15.000Z',
+        summary: 'Completed successfully'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      task_id: taskId,
+      run_id: null,
+      run_manifest_path: null,
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-05T06:50:30.000Z',
+      state: 'stale',
+      reason: 'provider_issue_stale',
+      merge_closeout: {
+        recorded_at: '2026-04-05T06:50:30.000Z',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-05T06:50:30.000Z',
+        status: 'action_required',
+        reason: 'pending_shared_root_reconciliation',
+        summary: 'Merged attached PR #82; shared-root reconciliation is pending (shared_root_dirty) before the Linear issue can transition to Done.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/82'],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/82',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 82
+        },
+        snapshot: {
+          state: 'MERGED',
+          review_decision: 'APPROVED',
+          merge_state_status: 'UNKNOWN',
+          ready_to_merge: false,
+          gate_reasons: ['state=MERGED'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 0,
+          checks_failed: 0,
+          required_checks_pending: 0,
+          required_checks_failed: 0,
+          updated_at: '2026-04-05T06:50:30.000Z',
+          merged_at: null,
+          head_oid: 'head-oid-82'
+        },
+        merge_attempt: null,
+        shared_root: {
+          status: 'skipped',
+          reason: 'shared_root_dirty',
+          before_status: '## main...origin/main\\n M tasks/index.json',
+          after_status: '## main...origin/main\\n M tasks/index.json'
+        },
+        linear_transition: null
+      }
+    };
+
+    const projectionContext = createProjectionContext(paths, providerIntakeState);
+    projectionContext.linearAdvisoryState = {
+      tracked_issue: {
+        id: 'lin-issue-99',
+        identifier: 'CO-99',
+        title: 'Different issue is already done.',
+        state: 'Done',
+        state_type: 'completed',
+        updated_at: '2026-04-05T06:51:00.000Z'
+      } as never
+    };
+
+    const selected = await createSelectedRunProjectionReader(projectionContext).buildSelectedRunContext();
+
+    expect(selected?.providerDebugSnapshot).toMatchObject({
+      live_linear_state: {
+        state: null,
+        state_type: null,
+        updated_at: null
+      },
+      claim: {
+        freshness: 'stale'
+      },
+      progress: {
+        phase: 'pending_shared_root_reconciliation',
+        kind: 'merge_closeout',
+        status: 'stalled',
+        stall_reason: 'shared_root_dirty'
+      }
+    });
+    expect(selected?.displayStatus).toBe('pending_shared_root_reconciliation');
+    expect(selected?.statusReason).toBe('shared_root_dirty');
+    expect(selected?.latestEvent).toMatchObject({
+      event: 'pending_shared_root_reconciliation',
       reason: 'shared_root_dirty'
     });
   });

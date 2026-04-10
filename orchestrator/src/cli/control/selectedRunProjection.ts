@@ -113,6 +113,14 @@ interface ProjectionContextParts {
   providerLinearWorkerProof: ProviderLinearWorkerProof | null;
 }
 
+interface SelectedRunProviderClaimMatchSource
+  extends Pick<
+    SelectedRunManifestSnapshot,
+    'issueId' | 'issueIdentifier' | 'issueProvider' | 'manifestPath' | 'manifestRecord' | 'runId' | 'taskId'
+  > {
+  providerLinearWorkerProof: ProviderLinearWorkerProof | null;
+}
+
 interface ResolvedCompatibilityState {
   state: string | null;
   stateType: string | null;
@@ -235,7 +243,11 @@ async function buildSelectedRunContextFromSnapshot(
     resolveProjectionContextParts(context, snapshot),
     resolveControlWorkspacePath(context)
   ]);
-  const providerClaim = findMatchingProviderIntakeClaim(context.providerIntakeState, snapshot);
+  const providerClaim = findMatchingProviderIntakeClaim(
+    context.providerIntakeState,
+    snapshot,
+    parts.providerLinearWorkerProof
+  );
   return buildProjectionContextFromParts(
     snapshot,
     parts,
@@ -254,7 +266,11 @@ async function buildCompatibilitySourceContextFromSnapshot(
     resolveProjectionContextParts(context, snapshot),
     resolveControlWorkspacePath(context)
   ]);
-  const providerClaim = findMatchingProviderIntakeClaim(context.providerIntakeState, snapshot);
+  const providerClaim = findMatchingProviderIntakeClaim(
+    context.providerIntakeState,
+    snapshot,
+    parts.providerLinearWorkerProof
+  );
   return buildProjectionContextFromParts(
     snapshot,
     parts,
@@ -289,6 +305,12 @@ function buildProjectionContextFromParts(
     providerClaim,
     allowTrackedIssueFallbackIdentityRebinding
   );
+  const matchedTrackedIssue = resolveProjectionTrackedIssue(parts.trackedIssue, {
+    issueIdentifier,
+    issueId,
+    taskId,
+    runId
+  });
   const control = parts.control;
   const manifestRawStatus = readStringValue(manifestRecord, 'status') ?? 'unknown';
   const startedAt = readStringValue(manifestRecord, 'started_at', 'startedAt') ?? null;
@@ -333,7 +355,7 @@ function buildProjectionContextFromParts(
         })
       : null;
   const providerDebugSnapshot = buildProviderIssueDebugSnapshot({
-    tracked_issue: parts.trackedIssue,
+    tracked_issue: matchedTrackedIssue,
     claim: providerClaim,
     proof: proofIsFreshForStage ? parts.providerLinearWorkerProof : null,
     rehydrated_at: providerIntakeState?.rehydrated_at ?? null
@@ -341,7 +363,7 @@ function buildProjectionContextFromParts(
   const terminalMergeCloseoutProgress = resolveTerminalMergeCloseoutProgress({
     rawStatus,
     providerDebugSnapshot,
-    trackedIssue: parts.trackedIssue
+    trackedIssue: matchedTrackedIssue
   });
   const summary = resolveSelectedRunDisplaySummary({
     manifestRecord,
@@ -357,12 +379,6 @@ function buildProjectionContextFromParts(
   });
   const questionSummary = buildSelectedRunQuestionSummary(parts.questions);
   const latestAction = control.latest_action?.action ?? null;
-  const matchedTrackedIssue = resolveProjectionTrackedIssue(parts.trackedIssue, {
-    issueIdentifier,
-    issueId,
-    taskId,
-    runId
-  });
   const compatibilityState = resolveCompatibilityState(
     providerClaim?.reason === 'provider_issue_rehydrated_active_run' ? null : matchedTrackedIssue,
     providerClaim
@@ -1105,6 +1121,7 @@ async function readTaskCompatibilityContexts(
     const advisoryState = await readJsonFile<LinearAdvisoryStateSnapshot>(
       join(runDir, LINEAR_ADVISORY_STATE_FILE)
     );
+    const providerLinearWorkerProof = await readProviderLinearWorkerProofForProjection(runDir);
 
     const context = buildProjectionContextFromParts(
       snapshot,
@@ -1113,11 +1130,11 @@ async function readTaskCompatibilityContexts(
         questions: Array.isArray(questionSnapshot?.questions) ? questionSnapshot.questions : [],
         runDir,
         trackedIssue: advisoryState?.tracked_issue ?? null,
-        providerLinearWorkerProof: await readProviderLinearWorkerProofForProjection(runDir)
+        providerLinearWorkerProof
       },
       resolveRunsRootFromRunDir(runDir),
       options.controlWorkspacePath ?? resolveSafeLegacyWorkspacePathFromRunDir(runDir),
-      findMatchingProviderIntakeClaim(options.providerIntakeState, snapshot),
+      findMatchingProviderIntakeClaim(options.providerIntakeState, snapshot, providerLinearWorkerProof),
       options.providerIntakeState ?? null
     );
     if (context) {
@@ -1199,24 +1216,26 @@ function isManifestRetryFallbackCandidate(manifestRecord: Record<string, unknown
 
 function findMatchingProviderIntakeClaim(
   state: ProviderIntakeState | null | undefined,
-  snapshot: SelectedRunManifestSnapshot | null
+  snapshot: SelectedRunManifestSnapshot | null,
+  providerLinearWorkerProof: ProviderLinearWorkerProof | null = null
 ): ProviderIntakeClaimRecord | null {
   if (!state || !snapshot) {
     return null;
   }
-  const issueScopedClaim = findIssueScopedProviderIntakeClaim(state, snapshot);
+  const claimMatchSource = buildSelectedRunProviderClaimMatchSource(snapshot, providerLinearWorkerProof);
+  const issueScopedClaim = findIssueScopedProviderIntakeClaim(state, claimMatchSource);
   if (issueScopedClaim) {
-    return providerIntakeClaimCanFallbackByIssue(issueScopedClaim, snapshot) ? issueScopedClaim : null;
+    return providerIntakeClaimCanFallbackByIssue(issueScopedClaim, claimMatchSource) ? issueScopedClaim : null;
   }
   const matchedClaims = state.claims
-    .filter((claim) => providerIntakeClaimMatchesSelectedRun(claim, snapshot))
-    .sort((left, right) => compareProviderIntakeClaimSpecificity(right, left, snapshot));
+    .filter((claim) => providerIntakeClaimMatchesSelectedRun(claim, claimMatchSource))
+    .sort((left, right) => compareProviderIntakeClaimSpecificity(right, left, claimMatchSource));
   return matchedClaims[0] ?? null;
 }
 
 function findIssueScopedProviderIntakeClaim(
   state: ProviderIntakeState,
-  snapshot: SelectedRunManifestSnapshot
+  snapshot: SelectedRunProviderClaimMatchSource
 ): ProviderIntakeClaimRecord | null {
   if (snapshot.issueId) {
     const byIssueId = readProviderIntakeClaim(state, buildProviderIssueKey('linear', snapshot.issueId));
@@ -1232,10 +1251,7 @@ function providerIntakeClaimMatchesSelectedRun(
     ProviderIntakeClaimRecord,
     'issue_id' | 'issue_identifier' | 'run_manifest_path' | 'run_id' | 'task_id'
   >,
-  snapshot: Pick<
-    SelectedRunManifestSnapshot,
-    'issueId' | 'issueIdentifier' | 'issueProvider' | 'manifestPath' | 'manifestRecord' | 'runId' | 'taskId'
-  >
+  snapshot: SelectedRunProviderClaimMatchSource
 ): boolean {
   if (claim.run_manifest_path && claim.run_manifest_path === snapshot.manifestPath) {
     return true;
@@ -1264,10 +1280,7 @@ function compareProviderIntakeClaimSpecificity(
     ProviderIntakeClaimRecord,
     'issue_id' | 'issue_identifier' | 'run_manifest_path' | 'run_id' | 'task_id'
   >,
-  snapshot: Pick<
-    SelectedRunManifestSnapshot,
-    'issueId' | 'issueIdentifier' | 'issueProvider' | 'manifestPath' | 'manifestRecord' | 'runId' | 'taskId'
-  >
+  snapshot: SelectedRunProviderClaimMatchSource
 ): number {
   const leftPriority = scoreProviderIntakeClaimSpecificity(left, snapshot);
   const rightPriority = scoreProviderIntakeClaimSpecificity(right, snapshot);
@@ -1287,10 +1300,7 @@ function scoreProviderIntakeClaimSpecificity(
     ProviderIntakeClaimRecord,
     'issue_id' | 'issue_identifier' | 'run_manifest_path' | 'run_id' | 'task_id'
   >,
-  snapshot: Pick<
-    SelectedRunManifestSnapshot,
-    'issueId' | 'issueIdentifier' | 'issueProvider' | 'manifestPath' | 'manifestRecord' | 'runId' | 'taskId'
-  >
+  snapshot: SelectedRunProviderClaimMatchSource
 ): number {
   if (claim.run_manifest_path && claim.run_manifest_path === snapshot.manifestPath) {
     return 4;
@@ -1312,10 +1322,7 @@ function providerIntakeClaimCanFallbackByIssue(
     ProviderIntakeClaimRecord,
     'issue_id' | 'issue_identifier' | 'run_manifest_path' | 'run_id' | 'task_id'
   >,
-  snapshot: Pick<
-    SelectedRunManifestSnapshot,
-    'issueId' | 'issueIdentifier' | 'issueProvider' | 'manifestPath' | 'manifestRecord' | 'runId' | 'taskId'
-  >
+  snapshot: SelectedRunProviderClaimMatchSource
 ): boolean {
   return (
     providerIntakeClaimMatchesSelectedRun(claim, snapshot) ||
@@ -1335,20 +1342,12 @@ function providerIntakeClaimMatchesIssueIdentity(
 
 function providerIntakeClaimMatchesSyntheticFallbackTaskBinding(
   claim: Pick<ProviderIntakeClaimRecord, 'issue_id' | 'task_id'>,
-  snapshot: Pick<
-    SelectedRunManifestSnapshot,
-    'issueId' | 'issueIdentifier' | 'issueProvider' | 'manifestRecord' | 'taskId' | 'runId'
-  >
+  snapshot: SelectedRunProviderClaimMatchSource
 ): boolean {
   if (!claim.task_id || !snapshot.taskId) {
     return false;
   }
-  const pipelineTitle =
-    readStringValue(snapshot.manifestRecord, 'pipeline_title', 'pipelineTitle') ?? null;
-  const hasLinearProviderWorkerProvenance =
-    snapshot.issueProvider === 'linear' ||
-    pipelineTitle === PROVIDER_LINEAR_WORKER_PIPELINE_TITLE;
-  if (!hasLinearProviderWorkerProvenance) {
+  if (!hasLinearProviderWorkerProjectionProvenance(snapshot, snapshot.providerLinearWorkerProof)) {
     return false;
   }
   if (claim.task_id !== buildProviderFallbackTaskId({ id: claim.issue_id })) {
@@ -1368,6 +1367,35 @@ function providerIntakeClaimMatchesSyntheticFallbackTaskBinding(
 
 function isProviderLinearChildPipelineId(pipelineId: string | null): boolean {
   return pipelineId !== null && PROVIDER_LINEAR_CHILD_PIPELINE_IDS.has(pipelineId);
+}
+
+function hasLinearProviderWorkerProjectionProvenance(
+  snapshot: Pick<SelectedRunManifestSnapshot, 'issueProvider' | 'manifestRecord'>,
+  providerLinearWorkerProof: ProviderLinearWorkerProof | null
+): boolean {
+  const pipelineTitle =
+    readStringValue(snapshot.manifestRecord, 'pipeline_title', 'pipelineTitle') ?? null;
+  return (
+    snapshot.issueProvider === 'linear' ||
+    pipelineTitle === PROVIDER_LINEAR_WORKER_PIPELINE_TITLE ||
+    providerLinearWorkerProof != null
+  );
+}
+
+function buildSelectedRunProviderClaimMatchSource(
+  snapshot: SelectedRunManifestSnapshot,
+  providerLinearWorkerProof: ProviderLinearWorkerProof | null
+): SelectedRunProviderClaimMatchSource {
+  return {
+    issueId: snapshot.issueId,
+    issueIdentifier: snapshot.issueIdentifier,
+    issueProvider: snapshot.issueProvider,
+    manifestPath: snapshot.manifestPath,
+    manifestRecord: snapshot.manifestRecord,
+    runId: snapshot.runId,
+    taskId: snapshot.taskId,
+    providerLinearWorkerProof
+  };
 }
 
 function hasAuthoritativeProjectionIssueIdentity(
