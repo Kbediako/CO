@@ -38,16 +38,16 @@
 - [x] `MCP_RUNNER_TASK_ID=linear-d19bd14e-0604-456d-9a45-e65b898cf7a2 node scripts/spec-guard.mjs --dry-run`. Evidence: terminal output `Spec guard: OK`.
 - [x] `MCP_RUNNER_TASK_ID=linear-d19bd14e-0604-456d-9a45-e65b898cf7a2 npm run build`. Evidence: successful build completion on 2026-04-10.
 - [x] `MCP_RUNNER_TASK_ID=linear-d19bd14e-0604-456d-9a45-e65b898cf7a2 npm run lint`. Evidence: successful lint completion on 2026-04-10.
-- [x] `MCP_RUNNER_TASK_ID=linear-d19bd14e-0604-456d-9a45-e65b898cf7a2 npm run test`. Evidence: `out/linear-d19bd14e-0604-456d-9a45-e65b898cf7a2/manual/20260410T081244Z-post-feedback-validation.md` records the post-feedback passing repo-wide run on the current head (`324` files / `3320` tests).
+- [x] `MCP_RUNNER_TASK_ID=linear-d19bd14e-0604-456d-9a45-e65b898cf7a2 npm run test`. Evidence: `out/linear-d19bd14e-0604-456d-9a45-e65b898cf7a2/manual/20260410T083028Z-post-main-merge-review-validation.md` records the passing merged-head repo-wide rerun (`324` files / `3341` tests) after a one-off temp-dir cleanup race did not reproduce in the focused rerun.
 - [x] `MCP_RUNNER_TASK_ID=linear-d19bd14e-0604-456d-9a45-e65b898cf7a2 npm run docs:check`. Evidence: terminal output `docs:check: OK`.
-- [x] `MCP_RUNNER_TASK_ID=linear-d19bd14e-0604-456d-9a45-e65b898cf7a2 npm run docs:freshness`. Evidence: `out/linear-d19bd14e-0604-456d-9a45-e65b898cf7a2/manual/20260410T081244Z-post-feedback-validation.md` records the merged-head pass (`docs:freshness OK - 3488 docs, 3491 registry entries`).
-- [x] `MCP_RUNNER_TASK_ID=linear-d19bd14e-0604-456d-9a45-e65b898cf7a2 node scripts/diff-budget.mjs`. Evidence: terminal output `Diff budget: OK (scope=working-tree, files=9/25, lines=1002/1200, +980/-22)`.
-- [x] `MCP_RUNNER_TASK_ID=linear-d19bd14e-0604-456d-9a45-e65b898cf7a2 FORCE_CODEX_REVIEW=1 npm run review` or truthful manual fallback recorded. Evidence: `out/linear-d19bd14e-0604-456d-9a45-e65b898cf7a2/manual/20260410T074750Z-review-elegance-fallback.md`.
-- [x] Explicit elegance review recorded before any review handoff. Evidence: `out/linear-d19bd14e-0604-456d-9a45-e65b898cf7a2/manual/20260410T074750Z-review-elegance-fallback.md`.
+- [x] `MCP_RUNNER_TASK_ID=linear-d19bd14e-0604-456d-9a45-e65b898cf7a2 npm run docs:freshness`. Evidence: `out/linear-d19bd14e-0604-456d-9a45-e65b898cf7a2/manual/20260410T083028Z-post-main-merge-review-validation.md` records the merged-head pass (`docs:freshness OK - 3494 docs, 3497 registry entries`).
+- [x] `MCP_RUNNER_TASK_ID=linear-d19bd14e-0604-456d-9a45-e65b898cf7a2 node scripts/diff-budget.mjs`. Evidence: `out/linear-d19bd14e-0604-456d-9a45-e65b898cf7a2/manual/20260410T083028Z-post-main-merge-review-validation.md` records the post-merge clean-head pass (`scope=working-tree, files=0/25, lines=0/1200, +0/-0`).
+- [x] `MCP_RUNNER_TASK_ID=linear-d19bd14e-0604-456d-9a45-e65b898cf7a2 FORCE_CODEX_REVIEW=1 npm run review` or truthful manual fallback recorded. Evidence: `/Users/kbediako/Code/CO/.runs/linear-d19bd14e-0604-456d-9a45-e65b898cf7a2/cli/2026-04-10T06-48-56-057Z-b31e5ab8/review/telemetry.json` records `status: failed`, `review_outcome: failed-boundary`, and `termination_boundary.kind: startup-anchor`; the required manual fallback is recorded in `out/linear-d19bd14e-0604-456d-9a45-e65b898cf7a2/manual/20260410T083028Z-post-main-merge-review-validation.md`.
+- [x] Explicit elegance review recorded before any review handoff. Evidence: `out/linear-d19bd14e-0604-456d-9a45-e65b898cf7a2/manual/20260410T083028Z-post-main-merge-review-validation.md`.
 
 ## Handoff
 - [ ] Workpad refreshed after docs, after implementation, and immediately before any review or merge handoff. Evidence: local source refreshed at `out/linear-d19bd14e-0604-456d-9a45-e65b898cf7a2/manual/workpad.md`, but the latest Linear `upsert-workpad` attempt hit `linear_rate_limited` shared-budget cooldown until `2026-04-10T08:06:28.015Z`.
 - [ ] PR attached to the Linear issue before review-state transition. Evidence: pending.
-- [x] Latest `origin/main` merged into the branch before review-state transition. Evidence: merge commit `71d42ab04` plus follow-up docs budget fix `522d79e10`.
+- [x] Latest `origin/main` merged into the branch before review-state transition. Evidence: merge commit `31d8a9aeb`.
 - [ ] PR checks green and actionable review feedback handled or explicitly pushed back before review-state transition. Evidence: pending.
 - [x] Issue remains active until review handoff prerequisites are complete. Evidence: current issue state is `In Progress`.
