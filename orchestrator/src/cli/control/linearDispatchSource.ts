@@ -803,7 +803,7 @@ function normalizeEligibleStateSlotCounts(
   }
   for (const [rawState, rawCount] of Object.entries(input)) {
     const state = normalizeProviderLinearWorkflowState(rawState);
-    if (!state || !Number.isInteger(rawCount) || rawCount <= 0) {
+    if (!state || !Number.isInteger(rawCount) || rawCount < 0) {
       continue;
     }
     normalized.set(state, rawCount);

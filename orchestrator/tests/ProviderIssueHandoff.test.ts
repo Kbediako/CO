@@ -926,7 +926,30 @@ describe('createProviderIssueHandoffService', () => {
   });
 
   it('requests bounded fresh discovery after claim reconcile when slots remain', async () => {
-    const { paths } = await createHostPaths();
+    const { root, paths } = await createHostPaths();
+    const occupiedPaths = resolveRunPaths(
+      {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'task-partial-state'
+      },
+      'run-partial-state'
+    );
+    await mkdir(occupiedPaths.runDir, { recursive: true });
+    await writeFile(
+      occupiedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-partial-state',
+        task_id: 'task-partial-state',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-occupied',
+        issue_identifier: 'CO-1',
+        updated_at: '2026-03-19T04:00:00.000Z'
+      }),
+      'utf8'
+    );
     const launcher = {
       start: vi.fn(async () => null),
       resume: vi.fn(async () => undefined)
@@ -967,10 +990,8 @@ describe('createProviderIssueHandoffService', () => {
     expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
     expect(refetchTrackedIssues).toHaveBeenCalledWith({
       mode: 'fresh_discovery',
-      eligibleTargetCount: 2,
-      eligibleStateSlotCounts: {
-        'in progress': 1
-      }
+      eligibleTargetCount: 1,
+      eligibleStateSlotCounts: {}
     });
     expect(launcher.start).toHaveBeenCalledTimes(1);
     expect(launcher.start.mock.calls[0]?.[0]).toEqual(

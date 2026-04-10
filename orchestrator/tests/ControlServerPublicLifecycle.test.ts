@@ -484,8 +484,20 @@ describe('startControlServerPublicLifecycle', () => {
       refetchTrackedIssues: expect.any(Function),
       deferFreshDiscovery: true
     });
-
-    await closeControlServerPublicLifecycle(started);
+    let resolveBudgetRead: (() => void) | null = null;
+    vi.mocked(readSharedLinearBudgetStatus).mockImplementationOnce(
+      async () =>
+        await new Promise((resolve) => {
+          resolveBudgetRead = () => resolve(null);
+        })
+    );
+    const pendingTrigger = started.triggerProviderRefresh?.();
+    await Promise.resolve();
+    const closePromise = closeControlServerPublicLifecycle(started);
+    resolveBudgetRead?.();
+    await pendingTrigger;
+    await closePromise;
+    expect(poll).toHaveBeenCalledTimes(2);
   });
 
   it('reruns a full recovery sweep after the slow sweep interval elapses', async () => {

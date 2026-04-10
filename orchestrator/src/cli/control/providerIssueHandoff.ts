@@ -3285,11 +3285,15 @@ function createProviderPollDispatchBudget(featureToggles: Record<string, unknown
   const limits = resolveProviderPollDispatchLimits(featureToggles);
   let occupiedGlobalSlots = 0;
   const occupiedStateSlots = new Map<string, number>();
+  let hasPartialStateSnapshot = false;
 
   const hasGlobalSlots = (): boolean => occupiedGlobalSlots < limits.maxConcurrentAgents;
   const remainingGlobalSlots = (): number =>
     Math.max(0, limits.maxConcurrentAgents - occupiedGlobalSlots);
   const remainingStateSlots = (): Record<string, number> => {
+    if (hasPartialStateSnapshot) {
+      return {};
+    }
     const remaining: Record<string, number> = {};
     for (const [state, stateLimit] of limits.maxConcurrentAgentsByState.entries()) {
       remaining[state] = Math.max(0, stateLimit - (occupiedStateSlots.get(state) ?? 0));
@@ -3314,6 +3318,7 @@ function createProviderPollDispatchBudget(featureToggles: Record<string, unknown
     occupiedGlobalSlots += 1;
     const normalizedState = normalizeProviderLinearWorkflowState(trackedIssue.state);
     if (!normalizedState) {
+      hasPartialStateSnapshot = true;
       return;
     }
     occupiedStateSlots.set(normalizedState, (occupiedStateSlots.get(normalizedState) ?? 0) + 1);

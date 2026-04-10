@@ -898,177 +898,47 @@ describe('resolveLiveLinearTrackedIssues', () => {
     });
   });
 
-  it('keeps scanning discovery pages until it fills constrained state capacity with dispatchable candidates', async () => {
+  it('keeps scanning discovery pages until it finds dispatchable work after saturated states', async () => {
+    const issueNode = (
+      id: string,
+      priority: number,
+      state: { name: string; type: string },
+      createdAt: string
+    ) => ({
+      id,
+      identifier: `CO-${priority}`,
+      title: id,
+      priority,
+      createdAt,
+      updatedAt: '2026-03-20T04:15:00.000Z',
+      assignee: null,
+      state,
+      team: { id: 'lin-team-1', key: 'PREPROD', name: 'PRE-PRO/PRODUCTION' },
+      project: { id: 'lin-project-1', name: 'Icon Agency (Bookings)' },
+      inverseRelations: { nodes: [] }
+    });
+    const responseFor = (nodes: unknown[]) =>
+      jsonResponse({
+        data: {
+          viewer: { id: 'viewer-1', organization: { id: 'lin-workspace-1' } },
+          issues: {
+            pageInfo: { hasPreviousPage: false, startCursor: null },
+            nodes
+          }
+        }
+      });
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
         variables?: { before?: string | null; priority?: number };
       };
-
-      if ((body.variables?.priority ?? null) === 1 && (body.variables?.before ?? null) === null) {
-        return jsonResponse({
-          data: {
-            viewer: {
-              id: 'viewer-1',
-              organization: { id: 'lin-workspace-1' }
-            },
-            issues: {
-              pageInfo: {
-                hasPreviousPage: true,
-                startCursor: 'cursor-1'
-              },
-              nodes: [
-                {
-                  id: 'lin-issue-in-progress-2',
-                  identifier: 'CO-3',
-                  title: 'Second in-progress candidate',
-                  priority: 1,
-                  createdAt: '2026-03-18T04:00:00.000Z',
-                  updatedAt: '2026-03-20T04:10:00.000Z',
-                  assignee: null,
-                  state: {
-                    name: 'In Progress',
-                    type: 'started'
-                  },
-                  team: {
-                    id: 'lin-team-1',
-                    key: 'PREPROD',
-                    name: 'PRE-PRO/PRODUCTION'
-                  },
-                  project: {
-                    id: 'lin-project-1',
-                    name: 'Icon Agency (Bookings)'
-                  },
-                  inverseRelations: { nodes: [] }
-                }
-              ]
-            }
-          }
-        });
-      }
-      if ((body.variables?.priority ?? null) === 1 && body.variables?.before === 'cursor-1') {
-        return jsonResponse({
-          data: {
-            viewer: {
-              id: 'viewer-1',
-              organization: { id: 'lin-workspace-1' }
-            },
-            issues: {
-              pageInfo: {
-                hasPreviousPage: false,
-                startCursor: null
-              },
-              nodes: [
-                {
-                  id: 'lin-issue-in-progress-1',
-                  identifier: 'CO-2',
-                  title: 'First in-progress candidate',
-                  priority: 1,
-                  createdAt: '2026-03-17T04:00:00.000Z',
-                  updatedAt: '2026-03-20T04:05:00.000Z',
-                  assignee: null,
-                  state: {
-                    name: 'In Progress',
-                    type: 'started'
-                  },
-                  team: {
-                    id: 'lin-team-1',
-                    key: 'PREPROD',
-                    name: 'PRE-PRO/PRODUCTION'
-                  },
-                  project: {
-                    id: 'lin-project-1',
-                    name: 'Icon Agency (Bookings)'
-                  },
-                  inverseRelations: { nodes: [] }
-                }
-              ]
-            }
-          }
-        });
-      }
-      if ((body.variables?.priority ?? null) === 2) {
-        expect(body.variables?.before ?? null).toBe(null);
-        return jsonResponse({
-          data: {
-            viewer: {
-              id: 'viewer-1',
-              organization: { id: 'lin-workspace-1' }
-            },
-            issues: {
-              pageInfo: {
-                hasPreviousPage: false,
-                startCursor: null
-              },
-              nodes: [
-                {
-                  id: 'lin-issue-in-progress-3',
-                  identifier: 'CO-4',
-                  title: 'Third in-progress candidate',
-                  priority: 2,
-                  createdAt: '2026-03-19T04:00:00.000Z',
-                  updatedAt: '2026-03-20T04:12:00.000Z',
-                  assignee: null,
-                  state: {
-                    name: 'In Progress',
-                    type: 'started'
-                  },
-                  team: {
-                    id: 'lin-team-1',
-                    key: 'PREPROD',
-                    name: 'PRE-PRO/PRODUCTION'
-                  },
-                  project: {
-                    id: 'lin-project-1',
-                    name: 'Icon Agency (Bookings)'
-                  },
-                  inverseRelations: { nodes: [] }
-                }
-              ]
-            }
-          }
-        });
-      }
-      expect(body.variables?.priority).toBe(3);
       expect(body.variables?.before ?? null).toBe(null);
-      return jsonResponse({
-        data: {
-          viewer: {
-            id: 'viewer-1',
-            organization: { id: 'lin-workspace-1' }
-          },
-          issues: {
-            pageInfo: {
-              hasPreviousPage: false,
-              startCursor: null
-            },
-            nodes: [
-              {
-                id: 'lin-issue-todo',
-                identifier: 'CO-1',
-                title: 'Todo candidate',
-                priority: 3,
-                createdAt: '2026-03-16T04:00:00.000Z',
-                updatedAt: '2026-03-20T04:15:00.000Z',
-                assignee: null,
-                state: {
-                  name: 'Todo',
-                  type: 'unstarted'
-                },
-                team: {
-                  id: 'lin-team-1',
-                  key: 'PREPROD',
-                  name: 'PRE-PRO/PRODUCTION'
-                },
-                project: {
-                  id: 'lin-project-1',
-                  name: 'Icon Agency (Bookings)'
-                },
-                inverseRelations: { nodes: [] }
-              }
-            ]
-          }
-        }
-      });
+      return (body.variables?.priority ?? null) === 1
+        ? responseFor([
+            issueNode('lin-issue-in-progress-1', 1, { name: 'In Progress', type: 'started' }, '2026-03-17T04:00:00.000Z')
+          ])
+        : responseFor([
+            issueNode('lin-issue-todo-1', 2, { name: 'Todo', type: 'unstarted' }, '2026-03-18T04:00:00.000Z')
+          ]);
     });
 
     const result = await resolveLiveLinearTrackedIssues({
@@ -1083,29 +953,16 @@ describe('resolveLiveLinearTrackedIssues', () => {
       },
       fetchImpl,
       queryMode: 'fresh_discovery',
-      eligibleIssueTargetCount: 2,
+      eligibleIssueTargetCount: 1,
       eligibleStateSlotCounts: {
-        'in progress': 1
+        'in progress': 0
       }
     });
 
-    expect(fetchImpl).toHaveBeenCalledTimes(4);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
     expect(result).toMatchObject({
       kind: 'ready',
-      tracked_issues: [
-        {
-          id: 'lin-issue-in-progress-1'
-        },
-        {
-          id: 'lin-issue-in-progress-2'
-        },
-        {
-          id: 'lin-issue-in-progress-3'
-        },
-        {
-          id: 'lin-issue-todo'
-        }
-      ]
+      tracked_issues: [{ id: 'lin-issue-in-progress-1' }, { id: 'lin-issue-todo-1' }]
     });
   });
 });

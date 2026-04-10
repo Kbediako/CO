@@ -367,6 +367,10 @@ function createProviderRefreshCoordinator(
       return;
     }
     const preflightSchedule = await resolveProviderRefreshSchedule().catch(() => null);
+    if (stopped) {
+      clearScheduledTrigger();
+      return;
+    }
     if (preflightSchedule?.linear_budget?.cooldown_active) {
       clearScheduledTrigger();
       await scheduleNextTriggerAsync();
