@@ -88,9 +88,11 @@ class ArtifactRetention {
     if (!this.cleaned) {
       this.cleaned = true;
       this.holderCount = 0;
-      activeArtifactRoots.delete(this.artifactRoot);
       this.cleanupPromise = rm(this.artifactRoot, { recursive: true, force: true })
         .catch(() => {})
+        .finally(() => {
+          activeArtifactRoots.delete(this.artifactRoot);
+        })
         .then(() => undefined);
     }
     await this.cleanupPromise;
