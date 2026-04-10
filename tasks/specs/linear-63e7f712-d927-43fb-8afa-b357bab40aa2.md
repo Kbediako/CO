@@ -42,7 +42,8 @@ CO-114 already landed the retained subprocess smoke speedup and is explicitly no
 
 ## Design
 - Extract a shared helper under `tests/helpers/**` that:
-  - computes the newest mtime across the transitive relative runtime-dependency closure of a source entrypoint
+  - computes closure freshness from the newest runtime freshness token across the transitive relative runtime-dependency closure of a source entrypoint (`mtime`-based)
+  - separately tracks change tokens (`max(mtimeMs, ctimeMs)`) for newly appeared or higher-priority candidates plus disappearance tokens from the winning candidate's parent directory so missing-to-resolved, resolution-priority flips, and delete-triggered fallback invalidate stale `dist`
   - resolves relative `.js` and extensionless specifiers back to checkout source files (`.ts`, `.js`, and `index.*` variants) before recursing
   - caches the discovered dependency set per source entrypoint within the test process
   - ignores type-only edges so runtime-unrelated type edits do not evict the fast built-entry path

@@ -58,6 +58,7 @@ last_review: 2026-04-10
   - Review seed entrypoint: `scripts/run-review.ts`
   - resolve relative `.js` and extensionless specifiers back to the source files present in the checkout (`.ts`, `.js`, and `index.*` variants) so the closure follows checkout source truth rather than built-output paths
   - cache the discovered closure per source entrypoint within the test process so repeated smoke invocations do not repeatedly walk the graph
+  - derive closure freshness from `mtime` while separately using change tokens (`max(mtimeMs, ctimeMs)`) for newly appeared or higher-priority candidates and disappearance tokens from the winning candidate's parent directory so resolution flips invalidate stale `dist`
 - Helper behavior:
   - recurse only through the discovered relative runtime-dependency closure for that suite, so the helper stays bounded to the relevant entrypoint graph
   - ignore type-only edges so runtime-unrelated type edits do not force source-entry fallback
