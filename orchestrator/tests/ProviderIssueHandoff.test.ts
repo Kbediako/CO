@@ -5922,15 +5922,17 @@ describe('createProviderIssueHandoffService', () => {
       launcher,
       startPipelineId: 'diagnostics'
     });
+    const timerCountAfterConstruction = setTimeoutSpy.mock.calls.length;
+    expect(timerCountAfterConstruction).toBeGreaterThanOrEqual(1);
 
     await service.refresh();
-    await waitForMockCalls(setTimeoutSpy);
+    await waitForMockCalls(setTimeoutSpy, timerCountAfterConstruction);
 
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
 
     const scheduledTimeoutCount = setTimeoutSpy.mock.calls.length;
-    expect(scheduledTimeoutCount).toBe(1);
+    expect(scheduledTimeoutCount).toBe(timerCountAfterConstruction);
     const [, delayMs] = setTimeoutSpy.mock.calls[scheduledTimeoutCount - 1] ?? [];
     expect(delayMs).toBeGreaterThanOrEqual(999);
     expect(delayMs).toBeLessThanOrEqual(1_000);
@@ -6033,15 +6035,17 @@ describe('createProviderIssueHandoffService', () => {
       launcher,
       startPipelineId: 'diagnostics'
     });
+    const timerCountAfterConstruction = setTimeoutSpy.mock.calls.length;
+    expect(timerCountAfterConstruction).toBeGreaterThanOrEqual(1);
 
     await service.refresh();
-    await waitForMockCalls(setTimeoutSpy);
+    await waitForMockCalls(setTimeoutSpy, timerCountAfterConstruction);
 
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
 
     const scheduledTimeoutCount = setTimeoutSpy.mock.calls.length;
-    expect(scheduledTimeoutCount).toBe(1);
+    expect(scheduledTimeoutCount).toBe(timerCountAfterConstruction);
     const [, delayMs] = setTimeoutSpy.mock.calls[scheduledTimeoutCount - 1] ?? [];
     expect(delayMs).toBeGreaterThanOrEqual(999);
     expect(delayMs).toBeLessThanOrEqual(1_000);
@@ -6344,13 +6348,18 @@ describe('createProviderIssueHandoffService', () => {
       launcher,
       startPipelineId: 'diagnostics'
     });
+    const timerCountAfterConstruction = setTimeoutSpy.mock.calls.length;
+    expect(timerCountAfterConstruction).toBeGreaterThanOrEqual(1);
+    const retryTimerCallback = setTimeoutSpy.mock.calls[timerCountAfterConstruction - 1]?.[0];
+    expect(typeof retryTimerCallback).toBe('function');
 
     await service.refresh();
-    await waitForMockCalls(setTimeoutSpy);
+    await waitForMockCalls(setTimeoutSpy, timerCountAfterConstruction);
+    expect(setTimeoutSpy.mock.calls.length).toBe(timerCountAfterConstruction);
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
     vi.setSystemTime(new Date('2026-03-19T04:30:01.001Z'));
-    getLatestScheduledTimeoutCallback(setTimeoutSpy)();
+    (retryTimerCallback as () => void)();
     await flushAsyncWork();
     await waitForCondition(
       () =>
@@ -6445,11 +6454,16 @@ describe('createProviderIssueHandoffService', () => {
       launcher,
       startPipelineId: 'diagnostics'
     });
+    const timerCountAfterConstruction = setTimeoutSpy.mock.calls.length;
+    expect(timerCountAfterConstruction).toBeGreaterThanOrEqual(1);
+    const retryTimerCallback = setTimeoutSpy.mock.calls[timerCountAfterConstruction - 1]?.[0];
+    expect(typeof retryTimerCallback).toBe('function');
 
     await service.refresh();
-    await waitForMockCalls(setTimeoutSpy);
+    await waitForMockCalls(setTimeoutSpy, timerCountAfterConstruction);
+    expect(setTimeoutSpy.mock.calls.length).toBe(timerCountAfterConstruction);
     vi.setSystemTime(new Date('2026-03-19T04:30:01.001Z'));
-    getLatestScheduledTimeoutCallback(setTimeoutSpy)();
+    (retryTimerCallback as () => void)();
     await flushAsyncWork();
     await waitForCondition(
       () =>
