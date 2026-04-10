@@ -167,6 +167,28 @@ describe('CompatibilityIssuePresenter', () => {
     expect(runningEntry.display_event).toBe('updated TECH_SPEC + validating status parity');
   });
 
+  it('does not surface selected-only synthetic linear task-id fallback sources as issue rows', () => {
+    const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+    const projection = buildCompatibilityProjectionSnapshot(
+      buildCompatibilityRuntime(
+        buildCompatibilitySource({
+          issueProvider: 'linear',
+          issueIdentifier: taskId,
+          issueId: taskId,
+          taskId,
+          rawStatus: 'in_progress',
+          displayStatus: 'In Progress',
+          updatedAt: '2026-04-06T02:35:00.000Z',
+          completedAt: null,
+          summary: 'fallback-only selected source'
+        })
+      )
+    );
+
+    expect(projection.selected?.issue_identifier).toBe(taskId);
+    expect(projection.issues).toEqual([]);
+  });
+
   it('keeps the projected child-summary message and timestamp when newer proof telemetry is generic', () => {
     const runningEntry = buildCompatibilityRunningEntry(
       buildCompatibilitySource({

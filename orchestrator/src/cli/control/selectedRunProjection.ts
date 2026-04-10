@@ -265,7 +265,12 @@ function buildProjectionContextFromParts(
   if (!snapshot) {
     return null;
   }
-  const { manifestRecord, issueIdentifier, issueId, taskId, runId } = snapshot;
+  const { manifestRecord, taskId, runId } = snapshot;
+  const { issueIdentifier, issueId, lookupAliases } = resolveProjectionIssueIdentity(
+    snapshot,
+    parts.trackedIssue,
+    providerClaim
+  );
   const control = parts.control;
   const manifestRawStatus = readStringValue(manifestRecord, 'status') ?? 'unknown';
   const startedAt = readStringValue(manifestRecord, 'started_at', 'startedAt') ?? null;
@@ -368,7 +373,7 @@ function buildProjectionContextFromParts(
     issueId,
     taskId,
     runId,
-    lookupAliases: snapshot.lookupAliases,
+    lookupAliases,
     rawStatus,
     displayStatus,
     statusReason,
@@ -392,6 +397,57 @@ function buildProjectionContextFromParts(
     providerDebugSnapshot,
     providerRetryState: buildProviderRetryState(providerClaim)
   };
+}
+
+function resolveProjectionIssueIdentity(
+  snapshot: Pick<SelectedRunManifestSnapshot, 'issueIdentifier' | 'issueId' | 'taskId' | 'runId' | 'lookupAliases'>,
+  trackedIssue: LiveLinearTrackedIssue | null,
+  providerClaim: ProviderIntakeClaimRecord | null
+): {
+  issueIdentifier: string;
+  issueId: string | null;
+  lookupAliases: string[];
+} {
+  const manifestIssueIdentifier = isProjectionFallbackIdentityValue(snapshot.issueIdentifier, snapshot)
+    ? null
+    : snapshot.issueIdentifier;
+  const manifestIssueId = isProjectionFallbackIdentityValue(snapshot.issueId, snapshot)
+    ? null
+    : snapshot.issueId;
+  const issueIdentifier =
+    manifestIssueIdentifier ??
+    trackedIssue?.identifier ??
+    providerClaim?.issue_identifier ??
+    snapshot.issueIdentifier;
+  const issueId =
+    manifestIssueId ??
+    trackedIssue?.id ??
+    providerClaim?.issue_id ??
+    snapshot.issueId;
+
+  return {
+    issueIdentifier,
+    issueId,
+    lookupAliases: Array.from(
+      new Set(
+        snapshot.lookupAliases.concat(
+          buildProjectionLookupAliases({
+            issueIdentifier,
+            issueId,
+            taskId: snapshot.taskId,
+            runId: snapshot.runId
+          })
+        )
+      )
+    )
+  };
+}
+
+function isProjectionFallbackIdentityValue(
+  value: string | null,
+  input: Pick<SelectedRunManifestSnapshot, 'taskId' | 'runId'>
+): boolean {
+  return value === input.taskId || value === input.runId;
 }
 
 function resolveSelectedRunWorkspacePath(input: {
@@ -1106,7 +1162,7 @@ function providerIntakeClaimMatchesSelectedRun(
     return true;
   }
   if (!providerIntakeClaimMatchesIssueIdentity(claim, snapshot)) {
-    return false;
+    return providerIntakeClaimMatchesSyntheticChildTaskPrefix(claim, snapshot);
   }
   if (claim.run_id && snapshot.runId) {
     if (claim.task_id && snapshot.taskId && claim.task_id !== snapshot.taskId) {
@@ -1144,6 +1200,34 @@ function providerIntakeClaimMatchesIssueIdentity(
     (claim.issue_id != null && snapshot.issueId != null && claim.issue_id === snapshot.issueId) ||
     claim.issue_identifier === snapshot.issueIdentifier
   );
+}
+
+function providerIntakeClaimMatchesSyntheticChildTaskPrefix(
+  claim: Pick<ProviderIntakeClaimRecord, 'task_id'>,
+  snapshot: Pick<SelectedRunManifestSnapshot, 'issueId' | 'issueIdentifier' | 'taskId' | 'runId'>
+): boolean {
+  if (!claim.task_id || !snapshot.taskId) {
+    return false;
+  }
+  if (!snapshot.taskId.startsWith(`${claim.task_id}-`)) {
+    return false;
+  }
+  return !hasAuthoritativeProjectionIssueIdentity(snapshot);
+}
+
+function hasAuthoritativeProjectionIssueIdentity(
+  snapshot: Pick<SelectedRunManifestSnapshot, 'issueId' | 'issueIdentifier' | 'taskId' | 'runId'>
+): boolean {
+  const fallbackIdentities = new Set(
+    [snapshot.taskId, snapshot.runId].filter((value): value is string => typeof value === 'string')
+  );
+  if (snapshot.issueIdentifier && !fallbackIdentities.has(snapshot.issueIdentifier)) {
+    return true;
+  }
+  if (snapshot.issueId && !fallbackIdentities.has(snapshot.issueId)) {
+    return true;
+  }
+  return false;
 }
 
 function buildProviderRetryState(
