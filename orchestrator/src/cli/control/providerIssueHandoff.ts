@@ -675,11 +675,11 @@ export function createProviderIssueHandoffService(
     state?: string | null;
     worker_host?: string | null;
   }>> => {
-    const occupancyClaims = options.state.claims.map((claim) => ({
-      provider_key: claim.provider_key,
-      state: claim.state,
-      worker_host: claim.worker_host
-    }));
+    const occupancyClaims: Array<{
+      provider_key?: string | null;
+      state?: string | null;
+      worker_host?: string | null;
+    }> = [];
     const seededOccupancyKeys = new Set<string>();
     const activeDiscoveredRuns =
       (await discoverProviderIssueRunsForCurrentOperation()).filter((run) => run.status === 'in_progress');
@@ -703,17 +703,21 @@ export function createProviderIssueHandoffService(
       const occupancyKey =
         activeClaimRun?.manifestPath ??
         activeClaimRun?.runId ??
-        (
-          claim.state === 'running'
-            ? null
-            : claim.run_manifest_path ??
-              claim.run_id ??
-              `claim:${claim.provider_key}:${claim.state}`
-        );
+        claim.run_manifest_path ??
+        claim.run_id ??
+        `claim:${claim.provider_key}:${claim.state}`;
       if (!occupancyKey) {
         continue;
       }
+      if (seededOccupancyKeys.has(occupancyKey)) {
+        continue;
+      }
       seededOccupancyKeys.add(occupancyKey);
+      occupancyClaims.push({
+        provider_key: claim.provider_key,
+        state: claim.state,
+        worker_host: claim.worker_host
+      });
     }
 
     for (const run of activeDiscoveredRuns) {

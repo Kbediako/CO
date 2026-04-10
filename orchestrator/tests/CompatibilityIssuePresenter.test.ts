@@ -207,6 +207,94 @@ describe('CompatibilityIssuePresenter', () => {
     ).toBe('worker-host-proof');
   });
 
+  it('does not resurrect intake worker_host when the claim explicitly clears it', () => {
+    expect(
+      resolveProviderWorkerHost({
+        providerDebugSnapshot: {
+          live_linear_state: {
+            state: 'In Progress',
+            state_type: 'started',
+            updated_at: '2026-04-06T02:35:00.000Z'
+          },
+          claim: {
+            state: 'running',
+            reason: 'provider_issue_rehydrated_active_run',
+            updated_at: '2026-04-06T02:35:00.000Z',
+            run_id: 'run-co-100',
+            worker_host: null,
+            launch_source: 'control-host',
+            launch_started_at: '2026-04-06T02:30:00.000Z',
+            freshness: 'current',
+            is_rehydrated: false,
+            rehydrated_at: null
+          },
+          worker: null,
+          parallelization: null,
+          pull_request: null,
+          progress: null,
+          last_audit_operation: null,
+          last_semantic_progress_at: '2026-04-06T02:35:00.000Z',
+          stall_classification: null,
+          stall_reason: null,
+          recovery_recommendation: null
+        },
+        providerIntake: {
+          provider: 'linear',
+          issue_id: 'issue-100',
+          issue_identifier: 'CO-100',
+          issue_title: 'CO-100',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-06T02:35:00.000Z',
+          task_id: 'linear-co-100',
+          mapping_source: 'provider_id_fallback',
+          state: 'running',
+          reason: 'provider_issue_rehydrated_active_run',
+          run_id: 'run-co-100',
+          worker_host: 'worker-host-stale',
+          freshness: 'current',
+          rehydrated_at: '2026-04-06T02:35:00.000Z',
+          is_rehydrated: false,
+          updated_at: '2026-04-06T02:35:00.000Z'
+        }
+      })
+    ).toBeNull();
+  });
+
+  it('does not resurrect intake worker_host when fresh proof explicitly clears it', () => {
+    expect(
+      resolveProviderWorkerHost({
+        providerLinearWorkerProof: {
+          issue_id: 'issue-100',
+          issue_identifier: 'CO-100',
+          attempt_started_at: '2026-04-06T02:30:00.000Z',
+          updated_at: '2026-04-06T02:35:00.000Z',
+          worker_host: null
+        },
+        providerIntake: {
+          provider: 'linear',
+          issue_id: 'issue-100',
+          issue_identifier: 'CO-100',
+          issue_title: 'CO-100',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-06T02:35:00.000Z',
+          task_id: 'linear-co-100',
+          mapping_source: 'provider_id_fallback',
+          state: 'running',
+          reason: 'provider_issue_rehydrated_active_run',
+          run_id: 'run-co-100',
+          worker_host: 'worker-host-stale',
+          freshness: 'current',
+          rehydrated_at: '2026-04-06T02:35:00.000Z',
+          is_rehydrated: false,
+          updated_at: '2026-04-06T02:35:00.000Z'
+        },
+        stageStartedAt: '2026-04-06T02:30:00.000Z'
+      })
+    ).toBeNull();
+  });
+
   it('uses provider intake fallback for selected and issue payloads when no claim or proof host is present', () => {
     const source = buildCompatibilitySource({
       rawStatus: 'in_progress',

@@ -431,7 +431,7 @@ describe('createProviderIssueHandoffService', () => {
       review_promotion: null,
       merge_closeout: null
     });
-    const persist = vi.fn(async () => undefined);
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
     const launcher = {
       start: vi.fn(async () => null),
       resume: vi.fn(async () => undefined)
@@ -501,6 +501,11 @@ describe('createProviderIssueHandoffService', () => {
       worker_host: 'worker-host-02',
       state: 'starting'
     });
+    expect(persist).toHaveBeenCalledTimes(1);
+    expect(getPersistedState().claims.find((claim) => claim.issue_id === 'lin-issue-2')).toMatchObject({
+      worker_host: 'worker-host-02',
+      state: 'starting'
+    });
   });
 
   it('fails closed with a queued retry when configured worker_hosts are at capacity', async () => {
@@ -538,7 +543,7 @@ describe('createProviderIssueHandoffService', () => {
       review_promotion: null,
       merge_closeout: null
     });
-    const persist = vi.fn(async () => undefined);
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
     const launcher = {
       start: vi.fn(async () => null),
       resume: vi.fn(async () => undefined)
@@ -598,6 +603,147 @@ describe('createProviderIssueHandoffService', () => {
       state: 'handoff_failed',
       retry_queued: true,
       reason: expect.stringContaining('at capacity')
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+    expect(getPersistedState().claims.find((claim) => claim.issue_id === 'lin-issue-2')).toMatchObject({
+      state: 'handoff_failed',
+      retry_queued: true,
+      reason: expect.stringContaining('at capacity')
+    });
+  });
+
+  it('does not double-count a discovered active run that already matches a starting worker_host claim', async () => {
+    const { root, paths } = await createHostPaths();
+    const occupiedEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-occupied'
+    };
+    const occupiedPaths = resolveRunPaths(occupiedEnv, 'run-occupied');
+    await mkdir(occupiedPaths.runDir, { recursive: true });
+    await writeFile(
+      occupiedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-occupied',
+        task_id: 'task-occupied',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'occupied-issue',
+        issue_identifier: 'CO-occupied',
+        issue_updated_at: '2026-03-19T04:00:00.000Z',
+        updated_at: '2026-03-19T04:01:00.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(occupiedPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        attempt_started_at: '2026-03-19T04:00:00.000Z',
+        worker_host: 'worker-host-01'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:occupied-issue',
+      issue_id: 'occupied-issue',
+      issue_identifier: 'CO-occupied',
+      issue_title: 'Occupied issue',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:00:00.000Z',
+      task_id: 'linear-occupied-issue',
+      mapping_source: 'provider_id_fallback',
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      accepted_at: '2026-03-19T04:00:00.000Z',
+      updated_at: '2026-03-19T04:01:00.000Z',
+      last_delivery_id: null,
+      last_event: null,
+      last_action: null,
+      last_webhook_timestamp: null,
+      run_id: null,
+      run_manifest_path: null,
+      worker_host: 'worker-host-01',
+      launch_source: 'control-host',
+      launch_token: 'launch-occupied',
+      launch_started_at: '2026-03-19T04:00:00.000Z',
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null,
+      review_promotion: null,
+      merge_closeout: null
+    });
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const providerWorkflowConfigStore = {
+      bootstrap: vi.fn(),
+      refresh: vi.fn(),
+      snapshot: () => ({
+        status: 'ready' as const,
+        pipeline_id: 'provider-linear-worker',
+        source_path: '/repo/codex.orchestrator.json',
+        snapshot_path: '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+        last_reload_attempt_at: null,
+        last_success_at: null,
+        last_error_at: null,
+        last_error: null,
+        terminal_cleanup: null,
+        worker_hosts: [
+          {
+            name: 'worker-host-01',
+            transport: 'ssh' as const,
+            ssh_destination: 'codex@worker-host-01',
+            ssh_options: [],
+            max_concurrent_agents: 2,
+            node_path: null
+          }
+        ]
+      }),
+      getLaunchConfigPath: vi.fn(),
+      recordTerminalCleanupResult: vi.fn()
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      providerWorkflowConfigStore
+    });
+
+    await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-2',
+        identifier: 'CO-3'
+      }),
+      deliveryId: 'delivery-2',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_000_001
+    });
+
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'lin-issue-2',
+      issueIdentifier: 'CO-3',
+      workerHost: 'worker-host-01'
+    }));
+    expect(providerWorkflowConfigStore.refresh).toHaveBeenCalledTimes(1);
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-issue-2')).toMatchObject({
+      worker_host: 'worker-host-01',
+      state: 'starting'
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+    expect(getPersistedState().claims.find((claim) => claim.issue_id === 'lin-issue-2')).toMatchObject({
+      worker_host: 'worker-host-01',
+      state: 'starting'
     });
   });
 

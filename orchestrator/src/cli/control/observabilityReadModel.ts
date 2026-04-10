@@ -107,6 +107,11 @@ export interface ControlProviderWorkflowPayload {
   worker_hosts?: ControlProviderWorkerHostPayload[] | null;
 }
 
+type ResolvedWorkerHost =
+  | { kind: 'missing' }
+  | { kind: 'cleared' }
+  | { kind: 'host'; value: string };
+
 interface SharedSelectedProjectionFields {
   issueProvider: string | null;
   issueIdentifier: string;
@@ -423,7 +428,7 @@ export function buildSelectedRunLatestEventPayload(
 export function readProviderLinearWorkerHost(
   proof: ProviderLinearWorkerProof | null | undefined,
   stageStartedAt: string | null | undefined
-): string | null {
+): ResolvedWorkerHost {
   if (
     !proof
     || !isProviderLinearWorkerProofFreshForStage(
@@ -431,10 +436,10 @@ export function readProviderLinearWorkerHost(
       stageStartedAt ?? null
     )
   ) {
-    return null;
+    return { kind: 'missing' };
   }
-  return normalizeProviderWorkerHostName(
-    (proof as ProviderLinearWorkerProof & { worker_host?: unknown }).worker_host
+  return readResolvedWorkerHost(
+    proof as ProviderLinearWorkerProof & Record<string, unknown>
   );
 }
 
@@ -449,15 +454,42 @@ export function resolveProviderWorkerHost(input: {
     claimLaunchStartedAt
     ?? input.stageStartedAt
     ?? null;
+  const claimHost = readResolvedWorkerHost(
+    input.providerDebugSnapshot?.claim as Record<string, unknown> | null | undefined
+  );
+  if (claimHost.kind === 'host') {
+    return claimHost.value;
+  }
+  if (claimHost.kind === 'cleared') {
+    return null;
+  }
   const proofHost = readProviderLinearWorkerHost(
     input.providerLinearWorkerProof,
     stageStartedAt
   );
-  return (
-    normalizeProviderWorkerHostName(input.providerDebugSnapshot?.claim?.worker_host) ??
-    proofHost ??
-    normalizeProviderWorkerHostName(input.providerIntake?.worker_host)
-  );
+  if (proofHost.kind === 'host') {
+    return proofHost.value;
+  }
+  if (proofHost.kind === 'cleared') {
+    return null;
+  }
+  return normalizeProviderWorkerHostName(input.providerIntake?.worker_host);
+}
+
+function readResolvedWorkerHost(
+  source: Record<string, unknown> | null | undefined
+): ResolvedWorkerHost {
+  if (
+    !source
+    || !Object.prototype.hasOwnProperty.call(source, 'worker_host')
+    || source.worker_host === undefined
+  ) {
+    return { kind: 'missing' };
+  }
+  const workerHost = normalizeProviderWorkerHostName(source.worker_host);
+  return workerHost === null
+    ? { kind: 'cleared' }
+    : { kind: 'host', value: workerHost };
 }
 
 export function buildProjectionSelectedPayload(
