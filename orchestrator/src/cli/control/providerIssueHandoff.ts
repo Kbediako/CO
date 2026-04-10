@@ -455,6 +455,9 @@ export function createProviderIssueHandoffService(
       return null;
     }
     const claimState = resolveProviderMergeCloseoutClaimState(mergeCloseout);
+    const workerHost = input.latestRun
+      ? resolveRehydratedActiveRunWorkerHost(input.latestRun, input.claim)
+      : input.claim.worker_host;
     return await upsertProviderClaimAndPersist({
       ...input.claim,
       issue_state: mergeCloseout.issue_state,
@@ -465,6 +468,7 @@ export function createProviderIssueHandoffService(
       task_id: input.latestRun?.taskId ?? input.claim.task_id,
       run_id: input.latestRun?.runId ?? input.claim.run_id,
       run_manifest_path: input.latestRun?.manifestPath ?? input.claim.run_manifest_path,
+      worker_host: workerHost,
       ...clearProviderRetryFields(),
       merge_closeout: mergeCloseout
     });
@@ -540,6 +544,9 @@ export function createProviderIssueHandoffService(
         ...refreshedLifecycle
       });
     }
+    const workerHost = input.latestRun
+      ? resolveRehydratedActiveRunWorkerHost(input.latestRun, input.claim)
+      : input.claim.worker_host;
     return await upsertProviderClaimAndPersist({
       ...input.claim,
       issue_state: reviewPromotion.issue_state,
@@ -550,6 +557,7 @@ export function createProviderIssueHandoffService(
       task_id: input.latestRun?.taskId ?? input.claim.task_id,
       run_id: input.latestRun?.runId ?? input.claim.run_id,
       run_manifest_path: input.latestRun?.manifestPath ?? input.claim.run_manifest_path,
+      worker_host: workerHost,
       ...clearProviderRetryFields(),
       review_promotion: reviewPromotion,
       merge_closeout: null
@@ -622,6 +630,7 @@ export function createProviderIssueHandoffService(
     mergeCloseout: ProviderMergeCloseoutRecord;
   }): Promise<ProviderIntakeClaimRecord> => {
     const trackedIssueClaimFields = buildTrackedIssueClaimFields(input.trackedIssue);
+    const workerHost = resolveRehydratedActiveRunWorkerHost(input.latestRun, input.claim);
     return await upsertProviderClaimAndPersist({
       ...input.claim,
       ...trackedIssueClaimFields,
@@ -635,6 +644,7 @@ export function createProviderIssueHandoffService(
       task_id: input.latestRun.taskId,
       run_id: input.latestRun.runId,
       run_manifest_path: input.latestRun.manifestPath,
+      worker_host: workerHost,
       ...clearProviderRetryFields(),
       merge_closeout: input.mergeCloseout
     });
