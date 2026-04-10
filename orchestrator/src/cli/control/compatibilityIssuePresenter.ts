@@ -16,7 +16,13 @@ import {
 } from './observabilityReadModel.js';
 import type { LinearBudgetStatus } from './linearBudgetState.js';
 
+const PROVIDER_LINEAR_WORKER_PIPELINE_TITLE = 'Provider Linear Worker';
+const PROVIDER_LINEAR_WORKER_PIPELINE_ID = 'provider-linear-worker';
+const SYNTHETIC_LINEAR_TASK_ID_PATTERN =
+  /^linear-[a-z0-9]+(?:-[a-z0-9]+)*$/i;
+
 export interface CompatibilityIssueSourceRecord {
+  issueProvider: string | null;
   issueIdentifier: string;
   issueId: string | null;
   taskId: string | null;
@@ -25,6 +31,9 @@ export interface CompatibilityIssueSourceRecord {
   updatedAt: string | null;
   startedAt: string | null;
   completedAt: string | null;
+  pipelineId?: string | null;
+  pipelineTitle?: string | null;
+  providerLinearWorkerProof?: ControlCompatibilitySourceContext['providerLinearWorkerProof'];
   latestEvent: {
     at: string | null;
   } | null;
@@ -196,15 +205,21 @@ export function buildCompatibilityIssueIndex<
     issuesByIdentifier.set(source.issueIdentifier, existing);
   };
 
-  registerIssue(snapshot.selected, {
-    kind: 'selected',
-    dispatchPilotSummary: snapshot.dispatchPilot
-  });
+  if (!isSyntheticLinearFallbackOnlyIssueSource(snapshot.selected)) {
+    registerIssue(snapshot.selected, {
+      kind: 'selected',
+      dispatchPilotSummary: snapshot.dispatchPilot
+    });
+  }
   snapshot.running.forEach((entry) => {
-    registerIssue(entry, { kind: 'running' });
+    if (!isSyntheticLinearFallbackOnlyIssueSource(entry)) {
+      registerIssue(entry, { kind: 'running' });
+    }
   });
   snapshot.retrying.forEach((entry) => {
-    registerIssue(entry, { kind: 'retry' });
+    if (!isSyntheticLinearFallbackOnlyIssueSource(entry)) {
+      registerIssue(entry, { kind: 'retry' });
+    }
   });
 
   return {
@@ -1081,6 +1096,90 @@ function buildCompatibilityIssueAliases<TSource extends CompatibilityIssueSource
     }
   }
   return Array.from(aliases);
+}
+
+function hasExplicitCompatibilityIssueIdentity(
+  source: Pick<
+    CompatibilityIssueSourceRecord,
+    'issueProvider' | 'issueIdentifier' | 'issueId' | 'taskId' | 'runId'
+  >
+): boolean {
+  if (
+    source.issueIdentifier &&
+    !isFallbackCompatibilityIdentityValue(source.issueIdentifier, source)
+  ) {
+    return true;
+  }
+  if (source.issueId && !isFallbackCompatibilityIdentityValue(source.issueId, source)) {
+    return true;
+  }
+  return false;
+}
+
+function isFallbackCompatibilityIdentityValue(
+  value: string,
+  source: Pick<CompatibilityIssueSourceRecord, 'taskId' | 'runId'>
+): boolean {
+  return (
+    isFallbackCompatibilityIdentityAlias(value, source.taskId) ||
+    isFallbackCompatibilityIdentityAlias(value, source.runId)
+  );
+}
+
+function isFallbackCompatibilityIdentityAlias(
+  value: string,
+  candidate: string | null
+): boolean {
+  if (!candidate) {
+    return false;
+  }
+  if (value === candidate) {
+    return true;
+  }
+  return SYNTHETIC_LINEAR_TASK_ID_PATTERN.test(value) && candidate.startsWith(`${value}-`);
+}
+
+function isSyntheticLinearFallbackOnlyIssueSource(
+  source: Pick<
+    CompatibilityIssueSourceRecord,
+    | 'issueProvider'
+    | 'issueIdentifier'
+    | 'issueId'
+    | 'pipelineId'
+    | 'pipelineTitle'
+    | 'providerLinearWorkerProof'
+    | 'taskId'
+    | 'runId'
+  > | null
+): boolean {
+  return (
+    source !== null &&
+    hasSyntheticLinearFallbackProvenance(source) &&
+    source.taskId !== null &&
+    SYNTHETIC_LINEAR_TASK_ID_PATTERN.test(source.taskId) &&
+    !hasExplicitCompatibilityIssueIdentity(source)
+  );
+}
+
+function hasSyntheticLinearFallbackProvenance(
+  source: Pick<
+    CompatibilityIssueSourceRecord,
+    'issueProvider' | 'pipelineId' | 'pipelineTitle' | 'providerLinearWorkerProof'
+  >
+): boolean {
+  if (source.issueProvider !== null && source.issueProvider !== 'linear') {
+    return false;
+  }
+  return (
+    source.pipelineId === PROVIDER_LINEAR_WORKER_PIPELINE_ID ||
+    source.pipelineTitle === PROVIDER_LINEAR_WORKER_PIPELINE_TITLE ||
+    source.providerLinearWorkerProof != null ||
+    (source.issueProvider === 'linear' &&
+      (source.pipelineId === 'docs-review' ||
+        source.pipelineId === 'implementation-gate' ||
+        source.pipelineId === 'docs-relevance-advisory' ||
+        source.pipelineId === 'provider-linear-child-lane'))
+  );
 }
 
 function pickPreferredCompatibilitySource<TSource extends CompatibilityIssueSourceRecord>(

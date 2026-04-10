@@ -66,6 +66,23 @@
       }
     },
     {
+      "id": "20260410-linear-aa307fdc-53a1-4225-8d09-28457165fbc8",
+      "title": "CO STATUS: stop synthetic linear-* task-id fallback rows from rendering as running issues",
+      "relates_to": "tasks/tasks-linear-aa307fdc-53a1-4225-8d09-28457165fbc8.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-10",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-aa307fdc-53a1-4225-8d09-28457165fbc8.md",
+        "task": "tasks/tasks-linear-aa307fdc-53a1-4225-8d09-28457165fbc8.md",
+        "agent_task": ".agent/task/linear-aa307fdc-53a1-4225-8d09-28457165fbc8.md",
+        "docs": "docs/TECH_SPEC-linear-aa307fdc-53a1-4225-8d09-28457165fbc8.md"
+      }
+    },
+    {
       "id": "20260410-linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc",
       "title": "CO STATUS: clear stale retry state when active claims rehydrate so one issue cannot appear in both Running and Backoff",
       "relates_to": "tasks/tasks-linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc.md",
@@ -200,6 +217,29 @@
         "task": "tasks/tasks-linear-255030bf-bdda-4594-b503-28639a98b9da.md",
         "agent_task": ".agent/task/linear-255030bf-bdda-4594-b503-28639a98b9da.md",
         "docs": "docs/TECH_SPEC-linear-255030bf-bdda-4594-b503-28639a98b9da.md"
+      }
+    },
+    {
+      "id": "20260410-linear-7105185a-05da-4f49-89d9-35efbba38f3c",
+      "title": "CO: capture live Linear request-burn telemetry after webhook-first targeted reconcile rollout",
+      "relates_to": "tasks/tasks-linear-7105185a-05da-4f49-89d9-35efbba38f3c.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-10",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (clean-success)",
+          "date": "2026-04-10",
+          "manifest": ".runs/linear-7105185a-05da-4f49-89d9-35efbba38f3c-co-147-docs-review-rerun/cli/2026-04-10T16-00-45-369Z-c879ebe1/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-7105185a-05da-4f49-89d9-35efbba38f3c.md",
+        "task": "tasks/tasks-linear-7105185a-05da-4f49-89d9-35efbba38f3c.md",
+        "agent_task": ".agent/task/linear-7105185a-05da-4f49-89d9-35efbba38f3c.md",
+        "docs": "docs/TECH_SPEC-linear-7105185a-05da-4f49-89d9-35efbba38f3c.md"
       }
     },
     {

@@ -119,6 +119,7 @@ interface SharedSelectedProjectionFields {
   latestAction: string | null;
   latestEvent: SelectedRunLatestEvent | null;
   workspacePath: string | null;
+  pipelineId?: string | null;
   pipelineTitle: string | null;
   stages: SelectedRunStageSummary[];
   approvalsTotal: number;
