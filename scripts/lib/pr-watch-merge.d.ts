@@ -73,6 +73,12 @@ export interface PrWatchMergeArgsOptions {
   headOid?: string | null;
 }
 
+export interface PrWatchMergeUpdateBranchArgsOptions {
+  owner: string;
+  repo: string;
+  prNumber: number;
+}
+
 export interface PrWatchMergeSnapshotInput {
   owner: string;
   repo: string;
@@ -94,6 +100,7 @@ export function isHumanReviewActor(
 
 export function parseGitHubRepoFromRemoteUrl(rawUrl: string): { owner: string; repo: string } | null;
 export function buildPrNumberViewArgs(owner?: string, repo?: string): string[];
+export function buildPrUpdateBranchArgs(options: PrWatchMergeUpdateBranchArgsOptions): string[];
 export function isNoRequiredChecksReportedErrorMessage(value: string | null | undefined): boolean;
 
 export function summarizeRequiredChecks(entries: unknown): PrWatchMergeCheckSummary;
@@ -126,6 +133,28 @@ export function resolveActionRequiredReasons(
   snapshot: PrWatchMergeSnapshot,
   options?: Pick<PrWatchMergeOptions, 'readinessMode'>
 ): string[];
+
+export interface AutomaticBranchRecoverySnapshotLike {
+  action_required_reasons?: string[] | null;
+  gate_reasons?: string[] | null;
+  gateReasons?: string[] | null;
+}
+
+export function resolveAutomaticBranchRecoveryReason(
+  snapshotOrReasons: PrWatchMergeSnapshot | AutomaticBranchRecoverySnapshotLike | string[],
+  options?: Pick<PrWatchMergeOptions, 'readinessMode'> & {
+    requireExclusive?: boolean;
+  }
+): 'merge_state=BEHIND' | 'merge_state=DIRTY' | null;
+
+export function shouldAttemptAutomaticBranchRecovery(
+  snapshotOrReasons: PrWatchMergeSnapshot | AutomaticBranchRecoverySnapshotLike | string[],
+  options?: Pick<PrWatchMergeOptions, 'readinessMode'>
+): boolean;
+
+export function isConflictLikeBranchRecoveryFailureMessage(
+  value: string | null | undefined
+): boolean;
 
 export function shouldSucceedAfterTimeout(
   snapshot: PrWatchMergeSnapshot | null | undefined,

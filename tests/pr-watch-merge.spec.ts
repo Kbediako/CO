@@ -3,16 +3,20 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   buildPrNumberViewArgs,
   buildPrMergeArgs,
+  buildPrUpdateBranchArgs,
   buildStatusSnapshot,
+  isConflictLikeBranchRecoveryFailureMessage,
   isNoRequiredChecksReportedErrorMessage,
   isHumanReviewActor,
   parseGitHubRepoFromRemoteUrl,
+  resolveAutomaticBranchRecoveryReason,
   resolveActionRequiredReasons,
   resolveLatestBotRereviewRequests,
   resolveBotRereviewTimingForKind,
   resolveCachedRequiredChecksSummary,
   resolveRequiredChecksSummary,
   runPrWatchMerge,
+  shouldAttemptAutomaticBranchRecovery,
   shouldSucceedAfterTimeout,
   summarizeRequiredChecks
 } from '../scripts/lib/pr-watch-merge.js';
@@ -81,6 +85,16 @@ describe('buildPrNumberViewArgs', () => {
       '--repo',
       'Kbediako/CO'
     ]);
+  });
+});
+
+describe('buildPrUpdateBranchArgs', () => {
+  it('includes explicit repo context for gh pr update-branch', () => {
+    expect(buildPrUpdateBranchArgs({
+      owner: 'Kbediako',
+      repo: 'CO',
+      prNumber: 253
+    })).toEqual(['pr', 'update-branch', '253', '--repo', 'Kbediako/CO']);
   });
 });
 
@@ -531,6 +545,104 @@ describe('resolveActionRequiredReasons', () => {
 
     expect(snapshot.requiredChecks).toBeNull();
     expect(resolveActionRequiredReasons(snapshot)).toEqual([]);
+  });
+});
+
+describe('resolveAutomaticBranchRecoveryReason', () => {
+  it('picks BEHIND from action-required snapshots', () => {
+    const snapshot = buildStatusSnapshot(
+      makeResponse([], {
+        mergeStateStatus: 'BEHIND'
+      }),
+      summarizeRequiredChecks([
+        { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+      ]),
+      {
+        fetchError: false,
+        unacknowledgedCount: 0
+      }
+    );
+
+    expect(resolveAutomaticBranchRecoveryReason(snapshot)).toBe('merge_state=BEHIND');
+    expect(shouldAttemptAutomaticBranchRecovery(snapshot)).toBe(true);
+  });
+
+  it('ignores non-recovery action-required reasons', () => {
+    const snapshot = buildStatusSnapshot(
+      makeResponse([], {
+        reviewDecision: 'CHANGES_REQUESTED'
+      }),
+      summarizeRequiredChecks([
+        { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+      ]),
+      {
+        fetchError: false,
+        unacknowledgedCount: 0
+      }
+    );
+
+    expect(resolveAutomaticBranchRecoveryReason(snapshot)).toBeNull();
+  });
+
+  it('accepts precomputed action-required reason lists', () => {
+    expect(resolveAutomaticBranchRecoveryReason([
+      'review=CHANGES_REQUESTED',
+      'merge_state=DIRTY'
+    ])).toBe('merge_state=DIRTY');
+  });
+});
+
+describe('shouldAttemptAutomaticBranchRecovery', () => {
+  it('requires BEHIND or DIRTY to be the only action-required blocker', () => {
+    expect(shouldAttemptAutomaticBranchRecovery(['merge_state=BEHIND'])).toBe(true);
+    expect(
+      shouldAttemptAutomaticBranchRecovery(['review=CHANGES_REQUESTED', 'merge_state=BEHIND'])
+    ).toBe(false);
+    expect(
+      shouldAttemptAutomaticBranchRecovery(['merge_state=DIRTY', 'unresolved_threads=2'])
+    ).toBe(false);
+  });
+
+  it('requires the snapshot to be otherwise green before mutating the branch', () => {
+    const snapshot = buildStatusSnapshot(
+      makeResponse([], {
+        mergeStateStatus: 'BEHIND'
+      }),
+      summarizeRequiredChecks([
+        { name: 'corelane', state: 'PENDING', bucket: 'pending', link: 'https://example.com/corelane' }
+      ]),
+      {
+        fetchError: false,
+        unacknowledgedCount: 0
+      }
+    );
+
+    expect(snapshot.gateReasons).toEqual(['required_checks_pending=1', 'merge_state=BEHIND']);
+    expect(resolveActionRequiredReasons(snapshot)).toEqual(['merge_state=BEHIND']);
+    expect(resolveAutomaticBranchRecoveryReason(snapshot)).toBe('merge_state=BEHIND');
+    expect(resolveAutomaticBranchRecoveryReason(snapshot, { requireExclusive: true })).toBeNull();
+    expect(shouldAttemptAutomaticBranchRecovery(snapshot)).toBe(false);
+  });
+});
+
+describe('isConflictLikeBranchRecoveryFailureMessage', () => {
+  it('recognizes GitHub conflict-style update-branch failures', () => {
+    expect(
+      isConflictLikeBranchRecoveryFailureMessage(
+        'GraphQL: This branch cannot be rebased due to conflicts'
+      )
+    ).toBe(true);
+    expect(
+      isConflictLikeBranchRecoveryFailureMessage(
+        'Update failed because of merge conflicts in src/index.ts'
+      )
+    ).toBe(true);
+  });
+
+  it('ignores non-conflict branch refresh failures', () => {
+    expect(
+      isConflictLikeBranchRecoveryFailureMessage('HTTP 502 from GitHub while updating branch')
+    ).toBe(false);
   });
 });
 

@@ -158,6 +158,17 @@ interface ProviderIssuePullRequestLifecycleLike {
     number?: number | null;
   } | null;
   snapshot?: ProviderIssuePullRequestSnapshotLike | null;
+  branch_recovery?: {
+    attempted_at?: string | null;
+    recovery_reason?: string | null;
+    command?: string | null;
+    args?: string[] | null;
+    exit_code?: number | null;
+    ok?: boolean | null;
+    stdout?: string | null;
+    stderr?: string | null;
+    failure_kind?: string | null;
+  } | null;
 }
 
 interface ProviderIssueReviewPromotionLike extends ProviderIssuePullRequestLifecycleLike {
@@ -315,6 +326,17 @@ export interface ControlProviderDebugSnapshot {
     action_required_reasons: string[];
     updated_at: string | null;
     merged_at: string | null;
+    branch_recovery: {
+      attempted_at: string | null;
+      recovery_reason: string | null;
+      command: string | null;
+      args: string[];
+      exit_code: number | null;
+      ok: boolean | null;
+      stdout: string | null;
+      stderr: string | null;
+      failure_kind: string | null;
+    } | null;
   } | null;
   progress: ProviderLinearWorkerProgressSnapshot | null;
   last_audit_operation: {
@@ -1211,6 +1233,19 @@ function deriveMergeCloseoutProgressSnapshot(
     };
   }
 
+  if (hasPendingBranchRecovery(mergeCloseout)) {
+    return {
+      phase: 'watching_merge',
+      kind: 'merge_closeout',
+      status: 'progressing',
+      summary,
+      last_semantic_progress_at: lastSemanticProgressAt,
+      stall_classification: 'progressing',
+      stall_reason: null,
+      recovery_recommendation: 'continue_waiting'
+    };
+  }
+
   if (
     reviewBlockerReason
     || (unresolvedThreadCount ?? 0) > 0
@@ -1351,6 +1386,19 @@ function deriveReviewPromotionProgressSnapshot(
     };
   }
 
+  if (hasPendingBranchRecovery(reviewPromotion)) {
+    return {
+      phase: 'review_handoff',
+      kind: 'workflow',
+      status: 'progressing',
+      summary,
+      last_semantic_progress_at: lastSemanticProgressAt,
+      stall_classification: 'progressing',
+      stall_reason: null,
+      recovery_recommendation: 'continue_waiting'
+    };
+  }
+
   if (
     reviewBlockerReason
     || (unresolvedThreadCount ?? 0) > 0
@@ -1446,6 +1494,14 @@ function derivePendingMergeCloseoutProgressSnapshot(
   };
 }
 
+function hasPendingBranchRecovery(record: ProviderIssuePullRequestLifecycleLike): boolean {
+  return (
+    normalizeOptionalString(record.reason) === 'branch_refresh_requested'
+    && record.branch_recovery?.ok === true
+    && Boolean(normalizeOptionalString(record.branch_recovery.recovery_reason))
+  );
+}
+
 function resolveMergeCloseoutReviewBlockerReason(input: {
   unresolvedThreadCount: number | null;
   actionRequiredReasons: string[];
@@ -1529,7 +1585,23 @@ function buildProviderDebugPullRequestSnapshot(input: {
     gate_reasons: normalizeStringArray(snapshot?.gate_reasons),
     action_required_reasons: normalizeStringArray(snapshot?.action_required_reasons),
     updated_at: normalizeOptionalString(snapshot?.updated_at),
-    merged_at: normalizeOptionalString(snapshot?.merged_at)
+    merged_at: normalizeOptionalString(snapshot?.merged_at),
+    branch_recovery: selectedRecord.branch_recovery
+      ? {
+          attempted_at: normalizeOptionalString(selectedRecord.branch_recovery.attempted_at),
+          recovery_reason: normalizeOptionalString(selectedRecord.branch_recovery.recovery_reason),
+          command: normalizeOptionalString(selectedRecord.branch_recovery.command),
+          args: normalizeStringArray(selectedRecord.branch_recovery.args),
+          exit_code: normalizeOptionalInteger(selectedRecord.branch_recovery.exit_code),
+          ok:
+            typeof selectedRecord.branch_recovery.ok === 'boolean'
+              ? selectedRecord.branch_recovery.ok
+              : null,
+          stdout: normalizeOptionalString(selectedRecord.branch_recovery.stdout),
+          stderr: normalizeOptionalString(selectedRecord.branch_recovery.stderr),
+          failure_kind: normalizeOptionalString(selectedRecord.branch_recovery.failure_kind)
+        }
+      : null
   };
 }
 

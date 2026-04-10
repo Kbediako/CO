@@ -17,6 +17,7 @@ const REQUIRED_BUCKET_PENDING = new Set(['pending']);
 const REQUIRED_BUCKET_FAILED = new Set(['fail', 'cancel', 'skipping']);
 const MERGEABLE_STATES = new Set(['CLEAN', 'HAS_HOOKS', 'UNSTABLE']);
 const ACTION_REQUIRED_MERGE_STATES = new Set(['BEHIND', 'DIRTY']);
+const AUTOMATIC_BRANCH_RECOVERY_REASONS = new Set(['merge_state=BEHIND', 'merge_state=DIRTY']);
 const MERGE_BLOCKED_REVIEW_DECISIONS = new Set(['CHANGES_REQUESTED', 'REVIEW_REQUIRED']);
 const REVIEW_HANDOFF_BLOCKED_REVIEW_DECISIONS = new Set(['CHANGES_REQUESTED']);
 const DO_NOT_MERGE_LABEL = /do[\s_-]*not[\s_-]*merge/i;
@@ -336,7 +337,7 @@ ${isReviewMode ? '' : `  --merge-method <method>   merge|squash|rebase (default:
 `}
   --exit-on-action-required Exit non-zero when author action is required
   --no-exit-on-action-required Keep monitoring even when author action is required
-  --dry-run                 Never call gh pr merge (report only)
+  --dry-run                 Never call gh pr merge/update-branch (report only)
   -h, --help                Show this help message
 
 Environment:
@@ -528,6 +529,10 @@ export function buildPrNumberViewArgs(owner, repo) {
     args.push('--repo', `${owner.trim()}/${repo.trim()}`);
   }
   return args;
+}
+
+export function buildPrUpdateBranchArgs({ owner, repo, prNumber }) {
+  return ['pr', 'update-branch', String(prNumber), '--repo', `${owner}/${repo}`];
 }
 
 async function resolvePrNumber(prArg, owner, repo) {
@@ -855,6 +860,82 @@ export function resolveActionRequiredReasons(snapshot, options = {}) {
     }
   }
   return reasons;
+}
+
+function readPrecomputedRecoveryReasonList(snapshotOrReasons) {
+  if (Array.isArray(snapshotOrReasons)) {
+    return snapshotOrReasons.filter((reason) => typeof reason === 'string' && reason.trim().length > 0);
+  }
+  const precomputedReasons = snapshotOrReasons?.action_required_reasons;
+  return Array.isArray(precomputedReasons)
+    ? precomputedReasons.filter((reason) => typeof reason === 'string' && reason.trim().length > 0)
+    : [];
+}
+
+function readRecoveryGateReasons(snapshotOrReasons) {
+  if (!snapshotOrReasons || Array.isArray(snapshotOrReasons) || typeof snapshotOrReasons !== 'object') {
+    return [];
+  }
+  const rawGateReasons = Array.isArray(snapshotOrReasons.gateReasons)
+    ? snapshotOrReasons.gateReasons
+    : snapshotOrReasons.gate_reasons;
+  return Array.isArray(rawGateReasons)
+    ? rawGateReasons.filter((reason) => typeof reason === 'string' && reason.trim().length > 0)
+    : [];
+}
+
+export function resolveAutomaticBranchRecoveryReason(snapshotOrReasons, options = {}) {
+  const reasons = readPrecomputedRecoveryReasonList(snapshotOrReasons);
+  const resolvedReasons = reasons.length > 0
+    ? reasons
+    : resolveActionRequiredReasons(snapshotOrReasons, options);
+  const recoveryReason = reasons.find((reason) => AUTOMATIC_BRANCH_RECOVERY_REASONS.has(reason));
+  const selectedReason = typeof recoveryReason === 'string'
+    ? recoveryReason
+    : resolvedReasons.find((reason) => AUTOMATIC_BRANCH_RECOVERY_REASONS.has(reason));
+  if (typeof selectedReason !== 'string') {
+    return null;
+  }
+  if (options.requireExclusive === true) {
+    if (
+      resolvedReasons.length === 0
+      || resolvedReasons.some((reason) => !AUTOMATIC_BRANCH_RECOVERY_REASONS.has(reason))
+    ) {
+      return null;
+    }
+    const gateReasons = readRecoveryGateReasons(snapshotOrReasons);
+    if (gateReasons.some((reason) => !AUTOMATIC_BRANCH_RECOVERY_REASONS.has(reason))) {
+      return null;
+    }
+  }
+  return selectedReason;
+}
+
+export function shouldAttemptAutomaticBranchRecovery(snapshotOrReasons, options = {}) {
+  const reasons = readPrecomputedRecoveryReasonList(snapshotOrReasons);
+  const resolvedReasons = reasons.length > 0
+    ? reasons
+    : resolveActionRequiredReasons(snapshotOrReasons, options);
+  const recoveryReason = resolveAutomaticBranchRecoveryReason(snapshotOrReasons, {
+    ...options,
+    requireExclusive: true
+  });
+  return (
+    typeof recoveryReason === 'string'
+    && resolvedReasons.length === 1
+    && resolvedReasons[0] === recoveryReason
+  );
+}
+
+export function isConflictLikeBranchRecoveryFailureMessage(value) {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return false;
+  }
+  return (
+    /\bconflict(?:ing|s)?\b/iu.test(value)
+    || /\bcannot be (?:cleanly )?(?:rebased|merged)\b/iu.test(value)
+    || /\bmerge conflict\b/iu.test(value)
+  );
 }
 
 export function shouldSucceedAfterTimeout(snapshot, options = {}) {
@@ -1408,6 +1489,26 @@ async function attemptMerge({ owner, repo, prNumber, mergeMethod, deleteBranch, 
   return await runGh(args, { allowFailure: true });
 }
 
+async function attemptUpdateBranch({ owner, repo, prNumber }) {
+  const args = buildPrUpdateBranchArgs({ owner, repo, prNumber });
+  return await runGh(args, { allowFailure: true });
+}
+
+function buildAutomaticBranchRecoveryKey(snapshot, recoveryReason) {
+  return [
+    recoveryReason,
+    snapshot?.headOid || 'no-head',
+    snapshot?.updatedAt || 'no-updated'
+  ].join('|');
+}
+
+function describeAutomaticBranchRecovery(recoveryReason) {
+  if (recoveryReason === 'merge_state=DIRTY') {
+    return 'conflict recovery';
+  }
+  return 'branch refresh';
+}
+
 async function runPrWatchMergeOrThrow(argv, options) {
   const { args, positionals } = parseArgs(argv);
   const readinessMode = normalizeReadinessMode(options.readinessMode);
@@ -1542,6 +1643,7 @@ async function runPrWatchMergeOrThrow(argv, options) {
   let quietWindowAnchorUpdatedAt = null;
   let quietWindowAnchorHeadOid = null;
   let lastMergeAttemptHeadOid = null;
+  let pendingAutomaticBranchRecoveryKey = null;
   let requiredChecksForNextPollCache = null;
   let latestSnapshot = null;
   let pollingHealthySinceLatestSnapshot = false;
@@ -1602,9 +1704,101 @@ async function runPrWatchMergeOrThrow(argv, options) {
 
     log(formatStatusLine(snapshot, quietRemainingMs));
 
+    const actionRequiredReasons = resolveActionRequiredReasons(snapshot, { readinessMode });
+    const automaticBranchRecoveryReason =
+      (isReviewMode || autoMerge)
+        ? resolveAutomaticBranchRecoveryReason(snapshot, {
+            readinessMode,
+            requireExclusive: true
+          })
+        : null;
+    const shouldAttemptRecovery =
+      (isReviewMode || autoMerge)
+      && shouldAttemptAutomaticBranchRecovery(snapshot, { readinessMode });
+    const automaticBranchRecoveryKey = automaticBranchRecoveryReason
+      ? buildAutomaticBranchRecoveryKey(snapshot, automaticBranchRecoveryReason)
+      : null;
+    if (
+      pendingAutomaticBranchRecoveryKey
+      && pendingAutomaticBranchRecoveryKey !== automaticBranchRecoveryKey
+    ) {
+      pendingAutomaticBranchRecoveryKey = null;
+    }
+    if (
+      shouldAttemptRecovery
+      && automaticBranchRecoveryReason
+      && automaticBranchRecoveryKey
+      && pendingAutomaticBranchRecoveryKey !== automaticBranchRecoveryKey
+    ) {
+      if (dryRun) {
+        log(
+          `Dry run: would attempt automatic ${describeAutomaticBranchRecovery(
+            automaticBranchRecoveryReason
+          )} for ${automaticBranchRecoveryReason}.`
+        );
+      } else {
+        log(
+          `Attempting automatic ${describeAutomaticBranchRecovery(
+            automaticBranchRecoveryReason
+          )} via gh pr update-branch (${automaticBranchRecoveryReason}).`
+        );
+        const updateBranchResult = await attemptUpdateBranch({
+          owner,
+          repo,
+          prNumber
+        });
+        if (updateBranchResult.exitCode === 0) {
+          pendingAutomaticBranchRecoveryKey = automaticBranchRecoveryKey;
+          quietWindowStartedAt = null;
+          quietWindowAnchorUpdatedAt = null;
+          quietWindowAnchorHeadOid = null;
+          lastMergeAttemptHeadOid = null;
+          log(
+            `Automatic ${describeAutomaticBranchRecovery(
+              automaticBranchRecoveryReason
+            )} requested for PR #${prNumber}; waiting for GitHub readiness to refresh.`
+          );
+          const remainingTimeMs = deadline - Date.now();
+          if (remainingTimeMs <= 0) {
+            break;
+          }
+          await sleep(Math.min(intervalMs, remainingTimeMs));
+          continue;
+        }
+        const details =
+          updateBranchResult.stderr
+          || updateBranchResult.stdout
+          || `exit code ${updateBranchResult.exitCode}`;
+        log(
+          `Automatic ${describeAutomaticBranchRecovery(
+            automaticBranchRecoveryReason
+          )} failed: ${details}`
+        );
+        if (isConflictLikeBranchRecoveryFailureMessage(details)) {
+          log('GitHub reported merge conflicts while attempting automatic branch recovery.');
+        }
+      }
+    }
+
     if (exitOnActionRequired) {
-      const actionRequiredReasons = resolveActionRequiredReasons(snapshot, { readinessMode });
       if (actionRequiredReasons.length > 0) {
+        if (
+          shouldAttemptRecovery
+          && automaticBranchRecoveryKey
+          && pendingAutomaticBranchRecoveryKey === automaticBranchRecoveryKey
+        ) {
+          log(
+            `Automatic ${describeAutomaticBranchRecovery(
+              automaticBranchRecoveryReason
+            )} is still pending; suppressing action-required exit for now.`
+          );
+          const remainingTimeMs = deadline - Date.now();
+          if (remainingTimeMs <= 0) {
+            break;
+          }
+          await sleep(Math.min(intervalMs, remainingTimeMs));
+          continue;
+        }
         const details = actionRequiredReasons.join(', ');
         throw new PrWatchMergeExitError(
           `${isReviewMode ? 'Action required before review handoff' : 'Action required before merge'}: ${details}${snapshot.url ? ` (${snapshot.url})` : ''}`,
