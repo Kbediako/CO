@@ -1647,6 +1647,7 @@ async function runPrWatchMergeOrThrow(argv, options) {
   let quietWindowAnchorHeadOid = null;
   let lastMergeAttemptHeadOid = null;
   let pendingAutomaticBranchRecoveryKey = null;
+  let attemptedAutomaticBranchRecoveryKey = null;
   let requiredChecksForNextPollCache = null;
   let latestSnapshot = null;
   let pollingHealthySinceLatestSnapshot = false;
@@ -1728,10 +1729,17 @@ async function runPrWatchMergeOrThrow(argv, options) {
       pendingAutomaticBranchRecoveryKey = null;
     }
     if (
+      attemptedAutomaticBranchRecoveryKey
+      && attemptedAutomaticBranchRecoveryKey !== automaticBranchRecoveryKey
+    ) {
+      attemptedAutomaticBranchRecoveryKey = null;
+    }
+    if (
       shouldAttemptRecovery
       && automaticBranchRecoveryReason
       && automaticBranchRecoveryKey
       && pendingAutomaticBranchRecoveryKey !== automaticBranchRecoveryKey
+      && attemptedAutomaticBranchRecoveryKey !== automaticBranchRecoveryKey
     ) {
       if (dryRun) {
         log(
@@ -1750,6 +1758,7 @@ async function runPrWatchMergeOrThrow(argv, options) {
           repo,
           prNumber
         });
+        attemptedAutomaticBranchRecoveryKey = automaticBranchRecoveryKey;
         if (updateBranchResult.exitCode === 0) {
           pendingAutomaticBranchRecoveryKey = automaticBranchRecoveryKey;
           quietWindowStartedAt = null;

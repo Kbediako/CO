@@ -1,3 +1,4 @@
+import { EventEmitter } from 'node:events';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -896,6 +897,117 @@ describe('runPrWatchMerge review-mode flag validation', () => {
     expect(errorSpy).toHaveBeenCalledWith(
       'ready-review does not support merge flags: --merge-method'
     );
+  });
+
+  it('does not retry a failed automatic branch recovery for the same head and reason', async () => {
+    vi.resetModules();
+    const snapshotPayloads = [
+      makeResponse([], {
+        mergeStateStatus: 'BEHIND',
+        updatedAt: '2026-02-16T03:00:00.000Z'
+      }),
+      makeResponse([], {
+        mergeStateStatus: 'BEHIND',
+        updatedAt: '2026-02-16T03:01:00.000Z'
+      }),
+      makeResponse([], {
+        state: 'MERGED',
+        mergeStateStatus: 'CLEAN',
+        mergedAt: '2026-02-16T03:02:00.000Z',
+        updatedAt: '2026-02-16T03:02:00.000Z'
+      })
+    ];
+    let snapshotIndex = 0;
+    let updateBranchAttempts = 0;
+    const spawnMock = vi.fn((command: string, args: string[]) => {
+      const stdout = new EventEmitter();
+      const stderr = new EventEmitter();
+      const child = Object.assign(new EventEmitter(), { stdout, stderr });
+      let result: { exitCode: number; stdout: string; stderr: string };
+
+      if (command !== 'gh') {
+        throw new Error(`Unexpected command: ${command} ${args.join(' ')}`);
+      }
+
+      if (args[0] === 'auth' && args[1] === 'status') {
+        result = { exitCode: 0, stdout: '', stderr: '' };
+      } else if (args[0] === 'api' && args[1] === 'graphql') {
+        const payload = snapshotPayloads[Math.min(snapshotIndex, snapshotPayloads.length - 1)];
+        snapshotIndex += 1;
+        result = { exitCode: 0, stdout: JSON.stringify(payload), stderr: '' };
+      } else if (args[0] === 'pr' && args[1] === 'checks') {
+        result = { exitCode: 0, stdout: '[]', stderr: '' };
+      } else if (args[0] === 'pr' && args[1] === 'update-branch') {
+        updateBranchAttempts += 1;
+        result = {
+          exitCode: 1,
+          stdout: '',
+          stderr: 'HTTP 502 from GitHub while updating branch'
+        };
+      } else if (args[0] === 'api') {
+        result = { exitCode: 0, stdout: '[[]]', stderr: '' };
+      } else {
+        throw new Error(`Unexpected gh args: ${args.join(' ')}`);
+      }
+
+      queueMicrotask(() => {
+        if (result.stdout) {
+          stdout.emit('data', Buffer.from(result.stdout));
+        }
+        if (result.stderr) {
+          stderr.emit('data', Buffer.from(result.stderr));
+        }
+        child.emit('close', result.exitCode);
+      });
+
+      return child as any;
+    });
+    const sleepMock = vi.fn(async () => undefined);
+    vi.doMock('node:child_process', () => ({
+      spawn: spawnMock
+    }));
+    vi.doMock('node:timers/promises', () => ({
+      setTimeout: sleepMock
+    }));
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    try {
+      const { runPrWatchMerge: runPrWatchMergeWithMocks } = await import('../scripts/lib/pr-watch-merge.js');
+
+      await expect(
+        runPrWatchMergeWithMocks(
+          [
+            '--owner',
+            'Kbediako',
+            '--repo',
+            'CO',
+            '--pr',
+            '211',
+            '--interval-seconds',
+            '0.001',
+            '--quiet-minutes',
+            '0.001',
+            '--timeout-minutes',
+            '1',
+            '--no-exit-on-action-required'
+          ],
+          {
+            enableAutomaticBranchRecovery: true
+          }
+        )
+      ).resolves.toBe(0);
+
+      expect(updateBranchAttempts).toBe(1);
+      expect(snapshotIndex).toBe(3);
+      expect(errorSpy).not.toHaveBeenCalled();
+    } finally {
+      logSpy.mockRestore();
+      errorSpy.mockRestore();
+      vi.doUnmock('node:child_process');
+      vi.doUnmock('node:timers/promises');
+      vi.resetModules();
+    }
   });
 });
 
