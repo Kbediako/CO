@@ -47,4 +47,6 @@
 ## Closeout
 - [x] Fresh standalone review was truthfully replaced with a recorded manual fallback after a classified wrapper boundary. Evidence: `.runs/linear-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6/cli/2026-04-10T10-01-23-158Z-7c7afa99/review/telemetry.json`, `out/linear-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6/manual/20260410T160139Z-review-boundary-fallback.md`.
 - [x] Explicit elegance/minimality pass is completed before review handoff. Evidence: `out/linear-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6/manual/20260410T160139Z-elegance-review.md`.
-- [ ] The workpad, PR attachment, and issue-state handoff all reflect the final fresh-branch implementation state.
+- [x] The workpad and PR attachment reflect the current fresh-branch implementation state. Evidence: `out/linear-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6/manual/workpad.md`, PR `#432`.
+- [ ] Unresolved actionable review threads are zero, or any waiver is recorded with evidence. Evidence: PR `#432` currently has active CodeRabbit review threads and no waiver.
+- [ ] Issue-state handoff occurs only after the review drain and required checks are clean. Evidence: pending while PR `#432` remains blocked by a failed required check and active review feedback.
