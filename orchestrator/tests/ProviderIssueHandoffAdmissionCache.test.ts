@@ -49,6 +49,19 @@ async function waitForCondition(
   throw new Error(`Condition not met after ${turns} timer turns.`);
 }
 
+function getLatestScheduledTimeoutCallback(
+  setTimeoutSpy: { mock: { calls: unknown[][] } }
+): () => void {
+  for (let index = setTimeoutSpy.mock.calls.length - 1; index >= 0; index -= 1) {
+    const [callback] = setTimeoutSpy.mock.calls[index] ?? [];
+    if (typeof callback !== 'function') {
+      continue;
+    }
+    return callback as () => void;
+  }
+  throw new Error('No scheduled timeout callback found.');
+}
+
 async function createHostPaths() {
   const { mkdtemp, mkdir } = await import('node:fs/promises');
   const { resolveRunPaths } = await import('../src/cli/run/runPaths.js');
@@ -225,5 +238,93 @@ describe('createProviderIssueHandoffService admission cache', () => {
     expect(
       readdirSpy.mock.calls.filter(([path]) => path === runsRoot).length
     ).toBeGreaterThanOrEqual(2);
+  });
+
+  it('waits for the active refresh lifecycle lock before running deferred best-effort rehydrate retries', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
+
+    const { createProviderIssueHandoffService } = await import(
+      '../src/cli/control/providerIssueHandoff.js'
+    );
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-125',
+      issue_title: 'Enforce provider max concurrency',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:30:00.000Z',
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      accepted_at: '2026-03-19T04:30:00.000Z',
+      updated_at: '2026-03-19T04:30:00.000Z',
+      last_delivery_id: 'delivery-lock-check',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_200_000,
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: 'control-host',
+      launch_token: 'launch-token-lock-check'
+    });
+
+    let persistCallCount = 0;
+    let activePersistCalls = 0;
+    let maxActivePersistCalls = 0;
+    let releaseBlockedPersist: (() => void) | null = null;
+    const persist = vi.fn(async () => {
+      persistCallCount += 1;
+      activePersistCalls += 1;
+      maxActivePersistCalls = Math.max(maxActivePersistCalls, activePersistCalls);
+      try {
+        if (persistCallCount === 2) {
+          await new Promise<void>((resolve) => {
+            releaseBlockedPersist = resolve;
+          });
+        }
+      } finally {
+        activePersistCalls -= 1;
+      }
+    });
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      startPipelineId: 'diagnostics'
+    });
+
+    await service.rehydrate();
+    await waitForCondition(() => setTimeoutSpy.mock.calls.length >= 1);
+
+    const refreshPromise = service.refresh();
+    await waitForCondition(() => persist.mock.calls.length >= 2 && activePersistCalls === 1);
+
+    const blockedPersistCalls = persist.mock.calls.length;
+    getLatestScheduledTimeoutCallback(setTimeoutSpy)();
+    await flushAsyncWork();
+
+    expect(persist).toHaveBeenCalledTimes(blockedPersistCalls);
+    expect(maxActivePersistCalls).toBe(1);
+
+    if (!releaseBlockedPersist) {
+      throw new Error('Expected refresh persist to be blocked.');
+    }
+    releaseBlockedPersist();
+    await refreshPromise;
+    await waitForCondition(() => persist.mock.calls.length >= blockedPersistCalls + 1);
+
+    expect(maxActivePersistCalls).toBe(1);
   });
 });

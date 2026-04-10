@@ -326,6 +326,10 @@ export function createProviderIssueHandoffService(
   ): Promise<T> =>
     await providerIssueRunDiscoveryScope.run({ discoveredRuns: null }, operation);
 
+  const runOutsideRefreshLifecycleScope = async <T>(
+    operation: () => Promise<T>
+  ): Promise<T> => await refreshLifecycleScope.run(false, operation);
+
   const persistState = async (): Promise<void> => {
     await options.persist();
     rebuildRetryQueue();
@@ -715,8 +719,10 @@ export function createProviderIssueHandoffService(
     }
     bestEffortRehydrateTimer = globalThis.setTimeout(() => {
       bestEffortRehydrateTimer = null;
-      void runWithFreshProviderIssueRunDiscoveryCache(() =>
-        runWithRefreshLifecycleLock(() => rehydrateNow({ refreshTrackedIssueMetadata: true }))
+      void runOutsideRefreshLifecycleScope(() =>
+        runWithFreshProviderIssueRunDiscoveryCache(() =>
+          runWithRefreshLifecycleLock(() => rehydrateNow({ refreshTrackedIssueMetadata: true }))
+        )
       )
         .then((result) => {
           if (result.hasPendingClaims && attempt < BEST_EFFORT_REHYDRATE_MAX_ATTEMPTS) {
@@ -1956,7 +1962,7 @@ export function createProviderIssueHandoffService(
   };
 
   async function dispatchQueuedProviderRetry(providerKey: string, expectedDueAt: string): Promise<void> {
-    await runWithFreshProviderIssueRunDiscoveryCache(async () => {
+    await runOutsideRefreshLifecycleScope(() => runWithFreshProviderIssueRunDiscoveryCache(async () => {
       await runWithRefreshLifecycleLock(async () => {
         const claim = readProviderIntakeClaim(options.state, providerKey);
         if (
@@ -2094,7 +2100,7 @@ export function createProviderIssueHandoffService(
           preserveRetryAttempt: true
         });
       });
-    });
+    }));
   }
 
   const processTrackedIssueCandidate = async (input: {

@@ -5800,6 +5800,131 @@ describe('createProviderIssueHandoffService', () => {
     }));
   });
 
+  it('waits for the active refresh lifecycle lock before dispatching queued retry timers', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-completed'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-completed');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-completed',
+        task_id: 'task-1303-completed',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:21:00.000Z',
+      task_id: 'task-1303-completed',
+      mapping_source: 'provider_id_fallback',
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      accepted_at: '2026-03-19T04:21:05.000Z',
+      updated_at: '2026-03-19T04:21:10.000Z',
+      last_delivery_id: 'delivery-completed',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-completed',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null,
+      retry_queued: true,
+      retry_attempt: 1,
+      retry_due_at: '2026-03-19T04:30:01.000Z',
+      retry_error: null
+    });
+
+    let persistCallCount = 0;
+    let activePersistCalls = 0;
+    let maxActivePersistCalls = 0;
+    let releaseBlockedPersist: (() => void) | null = null;
+    const persist = vi.fn(async () => {
+      persistCallCount += 1;
+      activePersistCalls += 1;
+      maxActivePersistCalls = Math.max(maxActivePersistCalls, activePersistCalls);
+      try {
+        if (persistCallCount === 2) {
+          await new Promise<void>((resolve) => {
+            releaseBlockedPersist = resolve;
+          });
+        }
+      } finally {
+        activePersistCalls -= 1;
+      }
+    });
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-rehydrated',
+        manifestPath: '/tmp/provider-run/rehydrated-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics',
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          updated_at: '2026-03-19T04:21:00.000Z'
+        })
+      })
+    });
+
+    await service.rehydrate();
+    await waitForMockCalls(setTimeoutSpy);
+
+    const refreshPromise = service.refresh();
+    await waitForCondition(() => persist.mock.calls.length >= 2 && activePersistCalls === 1);
+
+    const blockedPersistCalls = persist.mock.calls.length;
+    vi.setSystemTime(new Date('2026-03-19T04:30:01.001Z'));
+    getLatestScheduledTimeoutCallback(setTimeoutSpy)();
+    await flushAsyncWork();
+
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(persist).toHaveBeenCalledTimes(blockedPersistCalls);
+    expect(maxActivePersistCalls).toBe(1);
+
+    if (!releaseBlockedPersist) {
+      throw new Error('Expected refresh persist to be blocked.');
+    }
+    releaseBlockedPersist();
+    await refreshPromise;
+    await waitForMockCalls(launcher.start, 1, QUEUED_RETRY_SETTLE_TURNS);
+
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(maxActivePersistCalls).toBe(1);
+  });
+
   it('dispatches persisted queued retries after the first refresh without an explicit rehydrate', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
@@ -14152,6 +14277,20 @@ describe('createProviderIssueHandoffService', () => {
       retry_due_at: '2026-03-19T04:30:01.000Z',
       retry_error: null
     });
+    await writeFile(
+      completedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-review-completed',
+        task_id: 'task-1303-review-completed',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:30:30.000Z',
+        updated_at: '2026-03-19T04:30:30.000Z'
+      }),
+      'utf8'
+    );
     state.claims.push({
       provider: 'linear',
       provider_key: 'linear:lin-issue-occupied',
