@@ -933,6 +933,146 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.resume).not.toHaveBeenCalled();
   });
 
+  it('requests bounded fresh discovery after claim reconcile when slots remain', async () => {
+    const { root, paths } = await createHostPaths();
+    const occupiedPaths = resolveRunPaths(
+      {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'task-partial-state'
+      },
+      'run-partial-state'
+    );
+    await mkdir(occupiedPaths.runDir, { recursive: true });
+    await writeFile(
+      occupiedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-partial-state',
+        task_id: 'task-partial-state',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-occupied',
+        issue_identifier: 'CO-1',
+        updated_at: '2026-03-19T04:00:00.000Z'
+      }),
+      'utf8'
+    );
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const refetchTrackedIssues = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-issue-fresh',
+          identifier: 'CO-2',
+          priority: 1
+        })
+      ]
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state: createProviderIntakeState(),
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 2,
+          max_concurrent_agents_by_state: {
+            'in progress': 1
+          }
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(refetchTrackedIssues).toHaveBeenCalledWith({
+      mode: 'fresh_discovery',
+      eligibleTargetCount: 1,
+      eligibleStateSlotCounts: {},
+      excludedIssueIds: ['lin-issue-occupied']
+    });
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(launcher.start.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        issueId: 'lin-issue-fresh'
+      })
+    );
+  });
+
+  it('skips bounded fresh discovery when occupied work already consumes the global slot budget', async () => {
+    const { root, paths } = await createHostPaths();
+    const occupiedEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-occupied'
+    };
+    const occupiedPaths = resolveRunPaths(occupiedEnv, 'run-occupied');
+    await mkdir(occupiedPaths.runDir, { recursive: true });
+    await writeFile(
+      occupiedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-occupied',
+        task_id: 'task-occupied',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-occupied',
+        issue_identifier: 'CO-1',
+        updated_at: '2026-03-19T04:00:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const refetchTrackedIssues = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-issue-fresh',
+          identifier: 'CO-2',
+          priority: 1
+        })
+      ]
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state: createProviderIntakeState(),
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(refetchTrackedIssues).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
   it('treats queued retry claims as occupied poll slots before launching fresh poll candidates', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();

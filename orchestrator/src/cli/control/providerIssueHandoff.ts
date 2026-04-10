@@ -20,7 +20,8 @@ import {
 import {
   isLiveLinearTrackedIssueOwnedByCurrentViewerOrUnassigned,
   sortLiveLinearTrackedIssuesForDispatch,
-  type LiveLinearTrackedIssue
+  type LiveLinearTrackedIssue,
+  type LiveLinearTrackedIssuesQueryMode
 } from './linearDispatchSource.js';
 import { resolveLinearWebhookSourceSetup } from './linearWebhookController.js';
 import { resolveLinearApiTokenFingerprint } from './linearGraphqlClient.js';
@@ -91,11 +92,21 @@ export type ProviderTrackedIssuePollResolution =
   | { kind: 'ready'; trackedIssues: LiveLinearTrackedIssue[] }
   | { kind: 'skip'; reason: string };
 
-type ProviderTrackedIssueRefetch = () => Promise<ProviderTrackedIssuePollResolution>;
+export interface ProviderTrackedIssueRefetchInput {
+  mode?: LiveLinearTrackedIssuesQueryMode;
+  eligibleTargetCount?: number;
+  eligibleStateSlotCounts?: Record<string, number>;
+  excludedIssueIds?: string[];
+}
+
+type ProviderTrackedIssueRefetch = (
+  input?: ProviderTrackedIssueRefetchInput
+) => Promise<ProviderTrackedIssuePollResolution>;
 
 export interface ProviderIssueHandoffPollInput {
   trackedIssues: LiveLinearTrackedIssue[];
-  refetchTrackedIssues?: (() => Promise<ProviderTrackedIssuePollResolution>) | null;
+  refetchTrackedIssues?: ProviderTrackedIssueRefetch | null;
+  deferFreshDiscovery?: boolean;
 }
 
 interface ProviderIssueRunRecord {
@@ -157,7 +168,7 @@ export interface CreateProviderIssueHandoffServiceOptions {
       issueId: string;
     }
   ) => Promise<ProviderTrackedIssueRefreshResolution>) | null;
-  resolveTrackedIssues?: (() => Promise<ProviderTrackedIssuePollResolution>) | null;
+  resolveTrackedIssues?: ProviderTrackedIssueRefetch | null;
   providerWorkflowConfigStore?: ProviderWorkflowConfigStore | null;
   runTerminalCleanup?: typeof runProviderTerminalCleanup;
   runReviewHandoffPromotion?: ((input: {
@@ -2870,7 +2881,27 @@ export function createProviderIssueHandoffService(
         return;
       }
 
-      for (const trackedIssue of sortLiveLinearTrackedIssuesForDispatch(pollInput.trackedIssues)) {
+      let freshDiscoveryTrackedIssues = pollInput.trackedIssues;
+      if (
+        pollInput.deferFreshDiscovery === true &&
+        freshDiscoveryTrackedIssues.length === 0 &&
+        trackedIssueRefetch &&
+        pollDispatchBudget.remainingGlobalSlots() > 0
+      ) {
+        const freshDiscoveryResolution = await trackedIssueRefetch({
+          mode: 'fresh_discovery',
+          eligibleTargetCount: pollDispatchBudget.remainingGlobalSlots(),
+          eligibleStateSlotCounts: pollDispatchBudget.remainingStateSlots(),
+          excludedIssueIds: Array.from(
+            new Set([...existingProviderKeys, ...occupiedPollDispatchKeys, ...consumedTrackedIssueKeys])
+          ).map((providerKey) => providerKey.slice(providerKey.indexOf(':') + 1))
+        });
+        if (freshDiscoveryResolution.kind === 'ready') {
+          freshDiscoveryTrackedIssues = freshDiscoveryResolution.trackedIssues;
+        }
+      }
+
+      for (const trackedIssue of sortLiveLinearTrackedIssuesForDispatch(freshDiscoveryTrackedIssues)) {
         const providerKey = buildProviderIssueKey(trackedIssue.provider, trackedIssue.id);
         if (existingProviderKeys.has(providerKey) || consumedTrackedIssueKeys.has(providerKey)) {
           continue;
@@ -3223,12 +3254,27 @@ function createProviderPollDispatchBudget(featureToggles: Record<string, unknown
   canDispatch(trackedIssue: Pick<LiveLinearTrackedIssue, 'state'>): boolean;
   noteOccupied(trackedIssue: Pick<LiveLinearTrackedIssue, 'state'>): void;
   hasGlobalSlots(): boolean;
+  remainingGlobalSlots(): number;
+  remainingStateSlots(): Record<string, number>;
 } {
   const limits = resolveProviderPollDispatchLimits(featureToggles);
   let occupiedGlobalSlots = 0;
   const occupiedStateSlots = new Map<string, number>();
+  let hasPartialStateSnapshot = false;
 
   const hasGlobalSlots = (): boolean => occupiedGlobalSlots < limits.maxConcurrentAgents;
+  const remainingGlobalSlots = (): number =>
+    Math.max(0, limits.maxConcurrentAgents - occupiedGlobalSlots);
+  const remainingStateSlots = (): Record<string, number> => {
+    if (hasPartialStateSnapshot) {
+      return {};
+    }
+    const remaining: Record<string, number> = {};
+    for (const [state, stateLimit] of limits.maxConcurrentAgentsByState.entries()) {
+      remaining[state] = Math.max(0, stateLimit - (occupiedStateSlots.get(state) ?? 0));
+    }
+    return remaining;
+  };
 
   const canDispatch = (trackedIssue: Pick<LiveLinearTrackedIssue, 'state'>): boolean => {
     if (!hasGlobalSlots()) {
@@ -3247,6 +3293,7 @@ function createProviderPollDispatchBudget(featureToggles: Record<string, unknown
     occupiedGlobalSlots += 1;
     const normalizedState = normalizeProviderLinearWorkflowState(trackedIssue.state);
     if (!normalizedState) {
+      hasPartialStateSnapshot = true;
       return;
     }
     occupiedStateSlots.set(normalizedState, (occupiedStateSlots.get(normalizedState) ?? 0) + 1);
@@ -3255,7 +3302,9 @@ function createProviderPollDispatchBudget(featureToggles: Record<string, unknown
   return {
     canDispatch,
     noteOccupied,
-    hasGlobalSlots
+    hasGlobalSlots,
+    remainingGlobalSlots,
+    remainingStateSlots
   };
 }
 
