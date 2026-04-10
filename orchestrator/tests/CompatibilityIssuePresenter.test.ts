@@ -30,6 +30,7 @@ function buildCompatibilitySource(
     latestAction: null,
     latestEvent: null,
     workspacePath: '/repo/.workspaces/co-100',
+    pipelineId: null,
     pipelineTitle: 'Implementation gate',
     stages: [],
     approvalsTotal: 0,
@@ -176,6 +177,7 @@ describe('CompatibilityIssuePresenter', () => {
           issueIdentifier: taskId,
           issueId: taskId,
           taskId,
+          pipelineId: 'provider-linear-worker',
           rawStatus: 'in_progress',
           displayStatus: 'In Progress',
           updatedAt: '2026-04-06T02:35:00.000Z',
@@ -198,6 +200,7 @@ describe('CompatibilityIssuePresenter', () => {
           issueIdentifier: taskId,
           issueId: taskId,
           taskId,
+          pipelineId: 'provider-linear-worker',
           rawStatus: 'in_progress',
           displayStatus: 'In Progress',
           updatedAt: '2026-04-06T02:35:00.000Z',
@@ -222,6 +225,7 @@ describe('CompatibilityIssuePresenter', () => {
           issueIdentifier: runningTaskId,
           issueId: runningTaskId,
           taskId: runningTaskId,
+          pipelineId: 'provider-linear-worker',
           rawStatus: 'in_progress',
           displayStatus: 'In Progress',
           completedAt: null,
@@ -234,6 +238,7 @@ describe('CompatibilityIssuePresenter', () => {
           issueIdentifier: retryTaskId,
           issueId: retryTaskId,
           taskId: retryTaskId,
+          pipelineId: 'provider-linear-worker',
           rawStatus: 'failed',
           displayStatus: 'retrying',
           completedAt: null,
@@ -259,6 +264,7 @@ describe('CompatibilityIssuePresenter', () => {
           issueIdentifier: parentTaskId,
           issueId: parentTaskId,
           taskId: runningTaskId,
+          pipelineId: 'docs-review',
           rawStatus: 'in_progress',
           displayStatus: 'In Progress',
           completedAt: null,
@@ -271,6 +277,7 @@ describe('CompatibilityIssuePresenter', () => {
           issueIdentifier: parentTaskId,
           issueId: parentTaskId,
           taskId: retryTaskId,
+          pipelineId: 'implementation-gate',
           rawStatus: 'failed',
           displayStatus: 'retrying',
           completedAt: null,
@@ -298,6 +305,29 @@ describe('CompatibilityIssuePresenter', () => {
           updatedAt: '2026-04-06T02:35:00.000Z',
           completedAt: null,
           summary: 'non-linear selected source'
+        })
+      )
+    );
+
+    expect(projection.issues.map((issue) => issue.issueIdentifier)).toEqual([taskId]);
+  });
+
+  it('keeps linear-tagged selected rows when provider-worker provenance is absent', () => {
+    const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+    const projection = buildCompatibilityProjectionSnapshot(
+      buildCompatibilityRuntime(
+        buildCompatibilitySource({
+          issueProvider: 'linear',
+          issueIdentifier: taskId,
+          issueId: taskId,
+          taskId,
+          pipelineId: 'custom-background-pipeline',
+          pipelineTitle: 'Custom Background Pipeline',
+          rawStatus: 'in_progress',
+          displayStatus: 'In Progress',
+          updatedAt: '2026-04-06T02:35:00.000Z',
+          completedAt: null,
+          summary: 'linear-tagged custom pipeline should stay visible'
         })
       )
     );

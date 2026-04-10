@@ -51,6 +51,7 @@ import {
 } from './providerLinearWorkerTruth.js';
 
 const PROVIDER_LINEAR_WORKER_PIPELINE_TITLE = 'Provider Linear Worker';
+const PROVIDER_LINEAR_WORKER_PIPELINE_ID = 'provider-linear-worker';
 const SYNTHETIC_LINEAR_TASK_ID_PATTERN =
   /^linear-[a-z0-9]+(?:-[a-z0-9]+)*$/i;
 const PROVIDER_LINEAR_CHILD_PIPELINE_IDS = new Set([
@@ -428,6 +429,7 @@ function buildProjectionContextFromParts(
     latestAction,
     latestEvent,
     workspacePath,
+    pipelineId: readStringValue(manifestRecord, 'pipeline_id', 'pipelineId') ?? null,
     pipelineTitle: readStringValue(manifestRecord, 'pipeline_title', 'pipelineTitle') ?? null,
     stages: readManifestStageSummaries(manifestRecord),
     approvalsTotal: readManifestApprovalsTotal(manifestRecord),
@@ -1347,7 +1349,7 @@ function providerIntakeClaimMatchesSyntheticFallbackTaskBinding(
   if (!claim.task_id || !snapshot.taskId) {
     return false;
   }
-  if (!hasLinearProviderWorkerProjectionProvenance(snapshot, snapshot.providerLinearWorkerProof)) {
+  if (!hasProviderLinearClaimBindingProvenance(snapshot, snapshot.providerLinearWorkerProof)) {
     return false;
   }
   if (claim.task_id !== buildProviderFallbackTaskId({ id: claim.issue_id })) {
@@ -1381,14 +1383,19 @@ function matchesSyntheticProviderChildTaskId(
   return snapshotTaskId === `${claimTaskId}-${pipelineId}`;
 }
 
-function hasLinearProviderWorkerProjectionProvenance(
+function hasProviderLinearClaimBindingProvenance(
   snapshot: Pick<SelectedRunManifestSnapshot, 'issueProvider' | 'manifestRecord'>,
   providerLinearWorkerProof: ProviderLinearWorkerProof | null
 ): boolean {
+  if (snapshot.issueProvider !== null && snapshot.issueProvider !== 'linear') {
+    return false;
+  }
+  const pipelineId = readStringValue(snapshot.manifestRecord, 'pipeline_id', 'pipelineId') ?? null;
   const pipelineTitle =
     readStringValue(snapshot.manifestRecord, 'pipeline_title', 'pipelineTitle') ?? null;
   return (
-    snapshot.issueProvider === 'linear' ||
+    pipelineId === PROVIDER_LINEAR_WORKER_PIPELINE_ID ||
+    isProviderLinearChildPipelineId(pipelineId) ||
     pipelineTitle === PROVIDER_LINEAR_WORKER_PIPELINE_TITLE ||
     providerLinearWorkerProof != null
   );

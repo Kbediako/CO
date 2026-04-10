@@ -1490,6 +1490,7 @@ describe('ControlRuntime', () => {
       });
       await seedManifest(fixture.paths, {
         task_id: taskId,
+        pipeline_id: 'provider-linear-worker',
         issue_provider: 'linear',
         status: 'in_progress',
         started_at: '2026-03-07T00:25:00.000Z',
@@ -1518,6 +1519,7 @@ describe('ControlRuntime', () => {
       });
       await seedManifest(fixture.paths, {
         task_id: taskId,
+        pipeline_id: 'provider-linear-worker',
         pipeline_title: 'Provider Linear Worker',
         status: 'in_progress',
         started_at: '2026-03-07T00:25:00.000Z',
@@ -1546,6 +1548,7 @@ describe('ControlRuntime', () => {
       });
       await seedManifest(fixture.paths, {
         task_id: taskId,
+        pipeline_id: 'provider-linear-worker',
         pipeline_title: 'Provider Linear Worker',
         status: 'in_progress',
         started_at: '2026-03-07T00:25:00.000Z',
@@ -1688,6 +1691,7 @@ describe('ControlRuntime', () => {
 
       await seedManifest(fixture.paths, {
         task_id: taskId,
+        pipeline_id: 'provider-linear-worker',
         issue_provider: 'linear',
         status: 'in_progress',
         started_at: '2026-03-07T00:25:00.000Z',
@@ -1731,6 +1735,7 @@ describe('ControlRuntime', () => {
       const siblingPaths = await createSiblingRun(fixture.root, taskId, 'run-2', {
         manifest: {
           task_id: taskId,
+          pipeline_id: 'provider-linear-worker',
           issue_provider: 'linear',
           status: 'in_progress',
           started_at: '2026-03-07T00:25:00.000Z',
@@ -1868,6 +1873,7 @@ describe('ControlRuntime', () => {
       await createSiblingRun(fixture.root, childTaskId, 'run-child', {
         manifest: {
           task_id: childTaskId,
+          pipeline_id: 'docs-review',
           issue_provider: 'linear',
           issue_id: parentTaskId,
           issue_identifier: parentTaskId,

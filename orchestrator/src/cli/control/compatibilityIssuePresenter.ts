@@ -17,6 +17,7 @@ import {
 import type { LinearBudgetStatus } from './linearBudgetState.js';
 
 const PROVIDER_LINEAR_WORKER_PIPELINE_TITLE = 'Provider Linear Worker';
+const PROVIDER_LINEAR_WORKER_PIPELINE_ID = 'provider-linear-worker';
 const SYNTHETIC_LINEAR_TASK_ID_PATTERN =
   /^linear-[a-z0-9]+(?:-[a-z0-9]+)*$/i;
 
@@ -30,6 +31,7 @@ export interface CompatibilityIssueSourceRecord {
   updatedAt: string | null;
   startedAt: string | null;
   completedAt: string | null;
+  pipelineId?: string | null;
   pipelineTitle?: string | null;
   providerLinearWorkerProof?: ControlCompatibilitySourceContext['providerLinearWorkerProof'];
   latestEvent: {
@@ -1140,7 +1142,14 @@ function isFallbackCompatibilityIdentityAlias(
 function isSyntheticLinearFallbackOnlyIssueSource(
   source: Pick<
     CompatibilityIssueSourceRecord,
-    'issueProvider' | 'issueIdentifier' | 'issueId' | 'pipelineTitle' | 'providerLinearWorkerProof' | 'taskId' | 'runId'
+    | 'issueProvider'
+    | 'issueIdentifier'
+    | 'issueId'
+    | 'pipelineId'
+    | 'pipelineTitle'
+    | 'providerLinearWorkerProof'
+    | 'taskId'
+    | 'runId'
   > | null
 ): boolean {
   return (
@@ -1153,10 +1162,20 @@ function isSyntheticLinearFallbackOnlyIssueSource(
 }
 
 function hasSyntheticLinearFallbackProvenance(
-  source: Pick<CompatibilityIssueSourceRecord, 'issueProvider' | 'pipelineTitle' | 'providerLinearWorkerProof'>
+  source: Pick<
+    CompatibilityIssueSourceRecord,
+    'issueProvider' | 'pipelineId' | 'pipelineTitle' | 'providerLinearWorkerProof'
+  >
 ): boolean {
+  if (source.issueProvider !== null && source.issueProvider !== 'linear') {
+    return false;
+  }
   return (
-    source.issueProvider === 'linear' ||
+    source.pipelineId === PROVIDER_LINEAR_WORKER_PIPELINE_ID ||
+    source.pipelineId === 'docs-review' ||
+    source.pipelineId === 'implementation-gate' ||
+    source.pipelineId === 'docs-relevance-advisory' ||
+    source.pipelineId === 'provider-linear-child-lane' ||
     source.pipelineTitle === PROVIDER_LINEAR_WORKER_PIPELINE_TITLE ||
     source.providerLinearWorkerProof != null
   );

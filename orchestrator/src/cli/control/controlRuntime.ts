@@ -521,6 +521,7 @@ function isControlHostSelectedFallbackSource(
     | 'issueProvider'
     | 'issueIdentifier'
     | 'issueId'
+    | 'pipelineId'
     | 'pipelineTitle'
     | 'providerLinearWorkerProof'
     | 'taskId'
@@ -542,6 +543,7 @@ function findMatchingProviderIntakeClaim(
     | 'issueIdentifier'
     | 'issueProvider'
     | 'manifestPath'
+    | 'pipelineId'
     | 'pipelineTitle'
     | 'providerLinearWorkerProof'
     | 'taskId'
@@ -574,6 +576,7 @@ function scoreProviderClaimMatch(
     | 'issueIdentifier'
     | 'issueProvider'
     | 'manifestPath'
+    | 'pipelineId'
     | 'pipelineTitle'
     | 'providerLinearWorkerProof'
     | 'taskId'
@@ -614,6 +617,7 @@ function canScoreProviderRunBindingMatch(
     | 'issueId'
     | 'issueIdentifier'
     | 'issueProvider'
+    | 'pipelineId'
     | 'pipelineTitle'
     | 'providerLinearWorkerProof'
     | 'taskId'
@@ -636,6 +640,7 @@ function isAuthoritativeProviderTaskIdMatch(
     | 'issueId'
     | 'issueIdentifier'
     | 'issueProvider'
+    | 'pipelineId'
     | 'pipelineTitle'
     | 'providerLinearWorkerProof'
     | 'taskId'
@@ -735,6 +740,7 @@ function hasMatchingProviderIssueIdentity(
     | 'issueId'
     | 'issueIdentifier'
     | 'issueProvider'
+    | 'pipelineId'
     | 'pipelineTitle'
     | 'providerLinearWorkerProof'
     | 'taskId'
@@ -756,7 +762,13 @@ function hasMatchingProviderIssueIdentity(
 function readAuthoritativeProviderIssueId(
   source: Pick<
     ControlCompatibilitySourceContext,
-    'issueId' | 'issueProvider' | 'pipelineTitle' | 'providerLinearWorkerProof' | 'taskId' | 'runId'
+    | 'issueId'
+    | 'issueProvider'
+    | 'pipelineId'
+    | 'pipelineTitle'
+    | 'providerLinearWorkerProof'
+    | 'taskId'
+    | 'runId'
   >
 ): string | null {
   const issueId = source.issueId ?? null;
@@ -774,6 +786,7 @@ function readAuthoritativeProviderIssueIdentifier(
     ControlCompatibilitySourceContext,
     | 'issueIdentifier'
     | 'issueProvider'
+    | 'pipelineId'
     | 'pipelineTitle'
     | 'providerLinearWorkerProof'
     | 'taskId'
@@ -794,7 +807,12 @@ function isFallbackCompatibilityIdentityValue(
   value: string,
   source: Pick<
     ControlCompatibilitySourceContext,
-    'issueProvider' | 'pipelineTitle' | 'providerLinearWorkerProof' | 'taskId' | 'runId'
+    | 'issueProvider'
+    | 'pipelineId'
+    | 'pipelineTitle'
+    | 'providerLinearWorkerProof'
+    | 'taskId'
+    | 'runId'
   >
 ): boolean {
   return (
@@ -808,7 +826,7 @@ function isFallbackCompatibilityIdentityAlias(
   candidate: string | null,
   source: Pick<
     ControlCompatibilitySourceContext,
-    'issueProvider' | 'pipelineTitle' | 'providerLinearWorkerProof'
+    'issueProvider' | 'pipelineId' | 'pipelineTitle' | 'providerLinearWorkerProof'
   >
 ): boolean {
   if (!candidate) {
@@ -830,6 +848,7 @@ function hasExplicitCompatibilityIssueIdentity(
     | 'issueIdentifier'
     | 'issueId'
     | 'issueProvider'
+    | 'pipelineId'
     | 'pipelineTitle'
     | 'providerLinearWorkerProof'
     | 'taskId'
@@ -851,11 +870,18 @@ function hasExplicitCompatibilityIssueIdentity(
 function hasSyntheticLinearFallbackProvenance(
   source: Pick<
     ControlCompatibilitySourceContext,
-    'issueProvider' | 'pipelineTitle' | 'providerLinearWorkerProof'
+    'issueProvider' | 'pipelineId' | 'pipelineTitle' | 'providerLinearWorkerProof'
   >
 ): boolean {
+  if (source.issueProvider !== null && source.issueProvider !== 'linear') {
+    return false;
+  }
   return (
-    source.issueProvider === 'linear' ||
+    source.pipelineId === 'provider-linear-worker' ||
+    source.pipelineId === 'docs-review' ||
+    source.pipelineId === 'implementation-gate' ||
+    source.pipelineId === 'docs-relevance-advisory' ||
+    source.pipelineId === 'provider-linear-child-lane' ||
     source.pipelineTitle === 'Provider Linear Worker' ||
     source.providerLinearWorkerProof != null
   );
