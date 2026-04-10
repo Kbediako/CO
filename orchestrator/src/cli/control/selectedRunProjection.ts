@@ -1328,13 +1328,18 @@ function providerIntakeClaimMatchesSyntheticChildTaskPrefix(
   claim: Pick<ProviderIntakeClaimRecord, 'issue_id' | 'task_id'>,
   snapshot: Pick<
     SelectedRunManifestSnapshot,
-    'issueId' | 'issueIdentifier' | 'issueProvider' | 'taskId' | 'runId'
+    'issueId' | 'issueIdentifier' | 'issueProvider' | 'manifestRecord' | 'taskId' | 'runId'
   >
 ): boolean {
   if (!claim.task_id || !snapshot.taskId) {
     return false;
   }
-  if (snapshot.issueProvider !== null && snapshot.issueProvider !== 'linear') {
+  const pipelineTitle =
+    readStringValue(snapshot.manifestRecord, 'pipeline_title', 'pipelineTitle') ?? null;
+  const hasLinearProviderWorkerProvenance =
+    snapshot.issueProvider === 'linear' ||
+    pipelineTitle === PROVIDER_LINEAR_WORKER_PIPELINE_TITLE;
+  if (!hasLinearProviderWorkerProvenance) {
     return false;
   }
   if (claim.task_id !== buildProviderFallbackTaskId({ id: claim.issue_id })) {

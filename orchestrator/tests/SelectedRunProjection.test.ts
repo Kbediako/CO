@@ -1387,6 +1387,51 @@ describe('SelectedRunProjection', () => {
     );
   });
 
+  it('does not rebind fallback-only synthetic child task ids for null-provider non-worker manifests', async () => {
+    const parentTaskId = 'linear-lin-issue-1';
+    const childTaskId = `${parentTaskId}-docs-review`;
+    const { paths } = await createHostPaths(undefined, { taskId: childTaskId, runId: 'run-child' });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: childTaskId,
+        pipeline_title: 'Custom Background Pipeline',
+        status: 'in_progress',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Custom pipeline run should not adopt a provider child prefix claim.'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Parent issue claim',
+      task_id: parentTaskId,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: null,
+      run_manifest_path: null
+    };
+
+    const selected = await createProjectionReader(
+      paths,
+      paths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: childTaskId,
+      issueId: childTaskId,
+      taskId: childTaskId,
+      runId: 'run-child'
+    });
+    expect(selected?.lookupAliases).not.toEqual(expect.arrayContaining(['CO-2', 'lin-issue-1']));
+  });
+
   it('treats child manifests whose issue identity still points at the parent fallback task id as fallback-only', async () => {
     const parentTaskId = 'linear-lin-issue-1';
     const childTaskId = `${parentTaskId}-docs-review`;
