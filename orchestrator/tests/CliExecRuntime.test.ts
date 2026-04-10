@@ -46,8 +46,18 @@ describe('CLI exec runtime', () => {
     const runner = getCliExecRunner();
     const startedAt = Date.now();
     const result = await runner.run({
-      command: 'bash',
-      args: ['-lc', 'sleep 2 & echo ready'],
+      command: process.execPath,
+      args: [
+        '-e',
+        [
+          "const { spawn } = require('node:child_process');",
+          "spawn(process.execPath, ['-e', 'setTimeout(() => {}, 2000)'], {",
+          "  detached: true,",
+          "  stdio: 'inherit'",
+          '}).unref();',
+          "process.stdout.write('ready\\n');"
+        ].join('')
+      ],
       cwd: process.cwd(),
       env: process.env
     });
