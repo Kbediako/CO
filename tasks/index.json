@@ -1,6 +1,30 @@
 {
   "items": [
     {
+      "id": "20260410-linear-653a1d08-94a4-47e1-8f63-2232dcaf8f1e",
+      "title": "CO: stabilize provider-worker validation and review gating for long-running suites",
+      "relates_to": "tasks/tasks-linear-653a1d08-94a4-47e1-8f63-2232dcaf8f1e.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-10",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (manual fallback accepted)",
+          "date": "2026-04-10",
+          "manifest": ".runs/linear-653a1d08-94a4-47e1-8f63-2232dcaf8f1e-co-134-docs-review/cli/2026-04-10T00-23-47-516Z-b5b978f9/manifest.json",
+          "override_reason": "The audited docs-review child stream passed docs:check and failed before the forced review stage only because the shared repo docs:freshness baseline remained stale (`stale docs: 119`). The CO-134 packet itself is registered and absent from the child-stream stale set, so the manifest-backed run is accepted as truthful packet evidence."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-653a1d08-94a4-47e1-8f63-2232dcaf8f1e.md",
+        "task": "tasks/tasks-linear-653a1d08-94a4-47e1-8f63-2232dcaf8f1e.md",
+        "agent_task": ".agent/task/linear-653a1d08-94a4-47e1-8f63-2232dcaf8f1e.md",
+        "docs": "docs/TECH_SPEC-linear-653a1d08-94a4-47e1-8f63-2232dcaf8f1e.md"
+      }
+    },
+    {
       "id": "20260410-linear-87d23327-3ee6-429c-a25f-8bd9c84cde58",
       "title": "CO: stabilize broad timeout-heavy repo test lane so unrelated failures stop blocking narrow issue handoffs",
       "relates_to": "tasks/tasks-linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md",

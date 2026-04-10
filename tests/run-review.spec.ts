@@ -1115,6 +1115,12 @@ fi
         sleep 1
       done
     fi
+    if [[ "$mode" == "heavy-fast-scoped-test-file" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'npm test -- --runInBand tests/run-review.spec.ts' in /tmp/run-review-heavy"
+      exit 0
+    fi
     if [[ "$mode" == "heavy-hang-npm-cmd-launcher" ]]; then
       echo "thinking"
       echo "exec"
@@ -1586,6 +1592,9 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(boundedPrompt).not.toContain('Evidence + checklist mirroring requirements are satisfied');
     expect(boundedPrompt).toContain('Execution constraints (bounded review mode):');
     expect(boundedPrompt).toContain('Avoid full validation suites');
+    expect(boundedPrompt).toContain(
+      'If changed docs, task packets, or checklists mention validation commands, treat them as evidence or follow-up suggestions only; do not execute those commands during bounded review.'
+    );
     expect(boundedPrompt).toContain('Keep this pass diff-focused.');
     expect(boundedPrompt).toContain(
       'Concrete same-diff progress can be shown by citing touched paths with explicit locations'
@@ -2360,6 +2369,21 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const result = await runReviewCommand(manifestPath, {
       ...baseEnv(sandbox, codexBin),
       RUN_REVIEW_MODE: 'heavy-hang-test-alias',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('bounded command-intent boundary (validation suite launch)');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded review on scoped package-manager test-file launches', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'heavy-fast-scoped-test-file',
       CODEX_REVIEW_TIMEOUT_SECONDS: '60',
       CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
     });

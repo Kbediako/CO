@@ -296,7 +296,7 @@ describe('codex-orchestrator command surface', () => {
           CLI_STDERR_PATH: stderrPath,
           CLI_EXIT_CODE_PATH: exitCodePath
         },
-        timeout: CLI_BOOT_TIMEOUT
+        timeout: CLI_BINARY_SHELL_TIMEOUT
       }
     );
 
@@ -308,7 +308,7 @@ describe('codex-orchestrator command surface', () => {
       expect(stderr).toMatch(/Unknown command: unknown-command|Command failed:/);
     }
     expect(stdout).toContain('Usage: codex-orchestrator <command> [options]');
-  }, CLI_BOOT_TIMEOUT);
+  }, CLI_BINARY_SHELL_TIMEOUT);
 
   it('falls back to exec failure message detail when stderr is empty', () => {
     const parsed = parseCliFailure({
