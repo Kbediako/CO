@@ -444,9 +444,10 @@ export function resolveProviderWorkerHost(input: {
   providerIntake?: ProviderIntakeSummaryPayload | null | undefined;
   stageStartedAt?: string | null | undefined;
 }): string | null {
+  const claimLaunchStartedAt = input.providerDebugSnapshot?.claim?.launch_started_at ?? null;
   const stageStartedAt =
-    input.stageStartedAt
-    ?? input.providerDebugSnapshot?.claim?.launch_started_at
+    claimLaunchStartedAt
+    ?? input.stageStartedAt
     ?? null;
   return (
     normalizeProviderWorkerHostName(input.providerDebugSnapshot?.claim?.worker_host) ??

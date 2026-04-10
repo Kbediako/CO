@@ -110,6 +110,69 @@ describe('CompatibilityIssuePresenter', () => {
     ).toBeNull();
   });
 
+  it('prefers claim launch_started_at over older started_at when filtering stale proof worker_host', () => {
+    const source = buildCompatibilitySource({
+      rawStatus: 'in_progress',
+      displayStatus: 'In Progress',
+      startedAt: '2026-04-06T02:00:00.000Z',
+      providerLinearWorkerProof: {
+        issue_id: 'issue-100',
+        issue_identifier: 'CO-100',
+        attempt_started_at: '2026-04-06T02:10:00.000Z',
+        updated_at: '2026-04-06T02:20:00.000Z',
+        worker_host: 'worker-host-stale'
+      } as NonNullable<ControlCompatibilitySourceContext['providerLinearWorkerProof']> & {
+        worker_host: string;
+      },
+      providerDebugSnapshot: {
+        live_linear_state: {
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-04-06T02:35:00.000Z'
+        },
+        claim: {
+          state: 'in_progress',
+          updated_at: '2026-04-06T02:35:00.000Z',
+          accepted_at: '2026-04-06T02:05:00.000Z',
+          launch_started_at: '2026-04-06T02:30:00.000Z',
+          worker_host: null
+        },
+        worker: null,
+        parallelization: null,
+        pull_request: null,
+        progress: null,
+        last_audit_operation: null,
+        last_semantic_progress_at: '2026-04-06T02:35:00.000Z',
+        stall_classification: null,
+        stall_reason: null,
+        recovery_recommendation: null
+      } as NonNullable<ControlCompatibilitySourceContext['providerDebugSnapshot']>
+    });
+
+    const projection = buildCompatibilityProjectionSnapshot({
+      selected: source,
+      running: [source],
+      retrying: [source],
+      codexTotals: {
+        input_tokens: 0,
+        output_tokens: 0,
+        total_tokens: 0,
+        seconds_running: 0
+      },
+      rateLimits: null,
+      dispatchPilot: null,
+      tracked: null,
+      providerIntake: null,
+      providerWorkflow: null,
+      polling: null
+    });
+
+    expect(projection.selected?.worker_host).toBeUndefined();
+    expect(projection.running[0]?.worker_host).toBeUndefined();
+    expect(projection.retrying[0]?.worker_host).toBeUndefined();
+    expect(projection.issues[0]?.payload.worker_host).toBeUndefined();
+  });
+
   it('surfaces worker_host through selected, running, retrying, and issue payloads', () => {
     const workerHost = 'worker-host-01';
     const source = buildCompatibilitySource({
