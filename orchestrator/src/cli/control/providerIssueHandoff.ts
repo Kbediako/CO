@@ -2844,6 +2844,12 @@ export function createProviderIssueHandoffService(
       }
 
       const latestRun = resolveLatestKnownProviderRun(attachableDiscoveredRuns);
+      const latestRunWorkerHost = latestRun
+        ? resolvePreferredStartWorkerHost({
+            claimWorkerHost: latestExisting?.worker_host ?? null,
+            previousRun: latestRun
+          })
+        : null;
       if (latestRun && latestRun.status && RESUME_ELIGIBLE_STATUSES.has(latestRun.status)) {
         if (hasPendingReleaseCancel(releasedRun?.manifestPath ?? latestRun.manifestPath)) {
           const claim = await upsertProviderClaimAndPersist({
@@ -2854,6 +2860,7 @@ export function createProviderIssueHandoffService(
             reason: latestExisting?.reason ?? 'provider_issue_release_cancel_inflight',
             run_id: latestRun.runId,
             run_manifest_path: latestRun.manifestPath,
+            worker_host: latestRunWorkerHost,
           });
           return { kind: 'ignored', reason: 'provider_issue_release_cancel_inflight', claim };
         }
@@ -2944,6 +2951,7 @@ export function createProviderIssueHandoffService(
               reason: 'provider_issue_run_already_completed',
               run_id: latestRun.runId,
               run_manifest_path: latestRun.manifestPath,
+              worker_host: latestRunWorkerHost,
             });
             return { kind: 'ignored', reason: 'provider_issue_run_already_completed', claim };
           }
@@ -2956,6 +2964,7 @@ export function createProviderIssueHandoffService(
             reason: PROVIDER_POST_WORKER_EXIT_REFRESH_PENDING_REASON,
             run_id: latestRun.runId,
             run_manifest_path: latestRun.manifestPath,
+            worker_host: latestRunWorkerHost,
             ...buildQueuedProviderRetryFields({
               claim: latestExisting ?? clearProviderRetryFields(),
               previousRun: latestRun,

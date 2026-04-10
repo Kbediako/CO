@@ -6586,6 +6586,35 @@ describe('createProviderIssueHandoffService', () => {
     );
 
     const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-started',
+      last_event: 'Issue',
+      last_action: 'create',
+      last_webhook_timestamp: 1_742_360_000_000,
+      run_id: 'run-starting-placeholder',
+      run_manifest_path: '/tmp/provider-run/run-starting-placeholder-manifest.json',
+      worker_host: 'worker-host-01',
+      launch_source: null,
+      launch_token: null,
+      retry_queued: false,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
+    } satisfies ProviderIntakeState['claims'][number]);
     const persist = vi.fn(async () => undefined);
     const launcher = {
       start: vi.fn(async () => null),
@@ -6623,6 +6652,7 @@ describe('createProviderIssueHandoffService', () => {
       task_id: 'task-1303-completed',
       run_id: 'run-completed',
       run_manifest_path: childPaths.manifestPath,
+      worker_host: 'worker-host-01',
       retry_queued: true,
       retry_attempt: 1,
       retry_due_at: expect.any(String),
@@ -8166,6 +8196,35 @@ describe('createProviderIssueHandoffService', () => {
     );
 
     const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:10:00.000Z',
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      accepted_at: '2026-03-19T04:10:05.000Z',
+      updated_at: '2026-03-19T04:10:10.000Z',
+      last_delivery_id: 'delivery-running',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_359_900_000,
+      run_id: 'run-starting-placeholder',
+      run_manifest_path: '/tmp/provider-run/run-starting-placeholder-manifest.json',
+      worker_host: 'worker-host-01',
+      launch_source: null,
+      launch_token: null,
+      retry_queued: false,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
+    } satisfies ProviderIntakeState['claims'][number]);
     const persist = vi.fn(async () => undefined);
     const launcher = {
       start: vi.fn(async () => null),
@@ -8201,7 +8260,8 @@ describe('createProviderIssueHandoffService', () => {
       reason: 'provider_issue_run_already_completed',
       task_id: 'task-1303-completed',
       run_id: 'run-completed',
-      run_manifest_path: childPaths.manifestPath
+      run_manifest_path: childPaths.manifestPath,
+      worker_host: 'worker-host-01'
     });
     expect(persist).toHaveBeenCalledTimes(1);
   });
