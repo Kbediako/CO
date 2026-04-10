@@ -16,7 +16,7 @@
 - [x] Current blocker classified as stage timeout, suite regression, review-boundary drift, or an evidence-backed combination. Evidence: current-main reruns showed an initial `docs/TASKS.md` budget overflow, then full-suite-only instability in `orchestrator/tests/CliExecRuntime.test.ts` and `tests/cli-command-surface.spec.ts`, followed by a fully green exact-tree implementation-gate on `.runs/linear-653a1d08-94a4-47e1-8f63-2232dcaf8f1e-implementation-gate/cli/2026-04-10T11-03-54-431Z-55ff03c2/manifest.json`.
 - [x] Minimal owner fix or narrowed contract landed for implementation-gate validation truth. Evidence: `orchestrator/src/cli/services/execRuntime.ts`, `orchestrator/tests/CliExecRuntime.test.ts`, and `tests/cli-command-surface.spec.ts`.
 - [x] Minimal owner fix or narrowed contract landed for bounded standalone-review truth. Evidence: `scripts/lib/review-command-intent-classification.ts`, `scripts/lib/review-prompt-context.ts`, `tests/review-command-intent-classification.spec.ts`, `tests/review-execution-state.spec.ts`, `tests/run-review.spec.ts`, and `.runs/linear-653a1d08-94a4-47e1-8f63-2232dcaf8f1e-implementation-gate/cli/2026-04-10T11-03-54-431Z-55ff03c2/review/telemetry.json`.
-- [x] Diff stays bounded to the classified owner surfaces plus required docs and evidence paths. Evidence: `node scripts/diff-budget.mjs` passed.
+- [x] Diff stays bounded to the classified owner surfaces plus required docs and evidence paths. Evidence: `out/linear-653a1d08-94a4-47e1-8f63-2232dcaf8f1e/manual/20260410T1136Z-handoff-logs/diff-budget.log`.
 
 ## Validation
 - [x] Focused reproduction captured for `orchestrator/tests/ProviderLinearWorkerRunner.test.ts`. Evidence: `out/linear-653a1d08-94a4-47e1-8f63-2232dcaf8f1e/manual/20260410T002600Z-focused-repro/provider-linear-worker-runner.log`.
@@ -30,10 +30,10 @@
 - [x] `npm run test`. Evidence: `.runs/linear-653a1d08-94a4-47e1-8f63-2232dcaf8f1e-implementation-gate/cli/2026-04-10T11-03-54-431Z-55ff03c2/commands/05-test.ndjson`.
 - [x] `npm run docs:check`. Evidence: `.runs/linear-653a1d08-94a4-47e1-8f63-2232dcaf8f1e-implementation-gate/cli/2026-04-10T11-03-54-431Z-55ff03c2/commands/06-docs-check.ndjson`.
 - [x] `npm run docs:freshness`. Evidence: `.runs/linear-653a1d08-94a4-47e1-8f63-2232dcaf8f1e-implementation-gate/cli/2026-04-10T11-03-54-431Z-55ff03c2/commands/07-docs-freshness.ndjson`.
-- [x] `node scripts/diff-budget.mjs`. Evidence: local run passed with `files=12/25`, `lines=533/1200`.
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/linear-653a1d08-94a4-47e1-8f63-2232dcaf8f1e/manual/20260410T1136Z-handoff-logs/diff-budget.log` (`files=12/25`, `lines=533/1200`).
 - [x] Standalone review or truthful manual fallback recorded. Evidence: `.runs/linear-653a1d08-94a4-47e1-8f63-2232dcaf8f1e-implementation-gate/cli/2026-04-10T11-03-54-431Z-55ff03c2/review/telemetry.json`.
 - [x] Explicit elegance pass recorded. Evidence: `out/linear-653a1d08-94a4-47e1-8f63-2232dcaf8f1e/manual/workpad.md`.
-- [x] `npm run pack:smoke` if the final diff still touches downstream-facing CLI or review-wrapper surfaces. Evidence: local run passed on `2026-04-10`.
+- [x] `npm run pack:smoke` if the final diff still touches downstream-facing CLI or review-wrapper surfaces. Evidence: `out/linear-653a1d08-94a4-47e1-8f63-2232dcaf8f1e/manual/20260410T1136Z-handoff-logs/pack-smoke.log`.
 
 ## Handoff
 - [ ] PR attached to the issue.

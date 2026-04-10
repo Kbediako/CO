@@ -5,7 +5,7 @@
 - Scope: docs-first packet, single workpad upkeep, focused reproductions, owner classification, minimal validation or review-wrapper repair, and required validation plus review handoff gates.
 - Assumptions:
   - the issue’s earlier `cli-frontend-test` timeout may already be stale on the current tree because the test now bootstraps an isolated temp package root
-  - the current blocker is most likely split across a small number of overlapping validation and review-owner surfaces rather than requiring a broad repo-wide CI rewrite
+  - the current blocker is most likely split across a few overlapping validation and review-owner surfaces rather than requiring a broad repo-wide CI rewrite
 
 ## Issue Readiness Gate
 - Intent checksum / protected terms carried forward: preserve `validation-stability lane`, `implementation-gate`, `npm run test`, `ProviderLinearWorkerRunner.test.ts`, `failed-boundary`, and the requirement for a machine-checkable explanation of timeout vs suite failure vs both.
