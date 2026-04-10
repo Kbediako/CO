@@ -18,10 +18,10 @@
 - [x] docs-review approval is captured via truthful fallback. Evidence: `.runs/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58-co-132-docs-review-rework/cli/2026-04-10T06-58-57-866Z-f78281ef/manifest.json`, `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/20260410T065901Z-docs-review-fallback.md`, `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/20260410T075554Z-closeout-validation/05-docs-check.log`, `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/20260410T075554Z-closeout-validation/06-docs-freshness.log`.
 
 ## Workflow
-- [x] Issue is in the live started-state family (`Rework`) before active coding. Evidence: `linear issue-context` on 2026-04-10 reported state `Rework`.
+- [x] Issue remains in the live started-state family while active work continues. Evidence: `linear issue-context` on 2026-04-10 currently reports state `In Progress`.
 - [x] The required turn-level parallelization decision was recorded as `forbid_parallel` / `parent_only_mutation`. Evidence: provider-worker `parallelization` on 2026-04-10.
 - [x] Workspace remains on the dedicated issue branch `linear/co-132-timeout-test-lane-truth`. Evidence: `git status --short --branch`.
-- [x] Exactly one persistent `## Codex Workpad` comment exists on the issue, and the refreshed local source is ready for the next upsert retry. Evidence: local source `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/workpad.md`, Linear comment `6b7340b8-8a70-4e2a-b065-3d6e250d624e`, upsert cooldown until `2026-04-10T08:06:28.015Z`.
+- [x] Exactly one persistent `## Codex Workpad` comment exists on the issue and is current. Evidence: local source `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/workpad.md`, Linear comment `6b7340b8-8a70-4e2a-b065-3d6e250d624e`.
 - [x] Prior rework artifacts were retired before this attempt. Evidence: PR `#400` is closed.
 
 ## Investigation
@@ -43,8 +43,8 @@
 - [x] Manual correctness, regressions, and elegance review were recorded instead of stalling on wrapper retry. Evidence: `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/20260410T070659Z-baseline-repro/09-manual-review-and-elegance-fallback.md`.
 
 ## Handoff
-- [x] Workpad source refreshed to match the current classification, validation bundle, and review fallback; the next live upsert retry is pending the Linear cooldown. Evidence: `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/workpad.md`.
-- [ ] Replacement PR attached to the Linear issue before any review-state transition. Evidence: pending.
+- [x] Workpad source and live Linear comment are refreshed to match the current classification, validation bundle, and review fallback. Evidence: `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/workpad.md`, `https://linear.app/asabeko/issue/CO-132/stabilize-broad-timeout-heavy-repo-test-lane-so-unrelated-failures#comment-6b7340b8`.
+- [x] Replacement PR is attached to the Linear issue before any review-state transition. Evidence: `https://github.com/Kbediako/CO/pull/410`.
 - [ ] `pr ready-review` drain completed cleanly on the replacement PR. Evidence: pending.
 - [ ] PR checks are green and actionable review feedback is handled or explicitly pushed back before review-state transition. Evidence: pending.
-- [x] Issue remains active until handoff prerequisites are complete. Evidence: issue state is currently `Rework`.
+- [x] Issue remains active until handoff prerequisites are complete. Evidence: issue state is currently `In Progress`.
