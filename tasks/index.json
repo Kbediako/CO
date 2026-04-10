@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260410-linear-d19bd14e-0604-456d-9a45-e65b898cf7a2",
+      "title": "CO: clear stale merge-closeout action-required claims when issues leave Merging and return to active work",
+      "relates_to": "tasks/tasks-linear-d19bd14e-0604-456d-9a45-e65b898cf7a2.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-10",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-d19bd14e-0604-456d-9a45-e65b898cf7a2.md",
+        "task": "tasks/tasks-linear-d19bd14e-0604-456d-9a45-e65b898cf7a2.md",
+        "agent_task": ".agent/task/linear-d19bd14e-0604-456d-9a45-e65b898cf7a2.md",
+        "docs": "docs/TECH_SPEC-linear-d19bd14e-0604-456d-9a45-e65b898cf7a2.md"
+      }
+    },
+    {
       "id": "20260410-linear-710e37a2-a7bb-4976-859f-0378d6a7104f",
       "title": "CO: clear repo-wide stale spec-review dates that are blocking unrelated merge-ready PRs at spec-guard",
       "relates_to": "tasks/tasks-linear-710e37a2-a7bb-4976-859f-0378d6a7104f.md",
