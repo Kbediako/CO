@@ -720,7 +720,9 @@ export function createProviderIssueHandoffService(
       occupancyClaims.push({
         provider_key: claim.provider_key,
         state: claim.state,
-        worker_host: claim.worker_host
+        worker_host: activeClaimRun
+          ? resolveRehydratedActiveRunWorkerHost(activeClaimRun, claim)
+          : claim.worker_host
       });
     }
 
