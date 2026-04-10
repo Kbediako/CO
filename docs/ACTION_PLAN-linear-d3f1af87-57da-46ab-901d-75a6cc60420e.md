@@ -54,5 +54,5 @@
   - Mitigation: keep downstream proof focused on whether `docs:freshness` is no longer first to fail.
 
 ## Approvals
-- Reviewer: pending docs-review
+- Reviewer: docs-review child stream failed only on the pre-existing repo baseline; manual fallback accepted in `out/linear-d3f1af87-57da-46ab-901d-75a6cc60420e/manual/20260410T053642Z-docs-review-fallback.md`
 - Date: 2026-04-10
