@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260411-linear-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6",
+      "title": "CO: Recover frontend-test CLI from pre-manifest hang under ts-node entrypoint",
+      "relates_to": "tasks/tasks-linear-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-11",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6.md",
+        "task": "tasks/tasks-linear-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6.md",
+        "agent_task": ".agent/task/linear-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6.md",
+        "docs": "docs/TECH_SPEC-linear-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6.md"
+      }
+    },
+    {
       "id": "20260411-linear-0d66d189-fc51-4054-80db-b6990858f33d",
       "title": "CO: prevent duplicate same-task control hosts from competing on provider intake",
       "relates_to": "tasks/tasks-linear-0d66d189-fc51-4054-80db-b6990858f33d.md",
