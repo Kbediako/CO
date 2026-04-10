@@ -1507,6 +1507,85 @@ describe('ControlRuntime', () => {
     }
   });
 
+  it('suppresses null-provider synthetic linear task-id provider-worker rows when no canonical issue identity exists', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
+    try {
+      const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+      const fixture = await createFixture({
+        taskId
+      });
+      await seedManifest(fixture.paths, {
+        task_id: taskId,
+        pipeline_title: 'Provider Linear Worker',
+        status: 'in_progress',
+        started_at: '2026-03-07T00:25:00.000Z',
+        updated_at: '2026-03-07T00:29:00.000Z',
+        summary: 'null-provider provider worker fallback manifest without canonical issue identity'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+
+      expect(compatibilityProjection.running).toEqual([]);
+      expect(compatibilityProjection.issues).toEqual([]);
+      expect(compatibilityProjection.selected?.issue_identifier).toBe(taskId);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps non-linear lookalike task ids authoritative when provider-linear-worker provenance is absent', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
+    try {
+      const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+      const fixture = await createFixture({
+        taskId
+      });
+      await seedManifest(fixture.paths, {
+        task_id: taskId,
+        pipeline_title: 'Custom Background Worker',
+        status: 'in_progress',
+        started_at: '2026-03-07T00:25:00.000Z',
+        updated_at: '2026-03-07T00:29:00.000Z',
+        summary: 'non-linear workflow that happens to use a linear-like task id'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+
+      expect(compatibilityProjection.running.map((entry) => entry.issue_identifier)).toEqual([taskId]);
+      expect(compatibilityProjection.issues.map((issue) => issue.issueIdentifier)).toEqual([taskId]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps non-linear selected rows visible even when their task id matches the synthetic linear pattern', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
+    try {
+      const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+      const fixture = await createFixture({
+        taskId
+      });
+      await seedManifest(fixture.paths, {
+        task_id: taskId,
+        issue_provider: 'github',
+        status: 'in_progress',
+        started_at: '2026-03-07T00:25:00.000Z',
+        updated_at: '2026-03-07T00:29:00.000Z',
+        summary: 'non-linear workflow with a Linear-shaped task id'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+
+      expect(compatibilityProjection.running.map((entry) => entry.issue_identifier)).toEqual([taskId]);
+      expect(compatibilityProjection.issues.map((issue) => issue.issueIdentifier)).toEqual([taskId]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('rebinds selected synthetic linear task-id rows to the canonical claim-backed issue identity', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));

@@ -1105,6 +1105,50 @@ describe('SelectedRunProjection', () => {
     );
   });
 
+  it('does not rebind non-synthetic child task prefixes to a provider claim', async () => {
+    const parentTaskId = 'task-parent';
+    const childTaskId = `${parentTaskId}-docs-review`;
+    const { paths } = await createHostPaths(undefined, { taskId: childTaskId, runId: 'run-child' });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: childTaskId,
+        status: 'in_progress',
+        issue_provider: 'linear',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Child docs review run is active.'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_id: 'lin-issue-146',
+      issue_identifier: 'CO-146',
+      issue_title: 'Parent issue claim',
+      task_id: parentTaskId,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: null,
+      run_manifest_path: null
+    };
+
+    const selected = await createProjectionReader(
+      paths,
+      paths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: childTaskId,
+      issueId: childTaskId,
+      taskId: childTaskId,
+      runId: 'run-child'
+    });
+  });
+
   it('keeps the generic latest event when provider evidence is only a stale claim', async () => {
     const { paths } = await createHostPaths();
     await writeFile(

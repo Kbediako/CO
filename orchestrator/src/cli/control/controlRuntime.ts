@@ -63,6 +63,7 @@ interface ControlRuntimeContext {
 }
 
 const NULL_PROVIDER_RUNNING_FRESHNESS_MS = 10 * 60 * 1000;
+const PROVIDER_LINEAR_WORKER_PIPELINE_TITLE = 'Provider Linear Worker';
 const SYNTHETIC_LINEAR_TASK_ID_PATTERN =
   /^linear-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?:-.+)?$/i;
 
@@ -767,13 +768,33 @@ function hasExplicitCompatibilityIssueIdentity(
 }
 
 function isSyntheticLinearFallbackOnlySource(
-  source: Pick<ControlCompatibilitySourceContext, 'issueIdentifier' | 'issueId' | 'taskId' | 'runId'>
+  source: Pick<
+    ControlCompatibilitySourceContext,
+    'issueProvider' | 'issueIdentifier' | 'issueId' | 'pipelineTitle' | 'providerLinearWorkerProof' | 'taskId' | 'runId'
+  >
 ): boolean {
-  return isSyntheticLinearTaskId(source.taskId) && !hasExplicitCompatibilityIssueIdentity(source);
+  return (
+    hasSyntheticLinearFallbackProvenance(source) &&
+    isSyntheticLinearTaskId(source.taskId) &&
+    !hasExplicitCompatibilityIssueIdentity(source)
+  );
 }
 
 function isSyntheticLinearTaskId(taskId: string | null): boolean {
   return taskId !== null && SYNTHETIC_LINEAR_TASK_ID_PATTERN.test(taskId);
+}
+
+function hasSyntheticLinearFallbackProvenance(
+  source: Pick<
+    ControlCompatibilitySourceContext,
+    'issueProvider' | 'pipelineTitle' | 'providerLinearWorkerProof'
+  >
+): boolean {
+  return (
+    source.issueProvider === 'linear' ||
+    source.pipelineTitle === PROVIDER_LINEAR_WORKER_PIPELINE_TITLE ||
+    source.providerLinearWorkerProof !== null
+  );
 }
 
 function isFreshNullProviderRunningSource(
