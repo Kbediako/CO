@@ -1,6 +1,30 @@
 {
   "items": [
     {
+      "id": "20260410-linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc",
+      "title": "CO STATUS: clear stale retry state when active claims rehydrate so one issue cannot appear in both Running and Backoff",
+      "relates_to": "tasks/tasks-linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-10",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
+          "date": "2026-04-10",
+          "manifest": ".runs/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc-co-145-docs-review/cli/2026-04-10T06-58-45-966Z-acba9f0e/manifest.json",
+          "override_reason": "The audited docs-review child stream passed spec-guard and docs:check, then failed only on the standing repo docs:freshness baseline (`stale docs: 119`; `Task Packet stale=85`, `Task Mirror stale=17`, `Report Only stale=17`). The CO-145 packet was created and registered in this run with `last_review: 2026-04-10`, so the manifest-backed run is recorded as a truthful repo-baseline fallback rather than a packet-shape blocker. See out/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc/manual/20260410T065845Z-docs-review-fallback.md."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc.md",
+        "task": "tasks/tasks-linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc.md",
+        "agent_task": ".agent/task/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc.md",
+        "docs": "docs/TECH_SPEC-linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc.md"
+      }
+    },
+    {
       "id": "20260410-linear-97d69ad8-ba75-432f-b8b2-21ca83754325",
       "title": "CO: add autonomous branch refresh and conflict recovery for green-but-dirty PRs before and during Merging",
       "relates_to": "tasks/tasks-linear-97d69ad8-ba75-432f-b8b2-21ca83754325.md",

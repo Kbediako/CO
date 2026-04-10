@@ -1257,30 +1257,20 @@ export function createProviderIssueHandoffService(
           }
         }
         const trackedIssueFields = freshTrackedIssue.claimFields;
-        const reactivatedMergeCloseoutReset =
-          claim.reason === 'provider_issue_rehydrated_active_run'
-            ? {}
-            : { review_promotion: null, merge_closeout: null };
+        const rehydratedActiveRunFields = buildRehydratedActiveRunClaimFields({
+          claim,
+          run: activeRun
+        });
         publishRuntime ||= hasProviderClaimTransitioned(claim, {
           ...trackedIssueFields,
-          state: 'running',
-          reason: 'provider_issue_rehydrated_active_run',
-          task_id: activeRun.taskId,
-          run_id: activeRun.runId,
-          run_manifest_path: activeRun.manifestPath,
-          ...reactivatedMergeCloseoutReset
+          ...rehydratedActiveRunFields
         });
         upsertProviderIntakeClaim(options.state, {
           ...claim,
           ...trackedIssueFields,
           launch_source: undefined,
           launch_token: undefined,
-          task_id: activeRun.taskId,
-          state: 'running',
-          reason: 'provider_issue_rehydrated_active_run',
-          run_id: activeRun.runId,
-          run_manifest_path: activeRun.manifestPath,
-          ...reactivatedMergeCloseoutReset,
+          ...rehydratedActiveRunFields,
           updated_at: now
         });
         hasPendingClaims = true;
@@ -2166,26 +2156,21 @@ export function createProviderIssueHandoffService(
         }
         if (activeRun) {
           const trackedIssueFields = buildFreshTrackedIssueClaimFields(existing, input.trackedIssue);
-          const reactivatedMergeCloseoutReset =
-            existing.reason === 'provider_issue_rehydrated_active_run'
-              ? {}
-              : { review_promotion: null, merge_closeout: null };
+          const rehydratedActiveRunFields = buildRehydratedActiveRunClaimFields({
+            claim: existing,
+            run: activeRun
+          });
           const claim = await upsertProviderClaimAndPersist({
             ...existing,
             ...trackedIssueFields,
             launch_source: undefined,
             launch_token: undefined,
-            task_id: activeRun.taskId,
-            state: 'running',
-            reason: 'provider_issue_rehydrated_active_run',
-            run_id: activeRun.runId,
-            run_manifest_path: activeRun.manifestPath,
+            ...rehydratedActiveRunFields,
             accepted_at: existing.accepted_at,
             last_delivery_id: input.deliveryId,
             last_event: input.event,
             last_action: input.action,
-            last_webhook_timestamp: input.webhookTimestamp,
-            ...reactivatedMergeCloseoutReset
+            last_webhook_timestamp: input.webhookTimestamp
           });
           return { kind: 'ignored', reason: 'provider_issue_rehydrated_active_run', claim };
         }
@@ -2236,6 +2221,7 @@ export function createProviderIssueHandoffService(
           reason: 'provider_issue_run_already_active',
           run_id: activeRun.runId,
           run_manifest_path: activeRun.manifestPath,
+          ...buildActiveRunRetryFields(latestRetryStateBase),
         });
         return { kind: 'ignored', reason: 'provider_issue_run_already_active', claim };
       }
@@ -2645,18 +2631,13 @@ export function createProviderIssueHandoffService(
                 claim,
                 resolution.trackedIssue
               );
-              const reactivatedMergeCloseoutReset =
-                claim.reason === 'provider_issue_rehydrated_active_run'
-                  ? {}
-                  : { review_promotion: null, merge_closeout: null };
+              const rehydratedActiveRunFields = buildRehydratedActiveRunClaimFields({
+                claim,
+                run: activeRun
+              });
               const transitioned = hasProviderClaimTransitioned(claim, {
                 ...trackedIssueFields,
-                state: 'running',
-                reason: 'provider_issue_rehydrated_active_run',
-                task_id: activeRun.taskId,
-                run_id: activeRun.runId,
-                run_manifest_path: activeRun.manifestPath,
-                ...reactivatedMergeCloseoutReset
+                ...rehydratedActiveRunFields
               });
               const refreshActiveRunSnapshot = captureProviderStateSnapshot();
               upsertProviderIntakeClaim(options.state, {
@@ -2664,12 +2645,7 @@ export function createProviderIssueHandoffService(
                 ...trackedIssueFields,
                 launch_source: undefined,
                 launch_token: undefined,
-                task_id: activeRun.taskId,
-                state: 'running',
-                reason: 'provider_issue_rehydrated_active_run',
-                run_id: activeRun.runId,
-                run_manifest_path: activeRun.manifestPath,
-                ...reactivatedMergeCloseoutReset
+                ...rehydratedActiveRunFields
               });
               if (transitioned) {
                 await persistStateOrRollback(refreshActiveRunSnapshot);
@@ -2758,18 +2734,13 @@ export function createProviderIssueHandoffService(
               claim,
               resolution.trackedIssue
             );
-            const reactivatedMergeCloseoutReset =
-              claim.reason === 'provider_issue_rehydrated_active_run'
-                ? {}
-                : { review_promotion: null, merge_closeout: null };
+            const rehydratedActiveRunFields = buildRehydratedActiveRunClaimFields({
+              claim,
+              run: activeRun
+            });
             const transitioned = hasProviderClaimTransitioned(claim, {
               ...trackedIssueFields,
-              state: 'running',
-              reason: 'provider_issue_rehydrated_active_run',
-              task_id: activeRun.taskId,
-              run_id: activeRun.runId,
-              run_manifest_path: activeRun.manifestPath,
-              ...reactivatedMergeCloseoutReset
+              ...rehydratedActiveRunFields
             });
             const refreshActiveRunSnapshot = captureProviderStateSnapshot();
             upsertProviderIntakeClaim(options.state, {
@@ -2777,12 +2748,7 @@ export function createProviderIssueHandoffService(
               ...trackedIssueFields,
               launch_source: undefined,
               launch_token: undefined,
-              task_id: activeRun.taskId,
-              state: 'running',
-              reason: 'provider_issue_rehydrated_active_run',
-              run_id: activeRun.runId,
-              run_manifest_path: activeRun.manifestPath,
-              ...reactivatedMergeCloseoutReset
+              ...rehydratedActiveRunFields
             });
             if (transitioned) {
               await persistStateOrRollback(refreshActiveRunSnapshot);
@@ -3774,6 +3740,56 @@ function groupProviderIssueRuns(records: ProviderIssueRunRecord[]): Map<string, 
     grouped.set(key, [record]);
   }
   return grouped;
+}
+
+function buildActiveRunRetryFields(input: Pick<ProviderIntakeClaimRecord, 'retry_attempt'>): Pick<
+  ProviderIntakeClaimRecord,
+  'retry_queued' | 'retry_attempt' | 'retry_due_at' | 'retry_error'
+> {
+  const retryAttempt =
+    typeof input.retry_attempt === 'number' && input.retry_attempt > 0
+      ? input.retry_attempt
+      : null;
+  if (retryAttempt === null) {
+    return clearProviderRetryFields();
+  }
+  return {
+    retry_queued: false,
+    retry_attempt: retryAttempt,
+    retry_due_at: null,
+    retry_error: null
+  };
+}
+
+function buildRehydratedActiveRunClaimFields(input: {
+  claim: Pick<ProviderIntakeClaimRecord, 'reason' | 'retry_attempt'>;
+  run: Pick<ProviderIssueRunRecord, 'taskId' | 'runId' | 'manifestPath'>;
+}): Pick<
+  ProviderIntakeClaimRecord,
+  | 'state'
+  | 'reason'
+  | 'task_id'
+  | 'run_id'
+  | 'run_manifest_path'
+  | 'retry_queued'
+  | 'retry_attempt'
+  | 'retry_due_at'
+  | 'retry_error'
+> &
+  Partial<Pick<ProviderIntakeClaimRecord, 'review_promotion' | 'merge_closeout'>> {
+  const reactivatedMergeCloseoutReset =
+    input.claim.reason === 'provider_issue_rehydrated_active_run'
+      ? {}
+      : { review_promotion: null, merge_closeout: null };
+  return {
+    state: 'running',
+    reason: 'provider_issue_rehydrated_active_run',
+    task_id: input.run.taskId,
+    run_id: input.run.runId,
+    run_manifest_path: input.run.manifestPath,
+    ...buildActiveRunRetryFields(input.claim),
+    ...reactivatedMergeCloseoutReset
+  };
 }
 
 function buildProviderRetryLaunchFields(input: {
