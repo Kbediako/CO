@@ -194,12 +194,18 @@ async function waitForMockCalls(
 }
 
 function getLatestScheduledTimeoutCallback(
-  setTimeoutSpy: { mock: { calls: unknown[][] } }
+  setTimeoutSpy: { mock: { calls: unknown[][]; results: Array<{ value: unknown }> } }
 ): () => void {
   for (let index = setTimeoutSpy.mock.calls.length - 1; index >= 0; index -= 1) {
     const [callback] = setTimeoutSpy.mock.calls[index] ?? [];
     if (typeof callback !== 'function') {
       continue;
+    }
+    // These tests sometimes invoke the captured callback directly instead of advancing fake timers.
+    // Clear the original scheduled handle first so the same retry path does not also fire later.
+    const scheduledHandle = setTimeoutSpy.mock.results[index]?.value;
+    if (scheduledHandle !== undefined) {
+      clearTimeout(scheduledHandle as ReturnType<typeof setTimeout>);
     }
     return callback as () => void;
   }
