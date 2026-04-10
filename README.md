@@ -55,6 +55,7 @@ codex-orchestrator review --task <task-id>
 codex-orchestrator doctor --usage --window-days 30
 codex-orchestrator start diagnostics --task <task-id> --format json
 codex-orchestrator co-status
+codex-orchestrator control-host supervise status --format json
 ```
 
 ## Skills (bundled)

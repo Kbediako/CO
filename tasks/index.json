@@ -25,6 +25,23 @@
       }
     },
     {
+      "id": "20260409-linear-0b606d2f-d31c-40a0-8709-e0aec86396ee",
+      "title": "CO: ship installable local control-host supervision instead of host-local co-control-host-supervisor.sh",
+      "relates_to": "tasks/tasks-linear-0b606d2f-d31c-40a0-8709-e0aec86396ee.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-09",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-0b606d2f-d31c-40a0-8709-e0aec86396ee.md",
+        "task": "tasks/tasks-linear-0b606d2f-d31c-40a0-8709-e0aec86396ee.md",
+        "agent_task": ".agent/task/linear-0b606d2f-d31c-40a0-8709-e0aec86396ee.md",
+        "docs": "docs/TECH_SPEC-linear-0b606d2f-d31c-40a0-8709-e0aec86396ee.md"
+      }
+    },
+    {
       "id": "20260409-linear-70e83230-4f52-4850-b494-41fd0ec32f13",
       "title": "CO: Add a guarded resident app-server control seam with drain/restart/resume continuity",
       "relates_to": "tasks/tasks-linear-70e83230-4f52-4850-b494-41fd0ec32f13.md",
