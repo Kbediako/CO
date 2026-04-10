@@ -400,7 +400,7 @@ describe('startControlServerPublicLifecycle', () => {
     await closeControlServerPublicLifecycle(started);
   });
 
-  it('coalesces startup-triggered, startup-refresh-triggered, and interval-triggered bulk polls before issuing another Linear fetch', async () => {
+  it('coalesces overlapping recovery sweeps, then falls back to deferred discovery on steady-state ticks', async () => {
     vi.useFakeTimers();
 
     let resolveTrackedIssues: (() => void) | null = null;
@@ -472,10 +472,101 @@ describe('startControlServerPublicLifecycle', () => {
     resolveTrackedIssues?.();
     await startupRefresh;
     expect(poll).toHaveBeenCalledTimes(1);
+    expect(poll).toHaveBeenNthCalledWith(1, {
+      trackedIssues: [trackedIssue],
+      refetchTrackedIssues: expect.any(Function)
+    });
 
     await vi.advanceTimersByTimeAsync(15_000);
-    expect(resolveLiveLinearTrackedIssues).toHaveBeenCalledTimes(2);
+    expect(resolveLiveLinearTrackedIssues).toHaveBeenCalledTimes(1);
     expect(poll).toHaveBeenCalledTimes(2);
+    expect(poll).toHaveBeenNthCalledWith(2, {
+      trackedIssues: [],
+      refetchTrackedIssues: expect.any(Function),
+      deferFreshDiscovery: true
+    });
+    let resolveBudgetRead: (() => void) | null = null;
+    vi.mocked(readSharedLinearBudgetStatus).mockImplementationOnce(
+      async () =>
+        await new Promise((resolve) => {
+          resolveBudgetRead = () => resolve(null);
+        })
+    );
+    const pendingTrigger = started.triggerProviderRefresh?.();
+    await Promise.resolve();
+    const closePromise = closeControlServerPublicLifecycle(started);
+    resolveBudgetRead?.();
+    await pendingTrigger;
+    await closePromise;
+    expect(poll).toHaveBeenCalledTimes(2);
+  });
+
+  it('reruns a full recovery sweep after the slow sweep interval elapses', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-24T00:00:00.000Z'));
+
+    const trackedIssue = buildTrackedIssue('issue-1');
+    vi.mocked(resolveLiveLinearTrackedIssues).mockResolvedValue({
+      kind: 'ready',
+      tracked_issues: [trackedIssue]
+    } as Awaited<ReturnType<typeof resolveLiveLinearTrackedIssues>>);
+
+    const poll = vi.fn(async () => undefined);
+    const requestContextShared = {
+      clients: new Set(),
+      controlStore: {
+        snapshot: () => ({ feature_toggles: {} })
+      },
+      eventTransport: { broadcast: vi.fn() },
+      providerIssueHandoff: {
+        handleAcceptedTrackedIssue: vi.fn(),
+        poll,
+        rehydrate: vi.fn(async () => undefined),
+        refresh: vi.fn(async () => undefined)
+      }
+    } as unknown as ControlRequestSharedContext;
+    const lifecycleState = {
+      expiryLifecycle: { close: vi.fn() },
+      bootstrapLifecycle: { close: vi.fn(async () => undefined) }
+    } as unknown as ControlServerOwnedLifecycleState;
+    const server = { kind: 'server' } as unknown as http.Server;
+
+    vi.mocked(prepareControlServerStartupInputs).mockResolvedValue({
+      requestContextShared,
+      host: '127.0.0.1',
+      controlToken: 'token-123'
+    } satisfies PreparedControlServerStartupInputs);
+    vi.mocked(startControlServerReadyInstanceLifecycle).mockResolvedValue({
+      server,
+      baseUrl: 'http://127.0.0.1:4545',
+      lifecycleState
+    });
+
+    const started = await startControlServerPublicLifecycle({
+      paths: { repoRoot: '/tmp/repo' } as RunPaths,
+      config: { ui: { bindHost: '127.0.0.1' } } as unknown as EffectiveDelegationConfig,
+      runId: 'run-1'
+    });
+
+    await flushStartupProviderRefresh();
+    expect(resolveLiveLinearTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(resolveLiveLinearTrackedIssues).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        queryMode: 'recovery_sweep'
+      })
+    );
+
+    vi.setSystemTime(new Date('2026-03-24T00:10:00.001Z'));
+    await started.triggerProviderRefresh?.();
+
+    expect(resolveLiveLinearTrackedIssues).toHaveBeenCalledTimes(2);
+    expect(resolveLiveLinearTrackedIssues).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        queryMode: 'recovery_sweep'
+      })
+    );
 
     await closeControlServerPublicLifecycle(started);
   });
@@ -2086,7 +2177,7 @@ describe('startControlServerPublicLifecycle', () => {
     await closeControlServerPublicLifecycle(started);
   });
 
-  it('keeps interval-triggered bulk polls from overlapping the Linear fetch path when a fetch exceeds the interval', async () => {
+  it('keeps interval-triggered recovery sweeps from overlapping the Linear fetch path when a fetch exceeds the interval', async () => {
     vi.useFakeTimers();
 
     let resolveTrackedIssues: (() => void) | null = null;
@@ -2159,8 +2250,13 @@ describe('startControlServerPublicLifecycle', () => {
     expect(poll).toHaveBeenCalledTimes(1);
 
     await vi.advanceTimersByTimeAsync(15_000);
-    expect(resolveLiveLinearTrackedIssues).toHaveBeenCalledTimes(2);
+    expect(resolveLiveLinearTrackedIssues).toHaveBeenCalledTimes(1);
     expect(poll).toHaveBeenCalledTimes(2);
+    expect(poll).toHaveBeenNthCalledWith(2, {
+      trackedIssues: [],
+      refetchTrackedIssues: expect.any(Function),
+      deferFreshDiscovery: true
+    });
 
     await closeControlServerPublicLifecycle(started);
   });

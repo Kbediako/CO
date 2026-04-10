@@ -1157,7 +1157,14 @@ function resolveMatchingEndpointKeys(
   }
   const operationPrefix = `${operation}:`;
   for (const [key, endpoint] of Object.entries(endpoints)) {
-    if (endpoint.aliases.some((alias) => alias === operation || alias.startsWith(operationPrefix))) {
+    if (
+      endpoint.aliases.some(
+        (alias) =>
+          alias === operation ||
+          alias.startsWith(operationPrefix) ||
+          operation.startsWith(`${alias}:`)
+      )
+    ) {
       matches.add(key);
     }
   }
