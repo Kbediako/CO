@@ -62,7 +62,6 @@ interface ControlRuntimeContext {
 }
 
 const NULL_PROVIDER_RUNNING_FRESHNESS_MS = 10 * 60 * 1000;
-const PROVIDER_LINEAR_WORKER_PIPELINE_TITLE = 'Provider Linear Worker';
 const SYNTHETIC_LINEAR_TASK_ID_PATTERN =
   /^linear-[a-z0-9]+(?:-[a-z0-9]+)*$/i;
 
