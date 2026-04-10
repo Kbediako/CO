@@ -5,7 +5,7 @@ status: completed
 owners:
   - Codex
 created: 2026-03-10
-last_review: 2026-03-10
+last_review: 2026-04-10
 review_cadence_days: 30
 related_prd: docs/PRD-coordinator-symphony-aligned-control-server-live-instance-host-shell-extraction.md
 related_action_plan: docs/ACTION_PLAN-coordinator-symphony-aligned-control-server-live-instance-host-shell-extraction.md
@@ -36,6 +36,8 @@ Extract only the pending ready-instance host shell from `ControlServer.start()` 
 - Review-wrapper work.
 
 ## Notes
+
+- 2026-04-10: Re-reviewed for CO-143 docs:freshness baseline restoration. The completed March 10 packet still reads as a truthful historical record, so the packet freshness metadata was refreshed after the cohort audit recorded in `out/linear-d3f1af87-57da-46ab-901d-75a6cc60420e/manual/20260410T0545Z-cohort-audit.md`.
 
 - 2026-03-10: Approved for docs-first registration based on the `1105` closeout evidence plus bounded scout confirmation that the remaining seam is the pending instance host shell inside `ControlServer.start()`, and that it should stay a same-file `private static` helper rather than a new exported module. Evidence: `docs/findings/1106-control-server-live-instance-host-shell-extraction-deliberation.md`, `out/1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction/manual/20260310T041150Z-closeout/14-next-slice-note.md`.
 - 2026-03-10: Completed. `ControlServer.start()` now delegates the remaining pending live-instance host shell to `startPendingReadyInstance(...)`, focused regressions passed `99/99`, the delegated diagnostics scout passed `190/190` files and `1273/1273` tests, standalone review returned a clean diff-local verdict, and pack-smoke passed. Evidence: `out/1106-coordinator-symphony-aligned-control-server-live-instance-host-shell-extraction/manual/20260310T041640Z-closeout/00-summary.md`, `out/1106-coordinator-symphony-aligned-control-server-live-instance-host-shell-extraction/manual/20260310T041640Z-closeout/05-targeted-tests.log`, `out/1106-coordinator-symphony-aligned-control-server-live-instance-host-shell-extraction/manual/20260310T041640Z-closeout/05-test.log`, `out/1106-coordinator-symphony-aligned-control-server-live-instance-host-shell-extraction/manual/20260310T041640Z-closeout/09-review.log`, `out/1106-coordinator-symphony-aligned-control-server-live-instance-host-shell-extraction/manual/20260310T041640Z-closeout/10-pack-smoke.log`, `out/1106-coordinator-symphony-aligned-control-server-live-instance-host-shell-extraction/manual/20260310T041640Z-closeout/11-manual-live-instance-host-shell-check.json`, `out/1106-coordinator-symphony-aligned-control-server-live-instance-host-shell-extraction/manual/20260310T041640Z-closeout/12-elegance-review.md`, `out/1106-coordinator-symphony-aligned-control-server-live-instance-host-shell-extraction/manual/20260310T041640Z-closeout/13-override-notes.md`, `.runs/1106-coordinator-symphony-aligned-control-server-live-instance-host-shell-extraction-scout/cli/2026-03-10T04-17-31-957Z-da850ef8/manifest.json`.

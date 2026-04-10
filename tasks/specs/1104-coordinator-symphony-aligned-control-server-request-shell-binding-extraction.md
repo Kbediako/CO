@@ -5,7 +5,7 @@ status: completed
 owners:
   - Codex
 created: 2026-03-10
-last_review: 2026-03-10
+last_review: 2026-04-10
 review_cadence_days: 30
 related_prd: docs/PRD-coordinator-symphony-aligned-control-server-request-shell-binding-extraction.md
 related_action_plan: docs/ACTION_PLAN-coordinator-symphony-aligned-control-server-request-shell-binding-extraction.md
@@ -35,6 +35,8 @@ Extract the remaining inline request-shell binding assembly from `ControlServer.
 - Review-wrapper work.
 
 ## Notes
+
+- 2026-04-10: Re-reviewed for CO-143 docs:freshness baseline restoration. The completed March 10 packet still reads as a truthful historical record, so the packet freshness metadata was refreshed after the cohort audit recorded in `out/linear-d3f1af87-57da-46ab-901d-75a6cc60420e/manual/20260410T0545Z-cohort-audit.md`.
 
 - 2026-03-10: Approved for docs-first registration based on the `1103` closeout evidence showing the remaining `ControlServer.start()` request-path work is now only the request-shell binding block. Evidence: `docs/findings/1104-control-server-request-shell-binding-extraction-deliberation.md`, `out/1103-coordinator-symphony-aligned-control-request-controller-shell-extraction/manual/20260310T030712Z-closeout/14-next-slice-note.md`.
 - 2026-03-10: Completed. `ControlServer.start()` now delegates the remaining request-shell binding assembly to `createBoundControlServerRequestShell`, focused regressions passed `101/101`, the full suite passed `189/189` files and `1270/1270` tests, the bounded standalone review returned a clean diff verdict, and pack-smoke passed. Evidence: `out/1104-coordinator-symphony-aligned-control-server-request-shell-binding-extraction/manual/20260310T033215Z-closeout/00-summary.md`, `out/1104-coordinator-symphony-aligned-control-server-request-shell-binding-extraction/manual/20260310T033215Z-closeout/05-targeted-tests.log`, `out/1104-coordinator-symphony-aligned-control-server-request-shell-binding-extraction/manual/20260310T033215Z-closeout/05-test.log`, `out/1104-coordinator-symphony-aligned-control-server-request-shell-binding-extraction/manual/20260310T033215Z-closeout/09-review.log`, `out/1104-coordinator-symphony-aligned-control-server-request-shell-binding-extraction/manual/20260310T033215Z-closeout/10-pack-smoke.log`, `out/1104-coordinator-symphony-aligned-control-server-request-shell-binding-extraction/manual/20260310T033215Z-closeout/11-manual-request-shell-binding-check.json`, `out/1104-coordinator-symphony-aligned-control-server-request-shell-binding-extraction/manual/20260310T033215Z-closeout/12-elegance-review.md`, `out/1104-coordinator-symphony-aligned-control-server-request-shell-binding-extraction/manual/20260310T033215Z-closeout/13-override-notes.md`.

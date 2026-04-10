@@ -12,9 +12,13 @@ import {
 import { isoTimestamp } from '../utils/time.js';
 import {
   buildPrMergeArgs,
+  buildPrUpdateBranchArgs,
   fetchPrStatusSnapshot,
+  isConflictLikeBranchRecoveryFailureMessage,
   parseGitHubRepoFromRemoteUrl,
+  resolveAutomaticBranchRecoveryReason,
   resolveActionRequiredReasons,
+  shouldAttemptAutomaticBranchRecovery,
   type PrWatchMergeSnapshot
 } from '../../../../scripts/lib/pr-watch-merge.js';
 
@@ -65,6 +69,19 @@ export interface ProviderMergeCloseoutAttemptRecord {
   stderr: string | null;
 }
 
+export interface ProviderBranchRecoveryAttemptRecord {
+  attempted_at: string;
+  head_oid: string | null;
+  recovery_reason: string;
+  command: string;
+  args: string[];
+  exit_code: number | null;
+  ok: boolean;
+  stdout: string | null;
+  stderr: string | null;
+  failure_kind: 'conflict' | 'other' | null;
+}
+
 export interface ProviderMergeCloseoutSharedRootRecord {
   status: 'reconciled' | 'skipped' | 'failed';
   attempted_at: string;
@@ -106,6 +123,7 @@ export interface ProviderReviewHandoffPromotionRecord {
   conflicting_attached_pr_urls: string[];
   pr: ProviderMergeCloseoutPullRequestRecord | null;
   snapshot: ProviderMergeCloseoutSnapshotRecord | null;
+  branch_recovery: ProviderBranchRecoveryAttemptRecord | null;
   linear_transition: ProviderMergeCloseoutLinearTransitionRecord | null;
 }
 
@@ -124,6 +142,7 @@ export interface ProviderMergeCloseoutRecord {
   conflicting_attached_pr_urls: string[];
   pr: ProviderMergeCloseoutPullRequestRecord | null;
   snapshot: ProviderMergeCloseoutSnapshotRecord | null;
+  branch_recovery: ProviderBranchRecoveryAttemptRecord | null;
   merge_attempt: ProviderMergeCloseoutAttemptRecord | null;
   shared_root: ProviderMergeCloseoutSharedRootRecord | null;
   linear_transition: ProviderMergeCloseoutLinearTransitionRecord | null;
@@ -179,6 +198,7 @@ export async function runProviderDeterministicMergeCloseout(
     issueStateType?: string | null;
     issueUpdatedAt?: string | null;
     mode?: ProviderMergeCloseoutMode;
+    previousBranchRecovery?: ProviderBranchRecoveryAttemptRecord | null;
     repoRoot: string;
     sourceSetup?: DispatchPilotSourceSetup | null;
     env?: NodeJS.ProcessEnv;
@@ -210,6 +230,7 @@ export async function runProviderDeterministicMergeCloseout(
     conflicting_attached_pr_urls: [] as string[],
     pr: null as ProviderMergeCloseoutPullRequestRecord | null,
     snapshot: null as ProviderMergeCloseoutSnapshotRecord | null,
+    branch_recovery: null as ProviderBranchRecoveryAttemptRecord | null,
     merge_attempt: null as ProviderMergeCloseoutAttemptRecord | null,
     shared_root: null as ProviderMergeCloseoutSharedRootRecord | null,
     linear_transition: null as ProviderMergeCloseoutLinearTransitionRecord | null
@@ -401,16 +422,14 @@ export async function runProviderDeterministicMergeCloseout(
 
   if (!snapshot) {
     try {
-      const rawSnapshot = await resolveSnapshot({
+      snapshot = await loadProviderSnapshotRecord({
         owner: pr.owner,
         repo: pr.repo,
         prNumber: pr.number,
-        readinessMode: 'merge'
+        readinessMode: 'merge',
+        resolveSnapshot,
+        resolveSnapshotActionRequiredReasons
       });
-      const actionRequiredReasons = resolveSnapshotActionRequiredReasons(rawSnapshot as never, {
-        readinessMode: 'merge'
-      });
-      snapshot = mapSnapshotRecord(rawSnapshot, actionRequiredReasons);
     } catch (error) {
       return {
         ...baseWithResolution,
@@ -436,7 +455,7 @@ export async function runProviderDeterministicMergeCloseout(
     };
   }
 
-  const alreadyMerged = snapshot.merged_at !== null || snapshot.state === 'MERGED';
+  let alreadyMerged = snapshot.merged_at !== null || snapshot.state === 'MERGED';
 
   if (mode === 'probe-merged-recovery' && !alreadyMerged) {
     return {
@@ -451,15 +470,144 @@ export async function runProviderDeterministicMergeCloseout(
     };
   }
 
+  let branchRecovery: ProviderBranchRecoveryAttemptRecord | null = null;
   if (!alreadyMerged && !snapshot.ready_to_merge) {
-    const nonMergedOutcome = classifyNonMergedSnapshot(snapshot, pr.number)!;
-    return {
-      ...baseWithResolution,
+    branchRecovery = await attemptProviderBranchRecovery({
       pr,
       snapshot,
-      ...nonMergedOutcome,
-      summary: summarizeSelection(nonMergedOutcome.summary)
-    };
+      previousBranchRecovery: input.previousBranchRecovery ?? null,
+      repoRoot: input.repoRoot,
+      now,
+      runCommand
+    });
+    if (branchRecovery?.ok) {
+      try {
+        snapshot = await loadProviderSnapshotRecord({
+          owner: pr.owner,
+          repo: pr.repo,
+          prNumber: pr.number,
+          readinessMode: 'merge',
+          resolveSnapshot,
+          resolveSnapshotActionRequiredReasons
+        });
+      } catch {
+        // Preserve the pre-recovery snapshot when verification cannot be reread.
+      }
+      alreadyMerged = snapshot.merged_at !== null || snapshot.state === 'MERGED';
+      if (!alreadyMerged && !snapshot.ready_to_merge) {
+        const pendingRecovery = classifyPendingBranchRecovery({
+          snapshot,
+          recoveryAttempt: branchRecovery,
+          prNumber: pr.number,
+          mode: 'merge_closeout'
+        });
+        if (pendingRecovery) {
+          return {
+            ...baseWithResolution,
+            pr,
+            snapshot,
+            branch_recovery: branchRecovery,
+            ...pendingRecovery,
+            summary: summarizeSelection(pendingRecovery.summary)
+          };
+        }
+        const nonMergedOutcome = classifyNonMergedSnapshot(snapshot, pr.number)!;
+        return {
+          ...baseWithResolution,
+          pr,
+          snapshot,
+          branch_recovery: branchRecovery,
+          ...nonMergedOutcome,
+          summary: summarizeSelection(nonMergedOutcome.summary)
+        };
+      }
+    } else if (branchRecovery?.failure_kind === 'conflict') {
+      const transitionAttemptedAt = now();
+      const transitionResult = await transitionIssueState({
+        issueId: input.issueId,
+        stateName: 'Rework',
+        env,
+        sourceSetup: input.sourceSetup
+      });
+      const linearTransition: ProviderMergeCloseoutLinearTransitionRecord = transitionResult.ok
+        ? {
+            status: transitionResult.action === 'noop' ? 'noop' : 'transitioned',
+            attempted_at: transitionAttemptedAt,
+            previous_state: transitionResult.previous_state?.name ?? currentIssueState ?? null,
+            target_state: transitionResult.target_state.name,
+            issue_state: transitionResult.issue.state?.name ?? null,
+            issue_state_type: transitionResult.issue.state?.type ?? null,
+            issue_updated_at: transitionResult.issue.updated_at ?? currentIssueUpdatedAt,
+            error: null
+          }
+        : {
+            status: 'failed',
+            attempted_at: transitionAttemptedAt,
+            previous_state: currentIssueState ?? null,
+            target_state: 'Rework',
+            issue_state: currentIssueState ?? null,
+            issue_state_type: currentIssueStateType ?? null,
+            issue_updated_at: currentIssueUpdatedAt,
+            error: `${transitionResult.error.code}: ${transitionResult.error.message}`
+          };
+      if (!transitionResult.ok) {
+        return {
+          ...baseWithResolution,
+          pr,
+          snapshot,
+          branch_recovery: branchRecovery,
+          linear_transition: linearTransition,
+          status: 'transition_failed',
+          reason: 'linear_rework_transition_failed_after_branch_recovery_conflict',
+          summary: summarizeSelection(
+            `Automatic ${describeProviderBranchRecoveryReason(
+              branchRecovery.recovery_reason
+            )} hit a merge conflict for attached PR #${pr.number}, and the Linear issue could not transition to Rework.`
+          )
+        };
+      }
+      return {
+        ...baseWithResolution,
+        issue_state: linearTransition.issue_state,
+        issue_state_type: linearTransition.issue_state_type,
+        issue_updated_at: linearTransition.issue_updated_at,
+        pr,
+        snapshot,
+        branch_recovery: branchRecovery,
+        linear_transition: linearTransition,
+        status: 'action_required',
+        reason: 'branch_recovery_conflict',
+        summary: summarizeSelection(
+          `Automatic ${describeProviderBranchRecoveryReason(
+            branchRecovery.recovery_reason
+          )} hit a merge conflict for attached PR #${pr.number}; moved the issue to Rework with exact recovery metadata recorded.`
+        )
+      };
+    } else if (branchRecovery) {
+      return {
+        ...baseWithResolution,
+        pr,
+        snapshot,
+        branch_recovery: branchRecovery,
+        status: 'action_required',
+        reason: 'branch_recovery_failed',
+        summary: summarizeSelection(
+          `Automatic ${describeProviderBranchRecoveryReason(
+            branchRecovery.recovery_reason
+          )} failed for attached PR #${pr.number}; inspect the recorded gh output before merge closeout can continue.`
+        )
+      };
+    }
+    if (!alreadyMerged && !snapshot.ready_to_merge) {
+      const nonMergedOutcome = classifyNonMergedSnapshot(snapshot, pr.number)!;
+      return {
+        ...baseWithResolution,
+        pr,
+        snapshot,
+        ...nonMergedOutcome,
+        summary: summarizeSelection(nonMergedOutcome.summary)
+      };
+    }
   }
 
   let mergeAttempt: ProviderMergeCloseoutAttemptRecord | null = null;
@@ -514,6 +662,7 @@ export async function runProviderDeterministicMergeCloseout(
           ...baseWithResolution,
           pr,
           snapshot: verificationSnapshot,
+          branch_recovery: branchRecovery,
           merge_attempt: mergeAttempt,
           ...verificationOutcome,
           summary: summarizeSelection(verificationOutcome.summary)
@@ -523,6 +672,7 @@ export async function runProviderDeterministicMergeCloseout(
         ...baseWithResolution,
         pr,
         snapshot: verificationSnapshot,
+        branch_recovery: branchRecovery,
         merge_attempt: mergeAttempt,
         status: 'merge_failed',
         reason: mergeResult.ok ? 'merge_not_confirmed' : 'merge_command_failed',
@@ -545,6 +695,7 @@ export async function runProviderDeterministicMergeCloseout(
       ...baseWithResolution,
       pr,
       snapshot: verificationSnapshot,
+      branch_recovery: branchRecovery,
       merge_attempt: mergeAttempt,
       shared_root: sharedRoot,
       status: 'merge_failed',
@@ -558,6 +709,7 @@ export async function runProviderDeterministicMergeCloseout(
       ...baseWithResolution,
       pr,
       snapshot: verificationSnapshot,
+      branch_recovery: branchRecovery,
       merge_attempt: mergeAttempt,
       shared_root: sharedRoot,
       status: 'action_required',
@@ -605,6 +757,7 @@ export async function runProviderDeterministicMergeCloseout(
         ...baseWithResolution,
         pr,
         snapshot: verificationSnapshot,
+        branch_recovery: branchRecovery,
         merge_attempt: mergeAttempt,
         shared_root: sharedRoot,
         linear_transition: linearTransition,
@@ -619,6 +772,7 @@ export async function runProviderDeterministicMergeCloseout(
       ...baseWithResolution,
       pr,
       snapshot: verificationSnapshot,
+      branch_recovery: branchRecovery,
       merge_attempt: mergeAttempt,
       shared_root: sharedRoot,
       linear_transition: linearTransition,
@@ -635,6 +789,7 @@ export async function runProviderDeterministicMergeCloseout(
     issue_updated_at: linearTransition.issue_updated_at,
     pr,
     snapshot: verificationSnapshot,
+    branch_recovery: branchRecovery,
     merge_attempt: mergeAttempt,
     shared_root: sharedRoot,
     linear_transition: linearTransition,
@@ -657,6 +812,7 @@ export async function runProviderReviewHandoffPromotion(
     issueState?: string | null;
     issueStateType?: string | null;
     issueUpdatedAt?: string | null;
+    previousBranchRecovery?: ProviderBranchRecoveryAttemptRecord | null;
     repoRoot: string;
     sourceSetup?: DispatchPilotSourceSetup | null;
     env?: NodeJS.ProcessEnv;
@@ -687,6 +843,7 @@ export async function runProviderReviewHandoffPromotion(
     conflicting_attached_pr_urls: [] as string[],
     pr: null as ProviderMergeCloseoutPullRequestRecord | null,
     snapshot: null as ProviderMergeCloseoutSnapshotRecord | null,
+    branch_recovery: null as ProviderBranchRecoveryAttemptRecord | null,
     linear_transition: null as ProviderMergeCloseoutLinearTransitionRecord | null
   };
 
@@ -830,16 +987,14 @@ export async function runProviderReviewHandoffPromotion(
 
   if (!snapshot) {
     try {
-      const rawSnapshot = await resolveSnapshot({
+      snapshot = await loadProviderSnapshotRecord({
         owner: pr.owner,
         repo: pr.repo,
         prNumber: pr.number,
-        readinessMode: 'merge'
+        readinessMode: 'merge',
+        resolveSnapshot,
+        resolveSnapshotActionRequiredReasons
       });
-      const actionRequiredReasons = resolveSnapshotActionRequiredReasons(rawSnapshot as never, {
-        readinessMode: 'merge'
-      });
-      snapshot = mapSnapshotRecord(rawSnapshot, actionRequiredReasons);
     } catch (error) {
       return {
         ...baseWithResolution,
@@ -865,17 +1020,146 @@ export async function runProviderReviewHandoffPromotion(
     };
   }
 
-  const alreadyMerged = isMergedPullRequestSnapshot(snapshot);
+  let alreadyMerged = isMergedPullRequestSnapshot(snapshot);
 
+  let branchRecovery: ProviderBranchRecoveryAttemptRecord | null = null;
   if (!alreadyMerged && !snapshot.ready_to_merge) {
-    const promotionOutcome = classifyNonMergedReviewPromotionSnapshot(snapshot, pr.number)!;
-    return {
-      ...baseWithResolution,
+    branchRecovery = await attemptProviderBranchRecovery({
       pr,
       snapshot,
-      ...promotionOutcome,
-      summary: summarizeSelection(promotionOutcome.summary)
-    };
+      previousBranchRecovery: input.previousBranchRecovery ?? null,
+      repoRoot: input.repoRoot,
+      now,
+      runCommand
+    });
+    if (branchRecovery?.ok) {
+      try {
+        snapshot = await loadProviderSnapshotRecord({
+          owner: pr.owner,
+          repo: pr.repo,
+          prNumber: pr.number,
+          readinessMode: 'merge',
+          resolveSnapshot,
+          resolveSnapshotActionRequiredReasons
+        });
+      } catch {
+        // Preserve the pre-recovery snapshot when verification cannot be reread.
+      }
+      alreadyMerged = isMergedPullRequestSnapshot(snapshot);
+      if (!alreadyMerged && !snapshot.ready_to_merge) {
+        const pendingRecovery = classifyPendingBranchRecovery({
+          snapshot,
+          recoveryAttempt: branchRecovery,
+          prNumber: pr.number,
+          mode: 'review_promotion'
+        });
+        if (pendingRecovery) {
+          return {
+            ...baseWithResolution,
+            pr,
+            snapshot,
+            branch_recovery: branchRecovery,
+            ...pendingRecovery,
+            summary: summarizeSelection(pendingRecovery.summary)
+          };
+        }
+        const promotionOutcome = classifyNonMergedReviewPromotionSnapshot(snapshot, pr.number)!;
+        return {
+          ...baseWithResolution,
+          pr,
+          snapshot,
+          branch_recovery: branchRecovery,
+          ...promotionOutcome,
+          summary: summarizeSelection(promotionOutcome.summary)
+        };
+      }
+    } else if (branchRecovery?.failure_kind === 'conflict') {
+      const transitionAttemptedAt = now();
+      const transitionResult = await transitionIssueState({
+        issueId: input.issueId,
+        stateName: 'Rework',
+        env,
+        sourceSetup: input.sourceSetup
+      });
+      const linearTransition: ProviderMergeCloseoutLinearTransitionRecord = transitionResult.ok
+        ? {
+            status: transitionResult.action === 'noop' ? 'noop' : 'transitioned',
+            attempted_at: transitionAttemptedAt,
+            previous_state: transitionResult.previous_state?.name ?? currentIssueState ?? null,
+            target_state: transitionResult.target_state.name,
+            issue_state: transitionResult.issue.state?.name ?? null,
+            issue_state_type: transitionResult.issue.state?.type ?? null,
+            issue_updated_at: transitionResult.issue.updated_at ?? currentIssueUpdatedAt,
+            error: null
+          }
+        : {
+            status: 'failed',
+            attempted_at: transitionAttemptedAt,
+            previous_state: currentIssueState ?? null,
+            target_state: 'Rework',
+            issue_state: currentIssueState ?? null,
+            issue_state_type: currentIssueStateType ?? null,
+            issue_updated_at: currentIssueUpdatedAt,
+            error: `${transitionResult.error.code}: ${transitionResult.error.message}`
+          };
+      if (!transitionResult.ok) {
+        return {
+          ...baseWithResolution,
+          pr,
+          snapshot,
+          branch_recovery: branchRecovery,
+          linear_transition: linearTransition,
+          status: 'transition_failed',
+          reason: 'linear_rework_transition_failed_after_branch_recovery_conflict',
+          summary: summarizeSelection(
+            `Automatic ${describeProviderBranchRecoveryReason(
+              branchRecovery.recovery_reason
+            )} hit a merge conflict for attached PR #${pr.number}, and the Linear issue could not transition to Rework before review handoff could continue.`
+          )
+        };
+      }
+      return {
+        ...baseWithResolution,
+        issue_state: linearTransition.issue_state,
+        issue_state_type: linearTransition.issue_state_type,
+        issue_updated_at: linearTransition.issue_updated_at,
+        pr,
+        snapshot,
+        branch_recovery: branchRecovery,
+        linear_transition: linearTransition,
+        status: 'action_required',
+        reason: 'branch_recovery_conflict',
+        summary: summarizeSelection(
+          `Automatic ${describeProviderBranchRecoveryReason(
+            branchRecovery.recovery_reason
+          )} hit a merge conflict for attached PR #${pr.number}; moved the issue to Rework with exact recovery metadata recorded.`
+        )
+      };
+    } else if (branchRecovery) {
+      return {
+        ...baseWithResolution,
+        pr,
+        snapshot,
+        branch_recovery: branchRecovery,
+        status: 'action_required',
+        reason: 'branch_recovery_failed',
+        summary: summarizeSelection(
+          `Automatic ${describeProviderBranchRecoveryReason(
+            branchRecovery.recovery_reason
+          )} failed for attached PR #${pr.number}; inspect the recorded gh output before review-handoff promotion can continue.`
+        )
+      };
+    }
+    if (!alreadyMerged && !snapshot.ready_to_merge) {
+      const promotionOutcome = classifyNonMergedReviewPromotionSnapshot(snapshot, pr.number)!;
+      return {
+        ...baseWithResolution,
+        pr,
+        snapshot,
+        ...promotionOutcome,
+        summary: summarizeSelection(promotionOutcome.summary)
+      };
+    }
   }
 
   const transitionAttemptedAt = now();
@@ -912,6 +1196,7 @@ export async function runProviderReviewHandoffPromotion(
       ...baseWithResolution,
       pr,
       snapshot,
+      branch_recovery: branchRecovery,
       linear_transition: linearTransition,
       status: 'transition_failed',
       reason: 'linear_merging_transition_failed',
@@ -930,6 +1215,7 @@ export async function runProviderReviewHandoffPromotion(
     issue_updated_at: linearTransition.issue_updated_at,
     pr,
     snapshot,
+    branch_recovery: branchRecovery,
     linear_transition: linearTransition,
     status: 'promoted',
     reason: 'promoted_to_merging',
@@ -1233,6 +1519,137 @@ function buildMultipleAttachedPrsPromotionSummary(input: {
     return `Attached GitHub pull requests match ${input.repoKey}, but no current review-handoff promotion candidate remains after historical filtering.${ignoredHistoricalSummary}`;
   }
   return `Multiple attached GitHub pull requests match ${input.repoKey}; conflicting attached PR URLs still require deterministic disambiguation before review-handoff promotion can continue: ${input.conflictingAttachedPrUrls.join(', ')}.${ignoredHistoricalSummary}`;
+}
+
+async function loadProviderSnapshotRecord(input: {
+  owner: string;
+  repo: string;
+  prNumber: number;
+  readinessMode: 'merge' | 'review';
+  resolveSnapshot: (input: ProviderPrSnapshotReaderInput) => Promise<ProviderPrSnapshotRecord>;
+  resolveSnapshotActionRequiredReasons: (
+    snapshot: ProviderPrSnapshotRecord,
+    options?: { readinessMode?: 'merge' | 'review' }
+  ) => string[];
+}): Promise<ProviderMergeCloseoutSnapshotRecord> {
+  const rawSnapshot = await input.resolveSnapshot({
+    owner: input.owner,
+    repo: input.repo,
+    prNumber: input.prNumber,
+    readinessMode: input.readinessMode
+  });
+  const actionRequiredReasons = input.resolveSnapshotActionRequiredReasons(rawSnapshot, {
+    readinessMode: input.readinessMode
+  });
+  return mapSnapshotRecord(rawSnapshot, actionRequiredReasons);
+}
+
+function describeProviderBranchRecoveryReason(reason: string): string {
+  if (reason === 'merge_state=DIRTY') {
+    return 'conflict recovery';
+  }
+  return 'branch refresh';
+}
+
+function doesProviderBranchRecoveryMatchPullRequest(
+  recovery: ProviderBranchRecoveryAttemptRecord | null | undefined,
+  pr: ProviderMergeCloseoutPullRequestRecord
+): boolean {
+  if (!recovery || recovery.command !== 'gh') {
+    return false;
+  }
+  const expectedRepo = `${pr.owner}/${pr.repo}`;
+  return (
+    recovery.args[0] === 'pr'
+    && recovery.args[1] === 'update-branch'
+    && recovery.args[2] === String(pr.number)
+    && recovery.args.includes(expectedRepo)
+  );
+}
+
+async function attemptProviderBranchRecovery(input: {
+  pr: ProviderMergeCloseoutPullRequestRecord;
+  snapshot: ProviderMergeCloseoutSnapshotRecord;
+  previousBranchRecovery?: ProviderBranchRecoveryAttemptRecord | null;
+  repoRoot: string;
+  now: () => string;
+  runCommand: ProviderMergeCloseoutCommandRunner;
+}): Promise<ProviderBranchRecoveryAttemptRecord | null> {
+  const recoveryReason = resolveAutomaticBranchRecoveryReason(input.snapshot, {
+    requireExclusive: true
+  });
+  if (
+    !recoveryReason
+    || !shouldAttemptAutomaticBranchRecovery(input.snapshot)
+  ) {
+    return null;
+  }
+  const previousBranchRecovery = input.previousBranchRecovery ?? null;
+  if (
+    previousBranchRecovery?.ok === true
+    && previousBranchRecovery.failure_kind === null
+    && doesProviderBranchRecoveryMatchPullRequest(previousBranchRecovery, input.pr)
+    && previousBranchRecovery.head_oid === input.snapshot.head_oid
+    && previousBranchRecovery.recovery_reason === recoveryReason
+  ) {
+    return previousBranchRecovery;
+  }
+  const attemptedAt = input.now();
+  const args = buildPrUpdateBranchArgs({
+    owner: input.pr.owner,
+    repo: input.pr.repo,
+    prNumber: input.pr.number
+  });
+  const result = await input.runCommand({
+    command: 'gh',
+    args,
+    cwd: input.repoRoot
+  });
+  const details = normalizeCommandText(result.stderr) ?? normalizeCommandText(result.stdout);
+  return {
+    attempted_at: attemptedAt,
+    head_oid: input.snapshot.head_oid,
+    recovery_reason: recoveryReason,
+    command: 'gh',
+    args,
+    exit_code: result.exitCode,
+    ok: result.ok,
+    stdout: normalizeCommandText(result.stdout),
+    stderr: normalizeCommandText(result.stderr),
+    failure_kind: result.ok
+      ? null
+      : isConflictLikeBranchRecoveryFailureMessage(details) ? 'conflict' : 'other'
+  };
+}
+
+function classifyPendingBranchRecovery(input: {
+  snapshot: ProviderMergeCloseoutSnapshotRecord;
+  recoveryAttempt: ProviderBranchRecoveryAttemptRecord;
+  prNumber: number;
+  mode: 'merge_closeout' | 'review_promotion';
+}): {
+  status: 'watching';
+  reason: 'branch_refresh_requested';
+  summary: string;
+} | null {
+  const pendingReason = resolveAutomaticBranchRecoveryReason(input.snapshot, {
+    requireExclusive: true
+  });
+  if (
+    pendingReason !== input.recoveryAttempt.recovery_reason
+    || !shouldAttemptAutomaticBranchRecovery(input.snapshot)
+  ) {
+    return null;
+  }
+  const action = describeProviderBranchRecoveryReason(input.recoveryAttempt.recovery_reason);
+  return {
+    status: 'watching',
+    reason: 'branch_refresh_requested',
+    summary:
+      input.mode === 'review_promotion'
+        ? `Requested automatic ${action} for attached PR #${input.prNumber}; waiting for GitHub to recompute review-handoff readiness.`
+        : `Requested automatic ${action} for attached PR #${input.prNumber}; waiting for GitHub to recompute merge readiness.`
+  };
 }
 
 function classifyNonMergedSnapshot(

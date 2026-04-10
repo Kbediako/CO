@@ -5,7 +5,7 @@ status: completed
 owners:
   - Codex
 created: 2026-03-10
-last_review: 2026-03-10
+last_review: 2026-04-10
 review_cadence_days: 30
 related_prd: docs/PRD-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction.md
 related_action_plan: docs/ACTION_PLAN-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction.md
@@ -37,6 +37,8 @@ Extract the remaining ready-instance startup bundle composition from `ControlSer
 - Review-wrapper work.
 
 ## Notes
+
+- 2026-04-10: Re-reviewed for CO-143 docs:freshness baseline restoration. The completed March 10 packet still reads as a truthful historical record, so the packet freshness metadata was refreshed after the cohort audit recorded in `out/linear-d3f1af87-57da-46ab-901d-75a6cc60420e/manual/20260410T0545Z-cohort-audit.md`.
 
 - 2026-03-10: Approved for docs-first registration based on the `1104` closeout evidence showing the remaining `ControlServer.start()` work is now only the ready-instance startup composition over the extracted collaborators. Evidence: `docs/findings/1105-control-server-ready-instance-startup-composition-extraction-deliberation.md`, `out/1104-coordinator-symphony-aligned-control-server-request-shell-binding-extraction/manual/20260310T033215Z-closeout/14-next-slice-note.md`.
 - 2026-03-10: Completed. `ControlServer.start()` now delegates bootstrap assembly plus final startup sequencing to `startControlServerReadyInstanceStartup`, focused regressions passed `103/103`, the task-scoped diagnostics full suite passed `190/190` files and `1273/1273` tests, the bounded standalone review surfaced and validated one real helper-test contract fix before returning a clean diff verdict, and pack-smoke passed. Evidence: `out/1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction/manual/20260310T041150Z-closeout/00-summary.md`, `out/1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction/manual/20260310T041150Z-closeout/05-targeted-tests.log`, `out/1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction/manual/20260310T041150Z-closeout/05-test.log`, `out/1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction/manual/20260310T041150Z-closeout/09-review.log`, `out/1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction/manual/20260310T041150Z-closeout/10-pack-smoke.log`, `out/1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction/manual/20260310T041150Z-closeout/11-manual-startup-composition-check.json`, `out/1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction/manual/20260310T041150Z-closeout/12-elegance-review.md`, `out/1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction/manual/20260310T041150Z-closeout/13-override-notes.md`.

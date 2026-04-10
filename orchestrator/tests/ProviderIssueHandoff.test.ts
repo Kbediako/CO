@@ -14206,12 +14206,13 @@ describe('createProviderIssueHandoffService', () => {
     await service.refresh();
 
     expect(runMergeCloseout).toHaveBeenCalledTimes(1);
-    expect(runMergeCloseout).toHaveBeenCalledWith({
+    expect(runMergeCloseout).toHaveBeenCalledWith(expect.objectContaining({
       issueId: 'lin-issue-1',
       issueIdentifier: 'CO-2',
       issueState: 'Merging',
       issueStateType: 'started',
       issueUpdatedAt: '2026-03-19T04:30:30.000Z',
+      previousBranchRecovery: null,
       sourceSetup: {
         provider: 'linear',
         workspace_id: 'workspace-1',
@@ -14225,7 +14226,7 @@ describe('createProviderIssueHandoffService', () => {
         )
       }),
       repoRoot: root
-    });
+    }));
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
     const expectedClaim = {
