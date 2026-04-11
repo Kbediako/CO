@@ -156,6 +156,8 @@ function createTrackedIssue(overrides: Partial<LiveLinearTrackedIssue> = {}): Li
     url: 'https://linear.app/example/issue/CO-2',
     state: 'In Progress',
     state_type: 'started',
+    archived_at: null,
+    trashed: false,
     workspace_id: 'workspace-1',
     viewer_id: 'viewer-1',
     assignee_id: 'viewer-1',
@@ -1054,6 +1056,51 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     );
     expect(continuationPrompt).toContain(
       'Do not retry `upsert-workpad` in this attempt until you first fix the deterministic validation error (workpad_marker_missing: Workpad body must contain "## Codex Workpad".).'
+    );
+  });
+
+  it('suppresses archived issue mutations within the same attempt', () => {
+    const issue = createTrackedIssue();
+    const helperCommand = SOURCE_HELPER_COMMAND;
+    const audit: ProviderLinearAuditSummary = {
+      path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+      attempted_count: 1,
+      success_count: 0,
+      failure_count: 1,
+      latest_recorded_at: '2026-03-21T09:00:00.000Z',
+      parallelization_entries: [],
+      latest_by_operation: {
+        'upsert-workpad': {
+          recorded_at: '2026-03-21T09:00:00.000Z',
+          operation: 'upsert-workpad',
+          ok: false,
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          source_setup: null,
+          action: null,
+          via: null,
+          state: null,
+          follow_up_issue_id: null,
+          follow_up_issue_identifier: null,
+          failed_relation_type: null,
+          comment_id: null,
+          attachment_id: null,
+          error_code: 'linear_issue_not_mutable',
+          error_message: 'Linear issue CO-2 is archived and trashed and cannot accept provider mutations.'
+        }
+      }
+    };
+
+    const continuationPrompt = buildProviderWorkerPrompt(issue, 2, 5, helperCommand, '/tmp/co', {
+      linearAudit: audit,
+      attemptStartedAt: '2026-03-21T08:59:59.000Z'
+    });
+
+    expect(continuationPrompt).toContain(
+      'Same-attempt deterministic provider mutation suppressions are in effect'
+    );
+    expect(continuationPrompt).toContain(
+      'Do not retry `upsert-workpad` in this attempt until the Linear issue is restored to a mutable active state.'
     );
   });
 

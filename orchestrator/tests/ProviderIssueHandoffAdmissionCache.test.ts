@@ -100,6 +100,8 @@ function createTrackedIssue() {
     url: null,
     state: 'In Progress',
     state_type: 'started',
+    archived_at: null,
+    trashed: false,
     viewer_id: 'viewer-1',
     assignee_id: 'viewer-1',
     assignee_name: 'Codex',

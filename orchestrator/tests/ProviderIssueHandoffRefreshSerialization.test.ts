@@ -56,6 +56,8 @@ function createTrackedIssue(
     url: null,
     state: 'In Progress',
     state_type: 'started',
+    archived_at: null,
+    trashed: false,
     workspace_id: 'workspace-1',
     viewer_id: 'viewer-1',
     assignee_id: 'viewer-1',

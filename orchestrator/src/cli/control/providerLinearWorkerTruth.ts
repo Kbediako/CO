@@ -189,6 +189,24 @@ function buildDeterministicProviderMutationSuppression(
             ? 'deterministic provider mutation suppressed: create-follow-up requires the parity matrix before retry'
             : buildGenericSuppressionSummary(entry.operation, errorCode, errorMessage)
       };
+    case 'transition':
+    case 'upsert-workpad':
+      if (errorCode === 'linear_issue_not_mutable') {
+        return {
+          operation: entry.operation,
+          error_code: errorCode,
+          error_message: errorMessage,
+          instruction: `Do not retry \`${entry.operation}\` in this attempt until the Linear issue is restored to a mutable active state.`,
+          summary: `deterministic provider mutation suppressed: ${entry.operation} cannot run while the Linear issue is archived or trashed`
+        };
+      }
+      return {
+        operation: entry.operation,
+        error_code: errorCode,
+        error_message: errorMessage,
+        instruction: buildGenericSuppressionInstruction(entry.operation, errorCode, errorMessage),
+        summary: buildGenericSuppressionSummary(entry.operation, errorCode, errorMessage)
+      };
     default:
       return {
         operation: entry.operation,
@@ -252,6 +270,9 @@ function isDeterministicProviderMutationFailure(entry: ProviderLinearAuditEntry)
     return true;
   }
   if (errorCode === 'linear_issue_id_missing') {
+    return true;
+  }
+  if (errorCode === 'linear_issue_not_mutable') {
     return true;
   }
   return /^linear_follow_up_.*_missing$/u.test(errorCode);

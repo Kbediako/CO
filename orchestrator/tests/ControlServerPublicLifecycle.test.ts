@@ -80,6 +80,8 @@ function buildTrackedIssue(id: string): LiveLinearTrackedIssue {
     url: null,
     state: 'Todo',
     state_type: 'unstarted',
+    archived_at: null,
+    trashed: false,
     workspace_id: null,
     viewer_id: null,
     assignee_id: null,

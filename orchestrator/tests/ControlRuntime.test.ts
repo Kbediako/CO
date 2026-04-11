@@ -235,6 +235,8 @@ function createTrackedIssue(overrides: Partial<LiveLinearTrackedIssue> = {}): Li
     url: 'https://linear.app/asabeko/issue/ISSUE-1',
     state: 'In Progress',
     state_type: 'started',
+    archived_at: null,
+    trashed: false,
     viewer_id: 'viewer-1',
     assignee_id: 'viewer-1',
     assignee_name: 'Codex',

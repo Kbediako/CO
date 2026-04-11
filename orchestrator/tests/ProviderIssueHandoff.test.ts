@@ -129,6 +129,8 @@ function createTrackedIssue(
     priority: 2,
     created_at: '2026-03-18T04:00:00.000Z',
     updated_at: '2026-03-19T04:00:00.000Z',
+    archived_at: null,
+    trashed: false,
     blocked_by: [],
     recent_activity: [],
     ...overrides
@@ -3769,6 +3771,49 @@ describe('createProviderIssueHandoffService', () => {
       reason: 'provider_issue_state_not_active',
       issue_state: 'QA Ready',
       issue_state_type: 'started'
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores archived or trashed issues before starting provider work and records mutability truth', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics'
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        archived_at: '2026-04-11T05:00:00.000Z',
+        trashed: true
+      }),
+      deliveryId: 'delivery-archived-not-mutable',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_744_352_320_000
+    });
+
+    expect(result).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_not_mutable'
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'ignored',
+      reason: 'provider_issue_not_mutable',
+      issue_archived_at: '2026-04-11T05:00:00.000Z',
+      issue_trashed: true
     });
     expect(persist).toHaveBeenCalledTimes(1);
   });
@@ -9170,6 +9215,119 @@ describe('createProviderIssueHandoffService', () => {
     });
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
+  it('releases non-mutable issues on refresh and persists archived mutability truth', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-active'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'task-1303-active',
+        pipeline_id: 'diagnostics',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+    const endpoint = await createControlEndpointServer();
+    await writeFile(
+      join(childPaths.runDir, 'control_endpoint.json'),
+      JSON.stringify({
+        base_url: endpoint.baseUrl,
+        token_path: 'control_auth.json'
+      }),
+      'utf8'
+    );
+    await writeFile(childPaths.controlAuthPath, JSON.stringify({ token: 'child-token' }), 'utf8');
+    const workspacePath = resolveProviderWorkspacePath(root, 'task-1303-active');
+    await mkdir(workspacePath, { recursive: true });
+    await writeFile(join(workspacePath, '.git'), 'gitdir: /tmp/provider-worktree\n', 'utf8');
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: 'task-1303-active',
+      mapping_source: 'provider_id_fallback',
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-running',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-child',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics',
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          archived_at: '2026-04-11T05:00:00.000Z',
+          trashed: true
+        })
+      })
+    });
+
+    try {
+      await service.refresh();
+
+      await vi.waitFor(() => {
+        expect(endpoint.actions).toEqual([
+          expect.objectContaining({
+            action: 'cancel',
+            reason: 'provider_issue_released:not_mutable'
+          })
+        ]);
+      });
+      expect(state.claims[0]).toMatchObject({
+        state: 'released',
+        reason: 'provider_issue_released:not_mutable',
+        issue_archived_at: '2026-04-11T05:00:00.000Z',
+        issue_trashed: true,
+        run_id: 'run-child',
+        run_manifest_path: childPaths.manifestPath
+      });
+      await expect(access(workspacePath)).resolves.toBeUndefined();
+      expect(launcher.start).not.toHaveBeenCalled();
+      expect(launcher.resume).not.toHaveBeenCalled();
+    } finally {
+      await endpoint.close();
+    }
   });
 
   it('releases blocked Todo issues without cleaning their provider workspace', async () => {

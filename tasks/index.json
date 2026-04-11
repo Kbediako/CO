@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260411-linear-acc07ffc-06ac-4649-a235-1bf37c13cc51",
+      "title": "CO: prevent archived or trashed Linear issues from being claimed or mutated as active provider lanes",
+      "relates_to": "tasks/tasks-linear-acc07ffc-06ac-4649-a235-1bf37c13cc51.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-11",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-acc07ffc-06ac-4649-a235-1bf37c13cc51.md",
+        "task": "tasks/tasks-linear-acc07ffc-06ac-4649-a235-1bf37c13cc51.md",
+        "agent_task": ".agent/task/linear-acc07ffc-06ac-4649-a235-1bf37c13cc51.md",
+        "docs": "docs/TECH_SPEC-linear-acc07ffc-06ac-4649-a235-1bf37c13cc51.md"
+      }
+    },
+    {
       "id": "20260411-linear-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6",
       "title": "CO: Recover frontend-test CLI from pre-manifest hang under ts-node entrypoint",
       "relates_to": "tasks/tasks-linear-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6.md",

@@ -337,6 +337,8 @@ export interface ProviderLinearIssueContext {
   description: string | null;
   url: string | null;
   updated_at: string | null;
+  archived_at: string | null;
+  trashed: boolean;
   workspace_id: string | null;
   state: ProviderLinearWorkflowState | null;
   team: {
@@ -356,7 +358,7 @@ export interface ProviderLinearIssueContext {
 
 type ProviderLinearIssueSummary = Pick<
   ProviderLinearIssueContext,
-  'id' | 'identifier' | 'url' | 'updated_at' | 'workspace_id' | 'state' | 'team' | 'project'
+  'id' | 'identifier' | 'url' | 'updated_at' | 'archived_at' | 'trashed' | 'workspace_id' | 'state' | 'team' | 'project'
 >;
 
 export type ProviderLinearIssueContextResult =
@@ -492,6 +494,8 @@ interface LinearIssueContextQueryResponse {
     description?: string | null;
     url?: string | null;
     updatedAt?: string | null;
+    archivedAt?: string | null;
+    trashed?: boolean | null;
     state?: {
       id?: string | null;
       name?: string | null;
@@ -563,6 +567,8 @@ interface LinearIssueSummaryQueryResponse {
     identifier?: string | null;
     url?: string | null;
     updatedAt?: string | null;
+    archivedAt?: string | null;
+    trashed?: boolean | null;
     state?: {
       id?: string | null;
       name?: string | null;
@@ -898,7 +904,19 @@ export async function upsertProviderLinearWorkpadComment(input: {
   }
 
   let issueContext = context.issue;
-  if (cachedContext && !canTrustCachedMutationContext) {
+  const revalidatedCachedMutability =
+    cachedContext && issueHasMutabilityBlock(issueContext)
+      ? await readIssueContext(session.session, 'upsert-workpad', issueId, {
+          includeAttachments: false
+        })
+      : null;
+  if (revalidatedCachedMutability && !revalidatedCachedMutability.ok) {
+    return failureFromWorkflowError('upsert-workpad', revalidatedCachedMutability.error);
+  }
+  if (revalidatedCachedMutability?.ok) {
+    issueContext = revalidatedCachedMutability.issue;
+  }
+  if (cachedContext && !canTrustCachedMutationContext && !revalidatedCachedMutability) {
     // Re-read live comment state before any mutation so cached workpad ids cannot
     // cause duplicate comments or updates against deleted/replaced workpads.
     const liveContext = await readIssueContext(session.session, 'upsert-workpad', issueId, {
@@ -1036,6 +1054,11 @@ export async function upsertProviderLinearWorkpadComment(input: {
       comment: selectedComment,
       source_setup: session.session.sourceSetup
     };
+  }
+
+  const mutabilityFailure = failureIfIssueNotMutable('upsert-workpad', issueContext);
+  if (mutabilityFailure) {
+    return mutabilityFailure;
   }
 
   const resolvedEmbeddedWorkpad = bodyHasLocalImageReferences
@@ -1340,7 +1363,18 @@ export async function transitionProviderLinearIssueState(input: {
 
   let summary = initialSummary.issue;
   let cacheContext = cachedContext;
-  if (cachedContext && !canTrustCachedMutationContext) {
+  const revalidatedCachedMutability =
+    cachedContext && issueHasMutabilityBlock(summary)
+      ? await readIssueSummary(session.session, 'transition', issueId)
+      : null;
+  if (revalidatedCachedMutability && !revalidatedCachedMutability.ok) {
+    return failureFromWorkflowError('transition', revalidatedCachedMutability.error);
+  }
+  if (revalidatedCachedMutability?.ok && cachedContext) {
+    summary = revalidatedCachedMutability.issue;
+    cacheContext = mergeCachedIssueContextSummary(cachedContext, summary);
+  }
+  if (cachedContext && !canTrustCachedMutationContext && !revalidatedCachedMutability) {
     const liveSummary = await readIssueSummary(session.session, 'transition', issueId);
     if (!liveSummary.ok) {
       return failureFromWorkflowError('transition', liveSummary.error);
@@ -1401,6 +1435,11 @@ export async function transitionProviderLinearIssueState(input: {
       target_state: targetState,
       source_setup: session.session.sourceSetup
     };
+  }
+
+  const mutabilityFailure = failureIfIssueNotMutable('transition', summary);
+  if (mutabilityFailure) {
+    return mutabilityFailure;
   }
 
   const transitionBudgetError = await preflightProviderLinearBudget({
@@ -2900,6 +2939,8 @@ function summarizeIssueContext(issue: ProviderLinearIssueContext): ProviderLinea
     identifier: issue.identifier,
     url: issue.url,
     updated_at: issue.updated_at,
+    archived_at: issue.archived_at,
+    trashed: issue.trashed,
     workspace_id: issue.workspace_id,
     state: issue.state,
     team: issue.team,
@@ -2915,11 +2956,45 @@ function mergeCachedIssueContextSummary(
     ...issue,
     url: summary.url,
     updated_at: summary.updated_at,
+    archived_at: summary.archived_at,
+    trashed: summary.trashed,
     workspace_id: summary.workspace_id,
     state: summary.state,
     team: summary.team,
     project: summary.project
   };
+}
+
+function failureIfIssueNotMutable<T extends ProviderLinearOperation>(
+  operation: T,
+  issue: Pick<ProviderLinearIssueSummary, 'id' | 'identifier' | 'archived_at' | 'trashed'>
+): ProviderLinearOperationFailure<T> | null {
+  const mutabilityStates = issueHasMutabilityBlock(issue)
+    ? [issue.archived_at ? 'archived' : null, issue.trashed ? 'trashed' : null].filter(
+        (value): value is string => Boolean(value)
+      )
+    : [];
+  if (mutabilityStates.length === 0) {
+    return null;
+  }
+  return failure(
+    operation,
+    'linear_issue_not_mutable',
+    `Linear issue ${issue.identifier} is ${mutabilityStates.join(' and ')} and cannot accept provider mutations.`,
+    409,
+    {
+      issue_id: issue.id,
+      issue_identifier: issue.identifier,
+      archived_at: issue.archived_at,
+      trashed: issue.trashed
+    }
+  );
+}
+
+function issueHasMutabilityBlock(
+  issue: Pick<ProviderLinearIssueSummary, 'archived_at' | 'trashed'>
+): boolean {
+  return Boolean(issue.archived_at) || issue.trashed === true;
 }
 
 function resolveIssueContextCachePath(env: NodeJS.ProcessEnv | undefined): string | null {
@@ -3156,6 +3231,8 @@ function parseCachedIssueContext(value: unknown): ProviderLinearIssueContext | n
     description: normalizeOptionalString(issue.description as string | null | undefined),
     url: normalizeOptionalString(issue.url as string | null | undefined),
     updated_at: normalizeIso(issue.updated_at as string | null | undefined),
+    archived_at: normalizeIso(issue.archived_at as string | null | undefined),
+    trashed: normalizeOptionalBoolean(issue.trashed) ?? false,
     workspace_id: normalizeOptionalString(issue.workspace_id as string | null | undefined),
     state,
     team,
@@ -3622,6 +3699,8 @@ function parseIssueSummary(
       identifier,
       url: normalizeOptionalString(issueNode.url),
       updated_at: normalizeIso(issueNode.updatedAt),
+      archived_at: normalizeIso(issueNode.archivedAt),
+      trashed: normalizeOptionalBoolean(issueNode.trashed) ?? false,
       workspace_id: normalizedWorkspaceId,
       state: parseWorkflowState(issueNode.state ?? null),
       team: issueNode.team
@@ -3707,6 +3786,8 @@ function parseIssueContext(
       description: normalizeOptionalString(issueNode.description),
       url: normalizeOptionalString(issueNode.url),
       updated_at: normalizeIso(issueNode.updatedAt),
+      archived_at: normalizeIso(issueNode.archivedAt),
+      trashed: normalizeOptionalBoolean(issueNode.trashed) ?? false,
       workspace_id: normalizedWorkspaceId,
       state: parseWorkflowState(issueNode.state ?? null),
       team: issueNode.team
@@ -3792,6 +3873,8 @@ function buildIssueContextQuery(options: {
       description
       url
       updatedAt
+      archivedAt
+      trashed
       state {
         id
         name
@@ -3832,6 +3915,8 @@ function buildIssueSummaryQuery(): string {
       identifier
       url
       updatedAt
+      archivedAt
+      trashed
       state {
         id
         name
@@ -5623,6 +5708,10 @@ function normalizeRequiredString(value: string | null | undefined): string | nul
 
 function normalizeOptionalString(value: string | null | undefined): string | null {
   return normalizeRequiredString(value);
+}
+
+function normalizeOptionalBoolean(value: unknown): boolean | null {
+  return typeof value === 'boolean' ? value : null;
 }
 
 function buildFollowUpIssueDescription(input: {

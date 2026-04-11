@@ -42,6 +42,16 @@ export interface ProviderLinearWorkerLifecycleClassification {
   terminalReason: 'issue_review_handoff' | 'issue_inactive' | null;
 }
 
+type ProviderLinearTrackedIssueMutabilityInput = Partial<
+  Pick<LiveLinearTrackedIssue, 'archived_at' | 'trashed'>
+>;
+
+type ProviderLinearTrackedIssueLifecycleInput = Pick<
+  LiveLinearTrackedIssue,
+  'state' | 'state_type' | 'blocked_by'
+> &
+  ProviderLinearTrackedIssueMutabilityInput;
+
 export function normalizeProviderLinearWorkflowState(
   value: string | null | undefined
 ): string | null {
@@ -107,16 +117,25 @@ export function providerLinearTodoBlockedByNonTerminal(
   });
 }
 
+export function isProviderLinearTrackedIssueMutable(
+  issue: ProviderLinearTrackedIssueMutabilityInput
+): boolean {
+  return !issue.archived_at && issue.trashed !== true;
+}
+
 function isProviderLinearWorkflowStateExecutionEligible(input: {
   workflowState: ProviderLinearWorkflowStateClassification;
-  blockers: LiveLinearTrackedIssue['blocked_by'] | null | undefined;
+  issue: ProviderLinearTrackedIssueLifecycleInput;
 }): boolean {
+  if (!isProviderLinearTrackedIssueMutable(input.issue)) {
+    return false;
+  }
   if (!input.workflowState.isActive) {
     return false;
   }
   if (
     input.workflowState.isTodo &&
-    providerLinearTodoBlockedByNonTerminal(input.blockers)
+    providerLinearTodoBlockedByNonTerminal(input.issue.blocked_by)
   ) {
     return false;
   }
@@ -124,12 +143,12 @@ function isProviderLinearWorkflowStateExecutionEligible(input: {
 }
 
 export function classifyProviderLinearWorkerLifecycle(
-  issue: Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'blocked_by'>
+  issue: ProviderLinearTrackedIssueLifecycleInput
 ): ProviderLinearWorkerLifecycleClassification {
   const workflowState = classifyProviderLinearWorkflowState(issue);
   const isExecutionEligible = isProviderLinearWorkflowStateExecutionEligible({
     workflowState,
-    blockers: issue.blocked_by
+    issue
   });
 
   if (isExecutionEligible) {
@@ -159,7 +178,7 @@ export function classifyProviderLinearWorkerLifecycle(
 }
 
 export function isProviderLinearTrackedIssueEligibleForExecution(
-  issue: Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'blocked_by'>
+  issue: ProviderLinearTrackedIssueLifecycleInput
 ): boolean {
   return classifyProviderLinearWorkerLifecycle(issue).isExecutionEligible;
 }

@@ -98,6 +98,8 @@ describe('resolveLiveLinearTrackedIssueById', () => {
             title: 'Investigate advisory routing',
             url: 'https://linear.app/asabeko/issue/PREPROD-101',
             updatedAt: '2026-03-06T02:00:00.000Z',
+            archivedAt: null,
+            trashed: false,
             state: {
               name: 'In Progress',
               type: 'started'
@@ -184,6 +186,8 @@ describe('resolveLiveLinearTrackedIssueById', () => {
         identifier: 'PREPROD-101',
         title: 'Investigate advisory routing',
         state: 'In Progress',
+        archived_at: null,
+        trashed: false,
         blocked_by: [
           {
             id: 'lin-blocker-1',
@@ -1433,6 +1437,115 @@ describe('resolveLiveLinearDispatchRecommendation', () => {
         identifier: 'PREPROD-104',
         state: 'Ready',
         state_type: 'unstarted'
+      }
+    });
+  });
+
+  it('excludes archived or trashed issues from fresh dispatch admission', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async () =>
+      jsonResponse({
+        data: {
+          viewer: {
+            id: 'viewer-1',
+            organization: {
+              id: 'lin-workspace-1'
+            }
+          },
+          issues: {
+            pageInfo: {
+              hasNextPage: false,
+              endCursor: null
+            },
+            nodes: [
+              {
+                id: 'lin-issue-archived',
+                identifier: 'PREPROD-100',
+                title: 'Archived issue should not dispatch',
+                priority: 1,
+                createdAt: '2026-03-18T04:00:00.000Z',
+                updatedAt: '2026-03-20T06:00:00.000Z',
+                archivedAt: '2026-04-11T05:00:00.000Z',
+                trashed: true,
+                assignee: {
+                  id: 'viewer-1',
+                  displayName: 'Codex'
+                },
+                state: {
+                  name: 'Ready',
+                  type: 'unstarted'
+                },
+                team: {
+                  id: 'lin-team-1',
+                  key: 'PREPROD',
+                  name: 'PRE-PRO/PRODUCTION'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'Icon Agency (Bookings)'
+                },
+                inverseRelations: { nodes: [] },
+                history: { nodes: [] }
+              },
+              {
+                id: 'lin-issue-active',
+                identifier: 'PREPROD-101',
+                title: 'Mutable Ready issue should dispatch',
+                priority: 2,
+                createdAt: '2026-03-19T04:00:00.000Z',
+                updatedAt: '2026-03-20T06:30:00.000Z',
+                archivedAt: null,
+                trashed: false,
+                assignee: {
+                  id: 'viewer-1',
+                  displayName: 'Codex'
+                },
+                state: {
+                  name: 'Ready',
+                  type: 'unstarted'
+                },
+                team: {
+                  id: 'lin-team-1',
+                  key: 'PREPROD',
+                  name: 'PRE-PRO/PRODUCTION'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'Icon Agency (Bookings)'
+                },
+                inverseRelations: { nodes: [] },
+                history: { nodes: [] }
+              }
+            ]
+          }
+        }
+      })
+    );
+
+    const result = await resolveLiveLinearDispatchRecommendation({
+      source: {
+        provider: 'linear',
+        live: true
+      },
+      sourceSetup: {
+        provider: 'linear',
+        workspace_id: 'lin-workspace-1',
+        team_id: 'lin-team-1',
+        project_id: 'lin-project-1'
+      },
+      defaultIssueIdentifier: 'task-1014',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toMatchObject({
+      kind: 'ready',
+      tracked_issue: {
+        id: 'lin-issue-active',
+        identifier: 'PREPROD-101',
+        archived_at: null,
+        trashed: false
       }
     });
   });
