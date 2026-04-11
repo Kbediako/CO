@@ -338,7 +338,7 @@ export interface ProviderLinearIssueContext {
   url: string | null;
   updated_at: string | null;
   archived_at: string | null;
-  trashed: boolean;
+  trashed: boolean | null;
   workspace_id: string | null;
   state: ProviderLinearWorkflowState | null;
   team: {
@@ -904,6 +904,7 @@ export async function upsertProviderLinearWorkpadComment(input: {
   }
 
   let issueContext = context.issue;
+  let issueContextFreshForMutation = cachedContext === null;
   const revalidatedCachedMutability =
     cachedContext && issueHasMutabilityBlock(issueContext)
       ? await readIssueContext(session.session, 'upsert-workpad', issueId, {
@@ -915,6 +916,7 @@ export async function upsertProviderLinearWorkpadComment(input: {
   }
   if (revalidatedCachedMutability?.ok) {
     issueContext = revalidatedCachedMutability.issue;
+    issueContextFreshForMutation = true;
   }
   if (cachedContext && !canTrustCachedMutationContext && !revalidatedCachedMutability) {
     // Re-read live comment state before any mutation so cached workpad ids cannot
@@ -926,6 +928,7 @@ export async function upsertProviderLinearWorkpadComment(input: {
       return failureFromWorkflowError('upsert-workpad', liveContext.error);
     }
     issueContext = liveContext.issue;
+    issueContextFreshForMutation = true;
   }
 
   const requestedCommentId = normalizeRequiredString(input.commentId ?? null);
@@ -982,6 +985,7 @@ export async function upsertProviderLinearWorkpadComment(input: {
   }
   const currentLocalImageCacheEntries = localImageCacheEntriesResult.local_images;
   const shouldRevalidateCachedNoop = Boolean(
+    !issueContextFreshForMutation &&
     selectedComment &&
     cachedContext &&
     canTrustCachedMutationContext &&
@@ -1004,6 +1008,7 @@ export async function upsertProviderLinearWorkpadComment(input: {
       return failureFromWorkflowError('upsert-workpad', liveContext.error);
     }
     issueContext = liveContext.issue;
+    issueContextFreshForMutation = true;
     selectedCommentResult = resolveWorkpadMutationContext(issueContext);
     if (!selectedCommentResult.ok) {
       return failure(
@@ -1054,6 +1059,66 @@ export async function upsertProviderLinearWorkpadComment(input: {
       comment: selectedComment,
       source_setup: session.session.sourceSetup
     };
+  }
+
+  if (!issueContextFreshForMutation) {
+    const liveContext = await readIssueContext(session.session, 'upsert-workpad', issueId, {
+      includeAttachments: false
+    });
+    if (!liveContext.ok) {
+      return failureFromWorkflowError('upsert-workpad', liveContext.error);
+    }
+    issueContext = liveContext.issue;
+    issueContextFreshForMutation = true;
+    selectedCommentResult = resolveWorkpadMutationContext(issueContext);
+    if (!selectedCommentResult.ok) {
+      return failure(
+        'upsert-workpad',
+        selectedCommentResult.error.code,
+        selectedCommentResult.error.message,
+        selectedCommentResult.error.status,
+        selectedCommentResult.error.details
+      );
+    }
+    selectedComment = selectedCommentResult.comment;
+    if (selectedComment && !bodyHasLocalImageReferences && selectedComment.body === body) {
+      await writeCachedIssueContextRecord(input.env, issueContext, session.session.sourceSetup, {
+        embeddedWorkpad: null
+      });
+      return {
+        ok: true,
+        operation: 'upsert-workpad',
+        action: 'noop',
+        issue: {
+          id: issueContext.id,
+          identifier: issueContext.identifier
+        },
+        comment: selectedComment,
+        source_setup: session.session.sourceSetup
+      };
+    }
+    const liveMatchingEmbeddedWorkpadNoopCache = resolveEmbeddedWorkpadNoopCache({
+      cachedWorkpad: cachedEmbeddedWorkpad,
+      comment: selectedComment,
+      originalBody: body,
+      localImages: currentLocalImageCacheEntries
+    });
+    if (selectedComment && liveMatchingEmbeddedWorkpadNoopCache) {
+      await writeCachedIssueContextRecord(input.env, issueContext, session.session.sourceSetup, {
+        embeddedWorkpad: liveMatchingEmbeddedWorkpadNoopCache
+      });
+      return {
+        ok: true,
+        operation: 'upsert-workpad',
+        action: 'noop',
+        issue: {
+          id: issueContext.id,
+          identifier: issueContext.identifier
+        },
+        comment: selectedComment,
+        source_setup: session.session.sourceSetup
+      };
+    }
   }
 
   const mutabilityFailure = failureIfIssueNotMutable('upsert-workpad', issueContext);
@@ -1363,6 +1428,7 @@ export async function transitionProviderLinearIssueState(input: {
 
   let summary = initialSummary.issue;
   let cacheContext = cachedContext;
+  let summaryFreshForTransition = cachedContext === null;
   const revalidatedCachedMutability =
     cachedContext && issueHasMutabilityBlock(summary)
       ? await readIssueSummary(session.session, 'transition', issueId)
@@ -1373,6 +1439,7 @@ export async function transitionProviderLinearIssueState(input: {
   if (revalidatedCachedMutability?.ok && cachedContext) {
     summary = revalidatedCachedMutability.issue;
     cacheContext = mergeCachedIssueContextSummary(cachedContext, summary);
+    summaryFreshForTransition = true;
   }
   if (cachedContext && !canTrustCachedMutationContext && !revalidatedCachedMutability) {
     const liveSummary = await readIssueSummary(session.session, 'transition', issueId);
@@ -1381,16 +1448,18 @@ export async function transitionProviderLinearIssueState(input: {
     }
     summary = liveSummary.issue;
     cacheContext = mergeCachedIssueContextSummary(cachedContext, summary);
+    summaryFreshForTransition = true;
   }
 
   let targetState = resolveWorkflowStateByName(summary.team?.states ?? [], stateName);
-  if (!targetState && cachedContext && canTrustCachedMutationContext) {
+  if (!targetState && cachedContext && canTrustCachedMutationContext && !summaryFreshForTransition) {
     const liveSummary = await readIssueSummary(session.session, 'transition', issueId);
     if (!liveSummary.ok) {
       return failureFromWorkflowError('transition', liveSummary.error);
     }
     summary = liveSummary.issue;
     cacheContext = mergeCachedIssueContextSummary(cachedContext, summary);
+    summaryFreshForTransition = true;
     targetState = resolveWorkflowStateByName(summary.team?.states ?? [], stateName);
   }
   if (!targetState) {
@@ -1402,13 +1471,19 @@ export async function transitionProviderLinearIssueState(input: {
     );
   }
 
-  if (sameWorkflowState(summary.state, targetState) && cachedContext && canTrustCachedMutationContext) {
+  if (
+    sameWorkflowState(summary.state, targetState) &&
+    cachedContext &&
+    canTrustCachedMutationContext &&
+    !summaryFreshForTransition
+  ) {
     const liveSummary = await readIssueSummary(session.session, 'transition', issueId);
     if (!liveSummary.ok) {
       return failureFromWorkflowError('transition', liveSummary.error);
     }
     summary = liveSummary.issue;
     cacheContext = mergeCachedIssueContextSummary(cachedContext, summary);
+    summaryFreshForTransition = true;
     targetState = resolveWorkflowStateByName(summary.team?.states ?? [], stateName);
     if (!targetState) {
       return failure(
@@ -1435,6 +1510,41 @@ export async function transitionProviderLinearIssueState(input: {
       target_state: targetState,
       source_setup: session.session.sourceSetup
     };
+  }
+
+  if (!summaryFreshForTransition) {
+    const liveSummary = await readIssueSummary(session.session, 'transition', issueId);
+    if (!liveSummary.ok) {
+      return failureFromWorkflowError('transition', liveSummary.error);
+    }
+    summary = liveSummary.issue;
+    cacheContext = cacheContext ? mergeCachedIssueContextSummary(cacheContext, summary) : null;
+    summaryFreshForTransition = true;
+    targetState = resolveWorkflowStateByName(summary.team?.states ?? [], stateName);
+    if (!targetState) {
+      return failure(
+        'transition',
+        'linear_state_not_found',
+        `Linear team state "${stateName}" was not found for issue ${summary.identifier}.`,
+        422
+      );
+    }
+    if (sameWorkflowState(summary.state, targetState)) {
+      return {
+        ok: true,
+        operation: 'transition',
+        action: 'noop',
+        issue: {
+          id: summary.id,
+          identifier: summary.identifier,
+          state: summary.state,
+          updated_at: summary.updated_at
+        },
+        previous_state: summary.state,
+        target_state: targetState,
+        source_setup: session.session.sourceSetup
+      };
+    }
   }
 
   const mutabilityFailure = failureIfIssueNotMutable('transition', summary);
@@ -3232,7 +3342,7 @@ function parseCachedIssueContext(value: unknown): ProviderLinearIssueContext | n
     url: normalizeOptionalString(issue.url as string | null | undefined),
     updated_at: normalizeIso(issue.updated_at as string | null | undefined),
     archived_at: normalizeIso(issue.archived_at as string | null | undefined),
-    trashed: normalizeOptionalBoolean(issue.trashed) ?? false,
+    trashed: normalizeOptionalBoolean(issue.trashed),
     workspace_id: normalizeOptionalString(issue.workspace_id as string | null | undefined),
     state,
     team,
@@ -3700,7 +3810,7 @@ function parseIssueSummary(
       url: normalizeOptionalString(issueNode.url),
       updated_at: normalizeIso(issueNode.updatedAt),
       archived_at: normalizeIso(issueNode.archivedAt),
-      trashed: normalizeOptionalBoolean(issueNode.trashed) ?? false,
+      trashed: normalizeOptionalBoolean(issueNode.trashed),
       workspace_id: normalizedWorkspaceId,
       state: parseWorkflowState(issueNode.state ?? null),
       team: issueNode.team
@@ -3787,7 +3897,7 @@ function parseIssueContext(
       url: normalizeOptionalString(issueNode.url),
       updated_at: normalizeIso(issueNode.updatedAt),
       archived_at: normalizeIso(issueNode.archivedAt),
-      trashed: normalizeOptionalBoolean(issueNode.trashed) ?? false,
+      trashed: normalizeOptionalBoolean(issueNode.trashed),
       workspace_id: normalizedWorkspaceId,
       state: parseWorkflowState(issueNode.state ?? null),
       team: issueNode.team

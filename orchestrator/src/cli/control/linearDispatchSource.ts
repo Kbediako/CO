@@ -48,7 +48,7 @@ export interface LiveLinearTrackedIssue {
   state: string | null;
   state_type: string | null;
   archived_at: string | null;
-  trashed: boolean;
+  trashed: boolean | null;
   viewer_id: string | null;
   assignee_id: string | null;
   assignee_name: string | null;
@@ -1141,7 +1141,7 @@ function parseTrackedIssue(
     state: normalizeEnvValue(issue.state?.name),
     state_type: normalizeEnvValue(issue.state?.type),
     archived_at: normalizeIso(issue.archivedAt),
-    trashed: normalizeOptionalBoolean(issue.trashed) ?? false,
+    trashed: normalizeOptionalBoolean(issue.trashed),
     viewer_id: input.viewerId,
     assignee_id: normalizeEnvValue(issue.assignee?.id),
     assignee_name: normalizeEnvValue(issue.assignee?.displayName ?? issue.assignee?.name),

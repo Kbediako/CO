@@ -2519,6 +2519,18 @@ export function createProviderIssueHandoffService(
             releasedWebhookTiming === 'newer' ||
             releasedWebhookTiming === 'unknown'
           );
+        const releasedMutabilityTruth =
+          newerWebhookBlockedByDrain
+            ? {
+                issue_archived_at: claimBase.issue_archived_at,
+                issue_trashed: claimBase.issue_trashed
+              }
+            : preserveReleasedIssueMetadata
+              ? mergeReleasedTrackedIssueMutability(existing, claimBase)
+              : {
+                  issue_archived_at: claimBase.issue_archived_at,
+                  issue_trashed: claimBase.issue_trashed
+                };
         if (
           releaseCancelPending ||
           replayBlockedByReleasedMetadata
@@ -2555,6 +2567,8 @@ export function createProviderIssueHandoffService(
                 : preserveReleasedIssueMetadata
                   ? existing.issue_updated_at
                   : claimBase.issue_updated_at,
+            issue_archived_at: releasedMutabilityTruth.issue_archived_at,
+            issue_trashed: releasedMutabilityTruth.issue_trashed,
             issue_viewer_id:
               newerWebhookBlockedByDrain
                 ? claimBase.issue_viewer_id
@@ -3955,11 +3969,14 @@ function shouldReopenReleasedClaimAtCurrentTimestamp(input: {
   claim: Pick<ProviderIntakeClaimRecord, 'reason'>;
   trackedIssue: Pick<
     LiveLinearTrackedIssue,
-    'state' | 'state_type' | 'viewer_id' | 'assignee_id' | 'blocked_by'
+    'state' | 'state_type' | 'archived_at' | 'trashed' | 'viewer_id' | 'assignee_id' | 'blocked_by'
   >;
 }): boolean {
   if (isProviderIssueReleasedPendingReopen(input.claim.reason ?? null)) {
     return true;
+  }
+  if (input.claim.reason === 'provider_issue_released:not_mutable') {
+    return isProviderLinearTrackedIssueMutable(input.trackedIssue);
   }
   if (input.claim.reason !== 'provider_issue_released:assignee_changed') {
     return false;
@@ -3972,7 +3989,7 @@ function shouldReopenReleasedClaimOnRefresh(input: {
   releaseRun: ProviderIssueRunRecord | null;
   trackedIssue: Pick<
     LiveLinearTrackedIssue,
-    'updated_at' | 'state' | 'state_type' | 'viewer_id' | 'assignee_id' | 'blocked_by'
+    'updated_at' | 'state' | 'state_type' | 'archived_at' | 'trashed' | 'viewer_id' | 'assignee_id' | 'blocked_by'
   >;
 }): boolean {
   if (isProviderIssueReleasedPendingReopen(input.claim.reason ?? null)) {
@@ -3996,6 +4013,29 @@ function shouldReopenReleasedClaimOnRefresh(input: {
       })
     )
   );
+}
+
+function mergeReleasedTrackedIssueMutability(
+  existing: Pick<ProviderIntakeClaimRecord, 'issue_archived_at' | 'issue_trashed'>,
+  next: Pick<ProviderIntakeClaimRecord, 'issue_archived_at' | 'issue_trashed'>
+): Pick<ProviderIntakeClaimRecord, 'issue_archived_at' | 'issue_trashed'> {
+  const existingArchivedAt =
+    typeof existing.issue_archived_at === 'string' ? existing.issue_archived_at : null;
+  const nextArchivedAt =
+    typeof next.issue_archived_at === 'string' ? next.issue_archived_at : null;
+  const existingTrashed =
+    existing.issue_trashed === true ? true : (existing.issue_trashed === false ? false : null);
+  const nextTrashed =
+    next.issue_trashed === true ? true : (next.issue_trashed === false ? false : null);
+  return {
+    issue_archived_at: existingArchivedAt ?? nextArchivedAt,
+    issue_trashed:
+      existingTrashed === true || nextTrashed === true
+        ? true
+        : existingTrashed === false || nextTrashed === false
+          ? false
+          : null
+  };
 }
 
 function didRunFinishAfterClaimLaunch(
@@ -5620,7 +5660,8 @@ function buildTrackedIssueSnapshotFromClaim(
     updated_at: claim.issue_updated_at,
     archived_at:
       typeof claim.issue_archived_at === 'string' ? claim.issue_archived_at : null,
-    trashed: claim.issue_trashed === true,
+    trashed:
+      claim.issue_trashed === true ? true : (claim.issue_trashed === false ? false : null),
     blocked_by: claim.issue_blocked_by ?? [],
     recent_activity: []
   };

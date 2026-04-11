@@ -504,7 +504,7 @@ function normalizeRetryQueued(value: unknown): boolean | null {
 }
 
 function normalizeOptionalBoolean(value: unknown): boolean | null {
-  return typeof value === 'boolean' ? value : null;
+  return normalizeRetryQueued(value);
 }
 
 function normalizeProviderIssueBlockedBy(

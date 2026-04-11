@@ -37,7 +37,7 @@
 - [ ] `npm run docs:check`.
 - [ ] `npm run docs:freshness`.
 - [ ] `npm run repo:stewardship`.
-- [ ] `node scripts/diff-budget.mjs`.
+- [ ] `DIFF_BUDGET_OVERRIDE_REASON="CO-153 requires a fresh docs-first packet plus bounded source and regression coverage for archived/trashed admission, mutability revalidation, and summary suppression in one reviewable lane." node scripts/diff-budget.mjs`.
 - [ ] Manifest-backed standalone review plus explicit elegance review before handoff.
 - [ ] `npm run pack:smoke`.
 

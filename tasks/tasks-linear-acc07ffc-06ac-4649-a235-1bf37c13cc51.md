@@ -20,11 +20,11 @@
 - [x] Pre-implementation issue-quality review captured. Evidence: `tasks/specs/linear-acc07ffc-06ac-4649-a235-1bf37c13cc51.md` review notes and readiness gate.
 
 ## Implementation
-- [ ] Carry `archived_at` / `trashed` truth through tracked issue discovery and persisted intake claims.
-- [ ] Exclude or explicitly block archived/trashed issues before provider claim/start.
-- [ ] Fail `transition` and `upsert-workpad` closed with `linear_issue_not_mutable` while preserving truthful `noop` behavior.
-- [ ] Revalidate cached archived state live before allowing restored issues to resume.
-- [ ] Suppress same-attempt retries for `linear_issue_not_mutable` in worker prompt and selected-run/proof summaries.
+- [x] Carry `archived_at` / `trashed` truth through tracked issue discovery and persisted intake claims. Evidence: `orchestrator/src/cli/control/linearDispatchSource.ts`, `orchestrator/src/cli/control/providerIntakeState.ts`, `orchestrator/src/cli/control/providerIssueHandoff.ts`, `orchestrator/tests/LinearDispatchSource.test.ts`, `orchestrator/tests/ProviderIssueHandoff.test.ts`.
+- [x] Exclude or explicitly block archived/trashed issues before provider claim/start. Evidence: `orchestrator/src/cli/control/providerLinearWorkflowStates.ts`, `orchestrator/src/cli/control/providerIssueHandoff.ts`, `orchestrator/tests/LinearDispatchSource.test.ts`, `orchestrator/tests/ProviderIssueHandoff.test.ts`.
+- [x] Fail `transition` and `upsert-workpad` closed with `linear_issue_not_mutable` while preserving truthful `noop` behavior. Evidence: `orchestrator/src/cli/control/providerLinearWorkflowFacade.ts`, `orchestrator/tests/ProviderLinearWorkflowFacade.test.ts`.
+- [x] Revalidate cached archived state live before allowing restored issues to resume. Evidence: `orchestrator/src/cli/control/providerLinearWorkflowFacade.ts`, `orchestrator/src/cli/control/providerIssueHandoff.ts`, `orchestrator/tests/ProviderLinearWorkflowFacade.test.ts`, `orchestrator/tests/ProviderIssueHandoff.test.ts`.
+- [x] Suppress same-attempt retries for `linear_issue_not_mutable` in worker prompt and selected-run/proof summaries. Evidence: `orchestrator/src/cli/control/providerLinearWorkerTruth.ts`, `orchestrator/tests/ProviderLinearWorkerRunner.test.ts`, `orchestrator/tests/SelectedRunProjection.test.ts`, `orchestrator/tests/CommandRunnerReviewEvidenceConsistency.test.ts`.
 
 ## Validation
 - [ ] Audited docs-review child stream or truthful packet-local fallback recorded.
@@ -37,14 +37,14 @@
 - [ ] `npm run docs:check`.
 - [ ] `npm run docs:freshness`.
 - [ ] `npm run repo:stewardship`.
-- [ ] `node scripts/diff-budget.mjs`.
+- [ ] `DIFF_BUDGET_OVERRIDE_REASON="CO-153 requires a fresh docs-first packet plus bounded source and regression coverage for archived/trashed admission, mutability revalidation, and summary suppression in one reviewable lane." node scripts/diff-budget.mjs`.
 - [ ] Manifest-backed standalone review plus explicit elegance review before handoff.
 - [ ] `npm run pack:smoke`.
 
 ## Handoff
-- [ ] Successful same-issue child-lane result is accepted, rejected, or invalidated explicitly so the `parallelize_now` turn remains truthful.
-- [ ] PR attached to the issue before review-state transition.
-- [ ] Latest `origin/main` merged into the branch before review-state transition.
+- [x] Successful same-issue child-lane result is accepted, rejected, or invalidated explicitly so the `parallelize_now` turn remains truthful. Evidence: child lane `co-153-docs-packet` was launched, completed, and invalidated as superseded in the active workpad.
+- [x] PR attached to the issue before review-state transition. Evidence: attached PR `#440` / `https://github.com/Kbediako/CO/pull/440`.
+- [x] Latest `origin/main` merged into the branch before review-state transition. Evidence: merge commit `e594b5e04` on `linear/co-153-archived-issue-admission`.
 - [ ] PR checks green and `pr ready-review` drain clean before review-state transition.
 - [ ] Unresolved actionable review threads: `0` or explicit pushback recorded.
 - [ ] Issue moved to `In Review`. Evidence: pending.
@@ -67,5 +67,5 @@
 - `orchestrator/tests/SelectedRunProjection.test.ts`
 
 ## Notes
-- The initial child lane `co-153-docs-packet` was launched under `parallelize_now` for doc-only ownership but appears stalled after runtime selection under appserver; do not stall the lane on that run. Before handoff, ensure a successful bounded child lane finishes on a disjoint slice and is finalized explicitly.
+- The initial child lane `co-153-docs-packet` was launched under `parallelize_now`, completed successfully on the docs-first slice, and was then invalidated as superseded after the parent reran docs review cleanly.
 - This lane intentionally excludes auto-unarchive automation, generic workpad redesign, and mutation of archived issue `CO-32`.

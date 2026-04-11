@@ -1465,6 +1465,35 @@ describe('resolveLiveLinearDispatchRecommendation', () => {
                 createdAt: '2026-03-18T04:00:00.000Z',
                 updatedAt: '2026-03-20T06:00:00.000Z',
                 archivedAt: '2026-04-11T05:00:00.000Z',
+                trashed: false,
+                assignee: {
+                  id: 'viewer-1',
+                  displayName: 'Codex'
+                },
+                state: {
+                  name: 'Ready',
+                  type: 'unstarted'
+                },
+                team: {
+                  id: 'lin-team-1',
+                  key: 'PREPROD',
+                  name: 'PRE-PRO/PRODUCTION'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'Icon Agency (Bookings)'
+                },
+                inverseRelations: { nodes: [] },
+                history: { nodes: [] }
+              },
+              {
+                id: 'lin-issue-trashed',
+                identifier: 'PREPROD-100B',
+                title: 'Trashed issue should not dispatch',
+                priority: 1,
+                createdAt: '2026-03-18T04:30:00.000Z',
+                updatedAt: '2026-03-20T06:10:00.000Z',
+                archivedAt: null,
                 trashed: true,
                 assignee: {
                   id: 'viewer-1',

@@ -432,6 +432,16 @@ async function createRunScopedEnv(): Promise<NodeJS.ProcessEnv> {
   };
 }
 
+async function createBudgetedRunScopedEnv(): Promise<NodeJS.ProcessEnv> {
+  const dir = await mkdtemp(join(tmpdir(), 'provider-linear-workflow-facade-'));
+  tempDirs.push(dir);
+  return {
+    CODEX_HOME: dir,
+    CO_LINEAR_API_TOKEN: 'lin-api-token',
+    CODEX_PROVIDER_LINEAR_AUDIT_PATH: join(dir, 'provider-linear-worker-linear-audit.jsonl')
+  };
+}
+
 async function writeCachedIssueContext(
   env: NodeJS.ProcessEnv,
   issue: Record<string, unknown>,
@@ -1361,13 +1371,16 @@ describe('providerLinearWorkflowFacade', () => {
 
     const updatedWorkpadBody = buildStructuredWorkpadBody({
       planLines: ['- Updated through the cached workpad path.'],
-      notesLines: ['- Fresh cached workpad state should mutate directly without a second read.']
+      notesLines: ['- Fresh cached workpad state should re-read live before mutation.']
     });
     const mutationFetch: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
         query?: string;
         variables?: Record<string, string>;
       };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(buildIssueContextBody());
+      }
       if (body.query?.includes('ProviderLinearUpdateComment')) {
         expect(body.variables).toEqual({
           id: 'comment-workpad',
@@ -1396,7 +1409,7 @@ describe('providerLinearWorkflowFacade', () => {
       fetchImpl: mutationFetch
     });
 
-    expect(mutationFetch).toHaveBeenCalledTimes(1);
+    expect(mutationFetch).toHaveBeenCalledTimes(2);
     expect(result).toMatchObject({
       ok: true,
       operation: 'upsert-workpad',
@@ -1444,6 +1457,131 @@ describe('providerLinearWorkflowFacade', () => {
       comment: {
         id: 'comment-workpad',
         body: updatedWorkpadBody
+      }
+    });
+  });
+
+  it('allows a cached workpad reread to resolve as noop when one shared request remains', async () => {
+    const env = await createBudgetedRunScopedEnv();
+    const resetAt = String(Date.now() + 60_000);
+    const desiredWorkpadBody = buildStructuredWorkpadBody({
+      planLines: ['- Allow a truthful cached reread to resolve the workpad as noop.'],
+      notesLines: ['- One shared request is enough when the live comment already matches the desired workpad.']
+    });
+
+    await writeCachedIssueContext(env, buildCachedIssueContext(), {
+      recordedAt: new Date().toISOString()
+    });
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'provider-linear:issue-context',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '1',
+        'x-ratelimit-requests-reset': resetAt
+      }
+    });
+
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+      };
+      expect(body.query).toContain('ProviderLinearIssueContext');
+      return jsonResponse(
+        buildIssueContextBody({
+          comments: {
+            nodes: [
+              {
+                id: 'comment-workpad',
+                body: desiredWorkpadBody,
+                url: 'https://linear.app/comment/workpad',
+                createdAt: '2026-03-22T09:00:00.000Z',
+                updatedAt: '2026-03-22T09:30:00.000Z',
+                resolvedAt: null
+              }
+            ]
+          }
+        }),
+        200,
+        {
+          'x-ratelimit-requests-limit': '100',
+          'x-ratelimit-requests-remaining': '0',
+          'x-ratelimit-requests-reset': resetAt
+        }
+      );
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: desiredWorkpadBody,
+      env,
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'noop',
+      comment: {
+        id: 'comment-workpad',
+        body: desiredWorkpadBody
+      }
+    });
+  });
+
+  it('fails cached workpad mutation after the reread when one shared request remains', async () => {
+    const env = await createBudgetedRunScopedEnv();
+    const resetAt = String(Date.now() + 60_000);
+    const updatedWorkpadBody = buildStructuredWorkpadBody({
+      planLines: ['- Retry the cached workpad mutation after the live reread.'],
+      notesLines: ['- One shared request should allow the reread but still block the later mutation.']
+    });
+
+    await writeCachedIssueContext(env, buildCachedIssueContext(), {
+      recordedAt: new Date().toISOString()
+    });
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'provider-linear:issue-context',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '1',
+        'x-ratelimit-requests-reset': resetAt
+      }
+    });
+
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(buildIssueContextBody(), 200, {
+          'x-ratelimit-requests-limit': '100',
+          'x-ratelimit-requests-remaining': '0',
+          'x-ratelimit-requests-reset': resetAt
+        });
+      }
+      throw new Error('The cached workpad mutation should stop before the write query.');
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: updatedWorkpadBody,
+      env,
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'linear_rate_limited',
+        status: 429,
+        details: {
+          shared_budget_fail_fast: true
+        }
       }
     });
   });
@@ -1506,19 +1644,30 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
-  it('revalidates cached archived issues live before failing a workpad mutation', async () => {
+  it.each([
+    {
+      archived_at: '2026-04-11T05:00:00.000Z',
+      trashed: false,
+      label: 'archived'
+    },
+    {
+      archived_at: null,
+      trashed: true,
+      label: 'trashed'
+    }
+  ])('revalidates cached $label issues live before failing a workpad mutation', async ({ archived_at, trashed }) => {
     const env = await createRunScopedEnv();
     await writeCachedIssueContext(
       env,
       buildCachedIssueContext({
-        archived_at: '2026-04-11T05:00:00.000Z',
-        trashed: true,
+        archived_at,
+        trashed,
         comments: [],
         workpad_comment: null
       })
     );
     const desiredWorkpad = buildStructuredWorkpadBody({
-      planLines: ['- Do not attempt a workpad mutation against an archived issue.'],
+      planLines: ['- Do not attempt a workpad mutation against a non-mutable issue.'],
       notesLines: ['- The issue must be restored before the single workpad comment can be updated.']
     });
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
@@ -1530,15 +1679,15 @@ describe('providerLinearWorkflowFacade', () => {
         expect(body.query).toContain('trashed');
         return jsonResponse(
           buildIssueContextBody({
-            archivedAt: '2026-04-11T05:00:00.000Z',
-            trashed: true,
+            archivedAt: archived_at,
+            trashed,
             comments: {
               nodes: []
             }
           })
         );
       }
-      throw new Error('Workpad mutation must not run for a cached archived issue.');
+      throw new Error('Workpad mutation must not run for a cached non-mutable issue.');
     });
 
     const result = await upsertProviderLinearWorkpadComment({
@@ -1558,8 +1707,62 @@ describe('providerLinearWorkflowFacade', () => {
         details: {
           issue_id: 'lin-issue-1',
           issue_identifier: 'CO-1',
+          archived_at,
+          trashed
+        }
+      }
+    });
+  });
+
+  it('re-reads live issue context before mutating from a trusted cached workpad context', async () => {
+    const env = await createRunScopedEnv();
+    await writeCachedIssueContext(
+      env,
+      buildCachedIssueContext({
+        archived_at: null,
+        trashed: false
+      })
+    );
+    const desiredWorkpad = buildStructuredWorkpadBody({
+      planLines: ['- Re-read live mutability before writing from cache.'],
+      notesLines: ['- Fresh cache alone must not allow a write after the issue is archived.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            archivedAt: '2026-04-11T05:00:00.000Z',
+            trashed: false,
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
+      throw new Error('Workpad mutation must not run after live reread reports an archived issue.');
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: desiredWorkpad,
+      env,
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'linear_issue_not_mutable',
+        status: 409,
+        details: {
+          issue_id: 'lin-issue-1',
           archived_at: '2026-04-11T05:00:00.000Z',
-          trashed: true
+          trashed: false
         }
       }
     });
@@ -1627,6 +1830,84 @@ describe('providerLinearWorkflowFacade', () => {
       comment: {
         id: 'comment-workpad',
         body: updatedWorkpadBody
+      }
+    });
+  });
+
+  it('reuses the live mutability reread when a restored cached workpad already matches', async () => {
+    const env = await createBudgetedRunScopedEnv();
+    const resetAt = String(Date.now() + 60_000);
+    const desiredWorkpadBody = buildStructuredWorkpadBody({
+      planLines: ['- Reuse the first live reread when the restored workpad is already correct.'],
+      notesLines: ['- Do not spend a second request on the noop path after mutability revalidation.']
+    });
+
+    await writeCachedIssueContext(
+      env,
+      buildCachedIssueContext({
+        archived_at: '2026-04-11T05:00:00.000Z',
+        trashed: true
+      }),
+      {
+        recordedAt: new Date().toISOString()
+      }
+    );
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'provider-linear:issue-context',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '1',
+        'x-ratelimit-requests-reset': resetAt
+      }
+    });
+
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+      };
+      expect(body.query).toContain('ProviderLinearIssueContext');
+      return jsonResponse(
+        buildIssueContextBody({
+          archivedAt: null,
+          trashed: false,
+          comments: {
+            nodes: [
+              {
+                id: 'comment-workpad',
+                body: desiredWorkpadBody,
+                url: 'https://linear.app/comment/workpad',
+                createdAt: '2026-03-22T09:00:00.000Z',
+                updatedAt: '2026-03-22T09:30:00.000Z',
+                resolvedAt: null
+              }
+            ]
+          }
+        }),
+        200,
+        {
+          'x-ratelimit-requests-limit': '100',
+          'x-ratelimit-requests-remaining': '0',
+          'x-ratelimit-requests-reset': resetAt
+        }
+      );
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: desiredWorkpadBody,
+      env,
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'noop',
+      comment: {
+        id: 'comment-workpad',
+        body: desiredWorkpadBody
       }
     });
   });
@@ -1880,13 +2161,22 @@ describe('providerLinearWorkflowFacade', () => {
 
     const createdWorkpadBody = buildStructuredWorkpadBody({
       planLines: ['- Create the workpad directly from a fresh cached issue-context read.'],
-      notesLines: ['- Fresh cached workpad absence should not force another live read before create.']
+      notesLines: ['- Fresh cached workpad absence should still re-read live before create.']
     });
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
         query?: string;
         variables?: Record<string, string>;
       };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
       if (body.query?.includes('ProviderLinearCreateComment')) {
         expect(body.variables).toEqual({
           issueId: 'lin-issue-1',
@@ -1915,7 +2205,7 @@ describe('providerLinearWorkflowFacade', () => {
       fetchImpl
     });
 
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
     expect(result).toMatchObject({
       ok: true,
       operation: 'upsert-workpad',
@@ -1929,7 +2219,9 @@ describe('providerLinearWorkflowFacade', () => {
 
   it('revalidates stale cached workpad selection before updating a replaced live comment', async () => {
     const env = await createRunScopedEnv();
-    await writeCachedIssueContext(env, buildCachedIssueContext());
+    await writeCachedIssueContext(env, buildCachedIssueContext(), {
+      recordedAt: new Date().toISOString()
+    });
 
     const updatedWorkpadBody = buildStructuredWorkpadBody({
       planLines: ['- Update the currently live workpad after stale-cache revalidation.'],
@@ -2201,6 +2493,15 @@ describe('providerLinearWorkflowFacade', () => {
         query?: string;
         variables?: Record<string, string>;
       };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
       if (body.query?.includes('ProviderLinearCreateComment')) {
         expect(body.variables).toEqual({
           issueId: 'lin-issue-1',
@@ -2229,7 +2530,7 @@ describe('providerLinearWorkflowFacade', () => {
       fetchImpl: recreateFetch
     });
 
-    expect(recreateFetch).toHaveBeenCalledTimes(1);
+    expect(recreateFetch).toHaveBeenCalledTimes(2);
     expect(recreateResult).toMatchObject({
       ok: true,
       operation: 'upsert-workpad',
@@ -7379,6 +7680,9 @@ describe('providerLinearWorkflowFacade', () => {
         query?: string;
         variables?: Record<string, string>;
       };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        return jsonResponse(buildIssueContextBody());
+      }
       if (body.query?.includes('ProviderLinearMoveIssue')) {
         expect(body.variables).toEqual({
           id: 'lin-issue-1',
@@ -7411,7 +7715,7 @@ describe('providerLinearWorkflowFacade', () => {
       fetchImpl: mutationFetch
     });
 
-    expect(mutationFetch).toHaveBeenCalledTimes(1);
+    expect(mutationFetch).toHaveBeenCalledTimes(2);
     expect(result).toMatchObject({
       ok: true,
       operation: 'transition',
@@ -7465,7 +7769,18 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
-  it('fails closed when the live issue summary is archived or trashed before transition', async () => {
+  it.each([
+    {
+      archivedAt: '2026-04-11T05:00:00.000Z',
+      trashed: false,
+      label: 'archived'
+    },
+    {
+      archivedAt: null,
+      trashed: true,
+      label: 'trashed'
+    }
+  ])('fails closed when the live issue summary is $label before transition', async ({ archivedAt, trashed }) => {
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
         query?: string;
@@ -7475,13 +7790,13 @@ describe('providerLinearWorkflowFacade', () => {
         expect(body.query).toContain('trashed');
         return jsonResponse(
           buildIssueContextBody({
-            archivedAt: '2026-04-11T05:00:00.000Z',
-            trashed: true
+            archivedAt,
+            trashed
           })
         );
       }
       if (body.query?.includes('ProviderLinearMoveIssue')) {
-        throw new Error('Transition mutation must not run for an archived issue.');
+        throw new Error('Transition mutation must not run for a non-mutable issue.');
       }
       throw new Error(`Unexpected query: ${body.query}`);
     });
@@ -7505,20 +7820,31 @@ describe('providerLinearWorkflowFacade', () => {
         details: {
           issue_id: 'lin-issue-1',
           issue_identifier: 'CO-1',
-          archived_at: '2026-04-11T05:00:00.000Z',
-          trashed: true
+          archived_at: archivedAt,
+          trashed
         }
       }
     });
   });
 
-  it('revalidates cached archived issues live before failing a transition', async () => {
+  it.each([
+    {
+      archived_at: '2026-04-11T05:00:00.000Z',
+      trashed: false,
+      label: 'archived'
+    },
+    {
+      archived_at: null,
+      trashed: true,
+      label: 'trashed'
+    }
+  ])('revalidates cached $label issues live before failing a transition', async ({ archived_at, trashed }) => {
     const env = await createRunScopedEnv();
     await writeCachedIssueContext(
       env,
       buildCachedIssueContext({
-        archived_at: '2026-04-11T05:00:00.000Z',
-        trashed: true
+        archived_at,
+        trashed
       })
     );
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
@@ -7530,13 +7856,13 @@ describe('providerLinearWorkflowFacade', () => {
         expect(body.query).toContain('trashed');
         return jsonResponse(
           buildIssueContextBody({
-            archivedAt: '2026-04-11T05:00:00.000Z',
-            trashed: true
+            archivedAt: archived_at,
+            trashed
           })
         );
       }
       if (body.query?.includes('ProviderLinearMoveIssue')) {
-        throw new Error('Transition mutation must not run for a cached archived issue.');
+        throw new Error('Transition mutation must not run for a cached non-mutable issue.');
       }
       throw new Error(`Unexpected query: ${body.query}`);
     });
@@ -7558,8 +7884,58 @@ describe('providerLinearWorkflowFacade', () => {
         details: {
           issue_id: 'lin-issue-1',
           issue_identifier: 'CO-1',
+          archived_at,
+          trashed
+        }
+      }
+    });
+  });
+
+  it('re-reads the live issue summary before transitioning from a trusted cached context', async () => {
+    const env = await createRunScopedEnv();
+    await writeCachedIssueContext(
+      env,
+      buildCachedIssueContext({
+        archived_at: null,
+        trashed: false
+      })
+    );
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+      };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            archivedAt: '2026-04-11T05:00:00.000Z',
+            trashed: false
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearMoveIssue')) {
+        throw new Error('Transition mutation must not run after live reread reports an archived issue.');
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await transitionProviderLinearIssueState({
+      issueId: 'lin-issue-1',
+      stateName: 'Human Review',
+      env,
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'transition',
+      error: {
+        code: 'linear_issue_not_mutable',
+        status: 409,
+        details: {
+          issue_id: 'lin-issue-1',
           archived_at: '2026-04-11T05:00:00.000Z',
-          trashed: true
+          trashed: false
         }
       }
     });
@@ -7634,6 +8010,79 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it('reuses the live mutability reread when a restored cached transition is already in the target state', async () => {
+    const env = await createBudgetedRunScopedEnv();
+    const resetAt = String(Date.now() + 60_000);
+
+    await writeCachedIssueContext(
+      env,
+      buildCachedIssueContext({
+        archived_at: '2026-04-11T05:00:00.000Z',
+        trashed: true
+      }),
+      {
+        recordedAt: new Date().toISOString()
+      }
+    );
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'provider-linear:issue-context',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '1',
+        'x-ratelimit-requests-reset': resetAt
+      }
+    });
+
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+      };
+      expect(body.query).toContain('ProviderLinearIssueSummary');
+      return jsonResponse(
+        buildIssueContextBody({
+          archivedAt: null,
+          trashed: false,
+          state: {
+            id: 'state-human-review',
+            name: 'Human Review',
+            type: 'started'
+          }
+        }),
+        200,
+        {
+          'x-ratelimit-requests-limit': '100',
+          'x-ratelimit-requests-remaining': '0',
+          'x-ratelimit-requests-reset': resetAt
+        }
+      );
+    });
+
+    const result = await transitionProviderLinearIssueState({
+      issueId: 'lin-issue-1',
+      stateName: 'Human Review',
+      env,
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'transition',
+      action: 'noop',
+      issue: {
+        state: {
+          id: 'state-human-review',
+          name: 'Human Review'
+        }
+      },
+      previous_state: {
+        id: 'state-human-review',
+        name: 'Human Review'
+      }
+    });
+  });
+
   it('allows transition to noop when the live archived issue is already in the target state', async () => {
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
@@ -7696,6 +8145,13 @@ describe('providerLinearWorkflowFacade', () => {
         query?: string;
         variables?: Record<string, string>;
       };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            updatedAt: '2026-03-22T10:00:00.000Z'
+          })
+        );
+      }
       if (body.query?.includes('ProviderLinearMoveIssue')) {
         expect(body.variables).toEqual({
           id: 'lin-issue-1',
@@ -7819,6 +8275,122 @@ describe('providerLinearWorkflowFacade', () => {
       previous_state: {
         id: 'state-human-review',
         name: 'Human Review'
+      }
+    });
+  });
+
+  it('allows a cached transition reread to resolve as noop when one shared request remains', async () => {
+    const env = await createBudgetedRunScopedEnv();
+    const resetAt = String(Date.now() + 60_000);
+
+    await writeCachedIssueContext(env, buildCachedIssueContext(), {
+      recordedAt: new Date().toISOString()
+    });
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'provider-linear:issue-context',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '1',
+        'x-ratelimit-requests-reset': resetAt
+      }
+    });
+
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+      };
+      expect(body.query).toContain('ProviderLinearIssueSummary');
+      return jsonResponse(
+        buildIssueContextBody({
+          state: {
+            id: 'state-human-review',
+            name: 'Human Review',
+            type: 'started'
+          }
+        }),
+        200,
+        {
+          'x-ratelimit-requests-limit': '100',
+          'x-ratelimit-requests-remaining': '0',
+          'x-ratelimit-requests-reset': resetAt
+        }
+      );
+    });
+
+    const result = await transitionProviderLinearIssueState({
+      issueId: 'lin-issue-1',
+      stateName: 'Human Review',
+      env,
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'transition',
+      action: 'noop',
+      issue: {
+        state: {
+          id: 'state-human-review',
+          name: 'Human Review'
+        }
+      },
+      previous_state: {
+        id: 'state-human-review',
+        name: 'Human Review'
+      }
+    });
+  });
+
+  it('fails cached transition after the reread when one shared request remains', async () => {
+    const env = await createBudgetedRunScopedEnv();
+    const resetAt = String(Date.now() + 60_000);
+
+    await writeCachedIssueContext(env, buildCachedIssueContext(), {
+      recordedAt: new Date().toISOString()
+    });
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'provider-linear:issue-context',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '1',
+        'x-ratelimit-requests-reset': resetAt
+      }
+    });
+
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+      };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        return jsonResponse(buildIssueContextBody(), 200, {
+          'x-ratelimit-requests-limit': '100',
+          'x-ratelimit-requests-remaining': '0',
+          'x-ratelimit-requests-reset': resetAt
+        });
+      }
+      throw new Error('The cached transition should stop before the state mutation query.');
+    });
+
+    const result = await transitionProviderLinearIssueState({
+      issueId: 'lin-issue-1',
+      stateName: 'Human Review',
+      env,
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'transition',
+      error: {
+        code: 'linear_rate_limited',
+        status: 429,
+        details: {
+          shared_budget_fail_fast: true
+        }
       }
     });
   });
