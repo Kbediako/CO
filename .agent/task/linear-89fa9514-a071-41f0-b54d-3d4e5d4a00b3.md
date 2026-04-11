@@ -38,7 +38,7 @@
 - [x] `MCP_RUNNER_TASK_ID=linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3 npm run docs:check`.
 - [x] `MCP_RUNNER_TASK_ID=linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3 npm run docs:freshness`.
 - [x] `MCP_RUNNER_TASK_ID=linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3 node scripts/diff-budget.mjs`. Evidence: final rerun after the docs-only review-fallback update reported `scope=working-tree, files=9/25, lines=507/1200, +506/-1`.
-- [x] Manifest-backed standalone review plus explicit elegance review before handoff. Evidence: `../../.runs/linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3/cli/2026-04-11T13-49-50-356Z-aa2ff05d/review/telemetry.json`, `out/linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3/manual/20260411T142419Z-standalone-review-fallback.md`, `out/linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3/manual/20260411T142419Z-elegance-review.md`.
+- [x] Manifest-backed standalone review plus explicit elegance review before handoff. Evidence: `.runs/linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3/cli/2026-04-11T13-49-50-356Z-aa2ff05d/review/telemetry.json`, `out/linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3/manual/20260411T142419Z-standalone-review-fallback.md`, `out/linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3/manual/20260411T142419Z-elegance-review.md`.
 
 ## Handoff
 - [x] Workpad refreshed after docs-first, after implementation, and before the current stop point. Evidence: local source `out/linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3/manual/workpad.md`, remote comment `5c5ef835-4142-4b45-8603-57e01e1616dd`.

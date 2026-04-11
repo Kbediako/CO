@@ -14,7 +14,7 @@
           "reviewer": "codex-orchestrator docs-review (manual fallback accepted)",
           "date": "2026-04-11",
           "manifest": ".runs/linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3-co-126-docs-review-rerun/cli/2026-04-11T14-04-14-631Z-ef2cd11d/manifest.json",
-          "override_reason": "Initial docs-review failed docs:check because the packet mentioned planned README anchors before they existed and docs/TASKS.md exceeded the line cap. After generic anchor wording plus docs:archive-tasks, the rerun passed delegation guard, spec guard, docs:check, and docs:freshness. The forced review then drifted for more than four minutes into low-signal speculation about the archive side effect without telemetry or a verdict, so packet-local fallback was accepted after verifying the removed 1005 snapshot landed in /Users/kbediako/Code/CO/out/linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3/TASKS-archive-2026.md."
+          "override_reason": "Initial docs-review failed docs:check because the packet mentioned planned README anchors before they existed and docs/TASKS.md exceeded the line cap. After generic anchor wording plus docs:archive-tasks, the rerun passed delegation guard, spec guard, docs:check, and docs:freshness. The forced review then drifted for more than four minutes into low-signal speculation about the archive side effect without telemetry or a verdict, so packet-local fallback was accepted after verifying the removed 1005 snapshot landed in out/linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3/TASKS-archive-2026.md."
         },
         "review": {
           "reviewer": "codex-orchestrator review (failed-boundary, manual fallback accepted)",
