@@ -9872,6 +9872,129 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it.each([
+    {
+      archivedAt: '2026-04-11T05:00:00.000Z',
+      trashed: false,
+      label: 'archived'
+    },
+    {
+      archivedAt: null,
+      trashed: true,
+      label: 'trashed'
+    }
+  ])('fails closed when the live issue is $label before attaching a PR', async ({ archivedAt, trashed }) => {
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        expect(body.query).toContain('archivedAt');
+        expect(body.query).toContain('trashed');
+        return jsonResponse(
+          buildIssueContextBody({
+            archivedAt,
+            trashed,
+            attachments: {
+              nodes: []
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearAttachGitHubPr') || body.query?.includes('ProviderLinearAttachUrl')) {
+        throw new Error('attach mutation must not run for a non-mutable issue.');
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await attachProviderLinearIssuePr({
+      issueId: 'lin-issue-1',
+      url: 'https://github.com/openai/codex-orchestrator/pull/123',
+      title: 'PR 123',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'attach-pr',
+      error: {
+        code: 'linear_issue_not_mutable',
+        status: 409,
+        details: {
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-1',
+          archived_at: archivedAt,
+          trashed
+        }
+      }
+    });
+  });
+
+  it('keeps canonical-equivalent existing PR attachments as a noop even when the live issue is archived', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        expect(body.query).toContain('archivedAt');
+        expect(body.query).toContain('trashed');
+        return jsonResponse(
+          buildIssueContextBody({
+            archivedAt: '2026-04-11T05:00:00.000Z',
+            trashed: true,
+            attachments: {
+              nodes: [
+                {
+                  id: 'attachment-pr',
+                  title: 'PR 123',
+                  url: 'https://github.com/openai/codex-orchestrator/pull/123',
+                  sourceType: 'github'
+                }
+              ]
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearAttachGitHubPr') || body.query?.includes('ProviderLinearAttachUrl')) {
+        throw new Error('attach mutation should not run when a canonical-equivalent PR link already exists');
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await attachProviderLinearIssuePr({
+      issueId: 'lin-issue-1',
+      url: 'https://www.github.com/openai/codex-orchestrator/pull/123/files?utm_source=test#discussion_r1',
+      title: 'PR 123',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({
+      ok: true,
+      operation: 'attach-pr',
+      action: 'noop',
+      via: 'existing',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      attachment: {
+        id: 'attachment-pr',
+        title: 'PR 123',
+        url: 'https://github.com/openai/codex-orchestrator/pull/123',
+        source_type: 'github'
+      },
+      source_setup: null
+    });
+  });
+
   it('canonicalizes noisy GitHub PR URLs before creating a new attachment', async () => {
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
