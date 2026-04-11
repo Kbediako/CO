@@ -412,6 +412,56 @@ describe('repo stewardship audit', () => {
   );
 
   it(
+    'preserves literal backslashes in tracked surface paths',
+    async () => {
+      const repoRoot = await mkdtemp(join(tmpdir(), 'repo-stewardship-backslash-paths-'));
+      createdDirs.push(repoRoot);
+
+      await writeFile(join(repoRoot, 'foo\\bar.txt'), 'literal backslash\n', 'utf8');
+      await writeCatalog(repoRoot, {
+        version: 1,
+        classes: {
+          code_surface: { label: 'Code Surface', report_order: 10 },
+          repo_config: { label: 'Repo Config', report_order: 20 }
+        },
+        entries: [
+          {
+            path: 'foo\\bar.txt',
+            surface_class: 'code_surface',
+            decision: 'validate',
+            owner: 'Codex',
+            rationale: 'fixture proves tracked backslashes stay literal'
+          }
+        ],
+        patterns: [
+          {
+            glob: 'docs/**/*.json',
+            surface_class: 'repo_config',
+            decision: 'validate',
+            owner: 'Codex',
+            rationale: 'catalog files stay explicit config surfaces'
+          }
+        ]
+      });
+
+      await initTrackedRepo(repoRoot);
+
+      const { report, hasFailures } = await runRepoStewardshipAudit(repoRoot, {
+        outRoot: join(repoRoot, 'out'),
+        taskId: 'fixture'
+      });
+
+      const backslashDecision = report.decisions.find((item) => item.path === 'foo\\bar.txt');
+
+      expect(hasFailures).toBe(false);
+      expect(report.uncatalogued_surfaces).toEqual([]);
+      expect(backslashDecision?.decision).toBe('validate');
+      expect(backslashDecision?.summary).not.toContain('tracked surface missing');
+    },
+    20_000
+  );
+
+  it(
     'keeps question-mark globs within a single path segment',
     async () => {
       const repoRoot = await mkdtemp(join(tmpdir(), 'repo-stewardship-question-glob-'));

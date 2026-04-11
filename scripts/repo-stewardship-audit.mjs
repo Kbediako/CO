@@ -31,7 +31,7 @@ function normalizeString(value) {
 }
 
 function normalizePath(value) {
-  const normalized = typeof value === 'string' ? value.replace(/\\/g, '/') : '';
+  const normalized = typeof value === 'string' ? value : '';
   if (!normalized) {
     return '';
   }
@@ -49,8 +49,7 @@ function normalizeBoundaryPath(value) {
   if (normalized) {
     return normalized;
   }
-  const slashNormalized = value.replace(/\\/g, '/');
-  return slashNormalized === '.' || slashNormalized === './' ? '.' : '';
+  return value === '.' || value === './' ? '.' : '';
 }
 
 function normalizeStringArray(value) {
