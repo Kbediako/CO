@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp d438b9716be5cc95212b78f4616fda75d05ca016b8c4c8c68643b15a930b6987 -->
+<!-- codex:instruction-stamp 8a251b41d9509838ee94cf6df8ac29a7e8d4f1b7990dba342b593b5e8aa45492 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -198,9 +198,10 @@ Implementation work is not “complete” until you run (in order):
 5. `npm run test`
 6. `npm run docs:check`
 7. `npm run docs:freshness`
-8. `node scripts/diff-budget.mjs`
-9. `codex-orchestrator review` (or `npm run review` in this repo)
-10. `npm run pack:smoke` (required when touching CLI/package/skills/review-wrapper paths intended for downstream npm users)
+8. `npm run repo:stewardship`
+9. `node scripts/diff-budget.mjs`
+10. `codex-orchestrator review` (or `npm run review` in this repo)
+11. `npm run pack:smoke` (required when touching CLI/package/skills/review-wrapper paths intended for downstream npm users)
 
 | Command | When to use | Notes |
 | --- | --- | --- |
