@@ -79,8 +79,17 @@ export function listTrackedFiles(repoRoot, pathspecs = []) {
     maxBuffer: GIT_LS_FILES_MAX_BUFFER
   });
 
-  if (git.status !== 0) {
-    throw new Error(`git ls-files failed while collecting tracked files: ${git.stderr || git.stdout}`);
+  if (git.error || git.status !== 0) {
+    const detail = [
+      git.error?.message,
+      typeof git.stderr === 'string' ? git.stderr.trim() : '',
+      typeof git.stdout === 'string' ? git.stdout.trim() : '',
+      `status=${git.status ?? '<no status>'}`,
+      `signal=${git.signal ?? '<no signal>'}`
+    ]
+      .filter((part) => part)
+      .join('; ');
+    throw new Error(`git ls-files failed while collecting tracked files: ${detail}`);
   }
 
   return git.stdout
