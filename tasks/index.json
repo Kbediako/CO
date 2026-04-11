@@ -1,6 +1,30 @@
 {
   "items": [
     {
+      "id": "20260411-linear-38a28769-bced-48c3-ab3b-63bf3ffdea61",
+      "title": "CO: repair fresh-issue Linear workpad and PR-attachment writes",
+      "relates_to": "tasks/tasks-linear-38a28769-bced-48c3-ab3b-63bf3ffdea61.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-11",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (manual fallback accepted)",
+          "date": "2026-04-11",
+          "manifest": ".runs/linear-38a28769-bced-48c3-ab3b-63bf3ffdea61-co-154-docs-review/cli/2026-04-11T11-49-08-728Z-6a4be6b6/manifest.json",
+          "override_reason": "Child docs-review passed delegation guard, spec guard, docs:check, and docs:freshness. The forced review step stalled past four minutes without telemetry or a diff-local verdict, drifting into archive/script heuristics instead, so packet-local fallback was accepted."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-38a28769-bced-48c3-ab3b-63bf3ffdea61.md",
+        "task": "tasks/tasks-linear-38a28769-bced-48c3-ab3b-63bf3ffdea61.md",
+        "agent_task": ".agent/task/linear-38a28769-bced-48c3-ab3b-63bf3ffdea61.md",
+        "docs": "docs/TECH_SPEC-linear-38a28769-bced-48c3-ab3b-63bf3ffdea61.md"
+      }
+    },
+    {
       "id": "20260411-linear-acc07ffc-06ac-4649-a235-1bf37c13cc51",
       "title": "CO: prevent archived or trashed Linear issues from being claimed or mutated as active provider lanes",
       "relates_to": "tasks/tasks-linear-acc07ffc-06ac-4649-a235-1bf37c13cc51.md",
