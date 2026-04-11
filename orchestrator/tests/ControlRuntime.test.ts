@@ -4195,6 +4195,63 @@ describe('ControlRuntime', () => {
     });
   });
 
+  it('surfaces control-host owner metadata through provider polling health', async () => {
+    const fixture = await createFixture();
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => {}),
+      refresh: vi.fn(async () => {})
+    } as unknown as ProviderIssueHandoffService;
+
+    initializeProviderPollingHealth(providerIssueHandoff, {
+      intervalMs: 15000,
+      controlHostOwner: {
+        status: 'owned',
+        reason: null,
+        updated_at: '2026-04-11T00:00:00.000Z',
+        diagnostic_path: null,
+        lock_dir: '/repo/.runs/local-mcp/cli/control-host/control-host-owner.lock',
+        owner_path: '/repo/.runs/local-mcp/cli/control-host/control-host-owner.json',
+        owner: {
+          owner_token: 'owner-token',
+          status: 'owned',
+          pid: 123,
+          ppid: 1,
+          hostname: 'host.local',
+          acquired_at: '2026-04-11T00:00:00.000Z',
+          updated_at: '2026-04-11T00:00:00.000Z',
+          released_at: null,
+          repo_root: '/repo',
+          task_id: 'local-mcp',
+          run_id: 'control-host',
+          run_dir: '/repo/.runs/local-mcp/cli/control-host',
+          pipeline_id: 'provider-linear-worker',
+          lock_dir: '/repo/.runs/local-mcp/cli/control-host/control-host-owner.lock',
+          owner_path: '/repo/.runs/local-mcp/cli/control-host/control-host-owner.json'
+        }
+      }
+    });
+
+    const runtime = createControlRuntime({
+      controlStore: fixture.controlStore,
+      questionQueue: { list: () => [] },
+      paths: fixture.paths,
+      linearAdvisoryState: { tracked_issue: null },
+      readProviderIssueHandoff: () => providerIssueHandoff
+    });
+
+    const compatibilityProjection = await runtime.snapshot().readCompatibilityProjection();
+    expect(compatibilityProjection.polling?.control_host_owner).toMatchObject({
+      status: 'owned',
+      owner: {
+        pid: 123,
+        task_id: 'local-mcp',
+        run_id: 'control-host',
+        pipeline_id: 'provider-linear-worker'
+      }
+    });
+  });
+
   it('falls back to the persisted polling snapshot before live polling health restarts', async () => {
     const fixture = await createFixture();
     const providerIssueHandoff = {

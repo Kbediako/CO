@@ -159,6 +159,11 @@ export async function runControlHostCliShell(
     paths,
     config,
     runId,
+    controlHostOwnership: {
+      repoRoot: env.repoRoot,
+      taskId,
+      pipelineId: startPipelineId
+    },
     providerWorkflowConfigStore,
     createProviderIssueHandoff: ({
       providerIntakeState,

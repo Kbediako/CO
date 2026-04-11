@@ -1,0 +1,671 @@
+import { randomUUID } from 'node:crypto';
+import { mkdir, readFile, rm } from 'node:fs/promises';
+import { hostname } from 'node:os';
+import { join } from 'node:path';
+import process from 'node:process';
+
+import type { RunPaths } from '../run/runPaths.js';
+import { writeJsonAtomic } from '../utils/fs.js';
+import { isoTimestamp } from '../utils/time.js';
+import {
+  CONTROL_HOST_DUPLICATE_OWNER_FILE,
+  CONTROL_HOST_OWNER_FILE,
+  CONTROL_HOST_OWNER_LOCK_DIR,
+  CONTROL_HOST_STALE_OWNER_FILE
+} from './controlPersistenceFiles.js';
+
+export type ControlHostOwnershipDiagnosticReason =
+  | 'duplicate_control_host_owner'
+  | 'ambiguous_control_host_owner'
+  | 'stale_control_host_owner';
+
+export interface ControlHostOwnerMetadata {
+  schema_version: 1;
+  status: 'owned' | 'released';
+  owner_token: string;
+  acquired_at: string;
+  updated_at: string;
+  released_at: string | null;
+  repo_root: string | null;
+  task_id: string | null;
+  run_id: string;
+  run_dir: string;
+  pipeline_id: string | null;
+  pid: number;
+  ppid: number | null;
+  hostname: string;
+  cwd: string | null;
+  argv: string[];
+  lock_dir: string;
+  lock_owner_path: string;
+  owner_path: string;
+}
+
+export interface ControlHostOwnerSummary {
+  owner_token: string;
+  status: ControlHostOwnerMetadata['status'];
+  pid: number;
+  ppid: number | null;
+  hostname: string;
+  acquired_at: string;
+  updated_at: string;
+  released_at: string | null;
+  repo_root: string | null;
+  task_id: string | null;
+  run_id: string;
+  run_dir: string;
+  pipeline_id: string | null;
+  lock_dir: string;
+  owner_path: string;
+}
+
+export interface ControlHostOwnershipDiagnostic {
+  schema_version: 1;
+  reason: ControlHostOwnershipDiagnosticReason;
+  observed_at: string;
+  run_dir: string;
+  lock_dir: string;
+  diagnostic_path: string;
+  existing_owner: ControlHostOwnerMetadata | null;
+  attempted_owner: ControlHostOwnerMetadata;
+  action:
+    | 'duplicate_rejected'
+    | 'ambiguous_rejected'
+    | 'stale_reclaimed';
+}
+
+export interface ControlHostOwnershipPollingPayload {
+  status:
+    | 'owned'
+    | 'duplicate_rejected'
+    | 'ambiguous_rejected'
+    | 'stale_reclaimed';
+  reason: ControlHostOwnershipDiagnosticReason | null;
+  updated_at: string;
+  owner: ControlHostOwnerSummary | null;
+  attempted_owner?: ControlHostOwnerSummary | null;
+  diagnostic_path: string | null;
+  lock_dir: string | null;
+  owner_path: string | null;
+}
+
+export interface ControlHostOwnershipHandle {
+  metadata: ControlHostOwnerMetadata;
+  polling: ControlHostOwnershipPollingPayload;
+  release(): Promise<void>;
+}
+
+export interface AcquireControlHostOwnershipOptions {
+  paths: Pick<RunPaths, 'runDir'>;
+  runId: string;
+  repoRoot?: string | null;
+  taskId?: string | null;
+  pipelineId?: string | null;
+  processId?: number;
+  parentProcessId?: number | null;
+  cwd?: string | null;
+  argv?: string[];
+  host?: string;
+  now?: () => string;
+  isProcessAlive?: (pid: number) => boolean;
+}
+
+interface ControlHostOwnershipPaths {
+  runDir: string;
+  lockDir: string;
+  lockOwnerPath: string;
+  ownerPath: string;
+  duplicateDiagnosticPath: string;
+  staleDiagnosticPath: string;
+}
+
+type ExistingOwnerState =
+  | { kind: 'active'; owner: ControlHostOwnerMetadata }
+  | { kind: 'stale'; owner: ControlHostOwnerMetadata }
+  | { kind: 'ambiguous'; owner: ControlHostOwnerMetadata | null };
+
+export class DuplicateControlHostOwnerError extends Error {
+  readonly code = 'duplicate_control_host_owner';
+  readonly reason: ControlHostOwnershipDiagnosticReason;
+  readonly existingOwner: ControlHostOwnerMetadata | null;
+  readonly attemptedOwner: ControlHostOwnerMetadata;
+  readonly diagnosticPath: string;
+
+  constructor(input: {
+    reason: ControlHostOwnershipDiagnosticReason;
+    existingOwner: ControlHostOwnerMetadata | null;
+    attemptedOwner: ControlHostOwnerMetadata;
+    diagnosticPath: string;
+  }) {
+    super(
+      formatDuplicateControlHostOwnerMessage(
+        input.reason,
+        input.existingOwner,
+        input.attemptedOwner,
+        input.diagnosticPath
+      )
+    );
+    this.name = 'DuplicateControlHostOwnerError';
+    this.reason = input.reason;
+    this.existingOwner = input.existingOwner;
+    this.attemptedOwner = input.attemptedOwner;
+    this.diagnosticPath = input.diagnosticPath;
+  }
+}
+
+export async function acquireControlHostOwnership(
+  options: AcquireControlHostOwnershipOptions
+): Promise<ControlHostOwnershipHandle> {
+  const paths = resolveControlHostOwnershipPaths(options.paths.runDir);
+  const now = options.now ?? isoTimestamp;
+  const isProcessAlive = options.isProcessAlive ?? isLocalProcessAlive;
+  const attemptedOwner = buildControlHostOwnerMetadata(options, paths, now());
+
+  await mkdir(paths.runDir, { recursive: true });
+  await removePriorOwnershipDiagnostics(paths).catch(() => undefined);
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      await mkdir(paths.lockDir);
+      try {
+        await writeJsonAtomic(paths.lockOwnerPath, attemptedOwner);
+        await writeJsonAtomic(paths.ownerPath, attemptedOwner);
+      } catch (error) {
+        await rm(paths.lockDir, { recursive: true, force: true }).catch(() => undefined);
+        throw error;
+      }
+      return createControlHostOwnershipHandle(attemptedOwner, paths, now);
+    } catch (error) {
+      if (!isAlreadyExistsError(error)) {
+        throw error;
+      }
+      const existingOwner = await readControlHostOwnerMetadataFromPath(paths.lockOwnerPath);
+      const existingState = classifyExistingOwner(existingOwner, {
+        host: attemptedOwner.hostname,
+        isProcessAlive
+      });
+      if (existingState.kind === 'stale') {
+        await writeControlHostOwnershipDiagnostic({
+          paths,
+          reason: 'stale_control_host_owner',
+          action: 'stale_reclaimed',
+          existingOwner: existingState.owner,
+          attemptedOwner,
+          observedAt: now(),
+          diagnosticPath: paths.staleDiagnosticPath
+        });
+        await rm(paths.lockDir, { recursive: true, force: true });
+        continue;
+      }
+      const reason: ControlHostOwnershipDiagnosticReason =
+        existingState.kind === 'active'
+          ? 'duplicate_control_host_owner'
+          : 'ambiguous_control_host_owner';
+      await writeControlHostOwnershipDiagnostic({
+        paths,
+        reason,
+        action:
+          reason === 'duplicate_control_host_owner'
+            ? 'duplicate_rejected'
+            : 'ambiguous_rejected',
+        existingOwner: existingState.owner,
+        attemptedOwner,
+        observedAt: now(),
+        diagnosticPath: paths.duplicateDiagnosticPath
+      });
+      throw new DuplicateControlHostOwnerError({
+        reason,
+        existingOwner: existingState.owner,
+        attemptedOwner,
+        diagnosticPath: paths.duplicateDiagnosticPath
+      });
+    }
+  }
+
+  throw new DuplicateControlHostOwnerError({
+    reason: 'ambiguous_control_host_owner',
+    existingOwner: await readControlHostOwnerMetadataFromPath(paths.lockOwnerPath),
+    attemptedOwner,
+    diagnosticPath: paths.duplicateDiagnosticPath
+  });
+}
+
+export async function readControlHostOwnerMetadata(
+  runDir: string
+): Promise<ControlHostOwnerMetadata | null> {
+  return await readControlHostOwnerMetadataFromPath(
+    join(runDir, CONTROL_HOST_OWNER_FILE)
+  );
+}
+
+export function buildControlHostOwnershipPollingPayload(
+  metadata: ControlHostOwnerMetadata
+): ControlHostOwnershipPollingPayload {
+  return {
+    status: 'owned',
+    reason: null,
+    updated_at: metadata.updated_at,
+    owner: summarizeControlHostOwner(metadata),
+    diagnostic_path: null,
+    lock_dir: metadata.lock_dir,
+    owner_path: metadata.owner_path
+  };
+}
+
+export async function readControlHostOwnershipDiagnosticSummary(
+  runDir: string
+): Promise<ControlHostOwnershipPollingPayload | null> {
+  const duplicate = await readControlHostOwnershipDiagnosticFromPath(
+    join(runDir, CONTROL_HOST_DUPLICATE_OWNER_FILE)
+  );
+  if (duplicate) {
+    return buildControlHostOwnershipPollingPayloadFromDiagnostic(duplicate);
+  }
+  const stale = await readControlHostOwnershipDiagnosticFromPath(
+    join(runDir, CONTROL_HOST_STALE_OWNER_FILE)
+  );
+  if (stale) {
+    return buildControlHostOwnershipPollingPayloadFromDiagnostic(stale);
+  }
+  return null;
+}
+
+export async function readControlHostOwnershipOperatorHint(
+  runDir: string
+): Promise<string | null> {
+  const diagnostic = await readControlHostOwnershipDiagnosticSummary(runDir);
+  if (!diagnostic || diagnostic.status === 'owned') {
+    return null;
+  }
+  const owner = diagnostic.owner;
+  const attempted = diagnostic.attempted_owner ?? null;
+  const ownerText = owner
+    ? `owner pid=${owner.pid} host=${owner.hostname} task=${owner.task_id ?? 'unknown'} run=${owner.run_id} pipeline=${owner.pipeline_id ?? 'unknown'}`
+    : 'owner metadata unavailable';
+  const attemptedText = attempted
+    ? `attempted pid=${attempted.pid} host=${attempted.hostname}`
+    : 'attempted owner unavailable';
+  return `control-host ownership diagnostic: ${diagnostic.reason ?? diagnostic.status}; ${ownerText}; ${attemptedText}; artifact=${diagnostic.diagnostic_path ?? 'unknown'}`;
+}
+
+export function normalizeControlHostOwnershipPollingPayload(
+  value: unknown
+): ControlHostOwnershipPollingPayload | null {
+  if (!isRecordLike(value)) {
+    return null;
+  }
+  const status = normalizePollingStatus(value.status);
+  if (!status) {
+    return null;
+  }
+  return {
+    status,
+    reason: normalizeDiagnosticReason(value.reason),
+    updated_at: typeof value.updated_at === 'string' ? value.updated_at : '',
+    owner: normalizeControlHostOwnerSummary(value.owner),
+    attempted_owner: normalizeControlHostOwnerSummary(value.attempted_owner),
+    diagnostic_path: typeof value.diagnostic_path === 'string' ? value.diagnostic_path : null,
+    lock_dir: typeof value.lock_dir === 'string' ? value.lock_dir : null,
+    owner_path: typeof value.owner_path === 'string' ? value.owner_path : null
+  };
+}
+
+function createControlHostOwnershipHandle(
+  metadata: ControlHostOwnerMetadata,
+  paths: ControlHostOwnershipPaths,
+  now: () => string
+): ControlHostOwnershipHandle {
+  return {
+    metadata,
+    polling: buildControlHostOwnershipPollingPayload(metadata),
+    async release(): Promise<void> {
+      const currentOwner = await readControlHostOwnerMetadataFromPath(paths.lockOwnerPath);
+      if (!currentOwner || currentOwner.owner_token !== metadata.owner_token) {
+        return;
+      }
+      const releasedAt = now();
+      const releasedOwner: ControlHostOwnerMetadata = {
+        ...metadata,
+        status: 'released',
+        updated_at: releasedAt,
+        released_at: releasedAt
+      };
+      await writeJsonAtomic(paths.ownerPath, releasedOwner);
+      await rm(paths.lockDir, { recursive: true, force: true });
+    }
+  };
+}
+
+function buildControlHostOwnerMetadata(
+  options: AcquireControlHostOwnershipOptions,
+  paths: ControlHostOwnershipPaths,
+  timestamp: string
+): ControlHostOwnerMetadata {
+  return {
+    schema_version: 1,
+    status: 'owned',
+    owner_token: randomUUID(),
+    acquired_at: timestamp,
+    updated_at: timestamp,
+    released_at: null,
+    repo_root: normalizeNullableString(options.repoRoot),
+    task_id: normalizeNullableString(options.taskId),
+    run_id: options.runId,
+    run_dir: paths.runDir,
+    pipeline_id: normalizeNullableString(options.pipelineId),
+    pid: options.processId ?? process.pid,
+    ppid: options.parentProcessId === undefined ? process.ppid : options.parentProcessId,
+    hostname: options.host ?? hostname(),
+    cwd: options.cwd === undefined ? process.cwd() : options.cwd,
+    argv: options.argv ?? process.argv.slice(),
+    lock_dir: paths.lockDir,
+    lock_owner_path: paths.lockOwnerPath,
+    owner_path: paths.ownerPath
+  };
+}
+
+function resolveControlHostOwnershipPaths(runDir: string): ControlHostOwnershipPaths {
+  return {
+    runDir,
+    lockDir: join(runDir, CONTROL_HOST_OWNER_LOCK_DIR),
+    lockOwnerPath: join(runDir, CONTROL_HOST_OWNER_LOCK_DIR, 'owner.json'),
+    ownerPath: join(runDir, CONTROL_HOST_OWNER_FILE),
+    duplicateDiagnosticPath: join(runDir, CONTROL_HOST_DUPLICATE_OWNER_FILE),
+    staleDiagnosticPath: join(runDir, CONTROL_HOST_STALE_OWNER_FILE)
+  };
+}
+
+async function writeControlHostOwnershipDiagnostic(input: {
+  paths: ControlHostOwnershipPaths;
+  reason: ControlHostOwnershipDiagnosticReason;
+  action: ControlHostOwnershipDiagnostic['action'];
+  existingOwner: ControlHostOwnerMetadata | null;
+  attemptedOwner: ControlHostOwnerMetadata;
+  observedAt: string;
+  diagnosticPath: string;
+}): Promise<ControlHostOwnershipDiagnostic> {
+  const diagnostic: ControlHostOwnershipDiagnostic = {
+    schema_version: 1,
+    reason: input.reason,
+    observed_at: input.observedAt,
+    run_dir: input.paths.runDir,
+    lock_dir: input.paths.lockDir,
+    diagnostic_path: input.diagnosticPath,
+    existing_owner: input.existingOwner,
+    attempted_owner: input.attemptedOwner,
+    action: input.action
+  };
+  await writeJsonAtomic(input.diagnosticPath, diagnostic);
+  return diagnostic;
+}
+
+async function removePriorOwnershipDiagnostics(paths: ControlHostOwnershipPaths): Promise<void> {
+  await Promise.all([
+    rm(paths.duplicateDiagnosticPath, { force: true }),
+    rm(paths.staleDiagnosticPath, { force: true })
+  ]);
+}
+
+function classifyExistingOwner(
+  owner: ControlHostOwnerMetadata | null,
+  input: {
+    host: string;
+    isProcessAlive: (pid: number) => boolean;
+  }
+): ExistingOwnerState {
+  if (!owner) {
+    return { kind: 'ambiguous', owner: null };
+  }
+  if (!Number.isInteger(owner.pid) || owner.pid <= 0) {
+    return { kind: 'ambiguous', owner };
+  }
+  if (owner.hostname && owner.hostname !== input.host) {
+    return { kind: 'active', owner };
+  }
+  return input.isProcessAlive(owner.pid)
+    ? { kind: 'active', owner }
+    : { kind: 'stale', owner };
+}
+
+function isLocalProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException)?.code !== 'ESRCH';
+  }
+}
+
+async function readControlHostOwnerMetadataFromPath(
+  path: string
+): Promise<ControlHostOwnerMetadata | null> {
+  try {
+    return normalizeControlHostOwnerMetadata(JSON.parse(await readFile(path, 'utf8')));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
+      return null;
+    }
+    return null;
+  }
+}
+
+async function readControlHostOwnershipDiagnosticFromPath(
+  path: string
+): Promise<ControlHostOwnershipDiagnostic | null> {
+  try {
+    return normalizeControlHostOwnershipDiagnostic(JSON.parse(await readFile(path, 'utf8')));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
+      return null;
+    }
+    return null;
+  }
+}
+
+function normalizeControlHostOwnerMetadata(value: unknown): ControlHostOwnerMetadata | null {
+  if (!isRecordLike(value)) {
+    return null;
+  }
+  if (value.schema_version !== 1 || value.status !== 'owned' && value.status !== 'released') {
+    return null;
+  }
+  if (
+    typeof value.owner_token !== 'string' ||
+    typeof value.acquired_at !== 'string' ||
+    typeof value.updated_at !== 'string' ||
+    typeof value.run_id !== 'string' ||
+    typeof value.run_dir !== 'string' ||
+    typeof value.pid !== 'number' ||
+    typeof value.hostname !== 'string' ||
+    typeof value.lock_dir !== 'string' ||
+    typeof value.lock_owner_path !== 'string' ||
+    typeof value.owner_path !== 'string'
+  ) {
+    return null;
+  }
+  return {
+    schema_version: 1,
+    status: value.status,
+    owner_token: value.owner_token,
+    acquired_at: value.acquired_at,
+    updated_at: value.updated_at,
+    released_at: typeof value.released_at === 'string' ? value.released_at : null,
+    repo_root: typeof value.repo_root === 'string' ? value.repo_root : null,
+    task_id: typeof value.task_id === 'string' ? value.task_id : null,
+    run_id: value.run_id,
+    run_dir: value.run_dir,
+    pipeline_id: typeof value.pipeline_id === 'string' ? value.pipeline_id : null,
+    pid: value.pid,
+    ppid: typeof value.ppid === 'number' ? value.ppid : null,
+    hostname: value.hostname,
+    cwd: typeof value.cwd === 'string' ? value.cwd : null,
+    argv: Array.isArray(value.argv)
+      ? value.argv.filter((entry): entry is string => typeof entry === 'string')
+      : [],
+    lock_dir: value.lock_dir,
+    lock_owner_path: value.lock_owner_path,
+    owner_path: value.owner_path
+  };
+}
+
+function normalizeControlHostOwnershipDiagnostic(
+  value: unknown
+): ControlHostOwnershipDiagnostic | null {
+  if (!isRecordLike(value) || value.schema_version !== 1) {
+    return null;
+  }
+  const reason = normalizeDiagnosticReason(value.reason);
+  if (!reason) {
+    return null;
+  }
+  const attemptedOwner = normalizeControlHostOwnerMetadata(value.attempted_owner);
+  if (!attemptedOwner) {
+    return null;
+  }
+  const action =
+    value.action === 'duplicate_rejected' ||
+    value.action === 'ambiguous_rejected' ||
+    value.action === 'stale_reclaimed'
+      ? value.action
+      : reason === 'stale_control_host_owner'
+        ? 'stale_reclaimed'
+        : reason === 'duplicate_control_host_owner'
+          ? 'duplicate_rejected'
+          : 'ambiguous_rejected';
+  return {
+    schema_version: 1,
+    reason,
+    observed_at: typeof value.observed_at === 'string' ? value.observed_at : '',
+    run_dir: typeof value.run_dir === 'string' ? value.run_dir : attemptedOwner.run_dir,
+    lock_dir: typeof value.lock_dir === 'string' ? value.lock_dir : attemptedOwner.lock_dir,
+    diagnostic_path:
+      typeof value.diagnostic_path === 'string' ? value.diagnostic_path : '',
+    existing_owner: normalizeControlHostOwnerMetadata(value.existing_owner),
+    attempted_owner: attemptedOwner,
+    action
+  };
+}
+
+function buildControlHostOwnershipPollingPayloadFromDiagnostic(
+  diagnostic: ControlHostOwnershipDiagnostic
+): ControlHostOwnershipPollingPayload {
+  const status =
+    diagnostic.action === 'stale_reclaimed'
+      ? 'stale_reclaimed'
+      : diagnostic.action === 'ambiguous_rejected'
+        ? 'ambiguous_rejected'
+        : 'duplicate_rejected';
+  return {
+    status,
+    reason: diagnostic.reason,
+    updated_at: diagnostic.observed_at,
+    owner: diagnostic.existing_owner ? summarizeControlHostOwner(diagnostic.existing_owner) : null,
+    attempted_owner: summarizeControlHostOwner(diagnostic.attempted_owner),
+    diagnostic_path: diagnostic.diagnostic_path,
+    lock_dir: diagnostic.lock_dir,
+    owner_path: diagnostic.existing_owner?.owner_path ?? diagnostic.attempted_owner.owner_path
+  };
+}
+
+function summarizeControlHostOwner(
+  metadata: ControlHostOwnerMetadata
+): ControlHostOwnerSummary {
+  return {
+    owner_token: metadata.owner_token,
+    status: metadata.status,
+    pid: metadata.pid,
+    ppid: metadata.ppid,
+    hostname: metadata.hostname,
+    acquired_at: metadata.acquired_at,
+    updated_at: metadata.updated_at,
+    released_at: metadata.released_at,
+    repo_root: metadata.repo_root,
+    task_id: metadata.task_id,
+    run_id: metadata.run_id,
+    run_dir: metadata.run_dir,
+    pipeline_id: metadata.pipeline_id,
+    lock_dir: metadata.lock_dir,
+    owner_path: metadata.owner_path
+  };
+}
+
+function normalizeControlHostOwnerSummary(value: unknown): ControlHostOwnerSummary | null {
+  if (!isRecordLike(value)) {
+    return null;
+  }
+  if (
+    typeof value.owner_token !== 'string' ||
+    typeof value.status !== 'string' ||
+    typeof value.pid !== 'number' ||
+    typeof value.hostname !== 'string' ||
+    typeof value.acquired_at !== 'string' ||
+    typeof value.updated_at !== 'string' ||
+    typeof value.run_id !== 'string' ||
+    typeof value.run_dir !== 'string' ||
+    typeof value.lock_dir !== 'string' ||
+    typeof value.owner_path !== 'string'
+  ) {
+    return null;
+  }
+  const status = value.status === 'released' ? 'released' : 'owned';
+  return {
+    owner_token: value.owner_token,
+    status,
+    pid: value.pid,
+    ppid: typeof value.ppid === 'number' ? value.ppid : null,
+    hostname: value.hostname,
+    acquired_at: value.acquired_at,
+    updated_at: value.updated_at,
+    released_at: typeof value.released_at === 'string' ? value.released_at : null,
+    repo_root: typeof value.repo_root === 'string' ? value.repo_root : null,
+    task_id: typeof value.task_id === 'string' ? value.task_id : null,
+    run_id: value.run_id,
+    run_dir: value.run_dir,
+    pipeline_id: typeof value.pipeline_id === 'string' ? value.pipeline_id : null,
+    lock_dir: value.lock_dir,
+    owner_path: value.owner_path
+  };
+}
+
+function normalizeDiagnosticReason(value: unknown): ControlHostOwnershipDiagnosticReason | null {
+  return value === 'duplicate_control_host_owner' ||
+    value === 'ambiguous_control_host_owner' ||
+    value === 'stale_control_host_owner'
+    ? value
+    : null;
+}
+
+function normalizePollingStatus(
+  value: unknown
+): ControlHostOwnershipPollingPayload['status'] | null {
+  return value === 'owned' ||
+    value === 'duplicate_rejected' ||
+    value === 'ambiguous_rejected' ||
+    value === 'stale_reclaimed'
+    ? value
+    : null;
+}
+
+function normalizeNullableString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+}
+
+function isRecordLike(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isAlreadyExistsError(error: unknown): boolean {
+  return (error as NodeJS.ErrnoException)?.code === 'EEXIST';
+}
+
+function formatDuplicateControlHostOwnerMessage(
+  reason: ControlHostOwnershipDiagnosticReason,
+  existingOwner: ControlHostOwnerMetadata | null,
+  attemptedOwner: ControlHostOwnerMetadata,
+  diagnosticPath: string
+): string {
+  const ownerText = existingOwner
+    ? `existing pid=${existingOwner.pid} host=${existingOwner.hostname} task=${existingOwner.task_id ?? 'unknown'} run=${existingOwner.run_id} pipeline=${existingOwner.pipeline_id ?? 'unknown'}`
+    : 'existing owner metadata unavailable';
+  return `control-host ownership rejected (${reason}): ${ownerText}; attempted pid=${attemptedOwner.pid} host=${attemptedOwner.hostname}; diagnostic=${diagnosticPath}`;
+}
