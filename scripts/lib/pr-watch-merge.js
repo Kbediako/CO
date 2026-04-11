@@ -430,15 +430,24 @@ export function planGitHubRateLimitBackoff(rateLimit, options = {}) {
       : 5000;
   const candidates = [];
   if (typeof rateLimit?.retry_after_seconds === 'number' && Number.isFinite(rateLimit.retry_after_seconds)) {
-    candidates.push(Math.max(0, rateLimit.retry_after_seconds * 1000));
+    const retryAfterMs = rateLimit.retry_after_seconds * 1000;
+    if (retryAfterMs > 0) {
+      candidates.push(retryAfterMs);
+    }
   }
   const retryAtMs = parseTimestampMs(rateLimit?.retry_at);
   if (retryAtMs !== null) {
-    candidates.push(Math.max(0, retryAtMs - nowMs));
+    const retryDelayMs = retryAtMs - nowMs;
+    if (retryDelayMs > 0) {
+      candidates.push(retryDelayMs);
+    }
   }
   const resetAtMs = parseTimestampMs(rateLimit?.reset_at);
   if (resetAtMs !== null) {
-    candidates.push(Math.max(0, resetAtMs - nowMs));
+    const resetDelayMs = resetAtMs - nowMs;
+    if (resetDelayMs > 0) {
+      candidates.push(resetDelayMs);
+    }
   }
   const baseMs = candidates.length > 0 ? Math.max(...candidates) : fallbackMs;
   const jitterMs = stableJitterMs(options.jitterSeed, maxJitterMs);

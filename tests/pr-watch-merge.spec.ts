@@ -896,6 +896,30 @@ describe('planGitHubRateLimitBackoff', () => {
 
     expect(planned).toBe(15_000);
   });
+
+  it('uses fallback cooldown when reset metadata is stale', () => {
+    const nowMs = Date.parse('2026-04-11T02:13:00.000Z');
+    const planned = planGitHubRateLimitBackoff(
+      {
+        kind: 'github_rate_limited',
+        surface: 'rest',
+        limit_type: 'secondary',
+        status: 429,
+        reset_at: '2026-04-11T01:37:25.000Z',
+        retry_after_seconds: null,
+        retry_at: '2026-04-11T01:37:25.000Z',
+        message: null
+      },
+      {
+        nowMs,
+        fallbackMs: 30_000,
+        maxJitterMs: 0,
+        remainingMs: 180_000
+      }
+    );
+
+    expect(planned).toBe(30_000);
+  });
 });
 
 describe('resolveCachedRequiredChecksSummary', () => {
