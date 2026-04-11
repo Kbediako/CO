@@ -3,6 +3,7 @@
 ## Summary
 - Problem Statement: Front-end teams lack a reproducible pipeline for capturing high-fidelity design references, resulting in manual screenshot diffs, unsourced component snapshots, and missing privacy controls for staged assets.
 - Desired Outcome: Provide an opt-in `design-reference` pipeline that extracts DOM/CSS/screenshots via Playwright, builds a canonical reference page, componentizes the output inside `packages/design-system`, generates advanced motion/video assets when enabled, performs visual regression checks, and mirrors summarized evidence into manifests and run artifacts.
+- Current repo truth after `CO-88`: the checked-in `packages/design-system` package is still a thin scaffold and its `test:visual` command is placeholder smoke. Treat this PRD as pipeline intent plus historical evidence, not as proof that the current branch ships a mature design-system regression surface.
 
 ## Goals
 - Activate the pipeline when `design.config.yaml` sets `metadata.design.enabled=true` or when CLI runs with `--pipeline design-reference`, honoring repository guardrails and approval policies.

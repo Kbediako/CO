@@ -300,6 +300,23 @@
       }
     },
     {
+      "id": "20260410-linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0",
+      "title": "CO: Repo-wide cleanup of stale compatibility debt, contradictory docs, and placeholder surfaces",
+      "relates_to": "tasks/tasks-linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-11",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.md",
+        "task": "tasks/tasks-linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.md",
+        "agent_task": ".agent/task/linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.md",
+        "docs": "docs/TECH_SPEC-linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.md"
+      }
+    },
+    {
       "id": "20260410-linear-255030bf-bdda-4594-b503-28639a98b9da",
       "title": "CO: shift Linear intake to webhook-first targeted reconcile with slow full recovery sweeps",
       "relates_to": "tasks/tasks-linear-255030bf-bdda-4594-b503-28639a98b9da.md",
