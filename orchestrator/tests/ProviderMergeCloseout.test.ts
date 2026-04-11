@@ -161,6 +161,178 @@ describe('runProviderDeterministicMergeCloseout', () => {
     expect(runCommand).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps action-required snapshot blockers ahead of GitHub API rate-limit watching', async () => {
+    const githubRateLimit = {
+      kind: 'github_rate_limited',
+      surface: 'rest',
+      limit_type: 'primary',
+      status: 403,
+      reset_at: '2026-04-11T00:05:00.000Z',
+      retry_after_seconds: null,
+      retry_at: '2026-04-11T00:05:00.000Z',
+      message: 'HTTP 403: API rate limit exceeded.'
+    };
+    const runCommand = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      exitCode: 0,
+      stdout: 'git@github.com:asabeko/CO.git\n',
+      stderr: ''
+    });
+    const fetchSnapshot = vi.fn().mockResolvedValueOnce({
+      state: 'OPEN',
+      reviewDecision: 'CHANGES_REQUESTED',
+      mergeStateStatus: 'BLOCKED',
+      readyToMerge: false,
+      gateReasons: ['review=CHANGES_REQUESTED'],
+      unresolvedThreadCount: 1,
+      updatedAt: '2026-04-11T00:00:00.000Z',
+      mergedAt: null,
+      headOid: 'abc123',
+      checks: { pending: [], failed: [] },
+      requiredChecks: { pending: [], failed: [] },
+      githubRateLimit
+    });
+
+    const result = await runProviderDeterministicMergeCloseout(
+      {
+        issueId: 'lin-issue-1',
+        issueIdentifier: 'CO-151',
+        issueState: 'Merging',
+        issueStateType: 'started',
+        issueUpdatedAt: '2026-04-11T00:00:00.000Z',
+        repoRoot: '/tmp/co'
+      },
+      {
+        readIssueContext: vi.fn(async () => ({
+          ok: true,
+          operation: 'issue-context',
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-151',
+            title: 'GitHub API backoff',
+            description: null,
+            url: null,
+            updated_at: '2026-04-11T00:00:00.000Z',
+            workspace_id: null,
+            state: { id: 'state-merging', name: 'Merging', type: 'started' },
+            team: null,
+            project: null,
+            comments: [],
+            attachments: [{ id: 'att-1', title: 'PR', url: 'https://github.com/asabeko/CO/pull/431' }],
+            workpad_comment: null
+          },
+          source_setup: null
+        })),
+        fetchSnapshot,
+        resolveSnapshotActionRequiredReasons: vi.fn(() => ['review=CHANGES_REQUESTED']),
+        runCommand
+      }
+    );
+
+    expect(result).toMatchObject({
+      status: 'action_required',
+      reason: 'review=CHANGES_REQUESTED',
+      github_rate_limit: null
+    });
+    expect(fetchSnapshot).toHaveBeenCalledTimes(1);
+    expect(runCommand).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves merge command failure when post-merge verification is GitHub rate-limited', async () => {
+    const githubRateLimit = {
+      kind: 'github_rate_limited',
+      surface: 'graphql',
+      limit_type: 'primary',
+      status: 403,
+      reset_at: '2026-04-11T00:05:00.000Z',
+      retry_after_seconds: null,
+      retry_at: '2026-04-11T00:05:00.000Z',
+      message: 'GraphQL: API rate limit exceeded.'
+    };
+    const error = Object.assign(new Error('GraphQL: API rate limit exceeded.'), {
+      githubRateLimit
+    });
+    const runCommand = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        exitCode: 0,
+        stdout: 'git@github.com:asabeko/CO.git\n',
+        stderr: ''
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        exitCode: 1,
+        stdout: '',
+        stderr: 'merge failed'
+      });
+    const fetchSnapshot = vi
+      .fn()
+      .mockResolvedValueOnce({
+        state: 'OPEN',
+        reviewDecision: 'APPROVED',
+        mergeStateStatus: 'CLEAN',
+        readyToMerge: true,
+        gateReasons: [],
+        unresolvedThreadCount: 0,
+        updatedAt: '2026-04-11T00:00:00.000Z',
+        mergedAt: null,
+        headOid: 'abc123',
+        checks: { pending: [], failed: [] },
+        requiredChecks: { pending: [], failed: [] }
+      })
+      .mockRejectedValueOnce(error);
+
+    const result = await runProviderDeterministicMergeCloseout(
+      {
+        issueId: 'lin-issue-1',
+        issueIdentifier: 'CO-151',
+        issueState: 'Merging',
+        issueStateType: 'started',
+        issueUpdatedAt: '2026-04-11T00:00:00.000Z',
+        repoRoot: '/tmp/co'
+      },
+      {
+        readIssueContext: vi.fn(async () => ({
+          ok: true,
+          operation: 'issue-context',
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-151',
+            title: 'GitHub API backoff',
+            description: null,
+            url: null,
+            updated_at: '2026-04-11T00:00:00.000Z',
+            workspace_id: null,
+            state: { id: 'state-merging', name: 'Merging', type: 'started' },
+            team: null,
+            project: null,
+            comments: [],
+            attachments: [{ id: 'att-1', title: 'PR', url: 'https://github.com/asabeko/CO/pull/431' }],
+            workpad_comment: null
+          },
+          source_setup: null
+        })),
+        fetchSnapshot,
+        resolveSnapshotActionRequiredReasons: vi.fn(() => []),
+        runCommand
+      }
+    );
+
+    expect(result).toMatchObject({
+      status: 'merge_failed',
+      reason: 'merge_command_failed',
+      merge_attempt: {
+        ok: false,
+        exit_code: 1,
+        stderr: 'merge failed'
+      },
+      github_rate_limit: githubRateLimit
+    });
+    expect(fetchSnapshot).toHaveBeenCalledTimes(2);
+    expect(runCommand).toHaveBeenCalledTimes(2);
+  });
+
   it('records merge attempt, shared-root reconciliation, and Done transition for a merge-ready attached PR', async () => {
     const runCommand = vi
       .fn()
@@ -1348,7 +1520,17 @@ describe('runProviderDeterministicMergeCloseout', () => {
           mergedAt: '2026-04-06T19:50:00.000Z',
           headOid: 'old360',
           checks: { pending: [], failed: [] },
-          requiredChecks: { pending: [], failed: [] }
+          requiredChecks: { pending: [], failed: [] },
+          githubRateLimit: {
+            kind: 'github_rate_limited',
+            surface: 'graphql',
+            limit_type: 'primary',
+            status: 403,
+            reset_at: '2026-04-06T20:05:00.000Z',
+            retry_after_seconds: null,
+            retry_at: '2026-04-06T20:05:00.000Z',
+            message: 'GraphQL: API rate limit exceeded.'
+          }
         };
       }
       if (prNumber === 372) {

@@ -714,6 +714,22 @@ export async function runProviderDeterministicMergeCloseout(
       // Preserve the pre-merge readiness snapshot when verification cannot be reread.
     }
 
+    if (verificationRateLimit && mergeResult.ok === false) {
+      return {
+        ...baseWithResolution,
+        pr,
+        snapshot: verificationSnapshot,
+        branch_recovery: branchRecovery,
+        merge_attempt: mergeAttempt,
+        status: 'merge_failed',
+        reason: 'merge_command_failed',
+        summary: summarizeSelection(
+          `GitHub merge command failed before the pull request was confirmed merged; post-merge verification was also blocked by GitHub API budget: ${formatProviderGitHubRateLimitSummary(verificationRateLimit)}.`
+        ),
+        github_rate_limit: verificationRateLimit
+      };
+    }
+
     if (verificationRateLimit) {
       return {
         ...baseWithResolution,
@@ -1507,7 +1523,7 @@ async function resolveAttachedSameRepoPullRequestCandidate(input: {
         readinessMode: 'merge'
       })
     );
-    if (snapshot.github_rate_limit) {
+    if (snapshot.github_rate_limit && !isTerminalPullRequestSnapshot(snapshot)) {
       throw buildProviderGitHubRateLimitError(snapshot.github_rate_limit);
     }
     inspectedCandidates.push({
@@ -1787,19 +1803,19 @@ function classifyNonMergedSnapshot(
       summary: `Attached PR #${prNumber} is closed without merging; reopen it or attach a replacement PR.`
     };
   }
+  if (snapshot.action_required_reasons.length > 0) {
+    return {
+      status: 'action_required',
+      reason: snapshot.action_required_reasons[0] ?? 'merge_action_required',
+      summary: `Merge closeout is blocked by: ${snapshot.action_required_reasons.join(', ')}.`
+    };
+  }
   if (snapshot.github_rate_limit) {
     return {
       status: 'watching',
       reason: 'github_rate_limited',
       summary: `Merge closeout is waiting for GitHub API budget recovery before rereading PR #${prNumber}: ${formatProviderGitHubRateLimitSummary(snapshot.github_rate_limit)}.`,
       github_rate_limit: snapshot.github_rate_limit
-    };
-  }
-  if (snapshot.action_required_reasons.length > 0) {
-    return {
-      status: 'action_required',
-      reason: snapshot.action_required_reasons[0] ?? 'merge_action_required',
-      summary: `Merge closeout is blocked by: ${snapshot.action_required_reasons.join(', ')}.`
     };
   }
   if (snapshot.gate_reasons.length > 0 || !snapshot.ready_to_merge) {
@@ -1832,19 +1848,19 @@ function classifyNonMergedReviewPromotionSnapshot(
         `Attached PR #${prNumber} is closed without merging; reopen it or attach a replacement PR before review-handoff promotion can continue.`
     };
   }
+  if (snapshot.action_required_reasons.length > 0) {
+    return {
+      status: 'action_required',
+      reason: snapshot.action_required_reasons[0] ?? 'review_handoff_promotion_blocked',
+      summary: `Review-handoff promotion is blocked by: ${snapshot.action_required_reasons.join(', ')}.`
+    };
+  }
   if (snapshot.github_rate_limit) {
     return {
       status: 'watching',
       reason: 'github_rate_limited',
       summary: `Review-handoff promotion is waiting for GitHub API budget recovery before rereading PR #${prNumber}: ${formatProviderGitHubRateLimitSummary(snapshot.github_rate_limit)}.`,
       github_rate_limit: snapshot.github_rate_limit
-    };
-  }
-  if (snapshot.action_required_reasons.length > 0) {
-    return {
-      status: 'action_required',
-      reason: snapshot.action_required_reasons[0] ?? 'review_handoff_promotion_blocked',
-      summary: `Review-handoff promotion is blocked by: ${snapshot.action_required_reasons.join(', ')}.`
     };
   }
   if (snapshot.gate_reasons.length > 0 || !snapshot.ready_to_merge) {
@@ -1864,6 +1880,12 @@ function isMergedPullRequestSnapshot(
   snapshot: ProviderMergeCloseoutSnapshotRecord
 ): boolean {
   return snapshot.merged_at !== null || snapshot.state === 'MERGED';
+}
+
+function isTerminalPullRequestSnapshot(
+  snapshot: ProviderMergeCloseoutSnapshotRecord
+): boolean {
+  return isMergedPullRequestSnapshot(snapshot) || snapshot.state === 'CLOSED';
 }
 
 function isSnapshotStrictlyOlderThanSelection(
