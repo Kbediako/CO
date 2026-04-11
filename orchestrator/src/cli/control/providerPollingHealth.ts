@@ -1,6 +1,7 @@
 import type { ProviderIssueHandoffService } from './providerIssueHandoff.js';
 import { logger } from '../../logger.js';
 import type { LinearBudgetStatus } from './linearBudgetState.js';
+import type { ControlHostOwnershipPollingPayload } from './controlHostOwnership.js';
 
 export type ControlPollingMode = 'poll' | 'refresh';
 export type ControlNextRefreshState = 'cooldown' | 'checking' | 'scheduled' | 'unknown';
@@ -31,6 +32,7 @@ export interface ControlPollingHealthPayload {
   restart_required: boolean;
   reason: string | null;
   linear_budget: LinearBudgetStatus | null;
+  control_host_owner?: ControlHostOwnershipPollingPayload | null;
 }
 
 interface MutableProviderPollingHealthState {
@@ -50,6 +52,7 @@ interface MutableProviderPollingHealthState {
   stuckAtMs: number | null;
   reason: string | null;
   linearBudget: LinearBudgetStatus | null;
+  controlHostOwner: ControlHostOwnershipPollingPayload | null;
   onUpdate: ((payload: ControlPollingHealthPayload) => Promise<void> | void) | null;
   updateChain: Promise<void>;
 }
@@ -66,6 +69,7 @@ export function initializeProviderPollingHealth(
   input: {
     intervalMs: number | null;
     stuckAfterMs?: number | null;
+    controlHostOwner?: ControlHostOwnershipPollingPayload | null;
     onUpdate?: ((payload: ControlPollingHealthPayload) => Promise<void> | void) | null;
     skipInitialUpdate?: boolean;
   }
@@ -77,6 +81,9 @@ export function initializeProviderPollingHealth(
   }
   if (input.onUpdate !== undefined) {
     state.onUpdate = input.onUpdate;
+  }
+  if (input.controlHostOwner !== undefined) {
+    state.controlHostOwner = input.controlHostOwner;
   }
   if (state.nextPollAtMs === null && input.intervalMs !== null) {
     state.nextPollAtMs = Date.now();
@@ -301,7 +308,8 @@ function buildProviderPollingHealthPayload(
     stuck_since_at: toIsoTimestamp(state.stuckAtMs),
     restart_required: stuck,
     reason,
-    linear_budget: state.linearBudget
+    linear_budget: state.linearBudget,
+    control_host_owner: state.controlHostOwner
   };
 }
 
@@ -403,6 +411,7 @@ function getOrCreateProviderPollingHealthState(
     stuckAtMs: null,
     reason: null,
     linearBudget: null,
+    controlHostOwner: null,
     onUpdate: null,
     updateChain: Promise.resolve()
   };
