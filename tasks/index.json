@@ -266,6 +266,23 @@
       }
     },
     {
+      "id": "20260410-linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702",
+      "title": "CO workflow: stop linked-worktree Linear helpers from leaking repo git identity",
+      "relates_to": "tasks/tasks-linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-10",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702.md",
+        "task": "tasks/tasks-linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702.md",
+        "agent_task": ".agent/task/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702.md",
+        "docs": "docs/TECH_SPEC-linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702.md"
+      }
+    },
+    {
       "id": "20260409-linear-da009c42-d0fc-4834-be72-f977a778693c",
       "title": "CO-102: recover active In Progress worker claims when control-host refresh path times out repeatedly under live PR completion pressure",
       "relates_to": "tasks/tasks-linear-da009c42-d0fc-4834-be72-f977a778693c.md",
