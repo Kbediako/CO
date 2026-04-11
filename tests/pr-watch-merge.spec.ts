@@ -11,11 +11,13 @@ import {
   isNoRequiredChecksReportedErrorMessage,
   isHumanReviewActor,
   parseGitHubRepoFromRemoteUrl,
+  planGitHubRateLimitBackoff,
   resolveAutomaticBranchRecoveryReason,
   resolveActionRequiredReasons,
   resolveLatestBotRereviewRequests,
   resolveBotRereviewTimingForKind,
   resolveCachedRequiredChecksSummary,
+  resolveGitHubRateLimitStatus,
   resolveRequiredChecksSummary,
   runPrWatchMerge,
   shouldAttemptAutomaticBranchRecovery,
@@ -727,6 +729,152 @@ describe('isNoRequiredChecksReportedErrorMessage', () => {
   });
 });
 
+describe('resolveGitHubRateLimitStatus', () => {
+  const nowMs = Date.parse('2026-04-11T00:00:00.000Z');
+
+  it('classifies REST primary rate limits with reset metadata', () => {
+    const resetEpochSeconds = 1_777_000_000;
+    const rateLimit = resolveGitHubRateLimitStatus(
+      {
+        args: ['pr', 'checks', '431'],
+        stderr: `HTTP 403: API rate limit exceeded for user ID 123\nx-ratelimit-reset: ${resetEpochSeconds}`
+      },
+      { nowMs }
+    );
+
+    expect(rateLimit).toMatchObject({
+      kind: 'github_rate_limited',
+      surface: 'rest',
+      limit_type: 'primary',
+      status: 403,
+      reset_at: new Date(resetEpochSeconds * 1000).toISOString()
+    });
+  });
+
+  it('classifies REST secondary throttles with retry-after metadata', () => {
+    const rateLimit = resolveGitHubRateLimitStatus(
+      {
+        args: ['api', 'repos/asabeko/CO/issues/431/comments'],
+        stderr: 'HTTP 429: You have exceeded a secondary rate limit.\nretry-after: 60'
+      },
+      { nowMs }
+    );
+
+    expect(rateLimit).toMatchObject({
+      kind: 'github_rate_limited',
+      surface: 'rest',
+      limit_type: 'secondary',
+      status: 429,
+      retry_after_seconds: 60,
+      retry_at: '2026-04-11T00:01:00.000Z'
+    });
+  });
+
+  it('classifies GraphQL RATE_LIMITED payloads', () => {
+    const rateLimit = resolveGitHubRateLimitStatus(
+      {
+        errors: [
+          {
+            type: 'RATE_LIMITED',
+            message: 'API rate limit exceeded for GraphQL.'
+          }
+        ]
+      },
+      { surface: 'graphql', nowMs }
+    );
+
+    expect(rateLimit).toMatchObject({
+      kind: 'github_rate_limited',
+      surface: 'graphql',
+      limit_type: 'primary'
+    });
+  });
+
+  it('does not classify CodeRabbit service cooldown prose as GitHub API throttling', () => {
+    expect(
+      resolveGitHubRateLimitStatus(
+        'CodeRabbit service cooldown: daily review rate limit reached. Please try again later.',
+        { nowMs }
+      )
+    ).toBeNull();
+  });
+
+  it('does not classify generic REST 403 failures without rate-limit evidence', () => {
+    expect(
+      resolveGitHubRateLimitStatus(
+        {
+          args: ['api', 'repos/asabeko/CO/issues/431/comments'],
+          stderr: 'HTTP 403: Resource not accessible by integration'
+        },
+        { nowMs }
+      )
+    ).toBeNull();
+  });
+
+  it('does not classify generic REST 403 failures just because reset headers are present', () => {
+    expect(
+      resolveGitHubRateLimitStatus(
+        {
+          args: ['api', 'repos/asabeko/CO/issues/431/comments'],
+          stderr: 'HTTP 403: Resource not accessible by integration\nx-ratelimit-reset: 1777000000'
+        },
+        { nowMs }
+      )
+    ).toBeNull();
+  });
+});
+
+describe('planGitHubRateLimitBackoff', () => {
+  it('prefers reset-aware waits with bounded deterministic jitter', () => {
+    const nowMs = Date.parse('2026-04-11T00:00:00.000Z');
+    const retryAt = '2026-04-11T00:02:00.000Z';
+    const planned = planGitHubRateLimitBackoff(
+      {
+        kind: 'github_rate_limited',
+        surface: 'graphql',
+        limit_type: 'primary',
+        status: 403,
+        reset_at: retryAt,
+        retry_after_seconds: null,
+        retry_at: null,
+        message: null
+      },
+      {
+        nowMs,
+        fallbackMs: 30_000,
+        maxJitterMs: 0,
+        remainingMs: 180_000
+      }
+    );
+
+    expect(planned).toBe(120_000);
+  });
+
+  it('caps waits to the remaining monitor budget', () => {
+    const nowMs = Date.parse('2026-04-11T00:00:00.000Z');
+    const planned = planGitHubRateLimitBackoff(
+      {
+        kind: 'github_rate_limited',
+        surface: 'rest',
+        limit_type: 'secondary',
+        status: 429,
+        reset_at: null,
+        retry_after_seconds: 120,
+        retry_at: null,
+        message: null
+      },
+      {
+        nowMs,
+        fallbackMs: 30_000,
+        maxJitterMs: 0,
+        remainingMs: 15_000
+      }
+    );
+
+    expect(planned).toBe(15_000);
+  });
+});
+
 describe('resolveCachedRequiredChecksSummary', () => {
   it('returns cached required checks when cache head matches current head', () => {
     const summary = summarizeRequiredChecks([
@@ -1000,6 +1148,227 @@ describe('runPrWatchMerge review-mode flag validation', () => {
 
       expect(updateBranchAttempts).toBe(1);
       expect(snapshotIndex).toBe(3);
+      expect(errorSpy).not.toHaveBeenCalled();
+    } finally {
+      logSpy.mockRestore();
+      errorSpy.mockRestore();
+      vi.doUnmock('node:child_process');
+      vi.doUnmock('node:timers/promises');
+      vi.resetModules();
+    }
+  });
+
+  it('reuses same-head fan-out evidence during quiet-window polling', async () => {
+    vi.resetModules();
+    const snapshotPayloads = [
+      makeResponse([], {
+        updatedAt: '2026-04-11T00:00:00.000Z',
+        mergedAt: null
+      }),
+      makeResponse([], {
+        state: 'MERGED',
+        updatedAt: '2026-04-11T00:00:00.000Z',
+        mergedAt: '2026-04-11T00:00:30.000Z'
+      })
+    ];
+    let snapshotIndex = 0;
+    let graphqlCalls = 0;
+    let requiredCheckCalls = 0;
+    let restFanoutCalls = 0;
+    const spawnMock = vi.fn((command: string, args: string[]) => {
+      const stdout = new EventEmitter();
+      const stderr = new EventEmitter();
+      const child = Object.assign(new EventEmitter(), { stdout, stderr });
+      let result: { exitCode: number; stdout: string; stderr: string };
+
+      if (command !== 'gh') {
+        throw new Error(`Unexpected command: ${command} ${args.join(' ')}`);
+      }
+
+      if (args[0] === 'auth' && args[1] === 'status') {
+        result = { exitCode: 0, stdout: '', stderr: '' };
+      } else if (args[0] === 'api' && args[1] === 'graphql') {
+        graphqlCalls += 1;
+        const payload = snapshotPayloads[Math.min(snapshotIndex, snapshotPayloads.length - 1)];
+        snapshotIndex += 1;
+        result = { exitCode: 0, stdout: JSON.stringify(payload), stderr: '' };
+      } else if (args[0] === 'pr' && args[1] === 'checks') {
+        requiredCheckCalls += 1;
+        result = {
+          exitCode: 0,
+          stdout: JSON.stringify([
+            { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+          ]),
+          stderr: ''
+        };
+      } else if (args[0] === 'api') {
+        restFanoutCalls += 1;
+        result = { exitCode: 0, stdout: '[[]]', stderr: '' };
+      } else {
+        throw new Error(`Unexpected gh args: ${args.join(' ')}`);
+      }
+
+      queueMicrotask(() => {
+        if (result.stdout) {
+          stdout.emit('data', Buffer.from(result.stdout));
+        }
+        if (result.stderr) {
+          stderr.emit('data', Buffer.from(result.stderr));
+        }
+        child.emit('close', result.exitCode);
+      });
+
+      return child as any;
+    });
+    const sleepMock = vi.fn(async () => undefined);
+    vi.doMock('node:child_process', () => ({
+      spawn: spawnMock
+    }));
+    vi.doMock('node:timers/promises', () => ({
+      setTimeout: sleepMock
+    }));
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    try {
+      const { runPrWatchMerge: runPrWatchMergeWithMocks } = await import('../scripts/lib/pr-watch-merge.js');
+
+      await expect(
+        runPrWatchMergeWithMocks([
+          '--owner',
+          'Kbediako',
+          '--repo',
+          'CO',
+          '--pr',
+          '211',
+          '--interval-seconds',
+          '0.001',
+          '--quiet-minutes',
+          '1',
+          '--timeout-minutes',
+          '1',
+          '--no-exit-on-action-required'
+        ])
+      ).resolves.toBe(0);
+
+      expect(graphqlCalls).toBe(2);
+      expect(requiredCheckCalls).toBe(2);
+      expect(restFanoutCalls).toBe(5);
+      expect(errorSpy).not.toHaveBeenCalled();
+    } finally {
+      logSpy.mockRestore();
+      errorSpy.mockRestore();
+      vi.doUnmock('node:child_process');
+      vi.doUnmock('node:timers/promises');
+      vi.resetModules();
+    }
+  });
+
+  it('does not reuse same-head bot fan-out while bot re-review is pending', async () => {
+    vi.resetModules();
+    const snapshotPayloads = [
+      makeResponse([], {
+        updatedAt: '2026-04-11T00:00:00.000Z',
+        mergedAt: null
+      }),
+      makeResponse([], {
+        state: 'MERGED',
+        updatedAt: '2026-04-11T00:00:00.000Z',
+        mergedAt: '2026-04-11T00:00:30.000Z'
+      })
+    ];
+    let snapshotIndex = 0;
+    let issueCommentCalls = 0;
+    const spawnMock = vi.fn((command: string, args: string[]) => {
+      const stdout = new EventEmitter();
+      const stderr = new EventEmitter();
+      const child = Object.assign(new EventEmitter(), { stdout, stderr });
+      let result: { exitCode: number; stdout: string; stderr: string };
+
+      if (command !== 'gh') {
+        throw new Error(`Unexpected command: ${command} ${args.join(' ')}`);
+      }
+
+      if (args[0] === 'auth' && args[1] === 'status') {
+        result = { exitCode: 0, stdout: '', stderr: '' };
+      } else if (args[0] === 'api' && args[1] === 'graphql') {
+        const payload = snapshotPayloads[Math.min(snapshotIndex, snapshotPayloads.length - 1)];
+        snapshotIndex += 1;
+        result = { exitCode: 0, stdout: JSON.stringify(payload), stderr: '' };
+      } else if (args[0] === 'pr' && args[1] === 'checks') {
+        result = {
+          exitCode: 0,
+          stdout: JSON.stringify([
+            { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+          ]),
+          stderr: ''
+        };
+      } else if (args[0] === 'api' && args[1] === 'repos/Kbediako/CO/issues/211/comments') {
+        issueCommentCalls += 1;
+        result = {
+          exitCode: 0,
+          stdout: JSON.stringify([
+            [
+              {
+                id: 10,
+                body: '@codex please re-review this iteration',
+                created_at: '2026-04-11T00:00:01.000Z',
+                user: { login: 'maintainer', type: 'User' }
+              }
+            ]
+          ]),
+          stderr: ''
+        };
+      } else if (args[0] === 'api') {
+        result = { exitCode: 0, stdout: '[[]]', stderr: '' };
+      } else {
+        throw new Error(`Unexpected gh args: ${args.join(' ')}`);
+      }
+
+      queueMicrotask(() => {
+        if (result.stdout) {
+          stdout.emit('data', Buffer.from(result.stdout));
+        }
+        if (result.stderr) {
+          stderr.emit('data', Buffer.from(result.stderr));
+        }
+        child.emit('close', result.exitCode);
+      });
+
+      return child as any;
+    });
+    const sleepMock = vi.fn(async () => undefined);
+    vi.doMock('node:child_process', () => ({
+      spawn: spawnMock
+    }));
+    vi.doMock('node:timers/promises', () => ({
+      setTimeout: sleepMock
+    }));
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    try {
+      const { runPrWatchMerge: runPrWatchMergeWithMocks } = await import('../scripts/lib/pr-watch-merge.js');
+
+      await expect(
+        runPrWatchMergeWithMocks([
+          '--owner',
+          'Kbediako',
+          '--repo',
+          'CO',
+          '--pr',
+          '211',
+          '--interval-seconds',
+          '0.001',
+          '--quiet-minutes',
+          '1',
+          '--timeout-minutes',
+          '1',
+          '--no-exit-on-action-required'
+        ])
+      ).resolves.toBe(0);
+
+      expect(issueCommentCalls).toBe(2);
       expect(errorSpy).not.toHaveBeenCalled();
     } finally {
       logSpy.mockRestore();

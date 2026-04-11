@@ -14,11 +14,14 @@ import {
   buildPrMergeArgs,
   buildPrUpdateBranchArgs,
   fetchPrStatusSnapshot,
+  formatGitHubRateLimitStatus,
   isConflictLikeBranchRecoveryFailureMessage,
   parseGitHubRepoFromRemoteUrl,
   resolveAutomaticBranchRecoveryReason,
   resolveActionRequiredReasons,
+  resolveGitHubRateLimitStatus,
   shouldAttemptAutomaticBranchRecovery,
+  type PrWatchMergeGitHubRateLimitStatus,
   type PrWatchMergeSnapshot
 } from '../../../../scripts/lib/pr-watch-merge.js';
 
@@ -57,6 +60,18 @@ export interface ProviderMergeCloseoutSnapshotRecord {
   updated_at: string | null;
   merged_at: string | null;
   head_oid: string | null;
+  github_rate_limit?: ProviderGitHubRateLimitRecord | null;
+}
+
+export interface ProviderGitHubRateLimitRecord {
+  kind: 'github_rate_limited';
+  surface: string;
+  limit_type: string;
+  status: number | null;
+  reset_at: string | null;
+  retry_after_seconds: number | null;
+  retry_at: string | null;
+  message: string | null;
 }
 
 export interface ProviderMergeCloseoutAttemptRecord {
@@ -125,6 +140,7 @@ export interface ProviderReviewHandoffPromotionRecord {
   snapshot: ProviderMergeCloseoutSnapshotRecord | null;
   branch_recovery: ProviderBranchRecoveryAttemptRecord | null;
   linear_transition: ProviderMergeCloseoutLinearTransitionRecord | null;
+  github_rate_limit?: ProviderGitHubRateLimitRecord | null;
 }
 
 export interface ProviderMergeCloseoutRecord {
@@ -146,6 +162,7 @@ export interface ProviderMergeCloseoutRecord {
   merge_attempt: ProviderMergeCloseoutAttemptRecord | null;
   shared_root: ProviderMergeCloseoutSharedRootRecord | null;
   linear_transition: ProviderMergeCloseoutLinearTransitionRecord | null;
+  github_rate_limit?: ProviderGitHubRateLimitRecord | null;
 }
 
 export interface ProviderMergeCloseoutCommandResult {
@@ -233,7 +250,8 @@ export async function runProviderDeterministicMergeCloseout(
     branch_recovery: null as ProviderBranchRecoveryAttemptRecord | null,
     merge_attempt: null as ProviderMergeCloseoutAttemptRecord | null,
     shared_root: null as ProviderMergeCloseoutSharedRootRecord | null,
-    linear_transition: null as ProviderMergeCloseoutLinearTransitionRecord | null
+    linear_transition: null as ProviderMergeCloseoutLinearTransitionRecord | null,
+    github_rate_limit: null as ProviderGitHubRateLimitRecord | null
   };
 
   const repoOriginResult = await runCommand({
@@ -382,6 +400,16 @@ export async function runProviderDeterministicMergeCloseout(
         resolveSnapshotActionRequiredReasons
       });
     } catch (error) {
+      const githubRateLimit = resolveProviderGitHubRateLimitRecord(error);
+      if (githubRateLimit) {
+        return {
+          ...baseWithContext,
+          status: 'watching',
+          reason: 'github_rate_limited',
+          summary: `GitHub API budget blocked attached pull-request disambiguation during merge closeout: ${formatProviderGitHubRateLimitSummary(githubRateLimit)}.`,
+          github_rate_limit: githubRateLimit
+        };
+      }
       return {
         ...baseWithContext,
         status: 'merge_failed',
@@ -431,6 +459,20 @@ export async function runProviderDeterministicMergeCloseout(
         resolveSnapshotActionRequiredReasons
       });
     } catch (error) {
+      const githubRateLimit = resolveProviderGitHubRateLimitRecord(error);
+      if (githubRateLimit) {
+        return {
+          ...baseWithResolution,
+          pr,
+          status: 'watching',
+          reason: 'github_rate_limited',
+          summary: summarizeSelection(
+            `GitHub API budget blocked merge-readiness snapshot loading: ${formatProviderGitHubRateLimitSummary(githubRateLimit)}.`
+          ),
+          snapshot: null,
+          github_rate_limit: githubRateLimit
+        };
+      }
       return {
         ...baseWithResolution,
         pr,
@@ -490,7 +532,22 @@ export async function runProviderDeterministicMergeCloseout(
           resolveSnapshot,
           resolveSnapshotActionRequiredReasons
         });
-      } catch {
+      } catch (error) {
+        const githubRateLimit = resolveProviderGitHubRateLimitRecord(error);
+        if (githubRateLimit) {
+          return {
+            ...baseWithResolution,
+            pr,
+            snapshot,
+            branch_recovery: branchRecovery,
+            status: 'watching',
+            reason: 'github_rate_limited',
+            summary: summarizeSelection(
+              `GitHub API budget blocked post-branch-recovery readiness verification: ${formatProviderGitHubRateLimitSummary(githubRateLimit)}.`
+            ),
+            github_rate_limit: githubRateLimit
+          };
+        }
         // Preserve the pre-recovery snapshot when verification cannot be reread.
       }
       alreadyMerged = snapshot.merged_at !== null || snapshot.state === 'MERGED';
@@ -638,6 +695,7 @@ export async function runProviderDeterministicMergeCloseout(
       stderr: normalizeCommandText(mergeResult.stderr)
     };
 
+    let verificationRateLimit: ProviderGitHubRateLimitRecord | null = null;
     try {
       const rawVerificationSnapshot = await resolveSnapshot({
         owner: pr.owner,
@@ -651,8 +709,25 @@ export async function runProviderDeterministicMergeCloseout(
           readinessMode: 'merge'
         })
       );
-    } catch {
+    } catch (error) {
+      verificationRateLimit = resolveProviderGitHubRateLimitRecord(error);
       // Preserve the pre-merge readiness snapshot when verification cannot be reread.
+    }
+
+    if (verificationRateLimit) {
+      return {
+        ...baseWithResolution,
+        pr,
+        snapshot: verificationSnapshot,
+        branch_recovery: branchRecovery,
+        merge_attempt: mergeAttempt,
+        status: 'watching',
+        reason: 'github_rate_limited',
+        summary: summarizeSelection(
+          `GitHub API budget blocked post-merge verification snapshot loading: ${formatProviderGitHubRateLimitSummary(verificationRateLimit)}.`
+        ),
+        github_rate_limit: verificationRateLimit
+      };
     }
 
     if (verificationSnapshot.merged_at === null && verificationSnapshot.state !== 'MERGED') {
@@ -844,7 +919,8 @@ export async function runProviderReviewHandoffPromotion(
     pr: null as ProviderMergeCloseoutPullRequestRecord | null,
     snapshot: null as ProviderMergeCloseoutSnapshotRecord | null,
     branch_recovery: null as ProviderBranchRecoveryAttemptRecord | null,
-    linear_transition: null as ProviderMergeCloseoutLinearTransitionRecord | null
+    linear_transition: null as ProviderMergeCloseoutLinearTransitionRecord | null,
+    github_rate_limit: null as ProviderGitHubRateLimitRecord | null
   };
 
   const repoOriginResult = await runCommand({
@@ -947,6 +1023,16 @@ export async function runProviderReviewHandoffPromotion(
         resolveSnapshotActionRequiredReasons
       });
     } catch (error) {
+      const githubRateLimit = resolveProviderGitHubRateLimitRecord(error);
+      if (githubRateLimit) {
+        return {
+          ...baseWithContext,
+          status: 'watching',
+          reason: 'github_rate_limited',
+          summary: `GitHub API budget blocked attached pull-request disambiguation during review-handoff promotion: ${formatProviderGitHubRateLimitSummary(githubRateLimit)}.`,
+          github_rate_limit: githubRateLimit
+        };
+      }
       return {
         ...baseWithContext,
         status: 'promotion_failed',
@@ -996,6 +1082,20 @@ export async function runProviderReviewHandoffPromotion(
         resolveSnapshotActionRequiredReasons
       });
     } catch (error) {
+      const githubRateLimit = resolveProviderGitHubRateLimitRecord(error);
+      if (githubRateLimit) {
+        return {
+          ...baseWithResolution,
+          pr,
+          status: 'watching',
+          reason: 'github_rate_limited',
+          summary: summarizeSelection(
+            `GitHub API budget blocked review-handoff readiness snapshot loading: ${formatProviderGitHubRateLimitSummary(githubRateLimit)}.`
+          ),
+          snapshot: null,
+          github_rate_limit: githubRateLimit
+        };
+      }
       return {
         ...baseWithResolution,
         pr,
@@ -1042,7 +1142,22 @@ export async function runProviderReviewHandoffPromotion(
           resolveSnapshot,
           resolveSnapshotActionRequiredReasons
         });
-      } catch {
+      } catch (error) {
+        const githubRateLimit = resolveProviderGitHubRateLimitRecord(error);
+        if (githubRateLimit) {
+          return {
+            ...baseWithResolution,
+            pr,
+            snapshot,
+            branch_recovery: branchRecovery,
+            status: 'watching',
+            reason: 'github_rate_limited',
+            summary: summarizeSelection(
+              `GitHub API budget blocked post-branch-recovery review-handoff verification: ${formatProviderGitHubRateLimitSummary(githubRateLimit)}.`
+            ),
+            github_rate_limit: githubRateLimit
+          };
+        }
         // Preserve the pre-recovery snapshot when verification cannot be reread.
       }
       alreadyMerged = isMergedPullRequestSnapshot(snapshot);
@@ -1386,14 +1501,18 @@ async function resolveAttachedSameRepoPullRequestCandidate(input: {
       prNumber: pr.number,
       readinessMode: 'merge'
     });
+    const snapshot = mapSnapshotRecord(
+      rawSnapshot,
+      input.resolveSnapshotActionRequiredReasons(rawSnapshot as never, {
+        readinessMode: 'merge'
+      })
+    );
+    if (snapshot.github_rate_limit) {
+      throw buildProviderGitHubRateLimitError(snapshot.github_rate_limit);
+    }
     inspectedCandidates.push({
       pr,
-      snapshot: mapSnapshotRecord(
-        rawSnapshot,
-        input.resolveSnapshotActionRequiredReasons(rawSnapshot as never, {
-          readinessMode: 'merge'
-        })
-      )
+      snapshot
     });
   }
 
@@ -1660,6 +1779,13 @@ function classifyNonMergedSnapshot(
   reason: string;
   summary: string;
 } | null {
+  if (snapshot.github_rate_limit) {
+    return {
+      status: 'watching',
+      reason: 'github_rate_limited',
+      summary: `Merge closeout is waiting for GitHub API budget recovery before rereading PR #${prNumber}: ${formatProviderGitHubRateLimitSummary(snapshot.github_rate_limit)}.`
+    };
+  }
   if (snapshot.state === 'CLOSED') {
     return {
       status: 'action_required',
@@ -1695,6 +1821,13 @@ function classifyNonMergedReviewPromotionSnapshot(
   reason: string;
   summary: string;
 } | null {
+  if (snapshot.github_rate_limit) {
+    return {
+      status: 'watching',
+      reason: 'github_rate_limited',
+      summary: `Review-handoff promotion is waiting for GitHub API budget recovery before rereading PR #${prNumber}: ${formatProviderGitHubRateLimitSummary(snapshot.github_rate_limit)}.`
+    };
+  }
   if (snapshot.state === 'CLOSED') {
     return {
       status: 'action_required',
@@ -1755,8 +1888,12 @@ function mapSnapshotRecord(
   snapshot: ProviderPrSnapshotRecord,
   actionRequiredReasons: string[]
 ): ProviderMergeCloseoutSnapshotRecord {
+  const snapshotRecord = readRecord(snapshot);
   const checks = readRecord(snapshot.checks);
   const requiredChecks = readRecord(snapshot.requiredChecks);
+  const githubRateLimit = mapProviderGitHubRateLimit(
+    readRecord(snapshotRecord?.githubRateLimit) ?? readRecord(snapshotRecord?.github_rate_limit)
+  );
   return {
     state: normalizeOptionalString(snapshot.state),
     review_decision: normalizeOptionalString(snapshot.reviewDecision),
@@ -1771,8 +1908,47 @@ function mapSnapshotRecord(
     required_checks_failed: readArrayLength(requiredChecks?.failed),
     updated_at: normalizeOptionalString(snapshot.updatedAt),
     merged_at: normalizeOptionalString(snapshot.mergedAt),
-    head_oid: normalizeOptionalString(snapshot.headOid)
+    head_oid: normalizeOptionalString(snapshot.headOid),
+    github_rate_limit: githubRateLimit
   };
+}
+
+function resolveProviderGitHubRateLimitRecord(input: unknown): ProviderGitHubRateLimitRecord | null {
+  const embedded = readRecord(input)?.githubRateLimit;
+  const embeddedRateLimit = mapProviderGitHubRateLimit(embedded);
+  if (embeddedRateLimit) {
+    return embeddedRateLimit;
+  }
+  return mapProviderGitHubRateLimit(resolveGitHubRateLimitStatus(input));
+}
+
+function mapProviderGitHubRateLimit(input: unknown): ProviderGitHubRateLimitRecord | null {
+  const rateLimit = readRecord(input);
+  if (!rateLimit || rateLimit.kind !== 'github_rate_limited') {
+    return null;
+  }
+  return {
+    kind: 'github_rate_limited',
+    surface: normalizeOptionalString(rateLimit.surface) ?? 'unknown',
+    limit_type: normalizeOptionalString(rateLimit.limit_type) ?? 'unknown',
+    status: normalizeOptionalNumber(rateLimit.status),
+    reset_at: normalizeOptionalString(rateLimit.reset_at),
+    retry_after_seconds: normalizeOptionalNumber(rateLimit.retry_after_seconds),
+    retry_at: normalizeOptionalString(rateLimit.retry_at),
+    message: normalizeOptionalString(rateLimit.message)
+  };
+}
+
+function formatProviderGitHubRateLimitSummary(rateLimit: ProviderGitHubRateLimitRecord): string {
+  return formatGitHubRateLimitStatus(rateLimit as PrWatchMergeGitHubRateLimitStatus);
+}
+
+function buildProviderGitHubRateLimitError(rateLimit: ProviderGitHubRateLimitRecord): Error {
+  const error = new Error(formatProviderGitHubRateLimitSummary(rateLimit)) as Error & {
+    githubRateLimit?: ProviderGitHubRateLimitRecord;
+  };
+  error.githubRateLimit = rateLimit;
+  return error;
 }
 
 function assessSharedRootMergeSafety(

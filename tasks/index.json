@@ -1,6 +1,30 @@
 {
   "items": [
     {
+      "id": "20260411-linear-e99b2aec-61dd-4d0d-8c8e-dc78ffbfe605",
+      "title": "CO: Back off GitHub GraphQL and REST polling in PR readiness and merge closeout",
+      "relates_to": "tasks/tasks-linear-e99b2aec-61dd-4d0d-8c8e-dc78ffbfe605.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-11",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (repo docs:freshness baseline; manual fallback accepted)",
+          "date": "2026-04-11",
+          "manifest": ".runs/linear-e99b2aec-61dd-4d0d-8c8e-dc78ffbfe605-co-151-docs-review/cli/2026-04-11T00-57-29-630Z-45cacf66/manifest.json",
+          "override_reason": "Child docs-review passed delegation guard, spec-guard, and docs:check for the CO-151 packet, then stopped on the standing repo-wide docs:freshness baseline: 77 stale older docs with no missing registry, missing-on-disk, or invalid entries. CO-151 packet files were registered and not stale."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-e99b2aec-61dd-4d0d-8c8e-dc78ffbfe605.md",
+        "task": "tasks/tasks-linear-e99b2aec-61dd-4d0d-8c8e-dc78ffbfe605.md",
+        "agent_task": ".agent/task/linear-e99b2aec-61dd-4d0d-8c8e-dc78ffbfe605.md",
+        "docs": "docs/TECH_SPEC-linear-e99b2aec-61dd-4d0d-8c8e-dc78ffbfe605.md"
+      }
+    },
+    {
       "id": "20260410-linear-e122d053-40f2-4246-9648-81c9001715f1",
       "title": "CO: enforce provider max-concurrency across webhook, retry, and resume admission paths",
       "relates_to": "tasks/tasks-linear-e122d053-40f2-4246-9648-81c9001715f1.md",

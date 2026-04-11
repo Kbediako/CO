@@ -6,6 +6,85 @@ import {
 } from '../src/cli/control/providerMergeCloseout.js';
 
 describe('runProviderDeterministicMergeCloseout', () => {
+  it('records GitHub API rate limits as transient merge-closeout evidence', async () => {
+    const githubRateLimit = {
+      kind: 'github_rate_limited',
+      surface: 'graphql',
+      limit_type: 'primary',
+      status: 403,
+      reset_at: '2026-04-11T00:05:00.000Z',
+      retry_after_seconds: null,
+      retry_at: '2026-04-11T00:05:00.000Z',
+      message: 'GraphQL: API rate limit exceeded.'
+    };
+    const error = Object.assign(new Error('GraphQL: API rate limit exceeded.'), {
+      githubRateLimit
+    });
+    const runCommand = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      exitCode: 0,
+      stdout: 'git@github.com:asabeko/CO.git\n',
+      stderr: ''
+    });
+    const fetchSnapshot = vi.fn().mockRejectedValueOnce(error);
+
+    const result = await runProviderDeterministicMergeCloseout(
+      {
+        issueId: 'lin-issue-1',
+        issueIdentifier: 'CO-151',
+        issueState: 'Merging',
+        issueStateType: 'started',
+        issueUpdatedAt: '2026-04-11T00:00:00.000Z',
+        repoRoot: '/tmp/co'
+      },
+      {
+        readIssueContext: vi.fn(async () => ({
+          ok: true,
+          operation: 'issue-context',
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-151',
+            title: 'GitHub API backoff',
+            description: null,
+            url: null,
+            updated_at: '2026-04-11T00:00:00.000Z',
+            workspace_id: null,
+            state: { id: 'state-merging', name: 'Merging', type: 'started' },
+            team: null,
+            project: null,
+            comments: [],
+            attachments: [{ id: 'att-1', title: 'PR', url: 'https://github.com/asabeko/CO/pull/431' }],
+            workpad_comment: null
+          },
+          source_setup: null
+        })),
+        fetchSnapshot,
+        resolveSnapshotActionRequiredReasons: vi.fn(() => []),
+        runCommand
+      }
+    );
+
+    expect(result).toMatchObject({
+      status: 'watching',
+      reason: 'github_rate_limited',
+      pr: {
+        owner: 'asabeko',
+        repo: 'CO',
+        number: 431
+      },
+      snapshot: null,
+      github_rate_limit: {
+        kind: 'github_rate_limited',
+        surface: 'graphql',
+        limit_type: 'primary',
+        status: 403,
+        retry_at: '2026-04-11T00:05:00.000Z'
+      }
+    });
+    expect(fetchSnapshot).toHaveBeenCalledTimes(1);
+    expect(runCommand).toHaveBeenCalledTimes(1);
+  });
+
   it('records merge attempt, shared-root reconciliation, and Done transition for a merge-ready attached PR', async () => {
     const runCommand = vi
       .fn()
