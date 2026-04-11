@@ -7,6 +7,9 @@ import type {
   ControlProviderDebugSnapshot,
   ProviderLinearWorkerProgressCandidate
 } from './providerIssueObservability.js';
+import { isProviderLinearWorkerProofFreshForStage } from './providerLinearWorkerTruth.js';
+import type { ProviderWorkerHostConfig } from './providerWorkerHosts.js';
+import { normalizeProviderWorkerHostName } from './providerWorkerHosts.js';
 
 export type { ControlPollingHealthPayload } from './providerPollingHealth.js';
 
@@ -89,6 +92,8 @@ export interface ControlProviderTerminalCleanupPayload {
   last_result: ControlProviderTerminalCleanupLastResultPayload | null;
 }
 
+export type ControlProviderWorkerHostPayload = ProviderWorkerHostConfig;
+
 export interface ControlProviderWorkflowPayload {
   status: 'ready' | 'reload_failed';
   pipeline_id: string;
@@ -99,7 +104,13 @@ export interface ControlProviderWorkflowPayload {
   last_error_at: string | null;
   last_error: string | null;
   terminal_cleanup?: ControlProviderTerminalCleanupPayload | null;
+  worker_hosts?: ControlProviderWorkerHostPayload[] | null;
 }
+
+type ResolvedWorkerHost =
+  | { kind: 'missing' }
+  | { kind: 'cleared' }
+  | { kind: 'host'; value: string };
 
 interface SharedSelectedProjectionFields {
   issueProvider: string | null;
@@ -175,6 +186,7 @@ export interface ControlSelectedRunPayload {
   workspace: {
     path: string | null;
   };
+  worker_host?: string | null;
   question_summary: ControlQuestionSummaryPayload;
   tracked: ControlTrackedPayload;
   provider_linear_worker_proof?: ProviderLinearWorkerProof;
@@ -205,6 +217,7 @@ export interface ControlRunningPayload {
   display_state: string;
   status_reason: string | null;
   pid: string | null;
+  worker_host?: string | null;
   session_id: string | null;
   turn_count: number | null;
   last_event: string | null;
@@ -228,6 +241,7 @@ export interface ControlRetryPayload {
   display_state: string;
   status_reason: string | null;
   session_id: string | null;
+  worker_host?: string | null;
   thread_id?: string | null;
   turn_count?: number | null;
   workspace_path: string | null;
@@ -316,6 +330,7 @@ export interface ControlIssuePayload {
   workspace: {
     path: string | null;
   };
+  worker_host?: string | null;
   attempts: {
     restart_count: number | null;
     current_retry_attempt: number | null;
@@ -411,9 +426,83 @@ export function buildSelectedRunLatestEventPayload(
   };
 }
 
+export function readProviderLinearWorkerHost(
+  proof: ProviderLinearWorkerProof | null | undefined,
+  stageStartedAt: string | null | undefined
+): ResolvedWorkerHost {
+  if (
+    !proof
+    || !isProviderLinearWorkerProofFreshForStage(
+      proof as ProviderLinearWorkerProof & Record<string, unknown>,
+      stageStartedAt ?? null
+    )
+  ) {
+    return { kind: 'missing' };
+  }
+  return readResolvedWorkerHost(
+    proof as ProviderLinearWorkerProof & Record<string, unknown>
+  );
+}
+
+export function resolveProviderWorkerHost(input: {
+  providerLinearWorkerProof?: ProviderLinearWorkerProof | null | undefined;
+  providerDebugSnapshot?: ControlProviderDebugSnapshot | null | undefined;
+  providerIntake?: ProviderIntakeSummaryPayload | null | undefined;
+  stageStartedAt?: string | null | undefined;
+}): string | null {
+  const claimLaunchStartedAt = input.providerDebugSnapshot?.claim?.launch_started_at ?? null;
+  const stageStartedAt =
+    claimLaunchStartedAt
+    ?? input.stageStartedAt
+    ?? null;
+  const claimHost = readResolvedWorkerHost(
+    input.providerDebugSnapshot?.claim as Record<string, unknown> | null | undefined
+  );
+  if (claimHost.kind === 'host') {
+    return claimHost.value;
+  }
+  if (claimHost.kind === 'cleared') {
+    return null;
+  }
+  const proofHost = readProviderLinearWorkerHost(
+    input.providerLinearWorkerProof,
+    stageStartedAt
+  );
+  if (proofHost.kind === 'host') {
+    return proofHost.value;
+  }
+  if (proofHost.kind === 'cleared') {
+    return null;
+  }
+  return normalizeProviderWorkerHostName(input.providerIntake?.worker_host);
+}
+
+function readResolvedWorkerHost(
+  source: Record<string, unknown> | null | undefined
+): ResolvedWorkerHost {
+  if (
+    !source
+    || !Object.prototype.hasOwnProperty.call(source, 'worker_host')
+    || source.worker_host === undefined
+  ) {
+    return { kind: 'missing' };
+  }
+  const workerHost = normalizeProviderWorkerHostName(source.worker_host);
+  return workerHost === null
+    ? { kind: 'cleared' }
+    : { kind: 'host', value: workerHost };
+}
+
 export function buildProjectionSelectedPayload(
-  selected: SelectedRunContext | ControlCompatibilitySourceContext
+  selected: SelectedRunContext | ControlCompatibilitySourceContext,
+  providerIntake: ProviderIntakeSummaryPayload | null = null
 ): ControlSelectedRunPayload {
+  const workerHost = resolveProviderWorkerHost({
+    providerLinearWorkerProof: selected.providerLinearWorkerProof,
+    providerDebugSnapshot: selected.providerDebugSnapshot,
+    providerIntake,
+    stageStartedAt: selected.startedAt
+  });
   return {
     issue_id: selected.issueId,
     issue_identifier: selected.issueIdentifier,
@@ -434,6 +523,7 @@ export function buildProjectionSelectedPayload(
     workspace: {
       path: selected.workspacePath
     },
+    ...(workerHost !== null ? { worker_host: workerHost } : {}),
     question_summary: buildSelectedRunQuestionSummaryPayload(selected.questionSummary),
     tracked: buildTrackedPayloadEnvelope(selected.tracked),
     ...(selected.providerLinearWorkerProof
@@ -556,7 +646,13 @@ export function buildSelectedRunRuntimeFingerprintInput(
                     }
                   : null
               }
-            : null
+            : null,
+          worker_hosts: Array.isArray(providerWorkflow.worker_hosts)
+            ? providerWorkflow.worker_hosts.map((host) => ({
+                ...host,
+                ssh_options: [...host.ssh_options]
+              }))
+            : []
         }
       : null
   };

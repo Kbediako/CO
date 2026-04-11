@@ -124,6 +124,73 @@ describe('providerWorkflowConfigStore', () => {
     );
   });
 
+  it('preserves the last known good snapshot when a later reload has invalid worker_hosts metadata', async () => {
+    await writeRepoConfig(buildValidProviderConfig('v1'));
+    const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+    const store = createProviderWorkflowConfigStore({
+      env: buildEnv(workspaceRoot),
+      runDir: join(workspaceRoot, '.runs', 'local-mcp', 'cli', 'control-host'),
+      pipelineId: 'provider-linear-worker'
+    });
+
+    await store.bootstrap();
+    const snapshotPath = await store.getLaunchConfigPath();
+    const initialSnapshot = await readFile(snapshotPath, 'utf8');
+
+    await writeRepoConfig(
+      buildValidProviderConfig('broken', {
+        worker_hosts: {
+          hosts: [
+            {
+              name: 'worker-host-01'
+            }
+          ]
+        }
+      })
+    );
+    const degraded = await store.refresh();
+
+    expect(degraded.status).toBe('reload_failed');
+    expect(degraded.snapshot_path).toBe(snapshotPath);
+    expect(degraded.last_error).toContain('ssh_destination');
+    expect(await readFile(snapshotPath, 'utf8')).toBe(initialSnapshot);
+    expect(await store.getLaunchConfigPath()).toBe(snapshotPath);
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('keeping last known good configuration')
+    );
+  });
+
+  it('fails closed when worker_hosts.hosts is present but not an array', async () => {
+    await writeRepoConfig(buildValidProviderConfig('v1'));
+    const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+    const store = createProviderWorkflowConfigStore({
+      env: buildEnv(workspaceRoot),
+      runDir: join(workspaceRoot, '.runs', 'local-mcp', 'cli', 'control-host'),
+      pipelineId: 'provider-linear-worker'
+    });
+
+    await store.bootstrap();
+    const snapshotPath = await store.getLaunchConfigPath();
+    const initialSnapshot = await readFile(snapshotPath, 'utf8');
+
+    await writeRepoConfig(
+      buildValidProviderConfig('broken-shape', {
+        worker_hosts: {
+          hosts: {}
+        }
+      })
+    );
+    const degraded = await store.refresh();
+
+    expect(degraded.status).toBe('reload_failed');
+    expect(degraded.snapshot_path).toBe(snapshotPath);
+    expect(degraded.last_error).toContain('"hosts" must be an array');
+    expect(await readFile(snapshotPath, 'utf8')).toBe(initialSnapshot);
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('keeping last known good configuration')
+    );
+  });
+
   it('replaces the snapshot and clears the error when a later valid reload succeeds', async () => {
     await writeRepoConfig(buildValidProviderConfig('v1'));
     const store = createProviderWorkflowConfigStore({
@@ -237,6 +304,89 @@ describe('providerWorkflowConfigStore', () => {
     }
 
     expect(store.snapshot().terminal_cleanup?.last_result?.status).toBe('failed');
+  });
+
+  it('loads optional worker-host inventory metadata into the provider workflow snapshot', async () => {
+    await writeRepoConfig(
+      buildValidProviderConfig('v1', {
+        worker_hosts: {
+          hosts: [
+            {
+              name: 'worker-host-01',
+              transport: 'ssh',
+              ssh_destination: 'codex@worker-host-01',
+              ssh_options: ['-p', '2222'],
+              max_concurrent_agents: 2,
+              node_path: '/opt/homebrew/bin/node'
+            },
+            {
+              name: 'worker-host-02',
+              ssh_destination: 'codex@worker-host-02',
+              max_concurrent_agents: 1
+            }
+          ]
+        }
+      })
+    );
+    const store = createProviderWorkflowConfigStore({
+      env: buildEnv(workspaceRoot),
+      runDir: join(workspaceRoot, '.runs', 'local-mcp', 'cli', 'control-host'),
+      pipelineId: 'provider-linear-worker'
+    });
+
+    const bootstrapped = await store.bootstrap();
+
+    expect(bootstrapped.worker_hosts).toEqual([
+      {
+        name: 'worker-host-01',
+        transport: 'ssh',
+        ssh_destination: 'codex@worker-host-01',
+        ssh_options: ['-p', '2222'],
+        max_concurrent_agents: 2,
+        node_path: '/opt/homebrew/bin/node'
+      },
+      {
+        name: 'worker-host-02',
+        transport: 'ssh',
+        ssh_destination: 'codex@worker-host-02',
+        ssh_options: [],
+        max_concurrent_agents: 1,
+        node_path: null
+      }
+    ]);
+  });
+
+  it('defaults optional worker-host max_concurrent_agents to one when omitted', async () => {
+    await writeRepoConfig(
+      buildValidProviderConfig('v1', {
+        worker_hosts: {
+          hosts: [
+            {
+              name: 'worker-host-01',
+              ssh_destination: 'codex@worker-host-01'
+            }
+          ]
+        }
+      })
+    );
+    const store = createProviderWorkflowConfigStore({
+      env: buildEnv(workspaceRoot),
+      runDir: join(workspaceRoot, '.runs', 'local-mcp', 'cli', 'control-host'),
+      pipelineId: 'provider-linear-worker'
+    });
+
+    const bootstrapped = await store.bootstrap();
+
+    expect(bootstrapped.worker_hosts).toEqual([
+      {
+        name: 'worker-host-01',
+        transport: 'ssh',
+        ssh_destination: 'codex@worker-host-01',
+        ssh_options: [],
+        max_concurrent_agents: 1,
+        node_path: null
+      }
+    ]);
   });
 
   it('retries a failed revision when the config is repaired without metadata change', async () => {
@@ -522,7 +672,10 @@ function getRepoConfigPath(): string {
   return join(workspaceRoot, 'codex.orchestrator.json');
 }
 
-function buildValidProviderConfig(version: string): Record<string, unknown> {
+function buildValidProviderConfig(
+  version: string,
+  metadataOverrides: Record<string, unknown> = {}
+): Record<string, unknown> {
   return {
     defaultPipeline: 'provider-linear-worker',
     pipelines: [
@@ -538,7 +691,8 @@ function buildValidProviderConfig(version: string): Record<string, unknown> {
               comment_template:
                 'Closing because the Linear issue for branch {{branch}} entered a terminal state without merge.'
             }
-          }
+          },
+          ...metadataOverrides
         },
         stages: [
           {
