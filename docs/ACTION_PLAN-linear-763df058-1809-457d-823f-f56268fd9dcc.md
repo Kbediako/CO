@@ -38,7 +38,7 @@
 ## Validation
 - Checks / tests:
   - maintain the single Linear workpad comment via `linear upsert-workpad`
-  - `MCP_RUNNER_TASK_ID=linear-763df058-1809-457d-823f-f56268fd9dcc "/opt/homebrew/Cellar/node/25.2.1/bin/node" "/Users/kbediako/Code/CO/dist/bin/codex-orchestrator.js" linear child-stream --pipeline docs-review --stream co-17-docs-review --format json`
+  - `MCP_RUNNER_TASK_ID=linear-763df058-1809-457d-823f-f56268fd9dcc "/opt/homebrew/Cellar/node/25.2.1/bin/node" "/Users/kbediako/Code/CO/dist/bin/codex-orchestrator.js" linear child-stream --pipeline docs-review --stream co-17-docs-review-refresh --format json`
   - `node scripts/delegation-guard.mjs`
   - `node scripts/spec-guard.mjs --dry-run`
   - `npm run build`
