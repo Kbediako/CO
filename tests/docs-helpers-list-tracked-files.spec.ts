@@ -10,7 +10,7 @@ describe('listTrackedFiles', () => {
     vi.resetModules();
     const spawnSync = vi.fn(() => ({
       status: 0,
-      stdout: 'b.txt\na.txt\n',
+      stdout: 'b.txt\0a.txt\0',
       stderr: ''
     }));
     vi.doMock('node:child_process', () => ({ spawnSync }));
@@ -20,7 +20,7 @@ describe('listTrackedFiles', () => {
     expect(listTrackedFiles('/repo')).toEqual(['a.txt', 'b.txt']);
     expect(spawnSync).toHaveBeenCalledWith(
       'git',
-      ['-C', '/repo', 'ls-files'],
+      ['-C', '/repo', 'ls-files', '-z'],
       expect.objectContaining({
         encoding: 'utf8',
         maxBuffer: expect.any(Number)
@@ -33,7 +33,7 @@ describe('listTrackedFiles', () => {
     vi.resetModules();
     const spawnSync = vi.fn(() => ({
       status: 0,
-      stdout: 'docs/b.md\ndocs/a.md\n',
+      stdout: 'docs/b.md\0docs/a.md\0',
       stderr: ''
     }));
     vi.doMock('node:child_process', () => ({ spawnSync }));
@@ -43,12 +43,26 @@ describe('listTrackedFiles', () => {
     expect(listTrackedFiles('/repo', ['docs/**'])).toEqual(['docs/a.md', 'docs/b.md']);
     expect(spawnSync).toHaveBeenCalledWith(
       'git',
-      ['-C', '/repo', 'ls-files', '--', 'docs/**'],
+      ['-C', '/repo', 'ls-files', '-z', '--', 'docs/**'],
       expect.objectContaining({
         encoding: 'utf8',
         maxBuffer: expect.any(Number)
       })
     );
+  });
+
+  it('preserves tracked path whitespace from nul-delimited git output', async () => {
+    vi.resetModules();
+    const spawnSync = vi.fn(() => ({
+      status: 0,
+      stdout: ' leading.txt\0trailing.txt \0',
+      stderr: ''
+    }));
+    vi.doMock('node:child_process', () => ({ spawnSync }));
+
+    const { listTrackedFiles } = await import('../scripts/lib/docs-helpers.js');
+
+    expect(listTrackedFiles('/repo')).toEqual([' leading.txt', 'trailing.txt ']);
   });
 
   it('includes stderr and status details when git ls-files fails', async () => {

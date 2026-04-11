@@ -69,7 +69,7 @@ export async function collectDocFiles(repoRoot) {
 }
 
 export function listTrackedFiles(repoRoot, pathspecs = []) {
-  const args = ['-C', repoRoot, 'ls-files'];
+  const args = ['-C', repoRoot, 'ls-files', '-z'];
   if (Array.isArray(pathspecs) && pathspecs.length > 0) {
     args.push('--', ...pathspecs);
   }
@@ -93,8 +93,7 @@ export function listTrackedFiles(repoRoot, pathspecs = []) {
   }
 
   return git.stdout
-    .split('\n')
-    .map((line) => line.trim())
+    .split('\0')
     .filter((line) => line.length > 0)
     .map((line) => toPosixPath(line))
     .sort();
