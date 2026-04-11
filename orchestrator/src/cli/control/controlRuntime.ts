@@ -8,6 +8,7 @@ import {
   readProviderPollingHealth,
   resolveControlPollingNextRefreshProjection
 } from './providerPollingHealth.js';
+import { normalizeControlHostOwnershipPollingPayload } from './controlHostOwnership.js';
 import {
   buildProviderIntakeSummary,
   isRecordLike,
@@ -372,7 +373,8 @@ function normalizePersistedProviderPollingSnapshot(
     stuck_since_at: typeof polling.stuck_since_at === 'string' ? polling.stuck_since_at : null,
     restart_required: polling.restart_required === true,
     reason: typeof polling.reason === 'string' ? polling.reason : null,
-    linear_budget: linearBudget
+    linear_budget: linearBudget,
+    control_host_owner: normalizeControlHostOwnershipPollingPayload(polling.control_host_owner)
   };
 }
 
