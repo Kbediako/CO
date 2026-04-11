@@ -113,6 +113,7 @@ export interface AcquireControlHostOwnershipOptions {
 interface ControlHostOwnershipPaths {
   runDir: string;
   lockDir: string;
+  reclaimLockDir: string;
   lockOwnerPath: string;
   ownerPath: string;
   duplicateDiagnosticPath: string;
@@ -185,16 +186,13 @@ export async function acquireControlHostOwnership(
         isProcessAlive
       });
       if (existingState.kind === 'stale') {
-        await writeControlHostOwnershipDiagnostic({
+        await reclaimStaleControlHostOwner({
           paths,
-          reason: 'stale_control_host_owner',
-          action: 'stale_reclaimed',
-          existingOwner: existingState.owner,
           attemptedOwner,
-          observedAt: now(),
-          diagnosticPath: paths.staleDiagnosticPath
+          staleOwner: existingState.owner,
+          observedAt: now,
+          isProcessAlive
         });
-        await rm(paths.lockDir, { recursive: true, force: true });
         continue;
       }
       const reason: ControlHostOwnershipDiagnosticReason =
@@ -368,11 +366,58 @@ function resolveControlHostOwnershipPaths(runDir: string): ControlHostOwnershipP
   return {
     runDir,
     lockDir: join(runDir, CONTROL_HOST_OWNER_LOCK_DIR),
+    reclaimLockDir: join(runDir, `${CONTROL_HOST_OWNER_LOCK_DIR}.reclaim`),
     lockOwnerPath: join(runDir, CONTROL_HOST_OWNER_LOCK_DIR, 'owner.json'),
     ownerPath: join(runDir, CONTROL_HOST_OWNER_FILE),
     duplicateDiagnosticPath: join(runDir, CONTROL_HOST_DUPLICATE_OWNER_FILE),
     staleDiagnosticPath: join(runDir, CONTROL_HOST_STALE_OWNER_FILE)
   };
+}
+
+async function reclaimStaleControlHostOwner(input: {
+  paths: ControlHostOwnershipPaths;
+  staleOwner: ControlHostOwnerMetadata;
+  attemptedOwner: ControlHostOwnerMetadata;
+  observedAt: () => string;
+  isProcessAlive: (pid: number) => boolean;
+}): Promise<boolean> {
+  try {
+    await mkdir(input.paths.reclaimLockDir);
+  } catch (error) {
+    if (isAlreadyExistsError(error)) {
+      return false;
+    }
+    throw error;
+  }
+
+  try {
+    const currentOwner = await readControlHostOwnerMetadataFromPath(input.paths.lockOwnerPath);
+    if (!currentOwner || currentOwner.owner_token !== input.staleOwner.owner_token) {
+      return false;
+    }
+    const currentState = classifyExistingOwner(currentOwner, {
+      host: input.attemptedOwner.hostname,
+      isProcessAlive: input.isProcessAlive
+    });
+    if (currentState.kind !== 'stale') {
+      return false;
+    }
+    await writeControlHostOwnershipDiagnostic({
+      paths: input.paths,
+      reason: 'stale_control_host_owner',
+      action: 'stale_reclaimed',
+      existingOwner: currentOwner,
+      attemptedOwner: input.attemptedOwner,
+      observedAt: input.observedAt(),
+      diagnosticPath: input.paths.staleDiagnosticPath
+    });
+    await rm(input.paths.lockDir, { recursive: true, force: true });
+    return true;
+  } finally {
+    await rm(input.paths.reclaimLockDir, { recursive: true, force: true }).catch(
+      () => undefined
+    );
+  }
 }
 
 async function writeControlHostOwnershipDiagnostic(input: {

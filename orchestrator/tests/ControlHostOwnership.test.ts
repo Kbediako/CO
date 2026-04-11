@@ -1,3 +1,4 @@
+import { writeFileSync } from 'node:fs';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -155,6 +156,76 @@ describe('control host ownership', () => {
     );
 
     await current.release();
+  });
+
+  it('does not remove a changed owner while attempting stale reclaim', async () => {
+    const runDir = await createRunDir();
+    const stale = await acquireControlHostOwnership({
+      paths: { runDir },
+      runId: 'control-host',
+      repoRoot: '/repo',
+      taskId: 'local-mcp',
+      pipelineId: 'provider-linear-worker',
+      processId: 123,
+      parentProcessId: 1,
+      host: TEST_HOST,
+      cwd: '/repo',
+      argv: ['codex-orchestrator', 'control-host'],
+      now: () => '2026-04-11T00:00:00.000Z'
+    });
+    const replacement: ControlHostOwnerMetadata = {
+      ...stale.metadata,
+      owner_token: 'replacement-owner-token',
+      pid: 789,
+      acquired_at: '2026-04-11T00:00:05.000Z',
+      updated_at: '2026-04-11T00:00:05.000Z'
+    };
+    let ownerChangedAfterFirstRead = false;
+
+    await expect(
+      acquireControlHostOwnership({
+        paths: { runDir },
+        runId: 'control-host',
+        repoRoot: '/repo',
+        taskId: 'local-mcp',
+        pipelineId: 'provider-linear-worker',
+        processId: 456,
+        parentProcessId: 1,
+        host: TEST_HOST,
+        cwd: '/repo',
+        argv: ['codex-orchestrator', 'control-host'],
+        now: () => '2026-04-11T00:00:10.000Z',
+        isProcessAlive: (pid) => {
+          if (pid === 123 && !ownerChangedAfterFirstRead) {
+            ownerChangedAfterFirstRead = true;
+            const serialized = `${JSON.stringify(replacement, null, 2)}\n`;
+            writeFileSync(
+              join(runDir, CONTROL_HOST_OWNER_LOCK_DIR, 'owner.json'),
+              serialized,
+              'utf8'
+            );
+            writeFileSync(join(runDir, CONTROL_HOST_OWNER_FILE), serialized, 'utf8');
+            return false;
+          }
+          return pid === 789;
+        }
+      })
+    ).rejects.toMatchObject({
+      code: 'duplicate_control_host_owner',
+      reason: 'duplicate_control_host_owner'
+    });
+
+    expect(ownerChangedAfterFirstRead).toBe(true);
+    const lockOwner = JSON.parse(
+      await readFile(join(runDir, CONTROL_HOST_OWNER_LOCK_DIR, 'owner.json'), 'utf8')
+    ) as { owner_token?: string; pid?: number };
+    expect(lockOwner).toMatchObject({
+      owner_token: 'replacement-owner-token',
+      pid: 789
+    });
+    expect((await readControlHostOwnerMetadata(runDir))?.owner_token).toBe(
+      'replacement-owner-token'
+    );
   });
 
   it('clears prior stale diagnostics on a later clean acquisition', async () => {
