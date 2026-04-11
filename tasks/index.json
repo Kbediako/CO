@@ -266,6 +266,29 @@
       }
     },
     {
+      "id": "20260410-linear-63e7f712-d927-43fb-8afa-b357bab40aa2",
+      "title": "CO: Harden hot-suite dist freshness heuristics for transitive CLI/runtime dependencies",
+      "relates_to": "tasks/tasks-linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-11",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator linear child-stream docs-review (manual fallback recorded after forced review stall)",
+          "date": "2026-04-11",
+          "manifest": ".runs/linear-63e7f712-d927-43fb-8afa-b357bab40aa2-docs-review/cli/2026-04-10T15-54-09-224Z-cab1c2ab/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md",
+        "task": "tasks/tasks-linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md",
+        "agent_task": ".agent/task/linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md",
+        "docs": "docs/TECH_SPEC-linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md"
+      }
+    },
+    {
       "id": "20260410-linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702",
       "title": "CO workflow: stop linked-worktree Linear helpers from leaking repo git identity",
       "relates_to": "tasks/tasks-linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702.md",
