@@ -2105,7 +2105,8 @@ function mapSnapshotRecord(
 }
 
 function resolveProviderGitHubRateLimitRecord(input: unknown): ProviderGitHubRateLimitRecord | null {
-  const embedded = readRecord(input)?.githubRateLimit;
+  const inputRecord = readRecord(input);
+  const embedded = inputRecord?.githubRateLimit ?? inputRecord?.github_rate_limit;
   const embeddedRateLimit = mapProviderGitHubRateLimit(embedded);
   if (embeddedRateLimit) {
     return embeddedRateLimit;

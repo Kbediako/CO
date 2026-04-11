@@ -79,6 +79,73 @@ describe('runProviderDeterministicMergeCloseout', () => {
     expect(runCommand).toHaveBeenCalledTimes(1);
   });
 
+  it('reads snake_case embedded GitHub API rate-limit errors', async () => {
+    const githubRateLimit = {
+      kind: 'github_rate_limited',
+      surface: 'rest',
+      limit_type: 'secondary',
+      status: 429,
+      reset_at: null,
+      retry_after_seconds: 60,
+      retry_at: '2026-04-11T00:01:00.000Z',
+      message: 'HTTP 429: You have exceeded a secondary rate limit.'
+    };
+    const runCommand = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      exitCode: 0,
+      stdout: 'git@github.com:asabeko/CO.git\n',
+      stderr: ''
+    });
+    const fetchSnapshot = vi.fn().mockRejectedValueOnce({
+      github_rate_limit: githubRateLimit
+    });
+
+    const result = await runProviderDeterministicMergeCloseout(
+      {
+        issueId: 'lin-issue-1',
+        issueIdentifier: 'CO-151',
+        issueState: 'Merging',
+        issueStateType: 'started',
+        issueUpdatedAt: '2026-04-11T00:00:00.000Z',
+        repoRoot: '/tmp/co'
+      },
+      {
+        readIssueContext: vi.fn(async () => ({
+          ok: true,
+          operation: 'issue-context',
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-151',
+            title: 'GitHub API backoff',
+            description: null,
+            url: null,
+            updated_at: '2026-04-11T00:00:00.000Z',
+            workspace_id: null,
+            state: { id: 'state-merging', name: 'Merging', type: 'started' },
+            team: null,
+            project: null,
+            comments: [],
+            attachments: [{ id: 'att-1', title: 'PR', url: 'https://github.com/asabeko/CO/pull/431' }],
+            workpad_comment: null
+          },
+          source_setup: null
+        })),
+        fetchSnapshot,
+        resolveSnapshotActionRequiredReasons: vi.fn(() => []),
+        runCommand
+      }
+    );
+
+    expect(result).toMatchObject({
+      status: 'watching',
+      reason: 'github_rate_limited',
+      snapshot: null,
+      github_rate_limit: githubRateLimit
+    });
+    expect(fetchSnapshot).toHaveBeenCalledTimes(1);
+    expect(runCommand).toHaveBeenCalledTimes(1);
+  });
+
   it('preserves snapshot-backed GitHub API rate-limit evidence at the top level', async () => {
     const githubRateLimit = {
       kind: 'github_rate_limited',

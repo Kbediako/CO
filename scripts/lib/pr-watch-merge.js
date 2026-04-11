@@ -262,11 +262,6 @@ function extractTextFromRateLimitInput(input) {
         }
       }
     }
-    try {
-      pieces.push(JSON.stringify(input));
-    } catch {
-      // Ignore non-serializable diagnostic inputs.
-    }
     return pieces.filter(Boolean).join('\n');
   }
   return '';
@@ -301,7 +296,15 @@ function isoFromEpochSeconds(value) {
   if (!Number.isFinite(value) || value <= 0) {
     return null;
   }
-  return new Date(value * 1000).toISOString();
+  const millis = value * 1000;
+  if (!Number.isFinite(millis)) {
+    return null;
+  }
+  try {
+    return new Date(millis).toISOString();
+  } catch {
+    return null;
+  }
 }
 
 function computeRetryAt(nowMs, retryAfterSeconds, resetAt) {
@@ -330,14 +333,6 @@ export function resolveGitHubRateLimitStatus(input, options = {}) {
     return input;
   }
   const text = extractTextFromRateLimitInput(input);
-  const status = parseHttpStatusFromText(text);
-  const retryAfterSeconds = parseHeaderSeconds(text, 'retry-after');
-  const resetEpochSeconds = parseHeaderSeconds(text, 'x-ratelimit-reset');
-  const remainingRequests = parseHeaderSeconds(text, 'x-ratelimit-remaining');
-  const hasRateLimitText = /\b(api\s+rate\s+limit\s+exceeded|secondary\s+(?:rate\s+)?limit|RATE_LIMITED)\b/iu.test(text);
-  const hasGraphqlRateLimitPayload =
-    Array.isArray(input?.errors) &&
-    input.errors.some((error) => typeof error?.type === 'string' && error.type.trim().toUpperCase() === 'RATE_LIMITED');
   const isCommandOrRawTextInput =
     typeof input === 'string'
     || input instanceof Error
@@ -351,13 +346,31 @@ export function resolveGitHubRateLimitStatus(input, options = {}) {
         || typeof input.stdout === 'string'
       )
     );
+  const structuredStatus =
+    input && typeof input === 'object' && Number.isInteger(input.status)
+      ? Number(input.status)
+      : null;
+  const status =
+    structuredStatus === 403 || structuredStatus === 429
+      ? structuredStatus
+      : isCommandOrRawTextInput ? parseHttpStatusFromText(text) : null;
+  const retryAfterSeconds = isCommandOrRawTextInput ? parseHeaderSeconds(text, 'retry-after') : null;
+  const resetEpochSeconds = isCommandOrRawTextInput ? parseHeaderSeconds(text, 'x-ratelimit-reset') : null;
+  const remainingRequests = isCommandOrRawTextInput ? parseHeaderSeconds(text, 'x-ratelimit-remaining') : null;
+  const hasRateLimitText = /\b(api\s+rate\s+limit\s+exceeded|secondary\s+(?:rate\s+)?limit|RATE_LIMITED)\b/iu.test(text);
+  const hasGraphqlRateLimitPayload =
+    Array.isArray(input?.errors) &&
+    input.errors.some((error) => typeof error?.type === 'string' && error.type.trim().toUpperCase() === 'RATE_LIMITED');
   const hasProtocolRateLimitEvidence =
     hasGraphqlRateLimitPayload
     || status === 429
     || retryAfterSeconds !== null
     || (resetEpochSeconds !== null && remainingRequests === 0)
     || (isCommandOrRawTextInput && hasRateLimitText);
-  if (!hasRateLimitSignal(text) || !hasProtocolRateLimitEvidence) {
+  if (
+    !hasProtocolRateLimitEvidence ||
+    (!hasRateLimitSignal(text) && status !== 429)
+  ) {
     return null;
   }
   const args = Array.isArray(input?.args) ? input.args : [];
@@ -2169,27 +2182,6 @@ async function runPrWatchMergeOrThrow(argv, options) {
 
     log(formatStatusLine(snapshot, quietRemainingMs));
 
-    if (snapshot.githubRateLimit) {
-      pollingHealthySinceLatestSnapshot = false;
-      const sleepMs = planPollingRateLimitSleepMs(snapshot.githubRateLimit, {
-        owner,
-        repo,
-        prNumber,
-        intervalMs,
-        deadline
-      });
-      if (sleepMs <= 0) {
-        break;
-      }
-      log(
-        `GitHub API fan-out is rate limited: ${formatGitHubRateLimitStatus(
-          snapshot.githubRateLimit
-        )} (retrying in ${formatDuration(sleepMs)}).`
-      );
-      await sleep(sleepMs);
-      continue;
-    }
-
     const actionRequiredReasons = resolveActionRequiredReasons(snapshot, { readinessMode });
     const automaticBranchRecoveryReason =
       automaticBranchRecoveryEnabled
@@ -2215,6 +2207,37 @@ async function runPrWatchMergeOrThrow(argv, options) {
       && attemptedAutomaticBranchRecoveryKey !== automaticBranchRecoveryKey
     ) {
       attemptedAutomaticBranchRecoveryKey = null;
+    }
+    if (
+      exitOnActionRequired
+      && actionRequiredReasons.length > 0
+      && !shouldAttemptRecovery
+    ) {
+      const details = actionRequiredReasons.join(', ');
+      throw new PrWatchMergeExitError(
+        `${isReviewMode ? 'Action required before review handoff' : 'Action required before merge'}: ${details}${snapshot.url ? ` (${snapshot.url})` : ''}`,
+        2
+      );
+    }
+    if (snapshot.githubRateLimit) {
+      pollingHealthySinceLatestSnapshot = false;
+      const sleepMs = planPollingRateLimitSleepMs(snapshot.githubRateLimit, {
+        owner,
+        repo,
+        prNumber,
+        intervalMs,
+        deadline
+      });
+      if (sleepMs <= 0) {
+        break;
+      }
+      log(
+        `GitHub API fan-out is rate limited: ${formatGitHubRateLimitStatus(
+          snapshot.githubRateLimit
+        )} (retrying in ${formatDuration(sleepMs)}).`
+      );
+      await sleep(sleepMs);
+      continue;
     }
     if (
       shouldAttemptRecovery

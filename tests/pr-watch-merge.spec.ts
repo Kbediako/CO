@@ -813,6 +813,54 @@ describe('resolveGitHubRateLimitStatus', () => {
     ).toBeNull();
   });
 
+  it('does not classify parsed success payload retry-after text without transport evidence', () => {
+    expect(
+      resolveGitHubRateLimitStatus(
+        {
+          data: {
+            repository: {
+              pullRequest: {
+                comments: {
+                  nodes: [
+                    {
+                      body: 'Example header from docs: retry-after: 60'
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        { surface: 'graphql', nowMs }
+      )
+    ).toBeNull();
+  });
+
+  it('ignores out-of-range reset epochs instead of throwing', () => {
+    expect(() =>
+      resolveGitHubRateLimitStatus(
+        {
+          args: ['pr', 'checks', '431'],
+          stderr: 'HTTP 403: API rate limit exceeded\nx-ratelimit-reset: 999999999999999999999'
+        },
+        { nowMs }
+      )
+    ).not.toThrow();
+
+    expect(
+      resolveGitHubRateLimitStatus(
+        {
+          args: ['pr', 'checks', '431'],
+          stderr: 'HTTP 403: API rate limit exceeded\nx-ratelimit-reset: 999999999999999999999'
+        },
+        { nowMs }
+      )
+    ).toMatchObject({
+      kind: 'github_rate_limited',
+      reset_at: null
+    });
+  });
+
   it('does not classify CodeRabbit service cooldown prose as GitHub API throttling', () => {
     expect(
       resolveGitHubRateLimitStatus(
@@ -1314,6 +1362,102 @@ describe('runPrWatchMerge review-mode flag validation', () => {
       expect(snapshotIndex).toBe(3);
       expect(errorSpy).not.toHaveBeenCalled();
       expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('is rate limited'));
+    } finally {
+      logSpy.mockRestore();
+      errorSpy.mockRestore();
+      vi.doUnmock('node:child_process');
+      vi.doUnmock('node:timers/promises');
+      vi.resetModules();
+    }
+  });
+
+  it('exits on deterministic action-required blockers before rate-limit retries', async () => {
+    vi.resetModules();
+    const snapshotPayload = makeResponse([], {
+      reviewDecision: 'CHANGES_REQUESTED',
+      updatedAt: '2026-04-11T00:00:00.000Z'
+    });
+    let graphqlCalls = 0;
+    const spawnMock = vi.fn((command: string, args: string[]) => {
+      const stdout = new EventEmitter();
+      const stderr = new EventEmitter();
+      const child = Object.assign(new EventEmitter(), { stdout, stderr });
+      let result: { exitCode: number; stdout: string; stderr: string };
+
+      if (command !== 'gh') {
+        throw new Error(`Unexpected command: ${command} ${args.join(' ')}`);
+      }
+
+      if (args[0] === 'auth' && args[1] === 'status') {
+        result = { exitCode: 0, stdout: '', stderr: '' };
+      } else if (args[0] === 'api' && args[1] === 'graphql') {
+        graphqlCalls += 1;
+        result = { exitCode: 0, stdout: JSON.stringify(snapshotPayload), stderr: '' };
+      } else if (args[0] === 'pr' && args[1] === 'checks') {
+        result = {
+          exitCode: 1,
+          stdout: '',
+          stderr: 'HTTP 429: You have exceeded a secondary rate limit.\nretry-after: 60'
+        };
+      } else if (args[0] === 'api') {
+        result = { exitCode: 0, stdout: '[[]]', stderr: '' };
+      } else {
+        throw new Error(`Unexpected gh args: ${args.join(' ')}`);
+      }
+
+      queueMicrotask(() => {
+        if (result.stdout) {
+          stdout.emit('data', Buffer.from(result.stdout));
+        }
+        if (result.stderr) {
+          stderr.emit('data', Buffer.from(result.stderr));
+        }
+        child.emit('close', result.exitCode);
+      });
+
+      return child as any;
+    });
+    const sleepMock = vi.fn(async () => undefined);
+    vi.doMock('node:child_process', () => ({
+      spawn: spawnMock
+    }));
+    vi.doMock('node:timers/promises', () => ({
+      setTimeout: sleepMock
+    }));
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    try {
+      const { runPrWatchMerge: runPrWatchMergeWithMocks } = await import('../scripts/lib/pr-watch-merge.js');
+
+      await expect(
+        runPrWatchMergeWithMocks(
+          [
+            '--owner',
+            'Kbediako',
+            '--repo',
+            'CO',
+            '--pr',
+            '211',
+            '--interval-seconds',
+            '0.001',
+            '--quiet-minutes',
+            '0.001',
+            '--timeout-minutes',
+            '1'
+          ],
+          {
+            defaultExitOnActionRequired: true
+          }
+        )
+      ).resolves.toBe(2);
+
+      expect(graphqlCalls).toBe(1);
+      expect(sleepMock).not.toHaveBeenCalled();
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Action required before merge: review=CHANGES_REQUESTED')
+      );
+      expect(logSpy).not.toHaveBeenCalledWith(expect.stringContaining('GitHub API fan-out is rate limited'));
     } finally {
       logSpy.mockRestore();
       errorSpy.mockRestore();
