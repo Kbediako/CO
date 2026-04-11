@@ -861,6 +861,31 @@ describe('resolveGitHubRateLimitStatus', () => {
     });
   });
 
+  it('ignores out-of-range retry-after values instead of throwing', () => {
+    expect(() =>
+      resolveGitHubRateLimitStatus(
+        {
+          args: ['pr', 'checks', '431'],
+          stderr: 'HTTP 429: You have exceeded a secondary rate limit.\nretry-after: 999999999999999999999'
+        },
+        { nowMs }
+      )
+    ).not.toThrow();
+
+    expect(
+      resolveGitHubRateLimitStatus(
+        {
+          args: ['pr', 'checks', '431'],
+          stderr: 'HTTP 429: You have exceeded a secondary rate limit.\nretry-after: 999999999999999999999'
+        },
+        { nowMs }
+      )
+    ).toMatchObject({
+      kind: 'github_rate_limited',
+      retry_at: null
+    });
+  });
+
   it('does not classify CodeRabbit service cooldown prose as GitHub API throttling', () => {
     expect(
       resolveGitHubRateLimitStatus(
@@ -957,6 +982,30 @@ describe('planGitHubRateLimitBackoff', () => {
         retry_after_seconds: null,
         retry_at: '2026-04-11T01:37:25.000Z',
         message: null
+      },
+      {
+        nowMs,
+        fallbackMs: 30_000,
+        maxJitterMs: 0,
+        remainingMs: 180_000
+      }
+    );
+
+    expect(planned).toBe(30_000);
+  });
+
+  it('uses fallback cooldown when retry-after metadata is outside the valid date range', () => {
+    const nowMs = Date.parse('2026-04-11T00:00:00.000Z');
+    const planned = planGitHubRateLimitBackoff(
+      {
+        kind: 'github_rate_limited',
+        surface: 'rest',
+        limit_type: 'secondary',
+        status: 429,
+        reset_at: null,
+        retry_after_seconds: 999999999999999999999,
+        retry_at: null,
+        message: 'HTTP 429: You have exceeded a secondary rate limit.'
       },
       {
         nowMs,

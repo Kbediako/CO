@@ -297,19 +297,36 @@ function isoFromEpochSeconds(value) {
     return null;
   }
   const millis = value * 1000;
-  if (!Number.isFinite(millis)) {
+  return isoFromMillis(millis);
+}
+
+function isoFromMillis(value) {
+  if (!Number.isFinite(value)) {
     return null;
   }
   try {
-    return new Date(millis).toISOString();
+    return new Date(value).toISOString();
   } catch {
     return null;
   }
 }
 
+function futureDelayMsFromSeconds(nowMs, seconds) {
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds)) {
+    return null;
+  }
+  const delayMs = seconds * 1000;
+  if (!Number.isFinite(delayMs) || delayMs <= 0) {
+    return null;
+  }
+  const targetMs = nowMs + delayMs;
+  return isoFromMillis(targetMs) ? delayMs : null;
+}
+
 function computeRetryAt(nowMs, retryAfterSeconds, resetAt) {
-  if (typeof retryAfterSeconds === 'number' && Number.isFinite(retryAfterSeconds)) {
-    return new Date(nowMs + retryAfterSeconds * 1000).toISOString();
+  const retryDelayMs = futureDelayMsFromSeconds(nowMs, retryAfterSeconds);
+  if (retryDelayMs !== null) {
+    return isoFromMillis(nowMs + retryDelayMs);
   }
   if (typeof resetAt === 'string' && resetAt.trim().length > 0) {
     return resetAt;
@@ -442,11 +459,9 @@ export function planGitHubRateLimitBackoff(rateLimit, options = {}) {
       ? Math.round(options.maxJitterMs)
       : 5000;
   const candidates = [];
-  if (typeof rateLimit?.retry_after_seconds === 'number' && Number.isFinite(rateLimit.retry_after_seconds)) {
-    const retryAfterMs = rateLimit.retry_after_seconds * 1000;
-    if (retryAfterMs > 0) {
-      candidates.push(retryAfterMs);
-    }
+  const retryAfterMs = futureDelayMsFromSeconds(nowMs, rateLimit?.retry_after_seconds);
+  if (retryAfterMs !== null) {
+    candidates.push(retryAfterMs);
   }
   const retryAtMs = parseTimestampMs(rateLimit?.retry_at);
   if (retryAtMs !== null) {

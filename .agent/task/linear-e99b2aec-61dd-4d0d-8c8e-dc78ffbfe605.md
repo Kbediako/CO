@@ -25,22 +25,22 @@
 - [x] Add reset-aware cooldown/backoff with bounded jitter. Evidence: `planGitHubRateLimitBackoff`, watcher polling/fan-out/update-branch throttle paths, and focused tests.
 - [x] Reduce same-head quiet-window fan-out through conservative cached snapshot reuse. Evidence: watcher fan-out cache implementation and focused cache reuse/invalidation tests.
 - [x] Prevent provider branch-recovery and ready-snapshot mutation while snapshot-backed GitHub throttle metadata is present. Evidence: `classifyPreBranchRecoverySnapshot` gates merge closeout and review-promotion before `gh pr update-branch`, and `classifyProviderMutationRateLimitSnapshot` gates non-terminal ready snapshots before `gh pr merge` or Linear `Merging` promotion.
-- [x] Harden PR feedback edge cases without widening the lane. Evidence: parsed payload prose no longer counts as transport rate-limit headers, oversized reset epochs are ignored safely, deterministic watcher action-required blockers run before rate-limit sleeps, and provider closeout reads snake_case embedded `github_rate_limit` records.
+- [x] Harden PR feedback edge cases without widening the lane. Evidence: parsed payload prose no longer counts as transport rate-limit headers, oversized reset/retry-after values are ignored safely, deterministic watcher action-required blockers run before rate-limit sleeps, and provider closeout reads snake_case embedded `github_rate_limit` records.
 - [x] Preserve existing readiness and merge safety semantics. Evidence: required checks still refresh each poll, CodeRabbit cooldown is not GitHub throttling, closed PRs still return `pr_closed_unmerged`, and full test suite passed.
 
 ## Validation
-- [x] Focused watcher tests for REST 403/429, GraphQL throttles, backoff planning, cache reuse/invalidation, update-branch throttles, parsed-payload text, invalid reset epochs, action-required precedence, stale reset fallback, provider branch-recovery throttle guard, ready-snapshot throttle mutation guard, and CodeRabbit cooldown distinction. Evidence: `npx vitest run --config vitest.config.core.ts tests/pr-watch-merge.spec.ts` passed with 76 tests after PR feedback hardening.
+- [x] Focused watcher tests for REST 403/429, GraphQL throttles, backoff planning, cache reuse/invalidation, update-branch throttles, parsed-payload text, invalid reset/retry-after values, action-required precedence, stale reset fallback, provider branch-recovery throttle guard, ready-snapshot throttle mutation guard, and CodeRabbit cooldown distinction. Evidence: `npx vitest run --config vitest.config.core.ts tests/pr-watch-merge.spec.ts` passed with 78 tests after retry-after hardening.
 - [x] Focused provider tests for GitHub API throttle evidence in merge closeout/review promotion. Evidence: `orchestrator/tests/ProviderMergeCloseout.test.ts` passed with 39 tests after PR feedback hardening.
-- [x] Combined watcher/provider focused regression suite. Evidence: `npx vitest run --config vitest.config.core.ts tests/pr-watch-merge.spec.ts orchestrator/tests/ProviderMergeCloseout.test.ts` passed with 115 tests after PR feedback hardening.
+- [x] Combined watcher/provider focused regression suite. Evidence: `npx vitest run --config vitest.config.core.ts tests/pr-watch-merge.spec.ts orchestrator/tests/ProviderMergeCloseout.test.ts` passed with 117 tests after retry-after hardening.
 - [x] `node scripts/delegation-guard.mjs`. Evidence: passed; 1 subagent manifest found.
 - [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: passed.
-- [x] `npm run build`. Evidence: passed after PR feedback hardening.
-- [x] `npm run lint`. Evidence: passed after PR feedback hardening.
-- [x] `npm run test`. Evidence: first run exposed two unrelated `ProviderIssueHandoff` timing/order failures, isolated rerun passed 211 tests, and latest full rerun passed 326 files / 3478 tests.
+- [x] `npm run build`. Evidence: passed after retry-after hardening.
+- [x] `npm run lint`. Evidence: passed after retry-after hardening.
+- [x] `npm run test`. Evidence: first run exposed two unrelated `ProviderIssueHandoff` timing/order failures, isolated rerun passed 211 tests, and latest full rerun passed 326 files / 3480 tests.
 - [x] `npm run docs:check`. Evidence: passed.
 - [x] `npm run docs:freshness`. Evidence: ran; failed only on standing repo-wide stale-doc baseline (`missing_registry=0`, `stale=77`).
-- [x] `node scripts/diff-budget.mjs`. Evidence: passed with `DIFF_BUDGET_OVERRIDE_REASON`; latest code/test working-tree scope was 4 files / 309 lines before checklist mirrors.
-- [x] Manifest-backed standalone review plus explicit elegance review before review handoff. Evidence: wrapper review failed closed on `failed-boundary` / `command-intent`; latest manual correctness/elegance fallback recorded in `out/linear-e99b2aec-61dd-4d0d-8c8e-dc78ffbfe605/manual/20260411T030425Z-review-feedback-hardening-fallback.md`.
+- [x] `node scripts/diff-budget.mjs`. Evidence: passed with `DIFF_BUDGET_OVERRIDE_REASON`; latest retry-after working-tree scope was 2 files / 82 lines before checklist mirrors.
+- [x] Manifest-backed standalone review plus explicit elegance review before review handoff. Evidence: wrapper review failed closed on `failed-boundary` / `command-intent`; latest manual correctness/elegance fallback recorded in `out/linear-e99b2aec-61dd-4d0d-8c8e-dc78ffbfe605/manual/20260411T032100Z-review-retry-after-fallback.md`.
 - [x] `npm run pack:smoke` because PR watcher/CLI behavior is downstream-facing. Evidence: passed.
 
 ## Handoff
@@ -58,6 +58,7 @@
 - 2026-04-11: Follow-up CodeRabbit review showed provider branch recovery could still call `gh pr update-branch` on snapshot-backed throttle metadata; added pre-recovery throttle classification for merge closeout and review promotion with focused regressions.
 - 2026-04-11: Follow-up CodeRabbit review showed provider paths could still mutate on non-terminal ready snapshots carrying throttle metadata; added a pre-mutation guard before `gh pr merge` and Linear `Merging` promotion with focused regressions.
 - 2026-04-11: Follow-up Codex/CodeRabbit review hardened evidence parsing and provider propagation: parsed payload prose is no longer treated as header evidence, invalid reset epochs are guarded, deterministic action-required blockers now win before rate-limit sleeps, and provider errors accept snake_case `github_rate_limit`.
+- 2026-04-11: Ready-review drain exposed one remaining Codex P2 for oversized `retry-after` ISO conversion; guarded retry-at conversion/backoff candidate selection and added focused regressions.
 
 ## Relevant Files
 - `scripts/lib/pr-watch-merge.js`
