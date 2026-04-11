@@ -5,6 +5,7 @@ import path from 'node:path';
 const DOC_ROOTS = ['.agent', '.ai-dev-tasks', 'docs', 'skills', 'tasks', 'templates'];
 const DOC_ROOT_FILES = ['README.md', 'AGENTS.md'];
 const EXCLUDED_DIR_NAMES = new Set(['.runs', 'out', 'archives', 'node_modules', 'dist']);
+const GIT_LS_FILES_MAX_BUFFER = 64 * 1024 * 1024;
 
 export async function pathExists(target, options = {}) {
   const { allowMissingOnly = false } = options;
@@ -74,7 +75,8 @@ export function listTrackedFiles(repoRoot, pathspecs = []) {
   }
 
   const git = spawnSync('git', args, {
-    encoding: 'utf8'
+    encoding: 'utf8',
+    maxBuffer: GIT_LS_FILES_MAX_BUFFER
   });
 
   if (git.status !== 0) {
