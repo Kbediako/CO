@@ -252,6 +252,23 @@
       }
     },
     {
+      "id": "20260410-linear-0878c751-6534-4352-ad6b-f18f67c239bb",
+      "title": "CO: Fix CLI command-surface timeout and exec quoting blocker",
+      "relates_to": "tasks/tasks-linear-0878c751-6534-4352-ad6b-f18f67c239bb.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-10",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-0878c751-6534-4352-ad6b-f18f67c239bb.md",
+        "task": "tasks/tasks-linear-0878c751-6534-4352-ad6b-f18f67c239bb.md",
+        "agent_task": ".agent/task/linear-0878c751-6534-4352-ad6b-f18f67c239bb.md",
+        "docs": "docs/TECH_SPEC-linear-0878c751-6534-4352-ad6b-f18f67c239bb.md"
+      }
+    },
+    {
       "id": "20260410-linear-97d69ad8-ba75-432f-b8b2-21ca83754325",
       "title": "CO: add autonomous branch refresh and conflict recovery for green-but-dirty PRs before and during Merging",
       "relates_to": "tasks/tasks-linear-97d69ad8-ba75-432f-b8b2-21ca83754325.md",
