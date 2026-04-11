@@ -338,12 +338,25 @@ export function resolveGitHubRateLimitStatus(input, options = {}) {
   const hasGraphqlRateLimitPayload =
     Array.isArray(input?.errors) &&
     input.errors.some((error) => typeof error?.type === 'string' && error.type.trim().toUpperCase() === 'RATE_LIMITED');
+  const isCommandOrRawTextInput =
+    typeof input === 'string'
+    || input instanceof Error
+    || (
+      input
+      && typeof input === 'object'
+      && (
+        Array.isArray(input.args)
+        || typeof input.exitCode === 'number'
+        || typeof input.stderr === 'string'
+        || typeof input.stdout === 'string'
+      )
+    );
   const hasProtocolRateLimitEvidence =
     hasGraphqlRateLimitPayload
     || status === 429
     || retryAfterSeconds !== null
-    || hasRateLimitText
-    || (resetEpochSeconds !== null && remainingRequests === 0);
+    || (resetEpochSeconds !== null && remainingRequests === 0)
+    || (isCommandOrRawTextInput && hasRateLimitText);
   if (!hasRateLimitSignal(text) || !hasProtocolRateLimitEvidence) {
     return null;
   }
@@ -695,7 +708,6 @@ async function runGhJson(args) {
     throwIfGitHubRateLimited(error, { surface });
     throw error;
   }
-  throwIfGitHubRateLimited(result.stdout, { surface });
   try {
     const parsed = JSON.parse(result.stdout);
     throwIfGitHubRateLimited(parsed, { surface });
@@ -704,6 +716,7 @@ async function runGhJson(args) {
     if (error instanceof GitHubRateLimitError) {
       throw error;
     }
+    throwIfGitHubRateLimited(result.stdout, { surface });
     throw new Error(
       `Failed to parse JSON from gh ${args.join(' ')}: ${
         error instanceof Error ? error.message : String(error)
@@ -722,7 +735,6 @@ async function runGhJsonSlurped(args) {
     throwIfGitHubRateLimited(error, { surface });
     throw error;
   }
-  throwIfGitHubRateLimited(result.stdout, { surface });
   try {
     const parsed = JSON.parse(result.stdout);
     throwIfGitHubRateLimited(parsed, { surface });
@@ -731,6 +743,7 @@ async function runGhJsonSlurped(args) {
     if (error instanceof GitHubRateLimitError) {
       throw error;
     }
+    throwIfGitHubRateLimited(result.stdout, { surface });
     throw new Error(
       `Failed to parse paginated JSON from gh ${args.join(' ')}: ${
         error instanceof Error ? error.message : String(error)
@@ -2218,8 +2231,8 @@ async function runPrWatchMergeOrThrow(argv, options) {
           repo,
           prNumber
         });
-        attemptedAutomaticBranchRecoveryKey = automaticBranchRecoveryKey;
         if (updateBranchResult.exitCode === 0) {
+          attemptedAutomaticBranchRecoveryKey = automaticBranchRecoveryKey;
           pendingAutomaticBranchRecoveryKey = automaticBranchRecoveryKey;
           quietWindowStartedAt = null;
           quietWindowAnchorUpdatedAt = null;
@@ -2237,6 +2250,31 @@ async function runPrWatchMergeOrThrow(argv, options) {
           await sleep(Math.min(intervalMs, remainingTimeMs));
           continue;
         }
+        const updateBranchRateLimit = resolveGitHubRateLimitStatus(updateBranchResult, {
+          surface: 'rest'
+        });
+        if (updateBranchRateLimit) {
+          const sleepMs = planPollingRateLimitSleepMs(updateBranchRateLimit, {
+            owner,
+            repo,
+            prNumber,
+            intervalMs,
+            deadline
+          });
+          if (sleepMs <= 0) {
+            break;
+          }
+          log(
+            `Automatic ${describeAutomaticBranchRecovery(
+              automaticBranchRecoveryReason
+            )} is rate limited: ${formatGitHubRateLimitStatus(
+              updateBranchRateLimit
+            )} (retrying in ${formatDuration(sleepMs)}).`
+          );
+          await sleep(sleepMs);
+          continue;
+        }
+        attemptedAutomaticBranchRecoveryKey = automaticBranchRecoveryKey;
         const details =
           updateBranchResult.stderr
           || updateBranchResult.stdout

@@ -20,25 +20,25 @@
 - [x] Pre-implementation issue-quality review captured. Evidence: `tasks/specs/linear-e99b2aec-61dd-4d0d-8c8e-dc78ffbfe605.md` review notes and readiness gate.
 
 ## Implementation
-- [ ] Classify GitHub REST 403/429 and GraphQL throttle failures explicitly. Evidence: pending.
-- [ ] Preserve reset/retry metadata in watcher/provider evidence. Evidence: pending.
-- [ ] Add reset-aware cooldown/backoff with bounded jitter. Evidence: pending.
-- [ ] Reduce same-head quiet-window fan-out through conservative cached snapshot reuse. Evidence: pending.
-- [ ] Preserve existing readiness and merge safety semantics. Evidence: pending.
+- [x] Classify GitHub REST 403/429 and GraphQL throttle failures explicitly. Evidence: `scripts/lib/pr-watch-merge.js`, `tests/pr-watch-merge.spec.ts`.
+- [x] Preserve reset/retry metadata in watcher/provider evidence. Evidence: `scripts/lib/pr-watch-merge.js`, `orchestrator/src/cli/control/providerMergeCloseout.ts`, `orchestrator/tests/ProviderMergeCloseout.test.ts`.
+- [x] Add reset-aware cooldown/backoff with bounded jitter. Evidence: `planGitHubRateLimitBackoff`, watcher polling/fan-out/update-branch throttle paths, and focused tests.
+- [x] Reduce same-head quiet-window fan-out through conservative cached snapshot reuse. Evidence: watcher fan-out cache implementation and focused cache reuse/invalidation tests.
+- [x] Preserve existing readiness and merge safety semantics. Evidence: required checks still refresh each poll, CodeRabbit cooldown is not GitHub throttling, closed PRs still return `pr_closed_unmerged`, and full test suite passed.
 
 ## Validation
-- [ ] Focused watcher tests for REST 403/429, GraphQL throttles, backoff planning, cache reuse/invalidation, and CodeRabbit cooldown distinction. Evidence: pending.
-- [ ] Focused provider tests for GitHub API throttle evidence in merge closeout/review promotion. Evidence: pending.
-- [ ] `node scripts/delegation-guard.mjs`. Evidence: pending.
-- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: pending.
-- [ ] `npm run build`. Evidence: pending.
-- [ ] `npm run lint`. Evidence: pending.
-- [ ] `npm run test`. Evidence: pending.
-- [ ] `npm run docs:check`. Evidence: pending.
-- [ ] `npm run docs:freshness`. Evidence: pending.
-- [ ] `node scripts/diff-budget.mjs`. Evidence: pending.
-- [ ] Manifest-backed standalone review plus explicit elegance review before review handoff. Evidence: pending.
-- [ ] `npm run pack:smoke` because PR watcher/CLI behavior is downstream-facing. Evidence: pending.
+- [x] Focused watcher tests for REST 403/429, GraphQL throttles, backoff planning, cache reuse/invalidation, update-branch throttles, parsed-payload text, and CodeRabbit cooldown distinction. Evidence: `npx vitest run --config vitest.config.core.ts tests/pr-watch-merge.spec.ts orchestrator/tests/ProviderMergeCloseout.test.ts` passed with 104 tests.
+- [x] Focused provider tests for GitHub API throttle evidence in merge closeout/review promotion. Evidence: `orchestrator/tests/ProviderMergeCloseout.test.ts` passed in focused and full suites.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: passed; 1 subagent manifest found.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: passed.
+- [x] `npm run build`. Evidence: passed after PR feedback rework.
+- [x] `npm run lint`. Evidence: passed after PR feedback rework.
+- [x] `npm run test`. Evidence: passed after PR feedback rework; 326 files, 3467 tests.
+- [x] `npm run docs:check`. Evidence: passed.
+- [x] `npm run docs:freshness`. Evidence: ran; failed only on standing repo-wide stale-doc baseline (`missing_registry=0`, `stale=77`).
+- [x] `node scripts/diff-budget.mjs`. Evidence: passed with `DIFF_BUDGET_OVERRIDE_REASON`; working-tree scope 4 files / 324 lines.
+- [x] Manifest-backed standalone review plus explicit elegance review before review handoff. Evidence: wrapper review failed closed on `failed-boundary` / `command-intent`; manual correctness/elegance fallback recorded in `out/linear-e99b2aec-61dd-4d0d-8c8e-dc78ffbfe605/manual/20260411T015117Z-review-rework-fallback.md`.
+- [x] `npm run pack:smoke` because PR watcher/CLI behavior is downstream-facing. Evidence: passed.
 
 ## Handoff
 - [ ] PR attached to the issue. Evidence: pending.
@@ -50,6 +50,7 @@
 ## Progress Log
 - 2026-04-11: Issue moved to `In Progress`, workpad created, branch created, and baseline watcher/provider seam audited.
 - 2026-04-11: Docs-review child stream recorded; packet-local docs gates passed and only the repo-wide stale-doc baseline blocked full docs:freshness. Next: implement GitHub throttle/backoff/cache seam.
+- 2026-04-11: PR feedback rework addressed CodeRabbit/Codex comments for parsed text false positives, update-branch throttle retry, provider evidence propagation, closed PR precedence, and task-checklist mirroring.
 
 ## Relevant Files
 - `scripts/lib/pr-watch-merge.js`

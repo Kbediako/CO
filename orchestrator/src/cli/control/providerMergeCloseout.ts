@@ -1778,19 +1778,21 @@ function classifyNonMergedSnapshot(
   status: 'watching' | 'action_required';
   reason: string;
   summary: string;
+  github_rate_limit?: ProviderGitHubRateLimitRecord | null;
 } | null {
-  if (snapshot.github_rate_limit) {
-    return {
-      status: 'watching',
-      reason: 'github_rate_limited',
-      summary: `Merge closeout is waiting for GitHub API budget recovery before rereading PR #${prNumber}: ${formatProviderGitHubRateLimitSummary(snapshot.github_rate_limit)}.`
-    };
-  }
   if (snapshot.state === 'CLOSED') {
     return {
       status: 'action_required',
       reason: 'pr_closed_unmerged',
       summary: `Attached PR #${prNumber} is closed without merging; reopen it or attach a replacement PR.`
+    };
+  }
+  if (snapshot.github_rate_limit) {
+    return {
+      status: 'watching',
+      reason: 'github_rate_limited',
+      summary: `Merge closeout is waiting for GitHub API budget recovery before rereading PR #${prNumber}: ${formatProviderGitHubRateLimitSummary(snapshot.github_rate_limit)}.`,
+      github_rate_limit: snapshot.github_rate_limit
     };
   }
   if (snapshot.action_required_reasons.length > 0) {
@@ -1820,20 +1822,22 @@ function classifyNonMergedReviewPromotionSnapshot(
   status: 'watching' | 'action_required';
   reason: string;
   summary: string;
+  github_rate_limit?: ProviderGitHubRateLimitRecord | null;
 } | null {
-  if (snapshot.github_rate_limit) {
-    return {
-      status: 'watching',
-      reason: 'github_rate_limited',
-      summary: `Review-handoff promotion is waiting for GitHub API budget recovery before rereading PR #${prNumber}: ${formatProviderGitHubRateLimitSummary(snapshot.github_rate_limit)}.`
-    };
-  }
   if (snapshot.state === 'CLOSED') {
     return {
       status: 'action_required',
       reason: 'pr_closed_unmerged',
       summary:
         `Attached PR #${prNumber} is closed without merging; reopen it or attach a replacement PR before review-handoff promotion can continue.`
+    };
+  }
+  if (snapshot.github_rate_limit) {
+    return {
+      status: 'watching',
+      reason: 'github_rate_limited',
+      summary: `Review-handoff promotion is waiting for GitHub API budget recovery before rereading PR #${prNumber}: ${formatProviderGitHubRateLimitSummary(snapshot.github_rate_limit)}.`,
+      github_rate_limit: snapshot.github_rate_limit
     };
   }
   if (snapshot.action_required_reasons.length > 0) {

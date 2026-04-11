@@ -73,13 +73,89 @@ describe('runProviderDeterministicMergeCloseout', () => {
         number: 431
       },
       snapshot: null,
-      github_rate_limit: {
-        kind: 'github_rate_limited',
-        surface: 'graphql',
-        limit_type: 'primary',
-        status: 403,
-        retry_at: '2026-04-11T00:05:00.000Z'
+      github_rate_limit: githubRateLimit
+    });
+    expect(fetchSnapshot).toHaveBeenCalledTimes(1);
+    expect(runCommand).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves snapshot-backed GitHub API rate-limit evidence at the top level', async () => {
+    const githubRateLimit = {
+      kind: 'github_rate_limited',
+      surface: 'rest',
+      limit_type: 'secondary',
+      status: 429,
+      reset_at: null,
+      retry_after_seconds: 60,
+      retry_at: '2026-04-11T00:01:00.000Z',
+      message: 'HTTP 429: You have exceeded a secondary rate limit.'
+    };
+    const runCommand = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      exitCode: 0,
+      stdout: 'git@github.com:asabeko/CO.git\n',
+      stderr: ''
+    });
+    const fetchSnapshot = vi.fn().mockResolvedValueOnce({
+      state: 'OPEN',
+      reviewDecision: 'APPROVED',
+      mergeStateStatus: 'UNKNOWN',
+      readyToMerge: false,
+      gateReasons: [],
+      unresolvedThreadCount: 0,
+      updatedAt: '2026-04-11T00:00:00.000Z',
+      mergedAt: null,
+      headOid: 'abc123',
+      checks: { pending: [], failed: [] },
+      requiredChecks: { pending: [], failed: [] },
+      githubRateLimit
+    });
+
+    const result = await runProviderDeterministicMergeCloseout(
+      {
+        issueId: 'lin-issue-1',
+        issueIdentifier: 'CO-151',
+        issueState: 'Merging',
+        issueStateType: 'started',
+        issueUpdatedAt: '2026-04-11T00:00:00.000Z',
+        repoRoot: '/tmp/co'
+      },
+      {
+        readIssueContext: vi.fn(async () => ({
+          ok: true,
+          operation: 'issue-context',
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-151',
+            title: 'GitHub API backoff',
+            description: null,
+            url: null,
+            updated_at: '2026-04-11T00:00:00.000Z',
+            workspace_id: null,
+            state: { id: 'state-merging', name: 'Merging', type: 'started' },
+            team: null,
+            project: null,
+            comments: [],
+            attachments: [{ id: 'att-1', title: 'PR', url: 'https://github.com/asabeko/CO/pull/431' }],
+            workpad_comment: null
+          },
+          source_setup: null
+        })),
+        fetchSnapshot,
+        resolveSnapshotActionRequiredReasons: vi.fn(() => []),
+        runCommand
       }
+    );
+
+    expect(result).toMatchObject({
+      status: 'watching',
+      reason: 'github_rate_limited',
+      pr: {
+        owner: 'asabeko',
+        repo: 'CO',
+        number: 431
+      },
+      github_rate_limit: githubRateLimit
     });
     expect(fetchSnapshot).toHaveBeenCalledTimes(1);
     expect(runCommand).toHaveBeenCalledTimes(1);
@@ -1765,7 +1841,17 @@ describe('runProviderDeterministicMergeCloseout', () => {
           mergedAt: null,
           headOid: 'abc123',
           checks: { pending: [], failed: [] },
-          requiredChecks: { pending: [], failed: [] }
+          requiredChecks: { pending: [], failed: [] },
+          githubRateLimit: {
+            kind: 'github_rate_limited',
+            surface: 'rest',
+            limit_type: 'primary',
+            status: 403,
+            reset_at: '2026-04-05T00:10:00.000Z',
+            retry_after_seconds: null,
+            retry_at: '2026-04-05T00:10:00.000Z',
+            message: 'HTTP 403: API rate limit exceeded.'
+          }
         })),
         resolveSnapshotActionRequiredReasons: vi.fn(() => []),
         runCommand,
@@ -1784,7 +1870,8 @@ describe('runProviderDeterministicMergeCloseout', () => {
       snapshot: {
         state: 'CLOSED',
         gate_reasons: ['state=CLOSED']
-      }
+      },
+      github_rate_limit: null
     });
     expect(runCommand).toHaveBeenCalledTimes(1);
     expect(runCommand).not.toHaveBeenCalledWith(expect.objectContaining({ command: 'gh' }));
