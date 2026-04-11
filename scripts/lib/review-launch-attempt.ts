@@ -159,6 +159,8 @@ export async function prepareReviewArtifacts(
 export async function runReviewLaunchAttemptShell(
   options: ReviewLaunchAttemptShellOptions
 ): Promise<void> {
+  // Keep review launch retries centralized here while run-review, non-interactive handoff,
+  // and execution-boundary preflight still share the same launch semantics.
   const ensureCommandAvailable =
     options.ensureReviewCommandAvailableFn ?? ensureReviewCommandAvailable;
   const resolveCommand = options.resolveReviewCommandFn ?? resolveReviewCommand;
