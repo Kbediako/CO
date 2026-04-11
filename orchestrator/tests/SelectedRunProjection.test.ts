@@ -3074,6 +3074,87 @@ describe('SelectedRunProjection', () => {
     expect(selected?.summary).not.toContain('deterministic provider mutation suppressed');
   });
 
+  it('includes current archived issue mutation suppressions in the selected-run summary', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:15:29.970Z',
+        summary: 'Provider linear worker completed with forced standalone review enabled for handoff',
+        commands: [
+          {
+            id: 'provider-linear-worker',
+            status: 'succeeded',
+            summary: 'Provider linear worker completed with forced standalone review enabled for handoff'
+          }
+        ]
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(
+        buildProviderLinearWorkerProof({
+          owner_phase: 'ended',
+          owner_status: 'succeeded',
+          end_reason: 'issue_inactive',
+          attempt_started_at: '2026-03-20T01:15:28.970Z',
+          updated_at: '2026-03-20T01:15:30.970Z',
+          linear_audit: {
+            path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+            attempted_count: 1,
+            success_count: 0,
+            failure_count: 1,
+            latest_recorded_at: '2026-03-20T01:15:29.970Z',
+            parallelization_entries: [],
+            latest_by_operation: {
+              'upsert-workpad': {
+                recorded_at: '2026-03-20T01:15:29.970Z',
+                operation: 'upsert-workpad',
+                ok: false,
+                issue_id: 'lin-issue-1',
+                issue_identifier: 'CO-2',
+                source_setup: null,
+                action: null,
+                via: null,
+                state: null,
+                follow_up_issue_id: null,
+                follow_up_issue_identifier: null,
+                failed_relation_type: null,
+                comment_id: null,
+                attachment_id: null,
+                error_code: 'linear_issue_not_mutable',
+                error_message: 'Linear issue CO-2 is archived and trashed and cannot accept provider mutations.'
+              }
+            }
+          }
+        })
+      ),
+      'utf8'
+    );
+
+    const selected = await createProjectionReader(paths, childPaths.manifestPath).buildSelectedRunContext();
+
+    expect(selected?.summary).toContain('Provider linear worker stopped because the issue was no longer active.');
+    expect(selected?.summary).toContain(
+      'deterministic provider mutation suppressed: upsert-workpad cannot run while the Linear issue is archived or trashed'
+    );
+  });
+
   it('omits degradation text when provider proof cannot be scoped to a single attempt', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {

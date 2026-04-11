@@ -28,6 +28,7 @@ import { resolveLinearWebhookSourceSetup } from './linearWebhookController.js';
 import { resolveLinearApiTokenFingerprint } from './linearGraphqlClient.js';
 import {
   classifyProviderLinearWorkflowState,
+  isProviderLinearTrackedIssueMutable,
   isProviderLinearTrackedIssueEligibleForExecution,
   normalizeProviderLinearWorkflowState,
   providerLinearTodoBlockedByNonTerminal
@@ -276,10 +277,12 @@ type ProviderTrackedIssueEligibility =
       claimReason:
         | 'provider_issue_state_not_active'
         | 'provider_issue_todo_blocked_by_non_terminal'
+        | 'provider_issue_not_mutable'
         | 'provider_issue_assignee_changed';
       releaseReason:
         | 'provider_issue_released:not_active'
         | 'provider_issue_released:todo_blocked_by_non_terminal'
+        | 'provider_issue_released:not_mutable'
         | 'provider_issue_released:assignee_changed';
       cleanupWorkspace: boolean;
     };
@@ -297,6 +300,8 @@ type ProviderTrackedIssueRefreshDisposition =
         | 'state'
         | 'state_type'
         | 'updated_at'
+        | 'archived_at'
+        | 'trashed'
         | 'viewer_id'
         | 'assignee_id'
         | 'assignee_name'
@@ -976,6 +981,8 @@ export function createProviderIssueHandoffService(
       | 'state'
       | 'state_type'
       | 'updated_at'
+      | 'archived_at'
+      | 'trashed'
       | 'viewer_id'
       | 'assignee_id'
       | 'assignee_name'
@@ -988,6 +995,8 @@ export function createProviderIssueHandoffService(
     | 'issue_state'
     | 'issue_state_type'
     | 'issue_updated_at'
+    | 'issue_archived_at'
+    | 'issue_trashed'
     | 'issue_viewer_id'
     | 'issue_viewer_auth_fingerprint'
     | 'issue_assignee_id'
@@ -999,6 +1008,8 @@ export function createProviderIssueHandoffService(
     issue_state: trackedIssue.state,
     issue_state_type: trackedIssue.state_type,
     issue_updated_at: trackedIssue.updated_at,
+    issue_archived_at: trackedIssue.archived_at,
+    issue_trashed: trackedIssue.trashed,
     issue_viewer_id: trackedIssue.viewer_id,
     issue_viewer_auth_fingerprint:
       typeof trackedIssue.viewer_id === 'string' && trackedIssue.viewer_id.length > 0
@@ -1035,6 +1046,8 @@ export function createProviderIssueHandoffService(
       | 'state'
       | 'state_type'
       | 'updated_at'
+      | 'archived_at'
+      | 'trashed'
       | 'viewer_id'
       | 'assignee_id'
       | 'assignee_name'
@@ -1048,6 +1061,8 @@ export function createProviderIssueHandoffService(
       | 'issue_state'
       | 'issue_state_type'
       | 'issue_updated_at'
+      | 'issue_archived_at'
+      | 'issue_trashed'
       | 'issue_viewer_id'
       | 'issue_viewer_auth_fingerprint'
       | 'issue_assignee_id'
@@ -1546,6 +1561,8 @@ export function createProviderIssueHandoffService(
       | 'state'
       | 'state_type'
       | 'updated_at'
+      | 'archived_at'
+      | 'trashed'
       | 'viewer_id'
       | 'assignee_id'
       | 'assignee_name'
@@ -1576,6 +1593,12 @@ export function createProviderIssueHandoffService(
       issue_state: input.trackedIssue?.state ?? input.claim.issue_state,
       issue_state_type: input.trackedIssue?.state_type ?? input.claim.issue_state_type,
       issue_updated_at: input.trackedIssue?.updated_at ?? input.claim.issue_updated_at,
+      issue_archived_at:
+        input.trackedIssue != null
+          ? trackedIssueFields?.issue_archived_at ?? null
+          : (input.claim.issue_archived_at ?? null),
+      issue_trashed:
+        input.trackedIssue != null ? trackedIssueFields?.issue_trashed ?? null : (input.claim.issue_trashed ?? null),
       issue_viewer_id:
         input.trackedIssue != null
           ? trackedIssueFields?.issue_viewer_id ?? null
@@ -2496,6 +2519,22 @@ export function createProviderIssueHandoffService(
             releasedWebhookTiming === 'newer' ||
             releasedWebhookTiming === 'unknown'
           );
+        const releasedMutabilityTruth =
+          newerWebhookBlockedByDrain
+            ? {
+                issue_archived_at: claimBase.issue_archived_at,
+                issue_trashed: claimBase.issue_trashed
+              }
+            : preserveReleasedIssueMetadata
+              ? (
+                  releasedWebhookTiming === 'equal'
+                    ? mergeReleasedTrackedIssueMutability(existing, claimBase)
+                    : resolveProviderClaimMutabilityTruth(existing)
+                )
+              : {
+                  issue_archived_at: claimBase.issue_archived_at,
+                  issue_trashed: claimBase.issue_trashed
+                };
         if (
           releaseCancelPending ||
           replayBlockedByReleasedMetadata
@@ -2532,6 +2571,8 @@ export function createProviderIssueHandoffService(
                 : preserveReleasedIssueMetadata
                   ? existing.issue_updated_at
                   : claimBase.issue_updated_at,
+            issue_archived_at: releasedMutabilityTruth.issue_archived_at,
+            issue_trashed: releasedMutabilityTruth.issue_trashed,
             issue_viewer_id:
               newerWebhookBlockedByDrain
                 ? claimBase.issue_viewer_id
@@ -3932,11 +3973,14 @@ function shouldReopenReleasedClaimAtCurrentTimestamp(input: {
   claim: Pick<ProviderIntakeClaimRecord, 'reason'>;
   trackedIssue: Pick<
     LiveLinearTrackedIssue,
-    'state' | 'state_type' | 'viewer_id' | 'assignee_id' | 'blocked_by'
+    'state' | 'state_type' | 'archived_at' | 'trashed' | 'viewer_id' | 'assignee_id' | 'blocked_by'
   >;
 }): boolean {
   if (isProviderIssueReleasedPendingReopen(input.claim.reason ?? null)) {
     return true;
+  }
+  if (input.claim.reason === 'provider_issue_released:not_mutable') {
+    return isProviderLinearTrackedIssueMutable(input.trackedIssue);
   }
   if (input.claim.reason !== 'provider_issue_released:assignee_changed') {
     return false;
@@ -3949,7 +3993,7 @@ function shouldReopenReleasedClaimOnRefresh(input: {
   releaseRun: ProviderIssueRunRecord | null;
   trackedIssue: Pick<
     LiveLinearTrackedIssue,
-    'updated_at' | 'state' | 'state_type' | 'viewer_id' | 'assignee_id' | 'blocked_by'
+    'updated_at' | 'state' | 'state_type' | 'archived_at' | 'trashed' | 'viewer_id' | 'assignee_id' | 'blocked_by'
   >;
 }): boolean {
   if (isProviderIssueReleasedPendingReopen(input.claim.reason ?? null)) {
@@ -3973,6 +4017,40 @@ function shouldReopenReleasedClaimOnRefresh(input: {
       })
     )
   );
+}
+
+function mergeReleasedTrackedIssueMutability(
+  existing: Pick<ProviderIntakeClaimRecord, 'issue_archived_at' | 'issue_trashed'>,
+  next: Pick<ProviderIntakeClaimRecord, 'issue_archived_at' | 'issue_trashed'>
+): Pick<ProviderIntakeClaimRecord, 'issue_archived_at' | 'issue_trashed'> {
+  const {
+    issue_archived_at: existingArchivedAt,
+    issue_trashed: existingTrashed
+  } = resolveProviderClaimMutabilityTruth(existing);
+  const {
+    issue_archived_at: nextArchivedAt,
+    issue_trashed: nextTrashed
+  } = resolveProviderClaimMutabilityTruth(next);
+  return {
+    issue_archived_at: existingArchivedAt ?? nextArchivedAt,
+    issue_trashed:
+      existingTrashed === true || nextTrashed === true
+        ? true
+        : existingTrashed === false || nextTrashed === false
+          ? false
+          : null
+  };
+}
+
+function resolveProviderClaimMutabilityTruth(
+  claim: Pick<ProviderIntakeClaimRecord, 'issue_archived_at' | 'issue_trashed'>
+): Pick<ProviderIntakeClaimRecord, 'issue_archived_at' | 'issue_trashed'> {
+  return {
+    issue_archived_at:
+      typeof claim.issue_archived_at === 'string' ? claim.issue_archived_at : null,
+    issue_trashed:
+      claim.issue_trashed === true ? true : (claim.issue_trashed === false ? false : null)
+  };
 }
 
 function didRunFinishAfterClaimLaunch(
@@ -4135,13 +4213,27 @@ function shouldClearStaleReviewPromotionForTrackedIssue(input: {
 function assessProviderTrackedIssueEligibility(
   trackedIssue: Pick<
     LiveLinearTrackedIssue,
-    'state' | 'state_type' | 'viewer_id' | 'assignee_id' | 'blocked_by'
+    | 'state'
+    | 'state_type'
+    | 'archived_at'
+    | 'trashed'
+    | 'viewer_id'
+    | 'assignee_id'
+    | 'blocked_by'
   >,
   options: {
     hasExistingClaim?: boolean;
   } = {}
 ): ProviderTrackedIssueEligibility {
   const workflowState = classifyProviderLinearWorkflowState(trackedIssue);
+  if (!isProviderLinearTrackedIssueMutable(trackedIssue)) {
+    return {
+      eligible: false,
+      claimReason: 'provider_issue_not_mutable',
+      releaseReason: 'provider_issue_released:not_mutable',
+      cleanupWorkspace: false
+    };
+  }
   const assigneeChanged =
     options.hasExistingClaim === true &&
     trackedIssue.assignee_id !== null &&
@@ -5142,6 +5234,8 @@ function hasProviderClaimTransitioned(
       | 'issue_state'
       | 'issue_state_type'
       | 'issue_updated_at'
+      | 'issue_archived_at'
+      | 'issue_trashed'
       | 'issue_viewer_id'
       | 'issue_viewer_auth_fingerprint'
       | 'issue_assignee_id'
@@ -5179,6 +5273,8 @@ function hasProviderClaimTransitioned(
             | 'issue_state'
             | 'issue_state_type'
             | 'issue_updated_at'
+            | 'issue_archived_at'
+            | 'issue_trashed'
             | 'issue_viewer_id'
             | 'issue_viewer_auth_fingerprint'
             | 'issue_assignee_id'
@@ -5210,6 +5306,14 @@ function hasProviderClaimTransitioned(
     (
       next.issue_updated_at !== undefined &&
       claim.issue_updated_at !== next.issue_updated_at
+    ) ||
+    (
+      next.issue_archived_at !== undefined &&
+      (claim.issue_archived_at ?? null) !== (next.issue_archived_at ?? null)
+    ) ||
+    (
+      next.issue_trashed !== undefined &&
+      (claim.issue_trashed ?? null) !== (next.issue_trashed ?? null)
     ) ||
     (
       next.issue_viewer_id !== undefined &&
@@ -5547,6 +5651,8 @@ function buildTrackedIssueSnapshotFromClaim(
     | 'issue_state'
     | 'issue_state_type'
     | 'issue_updated_at'
+    | 'issue_archived_at'
+    | 'issue_trashed'
     | 'issue_viewer_id'
     | 'issue_viewer_auth_fingerprint'
     | 'issue_assignee_id'
@@ -5579,6 +5685,10 @@ function buildTrackedIssueSnapshotFromClaim(
     project_id: null,
     project_name: null,
     updated_at: claim.issue_updated_at,
+    archived_at:
+      typeof claim.issue_archived_at === 'string' ? claim.issue_archived_at : null,
+    trashed:
+      claim.issue_trashed === true ? true : (claim.issue_trashed === false ? false : null),
     blocked_by: claim.issue_blocked_by ?? [],
     recent_activity: []
   };

@@ -42,6 +42,8 @@ export interface ProviderIntakeClaimRecord {
   issue_state: string | null;
   issue_state_type: string | null;
   issue_updated_at: string | null;
+  issue_archived_at?: string | null;
+  issue_trashed?: boolean | null;
   issue_viewer_id?: string | null;
   issue_viewer_auth_fingerprint?: string | null;
   issue_assignee_id?: string | null;
@@ -89,6 +91,8 @@ export interface ProviderIntakeSummaryPayload {
   issue_state: string | null;
   issue_state_type: string | null;
   issue_updated_at: string | null;
+  issue_archived_at?: string | null;
+  issue_trashed?: boolean | null;
   issue_viewer_id?: string | null;
   issue_assignee_id?: string | null;
   issue_assignee_name?: string | null;
@@ -229,6 +233,14 @@ export function upsertProviderIntakeClaim(
     issue_state: input.issue_state ?? null,
     issue_state_type: input.issue_state_type ?? null,
     issue_updated_at: input.issue_updated_at ?? null,
+    issue_archived_at:
+      input.issue_archived_at === undefined
+        ? existing?.issue_archived_at ?? null
+        : input.issue_archived_at ?? null,
+    issue_trashed:
+      input.issue_trashed === undefined
+        ? existing?.issue_trashed ?? null
+        : normalizeOptionalBoolean(input.issue_trashed),
     issue_viewer_id:
       input.issue_viewer_id === undefined
         ? existing?.issue_viewer_id ?? null
@@ -375,6 +387,8 @@ export function buildProviderIntakeSummary(
     issue_state: claim.issue_state,
     issue_state_type: claim.issue_state_type,
     issue_updated_at: claim.issue_updated_at,
+    issue_archived_at: claim.issue_archived_at ?? null,
+    issue_trashed: claim.issue_trashed ?? null,
     issue_viewer_id: claim.issue_viewer_id ?? null,
     issue_assignee_id: claim.issue_assignee_id ?? null,
     issue_assignee_name: claim.issue_assignee_name ?? null,
@@ -434,6 +448,9 @@ function normalizeProviderIntakeClaim(
     issue_state: typeof input.issue_state === 'string' ? input.issue_state : null,
     issue_state_type: typeof input.issue_state_type === 'string' ? input.issue_state_type : null,
     issue_updated_at: typeof input.issue_updated_at === 'string' ? input.issue_updated_at : null,
+    issue_archived_at:
+      typeof input.issue_archived_at === 'string' ? input.issue_archived_at : null,
+    issue_trashed: normalizeOptionalBoolean(input.issue_trashed),
     issue_viewer_id:
       typeof input.issue_viewer_id === 'string' ? input.issue_viewer_id : null,
     issue_viewer_auth_fingerprint:
@@ -484,6 +501,10 @@ export function isRecordLike(value: unknown): value is Record<string, unknown> {
 
 function normalizeRetryQueued(value: unknown): boolean | null {
   return typeof value === 'boolean' ? value : null;
+}
+
+function normalizeOptionalBoolean(value: unknown): boolean | null {
+  return normalizeRetryQueued(value);
 }
 
 function normalizeProviderIssueBlockedBy(

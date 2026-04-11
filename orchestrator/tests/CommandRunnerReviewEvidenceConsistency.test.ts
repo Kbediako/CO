@@ -845,6 +845,63 @@ describe('runCommandStage review evidence consistency', () => {
     expect(errorPayload.details?.command_exit_code).toBe(0);
   });
 
+  it('appends current archived issue mutation suppressions to the provider-worker summary', async () => {
+    mockState.runImpl = async (input) => {
+      const attemptStartedAt = new Date().toISOString();
+      const suppressionTimestamp = new Date(Date.parse(attemptStartedAt) + 1_000).toISOString();
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        attempt_started_at: attemptStartedAt,
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff',
+        linear_audit: {
+          path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+          attempted_count: 1,
+          success_count: 0,
+          failure_count: 1,
+          latest_recorded_at: suppressionTimestamp,
+          parallelization_entries: [],
+          latest_by_operation: {
+            'upsert-workpad': {
+              recorded_at: suppressionTimestamp,
+              operation: 'upsert-workpad',
+              ok: false,
+              issue_id: 'lin-issue-1',
+              issue_identifier: 'CO-2',
+              source_setup: null,
+              action: null,
+              via: null,
+              state: null,
+              follow_up_issue_id: null,
+              follow_up_issue_identifier: null,
+              failed_relation_type: null,
+              comment_id: null,
+              attachment_id: null,
+              error_code: 'linear_issue_not_mutable',
+              error_message: 'Linear issue CO-2 is archived and trashed and cannot accept provider mutations.'
+            }
+          }
+        }
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { manifest, stage, ...context } = await bootstrapCommandStage({
+      id: 'provider-linear-worker',
+      title: 'Run provider linear worker',
+      command: 'node providerLinearWorkerRunner.js',
+      summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+    });
+    const result = await runCommandStage({ ...context, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.summary).toContain('Provider linear worker reached review handoff.');
+    expect(result.summary).toContain(
+      'deterministic provider mutation suppressed: upsert-workpad cannot run while the Linear issue is archived or trashed'
+    );
+    expect(manifest.commands[0]?.status).toBe('succeeded');
+  });
+
   it('preserves failed provider-worker command summaries even when proof reports success', async () => {
     mockState.runImpl = async (input) => {
       await writeProviderLinearWorkerProofArtifacts(input, {

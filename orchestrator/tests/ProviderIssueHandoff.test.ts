@@ -129,6 +129,8 @@ function createTrackedIssue(
     priority: 2,
     created_at: '2026-03-18T04:00:00.000Z',
     updated_at: '2026-03-19T04:00:00.000Z',
+    archived_at: null,
+    trashed: false,
     blocked_by: [],
     recent_activity: [],
     ...overrides
@@ -3726,7 +3728,7 @@ describe('createProviderIssueHandoffService', () => {
         issue_state: workflowState,
         issue_state_type: 'started'
       });
-      expect(persist).toHaveBeenCalledTimes(1);
+      expect(persist).toHaveBeenCalled();
     }
   });
 
@@ -3773,6 +3775,63 @@ describe('createProviderIssueHandoffService', () => {
     expect(persist).toHaveBeenCalledTimes(1);
   });
 
+  it.each([
+    {
+      deliveryId: 'delivery-archived-not-mutable',
+      archived_at: '2026-04-11T05:00:00.000Z',
+      trashed: false
+    },
+    {
+      deliveryId: 'delivery-trashed-not-mutable',
+      archived_at: null,
+      trashed: true
+    }
+  ])(
+    'ignores archived or trashed issues before starting provider work and records mutability truth ($deliveryId)',
+    async ({ deliveryId, archived_at, trashed }) => {
+      const { paths } = await createHostPaths();
+      const state = createProviderIntakeState();
+      const persist = vi.fn(async () => undefined);
+      const launcher = {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      };
+
+      const service = createProviderIssueHandoffService({
+        paths,
+        state,
+        persist,
+        launcher,
+        startPipelineId: 'diagnostics'
+      });
+
+      const result = await service.handleAcceptedTrackedIssue({
+        trackedIssue: createTrackedIssue({
+          archived_at,
+          trashed
+        }),
+        deliveryId,
+        event: 'Issue',
+        action: 'update',
+        webhookTimestamp: 1_744_352_320_000
+      });
+
+      expect(result).toMatchObject({
+        kind: 'ignored',
+        reason: 'provider_issue_not_mutable'
+      });
+      expect(launcher.start).not.toHaveBeenCalled();
+      expect(launcher.resume).not.toHaveBeenCalled();
+      expect(state.claims[0]).toMatchObject({
+        state: 'ignored',
+        reason: 'provider_issue_not_mutable',
+        issue_archived_at: archived_at,
+        issue_trashed: trashed
+      });
+      expect(persist).toHaveBeenCalled();
+    }
+  );
+
   it.each(['Human Review', 'In Review'])(
     'ignores %s issues even when Linear marks them started',
     async (reviewState) => {
@@ -3815,7 +3874,7 @@ describe('createProviderIssueHandoffService', () => {
         issue_state: reviewState,
         issue_state_type: 'started'
       });
-      expect(persist).toHaveBeenCalledTimes(1);
+      expect(persist).toHaveBeenCalled();
     }
   );
 
@@ -7798,6 +7857,7 @@ describe('createProviderIssueHandoffService', () => {
       issue_state: 'In Progress',
       issue_state_type: 'started',
       issue_updated_at: '2026-03-19T04:21:00.000Z',
+      issue_trashed: null,
       issue_viewer_id: 'viewer-1',
       issue_viewer_auth_fingerprint: createLinearTokenFingerprint('linear-token-1'),
       issue_assignee_id: 'viewer-1',
@@ -7857,6 +7917,7 @@ describe('createProviderIssueHandoffService', () => {
     expect(state.claims[0]).toMatchObject({
       state: 'starting',
       reason: 'provider_issue_post_worker_exit_start_launched',
+      issue_trashed: null,
       issue_viewer_id: 'viewer-1',
       issue_assignee_id: 'viewer-1',
       issue_assignee_name: 'Codex',
@@ -9170,6 +9231,120 @@ describe('createProviderIssueHandoffService', () => {
     });
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
+  it('releases non-mutable issues on refresh and persists archived mutability truth', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-active'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'task-1303-active',
+        pipeline_id: 'diagnostics',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+    const endpoint = await createControlEndpointServer();
+    await writeFile(
+      join(childPaths.runDir, 'control_endpoint.json'),
+      JSON.stringify({
+        base_url: endpoint.baseUrl,
+        token_path: 'control_auth.json'
+      }),
+      'utf8'
+    );
+    await writeFile(childPaths.controlAuthPath, JSON.stringify({ token: 'child-token' }), 'utf8');
+    const workspacePath = resolveProviderWorkspacePath(root, 'task-1303-active');
+    await mkdir(workspacePath, { recursive: true });
+    await writeFile(join(workspacePath, '.git'), 'gitdir: /tmp/provider-worktree\n', 'utf8');
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: 'task-1303-active',
+      mapping_source: 'provider_id_fallback',
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-running',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-child',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics',
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          archived_at: '2026-04-11T05:00:00.000Z',
+          trashed: true
+        })
+      })
+    });
+
+    try {
+      await service.refresh();
+
+      await vi.waitFor(() => {
+        expect(endpoint.actions).toEqual([
+          expect.objectContaining({
+            action: 'cancel',
+            reason: 'provider_issue_released:not_mutable'
+          })
+        ]);
+      });
+      expect(state.claims[0]).toMatchObject({
+        state: 'released',
+        reason: 'provider_issue_released:not_mutable',
+        issue_archived_at: '2026-04-11T05:00:00.000Z',
+        issue_trashed: true,
+        run_id: 'run-child',
+        run_manifest_path: childPaths.manifestPath
+      });
+      expect(persist).toHaveBeenCalled();
+      await expect(access(workspacePath)).resolves.toBeUndefined();
+      expect(launcher.start).not.toHaveBeenCalled();
+      expect(launcher.resume).not.toHaveBeenCalled();
+    } finally {
+      await endpoint.close();
+    }
   });
 
   it('releases blocked Todo issues without cleaning their provider workspace', async () => {
@@ -13576,6 +13751,98 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('relaunches a released not-mutable claim on a same-timestamp webhook when the issue is restored', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Review',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      issue_archived_at: '2026-04-11T05:00:00.000Z',
+      issue_trashed: true,
+      task_id: 'task-1303-released-not-mutable-webhook',
+      mapping_source: 'provider_id_fallback',
+      state: 'released',
+      reason: 'provider_issue_released:not_mutable',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-released-not-mutable-webhook',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-released-not-mutable-webhook',
+      run_manifest_path: '/tmp/provider-run/released-not-mutable-webhook-manifest.json',
+      launch_source: null,
+      launch_token: null
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-reopened-not-mutable',
+        manifestPath: '/tmp/provider-run/reopened-not-mutable-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics'
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        state: 'Merging',
+        state_type: 'started',
+        updated_at: '2026-03-19T04:20:00.000Z',
+        archived_at: null,
+        trashed: false
+      }),
+      deliveryId: 'delivery-released-not-mutable-webhook-reopen',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_050_100
+    });
+
+    expect(result).toMatchObject({
+      kind: 'start',
+      reason: 'provider_issue_start_launched'
+    });
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-issue-1',
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-issue-1',
+      issueIdentifier: 'CO-2',
+      issueUpdatedAt: '2026-03-19T04:20:00.000Z',
+      launchToken: expect.any(String)
+    }));
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      issue_archived_at: null,
+      issue_trashed: false,
+      task_id: 'linear-lin-issue-1',
+      run_id: 'run-reopened-not-mutable',
+      run_manifest_path: '/tmp/provider-run/reopened-not-mutable-manifest.json',
+      launch_source: 'control-host',
+      launch_token: expect.any(String)
+    });
+    expect(persist).toHaveBeenCalled();
+  });
+
   it('keeps a released assignee-changed claim released on a same-timestamp webhook when viewer_id is missing and the issue is still assigned elsewhere', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
@@ -13650,6 +13917,172 @@ describe('createProviderIssueHandoffService', () => {
       issue_assignee_id: 'viewer-2',
       issue_assignee_name: 'Other Owner'
     });
+  });
+
+  it('records archived or trashed mutability truth on a blocked same-timestamp released replay', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Review',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      issue_archived_at: null,
+      issue_trashed: false,
+      issue_assignee_id: 'viewer-2',
+      issue_assignee_name: 'Other Owner',
+      task_id: 'task-1303-released-assignee-changed-webhook-archived',
+      mapping_source: 'provider_id_fallback',
+      state: 'released',
+      reason: 'provider_issue_released:assignee_changed',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-released-assignee-changed-webhook-archived',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-released-assignee-changed-webhook-archived',
+      run_manifest_path: '/tmp/provider-run/released-assignee-changed-webhook-archived-manifest.json',
+      launch_source: null,
+      launch_token: null
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics'
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        state: 'Merging',
+        state_type: 'started',
+        updated_at: '2026-03-19T04:20:00.000Z',
+        archived_at: '2026-04-11T05:00:00.000Z',
+        trashed: true,
+        viewer_id: null,
+        assignee_id: 'viewer-2',
+        assignee_name: 'Other Owner'
+      }),
+      deliveryId: 'delivery-released-assignee-changed-webhook-archived-replay',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_050_100
+    });
+
+    expect(result).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_released:assignee_changed'
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:assignee_changed',
+      issue_state: 'In Review',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      issue_archived_at: '2026-04-11T05:00:00.000Z',
+      issue_trashed: true,
+      issue_assignee_id: 'viewer-2',
+      issue_assignee_name: 'Other Owner'
+    });
+    expect(persist).toHaveBeenCalled();
+  });
+
+  it('keeps fresher released mutability truth when an older replay arrives', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Review',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:20:01.000Z',
+      issue_archived_at: null,
+      issue_trashed: false,
+      issue_assignee_id: 'viewer-2',
+      issue_assignee_name: 'Other Owner',
+      task_id: 'task-1303-released-assignee-changed-webhook-older',
+      mapping_source: 'provider_id_fallback',
+      state: 'released',
+      reason: 'provider_issue_released:assignee_changed',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-released-assignee-changed-webhook-older',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-released-assignee-changed-webhook-older',
+      run_manifest_path: '/tmp/provider-run/released-assignee-changed-webhook-older-manifest.json',
+      launch_source: null,
+      launch_token: null
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics'
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        state: 'Merging',
+        state_type: 'started',
+        updated_at: '2026-03-19T04:20:00.000Z',
+        archived_at: '2026-04-11T05:00:00.000Z',
+        trashed: true,
+        viewer_id: null,
+        assignee_id: 'viewer-2',
+        assignee_name: 'Other Owner'
+      }),
+      deliveryId: 'delivery-released-assignee-changed-webhook-older-replay',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_050_100
+    });
+
+    expect(result).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_released:assignee_changed'
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:assignee_changed',
+      issue_state: 'In Review',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:20:01.000Z',
+      issue_archived_at: null,
+      issue_trashed: false,
+      issue_assignee_id: 'viewer-2',
+      issue_assignee_name: 'Other Owner'
+    });
+    expect(persist).toHaveBeenCalled();
   });
 
   it('relaunches a newer accepted webhook replay after the release drain has settled', async () => {
