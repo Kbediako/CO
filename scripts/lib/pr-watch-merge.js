@@ -75,6 +75,26 @@ class PrWatchMergeExitError extends Error {
   }
 }
 
+class GhCommandError extends Error {
+  constructor(args, result) {
+    const detail = result.stderr || result.stdout || `exit code ${result.exitCode}`;
+    super(`gh ${args.join(' ')} failed: ${detail}`);
+    this.name = 'GhCommandError';
+    this.args = [...args];
+    this.exitCode = result.exitCode;
+    this.stdout = result.stdout;
+    this.stderr = result.stderr;
+  }
+}
+
+class GitHubRateLimitError extends Error {
+  constructor(rateLimit, message = null) {
+    super(message || formatGitHubRateLimitStatus(rateLimit));
+    this.name = 'GitHubRateLimitError';
+    this.githubRateLimit = rateLimit;
+  }
+}
+
 const PR_QUERY = `
 query($owner:String!, $repo:String!, $number:Int!) {
   repository(owner:$owner, name:$repo) {
@@ -184,6 +204,287 @@ function formatDuration(ms) {
 
 function log(message) {
   console.log(`[${new Date().toISOString()}] ${message}`);
+}
+
+function sanitizeRateLimitMessage(value) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const normalized = value.replace(/\s+/gu, ' ').trim();
+  return normalized.length > 0 ? normalized.slice(0, 500) : null;
+}
+
+function inferGitHubApiSurfaceFromArgs(args) {
+  if (!Array.isArray(args)) {
+    return 'unknown';
+  }
+  if (args[0] === 'api' && args.includes('graphql')) {
+    return 'graphql';
+  }
+  if (args[0] === 'api' || (args[0] === 'pr' && args[1] === 'checks')) {
+    return 'rest';
+  }
+  return 'unknown';
+}
+
+function extractTextFromRateLimitInput(input) {
+  if (input instanceof Error) {
+    const pieces = [input.message];
+    if (typeof input.stderr === 'string') {
+      pieces.push(input.stderr);
+    }
+    if (typeof input.stdout === 'string') {
+      pieces.push(input.stdout);
+    }
+    return pieces.filter(Boolean).join('\n');
+  }
+  if (typeof input === 'string') {
+    return input;
+  }
+  if (input && typeof input === 'object') {
+    const pieces = [];
+    if (typeof input.message === 'string') {
+      pieces.push(input.message);
+    }
+    if (typeof input.stderr === 'string') {
+      pieces.push(input.stderr);
+    }
+    if (typeof input.stdout === 'string') {
+      pieces.push(input.stdout);
+    }
+    if (Array.isArray(input.errors)) {
+      for (const error of input.errors) {
+        if (typeof error?.message === 'string') {
+          pieces.push(error.message);
+        }
+        if (typeof error?.type === 'string') {
+          pieces.push(error.type);
+        }
+      }
+    }
+    return pieces.filter(Boolean).join('\n');
+  }
+  return '';
+}
+
+function parseHttpStatusFromText(text) {
+  const match =
+    text.match(/\bHTTP\s+(?<status>403|429)\b/iu) ||
+    text.match(/\bstatus(?:\s+code)?["':=\s]+(?<status>403|429)\b/iu) ||
+    text.match(/"status"\s*:\s*(?<status>403|429)\b/iu);
+  const parsed = match?.groups?.status ? Number.parseInt(match.groups.status, 10) : null;
+  return Number.isInteger(parsed) ? parsed : null;
+}
+
+function parseHeaderSeconds(text, headerName) {
+  const escapedHeaderName = headerName.replace(/[\\^$*+?.()|[\]{}]/gu, '\\$&');
+  const pattern = new RegExp(`${escapedHeaderName}["'\\s:=]+(?<value>\\d+)`, 'iu');
+  const match = text.match(pattern);
+  if (!match?.groups?.value) {
+    return null;
+  }
+  const parsed = Number.parseInt(match.groups.value, 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+function parseIsoTimestampFromText(text) {
+  const match = text.match(/\b(?<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z)\b/u);
+  return match?.groups?.timestamp ?? null;
+}
+
+function isoFromEpochSeconds(value) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+  const millis = value * 1000;
+  return isoFromMillis(millis);
+}
+
+function isoFromMillis(value) {
+  if (!Number.isFinite(value)) {
+    return null;
+  }
+  try {
+    return new Date(value).toISOString();
+  } catch {
+    return null;
+  }
+}
+
+function futureDelayMsFromSeconds(nowMs, seconds) {
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds)) {
+    return null;
+  }
+  const delayMs = seconds * 1000;
+  if (!Number.isFinite(delayMs) || delayMs <= 0) {
+    return null;
+  }
+  const targetMs = nowMs + delayMs;
+  return isoFromMillis(targetMs) ? delayMs : null;
+}
+
+function computeRetryAt(nowMs, retryAfterSeconds, resetAt) {
+  const retryDelayMs = futureDelayMsFromSeconds(nowMs, retryAfterSeconds);
+  if (retryDelayMs !== null) {
+    return isoFromMillis(nowMs + retryDelayMs);
+  }
+  if (typeof resetAt === 'string' && resetAt.trim().length > 0) {
+    return resetAt;
+  }
+  return null;
+}
+
+function hasRateLimitSignal(text) {
+  return (
+    /\b(api\s+rate\s+limit\s+exceeded|rate\s+limit\s+exceeded|secondary\s+(?:rate\s+)?limit|RATE_LIMITED)\b/iu.test(text)
+    || /\b(?:retry-after|x-ratelimit-reset)\b/iu.test(text)
+    || /\bHTTP\s+429\b/iu.test(text)
+  );
+}
+
+export function resolveGitHubRateLimitStatus(input, options = {}) {
+  if (input instanceof GitHubRateLimitError && input.githubRateLimit) {
+    return input.githubRateLimit;
+  }
+  if (input && typeof input === 'object' && input.kind === 'github_rate_limited') {
+    return input;
+  }
+  const text = extractTextFromRateLimitInput(input);
+  const isCommandOrRawTextInput =
+    typeof input === 'string'
+    || input instanceof Error
+    || (
+      input
+      && typeof input === 'object'
+      && (
+        Array.isArray(input.args)
+        || typeof input.exitCode === 'number'
+        || typeof input.stderr === 'string'
+        || typeof input.stdout === 'string'
+      )
+    );
+  const structuredStatus =
+    input && typeof input === 'object' && Number.isInteger(input.status)
+      ? Number(input.status)
+      : null;
+  const status =
+    structuredStatus === 403 || structuredStatus === 429
+      ? structuredStatus
+      : isCommandOrRawTextInput ? parseHttpStatusFromText(text) : null;
+  const retryAfterSeconds = isCommandOrRawTextInput ? parseHeaderSeconds(text, 'retry-after') : null;
+  const resetEpochSeconds = isCommandOrRawTextInput ? parseHeaderSeconds(text, 'x-ratelimit-reset') : null;
+  const remainingRequests = isCommandOrRawTextInput ? parseHeaderSeconds(text, 'x-ratelimit-remaining') : null;
+  const hasRateLimitText = /\b(api\s+rate\s+limit\s+exceeded|secondary\s+(?:rate\s+)?limit|RATE_LIMITED)\b/iu.test(text);
+  const hasGraphqlRateLimitPayload =
+    Array.isArray(input?.errors) &&
+    input.errors.some((error) => typeof error?.type === 'string' && error.type.trim().toUpperCase() === 'RATE_LIMITED');
+  const hasProtocolRateLimitEvidence =
+    hasGraphqlRateLimitPayload
+    || status === 429
+    || retryAfterSeconds !== null
+    || (resetEpochSeconds !== null && remainingRequests === 0)
+    || (isCommandOrRawTextInput && hasRateLimitText);
+  if (
+    !hasProtocolRateLimitEvidence ||
+    (!hasRateLimitSignal(text) && status !== 429)
+  ) {
+    return null;
+  }
+  const args = Array.isArray(input?.args) ? input.args : [];
+  const surface =
+    options.surface ??
+    (/\bgraphql\b/iu.test(text) ? 'graphql' : inferGitHubApiSurfaceFromArgs(args));
+  const resetAt = isoFromEpochSeconds(resetEpochSeconds) ?? parseIsoTimestampFromText(text);
+  const nowMs = typeof options.nowMs === 'number' && Number.isFinite(options.nowMs) ? options.nowMs : Date.now();
+  const limitType = /\bsecondary\b/iu.test(text) ? 'secondary' : 'primary';
+  return {
+    kind: 'github_rate_limited',
+    surface,
+    limit_type: limitType,
+    status,
+    reset_at: resetAt,
+    retry_after_seconds: retryAfterSeconds,
+    retry_at: computeRetryAt(nowMs, retryAfterSeconds, resetAt),
+    message: sanitizeRateLimitMessage(text)
+  };
+}
+
+export function formatGitHubRateLimitStatus(rateLimit) {
+  if (!rateLimit || typeof rateLimit !== 'object') {
+    return 'GitHub API rate limit is active.';
+  }
+  const parts = [
+    'GitHub API rate limit',
+    `surface=${rateLimit.surface ?? 'unknown'}`,
+    `type=${rateLimit.limit_type ?? 'unknown'}`
+  ];
+  if (rateLimit.status) {
+    parts.push(`status=${rateLimit.status}`);
+  }
+  if (rateLimit.retry_at) {
+    parts.push(`retry_at=${rateLimit.retry_at}`);
+  } else if (rateLimit.reset_at) {
+    parts.push(`reset_at=${rateLimit.reset_at}`);
+  }
+  return parts.join(' | ');
+}
+
+function throwIfGitHubRateLimited(input, options = {}) {
+  const rateLimit = resolveGitHubRateLimitStatus(input, options);
+  if (rateLimit) {
+    throw new GitHubRateLimitError(rateLimit);
+  }
+}
+
+function stableJitterMs(seed, maxJitterMs) {
+  if (!maxJitterMs || maxJitterMs <= 0) {
+    return 0;
+  }
+  const text = String(seed ?? 'github-rate-limit');
+  let hash = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    hash = (hash * 31 + text.charCodeAt(index)) >>> 0;
+  }
+  return hash % (maxJitterMs + 1);
+}
+
+export function planGitHubRateLimitBackoff(rateLimit, options = {}) {
+  const nowMs = typeof options.nowMs === 'number' && Number.isFinite(options.nowMs) ? options.nowMs : Date.now();
+  const fallbackMs =
+    typeof options.fallbackMs === 'number' && Number.isFinite(options.fallbackMs) && options.fallbackMs > 0
+      ? options.fallbackMs
+      : DEFAULT_INTERVAL_SECONDS * 1000;
+  const maxJitterMs =
+    typeof options.maxJitterMs === 'number' && Number.isFinite(options.maxJitterMs) && options.maxJitterMs >= 0
+      ? Math.round(options.maxJitterMs)
+      : 5000;
+  const candidates = [];
+  const retryAfterMs = futureDelayMsFromSeconds(nowMs, rateLimit?.retry_after_seconds);
+  if (retryAfterMs !== null) {
+    candidates.push(retryAfterMs);
+  }
+  const retryAtMs = parseTimestampMs(rateLimit?.retry_at);
+  if (retryAtMs !== null) {
+    const retryDelayMs = retryAtMs - nowMs;
+    if (retryDelayMs > 0) {
+      candidates.push(retryDelayMs);
+    }
+  }
+  const resetAtMs = parseTimestampMs(rateLimit?.reset_at);
+  if (resetAtMs !== null) {
+    const resetDelayMs = resetAtMs - nowMs;
+    if (resetDelayMs > 0) {
+      candidates.push(resetDelayMs);
+    }
+  }
+  const baseMs = candidates.length > 0 ? Math.max(...candidates) : fallbackMs;
+  const jitterMs = stableJitterMs(options.jitterSeed, maxJitterMs);
+  const plannedMs = Math.max(1000, baseMs + jitterMs);
+  const remainingMs =
+    typeof options.remainingMs === 'number' && Number.isFinite(options.remainingMs)
+      ? Math.max(0, options.remainingMs)
+      : null;
+  return remainingMs === null ? plannedMs : Math.min(plannedMs, remainingMs);
 }
 
 function parseTimestampMs(value) {
@@ -392,8 +693,7 @@ async function runGh(args, { allowFailure = false } = {}) {
         resolve(result);
         return;
       }
-      const detail = result.stderr || result.stdout || `exit code ${exitCode}`;
-      reject(new Error(`gh ${args.join(' ')} failed: ${detail}`));
+      reject(new GhCommandError(args, result));
     });
   });
 }
@@ -437,10 +737,23 @@ async function runGit(args, { allowFailure = false } = {}) {
 }
 
 async function runGhJson(args) {
-  const result = await runGh(args);
+  let result;
+  const surface = inferGitHubApiSurfaceFromArgs(args);
   try {
-    return JSON.parse(result.stdout);
+    result = await runGh(args);
   } catch (error) {
+    throwIfGitHubRateLimited(error, { surface });
+    throw error;
+  }
+  try {
+    const parsed = JSON.parse(result.stdout);
+    throwIfGitHubRateLimited(parsed, { surface });
+    return parsed;
+  } catch (error) {
+    if (error instanceof GitHubRateLimitError) {
+      throw error;
+    }
+    throwIfGitHubRateLimited(result.stdout, { surface });
     throw new Error(
       `Failed to parse JSON from gh ${args.join(' ')}: ${
         error instanceof Error ? error.message : String(error)
@@ -450,10 +763,24 @@ async function runGhJson(args) {
 }
 
 async function runGhJsonSlurped(args) {
-  const result = await runGh([...args, '--paginate', '--slurp']);
+  const ghArgs = [...args, '--paginate', '--slurp'];
+  let result;
+  const surface = inferGitHubApiSurfaceFromArgs(ghArgs);
   try {
-    return JSON.parse(result.stdout);
+    result = await runGh(ghArgs);
   } catch (error) {
+    throwIfGitHubRateLimited(error, { surface });
+    throw error;
+  }
+  try {
+    const parsed = JSON.parse(result.stdout);
+    throwIfGitHubRateLimited(parsed, { surface });
+    return parsed;
+  } catch (error) {
+    if (error instanceof GitHubRateLimitError) {
+      throw error;
+    }
+    throwIfGitHubRateLimited(result.stdout, { surface });
     throw new Error(
       `Failed to parse paginated JSON from gh ${args.join(' ')}: ${
         error instanceof Error ? error.message : String(error)
@@ -679,11 +1006,95 @@ export function resolveCachedRequiredChecksSummary(previousCache, currentHeadOid
   if (!previousCache || typeof previousCache !== 'object') {
     return null;
   }
-  const cachedHeadOid = typeof previousCache.headOid === 'string' ? previousCache.headOid : null;
+  const requiredChecksCache =
+    previousCache.requiredChecksForNextPoll && typeof previousCache.requiredChecksForNextPoll === 'object'
+      ? previousCache.requiredChecksForNextPoll
+      : previousCache;
+  const cachedHeadOid = typeof requiredChecksCache.headOid === 'string' ? requiredChecksCache.headOid : null;
   if (!cachedHeadOid || !currentHeadOid || cachedHeadOid !== currentHeadOid) {
     return null;
   }
-  return hasRequiredChecksSummary(previousCache.summary) ? previousCache.summary : null;
+  return hasRequiredChecksSummary(requiredChecksCache.summary) ? requiredChecksCache.summary : null;
+}
+
+function resolveReusableFanoutCache(previousCache, currentHeadOid, currentUpdatedAt) {
+  if (!previousCache || typeof previousCache !== 'object') {
+    return null;
+  }
+  const cachedHeadOid = typeof previousCache.headOid === 'string' ? previousCache.headOid : null;
+  const cachedUpdatedAt = typeof previousCache.updatedAt === 'string' ? previousCache.updatedAt : null;
+  if (!cachedHeadOid || !cachedUpdatedAt || !currentHeadOid || !currentUpdatedAt) {
+    return null;
+  }
+  if (cachedHeadOid !== currentHeadOid || cachedUpdatedAt !== currentUpdatedAt) {
+    return null;
+  }
+  if (
+    previousCache.requiredChecksFetchError === true
+    || previousCache.inlineBotFeedback?.fetchError === true
+    || previousCache.botRereviewSignals?.fetchError === true
+  ) {
+    return null;
+  }
+  if (!isReusableBotFanoutClean(previousCache.inlineBotFeedback, previousCache.botRereviewSignals)) {
+    return null;
+  }
+  return previousCache;
+}
+
+function isReusableBotFanoutClean(inlineBotFeedback, botRereviewSignals) {
+  if (!inlineBotFeedback || typeof inlineBotFeedback !== 'object') {
+    return false;
+  }
+  if (!botRereviewSignals || typeof botRereviewSignals !== 'object') {
+    return false;
+  }
+  if (inlineBotFeedback.fetchError === true || botRereviewSignals.fetchError === true) {
+    return false;
+  }
+  if (inlineBotFeedback.unacknowledgedCount !== 0) {
+    return false;
+  }
+  if (
+    Array.isArray(botRereviewSignals.pendingBots) &&
+    botRereviewSignals.pendingBots.length > 0
+  ) {
+    return false;
+  }
+  if (
+    Array.isArray(botRereviewSignals.inProgressBots) &&
+    botRereviewSignals.inProgressBots.length > 0
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function buildReusableFanoutCache(input) {
+  const requiredChecksForNextPoll = input.requiredChecks
+    ? {
+        headOid: input.headOid,
+        summary: input.requiredChecks
+      }
+    : null;
+  if (
+    input.requiredChecksResult?.fetchError === true
+    || input.inlineBotFeedback?.fetchError === true
+    || input.botRereviewSignals?.fetchError === true
+  ) {
+    return requiredChecksForNextPoll;
+  }
+  if (!isReusableBotFanoutClean(input.inlineBotFeedback, input.botRereviewSignals)) {
+    return requiredChecksForNextPoll;
+  }
+  return {
+    headOid: input.headOid,
+    updatedAt: input.updatedAt,
+    requiredChecksFetchError: false,
+    requiredChecksForNextPoll,
+    inlineBotFeedback: input.inlineBotFeedback,
+    botRereviewSignals: input.botRereviewSignals
+  };
 }
 
 export function buildStatusSnapshot(response, requiredChecks = null, inlineBotFeedback = null, options = {}) {
@@ -721,6 +1132,10 @@ export function buildStatusSnapshot(response, requiredChecks = null, inlineBotFe
   const botRereviewPending = Array.isArray(botRereview?.pendingBots) ? botRereview.pendingBots : [];
   const botRereviewInProgress = Array.isArray(botRereview?.inProgressBots) ? botRereview.inProgressBots : [];
   const requiredChecksQueryFailed = options.requiredChecksQueryFailed === true;
+  const githubRateLimits = Array.isArray(options.githubRateLimits)
+    ? options.githubRateLimits.map((entry) => resolveGitHubRateLimitStatus(entry)).filter(Boolean)
+    : [];
+  const githubRateLimit = githubRateLimits[0] ?? null;
   const coderabbitReviewMeta =
     botRereview?.coderabbit && typeof botRereview.coderabbit === 'object'
       ? botRereview.coderabbit
@@ -802,7 +1217,10 @@ export function buildStatusSnapshot(response, requiredChecks = null, inlineBotFe
     gateReasons,
     readinessMode,
     readyToMerge: gateReasons.length === 0,
-    headOid: pr.commits?.nodes?.[0]?.commit?.oid || null
+    headOid: pr.commits?.nodes?.[0]?.commit?.oid || null,
+    fanoutCacheHit: options.fanoutCacheHit === true,
+    githubRateLimit,
+    githubRateLimits
   };
 }
 
@@ -958,12 +1376,17 @@ function formatStatusLine(snapshot, quietRemainingMs) {
     : '-';
   const requiredPendingNames = requiredChecks ? requiredChecks.pending.join(', ') || '-' : '-';
   const reasons = snapshot.gateReasons.join(', ') || 'none';
+  const githubRateLimit = snapshot.githubRateLimit
+    ? `${snapshot.githubRateLimit.surface ?? 'unknown'}/${snapshot.githubRateLimit.limit_type ?? 'unknown'}`
+    : 'none';
   return [
     `PR #${snapshot.number}`,
     `state=${snapshot.state}`,
     `merge_state=${snapshot.mergeStateStatus}`,
     `review=${snapshot.reviewDecision}`,
     `target=${normalizeReadinessMode(snapshot.readinessMode)}`,
+    `fanout_cache=${snapshot.fanoutCacheHit ? 'hit' : 'miss'}`,
+    `github_rate_limit=${githubRateLimit}`,
     `gate_checks=${snapshot.gateChecksSource}`,
     `checks_ok=${snapshot.checks.successCount}/${snapshot.checks.total}`,
     `checks_pending=${snapshot.checks.pending.length}`,
@@ -989,6 +1412,17 @@ function formatStatusLine(snapshot, quietRemainingMs) {
   ].join(' | ');
 }
 
+function planPollingRateLimitSleepMs(rateLimit, { owner, repo, prNumber, intervalMs, deadline }) {
+  const nowMs = Date.now();
+  const remainingMs = Math.max(0, deadline - nowMs);
+  return planGitHubRateLimitBackoff(rateLimit, {
+    nowMs,
+    fallbackMs: intervalMs,
+    remainingMs,
+    jitterSeed: `${owner}/${repo}#${prNumber}:${rateLimit?.surface ?? 'unknown'}:${rateLimit?.limit_type ?? 'unknown'}`
+  });
+}
+
 async function fetchRequiredChecks(owner, repo, prNumber) {
   try {
     const result = await runGhJson([
@@ -1005,19 +1439,23 @@ async function fetchRequiredChecks(owner, repo, prNumber) {
     const summary = summarizeRequiredChecks(entries);
     return {
       summary: summary.total > 0 ? summary : null,
-      fetchError: false
+      fetchError: false,
+      rateLimit: null
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (isNoRequiredChecksReportedErrorMessage(message)) {
       return {
         summary: null,
-        fetchError: false
+        fetchError: false,
+        rateLimit: null
       };
     }
+    const rateLimit = resolveGitHubRateLimitStatus(error, { surface: 'rest' });
     return {
       summary: null,
-      fetchError: true
+      fetchError: true,
+      rateLimit
     };
   }
 }
@@ -1281,6 +1719,7 @@ async function fetchBotRereviewSignals(owner, repo, prNumber, headOid) {
     if (requestedKinds.length === 0) {
       return {
         fetchError: false,
+        rateLimit: null,
         pendingBots: [],
         inProgressBots: [],
         coderabbit
@@ -1290,6 +1729,7 @@ async function fetchBotRereviewSignals(owner, repo, prNumber, headOid) {
     const pendingBots = [];
     const inProgressBots = [];
     let hadSignalFetchError = false;
+    let signalRateLimit = null;
     for (const kind of requestedKinds) {
       const request = rereviewRequests[kind];
       if (!request) {
@@ -1304,8 +1744,9 @@ async function fetchBotRereviewSignals(owner, repo, prNumber, headOid) {
             request.source,
             request.commentId
           );
-        } catch {
+        } catch (error) {
           hadSignalFetchError = true;
+          signalRateLimit = signalRateLimit ?? resolveGitHubRateLimitStatus(error, { surface: 'rest' });
           requestCommentReactions = [];
         }
       }
@@ -1331,13 +1772,15 @@ async function fetchBotRereviewSignals(owner, repo, prNumber, headOid) {
 
     return {
       fetchError: hadSignalFetchError,
+      rateLimit: signalRateLimit,
       pendingBots,
       inProgressBots,
       coderabbit
     };
-  } catch {
+  } catch (error) {
     return {
       fetchError: true,
+      rateLimit: resolveGitHubRateLimitStatus(error, { surface: 'rest' }),
       pendingBots: [],
       inProgressBots: [],
       coderabbit: {
@@ -1351,7 +1794,7 @@ async function fetchBotRereviewSignals(owner, repo, prNumber, headOid) {
 
 async function fetchInlineBotFeedback(owner, repo, prNumber, headOid) {
   if (!headOid) {
-    return { fetchError: false, unacknowledgedCount: 0 };
+    return { fetchError: false, rateLimit: null, unacknowledgedCount: 0 };
   }
 
   try {
@@ -1405,9 +1848,13 @@ async function fetchInlineBotFeedback(owner, repo, prNumber, headOid) {
       }
     }
 
-    return { fetchError: false, unacknowledgedCount };
-  } catch {
-    return { fetchError: true, unacknowledgedCount: 0 };
+    return { fetchError: false, rateLimit: null, unacknowledgedCount };
+  } catch (error) {
+    return {
+      fetchError: true,
+      rateLimit: resolveGitHubRateLimitStatus(error, { surface: 'rest' }),
+      unacknowledgedCount: 0
+    };
   }
 }
 
@@ -1425,17 +1872,35 @@ async function fetchSnapshot(owner, repo, prNumber, previousRequiredChecksCache 
     `number=${prNumber}`
   ]);
   const currentHeadOid = response?.data?.repository?.pullRequest?.commits?.nodes?.[0]?.commit?.oid || null;
+  const currentUpdatedAt = response?.data?.repository?.pullRequest?.updatedAt || null;
+  const cachedFanout = resolveReusableFanoutCache(previousRequiredChecksCache, currentHeadOid, currentUpdatedAt);
   const previousRequiredChecks = resolveCachedRequiredChecksSummary(previousRequiredChecksCache, currentHeadOid);
-  const [requiredChecksResult, inlineBotFeedback, botRereviewSignals] = await Promise.all([
-    fetchRequiredChecks(owner, repo, prNumber),
-    fetchInlineBotFeedback(owner, repo, prNumber, currentHeadOid),
-    fetchBotRereviewSignals(owner, repo, prNumber, currentHeadOid)
-  ]);
+  let requiredChecksResult;
+  let inlineBotFeedback;
+  let botRereviewSignals;
+  let fanoutCacheHit = false;
+  if (cachedFanout) {
+    requiredChecksResult = await fetchRequiredChecks(owner, repo, prNumber);
+    inlineBotFeedback = cachedFanout.inlineBotFeedback;
+    botRereviewSignals = cachedFanout.botRereviewSignals;
+    fanoutCacheHit = true;
+  } else {
+    [requiredChecksResult, inlineBotFeedback, botRereviewSignals] = await Promise.all([
+      fetchRequiredChecks(owner, repo, prNumber),
+      fetchInlineBotFeedback(owner, repo, prNumber, currentHeadOid),
+      fetchBotRereviewSignals(owner, repo, prNumber, currentHeadOid)
+    ]);
+  }
   const requiredChecks = resolveRequiredChecksSummary(
     requiredChecksResult.summary,
     previousRequiredChecks,
     requiredChecksResult.fetchError
   );
+  const githubRateLimits = [
+    requiredChecksResult.rateLimit,
+    inlineBotFeedback?.rateLimit,
+    botRereviewSignals?.rateLimit
+  ].filter(Boolean);
   return {
     snapshot: buildStatusSnapshot(
       response,
@@ -1446,15 +1911,19 @@ async function fetchSnapshot(owner, repo, prNumber, previousRequiredChecksCache 
       },
       {
         ...options,
+        fanoutCacheHit,
+        githubRateLimits,
         requiredChecksQueryFailed: requiredChecksResult.fetchError
       }
     ),
-    requiredChecksForNextPoll: requiredChecks
-      ? {
-          headOid: currentHeadOid,
-          summary: requiredChecks
-        }
-      : null
+    requiredChecksForNextPoll: buildReusableFanoutCache({
+      headOid: currentHeadOid,
+      updatedAt: currentUpdatedAt,
+      requiredChecks,
+      requiredChecksResult,
+      inlineBotFeedback,
+      botRereviewSignals
+    })
   };
 }
 
@@ -1648,20 +2117,40 @@ async function runPrWatchMergeOrThrow(argv, options) {
   let lastMergeAttemptHeadOid = null;
   let pendingAutomaticBranchRecoveryKey = null;
   let attemptedAutomaticBranchRecoveryKey = null;
-  let requiredChecksForNextPollCache = null;
+  let fanoutForNextPollCache = null;
   let latestSnapshot = null;
   let pollingHealthySinceLatestSnapshot = false;
 
   while (Date.now() <= deadline) {
     let snapshot;
     try {
-      const fetched = await fetchSnapshot(owner, repo, prNumber, requiredChecksForNextPollCache, {
+      const fetched = await fetchSnapshot(owner, repo, prNumber, fanoutForNextPollCache, {
         readinessMode
       });
       snapshot = fetched.snapshot;
-      requiredChecksForNextPollCache = fetched.requiredChecksForNextPoll;
+      fanoutForNextPollCache = fetched.requiredChecksForNextPoll;
     } catch (error) {
       pollingHealthySinceLatestSnapshot = false;
+      const rateLimit = resolveGitHubRateLimitStatus(error);
+      if (rateLimit) {
+        const sleepMs = planPollingRateLimitSleepMs(rateLimit, {
+          owner,
+          repo,
+          prNumber,
+          intervalMs,
+          deadline
+        });
+        if (sleepMs <= 0) {
+          break;
+        }
+        log(
+          `Polling GitHub API rate limit: ${formatGitHubRateLimitStatus(
+            rateLimit
+          )} (retrying in ${formatDuration(sleepMs)}).`
+        );
+        await sleep(sleepMs);
+        continue;
+      }
       log(`Polling error: ${error instanceof Error ? error.message : String(error)} (retrying).`);
       await sleep(intervalMs);
       continue;
@@ -1735,6 +2224,37 @@ async function runPrWatchMergeOrThrow(argv, options) {
       attemptedAutomaticBranchRecoveryKey = null;
     }
     if (
+      exitOnActionRequired
+      && actionRequiredReasons.length > 0
+      && !shouldAttemptRecovery
+    ) {
+      const details = actionRequiredReasons.join(', ');
+      throw new PrWatchMergeExitError(
+        `${isReviewMode ? 'Action required before review handoff' : 'Action required before merge'}: ${details}${snapshot.url ? ` (${snapshot.url})` : ''}`,
+        2
+      );
+    }
+    if (snapshot.githubRateLimit) {
+      pollingHealthySinceLatestSnapshot = false;
+      const sleepMs = planPollingRateLimitSleepMs(snapshot.githubRateLimit, {
+        owner,
+        repo,
+        prNumber,
+        intervalMs,
+        deadline
+      });
+      if (sleepMs <= 0) {
+        break;
+      }
+      log(
+        `GitHub API fan-out is rate limited: ${formatGitHubRateLimitStatus(
+          snapshot.githubRateLimit
+        )} (retrying in ${formatDuration(sleepMs)}).`
+      );
+      await sleep(sleepMs);
+      continue;
+    }
+    if (
       shouldAttemptRecovery
       && automaticBranchRecoveryReason
       && automaticBranchRecoveryKey
@@ -1758,8 +2278,8 @@ async function runPrWatchMergeOrThrow(argv, options) {
           repo,
           prNumber
         });
-        attemptedAutomaticBranchRecoveryKey = automaticBranchRecoveryKey;
         if (updateBranchResult.exitCode === 0) {
+          attemptedAutomaticBranchRecoveryKey = automaticBranchRecoveryKey;
           pendingAutomaticBranchRecoveryKey = automaticBranchRecoveryKey;
           quietWindowStartedAt = null;
           quietWindowAnchorUpdatedAt = null;
@@ -1777,6 +2297,31 @@ async function runPrWatchMergeOrThrow(argv, options) {
           await sleep(Math.min(intervalMs, remainingTimeMs));
           continue;
         }
+        const updateBranchRateLimit = resolveGitHubRateLimitStatus(updateBranchResult, {
+          surface: 'rest'
+        });
+        if (updateBranchRateLimit) {
+          const sleepMs = planPollingRateLimitSleepMs(updateBranchRateLimit, {
+            owner,
+            repo,
+            prNumber,
+            intervalMs,
+            deadline
+          });
+          if (sleepMs <= 0) {
+            break;
+          }
+          log(
+            `Automatic ${describeAutomaticBranchRecovery(
+              automaticBranchRecoveryReason
+            )} is rate limited: ${formatGitHubRateLimitStatus(
+              updateBranchRateLimit
+            )} (retrying in ${formatDuration(sleepMs)}).`
+          );
+          await sleep(sleepMs);
+          continue;
+        }
+        attemptedAutomaticBranchRecoveryKey = automaticBranchRecoveryKey;
         const details =
           updateBranchResult.stderr
           || updateBranchResult.stdout

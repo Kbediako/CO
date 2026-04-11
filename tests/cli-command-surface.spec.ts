@@ -1,6 +1,5 @@
 import { execFile } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { chmod, mkdir, mkdtemp, readFile, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, realpath, rm, symlink, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -13,6 +12,7 @@ import {
   PROVIDER_OVERRIDE_ENV_KEYS,
   sanitizeProviderOverrideEnv
 } from '../orchestrator/src/cli/utils/providerOverrideEnv.js';
+import { shouldUseFreshDist } from './helpers/distFreshness.js';
 import { runEntrypointLikeExec } from './helpers/inProcessEntrypoint.js';
 
 const execFileAsync = promisify(execFile);
@@ -83,27 +83,6 @@ async function runCliSubprocess(
   });
 }
 
-async function shouldUseFreshDist(sourceEntry: string, distEntry: string): Promise<boolean> {
-  if (!existsSync(distEntry)) {
-    return false;
-  }
-
-  try {
-    const distStats = await stat(distEntry);
-    try {
-      const sourceStats = await stat(sourceEntry);
-      return distStats.mtimeMs >= sourceStats.mtimeMs;
-    } catch (sourceError) {
-      if ((sourceError as NodeJS.ErrnoException).code === 'ENOENT') {
-        return true;
-      }
-      return false;
-    }
-  } catch {
-    return false;
-  }
-}
-
 describe('shouldUseFreshDist', () => {
   it('uses dist when the source entry is missing but the built entry exists', async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), 'cli-fresh-dist-'));
@@ -113,6 +92,349 @@ describe('shouldUseFreshDist', () => {
       await expect(shouldUseFreshDist(join(tempRoot, 'missing-source.ts'), distEntry)).resolves.toBe(
         true
       );
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('treats dist as stale when a newer transitive CLI dependency exists', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'cli-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'bin', 'codex-orchestrator.ts');
+    const transitiveDependency = join(
+      tempRoot,
+      'orchestrator',
+      'src',
+      'cli',
+      'controlHostCliShell.ts'
+    );
+    const deeperDependency = join(tempRoot, 'scripts', 'lib', 'provider-run-contract.ts');
+    const distEntry = join(tempRoot, 'dist', 'bin', 'codex-orchestrator.js');
+
+    try {
+      await mkdir(join(tempRoot, 'bin'), { recursive: true });
+      await mkdir(join(tempRoot, 'orchestrator', 'src', 'cli'), { recursive: true });
+      await mkdir(join(tempRoot, 'scripts', 'lib'), { recursive: true });
+      await mkdir(join(tempRoot, 'dist', 'bin'), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "import { runControlHostCliShell } from '../orchestrator/src/cli/controlHostCliShell.js';\nexport { runControlHostCliShell };\n",
+        'utf8'
+      );
+      await writeFile(
+        transitiveDependency,
+        "export { runProviderContract } from '../../../scripts/lib/provider-run-contract.js';\n",
+        'utf8'
+      );
+      await writeFile(deeperDependency, 'export function runProviderContract() {}\n', 'utf8');
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const distAt = new Date('2026-01-01T00:00:01.000Z');
+      const dependencyAt = new Date('2026-01-01T00:00:02.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(transitiveDependency, sourceAt, sourceAt);
+      await utimes(distEntry, distAt, distAt);
+      await utimes(deeperDependency, dependencyAt, dependencyAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('ignores newer sibling files outside the tracked CLI dependency closure', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'cli-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'bin', 'codex-orchestrator.ts');
+    const transitiveDependency = join(tempRoot, 'orchestrator', 'src', 'cli', 'doctorCliShell.ts');
+    const unrelatedSibling = join(tempRoot, 'orchestrator', 'src', 'cli', 'unusedCliShell.ts');
+    const distEntry = join(tempRoot, 'dist', 'bin', 'codex-orchestrator.js');
+
+    try {
+      await mkdir(join(tempRoot, 'bin'), { recursive: true });
+      await mkdir(join(tempRoot, 'orchestrator', 'src', 'cli'), { recursive: true });
+      await mkdir(join(tempRoot, 'dist', 'bin'), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "export { runDoctorCliShell } from '../orchestrator/src/cli/doctorCliShell.js';\n",
+        'utf8'
+      );
+      await writeFile(transitiveDependency, 'export function runDoctorCliShell() {}\n', 'utf8');
+      await writeFile(unrelatedSibling, 'export const unused = true;\n', 'utf8');
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const distAt = new Date('2026-01-01T00:00:01.000Z');
+      const siblingAt = new Date('2026-01-01T00:00:02.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(transitiveDependency, sourceAt, sourceAt);
+      await utimes(distEntry, distAt, distAt);
+      await utimes(unrelatedSibling, siblingAt, siblingAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('refreshes a cached dependency closure when a tracked file adds a new runtime import', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'cli-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'bin', 'codex-orchestrator.ts');
+    const transitiveDependency = join(tempRoot, 'orchestrator', 'src', 'cli', 'doctorCliShell.ts');
+    const newlyTrackedDependency = join(tempRoot, 'scripts', 'lib', 'provider-run-contract.ts');
+    const distEntry = join(tempRoot, 'dist', 'bin', 'codex-orchestrator.js');
+
+    try {
+      await mkdir(join(tempRoot, 'bin'), { recursive: true });
+      await mkdir(join(tempRoot, 'orchestrator', 'src', 'cli'), { recursive: true });
+      await mkdir(join(tempRoot, 'scripts', 'lib'), { recursive: true });
+      await mkdir(join(tempRoot, 'dist', 'bin'), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "export { runDoctorCliShell } from '../orchestrator/src/cli/doctorCliShell.js';\n",
+        'utf8'
+      );
+      await writeFile(transitiveDependency, 'export function runDoctorCliShell() {}\n', 'utf8');
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const distAt = new Date('2026-01-01T00:00:01.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(transitiveDependency, sourceAt, sourceAt);
+      await utimes(distEntry, distAt, distAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+
+      const trackedUpdateAt = new Date('2026-01-01T00:00:02.000Z');
+      await writeFile(
+        transitiveDependency,
+        "export { runProviderContract } from '../../../scripts/lib/provider-run-contract.js';\n",
+        'utf8'
+      );
+      await writeFile(newlyTrackedDependency, 'export function runProviderContract() {}\n', 'utf8');
+      await utimes(transitiveDependency, trackedUpdateAt, trackedUpdateAt);
+      await utimes(newlyTrackedDependency, trackedUpdateAt, trackedUpdateAt);
+
+      await writeFile(distEntry, 'export const rebuiltProviderContract = true;\n', 'utf8');
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+
+      await writeFile(newlyTrackedDependency, 'export function runProviderContract() { return true; }\n', 'utf8');
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('refreshes a cached dependency closure when a higher-priority source candidate appears with an older mtime', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'cli-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'bin', 'codex-orchestrator.ts');
+    const transitiveDependencyTs = join(tempRoot, 'orchestrator', 'src', 'cli', 'doctorCliShell.ts');
+    const transitiveDependencyJs = join(tempRoot, 'orchestrator', 'src', 'cli', 'doctorCliShell.js');
+    const distEntry = join(tempRoot, 'dist', 'bin', 'codex-orchestrator.js');
+
+    try {
+      await mkdir(join(tempRoot, 'bin'), { recursive: true });
+      await mkdir(join(tempRoot, 'orchestrator', 'src', 'cli'), { recursive: true });
+      await mkdir(join(tempRoot, 'dist', 'bin'), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "export { runDoctorCliShell } from '../orchestrator/src/cli/doctorCliShell.js';\n",
+        'utf8'
+      );
+      await writeFile(transitiveDependencyTs, 'export function runDoctorCliShell() {}\n', 'utf8');
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const distAt = new Date('2026-01-01T00:00:05.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(transitiveDependencyTs, sourceAt, sourceAt);
+      await utimes(distEntry, distAt, distAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+
+      const higherPriorityAt = new Date('2026-01-01T00:00:01.000Z');
+      await writeFile(
+        transitiveDependencyJs,
+        'export function runDoctorCliShell() { return true; }\n',
+        'utf8'
+      );
+      await utimes(transitiveDependencyJs, higherPriorityAt, higherPriorityAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps dist stale after a higher-priority source candidate appears until dist mtime changes', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'cli-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'bin', 'codex-orchestrator.ts');
+    const transitiveDependencyTs = join(tempRoot, 'orchestrator', 'src', 'cli', 'doctorCliShell.ts');
+    const transitiveDependencyJs = join(tempRoot, 'orchestrator', 'src', 'cli', 'doctorCliShell.js');
+    const distEntry = join(tempRoot, 'dist', 'bin', 'codex-orchestrator.js');
+
+    try {
+      await mkdir(join(tempRoot, 'bin'), { recursive: true });
+      await mkdir(join(tempRoot, 'orchestrator', 'src', 'cli'), { recursive: true });
+      await mkdir(join(tempRoot, 'dist', 'bin'), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "export { runDoctorCliShell } from '../orchestrator/src/cli/doctorCliShell.js';\n",
+        'utf8'
+      );
+      await writeFile(transitiveDependencyTs, 'export function runDoctorCliShell() {}\n', 'utf8');
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const distAt = new Date('2026-01-01T00:00:05.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(transitiveDependencyTs, sourceAt, sourceAt);
+      await utimes(distEntry, distAt, distAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+
+      const higherPriorityAt = new Date('2026-01-01T00:00:01.000Z');
+      await writeFile(
+        transitiveDependencyJs,
+        'export function runDoctorCliShell() { return true; }\n',
+        'utf8'
+      );
+      await utimes(transitiveDependencyJs, higherPriorityAt, higherPriorityAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
+
+      await chmod(distEntry, 0o755);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('treats dist as stale when the winning CLI source candidate disappears and resolution falls back to an older file', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'cli-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'bin', 'codex-orchestrator.ts');
+    const transitiveDependencyTs = join(tempRoot, 'orchestrator', 'src', 'cli', 'doctorCliShell.ts');
+    const transitiveDependencyJs = join(tempRoot, 'orchestrator', 'src', 'cli', 'doctorCliShell.js');
+    const distEntry = join(tempRoot, 'dist', 'bin', 'codex-orchestrator.js');
+
+    try {
+      await mkdir(join(tempRoot, 'bin'), { recursive: true });
+      await mkdir(join(tempRoot, 'orchestrator', 'src', 'cli'), { recursive: true });
+      await mkdir(join(tempRoot, 'dist', 'bin'), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "export { runDoctorCliShell } from '../orchestrator/src/cli/doctorCliShell.js';\n",
+        'utf8'
+      );
+      await writeFile(transitiveDependencyTs, 'export function runDoctorCliShell() { return "ts"; }\n', 'utf8');
+      await writeFile(transitiveDependencyJs, 'export function runDoctorCliShell() { return "js"; }\n', 'utf8');
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const fallbackAt = new Date('2026-01-01T00:00:00.000Z');
+      const winningAt = new Date('2026-01-01T00:00:01.000Z');
+      const distAt = new Date('2026-01-01T00:00:05.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(transitiveDependencyTs, fallbackAt, fallbackAt);
+      await utimes(transitiveDependencyJs, winningAt, winningAt);
+      await utimes(distEntry, distAt, distAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+
+      await rm(transitiveDependencyJs);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps dist fresh when the winning CLI source candidate disappears and dist is rebuilt first', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'cli-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'bin', 'codex-orchestrator.ts');
+    const transitiveDependencyTs = join(tempRoot, 'orchestrator', 'src', 'cli', 'doctorCliShell.ts');
+    const transitiveDependencyJs = join(tempRoot, 'orchestrator', 'src', 'cli', 'doctorCliShell.js');
+    const distEntry = join(tempRoot, 'dist', 'bin', 'codex-orchestrator.js');
+
+    try {
+      await mkdir(join(tempRoot, 'bin'), { recursive: true });
+      await mkdir(join(tempRoot, 'orchestrator', 'src', 'cli'), { recursive: true });
+      await mkdir(join(tempRoot, 'dist', 'bin'), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "export { runDoctorCliShell } from '../orchestrator/src/cli/doctorCliShell.js';\n",
+        'utf8'
+      );
+      await writeFile(transitiveDependencyTs, 'export function runDoctorCliShell() { return "ts"; }\n', 'utf8');
+      await writeFile(transitiveDependencyJs, 'export function runDoctorCliShell() { return "js"; }\n', 'utf8');
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const fallbackAt = new Date('2026-01-01T00:00:00.000Z');
+      const winningAt = new Date('2026-01-01T00:00:01.000Z');
+      const distAt = new Date('2026-01-01T00:00:05.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(transitiveDependencyTs, fallbackAt, fallbackAt);
+      await utimes(transitiveDependencyJs, winningAt, winningAt);
+      await utimes(distEntry, distAt, distAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+
+      await rm(transitiveDependencyJs);
+
+      await writeFile(distEntry, 'export const rebuiltDoctorCliShell = "ts";\n', 'utf8');
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('refreshes a cached unresolved dependency when the missing runtime import becomes resolvable', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'cli-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'bin', 'codex-orchestrator.ts');
+    const transitiveDependency = join(tempRoot, 'orchestrator', 'src', 'cli', 'doctorCliShell.ts');
+    const initiallyMissingDependency = join(tempRoot, 'scripts', 'lib', 'provider-run-contract.ts');
+    const distEntry = join(tempRoot, 'dist', 'bin', 'codex-orchestrator.js');
+
+    try {
+      await mkdir(join(tempRoot, 'bin'), { recursive: true });
+      await mkdir(join(tempRoot, 'orchestrator', 'src', 'cli'), { recursive: true });
+      await mkdir(join(tempRoot, 'scripts', 'lib'), { recursive: true });
+      await mkdir(join(tempRoot, 'dist', 'bin'), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "export { runDoctorCliShell } from '../orchestrator/src/cli/doctorCliShell.js';\n",
+        'utf8'
+      );
+      await writeFile(
+        transitiveDependency,
+        "export { runProviderContract } from '../../../scripts/lib/provider-run-contract.js';\n",
+        'utf8'
+      );
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const distAt = new Date('2026-01-01T00:00:01.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(transitiveDependency, sourceAt, sourceAt);
+      await utimes(distEntry, distAt, distAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
+
+      const dependencyAt = new Date('2026-01-01T00:00:02.000Z');
+      await writeFile(
+        initiallyMissingDependency,
+        'export function runProviderContract() { return true; }\n',
+        'utf8'
+      );
+      await utimes(initiallyMissingDependency, dependencyAt, dependencyAt);
+
+      await writeFile(distEntry, 'export const rebuiltProviderContract = true;\n', 'utf8');
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
     }

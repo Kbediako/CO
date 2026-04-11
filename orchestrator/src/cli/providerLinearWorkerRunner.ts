@@ -32,6 +32,7 @@ import { readSharedLinearBudgetStatus, type LinearBudgetStatus } from './control
 import {
   classifyProviderLinearWorkerLifecycle,
 } from './control/providerLinearWorkflowStates.js';
+import { readControlHostOwnershipOperatorHint } from './control/controlHostOwnership.js';
 import {
   PROVIDER_LINEAR_AUDIT_ENV_VAR,
   PROVIDER_LINEAR_PARALLELIZATION_REASONS,
@@ -3523,6 +3524,7 @@ async function requestProviderControlHostRefresh(input: {
   if (!shouldRefresh) {
     return;
   }
+  let controlHostRunDir: string | null = null;
   try {
     const manifestTarget = await resolveProviderControlHostManifestPath(
       input.currentManifestPath,
@@ -3534,6 +3536,7 @@ async function requestProviderControlHostRefresh(input: {
     }
     const canonicalRunsRoot = manifestTarget.currentRun.canonicalRunsRoot;
     const canonicalRunDir = await realpathOrResolveIfMissing(dirname(manifestTarget.manifestPath));
+    controlHostRunDir = canonicalRunDir;
     const canonicalManifestPath = await realpathOrResolveIfMissing(
       resolve(canonicalRunDir, basename(manifestTarget.manifestPath))
     );
@@ -3619,8 +3622,13 @@ async function requestProviderControlHostRefresh(input: {
     const message = (error as Error)?.name === 'AbortError'
       ? 'refresh request timeout'
       : (error as Error)?.message ?? String(error);
+    const ownershipHint = controlHostRunDir
+      ? await readControlHostOwnershipOperatorHint(controlHostRunDir).catch(() => null)
+      : null;
     input.log.warn(
-      `provider-linear-worker could not request control-host refresh for ${input.proof.issue_identifier}: ${message}`
+      `provider-linear-worker could not request control-host refresh for ${input.proof.issue_identifier}: ${message}${
+        ownershipHint ? `; ${ownershipHint}` : ''
+      }`
     );
   }
 }

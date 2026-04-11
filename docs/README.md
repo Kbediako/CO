@@ -223,6 +223,7 @@ Note: the commands below assume a source checkout; `scripts/` helpers are not in
 | `npm run eval:test` | Optional evaluation harness (enable when `evaluation/fixtures/**` is populated). |
 | `npm run docs:check` | Deterministically validates scripts/pipelines/paths referenced in agent-facing docs, current posture locks, bundled-skill roster parity, and the README front-door budget. |
 | `npm run docs:freshness` | Validates docs registry coverage plus catalog class coverage and writes a class-separated report to `out/<task-id>/docs-freshness.json`. |
+| `npm run repo:stewardship` | Audits every tracked file via `git ls-files`, classifies each tracked surface as `validate`, `update`, `delete`, or `retain_with_rationale`, and writes `out/<task-id>/repo-stewardship.json`. |
 | `npm run ci:cloud-canary` | Runs the cloud canary harness (`scripts/cloud-canary-ci.mjs`) to verify cloud lifecycle manifest + run-summary evidence; credential-gated by `CODEX_CLOUD_ENV_ID` and optional auth secrets (`CODEX_CLOUD_BRANCH` defaults to `main`). Feature flags can be passed through with `CODEX_CLOUD_ENABLE_FEATURES` / `CODEX_CLOUD_DISABLE_FEATURES` (comma- or space-delimited, e.g. `sqlite,memories`). |
 | `node scripts/delegation-guard.mjs` | Enforces subagent delegation evidence before review (repo-only). |
 | `node scripts/spec-guard.mjs --dry-run` | Validates spec freshness; required before review (repo-only). |

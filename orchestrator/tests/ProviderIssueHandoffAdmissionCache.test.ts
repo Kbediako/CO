@@ -510,6 +510,7 @@ describe('createProviderIssueHandoffService admission cache', () => {
     const { resolveRunPaths } = await import('../src/cli/run/runPaths.js');
     const { root, paths } = await createHostPaths();
     const runsRoot = join(root, '.runs');
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
     const state = createProviderIntakeState();
     state.claims.push({
       provider: 'linear',
@@ -549,6 +550,8 @@ describe('createProviderIssueHandoffService admission cache', () => {
     expect(
       readdirSpy.mock.calls.filter(([path]) => path === runsRoot).length
     ).toBe(1);
+    await waitForCondition(() => setTimeoutSpy.mock.calls.length >= 1);
+    const queuedRehydrateCallback = getLatestScheduledTimeoutCallback(setTimeoutSpy);
 
     const childEnv = {
       repoRoot: root,
@@ -573,7 +576,8 @@ describe('createProviderIssueHandoffService admission cache', () => {
       'utf8'
     );
 
-    await vi.advanceTimersByTimeAsync(1_001);
+    await Promise.resolve(queuedRehydrateCallback());
+    await flushAsyncWork();
     await waitForCondition(
       () => state.claims[0]?.reason === 'provider_issue_rehydrated_active_run'
     );
@@ -657,12 +661,13 @@ describe('createProviderIssueHandoffService admission cache', () => {
 
     await service.rehydrate();
     await waitForCondition(() => setTimeoutSpy.mock.calls.length >= 1);
+    const queuedRetryCallback = getLatestScheduledTimeoutCallback(setTimeoutSpy);
 
     const refreshPromise = service.refresh();
     await waitForCondition(() => persist.mock.calls.length >= 2 && activePersistCalls === 1);
 
     const blockedPersistCalls = persist.mock.calls.length;
-    await Promise.resolve(getLatestScheduledTimeoutCallback(setTimeoutSpy)());
+    await Promise.resolve(queuedRetryCallback());
     await flushAsyncWork();
 
     expect(persist).toHaveBeenCalledTimes(blockedPersistCalls);
