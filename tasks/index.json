@@ -32,6 +32,23 @@
       }
     },
     {
+      "id": "20260411-linear-4dd7c20a-3eec-406f-addc-e89948f044f7",
+      "title": "CO: decide admission posture for unreadable foreign provider manifests",
+      "relates_to": "tasks/tasks-linear-4dd7c20a-3eec-406f-addc-e89948f044f7.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-11",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-4dd7c20a-3eec-406f-addc-e89948f044f7.md",
+        "task": "tasks/tasks-linear-4dd7c20a-3eec-406f-addc-e89948f044f7.md",
+        "agent_task": ".agent/task/linear-4dd7c20a-3eec-406f-addc-e89948f044f7.md",
+        "docs": "docs/TECH_SPEC-linear-4dd7c20a-3eec-406f-addc-e89948f044f7.md"
+      }
+    },
+    {
       "id": "20260411-linear-38a28769-bced-48c3-ab3b-63bf3ffdea61",
       "title": "CO: repair fresh-issue Linear workpad and PR-attachment writes",
       "relates_to": "tasks/tasks-linear-38a28769-bced-48c3-ab3b-63bf3ffdea61.md",
