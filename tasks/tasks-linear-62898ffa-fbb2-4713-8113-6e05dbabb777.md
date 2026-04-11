@@ -19,19 +19,19 @@
 - [x] Workspace moved from detached `HEAD` onto a task branch based on current `origin/main`. Evidence: branch `linear-62898ffa-fbb2-4713-8113-6e05dbabb777`, initially `345af4dd2`, then rebased onto `origin/main` `6d7ab74f8`.
 
 ## Investigation
-- [x] Fresh current-main reproduction captures the exact failing test case and assertion context. Evidence: no matching failure reproduced after rebasing onto `origin/main` `6d7ab74f8`; focused snapshot-only Todo subset, full `ProviderIssueHandoff` file, and full `npm run test` all passed.
+- [x] Fresh current-main reproduction captures the exact failing test case and assertion context. Evidence: no matching failure reproduced after rebasing onto `origin/main` `6d7ab74f8`; focused snapshot-only `Todo` subset, full `ProviderIssueHandoff` file, and full `npm run test` all passed.
 - [x] Owning retry scheduling cause is identified with source/test evidence. Evidence: no live retry scheduling bug is implicated at current HEAD; the issue-reported non-terminal `continues...` anchor is stale, current non-terminal source anchor is `releases...` around line 6686, and validation is green.
 - [x] The lane remains separate from `CO-128` frontend-test bootstrap work. Evidence: `docs/PRD-linear-62898ffa-fbb2-4713-8113-6e05dbabb777.md`.
 
 ## Implementation
 - [x] Smallest responsible code or validation-contract change is applied at the owning retry seam. Evidence: no code change was made because the current-main validation contract is already green; docs packet records the no-code validation-contract closeout.
-- [x] Focused regression or assertion proof covers the snapshot-only Todo retry/non-terminal blocker path. Evidence: `out/linear-62898ffa-fbb2-4713-8113-6e05dbabb777/manual/20260411T0412Z-focused-snapshot-todo-repro-post-rebase.log` and `out/linear-62898ffa-fbb2-4713-8113-6e05dbabb777/manual/20260411T0412Z-provider-handoff-file-repro-post-rebase.log`.
+- [x] Focused regression or assertion proof covers the snapshot-only `Todo` retry/non-terminal blocker path. Evidence: `out/linear-62898ffa-fbb2-4713-8113-6e05dbabb777/manual/20260411T0412Z-focused-snapshot-todo-repro-post-rebase.log` and `out/linear-62898ffa-fbb2-4713-8113-6e05dbabb777/manual/20260411T0412Z-provider-handoff-file-repro-post-rebase.log`.
 
 ## Validation
 - [x] Focused `ProviderIssueHandoff` test path passes after the repair or contract update. Evidence: `out/linear-62898ffa-fbb2-4713-8113-6e05dbabb777/manual/20260411T0412Z-focused-snapshot-todo-repro-post-rebase.log` and `out/linear-62898ffa-fbb2-4713-8113-6e05dbabb777/manual/20260411T0412Z-provider-handoff-file-repro-post-rebase.log`.
 - [x] Repo-wide `npm run test` passes cleanly or a specific repo-owned validation contract is documented. Evidence: `out/linear-62898ffa-fbb2-4713-8113-6e05dbabb777/manual/20260411T0413Z-npm-run-test-post-rebase.log` reports `328` files and `3494` tests passed.
 - [x] Standard validation floor runs before review handoff for a non-trivial diff. Evidence: post-rebase logs under `out/linear-62898ffa-fbb2-4713-8113-6e05dbabb777/manual/20260411T0417Z-post-rebase-*`, `20260411T0418Z-post-rebase-*`, and `20260411T0413Z-npm-run-test-post-rebase.log`.
-- [x] Standalone review and explicit elegance/minimality pass complete before handoff. Evidence: `out/linear-62898ffa-fbb2-4713-8113-6e05dbabb777/manual/20260411T0420Z-standalone-review-final.log`, review telemetry `../../.runs/linear-62898ffa-fbb2-4713-8113-6e05dbabb777/cli/2026-04-11T03-33-21-295Z-51d47db3/review/telemetry.json`, and `out/linear-62898ffa-fbb2-4713-8113-6e05dbabb777/manual/20260411T0424Z-elegance-review.md`.
+- [x] Standalone review and explicit elegance/minimality pass complete before handoff. Evidence: `out/linear-62898ffa-fbb2-4713-8113-6e05dbabb777/manual/20260411T0420Z-standalone-review-final.log`, review telemetry `.runs/linear-62898ffa-fbb2-4713-8113-6e05dbabb777/cli/2026-04-11T03-33-21-295Z-51d47db3/review/telemetry.json`, and `out/linear-62898ffa-fbb2-4713-8113-6e05dbabb777/manual/20260411T0424Z-elegance-review.md`.
 
 ## Handoff
 - [ ] Workpad refreshed after docs, reproduction, implementation, validation, and immediately before review handoff. Evidence: pending final handoff refresh.

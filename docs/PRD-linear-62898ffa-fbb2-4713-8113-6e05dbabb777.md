@@ -51,7 +51,7 @@
   - fresh validation did not reproduce the issue-reported shape: focused snapshot-only Todo subset passed, the full `ProviderIssueHandoff.test.ts` file passed, and full `npm run test` passed
   - the failure was observed on a docs-only `CO-128` branch, so it is not evidence that the `frontend-test` hang returned
 - Reference truth:
-  - snapshot-only Todo issues with persisted non-terminal blocker metadata should continue retrying without duplicating retry timers across refresh cycles
+  - snapshot-only Todo issues with persisted non-terminal blocker metadata should release rather than continue retrying; continued retries should only occur when blocker metadata is terminal, without duplicating retry timers across refresh cycles
   - the test should encode the real retry contract, not a stale assumption
   - repo-wide `npm run test` should be a truthful gate for unrelated lanes
 - Target truth / intended delta:

@@ -39,7 +39,7 @@ last_review: 2026-04-11
 - Functional requirements:
   - reproduce the current active non-terminal snapshot-only Todo retry anchor, currently `releases snapshot-only Todo retries when persisted blocker metadata is still non-terminal` around `ProviderIssueHandoff.test.ts:6686`, while preserving the issue-reported `continues...` wording as traceability
   - identify whether the second scheduled timeout is duplicate scheduling, intentional rescheduling that the test should encode, or a nearby retry-state artifact; current-main evidence identifies no live second-timeout failure to repair
-  - preserve snapshot-only Todo retry behavior for issues that still carry non-terminal blocker metadata
+  - preserve snapshot-only Todo release behavior for issues with non-terminal blocker metadata, and preserve continued retry behavior only for issues with terminal blocker metadata
   - ensure the final test contract proves the intended number of active scheduled retry timers after refresh
 - Non-functional requirements (performance, reliability, security):
   - keep fake-timer behavior deterministic
