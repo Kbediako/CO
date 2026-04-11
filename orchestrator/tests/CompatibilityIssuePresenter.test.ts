@@ -8,6 +8,7 @@ import type {
   ControlCompatibilityRuntimeSnapshot,
   ControlCompatibilitySourceContext
 } from '../src/cli/control/observabilityReadModel.js';
+import { resolveProviderWorkerHost } from '../src/cli/control/observabilityReadModel.js';
 
 function buildCompatibilitySource(
   overrides: Partial<ControlCompatibilitySourceContext> = {}
@@ -30,6 +31,7 @@ function buildCompatibilitySource(
     latestAction: null,
     latestEvent: null,
     workspacePath: '/repo/.workspaces/co-100',
+    pipelineId: null,
     pipelineTitle: 'Implementation gate',
     stages: [],
     approvalsTotal: 0,
@@ -95,6 +97,364 @@ function buildExhaustedLinearPolling() {
 }
 
 describe('CompatibilityIssuePresenter', () => {
+  it('ignores stale proof-derived worker_host values for the current attempt', () => {
+    expect(
+      resolveProviderWorkerHost({
+        providerLinearWorkerProof: {
+          issue_id: 'issue-100',
+          issue_identifier: 'CO-100',
+          attempt_started_at: '2026-04-06T02:00:00.000Z',
+          worker_host: 'worker-host-stale'
+        },
+        stageStartedAt: '2026-04-06T02:30:00.000Z'
+      })
+    ).toBeNull();
+  });
+
+  it('prefers claim launch_started_at over older started_at when filtering stale proof worker_host', () => {
+    const source = buildCompatibilitySource({
+      rawStatus: 'in_progress',
+      displayStatus: 'In Progress',
+      startedAt: '2026-04-06T02:00:00.000Z',
+      providerLinearWorkerProof: {
+        issue_id: 'issue-100',
+        issue_identifier: 'CO-100',
+        attempt_started_at: '2026-04-06T02:10:00.000Z',
+        updated_at: '2026-04-06T02:20:00.000Z',
+        worker_host: 'worker-host-stale'
+      } as NonNullable<ControlCompatibilitySourceContext['providerLinearWorkerProof']> & {
+        worker_host: string;
+      },
+      providerDebugSnapshot: {
+        live_linear_state: {
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-04-06T02:35:00.000Z'
+        },
+        claim: {
+          state: 'in_progress',
+          updated_at: '2026-04-06T02:35:00.000Z',
+          accepted_at: '2026-04-06T02:05:00.000Z',
+          launch_started_at: '2026-04-06T02:30:00.000Z',
+          worker_host: null
+        },
+        worker: null,
+        parallelization: null,
+        pull_request: null,
+        progress: null,
+        last_audit_operation: null,
+        last_semantic_progress_at: '2026-04-06T02:35:00.000Z',
+        stall_classification: null,
+        stall_reason: null,
+        recovery_recommendation: null
+      } as NonNullable<ControlCompatibilitySourceContext['providerDebugSnapshot']>
+    });
+
+    const projection = buildCompatibilityProjectionSnapshot({
+      selected: source,
+      running: [source],
+      retrying: [source],
+      codexTotals: {
+        input_tokens: 0,
+        output_tokens: 0,
+        total_tokens: 0,
+        seconds_running: 0
+      },
+      rateLimits: null,
+      dispatchPilot: null,
+      tracked: null,
+      providerIntake: null,
+      providerWorkflow: null,
+      polling: null
+    });
+
+    expect(projection.selected?.worker_host).toBeUndefined();
+    expect(projection.running[0]?.worker_host).toBeUndefined();
+    expect(projection.retrying[0]?.worker_host).toBeUndefined();
+    expect(projection.issues[0]?.payload.worker_host).toBeUndefined();
+  });
+
+  it('prefers a fresh proof worker_host over a stale intake fallback', () => {
+    expect(
+      resolveProviderWorkerHost({
+        providerLinearWorkerProof: {
+          issue_id: 'issue-100',
+          issue_identifier: 'CO-100',
+          attempt_started_at: '2026-04-06T02:30:00.000Z',
+          updated_at: '2026-04-06T02:35:00.000Z',
+          worker_host: 'worker-host-proof'
+        },
+        providerIntake: {
+          provider: 'linear',
+          issue_id: 'issue-100',
+          issue_identifier: 'CO-100',
+          issue_title: 'CO-100',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-06T02:35:00.000Z',
+          task_id: 'linear-co-100',
+          mapping_source: 'provider_id_fallback',
+          state: 'running',
+          reason: 'provider_issue_rehydrated_active_run',
+          run_id: 'run-co-100',
+          worker_host: 'worker-host-stale',
+          freshness: 'current',
+          rehydrated_at: '2026-04-06T02:35:00.000Z',
+          is_rehydrated: false,
+          updated_at: '2026-04-06T02:35:00.000Z'
+        },
+        stageStartedAt: '2026-04-06T02:30:00.000Z'
+      })
+    ).toBe('worker-host-proof');
+  });
+
+  it('does not resurrect intake worker_host when the claim explicitly clears it', () => {
+    expect(
+      resolveProviderWorkerHost({
+        providerDebugSnapshot: {
+          live_linear_state: {
+            state: 'In Progress',
+            state_type: 'started',
+            updated_at: '2026-04-06T02:35:00.000Z'
+          },
+          claim: {
+            state: 'running',
+            reason: 'provider_issue_rehydrated_active_run',
+            updated_at: '2026-04-06T02:35:00.000Z',
+            run_id: 'run-co-100',
+            worker_host: null,
+            launch_source: 'control-host',
+            launch_started_at: '2026-04-06T02:30:00.000Z',
+            freshness: 'current',
+            is_rehydrated: false,
+            rehydrated_at: null
+          },
+          worker: null,
+          parallelization: null,
+          pull_request: null,
+          progress: null,
+          last_audit_operation: null,
+          last_semantic_progress_at: '2026-04-06T02:35:00.000Z',
+          stall_classification: null,
+          stall_reason: null,
+          recovery_recommendation: null
+        },
+        providerIntake: {
+          provider: 'linear',
+          issue_id: 'issue-100',
+          issue_identifier: 'CO-100',
+          issue_title: 'CO-100',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-06T02:35:00.000Z',
+          task_id: 'linear-co-100',
+          mapping_source: 'provider_id_fallback',
+          state: 'running',
+          reason: 'provider_issue_rehydrated_active_run',
+          run_id: 'run-co-100',
+          worker_host: 'worker-host-stale',
+          freshness: 'current',
+          rehydrated_at: '2026-04-06T02:35:00.000Z',
+          is_rehydrated: false,
+          updated_at: '2026-04-06T02:35:00.000Z'
+        }
+      })
+    ).toBeNull();
+  });
+
+  it('does not resurrect intake worker_host when fresh proof explicitly clears it', () => {
+    expect(
+      resolveProviderWorkerHost({
+        providerLinearWorkerProof: {
+          issue_id: 'issue-100',
+          issue_identifier: 'CO-100',
+          attempt_started_at: '2026-04-06T02:30:00.000Z',
+          updated_at: '2026-04-06T02:35:00.000Z',
+          worker_host: null
+        },
+        providerIntake: {
+          provider: 'linear',
+          issue_id: 'issue-100',
+          issue_identifier: 'CO-100',
+          issue_title: 'CO-100',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-06T02:35:00.000Z',
+          task_id: 'linear-co-100',
+          mapping_source: 'provider_id_fallback',
+          state: 'running',
+          reason: 'provider_issue_rehydrated_active_run',
+          run_id: 'run-co-100',
+          worker_host: 'worker-host-stale',
+          freshness: 'current',
+          rehydrated_at: '2026-04-06T02:35:00.000Z',
+          is_rehydrated: false,
+          updated_at: '2026-04-06T02:35:00.000Z'
+        },
+        stageStartedAt: '2026-04-06T02:30:00.000Z'
+      })
+    ).toBeNull();
+  });
+
+  it('uses provider intake fallback for selected and issue payloads when no claim or proof host is present', () => {
+    const source = buildCompatibilitySource({
+      rawStatus: 'in_progress',
+      displayStatus: 'In Progress'
+    });
+
+    const projection = buildCompatibilityProjectionSnapshot({
+      selected: source,
+      running: [],
+      retrying: [],
+      codexTotals: {
+        input_tokens: 0,
+        output_tokens: 0,
+        total_tokens: 0,
+        seconds_running: 0
+      },
+      rateLimits: null,
+      dispatchPilot: null,
+      tracked: null,
+      providerIntake: {
+        provider: 'linear',
+        issue_id: 'issue-100',
+        issue_identifier: 'CO-100',
+        issue_title: 'CO-100',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-06T02:35:00.000Z',
+        task_id: 'linear-co-100',
+        mapping_source: 'provider_id_fallback',
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        run_id: 'run-co-100',
+        worker_host: 'worker-host-intake',
+        freshness: 'current',
+        rehydrated_at: '2026-04-06T02:35:00.000Z',
+        is_rehydrated: false,
+        updated_at: '2026-04-06T02:35:00.000Z'
+      },
+      providerWorkflow: null,
+      polling: null
+    });
+
+    expect(projection.selected?.worker_host).toBe('worker-host-intake');
+    expect(projection.issues[0]?.payload.worker_host).toBe('worker-host-intake');
+  });
+
+  it('surfaces worker_host through selected, running, retrying, and issue payloads', () => {
+    const workerHost = 'worker-host-01';
+    const source = buildCompatibilitySource({
+      rawStatus: 'in_progress',
+      displayStatus: 'In Progress',
+      providerLinearWorkerProof: {
+        issue_id: 'issue-100',
+        issue_identifier: 'CO-100',
+        pid: '123',
+        latest_session_id: 'session-3',
+        latest_session_id_source: 'derived_from_thread_and_turn',
+        turn_count: 2,
+        last_event: 'turn_running',
+        last_message: 'Provider worker turn is active.',
+        last_event_at: '2026-04-06T02:35:00.000Z',
+        tokens: {
+          input_tokens: 0,
+          output_tokens: 0,
+          total_tokens: 0
+        },
+        rate_limits: null,
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        workspace_path: '/repo/.workspaces/co-100',
+        linear_audit: null,
+        progress: null,
+        tracked_issue_error: null,
+        end_reason: null,
+        updated_at: '2026-04-06T02:35:00.000Z',
+        worker_host: workerHost
+      } as NonNullable<ControlCompatibilitySourceContext['providerLinearWorkerProof']> & {
+        worker_host: string;
+      },
+      providerDebugSnapshot: {
+        live_linear_state: {
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-04-06T02:35:00.000Z'
+        },
+        claim: null,
+        worker: {
+          owner_phase: 'turn_running',
+          owner_status: 'in_progress',
+          pid: '123',
+          worker_host: workerHost,
+          thread_id: 'thread-1',
+          latest_session_id: 'session-3',
+          turn_count: 2,
+          last_event: 'turn_running',
+          last_event_at: '2026-04-06T02:35:00.000Z',
+          updated_at: '2026-04-06T02:35:00.000Z'
+        },
+        parallelization: null,
+        pull_request: null,
+        progress: null,
+        last_audit_operation: null,
+        last_semantic_progress_at: '2026-04-06T02:35:00.000Z',
+        stall_classification: null,
+        stall_reason: null,
+        recovery_recommendation: null
+      } as NonNullable<ControlCompatibilitySourceContext['providerDebugSnapshot']>
+    });
+
+    const projection = buildCompatibilityProjectionSnapshot({
+      selected: source,
+      running: [source],
+      retrying: [source],
+      codexTotals: {
+        input_tokens: 0,
+        output_tokens: 0,
+        total_tokens: 0,
+        seconds_running: 0
+      },
+      rateLimits: null,
+      dispatchPilot: null,
+      tracked: null,
+      providerIntake: null,
+      providerWorkflow: null,
+      polling: null
+    });
+
+    expect(projection.selected).toMatchObject({
+      issue_identifier: 'CO-100',
+      worker_host: workerHost,
+      provider_debug_snapshot: {
+        worker: {
+          worker_host: workerHost
+        }
+      }
+    });
+    expect(projection.running).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'CO-100',
+        worker_host: workerHost
+      })
+    ]);
+    expect(projection.retrying).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'CO-100',
+        worker_host: workerHost
+      })
+    ]);
+    expect(projection.issues[0]?.payload).toMatchObject({
+      issue_identifier: 'CO-100',
+      worker_host: workerHost,
+      provider_debug_snapshot: {
+        worker: {
+          worker_host: workerHost
+        }
+      }
+    });
+  });
+
   it.each([
     {
       displayStatus: 'pending_shared_root_reconciliation',
@@ -165,6 +525,219 @@ describe('CompatibilityIssuePresenter', () => {
     );
 
     expect(runningEntry.display_event).toBe('updated TECH_SPEC + validating status parity');
+  });
+
+  it('does not surface selected-only synthetic linear task-id fallback sources as issue rows', () => {
+    const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+    const projection = buildCompatibilityProjectionSnapshot(
+      buildCompatibilityRuntime(
+        buildCompatibilitySource({
+          issueProvider: 'linear',
+          issueIdentifier: taskId,
+          issueId: taskId,
+          taskId,
+          pipelineId: 'provider-linear-worker',
+          rawStatus: 'in_progress',
+          displayStatus: 'In Progress',
+          updatedAt: '2026-04-06T02:35:00.000Z',
+          completedAt: null,
+          summary: 'fallback-only selected source'
+        })
+      )
+    );
+
+    expect(projection.selected?.issue_identifier).toBe(taskId);
+    expect(projection.issues).toEqual([]);
+  });
+
+  it('does not surface slug-shaped synthetic linear fallback task ids as issue rows', () => {
+    const taskId = 'linear-lin-issue-1';
+    const projection = buildCompatibilityProjectionSnapshot(
+      buildCompatibilityRuntime(
+        buildCompatibilitySource({
+          issueProvider: 'linear',
+          issueIdentifier: taskId,
+          issueId: taskId,
+          taskId,
+          pipelineId: 'provider-linear-worker',
+          rawStatus: 'in_progress',
+          displayStatus: 'In Progress',
+          updatedAt: '2026-04-06T02:35:00.000Z',
+          completedAt: null,
+          summary: 'fallback-only selected source using slug fallback task id'
+        })
+      )
+    );
+
+    expect(projection.selected?.issue_identifier).toBe(taskId);
+    expect(projection.issues).toEqual([]);
+  });
+
+  it('does not surface synthetic linear fallback rows from running or retry registration', () => {
+    const runningTaskId = 'linear-lin-issue-1';
+    const retryTaskId = 'linear-lin-issue-2';
+    const projection = buildCompatibilityProjectionSnapshot({
+      ...buildCompatibilityRuntime(null),
+      running: [
+        buildCompatibilitySource({
+          issueProvider: 'linear',
+          issueIdentifier: runningTaskId,
+          issueId: runningTaskId,
+          taskId: runningTaskId,
+          pipelineId: 'provider-linear-worker',
+          rawStatus: 'in_progress',
+          displayStatus: 'In Progress',
+          completedAt: null,
+          summary: 'fallback-only running source using slug fallback task id'
+        })
+      ],
+      retrying: [
+        buildCompatibilitySource({
+          issueProvider: 'linear',
+          issueIdentifier: retryTaskId,
+          issueId: retryTaskId,
+          taskId: retryTaskId,
+          pipelineId: 'provider-linear-worker',
+          rawStatus: 'failed',
+          displayStatus: 'retrying',
+          completedAt: null,
+          summary: 'fallback-only retry source using slug fallback task id'
+        })
+      ]
+    });
+
+    expect(projection.running).toEqual([]);
+    expect(projection.retrying).toEqual([]);
+    expect(projection.issues).toEqual([]);
+  });
+
+  it('does not surface child-shaped parent fallback aliases from running or retry registration', () => {
+    const parentTaskId = 'linear-lin-issue-1';
+    const runningTaskId = `${parentTaskId}-docs-review`;
+    const retryTaskId = `${parentTaskId}-implementation-gate`;
+    const projection = buildCompatibilityProjectionSnapshot({
+      ...buildCompatibilityRuntime(null),
+      running: [
+        buildCompatibilitySource({
+          issueProvider: 'linear',
+          issueIdentifier: parentTaskId,
+          issueId: parentTaskId,
+          taskId: runningTaskId,
+          pipelineId: 'docs-review',
+          rawStatus: 'in_progress',
+          displayStatus: 'In Progress',
+          completedAt: null,
+          summary: 'child-shaped running source still reporting the parent fallback alias'
+        })
+      ],
+      retrying: [
+        buildCompatibilitySource({
+          issueProvider: 'linear',
+          issueIdentifier: parentTaskId,
+          issueId: parentTaskId,
+          taskId: retryTaskId,
+          pipelineId: 'implementation-gate',
+          rawStatus: 'failed',
+          displayStatus: 'retrying',
+          completedAt: null,
+          summary: 'child-shaped retry source still reporting the parent fallback alias'
+        })
+      ]
+    });
+
+    expect(projection.running).toEqual([]);
+    expect(projection.retrying).toEqual([]);
+    expect(projection.issues).toEqual([]);
+  });
+
+  it('keeps non-linear selected rows even when their task id matches the synthetic linear pattern', () => {
+    const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+    const projection = buildCompatibilityProjectionSnapshot(
+      buildCompatibilityRuntime(
+        buildCompatibilitySource({
+          issueProvider: 'github',
+          issueIdentifier: taskId,
+          issueId: taskId,
+          taskId,
+          rawStatus: 'in_progress',
+          displayStatus: 'In Progress',
+          updatedAt: '2026-04-06T02:35:00.000Z',
+          completedAt: null,
+          summary: 'non-linear selected source'
+        })
+      )
+    );
+
+    expect(projection.issues.map((issue) => issue.issueIdentifier)).toEqual([taskId]);
+  });
+
+  it('keeps linear-tagged selected rows when provider-worker provenance is absent', () => {
+    const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+    const projection = buildCompatibilityProjectionSnapshot(
+      buildCompatibilityRuntime(
+        buildCompatibilitySource({
+          issueProvider: 'linear',
+          issueIdentifier: taskId,
+          issueId: taskId,
+          taskId,
+          pipelineId: 'custom-background-pipeline',
+          pipelineTitle: 'Custom Background Pipeline',
+          rawStatus: 'in_progress',
+          displayStatus: 'In Progress',
+          updatedAt: '2026-04-06T02:35:00.000Z',
+          completedAt: null,
+          summary: 'linear-tagged custom pipeline should stay visible'
+        })
+      )
+    );
+
+    expect(projection.issues.map((issue) => issue.issueIdentifier)).toEqual([taskId]);
+  });
+
+  it('keeps null-provider child-pipeline fallback rows when worker evidence is absent', () => {
+    const parentTaskId = 'linear-lin-issue-1';
+    const childTaskId = `${parentTaskId}-docs-review`;
+    const projection = buildCompatibilityProjectionSnapshot(
+      buildCompatibilityRuntime(
+        buildCompatibilitySource({
+          issueProvider: null,
+          issueIdentifier: parentTaskId,
+          issueId: parentTaskId,
+          taskId: childTaskId,
+          pipelineId: 'docs-review',
+          rawStatus: 'in_progress',
+          displayStatus: 'In Progress',
+          updatedAt: '2026-04-06T02:35:00.000Z',
+          completedAt: null,
+          summary: 'generic docs-review run with fallback-shaped issue fields'
+        })
+      )
+    );
+
+    expect(projection.issues.map((issue) => issue.issueIdentifier)).toEqual([parentTaskId]);
+  });
+
+  it('keeps selected rows when optional provider-worker provenance fields are omitted', () => {
+    const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+    const projection = buildCompatibilityProjectionSnapshot(
+      buildCompatibilityRuntime(
+        buildCompatibilitySource({
+          issueProvider: null,
+          issueIdentifier: taskId,
+          issueId: taskId,
+          taskId,
+          pipelineTitle: undefined,
+          providerLinearWorkerProof: undefined,
+          rawStatus: 'in_progress',
+          displayStatus: 'In Progress',
+          updatedAt: '2026-04-06T02:35:00.000Z',
+          completedAt: null,
+          summary: 'generic selected source with omitted provenance helpers'
+        })
+      )
+    );
+
+    expect(projection.issues.map((issue) => issue.issueIdentifier)).toEqual([taskId]);
   });
 
   it('keeps the projected child-summary message and timestamp when newer proof telemetry is generic', () => {

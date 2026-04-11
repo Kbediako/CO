@@ -1,5 +1,5 @@
 ---
-last_review: 2026-03-19
+last_review: 2026-04-10
 ---
 
 # Technical Spec — Design Reference Pipeline (Task 0401)
@@ -8,6 +8,7 @@ last_review: 2026-03-19
 - Objective: Implement an opt-in `design-reference` pipeline that stages high-fidelity design artifacts (DOM, CSS, screenshots, reference HTML, Storybook components, optional animations/video) and persists evidence into manifests and `out/**` outputs while respecting retention, privacy, and approval guardrails.
 - In Scope: Pipeline selection/config loading, `ArtifactStager` enhancements, Playwright extractor, reference page builder, componentization inside `packages/design-system`, advanced asset generators (Framer Motion/FFmpeg), visual regression execution, manifest schema/writer updates, DesignArtifactWriter, guardrail tooling updates.
 - Out of Scope: Automatic enrollment for all tasks, re-platforming Storybook, shipping a new analytics dashboard, bundling Playwright/FFmpeg binaries into core CI images.
+- Current repo truth after `CO-88`: the checked-in `packages/design-system` package remains scaffold-level and `npm --prefix packages/design-system run test:visual` is placeholder smoke. Treat this spec as pipeline intent plus historical evidence, not as proof of a mature current-branch component/regression surface.
 
 ## Requirements Mapping
 | PRD Goal | Spec Section |

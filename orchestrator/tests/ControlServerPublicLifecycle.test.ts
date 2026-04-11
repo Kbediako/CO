@@ -35,9 +35,18 @@ import {
   prepareControlServerStartupInputs,
   type PreparedControlServerStartupInputs
 } from '../src/cli/control/controlServerStartupInputPreparation.js';
+import {
+  acquireControlHostOwnership,
+  type ControlHostOwnershipHandle,
+  type ControlHostOwnershipPollingPayload
+} from '../src/cli/control/controlHostOwnership.js';
 
 vi.mock('../src/cli/control/controlServerStartupInputPreparation.js', () => ({
   prepareControlServerStartupInputs: vi.fn()
+}));
+
+vi.mock('../src/cli/control/controlHostOwnership.js', () => ({
+  acquireControlHostOwnership: vi.fn()
 }));
 
 vi.mock('../src/cli/control/controlServerReadyInstanceLifecycle.js', () => ({
@@ -71,6 +80,8 @@ function buildTrackedIssue(id: string): LiveLinearTrackedIssue {
     url: null,
     state: 'Todo',
     state_type: 'unstarted',
+    archived_at: null,
+    trashed: false,
     workspace_id: null,
     viewer_id: null,
     assignee_id: null,
@@ -86,6 +97,49 @@ function buildTrackedIssue(id: string): LiveLinearTrackedIssue {
   };
 }
 
+function buildMockControlHostOwnershipHandle(
+  input: {
+    release?: () => Promise<void>;
+    polling?: ControlHostOwnershipPollingPayload;
+  } = {}
+): ControlHostOwnershipHandle {
+  const polling: ControlHostOwnershipPollingPayload =
+    input.polling ?? {
+      status: 'owned',
+      reason: null,
+      updated_at: '2026-04-11T00:00:00.000Z',
+      owner: null,
+      diagnostic_path: null,
+      lock_dir: null,
+      owner_path: null
+    };
+  return {
+    metadata: {
+      schema_version: 1,
+      status: 'owned',
+      owner_token: 'owner-token',
+      acquired_at: polling.updated_at,
+      updated_at: polling.updated_at,
+      released_at: null,
+      repo_root: null,
+      task_id: null,
+      run_id: 'run-1',
+      run_dir: '/tmp/run',
+      pipeline_id: null,
+      pid: 1,
+      ppid: null,
+      hostname: 'host',
+      cwd: null,
+      argv: [],
+      lock_dir: '/tmp/run/control-host-owner.lock',
+      lock_owner_path: '/tmp/run/control-host-owner.lock/owner.json',
+      owner_path: '/tmp/run/control-host-owner.json'
+    },
+    polling,
+    release: input.release ?? vi.fn(async () => undefined)
+  };
+}
+
 async function flushStartupProviderRefresh(): Promise<void> {
   await vi.advanceTimersByTimeAsync(0);
 }
@@ -94,6 +148,7 @@ describe('startControlServerPublicLifecycle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useRealTimers();
+    vi.mocked(acquireControlHostOwnership).mockResolvedValue(null as never);
     vi.mocked(resolveLinearWebhookSourceSetup).mockReturnValue({
       sourceSetup: {} as never
     });
@@ -165,6 +220,95 @@ describe('startControlServerPublicLifecycle', () => {
       controlToken: 'token-123',
       intervalMs: 15_000
     });
+  });
+
+  it('fails closed before startup preparation when a same-task control-host owner already exists', async () => {
+    const error = Object.assign(
+      new Error('control-host ownership rejected (duplicate_control_host_owner)'),
+      {
+        code: 'duplicate_control_host_owner',
+        reason: 'duplicate_control_host_owner'
+      }
+    );
+    vi.mocked(acquireControlHostOwnership).mockRejectedValueOnce(error);
+
+    await expect(
+      startControlServerPublicLifecycle({
+        paths: { repoRoot: '/tmp/repo' } as RunPaths,
+        config: { ui: { bindHost: '127.0.0.1' } } as unknown as EffectiveDelegationConfig,
+        runId: 'run-1',
+        controlHostOwnership: {}
+      })
+    ).rejects.toMatchObject({
+      code: 'duplicate_control_host_owner',
+      reason: 'duplicate_control_host_owner'
+    });
+
+    expect(prepareControlServerStartupInputs).not.toHaveBeenCalled();
+    expect(startControlServerReadyInstanceLifecycle).not.toHaveBeenCalled();
+  });
+
+  it('releases the current control-host ownership handle during public lifecycle shutdown', async () => {
+    const release = vi.fn(async () => undefined);
+    vi.mocked(acquireControlHostOwnership).mockResolvedValueOnce(
+      buildMockControlHostOwnershipHandle({ release })
+    );
+    const requestContextShared = {
+      clients: new Set(),
+      eventTransport: { broadcast: vi.fn() }
+    } as unknown as ControlRequestSharedContext;
+    const lifecycleState = {
+      expiryLifecycle: { close: vi.fn() },
+      bootstrapLifecycle: { close: vi.fn(async () => undefined) }
+    } as unknown as ControlServerOwnedLifecycleState;
+    const server = { kind: 'server' } as unknown as http.Server;
+
+    vi.mocked(prepareControlServerStartupInputs).mockResolvedValue({
+      requestContextShared,
+      host: '127.0.0.1',
+      controlToken: 'token-123'
+    } satisfies PreparedControlServerStartupInputs);
+    vi.mocked(startControlServerReadyInstanceLifecycle).mockResolvedValue({
+      server,
+      baseUrl: 'http://127.0.0.1:4545',
+      lifecycleState
+    });
+
+    const started = await startControlServerPublicLifecycle({
+      paths: { repoRoot: '/tmp/repo' } as RunPaths,
+      config: { ui: { bindHost: '127.0.0.1' } } as unknown as EffectiveDelegationConfig,
+      runId: 'run-1',
+      controlHostOwnership: {}
+    });
+
+    await closeControlServerPublicLifecycle(started);
+
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the control-host ownership lock when runtime shutdown fails', async () => {
+    const release = vi.fn(async () => undefined);
+    vi.mocked(closeControlServerOwnedRuntime).mockRejectedValueOnce(
+      new Error('runtime shutdown failed')
+    );
+    const state = {
+      server: { kind: 'server' } as unknown as http.Server,
+      requestContextShared: {
+        clients: new Set(),
+        eventTransport: { broadcast: vi.fn() }
+      } as unknown as ControlRequestSharedContext,
+      lifecycleState: {
+        expiryLifecycle: { close: vi.fn() },
+        bootstrapLifecycle: { close: vi.fn(async () => undefined) }
+      } as unknown as ControlServerOwnedLifecycleState,
+      controlHostOwnership: buildMockControlHostOwnershipHandle({ release })
+    };
+
+    await expect(closeControlServerPublicLifecycle(state)).rejects.toThrow(
+      'runtime shutdown failed'
+    );
+
+    expect(release).not.toHaveBeenCalled();
   });
 
   it('triggers an immediate provider refresh, keeps the timer active, and clears it on shutdown', async () => {

@@ -11,12 +11,19 @@ import type {
 } from './observabilityReadModel.js';
 import {
   buildProjectionSelectedPayload,
+  resolveProviderWorkerHost,
   buildTrackedPayloadEnvelope,
   buildSelectedRunLatestEventPayload
 } from './observabilityReadModel.js';
 import type { LinearBudgetStatus } from './linearBudgetState.js';
 
+const PROVIDER_LINEAR_WORKER_PIPELINE_TITLE = 'Provider Linear Worker';
+const PROVIDER_LINEAR_WORKER_PIPELINE_ID = 'provider-linear-worker';
+const SYNTHETIC_LINEAR_TASK_ID_PATTERN =
+  /^linear-[a-z0-9]+(?:-[a-z0-9]+)*$/i;
+
 export interface CompatibilityIssueSourceRecord {
+  issueProvider: string | null;
   issueIdentifier: string;
   issueId: string | null;
   taskId: string | null;
@@ -25,6 +32,9 @@ export interface CompatibilityIssueSourceRecord {
   updatedAt: string | null;
   startedAt: string | null;
   completedAt: string | null;
+  pipelineId?: string | null;
+  pipelineTitle?: string | null;
+  providerLinearWorkerProof?: ControlCompatibilitySourceContext['providerLinearWorkerProof'];
   latestEvent: {
     at: string | null;
   } | null;
@@ -80,7 +90,9 @@ export function buildCompatibilityProjectionSnapshot(
   });
   const runningByIssue = new Map(running.map((entry) => [entry.issue_identifier, entry] as const));
   const retryingByIssue = new Map(retrying.map((entry) => [entry.issue_identifier, entry] as const));
-  const selectedPayload = snapshot.selected ? buildProjectionSelectedPayload(snapshot.selected) : null;
+  const selectedPayload = snapshot.selected
+    ? buildProjectionSelectedPayload(snapshot.selected, snapshot.providerIntake ?? null)
+    : null;
   const issues = index.issues
     .map((issue) => {
       const preferredSource = issue.runningSource ?? issue.retrySource ?? issue.selectedSource;
@@ -94,7 +106,8 @@ export function buildCompatibilityProjectionSnapshot(
           source: preferredSource,
           running: runningByIssue.get(issue.issueIdentifier) ?? null,
           retry: retryingByIssue.get(issue.issueIdentifier) ?? null,
-          dispatchPilotSummary: issue.dispatchPilotSummary
+          dispatchPilotSummary: issue.dispatchPilotSummary,
+          providerIntake: snapshot.providerIntake ?? null
         })
       };
     })
@@ -196,15 +209,21 @@ export function buildCompatibilityIssueIndex<
     issuesByIdentifier.set(source.issueIdentifier, existing);
   };
 
-  registerIssue(snapshot.selected, {
-    kind: 'selected',
-    dispatchPilotSummary: snapshot.dispatchPilot
-  });
+  if (!isSyntheticLinearFallbackOnlyIssueSource(snapshot.selected)) {
+    registerIssue(snapshot.selected, {
+      kind: 'selected',
+      dispatchPilotSummary: snapshot.dispatchPilot
+    });
+  }
   snapshot.running.forEach((entry) => {
-    registerIssue(entry, { kind: 'running' });
+    if (!isSyntheticLinearFallbackOnlyIssueSource(entry)) {
+      registerIssue(entry, { kind: 'running' });
+    }
   });
   snapshot.retrying.forEach((entry) => {
-    registerIssue(entry, { kind: 'retry' });
+    if (!isSyntheticLinearFallbackOnlyIssueSource(entry)) {
+      registerIssue(entry, { kind: 'retry' });
+    }
   });
 
   return {
@@ -290,6 +309,11 @@ export function buildCompatibilityRunningEntry(
   polling: ControlPollingHealthPayload | null = null
 ): ControlRunningPayload {
   const proof = selected.providerLinearWorkerProof ?? null;
+  const workerHost = resolveProviderWorkerHost({
+    providerLinearWorkerProof: proof,
+    providerDebugSnapshot: selected.providerDebugSnapshot,
+    stageStartedAt: selected.startedAt
+  });
   const proofCurrentTurnActivity = proof?.current_turn_activity ?? null;
   const proofCanonicalEvent = normalizeCompatibilityMessage(proofCurrentTurnActivity?.event);
   const proofCanonicalMessage = normalizeCompatibilityMessage(
@@ -410,6 +434,7 @@ export function buildCompatibilityRunningEntry(
     display_state: selected.displayStatus,
     status_reason: selected.statusReason,
     pid: selected.providerLinearWorkerProof?.pid ?? null,
+    ...(workerHost !== null ? { worker_host: workerHost } : {}),
     session_id: useLegacyProofFallback
       ? normalizeCompatibilityMessage(proof?.latest_session_id)
       : proofCanonicalSessionId,
@@ -430,6 +455,11 @@ export function buildCompatibilityRunningEntry(
 export function buildCompatibilityRetryEntry(selected: ControlCompatibilitySourceContext): ControlRetryPayload {
   const retryState = selected.providerRetryState ?? null;
   const proof = selected.providerLinearWorkerProof ?? null;
+  const workerHost = resolveProviderWorkerHost({
+    providerLinearWorkerProof: proof,
+    providerDebugSnapshot: selected.providerDebugSnapshot,
+    stageStartedAt: selected.startedAt
+  });
   return {
     issue_id: selected.issueId,
     issue_identifier: selected.issueIdentifier,
@@ -439,6 +469,7 @@ export function buildCompatibilityRetryEntry(selected: ControlCompatibilitySourc
     display_state: selected.displayStatus,
     status_reason: selected.statusReason,
     session_id: proof?.latest_session_id ?? null,
+    ...(workerHost !== null ? { worker_host: workerHost } : {}),
     thread_id: proof?.thread_id ?? null,
     turn_count: proof?.turn_count ?? null,
     workspace_path: selected.workspacePath,
@@ -457,10 +488,20 @@ export function buildCompatibilityIssuePayload(input: {
   running: ControlRunningPayload | null;
   retry: ControlRetryPayload | null;
   dispatchPilotSummary: ControlDispatchPilotPayload | null;
+  providerIntake?: ControlCompatibilityRuntimeSnapshot['providerIntake'];
 }): ControlIssuePayload {
-  const selectedPayload = buildProjectionSelectedPayload(input.source);
+  const selectedPayload = buildProjectionSelectedPayload(
+    input.source,
+    input.providerIntake ?? null
+  );
   const latestEvent = buildSelectedRunLatestEventPayload(input.source.latestEvent);
   const recentEvents = latestEvent ? [latestEvent] : [];
+  const workerHost = resolveProviderWorkerHost({
+    providerLinearWorkerProof: input.source.providerLinearWorkerProof,
+    providerDebugSnapshot: input.source.providerDebugSnapshot,
+    providerIntake: input.providerIntake ?? null,
+    stageStartedAt: input.source.startedAt
+  });
 
   return {
     issue_identifier: input.source.issueIdentifier,
@@ -474,6 +515,7 @@ export function buildCompatibilityIssuePayload(input: {
     workspace: {
       path: input.source.workspacePath ?? input.source.providerLinearWorkerProof?.workspace_path ?? null
     },
+    ...(workerHost !== null ? { worker_host: workerHost } : {}),
     attempts: buildCompatibilityIssueAttempts(input.source, input.retry),
     running: input.running,
     retry: input.retry,
@@ -1081,6 +1123,90 @@ function buildCompatibilityIssueAliases<TSource extends CompatibilityIssueSource
     }
   }
   return Array.from(aliases);
+}
+
+function hasExplicitCompatibilityIssueIdentity(
+  source: Pick<
+    CompatibilityIssueSourceRecord,
+    'issueProvider' | 'issueIdentifier' | 'issueId' | 'taskId' | 'runId'
+  >
+): boolean {
+  if (
+    source.issueIdentifier &&
+    !isFallbackCompatibilityIdentityValue(source.issueIdentifier, source)
+  ) {
+    return true;
+  }
+  if (source.issueId && !isFallbackCompatibilityIdentityValue(source.issueId, source)) {
+    return true;
+  }
+  return false;
+}
+
+function isFallbackCompatibilityIdentityValue(
+  value: string,
+  source: Pick<CompatibilityIssueSourceRecord, 'taskId' | 'runId'>
+): boolean {
+  return (
+    isFallbackCompatibilityIdentityAlias(value, source.taskId) ||
+    isFallbackCompatibilityIdentityAlias(value, source.runId)
+  );
+}
+
+function isFallbackCompatibilityIdentityAlias(
+  value: string,
+  candidate: string | null
+): boolean {
+  if (!candidate) {
+    return false;
+  }
+  if (value === candidate) {
+    return true;
+  }
+  return SYNTHETIC_LINEAR_TASK_ID_PATTERN.test(value) && candidate.startsWith(`${value}-`);
+}
+
+function isSyntheticLinearFallbackOnlyIssueSource(
+  source: Pick<
+    CompatibilityIssueSourceRecord,
+    | 'issueProvider'
+    | 'issueIdentifier'
+    | 'issueId'
+    | 'pipelineId'
+    | 'pipelineTitle'
+    | 'providerLinearWorkerProof'
+    | 'taskId'
+    | 'runId'
+  > | null
+): boolean {
+  return (
+    source !== null &&
+    hasSyntheticLinearFallbackProvenance(source) &&
+    source.taskId !== null &&
+    SYNTHETIC_LINEAR_TASK_ID_PATTERN.test(source.taskId) &&
+    !hasExplicitCompatibilityIssueIdentity(source)
+  );
+}
+
+function hasSyntheticLinearFallbackProvenance(
+  source: Pick<
+    CompatibilityIssueSourceRecord,
+    'issueProvider' | 'pipelineId' | 'pipelineTitle' | 'providerLinearWorkerProof'
+  >
+): boolean {
+  if (source.issueProvider !== null && source.issueProvider !== 'linear') {
+    return false;
+  }
+  return (
+    source.pipelineId === PROVIDER_LINEAR_WORKER_PIPELINE_ID ||
+    source.pipelineTitle === PROVIDER_LINEAR_WORKER_PIPELINE_TITLE ||
+    source.providerLinearWorkerProof != null ||
+    (source.issueProvider === 'linear' &&
+      (source.pipelineId === 'docs-review' ||
+        source.pipelineId === 'implementation-gate' ||
+        source.pipelineId === 'docs-relevance-advisory' ||
+        source.pipelineId === 'provider-linear-child-lane'))
+  );
 }
 
 function pickPreferredCompatibilitySource<TSource extends CompatibilityIssueSourceRecord>(

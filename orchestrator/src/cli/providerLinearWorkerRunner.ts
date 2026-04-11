@@ -32,6 +32,7 @@ import { readSharedLinearBudgetStatus, type LinearBudgetStatus } from './control
 import {
   classifyProviderLinearWorkerLifecycle,
 } from './control/providerLinearWorkflowStates.js';
+import { readControlHostOwnershipOperatorHint } from './control/controlHostOwnership.js';
 import {
   PROVIDER_LINEAR_AUDIT_ENV_VAR,
   PROVIDER_LINEAR_PARALLELIZATION_REASONS,
@@ -69,6 +70,10 @@ import {
   normalizeProviderLinearChildLanePathSelectors,
   type ProviderLinearChildLanePathSelector
 } from './providerLinearChildLanePhaseContract.js';
+import {
+  PROVIDER_WORKER_HOST_ENV_KEY,
+  normalizeProviderWorkerHostName
+} from './control/providerWorkerHosts.js';
 import { resolveCodexOrchestratorBootstrapInvocation } from './utils/packageProgramResolver.js';
 
 export const PROVIDER_LINEAR_WORKER_PROOF_FILENAME = 'provider-linear-worker-proof.json';
@@ -149,6 +154,7 @@ export interface ProviderLinearWorkerContext {
   providerControlHostRecordedInManifest: boolean;
   providerControlHostMatchesManifest: boolean;
   workspacePath: string | null;
+  workerHost: string | null;
   sourceSetup: DispatchPilotSourceSetup | null;
   issueId: string;
   issueIdentifier: string;
@@ -275,6 +281,7 @@ export interface ProviderLinearWorkerProof {
   owner_phase: string;
   owner_status: 'in_progress' | 'succeeded' | 'failed';
   workspace_path: string | null;
+  worker_host?: string | null;
   source_setup?: DispatchPilotSourceSetup | null;
   linear_audit: ProviderLinearAuditSummary | null;
   child_streams?: ProviderLinearWorkerChildStreamRecord[];
@@ -691,6 +698,13 @@ export async function loadProviderLinearWorkerContext(
       envProviderControlHostTaskId === manifestProviderControlHostTaskId &&
       envProviderControlHostRunId === manifestProviderControlHostRunId
   );
+  const hasExplicitWorkerHostOverride = Object.prototype.hasOwnProperty.call(
+    env,
+    PROVIDER_WORKER_HOST_ENV_KEY
+  );
+  const envWorkerHost = hasExplicitWorkerHostOverride
+    ? normalizeProviderWorkerHostName(env[PROVIDER_WORKER_HOST_ENV_KEY])
+    : undefined;
   return {
     manifest,
     manifestPath,
@@ -711,6 +725,10 @@ export async function loadProviderLinearWorkerContext(
       Boolean(manifestProviderControlHostTaskId && manifestProviderControlHostRunId),
     providerControlHostMatchesManifest,
     workspacePath: normalizedManifestWorkspacePath ?? repoRoot,
+    workerHost:
+      envWorkerHost !== undefined
+        ? envWorkerHost
+        : normalizeProviderWorkerHostName(manifest.worker_host ?? manifest.workerHost),
     sourceSetup: resolveProviderLinearWorkerSourceSetup(env),
     issueId,
     issueIdentifier,
@@ -3506,6 +3524,7 @@ async function requestProviderControlHostRefresh(input: {
   if (!shouldRefresh) {
     return;
   }
+  let controlHostRunDir: string | null = null;
   try {
     const manifestTarget = await resolveProviderControlHostManifestPath(
       input.currentManifestPath,
@@ -3517,6 +3536,7 @@ async function requestProviderControlHostRefresh(input: {
     }
     const canonicalRunsRoot = manifestTarget.currentRun.canonicalRunsRoot;
     const canonicalRunDir = await realpathOrResolveIfMissing(dirname(manifestTarget.manifestPath));
+    controlHostRunDir = canonicalRunDir;
     const canonicalManifestPath = await realpathOrResolveIfMissing(
       resolve(canonicalRunDir, basename(manifestTarget.manifestPath))
     );
@@ -3602,8 +3622,13 @@ async function requestProviderControlHostRefresh(input: {
     const message = (error as Error)?.name === 'AbortError'
       ? 'refresh request timeout'
       : (error as Error)?.message ?? String(error);
+    const ownershipHint = controlHostRunDir
+      ? await readControlHostOwnershipOperatorHint(controlHostRunDir).catch(() => null)
+      : null;
     input.log.warn(
-      `provider-linear-worker could not request control-host refresh for ${input.proof.issue_identifier}: ${message}`
+      `provider-linear-worker could not request control-host refresh for ${input.proof.issue_identifier}: ${message}${
+        ownershipHint ? `; ${ownershipHint}` : ''
+      }`
     );
   }
 }
@@ -3778,6 +3803,7 @@ export async function runProviderLinearWorker(
     owner_phase: 'bootstrapping',
     owner_status: 'in_progress',
     workspace_path: context.workspacePath,
+    worker_host: context.workerHost,
     source_setup: context.sourceSetup,
     linear_audit: null,
     child_streams: [],
@@ -4368,6 +4394,7 @@ export async function runProviderLinearWorker(
         owner_phase: execResult.exitCode === 0 ? 'turn_completed' : 'turn_failed',
         owner_status: execResult.exitCode === 0 ? 'in_progress' : 'failed',
         workspace_path: context.workspacePath,
+        worker_host: context.workerHost,
         source_setup: context.sourceSetup,
         linear_audit: finalProof.linear_audit,
         child_streams: finalProof.child_streams,

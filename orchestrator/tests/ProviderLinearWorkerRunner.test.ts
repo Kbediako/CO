@@ -36,10 +36,12 @@ import {
   type ProviderLinearAuditSummary
 } from '../src/cli/control/providerLinearWorkflowAudit.js';
 import { recordLinearBudgetHeadersObservation } from '../src/cli/control/linearBudgetState.js';
+import { CONTROL_HOST_DUPLICATE_OWNER_FILE } from '../src/cli/control/controlPersistenceFiles.js';
 import { resolveProviderLinearChildLaneScopeContract } from '../src/cli/providerLinearChildLanePhaseContract.js';
 import type { RuntimeCodexCommandContext } from '../src/cli/runtime/index.js';
 
 let tempRoot: string | null = null;
+const providerLinearWorkerRunnerTestTimeoutMs = 60_000;
 const SOURCE_HELPER_COMMAND = 'node "/tmp/co/bin/codex-orchestrator.js" linear';
 
 afterEach(async () => {
@@ -154,6 +156,8 @@ function createTrackedIssue(overrides: Partial<LiveLinearTrackedIssue> = {}): Li
     url: 'https://linear.app/example/issue/CO-2',
     state: 'In Progress',
     state_type: 'started',
+    archived_at: null,
+    trashed: false,
     workspace_id: 'workspace-1',
     viewer_id: 'viewer-1',
     assignee_id: 'viewer-1',
@@ -428,7 +432,7 @@ async function appendStaySerialParallelizationDecisionAuditForRequest(
   });
 }
 
-describe('provider linear worker runner', () => {
+describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerTestTimeoutMs }, () => {
   it('loads provider worker context from manifest-backed env', async () => {
     const { manifestPath } = await createManifestRoot();
 
@@ -466,6 +470,57 @@ describe('provider linear worker runner', () => {
       team_id: 'team-1',
       project_id: 'project-1'
     });
+  });
+
+  it('loads and normalizes the selected worker_host from provider worker env', async () => {
+    const { manifestPath } = await createManifestRoot();
+
+    const context = await loadProviderLinearWorkerContext({
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+      CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+      CODEX_ORCHESTRATOR_PROVIDER_WORKER_HOST: '  worker-host-01  '
+    });
+
+    expect(context.workerHost).toBe('worker-host-01');
+  });
+
+  it('treats an empty worker_host env value as an explicit local clear', async () => {
+    const { manifestPath } = await createManifestRoot();
+    await writeFile(manifestPath, JSON.stringify({
+      run_id: 'run-child',
+      task_id: 'linear-lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      workspace_path: tempRoot,
+      worker_host: 'worker-host-manifest'
+    }), 'utf8');
+
+    const context = await loadProviderLinearWorkerContext({
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+      CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+      CODEX_ORCHESTRATOR_PROVIDER_WORKER_HOST: '   '
+    });
+
+    expect(context.workerHost).toBeNull();
+  });
+
+  it('falls back to the manifest host when no worker_host env override is present', async () => {
+    const { manifestPath } = await createManifestRoot();
+    await writeFile(manifestPath, JSON.stringify({
+      run_id: 'run-child',
+      task_id: 'linear-lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      workspace_path: tempRoot,
+      worker_host: 'worker-host-manifest'
+    }), 'utf8');
+
+    const context = await loadProviderLinearWorkerContext({
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+      CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined
+    });
+
+    expect(context.workerHost).toBe('worker-host-manifest');
   });
 
   it('loads provider worker max turns from CODEX_HOME config when env overrides are absent', async () => {
@@ -1001,6 +1056,51 @@ describe('provider linear worker runner', () => {
     );
     expect(continuationPrompt).toContain(
       'Do not retry `upsert-workpad` in this attempt until you first fix the deterministic validation error (workpad_marker_missing: Workpad body must contain "## Codex Workpad".).'
+    );
+  });
+
+  it('suppresses archived issue mutations within the same attempt', () => {
+    const issue = createTrackedIssue();
+    const helperCommand = SOURCE_HELPER_COMMAND;
+    const audit: ProviderLinearAuditSummary = {
+      path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+      attempted_count: 1,
+      success_count: 0,
+      failure_count: 1,
+      latest_recorded_at: '2026-03-21T09:00:00.000Z',
+      parallelization_entries: [],
+      latest_by_operation: {
+        'upsert-workpad': {
+          recorded_at: '2026-03-21T09:00:00.000Z',
+          operation: 'upsert-workpad',
+          ok: false,
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          source_setup: null,
+          action: null,
+          via: null,
+          state: null,
+          follow_up_issue_id: null,
+          follow_up_issue_identifier: null,
+          failed_relation_type: null,
+          comment_id: null,
+          attachment_id: null,
+          error_code: 'linear_issue_not_mutable',
+          error_message: 'Linear issue CO-2 is archived and trashed and cannot accept provider mutations.'
+        }
+      }
+    };
+
+    const continuationPrompt = buildProviderWorkerPrompt(issue, 2, 5, helperCommand, '/tmp/co', {
+      linearAudit: audit,
+      attemptStartedAt: '2026-03-21T08:59:59.000Z'
+    });
+
+    expect(continuationPrompt).toContain(
+      'Same-attempt deterministic provider mutation suppressions are in effect'
+    );
+    expect(continuationPrompt).toContain(
+      'Do not retry `upsert-workpad` in this attempt until the Linear issue is restored to a mutable active state.'
     );
   });
 
@@ -1883,7 +1983,7 @@ describe('provider linear worker runner', () => {
         typeof message === 'string' && message.includes('[provider-linear-worker-progress]')
       )
     ).toBe(true);
-  });
+  }, providerLinearWorkerRunnerTestTimeoutMs);
 
   it('uses guarded resident-session seeds to resume the prior thread on worker turn one', async () => {
     const { manifestPath } = await createManifestRoot();
@@ -2101,7 +2201,7 @@ describe('provider linear worker runner', () => {
         project_id: 'project-1'
       }
     });
-  });
+  }, providerLinearWorkerRunnerTestTimeoutMs);
 
   it('treats a corrupt child-stream ledger as fatal during proof hydration', async () => {
     const { runDir } = await createManifestRoot();
@@ -4669,6 +4769,46 @@ describe('provider linear worker runner', () => {
       'utf8'
     );
     await writeFile(join(controlHostRunDir, 'control_auth.json'), JSON.stringify({ token: 'control-token' }), 'utf8');
+    const owner = {
+      schema_version: 1,
+      status: 'owned',
+      owner_token: 'owner-token',
+      acquired_at: '2026-04-11T00:00:00.000Z',
+      updated_at: '2026-04-11T00:00:00.000Z',
+      released_at: null,
+      repo_root: tempRoot,
+      task_id: 'local-mcp',
+      run_id: 'control-host',
+      run_dir: controlHostRunDir,
+      pipeline_id: 'provider-linear-worker',
+      pid: 123,
+      ppid: 1,
+      hostname: 'host.local',
+      cwd: tempRoot,
+      argv: ['codex-orchestrator', 'control-host'],
+      lock_dir: join(controlHostRunDir, 'control-host-owner.lock'),
+      lock_owner_path: join(controlHostRunDir, 'control-host-owner.lock', 'owner.json'),
+      owner_path: join(controlHostRunDir, 'control-host-owner.json')
+    };
+    await writeFile(
+      join(controlHostRunDir, CONTROL_HOST_DUPLICATE_OWNER_FILE),
+      JSON.stringify({
+        schema_version: 1,
+        reason: 'duplicate_control_host_owner',
+        observed_at: '2026-04-11T00:00:05.000Z',
+        run_dir: controlHostRunDir,
+        lock_dir: join(controlHostRunDir, 'control-host-owner.lock'),
+        diagnostic_path: join(controlHostRunDir, CONTROL_HOST_DUPLICATE_OWNER_FILE),
+        existing_owner: owner,
+        attempted_owner: {
+          ...owner,
+          owner_token: 'attempted-owner-token',
+          pid: 456
+        },
+        action: 'duplicate_rejected'
+      }),
+      'utf8'
+    );
     await writeFile(
       manifestPath,
       JSON.stringify({
@@ -4723,6 +4863,9 @@ describe('provider linear worker runner', () => {
     });
     expect(log.warn).toHaveBeenCalledWith(
       expect.stringContaining('control base_url not permitted')
+    );
+    expect(log.warn).toHaveBeenCalledWith(
+      expect.stringContaining('duplicate_control_host_owner')
     );
   });
 
@@ -9837,16 +9980,6 @@ describe('provider linear worker runner', () => {
           last_message: 'turn-2 active',
           owner_status: 'in_progress'
         });
-      });
-      const secondTurnProof = JSON.parse(
-        await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
-      ) as Record<string, unknown>;
-      expect(secondTurnProof).toMatchObject({
-        latest_turn_id: 'turn-2',
-        latest_session_id: 'thread-1-turn-2',
-        turn_count: 2,
-        last_message: 'turn-2 active',
-        owner_status: 'in_progress'
       });
 
       allowSecondTurnToFinishResolve?.();

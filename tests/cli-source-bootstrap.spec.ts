@@ -108,7 +108,7 @@ describe('checked-in CLI bootstrap', () => {
     });
 
     expect(result.stdout).toContain('ready');
-    await expect(readFile(join(tempRoot, 'child-signal.txt'), 'utf8')).resolves.toBe('SIGTERM\n');
+    await waitForFileContents(join(tempRoot, 'child-signal.txt'), 'SIGTERM\n');
     expect(result.stderr).toBe('');
   });
 
@@ -360,4 +360,23 @@ async function waitForOutput(readOutput: () => string, expected: string): Promis
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
   throw new Error(`Timed out waiting for output: ${expected}`);
+}
+
+async function waitForFileContents(path: string, expected: string): Promise<void> {
+  const deadline = Date.now() + 5_000;
+  let lastError: unknown = null;
+  while (Date.now() < deadline) {
+    try {
+      if ((await readFile(path, 'utf8')) === expected) {
+        return;
+      }
+    } catch (error) {
+      lastError = error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  if (lastError) {
+    throw lastError;
+  }
+  throw new Error(`Timed out waiting for file contents: ${path}`);
 }

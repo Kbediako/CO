@@ -27,9 +27,21 @@ export interface PrWatchMergeCoderabbitReviewMeta {
 
 export interface PrWatchMergeBotRereviewSignals {
   fetchError: boolean;
+  rateLimit?: PrWatchMergeGitHubRateLimitStatus | null;
   pendingBots: string[];
   inProgressBots: string[];
   coderabbit: PrWatchMergeCoderabbitReviewMeta;
+}
+
+export interface PrWatchMergeGitHubRateLimitStatus {
+  kind: 'github_rate_limited';
+  surface: 'graphql' | 'rest' | 'unknown' | string;
+  limit_type: 'primary' | 'secondary' | string;
+  status: number | null;
+  reset_at: string | null;
+  retry_after_seconds: number | null;
+  retry_at: string | null;
+  message: string | null;
 }
 
 export interface PrWatchMergeSnapshot {
@@ -58,11 +70,24 @@ export interface PrWatchMergeSnapshot {
   readinessMode: 'merge' | 'review';
   readyToMerge: boolean;
   headOid: string | null;
+  fanoutCacheHit: boolean;
+  githubRateLimit: PrWatchMergeGitHubRateLimitStatus | null;
+  githubRateLimits: PrWatchMergeGitHubRateLimitStatus[];
 }
 
 export interface PrWatchMergeRequiredChecksCache {
   headOid: string | null;
-  summary: PrWatchMergeCheckSummary;
+  updatedAt?: string | null;
+  summary?: PrWatchMergeCheckSummary;
+  requiredChecks?: PrWatchMergeCheckSummary | null;
+  requiredChecksFetchError?: boolean;
+  requiredChecksForNextPoll?: PrWatchMergeRequiredChecksCache | null;
+  inlineBotFeedback?: {
+    fetchError: boolean;
+    rateLimit?: PrWatchMergeGitHubRateLimitStatus | null;
+    unacknowledgedCount: number;
+  } | null;
+  botRereviewSignals?: PrWatchMergeBotRereviewSignals | null;
 }
 
 export interface PrWatchMergeArgsOptions {
@@ -126,13 +151,39 @@ export function buildStatusSnapshot(
   requiredChecks?: PrWatchMergeCheckSummary | null,
   inlineBotFeedback?: {
     fetchError: boolean;
+    rateLimit?: PrWatchMergeGitHubRateLimitStatus | null;
     unacknowledgedCount: number;
     rereview?: PrWatchMergeBotRereviewSignals | null;
   } | null,
   options?: Pick<PrWatchMergeOptions, 'readinessMode'> & {
     requiredChecksQueryFailed?: boolean;
+    fanoutCacheHit?: boolean;
+    githubRateLimits?: PrWatchMergeGitHubRateLimitStatus[];
   }
 ): PrWatchMergeSnapshot;
+
+export function resolveGitHubRateLimitStatus(
+  input: unknown,
+  options?: {
+    surface?: 'graphql' | 'rest' | 'unknown' | string;
+    nowMs?: number;
+  }
+): PrWatchMergeGitHubRateLimitStatus | null;
+
+export function formatGitHubRateLimitStatus(
+  rateLimit: PrWatchMergeGitHubRateLimitStatus | null | undefined
+): string;
+
+export function planGitHubRateLimitBackoff(
+  rateLimit: PrWatchMergeGitHubRateLimitStatus | null | undefined,
+  options?: {
+    nowMs?: number;
+    fallbackMs?: number;
+    maxJitterMs?: number;
+    remainingMs?: number;
+    jitterSeed?: string;
+  }
+): number;
 
 export function resolveActionRequiredReasons(
   snapshot: PrWatchMergeSnapshot,

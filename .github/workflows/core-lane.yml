@@ -10,6 +10,10 @@ jobs:
   core-lane:
     name: Core Lane
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
     steps:
       - name: Checkout (full history for diffs)
         uses: actions/checkout@v4
@@ -60,61 +64,111 @@ jobs:
         if: ${{ github.event_name == 'pull_request' }}
         env:
           DIFF_BUDGET_OVERRIDE_LABEL: diff-budget-override
+          GITHUB_API_URL: ${{ github.api_url }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           node - <<'NODE'
           const fs = require('fs');
 
-          const labelName = process.env.DIFF_BUDGET_OVERRIDE_LABEL;
-          const eventPath = process.env.GITHUB_EVENT_PATH;
-          if (!labelName || !eventPath) {
-            process.exit(0);
-          }
-
-          const event = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
-          const pullRequest = event.pull_request;
-          if (!pullRequest) {
-            process.exit(0);
-          }
-
-          const labels = Array.isArray(pullRequest.labels)
-            ? pullRequest.labels.map((label) => String(label?.name ?? '')).filter(Boolean)
-            : [];
-          if (!labels.includes(labelName)) {
-            process.exit(0);
-          }
-
-          const body = String(pullRequest.body ?? '');
-          const prefix = 'Diff budget override:';
-          let reason = '';
-          for (const rawLine of body.split(/\r?\n/)) {
-            const line = rawLine.trim();
-            if (line.startsWith(prefix)) {
-              reason = line.slice(prefix.length).trim();
-              break;
+          async function main() {
+            async function fetchJsonWithTimeout(url, options = {}, timeoutMs = 10_000) {
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+              try {
+                const response = await fetch(url, {
+                  ...options,
+                  signal: controller.signal
+                });
+                if (!response.ok) {
+                  throw new Error(`${response.status} ${response.statusText}`);
+                }
+                return await response.json();
+              } finally {
+                clearTimeout(timeoutId);
+              }
             }
+
+            const labelName = process.env.DIFF_BUDGET_OVERRIDE_LABEL;
+            const eventPath = process.env.GITHUB_EVENT_PATH;
+            if (!labelName || !eventPath) {
+              process.exit(0);
+            }
+
+            const event = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
+            let pullRequest = event.pull_request;
+            if (!pullRequest) {
+              process.exit(0);
+            }
+
+            const repository = process.env.GITHUB_REPOSITORY;
+            const apiBase = process.env.GITHUB_API_URL || 'https://api.github.com';
+            const token = process.env.GITHUB_TOKEN;
+            const pullNumber = Number(pullRequest.number ?? 0);
+            if (pullNumber > 0 && repository && token) {
+              try {
+                pullRequest = await fetchJsonWithTimeout(
+                  `${apiBase}/repos/${repository}/issues/${pullNumber}`,
+                  {
+                    headers: {
+                      Authorization: `Bearer ${token}`,
+                      Accept: 'application/vnd.github+json',
+                      'User-Agent': 'co-core-lane-diff-budget-override'
+                    }
+                  }
+                );
+              } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                console.warn(
+                  `Warning: failed to refresh live PR metadata for #${pullNumber}; falling back to event payload (${message}).`
+                );
+              }
+            }
+
+            const labels = Array.isArray(pullRequest.labels)
+              ? pullRequest.labels.map((label) => String(label?.name ?? '')).filter(Boolean)
+              : [];
+            if (!labels.includes(labelName)) {
+              process.exit(0);
+            }
+
+            const body = String(pullRequest.body ?? '');
+            const prefix = 'Diff budget override:';
+            let reason = '';
+            for (const rawLine of body.split(/\r?\n/)) {
+              const line = rawLine.trim();
+              if (line.startsWith(prefix)) {
+                reason = line.slice(prefix.length).trim();
+                break;
+              }
+            }
+
+            if (!reason) {
+              console.error(`Diff budget override label "${labelName}" is present, but no non-empty reason was found.`);
+              console.error('Add this single line to the PR description:');
+              console.error('  Diff budget override: <reason>');
+              process.exit(1);
+            }
+
+            const envFile = process.env.GITHUB_ENV;
+            if (envFile) {
+              fs.appendFileSync(envFile, `DIFF_BUDGET_OVERRIDE_REASON<<EOF\n${reason}\nEOF\n`);
+            }
+
+            const summaryFile = process.env.GITHUB_STEP_SUMMARY;
+            if (summaryFile) {
+              fs.appendFileSync(
+                summaryFile,
+                `### Diff budget override\n\nLabel: \`${labelName}\`\n\nReason: ${reason}\n`
+              );
+            }
+
+            console.log(`Diff budget override enabled: ${reason}`);
           }
 
-          if (!reason) {
-            console.error(`Diff budget override label "${labelName}" is present, but no non-empty reason was found.`);
-            console.error('Add this single line to the PR description:');
-            console.error('  Diff budget override: <reason>');
+          main().catch((error) => {
+            console.error(error);
             process.exit(1);
-          }
-
-          const envFile = process.env.GITHUB_ENV;
-          if (envFile) {
-            fs.appendFileSync(envFile, `DIFF_BUDGET_OVERRIDE_REASON<<EOF\n${reason}\nEOF\n`);
-          }
-
-          const summaryFile = process.env.GITHUB_STEP_SUMMARY;
-          if (summaryFile) {
-            fs.appendFileSync(
-              summaryFile,
-              `### Diff budget override\n\nLabel: \`${labelName}\`\n\nReason: ${reason}\n`
-            );
-          }
-
-          console.log(`Diff budget override enabled: ${reason}`);
+          });
           NODE
 
       - name: Diff budget

@@ -1019,6 +1019,1077 @@ describe('SelectedRunProjection', () => {
     });
   });
 
+  it('rebinds fallback-only task-id identity from tracked issue state for provider-worker manifests when manifest identity is missing', async () => {
+    const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+    const { paths } = await createHostPaths(undefined, { taskId });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'control-host',
+        task_id: taskId,
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Tracked issue is active.'
+      }),
+      'utf8'
+    );
+
+    const projectionContext = createProjectionContext(paths, undefined);
+    projectionContext.linearAdvisoryState = {
+      tracked_issue: {
+        id: 'lin-issue-146',
+        identifier: 'CO-146',
+        title: 'Tracked issue is active.',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-03-20T01:15:28.970Z'
+      } as never
+    };
+
+    const selected = await createSelectedRunProjectionReader(projectionContext).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: 'CO-146',
+      issueId: 'lin-issue-146'
+    });
+    expect(selected?.tracked?.linear).toMatchObject({
+      identifier: 'CO-146',
+      state: 'In Progress'
+    });
+    expect(selected?.lookupAliases).toEqual(
+      expect.arrayContaining(['CO-146', 'lin-issue-146', taskId, 'control-host'])
+    );
+  });
+
+  it('rebinds fallback-only task-id identity from tracked issue state for null-provider provider-worker manifests', async () => {
+    const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+    const { paths } = await createHostPaths(undefined, { taskId });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'control-host',
+        task_id: taskId,
+        pipeline_title: 'Provider Linear Worker',
+        status: 'in_progress',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Tracked issue is active.'
+      }),
+      'utf8'
+    );
+
+    const projectionContext = createProjectionContext(paths, undefined);
+    projectionContext.linearAdvisoryState = {
+      tracked_issue: {
+        id: 'lin-issue-146',
+        identifier: 'CO-146',
+        title: 'Tracked issue is active.',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-03-20T01:15:28.970Z'
+      } as never
+    };
+
+    const selected = await createSelectedRunProjectionReader(projectionContext).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: 'CO-146',
+      issueId: 'lin-issue-146'
+    });
+    expect(selected?.tracked?.linear).toMatchObject({
+      identifier: 'CO-146',
+      state: 'In Progress'
+    });
+  });
+
+  it('does not rebind fallback-only task-id identity from tracked issue state for non-linear manifests', async () => {
+    const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+    const { paths } = await createHostPaths(undefined, { taskId });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'control-host',
+        task_id: taskId,
+        issue_provider: 'github',
+        status: 'in_progress',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Non-linear task is active.'
+      }),
+      'utf8'
+    );
+
+    const projectionContext = createProjectionContext(paths, undefined);
+    projectionContext.linearAdvisoryState = {
+      tracked_issue: {
+        id: 'lin-issue-146',
+        identifier: 'CO-146',
+        title: 'Tracked issue is active.',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-03-20T01:15:28.970Z'
+      } as never
+    };
+
+    const selected = await createSelectedRunProjectionReader(projectionContext).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: taskId,
+      issueId: taskId
+    });
+    expect(selected?.lookupAliases).not.toEqual(expect.arrayContaining(['CO-146', 'lin-issue-146']));
+  });
+
+  it('does not mix a tracked issue id into a manifest with a different canonical identifier', async () => {
+    const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+    const { paths } = await createHostPaths(undefined, { taskId });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'control-host',
+        task_id: taskId,
+        issue_identifier: 'CO-146',
+        issue_provider: 'linear',
+        status: 'in_progress',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Manifest points at a different canonical issue.'
+      }),
+      'utf8'
+    );
+
+    const projectionContext = createProjectionContext(paths, undefined);
+    projectionContext.linearAdvisoryState = {
+      tracked_issue: {
+        id: 'lin-issue-999',
+        identifier: 'CO-999',
+        title: 'Tracked issue is stale.',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-03-20T01:15:28.970Z'
+      } as never
+    };
+
+    const selected = await createSelectedRunProjectionReader(projectionContext).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: 'CO-146',
+      issueId: taskId
+    });
+    expect(selected?.tracked).toBeNull();
+    expect(selected?.lookupAliases).not.toEqual(expect.arrayContaining(['CO-999', 'lin-issue-999']));
+  });
+
+  it('prefers a matched provider claim over tracked issue state when fallback identity is rebound', async () => {
+    const taskId = 'linear-lin-issue-1';
+    const { paths } = await createHostPaths(undefined, { taskId, runId: 'provider-run-1' });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'provider-run-1',
+        task_id: taskId,
+        pipeline_id: 'provider-linear-worker',
+        issue_provider: 'linear',
+        status: 'in_progress',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Tracked issue and provider claim disagree.'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_id: 'lin-issue-147',
+      issue_identifier: 'CO-147',
+      issue_title: 'Claim-backed issue',
+      issue_state: 'Human Review',
+      issue_state_type: 'started',
+      task_id: taskId,
+      run_id: 'provider-run-1',
+      run_manifest_path: paths.manifestPath,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run'
+    };
+
+    const projectionContext = createProjectionContext(paths, providerIntakeState);
+    projectionContext.linearAdvisoryState = {
+      tracked_issue: {
+        id: 'lin-issue-146',
+        identifier: 'CO-146',
+        title: 'Tracked issue is active.',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-03-20T01:15:28.970Z'
+      } as never
+    };
+
+    const selected = await createSelectedRunProjectionReader(projectionContext).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: 'CO-147',
+      issueId: 'lin-issue-147',
+      taskId,
+      runId: 'provider-run-1'
+    });
+    expect(selected?.lookupAliases).toEqual(
+      expect.arrayContaining(['CO-147', 'lin-issue-147', taskId, 'provider-run-1'])
+    );
+    expect(selected?.lookupAliases).not.toEqual(expect.arrayContaining(['CO-146', 'lin-issue-146']));
+    expect(selected?.compatibilityState).toBe('Human Review');
+    expect(selected?.tracked).toBeNull();
+    expect(selected?.providerDebugSnapshot?.live_linear_state).toEqual({
+      state: null,
+      state_type: null,
+      updated_at: null
+    });
+  });
+
+  it('rebinds fallback-only provider-worker task ids from tracked issue state when only pipeline_id survives', async () => {
+    const taskId = 'linear-lin-issue-146';
+    const { paths } = await createHostPaths(undefined, { taskId, runId: 'provider-run-1' });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'provider-run-1',
+        task_id: taskId,
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Legacy worker manifest only retained pipeline_id provenance.'
+      }),
+      'utf8'
+    );
+
+    const projectionContext = createProjectionContext(paths, createProviderIntakeState(paths.manifestPath));
+    projectionContext.providerIntakeState = undefined;
+    projectionContext.linearAdvisoryState = {
+      tracked_issue: {
+        id: 'lin-issue-146',
+        identifier: 'CO-146',
+        title: 'Tracked issue is active.',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-03-20T01:15:28.970Z'
+      } as never
+    };
+
+    const selected = await createSelectedRunProjectionReader(projectionContext).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: 'CO-146',
+      issueId: 'lin-issue-146',
+      taskId,
+      runId: 'provider-run-1'
+    });
+    expect(selected?.tracked?.linear).toMatchObject({
+      identifier: 'CO-146',
+      id: 'lin-issue-146'
+    });
+    expect(selected?.lookupAliases).toEqual(
+      expect.arrayContaining(['CO-146', 'lin-issue-146', taskId, 'provider-run-1'])
+    );
+  });
+
+  it('does not rebind fallback-only linear-tagged custom runs from tracked issue state', async () => {
+    const taskId = 'linear-lin-issue-146';
+    const { paths } = await createHostPaths(undefined, { taskId, runId: 'provider-run-1' });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'provider-run-1',
+        task_id: taskId,
+        pipeline_id: 'custom-background-pipeline',
+        pipeline_title: 'Custom Background Pipeline',
+        issue_provider: 'linear',
+        status: 'in_progress',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Linear-tagged custom run should keep its fallback task identity.'
+      }),
+      'utf8'
+    );
+
+    const projectionContext = createProjectionContext(paths, createProviderIntakeState(paths.manifestPath));
+    projectionContext.providerIntakeState = undefined;
+    projectionContext.linearAdvisoryState = {
+      tracked_issue: {
+        id: 'lin-issue-146',
+        identifier: 'CO-146',
+        title: 'Tracked issue is active.',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-03-20T01:15:28.970Z'
+      } as never
+    };
+
+    const selected = await createSelectedRunProjectionReader(projectionContext).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: taskId,
+      issueId: taskId,
+      taskId,
+      runId: 'provider-run-1'
+    });
+    expect(selected?.lookupAliases).not.toEqual(
+      expect.arrayContaining(['CO-146', 'lin-issue-146'])
+    );
+  });
+
+  it('rebinds fallback-only parent provider-worker task ids from a canonical claim when only task_id matches', async () => {
+    const taskId = 'linear-lin-issue-147';
+    const { paths } = await createHostPaths(undefined, { taskId, runId: 'provider-run-1' });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'provider-run-1',
+        task_id: taskId,
+        pipeline_id: 'provider-linear-worker',
+        issue_provider: 'linear',
+        status: 'in_progress',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Parent provider-worker manifest only has fallback task identity.'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_id: 'lin-issue-147',
+      issue_identifier: 'CO-147',
+      issue_title: 'Claim-backed issue',
+      issue_state: 'Human Review',
+      issue_state_type: 'started',
+      task_id: taskId,
+      run_id: null,
+      run_manifest_path: null,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run'
+    };
+
+    const selected = await createSelectedRunProjectionReader(
+      createProjectionContext(paths, providerIntakeState)
+    ).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: 'CO-147',
+      issueId: 'lin-issue-147',
+      taskId,
+      runId: 'provider-run-1',
+      compatibilityState: 'Human Review'
+    });
+    expect(selected?.lookupAliases).toEqual(
+      expect.arrayContaining(['CO-147', 'lin-issue-147', taskId, 'provider-run-1'])
+    );
+    expect(selected?.tracked).toBeNull();
+  });
+
+  it('lets active run-bound claims outrank stale tracked issue state for compatibility state', async () => {
+    const taskId = 'linear-lin-issue-1';
+    const { paths } = await createHostPaths(undefined, { taskId, runId: 'provider-run-1' });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'provider-run-1',
+        task_id: taskId,
+        pipeline_id: 'provider-linear-worker',
+        issue_provider: 'linear',
+        status: 'in_progress',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Tracked issue and provider claim refer to the same issue with different states.'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_id: 'lin-issue-147',
+      issue_identifier: 'CO-147',
+      issue_title: 'Claim-backed issue',
+      issue_state: 'Human Review',
+      issue_state_type: 'started',
+      task_id: taskId,
+      run_id: 'provider-run-1',
+      run_manifest_path: paths.manifestPath,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run'
+    };
+
+    const projectionContext = createProjectionContext(paths, providerIntakeState);
+    projectionContext.linearAdvisoryState = {
+      tracked_issue: {
+        id: 'lin-issue-147',
+        identifier: 'CO-147',
+        title: 'Tracked issue is stale.',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-03-20T01:10:00.000Z'
+      } as never
+    };
+
+    const selected = await createSelectedRunProjectionReader(projectionContext).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: 'CO-147',
+      issueId: 'lin-issue-147',
+      compatibilityState: 'Human Review'
+    });
+    expect(selected?.tracked?.linear).toMatchObject({
+      identifier: 'CO-147',
+      state: 'In Progress'
+    });
+  });
+
+  it('prefers fresher tracked issue state over stale rehydrated active claim state', async () => {
+    const taskId = 'linear-lin-issue-147';
+    const { paths } = await createHostPaths(undefined, { taskId, runId: 'provider-run-1' });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'provider-run-1',
+        task_id: taskId,
+        pipeline_id: 'provider-linear-worker',
+        issue_provider: 'linear',
+        status: 'in_progress',
+        updated_at: '2026-03-20T01:16:00.000Z',
+        summary: 'Tracked issue and provider claim refer to the same issue with different freshness.'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_id: 'lin-issue-147',
+      issue_identifier: 'CO-147',
+      issue_title: 'Claim-backed issue',
+      issue_state: 'Human Review',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-20T01:15:00.000Z',
+      task_id: taskId,
+      run_id: 'provider-run-1',
+      run_manifest_path: paths.manifestPath,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run'
+    };
+
+    const projectionContext = createProjectionContext(paths, providerIntakeState);
+    projectionContext.linearAdvisoryState = {
+      tracked_issue: {
+        id: 'lin-issue-147',
+        identifier: 'CO-147',
+        title: 'Tracked issue has already advanced.',
+        state: 'Merging',
+        state_type: 'started',
+        updated_at: '2026-03-20T01:16:30.000Z'
+      } as never
+    };
+
+    const selected = await createSelectedRunProjectionReader(projectionContext).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: 'CO-147',
+      issueId: 'lin-issue-147',
+      compatibilityState: 'Merging',
+      displayStatus: 'Merging'
+    });
+    expect(selected?.tracked?.linear).toMatchObject({
+      identifier: 'CO-147',
+      state: 'Merging'
+    });
+  });
+
+  it('rebinds fallback-only synthetic child task ids from the parent claim task prefix', async () => {
+    const parentTaskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+    const childTaskId = `${parentTaskId}-docs-review`;
+    const { paths } = await createHostPaths(undefined, { taskId: childTaskId, runId: 'run-child' });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: childTaskId,
+        pipeline_id: 'docs-review',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Child docs review run is active.'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_id: '0b49c08c-53a1-4225-8d09-28457165fbc8',
+      issue_identifier: 'CO-146',
+      issue_title: 'Parent issue claim',
+      task_id: parentTaskId,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: null,
+      run_manifest_path: null
+    };
+
+    const selected = await createProjectionReader(
+      paths,
+      paths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: 'CO-146',
+      issueId: '0b49c08c-53a1-4225-8d09-28457165fbc8',
+      taskId: childTaskId,
+      runId: 'run-child'
+    });
+    expect(selected?.lookupAliases).toEqual(
+      expect.arrayContaining(['CO-146', '0b49c08c-53a1-4225-8d09-28457165fbc8', childTaskId, 'run-child'])
+    );
+  });
+
+  it('does not rebind fallback-only parent task ids for non-worker linear manifests', async () => {
+    const taskId = 'linear-lin-issue-147';
+    const { paths } = await createHostPaths(undefined, { taskId, runId: 'provider-run-1' });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'provider-run-1',
+        task_id: taskId,
+        pipeline_id: 'custom-background-pipeline',
+        pipeline_title: 'Custom Background Pipeline',
+        issue_provider: 'linear',
+        status: 'in_progress',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Linear-tagged custom pipeline should not adopt fallback claim binding.'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_id: 'lin-issue-147',
+      issue_identifier: 'CO-147',
+      issue_title: 'Claim-backed issue',
+      issue_state: 'Human Review',
+      issue_state_type: 'started',
+      task_id: taskId,
+      run_id: null,
+      run_manifest_path: null,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run'
+    };
+
+    const selected = await createSelectedRunProjectionReader(
+      createProjectionContext(paths, providerIntakeState)
+    ).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: taskId,
+      issueId: taskId,
+      taskId,
+      runId: 'provider-run-1'
+    });
+    expect(selected?.lookupAliases).not.toEqual(
+      expect.arrayContaining(['CO-147', 'lin-issue-147'])
+    );
+    expect(selected?.compatibilityState).toBeNull();
+  });
+
+  it('prefers the strongest matching child-task prefix claim when multiple fallback parents overlap', async () => {
+    const shorterParentTaskId = 'linear-lin';
+    const strongerParentTaskId = 'linear-lin-issue-1';
+    const childTaskId = `${strongerParentTaskId}-docs-review`;
+    const { paths } = await createHostPaths(undefined, { taskId: childTaskId, runId: 'run-child' });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: childTaskId,
+        pipeline_id: 'docs-review',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Child docs review run is active.'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_id: 'lin',
+      issue_identifier: 'CO-1',
+      issue_title: 'Shorter parent issue claim',
+      task_id: shorterParentTaskId,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: null,
+      run_manifest_path: null
+    };
+    providerIntakeState.claims.push({
+      ...providerIntakeState.claims[0]!,
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Stronger parent issue claim',
+      task_id: strongerParentTaskId
+    });
+
+    const selected = await createProjectionReader(
+      paths,
+      paths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: 'CO-2',
+      issueId: 'lin-issue-1',
+      taskId: childTaskId,
+      runId: 'run-child'
+    });
+    expect(selected?.lookupAliases).toEqual(
+      expect.arrayContaining(['CO-2', 'lin-issue-1', childTaskId, 'run-child'])
+    );
+    expect(selected?.lookupAliases).not.toEqual(expect.arrayContaining(['CO-1', 'lin']));
+  });
+
+  it('rebinds fallback-only slug-shaped synthetic child task ids from the parent claim task prefix', async () => {
+    const parentTaskId = 'linear-lin-issue-1';
+    const childTaskId = `${parentTaskId}-docs-review`;
+    const { paths } = await createHostPaths(undefined, { taskId: childTaskId, runId: 'run-child' });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: childTaskId,
+        pipeline_id: 'docs-review',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Child docs review run is active.'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Parent issue claim',
+      task_id: parentTaskId,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: null,
+      run_manifest_path: null
+    };
+
+    const selected = await createProjectionReader(
+      paths,
+      paths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: 'CO-2',
+      issueId: 'lin-issue-1',
+      taskId: childTaskId,
+      runId: 'run-child'
+    });
+    expect(selected?.lookupAliases).toEqual(
+      expect.arrayContaining(['CO-2', 'lin-issue-1', childTaskId, 'run-child'])
+    );
+  });
+
+  it('rebinds fallback-only synthetic child task ids when only provider-worker proof proves provenance', async () => {
+    const parentTaskId = 'linear-lin-issue-1';
+    const childTaskId = `${parentTaskId}-docs-review`;
+    const { root, paths } = await createHostPaths(undefined, { taskId: childTaskId, runId: 'run-child' });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: childTaskId,
+        pipeline_id: 'docs-review',
+        status: 'in_progress',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Proof-backed child docs review run is active.'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(paths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(
+        buildProviderLinearWorkerProof({
+          owner_phase: 'turn_running',
+          owner_status: 'in_progress',
+          workspace_path: root,
+          updated_at: '2026-03-20T01:15:29.970Z'
+        })
+      ),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Parent issue claim',
+      task_id: parentTaskId,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: null,
+      run_manifest_path: null
+    };
+
+    const selected = await createProjectionReader(
+      paths,
+      paths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: 'CO-2',
+      issueId: 'lin-issue-1',
+      taskId: childTaskId,
+      runId: 'run-child'
+    });
+    expect(selected?.lookupAliases).toEqual(
+      expect.arrayContaining(['CO-2', 'lin-issue-1', childTaskId, 'run-child'])
+    );
+  });
+
+  it('does not rebind fallback-only synthetic child task ids for null-provider non-worker manifests', async () => {
+    const parentTaskId = 'linear-lin-issue-1';
+    const childTaskId = `${parentTaskId}-docs-review`;
+    const { paths } = await createHostPaths(undefined, { taskId: childTaskId, runId: 'run-child' });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: childTaskId,
+        pipeline_id: 'custom-background-pipeline',
+        pipeline_title: 'Custom Background Pipeline',
+        status: 'in_progress',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Custom pipeline run should not adopt a provider child prefix claim.'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Parent issue claim',
+      task_id: parentTaskId,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: null,
+      run_manifest_path: null
+    };
+
+    const selected = await createProjectionReader(
+      paths,
+      paths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: childTaskId,
+      issueId: childTaskId,
+      taskId: childTaskId,
+      runId: 'run-child'
+    });
+    expect(selected?.lookupAliases).not.toEqual(expect.arrayContaining(['CO-2', 'lin-issue-1']));
+  });
+
+  it('does not rebind fallback-only child task ids for null-provider docs-review runs', async () => {
+    const parentTaskId = 'linear-lin-issue-1';
+    const childTaskId = `${parentTaskId}-docs-review`;
+    const { paths } = await createHostPaths(undefined, { taskId: childTaskId, runId: 'run-child' });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: childTaskId,
+        pipeline_id: 'docs-review',
+        status: 'in_progress',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Generic docs review run should not adopt a provider child prefix claim.'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Parent issue claim',
+      task_id: parentTaskId,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: null,
+      run_manifest_path: null
+    };
+
+    const selected = await createProjectionReader(
+      paths,
+      paths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: childTaskId,
+      issueId: childTaskId,
+      taskId: childTaskId,
+      runId: 'run-child'
+    });
+    expect(selected?.lookupAliases).not.toEqual(expect.arrayContaining(['CO-2', 'lin-issue-1']));
+  });
+
+  it('treats child manifests whose issue identity still points at the parent fallback task id as fallback-only', async () => {
+    const parentTaskId = 'linear-lin-issue-1';
+    const childTaskId = `${parentTaskId}-docs-review`;
+    const { paths } = await createHostPaths(undefined, { taskId: childTaskId, runId: 'run-child' });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: childTaskId,
+        pipeline_id: 'docs-review',
+        issue_identifier: parentTaskId,
+        issue_id: parentTaskId,
+        status: 'in_progress',
+        issue_provider: 'linear',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Child docs review run is active.'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Parent issue claim',
+      task_id: parentTaskId,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: null,
+      run_manifest_path: null
+    };
+
+    const selected = await createProjectionReader(
+      paths,
+      paths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: 'CO-2',
+      issueId: 'lin-issue-1',
+      taskId: childTaskId,
+      runId: 'run-child'
+    });
+    expect(selected?.lookupAliases).toEqual(
+      expect.arrayContaining(['CO-2', 'lin-issue-1', childTaskId, 'run-child'])
+    );
+  });
+
+  it('does not rebind synthetic child task prefixes for non-linear manifests', async () => {
+    const parentTaskId = 'linear-lin-issue-1';
+    const childTaskId = `${parentTaskId}-docs-review`;
+    const { paths } = await createHostPaths(undefined, { taskId: childTaskId, runId: 'run-child' });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: childTaskId,
+        pipeline_id: 'docs-review',
+        status: 'in_progress',
+        issue_provider: 'github',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Non-linear child docs review run is active.'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Parent issue claim',
+      task_id: parentTaskId,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: null,
+      run_manifest_path: null
+    };
+
+    const selected = await createProjectionReader(
+      paths,
+      paths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: childTaskId,
+      issueId: childTaskId,
+      taskId: childTaskId,
+      runId: 'run-child'
+    });
+    expect(selected?.lookupAliases).not.toEqual(expect.arrayContaining(['CO-2', 'lin-issue-1']));
+  });
+
+  it('does not treat a longer provider-worker parent task id as a child-prefix match for a shorter claim task id', async () => {
+    const shorterParentTaskId = 'linear-lin-issue-1';
+    const longerParentTaskId = 'linear-lin-issue-1-2';
+    const { paths } = await createHostPaths(undefined, {
+      taskId: longerParentTaskId,
+      runId: 'run-parent-2'
+    });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-parent-2',
+        task_id: longerParentTaskId,
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Another parent provider-worker run should not bind the shorter issue claim.'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Shorter parent issue claim',
+      task_id: shorterParentTaskId,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: null,
+      run_manifest_path: null
+    };
+
+    const selected = await createProjectionReader(
+      paths,
+      paths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: longerParentTaskId,
+      issueId: longerParentTaskId,
+      taskId: longerParentTaskId,
+      runId: 'run-parent-2'
+    });
+    expect(selected?.lookupAliases).not.toEqual(expect.arrayContaining(['CO-2', 'lin-issue-1']));
+  });
+
+  it('does not treat a different parent slug as a docs-review child match for a shorter claim task id', async () => {
+    const shorterParentTaskId = 'linear-lin-issue-1';
+    const longerParentTaskId = 'linear-lin-issue-1-2';
+    const childTaskId = `${longerParentTaskId}-docs-review`;
+    const { paths } = await createHostPaths(undefined, {
+      taskId: childTaskId,
+      runId: 'run-child-2'
+    });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child-2',
+        task_id: childTaskId,
+        pipeline_id: 'docs-review',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Child docs-review run should not bind the shorter parent issue claim.'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Shorter parent issue claim',
+      task_id: shorterParentTaskId,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: null,
+      run_manifest_path: null
+    };
+
+    const selected = await createProjectionReader(
+      paths,
+      paths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: childTaskId,
+      issueId: childTaskId,
+      taskId: childTaskId,
+      runId: 'run-child-2'
+    });
+    expect(selected?.lookupAliases).not.toEqual(expect.arrayContaining(['CO-2', 'lin-issue-1']));
+  });
+
+  it('does not rebind non-synthetic child task prefixes to a provider claim', async () => {
+    const parentTaskId = 'task-parent';
+    const childTaskId = `${parentTaskId}-docs-review`;
+    const { paths } = await createHostPaths(undefined, { taskId: childTaskId, runId: 'run-child' });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: childTaskId,
+        status: 'in_progress',
+        issue_provider: 'linear',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Child docs review run is active.'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_id: 'lin-issue-146',
+      issue_identifier: 'CO-146',
+      issue_title: 'Parent issue claim',
+      task_id: parentTaskId,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: null,
+      run_manifest_path: null
+    };
+
+    const selected = await createProjectionReader(
+      paths,
+      paths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: childTaskId,
+      issueId: childTaskId,
+      taskId: childTaskId,
+      runId: 'run-child'
+    });
+  });
+
   it('keeps the generic latest event when provider evidence is only a stale claim', async () => {
     const { paths } = await createHostPaths();
     await writeFile(
@@ -1404,6 +2475,118 @@ describe('SelectedRunProjection', () => {
       event: 'pending_shared_root_reconciliation',
       message:
         'Merged attached PR #82; shared-root reconciliation is pending (shared_root_dirty) before the Linear issue can transition to Done.',
+      reason: 'shared_root_dirty'
+    });
+  });
+
+  it('keeps stale pending shared-root reconciliation visible when a mismatched tracked issue is already terminal', async () => {
+    const taskId = 'linear-lin-issue-1';
+    const { paths } = await createHostPaths(undefined, { taskId, runId: 'run-stale-shared-root-pending' });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-stale-shared-root-pending',
+        task_id: taskId,
+        pipeline_id: 'provider-linear-worker',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        updated_at: '2026-04-05T06:50:15.000Z',
+        summary: 'Completed successfully'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      task_id: taskId,
+      run_id: null,
+      run_manifest_path: null,
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-05T06:50:30.000Z',
+      state: 'stale',
+      reason: 'provider_issue_stale',
+      merge_closeout: {
+        recorded_at: '2026-04-05T06:50:30.000Z',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-05T06:50:30.000Z',
+        status: 'action_required',
+        reason: 'pending_shared_root_reconciliation',
+        summary: 'Merged attached PR #82; shared-root reconciliation is pending (shared_root_dirty) before the Linear issue can transition to Done.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/82'],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/82',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 82
+        },
+        snapshot: {
+          state: 'MERGED',
+          review_decision: 'APPROVED',
+          merge_state_status: 'UNKNOWN',
+          ready_to_merge: false,
+          gate_reasons: ['state=MERGED'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 0,
+          checks_failed: 0,
+          required_checks_pending: 0,
+          required_checks_failed: 0,
+          updated_at: '2026-04-05T06:50:30.000Z',
+          merged_at: null,
+          head_oid: 'head-oid-82'
+        },
+        merge_attempt: null,
+        shared_root: {
+          status: 'skipped',
+          reason: 'shared_root_dirty',
+          before_status: '## main...origin/main\\n M tasks/index.json',
+          after_status: '## main...origin/main\\n M tasks/index.json'
+        },
+        linear_transition: null
+      }
+    };
+
+    const projectionContext = createProjectionContext(paths, providerIntakeState);
+    projectionContext.linearAdvisoryState = {
+      tracked_issue: {
+        id: 'lin-issue-99',
+        identifier: 'CO-99',
+        title: 'Different issue is already done.',
+        state: 'Done',
+        state_type: 'completed',
+        updated_at: '2026-04-05T06:51:00.000Z'
+      } as never
+    };
+
+    const selected = await createSelectedRunProjectionReader(projectionContext).buildSelectedRunContext();
+
+    expect(selected?.providerDebugSnapshot).toMatchObject({
+      live_linear_state: {
+        state: null,
+        state_type: null,
+        updated_at: null
+      },
+      claim: {
+        freshness: 'stale'
+      },
+      progress: {
+        phase: 'pending_shared_root_reconciliation',
+        kind: 'merge_closeout',
+        status: 'stalled',
+        stall_reason: 'shared_root_dirty'
+      }
+    });
+    expect(selected?.displayStatus).toBe('pending_shared_root_reconciliation');
+    expect(selected?.statusReason).toBe('shared_root_dirty');
+    expect(selected?.latestEvent).toMatchObject({
+      event: 'pending_shared_root_reconciliation',
       reason: 'shared_root_dirty'
     });
   });
@@ -1889,6 +3072,87 @@ describe('SelectedRunProjection', () => {
 
     expect(selected?.summary).toContain('Provider linear worker stopped because the issue was no longer active.');
     expect(selected?.summary).not.toContain('deterministic provider mutation suppressed');
+  });
+
+  it('includes current archived issue mutation suppressions in the selected-run summary', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:15:29.970Z',
+        summary: 'Provider linear worker completed with forced standalone review enabled for handoff',
+        commands: [
+          {
+            id: 'provider-linear-worker',
+            status: 'succeeded',
+            summary: 'Provider linear worker completed with forced standalone review enabled for handoff'
+          }
+        ]
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(
+        buildProviderLinearWorkerProof({
+          owner_phase: 'ended',
+          owner_status: 'succeeded',
+          end_reason: 'issue_inactive',
+          attempt_started_at: '2026-03-20T01:15:28.970Z',
+          updated_at: '2026-03-20T01:15:30.970Z',
+          linear_audit: {
+            path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+            attempted_count: 1,
+            success_count: 0,
+            failure_count: 1,
+            latest_recorded_at: '2026-03-20T01:15:29.970Z',
+            parallelization_entries: [],
+            latest_by_operation: {
+              'upsert-workpad': {
+                recorded_at: '2026-03-20T01:15:29.970Z',
+                operation: 'upsert-workpad',
+                ok: false,
+                issue_id: 'lin-issue-1',
+                issue_identifier: 'CO-2',
+                source_setup: null,
+                action: null,
+                via: null,
+                state: null,
+                follow_up_issue_id: null,
+                follow_up_issue_identifier: null,
+                failed_relation_type: null,
+                comment_id: null,
+                attachment_id: null,
+                error_code: 'linear_issue_not_mutable',
+                error_message: 'Linear issue CO-2 is archived and trashed and cannot accept provider mutations.'
+              }
+            }
+          }
+        })
+      ),
+      'utf8'
+    );
+
+    const selected = await createProjectionReader(paths, childPaths.manifestPath).buildSelectedRunContext();
+
+    expect(selected?.summary).toContain('Provider linear worker stopped because the issue was no longer active.');
+    expect(selected?.summary).toContain(
+      'deterministic provider mutation suppressed: upsert-workpad cannot run while the Linear issue is archived or trashed'
+    );
   });
 
   it('omits degradation text when provider proof cannot be scoped to a single attempt', async () => {

@@ -47,6 +47,8 @@ export interface LiveLinearTrackedIssue {
   url: string | null;
   state: string | null;
   state_type: string | null;
+  archived_at: string | null;
+  trashed: boolean | null;
   viewer_id: string | null;
   assignee_id: string | null;
   assignee_name: string | null;
@@ -133,6 +135,8 @@ interface LinearIssueNode {
   priority?: number | null;
   createdAt?: string | null;
   updatedAt?: string | null;
+  archivedAt?: string | null;
+  trashed?: boolean | null;
   state?: {
     name?: string | null;
     type?: string | null;
@@ -631,7 +635,13 @@ export function isLiveLinearTrackedIssueOwnedByCurrentViewerOrUnassigned(
 export function isLiveLinearTrackedIssueEligibleForFreshDispatch(
   issue: Pick<
     LiveLinearTrackedIssue,
-    'state' | 'state_type' | 'blocked_by' | 'viewer_id' | 'assignee_id'
+    | 'state'
+    | 'state_type'
+    | 'blocked_by'
+    | 'archived_at'
+    | 'trashed'
+    | 'viewer_id'
+    | 'assignee_id'
   >
 ): boolean {
   return (
@@ -704,6 +714,8 @@ function buildLinearTrackedIssuesQuery(
           priority
           createdAt
           updatedAt
+          archivedAt
+          trashed
           ${includeRichIssueDetails ? 'description' : ''}
           assignee {
             id
@@ -818,7 +830,16 @@ function normalizeEligibleStateSlotCounts(
 }
 
 function shouldCountTrackedIssueTowardEligibilityTarget(
-  trackedIssue: Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'blocked_by' | 'viewer_id' | 'assignee_id'>,
+  trackedIssue: Pick<
+    LiveLinearTrackedIssue,
+    | 'state'
+    | 'state_type'
+    | 'blocked_by'
+    | 'archived_at'
+    | 'trashed'
+    | 'viewer_id'
+    | 'assignee_id'
+  >,
   eligibleStateSlotCounts: Map<string, number>,
   consumedEligibleStateSlots: Map<string, number>
 ): boolean {
@@ -873,6 +894,8 @@ function buildLinearIssueByIdQuery(issueId: string): {
         description
         url
         updatedAt
+        archivedAt
+        trashed
         assignee {
           id
           name
@@ -1117,6 +1140,8 @@ function parseTrackedIssue(
     url: normalizeEnvValue(issue.url),
     state: normalizeEnvValue(issue.state?.name),
     state_type: normalizeEnvValue(issue.state?.type),
+    archived_at: normalizeIso(issue.archivedAt),
+    trashed: normalizeOptionalBoolean(issue.trashed),
     viewer_id: input.viewerId,
     assignee_id: normalizeEnvValue(issue.assignee?.id),
     assignee_name: normalizeEnvValue(issue.assignee?.displayName ?? issue.assignee?.name),
@@ -1155,6 +1180,10 @@ function normalizeTrackedIssuePriority(value: number | null | undefined): number
   return Number.isInteger(value) && (value as number) >= 1 && (value as number) <= 4
     ? (value as number)
     : null;
+}
+
+function normalizeOptionalBoolean(value: unknown): boolean | null {
+  return typeof value === 'boolean' ? value : null;
 }
 
 function validateTrackedIssueScope(

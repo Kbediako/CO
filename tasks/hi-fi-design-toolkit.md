@@ -1,6 +1,7 @@
 # Task Checklist — Hi-Fi Design Toolkit (0410-hi-fi-design-toolkit)
 
 > Export `MCP_RUNNER_TASK_ID=0410-hi-fi-design-toolkit` before running diagnostics or guardrail commands. Mirror every checklist change with `docs/TASKS.md` and `.agent/task/hi-fi-design-toolkit.md`. Keep `[ ]` until the proving manifest (e.g., `.runs/0410-hi-fi-design-toolkit/cli/<run-id>/manifest.json`) is attached inline.
+> Current repo truth after `CO-88`: the checked-in `packages/design-system` package is still a thin scaffold/token sink, and `npm --prefix packages/design-system run test:visual` is placeholder smoke rather than a shipped visual-regression suite. Treat this checklist as pipeline history and intent, not proof of a mature published toolkit surface on the current branch.
 
 ## Foundation
 - [x] Collateral minted — `docs/design/PRD-hi-fi-design-toolkit.md`, `docs/design/specs/HI_FI_DESIGN_TOOLKIT.md`, `tasks/index.json`, `.agent/task/hi-fi-design-toolkit.md`, `docs/TASKS.md` reference Task 0410; Evidence: `.runs/0410-hi-fi-design-toolkit/cli/2025-11-07T03-19-35-861Z-962b4c81/manifest.json` (diagnostics run 2025-11-07T03:19:35Z).
@@ -11,7 +12,7 @@
 - [x] Extractor stage wired — `scripts/design/pipeline/toolkit/extract.ts` wraps `pnpm -C tools/extractor extract`, enforces permits + approvals, and stages context assets under `.runs/0410-hi-fi-design-toolkit/cli/<run-id>/artifacts/design-toolkit/context`; Evidence: `.runs/0410-hi-fi-design-toolkit/cli/2025-11-07T03-54-09-660Z-35b0a68c/manifest.json`.
 - [x] Tokens + style guide stage — `tokens.ts` + `styleguide` wrapper emit token bundles + Markdown docs, update manifest metrics (`token_count`, `styleguide_pages`); Evidence: `.runs/0410-hi-fi-design-toolkit/cli/2025-11-07T03-54-09-660Z-35b0a68c/manifest.json`.
 - [x] Reference & self-correction stage — `reference.ts` + optional `self-correct` loops log diff reductions, FFmpeg approvals, and staged outputs under `design-toolkit/reference`/`diffs`; Evidence: `.runs/0410-hi-fi-design-toolkit/cli/2025-11-07T03-54-09-660Z-35b0a68c/manifest.json`.
-- [x] Publish integration — toolkit outputs merged into `packages/design-system` (tokens + components) with `npm --prefix packages/design-system run test:visual` captured in manifest; Evidence: `.runs/0410-hi-fi-design-toolkit/cli/2025-11-07T03-54-09-660Z-35b0a68c/manifest.json`.
+- [x] Publish integration path recorded — toolkit outputs were wired toward `packages/design-system`, but the current checked-in package remains scaffold-level and `npm --prefix packages/design-system run test:visual` is still placeholder smoke. Evidence: `.runs/0410-hi-fi-design-toolkit/cli/2025-11-07T03-54-09-660Z-35b0a68c/manifest.json`.
 
 ## Guardrails & Evidence
 - [x] Manifest/schema updates — `packages/shared/manifest/types.ts` + writer persist `design_toolkit_artifacts`, `DesignArtifactWriter` emits `out/0410-hi-fi-design-toolkit/design/runs/<run>.json`; Evidence: `.runs/0410-hi-fi-design-toolkit/cli/2025-11-07T03-54-09-660Z-35b0a68c/manifest.json`.
