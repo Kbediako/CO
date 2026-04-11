@@ -696,6 +696,22 @@ export async function runProviderDeterministicMergeCloseout(
     }
   }
 
+  const preMergeRateLimitOutcome = classifyProviderMutationRateLimitSnapshot(
+    snapshot,
+    pr.number,
+    'merge_closeout'
+  );
+  if (preMergeRateLimitOutcome) {
+    return {
+      ...baseWithResolution,
+      pr,
+      snapshot,
+      branch_recovery: branchRecovery,
+      ...preMergeRateLimitOutcome,
+      summary: summarizeSelection(preMergeRateLimitOutcome.summary)
+    };
+  }
+
   let mergeAttempt: ProviderMergeCloseoutAttemptRecord | null = null;
   let verificationSnapshot = snapshot;
 
@@ -1351,6 +1367,22 @@ export async function runProviderReviewHandoffPromotion(
     }
   }
 
+  const prePromotionRateLimitOutcome = classifyProviderMutationRateLimitSnapshot(
+    snapshot,
+    pr.number,
+    'review_promotion'
+  );
+  if (prePromotionRateLimitOutcome) {
+    return {
+      ...baseWithResolution,
+      pr,
+      snapshot,
+      branch_recovery: branchRecovery,
+      ...prePromotionRateLimitOutcome,
+      summary: summarizeSelection(prePromotionRateLimitOutcome.summary)
+    };
+  }
+
   const transitionAttemptedAt = now();
   const transitionResult = await transitionIssueState({
     issueId: input.issueId,
@@ -1864,6 +1896,30 @@ function classifyPreBranchRecoverySnapshot(
     };
   }
   return null;
+}
+
+function classifyProviderMutationRateLimitSnapshot(
+  snapshot: ProviderMergeCloseoutSnapshotRecord,
+  prNumber: number,
+  mode: 'merge_closeout' | 'review_promotion'
+): {
+  status: 'watching';
+  reason: 'github_rate_limited';
+  summary: string;
+  github_rate_limit: ProviderGitHubRateLimitRecord;
+} | null {
+  if (!snapshot.github_rate_limit || isMergedPullRequestSnapshot(snapshot)) {
+    return null;
+  }
+  return {
+    status: 'watching',
+    reason: 'github_rate_limited',
+    summary:
+      mode === 'review_promotion'
+        ? `Review-handoff promotion is waiting for GitHub API budget recovery before mutating PR #${prNumber}: ${formatProviderGitHubRateLimitSummary(snapshot.github_rate_limit)}.`
+        : `Merge closeout is waiting for GitHub API budget recovery before mutating PR #${prNumber}: ${formatProviderGitHubRateLimitSummary(snapshot.github_rate_limit)}.`,
+    github_rate_limit: snapshot.github_rate_limit
+  };
 }
 
 function classifyPendingBranchRecovery(input: {

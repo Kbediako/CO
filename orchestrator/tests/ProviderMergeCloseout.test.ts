@@ -2254,6 +2254,98 @@ describe('runProviderDeterministicMergeCloseout', () => {
     expect(transitionIssueState).not.toHaveBeenCalled();
   });
 
+  it('does not merge ready snapshots that still carry GitHub throttle evidence', async () => {
+    const githubRateLimit = {
+      kind: 'github_rate_limited',
+      surface: 'rest',
+      limit_type: 'secondary',
+      status: 429,
+      reset_at: null,
+      retry_after_seconds: 60,
+      retry_at: '2026-04-05T00:12:00.000Z',
+      message: 'HTTP 429: You have exceeded a secondary rate limit.'
+    };
+    const runCommand = vi.fn(async (input: { command: string; args: string[] }) => {
+      if (input.command === 'git') {
+        return {
+          ok: true,
+          exitCode: 0,
+          stdout: 'git@github.com:asabeko/CO.git\n',
+          stderr: ''
+        };
+      }
+      throw new Error(`Unexpected command ${input.command} ${input.args.join(' ')}`);
+    });
+    const fetchSnapshot = vi.fn().mockResolvedValue({
+      state: 'OPEN',
+      reviewDecision: 'APPROVED',
+      mergeStateStatus: 'CLEAN',
+      readyToMerge: true,
+      gateReasons: [],
+      unresolvedThreadCount: 0,
+      updatedAt: '2026-04-05T00:11:00.000Z',
+      mergedAt: null,
+      headOid: 'abc123',
+      checks: { pending: [], failed: [] },
+      requiredChecks: { pending: [], failed: [] },
+      githubRateLimit
+    });
+    const transitionIssueState = vi.fn();
+
+    const result = await runProviderDeterministicMergeCloseout(
+      {
+        issueId: 'lin-issue-1',
+        issueIdentifier: 'CO-80',
+        issueState: 'Merging',
+        issueStateType: 'started',
+        issueUpdatedAt: '2026-04-05T00:11:00.000Z',
+        repoRoot: '/tmp/co'
+      },
+      {
+        now: vi.fn().mockReturnValueOnce('2026-04-05T00:11:00.000Z'),
+        readIssueContext: vi.fn(async () => ({
+          ok: true,
+          operation: 'issue-context',
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-80',
+            title: 'Deterministic merge closeout',
+            description: null,
+            url: null,
+            updated_at: '2026-04-05T00:11:00.000Z',
+            workspace_id: null,
+            state: { id: 'state-merging', name: 'Merging', type: 'started' },
+            team: null,
+            project: null,
+            comments: [],
+            attachments: [{ id: 'att-1', title: 'PR', url: 'https://github.com/asabeko/CO/pull/357' }],
+            workpad_comment: null
+          },
+          source_setup: null
+        })),
+        fetchSnapshot,
+        resolveSnapshotActionRequiredReasons: vi.fn(() => []),
+        runCommand,
+        transitionIssueState
+      }
+    );
+
+    expect(result).toMatchObject({
+      status: 'watching',
+      reason: 'github_rate_limited',
+      branch_recovery: null,
+      merge_attempt: null,
+      github_rate_limit: githubRateLimit,
+      snapshot: {
+        ready_to_merge: true,
+        action_required_reasons: []
+      }
+    });
+    expect(runCommand).not.toHaveBeenCalledWith(expect.objectContaining({ command: 'gh' }));
+    expect(fetchSnapshot).toHaveBeenCalledTimes(1);
+    expect(transitionIssueState).not.toHaveBeenCalled();
+  });
+
   it('requests branch refresh for BEHIND Merging PRs and keeps watching while GitHub recomputes readiness', async () => {
     const runCommand = vi
       .fn()
@@ -3197,6 +3289,98 @@ describe('runProviderReviewHandoffPromotion', () => {
       snapshot: {
         merge_state_status: 'BEHIND',
         action_required_reasons: ['merge_state=BEHIND']
+      }
+    });
+    expect(runCommand).not.toHaveBeenCalledWith(expect.objectContaining({ command: 'gh' }));
+    expect(fetchSnapshot).toHaveBeenCalledTimes(1);
+    expect(transitionIssueState).not.toHaveBeenCalled();
+  });
+
+  it('does not promote ready review handoff snapshots that still carry GitHub throttle evidence', async () => {
+    const githubRateLimit = {
+      kind: 'github_rate_limited',
+      surface: 'rest',
+      limit_type: 'secondary',
+      status: 429,
+      reset_at: null,
+      retry_after_seconds: 60,
+      retry_at: '2026-04-09T03:12:00.000Z',
+      message: 'HTTP 429: You have exceeded a secondary rate limit.'
+    };
+    const runCommand = vi.fn(async (input: { command: string; args: string[] }) => {
+      if (input.command === 'git') {
+        return {
+          ok: true,
+          exitCode: 0,
+          stdout: 'git@github.com:asabeko/CO.git\n',
+          stderr: ''
+        };
+      }
+      throw new Error(`Unexpected command ${input.command} ${input.args.join(' ')}`);
+    });
+    const fetchSnapshot = vi.fn().mockResolvedValue({
+      state: 'OPEN',
+      reviewDecision: 'APPROVED',
+      mergeStateStatus: 'CLEAN',
+      readyToMerge: true,
+      gateReasons: [],
+      unresolvedThreadCount: 0,
+      updatedAt: '2026-04-09T03:11:00.000Z',
+      mergedAt: null,
+      headOid: 'abc123',
+      checks: { pending: [], failed: [] },
+      requiredChecks: { pending: [], failed: [] },
+      githubRateLimit
+    });
+    const transitionIssueState = vi.fn();
+
+    const result = await runProviderReviewHandoffPromotion(
+      {
+        issueId: 'lin-issue-1',
+        issueIdentifier: 'CO-116',
+        issueState: 'In Review',
+        issueStateType: 'started',
+        issueUpdatedAt: '2026-04-09T03:11:00.000Z',
+        repoRoot: '/tmp/co'
+      },
+      {
+        now: vi.fn().mockReturnValueOnce('2026-04-09T03:11:00.000Z'),
+        readIssueContext: vi.fn(async () => ({
+          ok: true,
+          operation: 'issue-context',
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-116',
+            title: 'Review handoff promotion',
+            description: null,
+            url: null,
+            updated_at: '2026-04-09T03:11:00.000Z',
+            workspace_id: null,
+            state: { id: 'state-in-review', name: 'In Review', type: 'started' },
+            team: null,
+            project: null,
+            comments: [],
+            attachments: [{ id: 'att-1', title: 'PR', url: 'https://github.com/asabeko/CO/pull/416' }],
+            workpad_comment: null
+          },
+          source_setup: null
+        })),
+        fetchSnapshot,
+        resolveSnapshotActionRequiredReasons: vi.fn(() => []),
+        runCommand,
+        transitionIssueState
+      }
+    );
+
+    expect(result).toMatchObject({
+      status: 'watching',
+      reason: 'github_rate_limited',
+      issue_state: 'In Review',
+      branch_recovery: null,
+      github_rate_limit: githubRateLimit,
+      snapshot: {
+        ready_to_merge: true,
+        action_required_reasons: []
       }
     });
     expect(runCommand).not.toHaveBeenCalledWith(expect.objectContaining({ command: 'gh' }));
