@@ -18,6 +18,14 @@
 ## Issue Readiness Gate
 - Intent checksum / protected terms carried forward:
   - `archivedAt`, `trashed`, `linear_issue_not_mutable`, `issue-context/cache`, `transition`, `upsert-workpad`, `selected-run summary`, `provider proof summaries`
+- Nearby wrong interpretations to reject:
+  - “Only transition/workpad writes need guarding; admission can stay permissive.” Reject: archived/trashed issues must fail closed before provider claim/start admission.
+  - “Cached mutability stays authoritative after restore.” Reject: restored issues must reread live mutability before resuming mutation paths.
+  - “Suppression only applies to worker prompt text.” Reject: suppression must also cover selected-run and provider-proof summaries in the same attempt.
+- Current / Reference / Target parity matrix:
+  - Current: archived/trashed issues can still drift into active provider handling unless admission, cached mutability truth, and summary suppression are all applied together.
+  - Reference: preserved CO-32 artifacts cover `linear_issue_not_mutable`, `issue-context/cache` mutability truth, and deterministic suppression, but they do not complete admission hardening or fresh docs continuity on their own.
+  - Target: admission and mutation paths fail closed for archived/trashed issues, restored issues revalidate live before resuming, summaries suppress deterministic same-attempt retries, and the supported archive flow preserves the `docs/TASKS.md` `CO-68` snapshot.
 - Not done if:
   - archived/trashed issues are still claimable or startable
   - restored issues stay blocked behind stale cached mutability

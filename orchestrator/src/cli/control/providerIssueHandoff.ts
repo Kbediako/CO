@@ -2526,7 +2526,11 @@ export function createProviderIssueHandoffService(
                 issue_trashed: claimBase.issue_trashed
               }
             : preserveReleasedIssueMetadata
-              ? mergeReleasedTrackedIssueMutability(existing, claimBase)
+              ? (
+                  releasedWebhookTiming === 'equal'
+                    ? mergeReleasedTrackedIssueMutability(existing, claimBase)
+                    : resolveProviderClaimMutabilityTruth(existing)
+                )
               : {
                   issue_archived_at: claimBase.issue_archived_at,
                   issue_trashed: claimBase.issue_trashed
@@ -4019,14 +4023,14 @@ function mergeReleasedTrackedIssueMutability(
   existing: Pick<ProviderIntakeClaimRecord, 'issue_archived_at' | 'issue_trashed'>,
   next: Pick<ProviderIntakeClaimRecord, 'issue_archived_at' | 'issue_trashed'>
 ): Pick<ProviderIntakeClaimRecord, 'issue_archived_at' | 'issue_trashed'> {
-  const existingArchivedAt =
-    typeof existing.issue_archived_at === 'string' ? existing.issue_archived_at : null;
-  const nextArchivedAt =
-    typeof next.issue_archived_at === 'string' ? next.issue_archived_at : null;
-  const existingTrashed =
-    existing.issue_trashed === true ? true : (existing.issue_trashed === false ? false : null);
-  const nextTrashed =
-    next.issue_trashed === true ? true : (next.issue_trashed === false ? false : null);
+  const {
+    issue_archived_at: existingArchivedAt,
+    issue_trashed: existingTrashed
+  } = resolveProviderClaimMutabilityTruth(existing);
+  const {
+    issue_archived_at: nextArchivedAt,
+    issue_trashed: nextTrashed
+  } = resolveProviderClaimMutabilityTruth(next);
   return {
     issue_archived_at: existingArchivedAt ?? nextArchivedAt,
     issue_trashed:
@@ -4035,6 +4039,17 @@ function mergeReleasedTrackedIssueMutability(
         : existingTrashed === false || nextTrashed === false
           ? false
           : null
+  };
+}
+
+function resolveProviderClaimMutabilityTruth(
+  claim: Pick<ProviderIntakeClaimRecord, 'issue_archived_at' | 'issue_trashed'>
+): Pick<ProviderIntakeClaimRecord, 'issue_archived_at' | 'issue_trashed'> {
+  return {
+    issue_archived_at:
+      typeof claim.issue_archived_at === 'string' ? claim.issue_archived_at : null,
+    issue_trashed:
+      claim.issue_trashed === true ? true : (claim.issue_trashed === false ? false : null)
   };
 }
 
@@ -5219,6 +5234,8 @@ function hasProviderClaimTransitioned(
       | 'issue_state'
       | 'issue_state_type'
       | 'issue_updated_at'
+      | 'issue_archived_at'
+      | 'issue_trashed'
       | 'issue_viewer_id'
       | 'issue_viewer_auth_fingerprint'
       | 'issue_assignee_id'
@@ -5256,6 +5273,8 @@ function hasProviderClaimTransitioned(
             | 'issue_state'
             | 'issue_state_type'
             | 'issue_updated_at'
+            | 'issue_archived_at'
+            | 'issue_trashed'
             | 'issue_viewer_id'
             | 'issue_viewer_auth_fingerprint'
             | 'issue_assignee_id'
@@ -5287,6 +5306,14 @@ function hasProviderClaimTransitioned(
     (
       next.issue_updated_at !== undefined &&
       claim.issue_updated_at !== next.issue_updated_at
+    ) ||
+    (
+      next.issue_archived_at !== undefined &&
+      (claim.issue_archived_at ?? null) !== (next.issue_archived_at ?? null)
+    ) ||
+    (
+      next.issue_trashed !== undefined &&
+      (claim.issue_trashed ?? null) !== (next.issue_trashed ?? null)
     ) ||
     (
       next.issue_viewer_id !== undefined &&
