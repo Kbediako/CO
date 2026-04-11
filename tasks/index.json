@@ -410,6 +410,29 @@
       }
     },
     {
+      "id": "20260411-linear-11faa458-6864-4317-8f28-3fcf606c55a2",
+      "title": "CO workflow: add explicit remediation for historical shared git identity leakage",
+      "relates_to": "tasks/tasks-linear-11faa458-6864-4317-8f28-3fcf606c55a2.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-11",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (succeeded, clean-success)",
+          "date": "2026-04-11",
+          "manifest": ".runs/linear-11faa458-6864-4317-8f28-3fcf606c55a2-co-148-docs-review-r2/cli/2026-04-11T08-05-56-491Z-bce2642d/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-11faa458-6864-4317-8f28-3fcf606c55a2.md",
+        "task": "tasks/tasks-linear-11faa458-6864-4317-8f28-3fcf606c55a2.md",
+        "agent_task": ".agent/task/linear-11faa458-6864-4317-8f28-3fcf606c55a2.md",
+        "docs": "docs/TECH_SPEC-linear-11faa458-6864-4317-8f28-3fcf606c55a2.md"
+      }
+    },
+    {
       "id": "20260410-linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702",
       "title": "CO workflow: stop linked-worktree Linear helpers from leaking repo git identity",
       "relates_to": "tasks/tasks-linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702.md",
