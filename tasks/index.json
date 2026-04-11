@@ -1,6 +1,37 @@
 {
   "items": [
     {
+      "id": "20260411-linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3",
+      "title": "CO: resolve weakly-owned historical reference and archive residue surfaced by repo stewardship audit",
+      "relates_to": "tasks/tasks-linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-11",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (manual fallback accepted)",
+          "date": "2026-04-11",
+          "manifest": ".runs/linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3-co-126-docs-review-rerun/cli/2026-04-11T14-04-14-631Z-ef2cd11d/manifest.json",
+          "override_reason": "Initial docs-review failed docs:check because the packet mentioned planned README anchors before they existed and docs/TASKS.md exceeded the line cap. After generic anchor wording plus docs:archive-tasks, the rerun passed delegation guard, spec guard, docs:check, and docs:freshness. The forced review then drifted for more than four minutes into low-signal speculation about the archive side effect without telemetry or a verdict, so packet-local fallback was accepted after verifying the removed 1005 snapshot landed in out/linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3/TASKS-archive-2026.md."
+        },
+        "review": {
+          "reviewer": "codex-orchestrator review (failed-boundary, manual fallback accepted)",
+          "date": "2026-04-11",
+          "manifest": ".runs/linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3/cli/2026-04-11T13-49-50-356Z-aa2ff05d/manifest.json",
+          "telemetry": ".runs/linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3/cli/2026-04-11T13-49-50-356Z-aa2ff05d/review/telemetry.json",
+          "override_reason": "Forced standalone review executed under FORCE_CODEX_REVIEW=1 and failed closed with review_outcome=failed-boundary and termination_boundary.kind=startup-anchor before any verdict. Manual diff review then found and fixed the stale docs/TASKS.md status mirror, and the remaining diff was accepted after manual correctness/regression review plus explicit elegance review. See out/linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3/manual/20260411T142419Z-standalone-review-fallback.md and out/linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3/manual/20260411T142419Z-elegance-review.md."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3.md",
+        "task": "tasks/tasks-linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3.md",
+        "agent_task": ".agent/task/linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3.md",
+        "docs": "docs/TECH_SPEC-linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3.md"
+      }
+    },
+    {
       "id": "20260411-linear-4dd7c20a-3eec-406f-addc-e89948f044f7",
       "title": "CO: decide admission posture for unreadable foreign provider manifests",
       "relates_to": "tasks/tasks-linear-4dd7c20a-3eec-406f-addc-e89948f044f7.md",
