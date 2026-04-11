@@ -194,12 +194,18 @@ async function waitForMockCalls(
 }
 
 function getLatestScheduledTimeoutCallback(
-  setTimeoutSpy: { mock: { calls: unknown[][] } }
+  setTimeoutSpy: { mock: { calls: unknown[][]; results: Array<{ value: unknown }> } }
 ): () => void {
   for (let index = setTimeoutSpy.mock.calls.length - 1; index >= 0; index -= 1) {
     const [callback] = setTimeoutSpy.mock.calls[index] ?? [];
     if (typeof callback !== 'function') {
       continue;
+    }
+    // These tests sometimes invoke the captured callback directly instead of advancing fake timers.
+    // Clear the original scheduled handle first so the same retry path does not also fire later.
+    const scheduledHandle = setTimeoutSpy.mock.results[index]?.value;
+    if (scheduledHandle !== undefined) {
+      clearTimeout(scheduledHandle as ReturnType<typeof setTimeout>);
     }
     return callback as () => void;
   }
@@ -6428,7 +6434,7 @@ describe('createProviderIssueHandoffService', () => {
     expect(delayMs).toBeLessThanOrEqual(1_000);
     vi.setSystemTime(new Date('2026-03-19T04:30:01.001Z'));
     const startCallsBeforeRetry = launcher.start.mock.calls.length;
-    getLatestScheduledTimeoutCallback(setTimeoutSpy)();
+    vi.advanceTimersByTime(1_001);
     await flushAsyncWork();
     await waitForMockCalls(launcher.start, startCallsBeforeRetry + 1, QUEUED_RETRY_SETTLE_TURNS);
 
@@ -6558,7 +6564,7 @@ describe('createProviderIssueHandoffService', () => {
 
     const blockedPersistCalls = persist.mock.calls.length;
     vi.setSystemTime(new Date('2026-03-19T04:30:01.001Z'));
-    getLatestScheduledTimeoutCallback(setTimeoutSpy)();
+    vi.advanceTimersByTime(1_001);
     await flushAsyncWork();
 
     expect(launcher.start).not.toHaveBeenCalled();
@@ -6761,6 +6767,9 @@ describe('createProviderIssueHandoffService', () => {
     });
     const timerCountAfterConstruction = setTimeoutSpy.mock.calls.length;
     expect(timerCountAfterConstruction).toBeGreaterThanOrEqual(1);
+    const retryTimerCallback = setTimeoutSpy.mock.calls[timerCountAfterConstruction - 1]?.[0];
+    const [, retryDelayMs] = setTimeoutSpy.mock.calls[timerCountAfterConstruction - 1] ?? [];
+    expect(typeof retryTimerCallback).toBe('function');
 
     await service.refresh();
     await waitForMockCalls(setTimeoutSpy, timerCountAfterConstruction);
@@ -6768,13 +6777,10 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
 
-    const scheduledTimeoutCount = setTimeoutSpy.mock.calls.length;
-    expect(scheduledTimeoutCount).toBe(timerCountAfterConstruction);
-    const [, delayMs] = setTimeoutSpy.mock.calls[scheduledTimeoutCount - 1] ?? [];
-    expect(delayMs).toBeGreaterThanOrEqual(999);
-    expect(delayMs).toBeLessThanOrEqual(1_000);
+    expect(retryDelayMs).toBeGreaterThanOrEqual(999);
+    expect(retryDelayMs).toBeLessThanOrEqual(1_000);
     const persistCallsBeforeRetry = persist.mock.calls.length;
-    getLatestScheduledTimeoutCallback(setTimeoutSpy)();
+    (retryTimerCallback as () => void)();
     await flushAsyncWork();
     await waitForMockCalls(persist, persistCallsBeforeRetry + 1, 1_024);
     await waitForCondition(
@@ -6874,6 +6880,9 @@ describe('createProviderIssueHandoffService', () => {
     });
     const timerCountAfterConstruction = setTimeoutSpy.mock.calls.length;
     expect(timerCountAfterConstruction).toBeGreaterThanOrEqual(1);
+    const retryTimerCallback = setTimeoutSpy.mock.calls[timerCountAfterConstruction - 1]?.[0];
+    const [, retryDelayMs] = setTimeoutSpy.mock.calls[timerCountAfterConstruction - 1] ?? [];
+    expect(typeof retryTimerCallback).toBe('function');
 
     await service.refresh();
     await waitForMockCalls(setTimeoutSpy, timerCountAfterConstruction);
@@ -6881,13 +6890,10 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
 
-    const scheduledTimeoutCount = setTimeoutSpy.mock.calls.length;
-    expect(scheduledTimeoutCount).toBe(timerCountAfterConstruction);
-    const [, delayMs] = setTimeoutSpy.mock.calls[scheduledTimeoutCount - 1] ?? [];
-    expect(delayMs).toBeGreaterThanOrEqual(999);
-    expect(delayMs).toBeLessThanOrEqual(1_000);
+    expect(retryDelayMs).toBeGreaterThanOrEqual(999);
+    expect(retryDelayMs).toBeLessThanOrEqual(1_000);
     vi.setSystemTime(new Date('2026-03-19T04:30:01.001Z'));
-    getLatestScheduledTimeoutCallback(setTimeoutSpy)();
+    (retryTimerCallback as () => void)();
     await flushAsyncWork();
     await waitForMockCalls(launcher.start, 1, 1024);
 

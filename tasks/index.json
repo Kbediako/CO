@@ -1,6 +1,93 @@
 {
   "items": [
     {
+      "id": "20260411-linear-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6",
+      "title": "CO: Recover frontend-test CLI from pre-manifest hang under ts-node entrypoint",
+      "relates_to": "tasks/tasks-linear-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-11",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-11",
+          "manifest": ".runs/linear-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6-co-128-docs-review-rework-rerun/cli/2026-04-10T15-48-35-359Z-ace09c6b/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6.md",
+        "task": "tasks/tasks-linear-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6.md",
+        "agent_task": ".agent/task/linear-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6.md",
+        "docs": "docs/TECH_SPEC-linear-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6.md"
+      }
+    },
+    {
+      "id": "20260411-linear-0d66d189-fc51-4054-80db-b6990858f33d",
+      "title": "CO: prevent duplicate same-task control hosts from competing on provider intake",
+      "relates_to": "tasks/tasks-linear-0d66d189-fc51-4054-80db-b6990858f33d.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-11",
+      "approvals": {
+        "docs_review": {
+          "status": "succeeded",
+          "date": "2026-04-11",
+          "manifest": ".runs/linear-0d66d189-fc51-4054-80db-b6990858f33d-co-152-docs-review-rerun/cli/2026-04-11T04-06-38-962Z-e07fd549/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-0d66d189-fc51-4054-80db-b6990858f33d.md",
+        "task": "tasks/tasks-linear-0d66d189-fc51-4054-80db-b6990858f33d.md",
+        "agent_task": ".agent/task/linear-0d66d189-fc51-4054-80db-b6990858f33d.md",
+        "docs": "docs/TECH_SPEC-linear-0d66d189-fc51-4054-80db-b6990858f33d.md"
+      }
+    },
+    {
+      "id": "20260411-linear-62898ffa-fbb2-4713-8113-6e05dbabb777",
+      "title": "CO: Reinvestigate current-main npm run test failure in ProviderIssueHandoff snapshot-only Todo retry path",
+      "relates_to": "tasks/tasks-linear-62898ffa-fbb2-4713-8113-6e05dbabb777.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-11",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-62898ffa-fbb2-4713-8113-6e05dbabb777.md",
+        "task": "tasks/tasks-linear-62898ffa-fbb2-4713-8113-6e05dbabb777.md",
+        "agent_task": ".agent/task/linear-62898ffa-fbb2-4713-8113-6e05dbabb777.md",
+        "docs": "docs/TECH_SPEC-linear-62898ffa-fbb2-4713-8113-6e05dbabb777.md"
+      }
+    },
+    {
+      "id": "20260411-linear-e99b2aec-61dd-4d0d-8c8e-dc78ffbfe605",
+      "title": "CO: Back off GitHub GraphQL and REST polling in PR readiness and merge closeout",
+      "relates_to": "tasks/tasks-linear-e99b2aec-61dd-4d0d-8c8e-dc78ffbfe605.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-11",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (repo docs:freshness baseline; manual fallback accepted)",
+          "date": "2026-04-11",
+          "manifest": ".runs/linear-e99b2aec-61dd-4d0d-8c8e-dc78ffbfe605-co-151-docs-review/cli/2026-04-11T00-57-29-630Z-45cacf66/manifest.json",
+          "override_reason": "Child docs-review passed delegation guard, spec-guard, and docs:check for the CO-151 packet, then stopped on the standing repo-wide docs:freshness baseline: 77 stale older docs with no missing registry, missing-on-disk, or invalid entries. CO-151 packet files were registered and not stale."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-e99b2aec-61dd-4d0d-8c8e-dc78ffbfe605.md",
+        "task": "tasks/tasks-linear-e99b2aec-61dd-4d0d-8c8e-dc78ffbfe605.md",
+        "agent_task": ".agent/task/linear-e99b2aec-61dd-4d0d-8c8e-dc78ffbfe605.md",
+        "docs": "docs/TECH_SPEC-linear-e99b2aec-61dd-4d0d-8c8e-dc78ffbfe605.md"
+      }
+    },
+    {
       "id": "20260410-linear-e122d053-40f2-4246-9648-81c9001715f1",
       "title": "CO: enforce provider max-concurrency across webhook, retry, and resume admission paths",
       "relates_to": "tasks/tasks-linear-e122d053-40f2-4246-9648-81c9001715f1.md",
@@ -63,6 +150,23 @@
         "task": "tasks/tasks-linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md",
         "agent_task": ".agent/task/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md",
         "docs": "docs/TECH_SPEC-linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md"
+      }
+    },
+    {
+      "id": "20260410-linear-aa307fdc-53a1-4225-8d09-28457165fbc8",
+      "title": "CO STATUS: stop synthetic linear-* task-id fallback rows from rendering as running issues",
+      "relates_to": "tasks/tasks-linear-aa307fdc-53a1-4225-8d09-28457165fbc8.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-10",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-aa307fdc-53a1-4225-8d09-28457165fbc8.md",
+        "task": "tasks/tasks-linear-aa307fdc-53a1-4225-8d09-28457165fbc8.md",
+        "agent_task": ".agent/task/linear-aa307fdc-53a1-4225-8d09-28457165fbc8.md",
+        "docs": "docs/TECH_SPEC-linear-aa307fdc-53a1-4225-8d09-28457165fbc8.md"
       }
     },
     {
@@ -220,6 +324,29 @@
       }
     },
     {
+      "id": "20260410-linear-7105185a-05da-4f49-89d9-35efbba38f3c",
+      "title": "CO: capture live Linear request-burn telemetry after webhook-first targeted reconcile rollout",
+      "relates_to": "tasks/tasks-linear-7105185a-05da-4f49-89d9-35efbba38f3c.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-10",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (clean-success)",
+          "date": "2026-04-10",
+          "manifest": ".runs/linear-7105185a-05da-4f49-89d9-35efbba38f3c-co-147-docs-review-rerun/cli/2026-04-10T16-00-45-369Z-c879ebe1/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-7105185a-05da-4f49-89d9-35efbba38f3c.md",
+        "task": "tasks/tasks-linear-7105185a-05da-4f49-89d9-35efbba38f3c.md",
+        "agent_task": ".agent/task/linear-7105185a-05da-4f49-89d9-35efbba38f3c.md",
+        "docs": "docs/TECH_SPEC-linear-7105185a-05da-4f49-89d9-35efbba38f3c.md"
+      }
+    },
+    {
       "id": "20260410-linear-710e37a2-a7bb-4976-859f-0378d6a7104f",
       "title": "CO: clear repo-wide stale spec-review dates that are blocking unrelated merge-ready PRs at spec-guard",
       "relates_to": "tasks/tasks-linear-710e37a2-a7bb-4976-859f-0378d6a7104f.md",
@@ -240,6 +367,46 @@
         "task": "tasks/tasks-linear-710e37a2-a7bb-4976-859f-0378d6a7104f.md",
         "agent_task": ".agent/task/linear-710e37a2-a7bb-4976-859f-0378d6a7104f.md",
         "docs": "docs/TECH_SPEC-linear-710e37a2-a7bb-4976-859f-0378d6a7104f.md"
+      }
+    },
+    {
+      "id": "20260410-linear-63e7f712-d927-43fb-8afa-b357bab40aa2",
+      "title": "CO: Harden hot-suite dist freshness heuristics for transitive CLI/runtime dependencies",
+      "relates_to": "tasks/tasks-linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-11",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator linear child-stream docs-review (manual fallback recorded after forced review stall)",
+          "date": "2026-04-11",
+          "manifest": ".runs/linear-63e7f712-d927-43fb-8afa-b357bab40aa2-docs-review/cli/2026-04-10T15-54-09-224Z-cab1c2ab/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md",
+        "task": "tasks/tasks-linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md",
+        "agent_task": ".agent/task/linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md",
+        "docs": "docs/TECH_SPEC-linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md"
+      }
+    },
+    {
+      "id": "20260410-linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702",
+      "title": "CO workflow: stop linked-worktree Linear helpers from leaking repo git identity",
+      "relates_to": "tasks/tasks-linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-10",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702.md",
+        "task": "tasks/tasks-linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702.md",
+        "agent_task": ".agent/task/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702.md",
+        "docs": "docs/TECH_SPEC-linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702.md"
       }
     },
     {
@@ -474,6 +641,23 @@
         "task": "tasks/tasks-linear-ff81e5d8-2760-41ec-bdbb-5509ae2faade.md",
         "agent_task": ".agent/task/linear-ff81e5d8-2760-41ec-bdbb-5509ae2faade.md",
         "docs": "docs/TECH_SPEC-linear-ff81e5d8-2760-41ec-bdbb-5509ae2faade.md"
+      }
+    },
+    {
+      "id": "20260409-linear-d43b6785-88d6-442b-a34e-2ad19d4f723a",
+      "title": "CO: add recurring autonomous repo-wide stewardship audit and freshness upkeep beyond markdown docs surfaces",
+      "relates_to": "tasks/tasks-linear-d43b6785-88d6-442b-a34e-2ad19d4f723a.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-09",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-d43b6785-88d6-442b-a34e-2ad19d4f723a.md",
+        "task": "tasks/tasks-linear-d43b6785-88d6-442b-a34e-2ad19d4f723a.md",
+        "agent_task": ".agent/task/linear-d43b6785-88d6-442b-a34e-2ad19d4f723a.md",
+        "docs": "docs/TECH_SPEC-linear-d43b6785-88d6-442b-a34e-2ad19d4f723a.md"
       }
     },
     {
@@ -5405,7 +5589,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-12",
+      "last_review": "2026-04-11",
       "paths": {
         "spec": "tasks/specs/1120-coordinator-symphony-aligned-standalone-review-bounded-relevant-reinspection-dwell-boundary.md",
         "task": "tasks/tasks-1120-coordinator-symphony-aligned-standalone-review-bounded-relevant-reinspection-dwell-boundary.md",
@@ -5421,7 +5605,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-12",
+      "last_review": "2026-04-11",
       "paths": {
         "spec": "tasks/specs/1119-coordinator-symphony-aligned-standalone-review-active-closeout-bundle-fast-fail-boundary.md",
         "task": "tasks/tasks-1119-coordinator-symphony-aligned-standalone-review-active-closeout-bundle-fast-fail-boundary.md",
@@ -5437,7 +5621,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-11",
+      "last_review": "2026-04-11",
       "paths": {
         "spec": "tasks/specs/1118-coordinator-symphony-aligned-standalone-review-run-review-spec-whole-file-probe-truthfulness.md",
         "task": "tasks/tasks-1118-coordinator-symphony-aligned-standalone-review-run-review-spec-whole-file-probe-truthfulness.md",
@@ -5453,7 +5637,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-11",
+      "last_review": "2026-04-11",
       "paths": {
         "spec": "tasks/specs/1117-coordinator-symphony-aligned-standalone-review-run-review-spec-harness-env-isolation.md",
         "task": "tasks/tasks-1117-coordinator-symphony-aligned-standalone-review-run-review-spec-harness-env-isolation.md",
@@ -5469,7 +5653,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-11",
+      "last_review": "2026-04-11",
       "paths": {
         "spec": "tasks/specs/1116-coordinator-symphony-aligned-standalone-review-diff-local-concrete-progress-evidence-boundary.md",
         "task": "tasks/tasks-1116-coordinator-symphony-aligned-standalone-review-diff-local-concrete-progress-evidence-boundary.md",
@@ -5485,7 +5669,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-11",
+      "last_review": "2026-04-11",
       "paths": {
         "spec": "tasks/specs/1115-coordinator-symphony-aligned-standalone-review-generic-speculative-dwell-boundary.md",
         "task": "tasks/tasks-1115-coordinator-symphony-aligned-standalone-review-generic-speculative-dwell-boundary.md",
@@ -5501,7 +5685,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-11",
+      "last_review": "2026-04-11",
       "paths": {
         "spec": "tasks/specs/1114-coordinator-symphony-aligned-standalone-review-verdict-stability-guard.md",
         "task": "tasks/tasks-1114-coordinator-symphony-aligned-standalone-review-verdict-stability-guard.md",
@@ -5517,7 +5701,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-11",
+      "last_review": "2026-04-11",
       "paths": {
         "spec": "tasks/specs/1113-coordinator-symphony-aligned-standalone-review-untouched-helper-classification-parity.md",
         "task": "tasks/tasks-1113-coordinator-symphony-aligned-standalone-review-untouched-helper-classification-parity.md",
@@ -5533,7 +5717,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-11",
+      "last_review": "2026-04-11",
       "paths": {
         "spec": "tasks/specs/1112-coordinator-symphony-aligned-standalone-review-active-closeout-root-provenance-hint.md",
         "task": "tasks/tasks-1112-coordinator-symphony-aligned-standalone-review-active-closeout-root-provenance-hint.md",
@@ -5549,7 +5733,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-11",
+      "last_review": "2026-04-11",
       "paths": {
         "spec": "tasks/specs/1111-coordinator-symphony-aligned-standalone-review-closeout-bundle-self-reference-boundary.md",
         "task": "tasks/tasks-1111-coordinator-symphony-aligned-standalone-review-closeout-bundle-self-reference-boundary.md",
@@ -5565,7 +5749,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-11",
+      "last_review": "2026-04-11",
       "paths": {
         "spec": "tasks/specs/1110-coordinator-symphony-aligned-standalone-review-shell-probe-stop-condition.md",
         "task": "tasks/tasks-1110-coordinator-symphony-aligned-standalone-review-shell-probe-stop-condition.md",

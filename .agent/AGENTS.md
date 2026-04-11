@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 73d5fbdc3b3fe44234365f4083e3d0cb343bc76abce41e577e7ac5d4ba259fbc -->
+<!-- codex:instruction-stamp 818381476fde939f844aab6960e4f99ad2df6131506afbcb48ea9701f5eb4739 -->
 # Agent Enablement
 
 Task-specific project blocks were removed from this file in `CO-88`. Keep repo-wide guidance here and use `.agent/task/**` for active task-scoped instructions.
@@ -47,6 +47,7 @@ Task-specific project blocks were removed from this file in `CO-88`. Keep repo-w
 - `npx vitest run <pattern>` — Use this non-watch mode for focused suites; plain `npx vitest` launches an interactive watcher that never exits (we can’t press `q`), so always prefer the `run` form in automation.
 - `npm run eval:test` — Exercises evaluation harness scenarios; depends on local `python3` for cross-language fixtures.
 - `npm run docs:freshness` — Docs freshness audit; writes `out/<task-id>/docs-freshness.json`.
+- `npm run repo:stewardship` — Repo-wide tracked-file stewardship audit; writes `out/<task-id>/repo-stewardship.json` and classifies each tracked surface as `validate`, `update`, `delete`, or `retain_with_rationale`.
 - `npm run build:patterns` — Compile codemods/linters/templates; run whenever `patterns/**` changes.
 - `node --loader ts-node/esm evaluation/harness/run-all.ts --mode=mcp` — Manual sweep to generate scenario artifacts for manifests.
 - `node scripts/diff-budget.mjs` — Enforces a small-diff budget before review; set `DIFF_BUDGET_OVERRIDE_REASON` to bypass with justification.

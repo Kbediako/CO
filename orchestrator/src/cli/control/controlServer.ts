@@ -15,6 +15,8 @@ export class ControlServer {
   private baseUrl: string | null = null;
   private readonly lifecycleState: StartedControlServerPublicLifecycle['lifecycleState'];
   private readonly providerRefreshTimer: StartedControlServerPublicLifecycle['providerRefreshTimer'];
+  private readonly providerRefreshStartupTrigger: StartedControlServerPublicLifecycle['providerRefreshStartupTrigger'];
+  private readonly controlHostOwnership: StartedControlServerPublicLifecycle['controlHostOwnership'];
 
   private constructor(options: StartedControlServerPublicLifecycle) {
     this.server = options.server;
@@ -22,6 +24,8 @@ export class ControlServer {
     this.baseUrl = options.baseUrl;
     this.lifecycleState = options.lifecycleState;
     this.providerRefreshTimer = options.providerRefreshTimer;
+    this.providerRefreshStartupTrigger = options.providerRefreshStartupTrigger;
+    this.controlHostOwnership = options.controlHostOwnership;
   }
 
   static async start(options: ControlServerOptions): Promise<ControlServer> {
@@ -41,7 +45,9 @@ export class ControlServer {
       server: this.server,
       requestContextShared: this.requestContextShared,
       lifecycleState: this.lifecycleState,
-      providerRefreshTimer: this.providerRefreshTimer
+      providerRefreshTimer: this.providerRefreshTimer,
+      providerRefreshStartupTrigger: this.providerRefreshStartupTrigger,
+      controlHostOwnership: this.controlHostOwnership
     });
   }
 }

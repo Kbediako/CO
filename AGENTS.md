@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 0d83cdc60fdd51c4b9dbf50e67d3c8658a53904700d5f046fc50a55e5ecb7bbc -->
+<!-- codex:instruction-stamp 8a251b41d9509838ee94cf6df8ac29a7e8d4f1b7990dba342b593b5e8aa45492 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -198,9 +198,10 @@ Implementation work is not “complete” until you run (in order):
 5. `npm run test`
 6. `npm run docs:check`
 7. `npm run docs:freshness`
-8. `node scripts/diff-budget.mjs`
-9. `codex-orchestrator review` (or `npm run review` in this repo)
-10. `npm run pack:smoke` (required when touching CLI/package/skills/review-wrapper paths intended for downstream npm users)
+8. `npm run repo:stewardship`
+9. `node scripts/diff-budget.mjs`
+10. `codex-orchestrator review` (or `npm run review` in this repo)
+11. `npm run pack:smoke` (required when touching CLI/package/skills/review-wrapper paths intended for downstream npm users)
 
 | Command | When to use | Notes |
 | --- | --- | --- |
@@ -211,6 +212,7 @@ Implementation work is not “complete” until you run (in order):
 | `npm run test` | Unit + integration checks | Vitest harness covering orchestrator + patterns. |
 | `npm run docs:check` | Docs hygiene gate | Deterministically validates scripts/pipelines/paths referenced in agent-facing docs, current posture locks, bundled-skill roster parity, and the README front-door budget. |
 | `npm run docs:freshness` | Docs freshness gate | Validates registry coverage plus docs-catalog class coverage and emits a class-separated `out/<task-id>/docs-freshness.json`. |
+| `npm run repo:stewardship` | Repo stewardship audit | Inventories tracked files via `git ls-files`, classifies each surface as `validate`, `update`, `delete`, or `retain_with_rationale`, and emits `out/<task-id>/repo-stewardship.json`. |
 | `node scripts/diff-budget.mjs` | Review scope guard | Fails when diffs exceed the configured budget unless `DIFF_BUDGET_OVERRIDE_REASON` is set. |
 | `npm run eval:test` | Evaluation harness smoke tests | Requires fixtures in `evaluation/fixtures/**`; optional, enable when evaluation scope exists. |
 | `codex-orchestrator review` (`npm run review` alias) | Reviewer hand-off | Writes task/PRD context plus manifest evidence into the saved review prompt artifact. Unscoped launches pass that prompt inline to `codex review`. Explicit `--uncommitted` / `--base` / `--commit` launches keep the full prompt in `review/prompt.txt` and carry reviewer-visible scoped context via `--title` (user-provided when present, otherwise synthesized from `NOTES` + `--surface`) so scoped runs stay deterministic across current Codex review behavior. Explicit scoped launches still support only the default `diff` surface at the actual Codex layer; `--surface audit` / `--surface architecture` must fail fast and be rerun without the explicit scope. In non-interactive/CI runs (stdin not TTY or `CODEX_REVIEW_NON_INTERACTIVE=1` / `CODEX_NON_INTERACTIVE=1` / `CODEX_NO_INTERACTIVE=1`) it prints the handoff prompt and exits unless `FORCE_CODEX_REVIEW=1`; `docs-review` / `implementation-gate` and the `provider-linear-worker` pipeline set the forcing env for executed unattended review, while `docs-relevance-advisory` keeps it cleared for prompt-only advisory behavior; `NOTES` is recommended (`<goal + summary + risks>` plus optional questions) and the wrapper auto-generates fallback notes when omitted. |
