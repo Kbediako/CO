@@ -7,6 +7,7 @@ import process from 'node:process';
 import { logger } from '../../logger.js';
 import {
   PROVIDER_LINEAR_RESIDENT_SESSION_CONTINUITY_END_REASONS,
+  PROVIDER_SEMANTIC_STALL_RECHECK_DELAY_MS,
   PROVIDER_LINEAR_WORKER_AUDIT_FILENAME,
   PROVIDER_LINEAR_WORKER_PROOF_FILENAME,
   type ProviderLinearResidentSessionSeed
@@ -138,7 +139,21 @@ interface ProviderIssueRunRecord {
   residentSessionSeed: ProviderLinearResidentSessionSeed | null;
 }
 
+interface ProviderUnreadableManifestAdmissionOccupancyRecord {
+  provider: 'linear';
+  issueId: string;
+  manifestPath: string;
+  workerHost: string | null;
+}
+
+interface ProviderIssueRunDiscoverySnapshot {
+  discoveredRuns: ProviderIssueRunRecord[];
+  unreadableAdmissionOccupancy: ProviderUnreadableManifestAdmissionOccupancyRecord[];
+}
+
 interface ProviderLinearWorkerProofRecord {
+  issue_id?: unknown;
+  issue_identifier?: unknown;
   attempt_started_at?: unknown;
   thread_id?: unknown;
   turn_count?: unknown;
@@ -149,6 +164,9 @@ interface ProviderLinearWorkerProofRecord {
   worker_host?: unknown;
   resident_session?: unknown;
 }
+
+const PROVIDER_UNREADABLE_MANIFEST_LIVE_PROOF_TTL_MS =
+  2 * PROVIDER_SEMANTIC_STALL_RECHECK_DELAY_MS;
 
 function resolveRehydratedActiveRunWorkerHost(
   run: ProviderIssueRunRecord,
@@ -334,7 +352,7 @@ export function createProviderIssueHandoffService(
   const queuedRetryTrackedIssueRefetches = new Map<string, ProviderTrackedIssueRefetch>();
   const refreshLifecycleScope = new AsyncLocalStorage<boolean>();
   const providerIssueRunDiscoveryScope = new AsyncLocalStorage<{
-    discoveredRuns: Promise<ProviderIssueRunRecord[]> | null;
+    snapshot: Promise<ProviderIssueRunDiscoverySnapshot> | null;
   }>();
 
   const runWithRefreshLifecycleLock = async <T>(operation: () => Promise<T>): Promise<T> => {
@@ -355,7 +373,7 @@ export function createProviderIssueHandoffService(
   const resetProviderIssueRunDiscoveryCache = (): void => {
     const scope = providerIssueRunDiscoveryScope.getStore();
     if (scope) {
-      scope.discoveredRuns = null;
+      scope.snapshot = null;
     }
   };
 
@@ -367,8 +385,8 @@ export function createProviderIssueHandoffService(
     if (!scope) {
       return await discoverProviderIssueRuns(options.paths.runDir, input);
     }
-    scope.discoveredRuns ??= discoverProviderIssueRuns(options.paths.runDir);
-    const discoveredRuns = await scope.discoveredRuns;
+    scope.snapshot ??= discoverProviderIssueRunSnapshot(options.paths.runDir);
+    const discoveredRuns = (await scope.snapshot).discoveredRuns;
     if (!input) {
       return discoveredRuns;
     }
@@ -377,19 +395,30 @@ export function createProviderIssueHandoffService(
     );
   };
 
+  const discoverUnreadableProviderAdmissionOccupancyForCurrentOperation = async (): Promise<
+    ProviderUnreadableManifestAdmissionOccupancyRecord[]
+  > => {
+    const scope = providerIssueRunDiscoveryScope.getStore();
+    if (!scope) {
+      return (await discoverProviderIssueRunSnapshot(options.paths.runDir)).unreadableAdmissionOccupancy;
+    }
+    scope.snapshot ??= discoverProviderIssueRunSnapshot(options.paths.runDir);
+    return (await scope.snapshot).unreadableAdmissionOccupancy;
+  };
+
   const runWithProviderIssueRunDiscoveryCache = async <T>(
     operation: () => Promise<T>
   ): Promise<T> => {
     if (providerIssueRunDiscoveryScope.getStore()) {
       return await operation();
     }
-    return await providerIssueRunDiscoveryScope.run({ discoveredRuns: null }, operation);
+    return await providerIssueRunDiscoveryScope.run({ snapshot: null }, operation);
   };
 
   const runWithFreshProviderIssueRunDiscoveryCache = async <T>(
     operation: () => Promise<T>
   ): Promise<T> =>
-    await providerIssueRunDiscoveryScope.run({ discoveredRuns: null }, operation);
+    await providerIssueRunDiscoveryScope.run({ snapshot: null }, operation);
 
   const runOutsideRefreshLifecycleScope = async <T>(
     operation: () => Promise<T>
@@ -756,6 +785,20 @@ export function createProviderIssueHandoffService(
         provider_key: buildProviderIssueKey(run.provider, run.issueId),
         state: 'running',
         worker_host: run.workerHost
+      });
+    }
+
+    const unreadableAdmissionOccupancy =
+      await discoverUnreadableProviderAdmissionOccupancyForCurrentOperation();
+    for (const record of unreadableAdmissionOccupancy) {
+      if (seededOccupancyKeys.has(record.manifestPath)) {
+        continue;
+      }
+      seededOccupancyKeys.add(record.manifestPath);
+      occupancyClaims.push({
+        provider_key: buildProviderIssueKey(record.provider, record.issueId),
+        state: 'running',
+        worker_host: record.workerHost
       });
     }
 
@@ -1131,6 +1174,16 @@ export function createProviderIssueHandoffService(
       }
       seededOccupancyKeys.add(occupancyKey);
       const providerKey = buildProviderIssueKey(run.provider, run.issueId);
+      gate.noteOccupied({ state: claimStateByProviderKey.get(providerKey) ?? null });
+    }
+    const unreadableAdmissionOccupancy =
+      await discoverUnreadableProviderAdmissionOccupancyForCurrentOperation();
+    for (const record of unreadableAdmissionOccupancy) {
+      if (seededOccupancyKeys.has(record.manifestPath)) {
+        continue;
+      }
+      seededOccupancyKeys.add(record.manifestPath);
+      const providerKey = buildProviderIssueKey(record.provider, record.issueId);
       gate.noteOccupied({ state: claimStateByProviderKey.get(providerKey) ?? null });
     }
 
@@ -4498,9 +4551,22 @@ export async function discoverProviderIssueRuns(
     issueId: string;
   }
 ): Promise<ProviderIssueRunRecord[]> {
+  const snapshot = await discoverProviderIssueRunSnapshot(currentRunDir);
+  if (!input) {
+    return snapshot.discoveredRuns;
+  }
+  return snapshot.discoveredRuns.filter(
+    (run) => run.provider === input.provider && run.issueId === input.issueId
+  );
+}
+
+async function discoverProviderIssueRunSnapshot(
+  currentRunDir: string
+): Promise<ProviderIssueRunDiscoverySnapshot> {
   const runsRoot = resolve(currentRunDir, '..', '..', '..');
   const taskEntries = await readDirectoryNames(runsRoot);
   const discovered: ProviderIssueRunRecord[] = [];
+  const unreadableAdmissionOccupancy: ProviderUnreadableManifestAdmissionOccupancyRecord[] = [];
 
   for (const taskEntry of taskEntries) {
     if (taskEntry === 'local-mcp') {
@@ -4514,6 +4580,16 @@ export async function discoverProviderIssueRuns(
       try {
         manifest = await readJsonFile<Record<string, unknown>>(manifestPath);
       } catch (error) {
+        const proof = await readBestEffortJsonFile<ProviderLinearWorkerProofRecord>(
+          join(cliRoot, runEntry, PROVIDER_LINEAR_WORKER_PROOF_FILENAME)
+        );
+        const occupancyRecord = resolveUnreadableProviderAdmissionOccupancyRecord({
+          manifestPath,
+          proof
+        });
+        if (occupancyRecord) {
+          unreadableAdmissionOccupancy.push(occupancyRecord);
+        }
         logger.warn(
           `[provider-issue-run-discovery] skipping unreadable manifest ${manifestPath}: ${
             (error as Error)?.message ?? String(error)
@@ -4532,9 +4608,6 @@ export async function discoverProviderIssueRuns(
       const issueProvider = readStringValue(manifest, 'issue_provider');
       const issueId = readStringValue(manifest, 'issue_id');
       if (issueProvider !== 'linear' || !issueId) {
-        continue;
-      }
-      if (input && (issueProvider !== input.provider || issueId !== input.issueId)) {
         continue;
       }
       const proof = await readBestEffortJsonFile<ProviderLinearWorkerProofRecord>(
@@ -4582,9 +4655,57 @@ export async function discoverProviderIssueRuns(
     }
   }
 
-  return discovered.sort((left, right) => {
-    return Date.parse(right.updatedAt ?? '') - Date.parse(left.updatedAt ?? '');
-  });
+  return {
+    discoveredRuns: discovered.sort((left, right) => {
+      return Date.parse(right.updatedAt ?? '') - Date.parse(left.updatedAt ?? '');
+    }),
+    unreadableAdmissionOccupancy
+  };
+}
+
+function resolveUnreadableProviderAdmissionOccupancyRecord(input: {
+  manifestPath: string;
+  proof: ProviderLinearWorkerProofRecord | null;
+}): ProviderUnreadableManifestAdmissionOccupancyRecord | null {
+  const proofRecord = (input.proof ?? null) as (ProviderLinearWorkerProofRecord & Record<string, unknown>) | null;
+  if (!proofRecord) {
+    return null;
+  }
+  const issueId = readStringValue(proofRecord, 'issue_id');
+  const workerHost = normalizeProviderWorkerHostName(proofRecord.worker_host);
+  if (!issueId) {
+    return null;
+  }
+  if (readStringValue(proofRecord, 'owner_status') !== 'in_progress') {
+    return null;
+  }
+  const ownerPhase = readStringValue(proofRecord, 'owner_phase');
+  if (!ownerPhase || ownerPhase === 'ended') {
+    return null;
+  }
+  const proofHeartbeatTimestamp = resolveUnreadableProviderAdmissionOccupancyProofTimestampMs(proofRecord);
+  if (!Number.isFinite(proofHeartbeatTimestamp)) {
+    return null;
+  }
+  if (Date.now() - proofHeartbeatTimestamp > PROVIDER_UNREADABLE_MANIFEST_LIVE_PROOF_TTL_MS) {
+    return null;
+  }
+  return {
+    provider: 'linear',
+    issueId,
+    manifestPath: input.manifestPath,
+    workerHost
+  };
+}
+
+function resolveUnreadableProviderAdmissionOccupancyProofTimestampMs(
+  proof: Record<string, unknown>
+): number {
+  const proofUpdatedAtMs = readTimestampMs(proof, 'updated_at');
+  if (Number.isFinite(proofUpdatedAtMs)) {
+    return proofUpdatedAtMs;
+  }
+  return readTimestampMs(proof, 'attempt_started_at');
 }
 
 function resolveProviderIssueRunStatus(
@@ -5759,6 +5880,14 @@ function readStringValue(record: Record<string, unknown>, ...keys: string[]): st
     }
   }
   return null;
+}
+
+function readTimestampMs(record: Record<string, unknown>, ...keys: string[]): number {
+  const value = readStringValue(record, ...keys);
+  if (!value) {
+    return Number.NaN;
+  }
+  return Date.parse(value);
 }
 
 function readIntegerValue(record: Record<string, unknown> | null, ...keys: string[]): number | null {
