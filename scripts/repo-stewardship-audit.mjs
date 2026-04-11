@@ -41,6 +41,18 @@ function normalizePath(value) {
   return collapsed === '.' ? '' : collapsed.replace(/^\.\//, '');
 }
 
+function normalizeBoundaryPath(value) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  const normalized = normalizePath(value);
+  if (normalized) {
+    return normalized;
+  }
+  const slashNormalized = value.replace(/\\/g, '/');
+  return slashNormalized === '.' || slashNormalized === './' ? '.' : '';
+}
+
 function normalizeStringArray(value) {
   if (!Array.isArray(value)) {
     return [];
@@ -79,7 +91,7 @@ function globToRegExp(glob) {
     }
 
     if (char === '?') {
-      pattern += '.';
+      pattern += '[^/]';
       continue;
     }
 
@@ -130,7 +142,7 @@ function normalizeChecks(raw) {
       required_scripts: [],
       required_text: [],
       requires_local_readme: false,
-      readme_boundary: ''
+      readme_boundary: null
     };
   }
 
@@ -138,7 +150,9 @@ function normalizeChecks(raw) {
     required_scripts: normalizeStringArray(raw.required_scripts),
     required_text: normalizeStringArray(raw.required_text),
     requires_local_readme: raw.requires_local_readme === true,
-    readme_boundary: normalizePath(raw.readme_boundary)
+    readme_boundary: Object.hasOwn(raw, 'readme_boundary')
+      ? normalizeBoundaryPath(raw.readme_boundary)
+      : null
   };
 }
 
@@ -261,31 +275,32 @@ async function loadPackageScriptSet(repoRoot, cache) {
 
 async function findNearestLocalReadme(repoRoot, filePath, boundary) {
   const normalizedFilePath = normalizePath(filePath);
-  const normalizedBoundary = normalizePath(boundary);
+  const normalizedBoundary = normalizeBoundaryPath(boundary);
   let currentDir = path.posix.dirname(normalizedFilePath);
 
-  if (!currentDir || currentDir === '.') {
+  if (!currentDir) {
     return null;
   }
 
-  while (currentDir && currentDir !== '.') {
+  while (currentDir) {
     if (
       normalizedBoundary &&
+      normalizedBoundary !== '.' &&
       currentDir !== normalizedBoundary &&
       !currentDir.startsWith(`${normalizedBoundary}/`)
     ) {
       break;
     }
 
-    const candidate = `${currentDir}/README.md`;
+    const candidate = currentDir === '.' ? 'README.md' : `${currentDir}/README.md`;
     if (await pathExists(path.resolve(repoRoot, candidate))) {
       return candidate;
     }
 
-    if (!normalizedBoundary && currentDir === '.') {
+    if (normalizedBoundary && currentDir === normalizedBoundary) {
       break;
     }
-    if (normalizedBoundary && currentDir === normalizedBoundary) {
+    if (currentDir === '.') {
       break;
     }
 
@@ -355,15 +370,12 @@ async function evaluateSurface(repoRoot, filePath, rule, context) {
     }
 
     if (rule.checks.requires_local_readme) {
-      readmeAnchor = await findNearestLocalReadme(
-        repoRoot,
-        normalizedPath,
-        rule.checks.readme_boundary || path.posix.dirname(normalizedPath)
-      );
+      const readmeBoundary = rule.checks.readme_boundary ?? path.posix.dirname(normalizedPath);
+      readmeAnchor = await findNearestLocalReadme(repoRoot, normalizedPath, readmeBoundary);
       if (!readmeAnchor) {
         decision = 'update';
         issues.push(
-          `missing local README rationale under ${rule.checks.readme_boundary || path.posix.dirname(normalizedPath)}`
+          `missing local README rationale under ${readmeBoundary}`
         );
       } else {
         evidence.push(`local rationale anchor: ${readmeAnchor}`);

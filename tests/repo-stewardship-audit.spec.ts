@@ -410,4 +410,121 @@ describe('repo stewardship audit', () => {
     },
     20_000
   );
+
+  it(
+    'keeps question-mark globs within a single path segment',
+    async () => {
+      const repoRoot = await mkdtemp(join(tmpdir(), 'repo-stewardship-question-glob-'));
+      createdDirs.push(repoRoot);
+
+      await mkdir(join(repoRoot, 'docs', 'a', 'b'), { recursive: true });
+      await writeFile(join(repoRoot, 'docs', 'a', 'README.md'), '# A\n', 'utf8');
+      await writeFile(join(repoRoot, 'docs', 'a', 'b', 'README.md'), '# B\n', 'utf8');
+      await writeCatalog(repoRoot, {
+        version: 1,
+        classes: {
+          tasking_docs: { label: 'Tasking and Docs', report_order: 10 },
+          repo_config: { label: 'Repo Config', report_order: 20 },
+          uncatalogued: { label: 'Uncatalogued', report_order: 999 }
+        },
+        patterns: [
+          {
+            glob: 'docs/?/README.md',
+            surface_class: 'tasking_docs',
+            decision: 'validate',
+            owner: 'Codex',
+            rationale: 'single-character doc folders are explicitly catalogued'
+          },
+          {
+            glob: 'docs/**/*.json',
+            surface_class: 'repo_config',
+            decision: 'validate',
+            owner: 'Codex',
+            rationale: 'catalog files stay explicit config surfaces'
+          }
+        ]
+      });
+
+      await initTrackedRepo(repoRoot);
+
+      const { report, hasFailures } = await runRepoStewardshipAudit(repoRoot, {
+        outRoot: join(repoRoot, 'out'),
+        taskId: 'fixture'
+      });
+
+      expect(hasFailures).toBe(true);
+      expect(report.decisions.find((item) => item.path === 'docs/a/README.md')?.decision).toBe(
+        'validate'
+      );
+      expect(report.uncatalogued_surfaces).toContain('docs/a/b/README.md');
+      expect(report.decisions.find((item) => item.path === 'docs/a/b/README.md')?.matched_by).toBe(
+        'uncatalogued'
+      );
+    },
+    20_000
+  );
+
+  it(
+    'allows local README checks to anchor at the repo root',
+    async () => {
+      const repoRoot = await mkdtemp(join(tmpdir(), 'repo-stewardship-root-readme-'));
+      createdDirs.push(repoRoot);
+
+      await mkdir(join(repoRoot, 'scripts'), { recursive: true });
+      await writeFile(join(repoRoot, 'README.md'), '# Root rationale\n', 'utf8');
+      await writeFile(join(repoRoot, 'scripts', 'tool.js'), 'export const tool = true;\n', 'utf8');
+      await writeCatalog(repoRoot, {
+        version: 1,
+        classes: {
+          front_door: { label: 'Front Door', report_order: 10 },
+          repo_script: { label: 'Repo Script', report_order: 20 },
+          repo_config: { label: 'Repo Config', report_order: 30 }
+        },
+        entries: [
+          {
+            path: 'README.md',
+            surface_class: 'front_door',
+            decision: 'validate',
+            owner: 'Codex',
+            rationale: 'root README remains the repo rationale anchor'
+          },
+          {
+            path: 'scripts/tool.js',
+            surface_class: 'repo_script',
+            decision: 'retain_with_rationale',
+            owner: 'Codex',
+            rationale: 'fixture proves root README anchors are reachable',
+            checks: {
+              requires_local_readme: true,
+              readme_boundary: '.'
+            }
+          }
+        ],
+        patterns: [
+          {
+            glob: 'docs/**/*.json',
+            surface_class: 'repo_config',
+            decision: 'validate',
+            owner: 'Codex',
+            rationale: 'catalog files stay explicit config surfaces'
+          }
+        ]
+      });
+
+      await initTrackedRepo(repoRoot);
+
+      const { report, hasFailures } = await runRepoStewardshipAudit(repoRoot, {
+        outRoot: join(repoRoot, 'out'),
+        taskId: 'fixture'
+      });
+
+      const scriptDecision = report.decisions.find((item) => item.path === 'scripts/tool.js');
+
+      expect(hasFailures).toBe(false);
+      expect(scriptDecision?.decision).toBe('retain_with_rationale');
+      expect(scriptDecision?.readme_anchor).toBe('README.md');
+      expect(scriptDecision?.summary).not.toContain('missing local README');
+    },
+    20_000
+  );
 });
