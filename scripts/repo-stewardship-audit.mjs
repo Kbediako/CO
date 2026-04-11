@@ -31,7 +31,7 @@ function normalizeString(value) {
 }
 
 function normalizePath(value) {
-  const normalized = normalizeString(value).replace(/\\/g, '/');
+  const normalized = typeof value === 'string' ? value.replace(/\\/g, '/') : '';
   if (!normalized) {
     return '';
   }

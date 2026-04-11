@@ -344,4 +344,70 @@ describe('repo stewardship audit', () => {
     },
     20_000
   );
+
+  it(
+    'preserves leading and trailing whitespace in tracked surface paths',
+    async () => {
+      const repoRoot = await mkdtemp(join(tmpdir(), 'repo-stewardship-spaced-paths-'));
+      createdDirs.push(repoRoot);
+
+      await writeFile(join(repoRoot, ' leading.txt'), 'leading space\n', 'utf8');
+      await writeFile(join(repoRoot, 'trailing.txt '), 'trailing space\n', 'utf8');
+      await writeCatalog(repoRoot, {
+        version: 1,
+        classes: {
+          code_surface: { label: 'Code Surface', report_order: 10 },
+          repo_config: { label: 'Repo Config', report_order: 20 }
+        },
+        entries: [
+          {
+            path: ' leading.txt',
+            surface_class: 'code_surface',
+            decision: 'validate',
+            owner: 'Codex',
+            rationale: 'fixture proves leading path whitespace stays exact'
+          },
+          {
+            path: 'trailing.txt ',
+            surface_class: 'code_surface',
+            decision: 'validate',
+            owner: 'Codex',
+            rationale: 'fixture proves trailing path whitespace stays exact'
+          }
+        ],
+        patterns: [
+          {
+            glob: 'docs/**/*.json',
+            surface_class: 'repo_config',
+            decision: 'validate',
+            owner: 'Codex',
+            rationale: 'catalog files stay explicit config surfaces'
+          }
+        ]
+      });
+
+      await initTrackedRepo(repoRoot);
+
+      const { report, hasFailures } = await runRepoStewardshipAudit(repoRoot, {
+        outRoot: join(repoRoot, 'out'),
+        taskId: 'fixture'
+      });
+
+      expect(hasFailures).toBe(false);
+      expect(report.uncatalogued_surfaces).toEqual([]);
+      expect(report.decisions.find((item) => item.path === ' leading.txt')?.decision).toBe(
+        'validate'
+      );
+      expect(report.decisions.find((item) => item.path === 'trailing.txt ')?.decision).toBe(
+        'validate'
+      );
+      expect(report.decisions.find((item) => item.path === ' leading.txt')?.summary).not.toContain(
+        'tracked surface missing'
+      );
+      expect(report.decisions.find((item) => item.path === 'trailing.txt ')?.summary).not.toContain(
+        'tracked surface missing'
+      );
+    },
+    20_000
+  );
 });
