@@ -1679,6 +1679,11 @@ export async function attachProviderLinearIssuePr(input: {
     };
   }
 
+  const mutabilityFailure = failureIfIssueNotMutable('attach-pr', context.issue);
+  if (mutabilityFailure) {
+    return mutabilityFailure;
+  }
+
   const attachBudgetError = await preflightProviderLinearBudget({
     session: session.session,
     operation: 'attach-pr',
