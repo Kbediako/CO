@@ -49,7 +49,7 @@
   - `operatorDashboardPresenter.ts`
   - `controlStatusDashboard.ts`
   - `controlRuntime.ts`
-  - `selectedRunPresenter.ts`
+  - the legacy selected-run presenter seam later removed by `CO-88`
   - `ControlStatusDashboard.test.ts`
   - `ControlServer.test.ts`
   - `UiDataController.test.ts`
