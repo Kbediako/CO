@@ -2804,6 +2804,116 @@ describe('createProviderIssueHandoffService', () => {
     );
   });
 
+  it('counts unreadable foreign occupancy when the same issue only has a detached running claim with no active run', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const brokenEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-bad-live-manifest-detached-claim'
+    };
+    const brokenPaths = resolveRunPaths(brokenEnv, 'run-bad-live-manifest-detached-claim');
+    await mkdir(brokenPaths.runDir, { recursive: true });
+    await writeFile(
+      brokenPaths.manifestPath,
+      '{"run_id":"run-bad-live-manifest-detached-claim"',
+      'utf8'
+    );
+    await writeFile(
+      join(brokenPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        issue_id: 'lin-issue-occupied',
+        issue_identifier: 'CO-9',
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        worker_host: 'worker-host-01',
+        attempt_started_at: new Date(Date.now() - 120_000).toISOString(),
+        updated_at: new Date(Date.now() - 60_000).toISOString()
+      }),
+      'utf8'
+    );
+
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-occupied',
+      issue_id: 'lin-issue-occupied',
+      issue_identifier: 'CO-9',
+      issue_title: 'Detached running claim',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:25:00.000Z',
+      task_id: 'task-detached-running-claim',
+      mapping_source: 'provider_id_fallback',
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      accepted_at: '2026-03-19T04:25:05.000Z',
+      updated_at: '2026-03-19T04:25:10.000Z',
+      last_delivery_id: 'delivery-detached-running-claim',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_250_000,
+      run_id: null,
+      run_manifest_path: null,
+      worker_host: 'worker-host-01',
+      launch_source: null,
+      launch_token: null
+    });
+
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-fresh',
+        manifestPath: '/tmp/provider-run/fresh.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-fresh',
+        identifier: 'CO-3',
+        updated_at: '2026-03-19T04:32:00.000Z'
+      }),
+      deliveryId: 'delivery-fresh-after-detached-running-claim',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_320_000
+    });
+
+    expect(result).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_start_blocked:max_concurrency',
+      claim: {
+        provider_key: 'linear:lin-issue-fresh',
+        state: 'accepted',
+        reason: 'provider_issue_start_blocked:max_concurrency'
+      }
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        `[provider-issue-run-discovery] skipping unreadable manifest ${brokenPaths.manifestPath}:`
+      )
+    );
+  });
+
   it('does not treat a stale running claim without a live run as occupied capacity for direct webhook admission', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();

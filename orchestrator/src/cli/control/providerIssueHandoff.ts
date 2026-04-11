@@ -1115,6 +1115,7 @@ export function createProviderIssueHandoffService(
     const activeDiscoveredRuns = discoveredRuns.filter((run) => run.status === 'in_progress');
     const activeRunsByProviderIssue = groupProviderIssueRuns(activeDiscoveredRuns);
     const claimStateByProviderKey = new Map<string, string | null>();
+    const occupiedProviderKeys = new Set<string>();
 
     for (const claim of options.state.claims) {
       if (
@@ -1149,6 +1150,7 @@ export function createProviderIssueHandoffService(
         continue;
       }
       seededOccupancyKeys.add(occupancyKey);
+      occupiedProviderKeys.add(claim.provider_key);
       gate.noteOccupied({ state: claim.issue_state ?? null });
     }
 
@@ -1159,12 +1161,8 @@ export function createProviderIssueHandoffService(
       }
       seededOccupancyKeys.add(occupancyKey);
       const providerKey = buildProviderIssueKey(run.provider, run.issueId);
+      occupiedProviderKeys.add(providerKey);
       gate.noteOccupied({ state: claimStateByProviderKey.get(providerKey) ?? null });
-    }
-
-    const occupiedProviderKeys = new Set<string>(claimStateByProviderKey.keys());
-    for (const run of activeDiscoveredRuns) {
-      occupiedProviderKeys.add(buildProviderIssueKey(run.provider, run.issueId));
     }
     const unreadableAdmissionOccupancy =
       await discoverUnreadableProviderAdmissionOccupancyForCurrentOperation();
