@@ -2756,7 +2756,7 @@ describe('codex-orchestrator command surface', () => {
     expect(payload.payload?.outputs?.stdout).toContain('quoted-smoke');
   }, TEST_TIMEOUT);
 
-  it('rejects exec without a command through the binary shell', async () => {
+  it('rejects exec without a command through the source entry subprocess', async () => {
     await expect(runCliSourceSubprocess(['exec'], undefined, CLI_SOURCE_ENTRY_TIMEOUT)).rejects.toMatchObject({
       stderr: expect.stringContaining('exec requires a command to run.')
     });
