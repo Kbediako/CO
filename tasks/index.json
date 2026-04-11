@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260409-linear-763df058-1809-457d-823f-f56268fd9dcc",
+      "title": "CO: Evaluate telemetry-first dynamic provider-worker reasoning selection after docs-first approval",
+      "relates_to": "tasks/tasks-linear-763df058-1809-457d-823f-f56268fd9dcc.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-09",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-763df058-1809-457d-823f-f56268fd9dcc.md",
+        "task": "tasks/tasks-linear-763df058-1809-457d-823f-f56268fd9dcc.md",
+        "agent_task": ".agent/task/linear-763df058-1809-457d-823f-f56268fd9dcc.md",
+        "docs": "docs/TECH_SPEC-linear-763df058-1809-457d-823f-f56268fd9dcc.md"
+      }
+    },
+    {
       "id": "20260411-linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3",
       "title": "CO: resolve weakly-owned historical reference and archive residue surfaced by repo stewardship audit",
       "relates_to": "tasks/tasks-linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3.md",
