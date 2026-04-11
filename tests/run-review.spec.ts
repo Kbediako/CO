@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { execFile } from 'node:child_process';
-import { chmod, mkdtemp, mkdir, readFile, rm, symlink, utimes, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, mkdir, readFile, realpath, rm, symlink, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 
 import type { ReviewOutcomeDisposition } from '../scripts/lib/review-execution-telemetry.js';
-import { runReviewCli } from '../scripts/run-review.js';
+import { isDirectExecution, runReviewCli } from '../scripts/run-review.js';
 import { shouldUseFreshDist } from './helpers/distFreshness.js';
 import { runEntrypointInProcess } from './helpers/inProcessEntrypoint.js';
 
@@ -1701,6 +1702,61 @@ describe('shouldUseFreshDist', () => {
       await rm(tempRoot, { recursive: true, force: true });
     }
   });
+});
+
+describe('isDirectExecution', () => {
+  it('accepts both resolved and realpath entry urls for same-directory symlinked direct exec', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'run-review-direct-exec-'));
+    const targetEntry = join(tempRoot, 'run-review.js');
+    const symlinkEntry = join(tempRoot, 'run-review-link.js');
+
+    try {
+      await writeFile(targetEntry, 'export {};\n', 'utf8');
+      await symlink(targetEntry, symlinkEntry);
+
+      expect(isDirectExecution(targetEntry, pathToFileURL(targetEntry).href)).toBe(true);
+      expect(isDirectExecution(symlinkEntry, pathToFileURL(await realpath(symlinkEntry)).href)).toBe(true);
+      expect(isDirectExecution(symlinkEntry, pathToFileURL(symlinkEntry).href)).toBe(true);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('runs help output through a same-directory symlink under preserve-symlinks-main', async () => {
+    const directEntry = (await shouldUseFreshDist(runReviewScript, runReviewScriptDist))
+      ? runReviewScriptDist
+      : runReviewScript;
+    const linkPath = join(
+      dirname(directEntry),
+      `run-review-link-${process.pid}-${Date.now()}${directEntry.endsWith('.ts') ? '.ts' : '.js'}`
+    );
+
+    try {
+      await symlink(basename(directEntry), linkPath);
+
+      const directArgs = directEntry.endsWith('.ts')
+        ? ['--loader', 'ts-node/esm', linkPath, '--help']
+        : [linkPath, '--help'];
+
+      const { stdout } = await execFileAsync(
+        process.execPath,
+        directArgs,
+        {
+          cwd: process.cwd(),
+          env: {
+            ...process.env,
+            NODE_OPTIONS: [process.env.NODE_OPTIONS, '--preserve-symlinks-main'].filter(Boolean).join(' ')
+          },
+          maxBuffer: 16 * 1024 * 1024
+        }
+      );
+
+      expect(String(stdout ?? '')).toContain('Usage: npm run review -- [options]');
+      expect(String(stdout ?? '')).toContain('Standalone review wrapper for Codex review with manifest-backed context.');
+    } finally {
+      await rm(linkPath, { force: true });
+    }
+  }, 15_000);
 });
 
 afterEach(async () => {
