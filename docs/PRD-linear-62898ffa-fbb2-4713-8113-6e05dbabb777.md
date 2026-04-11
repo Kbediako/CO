@@ -9,7 +9,7 @@
 ## Summary
 - Problem Statement: fresh current-main validation no longer reproduces the `frontend-test` pre-manifest hang from `CO-128`, but repo-wide `npm run test` still reported a `ProviderIssueHandoff` snapshot-only Todo retry failure. The issue report named `continues snapshot-only Todo retries when persisted blocker metadata is still non-terminal` with a line-5975 scheduled-timeout count mismatch; on rebased `origin/main` `6d7ab74f8`, the nearby live non-terminal test anchor is `releases snapshot-only Todo retries when persisted blocker metadata is still non-terminal` around `orchestrator/tests/ProviderIssueHandoff.test.ts:6686`, so fresh reproduction must verify the current line/assertion before implementation.
 - Desired Outcome: reproduce the failure on fresh current main, isolate the owning retry-timer or snapshot-only Todo blocker-release cause, and restore truthful repo-wide `npm run test` behavior without routing this blocker back into `CO-128`.
-- 2026-04-11 outcome: after rebasing onto `origin/main` `6d7ab74f8`, the issue-reported failure still does not reproduce. Focused snapshot-only Todo tests, the full `ProviderIssueHandoff.test.ts` file, and repo-wide `npm run test` all pass for that surface. Later PR Core Lane runs exposed nearby queued-retry fake-timer races in `ProviderIssueHandoff.test.ts`, so this lane keeps the production retry implementation unchanged and stabilizes the test harness by advancing and awaiting queued retry timer dispatches instead of manually invoking captured timeout callbacks.
+- 2026-04-11 outcome: after rebasing onto `origin/main` `6d7ab74f8`, the issue-reported failure still does not reproduce. Focused snapshot-only Todo tests, the full `ProviderIssueHandoff.test.ts` file, and repo-wide `npm run test` all pass for that surface. Later PR Core Lane runs exposed nearby queued-retry fake-timer races in `ProviderIssueHandoff.test.ts`, so this lane keeps the production retry implementation unchanged and stabilizes the test harness by advancing the fake timer clock synchronously instead of manually invoking captured timeout callbacks.
 
 ## User Request Translation (Context Anchor)
 - User intent / needs (in your own words): treat the `ProviderIssueHandoff` failure as its own current-main blocker. Reproduce it first, identify whether snapshot-only Todo retries are scheduling an extra retry after non-terminal blocker metadata is released, then land the smallest responsible fix or document a truthful repo-owned validation contract.
@@ -118,7 +118,7 @@
 
 ## Open Questions
 - Resolved for the issue-reported snapshot-only Todo surface on current `origin/main`: no observed second-timeout failure remains in fresh reproduction, so there is no current owning production retry seam to patch in this lane.
-- Resolved for the later PR Core Lane failures: queued-retry overlap tests should drive Vitest's fake timer clock and await the queued retry dispatch, not manually invoke captured timeout callbacks while refresh or launch promises are still blocked.
+- Resolved for the later PR Core Lane failures: queued-retry overlap tests should drive Vitest's fake timer clock synchronously, not manually invoke captured timeout callbacks while refresh or launch promises are still blocked.
 
 ## Approvals
 - Product: self-approved from Linear issue `CO-150`.

@@ -33,7 +33,7 @@ last_review: 2026-04-11
 - Current outcome:
   - current `origin/main` `6d7ab74f8` validates cleanly for the issue-reported snapshot-only Todo surface after rebasing this branch; focused snapshot-only Todo subset, full `ProviderIssueHandoff.test.ts`, and repo-wide `npm run test` all pass
   - the reported non-terminal `continues...` test/line anchor is stale relative to current source; the current non-terminal anchor is the `releases...` test around line 6686
-  - later PR Core Lane failures exposed nearby queued retry timer test races; the production retry implementation remains unchanged, and the affected tests now advance and await fake timer dispatch instead of invoking captured timeout callbacks by hand
+  - later PR Core Lane failures exposed nearby queued retry timer test races; the production retry implementation remains unchanged, and the affected tests now advance the fake timer clock synchronously instead of invoking captured timeout callbacks by hand
 
 ## Technical Requirements
 - Functional requirements:
@@ -76,7 +76,7 @@ last_review: 2026-04-11
 
 ## Open Questions
 - Resolved for the issue-reported snapshot-only Todo surface on current `origin/main`: no duplicate/extra timeout failure reproduced, so no production implementation seam is currently implicated.
-- Resolved for the later PR Core Lane failures: affected queued-retry overlap tests should use `vi.advanceTimersByTimeAsync(...)` and await that dispatch after blocked refresh or launch promises release.
+- Resolved for the later PR Core Lane failures: affected queued-retry overlap tests should use synchronous `vi.advanceTimersByTime(...)` so the timer callback dispatches before lock-gating assertions while blocked refresh or launch promises still control completion.
 
 ## Approvals
 - Reviewer: docs-review clean after packet fixes

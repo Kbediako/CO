@@ -6434,7 +6434,7 @@ describe('createProviderIssueHandoffService', () => {
     expect(delayMs).toBeLessThanOrEqual(1_000);
     vi.setSystemTime(new Date('2026-03-19T04:30:01.001Z'));
     const startCallsBeforeRetry = launcher.start.mock.calls.length;
-    const queuedRetryDispatch = vi.advanceTimersByTimeAsync(1_001);
+    vi.advanceTimersByTime(1_001);
     await flushAsyncWork();
     await waitForMockCalls(launcher.start, startCallsBeforeRetry + 1, QUEUED_RETRY_SETTLE_TURNS);
 
@@ -6442,7 +6442,6 @@ describe('createProviderIssueHandoffService', () => {
     await flushAsyncWork();
 
     resolveStart?.();
-    await queuedRetryDispatch;
     await refreshPromise;
     await flushAsyncWork();
 
@@ -6565,7 +6564,7 @@ describe('createProviderIssueHandoffService', () => {
 
     const blockedPersistCalls = persist.mock.calls.length;
     vi.setSystemTime(new Date('2026-03-19T04:30:01.001Z'));
-    const queuedRetryDispatch = vi.advanceTimersByTimeAsync(1_001);
+    vi.advanceTimersByTime(1_001);
     await flushAsyncWork();
 
     expect(launcher.start).not.toHaveBeenCalled();
@@ -6577,7 +6576,6 @@ describe('createProviderIssueHandoffService', () => {
     }
     releaseBlockedPersist();
     await refreshPromise;
-    await queuedRetryDispatch;
     await waitForMockCalls(launcher.start, 1, QUEUED_RETRY_SETTLE_TURNS);
 
     expect(launcher.start).toHaveBeenCalledTimes(1);

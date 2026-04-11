@@ -24,7 +24,7 @@
 - [x] The lane remains separate from `CO-128` frontend-test bootstrap work. Evidence: `docs/PRD-linear-62898ffa-fbb2-4713-8113-6e05dbabb777.md`.
 
 ## Implementation
-- [x] Smallest responsible code or validation-contract change is applied at the owning retry seam. Evidence: no production retry code change was made for the issue-reported snapshot-only `Todo` surface; the bounded code delta stabilizes nearby queued-retry overlap tests by advancing and awaiting Vitest's queued retry timer dispatch.
+- [x] Smallest responsible code or validation-contract change is applied at the owning retry seam. Evidence: no production retry code change was made for the issue-reported snapshot-only `Todo` surface; the bounded code delta stabilizes nearby queued-retry overlap tests by advancing Vitest's fake timer clock synchronously.
 - [x] Focused regression or assertion proof covers the snapshot-only `Todo` retry/non-terminal blocker path and nearby queued retry timer dispatch seam. Evidence: `out/linear-62898ffa-fbb2-4713-8113-6e05dbabb777/manual/20260411T0412Z-focused-snapshot-todo-repro-post-rebase.log`, `out/linear-62898ffa-fbb2-4713-8113-6e05dbabb777/manual/20260411T0412Z-provider-handoff-file-repro-post-rebase.log`, `out/linear-62898ffa-fbb2-4713-8113-6e05dbabb777/manual/20260411T0442Z-focused-refresh-lock-after-patch.log`, `out/linear-62898ffa-fbb2-4713-8113-6e05dbabb777/manual/20260411T0501Z-focused-rehydrate-ownership-after-patch.log`, and `out/linear-62898ffa-fbb2-4713-8113-6e05dbabb777/manual/20260411T0501Z-provider-handoff-file-after-second-patch.log`.
 
 ## Validation
