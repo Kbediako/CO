@@ -1,9 +1,11 @@
+import { spawnSync } from 'node:child_process';
 import { access, readdir } from 'node:fs/promises';
 import path from 'node:path';
 
 const DOC_ROOTS = ['.agent', '.ai-dev-tasks', 'docs', 'skills', 'tasks', 'templates'];
 const DOC_ROOT_FILES = ['README.md', 'AGENTS.md'];
 const EXCLUDED_DIR_NAMES = new Set(['.runs', 'out', 'archives', 'node_modules', 'dist']);
+const GIT_LS_FILES_MAX_BUFFER = 64 * 1024 * 1024;
 
 export async function pathExists(target, options = {}) {
   const { allowMissingOnly = false } = options;
@@ -64,6 +66,37 @@ export async function collectDocFiles(repoRoot) {
 
   results.sort();
   return results;
+}
+
+export function listTrackedFiles(repoRoot, pathspecs = []) {
+  const args = ['-C', repoRoot, 'ls-files', '-z'];
+  if (Array.isArray(pathspecs) && pathspecs.length > 0) {
+    args.push('--', ...pathspecs);
+  }
+
+  const git = spawnSync('git', args, {
+    encoding: 'utf8',
+    maxBuffer: GIT_LS_FILES_MAX_BUFFER
+  });
+
+  if (git.error || git.status !== 0) {
+    const detail = [
+      git.error?.message,
+      typeof git.stderr === 'string' ? git.stderr.trim() : '',
+      typeof git.stdout === 'string' ? git.stdout.trim() : '',
+      `status=${git.status ?? '<no status>'}`,
+      `signal=${git.signal ?? '<no signal>'}`
+    ]
+      .filter((part) => part)
+      .join('; ');
+    throw new Error(`git ls-files failed while collecting tracked files: ${detail}`);
+  }
+
+  return git.stdout
+    .split('\0')
+    .filter((line) => line.length > 0)
+    .map((line) => toPosixPath(line))
+    .sort();
 }
 
 function normalizeSlashPath(value) {

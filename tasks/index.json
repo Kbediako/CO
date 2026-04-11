@@ -540,6 +540,23 @@
       }
     },
     {
+      "id": "20260409-linear-d43b6785-88d6-442b-a34e-2ad19d4f723a",
+      "title": "CO: add recurring autonomous repo-wide stewardship audit and freshness upkeep beyond markdown docs surfaces",
+      "relates_to": "tasks/tasks-linear-d43b6785-88d6-442b-a34e-2ad19d4f723a.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-09",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-d43b6785-88d6-442b-a34e-2ad19d4f723a.md",
+        "task": "tasks/tasks-linear-d43b6785-88d6-442b-a34e-2ad19d4f723a.md",
+        "agent_task": ".agent/task/linear-d43b6785-88d6-442b-a34e-2ad19d4f723a.md",
+        "docs": "docs/TECH_SPEC-linear-d43b6785-88d6-442b-a34e-2ad19d4f723a.md"
+      }
+    },
+    {
       "id": "20260408-linear-bb472787-be60-44e3-ac83-a3c297dab470",
       "title": "CO STATUS: tighten post-CO-107 live EVENT truth and operator telemetry freshness",
       "relates_to": "tasks/tasks-linear-bb472787-be60-44e3-ac83-a3c297dab470.md",
@@ -5468,7 +5485,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-12",
+      "last_review": "2026-04-11",
       "paths": {
         "spec": "tasks/specs/1120-coordinator-symphony-aligned-standalone-review-bounded-relevant-reinspection-dwell-boundary.md",
         "task": "tasks/tasks-1120-coordinator-symphony-aligned-standalone-review-bounded-relevant-reinspection-dwell-boundary.md",
@@ -5484,7 +5501,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-12",
+      "last_review": "2026-04-11",
       "paths": {
         "spec": "tasks/specs/1119-coordinator-symphony-aligned-standalone-review-active-closeout-bundle-fast-fail-boundary.md",
         "task": "tasks/tasks-1119-coordinator-symphony-aligned-standalone-review-active-closeout-bundle-fast-fail-boundary.md",
@@ -5500,7 +5517,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-11",
+      "last_review": "2026-04-11",
       "paths": {
         "spec": "tasks/specs/1118-coordinator-symphony-aligned-standalone-review-run-review-spec-whole-file-probe-truthfulness.md",
         "task": "tasks/tasks-1118-coordinator-symphony-aligned-standalone-review-run-review-spec-whole-file-probe-truthfulness.md",
@@ -5516,7 +5533,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-11",
+      "last_review": "2026-04-11",
       "paths": {
         "spec": "tasks/specs/1117-coordinator-symphony-aligned-standalone-review-run-review-spec-harness-env-isolation.md",
         "task": "tasks/tasks-1117-coordinator-symphony-aligned-standalone-review-run-review-spec-harness-env-isolation.md",
@@ -5532,7 +5549,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-11",
+      "last_review": "2026-04-11",
       "paths": {
         "spec": "tasks/specs/1116-coordinator-symphony-aligned-standalone-review-diff-local-concrete-progress-evidence-boundary.md",
         "task": "tasks/tasks-1116-coordinator-symphony-aligned-standalone-review-diff-local-concrete-progress-evidence-boundary.md",
@@ -5548,7 +5565,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-11",
+      "last_review": "2026-04-11",
       "paths": {
         "spec": "tasks/specs/1115-coordinator-symphony-aligned-standalone-review-generic-speculative-dwell-boundary.md",
         "task": "tasks/tasks-1115-coordinator-symphony-aligned-standalone-review-generic-speculative-dwell-boundary.md",
@@ -5564,7 +5581,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-11",
+      "last_review": "2026-04-11",
       "paths": {
         "spec": "tasks/specs/1114-coordinator-symphony-aligned-standalone-review-verdict-stability-guard.md",
         "task": "tasks/tasks-1114-coordinator-symphony-aligned-standalone-review-verdict-stability-guard.md",
@@ -5580,7 +5597,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-11",
+      "last_review": "2026-04-11",
       "paths": {
         "spec": "tasks/specs/1113-coordinator-symphony-aligned-standalone-review-untouched-helper-classification-parity.md",
         "task": "tasks/tasks-1113-coordinator-symphony-aligned-standalone-review-untouched-helper-classification-parity.md",
@@ -5596,7 +5613,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-11",
+      "last_review": "2026-04-11",
       "paths": {
         "spec": "tasks/specs/1112-coordinator-symphony-aligned-standalone-review-active-closeout-root-provenance-hint.md",
         "task": "tasks/tasks-1112-coordinator-symphony-aligned-standalone-review-active-closeout-root-provenance-hint.md",
@@ -5612,7 +5629,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-11",
+      "last_review": "2026-04-11",
       "paths": {
         "spec": "tasks/specs/1111-coordinator-symphony-aligned-standalone-review-closeout-bundle-self-reference-boundary.md",
         "task": "tasks/tasks-1111-coordinator-symphony-aligned-standalone-review-closeout-bundle-self-reference-boundary.md",
@@ -5628,7 +5645,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-11",
+      "last_review": "2026-04-11",
       "paths": {
         "spec": "tasks/specs/1110-coordinator-symphony-aligned-standalone-review-shell-probe-stop-condition.md",
         "task": "tasks/tasks-1110-coordinator-symphony-aligned-standalone-review-shell-probe-stop-condition.md",
