@@ -13,7 +13,12 @@ function usage() {
 
 Preserves inherited git identity by default. When both --name and --email are
 provided, enables worktree config if needed and writes the explicit identity to
-the linked worktree only.`);
+the linked worktree only.
+
+This helper is for future leak prevention only. It does not clear historical
+shared repo-local user.name/user.email overrides from the shared checkout.
+Use node scripts/shared-repo-git-identity.mjs --repo-root <shared-checkout-root>
+[--clear] for intentional historical cleanup from the shared checkout root.`);
 }
 
 function readOptionValue(argv, index, flag) {
