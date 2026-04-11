@@ -143,7 +143,7 @@ interface ProviderUnreadableManifestAdmissionOccupancyRecord {
   provider: 'linear';
   issueId: string;
   manifestPath: string;
-  workerHost: string;
+  workerHost: string | null;
 }
 
 interface ProviderIssueRunDiscoverySnapshot {
@@ -4673,7 +4673,7 @@ function resolveUnreadableProviderAdmissionOccupancyRecord(input: {
   }
   const issueId = readStringValue(proofRecord, 'issue_id');
   const workerHost = normalizeProviderWorkerHostName(proofRecord.worker_host);
-  if (!issueId || !workerHost) {
+  if (!issueId) {
     return null;
   }
   if (readStringValue(proofRecord, 'owner_status') !== 'in_progress') {
