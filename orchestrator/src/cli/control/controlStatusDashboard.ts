@@ -1453,36 +1453,39 @@ function formatRunningColumnValue(
 function summarizeRunningEvent(entry: OperatorDashboardSessionPayload, referenceTime: Date): string {
   const displayEvent = sanitizeDisplayValue(entry.display_event);
   if (displayEvent !== '-') {
-    return displayEvent;
+    return appendWorkerHostSummary(displayEvent, entry.worker_host);
   }
   const displayState = sanitizeDisplayValue(entry.display_state).toLowerCase();
   const lastMessage = sanitizeDisplayValue(entry.last_message);
   if (isHighSignalStatusText(lastMessage, displayState)) {
-    return lastMessage;
+    return appendWorkerHostSummary(lastMessage, entry.worker_host);
   }
   const summary = sanitizeDisplayValue(entry.summary);
   if (isHighSignalStatusText(summary, displayState) && !sameStatusText(summary, lastMessage)) {
-    return summary;
+    return appendWorkerHostSummary(summary, entry.worker_host);
   }
   const humanizedEvent = humanizeRunningEvent(entry.last_event);
   const eventAge = formatRelativePast(entry.last_event_at, referenceTime);
   if (isHighSignalStatusText(humanizedEvent, displayState)) {
-    return humanizedEvent;
+    return appendWorkerHostSummary(humanizedEvent, entry.worker_host);
   }
   const statusReason = humanizeRunningEvent(entry.status_reason);
   if (isHighSignalStatusText(statusReason, displayState)) {
-    return statusReason;
+    return appendWorkerHostSummary(statusReason, entry.worker_host);
   }
   if (humanizedEvent !== 'n/a' && eventAge !== null) {
-    return `${humanizedEvent} (${eventAge} ago)`;
+    return appendWorkerHostSummary(`${humanizedEvent} (${eventAge} ago)`, entry.worker_host);
   }
   if (summary !== '-') {
-    return summary;
+    return appendWorkerHostSummary(summary, entry.worker_host);
   }
   if (lastMessage !== '-') {
-    return eventAge === null ? lastMessage : `${lastMessage} (${eventAge} ago)`;
+    return appendWorkerHostSummary(
+      eventAge === null ? lastMessage : `${lastMessage} (${eventAge} ago)`,
+      entry.worker_host
+    );
   }
-  return 'n/a';
+  return appendWorkerHostSummary('n/a', entry.worker_host);
 }
 
 function summarizeRetryHeadline(entry: OperatorDashboardRetryPayload): string {
@@ -1503,21 +1506,32 @@ function summarizeRetryDetail(entry: OperatorDashboardRetryPayload): string {
   const displayState = sanitizeDisplayValue(entry.display_state).toLowerCase();
   const error = sanitizeDisplayValue(entry.error);
   if (isHighSignalStatusText(error, displayState) && !sameStatusText(error, headline)) {
-    return error;
+    return appendWorkerHostSummary(error, entry.worker_host);
   }
   const summary = sanitizeDisplayValue(entry.summary);
   if (isHighSignalStatusText(summary, displayState) && !sameStatusText(summary, headline)) {
-    return summary;
+    return appendWorkerHostSummary(summary, entry.worker_host);
   }
   const lastMessage = sanitizeDisplayValue(entry.last_message);
   if (isHighSignalStatusText(lastMessage, displayState) && !sameStatusText(lastMessage, headline)) {
-    return lastMessage;
+    return appendWorkerHostSummary(lastMessage, entry.worker_host);
   }
   const statusReason = humanizeRunningEvent(entry.status_reason);
   if (isHighSignalStatusText(statusReason, displayState) && !sameStatusText(statusReason, headline)) {
-    return statusReason;
+    return appendWorkerHostSummary(statusReason, entry.worker_host);
   }
-  return 'n/a';
+  return appendWorkerHostSummary('n/a', entry.worker_host);
+}
+
+function appendWorkerHostSummary(summary: string, workerHost: string | null | undefined): string {
+  const displayWorkerHost = sanitizeDisplayValue(workerHost);
+  if (displayWorkerHost === '-') {
+    return summary;
+  }
+  if (summary === 'n/a') {
+    return `worker ${displayWorkerHost}`;
+  }
+  return `${displayWorkerHost} | ${summary}`;
 }
 
 function selectRunningColumns(terminalColumns: number): RunningColumn[] {

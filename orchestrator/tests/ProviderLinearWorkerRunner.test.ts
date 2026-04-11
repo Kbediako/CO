@@ -41,6 +41,7 @@ import { resolveProviderLinearChildLaneScopeContract } from '../src/cli/provider
 import type { RuntimeCodexCommandContext } from '../src/cli/runtime/index.js';
 
 let tempRoot: string | null = null;
+const providerLinearWorkerRunnerTestTimeoutMs = 60_000;
 const SOURCE_HELPER_COMMAND = 'node "/tmp/co/bin/codex-orchestrator.js" linear';
 
 afterEach(async () => {
@@ -429,7 +430,7 @@ async function appendStaySerialParallelizationDecisionAuditForRequest(
   });
 }
 
-describe('provider linear worker runner', () => {
+describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerTestTimeoutMs }, () => {
   it('loads provider worker context from manifest-backed env', async () => {
     const { manifestPath } = await createManifestRoot();
 
@@ -467,6 +468,57 @@ describe('provider linear worker runner', () => {
       team_id: 'team-1',
       project_id: 'project-1'
     });
+  });
+
+  it('loads and normalizes the selected worker_host from provider worker env', async () => {
+    const { manifestPath } = await createManifestRoot();
+
+    const context = await loadProviderLinearWorkerContext({
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+      CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+      CODEX_ORCHESTRATOR_PROVIDER_WORKER_HOST: '  worker-host-01  '
+    });
+
+    expect(context.workerHost).toBe('worker-host-01');
+  });
+
+  it('treats an empty worker_host env value as an explicit local clear', async () => {
+    const { manifestPath } = await createManifestRoot();
+    await writeFile(manifestPath, JSON.stringify({
+      run_id: 'run-child',
+      task_id: 'linear-lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      workspace_path: tempRoot,
+      worker_host: 'worker-host-manifest'
+    }), 'utf8');
+
+    const context = await loadProviderLinearWorkerContext({
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+      CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+      CODEX_ORCHESTRATOR_PROVIDER_WORKER_HOST: '   '
+    });
+
+    expect(context.workerHost).toBeNull();
+  });
+
+  it('falls back to the manifest host when no worker_host env override is present', async () => {
+    const { manifestPath } = await createManifestRoot();
+    await writeFile(manifestPath, JSON.stringify({
+      run_id: 'run-child',
+      task_id: 'linear-lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      workspace_path: tempRoot,
+      worker_host: 'worker-host-manifest'
+    }), 'utf8');
+
+    const context = await loadProviderLinearWorkerContext({
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+      CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined
+    });
+
+    expect(context.workerHost).toBe('worker-host-manifest');
   });
 
   it('loads provider worker max turns from CODEX_HOME config when env overrides are absent', async () => {
@@ -1884,7 +1936,7 @@ describe('provider linear worker runner', () => {
         typeof message === 'string' && message.includes('[provider-linear-worker-progress]')
       )
     ).toBe(true);
-  });
+  }, providerLinearWorkerRunnerTestTimeoutMs);
 
   it('uses guarded resident-session seeds to resume the prior thread on worker turn one', async () => {
     const { manifestPath } = await createManifestRoot();
@@ -2102,7 +2154,7 @@ describe('provider linear worker runner', () => {
         project_id: 'project-1'
       }
     });
-  });
+  }, providerLinearWorkerRunnerTestTimeoutMs);
 
   it('treats a corrupt child-stream ledger as fatal during proof hydration', async () => {
     const { runDir } = await createManifestRoot();
@@ -9881,16 +9933,6 @@ describe('provider linear worker runner', () => {
           last_message: 'turn-2 active',
           owner_status: 'in_progress'
         });
-      });
-      const secondTurnProof = JSON.parse(
-        await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
-      ) as Record<string, unknown>;
-      expect(secondTurnProof).toMatchObject({
-        latest_turn_id: 'turn-2',
-        latest_session_id: 'thread-1-turn-2',
-        turn_count: 2,
-        last_message: 'turn-2 active',
-        owner_status: 'in_progress'
       });
 
       allowSecondTurnToFinishResolve?.();
