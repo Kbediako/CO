@@ -221,7 +221,13 @@ describe('startControlServerPublicLifecycle', () => {
   });
 
   it('fails closed before startup preparation when a same-task control-host owner already exists', async () => {
-    const error = new Error('control-host ownership rejected (duplicate_control_host_owner)');
+    const error = Object.assign(
+      new Error('control-host ownership rejected (duplicate_control_host_owner)'),
+      {
+        code: 'duplicate_control_host_owner',
+        reason: 'duplicate_control_host_owner'
+      }
+    );
     vi.mocked(acquireControlHostOwnership).mockRejectedValueOnce(error);
 
     await expect(
@@ -231,7 +237,10 @@ describe('startControlServerPublicLifecycle', () => {
         runId: 'run-1',
         controlHostOwnership: {}
       })
-    ).rejects.toThrow('duplicate_control_host_owner');
+    ).rejects.toMatchObject({
+      code: 'duplicate_control_host_owner',
+      reason: 'duplicate_control_host_owner'
+    });
 
     expect(prepareControlServerStartupInputs).not.toHaveBeenCalled();
     expect(startControlServerReadyInstanceLifecycle).not.toHaveBeenCalled();
@@ -273,6 +282,31 @@ describe('startControlServerPublicLifecycle', () => {
     await closeControlServerPublicLifecycle(started);
 
     expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the control-host ownership lock when runtime shutdown fails', async () => {
+    const release = vi.fn(async () => undefined);
+    vi.mocked(closeControlServerOwnedRuntime).mockRejectedValueOnce(
+      new Error('runtime shutdown failed')
+    );
+    const state = {
+      server: { kind: 'server' } as unknown as http.Server,
+      requestContextShared: {
+        clients: new Set(),
+        eventTransport: { broadcast: vi.fn() }
+      } as unknown as ControlRequestSharedContext,
+      lifecycleState: {
+        expiryLifecycle: { close: vi.fn() },
+        bootstrapLifecycle: { close: vi.fn(async () => undefined) }
+      } as unknown as ControlServerOwnedLifecycleState,
+      controlHostOwnership: buildMockControlHostOwnershipHandle({ release })
+    };
+
+    await expect(closeControlServerPublicLifecycle(state)).rejects.toThrow(
+      'runtime shutdown failed'
+    );
+
+    expect(release).not.toHaveBeenCalled();
   });
 
   it('triggers an immediate provider refresh, keeps the timer active, and clears it on shutdown', async () => {

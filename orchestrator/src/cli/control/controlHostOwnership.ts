@@ -441,10 +441,7 @@ async function readControlHostOwnerMetadataFromPath(
 ): Promise<ControlHostOwnerMetadata | null> {
   try {
     return normalizeControlHostOwnerMetadata(JSON.parse(await readFile(path, 'utf8')));
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
-      return null;
-    }
+  } catch {
     return null;
   }
 }
@@ -454,10 +451,7 @@ async function readControlHostOwnershipDiagnosticFromPath(
 ): Promise<ControlHostOwnershipDiagnostic | null> {
   try {
     return normalizeControlHostOwnershipDiagnostic(JSON.parse(await readFile(path, 'utf8')));
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
-      return null;
-    }
+  } catch {
     return null;
   }
 }
@@ -466,7 +460,7 @@ function normalizeControlHostOwnerMetadata(value: unknown): ControlHostOwnerMeta
   if (!isRecordLike(value)) {
     return null;
   }
-  if (value.schema_version !== 1 || value.status !== 'owned' && value.status !== 'released') {
+  if (value.schema_version !== 1 || (value.status !== 'owned' && value.status !== 'released')) {
     return null;
   }
   if (

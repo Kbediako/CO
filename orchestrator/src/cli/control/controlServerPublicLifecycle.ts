@@ -230,16 +230,10 @@ export async function closeControlServerPublicLifecycle(
   } catch (error) {
     closeError = error;
   }
-  try {
-    await state.controlHostOwnership?.release();
-  } catch (error) {
-    if (!closeError) {
-      throw error;
-    }
-  }
   if (closeError) {
     throw closeError;
   }
+  await state.controlHostOwnership?.release();
 }
 
 export function runProviderIssueHandoffRefresh(
