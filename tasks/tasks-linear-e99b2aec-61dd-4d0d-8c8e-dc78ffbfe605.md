@@ -24,24 +24,25 @@
 - [x] Preserve reset/retry metadata in watcher/provider evidence. Evidence: `scripts/lib/pr-watch-merge.js`, `orchestrator/src/cli/control/providerMergeCloseout.ts`, `orchestrator/tests/ProviderMergeCloseout.test.ts`.
 - [x] Add reset-aware cooldown/backoff with bounded jitter. Evidence: `planGitHubRateLimitBackoff`, watcher polling/fan-out/update-branch throttle paths, and focused tests.
 - [x] Reduce same-head quiet-window fan-out through conservative cached snapshot reuse. Evidence: watcher fan-out cache implementation and focused cache reuse/invalidation tests.
+- [x] Prevent provider branch-recovery mutation while snapshot-backed GitHub throttle metadata is present. Evidence: `classifyPreBranchRecoverySnapshot` gates merge closeout and review-promotion before `gh pr update-branch`.
 - [x] Preserve existing readiness and merge safety semantics. Evidence: required checks still refresh each poll, CodeRabbit cooldown is not GitHub throttling, closed PRs still return `pr_closed_unmerged`, and full test suite passed.
 
 ## Validation
-- [x] Focused watcher tests for REST 403/429, GraphQL throttles, backoff planning, cache reuse/invalidation, update-branch throttles, parsed-payload text, stale reset fallback, and CodeRabbit cooldown distinction. Evidence: `npx vitest run --config vitest.config.core.ts tests/pr-watch-merge.spec.ts orchestrator/tests/ProviderMergeCloseout.test.ts` passed with 107 tests after the live-drain stale-reset fix.
-- [x] Focused provider tests for GitHub API throttle evidence in merge closeout/review promotion. Evidence: `orchestrator/tests/ProviderMergeCloseout.test.ts` passed in focused and full suites.
+- [x] Focused watcher tests for REST 403/429, GraphQL throttles, backoff planning, cache reuse/invalidation, update-branch throttles, parsed-payload text, stale reset fallback, provider branch-recovery throttle guard, and CodeRabbit cooldown distinction. Evidence: `npx vitest run --config vitest.config.core.ts tests/pr-watch-merge.spec.ts orchestrator/tests/ProviderMergeCloseout.test.ts` passed with 109 tests after the branch-recovery throttle guard.
+- [x] Focused provider tests for GitHub API throttle evidence in merge closeout/review promotion. Evidence: `orchestrator/tests/ProviderMergeCloseout.test.ts` passed with 36 tests after the branch-recovery throttle guard.
 - [x] `node scripts/delegation-guard.mjs`. Evidence: passed; 1 subagent manifest found.
 - [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: passed.
-- [x] `npm run build`. Evidence: passed after stale-reset PR drain fix.
-- [x] `npm run lint`. Evidence: passed after stale-reset PR drain fix.
-- [x] `npm run test`. Evidence: passed after second PR feedback rework; 326 files, 3469 tests.
+- [x] `npm run build`. Evidence: passed after branch-recovery throttle guard.
+- [x] `npm run lint`. Evidence: passed after branch-recovery throttle guard.
+- [x] `npm run test`. Evidence: first run exposed two unrelated `ProviderIssueHandoff` timing/order failures, isolated rerun passed 211 tests, and full rerun passed 326 files / 3472 tests.
 - [x] `npm run docs:check`. Evidence: passed.
 - [x] `npm run docs:freshness`. Evidence: ran; failed only on standing repo-wide stale-doc baseline (`missing_registry=0`, `stale=77`).
-- [x] `node scripts/diff-budget.mjs`. Evidence: passed with `DIFF_BUDGET_OVERRIDE_REASON`; working-tree scope 4 files / 324 lines.
-- [x] Manifest-backed standalone review plus explicit elegance review before review handoff. Evidence: wrapper review failed closed on `failed-boundary` / `command-intent`; manual correctness/elegance fallback recorded in `out/linear-e99b2aec-61dd-4d0d-8c8e-dc78ffbfe605/manual/20260411T015117Z-review-rework-fallback.md`.
+- [x] `node scripts/diff-budget.mjs`. Evidence: passed with `DIFF_BUDGET_OVERRIDE_REASON`; working-tree scope 2 files / 292 lines for the final branch-recovery throttle guard.
+- [x] Manifest-backed standalone review plus explicit elegance review before review handoff. Evidence: wrapper review failed closed on `failed-boundary` / `command-intent`; latest manual correctness/elegance fallback recorded in `out/linear-e99b2aec-61dd-4d0d-8c8e-dc78ffbfe605/manual/20260411T023202Z-review-branch-recovery-throttle-fallback.md`.
 - [x] `npm run pack:smoke` because PR watcher/CLI behavior is downstream-facing. Evidence: passed.
 
 ## Handoff
-- [ ] PR attached to the issue. Evidence: pending.
+- [x] PR attached to the issue. Evidence: PR #436 is attached to `CO-151`.
 - [ ] Latest `origin/main` merged into the branch before review-state transition. Evidence: pending.
 - [ ] PR checks green and `pr ready-review` drain clean before review-state transition. Evidence: pending.
 - [ ] Unresolved actionable review threads: `0` or explicit pushback recorded. Evidence: pending.
@@ -52,6 +53,7 @@
 - 2026-04-11: Docs-review child stream recorded; packet-local docs gates passed and only the repo-wide stale-doc baseline blocked full docs:freshness. Next: implement GitHub throttle/backoff/cache seam.
 - 2026-04-11: PR feedback rework addressed CodeRabbit/Codex comments for parsed text false positives, update-branch throttle retry, provider evidence propagation, closed PR precedence, and task-checklist mirroring.
 - 2026-04-11: Live `pr ready-review` drain exposed stale secondary REST reset metadata causing near-immediate retries; fixed `planGitHubRateLimitBackoff` to ignore stale reset/retry timestamps and fall back to the configured cooldown.
+- 2026-04-11: Follow-up CodeRabbit review showed provider branch recovery could still call `gh pr update-branch` on snapshot-backed throttle metadata; added pre-recovery throttle classification for merge closeout and review promotion with focused regressions.
 
 ## Relevant Files
 - `scripts/lib/pr-watch-merge.js`
