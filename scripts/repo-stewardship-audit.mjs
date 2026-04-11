@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
@@ -273,6 +273,18 @@ async function loadPackageScriptSet(repoRoot, cache) {
   return cache.packageScripts;
 }
 
+async function trackedSurfaceExists(repoRoot, relativePath) {
+  try {
+    await lstat(path.resolve(repoRoot, relativePath));
+    return true;
+  } catch (error) {
+    if (error?.code !== 'ENOENT') {
+      throw error;
+    }
+    return false;
+  }
+}
+
 async function findNearestLocalReadme(repoRoot, filePath, boundary) {
   const normalizedFilePath = normalizePath(filePath);
   const normalizedBoundary = normalizeBoundaryPath(boundary);
@@ -321,9 +333,7 @@ async function evaluateSurface(repoRoot, filePath, rule, context) {
   const evidence = [];
   const issues = [];
   let readmeAnchor = null;
-  const surfaceExists = await pathExists(path.resolve(repoRoot, normalizedPath), {
-    allowMissingOnly: true
-  });
+  const surfaceExists = await trackedSurfaceExists(repoRoot, normalizedPath);
 
   if (!rule) {
     issues.push('tracked surface is uncatalogued');

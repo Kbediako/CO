@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -524,6 +524,55 @@ describe('repo stewardship audit', () => {
       expect(scriptDecision?.decision).toBe('retain_with_rationale');
       expect(scriptDecision?.readme_anchor).toBe('README.md');
       expect(scriptDecision?.summary).not.toContain('missing local README');
+    },
+    20_000
+  );
+
+  it(
+    'treats dangling tracked symlinks as present surfaces',
+    async () => {
+      const repoRoot = await mkdtemp(join(tmpdir(), 'repo-stewardship-dangling-symlink-'));
+      createdDirs.push(repoRoot);
+
+      await symlink('missing-target.txt', join(repoRoot, 'dangling-link'));
+      await writeCatalog(repoRoot, {
+        version: 1,
+        classes: {
+          code_surface: { label: 'Code Surface', report_order: 10 },
+          repo_config: { label: 'Repo Config', report_order: 20 }
+        },
+        entries: [
+          {
+            path: 'dangling-link',
+            surface_class: 'code_surface',
+            decision: 'validate',
+            owner: 'Codex',
+            rationale: 'tracked symlink itself is the audited surface'
+          }
+        ],
+        patterns: [
+          {
+            glob: 'docs/**/*.json',
+            surface_class: 'repo_config',
+            decision: 'validate',
+            owner: 'Codex',
+            rationale: 'catalog files stay explicit config surfaces'
+          }
+        ]
+      });
+
+      await initTrackedRepo(repoRoot);
+
+      const { report, hasFailures } = await runRepoStewardshipAudit(repoRoot, {
+        outRoot: join(repoRoot, 'out'),
+        taskId: 'fixture'
+      });
+
+      const symlinkDecision = report.decisions.find((item) => item.path === 'dangling-link');
+
+      expect(hasFailures).toBe(false);
+      expect(symlinkDecision?.decision).toBe('validate');
+      expect(symlinkDecision?.summary).not.toContain('tracked surface missing');
     },
     20_000
   );
