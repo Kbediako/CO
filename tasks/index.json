@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260412-linear-b3286a9a-9cef-45a5-bd8a-532856a1188d",
+      "title": "CO: harden run-review direct-exec symlink handling without regressing subprocess harnesses",
+      "relates_to": "tasks/tasks-linear-b3286a9a-9cef-45a5-bd8a-532856a1188d.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-12",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-b3286a9a-9cef-45a5-bd8a-532856a1188d.md",
+        "task": "tasks/tasks-linear-b3286a9a-9cef-45a5-bd8a-532856a1188d.md",
+        "agent_task": ".agent/task/linear-b3286a9a-9cef-45a5-bd8a-532856a1188d.md",
+        "docs": "docs/TECH_SPEC-linear-b3286a9a-9cef-45a5-bd8a-532856a1188d.md"
+      }
+    },
+    {
       "id": "20260411-linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3",
       "title": "CO: resolve weakly-owned historical reference and archive residue surfaced by repo stewardship audit",
       "relates_to": "tasks/tasks-linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3.md",
