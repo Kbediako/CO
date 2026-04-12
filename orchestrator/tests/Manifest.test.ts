@@ -909,7 +909,77 @@ describe('bootstrapManifest', () => {
           {
             dir_path: 'invalid-source0/dir_path',
             reason: 'provenance_contradiction',
-            detail: 'source_0 dir_path must not contain control characters'
+            detail: 'source_0 dir_path must not contain control characters or line separators'
+          }
+        ],
+        rediscovered_memory: {
+          reason: 'provenance_contradiction'
+        },
+        counters: {
+          contradiction_count: 1,
+          rediscovery_count: 1,
+          manual_repair_count: 0,
+          repeated_failure_streak: 1,
+          retrieval_hits: 0,
+          retrieval_misses: 1
+        }
+      });
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('sanitizes rejected candidate paths when inherited source_0 descriptor paths contain Unicode line separators', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-source0-path-line-separator-'));
+    const parentEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-parent'
+    };
+    const childEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-child'
+    };
+    const pipeline: PipelineDefinition = { id: 'test', title: 'Test Pipeline', stages: [] };
+
+    try {
+      const parent = await bootstrapManifest('run-parent', {
+        env: parentEnv,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      const parentManifestPath = parent.paths.manifestPath;
+      const parentManifest = JSON.parse(await readFile(parentManifestPath, 'utf8')) as {
+        memory?: { source_0?: { dir_path?: string } };
+      };
+      if (parentManifest.memory?.source_0) {
+        parentManifest.memory.source_0.dir_path = 'bad\u2028path';
+        await writeFile(parentManifestPath, JSON.stringify(parentManifest, null, 2), 'utf8');
+      }
+
+      const child = await bootstrapManifest('run-child', {
+        env: childEnv,
+        pipeline,
+        parentRunId: 'run-parent',
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      expect(child.manifest.memory?.observability).toMatchObject({
+        selected_memory: {
+          selection: 'fresh_rebuild'
+        },
+        rejected_candidates: [
+          {
+            dir_path: 'invalid-source0/dir_path',
+            reason: 'provenance_contradiction',
+            detail: 'source_0 dir_path must not contain control characters or line separators'
           }
         ],
         rediscovered_memory: {
