@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260412-linear-b792b517-98e4-4518-9fb2-860996dd62c8",
+      "title": "CO validation: stabilize unrelated CLI/runtime test timeouts that block provider-worker full-suite evidence",
+      "relates_to": "tasks/tasks-linear-b792b517-98e4-4518-9fb2-860996dd62c8.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-12",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-b792b517-98e4-4518-9fb2-860996dd62c8.md",
+        "task": "tasks/tasks-linear-b792b517-98e4-4518-9fb2-860996dd62c8.md",
+        "agent_task": ".agent/task/linear-b792b517-98e4-4518-9fb2-860996dd62c8.md",
+        "docs": "docs/TECH_SPEC-linear-b792b517-98e4-4518-9fb2-860996dd62c8.md"
+      }
+    },
+    {
       "id": "20260412-linear-95011595-52df-4ad8-9cb5-256e7eee5424",
       "title": "CO: stop released provider claims from burning Linear issue-by-id polls",
       "relates_to": "tasks/tasks-linear-95011595-52df-4ad8-9cb5-256e7eee5424.md",
