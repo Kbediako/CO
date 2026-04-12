@@ -15,7 +15,9 @@ function createInput(overrides: Partial<ExperienceInput> = {}): ExperienceInput 
     runId: overrides.runId ?? 'run-1',
     taskId: overrides.taskId ?? 'task-0506',
     epoch: overrides.epoch ?? 1,
-    groupId: overrides.groupId ?? 'group-1',
+    groupId: Object.prototype.hasOwnProperty.call(overrides, 'groupId')
+      ? (overrides.groupId ?? null)
+      : 'group-1',
     summary:
       overrides.summary ??
       'This is a synthetic experience summary that should be trimmed to the configured word limit for TF-GRPO runs.',
@@ -156,6 +158,86 @@ describe('ExperienceStore', () => {
     const top = await store.fetchTop({ domain: 'implementation', limit: 1, taskId: 'task-0506' });
     expect(top).toHaveLength(1);
     expect(top[0]?.runId).toBe('run-b');
+  });
+
+  it('suppresses repeated-source candidates with competitive scoring and anti-dominance normalization', async () => {
+    const store = new ExperienceStore({ outDir, runsDir });
+    await store.recordBatch(
+      [
+        createInput({
+          runId: 'run-a',
+          groupId: 'source-a',
+          reward: { gtScore: 0.9, relativeRank: 0.45 },
+          summary: 'source a strongest'
+        }),
+        createInput({
+          runId: 'run-b',
+          groupId: 'source-a',
+          reward: { gtScore: 0.88, relativeRank: 0.42 },
+          summary: 'source a repeated'
+        }),
+        createInput({
+          runId: 'run-c',
+          groupId: 'source-b',
+          reward: { gtScore: 0.82, relativeRank: 0.4 },
+          summary: 'source b diverse'
+        })
+      ],
+      'manifests/run.json'
+    );
+
+    const selection = await store.selectTop({
+      domain: 'implementation',
+      limit: 2,
+      taskId: 'task-0506',
+      policy: {
+        minScore: 0.1,
+        scoreWeights: { gtScore: 1, relativeRank: 1 },
+        antiDominanceNormalization: {
+          enabled: true,
+          strength: 0.5,
+          sourceGrouping: 'provenance_fallback_v1'
+        }
+      }
+    });
+
+    expect(selection.records).toHaveLength(2);
+    expect(selection.records.map((record) => record.groupId)).toEqual(['source-a', 'source-b']);
+    expect(selection.diagnostics.selected[1]?.dominance_penalty).toBe(0);
+    const repeatedCandidate = selection.diagnostics.candidates.find(
+      (candidate) => candidate.source_key === 'source-a' && candidate.selected === false
+    );
+    expect(repeatedCandidate?.dominance_penalty).toBe(0.5);
+    expect(repeatedCandidate?.exclusion_reason).toBe('outcompeted');
+    expect(selection.diagnostics.suppressed_source_keys).toContain('source-a');
+  });
+
+  it('uses run and manifest provenance when grouping repeated sources', async () => {
+    const store = new ExperienceStore({ outDir, runsDir });
+    await store.recordBatch(
+      [
+        createInput({
+          runId: 'run-a',
+          groupId: null,
+          reward: { gtScore: 0.71, relativeRank: 0.1 }
+        }),
+        createInput({
+          runId: 'run-b',
+          groupId: null,
+          reward: { gtScore: 0.6, relativeRank: 0.2 }
+        })
+      ],
+      'manifests/run.json'
+    );
+
+    const selection = await store.selectTop({
+      domain: 'implementation',
+      limit: 1,
+      taskId: 'task-0506'
+    });
+
+    expect(selection.diagnostics.selected[0]?.source_kind).toBe('run_id');
+    expect(selection.diagnostics.selected[0]?.source_key).toBe('run-a');
   });
 
   it('verifies stamp signatures and rejects invalid entries', async () => {

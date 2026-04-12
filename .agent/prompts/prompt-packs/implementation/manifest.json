@@ -3,6 +3,19 @@
   "domain": "implementation",
   "stamp": "f690d89bb2ba6c5ffbd0e6808a367f1bfa0bf933b07f164c0f1937d676436ad3",
   "experienceSlots": 3,
+  "retrievalPolicy": {
+    "kind": "competitive_scoring_v1",
+    "minScore": 0.1,
+    "scoreWeights": {
+      "gtScore": 1,
+      "relativeRank": 1
+    },
+    "antiDominanceNormalization": {
+      "enabled": true,
+      "strength": 0.5,
+      "sourceGrouping": "provenance_fallback_v1"
+    }
+  },
   "system": ".agent/prompts/hotswap-implementation.md",
   "inject": [
     ".agent/prompts/hotswap-implementation.md"

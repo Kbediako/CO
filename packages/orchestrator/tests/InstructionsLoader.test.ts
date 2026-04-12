@@ -116,6 +116,8 @@ describe('loadInstructionSet', () => {
       expect(pack.domain).toBe('implementation');
       expect(pack.stamp).toBe(stamp);
       expect(pack.experienceSlots).toBe(2);
+      expect(pack.retrievalPolicy.kind).toBe('competitive_scoring_v1');
+      expect(pack.retrievalPolicy.minScore).toBeNull();
       expect(pack.sections.inject).toHaveLength(1);
       expect(pack.sources).toHaveLength(5);
     } finally {

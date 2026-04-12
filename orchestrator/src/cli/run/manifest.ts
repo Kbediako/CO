@@ -21,7 +21,12 @@ import type { RunPaths } from './runPaths.js';
 import { resolveRunPaths, relativeToRepo } from './runPaths.js';
 import { materializeRunSource0 } from './source0.js';
 import { normalizeWorkspacePath } from './workspacePath.js';
-import { ExperienceStore } from '../../persistence/ExperienceStore.js';
+import {
+  ExperienceStore,
+  type ExperienceSelectionDiagnostics,
+  type ExperienceSelectionPolicy,
+  type ExperienceSelectionResult
+} from '../../persistence/ExperienceStore.js';
 import { formatExperienceInjections } from '../exec/experience.js';
 import { sanitizeRunId } from '../../persistence/sanitizeRunId.js';
 import {
@@ -63,6 +68,13 @@ interface GuardrailCounts {
   failed: number;
   skipped: number;
   other: number;
+}
+
+interface PromptPackSelectionArtifact {
+  policy: ExperienceSelectionPolicy;
+  experiences: string[];
+  selection: ExperienceSelectionResult | null;
+  diagnosticsPath: string | null;
 }
 
 const HEARTBEAT_INTERVAL_SECONDS = 5;
@@ -185,31 +197,57 @@ export async function bootstrapManifest(runId: string, options: ManifestBootstra
     runsDir: env.runsRoot,
     maxSummaryWords: instructions.experienceMaxWords
   });
-  const experienceSnippets = await Promise.all(
+  const promptPackSelections = await Promise.all(
     instructions.promptPacks.map(async (pack) => {
+      const policy = toExperienceSelectionPolicy(pack.retrievalPolicy, resolveExperienceMinReward());
       if (!pack.experienceSlots) {
-        return [];
+        return {
+          policy,
+          experiences: [],
+          selection: null,
+          diagnosticsPath: null
+        } satisfies PromptPackSelectionArtifact;
       }
-      const minReward = resolveExperienceMinReward();
-      const records = await experienceStore.fetchTop({
+      const selection = await experienceStore.selectTop({
         domain: pack.domain,
         limit: pack.experienceSlots,
-        minReward,
-        taskId: env.taskId
+        taskId: env.taskId,
+        policy
       });
-      return formatExperienceInjections(records, pack.experienceSlots);
+      const diagnosticsPath = await writePromptPackRetrievalDiagnostics({
+        env,
+        paths,
+        packId: pack.id,
+        diagnostics: selection.diagnostics
+      });
+      return {
+        policy,
+        experiences: formatExperienceInjections(selection.records, pack.experienceSlots, selection.diagnostics),
+        selection,
+        diagnosticsPath
+      } satisfies PromptPackSelectionArtifact;
     })
   );
   manifest.instructions_hash = instructions.hash || null;
   manifest.instructions_sources = instructions.sources.map((source) => source.path);
   manifest.prompt_packs = instructions.promptPacks.map((pack, index) => {
-    const experiences = experienceSnippets[index] ?? [];
+    const selectionArtifact = promptPackSelections[index];
+    const experiences = selectionArtifact?.experiences ?? [];
     return {
       id: pack.id,
       domain: pack.domain,
       stamp: pack.stamp,
       experience_slots: pack.experienceSlots,
       sources: pack.sources.map((source) => source.path),
+      retrieval_policy: serializePromptPackRetrievalPolicy(selectionArtifact?.policy),
+      ...(selectionArtifact?.selection
+        ? {
+            retrieval_selection: serializePromptPackRetrievalSelection(
+              selectionArtifact.selection.diagnostics,
+              selectionArtifact.diagnosticsPath
+            )
+          }
+        : {}),
       ...(experiences.length > 0 ? { experiences } : {})
     };
   });
@@ -341,6 +379,89 @@ function resolveExperienceMinReward(env: NodeJS.ProcessEnv = process.env): numbe
     return DEFAULT_MIN_EXPERIENCE_REWARD;
   }
   return Math.max(0, parsed);
+}
+
+function toExperienceSelectionPolicy(
+  policy: {
+    minScore: number | null;
+    scoreWeights: {
+      gtScore: number;
+      relativeRank: number;
+    };
+    antiDominanceNormalization: {
+      enabled: boolean;
+      strength: number;
+      sourceGrouping: 'provenance_fallback_v1';
+    };
+  },
+  fallbackMinScore: number
+): ExperienceSelectionPolicy {
+  return {
+    kind: 'competitive_scoring_v1',
+    minScore: policy.minScore ?? fallbackMinScore,
+    scoreWeights: {
+      gtScore: policy.scoreWeights.gtScore,
+      relativeRank: policy.scoreWeights.relativeRank
+    },
+    antiDominanceNormalization: {
+      enabled: policy.antiDominanceNormalization.enabled,
+      strength: policy.antiDominanceNormalization.strength,
+      sourceGrouping: policy.antiDominanceNormalization.sourceGrouping
+    }
+  };
+}
+
+function serializePromptPackRetrievalPolicy(policy: ExperienceSelectionPolicy | undefined) {
+  if (!policy) {
+    return undefined;
+  }
+  return {
+    kind: policy.kind,
+    min_score: policy.minScore,
+    score_weights: {
+      gt_score: policy.scoreWeights.gtScore,
+      relative_rank: policy.scoreWeights.relativeRank
+    },
+    anti_dominance_normalization: {
+      enabled: policy.antiDominanceNormalization.enabled,
+      strength: policy.antiDominanceNormalization.strength,
+      source_grouping: policy.antiDominanceNormalization.sourceGrouping
+    }
+  };
+}
+
+function serializePromptPackRetrievalSelection(
+  diagnostics: ExperienceSelectionDiagnostics,
+  diagnosticsPath: string | null
+) {
+  return {
+    candidate_count: diagnostics.candidate_count,
+    selected_count: diagnostics.selected_count,
+    diagnostics_path: diagnosticsPath,
+    selected_ids: diagnostics.selected_ids,
+    suppressed_source_keys: diagnostics.suppressed_source_keys,
+    selected: diagnostics.selected.map((entry) => ({
+      id: entry.id,
+      source_key: entry.source_key,
+      source_kind: entry.source_kind,
+      raw_score: entry.raw_score,
+      competitive_score: entry.competitive_score,
+      dominance_penalty: entry.dominance_penalty
+    }))
+  };
+}
+
+async function writePromptPackRetrievalDiagnostics(params: {
+  env: EnvironmentPaths;
+  paths: RunPaths;
+  packId: string;
+  diagnostics: ExperienceSelectionDiagnostics;
+}): Promise<string> {
+  const diagnosticsDir = join(params.paths.runDir, 'prompt-packs');
+  await mkdir(diagnosticsDir, { recursive: true });
+  const filePath = join(diagnosticsDir, `${slugify(params.packId)}-retrieval.json`);
+  await writeJsonAtomic(filePath, params.diagnostics);
+  return relativeToRepo(params.env, filePath);
 }
 
 export function updateHeartbeat(manifest: CliManifest): void {
