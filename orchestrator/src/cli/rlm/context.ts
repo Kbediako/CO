@@ -160,6 +160,42 @@ function validateIndex(index: ContextIndex): void {
   }
 }
 
+function validateIndexAgainstSource(index: ContextIndex, sourceBytes: Buffer): void {
+  if (index.source.byte_length !== sourceBytes.length) {
+    throw new Error('context index source length mismatch');
+  }
+
+  const expectedObjectId = `sha256:${hashBytes(sourceBytes)}`;
+  if (index.object_id !== expectedObjectId) {
+    throw new Error('context index object_id mismatch');
+  }
+
+  const expectedChunks = buildChunks(
+    sourceBytes,
+    index.chunking.target_bytes,
+    index.chunking.overlap_bytes
+  );
+  if (index.chunks.length !== expectedChunks.length) {
+    throw new Error('context index chunk count mismatch');
+  }
+
+  for (let indexPosition = 0; indexPosition < expectedChunks.length; indexPosition += 1) {
+    const expectedChunk = expectedChunks[indexPosition];
+    const actualChunk = index.chunks[indexPosition];
+    if (!actualChunk) {
+      throw new Error('context index chunk missing');
+    }
+    if (
+      actualChunk.id !== expectedChunk.id ||
+      actualChunk.start !== expectedChunk.start ||
+      actualChunk.end !== expectedChunk.end ||
+      actualChunk.sha256 !== expectedChunk.sha256
+    ) {
+      throw new Error('context index chunk mismatch');
+    }
+  }
+}
+
 export function parseContextPointer(pointer: string): { objectId: string; chunkId: string } | null {
   if (typeof pointer !== 'string' || !pointer.startsWith(DEFAULT_POINTER_PREFIX)) {
     return null;
@@ -194,6 +230,8 @@ export async function buildContextObject(options: ContextBuildOptions): Promise<
     const raw = await readFile(existingIndexPath, 'utf8');
     const parsed = JSON.parse(raw) as ContextIndex;
     validateIndex(parsed);
+    const sourceBytes = await readFile(existingSourcePath);
+    validateIndexAgainstSource(parsed, sourceBytes);
     if (sourceDir !== targetDir) {
       await copyFile(existingIndexPath, indexPath);
       await copyFile(existingSourcePath, sourcePath);

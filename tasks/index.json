@@ -18,6 +18,29 @@
       }
     },
     {
+      "id": "20260409-linear-99d7fc30-93ab-43fd-94c2-68d604b4f85c",
+      "title": "CO: Add memory provenance and outcome schema to manifests, events, and metrics",
+      "relates_to": "tasks/tasks-linear-99d7fc30-93ab-43fd-94c2-68d604b4f85c.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-12",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (clean-success)",
+          "date": "2026-04-09",
+          "manifest": ".runs/linear-99d7fc30-93ab-43fd-94c2-68d604b4f85c-docs-review/cli/2026-04-09T08-48-16-376Z-e9616108/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-99d7fc30-93ab-43fd-94c2-68d604b4f85c.md",
+        "task": "tasks/tasks-linear-99d7fc30-93ab-43fd-94c2-68d604b4f85c.md",
+        "agent_task": ".agent/task/linear-99d7fc30-93ab-43fd-94c2-68d604b4f85c.md",
+        "docs": "docs/TECH_SPEC-linear-99d7fc30-93ab-43fd-94c2-68d604b4f85c.md"
+      }
+    },
+    {
       "id": "20260412-linear-b3286a9a-9cef-45a5-bd8a-532856a1188d",
       "title": "CO: harden run-review direct-exec symlink handling without regressing subprocess harnesses",
       "relates_to": "tasks/tasks-linear-b3286a9a-9cef-45a5-bd8a-532856a1188d.md",

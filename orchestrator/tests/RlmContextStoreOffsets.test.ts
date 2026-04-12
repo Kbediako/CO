@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -118,5 +118,28 @@ describe('ContextStore search offsets', () => {
     expect(resolved?.chunkId).toBe(lastChunkId);
     const data = await store.read(legacyPointer, 0, 5);
     expect(data.text.length).toBeGreaterThan(0);
+  });
+
+  it('rejects directory context sources whose copied index.json does not match source.txt', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'rlm-context-'));
+    const contextObject = await buildContextObject({
+      source: { type: 'text', value: 'alpha beta gamma' },
+      targetDir: join(tempDir, 'parent-context'),
+      chunking: { targetBytes: 8, overlapBytes: 0, strategy: 'byte' }
+    });
+
+    const rawIndex = JSON.parse(await readFile(contextObject.indexPath, 'utf8')) as {
+      object_id: string;
+    };
+    rawIndex.object_id = 'sha256:tampered-index';
+    await writeFile(contextObject.indexPath, JSON.stringify(rawIndex, null, 2), 'utf8');
+
+    await expect(
+      buildContextObject({
+        source: { type: 'dir', value: contextObject.dir },
+        targetDir: join(tempDir, 'child-context'),
+        chunking: { targetBytes: 8, overlapBytes: 0, strategy: 'byte' }
+      })
+    ).rejects.toThrow('context index object_id mismatch');
   });
 });

@@ -19,7 +19,7 @@ import { loadInstructionSet } from '../../../../packages/orchestrator/src/instru
 import type { EnvironmentPaths } from './environment.js';
 import type { RunPaths } from './runPaths.js';
 import { resolveRunPaths, relativeToRepo } from './runPaths.js';
-import { materializeRunSource0 } from './source0.js';
+import { materializeRunSource0, refreshRunMemoryObservability } from './source0.js';
 import { normalizeWorkspacePath } from './workspacePath.js';
 import { ExperienceStore } from '../../persistence/ExperienceStore.js';
 import { formatExperienceInjections } from '../exec/experience.js';
@@ -366,7 +366,9 @@ export function recordResumeEvent(
   manifest: CliManifest,
   event: { actor: string; reason: string; outcome: 'accepted' | 'blocked'; detail?: string }
 ): void {
-  manifest.resume_events.push({ ...event, timestamp: isoTimestamp() });
+  const recordedAt = isoTimestamp();
+  manifest.resume_events.push({ ...event, timestamp: recordedAt });
+  refreshRunMemoryObservability(manifest, recordedAt);
 }
 
 export function ensureGuardrailStatus(manifest: CliManifest): GuardrailStatusSnapshot {

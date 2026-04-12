@@ -5,10 +5,21 @@ import { dirname, join } from 'node:path';
 import { createInterface } from 'node:readline';
 
 import type { EnvironmentPaths } from '../run/environment.js';
-import type { SandboxState, ToolRunStatus } from '../../../../packages/shared/manifest/types.js';
+import type {
+  CliManifest,
+  SandboxState,
+  ToolRunStatus
+} from '../../../../packages/shared/manifest/types.js';
 import { acquireLockWithRetry, type LockRetryOptions } from '../../persistence/lockFile.js';
 import { EnvUtils } from '../../../../packages/shared/config/index.js';
 import { writeJsonAtomic } from '../utils/fs.js';
+
+type RunMemoryObservability = NonNullable<NonNullable<CliManifest['memory']>['observability']>;
+type RunMemoryMetricsEntry = {
+  recorded_at: string;
+  selected_memory: RunMemoryObservability['selected_memory'];
+  counters: RunMemoryObservability['counters'];
+};
 
 export interface MetricsEntry {
   run_id: string;
@@ -32,6 +43,7 @@ export interface MetricsEntry {
   privacy_event_count?: number;
   privacy_events_truncated?: boolean;
   privacy_events: Array<Record<string, unknown>>;
+  memory?: RunMemoryMetricsEntry;
   handle_count: number;
   tfgrpo_epoch: number | null;
   tfgrpo_group_id: string | null;
