@@ -59,6 +59,14 @@ import {
   selectProviderWorkerHost
 } from './providerWorkerHosts.js';
 import {
+  appendProviderOperatorAutopilotAuditResult,
+  areProviderOperatorAutopilotResultsMeaningfullyEqual,
+  resolveProviderOperatorAutopilotConfig,
+  runProviderOperatorAutopilot,
+  type ProviderOperatorAutopilotConfig,
+  type ProviderOperatorAutopilotResult
+} from './providerOperatorAutopilot.js';
+import {
   runProviderTerminalCleanup,
   type ProviderTerminalCleanupConfig
 } from './providerTerminalCleanup.js';
@@ -267,6 +275,15 @@ export interface CreateProviderIssueHandoffServiceOptions {
     env?: NodeJS.ProcessEnv;
   }) => Promise<ProviderMergeCloseoutRecord>) | null;
   isProcessAlive?: ((pid: number) => boolean) | null;
+  runOperatorAutopilot?: ((input: {
+    tracked_issues: LiveLinearTrackedIssue[];
+    claims: ProviderIntakeClaimRecord[];
+    config: ProviderOperatorAutopilotConfig;
+    source_setup?: DispatchPilotSourceSetup | null;
+    env?: NodeJS.ProcessEnv;
+    previous_result?: ProviderOperatorAutopilotResult | null;
+  }) => Promise<ProviderOperatorAutopilotResult>) | null;
+  appendOperatorAutopilotAuditResult?: typeof appendProviderOperatorAutopilotAuditResult;
 }
 
 const RESUME_ELIGIBLE_STATUSES = new Set(['failed', 'cancelled']);
@@ -343,6 +360,9 @@ export function createProviderIssueHandoffService(
   const runReviewHandoffPromotion = options.runReviewHandoffPromotion ?? null;
   const runMergeCloseout = options.runMergeCloseout ?? null;
   const isProcessAlive = options.isProcessAlive ?? isLocalProcessAlive;
+  const runOperatorAutopilot = options.runOperatorAutopilot ?? runProviderOperatorAutopilot;
+  const appendOperatorAutopilotAuditResult =
+    options.appendOperatorAutopilotAuditResult ?? appendProviderOperatorAutopilotAuditResult;
   const retryQueue = createProviderIssueRetryQueue();
   const releaseCancelInFlight = new Map<
     string,
@@ -3995,8 +4015,19 @@ export function createProviderIssueHandoffService(
           return;
         }
 
+        const autopilotDispatch = await maybeRunProviderOperatorAutopilotCycle({
+          pollInput,
+          sourceSetup: resolveMergeCloseoutSourceSetup()
+        });
+
         assertRefreshCycleNotStuck();
-        let freshDiscoveryTrackedIssues = pollInput.trackedIssues;
+        let freshDiscoveryTrackedIssues = autopilotDispatch.trackedIssues;
+        const freshDiscoveryBlockedProviderKeys = buildFreshDiscoveryBlockedProviderKeys(
+          options.state.claims
+        );
+        let dispatchSkippedConsumedTrackedIssueKeys = autopilotDispatch.allowConsumedRedispatch
+          ? buildFreshDiscoveryConsumedProviderKeys(consumedTrackedIssueKeys, options.state.claims)
+          : consumedTrackedIssueKeys;
         if (
           pollInput.deferFreshDiscovery === true &&
           freshDiscoveryTrackedIssues.length === 0 &&
@@ -4004,12 +4035,20 @@ export function createProviderIssueHandoffService(
           !suppressFreshDiscovery &&
           pollDispatchBudget.remainingGlobalSlots() > 0
         ) {
+          dispatchSkippedConsumedTrackedIssueKeys = buildFreshDiscoveryConsumedProviderKeys(
+            consumedTrackedIssueKeys,
+            options.state.claims
+          );
           const freshDiscoveryResolution = await trackedIssueRefetch({
             mode: 'fresh_discovery',
             eligibleTargetCount: pollDispatchBudget.remainingGlobalSlots(),
             eligibleStateSlotCounts: pollDispatchBudget.remainingStateSlots(),
             excludedIssueIds: Array.from(
-              new Set([...existingProviderKeys, ...occupiedPollDispatchKeys, ...consumedTrackedIssueKeys])
+              new Set([
+                ...freshDiscoveryBlockedProviderKeys,
+                ...occupiedPollDispatchKeys,
+                ...dispatchSkippedConsumedTrackedIssueKeys
+              ])
             ).map((providerKey) => providerKey.slice(providerKey.indexOf(':') + 1))
           });
           if (freshDiscoveryResolution.kind === 'ready') {
@@ -4020,7 +4059,10 @@ export function createProviderIssueHandoffService(
         for (const trackedIssue of sortLiveLinearTrackedIssuesForDispatch(freshDiscoveryTrackedIssues)) {
           assertRefreshCycleNotStuck();
           const providerKey = buildProviderIssueKey(trackedIssue.provider, trackedIssue.id);
-          if (existingProviderKeys.has(providerKey) || consumedTrackedIssueKeys.has(providerKey)) {
+          if (
+            freshDiscoveryBlockedProviderKeys.has(providerKey) ||
+            dispatchSkippedConsumedTrackedIssueKeys.has(providerKey)
+          ) {
             continue;
           }
           if (!pollDispatchBudget.canDispatch(trackedIssue)) {
@@ -4052,6 +4094,125 @@ export function createProviderIssueHandoffService(
         }
       });
     });
+  };
+
+  const maybeRunProviderOperatorAutopilotCycle = async (input: {
+    pollInput: ProviderIssueHandoffPollInput;
+    sourceSetup: DispatchPilotSourceSetup | null;
+  }): Promise<{
+    trackedIssues: LiveLinearTrackedIssue[];
+    allowConsumedRedispatch: boolean;
+  }> => {
+    const fallbackTrackedIssues = input.pollInput.trackedIssues;
+    const trackedIssueRefetch = wrapTrackedIssueRefetch(input.pollInput.refetchTrackedIssues);
+    if (!options.providerWorkflowConfigStore || !runOperatorAutopilot) {
+      return { trackedIssues: fallbackTrackedIssues, allowConsumedRedispatch: false };
+    }
+    let providerWorkflow: Awaited<ReturnType<ProviderWorkflowConfigStore['refresh']>>;
+    try {
+      providerWorkflow = await options.providerWorkflowConfigStore.refresh();
+    } catch (error) {
+      logger.warn(
+        `[provider-operator-autopilot] Failed to refresh provider workflow config: ${
+          (error as Error)?.message ?? String(error)
+        }`
+      );
+      return { trackedIssues: fallbackTrackedIssues, allowConsumedRedispatch: false };
+    }
+    const autopilotConfig = resolveProviderOperatorAutopilotConfigFromPayload(providerWorkflow);
+    if (!autopilotConfig) {
+      return { trackedIssues: fallbackTrackedIssues, allowConsumedRedispatch: false };
+    }
+    const autopilotAuditPath = resolveProviderOperatorAutopilotAuditPathFromPayload(providerWorkflow);
+    const previousResult = resolveProviderOperatorAutopilotPreviousResultFromPayload(
+      providerWorkflow
+    );
+    let nextResult: ProviderOperatorAutopilotResult;
+    let loggedAutopilotFailure = false;
+    try {
+      nextResult = await runOperatorAutopilot({
+        tracked_issues: input.pollInput.trackedIssues,
+        claims: options.state.claims,
+        config: autopilotConfig,
+        source_setup: input.sourceSetup,
+        env: process.env,
+        previous_result: previousResult
+      });
+    } catch (error) {
+      const message = (error as Error)?.message ?? String(error);
+      nextResult = {
+        recorded_at: isoTimestamp(),
+        status: 'failed',
+        summary: 'Operator autopilot evaluation failed.',
+        error: message,
+        actions: [],
+        holds: [],
+        pending_actions:
+          autopilotConfig.post_merge_rollout.enabled
+            ? (
+                Array.isArray(previousResult?.pending_actions)
+                  ? previousResult.pending_actions.map((pendingAction) => ({ ...pendingAction }))
+                  : []
+              )
+            : []
+      };
+      loggedAutopilotFailure = true;
+      logger.warn(`[provider-operator-autopilot] ${nextResult.summary} error=${message}`);
+    }
+    const resultChanged = !areProviderOperatorAutopilotResultsMeaningfullyEqual(
+      previousResult,
+      nextResult
+    );
+    if (autopilotAuditPath && resultChanged) {
+      try {
+        await appendOperatorAutopilotAuditResult(
+          autopilotAuditPath,
+          nextResult
+        );
+      } catch (error) {
+        logger.warn(
+          `[provider-operator-autopilot] Failed to append audit result path=${
+            autopilotAuditPath
+          }: ${(error as Error)?.message ?? String(error)}`
+        );
+      }
+    }
+    if (resultChanged) {
+      options.providerWorkflowConfigStore.recordOperatorAutopilotResult(nextResult);
+    }
+    if (resultChanged && nextResult.status === 'failed' && !loggedAutopilotFailure) {
+      logger.warn(
+        `[provider-operator-autopilot] ${nextResult.summary} error=${nextResult.error ?? 'unknown'}`
+      );
+    }
+    if (
+      !nextResult.actions.some(
+        (action) =>
+          action.transition.status === 'transitioned' || action.transition.status === 'noop'
+      ) ||
+      !trackedIssueRefetch
+    ) {
+      return { trackedIssues: fallbackTrackedIssues, allowConsumedRedispatch: false };
+    }
+    try {
+      const resolution = await trackedIssueRefetch();
+      if (resolution.kind === 'ready') {
+        return {
+          trackedIssues: resolution.trackedIssues,
+          allowConsumedRedispatch: true
+        };
+      }
+      logger.warn(
+        '[provider-operator-autopilot] Tracked-issue refetch skipped after autopilot action; dispatch continues with the pre-transition poll snapshot.'
+      );
+    } catch (error) {
+      logger.warn(
+        `[provider-operator-autopilot] Failed to refetch tracked issues after autopilot action: ${
+          (error as Error)?.message ?? String(error)
+        }`
+      );
+    }
+    return { trackedIssues: fallbackTrackedIssues, allowConsumedRedispatch: false };
   };
 
   providerIssueHandoffService = {
@@ -4631,6 +4792,120 @@ function resolveProviderTerminalCleanupConfigFromPayload(
       commentTemplate: terminalCleanup.close_attached_pr.comment_template
     }
   };
+}
+
+function resolveProviderOperatorAutopilotConfigFromPayload(
+  providerWorkflow: {
+    operator_autopilot?: unknown;
+  } | null
+): ProviderOperatorAutopilotConfig | null {
+  const operatorAutopilot = resolveProviderOperatorAutopilotPayload(providerWorkflow);
+  if (!operatorAutopilot) {
+    return null;
+  }
+  return resolveProviderOperatorAutopilotConfig({
+    operator_autopilot: operatorAutopilot
+  });
+}
+
+function resolveProviderOperatorAutopilotPreviousResultFromPayload(
+  providerWorkflow: {
+    operator_autopilot?: unknown;
+  } | null
+): ProviderOperatorAutopilotResult | null {
+  const candidate = resolveProviderOperatorAutopilotPayload(providerWorkflow)?.last_result;
+  if (!candidate || typeof candidate !== 'object') {
+    return null;
+  }
+  const record = candidate as Record<string, unknown>;
+  const error = record.error;
+  const status = record.status;
+  if (
+    !Array.isArray(record.pending_actions) ||
+    !Array.isArray(record.actions) ||
+    !Array.isArray(record.holds) ||
+    typeof record.recorded_at !== 'string' ||
+    typeof status !== 'string' ||
+    typeof record.summary !== 'string' ||
+    (error !== null && typeof error !== 'string')
+  ) {
+    return null;
+  }
+  if (!new Set<ProviderOperatorAutopilotResult['status']>(['disabled', 'noop', 'acted', 'failed']).has(status as ProviderOperatorAutopilotResult['status'])) {
+    return null;
+  }
+  return {
+    recorded_at: record.recorded_at,
+    status: status as ProviderOperatorAutopilotResult['status'],
+    summary: record.summary,
+    error,
+    actions: record.actions as ProviderOperatorAutopilotResult['actions'],
+    holds: record.holds as ProviderOperatorAutopilotResult['holds'],
+    pending_actions: record.pending_actions as ProviderOperatorAutopilotResult['pending_actions']
+  };
+}
+
+function resolveProviderOperatorAutopilotAuditPathFromPayload(
+  providerWorkflow: {
+    operator_autopilot?: unknown;
+  } | null
+): string | null {
+  const auditPath = resolveProviderOperatorAutopilotPayload(providerWorkflow)?.audit_path;
+  return typeof auditPath === 'string' && auditPath.trim().length > 0 ? auditPath : null;
+}
+
+function resolveProviderOperatorAutopilotPayload(
+  providerWorkflow: {
+    operator_autopilot?: unknown;
+  } | null
+): {
+  audit_path?: unknown;
+  last_result?: unknown;
+} | null {
+  const operatorAutopilot = providerWorkflow?.operator_autopilot;
+  if (!operatorAutopilot || typeof operatorAutopilot !== 'object') {
+    return null;
+  }
+  return operatorAutopilot as {
+    audit_path?: unknown;
+    last_result?: unknown;
+  };
+}
+
+function buildFreshDiscoveryBlockedProviderKeys(
+  claims: ProviderIntakeClaimRecord[]
+): Set<string> {
+  return new Set(
+    claims
+      .filter(
+        (claim) =>
+          claim.state !== 'ignored' &&
+          claim.state !== 'released' &&
+          claim.state !== 'completed' &&
+          claim.state !== 'handoff_failed'
+      )
+      .map((claim) => claim.provider_key)
+  );
+}
+
+function buildFreshDiscoveryConsumedProviderKeys(
+  consumedTrackedIssueKeys: Set<string>,
+  claims: ProviderIntakeClaimRecord[]
+): Set<string> {
+  const nonBlockingClaimKeys = new Set(
+    claims
+      .filter(
+        (claim) =>
+          claim.state === 'ignored' ||
+          claim.state === 'released' ||
+          claim.state === 'completed' ||
+          claim.state === 'handoff_failed'
+      )
+      .map((claim) => claim.provider_key)
+  );
+  return new Set(
+    Array.from(consumedTrackedIssueKeys).filter((providerKey) => !nonBlockingClaimKeys.has(providerKey))
+  );
 }
 
 async function resolveProviderCleanupWorkspacePath(
