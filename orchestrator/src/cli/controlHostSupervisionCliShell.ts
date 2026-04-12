@@ -1496,7 +1496,7 @@ async function ensureTrackedProcessTreeExited(
 
   const initialOrphanedProcessGroupPids = await (
     options?.listProcessGroupPids ?? listProcessGroupProcessIds
-  )(rootPid).catch(() => []);
+  )(rootPid);
   if (initialOrphanedProcessGroupPids.length === 0) {
     return {
       result: 'exited_after_kickstart',
@@ -1525,7 +1525,7 @@ async function ensureTrackedProcessTreeExited(
   }
   const orphanedProcessGroupPids = await (
     options?.listProcessGroupPids ?? listProcessGroupProcessIds
-  )(rootPid).catch(() => []);
+  )(rootPid);
   if (orphanedProcessGroupPids.length === 0) {
     return {
       result: 'exited_after_kickstart',

@@ -1235,6 +1235,20 @@ describe('controlHostSupervision shell helpers', () => {
     expect(killProcessGroup).not.toHaveBeenCalled();
   });
 
+  it('fails closed when the tracked process-group recheck errors before force cleanup', async () => {
+    const probeError = new Error('ps failed');
+    const listProcessGroupPids = vi.fn().mockRejectedValue(probeError);
+    const killProcessGroup = vi.fn();
+
+    await expect(
+      ensureTrackedProcessTreeExited(4200, 0, {
+        listProcessGroupPids,
+        killProcessGroup
+      })
+    ).rejects.toThrow('ps failed');
+    expect(killProcessGroup).not.toHaveBeenCalled();
+  });
+
   it('treats the prior child as exited when identity verification skips cleanup after the process group disappears', async () => {
     const listProcessGroupPids = vi
       .fn()
