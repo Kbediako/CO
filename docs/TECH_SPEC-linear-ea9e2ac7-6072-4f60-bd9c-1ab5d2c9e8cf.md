@@ -58,6 +58,16 @@ last_review: 2026-04-12
   - generic prompt wording is already enough
   - `stay_serial` is an acceptable silent fallback for invalidated forced-split issues
   - the correct fix is to re-run or re-open validation work that is already green
+- Non-goals:
+  - changing the decision matrix or reason-code allowlist
+  - reopening already-green `CO-133` validation seams or rerunning green validation work
+  - adding new enforcement outside the existing provider-worker prompt, test, and docs seam
+- Not done if:
+  - `parallelize_now`, `forbid_parallel`, `blocked_by_dependency`, `clean-main-baseline-failures`, or `cli-orchestrator-cleanup-fallout` stop being preserved in the contract and auditable example
+  - close versus `Blocked` or follow-up behavior is still implicit
+  - workers can still read the contract as permission to invent child lanes or finish as `stay_serial`
+  - `blocked_by_dependency` is allowed without a real remaining dependency
+  - the implementation changes anything outside the existing provider-worker prompt, test, and docs seam
 
 ## Validation
 Validation evidence for this lane belongs in `tasks/tasks-linear-ea9e2ac7-6072-4f60-bd9c-1ab5d2c9e8cf.md`,

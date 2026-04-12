@@ -23,7 +23,7 @@ review_notes:
 # Technical Specification
 
 ## Context
-`CO-101` made ordinary same-issue child-lane decisions machine-checkable, but `CO-133` later exposed a narrower workflow gap. That source issue intentionally forced a non-serial validation split and explicitly disallowed silently finishing as `stay_serial` if the split collapsed. Fresh April 12, 2026 evidence showed the named `clean-main-baseline-failures` and `cli-orchestrator-cleanup-fallout` clusters were both clean non-repros, so no child lanes were truthful and a workflow-contract follow-up was needed. The repo-local provider-worker prompt still does not explain that branch directly, and it should make future closeout reasons truthful instead of forcing every clean non-repro down `blocked_by_dependency`.
+`CO-101` made ordinary same-issue child-lane decisions machine-checkable, but `CO-133` later exposed a narrower workflow gap. That source issue intentionally forced a non-serial validation split and explicitly disallowed silently finishing as `stay_serial` if the split collapsed. Fresh April 12, 2026 evidence showed the named `clean-main-baseline-failures` and `cli-orchestrator-cleanup-fallout` clusters were both clean non-repros, so no child lanes were truthful and a workflow-contract follow-up was needed. The repo-local provider-worker prompt now explains that branch directly, and this lane keeps the standing packet truthful and aligned with that closeout guidance instead of forcing every clean non-repro down `blocked_by_dependency`.
 
 ## Requirements
 1. Preserve the existing `parallelize_now`, `stay_serial`, and `forbid_parallel` contract from `CO-101`.
@@ -40,8 +40,8 @@ review_notes:
 
 ## Current Truth
 - `buildParallelizationGuidance(...)` currently tells workers to record a decision every active turn and explains the generic reason-code pairs.
-- The current prompt does not say what to do when a previously forced validation split disappears before any child lane can be launched.
-- `CO-133` already proved the truthful behavior, but only in issue-local artifacts rather than in standing repo workflow guidance.
+- The current prompt now includes the forced invalid-split non-repro guidance: it tells workers not to invent child lanes, to keep `forbid_parallel`, to use `parent_only_mutation` for direct clean closeout, and to reserve `blocked_by_dependency` for real remaining dependencies that should move to `Blocked`.
+- `CO-133` proved the truthful behavior and this lane is codifying that behavior as standing repo workflow guidance.
 
 ## Issue-Shaping Contract
 - User-request translation carried forward:
@@ -58,12 +58,18 @@ review_notes:
   - the generic prompt already makes this case obvious
   - `stay_serial` is acceptable when a forced split disappears
   - the fix should reopen `CO-133` validation work
+- Non-goals:
+  - changing the decision matrix or reason-code allowlist
+  - reopening already-green `CO-133` validation seams or rerunning green validation work
+  - adding new enforcement outside the existing provider-worker prompt, test, and docs seam
+- Not done if:
+  - `parallelize_now`, `forbid_parallel`, `blocked_by_dependency`, `clean-main-baseline-failures`, or `cli-orchestrator-cleanup-fallout` stop being preserved in the contract and auditable example
+  - close versus `Blocked` or follow-up behavior is still implicit
+  - workers can still read the contract as permission to invent child lanes or finish as `stay_serial`
+  - `blocked_by_dependency` is allowed without a real remaining dependency
+  - the implementation changes anything outside the existing provider-worker prompt, test, and docs seam
 
 ## Readiness Gate
-- Not done if:
-  - the prompt still leaves the invalid-split path implicit
-  - workers can still read the contract as permission to invent child lanes or finish as `stay_serial`
-  - the implementation changes anything outside the prompt/test/doc seam
 - Pre-implementation issue-quality review evidence:
   - the source closeout already provides the authoritative example, so the smallest correct change is to encode that example in standing workflow guidance and test it
 
