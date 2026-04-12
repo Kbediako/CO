@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260412-linear-74aec03f-253a-4d8e-a713-e1fbd7a1cb47",
+      "title": "CO: stop stale review and dead-claim reconciliation from burning Linear requests",
+      "relates_to": "tasks/tasks-linear-74aec03f-253a-4d8e-a713-e1fbd7a1cb47.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-12",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-74aec03f-253a-4d8e-a713-e1fbd7a1cb47.md",
+        "task": "tasks/tasks-linear-74aec03f-253a-4d8e-a713-e1fbd7a1cb47.md",
+        "agent_task": ".agent/task/linear-74aec03f-253a-4d8e-a713-e1fbd7a1cb47.md",
+        "docs": "docs/TECH_SPEC-linear-74aec03f-253a-4d8e-a713-e1fbd7a1cb47.md"
+      }
+    },
+    {
       "id": "20260412-linear-e934e6ea-8fdd-480c-9656-22c020cb19cf",
       "title": "CO workflow: hard-gate all Linear consumers on shared request headroom",
       "relates_to": "tasks/tasks-linear-e934e6ea-8fdd-480c-9656-22c020cb19cf.md",

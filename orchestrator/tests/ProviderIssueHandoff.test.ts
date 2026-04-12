@@ -215,6 +215,39 @@ function getLatestScheduledTimeoutCallback(
   throw new Error('No scheduled timeout callback found.');
 }
 
+function getSingleScheduledTimeoutByDelayRange(
+  setTimeoutSpy: { mock: { calls: unknown[][]; results: Array<{ value: unknown }> } },
+  minimumDelayMs: number,
+  maximumDelayMs: number
+): { callback: () => void; delayMs: number } {
+  const matchingCalls = setTimeoutSpy.mock.calls.flatMap((call, index) => {
+    const [callback, delayMs] = call ?? [];
+    if (
+      typeof callback !== 'function' ||
+      typeof delayMs !== 'number' ||
+      delayMs < minimumDelayMs ||
+      delayMs > maximumDelayMs
+    ) {
+      return [];
+    }
+    return [{
+      callback: callback as () => void,
+      delayMs,
+      index
+    }];
+  });
+  expect(matchingCalls).toHaveLength(1);
+  const [match] = matchingCalls;
+  const scheduledHandle = setTimeoutSpy.mock.results[match.index]?.value;
+  if (scheduledHandle !== undefined) {
+    clearTimeout(scheduledHandle as ReturnType<typeof setTimeout>);
+  }
+  return {
+    callback: match.callback,
+    delayMs: match.delayMs
+  };
+}
+
 describe('createProviderIssueHandoffService', () => {
   it('ignores child-stream and child-lane manifests without dropping provider workers that carry parent lineage', async () => {
     const { root, paths } = await createHostPaths();
@@ -293,6 +326,49 @@ describe('createProviderIssueHandoffService', () => {
       expect.objectContaining({
         runId: 'provider-run-1',
         workerHost: null
+      })
+    ]);
+  });
+
+  it('does not treat a remote worker-host proof pid as stale during prior-run discovery', async () => {
+    const { root, paths } = await createHostPaths();
+    const providerRunDir = join(root, '.runs', 'linear-lin-issue-1', 'cli', 'provider-run-1');
+    await mkdir(providerRunDir, { recursive: true });
+    await writeFile(join(providerRunDir, 'manifest.json'), JSON.stringify({
+      run_id: 'provider-run-1',
+      task_id: 'linear-lin-issue-1',
+      pipeline_id: 'provider-linear-worker',
+      parent_run_id: 'control-host-run-1',
+      issue_provider: 'linear',
+      issue_id: 'lin-issue-1',
+      status: 'in_progress',
+      started_at: '2026-03-27T01:05:00.000Z',
+      updated_at: '2026-03-27T01:06:00.000Z'
+    }), 'utf8');
+    await writeFile(
+      join(providerRunDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        attempt_started_at: '2026-03-27T01:05:00.000Z',
+        updated_at: '2026-03-27T01:05:30.000Z',
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        pid: 424242,
+        worker_host: 'worker-host-01'
+      }),
+      'utf8'
+    );
+
+    await expect(
+      discoverProviderIssueRuns(paths.runDir, {
+        provider: 'linear',
+        issueId: 'lin-issue-1',
+        isProcessAlive: () => false
+      })
+    ).resolves.toEqual([
+      expect.objectContaining({
+        runId: 'provider-run-1',
+        status: 'in_progress',
+        workerHost: 'worker-host-01'
       })
     ]);
   });
@@ -1866,6 +1942,497 @@ describe('createProviderIssueHandoffService', () => {
     });
 
     expect(refetchTrackedIssues).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
+  it('demotes a dead-pid running claim to cached revalidation, then revalidates it without reviving the dead run', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-12T07:20:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-dead-pid-poll'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-dead-pid-poll');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-dead-pid-poll',
+        task_id: 'task-dead-pid-poll',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-159',
+        issue_updated_at: '2026-04-12T07:19:00.000Z',
+        started_at: '2026-04-12T07:19:00.000Z',
+        updated_at: '2026-04-12T07:19:30.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-159',
+        pid: '424242',
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        attempt_started_at: '2026-04-12T07:19:00.000Z',
+        updated_at: '2026-04-12T07:19:30.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-159',
+      issue_title: 'Stop request burn',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-12T07:19:00.000Z',
+      task_id: 'task-dead-pid-poll',
+      mapping_source: 'provider_id_fallback',
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      accepted_at: '2026-04-12T07:19:05.000Z',
+      updated_at: '2026-04-12T07:19:10.000Z',
+      last_delivery_id: 'delivery-dead-pid-poll',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_744_444_740_000,
+      run_id: 'run-dead-pid-poll',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        identifier: 'CO-159',
+        updated_at: '2026-04-12T07:20:00.000Z'
+      })
+    }));
+    const refetchTrackedIssues = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssues: []
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue,
+      isProcessAlive: () => false
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(refetchTrackedIssues).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-12T07:19:00.000Z',
+      run_id: 'run-dead-pid-poll',
+      run_manifest_path: childPaths.manifestPath
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-12T07:19:00.000Z'
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: false
+    });
+
+    expect(resolveTrackedIssue.mock.calls).toEqual([
+      [{ provider: 'linear', issueId: 'lin-issue-1' }]
+    ]);
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_refresh_start_launched',
+      issue_updated_at: '2026-04-12T07:20:00.000Z',
+      run_id: null,
+      run_manifest_path: null
+    });
+  });
+
+  it('fails closed to cached review-wait truth during poll instead of re-reading the issue or fresh-discovering work', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-96',
+      issue_id: 'lin-issue-96',
+      issue_identifier: 'CO-96',
+      issue_title: 'Review wait',
+      issue_state: 'In Review',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-12T07:10:00.000Z',
+      task_id: 'task-review-wait',
+      mapping_source: 'provider_id_fallback',
+      state: 'completed',
+      reason: 'provider_issue_review_promotion_watching',
+      accepted_at: '2026-04-12T07:00:00.000Z',
+      updated_at: '2026-04-12T07:10:05.000Z',
+      last_delivery_id: 'delivery-review-wait',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_744_444_200_000,
+      run_id: 'run-review-wait',
+      run_manifest_path: '/tmp/run-review-wait/manifest.json',
+      launch_source: null,
+      launch_token: null,
+      review_promotion: {
+        recorded_at: '2026-04-12T07:10:00.000Z',
+        issue_id: 'lin-issue-96',
+        issue_identifier: 'CO-96',
+        issue_state: 'In Review',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-12T07:10:00.000Z',
+        status: 'watching',
+        reason: 'checks_pending',
+        summary: 'Waiting for required checks before review handoff can advance.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/451'],
+        ignored_historical_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/451',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 451
+        },
+        snapshot: {
+          state: 'OPEN',
+          review_decision: 'APPROVED',
+          merge_state_status: 'BLOCKED',
+          ready_to_merge: false,
+          gate_reasons: ['required_checks_pending=1'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 1,
+          checks_failed: 0,
+          required_checks_pending: 1,
+          required_checks_failed: 0,
+          updated_at: '2026-04-12T07:09:30.000Z',
+          merged_at: null,
+          head_oid: 'abc123'
+        },
+        linear_transition: null
+      }
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-96',
+        identifier: 'CO-96',
+        state: 'In Review',
+        state_type: 'started',
+        updated_at: '2026-04-12T07:12:00.000Z'
+      })
+    }));
+    const refetchTrackedIssues = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssues: []
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(refetchTrackedIssues).not.toHaveBeenCalled();
+    expect(persist).toHaveBeenCalledTimes(1);
+    expect(state.claims[0]).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_review_promotion_watching',
+      review_promotion: {
+        status: 'watching',
+        reason: 'checks_pending'
+      }
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
+  it('still evaluates review handoff promotion once during poll before caching a review-wait claim', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-96',
+      issue_id: 'lin-issue-96',
+      issue_identifier: 'CO-96',
+      issue_title: 'Review wait',
+      issue_state: 'In Review',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-12T07:10:00.000Z',
+      task_id: 'task-review-wait-first-pass',
+      mapping_source: 'provider_id_fallback',
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      accepted_at: '2026-04-12T07:00:00.000Z',
+      updated_at: '2026-04-12T07:10:05.000Z',
+      last_delivery_id: 'delivery-review-wait-first-pass',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_744_444_200_000,
+      run_id: 'run-review-wait-first-pass',
+      run_manifest_path: '/tmp/run-review-wait-first-pass/manifest.json',
+      launch_source: null,
+      launch_token: null
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-96',
+        identifier: 'CO-96',
+        state: 'In Review',
+        state_type: 'started',
+        updated_at: '2026-04-12T07:12:00.000Z'
+      })
+    }));
+    const runReviewHandoffPromotion = vi.fn(async () => ({
+      recorded_at: '2026-04-12T07:12:00.000Z',
+      issue_id: 'lin-issue-96',
+      issue_identifier: 'CO-96',
+      issue_state: 'In Review',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-12T07:12:00.000Z',
+      status: 'watching' as const,
+      reason: 'checks_pending',
+      summary: 'Waiting for required checks before review handoff can advance.',
+      attached_pr_urls: ['https://github.com/asabeko/CO/pull/451'],
+      ignored_historical_pr_urls: [],
+      conflicting_attached_pr_urls: [],
+      pr: {
+        url: 'https://github.com/asabeko/CO/pull/451',
+        owner: 'asabeko',
+        repo: 'CO',
+        number: 451
+      },
+      snapshot: {
+        state: 'OPEN',
+        review_decision: 'APPROVED',
+        merge_state_status: 'BLOCKED',
+        ready_to_merge: false,
+        gate_reasons: ['required_checks_pending=1'],
+        action_required_reasons: [],
+        unresolved_thread_count: 0,
+        checks_pending: 1,
+        checks_failed: 0,
+        required_checks_pending: 1,
+        required_checks_failed: 0,
+        updated_at: '2026-04-12T07:11:30.000Z',
+        merged_at: null,
+        head_oid: 'abc123'
+      },
+      linear_transition: null
+    }));
+    const refetchTrackedIssues = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssues: []
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue,
+      runReviewHandoffPromotion
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-96'
+    });
+    expect(runReviewHandoffPromotion).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'lin-issue-96',
+      issueIdentifier: 'CO-96',
+      issueState: 'In Review'
+    }));
+    expect(refetchTrackedIssues).toHaveBeenCalledWith(expect.objectContaining({
+      mode: 'fresh_discovery'
+    }));
+    expect(state.claims[0]).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_review_promotion_watching',
+      issue_updated_at: '2026-04-12T07:12:00.000Z',
+      review_promotion: {
+        status: 'watching',
+        reason: 'checks_pending'
+      }
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
+  it('does not dispatch queued retry work for cached review-wait claims while external checks are pending', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-12T07:20:00.000Z'));
+
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-96',
+      issue_id: 'lin-issue-96',
+      issue_identifier: 'CO-96',
+      issue_title: 'Review wait',
+      issue_state: 'In Review',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-12T07:10:00.000Z',
+      task_id: 'task-review-wait-retry',
+      mapping_source: 'provider_id_fallback',
+      state: 'completed',
+      reason: 'provider_issue_review_promotion_watching',
+      accepted_at: '2026-04-12T07:00:00.000Z',
+      updated_at: '2026-04-12T07:10:05.000Z',
+      last_delivery_id: 'delivery-review-wait-retry',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_744_444_200_000,
+      run_id: 'run-review-wait-retry',
+      run_manifest_path: '/tmp/run-review-wait-retry/manifest.json',
+      launch_source: null,
+      launch_token: null,
+      retry_queued: true,
+      retry_attempt: 2,
+      retry_due_at: '2026-04-12T07:20:01.000Z',
+      retry_error: 'stale wrapper failure',
+      review_promotion: {
+        recorded_at: '2026-04-12T07:10:00.000Z',
+        issue_id: 'lin-issue-96',
+        issue_identifier: 'CO-96',
+        issue_state: 'In Review',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-12T07:10:00.000Z',
+        status: 'watching',
+        reason: 'checks_pending',
+        summary: 'Waiting for required checks before review handoff can advance.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/451'],
+        ignored_historical_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/451',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 451
+        },
+        snapshot: {
+          state: 'OPEN',
+          review_decision: 'APPROVED',
+          merge_state_status: 'BLOCKED',
+          ready_to_merge: false,
+          gate_reasons: ['required_checks_pending=1'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 1,
+          checks_failed: 0,
+          required_checks_pending: 1,
+          required_checks_failed: 0,
+          updated_at: '2026-04-12T07:09:30.000Z',
+          merged_at: null,
+          head_oid: 'abc123'
+        },
+        linear_transition: null
+      }
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-96',
+        identifier: 'CO-96',
+        state: 'In Review',
+        state_type: 'started',
+        updated_at: '2026-04-12T07:12:00.000Z'
+      })
+    }));
+
+    createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue
+    });
+
+    await vi.advanceTimersByTimeAsync(1_500);
+    await flushAsyncWork();
+
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(persist).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_review_promotion_watching',
+      retry_queued: true,
+      retry_attempt: 2,
+      retry_due_at: '2026-04-12T07:20:01.000Z',
+      retry_error: 'stale wrapper failure'
+    });
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
   });
@@ -8358,11 +8925,14 @@ describe('createProviderIssueHandoffService', () => {
     });
 
     await service.refresh();
-    await waitForMockCalls(setTimeoutSpy);
+    const { callback: retryTimerCallback, delayMs: retryDelayMs } =
+      getSingleScheduledTimeoutByDelayRange(setTimeoutSpy, 999, 1_000);
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
+    expect(retryDelayMs).toBeGreaterThanOrEqual(999);
+    expect(retryDelayMs).toBeLessThanOrEqual(1_000);
     vi.setSystemTime(new Date('2026-03-19T04:30:01.001Z'));
-    getLatestScheduledTimeoutCallback(setTimeoutSpy)();
+    retryTimerCallback();
     await flushAsyncWork();
     await waitForMockCalls(launcher.start, 1, 1024);
 
@@ -8667,16 +9237,14 @@ describe('createProviderIssueHandoffService', () => {
       launcher,
       startPipelineId: 'diagnostics'
     });
-    const timerCountAfterConstruction = setTimeoutSpy.mock.calls.length;
-    expect(timerCountAfterConstruction).toBeGreaterThanOrEqual(1);
-    const retryTimerCallback = setTimeoutSpy.mock.calls[timerCountAfterConstruction - 1]?.[0];
-    expect(typeof retryTimerCallback).toBe('function');
 
     await service.refresh();
-    await waitForMockCalls(setTimeoutSpy, timerCountAfterConstruction);
-    expect(setTimeoutSpy.mock.calls.length).toBe(timerCountAfterConstruction);
+    const { callback: retryTimerCallback, delayMs: retryDelayMs } =
+      getSingleScheduledTimeoutByDelayRange(setTimeoutSpy, 999, 1_000);
+    expect(retryDelayMs).toBeGreaterThanOrEqual(999);
+    expect(retryDelayMs).toBeLessThanOrEqual(1_000);
     vi.setSystemTime(new Date('2026-03-19T04:30:01.001Z'));
-    (retryTimerCallback as () => void)();
+    retryTimerCallback();
     await flushAsyncWork();
     await waitForCondition(
       () =>
