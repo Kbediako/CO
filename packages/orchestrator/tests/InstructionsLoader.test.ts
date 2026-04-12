@@ -85,7 +85,19 @@ describe('loadInstructionSet', () => {
         { section: 'extract', path: promptRel, content: promptContent },
         { section: 'optimize', path: promptRel, content: promptContent }
       ];
-      const stamp = computePromptPackStamp(sources);
+      const stamp = computePromptPackStamp(sources, {
+        experienceSlots: 2,
+        retrievalPolicy: {
+          kind: 'competitive_scoring_v1',
+          minScore: null,
+          scoreWeights: { gtScore: 1, relativeRank: 1 },
+          antiDominanceNormalization: {
+            enabled: true,
+            strength: 0.5,
+            sourceGrouping: 'provenance_fallback_v1'
+          }
+        }
+      });
 
       const manifestDir = join(root, '.agent', 'prompts', 'prompt-packs', 'sample');
       await mkdir(manifestDir, { recursive: true });

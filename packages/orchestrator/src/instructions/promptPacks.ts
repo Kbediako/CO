@@ -70,6 +70,11 @@ export interface PromptPack {
   sources: PromptPackSectionSource[];
 }
 
+export interface PromptPackStampConfig {
+  experienceSlots: number;
+  retrievalPolicy: PromptPackRetrievalPolicy;
+}
+
 export async function loadPromptPacks(repoRoot: string): Promise<PromptPack[]> {
   const manifestPaths = await discoverPromptPackManifests(repoRoot);
   const packs: PromptPack[] = [];
@@ -148,7 +153,14 @@ async function loadPromptPack(manifestPath: string, repoRoot: string): Promise<P
     );
   }
 
-  const computedStamp = computePromptPackStamp(allSources);
+  const experienceSlots = Number.isInteger(parsed.experienceSlots) && parsed.experienceSlots! >= 0
+    ? parsed.experienceSlots!
+    : 0;
+  const retrievalPolicy = normalizePromptPackRetrievalPolicy(parsed.retrievalPolicy);
+  const computedStamp = computePromptPackStamp(allSources, {
+    experienceSlots,
+    retrievalPolicy
+  });
   if (!parsed.stamp) {
     throw new Error(`Prompt pack ${parsed.id} is missing a stamp (manifest: ${relative(repoRoot, manifestPath)})`);
   }
@@ -161,16 +173,12 @@ async function loadPromptPack(manifestPath: string, repoRoot: string): Promise<P
     );
   }
 
-  const experienceSlots = Number.isInteger(parsed.experienceSlots) && parsed.experienceSlots! >= 0
-    ? parsed.experienceSlots!
-    : 0;
-
   return {
     id: parsed.id,
     domain: parsed.domain,
     stamp: parsed.stamp,
     experienceSlots,
-    retrievalPolicy: normalizePromptPackRetrievalPolicy(parsed.retrievalPolicy),
+    retrievalPolicy,
     sections,
     sources: allSources
   };
@@ -316,7 +324,10 @@ async function loadSectionSource(
   };
 }
 
-export function computePromptPackStamp(sources: PromptPackSectionSource[]): string {
+export function computePromptPackStamp(
+  sources: PromptPackSectionSource[],
+  config?: PromptPackStampConfig
+): string {
   const hash = createHash('sha256');
   const sorted = [...sources].sort((a, b) => {
     if (a.section === b.section) {
@@ -328,6 +339,29 @@ export function computePromptPackStamp(sources: PromptPackSectionSource[]): stri
   for (const source of sorted) {
     hash.update(`${source.section}:${source.path}\n`, 'utf8');
     hash.update(source.content, 'utf8');
+    hash.update('\n', 'utf8');
+  }
+
+  if (config) {
+    hash.update(
+      JSON.stringify({
+        experienceSlots: config.experienceSlots,
+        retrievalPolicy: {
+          kind: config.retrievalPolicy.kind,
+          minScore: config.retrievalPolicy.minScore,
+          scoreWeights: {
+            gtScore: config.retrievalPolicy.scoreWeights.gtScore,
+            relativeRank: config.retrievalPolicy.scoreWeights.relativeRank
+          },
+          antiDominanceNormalization: {
+            enabled: config.retrievalPolicy.antiDominanceNormalization.enabled,
+            strength: config.retrievalPolicy.antiDominanceNormalization.strength,
+            sourceGrouping: config.retrievalPolicy.antiDominanceNormalization.sourceGrouping
+          }
+        }
+      }),
+      'utf8'
+    );
     hash.update('\n', 'utf8');
   }
 

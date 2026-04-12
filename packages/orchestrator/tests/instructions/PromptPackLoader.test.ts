@@ -72,7 +72,19 @@ describe('loadPromptPacks', () => {
         { section: 'extract', path: PROMPT_PATH, content },
         { section: 'optimize', path: PROMPT_PATH, content }
       ];
-      const stamp = computePromptPackStamp(sections);
+      const stamp = computePromptPackStamp(sections, {
+        experienceSlots: 4,
+        retrievalPolicy: {
+          kind: 'competitive_scoring_v1',
+          minScore: null,
+          scoreWeights: { gtScore: 1, relativeRank: 1 },
+          antiDominanceNormalization: {
+            enabled: true,
+            strength: 0.5,
+            sourceGrouping: 'provenance_fallback_v1'
+          }
+        }
+      });
 
       const manifestDir = join(root, '.agent', 'prompts', 'prompt-packs', 'valid');
       await mkdir(manifestDir, { recursive: true });
@@ -129,7 +141,19 @@ describe('loadPromptPacks', () => {
         { section: 'extract', path: PROMPT_PATH, content },
         { section: 'optimize', path: PROMPT_PATH, content }
       ];
-      const stamp = computePromptPackStamp(sections);
+      const stamp = computePromptPackStamp(sections, {
+        experienceSlots: 2,
+        retrievalPolicy: {
+          kind: 'competitive_scoring_v1',
+          minScore: 0.25,
+          scoreWeights: { gtScore: 2, relativeRank: 0.5 },
+          antiDominanceNormalization: {
+            enabled: true,
+            strength: 0.75,
+            sourceGrouping: 'provenance_fallback_v1'
+          }
+        }
+      });
 
       const manifestDir = join(root, '.agent', 'prompts', 'prompt-packs', 'policy');
       await mkdir(manifestDir, { recursive: true });
@@ -167,10 +191,15 @@ describe('loadPromptPacks', () => {
       );
 
       const [pack] = await loadPromptPacks(root);
+      expect(pack?.retrievalPolicy.kind).toBe('competitive_scoring_v1');
       expect(pack?.retrievalPolicy.minScore).toBe(0.25);
       expect(pack?.retrievalPolicy.scoreWeights.gtScore).toBe(2);
       expect(pack?.retrievalPolicy.scoreWeights.relativeRank).toBe(0.5);
+      expect(pack?.retrievalPolicy.antiDominanceNormalization.enabled).toBe(true);
       expect(pack?.retrievalPolicy.antiDominanceNormalization.strength).toBe(0.75);
+      expect(pack?.retrievalPolicy.antiDominanceNormalization.sourceGrouping).toBe(
+        'provenance_fallback_v1'
+      );
     } finally {
       await rm(root, { recursive: true, force: true });
     }

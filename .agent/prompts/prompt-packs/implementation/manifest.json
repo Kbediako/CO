@@ -1,7 +1,7 @@
 {
   "id": "tfgrpo-implementation",
   "domain": "implementation",
-  "stamp": "f690d89bb2ba6c5ffbd0e6808a367f1bfa0bf933b07f164c0f1937d676436ad3",
+  "stamp": "b55aec3122aeb8084c99f81e00684f62106cfc754f03b3f84b775674eb6568ee",
   "experienceSlots": 3,
   "retrievalPolicy": {
     "kind": "competitive_scoring_v1",

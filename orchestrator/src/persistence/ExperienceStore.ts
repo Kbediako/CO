@@ -107,9 +107,12 @@ export interface ExperienceSelectionResult {
 }
 
 interface ExperienceSelectionEntry {
-  record: ExperienceRecord;
+  record?: ExperienceRecord;
+  id: string;
+  createdAt: string;
   sourceKey: string;
   sourceKind: ExperienceSourceKind;
+  sourceBucketKey: string;
   rawScore: number;
   competitiveScore: number;
   dominancePenalty: number;
@@ -207,7 +210,9 @@ export class ExperienceStore {
     if (limit === 0) {
       return emptySelection(policy);
     }
-    const entriesBySource = new Map<string, ExperienceSelectionEntry[]>();
+    const entries: ExperienceSelectionEntry[] = [];
+    const selectedRecordEntriesBySource = new Map<string, ExperienceSelectionEntry[]>();
+    const selectedRecordLookup = new Map<string, ExperienceRecord>();
     const sourceCandidateCounts = new Map<string, number>();
     let candidateCount = 0;
     const applyRecord = (record: ExperienceRecord) => {
@@ -218,9 +223,19 @@ export class ExperienceStore {
         return;
       }
       const entry = createSelectionEntry(record, policy);
+      entries.push(entry);
       candidateCount += 1;
-      sourceCandidateCounts.set(entry.sourceKey, (sourceCandidateCounts.get(entry.sourceKey) ?? 0) + 1);
-      insertSourceCandidate(entriesBySource, entry, limit);
+      sourceCandidateCounts.set(
+        entry.sourceBucketKey,
+        (sourceCandidateCounts.get(entry.sourceBucketKey) ?? 0) + 1
+      );
+      // Keep full diagnostics for every candidate while retaining only bounded records for materialization.
+      const retainedEntry: ExperienceSelectionEntry = { ...entry, record };
+      selectedRecordLookup.set(retainedEntry.id, record);
+      const prunedEntry = insertSourceCandidate(selectedRecordEntriesBySource, retainedEntry, limit);
+      if (prunedEntry?.record) {
+        selectedRecordLookup.delete(prunedEntry.id);
+      }
     };
 
     if (taskFilter) {
@@ -233,11 +248,12 @@ export class ExperienceStore {
     }
 
     return selectCompetitiveTop(
-      [...entriesBySource.values()].flat(),
+      entries,
       limit,
       policy,
       candidateCount,
-      sourceCandidateCounts
+      sourceCandidateCounts,
+      selectedRecordLookup
     );
   }
 
@@ -406,9 +422,11 @@ function createSelectionEntry(
       record.reward.relativeRank * policy.scoreWeights.relativeRank
   );
   return {
-    record,
+    id: record.id,
+    createdAt: record.createdAt,
     sourceKey: source.key,
     sourceKind: source.kind,
+    sourceBucketKey: formatExperienceSourceBucketKey(source.kind, source.key),
     rawScore,
     competitiveScore: rawScore,
     dominancePenalty: 0,
@@ -422,8 +440,8 @@ function insertSourceCandidate(
   entriesBySource: Map<string, ExperienceSelectionEntry[]>,
   entry: ExperienceSelectionEntry,
   limit: number
-): void {
-  const bucket = entriesBySource.get(entry.sourceKey) ?? [];
+): ExperienceSelectionEntry | null {
+  const bucket = entriesBySource.get(entry.sourceBucketKey) ?? [];
   let insertAt = 0;
   while (
     insertAt < bucket.length &&
@@ -432,10 +450,12 @@ function insertSourceCandidate(
     insertAt += 1;
   }
   bucket.splice(insertAt, 0, entry);
+  let prunedEntry: ExperienceSelectionEntry | null = null;
   if (bucket.length > limit) {
-    bucket.pop();
+    prunedEntry = bucket.pop() ?? null;
   }
-  entriesBySource.set(entry.sourceKey, bucket);
+  entriesBySource.set(entry.sourceBucketKey, bucket);
+  return prunedEntry;
 }
 
 function selectCompetitiveTop(
@@ -443,7 +463,8 @@ function selectCompetitiveTop(
   limit: number,
   policy: ExperienceSelectionPolicy,
   candidateCount = entries.length,
-  sourceCandidateCounts: Map<string, number> = new Map()
+  sourceCandidateCounts: Map<string, number> = new Map(),
+  selectedRecordLookup: Map<string, ExperienceRecord> = new Map()
 ): ExperienceSelectionResult {
   const remaining = entries.filter((entry) => entry.exclusionReason === null);
   const selectedCounts = new Map<string, number>();
@@ -451,7 +472,7 @@ function selectCompetitiveTop(
 
   for (let slot = 1; slot <= limit && remaining.length > 0; slot += 1) {
     for (const entry of remaining) {
-      const priorSelections = selectedCounts.get(entry.sourceKey) ?? 0;
+      const priorSelections = selectedCounts.get(entry.sourceBucketKey) ?? 0;
       const dominancePenalty =
         policy.antiDominanceNormalization.enabled
           ? roundScore(policy.antiDominanceNormalization.strength * priorSelections)
@@ -473,7 +494,7 @@ function selectCompetitiveTop(
     best.selectedSlot = slot;
     best.exclusionReason = null;
     selectedEntries.push(best);
-    selectedCounts.set(best.sourceKey, (selectedCounts.get(best.sourceKey) ?? 0) + 1);
+    selectedCounts.set(best.sourceBucketKey, (selectedCounts.get(best.sourceBucketKey) ?? 0) + 1);
     remaining.shift();
   }
 
@@ -485,24 +506,33 @@ function selectCompetitiveTop(
 
   if (sourceCandidateCounts.size === 0) {
     for (const entry of entries) {
-      sourceCandidateCounts.set(entry.sourceKey, (sourceCandidateCounts.get(entry.sourceKey) ?? 0) + 1);
+      sourceCandidateCounts.set(
+        entry.sourceBucketKey,
+        (sourceCandidateCounts.get(entry.sourceBucketKey) ?? 0) + 1
+      );
     }
   }
   const suppressedSourceKeys = [...sourceCandidateCounts.entries()]
-    .filter(([sourceKey, count]) => count > (selectedCounts.get(sourceKey) ?? 0))
-    .map(([sourceKey]) => sourceKey)
+    .filter(([sourceBucketKey, count]) => count > (selectedCounts.get(sourceBucketKey) ?? 0))
+    .map(([sourceBucketKey]) => sourceBucketKey)
     .sort((a, b) => a.localeCompare(b));
 
   return {
-    records: selectedEntries.map((entry) => entry.record),
+    records: selectedEntries.map((entry) => {
+      const record = entry.record ?? selectedRecordLookup.get(entry.id);
+      if (!record) {
+        throw new Error(`Selected experience ${entry.id} is missing a retained record`);
+      }
+      return record;
+    }),
     diagnostics: {
       policy,
       candidate_count: candidateCount,
       selected_count: selectedEntries.length,
-      selected_ids: selectedEntries.map((entry) => entry.record.id),
+      selected_ids: selectedEntries.map((entry) => entry.id),
       suppressed_source_keys: suppressedSourceKeys,
       selected: selectedEntries.map((entry) => ({
-        id: entry.record.id,
+        id: entry.id,
         source_key: entry.sourceKey,
         source_kind: entry.sourceKind,
         raw_score: entry.rawScore,
@@ -513,7 +543,7 @@ function selectCompetitiveTop(
         .slice()
         .sort((a, b) => compareSelectionEntries(a, b))
         .map((entry) => ({
-          id: entry.record.id,
+          id: entry.id,
           source_key: entry.sourceKey,
           source_kind: entry.sourceKind,
           raw_score: entry.rawScore,
@@ -541,8 +571,8 @@ function deriveExperienceSource(record: ExperienceRecord): { kind: ExperienceSou
 }
 
 function compareSelectionEntries(
-  a: Pick<ExperienceSelectionEntry, 'record' | 'rawScore' | 'competitiveScore'>,
-  b: Pick<ExperienceSelectionEntry, 'record' | 'rawScore' | 'competitiveScore'>
+  a: Pick<ExperienceSelectionEntry, 'id' | 'createdAt' | 'rawScore' | 'competitiveScore'>,
+  b: Pick<ExperienceSelectionEntry, 'id' | 'createdAt' | 'rawScore' | 'competitiveScore'>
 ): number {
   if (a.competitiveScore !== b.competitiveScore) {
     return b.competitiveScore - a.competitiveScore;
@@ -551,19 +581,23 @@ function compareSelectionEntries(
 }
 
 function compareSelectionEntriesByRaw(
-  a: Pick<ExperienceSelectionEntry, 'record' | 'rawScore'>,
-  b: Pick<ExperienceSelectionEntry, 'record' | 'rawScore'>
+  a: Pick<ExperienceSelectionEntry, 'id' | 'createdAt' | 'rawScore'>,
+  b: Pick<ExperienceSelectionEntry, 'id' | 'createdAt' | 'rawScore'>
 ): number {
   if (a.rawScore !== b.rawScore) {
     return b.rawScore - a.rawScore;
   }
-  const aTime = a.record.createdAt ?? '';
-  const bTime = b.record.createdAt ?? '';
+  const aTime = a.createdAt ?? '';
+  const bTime = b.createdAt ?? '';
   const timeCompare = bTime.localeCompare(aTime);
   if (timeCompare !== 0) {
     return timeCompare;
   }
-  return a.record.id.localeCompare(b.record.id);
+  return a.id.localeCompare(b.id);
+}
+
+function formatExperienceSourceBucketKey(kind: ExperienceSourceKind, key: string): string {
+  return `${kind}:${key}`;
 }
 
 function roundScore(value: number): number {

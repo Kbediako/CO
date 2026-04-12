@@ -210,41 +210,68 @@ describe('ExperienceStore', () => {
     expect(selection.records).toHaveLength(2);
     expect(selection.records.map((record) => record.groupId)).toEqual(['source-a', 'source-b']);
     expect(selection.diagnostics.candidate_count).toBe(4);
+    expect(selection.diagnostics.candidates).toHaveLength(4);
+    expect(
+      selection.diagnostics.candidates.filter((candidate) => candidate.source_key === 'source-a')
+    ).toHaveLength(3);
     expect(selection.diagnostics.selected[1]?.dominance_penalty).toBe(0);
     const repeatedCandidate = selection.diagnostics.candidates.find(
       (candidate) => candidate.source_key === 'source-a' && candidate.selected === false
     );
     expect(repeatedCandidate?.dominance_penalty).toBe(0.5);
     expect(repeatedCandidate?.exclusion_reason).toBe('outcompeted');
-    expect(selection.diagnostics.suppressed_source_keys).toContain('source-a');
+    expect(selection.diagnostics.suppressed_source_keys).toContain('group_id:source-a');
   });
 
-  it('uses run and manifest provenance when grouping repeated sources', async () => {
+  it('treats run and manifest provenance as distinct suppression buckets', async () => {
     const store = new ExperienceStore({ outDir, runsDir });
     await store.recordBatch(
       [
         createInput({
-          runId: 'run-a',
+          runId: 'shared',
           groupId: null,
-          reward: { gtScore: 0.71, relativeRank: 0.1 }
-        }),
-        createInput({
-          runId: 'run-b',
-          groupId: null,
-          reward: { gtScore: 0.6, relativeRank: 0.2 }
+          reward: { gtScore: 0.9, relativeRank: 0.05 },
+          summary: 'run provenance winner'
         })
       ],
-      'manifests/run.json'
+      'manifests/run-a.json'
+    );
+    await store.recordBatch(
+      [
+        createInput({
+          runId: '',
+          groupId: null,
+          reward: { gtScore: 0.86, relativeRank: 0.05 },
+          summary: 'manifest provenance competitor'
+        })
+      ],
+      'shared'
+    );
+    await store.recordBatch(
+      [
+        createInput({
+          runId: 'other',
+          groupId: null,
+          reward: { gtScore: 0.7, relativeRank: 0.05 },
+          summary: 'other run fallback'
+        })
+      ],
+      'manifests/run-b.json'
     );
 
     const selection = await store.selectTop({
       domain: 'implementation',
-      limit: 1,
+      limit: 2,
       taskId: 'task-0506'
     });
 
-    expect(selection.diagnostics.selected[0]?.source_kind).toBe('run_id');
-    expect(selection.diagnostics.selected[0]?.source_key).toBe('run-a');
+    expect(selection.records).toHaveLength(2);
+    expect(selection.diagnostics.selected.map((entry) => `${entry.source_kind}:${entry.source_key}`)).toEqual([
+      'run_id:shared',
+      'manifest_path:shared'
+    ]);
+    expect(selection.diagnostics.selected[1]?.dominance_penalty).toBe(0);
+    expect(selection.diagnostics.suppressed_source_keys).toContain('run_id:other');
   });
 
   it('verifies stamp signatures and rejects invalid entries', async () => {

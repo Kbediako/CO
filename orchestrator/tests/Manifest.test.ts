@@ -309,7 +309,19 @@ describe('bootstrapManifest', () => {
         { section: 'extract', path: promptRel, content: '# Prompt\nUse experiences.' },
         { section: 'optimize', path: promptRel, content: '# Prompt\nUse experiences.' }
       ];
-      const stamp = computePromptPackStamp(sections);
+      const stamp = computePromptPackStamp(sections, {
+        experienceSlots: 2,
+        retrievalPolicy: {
+          kind: 'competitive_scoring_v1',
+          minScore: 0.1,
+          scoreWeights: { gtScore: 1, relativeRank: 1 },
+          antiDominanceNormalization: {
+            enabled: true,
+            strength: 0.5,
+            sourceGrouping: 'provenance_fallback_v1'
+          }
+        }
+      });
       await writeFile(
         join(repoRoot, '.agent', 'prompts', 'prompt-packs', 'sample', 'manifest.json'),
         JSON.stringify(
@@ -407,7 +419,7 @@ describe('bootstrapManifest', () => {
       expect(pack?.retrieval_policy?.kind).toBe('competitive_scoring_v1');
       expect(pack?.retrieval_policy?.min_score).toBe(0.1);
       expect(pack?.retrieval_selection?.selected_ids).toEqual(['exp-a1', 'exp-b1']);
-      expect(pack?.retrieval_selection?.suppressed_source_keys).toContain('source-a');
+      expect(pack?.retrieval_selection?.suppressed_source_keys).toContain('group_id:source-a');
       expect(pack?.experiences?.[0]).toContain('competitive');
       expect(pack?.experiences?.[0]).toContain('source group_id:source-a');
       expect(pack?.experiences?.[1]).toContain('source group_id:source-b');
@@ -455,7 +467,19 @@ describe('bootstrapManifest', () => {
         { section: 'extract', path: promptRel, content: promptContent },
         { section: 'optimize', path: promptRel, content: promptContent }
       ];
-      const stamp = computePromptPackStamp(sections);
+      const stamp = computePromptPackStamp(sections, {
+        experienceSlots: 1,
+        retrievalPolicy: {
+          kind: 'competitive_scoring_v1',
+          minScore: 0.1,
+          scoreWeights: { gtScore: 1, relativeRank: 1 },
+          antiDominanceNormalization: {
+            enabled: true,
+            strength: 0.5,
+            sourceGrouping: 'provenance_fallback_v1'
+          }
+        }
+      });
       const sharedManifest = {
         id: 'shared-pack',
         stamp,
