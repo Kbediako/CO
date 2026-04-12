@@ -20,7 +20,7 @@
 - [x] Pre-implementation issue-quality review captured. Evidence: `tasks/specs/linear-b84c9a78-b62f-48fa-b1c4-88f8222535da.md` review notes and readiness gate.
 
 ## Implementation
-- [x] Supervised restart waits for or force-cleans the previous tracked child tree before success. Evidence: `orchestrator/src/cli/controlHostSupervisionCliShell.ts` now reads the stored `child_pid`, waits for the prior supervised process group after `launchctl kickstart -k`, and fails closed unless that stale group exits or is force-cleaned.
+- [x] Supervised restart waits for or force-cleans the previous tracked child tree before success. Evidence: `orchestrator/src/cli/controlHostSupervisionCliShell.ts` now reads the stored `child_pid`, waits for the prior supervised process group after `launchctl kickstart -k`, validates that a timed-out PID still matches the expected supervised control-host command, and fails closed unless that stale group exits or is force-cleaned.
 - [x] Restart/orphan evidence preserves owner-token/process diagnostics. Evidence: restart output now includes `previous_child_pid`, `child_pid`, and `cleanup` orphan evidence, while the existing `controlHostOwnership.ts` / `polling.control_host_owner` owner-token+pid diagnostic surface remains the operator path for duplicate or stale ownership.
 - [x] Stuck refresh aborts further issue-by-id reads or fresh discovery after the stuck boundary. Evidence: `orchestrator/src/cli/control/providerIssueHandoff.ts` adds `shouldAbortRefreshCycle()` guards around tracked-issue resolution, queued retry rereads, and fresh discovery.
 - [x] Operator-facing status/runbook guidance distinguishes supervised control-host pids from provider workers. Evidence: `formatControlHostSupervisionStatus(...)` now prints the supervised child pid and `docs/public/provider-onboarding.md` documents `co-status --format json` owner diagnostics plus the detached provider-worker exclusion.
@@ -31,7 +31,7 @@
 - [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `✅ Spec guard: OK`
 - [x] `npm run build`. Evidence: passed on the final diff.
 - [x] `npm run lint`. Evidence: passed on the final diff.
-- [x] `npm run test`. Evidence: passed on the final diff with `333` files / `3648` tests green.
+- [x] `npm run test`. Evidence: passed on the final diff with `333` files / `3650` tests green.
 - [x] `npm run docs:check`. Evidence: `✅ docs:check: OK`
 - [x] `npm run docs:freshness`. Evidence: `docs:freshness OK - 3713 docs, 3716 registry entries`
 - [x] `npm run repo:stewardship`. Evidence: `repo:stewardship OK - 4692 tracked files, 0 action-required`
@@ -53,6 +53,7 @@
 - 2026-04-13: Implemented restart replacement hardening (`previous_child_pid` capture, process-group exit wait, force-clean fallback, and supervised-child status output), sticky stuck-refresh abort guards in `providerIssueHandoff.ts`, focused regressions, and operator runbook updates.
 - 2026-04-13: Manifest-backed standalone review failed with a bounded `command-intent` violation, so the lane used the allowed manual fallback review, found and fixed the descendant-collateral bug in restart cleanup, then reran the validation floor successfully.
 - 2026-04-13: Filed follow-up `CO-164` for the adjacent generic control-host teardown path so CO-163 stays bounded to supervise restart/orphan cleanup.
+- 2026-04-13: The first PR bot pass identified one remaining kill-safety gap: a reused stale `child_pid` could point at an unrelated process group. The final diff now validates the tracked PID command identity before forced cleanup and reran the full validation floor successfully.
 
 ## Relevant Files
 - `orchestrator/src/cli/controlHostSupervisionCliShell.ts`
@@ -68,4 +69,4 @@
 ## Notes
 - This lane intentionally builds on `CO-152` ownership protection instead of reopening startup ownership design.
 - Same-issue child lanes stayed serial in this turn because supervision restart cleanup and stuck-refresh abort share the same control-host ownership and polling contract.
-- The final restart cleanup only SIGKILLs the stale supervised control-host process group; out-of-group descendants are recorded diagnostically and preserved.
+- The final restart cleanup only SIGKILLs the stale supervised control-host process group, preserves out-of-group descendants, and skips forced cleanup entirely when the tracked PID no longer matches the supervised control-host command identity.

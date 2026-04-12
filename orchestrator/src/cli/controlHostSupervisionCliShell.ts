@@ -1459,6 +1459,7 @@ async function ensureTrackedProcessTreeExited(
     listProcessGroupPids?: (rootPid: number) => Promise<number[]>;
     killProcessGroup?: (pid: number, signal: NodeJS.Signals) => void;
     listDescendantPids?: (rootPid: number) => Promise<number[]>;
+    shouldForceKillTrackedProcessGroup?: (rootPid: number) => Promise<boolean>;
   }
 ): Promise<ControlHostSupervisionRestartCleanupResult> {
   const timeoutMs = Math.max(0, killTimeoutSeconds * 1_000);
@@ -1466,6 +1467,18 @@ async function ensureTrackedProcessTreeExited(
     listProcessGroupPids: options?.listProcessGroupPids
   });
   if (exitedAfterKickstart) {
+    return {
+      result: 'exited_after_kickstart',
+      orphanedProcessGroupPids: [],
+      orphanedDescendantPids: []
+    };
+  }
+
+  const shouldForceKill = await (
+    options?.shouldForceKillTrackedProcessGroup ??
+    (async () => true)
+  )(rootPid);
+  if (!shouldForceKill) {
     return {
       result: 'exited_after_kickstart',
       orphanedProcessGroupPids: [],
@@ -1501,6 +1514,46 @@ async function ensureTrackedProcessTreeExited(
   };
 }
 
+async function readProcessCommand(pid: number): Promise<string | null> {
+  const snapshot = await runCommand('ps', ['-p', String(pid), '-o', 'args=']);
+  if (snapshot.exitCode !== 0) {
+    if (snapshot.stdout.trim().length === 0) {
+      return null;
+    }
+    throw new Error(snapshot.stderr || `ps exited with code ${snapshot.exitCode}`);
+  }
+  const command = snapshot.stdout.trim();
+  return command.length > 0 ? command : null;
+}
+
+function matchesExpectedSupervisedControlHostCommand(
+  command: string,
+  config: ControlHostSupervisionConfig
+): boolean {
+  const requiredFragments = [
+    config.cliEntrypoint,
+    'control-host',
+    '--task',
+    config.taskId,
+    '--run',
+    config.runId,
+    '--pipeline',
+    config.pipelineId
+  ];
+  return requiredFragments.every((fragment) => command.includes(fragment));
+}
+
+async function shouldForceKillTrackedSupervisedProcessGroup(
+  rootPid: number,
+  config: ControlHostSupervisionConfig,
+  options?: {
+    readProcessCommand?: (pid: number) => Promise<string | null>;
+  }
+): Promise<boolean> {
+  const command = await (options?.readProcessCommand ?? readProcessCommand)(rootPid);
+  return command !== null && matchesExpectedSupervisedControlHostCommand(command, config);
+}
+
 async function restartExistingControlHostSupervision(
   resolved: ResolvedSupervisionInstall & { config: ControlHostSupervisionConfig },
   serviceTarget: string,
@@ -1511,6 +1564,7 @@ async function restartExistingControlHostSupervision(
       rootPid: number,
       killTimeoutSeconds: number
     ) => Promise<ControlHostSupervisionRestartCleanupResult>;
+    shouldForceKillTrackedProcessGroup?: (rootPid: number) => Promise<boolean>;
   }
 ): Promise<{
   previousChildPid: number | null;
@@ -1539,7 +1593,12 @@ async function restartExistingControlHostSupervision(
         } satisfies ControlHostSupervisionRestartCleanupResult)
       : await (
           options?.ensureTrackedProcessTreeExited ?? ensureTrackedProcessTreeExited
-        )(previousChildPid, resolved.config.killTimeoutSeconds);
+        )(previousChildPid, resolved.config.killTimeoutSeconds, {
+          shouldForceKillTrackedProcessGroup:
+            options?.shouldForceKillTrackedProcessGroup ??
+            (async (rootPid: number) =>
+              await shouldForceKillTrackedSupervisedProcessGroup(rootPid, resolved.config))
+        });
 
   const nextState = await readState(resolved.paths.statePath);
   return {
@@ -2076,6 +2135,7 @@ export const __test__ = {
   restoreExistingControlHostSupervisionInstall,
   rollbackFailedControlHostSupervisionInstall,
   restartExistingControlHostSupervision,
+  shouldForceKillTrackedSupervisedProcessGroup,
   resolveControlHostSupervisionProbeTimeoutMs,
   resolveControlHostSupervisionServiceTarget,
   ensureTrackedProcessTreeExited,
