@@ -2374,6 +2374,7 @@ describe('createProviderIssueHandoffService', () => {
       provider: 'linear',
       issueId: 'lin-issue-restored'
     });
+    expect(resolveTrackedIssue).toHaveBeenCalledTimes(1);
     expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
       taskId: 'linear-lin-issue-restored',
       pipelineId: 'diagnostics',
@@ -2383,6 +2384,7 @@ describe('createProviderIssueHandoffService', () => {
       issueUpdatedAt: '2026-04-12T07:20:00.000Z',
       launchToken: expect.any(String)
     }));
+    expect(launcher.start).toHaveBeenCalledTimes(1);
     expect(state.claims[0]).toMatchObject({
       state: 'starting',
       reason: 'provider_issue_refresh_start_launched',
