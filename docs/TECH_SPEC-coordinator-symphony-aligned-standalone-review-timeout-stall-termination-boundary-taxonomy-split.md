@@ -5,7 +5,7 @@ relates_to: docs/PRD-coordinator-symphony-aligned-standalone-review-timeout-stal
 risk: medium
 owners:
   - Codex
-last_review: 2026-03-12
+last_review: 2026-04-12
 ---
 
 # TECH_SPEC - Coordinator Symphony-Aligned Standalone Review Timeout-Stall Termination Boundary Taxonomy Split
