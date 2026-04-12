@@ -1485,6 +1485,42 @@ describe('startControlServerPublicLifecycle', () => {
     });
   });
 
+  it('keeps lifecycle-stuck polling fail-closed when later schedules arrive', () => {
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      poll: vi.fn(async () => undefined),
+      rehydrate: vi.fn(async () => undefined),
+      refresh: vi.fn(async () => undefined)
+    };
+
+    const startedAtMs = Date.parse('2026-03-22T09:00:00.000Z');
+    const stuckError = new Error('provider_refresh_lifecycle_stuck');
+    stuckError.name = 'ProviderRefreshLifecycleStuckError';
+
+    markProviderPollingStarted(providerIssueHandoff, {
+      mode: 'refresh',
+      atMs: startedAtMs
+    });
+    markProviderPollingCompleted(providerIssueHandoff, {
+      atMs: startedAtMs + 45_000,
+      error: stuckError
+    });
+
+    scheduleProviderPolling(providerIssueHandoff, {
+      intervalMs: 15_000,
+      reason: 'linear_budget_requests_low',
+      atMs: startedAtMs + 50_000
+    });
+
+    expect(readProviderPollingHealth(providerIssueHandoff, startedAtMs + 50_000)).toMatchObject({
+      checking: false,
+      stuck: true,
+      restart_required: true,
+      next_poll_at: null,
+      reason: 'provider_refresh_lifecycle_stuck'
+    });
+  });
+
   it('preserves the active refresh mode when a non-queued poll request coalesces behind it', async () => {
     let resolveRefresh: (() => void) | null = null;
     const firstRefresh = new Promise<void>((resolve) => {

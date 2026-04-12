@@ -189,9 +189,14 @@ export function scheduleProviderPolling(
   const state = getOrCreateProviderPollingHealthState(providerIssueHandoff);
   const intervalMs = normalizeScheduledPollingIntervalMs(input.intervalMs, state.intervalMs);
   state.intervalMs = intervalMs;
-  state.nextPollAtMs = atMs + intervalMs;
+  if (state.stuckAtMs !== null) {
+    state.nextPollAtMs = null;
+    state.reason = state.reason ?? buildProviderPollingStuckReason(state);
+  } else {
+    state.nextPollAtMs = atMs + intervalMs;
+    state.reason = normalizeOptionalString(input.reason) ?? null;
+  }
   state.updatedAtMs = atMs;
-  state.reason = normalizeOptionalString(input.reason) ?? null;
   state.linearBudget = input.linearBudget ?? null;
   queueProviderPollingHealthUpdate(providerIssueHandoff, state, atMs);
 }

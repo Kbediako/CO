@@ -26,21 +26,21 @@
 - [x] Operator-facing status/runbook guidance distinguishes supervised control-host pids from provider workers. Evidence: `formatControlHostSupervisionStatus(...)` now prints the supervised child pid and `docs/public/provider-onboarding.md` documents `co-status --format json` owner diagnostics plus the detached provider-worker exclusion.
 
 ## Validation
-- [x] Focused regression tests for supervision restart/orphan cleanup and stuck-refresh abort. Evidence: `npx vitest run orchestrator/tests/ControlServerPublicLifecycle.test.ts orchestrator/tests/ControlHostSupervision.test.ts orchestrator/tests/ProviderIssueHandoff.test.ts` passed on the final review-thread diff with `343` tests, including the new idle `restart_required` public refresh/poll regressions and the same-process concurrent restart-required provider-handoff regression.
+- [x] Focused regression tests for supervision restart/orphan cleanup and stuck-refresh abort. Evidence: the earlier `npx vitest run orchestrator/tests/ControlServerPublicLifecycle.test.ts orchestrator/tests/ControlHostSupervision.test.ts orchestrator/tests/ProviderIssueHandoff.test.ts` runtime set remained green with `343` tests, and the later rereview patch added `keeps lifecycle-stuck polling fail-closed when later schedules arrive` with `npx vitest run orchestrator/tests/ControlServerPublicLifecycle.test.ts` passing `42` tests on the current head.
 - [x] `node scripts/delegation-guard.mjs`. Evidence: `Delegation guard: OK (2 subagent manifest(s) found).`
 - [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `✅ Spec guard: OK`
 - [x] `npm run build`. Evidence: passed on the final diff.
 - [x] `npm run lint`. Evidence: passed on the final diff.
-- [x] `npm run test`. Evidence: passed on the final diff with `333` files / `3657` tests green.
+- [x] `npm run test`. Evidence: passed on the current head with `333` files / `3658` tests green.
 - [x] `npm run docs:check`. Evidence: `✅ docs:check: OK`
 - [x] `npm run docs:freshness`. Evidence: `docs:freshness OK - 3713 docs, 3716 registry entries`
 - [x] `npm run repo:stewardship`. Evidence: `repo:stewardship OK - 4698 tracked files, 0 action-required`
-- [x] `node scripts/diff-budget.mjs`. Evidence: `✅ Diff budget: OK (scope=working-tree, files=7/25, lines=354/1200, +318/-36)`
-- [x] Standalone review plus explicit elegance review before review handoff. Evidence: manifest-backed standalone review executed via `FORCE_CODEX_REVIEW=1 npm run review -- --manifest .runs/linear-b84c9a78-b62f-48fa-b1c4-88f8222535da/cli/2026-04-12T15-41-35-613Z-026f9583/manifest.json` but repeatedly stalled after surfacing concrete findings, so the lane used the documented manual fallback: the wrapper exposed the false `exited_after_kickstart`, idle `restart_required` restart, and same-process concurrent restart-required snapshot gaps; each was fixed on-branch, and the closing elegance pass kept the final solution to narrow helper gates plus regression coverage only.
+- [x] `node scripts/diff-budget.mjs`. Evidence: `✅ Diff budget: OK (scope=working-tree, files=4/25, lines=52/1200, +49/-3)`
+- [x] Standalone review plus explicit elegance review before review handoff. Evidence: manifest-backed standalone review executed twice via `FORCE_CODEX_REVIEW=1 npm run review -- --manifest .runs/linear-b84c9a78-b62f-48fa-b1c4-88f8222535da/cli/2026-04-12T15-41-35-613Z-026f9583/manifest.json`; the earlier run surfaced concrete findings before ending in the documented `review_outcome: failed-boundary` / `termination_boundary.kind: command-intent`, and the later rereview patch hit the same bounded wrapper failure after attempting a validation suite. The lane therefore used the documented manual fallback review on the final 3-file fix-up diff, found no additional correctness issues beyond the two bounded rereview fixes, and kept the closing elegance pass to the smallest helper/type change plus one targeted regression.
 - [x] `npm run pack:smoke` if downstream-facing CLI surfaces change. Evidence: passed in the downstream mock install environment.
 
 ## Handoff
-- [ ] PR attached to the issue. Evidence: pending.
+- [x] PR attached to the issue. Evidence: PR `#456` (`https://github.com/Kbediako/CO/pull/456`).
 - [ ] Latest `origin/main` merged into the branch before review-state transition. Evidence: pending.
 - [ ] PR checks green and `pr ready-review` drain clean before review-state transition. Evidence: pending.
 - [ ] Unresolved actionable review threads: `0` or explicit pushback recorded. Evidence: pending.
@@ -55,6 +55,7 @@
 - 2026-04-13: Filed follow-up `CO-164` for the adjacent generic control-host teardown path so CO-163 stays bounded to supervise restart/orphan cleanup.
 - 2026-04-13: The first PR bot pass identified one remaining kill-safety gap: a reused stale `child_pid` could point at an unrelated process group. The final diff now validates the tracked PID command identity before forced cleanup and reran the full validation floor successfully.
 - 2026-04-13: The later PR feedback sweep identified two more fail-closed gaps after `restart_required`: idle public refresh/poll entrypoints could restart work, and same-process concurrent `state.polling.restart_required` snapshots could still allow later direct issue reads. The final diff added the corresponding public-lifecycle and provider-handoff regressions, reran the full validation floor (`3657` tests), and closed with the documented manual review plus elegance fallback after the wrapper stalled without a fresh terminal verdict.
+- 2026-04-13: The next current-head CodeRabbit rereview surfaced two real bounded gaps and one deliberate-contract question. The lane fixed the sticky `provider_refresh_lifecycle_stuck` reason overwrite in `scheduleProviderPolling(...)`, corrected the injected `ensureTrackedProcessTreeExited(...)` option typing, pushed back on restart-time inheritance of persisted stuck state because startup intentionally preserves the stale snapshot for observability while still allowing a fresh host attempt, reran the full validation floor (`3658` tests), and recorded a second bounded standalone-review wrapper failure before closing with a no-new-findings manual fallback plus elegance pass.
 
 ## Relevant Files
 - `orchestrator/src/cli/controlHostSupervisionCliShell.ts`

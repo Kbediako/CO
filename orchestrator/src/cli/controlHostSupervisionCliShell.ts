@@ -1635,7 +1635,11 @@ async function restartExistingControlHostSupervision(
     readState?: (path: string) => Promise<ControlHostSupervisionState | null>;
     ensureTrackedProcessTreeExited?: (
       rootPid: number,
-      killTimeoutSeconds: number
+      killTimeoutSeconds: number,
+      options?: Pick<
+        NonNullable<Parameters<typeof ensureTrackedProcessTreeExited>[2]>,
+        'shouldForceKillTrackedProcessGroup'
+      >
     ) => Promise<ControlHostSupervisionRestartCleanupResult>;
     shouldForceKillTrackedProcessGroup?: (rootPid: number) => Promise<boolean>;
     readProcessCommand?: (pid: number) => Promise<string | null>;
