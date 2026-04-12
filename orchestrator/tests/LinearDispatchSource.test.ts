@@ -11,6 +11,7 @@ import {
 } from '../src/cli/control/linearDispatchSource.js';
 import {
   readSharedLinearBudgetStatus,
+  recordLinearBudgetHeadersObservation,
   recordLinearBudgetRateLimitObservation
 } from '../src/cli/control/linearBudgetState.js';
 
@@ -74,6 +75,52 @@ describe('resolveLiveLinearTrackedIssueById', () => {
         shared_budget_fail_fast: true,
         shared_budget_cooldown_active: true,
         requests_remaining: 0
+      }
+    });
+  });
+
+  it('fails fast from shared request reserve state before issuing another tracked-issue request', async () => {
+    const codexHome = await mkdtemp(join(tmpdir(), 'linear-dispatch-source-'));
+    tempDirs.push(codexHome);
+    const env = {
+      CODEX_HOME: codexHome,
+      CO_LINEAR_API_TOKEN: 'lin-api-token'
+    };
+
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'dispatch_source_issue_by_id',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '1',
+        'x-ratelimit-requests-reset': String(Date.now() + 60_000)
+      }
+    });
+
+    const fetchImpl: typeof fetch = vi.fn(async () => {
+      throw new Error('shared request reserve should fail closed before fetch');
+    });
+
+    const result = await resolveLiveLinearTrackedIssueById({
+      issueId: 'lin-issue-1',
+      env,
+      fetchImpl
+    });
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      kind: 'unavailable',
+      reason: 'dispatch_source_provider_rate_limited',
+      status: 429,
+      retryable: true,
+      details: {
+        error_code: 'linear_rate_limited',
+        shared_budget_fail_fast: true,
+        request_headroom_reserve_bucket: 'requests',
+        request_headroom_remaining: 1,
+        request_headroom_reserve: 1,
+        request_headroom_usable_remaining: 0,
+        requests_remaining: 1
       }
     });
   });

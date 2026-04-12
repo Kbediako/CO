@@ -413,7 +413,7 @@ describe('linearBudgetState', () => {
         },
         headers: {
           'x-ratelimit-requests-limit': '100',
-          'x-ratelimit-requests-remaining': '1'
+          'x-ratelimit-requests-remaining': '2'
         }
       });
     }
@@ -438,7 +438,7 @@ describe('linearBudgetState', () => {
       scope_kind: 'user',
       reservations_active: 1,
       requests: {
-        remaining: 0
+        remaining: 1
       }
     });
 
@@ -619,6 +619,70 @@ describe('linearBudgetState', () => {
     expect((await readSharedLinearBudgetStatus(env))?.requests?.reset_at).not.toBeNull();
   });
 
+  it('persists shared request-burn history with run and process attribution', async () => {
+    const codexHome = await mkdtemp(join(tmpdir(), 'linear-budget-state-'));
+    tempDirs.push(codexHome);
+    const env = {
+      ...createEnv(codexHome),
+      CODEX_ORCHESTRATOR_RUN_ID: 'run-budget-history-1'
+    };
+    const firstResetAtMs = Date.parse('2026-04-08T01:00:00.000Z');
+    const secondResetAtMs = Date.parse('2026-04-08T01:05:00.000Z');
+
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'dispatch_source_issue_by_id',
+      observedAt: '2026-04-08T00:00:00.000Z',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '12',
+        'x-ratelimit-requests-reset': String(firstResetAtMs),
+        'x-request-id': 'req-history-1'
+      }
+    });
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'provider-linear:issue-context',
+      observedAt: '2026-04-08T00:00:05.000Z',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '9',
+        'x-ratelimit-requests-reset': String(secondResetAtMs),
+        'x-request-id': 'req-history-2'
+      }
+    });
+
+    await expect(readSharedLinearBudgetStatus(env)).resolves.toMatchObject({
+      request_burn_history: [
+        {
+          source: 'dispatch_source_issue_by_id',
+          operation: 'dispatch_source_issue_by_id',
+          run_id: 'run-budget-history-1',
+          process_pid: process.pid,
+          request_id: 'req-history-1',
+          request_bucket: 'requests',
+          remaining: 12,
+          remaining_delta: null,
+          reset_at: '2026-04-08T01:00:00.000Z',
+          cooldown_reason: null
+        },
+        {
+          source: 'provider-linear:issue-context',
+          operation: 'provider-linear:issue-context',
+          run_id: 'run-budget-history-1',
+          process_pid: process.pid,
+          request_id: 'req-history-2',
+          request_bucket: 'requests',
+          remaining: 9,
+          remaining_delta: -3,
+          reset_at: '2026-04-08T01:05:00.000Z',
+          suppression_reason: null,
+          cooldown_reason: null
+        }
+      ]
+    });
+  });
+
   it('uses request complexity to fail preflight when complexity headroom is insufficient', async () => {
     const codexHome = await mkdtemp(join(tmpdir(), 'linear-budget-state-'));
     tempDirs.push(codexHome);
@@ -706,7 +770,7 @@ describe('linearBudgetState', () => {
       headers: {
         'x-ratelimit-endpoint-name': 'AttachPrStepB',
         'x-ratelimit-endpoint-requests-limit': '10',
-        'x-ratelimit-endpoint-requests-remaining': '5'
+        'x-ratelimit-endpoint-requests-remaining': '6'
       }
     });
 
@@ -722,7 +786,7 @@ describe('linearBudgetState', () => {
     });
     expect(budget?.selected_endpoint_key).toBe('endpoint:attachprstepb');
     expect(budget?.endpoint_requests).toMatchObject({
-      remaining: 0
+      remaining: 1
     });
     expect(
       resolveLinearBudgetPreflight({
@@ -734,8 +798,10 @@ describe('linearBudgetState', () => {
       ok: false,
       error: {
         details: {
-          shortfall_bucket: 'endpoint_requests',
-          shortfall_remaining: 0
+          request_headroom_reserve_bucket: 'endpoint_requests',
+          request_headroom_remaining: 1,
+          request_headroom_reserve: 1,
+          request_headroom_usable_remaining: 0
         }
       }
     });
@@ -829,7 +895,7 @@ describe('linearBudgetState', () => {
       source: 'dispatch_source_tracked_issues',
       headers: {
         'x-ratelimit-requests-limit': '100',
-        'x-ratelimit-requests-remaining': '2'
+        'x-ratelimit-requests-remaining': '3'
       }
     });
 
@@ -854,8 +920,10 @@ describe('linearBudgetState', () => {
         code: 'linear_rate_limited',
         details: {
           shared_budget_reservations_active: 2,
-          shortfall_bucket: 'requests',
-          shortfall_remaining: 0
+          request_headroom_reserve_bucket: 'requests',
+          request_headroom_remaining: 1,
+          request_headroom_reserve: 1,
+          request_headroom_usable_remaining: 0
         }
       }
     });
@@ -866,7 +934,7 @@ describe('linearBudgetState', () => {
     ).toMatchObject({
       reservations_active: 2,
       requests: {
-        remaining: 0
+        remaining: 1
       }
     });
 
@@ -904,7 +972,7 @@ describe('linearBudgetState', () => {
         source: 'dispatch_source_tracked_issues',
         headers: {
           'x-ratelimit-requests-limit': '100',
-          'x-ratelimit-requests-remaining': '1'
+          'x-ratelimit-requests-remaining': '2'
         }
       });
 
@@ -1078,6 +1146,46 @@ describe('linearBudgetState', () => {
           shortfall_bucket: 'requests',
           shortfall_remaining: 2,
           requests_remaining: 2
+        }
+      }
+    });
+  });
+
+  it('fails helper preflight when spending the last request would violate the shared reserve', async () => {
+    const codexHome = await mkdtemp(join(tmpdir(), 'linear-budget-state-'));
+    tempDirs.push(codexHome);
+    const env = createEnv(codexHome);
+
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'provider-linear:issue-context',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '1',
+        'x-ratelimit-requests-reset': String(Date.now() + 60_000)
+      }
+    });
+
+    const budget = await readSharedLinearBudgetStatus(env);
+    const preflight = resolveLinearBudgetPreflight({
+      budget,
+      operation: 'provider-linear:issue-context',
+      minimum_requests_remaining: 1
+    });
+
+    expect(preflight).toMatchObject({
+      ok: false,
+      error: {
+        code: 'linear_rate_limited',
+        status: 429,
+        details: {
+          shared_budget_fail_fast: true,
+          required_requests_remaining: 1,
+          request_headroom_reserve_bucket: 'requests',
+          request_headroom_remaining: 1,
+          request_headroom_reserve: 1,
+          request_headroom_usable_remaining: 0,
+          requests_remaining: 1
         }
       }
     });
