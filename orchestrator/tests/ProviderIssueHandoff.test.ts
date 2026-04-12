@@ -215,6 +215,39 @@ function getLatestScheduledTimeoutCallback(
   throw new Error('No scheduled timeout callback found.');
 }
 
+function getSingleScheduledTimeoutByDelayRange(
+  setTimeoutSpy: { mock: { calls: unknown[][]; results: Array<{ value: unknown }> } },
+  minimumDelayMs: number,
+  maximumDelayMs: number
+): { callback: () => void; delayMs: number } {
+  const matchingCalls = setTimeoutSpy.mock.calls.flatMap((call, index) => {
+    const [callback, delayMs] = call ?? [];
+    if (
+      typeof callback !== 'function' ||
+      typeof delayMs !== 'number' ||
+      delayMs < minimumDelayMs ||
+      delayMs > maximumDelayMs
+    ) {
+      return [];
+    }
+    return [{
+      callback: callback as () => void,
+      delayMs,
+      index
+    }];
+  });
+  expect(matchingCalls).toHaveLength(1);
+  const [match] = matchingCalls;
+  const scheduledHandle = setTimeoutSpy.mock.results[match.index]?.value;
+  if (scheduledHandle !== undefined) {
+    clearTimeout(scheduledHandle as ReturnType<typeof setTimeout>);
+  }
+  return {
+    callback: match.callback,
+    delayMs: match.delayMs
+  };
+}
+
 describe('createProviderIssueHandoffService', () => {
   it('ignores child-stream and child-lane manifests without dropping provider workers that carry parent lineage', async () => {
     const { root, paths } = await createHostPaths();
@@ -2020,12 +2053,18 @@ describe('createProviderIssueHandoffService', () => {
     expect(state.claims[0]).toMatchObject({
       state: 'accepted',
       reason: 'provider_issue_rehydration_pending_revalidation',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-12T07:19:00.000Z',
       run_id: 'run-dead-pid-poll',
       run_manifest_path: childPaths.manifestPath
     });
     expect(getPersistedState().claims[0]).toMatchObject({
       state: 'accepted',
-      reason: 'provider_issue_rehydration_pending_revalidation'
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-12T07:19:00.000Z'
     });
   });
 
@@ -8867,20 +8906,16 @@ describe('createProviderIssueHandoffService', () => {
       launcher,
       startPipelineId: 'diagnostics'
     });
-    const timerCountAfterConstruction = setTimeoutSpy.mock.calls.length;
-    expect(timerCountAfterConstruction).toBeGreaterThanOrEqual(1);
-    const retryTimerCallback = setTimeoutSpy.mock.calls[timerCountAfterConstruction - 1]?.[0];
-    const [, retryDelayMs] = setTimeoutSpy.mock.calls[timerCountAfterConstruction - 1] ?? [];
-    expect(typeof retryTimerCallback).toBe('function');
 
     await service.refresh();
-    await waitForMockCalls(setTimeoutSpy, timerCountAfterConstruction);
+    const { callback: retryTimerCallback, delayMs: retryDelayMs } =
+      getSingleScheduledTimeoutByDelayRange(setTimeoutSpy, 999, 1_000);
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
     expect(retryDelayMs).toBeGreaterThanOrEqual(999);
     expect(retryDelayMs).toBeLessThanOrEqual(1_000);
     vi.setSystemTime(new Date('2026-03-19T04:30:01.001Z'));
-    (retryTimerCallback as () => void)();
+    retryTimerCallback();
     await flushAsyncWork();
     await waitForMockCalls(launcher.start, 1, 1024);
 
@@ -9185,16 +9220,14 @@ describe('createProviderIssueHandoffService', () => {
       launcher,
       startPipelineId: 'diagnostics'
     });
-    const timerCountAfterConstruction = setTimeoutSpy.mock.calls.length;
-    expect(timerCountAfterConstruction).toBeGreaterThanOrEqual(1);
-    const retryTimerCallback = setTimeoutSpy.mock.calls[timerCountAfterConstruction - 1]?.[0];
-    expect(typeof retryTimerCallback).toBe('function');
 
     await service.refresh();
-    await waitForMockCalls(setTimeoutSpy, timerCountAfterConstruction);
-    expect(setTimeoutSpy.mock.calls.length).toBeGreaterThanOrEqual(timerCountAfterConstruction);
+    const { callback: retryTimerCallback, delayMs: retryDelayMs } =
+      getSingleScheduledTimeoutByDelayRange(setTimeoutSpy, 999, 1_000);
+    expect(retryDelayMs).toBeGreaterThanOrEqual(999);
+    expect(retryDelayMs).toBeLessThanOrEqual(1_000);
     vi.setSystemTime(new Date('2026-03-19T04:30:01.001Z'));
-    (retryTimerCallback as () => void)();
+    retryTimerCallback();
     await flushAsyncWork();
     await waitForCondition(
       () =>
