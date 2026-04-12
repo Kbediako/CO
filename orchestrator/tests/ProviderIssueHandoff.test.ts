@@ -215,7 +215,7 @@ function getLatestScheduledTimeoutCallback(
   throw new Error('No scheduled timeout callback found.');
 }
 
-function getSingleScheduledTimeoutByDelayRange(
+function getEarliestScheduledTimeoutByDelayRange(
   setTimeoutSpy: { mock: { calls: unknown[][]; results: Array<{ value: unknown }> } },
   minimumDelayMs: number,
   maximumDelayMs: number
@@ -236,7 +236,10 @@ function getSingleScheduledTimeoutByDelayRange(
       index
     }];
   });
-  expect(matchingCalls).toHaveLength(1);
+  // Retry-queue tests need the scheduler-owned timeout. That timer is scheduled
+  // during service construction, before any refresh-time best-effort rehydrate
+  // timer that may share the same 1s delay bucket.
+  expect(matchingCalls.length).toBeGreaterThan(0);
   const [match] = matchingCalls;
   const scheduledHandle = setTimeoutSpy.mock.results[match.index]?.value;
   if (scheduledHandle !== undefined) {
@@ -9124,7 +9127,7 @@ describe('createProviderIssueHandoffService', () => {
 
     await service.refresh();
     const { callback: retryTimerCallback, delayMs: retryDelayMs } =
-      getSingleScheduledTimeoutByDelayRange(setTimeoutSpy, 999, 1_000);
+      getEarliestScheduledTimeoutByDelayRange(setTimeoutSpy, 999, 1_000);
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
     expect(retryDelayMs).toBeGreaterThanOrEqual(999);
@@ -9438,7 +9441,7 @@ describe('createProviderIssueHandoffService', () => {
 
     await service.refresh();
     const { callback: retryTimerCallback, delayMs: retryDelayMs } =
-      getSingleScheduledTimeoutByDelayRange(setTimeoutSpy, 999, 1_000);
+      getEarliestScheduledTimeoutByDelayRange(setTimeoutSpy, 999, 1_000);
     expect(retryDelayMs).toBeGreaterThanOrEqual(999);
     expect(retryDelayMs).toBeLessThanOrEqual(1_000);
     vi.setSystemTime(new Date('2026-03-19T04:30:01.001Z'));
