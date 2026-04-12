@@ -1724,23 +1724,68 @@ async function resolveReportedSupervisedChildPid(
   config: ControlHostSupervisionConfig,
   options?: {
     readProcessCommand?: (pid: number) => Promise<string | null>;
+    fallbackChildPid?: number | null;
+    previousTrackedChildPid?: number | null;
   }
 ): Promise<number | null> {
   const nextChildPid = normalizeTrackedPid(nextState?.child_pid ?? undefined);
-  if (nextChildPid === null) {
-    return null;
+  if (nextChildPid !== null) {
+    const nextUpdatedAtMs = parseIsoTimestampToMs(nextState?.updated_at);
+    const previousUpdatedAtMs = parseIsoTimestampToMs(previousState?.updated_at);
+    if (
+      nextUpdatedAtMs === null ||
+      (previousUpdatedAtMs !== null && nextUpdatedAtMs <= previousUpdatedAtMs)
+    ) {
+      return null;
+    }
+    return (await isTrackedSupervisedProcessRoot(nextChildPid, config, options))
+      ? nextChildPid
+      : null;
   }
-  const nextUpdatedAtMs = parseIsoTimestampToMs(nextState?.updated_at);
-  const previousUpdatedAtMs = parseIsoTimestampToMs(previousState?.updated_at);
+  const fallbackChildPid = normalizeTrackedPid(options?.fallbackChildPid ?? undefined);
   if (
-    nextUpdatedAtMs === null ||
-    (previousUpdatedAtMs !== null && nextUpdatedAtMs <= previousUpdatedAtMs)
+    fallbackChildPid === null ||
+    fallbackChildPid === normalizeTrackedPid(options?.previousTrackedChildPid ?? undefined)
   ) {
     return null;
   }
-  return (await isTrackedSupervisedProcessRoot(nextChildPid, config, options))
-    ? nextChildPid
+  return (await isTrackedSupervisedProcessRoot(fallbackChildPid, config, options))
+    ? fallbackChildPid
     : null;
+}
+
+function extractLaunchctlServicePid(output: string): number | null {
+  const pidMatch = /^\s*pid = (\d+)\s*$/mu.exec(output);
+  return normalizeTrackedPid(pidMatch ? Number.parseInt(pidMatch[1] ?? '', 10) : undefined);
+}
+
+async function readTrackedChildSnapshotForRestart(
+  statePath: string,
+  serviceTarget: string,
+  options?: {
+    readState?: (path: string) => Promise<ControlHostSupervisionState | null>;
+    readLaunchctlPrint?: (serviceTarget: string) => Promise<CommandResult>;
+  }
+): Promise<{ state: ControlHostSupervisionState | null; trackedChildPid: number | null }> {
+  try {
+    const state = await (
+      options?.readState ??
+      (async (path: string) => await readJsonFileIfExists<ControlHostSupervisionState>(path))
+    )(statePath);
+    return {
+      state,
+      trackedChildPid: normalizeTrackedPid(state?.child_pid ?? undefined)
+    };
+  } catch {
+    const launchctl = await (
+      options?.readLaunchctlPrint ??
+      (async (nextServiceTarget: string) => await runLaunchctl(['print', nextServiceTarget], { allowFailure: true }))
+    )(serviceTarget);
+    return {
+      state: null,
+      trackedChildPid: launchctl.exitCode === 0 ? extractLaunchctlServicePid(launchctl.stdout) : null
+    };
+  }
 }
 
 async function restartExistingControlHostSupervision(
@@ -1749,6 +1794,7 @@ async function restartExistingControlHostSupervision(
   options?: {
     kickstart?: (serviceTarget: string) => Promise<void>;
     readState?: (path: string) => Promise<ControlHostSupervisionState | null>;
+    readLaunchctlPrint?: (serviceTarget: string) => Promise<CommandResult>;
     ensureTrackedProcessTreeExited?: (
       rootPid: number,
       killTimeoutSeconds: number,
@@ -1765,11 +1811,15 @@ async function restartExistingControlHostSupervision(
   childPid: number | null;
   cleanup: ControlHostSupervisionRestartCleanupResult;
 }> {
-  const readState =
-    options?.readState ??
-    (async (path: string) => await readJsonFileIfExists<ControlHostSupervisionState>(path));
-  const previousState = await readState(resolved.paths.statePath);
-  const previousChildPid = normalizeTrackedPid(previousState?.child_pid ?? undefined);
+  const previousSnapshot = await readTrackedChildSnapshotForRestart(
+    resolved.paths.statePath,
+    serviceTarget,
+    {
+      readState: options?.readState,
+      readLaunchctlPrint: options?.readLaunchctlPrint
+    }
+  );
+  const previousChildPid = previousSnapshot.trackedChildPid;
 
   await (
     options?.kickstart ??
@@ -1796,12 +1846,26 @@ async function restartExistingControlHostSupervision(
               }))
         });
 
-  const nextState = await readState(resolved.paths.statePath);
+  const nextSnapshot = await readTrackedChildSnapshotForRestart(
+    resolved.paths.statePath,
+    serviceTarget,
+    {
+      readState: options?.readState,
+      readLaunchctlPrint: options?.readLaunchctlPrint
+    }
+  );
   return {
     previousChildPid,
-    childPid: await resolveReportedSupervisedChildPid(nextState, previousState, resolved.config, {
-      readProcessCommand: options?.readProcessCommand
-    }),
+    childPid: await resolveReportedSupervisedChildPid(
+      nextSnapshot.state,
+      previousSnapshot.state,
+      resolved.config,
+      {
+        readProcessCommand: options?.readProcessCommand,
+        fallbackChildPid: nextSnapshot.trackedChildPid,
+        previousTrackedChildPid: previousSnapshot.trackedChildPid
+      }
+    ),
     cleanup
   };
 }
@@ -2337,6 +2401,7 @@ export const __test__ = {
   isTrackedSupervisedProcessGroup,
   resolveControlHostSupervisionProbeTimeoutMs,
   resolveControlHostSupervisionServiceTarget,
+  extractLaunchctlServicePid,
   ensureTrackedProcessTreeExited,
   terminateChildProcess,
   waitForProcessGroupToExitWithinTimeout,

@@ -28,6 +28,7 @@ const {
   createSleepWaiter,
   createControlHostSupervisionChildEventPromises,
   ensureTrackedProcessTreeExited,
+  extractLaunchctlServicePid,
   formatControlHostSupervisionStatus,
   inspectControlHostSupervisionLaunchAgent,
   isIgnorableLaunchctlBootoutFailure,
@@ -1468,6 +1469,94 @@ describe('controlHostSupervision shell helpers', () => {
         }
       )
     ).resolves.toBeNull();
+  });
+
+  it('extracts the supervised service pid from launchctl print output', () => {
+    expect(
+      extractLaunchctlServicePid([
+        'gui/501/com.kbediako.co.control-host = {',
+        '\tstate = running',
+        '\tpid = 4300',
+        '}'
+      ].join('\n'))
+    ).toBe(4300);
+    expect(extractLaunchctlServicePid('gui/501/com.kbediako.co.control-host = {\n\tstate = waiting\n}')).toBeNull();
+  });
+
+  it('falls back to launchctl pid discovery when the stored supervision state is unreadable', async () => {
+    const config = buildControlHostSupervisionConfig({
+      homeDir: '/Users/tester',
+      cwd: '/repo/workspace',
+      label: 'com.example.control-host',
+      repoRoot: '/repo/CO',
+      nodePath: '/custom/node',
+      cliEntrypoint: '/opt/codex-orchestrator.js',
+      taskId: 'custom-task',
+      runId: 'custom-run',
+      pipelineId: 'custom-pipeline'
+    });
+    const serviceTarget = resolveControlHostSupervisionServiceTarget(config.label);
+    const nextState = buildInitialControlHostSupervisionState({
+      config,
+      serviceTarget,
+      updatedAt: '2026-04-12T14:54:10.000Z'
+    });
+    nextState.child_pid = 4300;
+    const readState = vi
+      .fn<(_: string) => Promise<typeof nextState | null>>()
+      .mockRejectedValueOnce(new SyntaxError('Unexpected end of JSON input'))
+      .mockResolvedValueOnce(nextState);
+    const readLaunchctlPrint = vi.fn(async () => ({
+      exitCode: 0,
+      stdout: 'gui/501/com.example.control-host = {\n\tstate = running\n\tpid = 4200\n}\n',
+      stderr: ''
+    }));
+    const kickstart = vi.fn(async () => undefined);
+    const readProcessCommand = vi.fn(async (pid: number) =>
+      pid === 4300
+        ? '/custom/node /opt/codex-orchestrator.js control-host --task custom-task --run custom-run --pipeline custom-pipeline --format json'
+        : null
+    );
+    const ensureTrackedProcessTreeExitedStub = vi.fn(async () => ({
+      result: 'exited_after_kickstart' as const,
+      orphanedProcessGroupPids: [],
+      orphanedDescendantPids: []
+    }));
+
+    const restart = await restartExistingControlHostSupervision(
+      {
+        label: config.label,
+        paths: config.paths,
+        config
+      },
+      serviceTarget,
+      {
+        kickstart,
+        readState,
+        readLaunchctlPrint,
+        ensureTrackedProcessTreeExited: ensureTrackedProcessTreeExitedStub,
+        readProcessCommand
+      }
+    );
+
+    expect(readLaunchctlPrint).toHaveBeenCalledWith(serviceTarget);
+    expect(kickstart).toHaveBeenCalledWith(serviceTarget);
+    expect(ensureTrackedProcessTreeExitedStub).toHaveBeenCalledWith(
+      4200,
+      config.killTimeoutSeconds,
+      expect.objectContaining({
+        shouldForceKillTrackedProcessGroup: expect.any(Function)
+      })
+    );
+    expect(restart).toEqual({
+      previousChildPid: 4200,
+      childPid: 4300,
+      cleanup: {
+        result: 'exited_after_kickstart',
+        orphanedProcessGroupPids: [],
+        orphanedDescendantPids: []
+      }
+    });
   });
 
   it('kills the detached process group before escalating the wrapper after a timeout', async () => {
