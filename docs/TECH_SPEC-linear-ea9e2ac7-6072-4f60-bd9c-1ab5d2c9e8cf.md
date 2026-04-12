@@ -23,7 +23,7 @@ last_review: 2026-04-12
 
 ## Current Truth
 - `buildParallelizationGuidance(...)` already tells workers to record exactly one current-turn decision and respects the existing allowed decision/reason pairs.
-- The current prompt does not say what to do when a forced validation split collapses into a clean non-repro before any child lane can be launched.
+- The current prompt now includes the forced invalid-split non-repro guidance: it tells workers not to invent child lanes, to keep `forbid_parallel`, to use `parent_only_mutation` for direct clean closeout, and to reserve `blocked_by_dependency` for real remaining dependencies that should move to `Blocked`.
 - `CO-133` proved the truthful answer in practice:
   - no live independent failure owner remained for `clean-main-baseline-failures` or `cli-orchestrator-cleanup-fallout`
   - the parent recorded `forbid_parallel`
@@ -40,12 +40,12 @@ last_review: 2026-04-12
    - use `parent_only_mutation` and close the issue directly when no live dependent work remains
    - use `blocked_by_dependency` only when a real remaining dependency still exists and the issue should move to `Blocked`
    - use `create-follow-up` when the clean non-repro exposes a separate workflow-contract gap instead of a live dependency
-4. Preserve the exact motivating cluster names `clean-main-baseline-failures` and `cli-orchestrator-cleanup-fallout` in the example guidance so the contract stays auditable.
+4. Preserve the exact motivating cluster names `clean-main-baseline-failures` and `cli-orchestrator-cleanup-fallout` in the example guidance, so the contract stays auditable.
 5. Add focused regressions proving the first-turn and continuation prompts include the invalid-split non-repro guidance.
 
 ## Design
 - Extend `buildParallelizationGuidance(...)` in `orchestrator/src/cli/providerLinearWorkerRunner.ts` with one bounded bullet describing the invalidated forced-split case.
-- Keep the new guidance adjacent to the existing decision/reason-code instructions so workers see it as part of the same contract.
+- Keep the new guidance adjacent to the existing decision/reason-code instructions, so workers see it as part of the same contract.
 - Phrase the guidance as a decision-state-closeout rule, not as a new reason code or new enforcement path.
 - Update prompt assertions in `orchestrator/tests/ProviderLinearWorkerRunner.test.ts` to require the new guidance in both first-turn and continuation prompts.
 
