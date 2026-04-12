@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260412-linear-b84c9a78-b62f-48fa-b1c4-88f8222535da",
+      "title": "CO: harden control-host supervise restart against orphaned duplicate host burn",
+      "relates_to": "tasks/tasks-linear-b84c9a78-b62f-48fa-b1c4-88f8222535da.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-12",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-b84c9a78-b62f-48fa-b1c4-88f8222535da.md",
+        "task": "tasks/tasks-linear-b84c9a78-b62f-48fa-b1c4-88f8222535da.md",
+        "agent_task": ".agent/task/linear-b84c9a78-b62f-48fa-b1c4-88f8222535da.md",
+        "docs": "docs/TECH_SPEC-linear-b84c9a78-b62f-48fa-b1c4-88f8222535da.md"
+      }
+    },
+    {
       "id": "20260412-linear-8c691f55-5277-443a-b5dd-1f3f548b1b6d",
       "title": "CO: stop startup recovery sweeps from burning issue-by-id reads for retained released claims",
       "relates_to": "tasks/tasks-linear-8c691f55-5277-443a-b5dd-1f3f548b1b6d.md",

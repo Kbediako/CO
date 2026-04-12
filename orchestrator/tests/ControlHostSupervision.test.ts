@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   CONTROL_HOST_SUPERVISION_MAX_NODE_TIMER_SECONDS,
   buildControlHostSupervisionConfig,
+  buildInitialControlHostSupervisionState,
   buildControlHostSupervisionPlist,
   evaluateControlHostSupervisionHealthPayload,
   parseControlHostSupervisionCsv,
@@ -26,6 +27,7 @@ const {
   captureExistingControlHostSupervisionInstall,
   createSleepWaiter,
   createControlHostSupervisionChildEventPromises,
+  ensureTrackedProcessTreeExited,
   formatControlHostSupervisionStatus,
   inspectControlHostSupervisionLaunchAgent,
   isIgnorableLaunchctlBootoutFailure,
@@ -38,10 +40,12 @@ const {
   readIntegerFlag,
   removeInstalledControlHostSupervisionArtifacts,
   restoreExistingControlHostSupervisionInstall,
+  restartExistingControlHostSupervision,
   rollbackFailedControlHostSupervisionInstall,
   resolveControlHostSupervisionProbeTimeoutMs,
   resolveControlHostSupervisionServiceTarget,
   terminateChildProcess,
+  waitForProcessGroupToExitWithinTimeout,
   writeRuntimeStateWithCleanup
 } = controlHostSupervisionShellTest;
 
@@ -281,6 +285,7 @@ describe('controlHostSupervision shell helpers', () => {
     expect(rendered).toContain('Rollout: managed_supervision');
     expect(rendered).toContain(`Service target: ${serviceTarget}`);
     expect(rendered).toContain(`CLI entrypoint: ${config.cliEntrypoint}`);
+    expect(rendered).toContain('Supervised child pid: none recorded');
     expect(rendered).toContain('Last restart reason: restart_required');
     expect(rendered).toContain(`launchctl: ${serviceTarget} = {`);
   });
@@ -1105,6 +1110,91 @@ describe('controlHostSupervision shell helpers', () => {
     expect(child.kill).toHaveBeenCalledWith('SIGTERM');
   });
 
+  it('waits for the prior supervised child pid before reporting restart success', async () => {
+    const config = buildControlHostSupervisionConfig({
+      homeDir: '/Users/tester',
+      cwd: '/repo/workspace',
+      label: 'com.example.control-host',
+      repoRoot: '/repo/CO',
+      nodePath: '/custom/node',
+      cliEntrypoint: '/opt/codex-orchestrator.js',
+      taskId: 'custom-task',
+      runId: 'custom-run',
+      pipelineId: 'custom-pipeline'
+    });
+    const serviceTarget = resolveControlHostSupervisionServiceTarget(config.label);
+    const priorState = buildInitialControlHostSupervisionState({
+      config,
+      serviceTarget,
+      updatedAt: '2026-04-12T14:54:00.000Z'
+    });
+    priorState.child_pid = 4200;
+    const nextState = {
+      ...priorState,
+      updated_at: '2026-04-12T14:54:10.000Z',
+      child_pid: 4300
+    };
+    const readState = vi
+      .fn<(_: string) => Promise<typeof priorState | null>>()
+      .mockResolvedValueOnce(priorState)
+      .mockResolvedValueOnce(nextState);
+    const kickstart = vi.fn(async () => undefined);
+    const ensureTrackedProcessTreeExitedStub = vi.fn(async () => ({
+      result: 'exited_after_kickstart' as const,
+      orphanedProcessGroupPids: [],
+      orphanedDescendantPids: []
+    }));
+
+    const restart = await restartExistingControlHostSupervision(
+      {
+        label: config.label,
+        paths: config.paths,
+        config
+      },
+      serviceTarget,
+      {
+        kickstart,
+        readState,
+        ensureTrackedProcessTreeExited: ensureTrackedProcessTreeExitedStub
+      }
+    );
+
+    expect(kickstart).toHaveBeenCalledWith(serviceTarget);
+    expect(ensureTrackedProcessTreeExitedStub).toHaveBeenCalledWith(4200, config.killTimeoutSeconds);
+    expect(restart).toEqual({
+      previousChildPid: 4200,
+      childPid: 4300,
+      cleanup: {
+        result: 'exited_after_kickstart',
+        orphanedProcessGroupPids: [],
+        orphanedDescendantPids: []
+      }
+    });
+  });
+
+  it('force-cleans a previously tracked supervised child tree when it survives kickstart', async () => {
+    const listProcessGroupPids = vi
+      .fn()
+      .mockResolvedValueOnce([4200, 4201, 4202])
+      .mockResolvedValueOnce([4200, 4201, 4202])
+      .mockResolvedValueOnce([]);
+    const listDescendantPids = vi.fn().mockResolvedValue([4201, 4202]);
+    const killProcessGroup = vi.fn();
+
+    const cleanup = await ensureTrackedProcessTreeExited(4200, 0, {
+      listProcessGroupPids,
+      listDescendantPids,
+      killProcessGroup
+    });
+
+    expect(cleanup).toEqual({
+      result: 'force_killed',
+      orphanedProcessGroupPids: [4200, 4201, 4202],
+      orphanedDescendantPids: [4201, 4202]
+    });
+    expect(killProcessGroup).toHaveBeenCalledWith(4200, 'SIGKILL');
+  });
+
   it('kills the detached process group before escalating the wrapper after a timeout', async () => {
     const child = Object.assign(new EventEmitter(), {
       pid: 4200,
@@ -1247,5 +1337,17 @@ describe('controlHostSupervision shell helpers', () => {
     ]);
 
     expect(outcome).toBe('pending');
+  });
+
+  it('treats process-group exit as complete when the group disappears before the timeout', async () => {
+    const listProcessGroupPids = vi.fn().mockResolvedValue([]);
+
+    await expect(
+      waitForProcessGroupToExitWithinTimeout(4200, 0, {
+        listProcessGroupPids
+      })
+    ).resolves.toBe(true);
+
+    expect(listProcessGroupPids).toHaveBeenCalledWith(4200);
   });
 });

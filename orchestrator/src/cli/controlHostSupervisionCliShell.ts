@@ -81,6 +81,12 @@ interface ControlHostSupervisionLaunchAgentStatus {
   classification: 'managed_supervision' | 'legacy_shim' | 'unknown' | 'missing';
 }
 
+interface ControlHostSupervisionRestartCleanupResult {
+  result: 'no_prior_child' | 'exited_after_kickstart' | 'force_killed';
+  orphanedProcessGroupPids: number[];
+  orphanedDescendantPids: number[];
+}
+
 interface ControlHostSupervisionRolloutStatus {
   mode: 'managed_supervision' | 'legacy_shim' | 'mixed' | 'not_installed';
   migration_required: boolean;
@@ -280,20 +286,43 @@ async function printControlHostSupervisionStatus(flags: ArgMap): Promise<void> {
 async function restartControlHostSupervision(flags: ArgMap): Promise<void> {
   const format = readFormatFlag(flags);
   const resolved = await resolveStoredControlHostSupervision(flags, true);
+  if (!resolved.config) {
+    throw new Error('control-host supervision restart requires an installed config.');
+  }
+  const config = resolved.config;
   const serviceTarget = resolveControlHostSupervisionServiceTarget(resolved.label);
-  await runLaunchctl(['kickstart', '-k', serviceTarget]);
+  const restart = await restartExistingControlHostSupervision(
+    {
+      ...resolved,
+      config
+    },
+    serviceTarget
+  );
 
   const payload = {
     status: 'restarted',
     label: resolved.label,
     service_target: serviceTarget,
     config_path: resolved.paths.configPath,
-    plist_path: resolved.paths.plistPath
+    plist_path: resolved.paths.plistPath,
+    previous_child_pid: restart.previousChildPid,
+    child_pid: restart.childPid,
+    cleanup: {
+      result: restart.cleanup.result,
+      orphaned_process_group_pids: restart.cleanup.orphanedProcessGroupPids,
+      orphaned_descendant_pids: restart.cleanup.orphanedDescendantPids
+    }
   };
+  const restartDetail =
+    restart.cleanup.result === 'no_prior_child'
+      ? 'No previously tracked supervised child pid was recorded.'
+      : restart.cleanup.result === 'exited_after_kickstart'
+        ? `Previous supervised child pid ${restart.previousChildPid} exited before restart completed.`
+        : `Force-cleaned previous supervised child pid ${restart.previousChildPid}; orphaned group pids=${restart.cleanup.orphanedProcessGroupPids.join(',') || 'none'} descendants=${restart.cleanup.orphanedDescendantPids.join(',') || 'none'}.`;
   emitOutput(
     format,
     payload,
-    `Restarted control-host supervision for ${resolved.label} via ${serviceTarget}.`
+    `Restarted control-host supervision for ${resolved.label} via ${serviceTarget}. ${restartDetail}`
   );
 }
 
@@ -779,6 +808,9 @@ function formatControlHostSupervisionStatus(
   }
   if (payload.state) {
     lines.push(`State status: ${payload.state.status}`);
+    lines.push(
+      `Supervised child pid: ${payload.state.child_pid === null ? 'none recorded' : payload.state.child_pid}`
+    );
     if (payload.state.last_health_status) {
       lines.push(
         `Last health: ${payload.state.last_health_status} (${payload.state.consecutive_unhealthy_samples}/${payload.state.unhealthy_threshold})`
@@ -1397,6 +1429,126 @@ function killTrackedProcessGroup(
   }
 }
 
+async function waitForProcessGroupToExitWithinTimeout(
+  rootPid: number,
+  timeoutMs: number,
+  options?: {
+    listProcessGroupPids?: (rootPid: number) => Promise<number[]>;
+  }
+): Promise<boolean> {
+  const exitController = new AbortController();
+  const killWaiter = createSleepWaiter(timeoutMs);
+  const completed = await Promise.race([
+    waitForProcessGroupToExit(
+      rootPid,
+      options?.listProcessGroupPids,
+      exitController.signal
+    ).then(() => true),
+    killWaiter.promise.then(() => false)
+  ]).finally(() => {
+    exitController.abort();
+    killWaiter.dispose();
+  });
+  return completed;
+}
+
+async function ensureTrackedProcessTreeExited(
+  rootPid: number,
+  killTimeoutSeconds: number,
+  options?: {
+    listProcessGroupPids?: (rootPid: number) => Promise<number[]>;
+    killProcessGroup?: (pid: number, signal: NodeJS.Signals) => void;
+    listDescendantPids?: (rootPid: number) => Promise<number[]>;
+  }
+): Promise<ControlHostSupervisionRestartCleanupResult> {
+  const timeoutMs = Math.max(0, killTimeoutSeconds * 1_000);
+  const exitedAfterKickstart = await waitForProcessGroupToExitWithinTimeout(rootPid, timeoutMs, {
+    listProcessGroupPids: options?.listProcessGroupPids
+  });
+  if (exitedAfterKickstart) {
+    return {
+      result: 'exited_after_kickstart',
+      orphanedProcessGroupPids: [],
+      orphanedDescendantPids: []
+    };
+  }
+
+  const orphanedProcessGroupPids = await (
+    options?.listProcessGroupPids ?? listProcessGroupProcessIds
+  )(rootPid).catch(() => []);
+  const orphanedDescendantPids = await (
+    options?.listDescendantPids ?? listDescendantProcessIds
+  )(rootPid).catch(() => []);
+
+  // Force cleanup is scoped to the stale supervised control-host process group.
+  // Detached provider-worker issue runs can still appear as descendants and must
+  // be preserved; we record them for diagnostics instead of killing them.
+  killTrackedProcessGroup(rootPid, 'SIGKILL', options?.killProcessGroup);
+
+  const exitedAfterForceKill = await waitForProcessGroupToExitWithinTimeout(rootPid, timeoutMs, {
+    listProcessGroupPids: options?.listProcessGroupPids
+  });
+  if (!exitedAfterForceKill) {
+    throw new Error(
+      `Previous supervised control-host child pid ${rootPid} remained alive after forced cleanup.`
+    );
+  }
+
+  return {
+    result: 'force_killed',
+    orphanedProcessGroupPids,
+    orphanedDescendantPids
+  };
+}
+
+async function restartExistingControlHostSupervision(
+  resolved: ResolvedSupervisionInstall & { config: ControlHostSupervisionConfig },
+  serviceTarget: string,
+  options?: {
+    kickstart?: (serviceTarget: string) => Promise<void>;
+    readState?: (path: string) => Promise<ControlHostSupervisionState | null>;
+    ensureTrackedProcessTreeExited?: (
+      rootPid: number,
+      killTimeoutSeconds: number
+    ) => Promise<ControlHostSupervisionRestartCleanupResult>;
+  }
+): Promise<{
+  previousChildPid: number | null;
+  childPid: number | null;
+  cleanup: ControlHostSupervisionRestartCleanupResult;
+}> {
+  const readState =
+    options?.readState ??
+    (async (path: string) => await readJsonFileIfExists<ControlHostSupervisionState>(path));
+  const previousState = await readState(resolved.paths.statePath);
+  const previousChildPid = normalizeTrackedPid(previousState?.child_pid ?? undefined);
+
+  await (
+    options?.kickstart ??
+    (async (nextServiceTarget: string) => {
+      await runLaunchctl(['kickstart', '-k', nextServiceTarget]);
+    })
+  )(serviceTarget);
+
+  const cleanup =
+    previousChildPid === null
+      ? ({
+          result: 'no_prior_child',
+          orphanedProcessGroupPids: [],
+          orphanedDescendantPids: []
+        } satisfies ControlHostSupervisionRestartCleanupResult)
+      : await (
+          options?.ensureTrackedProcessTreeExited ?? ensureTrackedProcessTreeExited
+        )(previousChildPid, resolved.config.killTimeoutSeconds);
+
+  const nextState = await readState(resolved.paths.statePath);
+  return {
+    previousChildPid,
+    childPid: normalizeTrackedPid(nextState?.child_pid ?? undefined),
+    cleanup
+  };
+}
+
 function isMissingProcessError(error: unknown): boolean {
   return (
     error instanceof Error &&
@@ -1923,8 +2075,11 @@ export const __test__ = {
   removeInstalledControlHostSupervisionArtifacts,
   restoreExistingControlHostSupervisionInstall,
   rollbackFailedControlHostSupervisionInstall,
+  restartExistingControlHostSupervision,
   resolveControlHostSupervisionProbeTimeoutMs,
   resolveControlHostSupervisionServiceTarget,
+  ensureTrackedProcessTreeExited,
   terminateChildProcess,
+  waitForProcessGroupToExitWithinTimeout,
   writeRuntimeStateWithCleanup
 };

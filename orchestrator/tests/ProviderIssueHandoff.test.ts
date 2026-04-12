@@ -26,6 +26,10 @@ import {
   normalizeProviderIntakeState,
   type ProviderIntakeState
 } from '../src/cli/control/providerIntakeState.js';
+import {
+  markProviderPollingStarted,
+  markProviderPollingStuck
+} from '../src/cli/control/providerPollingHealth.js';
 
 const cleanupRoots: string[] = [];
 
@@ -1698,6 +1702,137 @@ describe('createProviderIssueHandoffService', () => {
       reason: 'provider_refresh_lifecycle_stuck',
       updated_at: '2026-03-19T04:00:10.000Z'
     });
+  });
+
+  it('aborts later direct issue-by-id refresh work after polling is marked stuck', async () => {
+    const { paths } = await createHostPaths();
+    const state = normalizeProviderIntakeState({
+      schema_version: 1,
+      updated_at: '2026-03-19T04:50:00.000Z',
+      rehydrated_at: null,
+      latest_provider_key: 'linear:lin-issue-2',
+      latest_reason: 'provider_issue_rehydration_pending_revalidation',
+      claims: [
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-1',
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          issue_title: 'Autonomous intake handoff',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-03-19T04:40:00.000Z',
+          task_id: 'linear-lin-issue-1',
+          mapping_source: 'provider_id_fallback',
+          state: 'accepted',
+          reason: 'provider_issue_rehydration_pending_revalidation',
+          accepted_at: '2026-03-19T04:40:05.000Z',
+          updated_at: '2026-03-19T04:40:10.000Z',
+          last_delivery_id: 'delivery-issue-1',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_742_360_050_000,
+          run_id: null,
+          run_manifest_path: null,
+          launch_source: 'control-host',
+          launch_token: 'launch-token-1'
+        },
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-2',
+          issue_id: 'lin-issue-2',
+          issue_identifier: 'CO-3',
+          issue_title: 'Autonomous intake handoff 2',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-03-19T04:41:00.000Z',
+          task_id: 'linear-lin-issue-2',
+          mapping_source: 'provider_id_fallback',
+          state: 'accepted',
+          reason: 'provider_issue_rehydration_pending_revalidation',
+          accepted_at: '2026-03-19T04:41:05.000Z',
+          updated_at: '2026-03-19T04:41:10.000Z',
+          last_delivery_id: 'delivery-issue-2',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_742_360_110_000,
+          run_id: null,
+          run_manifest_path: null,
+          launch_source: 'control-host',
+          launch_token: 'launch-token-2'
+        }
+      ]
+    });
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async ({ issueId }: { issueId: string }) => {
+      if (issueId === 'lin-issue-1') {
+        await markProviderPollingStuck(service);
+      }
+      return {
+        kind: 'ready' as const,
+        trackedIssue: createTrackedIssue({
+          id: issueId,
+          identifier: issueId === 'lin-issue-1' ? 'CO-2' : 'CO-3',
+          title:
+            issueId === 'lin-issue-1'
+              ? 'Autonomous intake handoff'
+              : 'Autonomous intake handoff 2'
+        })
+      };
+    });
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics',
+      resolveTrackedIssue
+    });
+    markProviderPollingStarted(service, { mode: 'poll' });
+
+    await service.poll?.({
+      trackedIssues: []
+    });
+
+    expect(resolveTrackedIssue).toHaveBeenCalledTimes(1);
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-1'
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+  });
+
+  it('skips fresh discovery once polling is already stuck', async () => {
+    const { paths } = await createHostPaths();
+    const service = createProviderIssueHandoffService({
+      paths,
+      state: createProviderIntakeState(),
+      persist: vi.fn(async () => undefined),
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      startPipelineId: 'diagnostics'
+    });
+    const refetchTrackedIssues = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssues: [createTrackedIssue({ id: 'lin-issue-4', identifier: 'CO-4' })]
+    }));
+
+    markProviderPollingStarted(service, { mode: 'poll' });
+    await markProviderPollingStuck(service);
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(refetchTrackedIssues).not.toHaveBeenCalled();
   });
 
   it('dispatches fresh poll candidates in Symphony order', async () => {
