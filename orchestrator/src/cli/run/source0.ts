@@ -299,6 +299,7 @@ function sanitizeRejectedCandidatePath(
   if (
     trimmed.length === 0 ||
     normalizedCandidate === '.' ||
+    hasControlCharacters(normalizedCandidate) ||
     isAbsolute(trimmed) ||
     WINDOWS_DRIVE_ABSOLUTE_PATH_RE.test(trimmed) ||
     normalizedCandidate.split('/').some((segment) => segment === '..')
@@ -603,6 +604,9 @@ function resolveRepoRelativeSource0Path(repoRoot: string, candidate: string, fie
     throw new Error(`source_0 ${field} must be repo-relative`);
   }
   const normalizedCandidate = candidate.replaceAll('\\', '/');
+  if (hasControlCharacters(normalizedCandidate)) {
+    throw new Error(`source_0 ${field} must not contain control characters`);
+  }
   if (normalizedCandidate.split('/').some((segment) => segment === '..')) {
     throw new Error(`source_0 ${field} must not traverse outside the repo root`);
   }
@@ -618,6 +622,13 @@ function resolveRepoRelativeSource0Path(repoRoot: string, candidate: string, fie
     throw new Error(`source_0 ${field} escapes the repo root`);
   }
   return resolvedPath;
+}
+
+function hasControlCharacters(value: string): boolean {
+  return Array.from(value).some((character) => {
+    const codePoint = character.codePointAt(0) ?? 0;
+    return codePoint < 0x20 || codePoint === 0x7f;
+  });
 }
 
 export function buildRunSource0PromptLines(descriptor: RunSource0Descriptor | null): string[] {
