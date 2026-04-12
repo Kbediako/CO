@@ -2245,6 +2245,7 @@ export function createProviderIssueHandoffService(
     trackedIssuesByKey?: Map<string, LiveLinearTrackedIssue> | null;
     consumedTrackedIssueKeys?: Set<string>;
     allowPollFailClosed?: boolean;
+    allowReleasedPollFailClosed?: boolean;
   }): Promise<ProviderTrackedIssueRefreshDisposition> => {
     if (input.trackedIssuesByKey) {
       const providerKey = buildProviderIssueKey(input.claim.provider, input.claim.issue_id);
@@ -2255,7 +2256,10 @@ export function createProviderIssueHandoffService(
         input.claim,
         input.trackedIssuesByKey,
         options.resolveTrackedIssue,
-        input.allowPollFailClosed === true
+        {
+          allowPollFailClosed: input.allowPollFailClosed === true,
+          allowReleasedPollFailClosed: input.allowReleasedPollFailClosed === true
+        }
       );
     }
 
@@ -3509,7 +3513,8 @@ export function createProviderIssueHandoffService(
             claim,
             trackedIssuesByKey,
             consumedTrackedIssueKeys,
-            allowPollFailClosed:
+            allowPollFailClosed: pollInput?.deferFreshDiscovery === true,
+            allowReleasedPollFailClosed:
               pollInput?.allowPollFailClosed === true || pollInput?.deferFreshDiscovery === true
           });
 
@@ -5857,7 +5862,10 @@ async function resolveTrackedIssuePollResolutionWithFallback(
   >,
   trackedIssuesByKey: Map<string, LiveLinearTrackedIssue>,
   resolveTrackedIssue?: CreateProviderIssueHandoffServiceOptions['resolveTrackedIssue'],
-  allowPollFailClosed = false
+  options?: {
+    allowPollFailClosed?: boolean;
+    allowReleasedPollFailClosed?: boolean;
+  }
 ):
   Promise<ProviderTrackedIssueRefreshDisposition | { kind: 'skip'; reason: string }> {
   const pollResolution = resolveTrackedIssuePollResolution(claim, trackedIssuesByKey);
@@ -5871,10 +5879,12 @@ async function resolveTrackedIssuePollResolutionWithFallback(
   }
 
   const failClosedReason =
-    allowPollFailClosed
-      ? resolveProviderIssuePollFailClosedReason(claim) ??
-        resolveReleasedProviderIssuePollFailClosedReason(claim)
-      : null;
+    (options?.allowPollFailClosed === true
+      ? resolveProviderIssuePollFailClosedReason(claim)
+      : null) ??
+    (options?.allowReleasedPollFailClosed === true
+      ? resolveReleasedProviderIssuePollFailClosedReason(claim)
+      : null);
   if (failClosedReason) {
     return {
       kind: 'skip',

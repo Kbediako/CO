@@ -2088,6 +2088,84 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('revalidates pending accepted claims during startup recovery sweeps even when released-only fail-closed is enabled', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-162',
+      issue_title: 'Startup sweep should still revalidate accepted work',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-12T07:19:00.000Z',
+      task_id: 'task-startup-accepted-revalidation',
+      mapping_source: 'provider_id_fallback',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      accepted_at: '2026-04-12T07:19:05.000Z',
+      updated_at: '2026-04-12T07:19:10.000Z',
+      last_delivery_id: 'delivery-startup-accepted-revalidation',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_744_444_740_000,
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-startup-accepted-revalidation',
+        manifestPath: '/tmp/provider-run/startup-accepted-revalidation-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        identifier: 'CO-162',
+        updated_at: '2026-04-12T07:20:00.000Z'
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      allowPollFailClosed: true
+    });
+
+    expect(resolveTrackedIssue.mock.calls).toEqual([
+      [{ provider: 'linear', issueId: 'lin-issue-1' }]
+    ]);
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_refresh_start_launched',
+      issue_updated_at: '2026-04-12T07:20:00.000Z',
+      run_id: 'run-startup-accepted-revalidation',
+      run_manifest_path: '/tmp/provider-run/startup-accepted-revalidation-manifest.json'
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_refresh_start_launched',
+      issue_updated_at: '2026-04-12T07:20:00.000Z',
+      run_id: 'run-startup-accepted-revalidation',
+      run_manifest_path: '/tmp/provider-run/startup-accepted-revalidation-manifest.json'
+    });
+  });
+
   it('fails closed to cached review-wait truth during poll instead of re-reading the issue or fresh-discovering work', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();

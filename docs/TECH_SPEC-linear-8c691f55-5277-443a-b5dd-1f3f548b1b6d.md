@@ -59,8 +59,8 @@ last_review: 2026-04-12
 - Monitoring / alerts:
   - rely on existing `request_burn_history` source attribution and intake snapshots; no new external alerting surface is required
 
-## Open Questions
-- Whether the smallest truthful implementation is a dedicated startup poll flag such as `allowPollFailClosed`, or a different bounded caller signal that enables the same released-claim cached fail-closed seam without reusing `deferFreshDiscovery` as a proxy.
+## Decision
+- Use the dedicated startup poll flag `allowPollFailClosed`, but scope that startup path to released-claim cached fail-closed behavior only. Broader cached fail-closed reasons remain tied to the deferred-poll `deferFreshDiscovery` path.
 
 ## Approvals
 - Reviewer: pending docs-review evidence
