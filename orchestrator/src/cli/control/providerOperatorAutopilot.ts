@@ -515,7 +515,9 @@ async function maybeRunReviewHandoffRework(input: {
       if (left.sortOrder !== right.sortOrder) {
         return left.sortOrder - right.sortOrder;
       }
-      return left.claim.issue_identifier.localeCompare(right.claim.issue_identifier);
+      const leftKey = left.trackedIssue.identifier ?? left.claim.issue_id;
+      const rightKey = right.trackedIssue.identifier ?? right.claim.issue_id;
+      return leftKey.localeCompare(rightKey);
     });
   const parkedCandidate = candidates[0] ?? null;
   if (!parkedCandidate) {

@@ -623,6 +623,78 @@ describe('providerOperatorAutopilot', () => {
     });
   });
 
+  it('falls back to tracked issue identifiers when review-handoff claim identifiers are missing', async () => {
+    const transitionIssueState = vi.fn(async () => ({
+      ok: true as const,
+      operation: 'transition' as const,
+      action: 'updated' as const,
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-118',
+        state: { id: 'rework', name: 'Rework', type: 'started' },
+        updated_at: '2026-04-09T10:05:00.000Z'
+      },
+      previous_state: { id: 'review', name: 'In Review', type: 'started' },
+      target_state: { id: 'rework', name: 'Rework', type: 'started' },
+      source_setup: null
+    }));
+
+    const result = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [
+          createTrackedIssue({
+            id: 'lin-issue-1',
+            identifier: 'CO-118',
+            state: 'In Review',
+            state_type: 'started'
+          })
+        ],
+        claims: [
+          createClaim({
+            issue_id: 'lin-issue-1',
+            issue_identifier: null as unknown as string,
+            issue_state: 'In Review',
+            review_promotion: createReviewPromotion({
+              status: 'action_required',
+              action_required_reasons: ['review=CHANGES_REQUESTED']
+            })
+          }),
+          createClaim({
+            issue_id: 'lin-issue-1',
+            issue_identifier: 'CO-118',
+            issue_state: 'In Review',
+            review_promotion: createReviewPromotion({
+              status: 'action_required',
+              action_required_reasons: ['review=CHANGES_REQUESTED']
+            })
+          })
+        ],
+        config: buildConfig(),
+        previous_result: null
+      },
+      {
+        now: () => '2026-04-09T10:06:00.000Z',
+        transition_issue_state: transitionIssueState
+      }
+    );
+
+    expect(transitionIssueState).toHaveBeenCalledWith({
+      issueId: 'lin-issue-1',
+      stateName: 'Rework',
+      sourceSetup: null,
+      env: expect.any(Object)
+    });
+    expect(result).toMatchObject({
+      status: 'acted',
+      actions: [
+        {
+          kind: 'review_handoff_rework',
+          issue_identifier: 'CO-118'
+        }
+      ]
+    });
+  });
+
   it('moves closed unmerged review handoffs to Rework even when the snapshot reason list is empty', async () => {
     const transitionIssueState = vi.fn(async () => ({
       ok: true as const,
