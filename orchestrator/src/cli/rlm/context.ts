@@ -278,14 +278,24 @@ export async function buildContextObject(options: ContextBuildOptions): Promise<
     if (!(await pathExists(existingIndexPath)) || !(await pathExists(existingSourcePath))) {
       throw new Error('context_source invalid');
     }
+    if (sourceDir !== targetDir) {
+      await copyFile(existingIndexPath, indexPath);
+      await copyFile(existingSourcePath, sourcePath);
+      const copiedRaw = await readFile(indexPath, 'utf8');
+      const copiedParsed = JSON.parse(copiedRaw) as ContextIndex;
+      validateIndex(copiedParsed);
+      await validateIndexAgainstSourcePath(copiedParsed, sourcePath);
+      return {
+        dir: targetDir,
+        indexPath,
+        sourcePath,
+        index: copiedParsed
+      };
+    }
     const raw = await readFile(existingIndexPath, 'utf8');
     const parsed = JSON.parse(raw) as ContextIndex;
     validateIndex(parsed);
     await validateIndexAgainstSourcePath(parsed, existingSourcePath);
-    if (sourceDir !== targetDir) {
-      await copyFile(existingIndexPath, indexPath);
-      await copyFile(existingSourcePath, sourcePath);
-    }
     return {
       dir: targetDir,
       indexPath,
