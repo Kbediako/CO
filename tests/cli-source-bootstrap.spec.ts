@@ -48,6 +48,24 @@ describe('checked-in CLI bootstrap', () => {
     expect(result.stderr).toBe('');
   });
 
+  it('preserves an explicit repo-config override from the caller', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'cli-bootstrap-source-env-override-'));
+    await writeFakePackageRoot(tempRoot, {
+      sourceBody:
+        'console.log(`repo-config-required=${process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED ?? ""}`);\n',
+      distBody: 'console.log("dist-runner");\n',
+      withTsNodeLoader: true
+    });
+
+    const result = await runBootstrap(tempRoot, {
+      CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: '1'
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout.trim()).toBe('repo-config-required=1');
+    expect(result.stderr).toBe('');
+  });
+
   it('forwards outer Node exec flags into the re-execed source entrypoint', async () => {
     tempRoot = await mkdtemp(join(tmpdir(), 'cli-bootstrap-execargv-'));
     await writeFakePackageRoot(tempRoot, {
@@ -246,7 +264,7 @@ async function writeFakePackageRoot(
 
 async function runBootstrap(
   packageRoot: string,
-  envOverrides: Record<string, string> = {},
+  envOverrides: Record<string, string | undefined> = {},
   options: { nodeArgs?: string[]; entryArgs?: string[]; cwd?: string } = {}
 ): Promise<{ exitCode: number | null; stdout: string; stderr: string }> {
   return await new Promise((resolve, reject) => {
@@ -259,10 +277,7 @@ async function runBootstrap(
       ],
       {
         cwd: options.cwd ?? packageRoot,
-        env: {
-          ...process.env,
-          ...envOverrides
-        },
+        env: buildBootstrapEnv(envOverrides),
         stdio: ['ignore', 'pipe', 'pipe']
       }
     );
@@ -288,7 +303,7 @@ async function runBootstrapInteractive(
     child: ReturnType<typeof spawn>;
     waitForStdout: (expected: string) => Promise<void>;
   }) => Promise<void>,
-  envOverrides: Record<string, string> = {},
+  envOverrides: Record<string, string | undefined> = {},
   options: { nodeArgs?: string[]; entryArgs?: string[]; cwd?: string } = {}
 ): Promise<{ exitCode: number | null; signal: NodeJS.Signals | null; stdout: string; stderr: string }> {
   return await new Promise((resolve, reject) => {
@@ -301,10 +316,7 @@ async function runBootstrapInteractive(
       ],
       {
         cwd: options.cwd ?? packageRoot,
-        env: {
-          ...process.env,
-          ...envOverrides
-        },
+        env: buildBootstrapEnv(envOverrides),
         stdio: ['ignore', 'pipe', 'pipe']
       }
     );
@@ -360,6 +372,25 @@ async function waitForOutput(readOutput: () => string, expected: string): Promis
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
   throw new Error(`Timed out waiting for output: ${expected}`);
+}
+
+function buildBootstrapEnv(overrides: Record<string, string | undefined>): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  for (const key of [
+    'CODEX_ORCHESTRATOR_PACKAGE_ROOT',
+    'CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED',
+    'TS_NODE_PROJECT'
+  ]) {
+    delete env[key];
+  }
+  for (const [key, value] of Object.entries(overrides)) {
+    if (value === undefined) {
+      delete env[key];
+      continue;
+    }
+    env[key] = value;
+  }
+  return env;
 }
 
 async function waitForFileContents(path: string, expected: string): Promise<void> {

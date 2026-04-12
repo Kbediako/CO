@@ -156,9 +156,18 @@ On macOS, use the shipped supervision surface instead of a copied local shell wr
    ```bash
    codex-orchestrator control-host supervise restart --format json
    ```
+   The restart payload records the previously tracked supervised child pid (`previous_child_pid`), the newly observed supervised child pid when available (`child_pid`), and `cleanup.result`. If launchd leaves the old supervised tree alive, the payload fails closed unless CO can force-clean that exact stale control-host process group first; any forced cleanup also records the orphaned process-group and descendant pids in `cleanup`.
 5. Remove the generated LaunchAgent, config, state, and logs:
    ```bash
    codex-orchestrator control-host supervise uninstall --format json
    ```
 
-`control-host supervise status --format json` is the machine-checkable operator surface for whether the LaunchAgent is still on the legacy shim rollout or the managed packaged rollout, whether migration is still required, whether launchd is loaded, and what last restart reason or health state the supervisor recorded.
+`control-host supervise status --format json` is the machine-checkable operator surface for whether the LaunchAgent is still on the legacy shim rollout or the managed packaged rollout, whether migration is still required, whether launchd is loaded, which supervised control-host child pid is currently recorded, and what last restart reason or health state the supervisor recorded.
+
+When a replacement host encounters an already-running owner during a restart race, inspect:
+
+```bash
+codex-orchestrator co-status --format json
+```
+
+The `polling.control_host_owner` payload carries the duplicate/stale owner diagnostic path plus owner pid/token metadata. Treat that owner diagnostic as control-host evidence, not as a provider-worker list: detached `provider-linear-worker` issue processes run independently in their own issue workspaces and are not the restart cleanup target.

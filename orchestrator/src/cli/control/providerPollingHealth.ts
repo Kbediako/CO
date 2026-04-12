@@ -146,6 +146,7 @@ export function markProviderPollingCompleted(
 ): void {
   const atMs = input.atMs ?? Date.now();
   const state = getOrCreateProviderPollingHealthState(providerIssueHandoff);
+  const preserveStuckState = isProviderLifecycleStuckError(input.error);
   state.checking = false;
   state.lastCompletedAtMs = atMs;
   if (input.error === undefined) {
@@ -156,11 +157,22 @@ export function markProviderPollingCompleted(
     state.lastErrorAtMs = atMs;
     state.lastError = normalizePollingError(input.error);
   }
-  state.nextPollAtMs = state.intervalMs !== null ? atMs + state.intervalMs : null;
+  state.nextPollAtMs =
+    preserveStuckState || state.intervalMs === null ? null : atMs + state.intervalMs;
   state.updatedAtMs = atMs;
   state.operationStartedAtMs = null;
-  state.stuckAtMs = null;
-  state.reason = null;
+  if (preserveStuckState) {
+    if (state.stuckAtMs === null) {
+      state.stuckAtMs =
+        state.stuckAfterMs !== null && state.lastRequestedAtMs !== null
+          ? state.lastRequestedAtMs + state.stuckAfterMs
+          : atMs;
+    }
+    state.reason = state.reason ?? buildProviderPollingStuckReason(state);
+  } else {
+    state.stuckAtMs = null;
+    state.reason = null;
+  }
   queueProviderPollingHealthUpdate(providerIssueHandoff, state, atMs);
 }
 
@@ -177,9 +189,14 @@ export function scheduleProviderPolling(
   const state = getOrCreateProviderPollingHealthState(providerIssueHandoff);
   const intervalMs = normalizeScheduledPollingIntervalMs(input.intervalMs, state.intervalMs);
   state.intervalMs = intervalMs;
-  state.nextPollAtMs = atMs + intervalMs;
+  if (state.stuckAtMs !== null) {
+    state.nextPollAtMs = null;
+    state.reason = state.reason ?? buildProviderPollingStuckReason(state);
+  } else {
+    state.nextPollAtMs = atMs + intervalMs;
+    state.reason = normalizeOptionalString(input.reason) ?? null;
+  }
   state.updatedAtMs = atMs;
-  state.reason = normalizeOptionalString(input.reason) ?? null;
   state.linearBudget = input.linearBudget ?? null;
   queueProviderPollingHealthUpdate(providerIssueHandoff, state, atMs);
 }
@@ -509,6 +526,18 @@ function normalizePollingError(error: unknown): string {
     return error;
   }
   return String(error);
+}
+
+function isProviderLifecycleStuckError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (
+      error.name === 'ProviderRefreshLifecycleStuckError' ||
+      error.name === 'ProviderPollLifecycleStuckError' ||
+      error.message === 'provider_refresh_lifecycle_stuck' ||
+      error.message === 'provider_poll_lifecycle_stuck'
+    )
+  );
 }
 
 function normalizeOptionalString(value: unknown): string | null {

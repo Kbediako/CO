@@ -28,6 +28,9 @@ import {
 import { resolveLiveLinearTrackedIssues } from '../src/cli/control/linearDispatchSource.js';
 import { resolveLinearWebhookSourceSetup } from '../src/cli/control/linearWebhookController.js';
 import {
+  markProviderPollingCompleted,
+  markProviderPollingStarted,
+  markProviderPollingStuck,
   readProviderPollingHealth,
   scheduleProviderPolling
 } from '../src/cli/control/providerPollingHealth.js';
@@ -826,6 +829,73 @@ describe('startControlServerPublicLifecycle', () => {
     expect(refresh).toHaveBeenCalledTimes(2);
   });
 
+  it('preserves restart_required when a refresh aborts with provider_refresh_lifecycle_stuck', async () => {
+    const refresh = vi.fn(async () => {
+      const error = new Error('provider_refresh_lifecycle_stuck');
+      error.name = 'ProviderRefreshLifecycleStuckError';
+      throw error;
+    });
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => undefined),
+      refresh
+    };
+
+    await expect(runProviderIssueHandoffRefresh(providerIssueHandoff)).resolves.toMatchObject({
+      queued: true,
+      coalesced: true,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck'
+    });
+    expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
+      checking: false,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck',
+      last_error: 'provider_refresh_lifecycle_stuck'
+    });
+    await expect(runProviderIssueHandoffRefresh(providerIssueHandoff)).resolves.toMatchObject({
+      queued: true,
+      coalesced: true,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck'
+    });
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects idle poll retries after polling is already marked restart_required', async () => {
+    const poll = vi.fn(async () => undefined);
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => undefined),
+      refresh: vi.fn(async () => undefined),
+      poll
+    };
+
+    markProviderPollingStarted(providerIssueHandoff, {
+      mode: 'poll'
+    });
+    await markProviderPollingStuck(providerIssueHandoff);
+    markProviderPollingCompleted(providerIssueHandoff, {
+      error: new Error('provider_poll_lifecycle_stuck')
+    });
+
+    await expect(
+      runProviderIssueHandoffPoll(providerIssueHandoff, {
+        trackedIssues: []
+      })
+    ).rejects.toThrow('provider_poll_lifecycle_stuck');
+    expect(poll).not.toHaveBeenCalled();
+    expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
+      checking: false,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_poll_lifecycle_stuck'
+    });
+  });
+
   it('acknowledges a newly started refresh immediately for public-route callers while the refresh keeps running', async () => {
     let resolveRefresh: (() => void) | null = null;
     const firstRefresh = new Promise<void>((resolve) => {
@@ -1412,6 +1482,42 @@ describe('startControlServerPublicLifecycle', () => {
       interval_ms: 15_000,
       next_poll_at: '2026-03-22T09:00:20.000Z',
       reason: 'linear_budget_requests_low'
+    });
+  });
+
+  it('keeps lifecycle-stuck polling fail-closed when later schedules arrive', () => {
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      poll: vi.fn(async () => undefined),
+      rehydrate: vi.fn(async () => undefined),
+      refresh: vi.fn(async () => undefined)
+    };
+
+    const startedAtMs = Date.parse('2026-03-22T09:00:00.000Z');
+    const stuckError = new Error('provider_refresh_lifecycle_stuck');
+    stuckError.name = 'ProviderRefreshLifecycleStuckError';
+
+    markProviderPollingStarted(providerIssueHandoff, {
+      mode: 'refresh',
+      atMs: startedAtMs
+    });
+    markProviderPollingCompleted(providerIssueHandoff, {
+      atMs: startedAtMs + 45_000,
+      error: stuckError
+    });
+
+    scheduleProviderPolling(providerIssueHandoff, {
+      intervalMs: 15_000,
+      reason: 'linear_budget_requests_low',
+      atMs: startedAtMs + 50_000
+    });
+
+    expect(readProviderPollingHealth(providerIssueHandoff, startedAtMs + 50_000)).toMatchObject({
+      checking: false,
+      stuck: true,
+      restart_required: true,
+      next_poll_at: null,
+      reason: 'provider_refresh_lifecycle_stuck'
     });
   });
 

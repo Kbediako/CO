@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   CONTROL_HOST_SUPERVISION_MAX_NODE_TIMER_SECONDS,
   buildControlHostSupervisionConfig,
+  buildInitialControlHostSupervisionState,
   buildControlHostSupervisionPlist,
   evaluateControlHostSupervisionHealthPayload,
   parseControlHostSupervisionCsv,
@@ -26,6 +27,8 @@ const {
   captureExistingControlHostSupervisionInstall,
   createSleepWaiter,
   createControlHostSupervisionChildEventPromises,
+  ensureTrackedProcessTreeExited,
+  extractLaunchctlServicePid,
   formatControlHostSupervisionStatus,
   inspectControlHostSupervisionLaunchAgent,
   isIgnorableLaunchctlBootoutFailure,
@@ -37,11 +40,15 @@ const {
   readStringFlag,
   readIntegerFlag,
   removeInstalledControlHostSupervisionArtifacts,
+  resolveReportedSupervisedChildPid,
   restoreExistingControlHostSupervisionInstall,
+  restartExistingControlHostSupervision,
+  isTrackedSupervisedProcessGroup,
   rollbackFailedControlHostSupervisionInstall,
   resolveControlHostSupervisionProbeTimeoutMs,
   resolveControlHostSupervisionServiceTarget,
   terminateChildProcess,
+  waitForProcessGroupToExitWithinTimeout,
   writeRuntimeStateWithCleanup
 } = controlHostSupervisionShellTest;
 
@@ -281,6 +288,7 @@ describe('controlHostSupervision shell helpers', () => {
     expect(rendered).toContain('Rollout: managed_supervision');
     expect(rendered).toContain(`Service target: ${serviceTarget}`);
     expect(rendered).toContain(`CLI entrypoint: ${config.cliEntrypoint}`);
+    expect(rendered).toContain('Supervised child pid: none recorded');
     expect(rendered).toContain('Last restart reason: restart_required');
     expect(rendered).toContain(`launchctl: ${serviceTarget} = {`);
   });
@@ -1105,6 +1113,452 @@ describe('controlHostSupervision shell helpers', () => {
     expect(child.kill).toHaveBeenCalledWith('SIGTERM');
   });
 
+  it('waits for the prior supervised child pid before reporting restart success', async () => {
+    const config = buildControlHostSupervisionConfig({
+      homeDir: '/Users/tester',
+      cwd: '/repo/workspace',
+      label: 'com.example.control-host',
+      repoRoot: '/repo/CO',
+      nodePath: '/custom/node',
+      cliEntrypoint: '/opt/codex-orchestrator.js',
+      taskId: 'custom-task',
+      runId: 'custom-run',
+      pipelineId: 'custom-pipeline'
+    });
+    const serviceTarget = resolveControlHostSupervisionServiceTarget(config.label);
+    const priorState = buildInitialControlHostSupervisionState({
+      config,
+      serviceTarget,
+      updatedAt: '2026-04-12T14:54:00.000Z'
+    });
+    priorState.child_pid = 4200;
+    const nextState = {
+      ...priorState,
+      updated_at: '2026-04-12T14:54:10.000Z',
+      child_pid: 4300
+    };
+    const readState = vi
+      .fn<(_: string) => Promise<typeof priorState | null>>()
+      .mockResolvedValueOnce(priorState)
+      .mockResolvedValueOnce(nextState);
+    const kickstart = vi.fn(async () => undefined);
+    const readProcessCommand = vi.fn(async (pid: number) =>
+      pid === 4300
+        ? '/custom/node /opt/codex-orchestrator.js control-host --task custom-task --run custom-run --pipeline custom-pipeline --format json'
+        : null
+    );
+    const ensureTrackedProcessTreeExitedStub = vi.fn(async () => ({
+      result: 'exited_after_kickstart' as const,
+      orphanedProcessGroupPids: [],
+      orphanedDescendantPids: []
+    }));
+
+    const restart = await restartExistingControlHostSupervision(
+      {
+        label: config.label,
+        paths: config.paths,
+        config
+      },
+      serviceTarget,
+      {
+        kickstart,
+        readState,
+        ensureTrackedProcessTreeExited: ensureTrackedProcessTreeExitedStub,
+        readProcessCommand
+      }
+    );
+
+    expect(kickstart).toHaveBeenCalledWith(serviceTarget);
+    expect(ensureTrackedProcessTreeExitedStub).toHaveBeenCalledWith(
+      4200,
+      config.killTimeoutSeconds,
+      expect.objectContaining({
+        shouldForceKillTrackedProcessGroup: expect.any(Function)
+      })
+    );
+    expect(readProcessCommand).toHaveBeenCalledWith(4300);
+    expect(restart).toEqual({
+      previousChildPid: 4200,
+      childPid: 4300,
+      cleanup: {
+        result: 'exited_after_kickstart',
+        orphanedProcessGroupPids: [],
+        orphanedDescendantPids: []
+      }
+    });
+  });
+
+  it('force-cleans a previously tracked supervised child tree when it survives kickstart', async () => {
+    const listProcessGroupPids = vi
+      .fn()
+      .mockResolvedValueOnce([4200, 4201, 4202])
+      .mockResolvedValueOnce([4200, 4201, 4202])
+      .mockResolvedValueOnce([4200, 4201, 4202])
+      .mockResolvedValueOnce([]);
+    const listDescendantPids = vi.fn().mockResolvedValue([4201, 4202]);
+    const killProcessGroup = vi.fn();
+
+    const cleanup = await ensureTrackedProcessTreeExited(4200, 0, {
+      listProcessGroupPids,
+      listDescendantPids,
+      killProcessGroup
+    });
+
+    expect(cleanup).toEqual({
+      result: 'force_killed',
+      orphanedProcessGroupPids: [4200, 4201, 4202],
+      orphanedDescendantPids: [4201, 4202]
+    });
+    expect(killProcessGroup).toHaveBeenCalledWith(4200, 'SIGKILL');
+  });
+
+  it('skips force cleanup when the tracked process group exits before the kill step', async () => {
+    const listProcessGroupPids = vi
+      .fn()
+      .mockResolvedValueOnce([4200])
+      .mockResolvedValueOnce([4200])
+      .mockResolvedValueOnce([]);
+    const shouldForceKillTrackedProcessGroup = vi.fn().mockResolvedValue(true);
+    const killProcessGroup = vi.fn();
+
+    const cleanup = await ensureTrackedProcessTreeExited(4200, 0, {
+      listProcessGroupPids,
+      shouldForceKillTrackedProcessGroup,
+      killProcessGroup
+    });
+
+    expect(cleanup).toEqual({
+      result: 'exited_after_kickstart',
+      orphanedProcessGroupPids: [],
+      orphanedDescendantPids: []
+    });
+    expect(shouldForceKillTrackedProcessGroup).toHaveBeenCalledTimes(2);
+    expect(killProcessGroup).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the tracked process-group recheck errors before force cleanup', async () => {
+    const probeError = new Error('ps failed');
+    const listProcessGroupPids = vi.fn().mockRejectedValue(probeError);
+    const killProcessGroup = vi.fn();
+
+    await expect(
+      ensureTrackedProcessTreeExited(4200, 0, {
+        listProcessGroupPids,
+        killProcessGroup
+      })
+    ).rejects.toThrow('ps failed');
+    expect(killProcessGroup).not.toHaveBeenCalled();
+  });
+
+  it('treats the prior child as exited when identity verification skips cleanup after the process group disappears', async () => {
+    const listProcessGroupPids = vi
+      .fn()
+      .mockResolvedValueOnce([4200])
+      .mockResolvedValueOnce([]);
+    const shouldForceKillTrackedProcessGroup = vi.fn().mockResolvedValue(false);
+    const killProcessGroup = vi.fn();
+
+    const cleanup = await ensureTrackedProcessTreeExited(4200, 0, {
+      listProcessGroupPids,
+      shouldForceKillTrackedProcessGroup,
+      killProcessGroup
+    });
+
+    expect(cleanup).toEqual({
+      result: 'exited_after_kickstart',
+      orphanedProcessGroupPids: [],
+      orphanedDescendantPids: []
+    });
+    expect(shouldForceKillTrackedProcessGroup).toHaveBeenCalledWith(4200);
+    expect(killProcessGroup).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when identity verification skips cleanup but the previous process group is still alive', async () => {
+    const listProcessGroupPids = vi.fn().mockResolvedValue([4200]);
+    const shouldForceKillTrackedProcessGroup = vi.fn().mockResolvedValue(false);
+    const killProcessGroup = vi.fn();
+
+    await expect(
+      ensureTrackedProcessTreeExited(4200, 0, {
+        listProcessGroupPids,
+        shouldForceKillTrackedProcessGroup,
+        killProcessGroup
+      })
+    ).rejects.toThrow(
+      'Previous supervised control-host child pid 4200 is still alive, but force cleanup was skipped because identity verification failed.'
+    );
+    expect(killProcessGroup).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when identity verification cannot re-enumerate the previous process group', async () => {
+    const listProcessGroupPids = vi
+      .fn()
+      .mockResolvedValueOnce([4200])
+      .mockRejectedValueOnce(new Error('ps failed'));
+    const shouldForceKillTrackedProcessGroup = vi.fn().mockResolvedValue(false);
+
+    await expect(
+      ensureTrackedProcessTreeExited(4200, 0, {
+        listProcessGroupPids,
+        shouldForceKillTrackedProcessGroup
+      })
+    ).rejects.toThrow('ps failed');
+  });
+
+  it('requires the expected supervised control-host command before allowing force cleanup', async () => {
+    const config = buildControlHostSupervisionConfig({
+      homeDir: '/Users/tester',
+      cwd: '/repo/workspace',
+      label: 'com.example.control-host',
+      repoRoot: '/repo/CO',
+      nodePath: '/custom/node',
+      cliEntrypoint: '/opt/codex-orchestrator.js',
+      taskId: 'custom-task',
+      runId: 'custom-run',
+      pipelineId: 'custom-pipeline'
+    });
+
+    await expect(
+      isTrackedSupervisedProcessGroup(4200, config, {
+        readProcessCommand: async () =>
+          '/custom/node /opt/codex-orchestrator.js control-host --task custom-task --run custom-run --pipeline custom-pipeline --format json'
+      })
+    ).resolves.toBe(true);
+    await expect(
+      isTrackedSupervisedProcessGroup(4200, config, {
+        readProcessCommand: async () => '/usr/bin/python3 unrelated.py'
+      })
+    ).resolves.toBe(false);
+    await expect(
+      isTrackedSupervisedProcessGroup(4200, config, {
+        readProcessCommand: async () => null
+      })
+    ).resolves.toBe(false);
+  });
+
+  it('rejects overlapping task and run prefixes when verifying the supervised control-host command', async () => {
+    const config = buildControlHostSupervisionConfig({
+      homeDir: '/Users/tester',
+      cwd: '/repo/workspace',
+      label: 'com.example.control-host',
+      repoRoot: '/repo/CO',
+      nodePath: '/custom/node',
+      cliEntrypoint: '/opt/codex-orchestrator.js',
+      taskId: 'custom-task-1',
+      runId: 'custom-run-1',
+      pipelineId: 'custom-pipeline-1'
+    });
+
+    await expect(
+      isTrackedSupervisedProcessGroup(4200, config, {
+        readProcessCommand: async () =>
+          '/custom/node /opt/codex-orchestrator.js control-host --task custom-task-12 --run custom-run-12 --pipeline custom-pipeline-12 --format json'
+      })
+    ).resolves.toBe(false);
+  });
+
+  it('matches the supervised control-host when the CLI entrypoint path contains spaces', async () => {
+    const config = buildControlHostSupervisionConfig({
+      homeDir: '/Users/tester',
+      cwd: '/repo/workspace',
+      label: 'com.example.control-host',
+      repoRoot: '/repo/CO',
+      nodePath: '/custom/node',
+      cliEntrypoint: '/opt/Codex Builds/codex-orchestrator.js',
+      taskId: 'custom-task-1',
+      runId: 'custom-run-1',
+      pipelineId: 'custom-pipeline-1'
+    });
+
+    await expect(
+      isTrackedSupervisedProcessGroup(4200, config, {
+        readProcessCommand: async () =>
+          '/custom/node /opt/Codex Builds/codex-orchestrator.js control-host --task custom-task-1 --run custom-run-1 --pipeline custom-pipeline-1 --format json'
+      })
+    ).resolves.toBe(true);
+  });
+
+  it('accepts lingering supervised group members when the root pid has already exited', async () => {
+    const config = buildControlHostSupervisionConfig({
+      homeDir: '/Users/tester',
+      cwd: '/repo/workspace',
+      label: 'com.example.control-host',
+      repoRoot: '/repo/CO',
+      nodePath: '/custom/node',
+      cliEntrypoint: '/opt/codex-orchestrator.js',
+      taskId: 'custom-task',
+      runId: 'custom-run',
+      pipelineId: 'custom-pipeline'
+    });
+
+    await expect(
+      isTrackedSupervisedProcessGroup(4200, config, {
+        listProcessGroupPids: async () => [4201, 4202],
+        readProcessCommand: async (pid: number) =>
+          pid === 4202
+            ? '/custom/node /opt/codex-orchestrator.js control-host --task custom-task --run custom-run --pipeline custom-pipeline --format json'
+            : null
+      })
+    ).resolves.toBe(true);
+  });
+
+  it('does not report a new supervised child pid until the state advances to a verified process', async () => {
+    const config = buildControlHostSupervisionConfig({
+      homeDir: '/Users/tester',
+      cwd: '/repo/workspace',
+      label: 'com.example.control-host',
+      repoRoot: '/repo/CO',
+      nodePath: '/custom/node',
+      cliEntrypoint: '/opt/codex-orchestrator.js',
+      taskId: 'custom-task',
+      runId: 'custom-run',
+      pipelineId: 'custom-pipeline'
+    });
+    const serviceTarget = resolveControlHostSupervisionServiceTarget(config.label);
+    const previousState = buildInitialControlHostSupervisionState({
+      config,
+      serviceTarget,
+      updatedAt: '2026-04-12T14:54:00.000Z'
+    });
+    previousState.child_pid = 4200;
+
+    await expect(
+      resolveReportedSupervisedChildPid(
+        {
+          ...previousState
+        },
+        previousState,
+        config,
+        {
+          readProcessCommand: async () =>
+            '/custom/node /opt/codex-orchestrator.js control-host --task custom-task --run custom-run --pipeline custom-pipeline --format json'
+        }
+      )
+    ).resolves.toBeNull();
+
+    await expect(
+      resolveReportedSupervisedChildPid(
+        {
+          ...previousState,
+          updated_at: '2026-04-12T14:54:10.000Z',
+          child_pid: 4300
+        },
+        previousState,
+        config,
+        {
+          readProcessCommand: async () =>
+            '/custom/node /opt/codex-orchestrator.js control-host --task custom-task --run custom-run --pipeline custom-pipeline --format json'
+        }
+      )
+    ).resolves.toBe(4300);
+
+    await expect(
+      resolveReportedSupervisedChildPid(
+        {
+          ...previousState,
+          updated_at: '2026-04-12T14:54:20.000Z',
+          child_pid: 4400
+        },
+        previousState,
+        config,
+        {
+          readProcessCommand: async (pid: number) =>
+            pid === 4401
+              ? '/custom/node /opt/codex-orchestrator.js control-host --task custom-task --run custom-run --pipeline custom-pipeline --format json'
+              : null,
+        }
+      )
+    ).resolves.toBeNull();
+  });
+
+  it('extracts the supervised service pid from launchctl print output', () => {
+    expect(
+      extractLaunchctlServicePid([
+        'gui/501/com.kbediako.co.control-host = {',
+        '\tstate = running',
+        '\tpid = 4300',
+        '}'
+      ].join('\n'))
+    ).toBe(4300);
+    expect(extractLaunchctlServicePid('gui/501/com.kbediako.co.control-host = {\n\tstate = waiting\n}')).toBeNull();
+  });
+
+  it('falls back to launchctl pid discovery when the stored supervision state is unreadable', async () => {
+    const config = buildControlHostSupervisionConfig({
+      homeDir: '/Users/tester',
+      cwd: '/repo/workspace',
+      label: 'com.example.control-host',
+      repoRoot: '/repo/CO',
+      nodePath: '/custom/node',
+      cliEntrypoint: '/opt/codex-orchestrator.js',
+      taskId: 'custom-task',
+      runId: 'custom-run',
+      pipelineId: 'custom-pipeline'
+    });
+    const serviceTarget = resolveControlHostSupervisionServiceTarget(config.label);
+    const nextState = buildInitialControlHostSupervisionState({
+      config,
+      serviceTarget,
+      updatedAt: '2026-04-12T14:54:10.000Z'
+    });
+    nextState.child_pid = 4300;
+    const readState = vi
+      .fn<(_: string) => Promise<typeof nextState | null>>()
+      .mockRejectedValueOnce(new SyntaxError('Unexpected end of JSON input'))
+      .mockResolvedValueOnce(nextState);
+    const readLaunchctlPrint = vi.fn(async () => ({
+      exitCode: 0,
+      stdout: 'gui/501/com.example.control-host = {\n\tstate = running\n\tpid = 4200\n}\n',
+      stderr: ''
+    }));
+    const kickstart = vi.fn(async () => undefined);
+    const readProcessCommand = vi.fn(async (pid: number) =>
+      pid === 4300
+        ? '/custom/node /opt/codex-orchestrator.js control-host --task custom-task --run custom-run --pipeline custom-pipeline --format json'
+        : null
+    );
+    const ensureTrackedProcessTreeExitedStub = vi.fn(async () => ({
+      result: 'exited_after_kickstart' as const,
+      orphanedProcessGroupPids: [],
+      orphanedDescendantPids: []
+    }));
+
+    const restart = await restartExistingControlHostSupervision(
+      {
+        label: config.label,
+        paths: config.paths,
+        config
+      },
+      serviceTarget,
+      {
+        kickstart,
+        readState,
+        readLaunchctlPrint,
+        ensureTrackedProcessTreeExited: ensureTrackedProcessTreeExitedStub,
+        readProcessCommand
+      }
+    );
+
+    expect(readLaunchctlPrint).toHaveBeenCalledWith(serviceTarget);
+    expect(kickstart).toHaveBeenCalledWith(serviceTarget);
+    expect(ensureTrackedProcessTreeExitedStub).toHaveBeenCalledWith(
+      4200,
+      config.killTimeoutSeconds,
+      expect.objectContaining({
+        shouldForceKillTrackedProcessGroup: expect.any(Function)
+      })
+    );
+    expect(restart).toEqual({
+      previousChildPid: 4200,
+      childPid: 4300,
+      cleanup: {
+        result: 'exited_after_kickstart',
+        orphanedProcessGroupPids: [],
+        orphanedDescendantPids: []
+      }
+    });
+  });
+
   it('kills the detached process group before escalating the wrapper after a timeout', async () => {
     const child = Object.assign(new EventEmitter(), {
       pid: 4200,
@@ -1247,5 +1701,17 @@ describe('controlHostSupervision shell helpers', () => {
     ]);
 
     expect(outcome).toBe('pending');
+  });
+
+  it('treats process-group exit as complete when the group disappears before the timeout', async () => {
+    const listProcessGroupPids = vi.fn().mockResolvedValue([]);
+
+    await expect(
+      waitForProcessGroupToExitWithinTimeout(4200, 0, {
+        listProcessGroupPids
+      })
+    ).resolves.toBe(true);
+
+    expect(listProcessGroupPids).toHaveBeenCalledWith(4200);
   });
 });
