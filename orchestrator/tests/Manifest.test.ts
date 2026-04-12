@@ -432,6 +432,104 @@ describe('bootstrapManifest', () => {
       await rm(repoRoot, { recursive: true, force: true });
     }
   });
+
+  it('writes unique retrieval diagnostics paths for prompt packs that share an id', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-retrieval-diagnostics-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-retrieval'
+    };
+    const pipeline: PipelineDefinition = { id: 'test', title: 'Test Pipeline', stages: [] };
+
+    try {
+      const promptRel = '.agent/prompts/sample.md';
+      const promptContent = '# Prompt\nUse experiences.';
+      await mkdir(join(repoRoot, '.agent', 'prompts'), { recursive: true });
+      await writeFile(join(repoRoot, promptRel), promptContent, 'utf8');
+      const sections: PromptPackSectionSource[] = [
+        { section: 'system', path: promptRel, content: promptContent },
+        { section: 'inject', path: promptRel, content: promptContent },
+        { section: 'summarize', path: promptRel, content: promptContent },
+        { section: 'extract', path: promptRel, content: promptContent },
+        { section: 'optimize', path: promptRel, content: promptContent }
+      ];
+      const stamp = computePromptPackStamp(sections);
+      const sharedManifest = {
+        id: 'shared-pack',
+        stamp,
+        experienceSlots: 1,
+        retrievalPolicy: {
+          kind: 'competitive_scoring_v1',
+          minScore: 0.1,
+          scoreWeights: {
+            gtScore: 1,
+            relativeRank: 1
+          },
+          antiDominanceNormalization: {
+            enabled: true,
+            strength: 0.5,
+            sourceGrouping: 'provenance_fallback_v1'
+          }
+        },
+        system: promptRel,
+        inject: [promptRel],
+        summarize: [promptRel],
+        extract: [promptRel],
+        optimize: [promptRel]
+      };
+
+      await mkdir(join(repoRoot, '.agent', 'prompts', 'prompt-packs', 'implementation'), {
+        recursive: true
+      });
+      await writeFile(
+        join(repoRoot, '.agent', 'prompts', 'prompt-packs', 'implementation', 'manifest.json'),
+        JSON.stringify(
+          {
+            ...sharedManifest,
+            domain: 'implementation'
+          },
+          null,
+          2
+        ),
+        'utf8'
+      );
+
+      await mkdir(join(repoRoot, '.agent', 'prompts', 'prompt-packs', 'diagnostics'), {
+        recursive: true
+      });
+      await writeFile(
+        join(repoRoot, '.agent', 'prompts', 'prompt-packs', 'diagnostics', 'manifest.json'),
+        JSON.stringify(
+          {
+            ...sharedManifest,
+            domain: 'diagnostics'
+          },
+          null,
+          2
+        ),
+        'utf8'
+      );
+
+      const { manifest } = await bootstrapManifest('run-retrieval', {
+        env,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      const paths =
+        manifest.prompt_packs
+          ?.map((pack) => pack.retrieval_selection?.diagnostics_path)
+          .filter((value): value is string => Boolean(value)) ?? [];
+      expect(paths).toHaveLength(2);
+      expect(new Set(paths).size).toBe(2);
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('loadManifest', () => {

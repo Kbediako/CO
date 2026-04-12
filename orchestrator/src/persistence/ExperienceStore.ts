@@ -106,6 +106,18 @@ export interface ExperienceSelectionResult {
   diagnostics: ExperienceSelectionDiagnostics;
 }
 
+interface ExperienceSelectionEntry {
+  record: ExperienceRecord;
+  sourceKey: string;
+  sourceKind: ExperienceSourceKind;
+  rawScore: number;
+  competitiveScore: number;
+  dominancePenalty: number;
+  selected: boolean;
+  selectedSlot: number | null;
+  exclusionReason: ExperienceExclusionReason | null;
+}
+
 export class ExperienceStoreLockError extends Error {
   constructor(message: string, public readonly taskId: string) {
     super(message);
@@ -195,7 +207,9 @@ export class ExperienceStore {
     if (limit === 0) {
       return emptySelection(policy);
     }
-    const records: ExperienceRecord[] = [];
+    const entriesBySource = new Map<string, ExperienceSelectionEntry[]>();
+    const sourceCandidateCounts = new Map<string, number>();
+    let candidateCount = 0;
     const applyRecord = (record: ExperienceRecord) => {
       if (record.domain !== safeDomain) {
         return;
@@ -203,7 +217,10 @@ export class ExperienceStore {
       if (taskFilter && record.taskId !== taskFilter) {
         return;
       }
-      records.push(record);
+      const entry = createSelectionEntry(record, policy);
+      candidateCount += 1;
+      sourceCandidateCounts.set(entry.sourceKey, (sourceCandidateCounts.get(entry.sourceKey) ?? 0) + 1);
+      insertSourceCandidate(entriesBySource, entry, limit);
     };
 
     if (taskFilter) {
@@ -215,7 +232,13 @@ export class ExperienceStore {
       }
     }
 
-    return selectCompetitiveTop(records, limit, policy);
+    return selectCompetitiveTop(
+      [...entriesBySource.values()].flat(),
+      limit,
+      policy,
+      candidateCount,
+      sourceCandidateCounts
+    );
   }
 
   verifyStamp(record: ExperienceRecord): boolean {
@@ -373,33 +396,58 @@ function resolveExperienceSelectionPolicy(
   };
 }
 
-function selectCompetitiveTop(
-  records: ExperienceRecord[],
-  limit: number,
+function createSelectionEntry(
+  record: ExperienceRecord,
   policy: ExperienceSelectionPolicy
-): ExperienceSelectionResult {
-  const entries = records.map((record) => {
-    const source = deriveExperienceSource(record);
-    const rawScore = roundScore(
-      record.reward.gtScore * policy.scoreWeights.gtScore +
+): ExperienceSelectionEntry {
+  const source = deriveExperienceSource(record);
+  const rawScore = roundScore(
+    record.reward.gtScore * policy.scoreWeights.gtScore +
       record.reward.relativeRank * policy.scoreWeights.relativeRank
-    );
-    return {
-      record,
-      sourceKey: source.key,
-      sourceKind: source.kind,
-      rawScore,
-      competitiveScore: rawScore,
-      dominancePenalty: 0,
-      selected: false,
-      selectedSlot: null as number | null,
-      exclusionReason: rawScore < policy.minScore ? ('raw_score_below_min_score' as ExperienceExclusionReason) : null
-    };
-  });
+  );
+  return {
+    record,
+    sourceKey: source.key,
+    sourceKind: source.kind,
+    rawScore,
+    competitiveScore: rawScore,
+    dominancePenalty: 0,
+    selected: false,
+    selectedSlot: null,
+    exclusionReason: rawScore < policy.minScore ? 'raw_score_below_min_score' : null
+  };
+}
 
+function insertSourceCandidate(
+  entriesBySource: Map<string, ExperienceSelectionEntry[]>,
+  entry: ExperienceSelectionEntry,
+  limit: number
+): void {
+  const bucket = entriesBySource.get(entry.sourceKey) ?? [];
+  let insertAt = 0;
+  while (
+    insertAt < bucket.length &&
+    compareSelectionEntriesByRaw(bucket[insertAt]!, entry) <= 0
+  ) {
+    insertAt += 1;
+  }
+  bucket.splice(insertAt, 0, entry);
+  if (bucket.length > limit) {
+    bucket.pop();
+  }
+  entriesBySource.set(entry.sourceKey, bucket);
+}
+
+function selectCompetitiveTop(
+  entries: ExperienceSelectionEntry[],
+  limit: number,
+  policy: ExperienceSelectionPolicy,
+  candidateCount = entries.length,
+  sourceCandidateCounts: Map<string, number> = new Map()
+): ExperienceSelectionResult {
   const remaining = entries.filter((entry) => entry.exclusionReason === null);
   const selectedCounts = new Map<string, number>();
-  const selectedEntries: typeof entries = [];
+  const selectedEntries: ExperienceSelectionEntry[] = [];
 
   for (let slot = 1; slot <= limit && remaining.length > 0; slot += 1) {
     for (const entry of remaining) {
@@ -435,9 +483,10 @@ function selectCompetitiveTop(
     }
   }
 
-  const sourceCandidateCounts = new Map<string, number>();
-  for (const entry of entries) {
-    sourceCandidateCounts.set(entry.sourceKey, (sourceCandidateCounts.get(entry.sourceKey) ?? 0) + 1);
+  if (sourceCandidateCounts.size === 0) {
+    for (const entry of entries) {
+      sourceCandidateCounts.set(entry.sourceKey, (sourceCandidateCounts.get(entry.sourceKey) ?? 0) + 1);
+    }
   }
   const suppressedSourceKeys = [...sourceCandidateCounts.entries()]
     .filter(([sourceKey, count]) => count > (selectedCounts.get(sourceKey) ?? 0))
@@ -448,7 +497,7 @@ function selectCompetitiveTop(
     records: selectedEntries.map((entry) => entry.record),
     diagnostics: {
       policy,
-      candidate_count: entries.length,
+      candidate_count: candidateCount,
       selected_count: selectedEntries.length,
       selected_ids: selectedEntries.map((entry) => entry.record.id),
       suppressed_source_keys: suppressedSourceKeys,
@@ -492,20 +541,19 @@ function deriveExperienceSource(record: ExperienceRecord): { kind: ExperienceSou
 }
 
 function compareSelectionEntries(
-  a: {
-    record: ExperienceRecord;
-    rawScore: number;
-    competitiveScore: number;
-  },
-  b: {
-    record: ExperienceRecord;
-    rawScore: number;
-    competitiveScore: number;
-  }
+  a: Pick<ExperienceSelectionEntry, 'record' | 'rawScore' | 'competitiveScore'>,
+  b: Pick<ExperienceSelectionEntry, 'record' | 'rawScore' | 'competitiveScore'>
 ): number {
   if (a.competitiveScore !== b.competitiveScore) {
     return b.competitiveScore - a.competitiveScore;
   }
+  return compareSelectionEntriesByRaw(a, b);
+}
+
+function compareSelectionEntriesByRaw(
+  a: Pick<ExperienceSelectionEntry, 'record' | 'rawScore'>,
+  b: Pick<ExperienceSelectionEntry, 'record' | 'rawScore'>
+): number {
   if (a.rawScore !== b.rawScore) {
     return b.rawScore - a.rawScore;
   }

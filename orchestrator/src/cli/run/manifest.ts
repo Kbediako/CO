@@ -198,7 +198,7 @@ export async function bootstrapManifest(runId: string, options: ManifestBootstra
     maxSummaryWords: instructions.experienceMaxWords
   });
   const promptPackSelections = await Promise.all(
-    instructions.promptPacks.map(async (pack) => {
+    instructions.promptPacks.map(async (pack, index) => {
       const policy = toExperienceSelectionPolicy(pack.retrievalPolicy, resolveExperienceMinReward());
       if (!pack.experienceSlots) {
         return {
@@ -217,7 +217,9 @@ export async function bootstrapManifest(runId: string, options: ManifestBootstra
       const diagnosticsPath = await writePromptPackRetrievalDiagnostics({
         env,
         paths,
+        packDomain: pack.domain,
         packId: pack.id,
+        packIndex: index,
         diagnostics: selection.diagnostics
       });
       return {
@@ -454,12 +456,17 @@ function serializePromptPackRetrievalSelection(
 async function writePromptPackRetrievalDiagnostics(params: {
   env: EnvironmentPaths;
   paths: RunPaths;
+  packDomain: string;
   packId: string;
+  packIndex: number;
   diagnostics: ExperienceSelectionDiagnostics;
 }): Promise<string> {
   const diagnosticsDir = join(params.paths.runDir, 'prompt-packs');
   await mkdir(diagnosticsDir, { recursive: true });
-  const filePath = join(diagnosticsDir, `${slugify(params.packId)}-retrieval.json`);
+  const filePath = join(
+    diagnosticsDir,
+    `${slugify(`${params.packDomain}-${params.packId}`)}-${String(params.packIndex + 1).padStart(2, '0')}-retrieval.json`
+  );
   await writeJsonAtomic(filePath, params.diagnostics);
   return relativeToRepo(params.env, filePath);
 }

@@ -177,6 +177,12 @@ describe('ExperienceStore', () => {
           summary: 'source a repeated'
         }),
         createInput({
+          runId: 'run-d',
+          groupId: 'source-a',
+          reward: { gtScore: 0.84, relativeRank: 0.39 },
+          summary: 'source a third'
+        }),
+        createInput({
           runId: 'run-c',
           groupId: 'source-b',
           reward: { gtScore: 0.82, relativeRank: 0.4 },
@@ -203,6 +209,7 @@ describe('ExperienceStore', () => {
 
     expect(selection.records).toHaveLength(2);
     expect(selection.records.map((record) => record.groupId)).toEqual(['source-a', 'source-b']);
+    expect(selection.diagnostics.candidate_count).toBe(4);
     expect(selection.diagnostics.selected[1]?.dominance_penalty).toBe(0);
     const repeatedCandidate = selection.diagnostics.candidates.find(
       (candidate) => candidate.source_key === 'source-a' && candidate.selected === false
