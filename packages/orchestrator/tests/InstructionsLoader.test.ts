@@ -85,7 +85,19 @@ describe('loadInstructionSet', () => {
         { section: 'extract', path: promptRel, content: promptContent },
         { section: 'optimize', path: promptRel, content: promptContent }
       ];
-      const stamp = computePromptPackStamp(sources);
+      const stamp = computePromptPackStamp(sources, {
+        experienceSlots: 2,
+        retrievalPolicy: {
+          kind: 'competitive_scoring_v1',
+          minScore: null,
+          scoreWeights: { gtScore: 1, relativeRank: 1 },
+          antiDominanceNormalization: {
+            enabled: true,
+            strength: 0.5,
+            sourceGrouping: 'provenance_fallback_v1'
+          }
+        }
+      });
 
       const manifestDir = join(root, '.agent', 'prompts', 'prompt-packs', 'sample');
       await mkdir(manifestDir, { recursive: true });
@@ -116,6 +128,8 @@ describe('loadInstructionSet', () => {
       expect(pack.domain).toBe('implementation');
       expect(pack.stamp).toBe(stamp);
       expect(pack.experienceSlots).toBe(2);
+      expect(pack.retrievalPolicy.kind).toBe('competitive_scoring_v1');
+      expect(pack.retrievalPolicy.minScore).toBeNull();
       expect(pack.sections.inject).toHaveLength(1);
       expect(pack.sources).toHaveLength(5);
     } finally {

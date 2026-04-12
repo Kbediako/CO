@@ -218,6 +218,34 @@ export interface CodexOrchestratorCLIManifest {
         stamp: string;
         experience_slots: number;
         sources: string[];
+        retrieval_policy?: {
+          kind: "competitive_scoring_v1";
+          min_score: number | null;
+          score_weights: {
+            gt_score: number;
+            relative_rank: number;
+          };
+          anti_dominance_normalization: {
+            enabled: boolean;
+            strength: number;
+            source_grouping: "provenance_fallback_v1";
+          };
+        } | null;
+        retrieval_selection?: {
+          candidate_count: number;
+          selected_count: number;
+          diagnostics_path: string | null;
+          selected_ids: string[];
+          suppressed_source_keys: string[];
+          selected: {
+            id: string;
+            source_key: string;
+            source_kind: "group_id" | "run_id" | "manifest_path" | "stamp_signature";
+            raw_score: number;
+            competitive_score: number;
+            dominance_penalty: number;
+          }[];
+        } | null;
         experiences?: string[] | null;
       }[]
     | null;

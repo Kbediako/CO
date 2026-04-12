@@ -9,10 +9,7 @@ import { isoTimestamp } from '../cli/utils/time.js';
 import { resolveCodexCliBin } from '../cli/utils/codexCli.js';
 import { slugify } from '../cli/utils/strings.js';
 import { appendLearningAlert, ensureLearningSection } from './manifest.js';
-import {
-  computePromptPackStamp,
-  loadPromptPacks
-} from '../../../packages/orchestrator/src/instructions/promptPacks.js';
+import { loadPromptPacks } from '../../../packages/orchestrator/src/instructions/promptPacks.js';
 
 export interface CrystalizerClient {
   generate(
@@ -68,7 +65,7 @@ export async function runCrystalizer(options: CrystalizerOptions): Promise<Cryst
   if (!pack) {
     throw new Error(`Prompt pack ${promptPackId} not found`);
   }
-  const packStamp = computePromptPackStamp(pack.sources);
+  const packStamp = pack.stamp;
   const promptSources = pack.sources.map((source) => source.content).join('\n\n');
   const prompt = composePrompt(promptSources, packStamp, problemStatement, validatedPatch, scenarioSummary ?? '');
 
