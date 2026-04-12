@@ -15283,6 +15283,119 @@ describe('createProviderIssueHandoffService', () => {
     ]);
   });
 
+  it('uses the guarded tracked-issue refetch after autopilot transitions when polling becomes stuck', async () => {
+    const { paths } = await createHostPaths();
+    const trackedIssue = createTrackedIssue({
+      id: 'lin-issue-1',
+      identifier: 'CO-118',
+      state: 'Backlog',
+      state_type: 'backlog'
+    });
+    const state = createProviderIntakeState();
+    const persist = vi.fn(async () => undefined);
+    const recordOperatorAutopilotResult = vi.fn();
+    const buildProviderWorkflowState = () => ({
+      status: 'ready' as const,
+      pipeline_id: 'provider-linear-worker',
+      source_path: '/repo/codex.orchestrator.json',
+      snapshot_path: '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+      last_reload_attempt_at: '2026-04-09T10:00:00.000Z',
+      last_success_at: '2026-04-09T10:00:00.000Z',
+      last_error_at: null,
+      last_error: null,
+      terminal_cleanup: null,
+      operator_autopilot: {
+        enabled: true,
+        backlog_promotion: {
+          enabled: true,
+          state_name: 'Backlog',
+          target_state_name: 'Ready'
+        },
+        review_handoff_rework: {
+          enabled: true,
+          target_state_name: 'Rework',
+          excluded_action_required_reasons: [
+            'draft',
+            'label:do-not-merge',
+            'review=REVIEW_REQUIRED',
+            'required_checks_query_failed'
+          ]
+        },
+        post_merge_rollout: {
+          enabled: true,
+          summary: 'Merge closeout completed; local rollout follow-up may still be required.'
+        },
+        audit_path: join(paths.runDir, 'provider-operator-autopilot.jsonl'),
+        last_result: null
+      }
+    });
+    const providerWorkflowConfigStore = {
+      bootstrap: vi.fn(async () => buildProviderWorkflowState()),
+      refresh: vi.fn(async () => buildProviderWorkflowState()),
+      snapshot: () => buildProviderWorkflowState(),
+      getLaunchConfigPath: vi.fn(async () => '/repo/.runs/local-mcp/cli/control-host/provider-workflow.json'),
+      recordTerminalCleanupResult: vi.fn(),
+      recordOperatorAutopilotResult
+    };
+    const refetchTrackedIssues = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssues: [trackedIssue]
+    }));
+    const runOperatorAutopilot = vi.fn(async () => {
+      await markProviderPollingStuck(service);
+      return {
+        recorded_at: '2026-04-09T10:00:00.000Z',
+        status: 'acted' as const,
+        summary: 'Promoted backlog head CO-118 to Ready.',
+        error: null,
+        actions: [
+          {
+            kind: 'backlog_promotion' as const,
+            issue_id: 'lin-issue-1',
+            issue_identifier: 'CO-118',
+            reason: 'backlog_head_promoted',
+            summary: 'Promoted backlog head CO-118 to Ready.',
+            transition: {
+              status: 'transitioned' as const,
+              attempted_at: '2026-04-09T10:00:00.000Z',
+              previous_state: 'Backlog',
+              target_state: 'Ready',
+              issue_state: 'Ready',
+              issue_state_type: 'unstarted',
+              issue_updated_at: '2026-04-09T10:05:00.000Z',
+              error: null
+            },
+            action_required_reasons: []
+          }
+        ],
+        holds: [],
+        pending_actions: []
+      };
+    });
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      providerWorkflowConfigStore,
+      runOperatorAutopilot,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      }
+    });
+    markProviderPollingStarted(service, { mode: 'poll' });
+
+    await expect(
+      service.poll?.({
+        trackedIssues: [trackedIssue],
+        refetchTrackedIssues
+      })
+    ).rejects.toThrow('provider_refresh_lifecycle_stuck');
+
+    expect(runOperatorAutopilot).toHaveBeenCalledTimes(1);
+    expect(refetchTrackedIssues).not.toHaveBeenCalled();
+  });
+
   it('uses shared autopilot defaults when nested workflow config blocks are omitted', async () => {
     const { paths } = await createHostPaths();
     const trackedIssue = createTrackedIssue({
@@ -15918,6 +16031,97 @@ describe('createProviderIssueHandoffService', () => {
       providerWorkflowConfigStore,
       runOperatorAutopilot,
       appendOperatorAutopilotAuditResult,
+      launcher,
+      resolveTrackedIssues: async () => ({
+        kind: 'ready',
+        trackedIssues: [trackedIssue]
+      })
+    });
+
+    await expect(service.refresh()).resolves.toBeUndefined();
+
+    expect(recordOperatorAutopilotResult).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'failed',
+        pending_actions: []
+      })
+    );
+  });
+
+  it('treats malformed operator autopilot previous results as absent during failure fallback', async () => {
+    const { paths } = await createHostPaths();
+    const trackedIssue = createTrackedIssue();
+    const state = createProviderIntakeState();
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-co-118',
+        manifestPath: '/repo/.runs/linear-0af906c6/run-co-118/manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const auditPath = join(paths.runDir, 'provider-operator-autopilot.jsonl');
+    const recordOperatorAutopilotResult = vi.fn();
+    const providerWorkflowState = () => ({
+      status: 'ready' as const,
+      pipeline_id: 'provider-linear-worker',
+      source_path: '/repo/codex.orchestrator.json',
+      snapshot_path: '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+      last_reload_attempt_at: '2026-04-09T10:00:00.000Z',
+      last_success_at: '2026-04-09T10:00:00.000Z',
+      last_error_at: null,
+      last_error: null,
+      terminal_cleanup: null,
+      operator_autopilot: {
+        enabled: true,
+        backlog_promotion: {
+          enabled: true,
+          state_name: 'Backlog',
+          target_state_name: 'Ready'
+        },
+        review_handoff_rework: {
+          enabled: true,
+          target_state_name: 'Rework',
+          excluded_action_required_reasons: [
+            'draft',
+            'label:do-not-merge',
+            'review=REVIEW_REQUIRED',
+            'required_checks_query_failed'
+          ]
+        },
+        post_merge_rollout: {
+          enabled: true,
+          summary: 'Merge closeout completed; local rollout follow-up may still be required.'
+        },
+        audit_path: auditPath,
+        last_result: {
+          recorded_at: '2026-04-09T10:11:00.000Z',
+          status: 'acted',
+          summary: 'stale payload',
+          actions: [],
+          holds: [],
+          pending_actions: 'not-an-array'
+        }
+      }
+    });
+    const providerWorkflowConfigStore = {
+      bootstrap: vi.fn(async () => providerWorkflowState()),
+      refresh: vi.fn(async () => providerWorkflowState()),
+      snapshot: () => providerWorkflowState(),
+      getLaunchConfigPath: vi.fn(async () => '/repo/.runs/local-mcp/cli/control-host/provider-workflow.json'),
+      recordTerminalCleanupResult: vi.fn(),
+      recordOperatorAutopilotResult
+    };
+    const runOperatorAutopilot = vi.fn(async ({ previous_result }) => {
+      expect(previous_result).toBeNull();
+      throw new Error('operator autopilot crashed');
+    });
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      providerWorkflowConfigStore,
+      runOperatorAutopilot,
       launcher,
       resolveTrackedIssues: async () => ({
         kind: 'ready',

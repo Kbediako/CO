@@ -4104,6 +4104,7 @@ export function createProviderIssueHandoffService(
     allowConsumedRedispatch: boolean;
   }> => {
     const fallbackTrackedIssues = input.pollInput.trackedIssues;
+    const trackedIssueRefetch = wrapTrackedIssueRefetch(input.pollInput.refetchTrackedIssues);
     if (!options.providerWorkflowConfigStore || !runOperatorAutopilot) {
       return { trackedIssues: fallbackTrackedIssues, allowConsumedRedispatch: false };
     }
@@ -4148,7 +4149,11 @@ export function createProviderIssueHandoffService(
         holds: [],
         pending_actions:
           autopilotConfig.post_merge_rollout.enabled
-            ? (previousResult?.pending_actions.map((pendingAction) => ({ ...pendingAction })) ?? [])
+            ? (
+                Array.isArray(previousResult?.pending_actions)
+                  ? previousResult.pending_actions.map((pendingAction) => ({ ...pendingAction }))
+                  : []
+              )
             : []
       };
       loggedAutopilotFailure = true;
@@ -4185,12 +4190,12 @@ export function createProviderIssueHandoffService(
         (action) =>
           action.transition.status === 'transitioned' || action.transition.status === 'noop'
       ) ||
-      !input.pollInput.refetchTrackedIssues
+      !trackedIssueRefetch
     ) {
       return { trackedIssues: fallbackTrackedIssues, allowConsumedRedispatch: false };
     }
     try {
-      const resolution = await input.pollInput.refetchTrackedIssues();
+      const resolution = await trackedIssueRefetch();
       if (resolution.kind === 'ready') {
         return {
           trackedIssues: resolution.trackedIssues,
@@ -4808,10 +4813,36 @@ function resolveProviderOperatorAutopilotPreviousResultFromPayload(
     operator_autopilot?: unknown;
   } | null
 ): ProviderOperatorAutopilotResult | null {
-  return (
-    resolveProviderOperatorAutopilotPayload(providerWorkflow)?.last_result ??
-    null
-  ) as ProviderOperatorAutopilotResult | null;
+  const candidate = resolveProviderOperatorAutopilotPayload(providerWorkflow)?.last_result;
+  if (!candidate || typeof candidate !== 'object') {
+    return null;
+  }
+  const record = candidate as Record<string, unknown>;
+  const error = record.error;
+  const status = record.status;
+  if (
+    !Array.isArray(record.pending_actions) ||
+    !Array.isArray(record.actions) ||
+    !Array.isArray(record.holds) ||
+    typeof record.recorded_at !== 'string' ||
+    typeof status !== 'string' ||
+    typeof record.summary !== 'string' ||
+    (error !== null && typeof error !== 'string')
+  ) {
+    return null;
+  }
+  if (!new Set<ProviderOperatorAutopilotResult['status']>(['disabled', 'noop', 'acted', 'failed']).has(status as ProviderOperatorAutopilotResult['status'])) {
+    return null;
+  }
+  return {
+    recorded_at: record.recorded_at,
+    status: status as ProviderOperatorAutopilotResult['status'],
+    summary: record.summary,
+    error,
+    actions: record.actions as ProviderOperatorAutopilotResult['actions'],
+    holds: record.holds as ProviderOperatorAutopilotResult['holds'],
+    pending_actions: record.pending_actions as ProviderOperatorAutopilotResult['pending_actions']
+  };
 }
 
 function resolveProviderOperatorAutopilotAuditPathFromPayload(

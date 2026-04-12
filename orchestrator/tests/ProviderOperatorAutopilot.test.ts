@@ -590,6 +590,9 @@ describe('providerOperatorAutopilot', () => {
             issue_state: 'In Review',
             issue_updated_at: '2026-04-09T09:05:00.000Z',
             review_promotion: createReviewPromotion({
+              issue_id: 'lin-issue-2',
+              issue_identifier: 'CO-119',
+              issue_state: 'In Review',
               status: 'action_required',
               action_required_reasons: ['review=CHANGES_REQUESTED', 'unresolved_threads=1']
             })
@@ -1027,16 +1030,29 @@ function createClaim(
 }
 
 function createReviewPromotion(input: {
+  issue_id?: string;
+  issue_identifier?: string;
+  issue_state?: string;
+  pr_owner?: string;
+  pr_repo?: string;
+  pr_number?: number;
   status: 'watching' | 'action_required' | 'promoted' | 'promotion_failed' | 'transition_failed';
   action_required_reasons: string[];
   reason?: string;
   snapshot_state?: 'OPEN' | 'CLOSED';
 }) {
+  const issueId = input.issue_id ?? 'lin-issue-1';
+  const issueIdentifier = input.issue_identifier ?? 'CO-118';
+  const issueState = input.issue_state ?? 'In Review';
+  const prOwner = input.pr_owner ?? 'asabeko';
+  const prRepo = input.pr_repo ?? 'CO';
+  const prNumber = input.pr_number ?? 118;
+  const prUrl = `https://github.com/${prOwner}/${prRepo}/pull/${prNumber}`;
   return {
     recorded_at: '2026-04-09T09:05:00.000Z',
-    issue_id: 'lin-issue-1',
-    issue_identifier: 'CO-118',
-    issue_state: 'In Review',
+    issue_id: issueId,
+    issue_identifier: issueIdentifier,
+    issue_state: issueState,
     issue_state_type: 'started',
     issue_updated_at: '2026-04-09T09:05:00.000Z',
     status: input.status,
@@ -1046,14 +1062,14 @@ function createReviewPromotion(input: {
         ? 'review_handoff_promotion_blocked'
         : 'review_handoff_watching'),
     summary: 'review-handoff promotion test fixture',
-    attached_pr_urls: ['https://github.com/asabeko/CO/pull/118'],
+    attached_pr_urls: [prUrl],
     ignored_historical_pr_urls: [],
     conflicting_attached_pr_urls: [],
     pr: {
-      url: 'https://github.com/asabeko/CO/pull/118',
-      owner: 'asabeko',
-      repo: 'CO',
-      number: 118
+      url: prUrl,
+      owner: prOwner,
+      repo: prRepo,
+      number: prNumber
     },
     snapshot: {
       state: input.snapshot_state ?? 'OPEN',
@@ -1076,27 +1092,40 @@ function createReviewPromotion(input: {
 }
 
 function createMergeCloseout(input: {
+  issue_id?: string;
+  issue_identifier?: string;
+  issue_state?: string;
+  pr_owner?: string;
+  pr_repo?: string;
+  pr_number?: number;
   status: 'watching' | 'action_required' | 'merged' | 'merge_failed' | 'transition_failed';
   reason: string;
 }) {
+  const issueId = input.issue_id ?? 'lin-issue-1';
+  const issueIdentifier = input.issue_identifier ?? 'CO-118';
+  const issueState = input.issue_state ?? 'Done';
+  const prOwner = input.pr_owner ?? 'asabeko';
+  const prRepo = input.pr_repo ?? 'CO';
+  const prNumber = input.pr_number ?? 118;
+  const prUrl = `https://github.com/${prOwner}/${prRepo}/pull/${prNumber}`;
   return {
     recorded_at: '2026-04-09T09:15:00.000Z',
-    issue_id: 'lin-issue-1',
-    issue_identifier: 'CO-118',
-    issue_state: 'Done',
+    issue_id: issueId,
+    issue_identifier: issueIdentifier,
+    issue_state: issueState,
     issue_state_type: 'completed',
     issue_updated_at: '2026-04-09T09:15:00.000Z',
     status: input.status,
     reason: input.reason,
     summary: 'merge closeout test fixture',
-    attached_pr_urls: ['https://github.com/asabeko/CO/pull/118'],
+    attached_pr_urls: [prUrl],
     ignored_historical_pr_urls: [],
     conflicting_attached_pr_urls: [],
     pr: {
-      url: 'https://github.com/asabeko/CO/pull/118',
-      owner: 'asabeko',
-      repo: 'CO',
-      number: 118
+      url: prUrl,
+      owner: prOwner,
+      repo: prRepo,
+      number: prNumber
     },
     snapshot: {
       state: 'MERGED',
