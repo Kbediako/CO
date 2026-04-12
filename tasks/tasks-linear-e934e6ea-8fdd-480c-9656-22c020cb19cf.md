@@ -13,30 +13,30 @@
 - [x] `tasks/index.json` updated with the new TECH_SPEC entry and review date. Evidence: `tasks/index.json`.
 - [x] `docs/docs-freshness-registry.json` updated with the six `linear-e934e6ea-8fdd-480c-9656-22c020cb19cf` artifact entries. Evidence: `docs/docs-freshness-registry.json`.
 - [x] `docs/TASKS.md` updated with the new lane snapshot. Evidence: `docs/TASKS.md`.
-- [x] Checklist mirrored to `.agent/task/linear-e934e6ea-8fdd-480c-9656-22c020cb19cf.md`. Evidence: `.agent/task/linear-e934e6ea-8fdd-480c-9656-22c020cb19cf.md`.
+- [x] Checklist mirrored to `.agent/task/linear-e934e6ea-8fdd-480c-9656-22c020cb19cf.md`. Evidence: `.agent/task/linear-e934e6ea-8fdd-480c-9656-22c020cb19cf.md`, `tasks/tasks-linear-e934e6ea-8fdd-480c-9656-22c020cb19cf.md`.
 - [ ] Audited docs-review child stream captured for `linear-e934e6ea-8fdd-480c-9656-22c020cb19cf`. Evidence: pending.
 
 ## Implementation
-- [ ] Extend the shared Linear governor so reserve-aware request-headroom preflight hard-gates nonessential live requests across helper and dispatch consumers. Evidence: pending.
-- [ ] Persist shared request-burn telemetry with source, operation, run/process metadata, request id, remaining delta, reset time, and cooldown reason. Evidence: pending.
-- [ ] Preserve existing local validation/no-op behavior for `create-follow-up` and unchanged workpads while the new shared reserve gate is active. Evidence: pending.
+- [x] Extend the shared Linear governor so reserve-aware request-headroom preflight hard-gates nonessential live requests across helper and dispatch consumers. Evidence: `orchestrator/src/cli/control/linearBudgetState.ts`, `orchestrator/src/cli/control/providerLinearWorkflowFacade.ts`, `orchestrator/tests/LinearDispatchSource.test.ts`, `orchestrator/tests/ProviderLinearWorkflowFacade.test.ts`.
+- [x] Persist shared request-burn telemetry with source, operation, run/process metadata, request id, remaining delta, reset time, and cooldown reason. Evidence: `orchestrator/src/cli/control/linearBudgetState.ts`, `orchestrator/tests/LinearBudgetState.test.ts`.
+- [x] Preserve existing local validation/no-op behavior for `create-follow-up` and unchanged workpads while the new shared reserve gate is active. Evidence: `orchestrator/src/cli/control/providerLinearWorkflowFacade.ts`, `orchestrator/tests/ProviderLinearWorkflowFacade.test.ts`, `out/linear-e934e6ea-8fdd-480c-9656-22c020cb19cf/manual/workpad.md`.
 
 ## Validation
-- [ ] `node scripts/delegation-guard.mjs`. Evidence: pending.
-- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: pending.
-- [ ] `npm run build`. Evidence: pending.
-- [ ] `npm run lint`. Evidence: pending.
-- [ ] `npm run test`. Evidence: pending.
-- [ ] `npm run docs:check`. Evidence: pending.
-- [ ] `npm run docs:freshness`. Evidence: pending.
-- [ ] `npm run repo:stewardship`. Evidence: pending.
-- [ ] `node scripts/diff-budget.mjs`. Evidence: pending.
-- [ ] `npm run review`. Evidence: pending.
-- [ ] `npm run pack:smoke`. Evidence: pending.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/linear-e934e6ea-8fdd-480c-9656-22c020cb19cf/manual/validation/delegation-guard.log`.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/linear-e934e6ea-8fdd-480c-9656-22c020cb19cf/manual/validation/spec-guard.log`.
+- [x] `npm run build`. Evidence: `out/linear-e934e6ea-8fdd-480c-9656-22c020cb19cf/manual/validation/build.log`.
+- [x] `npm run lint`. Evidence: `out/linear-e934e6ea-8fdd-480c-9656-22c020cb19cf/manual/validation/lint.log`.
+- [x] `npm run test`. Evidence: `out/linear-e934e6ea-8fdd-480c-9656-22c020cb19cf/manual/validation/test.log`.
+- [x] `npm run docs:check`. Evidence: `out/linear-e934e6ea-8fdd-480c-9656-22c020cb19cf/manual/validation/docs-check.log`.
+- [x] `npm run docs:freshness`. Evidence: `out/linear-e934e6ea-8fdd-480c-9656-22c020cb19cf/manual/validation/docs-freshness.log`.
+- [x] `npm run repo:stewardship`. Evidence: `out/linear-e934e6ea-8fdd-480c-9656-22c020cb19cf/manual/validation/repo-stewardship.log`.
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/linear-e934e6ea-8fdd-480c-9656-22c020cb19cf/manual/validation/diff-budget.log`.
+- [x] `npm run review`. Evidence: `out/linear-e934e6ea-8fdd-480c-9656-22c020cb19cf/manual/validation/review.log`, `../../.runs/linear-e934e6ea-8fdd-480c-9656-22c020cb19cf/cli/2026-04-12T02-37-24-809Z-79de77b3/review/telemetry.json`, `out/linear-e934e6ea-8fdd-480c-9656-22c020cb19cf/manual/standalone-review.md`.
+- [x] `npm run pack:smoke`. Evidence: `out/linear-e934e6ea-8fdd-480c-9656-22c020cb19cf/manual/validation/pack-smoke.log`.
 
 ## Handoff
-- [ ] Workpad refreshed with docs-review evidence, implementation scope, and current validation truth. Evidence: pending.
-- [ ] PR attached to the Linear issue before review-state transition. Evidence: pending.
+- [x] Workpad refreshed with docs-review evidence, implementation scope, and current validation truth. Evidence: `out/linear-e934e6ea-8fdd-480c-9656-22c020cb19cf/manual/workpad.md`, `https://linear.app/asabeko/issue/CO-156/co-workflow-hard-gate-all-linear-consumers-on-shared-request-headroom#comment-b1724542`.
+- [x] PR attached to the Linear issue before review-state transition. Evidence: `https://github.com/Kbediako/CO/pull/450`, `out/linear-e934e6ea-8fdd-480c-9656-22c020cb19cf/manual/workpad.md`.
 - [ ] Latest `origin/main` merged into the branch before review-state transition. Evidence: pending.
 - [ ] PR checks green and actionable review feedback handled or explicitly pushed back before review-state transition. Evidence: pending.
 - [ ] Issue moved to the actual team review state (`In Review`) only after coding stops. Evidence: pending.

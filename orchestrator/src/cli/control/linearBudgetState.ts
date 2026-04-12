@@ -776,15 +776,18 @@ async function recordLinearBudgetObservation(input: {
   return await withLinearBudgetStateLock(paths, async () => {
     const existing = await readNewestPersistedLinearBudgetStatus(paths, normalizeScopeHint(input.scope));
     const scope = await resolveWriteScope(paths, input.scope, existing);
+    const staleObservation = isStalePersistedLinearBudgetObservation(existing, observation);
     const mergedWithoutHistory = mergePersistedLinearBudgetStatus(existing, observation, scope);
     const merged = appendPersistedLinearBudgetRequestBurnHistory(
       mergedWithoutHistory,
-      buildPersistedLinearBudgetRequestBurnHistoryEntry({
-        env,
-        existing,
-        observation,
-        merged: mergedWithoutHistory
-      })
+      staleObservation
+        ? null
+        : buildPersistedLinearBudgetRequestBurnHistoryEntry({
+            env,
+            existing,
+            observation,
+            merged: mergedWithoutHistory
+          })
     );
     await writePersistedLinearBudgetStatus(paths, merged);
     if (scope.kind === 'user') {
@@ -853,14 +856,7 @@ function mergePersistedLinearBudgetStatus(
   observation: LinearBudgetObservation,
   scope: LinearBudgetScopeIdentity
 ): PersistedLinearBudgetStatus {
-  const existingObservedAtMs = existing ? parseIsoToMs(existing.observed_at) : null;
-  const observationObservedAtMs = parseIsoToMs(observation.observed_at);
-  if (
-    existing &&
-    existingObservedAtMs !== null &&
-    observationObservedAtMs !== null &&
-    observationObservedAtMs < existingObservedAtMs
-  ) {
+  if (isStalePersistedLinearBudgetObservation(existing, observation)) {
     return adoptPersistedScope(existing, scope);
   }
 
@@ -891,6 +887,20 @@ function mergePersistedLinearBudgetStatus(
     observation
   });
   return merged;
+}
+
+function isStalePersistedLinearBudgetObservation(
+  existing: PersistedLinearBudgetStatus | null,
+  observation: LinearBudgetObservation
+): existing is PersistedLinearBudgetStatus {
+  const existingObservedAtMs = existing ? parseIsoToMs(existing.observed_at) : null;
+  const observationObservedAtMs = parseIsoToMs(observation.observed_at);
+  return (
+    existing !== null &&
+    existingObservedAtMs !== null &&
+    observationObservedAtMs !== null &&
+    observationObservedAtMs < existingObservedAtMs
+  );
 }
 
 function createEmptyPersistedLinearBudgetStatus(scope: LinearBudgetScopeIdentity): PersistedLinearBudgetStatus {

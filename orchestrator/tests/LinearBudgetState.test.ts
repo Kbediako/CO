@@ -683,6 +683,60 @@ describe('linearBudgetState', () => {
     });
   });
 
+  it('does not append request-burn history for stale observations that lose the merge', async () => {
+    const codexHome = await mkdtemp(join(tmpdir(), 'linear-budget-state-'));
+    tempDirs.push(codexHome);
+    const env = {
+      ...createEnv(codexHome),
+      CODEX_ORCHESTRATOR_RUN_ID: 'run-budget-history-stale'
+    };
+    const staleResetAtMs = Date.parse('2026-04-08T01:00:00.000Z');
+    const currentResetAtMs = Date.parse('2026-04-08T01:05:00.000Z');
+
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'provider-linear:issue-context',
+      observedAt: '2026-04-08T00:00:05.000Z',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '9',
+        'x-ratelimit-requests-reset': String(currentResetAtMs),
+        'x-request-id': 'req-history-current'
+      }
+    });
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'dispatch_source_issue_by_id',
+      observedAt: '2026-04-08T00:00:00.000Z',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '12',
+        'x-ratelimit-requests-reset': String(staleResetAtMs),
+        'x-request-id': 'req-history-stale'
+      }
+    });
+
+    await expect(readSharedLinearBudgetStatus(env)).resolves.toMatchObject({
+      observed_at: '2026-04-08T00:00:05.000Z',
+      source: 'provider-linear:issue-context',
+      request_id: 'req-history-current',
+      request_burn_history: [
+        {
+          source: 'provider-linear:issue-context',
+          operation: 'provider-linear:issue-context',
+          run_id: 'run-budget-history-stale',
+          process_pid: process.pid,
+          request_id: 'req-history-current',
+          request_bucket: 'requests',
+          remaining: 9,
+          remaining_delta: null,
+          reset_at: '2026-04-08T01:05:00.000Z',
+          cooldown_reason: null
+        }
+      ]
+    });
+  });
+
   it('uses request complexity to fail preflight when complexity headroom is insufficient', async () => {
     const codexHome = await mkdtemp(join(tmpdir(), 'linear-budget-state-'));
     tempDirs.push(codexHome);
