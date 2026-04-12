@@ -5,7 +5,7 @@ status: draft
 owners:
   - Codex
 created: 2026-03-12
-last_review: 2026-03-12
+last_review: 2026-04-12
 review_cadence_days: 30
 related_prd: docs/PRD-coordinator-symphony-aligned-control-server-pending-ready-instance-activation-guard.md
 related_tasks:
