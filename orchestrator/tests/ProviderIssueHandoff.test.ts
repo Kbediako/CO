@@ -2088,6 +2088,84 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('revalidates pending accepted claims during startup recovery sweeps even when released-only fail-closed is enabled', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-162',
+      issue_title: 'Startup sweep should still revalidate accepted work',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-12T07:19:00.000Z',
+      task_id: 'task-startup-accepted-revalidation',
+      mapping_source: 'provider_id_fallback',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      accepted_at: '2026-04-12T07:19:05.000Z',
+      updated_at: '2026-04-12T07:19:10.000Z',
+      last_delivery_id: 'delivery-startup-accepted-revalidation',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_744_444_740_000,
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-startup-accepted-revalidation',
+        manifestPath: '/tmp/provider-run/startup-accepted-revalidation-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        identifier: 'CO-162',
+        updated_at: '2026-04-12T07:20:00.000Z'
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      allowPollFailClosed: true
+    });
+
+    expect(resolveTrackedIssue.mock.calls).toEqual([
+      [{ provider: 'linear', issueId: 'lin-issue-1' }]
+    ]);
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_refresh_start_launched',
+      issue_updated_at: '2026-04-12T07:20:00.000Z',
+      run_id: 'run-startup-accepted-revalidation',
+      run_manifest_path: '/tmp/provider-run/startup-accepted-revalidation-manifest.json'
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_refresh_start_launched',
+      issue_updated_at: '2026-04-12T07:20:00.000Z',
+      run_id: 'run-startup-accepted-revalidation',
+      run_manifest_path: '/tmp/provider-run/startup-accepted-revalidation-manifest.json'
+    });
+  });
+
   it('fails closed to cached review-wait truth during poll instead of re-reading the issue or fresh-discovering work', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
@@ -2302,6 +2380,110 @@ describe('createProviderIssueHandoffService', () => {
     ).toEqual(initialClaimSnapshots);
     expect(state.claims.filter((claim) => claim.reason === 'provider_issue_released:not_active')).toHaveLength(123);
     expect(state.claims.filter((claim) => claim.reason === 'provider_issue_released:not_mutable')).toHaveLength(5);
+  });
+
+  it('fails closed for retained released inactive and non-mutable claims during startup recovery sweeps while still reopening sweep-returned work', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+
+    for (let index = 0; index < 128; index += 1) {
+      const claimId = `lin-issue-${index + 1}`;
+      const releasedNotMutable = index >= 123;
+      state.claims.push({
+        provider: 'linear',
+        provider_key: `linear:${claimId}`,
+        issue_id: claimId,
+        issue_identifier: `CO-${1700 + index}`,
+        issue_title: `Released claim ${index + 1}`,
+        issue_state: releasedNotMutable ? 'In Review' : 'Done',
+        issue_state_type: releasedNotMutable ? 'started' : 'completed',
+        issue_updated_at: `2026-04-12T08:${String(index % 60).padStart(2, '0')}:00.000Z`,
+        issue_archived_at: releasedNotMutable ? '2026-04-12T07:00:00.000Z' : null,
+        issue_trashed: releasedNotMutable ? true : false,
+        task_id: `task-released-${index + 1}`,
+        mapping_source: 'provider_id_fallback',
+        state: 'released',
+        reason: releasedNotMutable
+          ? 'provider_issue_released:not_mutable'
+          : 'provider_issue_released:not_active',
+        accepted_at: `2026-04-12T08:${String(index % 60).padStart(2, '0')}:05.000Z`,
+        updated_at: `2026-04-12T08:${String(index % 60).padStart(2, '0')}:10.000Z`,
+        last_delivery_id: `delivery-released-${index + 1}`,
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_744_448_000_000 + index,
+        run_id: null,
+        run_manifest_path: null,
+        launch_source: null,
+        launch_token: null
+      });
+    }
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-startup-recovery-sweep',
+        manifestPath: '/tmp/provider-run/startup-recovery-sweep-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => {
+      throw new Error('startup recovery sweep should not call resolveTrackedIssue for retained released claims');
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    await service.poll?.({
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-issue-128',
+          identifier: 'CO-1827',
+          title: 'Released claim 128',
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-04-12T08:45:00.000Z',
+          archived_at: null,
+          trashed: false
+        })
+      ],
+      allowPollFailClosed: true
+    });
+
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-issue-128',
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-issue-128',
+      issueIdentifier: 'CO-1827',
+      issueUpdatedAt: '2026-04-12T08:45:00.000Z',
+      launchToken: expect.any(String)
+    }));
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims).toHaveLength(128);
+    expect(state.claims.filter((claim) => claim.state === 'released')).toHaveLength(127);
+    expect(state.claims.filter((claim) => claim.reason === 'provider_issue_released:not_active')).toHaveLength(123);
+    expect(state.claims.filter((claim) => claim.reason === 'provider_issue_released:not_mutable')).toHaveLength(4);
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-issue-128')).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_refresh_start_launched',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-12T08:45:00.000Z',
+      issue_archived_at: null,
+      issue_trashed: false,
+      task_id: 'linear-lin-issue-128',
+      run_id: 'run-startup-recovery-sweep',
+      run_manifest_path: '/tmp/provider-run/startup-recovery-sweep-manifest.json'
+    });
   });
 
   it('still reopens a retained released not-mutable claim on a non-deferred poll when live evidence restores mutability', async () => {
