@@ -70,6 +70,7 @@
   - `npm run docs:freshness`
   - `npm run repo:stewardship`
   - `node scripts/diff-budget.mjs`
+  - `npm run pack:smoke`
   - manifest-backed `codex-orchestrator review`
 - Rollback plan:
   - revert restart cleanup and abort-seam wiring together if focused regressions show collateral worker kills, ownership drift, or stale status evidence.

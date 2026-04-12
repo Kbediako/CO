@@ -135,5 +135,5 @@
 
 ## Approvals
 - Product: Linear issue `CO-163`
-- Engineering: pending docs-review
+- Engineering: audited docs-review fallback clean (`.runs/linear-b84c9a78-b62f-48fa-b1c4-88f8222535da-co-163-docs-review/cli/2026-04-12T15-55-23-100Z-6b52bdd3/manifest.json`)
 - Design: N/A

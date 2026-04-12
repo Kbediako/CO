@@ -26,17 +26,17 @@
 - [x] Operator-facing status/runbook guidance distinguishes supervised control-host pids from provider workers. Evidence: `formatControlHostSupervisionStatus(...)` now prints the supervised child pid and `docs/public/provider-onboarding.md` documents `co-status --format json` owner diagnostics plus the detached provider-worker exclusion.
 
 ## Validation
-- [x] Focused regression tests for supervision restart/orphan cleanup and stuck-refresh abort. Evidence: `npx vitest run orchestrator/tests/ControlHostSupervision.test.ts orchestrator/tests/ProviderIssueHandoff.test.ts` passed on the final review-thread diff with `299` tests, including the new active-run rehydrate stuck-refresh regression.
+- [x] Focused regression tests for supervision restart/orphan cleanup and stuck-refresh abort. Evidence: `npx vitest run orchestrator/tests/ControlServerPublicLifecycle.test.ts orchestrator/tests/ControlHostSupervision.test.ts orchestrator/tests/ProviderIssueHandoff.test.ts` passed on the final review-thread diff with `343` tests, including the new idle `restart_required` public refresh/poll regressions and the same-process concurrent restart-required provider-handoff regression.
 - [x] `node scripts/delegation-guard.mjs`. Evidence: `Delegation guard: OK (2 subagent manifest(s) found).`
 - [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `✅ Spec guard: OK`
 - [x] `npm run build`. Evidence: passed on the final diff.
 - [x] `npm run lint`. Evidence: passed on the final diff.
-- [x] `npm run test`. Evidence: passed on the final diff with `333` files / `3652` tests green.
+- [x] `npm run test`. Evidence: passed on the final diff with `333` files / `3657` tests green.
 - [x] `npm run docs:check`. Evidence: `✅ docs:check: OK`
 - [x] `npm run docs:freshness`. Evidence: `docs:freshness OK - 3713 docs, 3716 registry entries`
 - [x] `npm run repo:stewardship`. Evidence: `repo:stewardship OK - 4698 tracked files, 0 action-required`
-- [x] `node scripts/diff-budget.mjs`. Evidence: `✅ Diff budget: OK (scope=working-tree, files=6/25, lines=292/1200, +278/-14)`
-- [x] Standalone review plus explicit elegance review before review handoff. Evidence: manifest-backed standalone review executed via `FORCE_CODEX_REVIEW=1 npm run review -- --uncommitted` but ended with `review_outcome: failed-boundary` / `termination_boundary.kind: command-intent` / `provenance: validation-runner` at `.runs/linear-b84c9a78-b62f-48fa-b1c4-88f8222535da/cli/2026-04-12T15-41-35-613Z-026f9583/review/telemetry.json`; manual fallback review then found and fixed the descendant-collateral bug in restart cleanup, the final review-thread fixes added the active-run rehydrate stuck-refresh regression, and the closing elegance pass found no further simplification worth the extra risk.
+- [x] `node scripts/diff-budget.mjs`. Evidence: `✅ Diff budget: OK (scope=working-tree, files=7/25, lines=354/1200, +318/-36)`
+- [x] Standalone review plus explicit elegance review before review handoff. Evidence: manifest-backed standalone review executed via `FORCE_CODEX_REVIEW=1 npm run review -- --manifest .runs/linear-b84c9a78-b62f-48fa-b1c4-88f8222535da/cli/2026-04-12T15-41-35-613Z-026f9583/manifest.json` but repeatedly stalled after surfacing concrete findings, so the lane used the documented manual fallback: the wrapper exposed the false `exited_after_kickstart`, idle `restart_required` restart, and same-process concurrent restart-required snapshot gaps; each was fixed on-branch, and the closing elegance pass kept the final solution to narrow helper gates plus regression coverage only.
 - [x] `npm run pack:smoke` if downstream-facing CLI surfaces change. Evidence: passed in the downstream mock install environment.
 
 ## Handoff
@@ -54,7 +54,7 @@
 - 2026-04-13: Manifest-backed standalone review failed with a bounded `command-intent` violation, so the lane used the allowed manual fallback review, found and fixed the descendant-collateral bug in restart cleanup, then reran the validation floor successfully.
 - 2026-04-13: Filed follow-up `CO-164` for the adjacent generic control-host teardown path so CO-163 stays bounded to supervise restart/orphan cleanup.
 - 2026-04-13: The first PR bot pass identified one remaining kill-safety gap: a reused stale `child_pid` could point at an unrelated process group. The final diff now validates the tracked PID command identity before forced cleanup and reran the full validation floor successfully.
-- 2026-04-13: The later PR feedback sweep identified a second bounded review-thread gap: active-run rehydrate metadata refresh still needed to stop later direct issue reads once polling flipped to stuck. The final diff added that rehydrate regression test, reran the full validation floor (`3652` tests), and the current standalone-review telemetry is the expected bounded `validation-runner` failure with manual fallback closeout.
+- 2026-04-13: The later PR feedback sweep identified two more fail-closed gaps after `restart_required`: idle public refresh/poll entrypoints could restart work, and same-process concurrent `state.polling.restart_required` snapshots could still allow later direct issue reads. The final diff added the corresponding public-lifecycle and provider-handoff regressions, reran the full validation floor (`3657` tests), and closed with the documented manual review plus elegance fallback after the wrapper stalled without a fresh terminal verdict.
 
 ## Relevant Files
 - `orchestrator/src/cli/controlHostSupervisionCliShell.ts`
