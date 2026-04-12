@@ -275,7 +275,7 @@ describe('providerOperatorAutopilot', () => {
     });
   });
 
-  it('does not emit a backlog promotion action when the state transition noops', async () => {
+  it('records noop backlog promotions so same-cycle consumers can refetch tracked issue truth', async () => {
     const transitionIssueState = vi.fn(async () => ({
       ok: true as const,
       operation: 'transition' as const,
@@ -314,7 +314,17 @@ describe('providerOperatorAutopilot', () => {
     expect(transitionIssueState).toHaveBeenCalled();
     expect(result).toMatchObject({
       status: 'noop',
-      actions: [],
+      actions: [
+        {
+          kind: 'backlog_promotion',
+          issue_identifier: 'CO-118',
+          reason: 'backlog_head_already_promoted',
+          transition: {
+            status: 'noop',
+            target_state: 'Ready'
+          }
+        }
+      ],
       holds: [],
       pending_actions: []
     });
@@ -680,7 +690,7 @@ describe('providerOperatorAutopilot', () => {
     });
   });
 
-  it('does not emit a review handoff rework action when the state transition noops', async () => {
+  it('records noop review handoff rework transitions so same-cycle consumers can refetch tracked issue truth', async () => {
     const transitionIssueState = vi.fn(async () => ({
       ok: true as const,
       operation: 'transition' as const,
@@ -729,7 +739,18 @@ describe('providerOperatorAutopilot', () => {
     expect(transitionIssueState).toHaveBeenCalled();
     expect(result).toMatchObject({
       status: 'noop',
-      actions: [],
+      actions: [
+        {
+          kind: 'review_handoff_rework',
+          issue_identifier: 'CO-118',
+          reason: 'author_action_required_rework_already_applied',
+          action_required_reasons: ['review=CHANGES_REQUESTED'],
+          transition: {
+            status: 'noop',
+            target_state: 'Rework'
+          }
+        }
+      ],
       holds: [],
       pending_actions: []
     });

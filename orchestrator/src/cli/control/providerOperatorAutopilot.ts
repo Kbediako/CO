@@ -288,8 +288,11 @@ export async function runProviderOperatorAutopilot(
     pendingActions,
     input.config.post_merge_rollout.enabled
   );
+  const hasTransitionedAction = actions.some(
+    (action) => action.transition.status === 'transitioned'
+  );
   const status =
-    actions.length > 0 || effectivePendingActions.length > 0 ? 'acted' : 'noop';
+    hasTransitionedAction || effectivePendingActions.length > 0 ? 'acted' : 'noop';
   return {
     recorded_at: recordedAt,
     status,
@@ -429,7 +432,15 @@ async function maybeRunBacklogPromotion(input: {
   }
   if (transition.action === 'noop') {
     return {
-      action: null,
+      action: {
+        kind: 'backlog_promotion',
+        issue_id: candidate.id,
+        issue_identifier: candidate.identifier,
+        reason: 'backlog_head_already_promoted',
+        summary: `Backlog head ${candidate.identifier} already reflected ${input.config.backlog_promotion.target_state_name} when autopilot evaluated it.`,
+        transition: transitionRecord,
+        action_required_reasons: []
+      },
       hold: null,
       failed: false,
       summary: '',
@@ -557,7 +568,15 @@ async function maybeRunReviewHandoffRework(input: {
   }
   if (transition.action === 'noop') {
     return {
-      action: null,
+      action: {
+        kind: 'review_handoff_rework',
+        issue_id: candidate.trackedIssue.id,
+        issue_identifier: candidate.trackedIssue.identifier,
+        reason: 'author_action_required_rework_already_applied',
+        summary: `Review handoff ${candidate.trackedIssue.identifier} already reflected ${input.config.review_handoff_rework.target_state_name} when autopilot evaluated author-action-required blockers: ${authorActionReasons.join(', ')}.`,
+        transition: transitionRecord,
+        action_required_reasons: [...authorActionReasons]
+      },
       hold: null,
       failed: false,
       summary: '',
