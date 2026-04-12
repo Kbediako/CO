@@ -58,6 +58,38 @@
       }
     },
     {
+      "id": "20260409-linear-01e21df6-6438-4246-a423-a686f6020c5e",
+      "title": "CO: Add retrieval-stage competitive scoring and anti-dominance normalization",
+      "relates_to": "tasks/tasks-linear-01e21df6-6438-4246-a423-a686f6020c5e.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-12",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (clean-success)",
+          "date": "2026-04-09",
+          "manifest": ".runs/linear-01e21df6-6438-4246-a423-a686f6020c5e-co-95-docs-review/cli/2026-04-09T08-42-51-393Z-481f65db/manifest.json"
+        },
+        "review": {
+          "reviewer": "codex-orchestrator review (failed-boundary, manual fallback accepted)",
+          "date": "2026-04-12",
+          "manifest": ".runs/linear-01e21df6-6438-4246-a423-a686f6020c5e/cli/2026-04-12T00-03-59-586Z-066762b9/manifest.json",
+          "telemetry": ".runs/linear-01e21df6-6438-4246-a423-a686f6020c5e/cli/2026-04-12T00-03-59-586Z-066762b9/review/telemetry.json",
+          "override_reason": "Forced standalone review reran on the PR-feedback follow-up diff with FORCE_CODEX_REVIEW=1 and --uncommitted, but the wrapper again ended as review_outcome=failed-boundary with termination_boundary.kind=command-intent after the reviewer launched an explicit validation suite. Manual diff review of the final tree confirmed the namespaced source-bucket fix, complete diagnostics retention, checked-in prompt-pack stamp refresh, and the final crystalizer pack-stamp simplification are correct, and the explicit elegance pass kept the implementation at the smallest coherent fix surface.",
+          "fallback_note": "out/linear-01e21df6-6438-4246-a423-a686f6020c5e/manual/20260412T012034Z-manual-review-fallback.md",
+          "elegance_note": "out/linear-01e21df6-6438-4246-a423-a686f6020c5e/manual/20260412T012034Z-elegance-review.md"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-01e21df6-6438-4246-a423-a686f6020c5e.md",
+        "task": "tasks/tasks-linear-01e21df6-6438-4246-a423-a686f6020c5e.md",
+        "agent_task": ".agent/task/linear-01e21df6-6438-4246-a423-a686f6020c5e.md",
+        "docs": "docs/TECH_SPEC-linear-01e21df6-6438-4246-a423-a686f6020c5e.md"
+      }
+    },
+    {
       "id": "20260409-linear-763df058-1809-457d-823f-f56268fd9dcc",
       "title": "CO: Evaluate telemetry-first dynamic provider-worker reasoning selection after docs-first approval",
       "relates_to": "tasks/tasks-linear-763df058-1809-457d-823f-f56268fd9dcc.md",
