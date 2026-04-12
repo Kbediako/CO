@@ -1332,13 +1332,13 @@ export function createProviderIssueHandoffService(
       >
     >;
   }> => {
-    if (!options.resolveTrackedIssue) {
+    if (!resolveTrackedIssueWhenNotStuck) {
       return { trackedIssue: null, claimFields: {} };
     }
 
-    let resolution: Awaited<ReturnType<NonNullable<typeof options.resolveTrackedIssue>>>;
+    let resolution: Awaited<ReturnType<NonNullable<typeof resolveTrackedIssueWhenNotStuck>>>;
     try {
-      resolution = await options.resolveTrackedIssue({
+      resolution = await resolveTrackedIssueWhenNotStuck({
         provider: claim.provider,
         issueId: claim.issue_id
       });

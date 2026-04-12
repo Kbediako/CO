@@ -1543,7 +1543,7 @@ function matchesExpectedSupervisedControlHostCommand(
   return requiredFragments.every((fragment) => command.includes(fragment));
 }
 
-async function shouldForceKillTrackedSupervisedProcessGroup(
+async function isTrackedSupervisedProcessGroup(
   rootPid: number,
   config: ControlHostSupervisionConfig,
   options?: {
@@ -1552,6 +1552,39 @@ async function shouldForceKillTrackedSupervisedProcessGroup(
 ): Promise<boolean> {
   const command = await (options?.readProcessCommand ?? readProcessCommand)(rootPid);
   return command !== null && matchesExpectedSupervisedControlHostCommand(command, config);
+}
+
+function parseIsoTimestampToMs(value: string | null | undefined): number | null {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return null;
+  }
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+async function resolveReportedSupervisedChildPid(
+  nextState: ControlHostSupervisionState | null,
+  previousState: ControlHostSupervisionState | null,
+  config: ControlHostSupervisionConfig,
+  options?: {
+    readProcessCommand?: (pid: number) => Promise<string | null>;
+  }
+): Promise<number | null> {
+  const nextChildPid = normalizeTrackedPid(nextState?.child_pid ?? undefined);
+  if (nextChildPid === null) {
+    return null;
+  }
+  const nextUpdatedAtMs = parseIsoTimestampToMs(nextState?.updated_at);
+  const previousUpdatedAtMs = parseIsoTimestampToMs(previousState?.updated_at);
+  if (
+    nextUpdatedAtMs === null ||
+    (previousUpdatedAtMs !== null && nextUpdatedAtMs <= previousUpdatedAtMs)
+  ) {
+    return null;
+  }
+  return (await isTrackedSupervisedProcessGroup(nextChildPid, config, options))
+    ? nextChildPid
+    : null;
 }
 
 async function restartExistingControlHostSupervision(
@@ -1565,6 +1598,7 @@ async function restartExistingControlHostSupervision(
       killTimeoutSeconds: number
     ) => Promise<ControlHostSupervisionRestartCleanupResult>;
     shouldForceKillTrackedProcessGroup?: (rootPid: number) => Promise<boolean>;
+    readProcessCommand?: (pid: number) => Promise<string | null>;
   }
 ): Promise<{
   previousChildPid: number | null;
@@ -1597,13 +1631,17 @@ async function restartExistingControlHostSupervision(
           shouldForceKillTrackedProcessGroup:
             options?.shouldForceKillTrackedProcessGroup ??
             (async (rootPid: number) =>
-              await shouldForceKillTrackedSupervisedProcessGroup(rootPid, resolved.config))
+              await isTrackedSupervisedProcessGroup(rootPid, resolved.config, {
+                readProcessCommand: options?.readProcessCommand
+              }))
         });
 
   const nextState = await readState(resolved.paths.statePath);
   return {
     previousChildPid,
-    childPid: normalizeTrackedPid(nextState?.child_pid ?? undefined),
+    childPid: await resolveReportedSupervisedChildPid(nextState, previousState, resolved.config, {
+      readProcessCommand: options?.readProcessCommand
+    }),
     cleanup
   };
 }
@@ -2133,9 +2171,10 @@ export const __test__ = {
   readIntegerFlag,
   removeInstalledControlHostSupervisionArtifacts,
   restoreExistingControlHostSupervisionInstall,
+  resolveReportedSupervisedChildPid,
   rollbackFailedControlHostSupervisionInstall,
   restartExistingControlHostSupervision,
-  shouldForceKillTrackedSupervisedProcessGroup,
+  isTrackedSupervisedProcessGroup,
   resolveControlHostSupervisionProbeTimeoutMs,
   resolveControlHostSupervisionServiceTarget,
   ensureTrackedProcessTreeExited,

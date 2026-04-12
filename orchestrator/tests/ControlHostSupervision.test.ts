@@ -39,9 +39,10 @@ const {
   readStringFlag,
   readIntegerFlag,
   removeInstalledControlHostSupervisionArtifacts,
+  resolveReportedSupervisedChildPid,
   restoreExistingControlHostSupervisionInstall,
   restartExistingControlHostSupervision,
-  shouldForceKillTrackedSupervisedProcessGroup,
+  isTrackedSupervisedProcessGroup,
   rollbackFailedControlHostSupervisionInstall,
   resolveControlHostSupervisionProbeTimeoutMs,
   resolveControlHostSupervisionServiceTarget,
@@ -1140,6 +1141,11 @@ describe('controlHostSupervision shell helpers', () => {
       .mockResolvedValueOnce(priorState)
       .mockResolvedValueOnce(nextState);
     const kickstart = vi.fn(async () => undefined);
+    const readProcessCommand = vi.fn(async (pid: number) =>
+      pid === 4300
+        ? '/custom/node /opt/codex-orchestrator.js control-host --task custom-task --run custom-run --pipeline custom-pipeline --format json'
+        : null
+    );
     const ensureTrackedProcessTreeExitedStub = vi.fn(async () => ({
       result: 'exited_after_kickstart' as const,
       orphanedProcessGroupPids: [],
@@ -1156,7 +1162,8 @@ describe('controlHostSupervision shell helpers', () => {
       {
         kickstart,
         readState,
-        ensureTrackedProcessTreeExited: ensureTrackedProcessTreeExitedStub
+        ensureTrackedProcessTreeExited: ensureTrackedProcessTreeExitedStub,
+        readProcessCommand
       }
     );
 
@@ -1168,6 +1175,7 @@ describe('controlHostSupervision shell helpers', () => {
         shouldForceKillTrackedProcessGroup: expect.any(Function)
       })
     );
+    expect(readProcessCommand).toHaveBeenCalledWith(4300);
     expect(restart).toEqual({
       previousChildPid: 4200,
       childPid: 4300,
@@ -1236,21 +1244,72 @@ describe('controlHostSupervision shell helpers', () => {
     });
 
     await expect(
-      shouldForceKillTrackedSupervisedProcessGroup(4200, config, {
+      isTrackedSupervisedProcessGroup(4200, config, {
         readProcessCommand: async () =>
           '/custom/node /opt/codex-orchestrator.js control-host --task custom-task --run custom-run --pipeline custom-pipeline --format json'
       })
     ).resolves.toBe(true);
     await expect(
-      shouldForceKillTrackedSupervisedProcessGroup(4200, config, {
+      isTrackedSupervisedProcessGroup(4200, config, {
         readProcessCommand: async () => '/usr/bin/python3 unrelated.py'
       })
     ).resolves.toBe(false);
     await expect(
-      shouldForceKillTrackedSupervisedProcessGroup(4200, config, {
+      isTrackedSupervisedProcessGroup(4200, config, {
         readProcessCommand: async () => null
       })
     ).resolves.toBe(false);
+  });
+
+  it('does not report a new supervised child pid until the state advances to a verified process', async () => {
+    const config = buildControlHostSupervisionConfig({
+      homeDir: '/Users/tester',
+      cwd: '/repo/workspace',
+      label: 'com.example.control-host',
+      repoRoot: '/repo/CO',
+      nodePath: '/custom/node',
+      cliEntrypoint: '/opt/codex-orchestrator.js',
+      taskId: 'custom-task',
+      runId: 'custom-run',
+      pipelineId: 'custom-pipeline'
+    });
+    const serviceTarget = resolveControlHostSupervisionServiceTarget(config.label);
+    const previousState = buildInitialControlHostSupervisionState({
+      config,
+      serviceTarget,
+      updatedAt: '2026-04-12T14:54:00.000Z'
+    });
+    previousState.child_pid = 4200;
+
+    await expect(
+      resolveReportedSupervisedChildPid(
+        {
+          ...previousState
+        },
+        previousState,
+        config,
+        {
+          readProcessCommand: async () =>
+            '/custom/node /opt/codex-orchestrator.js control-host --task custom-task --run custom-run --pipeline custom-pipeline --format json'
+        }
+      )
+    ).resolves.toBeNull();
+
+    await expect(
+      resolveReportedSupervisedChildPid(
+        {
+          ...previousState,
+          updated_at: '2026-04-12T14:54:10.000Z',
+          child_pid: 4300
+        },
+        previousState,
+        config,
+        {
+          readProcessCommand: async () =>
+            '/custom/node /opt/codex-orchestrator.js control-host --task custom-task --run custom-run --pipeline custom-pipeline --format json'
+        }
+      )
+    ).resolves.toBe(4300);
   });
 
   it('kills the detached process group before escalating the wrapper after a timeout', async () => {

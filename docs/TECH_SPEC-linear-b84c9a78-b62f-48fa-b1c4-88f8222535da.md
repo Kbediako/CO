@@ -100,5 +100,5 @@ last_review: 2026-04-12
 - Whether the restart payload should include a compact owner summary directly, or only artifact paths plus prior/new child pid evidence for this lane.
 
 ## Approvals
-- Reviewer: pending audited docs-review
+- Reviewer: audited docs-review fallback clean (`.runs/linear-b84c9a78-b62f-48fa-b1c4-88f8222535da-co-163-docs-review/cli/2026-04-12T15-55-23-100Z-6b52bdd3/manifest.json`)
 - Date: 2026-04-12
