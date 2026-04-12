@@ -5,7 +5,7 @@ relates_to: docs/PRD-coordinator-symphony-aligned-standalone-review-shell-probe-
 risk: medium
 owners:
   - Codex
-last_review: 2026-03-12
+last_review: 2026-04-12
 ---
 
 # TECH_SPEC - Coordinator Symphony-Aligned Standalone Review Shell-Probe Termination Boundary Provenance Classification
