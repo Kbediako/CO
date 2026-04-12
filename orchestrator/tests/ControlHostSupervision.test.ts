@@ -1192,6 +1192,7 @@ describe('controlHostSupervision shell helpers', () => {
       .fn()
       .mockResolvedValueOnce([4200, 4201, 4202])
       .mockResolvedValueOnce([4200, 4201, 4202])
+      .mockResolvedValueOnce([4200, 4201, 4202])
       .mockResolvedValueOnce([]);
     const listDescendantPids = vi.fn().mockResolvedValue([4201, 4202]);
     const killProcessGroup = vi.fn();
@@ -1208,6 +1209,30 @@ describe('controlHostSupervision shell helpers', () => {
       orphanedDescendantPids: [4201, 4202]
     });
     expect(killProcessGroup).toHaveBeenCalledWith(4200, 'SIGKILL');
+  });
+
+  it('skips force cleanup when the tracked process group exits before the kill step', async () => {
+    const listProcessGroupPids = vi
+      .fn()
+      .mockResolvedValueOnce([4200])
+      .mockResolvedValueOnce([4200])
+      .mockResolvedValueOnce([]);
+    const shouldForceKillTrackedProcessGroup = vi.fn().mockResolvedValue(true);
+    const killProcessGroup = vi.fn();
+
+    const cleanup = await ensureTrackedProcessTreeExited(4200, 0, {
+      listProcessGroupPids,
+      shouldForceKillTrackedProcessGroup,
+      killProcessGroup
+    });
+
+    expect(cleanup).toEqual({
+      result: 'exited_after_kickstart',
+      orphanedProcessGroupPids: [],
+      orphanedDescendantPids: []
+    });
+    expect(shouldForceKillTrackedProcessGroup).toHaveBeenCalledTimes(2);
+    expect(killProcessGroup).not.toHaveBeenCalled();
   });
 
   it('treats the prior child as exited when identity verification skips cleanup after the process group disappears', async () => {

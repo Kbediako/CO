@@ -1494,9 +1494,45 @@ async function ensureTrackedProcessTreeExited(
     };
   }
 
+  const initialOrphanedProcessGroupPids = await (
+    options?.listProcessGroupPids ?? listProcessGroupProcessIds
+  )(rootPid).catch(() => []);
+  if (initialOrphanedProcessGroupPids.length === 0) {
+    return {
+      result: 'exited_after_kickstart',
+      orphanedProcessGroupPids: [],
+      orphanedDescendantPids: []
+    };
+  }
+  const shouldStillForceKill = await (
+    options?.shouldForceKillTrackedProcessGroup ??
+    (async () => true)
+  )(rootPid);
+  if (!shouldStillForceKill) {
+    const remainingProcessGroupPids = await (
+      options?.listProcessGroupPids ?? listProcessGroupProcessIds
+    )(rootPid);
+    if (remainingProcessGroupPids.length > 0) {
+      throw new Error(
+        `Previous supervised control-host child pid ${rootPid} is still alive, but force cleanup was skipped because identity verification failed.`
+      );
+    }
+    return {
+      result: 'exited_after_kickstart',
+      orphanedProcessGroupPids: [],
+      orphanedDescendantPids: []
+    };
+  }
   const orphanedProcessGroupPids = await (
     options?.listProcessGroupPids ?? listProcessGroupProcessIds
   )(rootPid).catch(() => []);
+  if (orphanedProcessGroupPids.length === 0) {
+    return {
+      result: 'exited_after_kickstart',
+      orphanedProcessGroupPids: [],
+      orphanedDescendantPids: []
+    };
+  }
   const orphanedDescendantPids = await (
     options?.listDescendantPids ?? listDescendantProcessIds
   )(rootPid).catch(() => []);
