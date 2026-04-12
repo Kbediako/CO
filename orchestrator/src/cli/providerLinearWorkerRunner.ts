@@ -935,7 +935,8 @@ function buildParallelizationGuidance(helperCommand: string, issueId: string): s
     `- Ordinary eligible same-issue child-lane parallelisation is a runtime contract in this lane, not optional prompt advice. During every active turn, record exactly one explicit decision with \`${helperCommand} parallelization --issue-id ${issueId} --decision <parallelize_now|stay_serial|forbid_parallel> --reason <reason-code> --summary <why>\`.`,
     `- Allowed decision and reason-code pairs: ${buildParallelizationReasonCodesSummary()}.`,
     `- If you record \`parallelize_now\`, you must actually launch at least one same-issue child lane in that turn with \`${helperCommand} child-lane --action launch ...\`, and at least one of those lanes must complete successfully before the turn ends; otherwise the provider worker fails closed.`,
-    '- If you record `stay_serial` or `forbid_parallel`, choose the bounded reason code that truthfully explains why `child_lanes: []` is acceptable for this turn so the proof and debug surfaces are explicit rather than silent.'
+    '- If you record `stay_serial` or `forbid_parallel`, choose the bounded reason code that truthfully explains why `child_lanes: []` is acceptable for this turn so the proof and debug surfaces are explicit rather than silent.',
+    '- For forced child-lane validation follow-ups, if fresh current-main evidence shows the originally named `clean-main-baseline-failures` and `cli-orchestrator-cleanup-fallout` clusters are both clean non-repros and no independent live cluster remains, do not invent child lanes or finish as `stay_serial`; record `forbid_parallel` with the bounded reason that matches the remaining work: use `parent_only_mutation` and close the issue directly when no live dependent work remains, and use `blocked_by_dependency` only when a real remaining dependency still exists and the issue should move to `Blocked`.'
   ];
 }
 

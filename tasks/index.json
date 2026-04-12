@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260412-linear-ea9e2ac7-6072-4f60-bd9c-1ab5d2c9e8cf",
+      "title": "CO workflow: add a truthful non-repro path for forced child-lane validation issues",
+      "relates_to": "tasks/tasks-linear-ea9e2ac7-6072-4f60-bd9c-1ab5d2c9e8cf.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-12",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-ea9e2ac7-6072-4f60-bd9c-1ab5d2c9e8cf.md",
+        "task": "tasks/tasks-linear-ea9e2ac7-6072-4f60-bd9c-1ab5d2c9e8cf.md",
+        "agent_task": ".agent/task/linear-ea9e2ac7-6072-4f60-bd9c-1ab5d2c9e8cf.md",
+        "docs": "docs/TECH_SPEC-linear-ea9e2ac7-6072-4f60-bd9c-1ab5d2c9e8cf.md"
+      }
+    },
+    {
       "id": "20260412-linear-95011595-52df-4ad8-9cb5-256e7eee5424",
       "title": "CO: stop released provider claims from burning Linear issue-by-id polls",
       "relates_to": "tasks/tasks-linear-95011595-52df-4ad8-9cb5-256e7eee5424.md",
