@@ -571,6 +571,148 @@ describe('bootstrapManifest', () => {
     }
   });
 
+  it('records a provenance contradiction when the inherited source_0 descriptor is malformed', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-source0-malformed-descriptor-'));
+    const parentEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-parent'
+    };
+    const childEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-child'
+    };
+    const pipeline: PipelineDefinition = { id: 'test', title: 'Test Pipeline', stages: [] };
+
+    try {
+      const parent = await bootstrapManifest('run-parent', {
+        env: parentEnv,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      const parentManifestPath = parent.paths.manifestPath;
+      const parentManifest = JSON.parse(await readFile(parentManifestPath, 'utf8')) as {
+        memory?: { source_0?: Record<string, unknown> };
+      };
+      if (parentManifest.memory?.source_0) {
+        delete parentManifest.memory.source_0.origin;
+        await writeFile(parentManifestPath, JSON.stringify(parentManifest, null, 2), 'utf8');
+      }
+
+      const child = await bootstrapManifest('run-child', {
+        env: childEnv,
+        pipeline,
+        parentRunId: 'run-parent',
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      expect(child.manifest.memory?.observability).toMatchObject({
+        selected_memory: {
+          selection: 'fresh_rebuild'
+        },
+        rejected_candidates: [
+          {
+            reason: 'provenance_contradiction',
+            detail: 'inherited source_0 descriptor is invalid'
+          }
+        ],
+        rediscovered_memory: {
+          reason: 'provenance_contradiction'
+        },
+        counters: {
+          contradiction_count: 1,
+          rediscovery_count: 1,
+          manual_repair_count: 0,
+          repeated_failure_streak: 1,
+          retrieval_hits: 0,
+          retrieval_misses: 1
+        }
+      });
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('records a provenance contradiction when the inherited source_0 field is non-object', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-source0-non-object-descriptor-'));
+    const parentEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-parent'
+    };
+    const childEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-child'
+    };
+    const pipeline: PipelineDefinition = { id: 'test', title: 'Test Pipeline', stages: [] };
+
+    try {
+      const parent = await bootstrapManifest('run-parent', {
+        env: parentEnv,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      const parentManifestPath = parent.paths.manifestPath;
+      const parentManifest = JSON.parse(await readFile(parentManifestPath, 'utf8')) as {
+        memory?: { source_0?: unknown };
+      };
+      if (parentManifest.memory) {
+        parentManifest.memory.source_0 = 'broken descriptor';
+        await writeFile(parentManifestPath, JSON.stringify(parentManifest, null, 2), 'utf8');
+      }
+
+      const child = await bootstrapManifest('run-child', {
+        env: childEnv,
+        pipeline,
+        parentRunId: 'run-parent',
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      expect(child.manifest.memory?.observability).toMatchObject({
+        selected_memory: {
+          selection: 'fresh_rebuild'
+        },
+        rejected_candidates: [
+          {
+            pointer: 'ctx:sha256:invalid-inherited-source0-descriptor#chunk:invalid',
+            object_id: 'sha256:invalid-inherited-source0-descriptor',
+            reason: 'provenance_contradiction',
+            detail: 'inherited source_0 descriptor is invalid'
+          }
+        ],
+        rediscovered_memory: {
+          from_pointer: 'ctx:sha256:invalid-inherited-source0-descriptor#chunk:invalid',
+          from_object_id: 'sha256:invalid-inherited-source0-descriptor',
+          reason: 'provenance_contradiction'
+        },
+        counters: {
+          contradiction_count: 1,
+          rediscovery_count: 1,
+          manual_repair_count: 0,
+          repeated_failure_streak: 1,
+          retrieval_hits: 0,
+          retrieval_misses: 1
+        }
+      });
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
   it('refreshes manual repair and resume latency signals from accepted manual-resume events', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-source0-repair-'));
     const env: EnvironmentPaths = {

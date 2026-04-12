@@ -1,5 +1,5 @@
 import { readFile, stat } from 'node:fs/promises';
-import { isAbsolute, join, relative, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 
 import type { CliManifest } from '../types.js';
 import { buildContextObject } from '../rlm/context.js';
@@ -14,6 +14,8 @@ const RUN_SOURCE0_PAYLOAD_KIND = 'run_source_0';
 const RUN_SOURCE0_CHUNK_TARGET_BYTES = 65_536;
 const RUN_SOURCE0_CHUNK_OVERLAP_BYTES = 4_096;
 const RUN_MEMORY_REPAIR_DETAIL_MARKER = 'memory-repair:';
+const INVALID_INHERITED_SOURCE0_OBJECT_ID = 'sha256:invalid-inherited-source0-descriptor';
+const INVALID_INHERITED_SOURCE0_CHUNK_ID = 'invalid';
 const WINDOWS_DRIVE_ABSOLUTE_PATH_RE = /^[A-Za-z]:[\\/]/u;
 
 export interface RunSource0Lineage {
@@ -197,6 +199,17 @@ function readSource0Candidate(input: unknown): Record<string, unknown> | null {
   return input;
 }
 
+function readManifestSource0Value(input: unknown): unknown {
+  if (
+    !isRecord(input) ||
+    !isRecord(input.memory) ||
+    !Object.prototype.hasOwnProperty.call(input.memory, 'source_0')
+  ) {
+    return undefined;
+  }
+  return input.memory.source_0;
+}
+
 function buildRunSource0Payload(params: {
   manifest: CliManifest;
 }): RunSource0Payload {
@@ -269,6 +282,35 @@ function buildRunMemoryRejectedCandidate(params: RejectedInheritedCandidate): Ru
     ...buildRunMemoryProvenanceDescriptor(params.descriptor),
     reason: params.reason,
     detail: params.detail
+  };
+}
+
+function buildMalformedInheritedSource0Descriptor(params: {
+  candidate: unknown;
+  fallbackOrigin: RunSource0Lineage;
+  fallbackCreatedAt: string;
+}): RunSource0Descriptor {
+  const candidate = isRecord(params.candidate) ? params.candidate : {};
+  const fallbackDir = join(dirname(params.fallbackOrigin.manifest_path), 'memory', 'source-0');
+  const objectId = readNonEmptyString(candidate.object_id) ?? INVALID_INHERITED_SOURCE0_OBJECT_ID;
+  return {
+    schema_version: RUN_SOURCE0_SCHEMA_VERSION,
+    kind: RUN_SOURCE0_CONTEXT_KIND,
+    object_id: objectId,
+    pointer:
+      readNonEmptyString(candidate.pointer) ??
+      buildRunSource0Pointer(objectId, INVALID_INHERITED_SOURCE0_CHUNK_ID),
+    dir_path: readNonEmptyString(candidate.dir_path) ?? fallbackDir,
+    index_path: readNonEmptyString(candidate.index_path) ?? join(fallbackDir, 'index.json'),
+    source_path: readNonEmptyString(candidate.source_path) ?? join(fallbackDir, 'source.txt'),
+    byte_length: readInteger(candidate.byte_length) ?? 0,
+    chunk_count: Math.max(1, readInteger(candidate.chunk_count) ?? 1),
+    created_at: readNonEmptyString(candidate.created_at) ?? params.fallbackCreatedAt,
+    origin: readRunSource0Lineage(candidate.origin) ?? params.fallbackOrigin,
+    inherited_from:
+      candidate.inherited_from === null
+        ? null
+        : readRunSource0Lineage(candidate.inherited_from)
   };
 }
 
@@ -729,6 +771,9 @@ export async function materializeRunSource0(params: {
   } | null;
 }): Promise<RunMemoryContract> {
   const targetDir = join(params.paths.runDir, 'memory', 'source-0');
+  const inheritedSource0Value = params.inheritedFrom
+    ? readManifestSource0Value(params.inheritedFrom.manifest)
+    : undefined;
   const inheritedDescriptor = params.inheritedFrom
     ? readRunSource0Descriptor(params.inheritedFrom.manifest)
     : null;
@@ -736,6 +781,42 @@ export async function materializeRunSource0(params: {
     ? buildCurrentRunLineage(params.inheritedFrom.manifest)
     : null;
   const recordedAt = isoTimestamp();
+
+  if (
+    params.inheritedFrom &&
+    inheritedLineage &&
+    inheritedSource0Value !== undefined &&
+    !inheritedDescriptor
+  ) {
+    const fresh = await materializeFreshRunSource0({
+      env: params.env,
+      paths: params.paths,
+      manifest: params.manifest,
+      targetDir,
+      inheritedFrom: inheritedLineage
+    });
+    return {
+      source_0: fresh.source_0,
+      observability: buildRunMemoryObservability({
+        manifest: params.manifest,
+        recordedAt,
+        selected: fresh.source_0,
+        selection: 'fresh_rebuild',
+        rejectedCandidates: [
+          {
+            descriptor: buildMalformedInheritedSource0Descriptor({
+              candidate: inheritedSource0Value,
+              fallbackOrigin: inheritedLineage,
+              fallbackCreatedAt: params.inheritedFrom.manifest.updated_at
+            }),
+            reason: 'provenance_contradiction',
+            detail: 'inherited source_0 descriptor is invalid'
+          }
+        ],
+        repeatedFailureStreak: readRepeatedFailureStreak(params.inheritedFrom.manifest) + 1
+      })
+    };
+  }
 
   if (inheritedDescriptor) {
     let rejectedCandidate = await assessInheritedRunSource0Candidate({
