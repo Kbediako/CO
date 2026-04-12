@@ -155,6 +155,7 @@ interface ProviderLinearWorkerProofRecord {
   issue_id?: unknown;
   issue_identifier?: unknown;
   attempt_started_at?: unknown;
+  pid?: unknown;
   thread_id?: unknown;
   turn_count?: unknown;
   owner_phase?: unknown;
@@ -263,6 +264,7 @@ export interface CreateProviderIssueHandoffServiceOptions {
     repoRoot: string;
     env?: NodeJS.ProcessEnv;
   }) => Promise<ProviderMergeCloseoutRecord>) | null;
+  isProcessAlive?: ((pid: number) => boolean) | null;
 }
 
 const RESUME_ELIGIBLE_STATUSES = new Set(['failed', 'cancelled']);
@@ -338,6 +340,7 @@ export function createProviderIssueHandoffService(
   const runTerminalCleanup = options.runTerminalCleanup ?? runProviderTerminalCleanup;
   const runReviewHandoffPromotion = options.runReviewHandoffPromotion ?? null;
   const runMergeCloseout = options.runMergeCloseout ?? null;
+  const isProcessAlive = options.isProcessAlive ?? isLocalProcessAlive;
   const retryQueue = createProviderIssueRetryQueue();
   const releaseCancelInFlight = new Map<
     string,
@@ -383,9 +386,21 @@ export function createProviderIssueHandoffService(
   }): Promise<ProviderIssueRunRecord[]> => {
     const scope = providerIssueRunDiscoveryScope.getStore();
     if (!scope) {
-      return await discoverProviderIssueRuns(options.paths.runDir, input);
+      return await discoverProviderIssueRuns(
+        options.paths.runDir,
+        input
+          ? {
+              ...input,
+              isProcessAlive
+            }
+          : {
+              isProcessAlive
+            }
+      );
     }
-    scope.snapshot ??= discoverProviderIssueRunSnapshot(options.paths.runDir);
+    scope.snapshot ??= discoverProviderIssueRunSnapshot(options.paths.runDir, {
+      isProcessAlive
+    });
     const discoveredRuns = (await scope.snapshot).discoveredRuns;
     if (!input) {
       return discoveredRuns;
@@ -400,9 +415,15 @@ export function createProviderIssueHandoffService(
   > => {
     const scope = providerIssueRunDiscoveryScope.getStore();
     if (!scope) {
-      return (await discoverProviderIssueRunSnapshot(options.paths.runDir)).unreadableAdmissionOccupancy;
+      return (
+        await discoverProviderIssueRunSnapshot(options.paths.runDir, {
+          isProcessAlive
+        })
+      ).unreadableAdmissionOccupancy;
     }
-    scope.snapshot ??= discoverProviderIssueRunSnapshot(options.paths.runDir);
+    scope.snapshot ??= discoverProviderIssueRunSnapshot(options.paths.runDir, {
+      isProcessAlive
+    });
     return (await scope.snapshot).unreadableAdmissionOccupancy;
   };
 
@@ -2221,6 +2242,7 @@ export function createProviderIssueHandoffService(
     claim: ProviderIntakeClaimRecord;
     trackedIssuesByKey?: Map<string, LiveLinearTrackedIssue> | null;
     consumedTrackedIssueKeys?: Set<string>;
+    allowPollFailClosed?: boolean;
   }): Promise<ProviderTrackedIssueRefreshDisposition> => {
     if (input.trackedIssuesByKey) {
       const providerKey = buildProviderIssueKey(input.claim.provider, input.claim.issue_id);
@@ -2230,7 +2252,8 @@ export function createProviderIssueHandoffService(
       return await resolveTrackedIssuePollResolutionWithFallback(
         input.claim,
         input.trackedIssuesByKey,
-        options.resolveTrackedIssue
+        options.resolveTrackedIssue,
+        input.allowPollFailClosed === true
       );
     }
 
@@ -2380,6 +2403,9 @@ export function createProviderIssueHandoffService(
         ) {
           return;
         }
+        if (resolveProviderIssuePollFailClosedReason(claim)) {
+          return;
+        }
 
         const claimRuns = await discoverProviderIssueRunsForCurrentOperation({
           provider: claim.provider,
@@ -2397,6 +2423,9 @@ export function createProviderIssueHandoffService(
         const resolution = await resolveRetryDispatchResolution(claim);
 
         if (resolution.kind === 'skip') {
+          if (isProviderIssuePollFailClosedReason(resolution.reason)) {
+            return;
+          }
           upsertProviderIntakeClaim(options.state, {
             ...claim,
             ...buildQueuedProviderRetryFields({
@@ -3436,6 +3465,7 @@ export function createProviderIssueHandoffService(
         const existingProviderKeys = new Set(options.state.claims.map((claim) => claim.provider_key));
         const pollDispatchBudget = createProviderPollDispatchBudget(options.readFeatureToggles?.() ?? null);
         const occupiedPollDispatchKeys = new Set<string>();
+        let suppressFreshDiscovery = false;
         const noteOccupiedPollDispatchSlot = (
           providerKey: string,
           trackedIssue: Pick<LiveLinearTrackedIssue, 'state'>
@@ -3476,10 +3506,14 @@ export function createProviderIssueHandoffService(
           const resolution = await resolveRefreshTrackedIssueResolution({
             claim,
             trackedIssuesByKey,
-            consumedTrackedIssueKeys
+            consumedTrackedIssueKeys,
+            allowPollFailClosed: pollInput?.deferFreshDiscovery === true
           });
 
           if (resolution.kind === 'skip') {
+            if (isProviderIssuePollFailClosedReason(resolution.reason)) {
+              suppressFreshDiscovery = true;
+            }
             if (claim.state === 'released') {
               void retryReleaseCancel({
                 releaseRun,
@@ -3881,6 +3915,7 @@ export function createProviderIssueHandoffService(
           pollInput.deferFreshDiscovery === true &&
           freshDiscoveryTrackedIssues.length === 0 &&
           trackedIssueRefetch &&
+          !suppressFreshDiscovery &&
           pollDispatchBudget.remainingGlobalSlots() > 0
         ) {
           const freshDiscoveryResolution = await trackedIssueRefetch({
@@ -4547,12 +4582,15 @@ const PROVIDER_CHILD_STREAM_PIPELINE_IDS = new Set([
 export async function discoverProviderIssueRuns(
   currentRunDir: string,
   input?: {
-    provider: 'linear';
-    issueId: string;
+    provider?: 'linear';
+    issueId?: string;
+    isProcessAlive?: ((pid: number) => boolean) | null;
   }
 ): Promise<ProviderIssueRunRecord[]> {
-  const snapshot = await discoverProviderIssueRunSnapshot(currentRunDir);
-  if (!input) {
+  const snapshot = await discoverProviderIssueRunSnapshot(currentRunDir, {
+    isProcessAlive: input?.isProcessAlive ?? null
+  });
+  if (!input?.provider || !input.issueId) {
     return snapshot.discoveredRuns;
   }
   return snapshot.discoveredRuns.filter(
@@ -4561,9 +4599,13 @@ export async function discoverProviderIssueRuns(
 }
 
 async function discoverProviderIssueRunSnapshot(
-  currentRunDir: string
+  currentRunDir: string,
+  options?: {
+    isProcessAlive?: ((pid: number) => boolean) | null;
+  }
 ): Promise<ProviderIssueRunDiscoverySnapshot> {
   const runsRoot = resolve(currentRunDir, '..', '..', '..');
+  const isProcessAlive = options?.isProcessAlive ?? isLocalProcessAlive;
   const taskEntries = await readDirectoryNames(runsRoot);
   const discovered: ProviderIssueRunRecord[] = [];
   const unreadableAdmissionOccupancy: ProviderUnreadableManifestAdmissionOccupancyRecord[] = [];
@@ -4585,7 +4627,8 @@ async function discoverProviderIssueRunSnapshot(
         );
         const occupancyRecord = resolveUnreadableProviderAdmissionOccupancyRecord({
           manifestPath,
-          proof
+          proof,
+          isProcessAlive
         });
         if (occupancyRecord) {
           unreadableAdmissionOccupancy.push(occupancyRecord);
@@ -4631,7 +4674,7 @@ async function discoverProviderIssueRunSnapshot(
         runId: readStringValue(manifest, 'run_id') ?? runEntry,
         manifestPath,
         pipelineId,
-        status: resolveProviderIssueRunStatus(manifest, proof),
+        status: resolveProviderIssueRunStatus(manifest, proof, isProcessAlive),
         proofTerminalStatus: resolveAuthoritativeProviderLinearWorkerTerminalStatus(
           manifest,
           proof
@@ -4666,6 +4709,7 @@ async function discoverProviderIssueRunSnapshot(
 function resolveUnreadableProviderAdmissionOccupancyRecord(input: {
   manifestPath: string;
   proof: ProviderLinearWorkerProofRecord | null;
+  isProcessAlive: (pid: number) => boolean;
 }): ProviderUnreadableManifestAdmissionOccupancyRecord | null {
   const proofRecord = (input.proof ?? null) as (ProviderLinearWorkerProofRecord & Record<string, unknown>) | null;
   if (!proofRecord) {
@@ -4676,11 +4720,7 @@ function resolveUnreadableProviderAdmissionOccupancyRecord(input: {
   if (!issueId) {
     return null;
   }
-  if (readStringValue(proofRecord, 'owner_status') !== 'in_progress') {
-    return null;
-  }
-  const ownerPhase = readStringValue(proofRecord, 'owner_phase');
-  if (!ownerPhase || ownerPhase === 'ended') {
+  if (!isProviderLinearWorkerInProgressProofLive(proofRecord, null, input.isProcessAlive)) {
     return null;
   }
   const proofHeartbeatTimestamp = resolveUnreadableProviderAdmissionOccupancyProofTimestampMs(proofRecord);
@@ -4708,14 +4748,39 @@ function resolveUnreadableProviderAdmissionOccupancyProofTimestampMs(
   return readTimestampMs(proof, 'attempt_started_at');
 }
 
+function isProviderLinearWorkerInProgressProofLive(
+  proof: Record<string, unknown>,
+  runStartedAt: string | null,
+  isProcessAlive: (pid: number) => boolean
+): boolean {
+  const ownerStatus = readStringValue(proof, 'owner_status');
+  if (ownerStatus && ownerStatus !== 'in_progress') {
+    return false;
+  }
+  const ownerPhase = readStringValue(proof, 'owner_phase');
+  if (ownerPhase === 'ended') {
+    return false;
+  }
+  const workerHost = normalizeProviderWorkerHostName(proof.worker_host);
+  const pid = readIntegerValue(proof, 'pid');
+  if (!workerHost && pid !== null && pid > 0 && !isProcessAlive(pid)) {
+    return false;
+  }
+  if (!runStartedAt) {
+    return true;
+  }
+  return isProviderLinearWorkerProofFreshForStage(proof, runStartedAt);
+}
+
 function resolveProviderIssueRunStatus(
   manifest: Record<string, unknown>,
-  proof: ProviderLinearWorkerProofRecord | null
+  proof: ProviderLinearWorkerProofRecord | null,
+  isProcessAlive: (pid: number) => boolean
 ): string | null {
   const manifestStatus = readStringValue(manifest, 'status');
   if (
     manifestStatus === 'in_progress' &&
-    hasStaleProviderLinearWorkerInProgressProof(manifest, proof)
+    hasStaleProviderLinearWorkerInProgressProof(manifest, proof, isProcessAlive)
   ) {
     return null;
   }
@@ -4728,24 +4793,27 @@ function resolveProviderIssueRunStatus(
 
 function hasStaleProviderLinearWorkerInProgressProof(
   manifest: Record<string, unknown>,
-  proof: ProviderLinearWorkerProofRecord | null
+  proof: ProviderLinearWorkerProofRecord | null,
+  isProcessAlive: (pid: number) => boolean
 ): boolean {
   if (!proof) {
     return false;
   }
   const proofRecord = proof as Record<string, unknown>;
-  if (readStringValue(proofRecord, 'owner_status') !== 'in_progress') {
+  const ownerStatus = readStringValue(proofRecord, 'owner_status');
+  if (ownerStatus && ownerStatus !== 'in_progress') {
     return false;
   }
   const ownerPhase = readStringValue(proofRecord, 'owner_phase');
-  if (!ownerPhase || ownerPhase === 'ended') {
+  if (ownerPhase === 'ended') {
     return false;
   }
   const runStartedAt = readStringValue(manifest, 'started_at');
-  if (!runStartedAt) {
-    return false;
-  }
-  return !isProviderLinearWorkerProofFreshForStage(proofRecord, runStartedAt);
+  return !isProviderLinearWorkerInProgressProofLive(
+    proofRecord,
+    runStartedAt,
+    isProcessAlive
+  );
 }
 
 function resolveAuthoritativeProviderLinearWorkerTerminalStatus(
@@ -5184,6 +5252,15 @@ function resolveProviderReviewPromotionClaimState(
   }
 }
 
+function isProviderReviewPromotionWatchingClaim(
+  claim: Pick<ProviderIntakeClaimRecord, 'reason' | 'review_promotion'>
+): boolean {
+  return (
+    claim.reason === 'provider_issue_review_promotion_watching' &&
+    claim.review_promotion?.status === 'watching'
+  );
+}
+
 function resolveProviderMergeCloseoutClaimReason(
   mergeCloseout: ProviderMergeCloseoutRecord
 ): string {
@@ -5206,6 +5283,44 @@ function isProviderMergeCloseoutWatchingClaim(
   claim: Pick<ProviderIntakeClaimRecord, 'reason' | 'merge_closeout'>
 ): boolean {
   return claim.reason === 'provider_issue_merge_closeout_watching' && claim.merge_closeout?.status === 'watching';
+}
+
+function resolveProviderIssuePollFailClosedReason(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'state' | 'reason' | 'issue_state' | 'issue_state_type' | 'review_promotion' | 'merge_closeout'
+  >
+): string | null {
+  const workflowState = classifyProviderLinearWorkflowState({
+    state: claim.issue_state,
+    state_type: claim.issue_state_type
+  });
+  if (
+    claim.state === 'accepted' &&
+    claim.reason === 'provider_issue_rehydration_pending_revalidation'
+  ) {
+    return 'provider_issue_poll_cached_revalidation_pending';
+  }
+  if (claim.state === 'accepted' && !workflowState.isActive) {
+    return 'provider_issue_poll_cached_non_runnable';
+  }
+  if (
+    (claim.state === 'completed' || claim.state === 'handoff_failed') &&
+    isProviderReviewPromotionWatchingClaim(claim)
+  ) {
+    return 'provider_issue_poll_cached_review_wait';
+  }
+  if (
+    (claim.state === 'completed' || claim.state === 'handoff_failed') &&
+    isProviderMergeCloseoutWatchingClaim(claim)
+  ) {
+    return 'provider_issue_poll_cached_merge_wait';
+  }
+  return null;
+}
+
+function isProviderIssuePollFailClosedReason(reason: string | null | undefined): boolean {
+  return typeof reason === 'string' && reason.startsWith('provider_issue_poll_cached_');
 }
 
 function resolveProviderMergeCloseoutClaimState(
@@ -5711,9 +5826,20 @@ function resolveTrackedIssuePollResolution(
 }
 
 async function resolveTrackedIssuePollResolutionWithFallback(
-  claim: Pick<ProviderIntakeClaimRecord, 'provider' | 'issue_id'>,
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    | 'provider'
+    | 'issue_id'
+    | 'state'
+    | 'reason'
+    | 'issue_state'
+    | 'issue_state_type'
+    | 'review_promotion'
+    | 'merge_closeout'
+  >,
   trackedIssuesByKey: Map<string, LiveLinearTrackedIssue>,
-  resolveTrackedIssue?: CreateProviderIssueHandoffServiceOptions['resolveTrackedIssue']
+  resolveTrackedIssue?: CreateProviderIssueHandoffServiceOptions['resolveTrackedIssue'],
+  allowPollFailClosed = false
 ):
   Promise<ProviderTrackedIssueRefreshDisposition | { kind: 'skip'; reason: string }> {
   const pollResolution = resolveTrackedIssuePollResolution(claim, trackedIssuesByKey);
@@ -5724,6 +5850,15 @@ async function resolveTrackedIssuePollResolutionWithFallback(
     !resolveTrackedIssue
   ) {
     return pollResolution;
+  }
+
+  const failClosedReason =
+    allowPollFailClosed ? resolveProviderIssuePollFailClosedReason(claim) : null;
+  if (failClosedReason) {
+    return {
+      kind: 'skip',
+      reason: failClosedReason
+    };
   }
 
   const directResolution = await resolveTrackedIssue({
@@ -5888,6 +6023,15 @@ function readTimestampMs(record: Record<string, unknown>, ...keys: string[]): nu
     return Number.NaN;
   }
   return Date.parse(value);
+}
+
+function isLocalProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException)?.code !== 'ESRCH';
+  }
 }
 
 function readIntegerValue(record: Record<string, unknown> | null, ...keys: string[]): number | null {
