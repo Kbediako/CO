@@ -1946,7 +1946,7 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.resume).not.toHaveBeenCalled();
   });
 
-  it('demotes a dead-pid running claim to cached revalidation and skips poll-time issue reads and fresh discovery', async () => {
+  it('demotes a dead-pid running claim to cached revalidation, then revalidates it without reviving the dead run', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-12T07:20:00.000Z'));
 
@@ -2065,6 +2065,49 @@ describe('createProviderIssueHandoffService', () => {
       issue_state: 'In Progress',
       issue_state_type: 'started',
       issue_updated_at: '2026-04-12T07:19:00.000Z'
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: false
+    });
+
+    expect(resolveTrackedIssue).toHaveBeenCalledTimes(1);
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-1'
+    });
+    expect(refetchTrackedIssues).not.toHaveBeenCalled();
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(launcher.start).toHaveBeenCalledWith(
+      expect.objectContaining({
+        taskId: 'linear-lin-issue-1',
+        pipelineId: 'diagnostics',
+        provider: 'linear',
+        issueId: 'lin-issue-1',
+        issueIdentifier: 'CO-159',
+        issueUpdatedAt: '2026-04-12T07:20:00.000Z'
+      })
+    );
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_refresh_start_launched',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-12T07:20:00.000Z',
+      run_id: null,
+      run_manifest_path: null
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_refresh_start_launched',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-12T07:20:00.000Z',
+      run_id: null,
+      run_manifest_path: null
     });
   });
 
