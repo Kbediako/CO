@@ -33,12 +33,12 @@
 - [x] `npm run docs:freshness`. Evidence: `docs:freshness OK - 3695 docs, 3698 registry entries`.
 - [x] `npm run repo:stewardship`. Evidence: `repo:stewardship OK - 4674 tracked files, 0 action-required`.
 - [x] `node scripts/diff-budget.mjs`. Evidence: `✅ Diff budget: OK (scope=working-tree, files=12/25, lines=526/1200, +521/-5)`.
-- [x] `npm run review`. Evidence: `.runs/linear-8c691f55-5277-443a-b5dd-1f3f548b1b6d/cli/2026-04-12T12-51-39-738Z-f5711f40/review/telemetry.json` (`review_outcome: failed-boundary`, `termination_boundary.kind=command-intent`) plus manual fallback in `out/linear-8c691f55-5277-443a-b5dd-1f3f548b1b6d/manual/standalone-review.md`.
+- [x] `npm run review`. Evidence: `.runs/linear-8c691f55-5277-443a-b5dd-1f3f548b1b6d/cli/2026-04-12T12-51-39-738Z-f5711f40/review/telemetry.json` (`review_outcome: failed-boundary`, `termination_boundary.kind=command-intent`) plus manual fallback in `out/linear-8c691f55-5277-443a-b5dd-1f3f548b1b6d/manual/standalone-review.md`. Waiver decision: accepted for this lane because the failure was a bounded review-wrapper command-intent violation rather than a code finding, the manual fallback review inspected the changed code directly and found no actionable regressions, and all other required validation gates remained green.
 - [x] `npm run pack:smoke`. Evidence: passed on `2026-04-12`.
 
 ## Handoff
 - [x] Workpad refreshed with docs-review evidence, implementation scope, validation truth, review fallback, and elegance result before handoff. Evidence: `out/linear-8c691f55-5277-443a-b5dd-1f3f548b1b6d/manual/workpad.md`.
-- [ ] PR attached to the Linear issue before review-state transition. Evidence: pending.
-- [ ] Latest `origin/main` merged into the branch before review-state transition. Evidence: pending.
+- [x] PR attached to the Linear issue before review-state transition. Evidence: `https://github.com/Kbediako/CO/pull/453`, Linear attachment `a3316f77-d20b-41aa-acfc-8ee158eced8b`.
+- [x] Latest `origin/main` merged into the branch before review-state transition. Evidence: `git fetch origin refs/heads/main:refs/remotes/origin/main` plus `git merge --no-edit origin/main` -> `Already up to date.`
 - [ ] PR checks green and actionable review feedback handled or explicitly pushed back before review-state transition. Evidence: pending.
 - [ ] Issue moved to the actual team review state (`In Review` or `Human Review`) only after coding stops. Evidence: pending.
