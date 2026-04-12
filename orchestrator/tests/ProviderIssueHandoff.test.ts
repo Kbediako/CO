@@ -8867,13 +8867,20 @@ describe('createProviderIssueHandoffService', () => {
       launcher,
       startPipelineId: 'diagnostics'
     });
+    const timerCountAfterConstruction = setTimeoutSpy.mock.calls.length;
+    expect(timerCountAfterConstruction).toBeGreaterThanOrEqual(1);
+    const retryTimerCallback = setTimeoutSpy.mock.calls[timerCountAfterConstruction - 1]?.[0];
+    const [, retryDelayMs] = setTimeoutSpy.mock.calls[timerCountAfterConstruction - 1] ?? [];
+    expect(typeof retryTimerCallback).toBe('function');
 
     await service.refresh();
-    await waitForMockCalls(setTimeoutSpy);
+    await waitForMockCalls(setTimeoutSpy, timerCountAfterConstruction);
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
+    expect(retryDelayMs).toBeGreaterThanOrEqual(999);
+    expect(retryDelayMs).toBeLessThanOrEqual(1_000);
     vi.setSystemTime(new Date('2026-03-19T04:30:01.001Z'));
-    getLatestScheduledTimeoutCallback(setTimeoutSpy)();
+    (retryTimerCallback as () => void)();
     await flushAsyncWork();
     await waitForMockCalls(launcher.start, 1, 1024);
 
