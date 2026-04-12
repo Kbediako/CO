@@ -300,6 +300,7 @@ function sanitizeRejectedCandidatePath(
     trimmed.length === 0 ||
     normalizedCandidate === '.' ||
     hasInvalidPathCharacters(normalizedCandidate) ||
+    normalizedCandidate.startsWith('/') ||
     isAbsolute(trimmed) ||
     WINDOWS_DRIVE_ABSOLUTE_PATH_RE.test(trimmed) ||
     normalizedCandidate.split('/').some((segment) => segment === '..')
@@ -600,10 +601,14 @@ export function resolveRunSource0Paths(
 }
 
 function resolveRepoRelativeSource0Path(repoRoot: string, candidate: string, field: string): string {
-  if (isAbsolute(candidate) || WINDOWS_DRIVE_ABSOLUTE_PATH_RE.test(candidate)) {
+  const normalizedCandidate = candidate.replaceAll('\\', '/');
+  if (
+    isAbsolute(candidate) ||
+    WINDOWS_DRIVE_ABSOLUTE_PATH_RE.test(candidate) ||
+    normalizedCandidate.startsWith('/')
+  ) {
     throw new Error(`source_0 ${field} must be repo-relative`);
   }
-  const normalizedCandidate = candidate.replaceAll('\\', '/');
   if (hasInvalidPathCharacters(normalizedCandidate)) {
     throw new Error(`source_0 ${field} must not contain control characters or line separators`);
   }
