@@ -204,4 +204,99 @@ describe('loadPromptPacks', () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  it('throws when experienceSlots is invalid', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'prompt-pack-invalid-slots-'));
+    try {
+      await createPrompt(root);
+      const manifestDir = join(root, '.agent', 'prompts', 'prompt-packs', 'invalid-slots');
+      await mkdir(manifestDir, { recursive: true });
+      await writeFile(
+        join(manifestDir, 'manifest.json'),
+        JSON.stringify(
+          {
+            id: 'invalid-slots-pack',
+            domain: 'implementation',
+            stamp: 'deadbeef',
+            experienceSlots: -1,
+            system: PROMPT_PATH,
+            inject: [PROMPT_PATH],
+            summarize: [PROMPT_PATH],
+            extract: [],
+            optimize: []
+          },
+          null,
+          2
+        ),
+        'utf8'
+      );
+
+      await expect(loadPromptPacks(root)).rejects.toThrow(/invalid experienceSlots/i);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('throws when anti-dominance enabled is not a boolean', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'prompt-pack-invalid-enabled-'));
+    try {
+      const content = '# Prompt\nInvalid boolean.';
+      await createPrompt(root, content);
+      const sections: PromptPackSectionSource[] = [
+        { section: 'system', path: PROMPT_PATH, content },
+        { section: 'inject', path: PROMPT_PATH, content },
+        { section: 'summarize', path: PROMPT_PATH, content },
+        { section: 'extract', path: PROMPT_PATH, content },
+        { section: 'optimize', path: PROMPT_PATH, content }
+      ];
+      const stamp = computePromptPackStamp(sections, {
+        experienceSlots: 1,
+        retrievalPolicy: {
+          kind: 'competitive_scoring_v1',
+          minScore: null,
+          scoreWeights: { gtScore: 1, relativeRank: 1 },
+          antiDominanceNormalization: {
+            enabled: true,
+            strength: 0.5,
+            sourceGrouping: 'provenance_fallback_v1'
+          }
+        }
+      });
+
+      const manifestDir = join(root, '.agent', 'prompts', 'prompt-packs', 'invalid-enabled');
+      await mkdir(manifestDir, { recursive: true });
+      await writeFile(
+        join(manifestDir, 'manifest.json'),
+        JSON.stringify(
+          {
+            id: 'invalid-enabled-pack',
+            domain: 'implementation',
+            stamp,
+            experienceSlots: 1,
+            retrievalPolicy: {
+              antiDominanceNormalization: {
+                enabled: 'false',
+                strength: 0.5,
+                sourceGrouping: 'provenance_fallback_v1'
+              }
+            },
+            system: PROMPT_PATH,
+            inject: [PROMPT_PATH],
+            summarize: [PROMPT_PATH],
+            extract: [],
+            optimize: []
+          },
+          null,
+          2
+        ),
+        'utf8'
+      );
+
+      await expect(loadPromptPacks(root)).rejects.toThrow(
+        /retrievalPolicy\.antiDominanceNormalization\.enabled must be a boolean/i
+      );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });

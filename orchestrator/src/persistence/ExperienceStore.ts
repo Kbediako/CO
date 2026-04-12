@@ -60,7 +60,7 @@ export type ExperienceExclusionReason = 'raw_score_below_min_score' | 'competiti
 
 export interface ExperienceSelectionPolicy {
   kind: 'competitive_scoring_v1';
-  minScore: number;
+  minScore: number | null;
   scoreWeights: {
     gtScore: number;
     relativeRank: number;
@@ -399,14 +399,34 @@ function resolveExperienceSelectionPolicy(
 ): ExperienceSelectionPolicy {
   return {
     kind: 'competitive_scoring_v1',
-    minScore: normalizeScore(policy?.minScore ?? minScoreFallback ?? 0),
+    minScore: normalizeOptionalScore(
+      policy?.minScore ?? minScoreFallback,
+      'selection.policy.minScore',
+      null
+    ),
     scoreWeights: {
-      gtScore: normalizeScore(policy?.scoreWeights?.gtScore ?? 1),
-      relativeRank: normalizeScore(policy?.scoreWeights?.relativeRank ?? 1)
+      gtScore: normalizeNonNegativeScore(
+        policy?.scoreWeights?.gtScore,
+        'selection.policy.scoreWeights.gtScore',
+        1
+      ),
+      relativeRank: normalizeNonNegativeScore(
+        policy?.scoreWeights?.relativeRank,
+        'selection.policy.scoreWeights.relativeRank',
+        1
+      )
     },
     antiDominanceNormalization: {
-      enabled: policy?.antiDominanceNormalization?.enabled ?? true,
-      strength: normalizeScore(policy?.antiDominanceNormalization?.strength ?? 0.5),
+      enabled: normalizeBoolean(
+        policy?.antiDominanceNormalization?.enabled,
+        'selection.policy.antiDominanceNormalization.enabled',
+        true
+      ),
+      strength: normalizeNonNegativeScore(
+        policy?.antiDominanceNormalization?.strength,
+        'selection.policy.antiDominanceNormalization.strength',
+        0.5
+      ),
       sourceGrouping: 'provenance_fallback_v1'
     }
   };
@@ -432,7 +452,8 @@ function createSelectionEntry(
     dominancePenalty: 0,
     selected: false,
     selectedSlot: null,
-    exclusionReason: rawScore < policy.minScore ? 'raw_score_below_min_score' : null
+    exclusionReason:
+      policy.minScore !== null && rawScore < policy.minScore ? 'raw_score_below_min_score' : null
   };
 }
 
@@ -483,7 +504,7 @@ function selectCompetitiveTop(
 
     remaining.sort(compareSelectionEntries);
     const best = remaining[0];
-    if (!best || best.competitiveScore < policy.minScore) {
+    if (!best || (policy.minScore !== null && best.competitiveScore < policy.minScore)) {
       for (const entry of remaining) {
         entry.exclusionReason = 'competitive_score_below_min_score';
       }
@@ -607,9 +628,34 @@ function roundScore(value: number): number {
   return Math.round(value * 1_000_000) / 1_000_000;
 }
 
-function normalizeScore(value: number): number {
+function normalizeOptionalScore(
+  value: number | null | undefined,
+  field: string,
+  defaultValue: number | null
+): number | null {
+  if (value === null || value === undefined) {
+    return defaultValue;
+  }
   if (!Number.isFinite(value) || value < 0) {
-    return 0;
+    throw new Error(`${field} must be a finite non-negative number.`);
+  }
+  return value;
+}
+
+function normalizeNonNegativeScore(value: number | undefined, field: string, defaultValue: number): number {
+  const normalized = normalizeOptionalScore(value, field, defaultValue);
+  if (normalized === null) {
+    throw new Error(`${field} must be a finite non-negative number.`);
+  }
+  return normalized;
+}
+
+function normalizeBoolean(value: boolean | undefined, field: string, defaultValue: boolean): boolean {
+  if (value === undefined) {
+    return defaultValue;
+  }
+  if (typeof value !== 'boolean') {
+    throw new Error(`${field} must be a boolean.`);
   }
   return value;
 }

@@ -479,7 +479,10 @@
             "required": ["kind", "min_score", "score_weights", "anti_dominance_normalization"],
             "properties": {
               "kind": { "type": "string", "const": "competitive_scoring_v1" },
-              "min_score": { "type": "number", "minimum": 0 },
+              "min_score": {
+                "type": ["number", "null"],
+                "minimum": 0
+              },
               "score_weights": {
                 "type": "object",
                 "additionalProperties": false,

@@ -153,9 +153,20 @@ async function loadPromptPack(manifestPath: string, repoRoot: string): Promise<P
     );
   }
 
-  const experienceSlots = Number.isInteger(parsed.experienceSlots) && parsed.experienceSlots! >= 0
-    ? parsed.experienceSlots!
-    : 0;
+  if (
+    parsed.experienceSlots !== undefined &&
+    (typeof parsed.experienceSlots !== 'number' ||
+      !Number.isInteger(parsed.experienceSlots) ||
+      parsed.experienceSlots < 0)
+  ) {
+    throw new Error(
+      `Prompt pack ${parsed.id} has invalid experienceSlots; expected a non-negative integer (${relative(
+        repoRoot,
+        manifestPath
+      )})`
+    );
+  }
+  const experienceSlots = parsed.experienceSlots ?? 0;
   const retrievalPolicy = normalizePromptPackRetrievalPolicy(parsed.retrievalPolicy);
   const computedStamp = computePromptPackStamp(allSources, {
     experienceSlots,
@@ -225,7 +236,11 @@ function normalizePromptPackRetrievalPolicy(
       )
     },
     antiDominanceNormalization: {
-      enabled: antiDominance?.enabled === undefined ? true : Boolean(antiDominance.enabled),
+      enabled: normalizeBoolean(
+        antiDominance?.enabled,
+        'retrievalPolicy.antiDominanceNormalization.enabled',
+        true
+      ),
       strength: normalizeNonNegativeNumber(
         antiDominance?.strength,
         'retrievalPolicy.antiDominanceNormalization.strength',
@@ -273,6 +288,16 @@ function normalizeNonNegativeNumber(
   }
   if (!Number.isFinite(value) || value < 0) {
     throw new Error(`${field} must be a finite non-negative number.`);
+  }
+  return value;
+}
+
+function normalizeBoolean(value: boolean | undefined, field: string, defaultValue: boolean): boolean {
+  if (value === undefined) {
+    return defaultValue;
+  }
+  if (typeof value !== 'boolean') {
+    throw new Error(`${field} must be a boolean.`);
   }
   return value;
 }

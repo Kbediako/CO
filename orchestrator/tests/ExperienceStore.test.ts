@@ -160,6 +160,24 @@ describe('ExperienceStore', () => {
     expect(top[0]?.runId).toBe('run-b');
   });
 
+  it('preserves no-threshold behavior when fetchTop does not receive minReward', async () => {
+    const store = new ExperienceStore({ outDir, runsDir });
+    await store.recordBatch(
+      [
+        createInput({
+          runId: 'run-negative',
+          reward: { gtScore: -0.4, relativeRank: -0.2 },
+          summary: 'negative score still eligible without an explicit threshold'
+        })
+      ],
+      'manifests/run.json'
+    );
+
+    const top = await store.fetchTop({ domain: 'implementation', limit: 1, taskId: 'task-0506' });
+    expect(top).toHaveLength(1);
+    expect(top[0]?.runId).toBe('run-negative');
+  });
+
   it('suppresses repeated-source candidates with competitive scoring and anti-dominance normalization', async () => {
     const store = new ExperienceStore({ outDir, runsDir });
     await store.recordBatch(
@@ -272,6 +290,37 @@ describe('ExperienceStore', () => {
     ]);
     expect(selection.diagnostics.selected[1]?.dominance_penalty).toBe(0);
     expect(selection.diagnostics.suppressed_source_keys).toContain('run_id:other');
+  });
+
+  it('throws when selection policy values are invalid', async () => {
+    const store = new ExperienceStore({ outDir, runsDir });
+    await store.recordBatch([createInput()], 'manifests/run.json');
+
+    await expect(
+      store.selectTop({
+        domain: 'implementation',
+        limit: 1,
+        taskId: 'task-0506',
+        policy: {
+          minScore: Number.NaN
+        }
+      })
+    ).rejects.toThrow(/selection\.policy\.minScore must be a finite non-negative number/i);
+
+    await expect(
+      store.selectTop({
+        domain: 'implementation',
+        limit: 1,
+        taskId: 'task-0506',
+        policy: {
+          antiDominanceNormalization: {
+            enabled: 'false' as unknown as boolean,
+            strength: 0.5,
+            sourceGrouping: 'provenance_fallback_v1'
+          }
+        }
+      })
+    ).rejects.toThrow(/selection\.policy\.antiDominanceNormalization\.enabled must be a boolean/i);
   });
 
   it('verifies stamp signatures and rejects invalid entries', async () => {

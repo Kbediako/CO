@@ -220,7 +220,7 @@ export interface CodexOrchestratorCLIManifest {
         sources: string[];
         retrieval_policy?: {
           kind: "competitive_scoring_v1";
-          min_score: number;
+          min_score: number | null;
           score_weights: {
             gt_score: number;
             relative_rank: number;
