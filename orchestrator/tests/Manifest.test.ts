@@ -837,6 +837,7 @@ describe('bootstrapManifest', () => {
         },
         rejected_candidates: [
           {
+            dir_path: 'invalid-source0/dir_path',
             reason: 'provenance_contradiction',
             detail: 'source_0 dir_path must not traverse outside the repo root'
           }

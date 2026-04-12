@@ -16,6 +16,7 @@ const RUN_SOURCE0_CHUNK_OVERLAP_BYTES = 4_096;
 const RUN_MEMORY_REPAIR_DETAIL_MARKER = 'memory-repair:';
 const INVALID_INHERITED_SOURCE0_OBJECT_ID = 'sha256:invalid-inherited-source0-descriptor';
 const INVALID_INHERITED_SOURCE0_CHUNK_ID = 'invalid';
+const SANITIZED_REJECTED_CANDIDATE_PATH_PREFIX = 'invalid-source0';
 const WINDOWS_DRIVE_ABSOLUTE_PATH_RE = /^[A-Za-z]:[\\/]/u;
 
 export interface RunSource0Lineage {
@@ -278,11 +279,33 @@ function buildRunMemorySelectedDescriptor(params: {
 }
 
 function buildRunMemoryRejectedCandidate(params: RejectedInheritedCandidate): RunMemoryRejectedCandidate {
+  const descriptor = buildRunMemoryProvenanceDescriptor(params.descriptor);
   return {
-    ...buildRunMemoryProvenanceDescriptor(params.descriptor),
+    ...descriptor,
+    dir_path: sanitizeRejectedCandidatePath(descriptor.dir_path, 'dir_path'),
+    index_path: sanitizeRejectedCandidatePath(descriptor.index_path, 'index_path'),
+    source_path: sanitizeRejectedCandidatePath(descriptor.source_path, 'source_path'),
     reason: params.reason,
     detail: params.detail
   };
+}
+
+function sanitizeRejectedCandidatePath(
+  candidate: string,
+  field: 'dir_path' | 'index_path' | 'source_path'
+): string {
+  const trimmed = candidate.trim();
+  const normalizedCandidate = trimmed.replaceAll('\\', '/');
+  if (
+    trimmed.length === 0 ||
+    normalizedCandidate === '.' ||
+    isAbsolute(trimmed) ||
+    WINDOWS_DRIVE_ABSOLUTE_PATH_RE.test(trimmed) ||
+    normalizedCandidate.split('/').some((segment) => segment === '..')
+  ) {
+    return `${SANITIZED_REJECTED_CANDIDATE_PATH_PREFIX}/${field}`;
+  }
+  return normalizedCandidate;
 }
 
 function buildMalformedInheritedSource0Descriptor(params: {
