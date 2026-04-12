@@ -1335,6 +1335,48 @@ describe('controlHostSupervision shell helpers', () => {
     ).resolves.toBe(false);
   });
 
+  it('rejects overlapping task and run prefixes when verifying the supervised control-host command', async () => {
+    const config = buildControlHostSupervisionConfig({
+      homeDir: '/Users/tester',
+      cwd: '/repo/workspace',
+      label: 'com.example.control-host',
+      repoRoot: '/repo/CO',
+      nodePath: '/custom/node',
+      cliEntrypoint: '/opt/codex-orchestrator.js',
+      taskId: 'custom-task-1',
+      runId: 'custom-run-1',
+      pipelineId: 'custom-pipeline-1'
+    });
+
+    await expect(
+      isTrackedSupervisedProcessGroup(4200, config, {
+        readProcessCommand: async () =>
+          '/custom/node /opt/codex-orchestrator.js control-host --task custom-task-12 --run custom-run-12 --pipeline custom-pipeline-12 --format json'
+      })
+    ).resolves.toBe(false);
+  });
+
+  it('matches the supervised control-host when the CLI entrypoint path contains spaces', async () => {
+    const config = buildControlHostSupervisionConfig({
+      homeDir: '/Users/tester',
+      cwd: '/repo/workspace',
+      label: 'com.example.control-host',
+      repoRoot: '/repo/CO',
+      nodePath: '/custom/node',
+      cliEntrypoint: '/opt/Codex Builds/codex-orchestrator.js',
+      taskId: 'custom-task-1',
+      runId: 'custom-run-1',
+      pipelineId: 'custom-pipeline-1'
+    });
+
+    await expect(
+      isTrackedSupervisedProcessGroup(4200, config, {
+        readProcessCommand: async () =>
+          '/custom/node /opt/Codex Builds/codex-orchestrator.js control-host --task custom-task-1 --run custom-run-1 --pipeline custom-pipeline-1 --format json'
+      })
+    ).resolves.toBe(true);
+  });
+
   it('accepts lingering supervised group members when the root pid has already exited', async () => {
     const config = buildControlHostSupervisionConfig({
       homeDir: '/Users/tester',

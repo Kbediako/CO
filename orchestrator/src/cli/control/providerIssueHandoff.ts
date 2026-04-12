@@ -3523,15 +3523,16 @@ export function createProviderIssueHandoffService(
 
   const runRefreshCycle = async (pollInput?: ProviderIssueHandoffPollInput): Promise<void> => {
     const trackedIssueRefetch = wrapTrackedIssueRefetch(pollInput?.refetchTrackedIssues ?? null);
-    await runWithProviderIssueRunDiscoveryCache(async () => {
-      await runWithRefreshLifecycleLock(async () => {
-        assertRefreshCycleNotStuck();
-        const result = await rehydrateNow();
-        if (result.hasPendingClaims) {
-          scheduleBestEffortRehydrateWithRefreshLock();
-        }
+      await runWithProviderIssueRunDiscoveryCache(async () => {
+        await runWithRefreshLifecycleLock(async () => {
+          assertRefreshCycleNotStuck();
+          const result = await rehydrateNow();
+          assertRefreshCycleNotStuck();
+          if (result.hasPendingClaims) {
+            scheduleBestEffortRehydrateWithRefreshLock();
+          }
 
-        const trackedIssuesByKey = pollInput ? buildTrackedIssuePollMap(pollInput.trackedIssues) : null;
+          const trackedIssuesByKey = pollInput ? buildTrackedIssuePollMap(pollInput.trackedIssues) : null;
         const consumedTrackedIssueKeys = new Set<string>();
         if (!options.resolveTrackedIssue && !trackedIssuesByKey) {
           return;

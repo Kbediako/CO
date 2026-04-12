@@ -1983,6 +1983,94 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('fails closed when refresh becomes stuck during rehydrate before fresh issue polling starts', async () => {
+    const { root, paths } = await createHostPaths();
+    const activeEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-active'
+    };
+    const activePaths = resolveRunPaths(activeEnv, 'run-active');
+    await mkdir(activePaths.runDir, { recursive: true });
+    await writeFile(
+      activePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-active',
+        task_id: 'task-1303-active',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        updated_at: '2026-03-19T04:31:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const launchedAt = new Date().toISOString();
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-03-19T04:10:00.000Z',
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      accepted_at: launchedAt,
+      updated_at: launchedAt,
+      last_delivery_id: 'delivery-old',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_000_000,
+      run_id: null,
+      run_manifest_path: null
+    });
+    const persist = vi.fn(async () => {
+      const stuckUpdatedAt = new Date(Date.now() + 1_000).toISOString();
+      state.polling = {
+        checking: true,
+        stuck: true,
+        restart_required: true,
+        reason: 'provider_refresh_lifecycle_stuck',
+        updated_at: stuckUpdatedAt
+      };
+      state.updated_at = stuckUpdatedAt;
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      }
+    });
+
+    await expect(service.refresh()).rejects.toThrow('provider_refresh_lifecycle_stuck');
+    expect(state.claims[0]).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: 'run-active',
+      run_manifest_path: activePaths.manifestPath,
+      task_id: 'task-1303-active'
+    });
+    expect(state.polling).toMatchObject({
+      checking: true,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck'
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
   it('skips fresh discovery once polling is already stuck', async () => {
     const { paths } = await createHostPaths();
     const service = createProviderIssueHandoffService({

@@ -1570,21 +1570,101 @@ async function readProcessCommand(pid: number): Promise<string | null> {
   return command.length > 0 ? command : null;
 }
 
+function parseShellStyleArguments(command: string): string[] {
+  const args: string[] = [];
+  let current = '';
+  let quote: '"' | "'" | null = null;
+  let escaped = false;
+
+  const flushCurrent = (): void => {
+    if (current.length === 0) {
+      return;
+    }
+    args.push(current);
+    current = '';
+  };
+
+  for (let index = 0; index < command.length; index += 1) {
+    const character = command[index]!;
+    if (escaped) {
+      current += character;
+      escaped = false;
+      continue;
+    }
+    if (quote === "'") {
+      if (character === "'") {
+        quote = null;
+      } else {
+        current += character;
+      }
+      continue;
+    }
+    if (quote === '"') {
+      if (character === '"') {
+        quote = null;
+        continue;
+      }
+      if (character === '\\') {
+        const nextCharacter = command[index + 1];
+        if (nextCharacter && ['\\', '"', '$', '`'].includes(nextCharacter)) {
+          current += nextCharacter;
+          index += 1;
+          continue;
+        }
+      }
+      current += character;
+      continue;
+    }
+    if (/\s/.test(character)) {
+      flushCurrent();
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+      continue;
+    }
+    if (character === '\\') {
+      escaped = true;
+      continue;
+    }
+    current += character;
+  }
+
+  if (escaped) {
+    current += '\\';
+  }
+  flushCurrent();
+  return args;
+}
+
+function readFlagValueFromArgs(args: string[], flag: string): string | null {
+  for (let index = 0; index < args.length; index += 1) {
+    const argument = args[index];
+    if (!argument) {
+      continue;
+    }
+    if (argument === flag) {
+      return args[index + 1] ?? null;
+    }
+    if (argument.startsWith(`${flag}=`)) {
+      return argument.slice(flag.length + 1);
+    }
+  }
+  return null;
+}
+
 function matchesExpectedSupervisedControlHostCommand(
   command: string,
   config: ControlHostSupervisionConfig
 ): boolean {
-  const requiredFragments = [
-    config.cliEntrypoint,
-    'control-host',
-    '--task',
-    config.taskId,
-    '--run',
-    config.runId,
-    '--pipeline',
-    config.pipelineId
-  ];
-  return requiredFragments.every((fragment) => command.includes(fragment));
+  const args = parseShellStyleArguments(command);
+  return (
+    command.includes(config.cliEntrypoint) &&
+    args.includes('control-host') &&
+    readFlagValueFromArgs(args, '--task') === config.taskId &&
+    readFlagValueFromArgs(args, '--run') === config.runId &&
+    readFlagValueFromArgs(args, '--pipeline') === config.pipelineId
+  );
 }
 
 async function isTrackedSupervisedProcessRoot(
