@@ -1829,6 +1829,11 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(firstTurnPrompt).toContain('Ordinary eligible same-issue child-lane parallelisation is a runtime contract');
     expect(firstTurnPrompt).toContain('linear parallelization --issue-id lin-issue-1 --decision <parallelize_now|stay_serial|forbid_parallel> --reason <reason-code> --summary <why>');
     expect(firstTurnPrompt).toContain('Allowed decision and reason-code pairs');
+    expect(firstTurnPrompt).toContain('clean-main-baseline-failures');
+    expect(firstTurnPrompt).toContain('cli-orchestrator-cleanup-fallout');
+    expect(firstTurnPrompt).toContain('use `parent_only_mutation` and close the issue directly when no live dependent work remains');
+    expect(firstTurnPrompt).toContain('use `blocked_by_dependency` only when a real remaining dependency still exists');
+    expect(firstTurnPrompt).toContain('close the issue directly when no live dependent work remains');
     expect(firstTurnPrompt).toContain(`inspect the shared local repo checkout at \`${expectedSharedRepoCheckoutPath}\` rather than the per-issue workspace`);
     expect(firstTurnPrompt).toContain(`\`git -C "${expectedSharedRepoCheckoutPath}" status --short --branch\``);
     expect(firstTurnPrompt).toContain(`\`git -C "${expectedSharedRepoCheckoutPath}" fetch origin refs/heads/main:refs/remotes/origin/main\``);
@@ -1840,6 +1845,11 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(continuationPrompt).toContain('Ordinary eligible same-issue child-lane parallelisation is a runtime contract');
     expect(continuationPrompt).toContain('linear parallelization --issue-id lin-issue-1 --decision <parallelize_now|stay_serial|forbid_parallel> --reason <reason-code> --summary <why>');
     expect(continuationPrompt).toContain('Allowed decision and reason-code pairs');
+    expect(continuationPrompt).toContain('clean-main-baseline-failures');
+    expect(continuationPrompt).toContain('cli-orchestrator-cleanup-fallout');
+    expect(continuationPrompt).toContain('use `parent_only_mutation` and close the issue directly when no live dependent work remains');
+    expect(continuationPrompt).toContain('use `blocked_by_dependency` only when a real remaining dependency still exists');
+    expect(continuationPrompt).toContain('close the issue directly when no live dependent work remains');
     expect(continuationPrompt).toContain(`inspect the shared local repo checkout at \`${expectedSharedRepoCheckoutPath}\` rather than the per-issue workspace`);
     expect(continuationPrompt).toContain(`\`git -C "${expectedSharedRepoCheckoutPath}" status --short --branch\``);
     expect(continuationPrompt).toContain(`\`git -C "${expectedSharedRepoCheckoutPath}" fetch origin refs/heads/main:refs/remotes/origin/main\``);
