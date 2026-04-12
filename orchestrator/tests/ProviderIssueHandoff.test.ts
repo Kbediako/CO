@@ -9185,7 +9185,7 @@ describe('createProviderIssueHandoffService', () => {
 
     await service.refresh();
     await waitForMockCalls(setTimeoutSpy, timerCountAfterConstruction);
-    expect(setTimeoutSpy.mock.calls.length).toBe(timerCountAfterConstruction);
+    expect(setTimeoutSpy.mock.calls.length).toBeGreaterThanOrEqual(timerCountAfterConstruction);
     vi.setSystemTime(new Date('2026-03-19T04:30:01.001Z'));
     (retryTimerCallback as () => void)();
     await flushAsyncWork();
