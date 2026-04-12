@@ -117,6 +117,7 @@ export interface ProviderIssueHandoffPollInput {
   trackedIssues: LiveLinearTrackedIssue[];
   refetchTrackedIssues?: ProviderTrackedIssueRefetch | null;
   deferFreshDiscovery?: boolean;
+  allowPollFailClosed?: boolean;
 }
 
 interface ProviderIssueRunRecord {
@@ -3508,7 +3509,8 @@ export function createProviderIssueHandoffService(
             claim,
             trackedIssuesByKey,
             consumedTrackedIssueKeys,
-            allowPollFailClosed: pollInput?.deferFreshDiscovery === true
+            allowPollFailClosed:
+              pollInput?.allowPollFailClosed === true || pollInput?.deferFreshDiscovery === true
           });
 
           if (resolution.kind === 'skip') {
