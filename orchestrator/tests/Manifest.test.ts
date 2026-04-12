@@ -12,6 +12,10 @@ import {
 import { readRunSource0Payload } from '../src/cli/run/source0.js';
 import type { EnvironmentPaths } from '../src/cli/run/environment.js';
 import type { CliManifestCommand, PipelineDefinition } from '../src/cli/types.js';
+import {
+  computePromptPackStamp,
+  type PromptPackSectionSource
+} from '../../packages/orchestrator/src/instructions/promptPacks.js';
 
 const MAX_ERROR_DETAIL_CHARS = 8 * 1024;
 
@@ -279,6 +283,273 @@ describe('bootstrapManifest', () => {
       expect(payload?.artifacts.manifest_path).toBe(
         join('.runs', 'task-child', 'cli', 'run-child', 'manifest.json')
       );
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('persists prompt-pack retrieval policy and competitive-selection diagnostics', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-retrieval-policy-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-retrieval'
+    };
+    const pipeline: PipelineDefinition = { id: 'test', title: 'Test Pipeline', stages: [] };
+
+    try {
+      const promptRel = '.agent/prompts/sample.md';
+      await mkdir(join(repoRoot, '.agent', 'prompts', 'prompt-packs', 'sample'), { recursive: true });
+      await writeFile(join(repoRoot, promptRel), '# Prompt\nUse experiences.', 'utf8');
+      const sections: PromptPackSectionSource[] = [
+        { section: 'system', path: promptRel, content: '# Prompt\nUse experiences.' },
+        { section: 'inject', path: promptRel, content: '# Prompt\nUse experiences.' },
+        { section: 'summarize', path: promptRel, content: '# Prompt\nUse experiences.' },
+        { section: 'extract', path: promptRel, content: '# Prompt\nUse experiences.' },
+        { section: 'optimize', path: promptRel, content: '# Prompt\nUse experiences.' }
+      ];
+      const stamp = computePromptPackStamp(sections, {
+        experienceSlots: 2,
+        retrievalPolicy: {
+          kind: 'competitive_scoring_v1',
+          minScore: 0.1,
+          scoreWeights: { gtScore: 1, relativeRank: 1 },
+          antiDominanceNormalization: {
+            enabled: true,
+            strength: 0.5,
+            sourceGrouping: 'provenance_fallback_v1'
+          }
+        }
+      });
+      await writeFile(
+        join(repoRoot, '.agent', 'prompts', 'prompt-packs', 'sample', 'manifest.json'),
+        JSON.stringify(
+          {
+            id: 'sample-pack',
+            domain: 'implementation',
+            stamp,
+            experienceSlots: 2,
+            retrievalPolicy: {
+              kind: 'competitive_scoring_v1',
+              minScore: 0.1,
+              scoreWeights: {
+                gtScore: 1,
+                relativeRank: 1
+              },
+              antiDominanceNormalization: {
+                enabled: true,
+                strength: 0.5,
+                sourceGrouping: 'provenance_fallback_v1'
+              }
+            },
+            system: promptRel,
+            inject: [promptRel],
+            summarize: [promptRel],
+            extract: [promptRel],
+            optimize: [promptRel]
+          },
+          null,
+          2
+        ),
+        'utf8'
+      );
+
+      await mkdir(join(env.outRoot, env.taskId), { recursive: true });
+      await writeFile(
+        join(env.outRoot, env.taskId, 'experiences.jsonl'),
+        [
+          {
+            id: 'exp-a1',
+            runId: 'run-a',
+            taskId: env.taskId,
+            epoch: 1,
+            groupId: 'source-a',
+            summary32: 'source a strongest',
+            reward: { gtScore: 0.9, relativeRank: 0.45 },
+            toolStats: [],
+            stampSignature: stamp,
+            domain: 'implementation',
+            createdAt: '2026-04-01T00:00:00.000Z',
+            manifestPath: '.runs/task-retrieval/cli/run-a/manifest.json'
+          },
+          {
+            id: 'exp-a2',
+            runId: 'run-b',
+            taskId: env.taskId,
+            epoch: 1,
+            groupId: 'source-a',
+            summary32: 'source a repeated',
+            reward: { gtScore: 0.88, relativeRank: 0.42 },
+            toolStats: [],
+            stampSignature: stamp,
+            domain: 'implementation',
+            createdAt: '2026-04-01T00:00:01.000Z',
+            manifestPath: '.runs/task-retrieval/cli/run-b/manifest.json'
+          },
+          {
+            id: 'exp-b1',
+            runId: 'run-c',
+            taskId: env.taskId,
+            epoch: 1,
+            groupId: 'source-b',
+            summary32: 'source b diverse',
+            reward: { gtScore: 0.82, relativeRank: 0.4 },
+            toolStats: [],
+            stampSignature: stamp,
+            domain: 'implementation',
+            createdAt: '2026-04-01T00:00:02.000Z',
+            manifestPath: '.runs/task-retrieval/cli/run-c/manifest.json'
+          }
+        ]
+          .map((record) => JSON.stringify(record))
+          .join('\n') + '\n',
+        'utf8'
+      );
+
+      const { manifest } = await bootstrapManifest('run-retrieval', {
+        env,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      const pack = manifest.prompt_packs?.[0];
+      expect(pack?.retrieval_policy?.kind).toBe('competitive_scoring_v1');
+      expect(pack?.retrieval_policy?.min_score).toBe(0.1);
+      expect(pack?.retrieval_selection?.selected_ids).toEqual(['exp-a1', 'exp-b1']);
+      expect(pack?.retrieval_selection?.suppressed_source_keys).toContain('group_id:source-a');
+      expect(pack?.experiences?.[0]).toContain('competitive');
+      expect(pack?.experiences?.[0]).toContain('source group_id:source-a');
+      expect(pack?.experiences?.[1]).toContain('source group_id:source-b');
+
+      const diagnosticsPath = pack?.retrieval_selection?.diagnostics_path;
+      expect(diagnosticsPath).toBeTruthy();
+      const diagnostics = JSON.parse(
+        await readFile(join(repoRoot, diagnosticsPath as string), 'utf8')
+      ) as {
+        candidate_count: number;
+        selected_count: number;
+        selected: Array<{ id: string }>;
+        candidates: Array<{ id: string; selected: boolean; exclusion_reason: string | null }>;
+      };
+      expect(diagnostics.candidate_count).toBe(3);
+      expect(diagnostics.selected_count).toBe(2);
+      expect(diagnostics.selected.map((entry) => entry.id)).toEqual(['exp-a1', 'exp-b1']);
+      expect(
+        diagnostics.candidates.find((entry) => entry.id === 'exp-a2')
+      ).toMatchObject({ selected: false, exclusion_reason: 'outcompeted' });
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('writes unique retrieval diagnostics paths for prompt packs that share an id', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-retrieval-diagnostics-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-retrieval'
+    };
+    const pipeline: PipelineDefinition = { id: 'test', title: 'Test Pipeline', stages: [] };
+
+    try {
+      const promptRel = '.agent/prompts/sample.md';
+      const promptContent = '# Prompt\nUse experiences.';
+      await mkdir(join(repoRoot, '.agent', 'prompts'), { recursive: true });
+      await writeFile(join(repoRoot, promptRel), promptContent, 'utf8');
+      const sections: PromptPackSectionSource[] = [
+        { section: 'system', path: promptRel, content: promptContent },
+        { section: 'inject', path: promptRel, content: promptContent },
+        { section: 'summarize', path: promptRel, content: promptContent },
+        { section: 'extract', path: promptRel, content: promptContent },
+        { section: 'optimize', path: promptRel, content: promptContent }
+      ];
+      const stamp = computePromptPackStamp(sections, {
+        experienceSlots: 1,
+        retrievalPolicy: {
+          kind: 'competitive_scoring_v1',
+          minScore: 0.1,
+          scoreWeights: { gtScore: 1, relativeRank: 1 },
+          antiDominanceNormalization: {
+            enabled: true,
+            strength: 0.5,
+            sourceGrouping: 'provenance_fallback_v1'
+          }
+        }
+      });
+      const sharedManifest = {
+        id: 'shared-pack',
+        stamp,
+        experienceSlots: 1,
+        retrievalPolicy: {
+          kind: 'competitive_scoring_v1',
+          minScore: 0.1,
+          scoreWeights: {
+            gtScore: 1,
+            relativeRank: 1
+          },
+          antiDominanceNormalization: {
+            enabled: true,
+            strength: 0.5,
+            sourceGrouping: 'provenance_fallback_v1'
+          }
+        },
+        system: promptRel,
+        inject: [promptRel],
+        summarize: [promptRel],
+        extract: [promptRel],
+        optimize: [promptRel]
+      };
+
+      await mkdir(join(repoRoot, '.agent', 'prompts', 'prompt-packs', 'implementation'), {
+        recursive: true
+      });
+      await writeFile(
+        join(repoRoot, '.agent', 'prompts', 'prompt-packs', 'implementation', 'manifest.json'),
+        JSON.stringify(
+          {
+            ...sharedManifest,
+            domain: 'implementation'
+          },
+          null,
+          2
+        ),
+        'utf8'
+      );
+
+      await mkdir(join(repoRoot, '.agent', 'prompts', 'prompt-packs', 'diagnostics'), {
+        recursive: true
+      });
+      await writeFile(
+        join(repoRoot, '.agent', 'prompts', 'prompt-packs', 'diagnostics', 'manifest.json'),
+        JSON.stringify(
+          {
+            ...sharedManifest,
+            domain: 'diagnostics'
+          },
+          null,
+          2
+        ),
+        'utf8'
+      );
+
+      const { manifest } = await bootstrapManifest('run-retrieval', {
+        env,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      const paths =
+        manifest.prompt_packs
+          ?.map((pack) => pack.retrieval_selection?.diagnostics_path)
+          .filter((value): value is string => Boolean(value)) ?? [];
+      expect(paths).toHaveLength(2);
+      expect(new Set(paths).size).toBe(2);
     } finally {
       await rm(repoRoot, { recursive: true, force: true });
     }
