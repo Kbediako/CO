@@ -28,6 +28,9 @@ import {
 import { resolveLiveLinearTrackedIssues } from '../src/cli/control/linearDispatchSource.js';
 import { resolveLinearWebhookSourceSetup } from '../src/cli/control/linearWebhookController.js';
 import {
+  markProviderPollingCompleted,
+  markProviderPollingStarted,
+  markProviderPollingStuck,
   readProviderPollingHealth,
   scheduleProviderPolling
 } from '../src/cli/control/providerPollingHealth.js';
@@ -824,6 +827,73 @@ describe('startControlServerPublicLifecycle', () => {
     await queuedRefresh;
 
     expect(refresh).toHaveBeenCalledTimes(2);
+  });
+
+  it('preserves restart_required when a refresh aborts with provider_refresh_lifecycle_stuck', async () => {
+    const refresh = vi.fn(async () => {
+      const error = new Error('provider_refresh_lifecycle_stuck');
+      error.name = 'ProviderRefreshLifecycleStuckError';
+      throw error;
+    });
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => undefined),
+      refresh
+    };
+
+    await expect(runProviderIssueHandoffRefresh(providerIssueHandoff)).resolves.toMatchObject({
+      queued: true,
+      coalesced: true,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck'
+    });
+    expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
+      checking: false,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck',
+      last_error: 'provider_refresh_lifecycle_stuck'
+    });
+    await expect(runProviderIssueHandoffRefresh(providerIssueHandoff)).resolves.toMatchObject({
+      queued: true,
+      coalesced: true,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck'
+    });
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects idle poll retries after polling is already marked restart_required', async () => {
+    const poll = vi.fn(async () => undefined);
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => undefined),
+      refresh: vi.fn(async () => undefined),
+      poll
+    };
+
+    markProviderPollingStarted(providerIssueHandoff, {
+      mode: 'poll'
+    });
+    await markProviderPollingStuck(providerIssueHandoff);
+    markProviderPollingCompleted(providerIssueHandoff, {
+      error: new Error('provider_poll_lifecycle_stuck')
+    });
+
+    await expect(
+      runProviderIssueHandoffPoll(providerIssueHandoff, {
+        trackedIssues: []
+      })
+    ).rejects.toThrow('provider_poll_lifecycle_stuck');
+    expect(poll).not.toHaveBeenCalled();
+    expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
+      checking: false,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_poll_lifecycle_stuck'
+    });
   });
 
   it('acknowledges a newly started refresh immediately for public-route callers while the refresh keeps running', async () => {

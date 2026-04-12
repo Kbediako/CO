@@ -27,6 +27,7 @@ import {
   type ProviderIntakeState
 } from '../src/cli/control/providerIntakeState.js';
 import {
+  readProviderPollingHealth,
   markProviderPollingStarted,
   markProviderPollingStuck
 } from '../src/cli/control/providerPollingHealth.js';
@@ -1804,7 +1805,7 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
-  it('preserves newer polling state when claim persistence rolls back after a concurrent polling update', async () => {
+  it('fails closed after claim persistence rolls back behind a newer concurrent restart_required polling update', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-19T04:00:00.000Z'));
 
@@ -1858,9 +1859,9 @@ describe('createProviderIssueHandoffService', () => {
       service.poll?.({
         trackedIssues: [createTrackedIssue()]
       })
-    ).resolves.toBeUndefined();
+    ).rejects.toThrow('provider_refresh_lifecycle_stuck');
 
-    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(launcher.start).not.toHaveBeenCalled();
     expect(state.polling).toMatchObject({
       checking: true,
       stuck: true,
@@ -1870,7 +1871,7 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
-  it('aborts later direct issue-by-id refresh work after polling is marked stuck', async () => {
+  it('fails closed once polling becomes stuck during later direct issue-by-id refresh work', async () => {
     const { paths } = await createHostPaths();
     const state = normalizeProviderIntakeState({
       schema_version: 1,
@@ -1934,6 +1935,7 @@ describe('createProviderIssueHandoffService', () => {
       start: vi.fn(async () => null),
       resume: vi.fn(async () => undefined)
     };
+    const loggerWarn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
     const resolveTrackedIssue = vi.fn(async ({ issueId }: { issueId: string }) => {
       if (issueId === 'lin-issue-1') {
         await markProviderPollingStuck(service);
@@ -1960,9 +1962,11 @@ describe('createProviderIssueHandoffService', () => {
     });
     markProviderPollingStarted(service, { mode: 'poll' });
 
-    await service.poll?.({
-      trackedIssues: []
-    });
+    await expect(
+      service.poll?.({
+        trackedIssues: []
+      })
+    ).rejects.toThrow('provider_refresh_lifecycle_stuck');
 
     expect(resolveTrackedIssue).toHaveBeenCalledTimes(1);
     expect(resolveTrackedIssue).toHaveBeenCalledWith({
@@ -1970,6 +1974,13 @@ describe('createProviderIssueHandoffService', () => {
       issueId: 'lin-issue-1'
     });
     expect(launcher.start).not.toHaveBeenCalled();
+    expect(loggerWarn).not.toHaveBeenCalled();
+    expect(readProviderPollingHealth(service)).toMatchObject({
+      checking: true,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_poll_lifecycle_stuck'
+    });
   });
 
   it('skips fresh discovery once polling is already stuck', async () => {
@@ -1992,11 +2003,13 @@ describe('createProviderIssueHandoffService', () => {
     markProviderPollingStarted(service, { mode: 'poll' });
     await markProviderPollingStuck(service);
 
-    await service.poll?.({
-      trackedIssues: [],
-      refetchTrackedIssues,
-      deferFreshDiscovery: true
-    });
+    await expect(
+      service.poll?.({
+        trackedIssues: [],
+        refetchTrackedIssues,
+        deferFreshDiscovery: true
+      })
+    ).rejects.toThrow('provider_refresh_lifecycle_stuck');
 
     expect(refetchTrackedIssues).not.toHaveBeenCalled();
   });

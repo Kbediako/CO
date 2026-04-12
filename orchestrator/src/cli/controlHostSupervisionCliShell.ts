@@ -1479,6 +1479,14 @@ async function ensureTrackedProcessTreeExited(
     (async () => true)
   )(rootPid);
   if (!shouldForceKill) {
+    const remainingProcessGroupPids = await (
+      options?.listProcessGroupPids ?? listProcessGroupProcessIds
+    )(rootPid);
+    if (remainingProcessGroupPids.length > 0) {
+      throw new Error(
+        `Previous supervised control-host child pid ${rootPid} is still alive, but force cleanup was skipped because identity verification failed.`
+      );
+    }
     return {
       result: 'exited_after_kickstart',
       orphanedProcessGroupPids: [],
@@ -1543,15 +1551,47 @@ function matchesExpectedSupervisedControlHostCommand(
   return requiredFragments.every((fragment) => command.includes(fragment));
 }
 
-async function isTrackedSupervisedProcessGroup(
-  rootPid: number,
+async function isTrackedSupervisedProcessRoot(
+  pid: number,
   config: ControlHostSupervisionConfig,
   options?: {
     readProcessCommand?: (pid: number) => Promise<string | null>;
   }
 ): Promise<boolean> {
-  const command = await (options?.readProcessCommand ?? readProcessCommand)(rootPid);
+  const command = await (options?.readProcessCommand ?? readProcessCommand)(pid);
   return command !== null && matchesExpectedSupervisedControlHostCommand(command, config);
+}
+
+async function isTrackedSupervisedProcessGroup(
+  rootPid: number,
+  config: ControlHostSupervisionConfig,
+  options?: {
+    readProcessCommand?: (pid: number) => Promise<string | null>;
+    listProcessGroupPids?: (rootPid: number) => Promise<number[]>;
+  }
+): Promise<boolean> {
+  const readTrackedProcessCommand = options?.readProcessCommand ?? readProcessCommand;
+  if (
+    await isTrackedSupervisedProcessRoot(rootPid, config, {
+      readProcessCommand: readTrackedProcessCommand
+    })
+  ) {
+    return true;
+  }
+
+  const processGroupPids = await (
+    options?.listProcessGroupPids ?? listProcessGroupProcessIds
+  )(rootPid).catch(() => []);
+  for (const pid of processGroupPids) {
+    if (pid === rootPid) {
+      continue;
+    }
+    const command = await readTrackedProcessCommand(pid);
+    if (command !== null && matchesExpectedSupervisedControlHostCommand(command, config)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function parseIsoTimestampToMs(value: string | null | undefined): number | null {
@@ -1582,7 +1622,7 @@ async function resolveReportedSupervisedChildPid(
   ) {
     return null;
   }
-  return (await isTrackedSupervisedProcessGroup(nextChildPid, config, options))
+  return (await isTrackedSupervisedProcessRoot(nextChildPid, config, options))
     ? nextChildPid
     : null;
 }

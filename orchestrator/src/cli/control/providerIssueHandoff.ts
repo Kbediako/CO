@@ -359,10 +359,28 @@ export function createProviderIssueHandoffService(
   const providerIssueRunDiscoveryScope = new AsyncLocalStorage<{
     snapshot: Promise<ProviderIssueRunDiscoverySnapshot> | null;
   }>();
+  const serviceCreatedAtMs = Date.now();
   let providerIssueHandoffService: ProviderIssueHandoffService | null = null;
 
   const shouldAbortRefreshCycle = (): boolean =>
-    providerIssueHandoffService !== null && isProviderPollingStuck(providerIssueHandoffService);
+    hasConcurrentRestartRequiredPollingSnapshot() ||
+    (providerIssueHandoffService !== null && isProviderPollingStuck(providerIssueHandoffService));
+  const throwRefreshLifecycleStuckError = (): never => {
+    const error = new Error('provider_refresh_lifecycle_stuck');
+    error.name = 'ProviderRefreshLifecycleStuckError';
+    throw error;
+  };
+  const isRefreshLifecycleStuckError = (error: unknown): boolean =>
+    error instanceof Error &&
+    (
+      error.name === 'ProviderRefreshLifecycleStuckError' ||
+      error.message === 'provider_refresh_lifecycle_stuck'
+    );
+  const assertRefreshCycleNotStuck = (): void => {
+    if (shouldAbortRefreshCycle()) {
+      throwRefreshLifecycleStuckError();
+    }
+  };
   const buildRefreshCycleStuckSkipResolution = (): { kind: 'skip'; reason: string } => ({
     kind: 'skip',
     reason: 'provider_refresh_lifecycle_stuck'
@@ -514,6 +532,25 @@ export function createProviderIssueHandoffService(
       return cloneProviderPollingSnapshot(currentPolling);
     }
     return cloneProviderPollingSnapshot(snapshotPolling);
+  };
+
+  const isRestartRequiredPollingSnapshot = (
+    polling: ProviderStateSnapshot['polling']
+  ): boolean =>
+    Boolean(
+      polling &&
+        (
+          polling.restart_required === true ||
+          polling.stuck === true
+        )
+    );
+
+  const hasConcurrentRestartRequiredPollingSnapshot = (): boolean => {
+    if (!isRestartRequiredPollingSnapshot(options.state.polling)) {
+      return false;
+    }
+    const pollingUpdatedAtMs = readProviderPollingSnapshotUpdatedAtMs(options.state.polling);
+    return pollingUpdatedAtMs !== null && pollingUpdatedAtMs >= serviceCreatedAtMs;
   };
 
   const pickRestoredProviderStateUpdatedAt = (
@@ -3488,9 +3525,7 @@ export function createProviderIssueHandoffService(
     const trackedIssueRefetch = wrapTrackedIssueRefetch(pollInput?.refetchTrackedIssues ?? null);
     await runWithProviderIssueRunDiscoveryCache(async () => {
       await runWithRefreshLifecycleLock(async () => {
-        if (shouldAbortRefreshCycle()) {
-          return;
-        }
+        assertRefreshCycleNotStuck();
         const result = await rehydrateNow();
         if (result.hasPendingClaims) {
           scheduleBestEffortRehydrateWithRefreshLock();
@@ -3534,9 +3569,7 @@ export function createProviderIssueHandoffService(
         }
 
         for (const claim of [...options.state.claims]) {
-          if (shouldAbortRefreshCycle()) {
-            return;
-          }
+          assertRefreshCycleNotStuck();
           const claimProviderKey = buildProviderIssueKey(claim.provider, claim.issue_id);
           try {
           const claimRuns =
@@ -3556,9 +3589,7 @@ export function createProviderIssueHandoffService(
             allowReleasedPollFailClosed:
               pollInput?.allowPollFailClosed === true || pollInput?.deferFreshDiscovery === true
           });
-          if (shouldAbortRefreshCycle()) {
-            return;
-          }
+          assertRefreshCycleNotStuck();
 
           if (resolution.kind === 'skip') {
             if (isProviderIssuePollFailClosedReason(resolution.reason)) {
@@ -3947,6 +3978,9 @@ export function createProviderIssueHandoffService(
             }
           }
           } catch (error) {
+            if (isRefreshLifecycleStuckError(error)) {
+              throw error;
+            }
             logger.warn(
               `Provider issue refresh reconcile failed for ${claimProviderKey}: ${
                 (error as Error)?.message ?? String(error)
@@ -3960,9 +3994,7 @@ export function createProviderIssueHandoffService(
           return;
         }
 
-        if (shouldAbortRefreshCycle()) {
-          return;
-        }
+        assertRefreshCycleNotStuck();
         let freshDiscoveryTrackedIssues = pollInput.trackedIssues;
         if (
           pollInput.deferFreshDiscovery === true &&
@@ -3985,9 +4017,7 @@ export function createProviderIssueHandoffService(
         }
 
         for (const trackedIssue of sortLiveLinearTrackedIssuesForDispatch(freshDiscoveryTrackedIssues)) {
-          if (shouldAbortRefreshCycle()) {
-            return;
-          }
+          assertRefreshCycleNotStuck();
           const providerKey = buildProviderIssueKey(trackedIssue.provider, trackedIssue.id);
           if (existingProviderKeys.has(providerKey) || consumedTrackedIssueKeys.has(providerKey)) {
             continue;

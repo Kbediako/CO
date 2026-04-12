@@ -1210,8 +1210,11 @@ describe('controlHostSupervision shell helpers', () => {
     expect(killProcessGroup).toHaveBeenCalledWith(4200, 'SIGKILL');
   });
 
-  it('skips forced cleanup when the tracked pid no longer matches the supervised control-host identity', async () => {
-    const listProcessGroupPids = vi.fn().mockResolvedValue([4200]);
+  it('treats the prior child as exited when identity verification skips cleanup after the process group disappears', async () => {
+    const listProcessGroupPids = vi
+      .fn()
+      .mockResolvedValueOnce([4200])
+      .mockResolvedValueOnce([]);
     const shouldForceKillTrackedProcessGroup = vi.fn().mockResolvedValue(false);
     const killProcessGroup = vi.fn();
 
@@ -1228,6 +1231,38 @@ describe('controlHostSupervision shell helpers', () => {
     });
     expect(shouldForceKillTrackedProcessGroup).toHaveBeenCalledWith(4200);
     expect(killProcessGroup).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when identity verification skips cleanup but the previous process group is still alive', async () => {
+    const listProcessGroupPids = vi.fn().mockResolvedValue([4200]);
+    const shouldForceKillTrackedProcessGroup = vi.fn().mockResolvedValue(false);
+    const killProcessGroup = vi.fn();
+
+    await expect(
+      ensureTrackedProcessTreeExited(4200, 0, {
+        listProcessGroupPids,
+        shouldForceKillTrackedProcessGroup,
+        killProcessGroup
+      })
+    ).rejects.toThrow(
+      'Previous supervised control-host child pid 4200 is still alive, but force cleanup was skipped because identity verification failed.'
+    );
+    expect(killProcessGroup).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when identity verification cannot re-enumerate the previous process group', async () => {
+    const listProcessGroupPids = vi
+      .fn()
+      .mockResolvedValueOnce([4200])
+      .mockRejectedValueOnce(new Error('ps failed'));
+    const shouldForceKillTrackedProcessGroup = vi.fn().mockResolvedValue(false);
+
+    await expect(
+      ensureTrackedProcessTreeExited(4200, 0, {
+        listProcessGroupPids,
+        shouldForceKillTrackedProcessGroup
+      })
+    ).rejects.toThrow('ps failed');
   });
 
   it('requires the expected supervised control-host command before allowing force cleanup', async () => {
@@ -1259,6 +1294,30 @@ describe('controlHostSupervision shell helpers', () => {
         readProcessCommand: async () => null
       })
     ).resolves.toBe(false);
+  });
+
+  it('accepts lingering supervised group members when the root pid has already exited', async () => {
+    const config = buildControlHostSupervisionConfig({
+      homeDir: '/Users/tester',
+      cwd: '/repo/workspace',
+      label: 'com.example.control-host',
+      repoRoot: '/repo/CO',
+      nodePath: '/custom/node',
+      cliEntrypoint: '/opt/codex-orchestrator.js',
+      taskId: 'custom-task',
+      runId: 'custom-run',
+      pipelineId: 'custom-pipeline'
+    });
+
+    await expect(
+      isTrackedSupervisedProcessGroup(4200, config, {
+        listProcessGroupPids: async () => [4201, 4202],
+        readProcessCommand: async (pid: number) =>
+          pid === 4202
+            ? '/custom/node /opt/codex-orchestrator.js control-host --task custom-task --run custom-run --pipeline custom-pipeline --format json'
+            : null
+      })
+    ).resolves.toBe(true);
   });
 
   it('does not report a new supervised child pid until the state advances to a verified process', async () => {
@@ -1310,6 +1369,24 @@ describe('controlHostSupervision shell helpers', () => {
         }
       )
     ).resolves.toBe(4300);
+
+    await expect(
+      resolveReportedSupervisedChildPid(
+        {
+          ...previousState,
+          updated_at: '2026-04-12T14:54:20.000Z',
+          child_pid: 4400
+        },
+        previousState,
+        config,
+        {
+          readProcessCommand: async (pid: number) =>
+            pid === 4401
+              ? '/custom/node /opt/codex-orchestrator.js control-host --task custom-task --run custom-run --pipeline custom-pipeline --format json'
+              : null,
+        }
+      )
+    ).resolves.toBeNull();
   });
 
   it('kills the detached process group before escalating the wrapper after a timeout', async () => {

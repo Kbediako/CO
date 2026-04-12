@@ -301,6 +301,18 @@ export function runProviderIssueHandoffRefresh(
     }
     return continueWhileBusy();
   }
+  const idleStuckError = buildProviderIssueHandoffRestartRequiredError(providerIssueHandoff);
+  if (idleStuckError) {
+    clearProviderIssueHandoffOperationState(providerIssueHandoff, state);
+    return mapProviderIssueHandoffRefreshOutcome(
+      providerIssueHandoff,
+      Promise.reject(idleStuckError),
+      {
+        queued: true,
+        coalesced: true
+      }
+    );
+  }
   const activeRefresh = waitForProviderIssueHandoffPending(
     providerIssueHandoff,
     startProviderIssueHandoffOperation(providerIssueHandoff, state, () => providerIssueHandoff.refresh(), {
@@ -622,9 +634,25 @@ function runProviderIssueHandoffOperation(
     }
     return continueWhileBusy();
   }
+  const idleStuckError = buildProviderIssueHandoffRestartRequiredError(providerIssueHandoff);
+  if (idleStuckError) {
+    clearProviderIssueHandoffOperationState(providerIssueHandoff, state);
+    return Promise.reject(idleStuckError);
+  }
   return waitForProviderIssueHandoffPending(
     providerIssueHandoff,
     startProviderIssueHandoffOperation(providerIssueHandoff, state, operation, healthContext)
+  );
+}
+
+function buildProviderIssueHandoffRestartRequiredError(
+  providerIssueHandoff: ProviderIssueHandoffService
+): Error | null {
+  if (!isProviderPollingStuck(providerIssueHandoff)) {
+    return null;
+  }
+  return new Error(
+    readProviderPollingHealth(providerIssueHandoff)?.reason ?? 'provider_refresh_lifecycle_stuck'
   );
 }
 
