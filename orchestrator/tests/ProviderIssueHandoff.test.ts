@@ -215,7 +215,7 @@ function getLatestScheduledTimeoutCallback(
   throw new Error('No scheduled timeout callback found.');
 }
 
-function getSingleScheduledTimeoutByDelayRange(
+function getEarliestScheduledTimeoutByDelayRange(
   setTimeoutSpy: { mock: { calls: unknown[][]; results: Array<{ value: unknown }> } },
   minimumDelayMs: number,
   maximumDelayMs: number
@@ -236,7 +236,10 @@ function getSingleScheduledTimeoutByDelayRange(
       index
     }];
   });
-  expect(matchingCalls).toHaveLength(1);
+  // Retry-queue tests need the scheduler-owned timeout. That timer is scheduled
+  // during service construction, before any refresh-time best-effort rehydrate
+  // timer that may share the same 1s delay bucket.
+  expect(matchingCalls.length).toBeGreaterThan(0);
   const [match] = matchingCalls;
   const scheduledHandle = setTimeoutSpy.mock.results[match.index]?.value;
   if (scheduledHandle !== undefined) {
@@ -2196,6 +2199,206 @@ describe('createProviderIssueHandoffService', () => {
       }
     });
     expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
+  it('fails closed for retained released inactive and non-mutable claims during deferred polls without direct reads or fresh discovery churn', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    const initialClaimSnapshots: Array<{
+      provider_key: string;
+      state: string;
+      reason: string;
+      updated_at: string;
+      issue_updated_at: string | null;
+    }> = [];
+
+    for (let index = 0; index < 128; index += 1) {
+      const claimId = `lin-issue-${index + 1}`;
+      const releasedNotMutable = index >= 123;
+      const claim = {
+        provider: 'linear' as const,
+        provider_key: `linear:${claimId}`,
+        issue_id: claimId,
+        issue_identifier: `CO-${1600 + index}`,
+        issue_title: `Released claim ${index + 1}`,
+        issue_state: releasedNotMutable ? 'In Review' : 'Done',
+        issue_state_type: releasedNotMutable ? 'started' : 'completed',
+        issue_updated_at: `2026-04-12T07:${String(index % 60).padStart(2, '0')}:00.000Z`,
+        issue_archived_at: releasedNotMutable ? '2026-04-12T06:00:00.000Z' : null,
+        issue_trashed: releasedNotMutable ? true : false,
+        task_id: `task-released-${index + 1}`,
+        mapping_source: 'provider_id_fallback' as const,
+        state: 'released' as const,
+        reason: releasedNotMutable
+          ? 'provider_issue_released:not_mutable'
+          : 'provider_issue_released:not_active',
+        accepted_at: `2026-04-12T07:${String(index % 60).padStart(2, '0')}:05.000Z`,
+        updated_at: `2026-04-12T07:${String(index % 60).padStart(2, '0')}:10.000Z`,
+        last_delivery_id: `delivery-released-${index + 1}`,
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_744_444_800_000 + index,
+        run_id: null,
+        run_manifest_path: null,
+        launch_source: null,
+        launch_token: null
+      };
+      state.claims.push(claim);
+      initialClaimSnapshots.push({
+        provider_key: claim.provider_key,
+        state: claim.state,
+        reason: claim.reason,
+        updated_at: claim.updated_at,
+        issue_updated_at: claim.issue_updated_at
+      });
+    }
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => {
+      throw new Error('deferred released-claim poll should not call resolveTrackedIssue');
+    });
+    const refetchTrackedIssues = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssues: []
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(refetchTrackedIssues).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims).toHaveLength(128);
+    expect(
+      state.claims.map((claim) => ({
+        provider_key: claim.provider_key,
+        state: claim.state,
+        reason: claim.reason,
+        updated_at: claim.updated_at,
+        issue_updated_at: claim.issue_updated_at
+      }))
+    ).toEqual(initialClaimSnapshots);
+    expect(state.claims.filter((claim) => claim.reason === 'provider_issue_released:not_active')).toHaveLength(123);
+    expect(state.claims.filter((claim) => claim.reason === 'provider_issue_released:not_mutable')).toHaveLength(5);
+  });
+
+  it('still reopens a retained released not-mutable claim on a non-deferred poll when live evidence restores mutability', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-restored',
+      issue_id: 'lin-issue-restored',
+      issue_identifier: 'CO-160A',
+      issue_title: 'Restorable released claim',
+      issue_state: 'In Review',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-12T07:10:00.000Z',
+      issue_archived_at: '2026-04-12T06:00:00.000Z',
+      issue_trashed: true,
+      task_id: 'task-released-restored',
+      mapping_source: 'provider_id_fallback',
+      state: 'released',
+      reason: 'provider_issue_released:not_mutable',
+      accepted_at: '2026-04-12T07:10:05.000Z',
+      updated_at: '2026-04-12T07:10:10.000Z',
+      last_delivery_id: 'delivery-released-restored',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_744_444_900_000,
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-reopened-restored',
+        manifestPath: '/tmp/provider-run/reopened-restored-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-restored',
+        identifier: 'CO-160A',
+        title: 'Restorable released claim',
+        state: 'Merging',
+        state_type: 'started',
+        updated_at: '2026-04-12T07:20:00.000Z',
+        archived_at: null,
+        trashed: false
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      deferFreshDiscovery: false
+    });
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-restored'
+    });
+    expect(resolveTrackedIssue).toHaveBeenCalledTimes(1);
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-issue-restored',
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-issue-restored',
+      issueIdentifier: 'CO-160A',
+      issueUpdatedAt: '2026-04-12T07:20:00.000Z',
+      launchToken: expect.any(String)
+    }));
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_refresh_start_launched',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-12T07:20:00.000Z',
+      issue_archived_at: null,
+      issue_trashed: false,
+      task_id: 'linear-lin-issue-restored',
+      run_id: 'run-reopened-restored',
+      run_manifest_path: '/tmp/provider-run/reopened-restored-manifest.json',
+      launch_source: 'control-host',
+      launch_token: expect.any(String)
+    });
     expect(launcher.resume).not.toHaveBeenCalled();
   });
 
@@ -8926,7 +9129,7 @@ describe('createProviderIssueHandoffService', () => {
 
     await service.refresh();
     const { callback: retryTimerCallback, delayMs: retryDelayMs } =
-      getSingleScheduledTimeoutByDelayRange(setTimeoutSpy, 999, 1_000);
+      getEarliestScheduledTimeoutByDelayRange(setTimeoutSpy, 999, 1_000);
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
     expect(retryDelayMs).toBeGreaterThanOrEqual(999);
@@ -9240,7 +9443,7 @@ describe('createProviderIssueHandoffService', () => {
 
     await service.refresh();
     const { callback: retryTimerCallback, delayMs: retryDelayMs } =
-      getSingleScheduledTimeoutByDelayRange(setTimeoutSpy, 999, 1_000);
+      getEarliestScheduledTimeoutByDelayRange(setTimeoutSpy, 999, 1_000);
     expect(retryDelayMs).toBeGreaterThanOrEqual(999);
     expect(retryDelayMs).toBeLessThanOrEqual(1_000);
     vi.setSystemTime(new Date('2026-03-19T04:30:01.001Z'));

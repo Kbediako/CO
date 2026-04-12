@@ -92,9 +92,9 @@ last_review: 2026-03-22
   - Symphony `SPEC.md`
   - Symphony Elixir `README.md`
   - Symphony Elixir `WORKFLOW.md`
-  - Symphony Elixir `lib/symphony_elixir/codex/dynamic_tool.ex`
-  - Symphony Elixir `lib/symphony_elixir/tracker.ex`
-  - Symphony Elixir `lib/symphony_elixir/linear/adapter.ex`
+  - Symphony Elixir `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/codex/dynamic_tool.ex`
+  - Symphony Elixir `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/tracker.ex`
+  - Symphony Elixir `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/linear/adapter.ex`
   - Symphony Elixir `test/symphony_elixir/live_e2e_test.exs`
   - Symphony Linear skill guide (`linear` SKILL)
   - `orchestrator/src/cli/providerLinearWorkerRunner.ts`

@@ -1800,13 +1800,14 @@ export function createProviderIssueHandoffService(
         !claim.run_manifest_path &&
         !claim.run_id;
       if (claim.state === 'released') {
-        publishRuntime ||= hasProviderClaimTransitioned(claim, {
+        const releasedClaimTransitioned = hasProviderClaimTransitioned(claim, {
           state: 'released',
           reason: claim.reason ?? 'provider_issue_released',
           task_id: releasedRun?.taskId ?? claim.task_id,
           run_id: releasedRun?.runId ?? claim.run_id,
           run_manifest_path: releasedRun?.manifestPath ?? claim.run_manifest_path
         });
+        publishRuntime ||= releasedClaimTransitioned;
         upsertProviderIntakeClaim(options.state, {
           ...claim,
           launch_source: undefined,
@@ -1816,7 +1817,7 @@ export function createProviderIssueHandoffService(
           reason: claim.reason ?? 'provider_issue_released',
           run_id: releasedRun?.runId ?? claim.run_id,
           run_manifest_path: releasedRun?.manifestPath ?? claim.run_manifest_path,
-          updated_at: now
+          updated_at: releasedClaimTransitioned ? now : claim.updated_at
         });
         if (shouldAttemptReleaseCancel(releasedRun)) {
           hasPendingClaims = true;
@@ -5319,6 +5320,21 @@ function resolveProviderIssuePollFailClosedReason(
   return null;
 }
 
+function resolveReleasedProviderIssuePollFailClosedReason(
+  claim: Pick<ProviderIntakeClaimRecord, 'state' | 'reason'>
+): string | null {
+  if (claim.state !== 'released' || isProviderIssueReleasedPendingReopen(claim.reason ?? null)) {
+    return null;
+  }
+  if (claim.reason === 'provider_issue_released:not_active') {
+    return 'provider_issue_poll_cached_released_not_active';
+  }
+  if (claim.reason === 'provider_issue_released:not_mutable') {
+    return 'provider_issue_poll_cached_released_not_mutable';
+  }
+  return null;
+}
+
 function isProviderIssuePollFailClosedReason(reason: string | null | undefined): boolean {
   return typeof reason === 'string' && reason.startsWith('provider_issue_poll_cached_');
 }
@@ -5853,7 +5869,10 @@ async function resolveTrackedIssuePollResolutionWithFallback(
   }
 
   const failClosedReason =
-    allowPollFailClosed ? resolveProviderIssuePollFailClosedReason(claim) : null;
+    allowPollFailClosed
+      ? resolveProviderIssuePollFailClosedReason(claim) ??
+        resolveReleasedProviderIssuePollFailClosedReason(claim)
+      : null;
   if (failClosedReason) {
     return {
       kind: 'skip',
