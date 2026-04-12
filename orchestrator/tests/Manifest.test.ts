@@ -7,7 +7,8 @@ import {
   bootstrapManifest,
   buildGuardrailSummary,
   ensureGuardrailStatus,
-  loadManifest
+  loadManifest,
+  recordResumeEvent
 } from '../src/cli/run/manifest.js';
 import { readRunSource0Payload } from '../src/cli/run/source0.js';
 import type { EnvironmentPaths } from '../src/cli/run/environment.js';
@@ -170,6 +171,23 @@ describe('bootstrapManifest', () => {
         manifest_path: join('.runs', 'task-parent', 'cli', 'run-parent', 'manifest.json')
       });
       expect(parentSource0?.inherited_from).toBeNull();
+      expect(parent.manifest.memory?.observability).toMatchObject({
+        selected_memory: {
+          selection: 'root',
+          pointer: parentSource0?.pointer,
+          object_id: parentSource0?.object_id
+        },
+        rejected_candidates: [],
+        rediscovered_memory: null,
+        counters: {
+          contradiction_count: 0,
+          rediscovery_count: 0,
+          manual_repair_count: 0,
+          repeated_failure_streak: 0,
+          retrieval_hits: 0,
+          retrieval_misses: 0
+        }
+      });
 
       const payload = parentSource0
         ? await readRunSource0Payload(repoRoot, parentSource0)
@@ -199,6 +217,23 @@ describe('bootstrapManifest', () => {
         run_id: 'run-parent',
         task_id: 'task-parent',
         manifest_path: join('.runs', 'task-parent', 'cli', 'run-parent', 'manifest.json')
+      });
+      expect(child.manifest.memory?.observability).toMatchObject({
+        selected_memory: {
+          selection: 'inherited_reuse',
+          pointer: childSource0?.pointer,
+          object_id: childSource0?.object_id
+        },
+        rejected_candidates: [],
+        rediscovered_memory: null,
+        counters: {
+          contradiction_count: 0,
+          rediscovery_count: 0,
+          manual_repair_count: 0,
+          repeated_failure_streak: 0,
+          retrieval_hits: 1,
+          retrieval_misses: 0
+        }
       });
 
       const childPayload = childSource0
@@ -274,6 +309,36 @@ describe('bootstrapManifest', () => {
         task_id: 'task-parent',
         manifest_path: join('.runs', 'task-parent', 'cli', 'run-parent', 'manifest.json')
       });
+      expect(child.manifest.memory?.observability).toMatchObject({
+        selected_memory: {
+          selection: 'fresh_rebuild',
+          pointer: childSource0?.pointer,
+          object_id: childSource0?.object_id
+        },
+        rejected_candidates: [
+          {
+            pointer: parentSource0?.pointer,
+            object_id: parentSource0?.object_id,
+            reason: 'missing_artifacts',
+            detail: 'inherited source_0 artifacts are missing'
+          }
+        ],
+        rediscovered_memory: {
+          from_pointer: parentSource0?.pointer,
+          from_object_id: parentSource0?.object_id,
+          to_pointer: childSource0?.pointer,
+          to_object_id: childSource0?.object_id,
+          reason: 'missing_artifacts'
+        },
+        counters: {
+          contradiction_count: 0,
+          rediscovery_count: 1,
+          manual_repair_count: 0,
+          repeated_failure_streak: 1,
+          retrieval_hits: 0,
+          retrieval_misses: 1
+        }
+      });
 
       const payload = childSource0
         ? await readRunSource0Payload(repoRoot, childSource0)
@@ -283,6 +348,722 @@ describe('bootstrapManifest', () => {
       expect(payload?.artifacts.manifest_path).toBe(
         join('.runs', 'task-child', 'cli', 'run-child', 'manifest.json')
       );
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('records a provenance contradiction when inherited source_0 payload lineage is invalid', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-source0-contradiction-'));
+    const parentEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-parent'
+    };
+    const childEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-child'
+    };
+    const pipeline: PipelineDefinition = { id: 'test', title: 'Test Pipeline', stages: [] };
+
+    try {
+      const parent = await bootstrapManifest('run-parent', {
+        env: parentEnv,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+      const parentSource0 = parent.manifest.memory?.source_0;
+      expect(parentSource0).toBeTruthy();
+
+      if (parentSource0) {
+        await writeFile(join(repoRoot, parentSource0.source_path), '{}\n', 'utf8');
+      }
+
+      const child = await bootstrapManifest('run-child', {
+        env: childEnv,
+        pipeline,
+        parentRunId: 'run-parent',
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      expect(child.manifest.memory?.observability).toMatchObject({
+        selected_memory: {
+          selection: 'fresh_rebuild'
+        },
+        rejected_candidates: [
+          {
+            pointer: parentSource0?.pointer,
+            object_id: parentSource0?.object_id,
+            reason: 'provenance_contradiction',
+            detail: 'inherited source_0 payload is invalid'
+          }
+        ],
+        rediscovered_memory: {
+          from_pointer: parentSource0?.pointer,
+          from_object_id: parentSource0?.object_id,
+          reason: 'provenance_contradiction'
+        },
+        counters: {
+          contradiction_count: 1,
+          rediscovery_count: 1,
+          manual_repair_count: 0,
+          repeated_failure_streak: 1,
+          retrieval_hits: 0,
+          retrieval_misses: 1
+        }
+      });
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('records a provenance contradiction when inherited source_0 index integrity is invalid', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-source0-index-contradiction-'));
+    const parentEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-parent'
+    };
+    const childEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-child'
+    };
+    const pipeline: PipelineDefinition = { id: 'test', title: 'Test Pipeline', stages: [] };
+
+    try {
+      const parent = await bootstrapManifest('run-parent', {
+        env: parentEnv,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+      const parentSource0 = parent.manifest.memory?.source_0;
+      expect(parentSource0).toBeTruthy();
+
+      if (parentSource0) {
+        const indexPath = join(repoRoot, parentSource0.index_path);
+        const rawIndex = JSON.parse(await readFile(indexPath, 'utf8')) as { object_id: string };
+        rawIndex.object_id = 'sha256:tampered-index';
+        await writeFile(indexPath, JSON.stringify(rawIndex, null, 2), 'utf8');
+      }
+
+      const child = await bootstrapManifest('run-child', {
+        env: childEnv,
+        pipeline,
+        parentRunId: 'run-parent',
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      expect(child.manifest.memory?.observability).toMatchObject({
+        selected_memory: {
+          selection: 'fresh_rebuild'
+        },
+        rejected_candidates: [
+          {
+            pointer: parentSource0?.pointer,
+            object_id: parentSource0?.object_id,
+            reason: 'provenance_contradiction',
+            detail: 'context index object_id mismatch'
+          }
+        ],
+        rediscovered_memory: {
+          from_pointer: parentSource0?.pointer,
+          from_object_id: parentSource0?.object_id,
+          reason: 'provenance_contradiction'
+        },
+        counters: {
+          contradiction_count: 1,
+          rediscovery_count: 1,
+          manual_repair_count: 0,
+          repeated_failure_streak: 1,
+          retrieval_hits: 0,
+          retrieval_misses: 1
+        }
+      });
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('records a provenance contradiction when inherited source_0 descriptor fields do not match artifacts', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-source0-descriptor-contradiction-'));
+    const parentEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-parent'
+    };
+    const childEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-child'
+    };
+    const pipeline: PipelineDefinition = { id: 'test', title: 'Test Pipeline', stages: [] };
+
+    try {
+      const parent = await bootstrapManifest('run-parent', {
+        env: parentEnv,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      const parentManifestPath = parent.paths.manifestPath;
+      const parentManifest = JSON.parse(await readFile(parentManifestPath, 'utf8')) as {
+        memory?: { source_0?: { object_id?: string; pointer?: string } };
+      };
+      if (parentManifest.memory?.source_0) {
+        parentManifest.memory.source_0.object_id = 'sha256:tampered-descriptor';
+        parentManifest.memory.source_0.pointer =
+          'ctx:sha256:tampered-descriptor#chunk:c000001';
+        await writeFile(parentManifestPath, JSON.stringify(parentManifest, null, 2), 'utf8');
+      }
+
+      const child = await bootstrapManifest('run-child', {
+        env: childEnv,
+        pipeline,
+        parentRunId: 'run-parent',
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      expect(child.manifest.memory?.observability).toMatchObject({
+        selected_memory: {
+          selection: 'fresh_rebuild'
+        },
+        rejected_candidates: [
+          {
+            pointer: 'ctx:sha256:tampered-descriptor#chunk:c000001',
+            object_id: 'sha256:tampered-descriptor',
+            reason: 'provenance_contradiction',
+            detail: 'inherited source_0 descriptor object_id does not match artifacts'
+          }
+        ],
+        rediscovered_memory: {
+          from_pointer: 'ctx:sha256:tampered-descriptor#chunk:c000001',
+          from_object_id: 'sha256:tampered-descriptor',
+          reason: 'provenance_contradiction'
+        },
+        counters: {
+          contradiction_count: 1,
+          rediscovery_count: 1,
+          manual_repair_count: 0,
+          repeated_failure_streak: 1,
+          retrieval_hits: 0,
+          retrieval_misses: 1
+        }
+      });
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('records a provenance contradiction when the inherited source_0 descriptor is malformed', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-source0-malformed-descriptor-'));
+    const parentEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-parent'
+    };
+    const childEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-child'
+    };
+    const pipeline: PipelineDefinition = { id: 'test', title: 'Test Pipeline', stages: [] };
+
+    try {
+      const parent = await bootstrapManifest('run-parent', {
+        env: parentEnv,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      const parentManifestPath = parent.paths.manifestPath;
+      const parentManifest = JSON.parse(await readFile(parentManifestPath, 'utf8')) as {
+        memory?: { source_0?: Record<string, unknown> };
+      };
+      if (parentManifest.memory?.source_0) {
+        delete parentManifest.memory.source_0.origin;
+        await writeFile(parentManifestPath, JSON.stringify(parentManifest, null, 2), 'utf8');
+      }
+
+      const child = await bootstrapManifest('run-child', {
+        env: childEnv,
+        pipeline,
+        parentRunId: 'run-parent',
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      expect(child.manifest.memory?.observability).toMatchObject({
+        selected_memory: {
+          selection: 'fresh_rebuild'
+        },
+        rejected_candidates: [
+          {
+            reason: 'provenance_contradiction',
+            detail: 'inherited source_0 descriptor is invalid'
+          }
+        ],
+        rediscovered_memory: {
+          reason: 'provenance_contradiction'
+        },
+        counters: {
+          contradiction_count: 1,
+          rediscovery_count: 1,
+          manual_repair_count: 0,
+          repeated_failure_streak: 1,
+          retrieval_hits: 0,
+          retrieval_misses: 1
+        }
+      });
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('records a provenance contradiction when the inherited source_0 field is non-object', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-source0-non-object-descriptor-'));
+    const parentEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-parent'
+    };
+    const childEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-child'
+    };
+    const pipeline: PipelineDefinition = { id: 'test', title: 'Test Pipeline', stages: [] };
+
+    try {
+      const parent = await bootstrapManifest('run-parent', {
+        env: parentEnv,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      const parentManifestPath = parent.paths.manifestPath;
+      const parentManifest = JSON.parse(await readFile(parentManifestPath, 'utf8')) as {
+        memory?: { source_0?: unknown };
+      };
+      if (parentManifest.memory) {
+        parentManifest.memory.source_0 = 'broken descriptor';
+        await writeFile(parentManifestPath, JSON.stringify(parentManifest, null, 2), 'utf8');
+      }
+
+      const child = await bootstrapManifest('run-child', {
+        env: childEnv,
+        pipeline,
+        parentRunId: 'run-parent',
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      expect(child.manifest.memory?.observability).toMatchObject({
+        selected_memory: {
+          selection: 'fresh_rebuild'
+        },
+        rejected_candidates: [
+          {
+            pointer: 'ctx:sha256:invalid-inherited-source0-descriptor#chunk:invalid',
+            object_id: 'sha256:invalid-inherited-source0-descriptor',
+            reason: 'provenance_contradiction',
+            detail: 'inherited source_0 descriptor is invalid'
+          }
+        ],
+        rediscovered_memory: {
+          from_pointer: 'ctx:sha256:invalid-inherited-source0-descriptor#chunk:invalid',
+          from_object_id: 'sha256:invalid-inherited-source0-descriptor',
+          reason: 'provenance_contradiction'
+        },
+        counters: {
+          contradiction_count: 1,
+          rediscovery_count: 1,
+          manual_repair_count: 0,
+          repeated_failure_streak: 1,
+          retrieval_hits: 0,
+          retrieval_misses: 1
+        }
+      });
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('refreshes manual repair and resume latency signals from accepted manual-resume events', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-source0-repair-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-repair'
+    };
+    const pipeline: PipelineDefinition = { id: 'test', title: 'Test Pipeline', stages: [] };
+
+    try {
+      const { manifest } = await bootstrapManifest('run-repair', {
+        env,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      recordResumeEvent(manifest, {
+        actor: 'operator',
+        reason: 'manual-resume',
+        outcome: 'accepted',
+        detail: 'memory-repair: repaired source_0 lineage'
+      });
+
+      expect(manifest.memory?.observability?.manual_repairs).toEqual([
+        {
+          timestamp: manifest.resume_events[0]?.timestamp,
+          actor: 'operator',
+          reason: 'manual-resume',
+          outcome: 'accepted',
+          detail: 'memory-repair: repaired source_0 lineage'
+        }
+      ]);
+      expect(manifest.memory?.observability?.counters.manual_repair_count).toBe(1);
+      expect(manifest.memory?.observability?.counters.resume_latency_ms).toBeGreaterThanOrEqual(0);
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('ignores accepted manual-resume events without an explicit memory-repair marker', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-source0-non-memory-resume-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-repair'
+    };
+    const pipeline: PipelineDefinition = { id: 'test', title: 'Test Pipeline', stages: [] };
+
+    try {
+      const { manifest } = await bootstrapManifest('run-repair', {
+        env,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      recordResumeEvent(manifest, {
+        actor: 'operator',
+        reason: 'manual-resume',
+        outcome: 'accepted',
+        detail: 'resume after operator confirmation'
+      });
+
+      expect(manifest.memory?.observability?.manual_repairs).toEqual([]);
+      expect(manifest.memory?.observability?.counters.manual_repair_count).toBe(0);
+      expect(manifest.memory?.observability?.counters.resume_latency_ms).toBeNull();
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('records a provenance contradiction when inherited source_0 descriptor paths escape the repo root', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-source0-path-contradiction-'));
+    const parentEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-parent'
+    };
+    const childEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-child'
+    };
+    const pipeline: PipelineDefinition = { id: 'test', title: 'Test Pipeline', stages: [] };
+
+    try {
+      const parent = await bootstrapManifest('run-parent', {
+        env: parentEnv,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      const parentManifestPath = parent.paths.manifestPath;
+      const parentManifest = JSON.parse(await readFile(parentManifestPath, 'utf8')) as {
+        memory?: { source_0?: { dir_path?: string } };
+      };
+      if (parentManifest.memory?.source_0) {
+        parentManifest.memory.source_0.dir_path = '../outside';
+        await writeFile(parentManifestPath, JSON.stringify(parentManifest, null, 2), 'utf8');
+      }
+
+      const child = await bootstrapManifest('run-child', {
+        env: childEnv,
+        pipeline,
+        parentRunId: 'run-parent',
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      expect(child.manifest.memory?.observability).toMatchObject({
+        selected_memory: {
+          selection: 'fresh_rebuild'
+        },
+        rejected_candidates: [
+          {
+            dir_path: 'invalid-source0/dir_path',
+            reason: 'provenance_contradiction',
+            detail: 'source_0 dir_path must not traverse outside the repo root'
+          }
+        ],
+        rediscovered_memory: {
+          reason: 'provenance_contradiction'
+        },
+        counters: {
+          contradiction_count: 1,
+          rediscovery_count: 1,
+          manual_repair_count: 0,
+          repeated_failure_streak: 1,
+          retrieval_hits: 0,
+          retrieval_misses: 1
+        }
+      });
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('sanitizes rejected candidate paths when inherited source_0 descriptor paths contain control characters', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-source0-path-control-char-'));
+    const parentEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-parent'
+    };
+    const childEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-child'
+    };
+    const pipeline: PipelineDefinition = { id: 'test', title: 'Test Pipeline', stages: [] };
+
+    try {
+      const parent = await bootstrapManifest('run-parent', {
+        env: parentEnv,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      const parentManifestPath = parent.paths.manifestPath;
+      const parentManifest = JSON.parse(await readFile(parentManifestPath, 'utf8')) as {
+        memory?: { source_0?: { dir_path?: string } };
+      };
+      if (parentManifest.memory?.source_0) {
+        parentManifest.memory.source_0.dir_path = 'bad\npath';
+        await writeFile(parentManifestPath, JSON.stringify(parentManifest, null, 2), 'utf8');
+      }
+
+      const child = await bootstrapManifest('run-child', {
+        env: childEnv,
+        pipeline,
+        parentRunId: 'run-parent',
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      expect(child.manifest.memory?.observability).toMatchObject({
+        selected_memory: {
+          selection: 'fresh_rebuild'
+        },
+        rejected_candidates: [
+          {
+            dir_path: 'invalid-source0/dir_path',
+            reason: 'provenance_contradiction',
+            detail: 'source_0 dir_path must not contain control characters or line separators'
+          }
+        ],
+        rediscovered_memory: {
+          reason: 'provenance_contradiction'
+        },
+        counters: {
+          contradiction_count: 1,
+          rediscovery_count: 1,
+          manual_repair_count: 0,
+          repeated_failure_streak: 1,
+          retrieval_hits: 0,
+          retrieval_misses: 1
+        }
+      });
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('sanitizes rejected candidate paths when inherited source_0 descriptor paths contain Unicode line separators', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-source0-path-line-separator-'));
+    const parentEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-parent'
+    };
+    const childEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-child'
+    };
+    const pipeline: PipelineDefinition = { id: 'test', title: 'Test Pipeline', stages: [] };
+
+    try {
+      const parent = await bootstrapManifest('run-parent', {
+        env: parentEnv,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      const parentManifestPath = parent.paths.manifestPath;
+      const parentManifest = JSON.parse(await readFile(parentManifestPath, 'utf8')) as {
+        memory?: { source_0?: { dir_path?: string } };
+      };
+      if (parentManifest.memory?.source_0) {
+        parentManifest.memory.source_0.dir_path = 'bad\u2028path';
+        await writeFile(parentManifestPath, JSON.stringify(parentManifest, null, 2), 'utf8');
+      }
+
+      const child = await bootstrapManifest('run-child', {
+        env: childEnv,
+        pipeline,
+        parentRunId: 'run-parent',
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      expect(child.manifest.memory?.observability).toMatchObject({
+        selected_memory: {
+          selection: 'fresh_rebuild'
+        },
+        rejected_candidates: [
+          {
+            dir_path: 'invalid-source0/dir_path',
+            reason: 'provenance_contradiction',
+            detail: 'source_0 dir_path must not contain control characters or line separators'
+          }
+        ],
+        rediscovered_memory: {
+          reason: 'provenance_contradiction'
+        },
+        counters: {
+          contradiction_count: 1,
+          rediscovery_count: 1,
+          manual_repair_count: 0,
+          repeated_failure_streak: 1,
+          retrieval_hits: 0,
+          retrieval_misses: 1
+        }
+      });
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('sanitizes rejected candidate paths when inherited source_0 descriptor paths use UNC-style backslash roots', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-source0-path-unc-root-'));
+    const parentEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-parent'
+    };
+    const childEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-child'
+    };
+    const pipeline: PipelineDefinition = { id: 'test', title: 'Test Pipeline', stages: [] };
+
+    try {
+      const parent = await bootstrapManifest('run-parent', {
+        env: parentEnv,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      const parentManifestPath = parent.paths.manifestPath;
+      const parentManifest = JSON.parse(await readFile(parentManifestPath, 'utf8')) as {
+        memory?: { source_0?: { dir_path?: string } };
+      };
+      if (parentManifest.memory?.source_0) {
+        parentManifest.memory.source_0.dir_path = '\\\\server\\share';
+        await writeFile(parentManifestPath, JSON.stringify(parentManifest, null, 2), 'utf8');
+      }
+
+      const child = await bootstrapManifest('run-child', {
+        env: childEnv,
+        pipeline,
+        parentRunId: 'run-parent',
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      expect(child.manifest.memory?.observability).toMatchObject({
+        selected_memory: {
+          selection: 'fresh_rebuild'
+        },
+        rejected_candidates: [
+          {
+            dir_path: 'invalid-source0/dir_path',
+            reason: 'provenance_contradiction',
+            detail: 'source_0 dir_path must be repo-relative'
+          }
+        ],
+        rediscovered_memory: {
+          reason: 'provenance_contradiction'
+        },
+        counters: {
+          contradiction_count: 1,
+          rediscovery_count: 1,
+          manual_repair_count: 0,
+          repeated_failure_streak: 1,
+          retrieval_hits: 0,
+          retrieval_misses: 1
+        }
+      });
     } finally {
       await rm(repoRoot, { recursive: true, force: true });
     }
@@ -300,7 +1081,9 @@ describe('bootstrapManifest', () => {
 
     try {
       const promptRel = '.agent/prompts/sample.md';
-      await mkdir(join(repoRoot, '.agent', 'prompts', 'prompt-packs', 'sample'), { recursive: true });
+      await mkdir(join(repoRoot, '.agent', 'prompts', 'prompt-packs', 'sample'), {
+        recursive: true
+      });
       await writeFile(join(repoRoot, promptRel), '# Prompt\nUse experiences.', 'utf8');
       const sections: PromptPackSectionSource[] = [
         { section: 'system', path: promptRel, content: '# Prompt\nUse experiences.' },

@@ -100,13 +100,13 @@ function foldAsciiBytes(buffer: Buffer): Buffer {
 }
 
 function buildChunks(source: Buffer, targetBytes: number, overlapBytes: number): ContextChunk[] {
-  const chunks: ContextChunk[] = [];
-  if (source.length === 0) {
-    return chunks;
-  }
   const safeTarget = Number.isFinite(targetBytes) ? Math.floor(targetBytes) : 0;
   if (safeTarget <= 0) {
     throw new Error('context chunk target_bytes must be > 0');
+  }
+  const chunks: ContextChunk[] = [];
+  if (source.length === 0) {
+    return chunks;
   }
   const safeOverlap = Number.isFinite(overlapBytes) ? Math.floor(overlapBytes) : 0;
   const overlap = clampOverlap(safeTarget, safeOverlap);
@@ -160,6 +160,93 @@ function validateIndex(index: ContextIndex): void {
   }
 }
 
+async function hashOpenFile(file: Awaited<ReturnType<typeof open>>): Promise<string> {
+  const hash = createHash('sha256');
+  const buffer = Buffer.allocUnsafe(64 * 1024);
+  for (;;) {
+    const { bytesRead } = await file.read(buffer, 0, buffer.length, null);
+    if (bytesRead === 0) {
+      break;
+    }
+    hash.update(buffer.subarray(0, bytesRead));
+  }
+  return hash.digest('hex');
+}
+
+async function readExactFileSlice(
+  file: Awaited<ReturnType<typeof open>>,
+  start: number,
+  end: number
+): Promise<Buffer> {
+  const length = Math.max(0, end - start);
+  const bytes = Buffer.alloc(length);
+  let offset = 0;
+  while (offset < length) {
+    const { bytesRead } = await file.read(bytes, offset, length - offset, start + offset);
+    if (bytesRead === 0) {
+      throw new Error('context source truncated while validating chunk');
+    }
+    offset += bytesRead;
+  }
+  return bytes;
+}
+
+async function validateIndexAgainstSourcePath(index: ContextIndex, sourcePath: string): Promise<void> {
+  const file = await open(sourcePath, 'r');
+  try {
+    const sourceStats = await file.stat();
+    if (index.source.byte_length !== sourceStats.size) {
+      throw new Error('context index source length mismatch');
+    }
+
+    const expectedObjectId = `sha256:${await hashOpenFile(file)}`;
+    if (index.object_id !== expectedObjectId) {
+      throw new Error('context index object_id mismatch');
+    }
+
+    const safeTarget = Number.isFinite(index.chunking.target_bytes)
+      ? Math.floor(index.chunking.target_bytes)
+      : 0;
+    if (safeTarget <= 0) {
+      throw new Error('context chunk target_bytes must be > 0');
+    }
+    const safeOverlap = Number.isFinite(index.chunking.overlap_bytes)
+      ? Math.floor(index.chunking.overlap_bytes)
+      : 0;
+    const overlap = clampOverlap(safeTarget, safeOverlap);
+    let indexPosition = 0;
+    let start = 0;
+    while (start < sourceStats.size) {
+      const end = Math.min(start + safeTarget, sourceStats.size);
+      const expectedId = `c${String(indexPosition + 1).padStart(6, '0')}`;
+      const actualChunk = index.chunks[indexPosition];
+      if (!actualChunk) {
+        throw new Error('context index chunk missing');
+      }
+      const chunkBytes = await readExactFileSlice(file, start, end);
+      if (
+        actualChunk.id !== expectedId ||
+        actualChunk.start !== start ||
+        actualChunk.end !== end ||
+        actualChunk.sha256 !== hashBytes(chunkBytes)
+      ) {
+        throw new Error('context index chunk mismatch');
+      }
+      indexPosition += 1;
+      if (end >= sourceStats.size) {
+        break;
+      }
+      start = Math.max(0, end - overlap);
+    }
+
+    if (index.chunks.length !== indexPosition) {
+      throw new Error('context index chunk count mismatch');
+    }
+  } finally {
+    await file.close();
+  }
+}
+
 export function parseContextPointer(pointer: string): { objectId: string; chunkId: string } | null {
   if (typeof pointer !== 'string' || !pointer.startsWith(DEFAULT_POINTER_PREFIX)) {
     return null;
@@ -191,13 +278,24 @@ export async function buildContextObject(options: ContextBuildOptions): Promise<
     if (!(await pathExists(existingIndexPath)) || !(await pathExists(existingSourcePath))) {
       throw new Error('context_source invalid');
     }
-    const raw = await readFile(existingIndexPath, 'utf8');
-    const parsed = JSON.parse(raw) as ContextIndex;
-    validateIndex(parsed);
     if (sourceDir !== targetDir) {
       await copyFile(existingIndexPath, indexPath);
       await copyFile(existingSourcePath, sourcePath);
+      const copiedRaw = await readFile(indexPath, 'utf8');
+      const copiedParsed = JSON.parse(copiedRaw) as ContextIndex;
+      validateIndex(copiedParsed);
+      await validateIndexAgainstSourcePath(copiedParsed, sourcePath);
+      return {
+        dir: targetDir,
+        indexPath,
+        sourcePath,
+        index: copiedParsed
+      };
     }
+    const raw = await readFile(existingIndexPath, 'utf8');
+    const parsed = JSON.parse(raw) as ContextIndex;
+    validateIndex(parsed);
+    await validateIndexAgainstSourcePath(parsed, existingSourcePath);
     return {
       dir: targetDir,
       indexPath,

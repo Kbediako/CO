@@ -272,6 +272,72 @@ export interface CodexOrchestratorCLIManifest {
         manifest_path: string;
       } | null;
     } | null;
+    observability?: {
+      schema_version: number;
+      recorded_at: string;
+      selected_memory: {
+        selection: "root" | "inherited_reuse" | "fresh_rebuild";
+        pointer: string;
+        object_id: string;
+        dir_path: string;
+        index_path: string;
+        source_path: string;
+        created_at: string;
+        origin: {
+          run_id: string;
+          task_id: string;
+          manifest_path: string;
+        };
+        inherited_from: {
+          run_id: string;
+          task_id: string;
+          manifest_path: string;
+        } | null;
+      };
+      rejected_candidates: {
+        pointer: string;
+        object_id: string;
+        dir_path: string;
+        index_path: string;
+        source_path: string;
+        created_at: string;
+        origin: {
+          run_id: string;
+          task_id: string;
+          manifest_path: string;
+        };
+        inherited_from: {
+          run_id: string;
+          task_id: string;
+          manifest_path: string;
+        } | null;
+        reason: "missing_artifacts" | "provenance_contradiction";
+        detail: string | null;
+      }[];
+      rediscovered_memory: {
+        from_pointer: string;
+        from_object_id: string;
+        to_pointer: string;
+        to_object_id: string;
+        reason: "missing_artifacts" | "provenance_contradiction";
+      } | null;
+      manual_repairs: {
+        timestamp: string;
+        actor: string;
+        reason: string;
+        outcome: "accepted";
+        detail: string | null;
+      }[];
+      counters: {
+        contradiction_count: number;
+        rediscovery_count: number;
+        resume_latency_ms: number | null;
+        manual_repair_count: number;
+        repeated_failure_streak: number;
+        retrieval_hits: number;
+        retrieval_misses: number;
+      };
+    } | null;
   } | null;
   tfgrpo?: {
     epoch?: number | null;

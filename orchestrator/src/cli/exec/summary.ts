@@ -4,6 +4,7 @@ import type { RunPaths } from '../run/runPaths.js';
 import { relativeToRepo } from '../run/runPaths.js';
 import { writeJsonAtomic } from '../utils/fs.js';
 import { persistManifest } from '../run/manifestPersister.js';
+import { refreshRunMemoryObservability } from '../run/source0.js';
 import type {
   ExecEvent,
   RunMetricSummary,
@@ -59,6 +60,7 @@ export function createRunSummaryPayload(params: {
   const metadataSandbox = execMetadata?.sandboxState;
   const sandboxState: SandboxState =
     resultSummary?.sandboxState ?? toolRecord?.sandboxState ?? metadataSandbox ?? 'sandboxed';
+  refreshRunMemoryObservability(manifest);
 
   return {
     status: runStatus === 'succeeded' ? 'succeeded' : 'failed',
@@ -96,6 +98,7 @@ export function createRunSummaryPayload(params: {
     },
     toolRun: toolRecord,
     metrics: metrics ?? undefined,
+    memory: manifest.memory?.observability ?? undefined,
     notifications: {
       targets: notificationTargets,
       delivered: [],
