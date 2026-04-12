@@ -594,7 +594,7 @@ describe('bootstrapManifest', () => {
         actor: 'operator',
         reason: 'manual-resume',
         outcome: 'accepted',
-        detail: 'memory repair'
+        detail: 'memory-repair: repaired source_0 lineage'
       });
 
       expect(manifest.memory?.observability?.manual_repairs).toEqual([
@@ -603,11 +603,114 @@ describe('bootstrapManifest', () => {
           actor: 'operator',
           reason: 'manual-resume',
           outcome: 'accepted',
-          detail: 'memory repair'
+          detail: 'memory-repair: repaired source_0 lineage'
         }
       ]);
       expect(manifest.memory?.observability?.counters.manual_repair_count).toBe(1);
       expect(manifest.memory?.observability?.counters.resume_latency_ms).toBeGreaterThanOrEqual(0);
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('ignores accepted manual-resume events without an explicit memory-repair marker', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-source0-non-memory-resume-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-repair'
+    };
+    const pipeline: PipelineDefinition = { id: 'test', title: 'Test Pipeline', stages: [] };
+
+    try {
+      const { manifest } = await bootstrapManifest('run-repair', {
+        env,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      recordResumeEvent(manifest, {
+        actor: 'operator',
+        reason: 'manual-resume',
+        outcome: 'accepted',
+        detail: 'resume after operator confirmation'
+      });
+
+      expect(manifest.memory?.observability?.manual_repairs).toEqual([]);
+      expect(manifest.memory?.observability?.counters.manual_repair_count).toBe(0);
+      expect(manifest.memory?.observability?.counters.resume_latency_ms).toBeNull();
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('records a provenance contradiction when inherited source_0 descriptor paths escape the repo root', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-source0-path-contradiction-'));
+    const parentEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-parent'
+    };
+    const childEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-child'
+    };
+    const pipeline: PipelineDefinition = { id: 'test', title: 'Test Pipeline', stages: [] };
+
+    try {
+      const parent = await bootstrapManifest('run-parent', {
+        env: parentEnv,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      const parentManifestPath = parent.paths.manifestPath;
+      const parentManifest = JSON.parse(await readFile(parentManifestPath, 'utf8')) as {
+        memory?: { source_0?: { dir_path?: string } };
+      };
+      if (parentManifest.memory?.source_0) {
+        parentManifest.memory.source_0.dir_path = '../outside';
+        await writeFile(parentManifestPath, JSON.stringify(parentManifest, null, 2), 'utf8');
+      }
+
+      const child = await bootstrapManifest('run-child', {
+        env: childEnv,
+        pipeline,
+        parentRunId: 'run-parent',
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      expect(child.manifest.memory?.observability).toMatchObject({
+        selected_memory: {
+          selection: 'fresh_rebuild'
+        },
+        rejected_candidates: [
+          {
+            reason: 'provenance_contradiction',
+            detail: 'source_0 dir_path must not traverse outside the repo root'
+          }
+        ],
+        rediscovered_memory: {
+          reason: 'provenance_contradiction'
+        },
+        counters: {
+          contradiction_count: 1,
+          rediscovery_count: 1,
+          manual_repair_count: 0,
+          repeated_failure_streak: 1,
+          retrieval_hits: 0,
+          retrieval_misses: 1
+        }
+      });
     } finally {
       await rm(repoRoot, { recursive: true, force: true });
     }

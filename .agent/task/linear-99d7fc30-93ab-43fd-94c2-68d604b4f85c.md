@@ -28,13 +28,13 @@
 - [x] `MCP_RUNNER_TASK_ID=linear-99d7fc30-93ab-43fd-94c2-68d604b4f85c npm run docs:check`. Evidence: `✅ docs:check: OK`.
 - [x] `MCP_RUNNER_TASK_ID=linear-99d7fc30-93ab-43fd-94c2-68d604b4f85c npm run docs:freshness`. Evidence: `docs:freshness OK - 3446 docs, 3449 registry entries`.
 - [x] `DIFF_BUDGET_OVERRIDE_REASON='CO-96 requires docs-first packet plus additive manifest/events/metrics schema and focused tests in one issue-scoped slice' MCP_RUNNER_TASK_ID=linear-99d7fc30-93ab-43fd-94c2-68d604b4f85c node scripts/diff-budget.mjs`. Evidence: override applied and accepted on the current working tree (`1827` lines > `1200`).
-- [x] `MCP_RUNNER_TASK_ID=linear-99d7fc30-93ab-43fd-94c2-68d604b4f85c FORCE_CODEX_REVIEW=1 npm run review -- --base origin/main`. Evidence: wrapper executed and recorded `review_outcome: failed-boundary` with `termination_boundary.kind: command-intent` / `provenance: validation-suite` in `../../.runs/linear-99d7fc30-93ab-43fd-94c2-68d604b4f85c/cli/2026-04-09T08-36-07-218Z-5118f818/review/telemetry.json`; manual fallback review then found and fixed the inherited-index integrity bug.
+- [x] `MCP_RUNNER_TASK_ID=linear-99d7fc30-93ab-43fd-94c2-68d604b4f85c FORCE_CODEX_REVIEW=1 npm run review`. Evidence: wrapper reran cleanly with `status: succeeded`, `review_outcome: clean-success`, and `termination_boundary: null` in `../../.runs/linear-99d7fc30-93ab-43fd-94c2-68d604b4f85c/cli/2026-04-11T23-10-47-968Z-39ee762d/review/telemetry.json`.
 - [x] Explicit elegance/minimality pass recorded after standalone review findings were addressed. Evidence: the final fix keeps integrity validation in `orchestrator/src/cli/rlm/context.ts` so every `dir`-sourced context object is protected; no duplicate source-0-only validation path was added.
 - [x] `MCP_RUNNER_TASK_ID=linear-99d7fc30-93ab-43fd-94c2-68d604b4f85c npm run pack:smoke`. Evidence: `✅ pack smoke passed`.
-- [ ] `MCP_RUNNER_TASK_ID=linear-99d7fc30-93ab-43fd-94c2-68d604b4f85c npm run test`. Evidence: blocked by unrelated timeout/stall failures in `orchestrator/tests/ProviderIssueHandoff.test.ts`, `tests/cli-frontend-test.spec.ts`, `orchestrator/tests/CodexOrchestratorCli.test.ts`, and `orchestrator/tests/ProviderLinearWorkerRunner.test.ts`, followed by suite stall in `tests/run-review.spec.ts` / `tests/cli-command-surface.spec.ts`.
+- [x] `MCP_RUNNER_TASK_ID=linear-99d7fc30-93ab-43fd-94c2-68d604b4f85c npm run test`. Evidence: reran cleanly after the post-PR `origin/main` merge repair; `332` files passed and `3618` tests passed.
 
 ## Handoff
 - [x] Exactly one persistent `## Codex Workpad` comment is current on the Linear issue. Evidence: Linear workpad comment `f7bced50-0879-4c68-a8e7-e4840c3143c8`, `out/linear-99d7fc30-93ab-43fd-94c2-68d604b4f85c/manual/workpad.md`.
-- [ ] PR attached to the issue before review-state handoff. Evidence: pending.
-- [ ] Latest `origin/main` merged into the branch before review-state transition. Evidence: pending.
+- [x] PR attached to the issue before review-state handoff. Evidence: PR `#449` / `https://github.com/Kbediako/CO/pull/449`.
+- [x] Latest `origin/main` merged into the branch before review-state transition. Evidence: merged `origin/main` `f3d45a494a0422cbb18b746b33a755c736f6c9e8` into branch commit `dcfe06b4d40b1c554c78a0907d2a8b278938207a`.
 - [ ] PR checks green, `pr ready-review` drains cleanly, and the issue moves to `In Review` only after coding stops. Evidence: pending.

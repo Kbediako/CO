@@ -59,7 +59,7 @@ function buildMemoryObservability(): NonNullable<NonNullable<CliManifest['memory
         actor: 'operator',
         reason: 'manual-resume',
         outcome: 'accepted',
-        detail: 'memory repair'
+        detail: 'memory-repair: repaired source_0 lineage'
       }
     ],
     counters: {
@@ -213,7 +213,7 @@ describe('createRunSummaryPayload', () => {
           actor: 'operator',
           reason: 'manual-resume',
           outcome: 'accepted',
-          detail: 'memory repair'
+          detail: 'memory-repair: repaired source_0 lineage'
         }
       ];
       if (manifest.memory?.observability) {

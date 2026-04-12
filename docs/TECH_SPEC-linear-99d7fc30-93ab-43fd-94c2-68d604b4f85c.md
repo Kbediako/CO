@@ -27,27 +27,16 @@ last_review: 2026-04-12
   - selected-memory provenance
   - rejected source-artifact candidates
   - rediscovered memory decisions
-  - manual repair records derived from existing resume artifacts
+  - manual repair records derived only from explicitly marked memory-repair resume artifacts
   - counters for contradiction, rediscovery, resume latency, manual repair, repeated-failure streak, and retrieval hits/misses
 - Derive selected/rejected/rediscovered decisions from the existing `source_0` inheritance path, using artifact availability plus descriptor/payload lineage validation rather than transcript text.
 - Mirror the manifest memory observability payload into `run:summary`.
 - Mirror the bounded counters and selected-memory provenance summary into `metrics.json`.
 
-## Validation
-- [x] `linear child-stream --pipeline docs-review` evidence captured for the new packet. Evidence: `.runs/linear-99d7fc30-93ab-43fd-94c2-68d604b4f85c-docs-review/cli/2026-04-09T08-48-16-376Z-e9616108/manifest.json`, `.runs/linear-99d7fc30-93ab-43fd-94c2-68d604b4f85c-docs-review/cli/2026-04-09T08-48-16-376Z-e9616108/review/telemetry.json`.
-- [x] Focused regressions cover manifest emission, inherited-context integrity, plus event and metrics projection. Evidence: `npm run test:orchestrator -- orchestrator/tests/RlmContextStoreOffsets.test.ts orchestrator/tests/Manifest.test.ts orchestrator/tests/ExecSummary.test.ts orchestrator/tests/MetricsRecorderMemory.test.ts` (`25` tests passed).
-- [x] The branch was refreshed onto current `origin/main` on the resumed attempt and the focused issue-local regressions reran cleanly afterward. Evidence: `git merge --ff-only origin/main` (fast-forward `d47f219eff01bd4152e8e272c3918668fbf5fa90 -> 889135b664ab6b6d65bd899cb86942d45caf4886`) plus `MCP_RUNNER_TASK_ID=linear-99d7fc30-93ab-43fd-94c2-68d604b4f85c npm run test:orchestrator -- orchestrator/tests/RlmContextStoreOffsets.test.ts orchestrator/tests/Manifest.test.ts orchestrator/tests/ExecSummary.test.ts orchestrator/tests/MetricsRecorderMemory.test.ts`.
-- [x] `node scripts/delegation-guard.mjs`
-- [x] `node scripts/spec-guard.mjs --dry-run`
-- [x] `npm run build`
-- [x] `npm run lint`
-- [ ] `npm run test`
-- [x] `npm run docs:check`
-- [x] `npm run docs:freshness`
-- [x] `node scripts/diff-budget.mjs`
-- [x] `FORCE_CODEX_REVIEW=1 npm run review`
-- [x] Explicit elegance/minimality pass recorded after review findings are addressed.
-- [x] `npm run pack:smoke`
+## Validation Plan
+- Evidence-bearing execution state lives in `tasks/tasks-linear-99d7fc30-93ab-43fd-94c2-68d604b4f85c.md`, `.agent/task/linear-99d7fc30-93ab-43fd-94c2-68d604b4f85c.md`, and the Linear workpad.
+- This lane requires docs-review evidence, focused regressions for manifest / summary / metrics emission, and the standard closeout gates (`delegation-guard`, `spec-guard`, `build`, `lint`, `test`, `docs:check`, `docs:freshness`, `diff-budget`, standalone review, elegance pass, and `pack:smoke`) before review handoff.
+- Branch freshness must be re-established against current `origin/main` before the issue leaves `In Progress`; if main moves after PR creation, rerun the affected validation gates on the refreshed branch and keep the checklist mirrors current.
 
 ## Approvals
 - Reviewer: `codex-orchestrator docs-review (clean-success)` via `.runs/linear-99d7fc30-93ab-43fd-94c2-68d604b4f85c-docs-review/cli/2026-04-09T08-48-16-376Z-e9616108/manifest.json`

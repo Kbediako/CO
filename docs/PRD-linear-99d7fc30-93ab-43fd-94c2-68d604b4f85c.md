@@ -56,7 +56,7 @@
   - `memory.source_0` exists as a pointer-based context-object descriptor with origin and inheritance lineage
   - source-0 materialization already distinguishes inherited availability versus child-local rebuilds, but that decision is not summarized as a shared memory observability contract
   - `run:summary` and `metrics.json` do not emit any dedicated memory provenance/outcome payload
-  - `resume_events` capture accepted/blocked resumes, but memory artifacts do not currently project manual repair or resume-latency signals
+- `resume_events` capture accepted/blocked resumes, but memory artifacts do not currently project explicitly marked manual repair or resume-latency signals
 - Reference truth:
   - `memory.source_0` and its underlying `source.txt` / `index.json` artifacts already provide the bounded source-artifact seam this issue should reuse
   - shared run-summary and metrics artifacts already have additive extension points for bounded machine-readable telemetry
@@ -132,7 +132,7 @@
 
 ## Open Questions
 - Should contradiction count treat only explicit provenance mismatches as contradictions, or should malformed inherited source payloads count as contradictions too? Default target: count payload or lineage mismatches as contradictions, but keep plain missing-artifact misses separate.
-- Is the smallest truthful manual-repair signal the accepted `manual-resume` event family already stored in `resume_events`, or does this lane need a narrower follow-up once a dedicated memory-repair hook exists?
+- Is the smallest truthful manual-repair signal an explicitly marked `manual-resume` event already stored in `resume_events`, or does this lane need a narrower follow-up once a dedicated memory-repair hook exists?
 
 ## Approvals
 - Product: Self-approved from the Linear issue scope

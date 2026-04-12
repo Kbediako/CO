@@ -8,7 +8,7 @@
 - Assumptions:
   - `memory.source_0` and `resume_events` are the authoritative raw seams for this slice
   - source-0 inheritance can truthfully distinguish inherited hits, rejected candidates, and rediscovery rebuilds
-  - manual repair can be represented narrowly from accepted manual resume records until a dedicated memory-repair hook exists
+  - manual repair can be represented narrowly only from explicitly marked manual-resume records until a dedicated memory-repair hook exists
 
 ## Issue Readiness Gate
 - Intent checksum / protected terms carried forward:
@@ -45,7 +45,7 @@
 
 ## Risks & Mitigations
 - Risk: contradiction or manual-repair semantics are guessed instead of derived.
-  - Mitigation: restrict contradiction to explicit descriptor/payload provenance mismatches and manual repair to accepted manual resume artifacts already persisted on the manifest.
+  - Mitigation: restrict contradiction to explicit descriptor/payload provenance mismatches and manual repair to explicitly marked manual resume artifacts already persisted on the manifest.
 - Risk: event/metrics projection duplicates general provider-worker observability.
   - Mitigation: keep the new contract under memory-specific names and source-artifact lineage fields only.
 - Risk: registry or docs-review drift blocks implementation.

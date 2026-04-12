@@ -64,7 +64,7 @@ describe('metricsRecorder memory observability', () => {
       actor: 'operator',
       reason: 'manual-resume',
       outcome: 'accepted',
-      detail: 'memory repair'
+      detail: 'memory-repair: repaired source_0 lineage'
     });
 
     const now = new Date().toISOString();
@@ -155,7 +155,7 @@ describe('metricsRecorder memory observability', () => {
         actor: 'operator',
         reason: 'manual-resume',
         outcome: 'accepted',
-        detail: 'memory repair'
+        detail: 'memory-repair: repaired source_0 lineage'
       });
 
       vi.setSystemTime(new Date('2026-04-09T09:00:05.000Z'));

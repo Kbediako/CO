@@ -13,6 +13,7 @@ const RUN_SOURCE0_CONTEXT_KIND = 'context_object';
 const RUN_SOURCE0_PAYLOAD_KIND = 'run_source_0';
 const RUN_SOURCE0_CHUNK_TARGET_BYTES = 65_536;
 const RUN_SOURCE0_CHUNK_OVERLAP_BYTES = 4_096;
+const RUN_MEMORY_REPAIR_DETAIL_MARKER = 'memory-repair:';
 const WINDOWS_DRIVE_ABSOLUTE_PATH_RE = /^[A-Za-z]:[\\/]/u;
 
 export interface RunSource0Lineage {
@@ -292,7 +293,13 @@ function readAcceptedManualRepairEvents(
   manifest: Pick<CliManifest, 'resume_events'>
 ): RunMemoryManualRepair[] {
   return manifest.resume_events
-    .filter((event) => event.outcome === 'accepted' && event.reason === 'manual-resume')
+    .filter(
+      (event) =>
+        event.outcome === 'accepted' &&
+        event.reason === 'manual-resume' &&
+        typeof event.detail === 'string' &&
+        event.detail.trim().toLowerCase().startsWith(RUN_MEMORY_REPAIR_DETAIL_MARKER)
+    )
     .map((event) => ({
       timestamp: event.timestamp,
       actor: event.actor,
@@ -383,7 +390,18 @@ async function assessInheritedRunSource0Candidate(params: {
   repoRoot: string;
   descriptor: RunSource0Descriptor;
 }): Promise<RejectedInheritedCandidate | null> {
-  if (!(await hasRunSource0Artifacts(params.repoRoot, params.descriptor))) {
+  let hasArtifacts = false;
+  try {
+    hasArtifacts = await hasRunSource0Artifacts(params.repoRoot, params.descriptor);
+  } catch (error: unknown) {
+    return {
+      descriptor: params.descriptor,
+      reason: 'provenance_contradiction',
+      detail: (error as Error)?.message ?? 'invalid inherited source_0 descriptor paths'
+    };
+  }
+
+  if (!hasArtifacts) {
     return {
       descriptor: params.descriptor,
       reason: 'missing_artifacts',
@@ -579,8 +597,8 @@ export async function hasRunSource0Artifacts(
   repoRoot: string,
   descriptor: RunSource0Descriptor
 ): Promise<boolean> {
+  const paths = resolveRunSource0Paths(repoRoot, descriptor);
   try {
-    const paths = resolveRunSource0Paths(repoRoot, descriptor);
     const [dirInfo, indexInfo, sourceInfo] = await Promise.all([
       stat(paths.dirPath),
       stat(paths.indexPath),

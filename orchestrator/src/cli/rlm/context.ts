@@ -160,39 +160,90 @@ function validateIndex(index: ContextIndex): void {
   }
 }
 
-function validateIndexAgainstSource(index: ContextIndex, sourceBytes: Buffer): void {
-  if (index.source.byte_length !== sourceBytes.length) {
-    throw new Error('context index source length mismatch');
-  }
-
-  const expectedObjectId = `sha256:${hashBytes(sourceBytes)}`;
-  if (index.object_id !== expectedObjectId) {
-    throw new Error('context index object_id mismatch');
-  }
-
-  const expectedChunks = buildChunks(
-    sourceBytes,
-    index.chunking.target_bytes,
-    index.chunking.overlap_bytes
-  );
-  if (index.chunks.length !== expectedChunks.length) {
-    throw new Error('context index chunk count mismatch');
-  }
-
-  for (let indexPosition = 0; indexPosition < expectedChunks.length; indexPosition += 1) {
-    const expectedChunk = expectedChunks[indexPosition];
-    const actualChunk = index.chunks[indexPosition];
-    if (!actualChunk) {
-      throw new Error('context index chunk missing');
+async function hashOpenFile(file: Awaited<ReturnType<typeof open>>): Promise<string> {
+  const hash = createHash('sha256');
+  const buffer = Buffer.allocUnsafe(64 * 1024);
+  while (true) {
+    const { bytesRead } = await file.read(buffer, 0, buffer.length, null);
+    if (bytesRead === 0) {
+      break;
     }
-    if (
-      actualChunk.id !== expectedChunk.id ||
-      actualChunk.start !== expectedChunk.start ||
-      actualChunk.end !== expectedChunk.end ||
-      actualChunk.sha256 !== expectedChunk.sha256
-    ) {
-      throw new Error('context index chunk mismatch');
+    hash.update(buffer.subarray(0, bytesRead));
+  }
+  return hash.digest('hex');
+}
+
+async function readExactFileSlice(
+  file: Awaited<ReturnType<typeof open>>,
+  start: number,
+  end: number
+): Promise<Buffer> {
+  const length = Math.max(0, end - start);
+  const bytes = Buffer.alloc(length);
+  let offset = 0;
+  while (offset < length) {
+    const { bytesRead } = await file.read(bytes, offset, length - offset, start + offset);
+    if (bytesRead === 0) {
+      throw new Error('context source truncated while validating chunk');
     }
+    offset += bytesRead;
+  }
+  return bytes;
+}
+
+async function validateIndexAgainstSourcePath(index: ContextIndex, sourcePath: string): Promise<void> {
+  const file = await open(sourcePath, 'r');
+  try {
+    const sourceStats = await file.stat();
+    if (index.source.byte_length !== sourceStats.size) {
+      throw new Error('context index source length mismatch');
+    }
+
+    const expectedObjectId = `sha256:${await hashOpenFile(file)}`;
+    if (index.object_id !== expectedObjectId) {
+      throw new Error('context index object_id mismatch');
+    }
+
+    const safeTarget = Number.isFinite(index.chunking.target_bytes)
+      ? Math.floor(index.chunking.target_bytes)
+      : 0;
+    if (safeTarget <= 0) {
+      throw new Error('context chunk target_bytes must be > 0');
+    }
+    const safeOverlap = Number.isFinite(index.chunking.overlap_bytes)
+      ? Math.floor(index.chunking.overlap_bytes)
+      : 0;
+    const overlap = clampOverlap(safeTarget, safeOverlap);
+    let indexPosition = 0;
+    let start = 0;
+    while (start < sourceStats.size) {
+      const end = Math.min(start + safeTarget, sourceStats.size);
+      const expectedId = `c${String(indexPosition + 1).padStart(6, '0')}`;
+      const actualChunk = index.chunks[indexPosition];
+      if (!actualChunk) {
+        throw new Error('context index chunk missing');
+      }
+      const chunkBytes = await readExactFileSlice(file, start, end);
+      if (
+        actualChunk.id !== expectedId ||
+        actualChunk.start !== start ||
+        actualChunk.end !== end ||
+        actualChunk.sha256 !== hashBytes(chunkBytes)
+      ) {
+        throw new Error('context index chunk mismatch');
+      }
+      indexPosition += 1;
+      if (end >= sourceStats.size) {
+        break;
+      }
+      start = Math.max(0, end - overlap);
+    }
+
+    if (index.chunks.length !== indexPosition) {
+      throw new Error('context index chunk count mismatch');
+    }
+  } finally {
+    await file.close();
   }
 }
 
@@ -230,8 +281,7 @@ export async function buildContextObject(options: ContextBuildOptions): Promise<
     const raw = await readFile(existingIndexPath, 'utf8');
     const parsed = JSON.parse(raw) as ContextIndex;
     validateIndex(parsed);
-    const sourceBytes = await readFile(existingSourcePath);
-    validateIndexAgainstSource(parsed, sourceBytes);
+    await validateIndexAgainstSourcePath(parsed, existingSourcePath);
     if (sourceDir !== targetDir) {
       await copyFile(existingIndexPath, indexPath);
       await copyFile(existingSourcePath, sourcePath);
