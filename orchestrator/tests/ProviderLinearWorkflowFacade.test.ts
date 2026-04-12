@@ -2042,6 +2042,82 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it('fails upsert-workpad before fetching a second comment page when the first truthful read exhausts the shared reserve', async () => {
+    const env = await createBudgetedRunScopedEnv();
+    const resetAt = String(Date.now() + 60_000);
+    const desiredWorkpadBody = buildStructuredWorkpadBody({
+      planLines: ['- Stop once the first truthful comment page crosses into the shared reserve.'],
+      notesLines: ['- Do not spend protected headroom on paginated follow-on reads.']
+    });
+
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'provider-linear:issue-context',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '1',
+        'x-ratelimit-requests-reset': resetAt
+      }
+    });
+
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: {
+          commentsAfter?: string | null;
+        };
+      };
+      expect(body.query).toContain('ProviderLinearIssueContext');
+      expect(body.variables?.commentsAfter ?? null).toBeNull();
+      return jsonResponse(
+        buildIssueContextBody({
+          comments: {
+            nodes: [
+              {
+                id: 'comment-note',
+                body: 'Unrelated note',
+                url: 'https://linear.app/comment/note',
+                createdAt: '2026-03-22T08:00:00.000Z',
+                updatedAt: '2026-03-22T08:30:00.000Z',
+                resolvedAt: null
+              }
+            ],
+            pageInfo: {
+              hasNextPage: true,
+              endCursor: 'cursor-2'
+            }
+          }
+        }),
+        200,
+        {
+          'x-ratelimit-requests-limit': '100',
+          'x-ratelimit-requests-remaining': '0',
+          'x-ratelimit-requests-reset': resetAt
+        }
+      );
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: desiredWorkpadBody,
+      env,
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'linear_rate_limited',
+        status: 429,
+        details: {
+          shared_budget_fail_fast: true
+        }
+      }
+    });
+  });
+
   it('revalidates cached workpad noop decisions before skipping the mutation', async () => {
     const env = await createRunScopedEnv();
     const desiredWorkpadBody = buildStructuredWorkpadBody({
@@ -8995,6 +9071,52 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it('fails issue-context reads fast when the shared request reserve would be violated', async () => {
+    const codexHome = await mkdtemp(join(tmpdir(), 'provider-linear-workflow-facade-'));
+    tempDirs.push(codexHome);
+    const env = {
+      CODEX_HOME: codexHome,
+      CO_LINEAR_API_TOKEN: 'lin-api-token'
+    };
+
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'provider-linear:issue-context',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '1',
+        'x-ratelimit-requests-reset': String(Date.now() + 60_000)
+      }
+    });
+
+    const fetchImpl: typeof fetch = vi.fn(async () => {
+      throw new Error('request reserve gate should fail before fetch');
+    });
+
+    const result = await getProviderLinearIssueContext({
+      issueId: 'lin-issue-1',
+      env,
+      fetchImpl
+    });
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'issue-context',
+      error: {
+        code: 'linear_rate_limited',
+        status: 429,
+        details: {
+          shared_budget_fail_fast: true,
+          request_headroom_reserve_bucket: 'requests',
+          request_headroom_remaining: 1,
+          request_headroom_reserve: 1,
+          request_headroom_usable_remaining: 0
+        }
+      }
+    });
+  });
+
   it('fails closed when the source issue is not assigned to a project', async () => {
     const fetchImpl: typeof fetch = vi.fn(async () =>
       jsonResponse(
@@ -9092,6 +9214,7 @@ describe('providerLinearWorkflowFacade', () => {
   });
 
   it('fails closed when a parity follow-up omits the parity matrix', async () => {
+    const fetchImpl = vi.fn();
     const result = await createProviderLinearFollowUpIssue({
       issueId: 'lin-issue-1',
       title: 'Parity follow-up',
@@ -9104,9 +9227,10 @@ describe('providerLinearWorkflowFacade', () => {
       env: {
         CO_LINEAR_API_TOKEN: 'lin-api-token'
       },
-      fetchImpl: vi.fn()
+      fetchImpl
     });
 
+    expect(fetchImpl).not.toHaveBeenCalled();
     expect(result).toEqual({
       ok: false,
       operation: 'create-follow-up',

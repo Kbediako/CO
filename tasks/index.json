@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260412-linear-e934e6ea-8fdd-480c-9656-22c020cb19cf",
+      "title": "CO workflow: hard-gate all Linear consumers on shared request headroom",
+      "relates_to": "tasks/tasks-linear-e934e6ea-8fdd-480c-9656-22c020cb19cf.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-12",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-e934e6ea-8fdd-480c-9656-22c020cb19cf.md",
+        "task": "tasks/tasks-linear-e934e6ea-8fdd-480c-9656-22c020cb19cf.md",
+        "agent_task": ".agent/task/linear-e934e6ea-8fdd-480c-9656-22c020cb19cf.md",
+        "docs": "docs/TECH_SPEC-linear-e934e6ea-8fdd-480c-9656-22c020cb19cf.md"
+      }
+    },
+    {
       "id": "20260412-linear-39a7ba03-ca72-4656-8941-f51250b09413",
       "title": "CO workflow: restore repo-wide spec/docs freshness baselines after 30-day rollover regression",
       "relates_to": "tasks/tasks-linear-39a7ba03-ca72-4656-8941-f51250b09413.md",
