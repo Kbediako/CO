@@ -1204,7 +1204,9 @@ function hydrateLinearBudgetStatus(
         endpoint_name: endpoint.endpoint_name,
         aliases: [...endpoint.aliases],
         observed_at: endpoint.observed_at,
-        requests: normalizeExpiredLinearBudgetBucket(endpoint.requests, endpoint.observed_at),
+        requests: normalizeExpiredLinearBudgetBucket(endpoint.requests, endpoint.observed_at, {
+          requestReserveBucket: 'endpoint_requests'
+        }),
         complexity: normalizeExpiredLinearBudgetBucket(endpoint.complexity, endpoint.observed_at),
         request_complexity: endpoint.request_complexity
       } satisfies LinearBudgetEndpointStatus
@@ -1224,7 +1226,9 @@ function hydrateLinearBudgetStatus(
     viewer_id: persisted.viewer_id,
     workspace_id: persisted.workspace_id,
     token_fingerprints: [...persisted.token_fingerprints],
-    requests: normalizeExpiredLinearBudgetBucket(persisted.requests, persisted.observed_at),
+    requests: normalizeExpiredLinearBudgetBucket(persisted.requests, persisted.observed_at, {
+      requestReserveBucket: 'requests'
+    }),
     endpoint_requests: null,
     complexity: normalizeExpiredLinearBudgetBucket(persisted.complexity, persisted.observed_at),
     endpoint_complexity: null,
@@ -2450,7 +2454,10 @@ function subtractReservationFromBucket(
 
 function normalizeExpiredLinearBudgetBucket(
   bucket: LinearBudgetBucketPayload | null,
-  observedAt: string
+  observedAt: string,
+  options: {
+    requestReserveBucket?: LinearBudgetRequestBucketKey;
+  } = {}
 ): LinearBudgetBucketPayload | null {
   if (!bucket) {
     return null;
@@ -2472,6 +2479,25 @@ function normalizeExpiredLinearBudgetBucket(
         remaining: null,
         reset_at: null
       };
+    }
+    const requestReserveBucket = options.requestReserveBucket;
+    if (requestReserveBucket) {
+      const reserve = resolveRequestPollingHeadroomReserve(
+        bucket.limit,
+        requestReserveBucket === 'endpoint_requests'
+      );
+      if (
+        observedAtMs !== null &&
+        bucket.remaining !== null &&
+        bucket.remaining <= reserve &&
+        observedAtMs + LINEAR_BUDGET_UNKNOWN_RESET_EXHAUSTED_GRACE_MS <= Date.now()
+      ) {
+        return {
+          limit: bucket.limit,
+          remaining: null,
+          reset_at: null
+        };
+      }
     }
     return bucket;
   }

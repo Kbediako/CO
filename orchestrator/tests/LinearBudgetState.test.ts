@@ -1191,6 +1191,38 @@ describe('linearBudgetState', () => {
     });
   });
 
+  it('expires stale reserve-floor request buckets without reset metadata after the fallback grace window', async () => {
+    const codexHome = await mkdtemp(join(tmpdir(), 'linear-budget-state-'));
+    tempDirs.push(codexHome);
+    const env = createEnv(codexHome);
+
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'provider-linear:issue-context',
+      observedAt: new Date(Date.now() - 61_000).toISOString(),
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '1'
+      }
+    });
+
+    const budget = await readSharedLinearBudgetStatus(env);
+    expect(budget).toMatchObject({
+      requests: {
+        limit: 100,
+        remaining: null,
+        reset_at: null
+      }
+    });
+    expect(
+      resolveLinearBudgetPreflight({
+        budget,
+        operation: 'provider-linear:issue-context',
+        minimum_requests_remaining: 1
+      })
+    ).toEqual({ ok: true });
+  });
+
   it('keeps request exhaustion distinct when complexity headroom remains high', async () => {
     const codexHome = await mkdtemp(join(tmpdir(), 'linear-budget-state-'));
     tempDirs.push(codexHome);
