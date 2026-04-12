@@ -432,9 +432,8 @@ async function assessInheritedRunSource0Candidate(params: {
   repoRoot: string;
   descriptor: RunSource0Descriptor;
 }): Promise<RejectedInheritedCandidate | null> {
-  let hasArtifacts = false;
   try {
-    hasArtifacts = await hasRunSource0Artifacts(params.repoRoot, params.descriptor);
+    resolveRunSource0Paths(params.repoRoot, params.descriptor);
   } catch (error: unknown) {
     return {
       descriptor: params.descriptor,
@@ -443,6 +442,7 @@ async function assessInheritedRunSource0Candidate(params: {
     };
   }
 
+  const hasArtifacts = await hasRunSource0Artifacts(params.repoRoot, params.descriptor);
   if (!hasArtifacts) {
     return {
       descriptor: params.descriptor,
@@ -639,8 +639,8 @@ export async function hasRunSource0Artifacts(
   repoRoot: string,
   descriptor: RunSource0Descriptor
 ): Promise<boolean> {
-  const paths = resolveRunSource0Paths(repoRoot, descriptor);
   try {
+    const paths = resolveRunSource0Paths(repoRoot, descriptor);
     const [dirInfo, indexInfo, sourceInfo] = await Promise.all([
       stat(paths.dirPath),
       stat(paths.indexPath),

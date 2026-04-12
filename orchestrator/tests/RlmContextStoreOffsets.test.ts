@@ -79,6 +79,17 @@ describe('ContextStore search offsets', () => {
     ).rejects.toThrow('target_bytes');
   });
 
+  it('rejects zero-byte contexts when chunk targetBytes is non-positive', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'rlm-context-'));
+    await expect(
+      buildContextObject({
+        source: { type: 'text', value: '' },
+        targetDir: join(tempDir, 'context'),
+        chunking: { targetBytes: 0, overlapBytes: 0, strategy: 'byte' }
+      })
+    ).rejects.toThrow('target_bytes');
+  });
+
   it('accepts numeric chunk pointers', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'rlm-context-'));
     const text = 'alpha beta gamma delta epsilon';

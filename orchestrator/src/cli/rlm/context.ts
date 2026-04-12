@@ -100,13 +100,13 @@ function foldAsciiBytes(buffer: Buffer): Buffer {
 }
 
 function buildChunks(source: Buffer, targetBytes: number, overlapBytes: number): ContextChunk[] {
-  const chunks: ContextChunk[] = [];
-  if (source.length === 0) {
-    return chunks;
-  }
   const safeTarget = Number.isFinite(targetBytes) ? Math.floor(targetBytes) : 0;
   if (safeTarget <= 0) {
     throw new Error('context chunk target_bytes must be > 0');
+  }
+  const chunks: ContextChunk[] = [];
+  if (source.length === 0) {
+    return chunks;
   }
   const safeOverlap = Number.isFinite(overlapBytes) ? Math.floor(overlapBytes) : 0;
   const overlap = clampOverlap(safeTarget, safeOverlap);
@@ -163,7 +163,7 @@ function validateIndex(index: ContextIndex): void {
 async function hashOpenFile(file: Awaited<ReturnType<typeof open>>): Promise<string> {
   const hash = createHash('sha256');
   const buffer = Buffer.allocUnsafe(64 * 1024);
-  while (true) {
+  for (;;) {
     const { bytesRead } = await file.read(buffer, 0, buffer.length, null);
     if (bytesRead === 0) {
       break;
