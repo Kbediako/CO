@@ -618,7 +618,8 @@ describe('startControlServerPublicLifecycle', () => {
     expect(poll).toHaveBeenCalledTimes(1);
     expect(poll).toHaveBeenNthCalledWith(1, {
       trackedIssues: [trackedIssue],
-      refetchTrackedIssues: expect.any(Function)
+      refetchTrackedIssues: expect.any(Function),
+      allowPollFailClosed: true
     });
 
     await vi.advanceTimersByTimeAsync(15_000);
@@ -1380,7 +1381,8 @@ describe('startControlServerPublicLifecycle', () => {
     expect(providerIssueHandoff.refresh).not.toHaveBeenCalled();
     expect(providerIssueHandoff.poll).toHaveBeenCalledWith({
       trackedIssues: [trackedIssue],
-      refetchTrackedIssues: expect.any(Function)
+      refetchTrackedIssues: expect.any(Function),
+      allowPollFailClosed: true
     });
 
     await closeControlServerPublicLifecycle(started);

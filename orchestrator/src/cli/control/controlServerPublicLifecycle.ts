@@ -451,7 +451,8 @@ function createProviderRefreshCoordinator(
             if (pollResolution.kind === 'ready') {
               await providerIssueHandoff.poll({
                 trackedIssues: pollResolution.trackedIssues,
-                refetchTrackedIssues
+                refetchTrackedIssues,
+                allowPollFailClosed: true
               });
               lastSuccessfulFullRecoverySweepAtMs = Date.now();
               return;
