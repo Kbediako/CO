@@ -23,6 +23,7 @@ const LINEAR_BUDGET_REQUEST_HEADROOM_RESERVE_RATIO = 0.01;
 const LINEAR_BUDGET_REQUEST_HEADROOM_RESERVE_MAX = 50;
 const LINEAR_BUDGET_ENDPOINT_REQUEST_HEADROOM_RESERVE_RATIO = 0.05;
 const LINEAR_BUDGET_ENDPOINT_REQUEST_HEADROOM_RESERVE_MAX = 5;
+const LINEAR_BUDGET_REQUEST_BURN_HISTORY_LIMIT = 64;
 const LINEAR_BUDGET_UNKNOWN_RESET_EXHAUSTED_GRACE_MS = LINEAR_BUDGET_DEFAULT_LOW_POLL_INTERVAL_MS;
 const LINEAR_BUDGET_LOCK_RETRY: LockRetryOptions = {
   maxAttempts: 25,
@@ -42,6 +43,7 @@ type LinearBudgetEffectiveBucketKey =
   | 'complexity'
   | 'endpoint_complexity';
 type LinearBudgetScopeKind = 'user' | 'token';
+type LinearBudgetRequestBucketKey = 'requests' | 'endpoint_requests';
 
 export interface LinearBudgetBucketPayload {
   limit: number | null;
@@ -69,6 +71,23 @@ export interface LinearBudgetReservationStatus {
   expires_at: string;
 }
 
+export interface LinearBudgetRequestBurnHistoryEntry {
+  recorded_at: string;
+  observed_at: string;
+  source: string;
+  operation: string;
+  run_id: string | null;
+  process_pid: number | null;
+  process_title: string | null;
+  request_id: string | null;
+  request_bucket: LinearBudgetRequestBucketKey | null;
+  remaining: number | null;
+  remaining_delta: number | null;
+  reset_at: string | null;
+  suppression_reason: string | null;
+  cooldown_reason: string | null;
+}
+
 export interface LinearBudgetStatus {
   observed_at: string;
   source: string;
@@ -92,6 +111,7 @@ export interface LinearBudgetStatus {
   request_complexity: number | null;
   endpoints: Record<string, LinearBudgetEndpointStatus>;
   reservations: LinearBudgetReservationStatus[];
+  request_burn_history?: LinearBudgetRequestBurnHistoryEntry[];
   reservations_active: number;
 }
 
@@ -114,6 +134,23 @@ interface PersistedLinearBudgetReservationStatus {
   expires_at: string;
 }
 
+interface PersistedLinearBudgetRequestBurnHistoryEntry {
+  recorded_at: string;
+  observed_at: string;
+  source: string;
+  operation: string;
+  run_id: string | null;
+  process_pid: number | null;
+  process_title: string | null;
+  request_id: string | null;
+  request_bucket: LinearBudgetRequestBucketKey | null;
+  remaining: number | null;
+  remaining_delta: number | null;
+  reset_at: string | null;
+  suppression_reason: string | null;
+  cooldown_reason: string | null;
+}
+
 interface PersistedLinearBudgetStatus {
   schema_version: 2;
   scope_kind: LinearBudgetScopeKind;
@@ -132,6 +169,7 @@ interface PersistedLinearBudgetStatus {
   selected_endpoint_key: string | null;
   endpoints: Record<string, PersistedLinearBudgetEndpointStatus>;
   reservations: PersistedLinearBudgetReservationStatus[];
+  request_burn_history?: PersistedLinearBudgetRequestBurnHistoryEntry[];
 }
 
 interface PersistedLinearBudgetAlias {
@@ -289,6 +327,7 @@ export function resolveLinearBudgetPreflight(input: {
   operation: string;
   minimum_requests_remaining?: number | null;
   minimum_complexity_remaining?: number | null;
+  allow_below_request_reserve?: boolean;
 }): LinearBudgetPreflightResolution {
   const budget = input.budget;
   if (!budget) {
@@ -300,7 +339,12 @@ export function resolveLinearBudgetPreflight(input: {
     normalizePositiveInteger(input.minimum_complexity_remaining) ?? inferOperationComplexityFloor(budget.request_complexity, minimumRequestsRemaining);
   const details = buildSharedLinearRateLimitDetails(budget, {
     shared_budget_fail_fast: true,
-    operation: input.operation
+    operation: input.operation,
+    ...(input.allow_below_request_reserve === true
+      ? {
+          shared_budget_request_headroom_override: 'allow_below_request_reserve'
+        }
+      : {})
   });
 
   if (budget.cooldown_active) {
@@ -368,6 +412,35 @@ export function resolveLinearBudgetPreflight(input: {
     }
   }
 
+  if (input.allow_below_request_reserve !== true) {
+    const requestReserveShortfall = resolveRequestReserveShortfall(
+      [
+        ['requests', budget.requests],
+        ['endpoint_requests', budget.endpoint_requests]
+      ],
+      minimumRequestsRemaining
+    );
+    if (requestReserveShortfall) {
+      return {
+        ok: false,
+        error: {
+          code: 'linear_rate_limited',
+          message: `Linear shared request headroom reserve is insufficient for ${input.operation}.`,
+          status: 429,
+          retryable: true,
+          details: {
+            ...details,
+            required_requests_remaining: minimumRequestsRemaining,
+            request_headroom_reserve_bucket: requestReserveShortfall.bucket,
+            request_headroom_remaining: requestReserveShortfall.remaining,
+            request_headroom_reserve: requestReserveShortfall.reserve,
+            request_headroom_usable_remaining: Math.max(0, requestReserveShortfall.usable_remaining)
+          }
+        }
+      };
+    }
+  }
+
   const exhaustedBucket = findExhaustedLinearBudgetBucket(budget);
   if (exhaustedBucket) {
     return {
@@ -395,6 +468,7 @@ export async function reserveLinearBudgetReservation(input: {
   minimum_requests_remaining?: number | null;
   minimum_complexity_remaining?: number | null;
   ttl_ms?: number | null;
+  allow_below_request_reserve?: boolean;
 }):
   Promise<
     | {
@@ -444,7 +518,8 @@ export async function reserveLinearBudgetReservation(input: {
       budget: selectedBudget,
       operation: input.operation,
       minimum_requests_remaining: normalizePositiveInteger(input.minimum_requests_remaining) ?? requestUnits,
-      minimum_complexity_remaining: inferredComplexityFloor
+      minimum_complexity_remaining: inferredComplexityFloor,
+      allow_below_request_reserve: input.allow_below_request_reserve === true
     });
     if (!preflight.ok) {
       return {
@@ -701,7 +776,19 @@ async function recordLinearBudgetObservation(input: {
   return await withLinearBudgetStateLock(paths, async () => {
     const existing = await readNewestPersistedLinearBudgetStatus(paths, normalizeScopeHint(input.scope));
     const scope = await resolveWriteScope(paths, input.scope, existing);
-    const merged = mergePersistedLinearBudgetStatus(existing, observation, scope);
+    const staleObservation = isStalePersistedLinearBudgetObservation(existing, observation);
+    const mergedWithoutHistory = mergePersistedLinearBudgetStatus(existing, observation, scope);
+    const merged = appendPersistedLinearBudgetRequestBurnHistory(
+      mergedWithoutHistory,
+      staleObservation
+        ? null
+        : buildPersistedLinearBudgetRequestBurnHistoryEntry({
+            env,
+            existing,
+            observation,
+            merged: mergedWithoutHistory
+          })
+    );
     await writePersistedLinearBudgetStatus(paths, merged);
     if (scope.kind === 'user') {
       await writePersistedLinearBudgetAlias(paths, scope);
@@ -769,14 +856,7 @@ function mergePersistedLinearBudgetStatus(
   observation: LinearBudgetObservation,
   scope: LinearBudgetScopeIdentity
 ): PersistedLinearBudgetStatus {
-  const existingObservedAtMs = existing ? parseIsoToMs(existing.observed_at) : null;
-  const observationObservedAtMs = parseIsoToMs(observation.observed_at);
-  if (
-    existing &&
-    existingObservedAtMs !== null &&
-    observationObservedAtMs !== null &&
-    observationObservedAtMs < existingObservedAtMs
-  ) {
+  if (isStalePersistedLinearBudgetObservation(existing, observation)) {
     return adoptPersistedScope(existing, scope);
   }
 
@@ -809,6 +889,20 @@ function mergePersistedLinearBudgetStatus(
   return merged;
 }
 
+function isStalePersistedLinearBudgetObservation(
+  existing: PersistedLinearBudgetStatus | null,
+  observation: LinearBudgetObservation
+): existing is PersistedLinearBudgetStatus {
+  const existingObservedAtMs = existing ? parseIsoToMs(existing.observed_at) : null;
+  const observationObservedAtMs = parseIsoToMs(observation.observed_at);
+  return (
+    existing !== null &&
+    existingObservedAtMs !== null &&
+    observationObservedAtMs !== null &&
+    observationObservedAtMs < existingObservedAtMs
+  );
+}
+
 function createEmptyPersistedLinearBudgetStatus(scope: LinearBudgetScopeIdentity): PersistedLinearBudgetStatus {
   return {
     schema_version: LINEAR_BUDGET_STATE_SCHEMA_VERSION,
@@ -827,7 +921,8 @@ function createEmptyPersistedLinearBudgetStatus(scope: LinearBudgetScopeIdentity
     request_complexity: null,
     selected_endpoint_key: null,
     endpoints: {},
-    reservations: []
+    reservations: [],
+    request_burn_history: []
   };
 }
 
@@ -854,7 +949,8 @@ function clonePersistedLinearBudgetStatus(
     requests: cloneBucket(value.requests),
     complexity: cloneBucket(value.complexity),
     endpoints: clonePersistedEndpoints(value.endpoints),
-    reservations: value.reservations.map((entry) => ({ ...entry }))
+    reservations: value.reservations.map((entry) => ({ ...entry })),
+    request_burn_history: clonePersistedLinearBudgetRequestBurnHistory(value.request_burn_history)
   };
 }
 
@@ -966,6 +1062,145 @@ function clonePersistedLinearBudgetReservations(
   return value.map((entry) => ({ ...entry })).sort(comparePersistedReservationCreatedAt);
 }
 
+function clonePersistedLinearBudgetRequestBurnHistory(
+  value: PersistedLinearBudgetRequestBurnHistoryEntry[] | undefined
+): LinearBudgetRequestBurnHistoryEntry[] {
+  return [...(value ?? [])]
+    .map((entry) => ({ ...entry }))
+    .sort(comparePersistedLinearBudgetRequestBurnHistoryEntry);
+}
+
+function comparePersistedLinearBudgetRequestBurnHistoryEntry(
+  left: Pick<PersistedLinearBudgetRequestBurnHistoryEntry, 'recorded_at' | 'observed_at'>,
+  right: Pick<PersistedLinearBudgetRequestBurnHistoryEntry, 'recorded_at' | 'observed_at'>
+): number {
+  const leftRecordedAtMs = parseIsoToMs(left.recorded_at) ?? parseIsoToMs(left.observed_at) ?? Number.NEGATIVE_INFINITY;
+  const rightRecordedAtMs =
+    parseIsoToMs(right.recorded_at) ?? parseIsoToMs(right.observed_at) ?? Number.NEGATIVE_INFINITY;
+  return leftRecordedAtMs - rightRecordedAtMs;
+}
+
+function mergePersistedLinearBudgetRequestBurnHistory(
+  existing: PersistedLinearBudgetRequestBurnHistoryEntry[] | undefined,
+  candidate: PersistedLinearBudgetRequestBurnHistoryEntry[] | undefined
+): PersistedLinearBudgetRequestBurnHistoryEntry[] {
+  const deduped = new Map<string, PersistedLinearBudgetRequestBurnHistoryEntry>();
+  for (const entry of [...(existing ?? []), ...(candidate ?? [])]) {
+    const key = [
+      entry.recorded_at,
+      entry.observed_at,
+      entry.source,
+      entry.request_id ?? '',
+      entry.request_bucket ?? '',
+      entry.remaining ?? '',
+      entry.reset_at ?? ''
+    ].join('|');
+    deduped.set(key, { ...entry });
+  }
+  return [...deduped.values()]
+    .sort(comparePersistedLinearBudgetRequestBurnHistoryEntry)
+    .slice(-LINEAR_BUDGET_REQUEST_BURN_HISTORY_LIMIT);
+}
+
+function appendPersistedLinearBudgetRequestBurnHistory(
+  persisted: PersistedLinearBudgetStatus,
+  entry: PersistedLinearBudgetRequestBurnHistoryEntry | null
+): PersistedLinearBudgetStatus {
+  if (!entry) {
+    return persisted;
+  }
+  const requestBurnHistory = mergePersistedLinearBudgetRequestBurnHistory(
+    persisted.request_burn_history,
+    [entry]
+  );
+  return {
+    ...persisted,
+    request_burn_history: requestBurnHistory
+  };
+}
+
+function buildPersistedLinearBudgetRequestBurnHistoryEntry(input: {
+  env: NodeJS.ProcessEnv;
+  existing: PersistedLinearBudgetStatus | null;
+  observation: LinearBudgetObservation;
+  merged: PersistedLinearBudgetStatus;
+}): PersistedLinearBudgetRequestBurnHistoryEntry | null {
+  const requestSample = resolveLinearBudgetRequestBurnSample(input.existing, input.observation);
+  if (!requestSample) {
+    return null;
+  }
+  const hydrated = hydrateLinearBudgetStatus(input.merged, {
+    operation: input.observation.source
+  });
+  return {
+    recorded_at: new Date().toISOString(),
+    observed_at: input.observation.observed_at,
+    source: input.observation.source,
+    operation: normalizeOptionalString(input.observation.source) ?? 'unknown',
+    run_id: resolveLinearBudgetObservationRunId(input.env),
+    process_pid: process.pid,
+    process_title: normalizeOptionalString(process.title),
+    request_id: input.observation.request_id,
+    request_bucket: requestSample.bucket,
+    remaining: requestSample.remaining,
+    remaining_delta: requestSample.remaining_delta,
+    reset_at: requestSample.reset_at,
+    suppression_reason: hydrated.suppression_reason,
+    cooldown_reason: hydrated.cooldown_active ? hydrated.suppression_reason : null
+  };
+}
+
+function resolveLinearBudgetRequestBurnSample(
+  existing: PersistedLinearBudgetStatus | null,
+  observation: LinearBudgetObservation
+):
+  | {
+      bucket: LinearBudgetRequestBucketKey;
+      remaining: number | null;
+      remaining_delta: number | null;
+      reset_at: string | null;
+    }
+  | null {
+  if (observation.requests) {
+    return {
+      bucket: 'requests',
+      remaining: observation.requests.remaining,
+      remaining_delta: resolveLinearBudgetRemainingDelta(
+        existing?.requests?.remaining ?? null,
+        observation.requests.remaining
+      ),
+      reset_at: observation.requests.reset_at
+    };
+  }
+  if (observation.endpoint?.requests) {
+    const targetKey = existing?.endpoints
+      ? resolvePersistedEndpointTargetKey(clonePersistedEndpoints(existing.endpoints), observation.endpoint)
+      : observation.endpoint.key;
+    return {
+      bucket: 'endpoint_requests',
+      remaining: observation.endpoint.requests.remaining,
+      remaining_delta: resolveLinearBudgetRemainingDelta(
+        existing?.endpoints[targetKey]?.requests?.remaining ?? null,
+        observation.endpoint.requests.remaining
+      ),
+      reset_at: observation.endpoint.requests.reset_at
+    };
+  }
+  return null;
+}
+
+function resolveLinearBudgetRemainingDelta(
+  previousRemaining: number | null,
+  nextRemaining: number | null
+): number | null {
+  return previousRemaining !== null && nextRemaining !== null ? nextRemaining - previousRemaining : null;
+}
+
+function resolveLinearBudgetObservationRunId(env: NodeJS.ProcessEnv): string | null {
+  return normalizeOptionalString(env.CODEX_ORCHESTRATOR_RUN_ID)
+    ?? normalizeOptionalString(env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID);
+}
+
 function hydrateLinearBudgetStatus(
   persisted: PersistedLinearBudgetStatus,
   options: LinearBudgetSelectionOptions = {}
@@ -979,7 +1214,9 @@ function hydrateLinearBudgetStatus(
         endpoint_name: endpoint.endpoint_name,
         aliases: [...endpoint.aliases],
         observed_at: endpoint.observed_at,
-        requests: normalizeExpiredLinearBudgetBucket(endpoint.requests, endpoint.observed_at),
+        requests: normalizeExpiredLinearBudgetBucket(endpoint.requests, endpoint.observed_at, {
+          requestReserveBucket: 'endpoint_requests'
+        }),
         complexity: normalizeExpiredLinearBudgetBucket(endpoint.complexity, endpoint.observed_at),
         request_complexity: endpoint.request_complexity
       } satisfies LinearBudgetEndpointStatus
@@ -999,7 +1236,9 @@ function hydrateLinearBudgetStatus(
     viewer_id: persisted.viewer_id,
     workspace_id: persisted.workspace_id,
     token_fingerprints: [...persisted.token_fingerprints],
-    requests: normalizeExpiredLinearBudgetBucket(persisted.requests, persisted.observed_at),
+    requests: normalizeExpiredLinearBudgetBucket(persisted.requests, persisted.observed_at, {
+      requestReserveBucket: 'requests'
+    }),
     endpoint_requests: null,
     complexity: normalizeExpiredLinearBudgetBucket(persisted.complexity, persisted.observed_at),
     endpoint_complexity: null,
@@ -1008,6 +1247,7 @@ function hydrateLinearBudgetStatus(
     request_complexity: persisted.request_complexity,
     endpoints: normalizedEndpoints,
     reservations: cleanedReservations.map((entry) => ({ ...entry })),
+    request_burn_history: clonePersistedLinearBudgetRequestBurnHistory(persisted.request_burn_history),
     reservations_active: cleanedReservations.length
   };
   const materialized = materializeBudgetForOperation(base, options.operation ?? null);
@@ -1426,6 +1666,38 @@ function resolveBucketShortfall(
   return null;
 }
 
+function resolveRequestReserveShortfall(
+  entries: Array<[LinearBudgetRequestBucketKey, LinearBudgetBucketPayload | null]>,
+  requiredRemaining: number
+):
+  | {
+      bucket: LinearBudgetRequestBucketKey;
+      remaining: number;
+      reserve: number;
+      usable_remaining: number;
+    }
+  | null {
+  for (const [bucketKey, bucket] of entries) {
+    if (!bucket || bucket.remaining === null) {
+      continue;
+    }
+    const reserve = resolveRequestPollingHeadroomReserve(
+      bucket.limit,
+      bucketKey === 'endpoint_requests'
+    );
+    const usableRemaining = bucket.remaining - reserve;
+    if (usableRemaining < requiredRemaining) {
+      return {
+        bucket: bucketKey,
+        remaining: bucket.remaining,
+        reserve,
+        usable_remaining: usableRemaining
+      };
+    }
+  }
+  return null;
+}
+
 function findExhaustedLinearBudgetBucket(budget: LinearBudgetStatus): LinearBudgetEffectiveBucketKey | null {
   for (const [bucketKey, bucket] of [
     ['requests', budget.requests],
@@ -1714,7 +1986,11 @@ function mergePersistedLinearBudgetCandidate(
       selectedEndpointKey && !endpoints[selectedEndpointKey] ? null : selectedEndpointKey,
     token_fingerprints: uniqueStrings([...existing.token_fingerprints, ...candidate.token_fingerprints]),
     endpoints,
-    reservations: mergePersistedLinearBudgetReservations(existing, candidate)
+    reservations: mergePersistedLinearBudgetReservations(existing, candidate),
+    request_burn_history: mergePersistedLinearBudgetRequestBurnHistory(
+      existing.request_burn_history,
+      candidate.request_burn_history
+    )
   };
   merged.cooldown_until = resolvePersistedLinearBudgetCooldownUntil({
     persisted: merged,
@@ -1790,6 +2066,11 @@ function parseSchemaV2LinearBudgetStatus(
         .map((entry) => parsePersistedLinearBudgetReservation(entry))
         .filter((entry): entry is PersistedLinearBudgetReservationStatus => entry !== null)
     : [];
+  const requestBurnHistory = Array.isArray(record.request_burn_history)
+    ? record.request_burn_history
+        .map((entry) => parsePersistedLinearBudgetRequestBurnHistoryEntry(entry))
+        .filter((entry): entry is PersistedLinearBudgetRequestBurnHistoryEntry => entry !== null)
+    : [];
 
   return {
     schema_version: 2,
@@ -1808,7 +2089,8 @@ function parseSchemaV2LinearBudgetStatus(
     request_complexity: parseNumberLike(record.request_complexity),
     selected_endpoint_key: normalizeOptionalString(record.selected_endpoint_key),
     endpoints,
-    reservations
+    reservations,
+    request_burn_history: requestBurnHistory
   };
 }
 
@@ -1859,7 +2141,8 @@ function parseLegacySchemaV1LinearBudgetStatus(
               request_complexity: null
             }
           },
-    reservations: []
+    reservations: [],
+    request_burn_history: []
   };
 }
 
@@ -1913,6 +2196,42 @@ function parsePersistedLinearBudgetReservation(
     complexity,
     created_at: createdAt,
     expires_at: expiresAt
+  };
+}
+
+function parsePersistedLinearBudgetRequestBurnHistoryEntry(
+  value: unknown
+): PersistedLinearBudgetRequestBurnHistoryEntry | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const recordedAt = normalizeOptionalString(record.recorded_at);
+  const observedAt = normalizeOptionalString(record.observed_at);
+  const source = normalizeRequiredString(record.source);
+  const requestBucket = normalizeOptionalString(record.request_bucket);
+  if (!recordedAt || !observedAt || !source) {
+    return null;
+  }
+  const operation = normalizeRequiredString(record.operation) ?? source;
+  return {
+    recorded_at: recordedAt,
+    observed_at: observedAt,
+    source,
+    operation,
+    run_id: normalizeOptionalString(record.run_id),
+    process_pid: parseNumberLike(record.process_pid),
+    process_title: normalizeOptionalString(record.process_title),
+    request_id: normalizeOptionalString(record.request_id),
+    request_bucket:
+      requestBucket === 'requests' || requestBucket === 'endpoint_requests'
+        ? requestBucket
+        : null,
+    remaining: parseNumberLike(record.remaining),
+    remaining_delta: parseSignedInteger(record.remaining_delta),
+    reset_at: normalizeOptionalString(record.reset_at),
+    suppression_reason: normalizeOptionalString(record.suppression_reason),
+    cooldown_reason: normalizeOptionalString(record.cooldown_reason)
   };
 }
 
@@ -2145,7 +2464,10 @@ function subtractReservationFromBucket(
 
 function normalizeExpiredLinearBudgetBucket(
   bucket: LinearBudgetBucketPayload | null,
-  observedAt: string
+  observedAt: string,
+  options: {
+    requestReserveBucket?: LinearBudgetRequestBucketKey;
+  } = {}
 ): LinearBudgetBucketPayload | null {
   if (!bucket) {
     return null;
@@ -2167,6 +2489,25 @@ function normalizeExpiredLinearBudgetBucket(
         remaining: null,
         reset_at: null
       };
+    }
+    const requestReserveBucket = options.requestReserveBucket;
+    if (requestReserveBucket) {
+      const reserve = resolveRequestPollingHeadroomReserve(
+        bucket.limit,
+        requestReserveBucket === 'endpoint_requests'
+      );
+      if (
+        observedAtMs !== null &&
+        bucket.remaining !== null &&
+        bucket.remaining <= reserve &&
+        observedAtMs + LINEAR_BUDGET_UNKNOWN_RESET_EXHAUSTED_GRACE_MS <= Date.now()
+      ) {
+        return {
+          limit: bucket.limit,
+          remaining: null,
+          reset_at: null
+        };
+      }
     }
     return bucket;
   }
@@ -2239,6 +2580,10 @@ function uniqueStrings(values: string[]): string[] {
 function normalizePositiveInteger(value: unknown): number | null {
   const parsed = parseNumberLike(value);
   return parsed !== null && parsed > 0 ? parsed : null;
+}
+
+function parseSignedInteger(value: unknown): number | null {
+  return parseNumberLike(value);
 }
 
 function parseNumberLike(value: unknown): number | null {

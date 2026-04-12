@@ -886,19 +886,27 @@ export async function upsertProviderLinearWorkpadComment(input: {
   const budgetError = await preflightProviderLinearBudget({
     session: session.session,
     operation: 'upsert-workpad',
-    minimumRequestsRemaining: 1
+    minimumRequestsRemaining: 1,
+    allowBelowRequestReserve: true
   });
   if (budgetError) {
     return failureFromWorkflowError('upsert-workpad', budgetError);
   }
+  let allowBelowRequestReserveForRead = true;
+  const readWorkpadIssueContext = () => {
+    const allowBelowRequestReserve = allowBelowRequestReserveForRead;
+    allowBelowRequestReserveForRead = false;
+    return readIssueContext(session.session, 'upsert-workpad', issueId, {
+      includeAttachments: false,
+      allowBelowRequestReserve
+    });
+  };
   const context = cachedContext
     ? {
         ok: true as const,
         issue: cachedContext
       }
-    : await readIssueContext(session.session, 'upsert-workpad', issueId, {
-        includeAttachments: false
-      });
+    : await readWorkpadIssueContext();
   if (!context.ok) {
     return failureFromWorkflowError('upsert-workpad', context.error);
   }
@@ -907,9 +915,7 @@ export async function upsertProviderLinearWorkpadComment(input: {
   let issueContextFreshForMutation = cachedContext === null;
   const revalidatedCachedMutability =
     cachedContext && issueHasMutabilityBlock(issueContext)
-      ? await readIssueContext(session.session, 'upsert-workpad', issueId, {
-          includeAttachments: false
-        })
+      ? await readWorkpadIssueContext()
       : null;
   if (revalidatedCachedMutability && !revalidatedCachedMutability.ok) {
     return failureFromWorkflowError('upsert-workpad', revalidatedCachedMutability.error);
@@ -921,9 +927,7 @@ export async function upsertProviderLinearWorkpadComment(input: {
   if (cachedContext && !canTrustCachedMutationContext && !revalidatedCachedMutability) {
     // Re-read live comment state before any mutation so cached workpad ids cannot
     // cause duplicate comments or updates against deleted/replaced workpads.
-    const liveContext = await readIssueContext(session.session, 'upsert-workpad', issueId, {
-      includeAttachments: false
-    });
+    const liveContext = await readWorkpadIssueContext();
     if (!liveContext.ok) {
       return failureFromWorkflowError('upsert-workpad', liveContext.error);
     }
@@ -1001,9 +1005,7 @@ export async function upsertProviderLinearWorkpadComment(input: {
   );
 
   if (shouldRevalidateCachedNoop) {
-    const liveContext = await readIssueContext(session.session, 'upsert-workpad', issueId, {
-      includeAttachments: false
-    });
+    const liveContext = await readWorkpadIssueContext();
     if (!liveContext.ok) {
       return failureFromWorkflowError('upsert-workpad', liveContext.error);
     }
@@ -1062,9 +1064,7 @@ export async function upsertProviderLinearWorkpadComment(input: {
   }
 
   if (!issueContextFreshForMutation) {
-    const liveContext = await readIssueContext(session.session, 'upsert-workpad', issueId, {
-      includeAttachments: false
-    });
+    const liveContext = await readWorkpadIssueContext();
     if (!liveContext.ok) {
       return failureFromWorkflowError('upsert-workpad', liveContext.error);
     }
@@ -1260,14 +1260,16 @@ export async function deleteProviderLinearWorkpadComment(input: {
   const budgetError = await preflightProviderLinearBudget({
     session: session.session,
     operation: 'delete-workpad',
-    minimumRequestsRemaining: 1
+    minimumRequestsRemaining: 1,
+    allowBelowRequestReserve: true
   });
   if (budgetError) {
     return failureFromWorkflowError('delete-workpad', budgetError);
   }
 
   const context = await readIssueContext(session.session, 'delete-workpad', issueId, {
-    includeAttachments: false
+    includeAttachments: false,
+    allowBelowRequestReserve: true
   });
   if (!context.ok) {
     return failureFromWorkflowError('delete-workpad', context.error);
@@ -1411,17 +1413,26 @@ export async function transitionProviderLinearIssueState(input: {
   const budgetError = await preflightProviderLinearBudget({
     session: session.session,
     operation: 'transition',
-    minimumRequestsRemaining: 1
+    minimumRequestsRemaining: 1,
+    allowBelowRequestReserve: true
   });
   if (budgetError) {
     return failureFromWorkflowError('transition', budgetError);
   }
+  let allowBelowRequestReserveForSummaryRead = true;
+  const readTransitionIssueSummary = () => {
+    const allowBelowRequestReserve = allowBelowRequestReserveForSummaryRead;
+    allowBelowRequestReserveForSummaryRead = false;
+    return readIssueSummary(session.session, 'transition', issueId, {
+      allowBelowRequestReserve
+    });
+  };
   const initialSummary = cachedContext
     ? {
         ok: true as const,
         issue: summarizeIssueContext(cachedContext)
       }
-    : await readIssueSummary(session.session, 'transition', issueId);
+    : await readTransitionIssueSummary();
   if (!initialSummary.ok) {
     return failureFromWorkflowError('transition', initialSummary.error);
   }
@@ -1431,7 +1442,7 @@ export async function transitionProviderLinearIssueState(input: {
   let summaryFreshForTransition = cachedContext === null;
   const revalidatedCachedMutability =
     cachedContext && issueHasMutabilityBlock(summary)
-      ? await readIssueSummary(session.session, 'transition', issueId)
+      ? await readTransitionIssueSummary()
       : null;
   if (revalidatedCachedMutability && !revalidatedCachedMutability.ok) {
     return failureFromWorkflowError('transition', revalidatedCachedMutability.error);
@@ -1442,7 +1453,7 @@ export async function transitionProviderLinearIssueState(input: {
     summaryFreshForTransition = true;
   }
   if (cachedContext && !canTrustCachedMutationContext && !revalidatedCachedMutability) {
-    const liveSummary = await readIssueSummary(session.session, 'transition', issueId);
+    const liveSummary = await readTransitionIssueSummary();
     if (!liveSummary.ok) {
       return failureFromWorkflowError('transition', liveSummary.error);
     }
@@ -1453,7 +1464,7 @@ export async function transitionProviderLinearIssueState(input: {
 
   let targetState = resolveWorkflowStateByName(summary.team?.states ?? [], stateName);
   if (!targetState && cachedContext && canTrustCachedMutationContext && !summaryFreshForTransition) {
-    const liveSummary = await readIssueSummary(session.session, 'transition', issueId);
+    const liveSummary = await readTransitionIssueSummary();
     if (!liveSummary.ok) {
       return failureFromWorkflowError('transition', liveSummary.error);
     }
@@ -1477,7 +1488,7 @@ export async function transitionProviderLinearIssueState(input: {
     canTrustCachedMutationContext &&
     !summaryFreshForTransition
   ) {
-    const liveSummary = await readIssueSummary(session.session, 'transition', issueId);
+    const liveSummary = await readTransitionIssueSummary();
     if (!liveSummary.ok) {
       return failureFromWorkflowError('transition', liveSummary.error);
     }
@@ -1513,7 +1524,7 @@ export async function transitionProviderLinearIssueState(input: {
   }
 
   if (!summaryFreshForTransition) {
-    const liveSummary = await readIssueSummary(session.session, 'transition', issueId);
+    const liveSummary = await readTransitionIssueSummary();
     if (!liveSummary.ok) {
       return failureFromWorkflowError('transition', liveSummary.error);
     }
@@ -1647,14 +1658,16 @@ export async function attachProviderLinearIssuePr(input: {
   const budgetError = await preflightProviderLinearBudget({
     session: session.session,
     operation: 'attach-pr',
-    minimumRequestsRemaining: 1
+    minimumRequestsRemaining: 1,
+    allowBelowRequestReserve: true
   });
   if (budgetError) {
     return failureFromWorkflowError('attach-pr', budgetError);
   }
 
   const context = await readIssueContext(session.session, 'attach-pr', issueId, {
-    includeComments: false
+    includeComments: false,
+    allowBelowRequestReserve: true
   });
   if (!context.ok) {
     return failureFromWorkflowError('attach-pr', context.error);
@@ -2124,6 +2137,7 @@ async function preflightProviderLinearBudget(input: {
   session: ResolvedLinearWorkflowSession;
   operation: ProviderLinearOperation;
   minimumRequestsRemaining?: number;
+  allowBelowRequestReserve?: boolean;
 }): Promise<ProviderLinearWorkflowError | null> {
   const budget = await readSharedLinearBudgetStatus(input.session.env, {
     operation: `provider-linear:${input.operation}`
@@ -2131,7 +2145,8 @@ async function preflightProviderLinearBudget(input: {
   const preflight = resolveLinearBudgetPreflight({
     budget,
     operation: `provider-linear:${input.operation}`,
-    minimum_requests_remaining: input.minimumRequestsRemaining
+    minimum_requests_remaining: input.minimumRequestsRemaining,
+    allow_below_request_reserve: input.allowBelowRequestReserve === true
   });
   return preflight.ok ? null : preflight.error;
 }
@@ -2142,6 +2157,7 @@ async function executeProviderLinearGraphql<TData>(input: {
   step: string;
   query: string;
   variables?: Record<string, unknown>;
+  allowBelowRequestReserve?: boolean;
 }):
   Promise<
     | {
@@ -2160,7 +2176,8 @@ async function executeProviderLinearGraphql<TData>(input: {
   }).catch(() => null);
   const preflight = resolveLinearBudgetPreflight({
     budget,
-    operation: operationName
+    operation: operationName,
+    allow_below_request_reserve: input.allowBelowRequestReserve === true
   });
   if (!preflight.ok) {
     return {
@@ -2171,7 +2188,8 @@ async function executeProviderLinearGraphql<TData>(input: {
 
   const reservation = await reserveLinearBudgetReservation({
     env: input.session.env,
-    operation: operationName
+    operation: operationName,
+    allow_below_request_reserve: input.allowBelowRequestReserve === true
   });
   if (!reservation.ok) {
     return {
@@ -3542,7 +3560,10 @@ function removeIssueContextComment(issue: ProviderLinearIssueContext, commentId:
 async function readIssueSummary(
   session: ResolvedLinearWorkflowSession,
   operation: ProviderLinearOperation,
-  issueId: string
+  issueId: string,
+  options: {
+    allowBelowRequestReserve?: boolean;
+  } = {}
 ):
   Promise<
     | {
@@ -3561,7 +3582,8 @@ async function readIssueSummary(
     query: buildIssueSummaryQuery(),
     variables: {
       issueId
-    }
+    },
+    allowBelowRequestReserve: options.allowBelowRequestReserve === true
   });
   if (!result.ok) {
     return {
@@ -3607,6 +3629,7 @@ async function readIssueContext(
   options: {
     includeComments?: boolean;
     includeAttachments?: boolean;
+    allowBelowRequestReserve?: boolean;
   } = {}
 ):
   Promise<
@@ -3633,6 +3656,7 @@ async function readIssueContext(
   let firstPage = true;
 
   while (firstPage || hasNextCommentPage) {
+    const allowBelowRequestReserve = firstPage && options.allowBelowRequestReserve === true;
     const result = await executeProviderLinearGraphql<LinearIssueContextQueryResponse>({
       session,
       operation,
@@ -3649,7 +3673,8 @@ async function readIssueContext(
             }
           : {
               issueId
-            }
+            },
+      allowBelowRequestReserve
     });
     if (!result.ok) {
       return {
