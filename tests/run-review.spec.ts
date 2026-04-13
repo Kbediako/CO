@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { execFile } from 'node:child_process';
 import { chmod, mkdtemp, mkdir, readFile, realpath, rm, symlink, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { basename, dirname, join } from 'node:path';
+import { basename, dirname, join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 
@@ -151,6 +151,18 @@ if [[ -n "\${RUN_REVIEW_ARGS_LOG:-}" ]]; then
     fi
     echo "argv=$*"
   } >> "\${RUN_REVIEW_ARGS_LOG}"
+fi
+if [[ -n "\${RUN_REVIEW_ENV_LOG:-}" ]]; then
+  {
+    echo "---"
+    echo "CODEX_ORCHESTRATOR_ROOT=\${CODEX_ORCHESTRATOR_ROOT-}"
+    echo "CODEX_ORCHESTRATOR_MANIFEST_PATH=\${CODEX_ORCHESTRATOR_MANIFEST_PATH-}"
+    echo "CODEX_ORCHESTRATOR_RUN_DIR=\${CODEX_ORCHESTRATOR_RUN_DIR-}"
+    echo "CODEX_ORCHESTRATOR_RUNS_DIR=\${CODEX_ORCHESTRATOR_RUNS_DIR-}"
+    echo "CODEX_ORCHESTRATOR_OUT_DIR=\${CODEX_ORCHESTRATOR_OUT_DIR-}"
+    echo "CODEX_ORCHESTRATOR_PRESERVE_PROVIDER_ARTIFACT_ROOTS=\${CODEX_ORCHESTRATOR_PRESERVE_PROVIDER_ARTIFACT_ROOTS-}"
+    echo "MANIFEST=\${MANIFEST-}"
+  } >> "\${RUN_REVIEW_ENV_LOG}"
 fi
 has_arg() {
   local needle="$1"
@@ -1284,6 +1296,8 @@ function baseEnv(sandbox: string, codexBin: string): Record<string, string | und
   delete env.CODEX_ORCHESTRATOR_RUN_DIR;
   delete env.CODEX_ORCHESTRATOR_RUNS_DIR;
   delete env.CODEX_ORCHESTRATOR_OUT_DIR;
+  delete env.CODEX_ORCHESTRATOR_PIPELINE_ID;
+  delete env.CODEX_ORCHESTRATOR_PRESERVE_PROVIDER_ARTIFACT_ROOTS;
   delete env.MCP_RUNNER_TASK_ID;
   delete env.TASK;
   delete env.CODEX_ORCHESTRATOR_TASK_ID;
@@ -1314,7 +1328,8 @@ async function runReviewCommand(
 async function runReviewCommandSubprocess(
   manifestPath: string | null,
   env: Record<string, string | undefined>,
-  extraArgs: string[] = []
+  extraArgs: string[] = [],
+  cwd = process.cwd()
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
   const entryArgs = (await shouldUseFreshDist(runReviewScript, runReviewScriptDist))
     ? [runReviewScriptDist, ...extraArgs]
@@ -1328,7 +1343,7 @@ async function runReviewCommandSubprocess(
     const { stdout, stderr } = await execFileAsync(
       process.execPath,
       args,
-      { cwd: process.cwd(), env, maxBuffer: 16 * 1024 * 1024, timeout: 30_000 }
+      { cwd, env, maxBuffer: 16 * 1024 * 1024, timeout: 30_000 }
     );
     return { exitCode: 0, stdout: String(stdout ?? ''), stderr: String(stderr ?? '') };
   } catch (error) {
@@ -3814,7 +3829,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.stderr).not.toContain('termination boundary: stall (output-stall).');
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
-  it('defaults manifest selection to active task env when --task is omitted', async () => {
+  it('defaults manifest selection to canonical task env when --task is omitted', async () => {
     const sandbox = await makeSandbox();
     await makeManifestForTask(
       sandbox,
@@ -3827,7 +3842,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const codexBin = await makeFakeCodex(sandbox);
     const result = await runReviewCommand(null, {
       ...baseEnv(sandbox, codexBin),
-      MCP_RUNNER_TASK_ID: '0975-codex-cli-capability-adoption-redesign'
+      CODEX_ORCHESTRATOR_TASK_ID: '0975-codex-cli-capability-adoption-redesign'
     });
 
     expect(result.exitCode).toBe(0);
@@ -4118,6 +4133,157 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const activePrompt = await readFile(activePromptPath, 'utf8');
     expect(activePrompt).toContain('Evidence manifest: .runs/sample-task/cli/active-manifest/manifest.json');
     await expect(readFile(stalePromptPath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('rebases provider-worker explicit manifest and inherited run-dir envs to issue workspace artifacts', async () => {
+    const sharedRoot = await mkdtemp(join(process.cwd(), '.tmp-run-review-provider-'));
+    createdSandboxes.push(sharedRoot);
+    const taskId = 'linear-lin-issue-1';
+    const issueWorkspacePath = join(sharedRoot, '.workspaces', taskId);
+    const sharedManifestPath = await makeManifestForTask(sharedRoot, taskId, 'provider-parent-run');
+    const workspaceManifestPath = await makeManifestForTask(
+      issueWorkspacePath,
+      taskId,
+      'provider-parent-run'
+    );
+    const codexBin = await makeFakeCodex(sharedRoot);
+    const envLogPath = join(sharedRoot, 'review-env.log');
+
+    const result = await runReviewCommandSubprocess(
+      null,
+      {
+        ...baseEnv(sharedRoot, codexBin),
+        MCP_RUNNER_TASK_ID: 'stale-linear-issue',
+        CODEX_ORCHESTRATOR_TASK_ID: taskId,
+        CODEX_ORCHESTRATOR_PIPELINE_ID: 'provider-linear-worker',
+        CODEX_ORCHESTRATOR_RUN_DIR: dirname(sharedManifestPath),
+        CODEX_ORCHESTRATOR_RUNS_DIR: join(sharedRoot, '.runs'),
+        CODEX_ORCHESTRATOR_OUT_DIR: join(sharedRoot, 'out'),
+        CODEX_ORCHESTRATOR_PRESERVE_PROVIDER_ARTIFACT_ROOTS: '1',
+        RUN_REVIEW_ENV_LOG: envLogPath
+      },
+      ['--manifest', relative(sharedRoot, sharedManifestPath), '--surface', 'audit'],
+      issueWorkspacePath
+    );
+
+    expect(result.exitCode).toBe(0);
+    const workspacePromptPath = join(dirname(workspaceManifestPath), 'review', 'prompt.txt');
+    const sharedPromptPath = join(dirname(sharedManifestPath), 'review', 'prompt.txt');
+    const workspacePrompt = await readFile(workspacePromptPath, 'utf8');
+    expect(workspacePrompt).toContain(
+      'Evidence manifest: .runs/linear-lin-issue-1/cli/provider-parent-run/manifest.json'
+    );
+    const reviewEnvLog = await readFile(envLogPath, 'utf8');
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_ROOT=${issueWorkspacePath}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_MANIFEST_PATH=${workspaceManifestPath}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_RUN_DIR=${dirname(workspaceManifestPath)}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_RUNS_DIR=${join(issueWorkspacePath, '.runs')}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_OUT_DIR=${join(issueWorkspacePath, 'out')}`);
+    expect(reviewEnvLog).toContain('CODEX_ORCHESTRATOR_PRESERVE_PROVIDER_ARTIFACT_ROOTS=1');
+    expect(reviewEnvLog).toContain(`MANIFEST=${workspaceManifestPath}`);
+    await expect(readFile(sharedPromptPath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('keeps inherited provider-worker manifest envs on the real shared manifest when no workspace counterpart exists', async () => {
+    const sharedRoot = await mkdtemp(join(process.cwd(), '.tmp-run-review-provider-'));
+    createdSandboxes.push(sharedRoot);
+    const taskId = 'linear-lin-issue-1';
+    const issueWorkspacePath = join(sharedRoot, '.workspaces', taskId);
+    await mkdir(issueWorkspacePath, { recursive: true });
+    const sharedManifestPath = await makeManifestForTask(sharedRoot, taskId, 'provider-parent-run');
+    const codexBin = await makeFakeCodex(sharedRoot);
+    const envLogPath = join(sharedRoot, 'review-env-no-counterpart.log');
+
+    const result = await runReviewCommandSubprocess(
+      null,
+      {
+        ...baseEnv(sharedRoot, codexBin),
+        MCP_RUNNER_TASK_ID: taskId,
+        CODEX_ORCHESTRATOR_PIPELINE_ID: 'provider-linear-worker',
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: sharedManifestPath,
+        CODEX_ORCHESTRATOR_RUN_DIR: dirname(sharedManifestPath),
+        CODEX_ORCHESTRATOR_RUNS_DIR: join(sharedRoot, '.runs'),
+        CODEX_ORCHESTRATOR_OUT_DIR: join(sharedRoot, 'out'),
+        RUN_REVIEW_ENV_LOG: envLogPath
+      },
+      ['--surface', 'audit'],
+      issueWorkspacePath
+    );
+
+    expect(result.exitCode).toBe(0);
+    const sharedPromptPath = join(dirname(sharedManifestPath), 'review', 'prompt.txt');
+    const workspacePromptPath = join(
+      issueWorkspacePath,
+      '.runs',
+      taskId,
+      'cli',
+      'provider-parent-run',
+      'review',
+      'prompt.txt'
+    );
+    const sharedPrompt = await readFile(sharedPromptPath, 'utf8');
+    expect(sharedPrompt).toContain(
+      'Evidence manifest: ../../.runs/linear-lin-issue-1/cli/provider-parent-run/manifest.json'
+    );
+    const reviewEnvLog = await readFile(envLogPath, 'utf8');
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_ROOT=${issueWorkspacePath}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_MANIFEST_PATH=${sharedManifestPath}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_RUN_DIR=${dirname(sharedManifestPath)}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_RUNS_DIR=${join(sharedRoot, '.runs')}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_OUT_DIR=${join(issueWorkspacePath, 'out')}`);
+    expect(reviewEnvLog).toContain('CODEX_ORCHESTRATOR_PRESERVE_PROVIDER_ARTIFACT_ROOTS=1');
+    expect(reviewEnvLog).toContain(`MANIFEST=${sharedManifestPath}`);
+    await expect(readFile(workspacePromptPath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('keeps explicit relative provider-worker runs-dir on the real shared manifest without a workspace counterpart', async () => {
+    const sharedRoot = await mkdtemp(join(process.cwd(), '.tmp-run-review-provider-'));
+    createdSandboxes.push(sharedRoot);
+    const taskId = 'linear-lin-issue-1';
+    const issueWorkspacePath = join(sharedRoot, '.workspaces', taskId);
+    await mkdir(issueWorkspacePath, { recursive: true });
+    await mkdir(join(issueWorkspacePath, '.runs'), { recursive: true });
+    const sharedManifestPath = await makeManifestForTask(sharedRoot, taskId, 'provider-parent-run');
+    const codexBin = await makeFakeCodex(sharedRoot);
+    const envLogPath = join(sharedRoot, 'review-env-relative-no-counterpart.log');
+
+    const result = await runReviewCommandSubprocess(
+      null,
+      {
+        ...baseEnv(sharedRoot, codexBin),
+        MCP_RUNNER_TASK_ID: taskId,
+        CODEX_ORCHESTRATOR_PIPELINE_ID: 'provider-linear-worker',
+        CODEX_ORCHESTRATOR_RUNS_DIR: '.runs',
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out',
+        RUN_REVIEW_ENV_LOG: envLogPath
+      },
+      ['--runs-dir', '.runs', '--surface', 'audit'],
+      issueWorkspacePath
+    );
+
+    expect(result.exitCode).toBe(0);
+    const sharedPromptPath = join(dirname(sharedManifestPath), 'review', 'prompt.txt');
+    const workspacePromptPath = join(
+      issueWorkspacePath,
+      '.runs',
+      taskId,
+      'cli',
+      'provider-parent-run',
+      'review',
+      'prompt.txt'
+    );
+    await expect(readFile(sharedPromptPath, 'utf8')).resolves.toContain(
+      'Evidence manifest: ../../.runs/linear-lin-issue-1/cli/provider-parent-run/manifest.json'
+    );
+    const reviewEnvLog = await readFile(envLogPath, 'utf8');
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_ROOT=${issueWorkspacePath}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_MANIFEST_PATH=${sharedManifestPath}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_RUN_DIR=${dirname(sharedManifestPath)}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_RUNS_DIR=${join(sharedRoot, '.runs')}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_OUT_DIR=${join(issueWorkspacePath, 'out')}`);
+    expect(reviewEnvLog).toContain('CODEX_ORCHESTRATOR_PRESERVE_PROVIDER_ARTIFACT_ROOTS=1');
+    expect(reviewEnvLog).toContain(`MANIFEST=${sharedManifestPath}`);
+    await expect(readFile(workspacePromptPath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
   it('ignores CODEX_ORCHESTRATOR_RUN_DIR when --task requests a different task', async () => {

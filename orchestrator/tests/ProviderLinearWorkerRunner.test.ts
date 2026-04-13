@@ -4,7 +4,7 @@ import http from 'node:http';
 import { mkdtemp, mkdir, readFile, realpath, rm, symlink, utimes, writeFile } from 'node:fs/promises';
 import type { Socket } from 'node:net';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { PassThrough } from 'node:stream';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -451,6 +451,130 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       maxTurns: 7
     });
     expect(context.sourceSetup).toBeNull();
+  });
+
+  it('prefers the issue workspace root when the manifest still points at the shared root', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const issueWorkspacePath = join(tempRoot ?? '', '.workspaces', 'linear-lin-issue-1');
+    await mkdir(issueWorkspacePath, { recursive: true });
+
+    const context = await loadProviderLinearWorkerContext({
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+      CODEX_ORCHESTRATOR_ROOT: issueWorkspacePath,
+      CODEX_ORCHESTRATOR_TASK_ID: 'linear-lin-issue-1'
+    });
+
+    expect(context.repoRoot).toBe(issueWorkspacePath);
+    expect(context.workspacePath).toBe(issueWorkspacePath);
+  });
+
+  it('prefers the current issue workspace cwd over a stale shared-root env value', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const issueWorkspacePath = join(tempRoot ?? '', '.workspaces', 'linear-lin-issue-1');
+    await mkdir(issueWorkspacePath, { recursive: true });
+
+    const context = await loadProviderLinearWorkerContext(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: relative(tempRoot ?? '', manifestPath),
+        CODEX_ORCHESTRATOR_ROOT: relative(issueWorkspacePath, tempRoot ?? ''),
+        CODEX_ORCHESTRATOR_TASK_ID: 'linear-lin-issue-1'
+      },
+      undefined,
+      issueWorkspacePath
+    );
+
+    expect(context.repoRoot).toBe(issueWorkspacePath);
+    expect(context.workspacePath).toBe(issueWorkspacePath);
+  });
+
+  it('rebases the provider manifest and run directory to the authoritative issue workspace', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const issueWorkspacePath = join(tempRoot ?? '', '.workspaces', 'linear-lin-issue-1');
+    const workspaceRunDir = join(
+      issueWorkspacePath,
+      '.runs',
+      'linear-lin-issue-1',
+      'cli',
+      'run-child'
+    );
+    const workspaceManifestPath = join(workspaceRunDir, 'manifest.json');
+    await mkdir(workspaceRunDir, { recursive: true });
+    await writeFile(
+      workspaceManifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: issueWorkspacePath
+      }),
+      'utf8'
+    );
+
+    const context = await loadProviderLinearWorkerContext(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_TASK_ID: 'linear-lin-issue-1'
+      },
+      undefined,
+      issueWorkspacePath
+    );
+
+    expect(context.repoRoot).toBe(issueWorkspacePath);
+    expect(context.workspacePath).toBe(issueWorkspacePath);
+    expect(context.manifestPath).toBe(workspaceManifestPath);
+    expect(context.controlHostManifestPath).toBe(manifestPath);
+    expect(context.runDir).toBe(workspaceRunDir);
+  });
+
+  it('keeps the original manifest when the authoritative issue workspace has no mirror', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const issueWorkspacePath = join(tempRoot ?? '', '.workspaces', 'linear-lin-issue-1');
+    await mkdir(issueWorkspacePath, { recursive: true });
+    const readManifest = vi.fn(async (inputPath: string) =>
+      JSON.parse(await readFile(inputPath, 'utf8')) as Record<string, unknown>
+    );
+
+    const context = await loadProviderLinearWorkerContext(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_TASK_ID: 'linear-lin-issue-1'
+      },
+      readManifest,
+      issueWorkspacePath
+    );
+
+    expect(context.repoRoot).toBe(issueWorkspacePath);
+    expect(context.workspacePath).toBe(issueWorkspacePath);
+    expect(context).toMatchObject({ manifestPath, controlHostManifestPath: manifestPath, runDir });
+    expect(readManifest).toHaveBeenCalledTimes(1);
+    expect(readManifest).toHaveBeenCalledWith(manifestPath);
+  });
+
+  it('rejects an issue-workspace manifest mirror with a mismatched task id', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const issueWorkspacePath = join(tempRoot ?? '', '.workspaces', 'linear-lin-issue-1');
+    const workspaceRunDir = join(issueWorkspacePath, '.runs', 'linear-lin-issue-1', 'cli', 'run-child');
+    await mkdir(workspaceRunDir, { recursive: true });
+    await writeFile(
+      join(workspaceRunDir, 'manifest.json'),
+      JSON.stringify({ run_id: 'run-child', task_id: 'linear-lin-issue-2', workspace_path: issueWorkspacePath }),
+      'utf8'
+    );
+
+    await expect(
+      loadProviderLinearWorkerContext(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_TASK_ID: 'linear-lin-issue-1'
+        },
+        undefined,
+        issueWorkspacePath
+      )
+    ).rejects.toThrow('Provider worker task id mismatch');
   });
 
   it('loads env-backed Linear scope binding into provider worker context', async () => {
@@ -9310,6 +9434,132 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       expect(written).toMatchObject({
         owner_status: 'succeeded',
         end_reason: 'max_turns_reached_issue_still_active'
+      });
+      expect(controlServer.requests).toHaveLength(1);
+      expect(controlServer.requests[0]).toMatchObject({
+        url: '/api/v1/refresh',
+        body: {
+          action: 'refresh',
+          source: 'provider-linear-worker',
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          owner_status: 'succeeded',
+          end_reason: 'max_turns_reached_issue_still_active'
+        }
+      });
+      expectRefreshAuthHeaders(controlServer.requests[0]?.headers);
+    } finally {
+      await controlServer.close();
+    }
+  });
+
+  it('keeps control-host refresh anchored to the shared provider manifest after issue-workspace manifest rebasing', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const issueWorkspacePath = join(tempRoot ?? '', '.workspaces', 'linear-lin-issue-1');
+    const workspaceRunDir = join(
+      issueWorkspacePath,
+      '.runs',
+      'linear-lin-issue-1',
+      'cli',
+      'run-child'
+    );
+    const workspaceManifestPath = join(workspaceRunDir, 'manifest.json');
+    await mkdir(workspaceRunDir, { recursive: true });
+
+    const controlHostRunDir = join(tempRoot ?? '', '.runs', 'local-mcp', 'cli', 'control-host');
+    await mkdir(controlHostRunDir, { recursive: true });
+    const controlServer = await createControlEndpointServer();
+    await writeFile(
+      join(controlHostRunDir, 'control_endpoint.json'),
+      JSON.stringify({
+        base_url: controlServer.baseUrl,
+        token_path: 'control_auth.json'
+      }),
+      'utf8'
+    );
+    await writeFile(join(controlHostRunDir, 'control_auth.json'), JSON.stringify({ token: 'control-token' }), 'utf8');
+    await writeFile(
+      join(controlHostRunDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: 'control-host',
+        task_id: 'local-mcp',
+        workspace_path: tempRoot
+      }),
+      'utf8'
+    );
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: tempRoot,
+        provider_control_host_task_id: 'local-mcp',
+        provider_control_host_run_id: 'control-host'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      workspaceManifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: issueWorkspacePath
+      }),
+      'utf8'
+    );
+
+    try {
+      const proof = await runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: issueWorkspacePath,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+        },
+        {
+          readTrackedIssue: vi.fn(async () => createTrackedIssue({
+            state: 'Merging',
+            state_type: 'started',
+            assignee_id: null,
+            assignee_name: null
+          })),
+          resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+          execRunner: vi.fn(async (request) => {
+            await appendStaySerialParallelizationDecisionAuditForRequest(request);
+            return {
+              exitCode: 0,
+              stdout: [
+                '{"type":"thread.started","thread_id":"thread-1"}',
+                '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+                '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}'
+              ].join('\n'),
+              stderr: ''
+            };
+          }),
+          now: vi
+            .fn()
+            .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+            .mockReturnValue('2026-03-21T09:00:01.000Z'),
+          log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+        }
+      );
+
+      expect(proof).toMatchObject({
+        owner_status: 'succeeded',
+        end_reason: 'max_turns_reached_issue_still_active',
+        workspace_path: issueWorkspacePath
+      });
+      const written = JSON.parse(
+        await readFile(join(workspaceRunDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+      ) as Record<string, unknown>;
+      expect(written).toMatchObject({
+        owner_status: 'succeeded',
+        end_reason: 'max_turns_reached_issue_still_active',
+        workspace_path: issueWorkspacePath
       });
       expect(controlServer.requests).toHaveLength(1);
       expect(controlServer.requests[0]).toMatchObject({

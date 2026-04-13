@@ -144,6 +144,8 @@ const toml = require('@iarna/toml') as {
 export interface ProviderLinearWorkerContext {
   manifest: Record<string, unknown>;
   manifestPath: string;
+  controlHostManifest: Record<string, unknown>;
+  controlHostManifestPath: string;
   runDir: string;
   repoRoot: string;
   runId: string;
@@ -618,16 +620,180 @@ function resolveProviderLinearWorkerSourceSetup(
   return hasLinearSourceBinding(sourceSetup) ? sourceSetup : null;
 }
 
+interface ProviderLinearWorkerRootAuthority {
+  repoRoot: string;
+  workspacePath: string | null;
+}
+
+function isProviderIssueWorkspaceRootForTask(
+  candidate: string | null,
+  taskId: string
+): candidate is string {
+  return Boolean(
+    candidate &&
+      basename(candidate) === taskId &&
+      basename(dirname(candidate)) === PROVIDER_WORKSPACE_ROOT_DIRNAME
+  );
+}
+
+function resolveProviderLinearWorkerConfiguredPath(input: {
+  rawPath: string;
+  cwd: string;
+  taskId: string | null;
+  envRepoRoot?: string | null;
+}): string {
+  const normalizedCwd = resolve(input.cwd);
+  if (isAbsolute(input.rawPath) || !input.taskId || !isProviderIssueWorkspaceRootForTask(normalizedCwd, input.taskId)) {
+    return resolve(normalizedCwd, input.rawPath);
+  }
+  const sharedRoot = dirname(dirname(normalizedCwd));
+  const envRepoRoot = input.envRepoRoot ? resolve(isAbsolute(input.envRepoRoot) ? input.envRepoRoot : resolve(normalizedCwd, input.envRepoRoot)) : null;
+  return envRepoRoot === sharedRoot ? resolve(sharedRoot, input.rawPath) : resolve(normalizedCwd, input.rawPath);
+}
+
+function resolveProviderLinearWorkerRootAuthority(input: {
+  manifestWorkspacePath: string | null;
+  envRepoRoot: string | null;
+  taskId: string | null;
+  cwd: string;
+}): ProviderLinearWorkerRootAuthority {
+  const normalizedManifestWorkspacePath = input.manifestWorkspacePath
+    ? resolveProviderLinearWorkerConfiguredPath({ rawPath: input.manifestWorkspacePath, cwd: input.cwd, taskId: input.taskId, envRepoRoot: input.envRepoRoot })
+    : null;
+  const normalizedEnvRepoRoot = input.envRepoRoot
+    ? resolveProviderLinearWorkerConfiguredPath({ rawPath: input.envRepoRoot, cwd: input.cwd, taskId: input.taskId })
+    : null;
+  const normalizedCwd = resolve(input.cwd);
+  const activeIssueWorkspacePath = input.taskId
+    ? [normalizedEnvRepoRoot, normalizedCwd, normalizedManifestWorkspacePath].find((candidate) =>
+        isProviderIssueWorkspaceRootForTask(candidate, input.taskId ?? '')
+      ) ?? null
+    : null;
+
+  if (activeIssueWorkspacePath) {
+    const activeSharedRoot = dirname(dirname(activeIssueWorkspacePath));
+    const explicitRootsAreCompatible = [normalizedManifestWorkspacePath, normalizedEnvRepoRoot].every(
+      (candidate) =>
+        !candidate ||
+        candidate === activeIssueWorkspacePath ||
+        candidate === activeSharedRoot
+    );
+    if (explicitRootsAreCompatible) {
+      return {
+        repoRoot: activeIssueWorkspacePath,
+        workspacePath: activeIssueWorkspacePath
+      };
+    }
+  }
+
+  if (
+    normalizedManifestWorkspacePath &&
+    normalizedEnvRepoRoot &&
+    normalizedEnvRepoRoot !== normalizedManifestWorkspacePath
+  ) {
+    throw new Error(
+      `Provider worker root mismatch between env (${normalizedEnvRepoRoot}) and manifest (${normalizedManifestWorkspacePath}).`
+    );
+  }
+
+  const repoRoot = normalizedManifestWorkspacePath ?? normalizedEnvRepoRoot ?? normalizedCwd;
+  return {
+    repoRoot,
+    workspacePath: normalizedManifestWorkspacePath ?? repoRoot
+  };
+}
+
+function resolveProviderLinearWorkerManifestPathForRoot(input: {
+  manifestPath: string;
+  repoRoot: string;
+  taskId: string;
+}): string {
+  const normalizedManifestPath = resolve(input.manifestPath);
+  if (!isProviderIssueWorkspaceRootForTask(input.repoRoot, input.taskId)) {
+    return normalizedManifestPath;
+  }
+  if (isPathWithinRoot(normalizedManifestPath, input.repoRoot)) {
+    return normalizedManifestPath;
+  }
+
+  const sharedRunsRoot = join(dirname(dirname(input.repoRoot)), '.runs');
+  if (!isPathWithinRoot(normalizedManifestPath, sharedRunsRoot)) {
+    return normalizedManifestPath;
+  }
+
+  const workspaceManifestPath = resolve(
+    input.repoRoot,
+    '.runs',
+    relative(sharedRunsRoot, normalizedManifestPath)
+  );
+  return existsSync(workspaceManifestPath) ? workspaceManifestPath : normalizedManifestPath;
+}
+
 export async function loadProviderLinearWorkerContext(
   env: NodeJS.ProcessEnv = process.env,
   readManifest: (path: string) => Promise<Record<string, unknown>> = async (path) =>
-    JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>
+    JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>,
+  cwd: string = process.cwd()
 ): Promise<ProviderLinearWorkerContext> {
-  const manifestPath = normalizeOptionalString(env.CODEX_ORCHESTRATOR_MANIFEST_PATH);
+  let manifestPath = normalizeOptionalString(env.CODEX_ORCHESTRATOR_MANIFEST_PATH);
   if (!manifestPath) {
     throw new Error('CODEX_ORCHESTRATOR_MANIFEST_PATH is required for provider-linear-worker.');
   }
-  const manifest = await readManifest(manifestPath);
+  const initialEnvTaskId =
+    normalizeOptionalString(env.CODEX_ORCHESTRATOR_TASK_ID) ??
+    normalizeOptionalString(env.MCP_RUNNER_TASK_ID) ??
+    normalizeOptionalString(env.TASK);
+  const envRepoRoot = normalizeOptionalString(env.CODEX_ORCHESTRATOR_ROOT);
+  manifestPath = resolveProviderLinearWorkerConfiguredPath({
+    rawPath: manifestPath,
+    cwd,
+    taskId: initialEnvTaskId ?? contextTaskIdFromManifestPath(manifestPath),
+    envRepoRoot
+  });
+  let manifest = await readManifest(manifestPath);
+  const controlHostManifestPath = manifestPath;
+  const controlHostManifest = manifest;
+  const residentSessionSeed = parseProviderLinearResidentSessionSeed(
+    env[PROVIDER_LINEAR_RESIDENT_SESSION_SEED_ENV]
+  );
+  const initialManifestTaskId =
+    normalizeOptionalString(manifest.task_id) ??
+    normalizeOptionalString(manifest.taskId);
+  const initialTaskId = initialManifestTaskId
+    ? sanitizeTaskId(initialManifestTaskId)
+    : contextTaskIdFromManifestPath(manifestPath);
+  const envTaskId = initialEnvTaskId;
+  if (!initialTaskId || (envTaskId && envTaskId !== initialTaskId)) {
+    throw new Error(initialTaskId ? `Provider worker task id mismatch between env (${envTaskId}) and manifest (${initialTaskId}).` : 'Provider worker task id unavailable.');
+  }
+  const manifestWorkspacePath =
+    normalizeOptionalString(manifest.workspace_path) ??
+    normalizeOptionalString(manifest.workspacePath);
+  const rootAuthority = resolveProviderLinearWorkerRootAuthority({
+    manifestWorkspacePath,
+    envRepoRoot,
+    taskId: initialTaskId,
+    cwd
+  });
+  const repoRoot = rootAuthority.repoRoot;
+  const selectedManifestPath = resolveProviderLinearWorkerManifestPathForRoot({
+    manifestPath,
+    repoRoot,
+    taskId: initialTaskId
+  });
+  if (selectedManifestPath !== manifestPath) {
+    manifestPath = selectedManifestPath;
+    manifest = await readManifest(manifestPath);
+  }
+  const manifestTaskId =
+    normalizeOptionalString(manifest.task_id) ??
+    normalizeOptionalString(manifest.taskId);
+  const taskId = manifestTaskId
+    ? sanitizeTaskId(manifestTaskId)
+    : contextTaskIdFromManifestPath(manifestPath);
+  if (!taskId || taskId !== initialTaskId || (envTaskId && envTaskId !== taskId)) {
+    throw new Error(taskId ? `Provider worker task id mismatch between env (${envTaskId ?? initialTaskId}) and manifest (${taskId}).` : 'Provider worker task id unavailable.');
+  }
   const manifestIssueId =
     normalizeOptionalString(manifest.issue_id) ??
     normalizeOptionalString(manifest.issueId);
@@ -652,40 +818,21 @@ export async function loadProviderLinearWorkerContext(
   if (!issueId || !issueIdentifier) {
     throw new Error('Provider worker requires issue_id and issue_identifier in env or manifest.');
   }
-  const residentSessionSeed = parseProviderLinearResidentSessionSeed(
-    env[PROVIDER_LINEAR_RESIDENT_SESSION_SEED_ENV]
-  );
-  const manifestWorkspacePath =
-    normalizeOptionalString(manifest.workspace_path) ??
-    normalizeOptionalString(manifest.workspacePath);
-  const envRepoRoot = normalizeOptionalString(env.CODEX_ORCHESTRATOR_ROOT);
-  const normalizedManifestWorkspacePath = manifestWorkspacePath ? resolve(manifestWorkspacePath) : null;
-  const normalizedEnvRepoRoot = envRepoRoot ? resolve(envRepoRoot) : null;
-  if (normalizedManifestWorkspacePath && normalizedEnvRepoRoot && normalizedEnvRepoRoot !== normalizedManifestWorkspacePath) {
-    throw new Error(`Provider worker root mismatch between env (${normalizedEnvRepoRoot}) and manifest (${normalizedManifestWorkspacePath}).`);
-  }
-  const repoRoot = normalizedManifestWorkspacePath ?? normalizedEnvRepoRoot ?? resolve(process.cwd());
   const manifestRunId = normalizeOptionalString(manifest.run_id), envRunId = normalizeOptionalString(env.CODEX_ORCHESTRATOR_RUN_ID);
   if (manifestRunId && envRunId && envRunId !== manifestRunId) throw new Error(`Provider worker run id mismatch between env (${envRunId}) and manifest (${manifestRunId}).`);
   const runId = manifestRunId ?? envRunId ?? `provider-linear-worker-${Date.now()}`;
-  const manifestTaskId =
-    normalizeOptionalString(manifest.task_id) ??
-    normalizeOptionalString(manifest.taskId);
-  const taskId = manifestTaskId
-    ? sanitizeTaskId(manifestTaskId)
-    : contextTaskIdFromManifestPath(manifestPath);
-  const envTaskId = normalizeOptionalString(env.CODEX_ORCHESTRATOR_TASK_ID);
-  if (!taskId || (envTaskId && envTaskId !== taskId)) {
-    throw new Error(taskId ? `Provider worker task id mismatch between env (${envTaskId}) and manifest (${taskId}).` : 'Provider worker task id unavailable.');
-  }
   const manifestPipelineId = normalizeOptionalString(manifest.pipeline_id) ?? normalizeOptionalString(manifest.pipelineId), envPipelineId = normalizeOptionalString(env.CODEX_ORCHESTRATOR_PIPELINE_ID);
   if (manifestPipelineId && envPipelineId && envPipelineId !== manifestPipelineId) throw new Error(`Provider worker pipeline id mismatch between env (${envPipelineId}) and manifest (${manifestPipelineId}).`);
   const manifestProviderControlHostTaskId =
     normalizeOptionalString(manifest.provider_control_host_task_id) ??
-    normalizeOptionalString(manifest.providerControlHostTaskId);
+    normalizeOptionalString(manifest.providerControlHostTaskId) ??
+    normalizeOptionalString(controlHostManifest.provider_control_host_task_id) ??
+    normalizeOptionalString(controlHostManifest.providerControlHostTaskId);
   const manifestProviderControlHostRunId =
     normalizeOptionalString(manifest.provider_control_host_run_id) ??
-    normalizeOptionalString(manifest.providerControlHostRunId);
+    normalizeOptionalString(manifest.providerControlHostRunId) ??
+    normalizeOptionalString(controlHostManifest.provider_control_host_run_id) ??
+    normalizeOptionalString(controlHostManifest.providerControlHostRunId);
   const envProviderControlHostTaskId =
     normalizeOptionalString(env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID);
   const envProviderControlHostRunId =
@@ -708,6 +855,8 @@ export async function loadProviderLinearWorkerContext(
   return {
     manifest,
     manifestPath,
+    controlHostManifest,
+    controlHostManifestPath,
     runDir: dirname(manifestPath),
     repoRoot,
     runId,
@@ -724,7 +873,7 @@ export async function loadProviderLinearWorkerContext(
     providerControlHostRecordedInManifest:
       Boolean(manifestProviderControlHostTaskId && manifestProviderControlHostRunId),
     providerControlHostMatchesManifest,
-    workspacePath: normalizedManifestWorkspacePath ?? repoRoot,
+    workspacePath: rootAuthority.workspacePath,
     workerHost:
       envWorkerHost !== undefined
         ? envWorkerHost
@@ -3842,9 +3991,9 @@ export async function runProviderLinearWorker(
     const hydratedProof = await writeProofSnapshot(deps, context.runDir, auditPath, nextProof, childEnv);
     emitSemanticProgressIfChanged(hydratedProof);
     await requestProviderControlHostRefresh({
-      currentManifestPath: context.manifestPath,
+      currentManifestPath: context.controlHostManifestPath,
       env,
-      manifest: context.manifest,
+      manifest: context.controlHostManifest,
       proof: hydratedProof,
       repoRoot: context.repoRoot,
       log: deps.log
@@ -3969,9 +4118,9 @@ export async function runProviderLinearWorker(
           const abortController = new AbortController();
           liveRefreshAbortController = abortController;
           liveRefreshRequest = requestProviderControlHostRefresh({
-            currentManifestPath: context.manifestPath,
+            currentManifestPath: context.controlHostManifestPath,
             env,
-            manifest: context.manifest,
+            manifest: context.controlHostManifest,
             proof: finalProof,
             repoRoot: context.repoRoot,
             log: deps.log,
@@ -4001,9 +4150,9 @@ export async function runProviderLinearWorker(
         const abortController = new AbortController();
         liveRefreshAbortController = abortController;
         liveRefreshRequest = requestProviderControlHostRefresh({
-          currentManifestPath: context.manifestPath,
+          currentManifestPath: context.controlHostManifestPath,
           env,
-          manifest: context.manifest,
+          manifest: context.controlHostManifest,
           proof,
           repoRoot: context.repoRoot,
           log: deps.log,
