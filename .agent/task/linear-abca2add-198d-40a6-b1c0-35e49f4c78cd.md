@@ -50,6 +50,11 @@
 - 2026-04-13: Recorded the required same-turn `stay_serial` / `single_bounded_change` decision because the remaining live scope is one bounded teardown helper plus focused docs/tests.
 - 2026-04-13: Source audit confirmed `terminateChildProcess(...)` still escalates to descendant `SIGKILL`s after process-group cleanup, while `ensureTrackedProcessTreeExited(...)` is already narrowed and out of scope for this lane.
 - 2026-04-13: The bounded seam still passes `spec-guard`, `build`, `lint`, `delegation-guard`, and the focused `ControlHostSupervision.test.ts` regression at the start of the resumed validation pass.
+- 2026-04-13: Docs-first packet was mirrored, the first `docs-review` child stream failed closed on the `docs/TASKS.md` line-budget guard, `npm run docs:archive-tasks` repaired the budget, displaced snapshots `1014` and `1015` were restored into tracked `docs/TASKS-archive-2026.md`, and the rerun child stream completed cleanly with `review_outcome=clean-success`.
+- 2026-04-13: `terminateChildProcess(...)` was narrowed to process-group-scoped timeout cleanup with descendant diagnostics only, the dead `killProcess` option was removed in the elegance pass, and the focused `ControlHostSupervision.test.ts` regression passed again after the final trim.
+- 2026-04-13: Full `npm run test` remained blocked by unrelated provider suites, so follow-up `CO-165` was created instead of widening CO-164 scope.
+- 2026-04-13: After refreshing the workpad with the final blocker state, the issue was moved from `In Progress` to `Blocked` because review handoff cannot proceed until `CO-165` clears the unrelated repo test baseline.
+- 2026-04-13: With `CO-165` now `Done`, the lane resumed on the same branch/workpad, refreshed the workpad back to an active validation plan, confirmed the branch trails `origin/main` by seven commits, and restarted the validation loop from the current repo baseline.
 
 ## Relevant Files
 - `orchestrator/src/cli/controlHostSupervisionCliShell.ts`
@@ -58,3 +63,5 @@
 ## Notes
 - This lane intentionally preserves the `CO-163` restart-specific cleanup semantics and only narrows the adjacent generic wrapper cleanup path.
 - Same-issue child lanes stayed serial this turn because docs, code, and tests all converge on the same bounded teardown contract.
+- The packaged `bin/codex-orchestrator.js linear ...` wrapper started failing in this workspace with an uncaught `[Object: null prototype]`; the underlying `runLinearCliShell(...)` path still worked, so live Linear reads/writes and child-stream launches used that direct shell path instead of broadening scope into wrapper repair.
+- `CO-165` tracks the unrelated provider-worker full-suite failures that still block review handoff for this lane.
