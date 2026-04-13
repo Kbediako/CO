@@ -227,6 +227,14 @@ function isPathWithinRoot(root: string, candidate: string): boolean {
   );
 }
 
+function firstPathSegment(relativePath: string): string {
+  return relativePath.split(path.sep).filter((segment) => segment.length > 0)[0] ?? '';
+}
+
+function isDefaultRunsLayoutSegment(segment: string): boolean {
+  return segment === '.runs' || segment === 'runs';
+}
+
 function isProviderIssueWorkspaceRootForEnv(repoRoot: string, env: NodeJS.ProcessEnv): boolean {
   if (env.CODEX_ORCHESTRATOR_PIPELINE_ID !== PROVIDER_LINEAR_WORKER_PIPELINE_ID) {
     return false;
@@ -257,6 +265,45 @@ function resolveProviderSharedRootForEnv(repoRoot: string, env: NodeJS.ProcessEn
   return resolveConfiguredReviewRoot(env) === sharedRoot ? sharedRoot : null;
 }
 
+function resolveConfiguredReviewArtifactRoot(
+  repoRoot: string,
+  env: NodeJS.ProcessEnv,
+  configured: string | undefined,
+  fallbackDirname: string
+): string {
+  const inheritedSharedRoot = resolveProviderSharedRootForEnv(repoRoot, env);
+  const baseRoot = inheritedSharedRoot ?? repoRoot;
+  const normalized = configured?.trim();
+  if (!normalized) {
+    return path.resolve(baseRoot, fallbackDirname);
+  }
+  return path.isAbsolute(normalized) ? path.resolve(normalized) : path.resolve(baseRoot, normalized);
+}
+
+function resolveWorkspaceArtifactRootForSharedRoot(
+  repoRoot: string,
+  env: NodeJS.ProcessEnv,
+  sharedArtifactRoot: string,
+  fallbackDirname: string,
+  allowCustomCounterpart = false
+): string | null {
+  const inheritedSharedRoot = resolveProviderSharedRootForEnv(repoRoot, env);
+  const sharedRoot = inheritedSharedRoot ?? path.dirname(path.dirname(repoRoot));
+  if (!isPathWithinRoot(sharedRoot, sharedArtifactRoot)) {
+    return null;
+  }
+  const relativeArtifactRoot = path.relative(sharedRoot, sharedArtifactRoot);
+  const firstSegment = firstPathSegment(relativeArtifactRoot);
+  if (
+    (fallbackDirname === '.runs' && isDefaultRunsLayoutSegment(firstSegment)) ||
+    firstSegment === fallbackDirname ||
+    allowCustomCounterpart
+  ) {
+    return path.resolve(repoRoot, relativeArtifactRoot);
+  }
+  return null;
+}
+
 function resolveReviewEnvPath(raw: string, repoRoot: string, env: NodeJS.ProcessEnv = process.env): string {
   const inheritedSharedRoot = resolveProviderSharedRootForEnv(repoRoot, env);
   const relativeBaseRoot = inheritedSharedRoot ?? repoRoot;
@@ -264,11 +311,26 @@ function resolveReviewEnvPath(raw: string, repoRoot: string, env: NodeJS.Process
   if (!isProviderIssueWorkspaceRootForEnv(repoRoot, env) || isPathWithinRoot(repoRoot, resolved)) {
     return resolved;
   }
-  const sharedRunsRoot = path.join(path.dirname(path.dirname(repoRoot)), '.runs');
+  const sharedRunsRoot = resolveConfiguredReviewArtifactRoot(
+    repoRoot,
+    env,
+    env.CODEX_ORCHESTRATOR_RUNS_DIR || '.runs',
+    '.runs'
+  );
   if (!isPathWithinRoot(sharedRunsRoot, resolved)) {
     return resolved;
   }
-  const workspaceCandidate = path.resolve(repoRoot, '.runs', path.relative(sharedRunsRoot, resolved));
+  const workspaceRunsRoot = resolveWorkspaceArtifactRootForSharedRoot(
+    repoRoot,
+    env,
+    sharedRunsRoot,
+    '.runs',
+    true
+  );
+  if (!workspaceRunsRoot) {
+    return resolved;
+  }
+  const workspaceCandidate = path.resolve(workspaceRunsRoot, path.relative(sharedRunsRoot, resolved));
   return existsSync(workspaceCandidate) ? workspaceCandidate : resolved;
 }
 
@@ -277,7 +339,11 @@ function resolveReviewRunsDirPath(raw: string, repoRoot: string, env: NodeJS.Pro
   return path.isAbsolute(raw) ? path.resolve(raw) : path.resolve(inheritedSharedRoot ?? repoRoot, raw);
 }
 
-function inferRunsRootFromManifestPath(manifestPath: string): string | null {
+function inferRunsRootFromManifestPath(
+  manifestPath: string,
+  env: NodeJS.ProcessEnv = process.env,
+  repoRoot: string | null = null
+): string | null {
   const resolvedManifestPath = path.resolve(manifestPath);
   if (path.basename(resolvedManifestPath) !== 'manifest.json') {
     return null;
@@ -289,9 +355,21 @@ function inferRunsRootFromManifestPath(manifestPath: string): string | null {
   }
   const taskDir = path.dirname(layoutDir);
   const runsRoot = path.dirname(taskDir);
-  return path.basename(runsRoot) === '.runs' || path.basename(runsRoot) === 'runs'
-    ? runsRoot
-    : null;
+  if (path.basename(runsRoot) === '.runs' || path.basename(runsRoot) === 'runs') {
+    return runsRoot;
+  }
+  if (repoRoot) {
+    const configuredRunsRoot = resolveConfiguredReviewArtifactRoot(
+      repoRoot,
+      env,
+      env.CODEX_ORCHESTRATOR_RUNS_DIR,
+      '.runs'
+    );
+    if (isPathWithinRoot(configuredRunsRoot, resolvedManifestPath)) {
+      return configuredRunsRoot;
+    }
+  }
+  return null;
 }
 
 function resolveReviewExecutionArtifactRoots(
@@ -299,7 +377,7 @@ function resolveReviewExecutionArtifactRoots(
   environmentPaths: { repoRoot: string; defaultRunsDir: string; defaultOutDir: string },
   manifestPath: string
 ): { runsDir: string; outDir: string; preserveProviderArtifactRoots: boolean } {
-  const manifestRunsRoot = inferRunsRootFromManifestPath(manifestPath);
+  const manifestRunsRoot = inferRunsRootFromManifestPath(manifestPath, env, environmentPaths.repoRoot);
   if (
     !manifestRunsRoot ||
     !isProviderIssueWorkspaceRootForEnv(environmentPaths.repoRoot, env) ||
@@ -313,18 +391,20 @@ function resolveReviewExecutionArtifactRoots(
   }
 
   const manifestRepoRoot = path.dirname(manifestRunsRoot);
-  const providerSharedRoot = resolveProviderSharedRootForEnv(environmentPaths.repoRoot, env);
   const configuredOutDir = env.CODEX_ORCHESTRATOR_OUT_DIR?.trim();
   const resolvedConfiguredOutDir = configuredOutDir
-    ? (path.isAbsolute(configuredOutDir)
-        ? path.resolve(configuredOutDir)
-        : path.resolve(manifestRepoRoot, configuredOutDir))
+    ? resolveConfiguredReviewArtifactRoot(environmentPaths.repoRoot, env, configuredOutDir, 'out')
     : null;
-  const outDir =
-    providerSharedRoot &&
-    resolvedConfiguredOutDir === path.join(providerSharedRoot, 'out')
-      ? path.join(environmentPaths.repoRoot, 'out')
-      : resolvedConfiguredOutDir ?? path.join(manifestRepoRoot, 'out');
+  const workspaceConfiguredOutDir = resolvedConfiguredOutDir
+    ? resolveWorkspaceArtifactRootForSharedRoot(
+        environmentPaths.repoRoot,
+        env,
+        resolvedConfiguredOutDir,
+        'out',
+        isPathWithinRoot(environmentPaths.repoRoot, manifestPath)
+      )
+    : null;
+  const outDir = workspaceConfiguredOutDir ?? resolvedConfiguredOutDir ?? path.join(manifestRepoRoot, 'out');
   return {
     runsDir: manifestRunsRoot,
     outDir,
@@ -500,7 +580,7 @@ async function resolveManifestPath(options: CliOptions, repoRoot: string): Promi
   );
 
   scored.sort((a, b) => b.mtimeMs - a.mtimeMs);
-  return scored[0]?.manifestPath ?? manifests[0];
+  return resolveReviewEnvPath(scored[0]?.manifestPath ?? manifests[0], repoRoot);
 }
 
 async function resolveManifestPathFromRunDir(repoRoot: string): Promise<string | null> {

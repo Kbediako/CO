@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
-import { join, relative, resolve } from 'node:path';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { dirname, join, relative, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import process from 'node:process';
 
@@ -111,6 +111,44 @@ describe('resolveEnvironmentPaths', () => {
     expect(env.taskId).toBe(taskId);
   });
 
+  it('rebases configured runs layout roots to the provider issue workspace', async () => {
+    const repoRoot = resolve(workspaceRoot, 'repo-root');
+    const taskId = 'linear-lin-issue-1';
+    const issueWorkspacePath = join(repoRoot, '.workspaces', taskId);
+    await mkdir(issueWorkspacePath, { recursive: true });
+    process.env.CODEX_ORCHESTRATOR_ROOT = repoRoot;
+    process.env.CODEX_ORCHESTRATOR_PIPELINE_ID = 'provider-linear-worker';
+    process.env.MCP_RUNNER_TASK_ID = taskId;
+    process.env.CODEX_ORCHESTRATOR_RUNS_DIR = join(repoRoot, 'runs');
+    process.env.CODEX_ORCHESTRATOR_OUT_DIR = join(repoRoot, 'out');
+
+    const env = resolveEnvironmentPathsForProcess(process.env, issueWorkspacePath);
+
+    expect(env.repoRoot).toBe(issueWorkspacePath);
+    expect(env.runsRoot).toBe(join(issueWorkspacePath, 'runs'));
+    expect(env.outRoot).toBe(join(issueWorkspacePath, 'out'));
+    expect(env.taskId).toBe(taskId);
+  });
+
+  it('rebases default shared roots when the configured provider root is already the issue workspace', async () => {
+    const repoRoot = resolve(workspaceRoot, 'repo-root');
+    const taskId = 'linear-lin-issue-1';
+    const issueWorkspacePath = join(repoRoot, '.workspaces', taskId);
+    await mkdir(issueWorkspacePath, { recursive: true });
+    process.env.CODEX_ORCHESTRATOR_ROOT = issueWorkspacePath;
+    process.env.CODEX_ORCHESTRATOR_PIPELINE_ID = 'provider-linear-worker';
+    process.env.MCP_RUNNER_TASK_ID = taskId;
+    process.env.CODEX_ORCHESTRATOR_RUNS_DIR = join(repoRoot, '.runs');
+    process.env.CODEX_ORCHESTRATOR_OUT_DIR = join(repoRoot, 'out');
+
+    const env = resolveEnvironmentPathsForProcess(process.env, issueWorkspacePath);
+
+    expect(env.repoRoot).toBe(issueWorkspacePath);
+    expect(env.runsRoot).toBe(join(issueWorkspacePath, '.runs'));
+    expect(env.outRoot).toBe(join(issueWorkspacePath, 'out'));
+    expect(env.taskId).toBe(taskId);
+  });
+
   it('preserves shared artifact roots when the active provider manifest has no workspace counterpart', async () => {
     const repoRoot = resolve(workspaceRoot, 'repo-root');
     const taskId = 'linear-lin-issue-1';
@@ -155,6 +193,28 @@ describe('resolveEnvironmentPaths', () => {
     expect(env.taskId).toBe(taskId);
   });
 
+  it('preserves relative shared runs layout roots when a provider manifest has no workspace counterpart', async () => {
+    const repoRoot = resolve(workspaceRoot, 'repo-root');
+    const taskId = 'linear-lin-issue-1';
+    const issueWorkspacePath = join(repoRoot, '.workspaces', taskId);
+    const sharedManifestPath = join(repoRoot, 'runs', taskId, 'cli', 'provider-parent-run', 'manifest.json');
+    await mkdir(issueWorkspacePath, { recursive: true });
+    process.env.CODEX_ORCHESTRATOR_ROOT = repoRoot;
+    process.env.CODEX_ORCHESTRATOR_PIPELINE_ID = 'provider-linear-worker';
+    process.env.MCP_RUNNER_TASK_ID = taskId;
+    process.env.CODEX_ORCHESTRATOR_RUNS_DIR = 'runs';
+    process.env.CODEX_ORCHESTRATOR_OUT_DIR = 'out';
+    process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH = relative(repoRoot, sharedManifestPath);
+    process.env.CODEX_ORCHESTRATOR_PRESERVE_PROVIDER_ARTIFACT_ROOTS = '1';
+
+    const env = resolveEnvironmentPathsForProcess(process.env, issueWorkspacePath);
+
+    expect(env.repoRoot).toBe(issueWorkspacePath);
+    expect(env.runsRoot).toBe(join(repoRoot, 'runs'));
+    expect(env.outRoot).toBe(join(repoRoot, 'out'));
+    expect(env.taskId).toBe(taskId);
+  });
+
   it('normalizes absolute shared roots before applying provider issue workspace override', async () => {
     const repoRoot = resolve(workspaceRoot, 'repo-root');
     const taskId = 'linear-lin-issue-1';
@@ -190,6 +250,64 @@ describe('resolveEnvironmentPaths', () => {
     expect(env.repoRoot).toBe(issueWorkspacePath);
     expect(env.runsRoot).toBe(join(externalRoot, 'runs'));
     expect(env.outRoot).toBe(join(externalRoot, 'out'));
+  });
+
+  it('preserves custom absolute shared artifact roots without a workspace manifest counterpart', async () => {
+    const repoRoot = resolve(workspaceRoot, 'repo-root');
+    const taskId = 'linear-lin-issue-1';
+    const issueWorkspacePath = join(repoRoot, '.workspaces', taskId);
+    await mkdir(issueWorkspacePath, { recursive: true });
+    process.env.CODEX_ORCHESTRATOR_ROOT = repoRoot;
+    process.env.CODEX_ORCHESTRATOR_PIPELINE_ID = 'provider-linear-worker';
+    process.env.MCP_RUNNER_TASK_ID = taskId;
+    process.env.CODEX_ORCHESTRATOR_RUNS_DIR = join(repoRoot, 'artifacts', 'runs');
+    process.env.CODEX_ORCHESTRATOR_OUT_DIR = join(repoRoot, 'artifacts', 'out');
+
+    const env = resolveEnvironmentPathsForProcess(process.env, issueWorkspacePath);
+
+    expect(env.repoRoot).toBe(issueWorkspacePath);
+    expect(env.runsRoot).toBe(join(repoRoot, 'artifacts', 'runs'));
+    expect(env.outRoot).toBe(join(repoRoot, 'artifacts', 'out'));
+  });
+
+  it('rebases custom absolute shared artifact roots after a workspace manifest counterpart is proven', async () => {
+    const repoRoot = resolve(workspaceRoot, 'repo-root');
+    const taskId = 'linear-lin-issue-1';
+    const issueWorkspacePath = join(repoRoot, '.workspaces', taskId);
+    const sharedManifestPath = join(
+      repoRoot,
+      'artifacts',
+      'runs',
+      taskId,
+      'cli',
+      'provider-parent-run',
+      'manifest.json'
+    );
+    const workspaceManifestPath = join(
+      issueWorkspacePath,
+      'artifacts',
+      'runs',
+      taskId,
+      'cli',
+      'provider-parent-run',
+      'manifest.json'
+    );
+    await mkdir(issueWorkspacePath, { recursive: true });
+    await mkdir(dirname(workspaceManifestPath), { recursive: true });
+    await writeFile(workspaceManifestPath, '{}', 'utf8');
+    process.env.CODEX_ORCHESTRATOR_ROOT = repoRoot;
+    process.env.CODEX_ORCHESTRATOR_PIPELINE_ID = 'provider-linear-worker';
+    process.env.MCP_RUNNER_TASK_ID = taskId;
+    process.env.CODEX_ORCHESTRATOR_RUNS_DIR = join(repoRoot, 'artifacts', 'runs');
+    process.env.CODEX_ORCHESTRATOR_OUT_DIR = join(repoRoot, 'artifacts', 'out');
+    process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH = sharedManifestPath;
+    process.env.CODEX_ORCHESTRATOR_PRESERVE_PROVIDER_ARTIFACT_ROOTS = '1';
+
+    const env = resolveEnvironmentPathsForProcess(process.env, issueWorkspacePath);
+
+    expect(env.repoRoot).toBe(issueWorkspacePath);
+    expect(env.runsRoot).toBe(join(issueWorkspacePath, 'artifacts', 'runs'));
+    expect(env.outRoot).toBe(join(issueWorkspacePath, 'artifacts', 'out'));
   });
 
   it('keeps the configured root when the cwd workspace is outside provider-worker context', async () => {

@@ -1,4 +1,4 @@
-import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import process from 'node:process';
 import {
   PROVIDER_CONTROL_HOST_RUN_ID_ENV,
@@ -435,7 +435,17 @@ function resolveWorkspaceScopedArtifactDir(repoRoot: string, value: string | und
     return fallback;
   }
   const candidate = isAbsolute(normalized) ? resolve(normalized) : resolve(repoRoot, normalized);
-  return isPathWithinRoot(repoRoot, candidate) ? candidate : fallback;
+  if (isPathWithinRoot(repoRoot, candidate)) {
+    return candidate;
+  }
+  if (basename(dirname(repoRoot)) !== '.workspaces') {
+    return fallback;
+  }
+  const sharedRoot = dirname(dirname(repoRoot));
+  if (isPathWithinRoot(sharedRoot, candidate)) {
+    return resolve(repoRoot, relative(sharedRoot, candidate));
+  }
+  return fallback;
 }
 function isPathWithinRoot(root: string, candidate: string): boolean {
   const relativePath = relative(root, candidate);

@@ -1,6 +1,48 @@
 {
   "items": [
-    {"id":"20260413-linear-c5182c19-8470-4792-a573-e3873ab22b8f","title":"CO workflow: make provider-worker issue-worktree root authoritative for child streams and review wrappers","relates_to":"tasks/tasks-linear-c5182c19-8470-4792-a573-e3873ab22b8f.md","risk":"high","owners":["Codex"],"last_review":"2026-04-13","approvals":{},"paths":{"spec":"tasks/specs/linear-c5182c19-8470-4792-a573-e3873ab22b8f.md","task":"tasks/tasks-linear-c5182c19-8470-4792-a573-e3873ab22b8f.md","agent_task":".agent/task/linear-c5182c19-8470-4792-a573-e3873ab22b8f.md","docs":"docs/TECH_SPEC-linear-c5182c19-8470-4792-a573-e3873ab22b8f.md"}},
+    {
+      "id": "20260414-linear-e3bc507e-c33d-48c7-9474-196a6ef9a28c",
+      "title": "CO workflow: align provider issue-worktree resolution for configured artifact roots",
+      "relates_to": "tasks/tasks-linear-e3bc507e-c33d-48c7-9474-196a6ef9a28c.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-14",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (clean-success after TASKS archive threshold repair)",
+          "date": "2026-04-14",
+          "status": "succeeded",
+          "manifest": ".runs/linear-e3bc507e-c33d-48c7-9474-196a6ef9a28c-docs-review-r2/cli/2026-04-13T19-14-21-280Z-150e2d52/manifest.json",
+          "prior_failed_manifest": ".runs/linear-e3bc507e-c33d-48c7-9474-196a6ef9a28c-docs-review/cli/2026-04-13T19-12-44-668Z-d484f408/manifest.json",
+          "repair_note": "docs/TASKS.md crossed max_lines after adding the CO-171 snapshot; npm run docs:archive-tasks archived one completed snapshot and local docs:check passed before the successful docs-review rerun."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-e3bc507e-c33d-48c7-9474-196a6ef9a28c.md",
+        "task": "tasks/tasks-linear-e3bc507e-c33d-48c7-9474-196a6ef9a28c.md",
+        "agent_task": ".agent/task/linear-e3bc507e-c33d-48c7-9474-196a6ef9a28c.md",
+        "docs": "docs/TECH_SPEC-linear-e3bc507e-c33d-48c7-9474-196a6ef9a28c.md"
+      }
+    },
+    {
+      "id": "20260413-linear-c5182c19-8470-4792-a573-e3873ab22b8f",
+      "title": "CO workflow: make provider-worker issue-worktree root authoritative for child streams and review wrappers",
+      "relates_to": "tasks/tasks-linear-c5182c19-8470-4792-a573-e3873ab22b8f.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-13",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-c5182c19-8470-4792-a573-e3873ab22b8f.md",
+        "task": "tasks/tasks-linear-c5182c19-8470-4792-a573-e3873ab22b8f.md",
+        "agent_task": ".agent/task/linear-c5182c19-8470-4792-a573-e3873ab22b8f.md",
+        "docs": "docs/TECH_SPEC-linear-c5182c19-8470-4792-a573-e3873ab22b8f.md"
+      }
+    },
     {
       "id": "20260413-linear-abca2add-198d-40a6-b1c0-35e49f4c78cd",
       "title": "CO: narrow generic control-host forced cleanup to avoid detached provider-worker collateral",
