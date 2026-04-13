@@ -1,4 +1,4 @@
-import { mkdir, readFile } from 'node:fs/promises';
+import { mkdir, readFile, realpath } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 
 import type { CliManifest, CliManifestCommand } from '../types.js';
@@ -319,14 +319,36 @@ function resolveRepoRelativePath(repoRoot: string, candidate: string, field: str
   return resolvedPath;
 }
 
+function assertContainedWithinRepoRoot(repoRoot: string, candidatePath: string, field: string): void {
+  const relativePath = relative(repoRoot, candidatePath);
+  if (
+    !relativePath ||
+    relativePath === '.' ||
+    isAbsolute(relativePath) ||
+    WINDOWS_DRIVE_PATH_RE.test(relativePath) ||
+    relativePath.split(/[\\/]+/u).some((segment) => segment === '..')
+  ) {
+    throw new Error(`block_memory ${field} escapes the repo root`);
+  }
+}
+
 export async function readRunBlockMemoryIndex(
   repoRoot: string,
   descriptor: RunBlockMemoryDescriptor
 ): Promise<RunBlockMemoryIndex | null> {
-  const resolvedIndexPath = resolveRepoRelativePath(resolve(repoRoot), descriptor.index_path, 'index_path');
+  const resolvedRepoRoot = resolve(repoRoot);
+  const resolvedIndexPath = resolveRepoRelativePath(resolvedRepoRoot, descriptor.index_path, 'index_path');
+  const canonicalRepoRoot = await realpath(resolvedRepoRoot);
+  let canonicalIndexPath: string;
+  try {
+    canonicalIndexPath = await realpath(resolvedIndexPath);
+  } catch {
+    return null;
+  }
+  assertContainedWithinRepoRoot(canonicalRepoRoot, canonicalIndexPath, 'index_path');
   let parsed: unknown;
   try {
-    const raw = await readFile(resolvedIndexPath, 'utf8');
+    const raw = await readFile(canonicalIndexPath, 'utf8');
     parsed = JSON.parse(raw) as unknown;
   } catch {
     return null;

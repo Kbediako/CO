@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -354,9 +354,10 @@ describe('review-prompt-context', () => {
   });
 
   it('returns null when the block memory index file is unreadable', async () => {
+    const sandbox = await makeSandbox();
     await expect(
       readRunBlockMemoryIndex(
-        '/tmp/repo',
+        sandbox,
         buildBlockMemoryDescriptor({
           index_path: '.runs/sample-task/cli/sample-run/memory/block-memory/missing.json'
         }) as RunBlockMemoryDescriptor
@@ -374,5 +375,18 @@ describe('review-prompt-context', () => {
 
     await expect(readRunBlockMemoryIndex(sandbox, buildBlockMemoryDescriptor() as RunBlockMemoryDescriptor)).resolves
       .toBeNull();
+  });
+
+  it('rejects symlinked block memory indexes that canonicalize outside the repo root', async () => {
+    const sandbox = await makeSandbox();
+    const outsideRoot = await makeSandbox();
+    const manifestDir = join(sandbox, '.runs', 'sample-task', 'cli', 'sample-run', 'memory', 'block-memory');
+    const outsideIndexPath = join(outsideRoot, 'outside-index.json');
+    await mkdir(manifestDir, { recursive: true });
+    await writeFile(outsideIndexPath, JSON.stringify(buildBlockMemoryIndex()), 'utf8');
+    await symlink(outsideIndexPath, join(manifestDir, 'index.json'));
+
+    await expect(readRunBlockMemoryIndex(sandbox, buildBlockMemoryDescriptor() as RunBlockMemoryDescriptor)).rejects
+      .toThrow('block_memory index_path escapes the repo root');
   });
 });
