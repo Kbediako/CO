@@ -65,6 +65,7 @@ export interface DelegateServerProcessInspection {
 
 export interface DelegateServerCleanupResult extends DelegateServerProcessInspection {
   dryRun: boolean;
+  replacedPids: number[];
   terminatedPids: number[];
   forcedPids: number[];
   remainingPids: number[];
@@ -77,6 +78,32 @@ interface DelegateServerProcessRecord {
   rssKb: number;
   command: string;
 }
+
+interface DelegateServerProcessInspectionBundle {
+  inspection: DelegateServerProcessInspection;
+  staleRecords: DelegateServerProcessRecord[];
+}
+
+interface DelegateServerCleanupDependencies {
+  inspect: (options: { staleThresholdSeconds?: number }) => DelegateServerProcessInspectionBundle;
+  readProcessRecord: (pid: number) => DelegateServerProcessRecord | null;
+  tryKillProcess: (pid: number, signal: NodeJS.Signals) => KillProcessOutcome;
+  isProcessAlive: (pid: number) => boolean;
+  waitForMs: (durationMs: number) => Promise<void>;
+}
+
+type KillProcessOutcome =
+  | { status: 'signaled' }
+  | { status: 'missing' }
+  | { status: 'blocked'; code: string | null; detail: string };
+
+const DEFAULT_DELEGATE_SERVER_CLEANUP_DEPENDENCIES: DelegateServerCleanupDependencies = {
+  inspect: inspectDelegateServerProcessBundle,
+  readProcessRecord: readDelegateServerProcessRecord,
+  tryKillProcess,
+  isProcessAlive,
+  waitForMs
+};
 
 export function resolveDelegationServerInvocation(options: {
   env?: NodeJS.ProcessEnv;
@@ -257,19 +284,29 @@ export function inspectDelegateServerProcesses(options: {
   snapshot?: string;
   staleThresholdSeconds?: number;
 } = {}): DelegateServerProcessInspection {
+  return inspectDelegateServerProcessBundle(options).inspection;
+}
+
+function inspectDelegateServerProcessBundle(options: {
+  snapshot?: string;
+  staleThresholdSeconds?: number;
+} = {}): DelegateServerProcessInspectionBundle {
   const thresholdSeconds = options.staleThresholdSeconds ?? DEFAULT_STALE_THRESHOLD_SECONDS;
   const snapshotResult: { ok: true; output: string } | { ok: false; detail: string } =
     options.snapshot === undefined ? readDelegateServerProcessSnapshot() : { ok: true, output: options.snapshot };
   if (!snapshotResult.ok) {
     return {
-      status: 'unavailable',
-      activeCount: 0,
-      staleCount: 0,
-      activePids: [],
-      stalePids: [],
-      staleRssKb: 0,
-      thresholdSeconds,
-      detail: snapshotResult.detail
+      inspection: {
+        status: 'unavailable',
+        activeCount: 0,
+        staleCount: 0,
+        activePids: [],
+        stalePids: [],
+        staleRssKb: 0,
+        thresholdSeconds,
+        detail: snapshotResult.detail
+      },
+      staleRecords: []
     };
   }
 
@@ -278,6 +315,7 @@ export function inspectDelegateServerProcesses(options: {
   const processMap = new Map(allProcesses.map((record) => [record.pid, record]));
   const activePids: number[] = [];
   const stalePids: number[] = [];
+  const staleRecords: DelegateServerProcessRecord[] = [];
   let staleRssKb = 0;
 
   for (const record of processes) {
@@ -287,6 +325,7 @@ export function inspectDelegateServerProcesses(options: {
     }
     if (record.elapsedSeconds !== null && record.elapsedSeconds >= thresholdSeconds) {
       stalePids.push(record.pid);
+      staleRecords.push(record);
       staleRssKb += record.rssKb;
     }
   }
@@ -299,56 +338,135 @@ export function inspectDelegateServerProcesses(options: {
         : 'No stale delegate-server processes detected.';
 
   return {
-    status: stalePids.length > 0 ? 'stale' : 'ok',
-    activeCount: activePids.length,
-    staleCount: stalePids.length,
-    activePids,
-    stalePids,
-    staleRssKb,
-    thresholdSeconds,
-    detail
+    inspection: {
+      status: stalePids.length > 0 ? 'stale' : 'ok',
+      activeCount: activePids.length,
+      staleCount: stalePids.length,
+      activePids,
+      stalePids,
+      staleRssKb,
+      thresholdSeconds,
+      detail
+    },
+    staleRecords
   };
 }
 
 export async function cleanupStaleDelegateServerProcesses(options: {
   apply?: boolean;
   staleThresholdSeconds?: number;
-} = {}): Promise<DelegateServerCleanupResult> {
-  const inspection = inspectDelegateServerProcesses({ staleThresholdSeconds: options.staleThresholdSeconds });
+} = {}, dependencies: Partial<DelegateServerCleanupDependencies> = {}): Promise<DelegateServerCleanupResult> {
+  const cleanupDependencies = { ...DEFAULT_DELEGATE_SERVER_CLEANUP_DEPENDENCIES, ...dependencies };
+  const { inspection, staleRecords } = cleanupDependencies.inspect({
+    staleThresholdSeconds: options.staleThresholdSeconds
+  });
   if (!options.apply || inspection.status === 'unavailable' || inspection.stalePids.length === 0) {
     return {
       ...inspection,
       dryRun: !options.apply,
+      replacedPids: [],
       terminatedPids: [],
       forcedPids: [],
       remainingPids: inspection.stalePids
     };
   }
 
-  const stalePids = [...inspection.stalePids].sort((left, right) => right - left);
-  for (const pid of stalePids) {
-    tryKillProcess(pid, 'SIGTERM');
-  }
-  await waitForMs(250);
+  const stalePidRecords = [...staleRecords].sort((left, right) => right.pid - left.pid);
+  const replacedSet = new Set<number>();
+  const terminatedSet = new Set<number>();
+  const remainingSet = new Set<number>();
+  const forcedSet = new Set<number>();
 
-  const forcedPids: number[] = [];
-  for (const pid of stalePids) {
-    if (isProcessAlive(pid)) {
-      forcedPids.push(pid);
-      tryKillProcess(pid, 'SIGKILL');
+  for (const record of stalePidRecords) {
+    const revalidation = classifyCleanupCandidate(record, cleanupDependencies);
+    if (revalidation === 'missing') {
+      terminatedSet.add(record.pid);
+      continue;
+    }
+    if (revalidation === 'replaced') {
+      replacedSet.add(record.pid);
+      continue;
+    }
+    if (revalidation === 'remaining') {
+      remainingSet.add(record.pid);
+      continue;
+    }
+    const killResult = cleanupDependencies.tryKillProcess(record.pid, 'SIGTERM');
+    if (killResult.status === 'missing') {
+      terminatedSet.add(record.pid);
+      continue;
+    }
+    if (killResult.status === 'blocked') {
+      remainingSet.add(record.pid);
     }
   }
-  if (forcedPids.length > 0) {
-    await waitForMs(250);
+  await cleanupDependencies.waitForMs(250);
+
+  for (const record of stalePidRecords) {
+    if (replacedSet.has(record.pid) || terminatedSet.has(record.pid)) {
+      continue;
+    }
+    const revalidation = classifyCleanupCandidate(record, cleanupDependencies);
+    if (revalidation === 'missing') {
+      remainingSet.delete(record.pid);
+      terminatedSet.add(record.pid);
+      continue;
+    }
+    if (revalidation === 'replaced') {
+      remainingSet.delete(record.pid);
+      replacedSet.add(record.pid);
+      continue;
+    }
+    if (revalidation === 'remaining') {
+      remainingSet.add(record.pid);
+      continue;
+    }
+    if (remainingSet.has(record.pid)) {
+      continue;
+    }
+    const killResult = cleanupDependencies.tryKillProcess(record.pid, 'SIGKILL');
+    if (killResult.status === 'signaled') {
+      forcedSet.add(record.pid);
+      continue;
+    }
+    if (killResult.status === 'missing') {
+      terminatedSet.add(record.pid);
+      continue;
+    }
+    remainingSet.add(record.pid);
+  }
+  if (forcedSet.size > 0) {
+    await cleanupDependencies.waitForMs(250);
   }
 
-  const remainingPids = stalePids.filter((pid) => isProcessAlive(pid));
-  const remainingSet = new Set(remainingPids);
-  const terminatedPids = stalePids.filter((pid) => !remainingSet.has(pid));
+  for (const record of stalePidRecords) {
+    if (replacedSet.has(record.pid) || terminatedSet.has(record.pid)) {
+      continue;
+    }
+    const revalidation = classifyCleanupCandidate(record, cleanupDependencies);
+    if (revalidation === 'missing') {
+      remainingSet.delete(record.pid);
+      terminatedSet.add(record.pid);
+      continue;
+    }
+    if (revalidation === 'replaced') {
+      remainingSet.delete(record.pid);
+      replacedSet.add(record.pid);
+      continue;
+    }
+    remainingSet.add(record.pid);
+  }
+
+  const stalePids = stalePidRecords.map((record) => record.pid);
+  const replacedPids = stalePids.filter((pid) => replacedSet.has(pid));
+  const terminatedPids = stalePids.filter((pid) => terminatedSet.has(pid));
+  const forcedPids = stalePids.filter((pid) => forcedSet.has(pid));
+  const remainingPids = stalePids.filter((pid) => remainingSet.has(pid));
 
   return {
     ...inspection,
     dryRun: false,
+    replacedPids,
     terminatedPids,
     forcedPids,
     remainingPids
@@ -374,6 +492,9 @@ export function formatDelegateServerCleanupSummary(result: DelegateServerCleanup
   );
   if (result.stalePids.length > 0) {
     lines.push(`- Stale pids: ${result.stalePids.join(', ')}`);
+  }
+  if (result.replacedPids.length > 0) {
+    lines.push(`- Replaced pids: ${result.replacedPids.join(', ')}`);
   }
   if (result.terminatedPids.length > 0) {
     lines.push(`- Terminated pids: ${result.terminatedPids.join(', ')}`);
@@ -509,6 +630,18 @@ function readDelegateServerProcessSnapshot(): { ok: true; output: string } | { o
     return { ok: false, detail: stderr || `ps exited with code ${result.status ?? 'unknown'}` };
   }
   return { ok: true, output: String(result.stdout ?? '') };
+}
+
+function readDelegateServerProcessRecord(pid: number): DelegateServerProcessRecord | null {
+  const result = spawnSync('ps', ['-p', String(pid), '-o', 'pid=,ppid=,etime=,rss=,args='], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: 5000
+  });
+  if (result.error || result.status !== 0) {
+    return null;
+  }
+  return parseDelegateServerProcessSnapshot(String(result.stdout ?? ''))[0] ?? null;
 }
 
 function parseDelegateServerProcessSnapshot(snapshot: string): DelegateServerProcessRecord[] {
@@ -669,13 +802,54 @@ function parseElapsedSeconds(value: string): number | null {
   return null;
 }
 
-function tryKillProcess(pid: number, signal: NodeJS.Signals): void {
+function classifyCleanupCandidate(
+  original: DelegateServerProcessRecord,
+  dependencies: Pick<DelegateServerCleanupDependencies, 'readProcessRecord' | 'isProcessAlive'>
+): 'ready' | 'missing' | 'replaced' | 'remaining' {
+  const current = dependencies.readProcessRecord(original.pid);
+  if (!current) {
+    return dependencies.isProcessAlive(original.pid) ? 'remaining' : 'missing';
+  }
+  const status = classifyMatchingDelegateServerProcess(original, current);
+  if (status === 'replaced') {
+    return 'replaced';
+  }
+  if (status === 'different') {
+    return 'remaining';
+  }
+  return 'ready';
+}
+
+function classifyMatchingDelegateServerProcess(
+  original: DelegateServerProcessRecord,
+  current: DelegateServerProcessRecord
+): 'same' | 'replaced' | 'different' {
+  if (!isDelegateServerCommand(current.command)) {
+    return 'replaced';
+  }
+  if (current.command !== original.command) {
+    return 'replaced';
+  }
+  if (original.elapsedSeconds !== null && current.elapsedSeconds !== null && current.elapsedSeconds < original.elapsedSeconds) {
+    return 'replaced';
+  }
+  return 'same';
+}
+
+function tryKillProcess(pid: number, signal: NodeJS.Signals): KillProcessOutcome {
   try {
     process.kill(pid, signal);
+    return { status: 'signaled' };
   } catch (error) {
-    if ((error as NodeJS.ErrnoException)?.code !== 'ESRCH') {
-      throw error;
+    const code = (error as NodeJS.ErrnoException)?.code ?? null;
+    if (code === 'ESRCH') {
+      return { status: 'missing' };
     }
+    return {
+      status: 'blocked',
+      code,
+      detail: error instanceof Error ? error.message : `process.kill(${pid}, ${signal}) failed`
+    };
   }
 }
 

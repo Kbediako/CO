@@ -209,6 +209,7 @@ describe('runDelegationCliShell', () => {
           thresholdSeconds: 600,
           detail: 'Detected 2 stale delegate-server processes not rooted in a live codex client.',
           dryRun: false,
+          replacedPids: [],
           terminatedPids: [202, 203],
           forcedPids: [],
           remainingPids: []

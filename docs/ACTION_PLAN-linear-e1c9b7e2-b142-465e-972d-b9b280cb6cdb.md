@@ -72,5 +72,6 @@
   - Mitigation: update the primary delegation/operator docs in the same lane and let `docs:check` / `docs:freshness` validate the packet.
 
 ## Approvals
-- Reviewer: Pending docs-review child stream for `linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb`
+- Reviewer: `codex-orchestrator docs-review (direct fallback after provider provenance boundary)`
 - Date: 2026-04-13
+- Evidence: `.runs/linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb/cli/2026-04-13T05-44-46-601Z-d94802bb/provider-linear-worker-linear-audit.jsonl`, `out/linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb/manual/20260413T055822Z-docs-review-fallback.md`

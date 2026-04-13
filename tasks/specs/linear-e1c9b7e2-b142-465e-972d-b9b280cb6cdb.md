@@ -17,6 +17,7 @@ last_review: 2026-04-13
 ## Traceability
 - Linear issue: `CO-168` / `e1c9b7e2-b142-465e-972d-b9b280cb6cdb`
 - Linear URL: https://linear.app/asabeko/issue/CO-168/co-fix-delegation-mcp-startupperf-and-stale-delegate-server-process
+- Docs-review fallback note: `out/linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb/manual/20260413T055822Z-docs-review-fallback.md`
 
 ## Summary
 - Objective: make delegation MCP setup, doctor, and recovery tooling agree on a fast direct transport and add bounded stale-process observability/remediation.
@@ -133,5 +134,6 @@ last_review: 2026-04-13
 - Whether `ps` inspection should remain Unix-only with a clear unavailable status on unsupported hosts or grow a Windows path now. Current preference: Unix-only with explicit unavailable messaging because the issue evidence and active host are macOS.
 
 ## Approvals
-- Reviewer: Pending docs-review child stream for `linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb`
+- Reviewer: `codex-orchestrator docs-review (direct fallback after provider provenance boundary)`
 - Date: 2026-04-13
+- Evidence: `.runs/linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb/cli/2026-04-13T05-44-46-601Z-d94802bb/provider-linear-worker-linear-audit.jsonl`, `out/linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb/manual/20260413T055822Z-docs-review-fallback.md`
