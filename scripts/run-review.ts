@@ -12,7 +12,7 @@
  */
 
 import { spawn } from 'node:child_process';
-import { realpathSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
@@ -76,6 +76,10 @@ const REVIEW_ENABLE_DELEGATION_MCP_ENV_KEY = 'CODEX_REVIEW_ENABLE_DELEGATION_MCP
 const REVIEW_DISABLE_DELEGATION_MCP_ENV_KEY = 'CODEX_REVIEW_DISABLE_DELEGATION_MCP';
 const REVIEW_TELEMETRY_DEBUG_ENV_KEY = 'CODEX_REVIEW_DEBUG_TELEMETRY';
 const REVIEW_SURFACE_ENV_KEY = 'CODEX_REVIEW_SURFACE';
+const PROVIDER_LINEAR_WORKER_PIPELINE_ID = 'provider-linear-worker';
+const PROVIDER_WORKSPACE_ROOT_DIRNAME = '.workspaces';
+const PRESERVE_PROVIDER_ARTIFACT_ROOTS_ENV =
+  'CODEX_ORCHESTRATOR_PRESERVE_PROVIDER_ARTIFACT_ROOTS';
 
 interface CliOptions {
   manifest?: string;
@@ -197,12 +201,158 @@ function inferTaskFromManifestPath(manifestPath: string): string | null {
   return null;
 }
 
-function resolveReviewEnvironmentPaths(): { repoRoot: string; defaultRunsDir: string } {
-  const { repoRoot, runsRoot } = resolveEnvironmentPaths();
+function resolveReviewEnvironmentPaths(): { repoRoot: string; defaultRunsDir: string; defaultOutDir: string } {
+  const { repoRoot, runsRoot, outRoot } = resolveEnvironmentPaths();
   return {
     repoRoot,
-    defaultRunsDir: runsRoot
+    defaultRunsDir: runsRoot,
+    defaultOutDir: outRoot
   };
+}
+
+function resolveProviderTaskIdFromEnv(env: NodeJS.ProcessEnv, repoRoot?: string): string | null {
+  const candidates = [env.CODEX_ORCHESTRATOR_TASK_ID?.trim(), env.MCP_RUNNER_TASK_ID?.trim(), env.TASK?.trim()].filter(Boolean) as string[];
+  const repoTask = repoRoot && env.CODEX_ORCHESTRATOR_PIPELINE_ID === PROVIDER_LINEAR_WORKER_PIPELINE_ID && path.basename(path.dirname(repoRoot)) === PROVIDER_WORKSPACE_ROOT_DIRNAME ? path.basename(repoRoot) : null;
+  if (repoTask && candidates.includes(repoTask)) return repoTask;
+  return env.MCP_RUNNER_TASK_ID?.trim() || env.TASK?.trim() || env.CODEX_ORCHESTRATOR_TASK_ID?.trim() || null;
+}
+
+function isPathWithinRoot(root: string, candidate: string): boolean {
+  const relativePath = path.relative(root, candidate);
+  return (
+    relativePath === '' ||
+    (!relativePath.startsWith('..') &&
+      !relativePath.startsWith(`..${path.sep}`) &&
+      !path.isAbsolute(relativePath))
+  );
+}
+
+function isProviderIssueWorkspaceRootForEnv(repoRoot: string, env: NodeJS.ProcessEnv): boolean {
+  if (env.CODEX_ORCHESTRATOR_PIPELINE_ID !== PROVIDER_LINEAR_WORKER_PIPELINE_ID) {
+    return false;
+  }
+  const taskId = resolveProviderTaskIdFromEnv(env, repoRoot);
+  return Boolean(
+    taskId &&
+      path.basename(repoRoot) === taskId &&
+      path.basename(path.dirname(repoRoot)) === PROVIDER_WORKSPACE_ROOT_DIRNAME
+  );
+}
+
+function resolveConfiguredReviewRoot(env: NodeJS.ProcessEnv): string | null {
+  const configuredRoot = env.CODEX_ORCHESTRATOR_ROOT?.trim();
+  if (!configuredRoot) {
+    return null;
+  }
+  return path.isAbsolute(configuredRoot)
+    ? path.resolve(configuredRoot)
+    : path.resolve(process.cwd(), configuredRoot);
+}
+
+function resolveProviderSharedRootForEnv(repoRoot: string, env: NodeJS.ProcessEnv): string | null {
+  if (!isProviderIssueWorkspaceRootForEnv(repoRoot, env)) {
+    return null;
+  }
+  const sharedRoot = path.dirname(path.dirname(repoRoot));
+  return resolveConfiguredReviewRoot(env) === sharedRoot ? sharedRoot : null;
+}
+
+function resolveReviewEnvPath(raw: string, repoRoot: string, env: NodeJS.ProcessEnv = process.env): string {
+  const inheritedSharedRoot = resolveProviderSharedRootForEnv(repoRoot, env);
+  const relativeBaseRoot = inheritedSharedRoot ?? repoRoot;
+  const resolved = path.isAbsolute(raw) ? path.resolve(raw) : path.resolve(relativeBaseRoot, raw);
+  if (!isProviderIssueWorkspaceRootForEnv(repoRoot, env) || isPathWithinRoot(repoRoot, resolved)) {
+    return resolved;
+  }
+  const sharedRunsRoot = path.join(path.dirname(path.dirname(repoRoot)), '.runs');
+  if (!isPathWithinRoot(sharedRunsRoot, resolved)) {
+    return resolved;
+  }
+  const workspaceCandidate = path.resolve(repoRoot, '.runs', path.relative(sharedRunsRoot, resolved));
+  return existsSync(workspaceCandidate) ? workspaceCandidate : resolved;
+}
+
+function resolveReviewRunsDirPath(raw: string, repoRoot: string, env: NodeJS.ProcessEnv = process.env): string {
+  const inheritedSharedRoot = resolveProviderSharedRootForEnv(repoRoot, env);
+  return path.isAbsolute(raw) ? path.resolve(raw) : path.resolve(inheritedSharedRoot ?? repoRoot, raw);
+}
+
+function inferRunsRootFromManifestPath(manifestPath: string): string | null {
+  const resolvedManifestPath = path.resolve(manifestPath);
+  if (path.basename(resolvedManifestPath) !== 'manifest.json') {
+    return null;
+  }
+  const runDir = path.dirname(resolvedManifestPath);
+  const layoutDir = path.dirname(runDir);
+  if (path.basename(layoutDir) !== 'cli' && path.basename(layoutDir) !== 'mcp') {
+    return null;
+  }
+  const taskDir = path.dirname(layoutDir);
+  const runsRoot = path.dirname(taskDir);
+  return path.basename(runsRoot) === '.runs' || path.basename(runsRoot) === 'runs'
+    ? runsRoot
+    : null;
+}
+
+function resolveReviewExecutionArtifactRoots(
+  env: NodeJS.ProcessEnv,
+  environmentPaths: { repoRoot: string; defaultRunsDir: string; defaultOutDir: string },
+  manifestPath: string
+): { runsDir: string; outDir: string; preserveProviderArtifactRoots: boolean } {
+  const manifestRunsRoot = inferRunsRootFromManifestPath(manifestPath);
+  if (
+    !manifestRunsRoot ||
+    !isProviderIssueWorkspaceRootForEnv(environmentPaths.repoRoot, env) ||
+    isPathWithinRoot(environmentPaths.defaultRunsDir, manifestPath)
+  ) {
+    return {
+      runsDir: environmentPaths.defaultRunsDir,
+      outDir: environmentPaths.defaultOutDir,
+      preserveProviderArtifactRoots: false
+    };
+  }
+
+  const manifestRepoRoot = path.dirname(manifestRunsRoot);
+  const providerSharedRoot = resolveProviderSharedRootForEnv(environmentPaths.repoRoot, env);
+  const configuredOutDir = env.CODEX_ORCHESTRATOR_OUT_DIR?.trim();
+  const resolvedConfiguredOutDir = configuredOutDir
+    ? (path.isAbsolute(configuredOutDir)
+        ? path.resolve(configuredOutDir)
+        : path.resolve(manifestRepoRoot, configuredOutDir))
+    : null;
+  const outDir =
+    providerSharedRoot &&
+    resolvedConfiguredOutDir === path.join(providerSharedRoot, 'out')
+      ? path.join(environmentPaths.repoRoot, 'out')
+      : resolvedConfiguredOutDir ?? path.join(manifestRepoRoot, 'out');
+  return {
+    runsDir: manifestRunsRoot,
+    outDir,
+    preserveProviderArtifactRoots: true
+  };
+}
+
+function buildReviewExecutionEnv(
+  env: NodeJS.ProcessEnv,
+  environmentPaths: { repoRoot: string; defaultRunsDir: string; defaultOutDir: string },
+  manifestPath: string
+): NodeJS.ProcessEnv {
+  const artifactRoots = resolveReviewExecutionArtifactRoots(env, environmentPaths, manifestPath);
+  const preserveProviderArtifactRoots =
+    artifactRoots.preserveProviderArtifactRoots ||
+    env[PRESERVE_PROVIDER_ARTIFACT_ROOTS_ENV] === '1';
+  const reviewEnv: NodeJS.ProcessEnv = {
+    ...env,
+    CODEX_ORCHESTRATOR_ROOT: environmentPaths.repoRoot,
+    CODEX_ORCHESTRATOR_RUNS_DIR: artifactRoots.runsDir,
+    CODEX_ORCHESTRATOR_OUT_DIR: artifactRoots.outDir,
+    CODEX_ORCHESTRATOR_RUN_DIR: path.dirname(manifestPath),
+    CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath
+  };
+  if (preserveProviderArtifactRoots) {
+    reviewEnv[PRESERVE_PROVIDER_ARTIFACT_ROOTS_ENV] = '1';
+  }
+  return reviewEnv;
 }
 
 function parseArgs(
@@ -218,9 +368,9 @@ function parseArgs(
 
   for (const entry of entries) {
     if (entry.key === 'manifest' && typeof entry.value === 'string') {
-      options.manifest = path.resolve(environmentPaths.repoRoot, entry.value);
+      options.manifest = resolveReviewEnvPath(entry.value, environmentPaths.repoRoot);
     } else if (entry.key === 'runs-dir' && typeof entry.value === 'string') {
-      options.runsDir = path.resolve(environmentPaths.repoRoot, entry.value);
+      options.runsDir = resolveReviewRunsDirPath(entry.value, environmentPaths.repoRoot);
     } else if (entry.key === 'task' && typeof entry.value === 'string') {
       options.task = entry.value;
     } else if (entry.key === 'runtime-mode') {
@@ -265,7 +415,7 @@ function parseArgs(
   if (!options.manifest) {
     const envManifest = process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH ?? process.env.MANIFEST;
     if (envManifest && envManifest.trim().length > 0) {
-      options.manifest = path.resolve(environmentPaths.repoRoot, envManifest.trim());
+      options.manifest = resolveReviewEnvPath(envManifest.trim(), environmentPaths.repoRoot);
     }
   }
 
@@ -277,7 +427,7 @@ function parseArgs(
   }
 
   if (!options.task && !options.manifest) {
-    const taskFromEnv = process.env.MCP_RUNNER_TASK_ID?.trim() || process.env.TASK?.trim();
+    const taskFromEnv = resolveProviderTaskIdFromEnv(process.env, environmentPaths.repoRoot);
     if (taskFromEnv) {
       options.task = taskFromEnv;
     }
@@ -319,6 +469,7 @@ function parseArgs(
 
 async function resolveManifestPath(options: CliOptions, repoRoot: string): Promise<string> {
   if (options.manifest) {
+    if (!(await pathExists(options.manifest))) throw new Error(`Manifest not found: ${options.manifest}`);
     return options.manifest;
   }
 
@@ -358,7 +509,7 @@ async function resolveManifestPathFromRunDir(repoRoot: string): Promise<string |
     return null;
   }
 
-  const manifestPath = path.join(path.resolve(repoRoot, configuredRunDir), 'manifest.json');
+  const manifestPath = path.join(resolveReviewEnvPath(configuredRunDir, repoRoot), 'manifest.json');
   return (await pathExists(manifestPath)) ? manifestPath : null;
 }
 
@@ -389,7 +540,7 @@ export async function runReviewCli(argv: string[] = process.argv.slice(2)): Prom
     const runnerLogExists = await pathExists(runnerLogPath);
     const relativeRunnerLog = path.relative(repoRoot, runnerLogPath);
     const manifestTask = inferTaskFromManifestPath(manifestPath);
-    const envTask = process.env.MCP_RUNNER_TASK_ID ?? process.env.TASK;
+    const envTask = resolveProviderTaskIdFromEnv(process.env, repoRoot);
     const taskKey = options.task ?? envTask ?? manifestTask;
     const taskLabel = taskKey ?? 'unknown-task';
     const diffBudgetOverride = process.env.DIFF_BUDGET_OVERRIDE_REASON?.trim();
@@ -497,10 +648,11 @@ export async function runReviewCli(argv: string[] = process.argv.slice(2)): Prom
     }
 
     const prompt = promptLines.join('\n');
+    const reviewBaseEnv = buildReviewExecutionEnv(process.env, environmentPaths, manifestPath);
     const { artifactPaths, nonInteractive, reviewEnv, handedOff } =
       await prepareReviewNonInteractiveHandoffShell({
         cliNonInteractive: options.nonInteractive,
-        env: process.env,
+        env: reviewBaseEnv,
         manifestPath,
         prompt,
         repoRoot,

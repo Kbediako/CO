@@ -1,5 +1,6 @@
 {
   "items": [
+    {"id":"20260413-linear-c5182c19-8470-4792-a573-e3873ab22b8f","title":"CO workflow: make provider-worker issue-worktree root authoritative for child streams and review wrappers","relates_to":"tasks/tasks-linear-c5182c19-8470-4792-a573-e3873ab22b8f.md","risk":"high","owners":["Codex"],"last_review":"2026-04-13","approvals":{},"paths":{"spec":"tasks/specs/linear-c5182c19-8470-4792-a573-e3873ab22b8f.md","task":"tasks/tasks-linear-c5182c19-8470-4792-a573-e3873ab22b8f.md","agent_task":".agent/task/linear-c5182c19-8470-4792-a573-e3873ab22b8f.md","docs":"docs/TECH_SPEC-linear-c5182c19-8470-4792-a573-e3873ab22b8f.md"}},
     {
       "id": "20260413-linear-abca2add-198d-40a6-b1c0-35e49f4c78cd",
       "title": "CO: narrow generic control-host forced cleanup to avoid detached provider-worker collateral",
