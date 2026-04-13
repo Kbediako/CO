@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260413-linear-abca2add-198d-40a6-b1c0-35e49f4c78cd",
+      "title": "CO: narrow generic control-host forced cleanup to avoid detached provider-worker collateral",
+      "relates_to": "tasks/tasks-linear-abca2add-198d-40a6-b1c0-35e49f4c78cd.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-13",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-abca2add-198d-40a6-b1c0-35e49f4c78cd.md",
+        "task": "tasks/tasks-linear-abca2add-198d-40a6-b1c0-35e49f4c78cd.md",
+        "agent_task": ".agent/task/linear-abca2add-198d-40a6-b1c0-35e49f4c78cd.md",
+        "docs": "docs/TECH_SPEC-linear-abca2add-198d-40a6-b1c0-35e49f4c78cd.md"
+      }
+    },
+    {
       "id": "20260412-linear-b84c9a78-b62f-48fa-b1c4-88f8222535da",
       "title": "CO: harden control-host supervise restart against orphaned duplicate host burn",
       "relates_to": "tasks/tasks-linear-b84c9a78-b62f-48fa-b1c4-88f8222535da.md",
