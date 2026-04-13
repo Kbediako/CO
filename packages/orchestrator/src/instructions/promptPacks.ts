@@ -70,6 +70,12 @@ export interface PromptPack {
   sources: PromptPackSectionSource[];
 }
 
+export interface PromptPackMetadata {
+  id: string;
+  domain: string;
+  experienceSlots: number;
+}
+
 export interface PromptPackStampConfig {
   experienceSlots: number;
   retrievalPolicy: PromptPackRetrievalPolicy;
@@ -80,6 +86,21 @@ export async function loadPromptPacks(repoRoot: string): Promise<PromptPack[]> {
   const packs: PromptPack[] = [];
   for (const manifestPath of manifestPaths) {
     packs.push(await loadPromptPack(manifestPath, repoRoot));
+  }
+  packs.sort((a, b) => {
+    if (a.domain === b.domain) {
+      return a.id.localeCompare(b.id);
+    }
+    return a.domain.localeCompare(b.domain);
+  });
+  return packs;
+}
+
+export async function loadPromptPackMetadata(repoRoot: string): Promise<PromptPackMetadata[]> {
+  const manifestPaths = await discoverPromptPackManifests(repoRoot);
+  const packs: PromptPackMetadata[] = [];
+  for (const manifestPath of manifestPaths) {
+    packs.push(await loadPromptPackMetadataEntry(manifestPath, repoRoot));
   }
   packs.sort((a, b) => {
     if (a.domain === b.domain) {
@@ -122,15 +143,12 @@ async function discoverPromptPackManifests(repoRoot: string): Promise<string[]> 
 }
 
 async function loadPromptPack(manifestPath: string, repoRoot: string): Promise<PromptPack> {
-  let parsed: PromptPackManifestFile;
-  try {
-    const raw = await readFile(manifestPath, 'utf8');
-    parsed = JSON.parse(raw) as PromptPackManifestFile;
-  } catch (error) {
-    throw new Error(`Failed to read prompt pack manifest at ${relative(repoRoot, manifestPath)}: ${String(error)}`);
-  }
+  const parsed = await readPromptPackManifestFile(manifestPath, repoRoot);
 
   validateManifest(parsed, manifestPath, repoRoot);
+  const id = requireNonEmptyManifestString(parsed.id, 'id', manifestPath, repoRoot);
+  const domain = requireNonEmptyManifestString(parsed.domain, 'domain', manifestPath, repoRoot);
+  const system = requireNonEmptyManifestString(parsed.system, 'system', manifestPath, repoRoot);
 
   const sections: Record<PromptPackSection, PromptPackSectionSource[]> = {
     system: [],
@@ -140,7 +158,7 @@ async function loadPromptPack(manifestPath: string, repoRoot: string): Promise<P
     optimize: []
   };
 
-  sections.system = [await loadSectionSource(repoRoot, 'system', parsed.system, manifestPath)];
+  sections.system = [await loadSectionSource(repoRoot, 'system', system, manifestPath)];
   sections.inject = await loadSectionArray(repoRoot, 'inject', parsed.inject ?? [], manifestPath);
   sections.summarize = await loadSectionArray(repoRoot, 'summarize', parsed.summarize ?? [], manifestPath);
   sections.extract = await loadSectionArray(repoRoot, 'extract', parsed.extract ?? [], manifestPath);
@@ -149,10 +167,69 @@ async function loadPromptPack(manifestPath: string, repoRoot: string): Promise<P
   const allSources = PROMPT_SECTIONS.flatMap((section) => sections[section]);
   if (allSources.length === 0) {
     throw new Error(
-      `Prompt pack ${parsed.id} ${parsed.domain} has no sources defined (${relative(repoRoot, manifestPath)})`
+      `Prompt pack ${id} ${domain} has no sources defined (${relative(repoRoot, manifestPath)})`
     );
   }
 
+  const experienceSlots = resolvePromptPackExperienceSlots(parsed, manifestPath, repoRoot);
+  const retrievalPolicy = normalizePromptPackRetrievalPolicy(parsed.retrievalPolicy);
+  const computedStamp = computePromptPackStamp(allSources, {
+    experienceSlots,
+    retrievalPolicy
+  });
+  if (!parsed.stamp) {
+    throw new Error(`Prompt pack ${id} is missing a stamp (manifest: ${relative(repoRoot, manifestPath)})`);
+  }
+  if (computedStamp !== parsed.stamp) {
+    throw new Error(
+      `Prompt pack ${id} stamp mismatch. expected ${parsed.stamp}, computed ${computedStamp} (${relative(
+        repoRoot,
+        manifestPath
+      )})`
+    );
+  }
+
+  return {
+    id,
+    domain,
+    stamp: parsed.stamp,
+    experienceSlots,
+    retrievalPolicy,
+    sections,
+    sources: allSources
+  };
+}
+
+async function loadPromptPackMetadataEntry(manifestPath: string, repoRoot: string): Promise<PromptPackMetadata> {
+  const parsed = await readPromptPackManifestFile(manifestPath, repoRoot);
+  validateManifest(parsed, manifestPath, repoRoot);
+  const id = requireNonEmptyManifestString(parsed.id, 'id', manifestPath, repoRoot);
+  const domain = requireNonEmptyManifestString(parsed.domain, 'domain', manifestPath, repoRoot);
+  requireNonEmptyManifestString(parsed.system, 'system', manifestPath, repoRoot);
+  if (!parsed.stamp) {
+    throw new Error(`Prompt pack ${id} is missing a stamp (manifest: ${relative(repoRoot, manifestPath)})`);
+  }
+  return {
+    id,
+    domain,
+    experienceSlots: resolvePromptPackExperienceSlots(parsed, manifestPath, repoRoot)
+  };
+}
+
+async function readPromptPackManifestFile(manifestPath: string, repoRoot: string): Promise<PromptPackManifestFile> {
+  try {
+    const raw = await readFile(manifestPath, 'utf8');
+    return JSON.parse(raw) as PromptPackManifestFile;
+  } catch (error) {
+    throw new Error(`Failed to read prompt pack manifest at ${relative(repoRoot, manifestPath)}: ${String(error)}`);
+  }
+}
+
+function resolvePromptPackExperienceSlots(
+  parsed: PromptPackManifestFile,
+  manifestPath: string,
+  repoRoot: string
+): number {
   if (
     parsed.experienceSlots !== undefined &&
     (typeof parsed.experienceSlots !== 'number' ||
@@ -166,33 +243,8 @@ async function loadPromptPack(manifestPath: string, repoRoot: string): Promise<P
       )})`
     );
   }
-  const experienceSlots = parsed.experienceSlots ?? 0;
-  const retrievalPolicy = normalizePromptPackRetrievalPolicy(parsed.retrievalPolicy);
-  const computedStamp = computePromptPackStamp(allSources, {
-    experienceSlots,
-    retrievalPolicy
-  });
-  if (!parsed.stamp) {
-    throw new Error(`Prompt pack ${parsed.id} is missing a stamp (manifest: ${relative(repoRoot, manifestPath)})`);
-  }
-  if (computedStamp !== parsed.stamp) {
-    throw new Error(
-      `Prompt pack ${parsed.id} stamp mismatch. expected ${parsed.stamp}, computed ${computedStamp} (${relative(
-        repoRoot,
-        manifestPath
-      )})`
-    );
-  }
 
-  return {
-    id: parsed.id,
-    domain: parsed.domain,
-    stamp: parsed.stamp,
-    experienceSlots,
-    retrievalPolicy,
-    sections,
-    sources: allSources
-  };
+  return parsed.experienceSlots ?? 0;
 }
 
 function validateManifest(manifest: PromptPackManifestFile, manifestPath: string, repoRoot: string): void {
@@ -211,6 +263,23 @@ function validateManifest(manifest: PromptPackManifestFile, manifestPath: string
       `Prompt pack manifest ${relative(repoRoot, manifestPath)} missing required fields: ${missing.join(', ')}`
     );
   }
+}
+
+function requireNonEmptyManifestString(
+  value: unknown,
+  field: 'id' | 'domain' | 'system',
+  manifestPath: string,
+  repoRoot: string
+): string {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new Error(
+      `Prompt pack manifest ${relative(
+        repoRoot,
+        manifestPath
+      )} has invalid '${field}'; expected a non-empty string (repoRoot: ${repoRoot})`
+    );
+  }
+  return value.trim();
 }
 
 function normalizePromptPackRetrievalPolicy(

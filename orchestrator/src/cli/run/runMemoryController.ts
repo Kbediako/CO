@@ -7,7 +7,11 @@ import {
 const DEFAULT_MAX_PROMPT_PACK_EXPERIENCE_CHARS = 320;
 
 export type RunMemoryRole = 'planner' | 'reviewer' | 'executor' | 'delegate';
-export type RunMemoryPromptPackSelectionReason = 'hint' | 'fallback' | 'first_available';
+export type RunMemoryPromptPackSelectionReason =
+  | 'explicit'
+  | 'hint'
+  | 'fallback'
+  | 'first_available';
 
 export interface RunMemoryRoleProfile {
   role: RunMemoryRole;
@@ -182,9 +186,23 @@ function selectPromptPackCandidate(params: {
   candidates: PromptPackCandidate[];
   hints: string[];
   profile: RunMemoryRoleProfile;
+  preferred_prompt_pack_ids?: string[];
 }): { candidate: PromptPackCandidate; reason: RunMemoryPromptPackSelectionReason } | null {
   if (!params.profile.include_prompt_pack_experiences || params.candidates.length === 0) {
     return null;
+  }
+
+  for (const packId of params.preferred_prompt_pack_ids ?? []) {
+    const normalizedPackId = packId.trim();
+    if (normalizedPackId.length === 0) {
+      continue;
+    }
+    const explicitMatch = params.candidates.find(
+      (candidate) => candidate.packRef.id === normalizedPackId
+    );
+    if (explicitMatch) {
+      return { candidate: explicitMatch, reason: 'explicit' };
+    }
   }
 
   const haystack = buildHintHaystack(params.hints);
@@ -228,11 +246,13 @@ export function selectRunMemoryForRole(params: {
   role: RunMemoryRole;
   manifest: unknown;
   hints?: string[];
+  include_source_0?: boolean;
+  preferred_prompt_pack_ids?: string[];
 }): RunMemorySelection {
   const profile = getRunMemoryRoleProfile(params.role);
   const refs: RunMemoryRef[] = [];
 
-  if (profile.include_source_0) {
+  if (profile.include_source_0 && params.include_source_0 !== false) {
     const descriptor = readRunSource0Descriptor(params.manifest);
     if (descriptor) {
       refs.push({ kind: 'source_0', descriptor });
@@ -242,7 +262,8 @@ export function selectRunMemoryForRole(params: {
   const selectedPromptPack = selectPromptPackCandidate({
     candidates: readPromptPackCandidates(params.manifest),
     hints: params.hints ?? [],
-    profile
+    profile,
+    preferred_prompt_pack_ids: params.preferred_prompt_pack_ids
   });
   if (selectedPromptPack) {
     const experienceLimit = Math.max(0, profile.max_prompt_pack_experiences);

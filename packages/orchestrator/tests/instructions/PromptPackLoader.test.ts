@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 
 import {
   loadPromptPacks,
+  loadPromptPackMetadata,
   computePromptPackStamp,
   type PromptPackSectionSource
 } from '../../src/instructions/promptPacks.js';
@@ -124,6 +125,82 @@ describe('loadPromptPacks', () => {
       );
       expect(pack.sections.system[0]?.content).toContain('Stamped');
       expect(pack.sources).toHaveLength(5);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('loads planner-facing prompt-pack metadata without reading prompt sources', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'prompt-pack-metadata-'));
+    try {
+      const manifestDir = join(root, '.agent', 'prompts', 'prompt-packs', 'metadata-only');
+      await mkdir(manifestDir, { recursive: true });
+      await writeFile(
+        join(manifestDir, 'manifest.json'),
+        JSON.stringify(
+          {
+            id: 'metadata-pack',
+            domain: 'diagnostics',
+            stamp: 'metadata-stamp',
+            experienceSlots: 2,
+            system: '.agent/prompts/missing-source.md',
+            inject: ['.agent/prompts/missing-source.md']
+          },
+          null,
+          2
+        ),
+        'utf8'
+      );
+
+      await expect(loadPromptPacks(root)).rejects.toThrow(/Failed to read prompt source/i);
+      await expect(loadPromptPackMetadata(root)).resolves.toEqual([
+        {
+          id: 'metadata-pack',
+          domain: 'diagnostics',
+          experienceSlots: 2
+        }
+      ]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    {
+      field: 'id',
+      manifest: { id: ['metadata-pack'], domain: 'diagnostics', system: PROMPT_PATH },
+      message: /invalid 'id'.*repoRoot:/i
+    },
+    {
+      field: 'domain',
+      manifest: { id: 'metadata-pack', domain: { slug: 'diagnostics' }, system: PROMPT_PATH },
+      message: /invalid 'domain'.*repoRoot:/i
+    },
+    {
+      field: 'system',
+      manifest: { id: 'metadata-pack', domain: 'diagnostics', system: 42 },
+      message: /invalid 'system'.*repoRoot:/i
+    }
+  ])('rejects malformed manifest $field fields before metadata sorting', async ({ field, manifest, message }) => {
+    const root = await mkdtemp(join(tmpdir(), `prompt-pack-invalid-${field}-`));
+    try {
+      const manifestDir = join(root, '.agent', 'prompts', 'prompt-packs', `invalid-${field}`);
+      await mkdir(manifestDir, { recursive: true });
+      await writeFile(
+        join(manifestDir, 'manifest.json'),
+        JSON.stringify(
+          {
+            ...manifest,
+            stamp: 'metadata-stamp',
+            experienceSlots: 1
+          },
+          null,
+          2
+        ),
+        'utf8'
+      );
+
+      await expect(loadPromptPackMetadata(root)).rejects.toThrow(message);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

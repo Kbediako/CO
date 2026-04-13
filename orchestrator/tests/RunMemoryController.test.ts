@@ -136,6 +136,29 @@ describe('run memory controller', () => {
     expect(promptLines).toContain('- Selection reason: fallback');
   });
 
+  it('honors explicit prompt-pack preferences and source-0 omission', () => {
+    const selection = selectRunMemoryForRole({
+      role: 'executor',
+      manifest: buildManifest(),
+      hints: ['Need diagnostics coverage'],
+      include_source_0: false,
+      preferred_prompt_pack_ids: ['pp-implementation']
+    });
+    const experienceRefs = selection.refs.filter(
+      (ref) => ref.kind === 'prompt_pack_experience'
+    );
+
+    expect(selection.refs.some((ref) => ref.kind === 'source_0')).toBe(false);
+    expect(experienceRefs[0]).toMatchObject({
+      kind: 'prompt_pack_experience',
+      selection_reason: 'explicit',
+      pack: {
+        id: 'pp-implementation',
+        domain: 'implementation'
+      }
+    });
+  });
+
   it('keeps role profiles defensive and avoids substring hint matches', () => {
     const firstSelection = selectRunMemoryForRole({
       role: 'executor',

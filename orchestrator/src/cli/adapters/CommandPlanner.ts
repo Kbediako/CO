@@ -1,6 +1,7 @@
 import type { PlannerAgent, PlanItem, PlanResult, TaskContext } from '../../types.js';
 import type { PipelineDefinition, PipelineStage } from '../types.js';
 import { PLANNER_EXECUTION_MODE_PARSER, resolveRequiresCloudPolicy } from '../../utils/executionMode.js';
+import { selectTaskMemoryRefs } from '../services/plannerMemory.js';
 
 export interface CommandPlannerOptions {
   targetStageId?: string | null;
@@ -8,6 +9,7 @@ export interface CommandPlannerOptions {
 
 export class CommandPlanner implements PlannerAgent {
   private cachedPlan: PlanResult | null = null;
+  private cachedPlanKey: string | null = null;
 
   constructor(
     private readonly pipeline: PipelineDefinition,
@@ -15,9 +17,9 @@ export class CommandPlanner implements PlannerAgent {
   ) {}
 
   async plan(task: TaskContext): Promise<PlanResult> {
-    void task;
-    if (!this.cachedPlan) {
-      const items = this.pipeline.stages.map((stage, index) => this.buildPlanItem(stage, index));
+    const planKey = buildPlanCacheKey(task);
+    if (!this.cachedPlan || this.cachedPlanKey !== planKey) {
+      const items = this.pipeline.stages.map((stage, index) => this.buildPlanItem(stage, index, task));
       const targetId = this.resolveTargetId(items);
       const normalizedItems = items.map((item) => ({
         ...item,
@@ -28,11 +30,12 @@ export class CommandPlanner implements PlannerAgent {
         notes: this.pipeline.description,
         targetId: targetId ?? null
       };
+      this.cachedPlanKey = planKey;
     }
     return clonePlanResult(this.cachedPlan);
   }
 
-  private buildPlanItem(stage: PipelineStage, index: number): PlanItem {
+  private buildPlanItem(stage: PipelineStage, index: number, task: TaskContext): PlanItem {
     const stagePlanHints = extractStagePlanHints(stage);
     const requiresCloud = resolveStageRequiresCloud(stage, stagePlanHints);
     const runnable = resolveStageRunnable(stagePlanHints);
@@ -55,6 +58,19 @@ export class CommandPlanner implements PlannerAgent {
       metadata.cloudEnvId = stagePlanHints.cloudEnvId;
     }
     metadata.requiresCloud = requiresCloud;
+
+    const selectedMemoryRefs = selectTaskMemoryRefs({
+      task,
+      pipeline: this.pipeline,
+      target: {
+        id: `${this.pipeline.id}:${stage.id}`,
+        description: stage.title
+      },
+      stage
+    });
+    if (selectedMemoryRefs.length > 0) {
+      metadata.selectedMemoryRefs = selectedMemoryRefs;
+    }
 
     return {
       id: `${this.pipeline.id}:${stage.id}`,
@@ -202,4 +218,8 @@ function clonePlanResult(plan: PlanResult): PlanResult {
     notes: plan.notes,
     targetId: plan.targetId ?? null
   };
+}
+
+function buildPlanCacheKey(task: TaskContext): string {
+  return JSON.stringify(task.memory?.refs ?? null);
 }

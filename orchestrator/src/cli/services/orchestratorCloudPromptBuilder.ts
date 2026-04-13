@@ -1,6 +1,11 @@
 import type { TaskContext, PlanItem } from '../../types.js';
 import type { CliManifest, PipelineDefinition } from '../types.js';
 import { buildRunMemoryPromptLines, selectRunMemoryForRole } from '../run/runMemoryController.js';
+import {
+  readPromptPackIdFromTaskMemoryRefId,
+  readSelectedMemoryRefs,
+  TASK_MEMORY_SOURCE0_REF_ID
+} from './plannerMemory.js';
 
 export type CloudPromptManifest = Pick<CliManifest, 'prompt_packs' | 'memory'>;
 
@@ -21,6 +26,12 @@ export function buildCloudPrompt(params: {
     'Apply the required repository changes for this target stage and produce a diff.'
   ].filter((line): line is string => Boolean(line));
 
+  const selectedMemoryRefs = readSelectedMemoryRefs(params.target);
+  const includeSource0 =
+    selectedMemoryRefs.length === 0 || selectedMemoryRefs.includes(TASK_MEMORY_SOURCE0_REF_ID);
+  const preferredPromptPackIds = selectedMemoryRefs
+    .map((refId) => readPromptPackIdFromTaskMemoryRefId(refId))
+    .filter((packId): packId is string => packId !== null);
   const runMemoryPromptLines = buildRunMemoryPromptLines(
     selectRunMemoryForRole({
       role: 'executor',
@@ -33,7 +44,9 @@ export function buildCloudPrompt(params: {
         params.target.description ?? '',
         params.stage.id,
         params.stage.title
-      ]
+      ],
+      include_source_0: includeSource0,
+      preferred_prompt_pack_ids: preferredPromptPackIds
     })
   );
   if (runMemoryPromptLines.length > 0) {
