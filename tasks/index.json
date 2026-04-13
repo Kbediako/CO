@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260413-linear-72e9f13e-0899-4769-9ca3-82586077fca9",
+      "title": "CO workflow: refresh current-main docs:freshness stale cohorts 1138-1163 plus release docs",
+      "relates_to": "tasks/tasks-linear-72e9f13e-0899-4769-9ca3-82586077fca9.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-13",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-72e9f13e-0899-4769-9ca3-82586077fca9.md",
+        "task": "tasks/tasks-linear-72e9f13e-0899-4769-9ca3-82586077fca9.md",
+        "agent_task": ".agent/task/linear-72e9f13e-0899-4769-9ca3-82586077fca9.md",
+        "docs": "docs/TECH_SPEC-linear-72e9f13e-0899-4769-9ca3-82586077fca9.md"
+      }
+    },
+    {
       "id": "20260412-linear-b84c9a78-b62f-48fa-b1c4-88f8222535da",
       "title": "CO: harden control-host supervise restart against orphaned duplicate host burn",
       "relates_to": "tasks/tasks-linear-b84c9a78-b62f-48fa-b1c4-88f8222535da.md",
@@ -5330,7 +5347,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-13",
+      "last_review": "2026-04-13",
       "paths": {
         "spec": "tasks/specs/1163-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-guard-and-planning-shell-extraction.md",
         "task": "tasks/tasks-1163-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-guard-and-planning-shell-extraction.md",
@@ -5346,7 +5363,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-13",
+      "last_review": "2026-04-13",
       "paths": {
         "spec": "tasks/specs/1162-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-task-manager-registration-shell-extraction.md",
         "task": "tasks/tasks-1162-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-task-manager-registration-shell-extraction.md",
@@ -5362,7 +5379,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-13",
+      "last_review": "2026-04-13",
       "paths": {
         "spec": "tasks/specs/1161-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-completion-shell-extraction.md",
         "task": "tasks/tasks-1161-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-completion-shell-extraction.md",
@@ -5378,7 +5395,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-13",
+      "last_review": "2026-04-13",
       "paths": {
         "spec": "tasks/specs/1160-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-registration-shell-extraction.md",
         "task": "tasks/tasks-1160-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-registration-shell-extraction.md",
@@ -5394,7 +5411,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-13",
+      "last_review": "2026-04-13",
       "paths": {
         "spec": "tasks/specs/1159-coordinator-symphony-aligned-orchestrator-execution-routing-shell-extraction.md",
         "task": "tasks/tasks-1159-coordinator-symphony-aligned-orchestrator-execution-routing-shell-extraction.md",
@@ -5410,7 +5427,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-13",
+      "last_review": "2026-04-13",
       "paths": {
         "spec": "tasks/specs/1158-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction.md",
         "task": "tasks/tasks-1158-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction.md",
@@ -5426,7 +5443,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-13",
+      "last_review": "2026-04-13",
       "paths": {
         "spec": "tasks/specs/1157-coordinator-symphony-aligned-orchestrator-cloud-target-executor-extraction.md",
         "task": "tasks/tasks-1157-coordinator-symphony-aligned-orchestrator-cloud-target-executor-extraction.md",
@@ -5442,7 +5459,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-13",
+      "last_review": "2026-04-13",
       "paths": {
         "spec": "tasks/specs/1156-coordinator-symphony-aligned-orchestrator-execution-mode-lifecycle-shell-extraction.md",
         "task": "tasks/tasks-1156-coordinator-symphony-aligned-orchestrator-execution-mode-lifecycle-shell-extraction.md",
@@ -5458,7 +5475,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-13",
+      "last_review": "2026-04-13",
       "paths": {
         "spec": "tasks/specs/1155-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction.md",
         "task": "tasks/tasks-1155-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction.md",
@@ -5474,7 +5491,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-13",
+      "last_review": "2026-04-13",
       "paths": {
         "spec": "tasks/specs/1154-coordinator-symphony-aligned-control-server-public-lifecycle-shell-extraction.md",
         "task": "tasks/tasks-1154-coordinator-symphony-aligned-control-server-public-lifecycle-shell-extraction.md",
@@ -5490,7 +5507,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-13",
+      "last_review": "2026-04-13",
       "paths": {
         "spec": "tasks/specs/1153-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction.md",
         "task": "tasks/tasks-1153-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction.md",
@@ -5506,7 +5523,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-13",
+      "last_review": "2026-04-13",
       "paths": {
         "spec": "tasks/specs/1152-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction.md",
         "task": "tasks/tasks-1152-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction.md",
@@ -5522,7 +5539,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-13",
+      "last_review": "2026-04-13",
       "paths": {
         "spec": "tasks/specs/1151-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction.md",
         "task": "tasks/tasks-1151-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction.md",
@@ -5538,7 +5555,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-13",
+      "last_review": "2026-04-13",
       "paths": {
         "spec": "tasks/specs/1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction.md",
         "task": "tasks/tasks-1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction.md",
@@ -5554,7 +5571,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-13",
+      "last_review": "2026-04-13",
       "paths": {
         "spec": "tasks/specs/1149-coordinator-symphony-aligned-control-oversight-read-contract-extraction.md",
         "task": "tasks/tasks-1149-coordinator-symphony-aligned-control-oversight-read-contract-extraction.md",
@@ -5570,7 +5587,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-13",
+      "last_review": "2026-04-13",
       "paths": {
         "spec": "tasks/specs/1148-coordinator-symphony-aligned-control-oversight-read-service-boundary-extraction.md",
         "task": "tasks/tasks-1148-coordinator-symphony-aligned-control-oversight-read-service-boundary-extraction.md",
@@ -5586,7 +5603,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-13",
+      "last_review": "2026-04-13",
       "paths": {
         "spec": "tasks/specs/1147-coordinator-symphony-aligned-control-oversight-service-boundary-extraction.md",
         "task": "tasks/tasks-1147-coordinator-symphony-aligned-control-oversight-service-boundary-extraction.md",
@@ -5602,7 +5619,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-13",
+      "last_review": "2026-04-13",
       "paths": {
         "spec": "tasks/specs/1146-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction.md",
         "task": "tasks/tasks-1146-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction.md",
@@ -5618,7 +5635,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-13",
+      "last_review": "2026-04-13",
       "paths": {
         "spec": "tasks/specs/1145-coordinator-symphony-aligned-telegram-oversight-runtime-lifecycle-shell-extraction.md",
         "task": "tasks/tasks-1145-coordinator-symphony-aligned-telegram-oversight-runtime-lifecycle-shell-extraction.md",
@@ -5634,7 +5651,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-13",
+      "last_review": "2026-04-13",
       "paths": {
         "spec": "tasks/specs/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction.md",
         "task": "tasks/tasks-1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction.md",
@@ -5650,7 +5667,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-13",
+      "last_review": "2026-04-13",
       "paths": {
         "spec": "tasks/specs/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction.md",
         "task": "tasks/tasks-1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction.md",
@@ -5666,7 +5683,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-13",
+      "last_review": "2026-04-13",
       "paths": {
         "spec": "tasks/specs/1142-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop.md",
         "task": "tasks/tasks-1142-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop.md",
@@ -5682,7 +5699,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-13",
+      "last_review": "2026-04-13",
       "paths": {
         "spec": "tasks/specs/1141-coordinator-symphony-aligned-telegram-projection-notification-state-contract-narrowing.md",
         "task": "tasks/tasks-1141-coordinator-symphony-aligned-telegram-projection-notification-state-contract-narrowing.md",
@@ -5698,7 +5715,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-13",
+      "last_review": "2026-04-13",
       "paths": {
         "spec": "tasks/specs/1140-coordinator-symphony-aligned-telegram-projection-notification-controller-extraction.md",
         "task": "tasks/tasks-1140-coordinator-symphony-aligned-telegram-projection-notification-controller-extraction.md",
@@ -5714,7 +5731,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-13",
+      "last_review": "2026-04-13",
       "paths": {
         "spec": "tasks/specs/1139-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction.md",
         "task": "tasks/tasks-1139-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction.md",
@@ -5730,7 +5747,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-13",
+      "last_review": "2026-04-13",
       "paths": {
         "spec": "tasks/specs/1138-coordinator-symphony-aligned-telegram-oversight-command-controller-extraction.md",
         "task": "tasks/tasks-1138-coordinator-symphony-aligned-telegram-oversight-command-controller-extraction.md",
