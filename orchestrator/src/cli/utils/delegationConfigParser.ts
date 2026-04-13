@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { hasMcpServerEntry } from './mcpServerEntry.js';
 
 export interface DelegationFallbackConfig {
+  command: string | null;
   args: string[];
   envVars: Record<string, string>;
 }
@@ -17,12 +18,27 @@ export function readDelegationFallbackConfig(configPath: string): DelegationFall
       return null;
     }
     return {
+      command: readDelegationCommandFromConfig(raw),
       args: readDelegationArgsFromConfig(raw),
       envVars: readDelegationEnvVarsFromConfig(raw)
     };
   } catch {
     return null;
   }
+}
+
+function readDelegationCommandFromConfig(raw: string): string | null {
+  const section = readSectionBody(raw, [
+    'mcp_servers.delegation',
+    'mcp_servers."delegation"',
+    "mcp_servers.'delegation'"
+  ]);
+  if (!section) {
+    const inlineEntry = readDelegationInlineEntry(raw);
+    return inlineEntry ? readInlineQuotedValue(inlineEntry, 'command') : null;
+  }
+  const commandMatch = section.match(/^\s*command\s*=\s*("(?:\\"|[^"])*"|'(?:\\'|[^'])*')\s*$/mu);
+  return commandMatch ? decodeQuotedTomlString(commandMatch[1] ?? '') : null;
 }
 
 function readDelegationArgsFromConfig(raw: string): string[] {
@@ -117,6 +133,15 @@ function readInlineEnvVars(raw: string): Record<string, string> {
   return envVars;
 }
 
+function readInlineQuotedValue(raw: string, propertyName: string): string | null {
+  const propertyPattern = new RegExp(
+    `\\b${escapeRegExp(propertyName)}\\s*=\\s*("(?:\\\\.|[^"])*"|'(?:\\\\.|[^'])*')`,
+    'u'
+  );
+  const propertyMatch = propertyPattern.exec(raw);
+  return propertyMatch ? decodeQuotedTomlString(propertyMatch[1] ?? '') : null;
+}
+
 function readSectionBody(raw: string, names: string[]): string | null {
   let currentTable: string | null = null;
   let collecting = false;
@@ -200,6 +225,14 @@ function readQuotedTokens(raw: string): string[] {
     token = tokenPattern.exec(raw);
   }
   return tokens;
+}
+
+function decodeQuotedTomlString(raw: string): string | null {
+  if (!raw || raw.length < 2) {
+    return null;
+  }
+  const unquoted = raw.slice(1, -1);
+  return unquoted.replace(/\\"/gu, '"').replace(/\\'/gu, '\'');
 }
 
 function stripTomlComment(line: string): string {

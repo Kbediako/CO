@@ -14,8 +14,8 @@ describe('runDelegationSetup', () => {
         join(tempHome, 'config.toml'),
         [
           '[mcp_servers."delegation"]',
-          'command = "codex-orchestrator"',
-          `args = ["delegate-server", "--repo", "${process.cwd().replace(/\\/g, '\\\\')}"]`
+          `command = "${process.execPath.replace(/\\/g, '\\\\')}"`,
+          `args = ["${join(process.cwd(), 'dist', 'bin', 'codex-orchestrator.js').replace(/\\/g, '\\\\')}", "delegate-server", "--repo", "${process.cwd().replace(/\\/g, '\\\\')}"]`
         ].join('\n'),
         'utf8'
       );
@@ -33,6 +33,8 @@ describe('runDelegationSetup', () => {
       expect(result.status).toBe('planned');
       expect(result.readiness.configured).toBe(true);
       expect(result.readiness.configPath).toBe(join(tempHome, 'config.toml'));
+      expect(result.plan.commandLine).toContain('dist/bin/codex-orchestrator.js');
+      expect(result.plan.commandLine).not.toContain('codex-orchestrator delegate-server --repo');
     } finally {
       await rm(tempHome, { recursive: true, force: true });
     }
@@ -45,8 +47,8 @@ describe('runDelegationSetup', () => {
         join(tempHome, 'config.toml'),
         [
           "[mcp_servers.'delegation']",
-          'command = "codex-orchestrator"',
-          `args = ["delegate-server", "--repo", "${process.cwd().replace(/\\/g, '\\\\')}"]`,
+          `command = "${process.execPath.replace(/\\/g, '\\\\')}"`,
+          `args = ["${join(process.cwd(), 'dist', 'bin', 'codex-orchestrator.js').replace(/\\/g, '\\\\')}", "delegate-server", "--repo", "${process.cwd().replace(/\\/g, '\\\\')}"]`,
           '',
           "[mcp_servers.'delegation'.env]",
           'CODEX_LOG_LEVEL = "debug"'
@@ -79,7 +81,7 @@ describe('runDelegationSetup', () => {
         join(tempHome, 'config.toml'),
         [
           '[mcp_servers]',
-          `"delegation" = { command = "codex-orchestrator", args = ["delegate-server", "--repo", "${process.cwd().replace(/\\/g, '\\\\')}"], env = { CODEX_LOG_LEVEL = "debug" } }`
+          `"delegation" = { command = "${process.execPath.replace(/\\/g, '\\\\')}", args = ["${join(process.cwd(), 'dist', 'bin', 'codex-orchestrator.js').replace(/\\/g, '\\\\')}", "delegate-server", "--repo", "${process.cwd().replace(/\\/g, '\\\\')}"], env = { CODEX_LOG_LEVEL = "debug" } }`
         ].join('\n'),
         'utf8'
       );

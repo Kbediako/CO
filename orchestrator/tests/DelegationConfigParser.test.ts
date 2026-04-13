@@ -26,6 +26,7 @@ describe('readDelegationFallbackConfig', () => {
       );
 
       expect(readDelegationFallbackConfig(configPath)).toEqual({
+        command: 'codex-orchestrator',
         args: ['delegate-server', '--repo', '/tmp/repo', '--label', 'qa "lane"'],
         envVars: {
           CODEX_LOG_LEVEL: 'debug',
@@ -51,6 +52,7 @@ describe('readDelegationFallbackConfig', () => {
       );
 
       expect(readDelegationFallbackConfig(configPath)).toEqual({
+        command: 'codex-orchestrator',
         args: ['delegate-server', '--repo', '/tmp/repo'],
         envVars: {
           CODEX_LOG_LEVEL: 'debug',
@@ -76,6 +78,7 @@ describe('readDelegationFallbackConfig', () => {
       );
 
       expect(readDelegationFallbackConfig(configPath)).toEqual({
+        command: 'codex-orchestrator',
         args: ['delegate-server', '--repo', '/tmp/repo', 'topic #1'],
         envVars: {}
       });
@@ -102,6 +105,7 @@ describe('readDelegationFallbackConfig', () => {
       );
 
       expect(readDelegationFallbackConfig(configPath)).toEqual({
+        command: 'codex-orchestrator',
         args: ['delegate-server', '--repo', '/tmp/repo'],
         envVars: {}
       });
@@ -124,6 +128,7 @@ describe('readDelegationFallbackConfig', () => {
       );
 
       expect(readDelegationFallbackConfig(configPath)).toEqual({
+        command: 'codex-orchestrator',
         args: ['delegate-server', '--repo', '/tmp/repo'],
         envVars: {
           PAYLOAD: '{"a":1}',

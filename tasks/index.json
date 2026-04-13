@@ -58,6 +58,23 @@
       }
     },
     {
+      "id": "20260413-linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb",
+      "title": "CO: Fix delegation MCP startup/perf and stale delegate-server process lifecycle",
+      "relates_to": "tasks/tasks-linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-13",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb.md",
+        "task": "tasks/tasks-linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb.md",
+        "agent_task": ".agent/task/linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb.md",
+        "docs": "docs/TECH_SPEC-linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb.md"
+      }
+    },
+    {
       "id": "20260412-linear-b84c9a78-b62f-48fa-b1c4-88f8222535da",
       "title": "CO: harden control-host supervise restart against orphaned duplicate host burn",
       "relates_to": "tasks/tasks-linear-b84c9a78-b62f-48fa-b1c4-88f8222535da.md",

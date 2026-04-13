@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  buildDelegationDirectTransportGuidance,
   formatDoctorCloudPreflightSummary,
   formatDoctorSummary,
   runDoctor,
@@ -181,29 +182,85 @@ describe('runDoctor', () => {
     }
   });
 
-  it('reports delegation readiness when config declares the delegation MCP entry', async () => {
+  it('flags wrapper-based delegation config as warning', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
     process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_CLI_BIN = join(tempHome, 'missing-codex');
     try {
       await writeFile(
         join(tempHome, 'config.toml'),
-        ['mcp_servers."delegation" = { command = "codex-orchestrator" } # keep enabled'].join('\n'),
+        ['mcp_servers."delegation" = { command = "codex-orchestrator", args = ["delegate-server"] }'].join('\n'),
         'utf8'
       );
 
       const result = runDoctor(process.cwd());
-      expect(result.delegation.status).toBe('ok');
+      expect(result.delegation.status).toBe('warning');
       expect(result.delegation.config.status).toBe('ok');
-      expect(formatDoctorSummary(result).join('\n')).toContain('Delegation: ok');
+      expect(result.delegation.transport.kind).toBe('wrapper');
+      expect(result.delegation.startup.status).toBe('skipped');
+      expect(formatDoctorSummary(result).join('\n')).toContain('Delegation: warning');
     } finally {
       if (originalCodexHome === undefined) {
         delete process.env.CODEX_HOME;
       } else {
         process.env.CODEX_HOME = originalCodexHome;
       }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
       await rm(tempHome, { recursive: true, force: true });
     }
+  });
+
+  it('reports direct-dist delegation readiness and initialize latency', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
+    process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_CLI_BIN = join(tempHome, 'missing-codex');
+    try {
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        [
+          '[mcp_servers.delegation]',
+          `command = "${process.execPath.replace(/\\/g, '\\\\')}"`,
+          `args = ["${join(process.cwd(), 'dist', 'bin', 'codex-orchestrator.js').replace(/\\/g, '\\\\')}", "delegate-server"]`
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = runDoctor(process.cwd());
+      expect(result.delegation.status).not.toBe('missing-config');
+      expect(result.delegation.transport.kind).toBe('direct-dist');
+      expect(result.delegation.startup.status).not.toBe('failed');
+      expect(result.delegation.startup.latency_ms).not.toBeNull();
+      expect(formatDoctorSummary(result).join('\n')).toContain('transport: safe (direct-dist)');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('degrades delegation direct-transport guidance instead of throwing when dist is unavailable', () => {
+    const guidance = buildDelegationDirectTransportGuidance(() => {
+      throw new Error('Unable to locate packaged program. Expected /tmp/repo/dist/bin/codex-orchestrator.js.');
+    });
+
+    expect(guidance).toContain('Direct dist transport unavailable until dist is built:');
+    expect(guidance).toContain('/tmp/repo/dist/bin/codex-orchestrator.js');
   });
 
   it('keeps overall doctor status at warning when providers are incomplete', async () => {

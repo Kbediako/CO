@@ -1495,6 +1495,9 @@ Commands:
     --repo <path>         Repo root for delegation server (default cwd).
     --yes                 Apply setup by running "codex mcp add ...".
     --format json         Emit machine-readable output (dry-run only).
+  delegation cleanup-stale
+    --yes                 Terminate stale delegate-server processes not rooted in a live codex client.
+    --format json         Emit machine-readable output.
   skills install          Install bundled skills into $CODEX_HOME/skills.
     --force               Overwrite existing skill files.
     --only <skills>       Install only selected skills (comma-separated).

@@ -7,6 +7,9 @@ afterEach(() => {
 });
 
 describe('runDelegationCliShell', () => {
+  const directDistCommand =
+    "codex mcp add delegation -- /opt/homebrew/bin/node /tmp/repo/dist/bin/codex-orchestrator.js delegate-server --repo '/tmp/repo'";
+
   it('rejects a missing subcommand before invoking the delegation setup engine', async () => {
     const runDelegationSetupMock = vi.fn<typeof import('../src/cli/delegationSetup.js').runDelegationSetup>();
 
@@ -20,7 +23,7 @@ describe('runDelegationCliShell', () => {
           runDelegationSetup: runDelegationSetupMock
         }
       )
-    ).rejects.toThrow('delegation requires a subcommand (setup).');
+    ).rejects.toThrow('delegation requires a subcommand (setup|cleanup-stale).');
 
     expect(runDelegationSetupMock).not.toHaveBeenCalled();
   });
@@ -70,7 +73,7 @@ describe('runDelegationCliShell', () => {
           codexBin: 'codex',
           codexHome: '/tmp/.codex',
           repoRoot: '/tmp/repo',
-          commandLine: "codex mcp add delegation -- codex-orchestrator delegate-server --repo '/tmp/repo'"
+          commandLine: directDistCommand
         },
         readiness: {
           configured: false,
@@ -102,7 +105,7 @@ describe('runDelegationCliShell', () => {
         codexBin: 'codex',
         codexHome: '/tmp/.codex',
         repoRoot: '/tmp/repo',
-        commandLine: "codex mcp add delegation -- codex-orchestrator delegate-server --repo '/tmp/repo'"
+        commandLine: directDistCommand
       },
       readiness: {
         configured: false,
@@ -120,7 +123,7 @@ describe('runDelegationCliShell', () => {
           codexBin: 'codex',
           codexHome: '/tmp/.codex',
           repoRoot: '/tmp/repo',
-          commandLine: "codex mcp add delegation -- codex-orchestrator delegate-server --repo '/tmp/repo'"
+          commandLine: directDistCommand
         },
         readiness: {
           configured: true,
@@ -164,7 +167,7 @@ describe('runDelegationCliShell', () => {
           codexBin: 'codex',
           codexHome: '/tmp/.codex',
           repoRoot: '/tmp/repo',
-          commandLine: "codex mcp add delegation -- codex-orchestrator delegate-server --repo '/tmp/repo'"
+          commandLine: directDistCommand
         },
         readiness: {
           configured: false,
@@ -189,6 +192,45 @@ describe('runDelegationCliShell', () => {
     expect(runDelegationSetupMock).toHaveBeenCalledWith({
       apply: false,
       repoRoot: '/tmp/repo'
+    });
+  });
+
+  it('runs cleanup-stale and emits json output', async () => {
+    const log = vi.fn();
+    const cleanupMock =
+      vi.fn<typeof import('../src/cli/utils/delegationMcpHealth.js').cleanupStaleDelegateServerProcesses>()
+        .mockResolvedValue({
+          status: 'stale',
+          activeCount: 1,
+          staleCount: 2,
+          activePids: [101],
+          stalePids: [202, 203],
+          staleRssKb: 8192,
+          thresholdSeconds: 600,
+          detail: 'Detected 2 stale delegate-server processes not rooted in a live codex client.',
+          dryRun: false,
+          terminatedPids: [202, 203],
+          forcedPids: [],
+          remainingPids: []
+        });
+
+    await runDelegationCliShell(
+      {
+        positionals: ['cleanup-stale'],
+        flags: { format: 'json', yes: true }
+      },
+      {
+        cleanupStaleDelegateServerProcesses: cleanupMock,
+        log
+      }
+    );
+
+    expect(cleanupMock).toHaveBeenCalledWith({ apply: true });
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
+      status: 'stale',
+      staleCount: 2,
+      dryRun: false,
+      terminatedPids: [202, 203]
     });
   });
 });

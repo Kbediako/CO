@@ -2642,6 +2642,8 @@ describe('codex-orchestrator command surface', () => {
     await runCli(['delegation', 'setup', '--yes', '--repo', repoRoot], env, FLOW_TARGET_TEST_TIMEOUT);
     const log = await readFile(addLog, 'utf8');
     expect(log).toContain('mcp add delegation');
+    expect(log).toContain('dist/bin/codex-orchestrator.js');
+    expect(log).not.toContain('codex-orchestrator delegate-server --repo');
     expect(log).toContain(`--repo ${repoRoot}`);
   }, FLOW_TARGET_TEST_TIMEOUT);
 
@@ -2676,6 +2678,7 @@ describe('codex-orchestrator command surface', () => {
     const log = await readFile(addLog, 'utf8');
     expect(log).toContain('mcp add delegation');
     expect(log).toContain('--env KEEP_ME=1');
+    expect(log).toContain('dist/bin/codex-orchestrator.js');
     expect(log).toContain(`--repo ${repoRoot}`);
   }, FLOW_TARGET_TEST_TIMEOUT);
 
@@ -2692,6 +2695,7 @@ describe('codex-orchestrator command surface', () => {
 
     const { stdout } = await runCli(['delegation', 'setup', '--format', 'json', '--repo', repoRoot], env);
     const payload = JSON.parse(stdout) as { plan?: { commandLine?: string } };
+    expect(payload.plan?.commandLine).toContain('dist/bin/codex-orchestrator.js');
     expect(payload.plan?.commandLine).toContain('--repo');
     expect(payload.plan?.commandLine).toContain(repoRoot);
   }, TEST_TIMEOUT);

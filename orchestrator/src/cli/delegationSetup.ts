@@ -1,4 +1,4 @@
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import process from 'node:process';
 import { join, resolve } from 'node:path';
 
@@ -6,6 +6,11 @@ import { resolveCodexCliBin } from './utils/codexCli.js';
 import { resolveCodexHome } from './utils/codexPaths.js';
 import { buildCommandPreview } from './utils/commandPreview.js';
 import { readDelegationFallbackConfig } from './utils/delegationConfigParser.js';
+import {
+  inspectDelegationMcpConfig,
+  readPinnedRepo,
+  resolveDelegationServerInvocation
+} from './utils/delegationMcpHealth.js';
 
 export interface DelegationSetupOptions {
   apply?: boolean;
@@ -34,6 +39,7 @@ export async function runDelegationSetup(options: DelegationSetupOptions = {}): 
   const codexBin = resolveCodexCliBin(env);
   const codexHome = resolveCodexHome(env);
   const configPath = join(codexHome, 'config.toml');
+  const delegateServer = resolveDelegationServerInvocation({ env, execPath: process.execPath });
 
   const plan = {
     codexBin,
@@ -44,14 +50,14 @@ export async function runDelegationSetup(options: DelegationSetupOptions = {}): 
       'add',
       'delegation',
       '--',
-      'codex-orchestrator',
-      'delegate-server',
+      delegateServer.command,
+      ...delegateServer.args,
       '--repo',
       repoRoot
     ])
   };
 
-  const probe = inspectDelegationReadiness({ codexBin, configPath, repoRoot, env });
+  const probe = inspectDelegationReadiness({ configPath, repoRoot, env });
   const readiness = { configured: probe.configured, configPath };
 
   if (!options.apply) {
@@ -66,7 +72,7 @@ export async function runDelegationSetup(options: DelegationSetupOptions = {}): 
     { codexBin, repoRoot, removeExisting: probe.removeExisting, envVars: probe.envVars },
     env
   );
-  const configuredAfter = inspectDelegationReadiness({ codexBin, configPath, repoRoot, env }).configured;
+  const configuredAfter = inspectDelegationReadiness({ configPath, repoRoot, env }).configured;
   return {
     status: 'applied',
     reason: probe.reason,
@@ -91,16 +97,17 @@ export function formatDelegationSetupSummary(result: DelegationSetupResult): str
 }
 
 function inspectDelegationReadiness(options: {
-  codexBin: string;
   configPath: string;
   repoRoot: string;
   env: NodeJS.ProcessEnv;
 }): { configured: boolean; removeExisting: boolean; envVars: Record<string, string>; reason?: string } {
   const requestedRepo = resolve(options.repoRoot);
-  const existing = readDelegationMcpServer(options.codexBin, options.env);
+  const snapshot = inspectDelegationMcpConfig(options.env);
+  const existing = snapshot.entry;
   if (existing) {
     const envVars = existing.envVars;
-    const isDelegationServer = existing.args.includes('delegate-server') || existing.args.includes('delegation-server');
+    const isDelegationServer =
+      existing.args.includes('delegate-server') || existing.args.includes('delegation-server');
     if (!isDelegationServer) {
       return {
         configured: false,
@@ -142,6 +149,7 @@ function applyDelegationSetup(
   plan: { codexBin: string; repoRoot: string; removeExisting: boolean; envVars: Record<string, string> },
   env: NodeJS.ProcessEnv
 ): Promise<void> {
+  const delegateServer = resolveDelegationServerInvocation({ env, execPath: process.execPath });
   const envFlags: string[] = [];
   for (const [key, value] of Object.entries(plan.envVars ?? {})) {
     envFlags.push('--env', `${key}=${value}`);
@@ -156,8 +164,8 @@ function applyDelegationSetup(
           'delegation',
           ...envFlags,
           '--',
-          'codex-orchestrator',
-          'delegate-server',
+          delegateServer.command,
+          ...delegateServer.args,
           '--repo',
           plan.repoRoot
         ],
@@ -190,54 +198,6 @@ function applyDelegationSetup(
   });
 }
 
-function readDelegationMcpServer(
-  codexBin: string,
-  env: NodeJS.ProcessEnv
-): { args: string[]; pinnedRepo: string | null; envVars: Record<string, string> } | null {
-  const result = spawnSync(codexBin, ['mcp', 'get', 'delegation', '--json'], {
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-    timeout: 5000,
-    env
-  });
-  if (result.error || result.status !== 0) {
-    return null;
-  }
-  const stdout = String(result.stdout ?? '').trim();
-  if (!stdout) {
-    return null;
-  }
-  try {
-    const parsed = JSON.parse(stdout) as Record<string, unknown>;
-    const transport = parsed.transport as Record<string, unknown> | undefined;
-    const args = Array.isArray(transport?.args)
-      ? (transport!.args as unknown[]).filter((value) => typeof value === 'string') as string[]
-      : [];
-    const envVars: Record<string, string> = {};
-    const envRecord = transport?.env;
-    if (envRecord && typeof envRecord === 'object' && !Array.isArray(envRecord)) {
-      for (const [key, value] of Object.entries(envRecord as Record<string, unknown>)) {
-        if (typeof value === 'string') {
-          envVars[key] = value;
-        }
-      }
-    }
-    const pinnedRepo = readPinnedRepo(args);
-    return { args, pinnedRepo, envVars };
-  } catch {
-    return null;
-  }
-}
-
-function readPinnedRepo(args: string[]): string | null {
-  const index = args.indexOf('--repo');
-  if (index === -1) {
-    return null;
-  }
-  const candidate = args[index + 1];
-  return typeof candidate === 'string' && candidate.trim().length > 0 ? candidate.trim() : null;
-}
-
 function inspectDelegationReadinessFallback(
   configPath: string,
   requestedRepo: string
@@ -246,8 +206,9 @@ function inspectDelegationReadinessFallback(
   if (!config) {
     return { configured: false, removeExisting: false, envVars: {} };
   }
+  const command = config.command ?? '';
   const isDelegationServer = config.args.includes('delegate-server') || config.args.includes('delegation-server');
-  if (!isDelegationServer) {
+  if (!isDelegationServer || !command.includes('codex-orchestrator')) {
     return {
       configured: false,
       removeExisting: true,
