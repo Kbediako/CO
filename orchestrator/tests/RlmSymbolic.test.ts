@@ -8,7 +8,7 @@ import { runSymbolicLoop, __test__ as symbolicTest } from '../src/cli/rlm/symbol
 import type { RlmState } from '../src/cli/rlm/types.js';
 import type { SymbolicBudgets } from '../src/cli/rlm/symbolic.js';
 
-const { parsePlannerOutput } = symbolicTest;
+const { buildPlannerPrompt, parsePlannerOutput } = symbolicTest;
 
 let tempDir: string | null = null;
 
@@ -306,6 +306,54 @@ describe('symbolic rlm loop', () => {
     expect(result.state.symbolic_iterations[0]?.deliberation?.artifact_paths).toBeUndefined();
     expect(result.state.symbolic_iterations[1]?.deliberation?.status).toBe('skipped');
     expect(result.state.symbolic_iterations[1]?.deliberation?.reason).toBe('not_due');
+  });
+
+  it('injects run memory controller lines into planner prompts', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'rlm-symbolic-'));
+    const repoRoot = tempDir;
+    const runDir = join(repoRoot, 'rlm');
+    const contextObject = await buildContextObject({
+      source: { type: 'text', value: 'alpha beta gamma delta epsilon' },
+      targetDir: join(runDir, 'context'),
+      chunking: { targetBytes: 32, overlapBytes: 0, strategy: 'byte' }
+    });
+
+    const budgets: SymbolicBudgets = {
+      maxSubcallsPerIteration: 1,
+      maxSearchesPerIteration: 1,
+      maxChunkReadsPerIteration: 1,
+      maxBytesPerChunkRead: 64,
+      maxSnippetsPerSubcall: 1,
+      maxBytesPerSnippet: 64,
+      maxSubcallInputBytes: 512,
+      maxPlannerPromptBytes: 4096,
+      searchTopK: 5,
+      maxPreviewBytes: 32,
+      maxConcurrency: 1
+    };
+
+    const result = buildPlannerPrompt({
+      goal: 'Summarize context',
+      contextStore: new ContextStore(contextObject),
+      budgets,
+      runMemoryPromptLines: [
+        'Shared source 0 anchor:',
+        '- Pointer: `ctx:sha256:source0#chunk:c000001`',
+        '',
+        'Relevant prior experiences (hints, not strict instructions):',
+        '- Retrieval profile: planner',
+        '1. [exp plan-1] Keep planner memory selection shared.'
+      ],
+      priorReads: [],
+      priorSearches: [],
+      priorSubcalls: []
+    });
+
+    expect(result.prompt).toContain('Shared source 0 anchor:');
+    expect(result.prompt).toContain('- Pointer: `ctx:sha256:source0#chunk:c000001`');
+    expect(result.prompt).toContain('Relevant prior experiences (hints, not strict instructions):');
+    expect(result.prompt).toContain('- Retrieval profile: planner');
+    expect(result.truncation).toEqual({});
   });
 
   it('persists deliberation artifacts when logging is enabled', async () => {

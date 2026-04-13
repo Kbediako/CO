@@ -18,6 +18,29 @@
       }
     },
     {
+      "id": "20260409-linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d",
+      "title": "CO: Add run memory controller with role-specific retrieval profiles",
+      "relates_to": "tasks/tasks-linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-14",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (clean-success)",
+          "date": "2026-04-09",
+          "manifest": ".runs/linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d-co-94-docs-review/cli/2026-04-09T08-52-01-943Z-a900f3f5/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d.md",
+        "task": "tasks/tasks-linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d.md",
+        "agent_task": ".agent/task/linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d.md",
+        "docs": "docs/TECH_SPEC-linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d.md"
+      }
+    },
+    {
       "id": "20260414-linear-e3bc507e-c33d-48c7-9474-196a6ef9a28c",
       "title": "CO workflow: align provider issue-worktree resolution for configured artifact roots",
       "relates_to": "tasks/tasks-linear-e3bc507e-c33d-48c7-9474-196a6ef9a28c.md",

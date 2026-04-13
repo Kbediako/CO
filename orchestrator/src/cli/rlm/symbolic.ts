@@ -44,6 +44,7 @@ export interface SymbolicLoopOptions {
   runDir: string;
   contextStore: ContextStore;
   budgets: SymbolicBudgets;
+  runMemoryPromptLines?: string[];
   runPlanner: (prompt: string, attempt: number) => Promise<string>;
   runSubcall: (prompt: string, meta: { id: string; purpose: string }) => Promise<string>;
   deliberation?: {
@@ -745,12 +746,22 @@ function buildPlannerPrompt(params: {
   goal: string;
   contextStore: ContextStore;
   budgets: SymbolicBudgets;
+  runMemoryPromptLines?: string[];
   priorReads: Array<{ pointer: string; excerpt: string }>;
   priorSearches: Array<{ query: string; results: RlmSymbolicSearchHit[] }>;
   priorSubcalls: PriorSubcallSummary[];
   deliberationBrief?: string | null;
 }): { prompt: string; truncation: RlmSymbolicIteration['truncation'] } {
-  const { goal, contextStore, budgets, priorReads, priorSearches, priorSubcalls, deliberationBrief } = params;
+  const {
+    goal,
+    contextStore,
+    budgets,
+    runMemoryPromptLines,
+    priorReads,
+    priorSearches,
+    priorSubcalls,
+    deliberationBrief
+  } = params;
 
   const baseLines: string[] = [
     'You are a symbolic RLM planner. Return JSON only (no prose).',
@@ -777,7 +788,8 @@ function buildPlannerPrompt(params: {
     '- Do not include full context; use pointers.',
     '- Prefer prior subcall pointers for recursive chaining.',
     '- Request at least one subcall before intent=final.',
-    ''
+    '',
+    ...(runMemoryPromptLines && runMemoryPromptLines.length > 0 ? [...runMemoryPromptLines, ''] : [])
   ];
 
   const sections: Array<{ key: keyof NonNullable<RlmSymbolicIteration['truncation']>; lines: string[] }> = [];
@@ -1240,6 +1252,7 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
         goal: options.goal,
         contextStore: options.contextStore,
         budgets: options.budgets,
+        runMemoryPromptLines: options.runMemoryPromptLines,
         priorReads,
         priorSearches,
         priorSubcalls,

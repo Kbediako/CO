@@ -13,6 +13,7 @@ const {
   resolveAlignmentCheckerEnabled,
   resolveAlignmentCheckerEnforce,
   resolveContextSource,
+  resolvePlannerRunMemoryPromptLines,
   DEFAULT_MAX_ITERATIONS,
   DEFAULT_MAX_MINUTES,
   DEFAULT_ALIGNMENT_CHECKER_ENABLED,
@@ -196,5 +197,147 @@ describe('rlmRunner config parsing', () => {
       bytes: Buffer.byteLength('fallback goal text', 'utf8'),
       explicit: false
     });
+  });
+
+  it('returns planner run memory prompt lines from a valid manifest', async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), 'rlm-runner-memory-lines-'));
+    sandboxes.push(sandbox);
+    const manifestDir = join(sandbox, '.runs', 'task-1', 'cli', 'run-1');
+    const contextDir = join(manifestDir, 'memory', 'source-0');
+    await mkdir(manifestDir, { recursive: true });
+    await mkdir(contextDir, { recursive: true });
+    await writeFile(
+      join(contextDir, 'index.json'),
+      JSON.stringify({
+        object_id: 'sha256:source0',
+        source: { byte_length: 4096 }
+      }),
+      'utf8'
+    );
+    await writeFile(join(contextDir, 'source.txt'), 'source 0 payload', 'utf8');
+    await writeFile(
+      join(manifestDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: 'run-1',
+        task_id: 'task-1',
+        memory: {
+          source_0: {
+            schema_version: 1,
+            kind: 'context_object',
+            object_id: 'sha256:source0',
+            pointer: 'ctx:sha256:source0#chunk:c000001',
+            dir_path: '.runs/task-1/cli/run-1/memory/source-0',
+            index_path: '.runs/task-1/cli/run-1/memory/source-0/index.json',
+            source_path: '.runs/task-1/cli/run-1/memory/source-0/source.txt',
+            byte_length: 4096,
+            chunk_count: 1,
+            created_at: '2026-04-01T00:00:00.000Z',
+            origin: {
+              run_id: 'run-1',
+              task_id: 'task-1',
+              manifest_path: '.runs/task-1/cli/run-1/manifest.json'
+            },
+            inherited_from: null
+          }
+        },
+        prompt_packs: [
+          {
+            id: 'pp-diagnostics',
+            domain: 'diagnostics',
+            stamp: 'diag',
+            experience_slots: 3,
+            sources: ['docs/TECH_SPEC-task-1.md'],
+            experiences: ['[exp diag-1] Prefer stable evidence artifacts.']
+          }
+        ]
+      }),
+      'utf8'
+    );
+
+    const promptLines = await resolvePlannerRunMemoryPromptLines(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: '.runs/task-1/cli/run-1/manifest.json'
+      } as NodeJS.ProcessEnv,
+      sandbox,
+      'Need a diagnostics plan'
+    );
+
+    expect(promptLines).toContain('Shared source 0 anchor:');
+    expect(promptLines).toContain('Relevant prior experiences (hints, not strict instructions):');
+    expect(promptLines).toContain('- Retrieval profile: planner');
+    expect(promptLines).toContain('- Pack id: pp-diagnostics');
+  });
+
+  it('omits planner source_0 prompt lines when manifest source_0 artifacts are missing', async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), 'rlm-runner-memory-lines-stale-source0-'));
+    sandboxes.push(sandbox);
+    const manifestDir = join(sandbox, '.runs', 'task-1', 'cli', 'run-1');
+    await mkdir(manifestDir, { recursive: true });
+    await writeFile(
+      join(manifestDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: 'run-1',
+        task_id: 'task-1',
+        memory: {
+          source_0: {
+            schema_version: 1,
+            kind: 'context_object',
+            object_id: 'sha256:source0',
+            pointer: 'ctx:sha256:source0#chunk:c000001',
+            dir_path: '.runs/task-1/cli/run-1/memory/source-0',
+            index_path: '.runs/task-1/cli/run-1/memory/source-0/index.json',
+            source_path: '.runs/task-1/cli/run-1/memory/source-0/source.txt',
+            byte_length: 4096,
+            chunk_count: 1,
+            created_at: '2026-04-01T00:00:00.000Z',
+            origin: {
+              run_id: 'run-1',
+              task_id: 'task-1',
+              manifest_path: '.runs/task-1/cli/run-1/manifest.json'
+            },
+            inherited_from: null
+          }
+        },
+        prompt_packs: [
+          {
+            id: 'pp-diagnostics',
+            domain: 'diagnostics',
+            stamp: 'diag',
+            experience_slots: 3,
+            sources: ['docs/TECH_SPEC-task-1.md'],
+            experiences: ['[exp diag-1] Prefer stable evidence artifacts.']
+          }
+        ]
+      }),
+      'utf8'
+    );
+
+    const promptLines = await resolvePlannerRunMemoryPromptLines(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: '.runs/task-1/cli/run-1/manifest.json'
+      } as NodeJS.ProcessEnv,
+      sandbox,
+      'Need a diagnostics plan'
+    );
+
+    expect(promptLines).not.toContain('Shared source 0 anchor:');
+    expect(promptLines).toContain('Relevant prior experiences (hints, not strict instructions):');
+    expect(promptLines).toContain('- Retrieval profile: planner');
+    expect(promptLines).toContain('- Pack id: pp-diagnostics');
+  });
+
+  it('fails soft when planner run memory manifest cannot be read', async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), 'rlm-runner-memory-lines-missing-'));
+    sandboxes.push(sandbox);
+
+    const promptLines = await resolvePlannerRunMemoryPromptLines(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: '.runs/task-1/cli/run-1/missing.json'
+      } as NodeJS.ProcessEnv,
+      sandbox,
+      'Need a diagnostics plan'
+    );
+
+    expect(promptLines).toEqual([]);
   });
 });
