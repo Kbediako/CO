@@ -170,6 +170,14 @@ function buildHintHaystack(hints: string[] | null | undefined): string {
     .toLowerCase();
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+}
+
+function hasHintDomain(haystack: string, domain: string): boolean {
+  return new RegExp(`(^|\\W)${escapeRegExp(domain)}($|\\W)`, 'u').test(haystack);
+}
+
 function selectPromptPackCandidate(params: {
   candidates: PromptPackCandidate[];
   hints: string[];
@@ -183,14 +191,15 @@ function selectPromptPackCandidate(params: {
   if (haystack.length > 0) {
     const directMatch = params.candidates.find(
       (candidate) =>
-        candidate.domain_lower !== 'implementation' && haystack.includes(candidate.domain_lower)
+        candidate.domain_lower !== 'implementation' &&
+        hasHintDomain(haystack, candidate.domain_lower)
     );
     if (directMatch) {
       return { candidate: directMatch, reason: 'hint' };
     }
 
     const broadMatch = params.candidates.find((candidate) =>
-      haystack.includes(candidate.domain_lower)
+      hasHintDomain(haystack, candidate.domain_lower)
     );
     if (broadMatch) {
       return { candidate: broadMatch, reason: 'hint' };
@@ -208,7 +217,11 @@ function selectPromptPackCandidate(params: {
 }
 
 export function getRunMemoryRoleProfile(role: RunMemoryRole): RunMemoryRoleProfile {
-  return RUN_MEMORY_ROLE_PROFILES[role];
+  const profile = RUN_MEMORY_ROLE_PROFILES[role];
+  return {
+    ...profile,
+    fallback_domains: [...profile.fallback_domains]
+  };
 }
 
 export function selectRunMemoryForRole(params: {

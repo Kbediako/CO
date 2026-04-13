@@ -1256,8 +1256,6 @@ export function buildProviderWorkerPrompt(
     ...buildMergedCloseoutGuidance(sharedRepoCheckoutPath),
     '- If the issue is in `Rework`, treat it as a full approach reset: close the previous PR, remove the previous workpad, create a fresh branch from `origin/main`, then restart execution under a new workpad before handing back to review.',
     ...(runMemoryPromptLines.length > 0 ? ['', ...runMemoryPromptLines] : []),
-    issue.url ? `- Linear URL: ${issue.url}` : null,
-    issue.state ? `- Current state: ${issue.state}` : null,
     `- This is turn #1 of ${maxTurns} for the current worker run.`,
     ...buildCurrentIssueContextSection(issue)
   ]

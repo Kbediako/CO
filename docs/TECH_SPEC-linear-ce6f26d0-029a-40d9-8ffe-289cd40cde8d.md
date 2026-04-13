@@ -5,7 +5,7 @@ relates_to: docs/PRD-linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-14
+last_review: 2026-04-13
 ---
 
 ## Canonical Reference
@@ -74,5 +74,5 @@ last_review: 2026-04-14
 - full repo validation floor before review handoff
 
 ## Approvals
-- Reviewer: Pre-implementation local self-review approved; audited `docs-review` child stream recorded at `.runs/linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d-co-94-docs-review/cli/2026-04-09T08-52-01-943Z-a900f3f5/manifest.json` (`clean-success` telemetry, plus one late surfaced checklist-header P2 fixed in the packet). Resumed current-base validation on 2026-04-14 after moving `CO-94` back to `In Progress`, merging current `origin/main`, running the full validation floor green, and recording a manual review/elegance fallback after the wrapper classified a `failed-boundary` command-intent stop.
-- Date: 2026-04-14
+- Reviewer: Pre-implementation local self-review approved; audited `docs-review` child stream recorded at `.runs/linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d-co-94-docs-review/cli/2026-04-09T08-52-01-943Z-a900f3f5/manifest.json` (`clean-success` telemetry, plus one late surfaced checklist-header P2 fixed in the packet). Current-base validation completed during the 2026-04-13 UTC run after moving `CO-94` back to `In Progress`, merging current `origin/main`, running the full validation floor green, and recording a manual review/elegance fallback after the wrapper classified a `failed-boundary` command-intent stop.
+- Date: 2026-04-13 UTC

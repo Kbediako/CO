@@ -1038,6 +1038,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(continuationPrompt).toContain('Relevant prior experiences (hints, not strict instructions):');
     expect(continuationPrompt).toContain('- Retrieval profile: executor');
     expect(continuationPrompt).toContain('- Pack id: pp-implementation');
+    expect(continuationPrompt).toContain('[exp impl-1] Keep provider-worker changes narrowly scoped.');
   });
 
   it('builds continuation guidance for first-turn guarded resident restarts', () => {

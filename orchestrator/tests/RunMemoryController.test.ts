@@ -104,6 +104,9 @@ describe('run memory controller', () => {
     expect(buildRunMemoryPromptLines(reviewerSelection)).not.toContain(
       'Relevant prior experiences (hints, not strict instructions):'
     );
+    expect(buildRunMemoryPromptLines(delegateSelection)).not.toContain(
+      'Relevant prior experiences (hints, not strict instructions):'
+    );
   });
 
   it('falls back executor retrieval to implementation experiences when no hint matches', () => {
@@ -131,5 +134,53 @@ describe('run memory controller', () => {
     expect(promptLines).toContain('- Pack id: pp-implementation');
     expect(promptLines).toContain('- Pack stamp: impl');
     expect(promptLines).toContain('- Selection reason: fallback');
+  });
+
+  it('keeps role profiles defensive and avoids substring hint matches', () => {
+    const firstSelection = selectRunMemoryForRole({
+      role: 'executor',
+      manifest: buildManifest(),
+      hints: ['unrelated domain']
+    });
+    firstSelection.profile.fallback_domains.splice(0, firstSelection.profile.fallback_domains.length, 'diagnostics');
+
+    const secondSelection = selectRunMemoryForRole({
+      role: 'executor',
+      manifest: buildManifest(),
+      hints: ['unrelated domain']
+    });
+    const secondExperienceRefs = secondSelection.refs.filter(
+      (ref) => ref.kind === 'prompt_pack_experience'
+    );
+    expect(secondExperienceRefs[0]).toMatchObject({
+      kind: 'prompt_pack_experience',
+      pack: { id: 'pp-implementation' },
+      selection_reason: 'fallback'
+    });
+
+    const substringSelection = selectRunMemoryForRole({
+      role: 'planner',
+      manifest: {
+        ...buildManifest(),
+        prompt_packs: [
+          {
+            id: 'pp-plan',
+            domain: 'plan',
+            stamp: 'plan',
+            experiences: ['[exp plan-1] Keep planning focused.']
+          },
+          ...buildManifest().prompt_packs
+        ]
+      },
+      hints: ['planetary rollout']
+    });
+    const substringExperienceRefs = substringSelection.refs.filter(
+      (ref) => ref.kind === 'prompt_pack_experience'
+    );
+    expect(substringExperienceRefs[0]).toMatchObject({
+      kind: 'prompt_pack_experience',
+      pack: { id: 'pp-implementation' },
+      selection_reason: 'fallback'
+    });
   });
 });

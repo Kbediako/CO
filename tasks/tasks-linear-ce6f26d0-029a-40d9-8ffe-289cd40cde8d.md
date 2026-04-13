@@ -3,7 +3,7 @@
 - Linear Issue: `CO-94` / `ce6f26d0-029a-40d9-8ffe-289cd40cde8d`
 - MCP Task ID: `linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d`
 - Primary PRD: `docs/PRD-linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d.md`
-- TECH_SPEC: `tasks/specs/linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d.md`
+- TECH_SPEC: `docs/TECH_SPEC-linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d.md`
 - Task spec: `tasks/specs/linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d.md`
 - ACTION_PLAN: `docs/ACTION_PLAN-linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d.md`
 

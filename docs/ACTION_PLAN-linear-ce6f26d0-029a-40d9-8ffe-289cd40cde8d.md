@@ -68,5 +68,5 @@
   - Mitigation: pin the planner consumer to the symbolic RLM planner path in the docs and tests.
 
 ## Approvals
-- Reviewer: Pre-implementation local self-review approved; audited `docs-review` child stream recorded clean-success on 2026-04-09. Current-base validation resumed on 2026-04-14 after `CO-94` moved back to `In Progress`; final validation is green, with the manifest-backed review wrapper classified as `failed-boundary` and the manual review/elegance fallback recorded in the task spec.
-- Date: 2026-04-14
+- Reviewer: Pre-implementation local self-review approved; audited `docs-review` child stream recorded clean-success on 2026-04-09. Current-base validation completed during the 2026-04-13 UTC run after `CO-94` moved back to `In Progress`; final validation is green, with the manifest-backed review wrapper classified as `failed-boundary` and the manual review/elegance fallback recorded in the task spec.
+- Date: 2026-04-13 UTC
