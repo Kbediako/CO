@@ -2924,9 +2924,10 @@ describe('createProviderIssueHandoffService', () => {
     });
 
     expect(resolveTrackedIssue).not.toHaveBeenCalled();
-    expect(refetchTrackedIssues).toHaveBeenCalledWith(expect.objectContaining({
-      mode: 'fresh_discovery'
-    }));
+    expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(refetchTrackedIssues.mock.calls).toEqual([
+      [expect.objectContaining({ mode: 'fresh_discovery' })]
+    ]);
     expect(launcher.start).toHaveBeenCalledTimes(1);
     expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
       taskId: 'linear-lin-issue-unrelated-runnable',

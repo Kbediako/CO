@@ -19,7 +19,7 @@ last_review: 2026-04-13
 - Linear URL: https://linear.app/asabeko/issue/CO-161/co-decouple-released-claim-deferred-poll-suppression-from-unrelated
 
 ## Summary
-- Objective: prove whether released-only deferred-poll cached skips block unrelated runnable discovery and, because the proof was real, record the landed suppression-seam split without reintroducing retained released-claim direct reads.
+- Objective: prove whether released-only deferred-poll cached skips block unrelated runnable discovery and because the proof was real, record the landed suppression-seam split without reintroducing retained released-claim direct reads.
 - Scope:
   - deferred-poll suppression routing in `providerIssueHandoff.ts`
   - focused regressions in `ProviderIssueHandoff.test.ts`
