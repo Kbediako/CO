@@ -56,6 +56,7 @@ const guardInheritedEnvKeys = [
   'CODEX_ORCHESTRATOR_RUNS_DIR',
   'CODEX_ORCHESTRATOR_OUT_DIR',
   'CODEX_ORCHESTRATOR_MANIFEST_PATH',
+  'CODEX_ORCHESTRATOR_PIPELINE_ID',
   'CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE',
   'CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_TOKEN',
   'CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID',
@@ -281,7 +282,8 @@ describe('delegation-guard script', () => {
         MCP_RUNNER_TASK_ID: taskId,
         CODEX_ORCHESTRATOR_ROOT: workspacePath,
         CODEX_ORCHESTRATOR_RUNS_DIR: sharedRunsDir,
-        CODEX_ORCHESTRATOR_MANIFEST_PATH: parentManifestPath
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: parentManifestPath,
+        CODEX_ORCHESTRATOR_PIPELINE_ID: 'provider-linear-worker'
       })
     });
 
@@ -323,13 +325,14 @@ describe('delegation-guard script', () => {
         MCP_RUNNER_TASK_ID: taskId,
         CODEX_ORCHESTRATOR_ROOT: workspacePath,
         CODEX_ORCHESTRATOR_RUNS_DIR: sharedRunsDir,
-        CODEX_ORCHESTRATOR_MANIFEST_PATH: parentManifestPath
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: parentManifestPath,
+        CODEX_ORCHESTRATOR_PIPELINE_ID: 'provider-linear-worker'
       })
     });
 
     expect(stdout).toContain(`No subagent manifests found for '${taskId}'.`);
-    expect(stdout).toContain(`${sharedRunsDir}/${taskId}-*/cli/<run-id>/manifest.json`);
     expect(stdout).toContain(`${workspacePath}/.runs/${taskId}-*/cli/<run-id>/manifest.json`);
+    expect(stdout).not.toContain(`${sharedRunsDir}/${taskId}-*/cli/<run-id>/manifest.json`);
     expect(stdout).toContain('Dry run: exiting successfully despite failures.');
   });
 
@@ -385,12 +388,14 @@ describe('delegation-guard script', () => {
         MCP_RUNNER_TASK_ID: taskId,
         CODEX_ORCHESTRATOR_ROOT: workspacePath,
         CODEX_ORCHESTRATOR_RUNS_DIR: sharedRunsDir,
-        CODEX_ORCHESTRATOR_MANIFEST_PATH: foreignManifestPath
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: foreignManifestPath,
+        CODEX_ORCHESTRATOR_PIPELINE_ID: 'provider-linear-worker'
       })
     });
 
     expect(stdout).toContain(`No subagent manifests found for '${taskId}'.`);
-    expect(stdout).toContain(`${sharedRunsDir}/${taskId}-*/cli/<run-id>/manifest.json`);
+    expect(stdout).toContain(`${workspacePath}/.runs/${taskId}-*/cli/<run-id>/manifest.json`);
+    expect(stdout).not.toContain(`${sharedRunsDir}/${taskId}-*/cli/<run-id>/manifest.json`);
     expect(stdout).not.toContain(`${foreignWorkspacePath}/.runs/${taskId}-*/cli/<run-id>/manifest.json`);
     expect(stdout).not.toContain('Delegation guard: OK (1 subagent manifest(s) found).');
   });

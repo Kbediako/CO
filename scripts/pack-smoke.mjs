@@ -45,6 +45,23 @@ async function assertPathExists(filePath, label) {
   }
 }
 
+async function assertPathMissing(filePath, label) {
+  try {
+    await access(filePath);
+  } catch (error) {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      error.code === 'ENOENT'
+    ) {
+      return;
+    }
+    throw error;
+  }
+  throw new Error(`${label} should be absent: ${filePath}`);
+}
+
 async function assertFileIncludes(filePath, text, label) {
   const raw = await readFile(filePath, 'utf8');
   if (!raw.includes(text)) {
@@ -339,6 +356,13 @@ async function main() {
     const packageRoot = path.join(tempDir, 'node_modules', '@kbediako', 'codex-orchestrator');
     const binName = process.platform === 'win32' ? 'codex-orchestrator.cmd' : 'codex-orchestrator';
     const binPath = path.join(tempDir, 'node_modules', '.bin', binName);
+
+    await assertPathExists(path.join(packageRoot, 'bin', 'codex-orchestrator.js'), 'packaged bootstrap bin');
+    await assertPathExists(path.join(packageRoot, 'dist', 'bin', 'codex-orchestrator.js'), 'packaged dist bin');
+    await assertPathMissing(path.join(packageRoot, 'bin', 'codex-orchestrator.ts'), 'repo-only source CLI');
+    await assertPathMissing(path.join(packageRoot, 'orchestrator', 'src'), 'repo-only orchestrator sources');
+    await assertPathMissing(path.join(packageRoot, 'node_modules', 'ts-node'), 'nested repo-only ts-node dependency');
+    await assertPathMissing(path.join(tempDir, 'node_modules', 'ts-node'), 'hoisted repo-only ts-node dependency');
 
     await assertMarkdownLinksResolve(packageRoot);
     await runCommand(binPath, ['--help'], { cwd: tempDir });

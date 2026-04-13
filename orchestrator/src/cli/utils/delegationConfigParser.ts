@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { hasMcpServerEntry } from './mcpServerEntry.js';
 
 export interface DelegationFallbackConfig {
+  command: string | null;
   args: string[];
   envVars: Record<string, string>;
 }
@@ -17,12 +18,27 @@ export function readDelegationFallbackConfig(configPath: string): DelegationFall
       return null;
     }
     return {
+      command: readDelegationCommandFromConfig(raw),
       args: readDelegationArgsFromConfig(raw),
       envVars: readDelegationEnvVarsFromConfig(raw)
     };
   } catch {
     return null;
   }
+}
+
+function readDelegationCommandFromConfig(raw: string): string | null {
+  const section = readSectionBody(raw, [
+    'mcp_servers.delegation',
+    'mcp_servers."delegation"',
+    "mcp_servers.'delegation'"
+  ]);
+  if (!section) {
+    const inlineEntry = readDelegationInlineEntry(raw);
+    return inlineEntry ? readInlineQuotedValue(inlineEntry, 'command') : null;
+  }
+  const commandMatch = section.match(/^\s*command\s*=\s*("(?:\\"|[^"])*"|'(?:\\'|[^'])*')\s*$/mu);
+  return commandMatch ? decodeQuotedTomlString(commandMatch[1] ?? '') : null;
 }
 
 function readDelegationArgsFromConfig(raw: string): string[] {
@@ -57,10 +73,9 @@ function readDelegationEnvVarsFromConfig(raw: string): Record<string, string> {
   let match = linePattern.exec(section);
   while (match) {
     const key = match[1];
-    const rawValue = match[2] ?? '';
-    if (key) {
-      const unquoted = rawValue.slice(1, -1);
-      const decoded = unquoted.replace(/\\"/gu, '"').replace(/\\'/gu, '\'');
+    const rawValue = match[2];
+    const decoded = rawValue ? decodeQuotedTomlString(rawValue) : null;
+    if (key && decoded !== null) {
       envVars[key] = decoded;
     }
     match = linePattern.exec(section);
@@ -106,15 +121,23 @@ function readInlineEnvVars(raw: string): Record<string, string> {
   let match = linePattern.exec(envRaw);
   while (match) {
     const key = match[1];
-    const rawValue = match[2] ?? '';
-    if (key) {
-      const unquoted = rawValue.slice(1, -1);
-      const decoded = unquoted.replace(/\\"/gu, '"').replace(/\\'/gu, '\'');
+    const rawValue = match[2];
+    const decoded = rawValue ? decodeQuotedTomlString(rawValue) : null;
+    if (key && decoded !== null) {
       envVars[key] = decoded;
     }
     match = linePattern.exec(envRaw);
   }
   return envVars;
+}
+
+function readInlineQuotedValue(raw: string, propertyName: string): string | null {
+  const propertyPattern = new RegExp(
+    `\\b${escapeRegExp(propertyName)}\\s*=\\s*("(?:\\\\.|[^"])*"|'(?:\\\\.|[^'])*')`,
+    'u'
+  );
+  const propertyMatch = propertyPattern.exec(raw);
+  return propertyMatch ? decodeQuotedTomlString(propertyMatch[1] ?? '') : null;
 }
 
 function readSectionBody(raw: string, names: string[]): string | null {
@@ -191,15 +214,35 @@ function readDelimitedContents(raw: string, openIndex: number, open: string, clo
 
 function readQuotedTokens(raw: string): string[] {
   const tokens: string[] = [];
-  const tokenPattern = /"((?:\\"|[^"])*)"|'((?:\\'|[^'])*)'/gu;
+  const tokenPattern = /("(?:\\.|[^"])*"|'(?:\\.|[^'])*')/gu;
   let token = tokenPattern.exec(raw);
   while (token) {
-    const quoted = token[1] ?? token[2] ?? '';
-    const decoded = quoted.replace(/\\"/gu, '"').replace(/\\'/gu, '\'');
-    tokens.push(decoded);
+    const decoded = decodeQuotedTomlString(token[1] ?? '');
+    if (decoded !== null) {
+      tokens.push(decoded);
+    }
     token = tokenPattern.exec(raw);
   }
   return tokens;
+}
+
+function decodeQuotedTomlString(raw: string): string | null {
+  if (!raw || raw.length < 2) {
+    return null;
+  }
+  if (raw.startsWith('"') && raw.endsWith('"')) {
+    try {
+      return JSON.parse(raw) as string;
+    } catch {
+      const unquoted = raw.slice(1, -1);
+      return unquoted
+        .replace(/\\\\/gu, '\\')
+        .replace(/\\"/gu, '"')
+        .replace(/\\'/gu, '\'');
+    }
+  }
+  const unquoted = raw.slice(1, -1);
+  return unquoted.replace(/\\'/gu, '\'');
 }
 
 function stripTomlComment(line: string): string {

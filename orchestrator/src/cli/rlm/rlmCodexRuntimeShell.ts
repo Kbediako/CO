@@ -15,6 +15,8 @@ export const COLLAB_FEATURE_LEGACY = 'collab';
 
 const DEFAULT_COLLAB_ROLE_POLICY = 'enforce';
 export const COLLAB_ROLE_POLICY_ENV_CANONICAL = 'RLM_SYMBOLIC_MULTI_AGENT_ROLE_POLICY';
+// Keep the legacy env aliases during the multi_agent migration window; the canonical
+// settings win when both are present so existing lanes can upgrade without silent drift.
 export const COLLAB_ROLE_POLICY_ENV_LEGACY = 'RLM_COLLAB_ROLE_POLICY';
 export const COLLAB_ALLOW_DEFAULT_ROLE_ENV_CANONICAL =
   'RLM_SYMBOLIC_MULTI_AGENT_ALLOW_DEFAULT_ROLE';

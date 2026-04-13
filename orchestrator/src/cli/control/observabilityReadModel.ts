@@ -3,7 +3,13 @@ import type { ControlPollingHealthPayload } from './providerPollingHealth.js';
 import type { ProviderIntakeSummaryPayload } from './providerIntakeState.js';
 import type { QuestionUrgency } from './questions.js';
 import type { ProviderLinearWorkerProof } from '../providerLinearWorkerRunner.js';
-import type { ControlProviderDebugSnapshot } from './providerIssueObservability.js';
+import type {
+  ControlProviderDebugSnapshot,
+  ProviderLinearWorkerProgressCandidate
+} from './providerIssueObservability.js';
+import { isProviderLinearWorkerProofFreshForStage } from './providerLinearWorkerTruth.js';
+import type { ProviderWorkerHostConfig } from './providerWorkerHosts.js';
+import { normalizeProviderWorkerHostName } from './providerWorkerHosts.js';
 
 export type { ControlPollingHealthPayload } from './providerPollingHealth.js';
 
@@ -21,6 +27,10 @@ export interface SelectedRunLatestEvent {
   at: string | null;
   event: string | null;
   message: string | null;
+  source?: string | null;
+  messageRecordedAt?: string | null;
+  sourceUpdatedAt?: string | null;
+  candidates?: ProviderLinearWorkerProgressCandidate[];
   requestedBy: string | null;
   reason: string | null;
 }
@@ -82,6 +92,78 @@ export interface ControlProviderTerminalCleanupPayload {
   last_result: ControlProviderTerminalCleanupLastResultPayload | null;
 }
 
+export type ControlProviderWorkerHostPayload = ProviderWorkerHostConfig;
+
+export interface ControlProviderOperatorAutopilotLinearTransitionPayload {
+  status: 'transitioned' | 'noop' | 'failed';
+  attempted_at: string;
+  previous_state: string | null;
+  target_state: string;
+  issue_state: string | null;
+  issue_state_type: string | null;
+  issue_updated_at: string | null;
+  error: string | null;
+}
+
+export interface ControlProviderOperatorAutopilotActionPayload {
+  kind: 'backlog_promotion' | 'review_handoff_rework';
+  issue_id: string;
+  issue_identifier: string | null;
+  reason: string;
+  summary: string;
+  transition: ControlProviderOperatorAutopilotLinearTransitionPayload;
+  action_required_reasons: string[];
+}
+
+export interface ControlProviderOperatorAutopilotHoldPayload {
+  kind: 'backlog_promotion' | 'review_handoff_rework';
+  issue_id: string | null;
+  issue_identifier: string | null;
+  reason: string;
+  summary: string;
+  action_required_reasons: string[];
+}
+
+export interface ControlProviderOperatorAutopilotPendingActionPayload {
+  kind: 'local_rollout';
+  issue_id: string;
+  issue_identifier: string | null;
+  summary: string;
+  merge_closeout_reason: string;
+  shared_root_status: string | null;
+  linear_transition_status: string | null;
+}
+
+export interface ControlProviderOperatorAutopilotLastResultPayload {
+  recorded_at: string;
+  status: 'disabled' | 'noop' | 'acted' | 'failed';
+  summary: string;
+  error: string | null;
+  actions: ControlProviderOperatorAutopilotActionPayload[];
+  holds: ControlProviderOperatorAutopilotHoldPayload[];
+  pending_actions: ControlProviderOperatorAutopilotPendingActionPayload[];
+}
+
+export interface ControlProviderOperatorAutopilotPayload {
+  enabled: boolean;
+  backlog_promotion: {
+    enabled: boolean;
+    state_name: string;
+    target_state_name: string;
+  };
+  review_handoff_rework: {
+    enabled: boolean;
+    target_state_name: string;
+    excluded_action_required_reasons: string[];
+  };
+  post_merge_rollout: {
+    enabled: boolean;
+    summary: string;
+  };
+  audit_path: string;
+  last_result: ControlProviderOperatorAutopilotLastResultPayload | null;
+}
+
 export interface ControlProviderWorkflowPayload {
   status: 'ready' | 'reload_failed';
   pipeline_id: string;
@@ -92,7 +174,14 @@ export interface ControlProviderWorkflowPayload {
   last_error_at: string | null;
   last_error: string | null;
   terminal_cleanup?: ControlProviderTerminalCleanupPayload | null;
+  worker_hosts?: ControlProviderWorkerHostPayload[] | null;
+  operator_autopilot?: ControlProviderOperatorAutopilotPayload | null;
 }
+
+type ResolvedWorkerHost =
+  | { kind: 'missing' }
+  | { kind: 'cleared' }
+  | { kind: 'host'; value: string };
 
 interface SharedSelectedProjectionFields {
   issueProvider: string | null;
@@ -112,6 +201,7 @@ interface SharedSelectedProjectionFields {
   latestAction: string | null;
   latestEvent: SelectedRunLatestEvent | null;
   workspacePath: string | null;
+  pipelineId?: string | null;
   pipelineTitle: string | null;
   stages: SelectedRunStageSummary[];
   approvalsTotal: number;
@@ -141,6 +231,10 @@ export interface ControlLatestEventPayload {
   event: string | null;
   message: string | null;
   at: string | null;
+  source?: string | null;
+  message_recorded_at?: string | null;
+  source_updated_at?: string | null;
+  candidates?: ProviderLinearWorkerProgressCandidate[];
   requested_by?: string | null;
   reason?: string | null;
 }
@@ -163,6 +257,7 @@ export interface ControlSelectedRunPayload {
   workspace: {
     path: string | null;
   };
+  worker_host?: string | null;
   question_summary: ControlQuestionSummaryPayload;
   tracked: ControlTrackedPayload;
   provider_linear_worker_proof?: ProviderLinearWorkerProof;
@@ -193,11 +288,16 @@ export interface ControlRunningPayload {
   display_state: string;
   status_reason: string | null;
   pid: string | null;
+  worker_host?: string | null;
   session_id: string | null;
   turn_count: number | null;
   last_event: string | null;
   last_message: string | null;
   display_event?: string | null;
+  event_source?: string | null;
+  message_recorded_at?: string | null;
+  source_updated_at?: string | null;
+  event_candidates?: ProviderLinearWorkerProgressCandidate[];
   started_at: string | null;
   last_event_at: string | null;
   tokens: ControlTokenUsagePayload;
@@ -212,6 +312,7 @@ export interface ControlRetryPayload {
   display_state: string;
   status_reason: string | null;
   session_id: string | null;
+  worker_host?: string | null;
   thread_id?: string | null;
   turn_count?: number | null;
   workspace_path: string | null;
@@ -300,6 +401,7 @@ export interface ControlIssuePayload {
   workspace: {
     path: string | null;
   };
+  worker_host?: string | null;
   attempts: {
     restart_count: number | null;
     current_retry_attempt: number | null;
@@ -382,6 +484,10 @@ export function buildSelectedRunLatestEventPayload(
     at: latestEvent.at,
     event: latestEvent.event,
     message: latestEvent.message,
+    source: latestEvent.source ?? null,
+    message_recorded_at: latestEvent.messageRecordedAt ?? null,
+    source_updated_at: latestEvent.sourceUpdatedAt ?? null,
+    candidates: latestEvent.candidates ?? [],
     ...(options.includeRequestMetadata
       ? {
           requested_by: latestEvent.requestedBy,
@@ -391,9 +497,83 @@ export function buildSelectedRunLatestEventPayload(
   };
 }
 
+export function readProviderLinearWorkerHost(
+  proof: ProviderLinearWorkerProof | null | undefined,
+  stageStartedAt: string | null | undefined
+): ResolvedWorkerHost {
+  if (
+    !proof
+    || !isProviderLinearWorkerProofFreshForStage(
+      proof as ProviderLinearWorkerProof & Record<string, unknown>,
+      stageStartedAt ?? null
+    )
+  ) {
+    return { kind: 'missing' };
+  }
+  return readResolvedWorkerHost(
+    proof as ProviderLinearWorkerProof & Record<string, unknown>
+  );
+}
+
+export function resolveProviderWorkerHost(input: {
+  providerLinearWorkerProof?: ProviderLinearWorkerProof | null | undefined;
+  providerDebugSnapshot?: ControlProviderDebugSnapshot | null | undefined;
+  providerIntake?: ProviderIntakeSummaryPayload | null | undefined;
+  stageStartedAt?: string | null | undefined;
+}): string | null {
+  const claimLaunchStartedAt = input.providerDebugSnapshot?.claim?.launch_started_at ?? null;
+  const stageStartedAt =
+    claimLaunchStartedAt
+    ?? input.stageStartedAt
+    ?? null;
+  const claimHost = readResolvedWorkerHost(
+    input.providerDebugSnapshot?.claim as Record<string, unknown> | null | undefined
+  );
+  if (claimHost.kind === 'host') {
+    return claimHost.value;
+  }
+  if (claimHost.kind === 'cleared') {
+    return null;
+  }
+  const proofHost = readProviderLinearWorkerHost(
+    input.providerLinearWorkerProof,
+    stageStartedAt
+  );
+  if (proofHost.kind === 'host') {
+    return proofHost.value;
+  }
+  if (proofHost.kind === 'cleared') {
+    return null;
+  }
+  return normalizeProviderWorkerHostName(input.providerIntake?.worker_host);
+}
+
+function readResolvedWorkerHost(
+  source: Record<string, unknown> | null | undefined
+): ResolvedWorkerHost {
+  if (
+    !source
+    || !Object.prototype.hasOwnProperty.call(source, 'worker_host')
+    || source.worker_host === undefined
+  ) {
+    return { kind: 'missing' };
+  }
+  const workerHost = normalizeProviderWorkerHostName(source.worker_host);
+  return workerHost === null
+    ? { kind: 'cleared' }
+    : { kind: 'host', value: workerHost };
+}
+
 export function buildProjectionSelectedPayload(
-  selected: SelectedRunContext | ControlCompatibilitySourceContext
+  selected: SelectedRunContext | ControlCompatibilitySourceContext,
+  providerIntake: ProviderIntakeSummaryPayload | null = null
 ): ControlSelectedRunPayload {
+  const workerHost = resolveProviderWorkerHost({
+    providerLinearWorkerProof: selected.providerLinearWorkerProof,
+    providerDebugSnapshot: selected.providerDebugSnapshot,
+    providerIntake,
+    stageStartedAt: selected.startedAt
+  });
   return {
     issue_id: selected.issueId,
     issue_identifier: selected.issueIdentifier,
@@ -414,6 +594,7 @@ export function buildProjectionSelectedPayload(
     workspace: {
       path: selected.workspacePath
     },
+    ...(workerHost !== null ? { worker_host: workerHost } : {}),
     question_summary: buildSelectedRunQuestionSummaryPayload(selected.questionSummary),
     tracked: buildTrackedPayloadEnvelope(selected.tracked),
     ...(selected.providerLinearWorkerProof
@@ -533,6 +714,82 @@ export function buildSelectedRunRuntimeFingerprintInput(
                       closed_pr_urls: [
                         ...providerWorkflow.terminal_cleanup.last_result.closed_pr_urls
                       ]
+                    }
+                  : null
+              }
+            : null,
+          worker_hosts: Array.isArray(providerWorkflow.worker_hosts)
+            ? providerWorkflow.worker_hosts.map((host) => ({
+                ...host,
+                ssh_options: [...host.ssh_options]
+              }))
+            : [],
+          operator_autopilot: providerWorkflow.operator_autopilot
+            ? {
+                enabled: providerWorkflow.operator_autopilot.enabled,
+                backlog_promotion: {
+                  enabled: providerWorkflow.operator_autopilot.backlog_promotion.enabled,
+                  state_name: providerWorkflow.operator_autopilot.backlog_promotion.state_name,
+                  target_state_name:
+                    providerWorkflow.operator_autopilot.backlog_promotion.target_state_name
+                },
+                review_handoff_rework: {
+                  enabled: providerWorkflow.operator_autopilot.review_handoff_rework.enabled,
+                  target_state_name:
+                    providerWorkflow.operator_autopilot.review_handoff_rework.target_state_name,
+                  excluded_action_required_reasons: [
+                    ...providerWorkflow.operator_autopilot.review_handoff_rework.excluded_action_required_reasons
+                  ]
+                },
+                post_merge_rollout: {
+                  enabled: providerWorkflow.operator_autopilot.post_merge_rollout.enabled,
+                  summary: providerWorkflow.operator_autopilot.post_merge_rollout.summary
+                },
+                audit_path: providerWorkflow.operator_autopilot.audit_path,
+                last_result: providerWorkflow.operator_autopilot.last_result
+                  ? {
+                      recorded_at: providerWorkflow.operator_autopilot.last_result.recorded_at,
+                      status: providerWorkflow.operator_autopilot.last_result.status,
+                      summary: providerWorkflow.operator_autopilot.last_result.summary,
+                      error: providerWorkflow.operator_autopilot.last_result.error,
+                      actions: providerWorkflow.operator_autopilot.last_result.actions.map((action) => ({
+                        kind: action.kind,
+                        issue_id: action.issue_id,
+                        issue_identifier: action.issue_identifier,
+                        reason: action.reason,
+                        summary: action.summary,
+                        transition: {
+                          status: action.transition.status,
+                          attempted_at: action.transition.attempted_at,
+                          previous_state: action.transition.previous_state,
+                          target_state: action.transition.target_state,
+                          issue_state: action.transition.issue_state,
+                          issue_state_type: action.transition.issue_state_type,
+                          issue_updated_at: action.transition.issue_updated_at,
+                          error: action.transition.error
+                        },
+                        action_required_reasons: [...action.action_required_reasons]
+                      })),
+                      holds: providerWorkflow.operator_autopilot.last_result.holds.map((hold) => ({
+                        kind: hold.kind,
+                        issue_id: hold.issue_id,
+                        issue_identifier: hold.issue_identifier,
+                        reason: hold.reason,
+                        summary: hold.summary,
+                        action_required_reasons: [...hold.action_required_reasons]
+                      })),
+                      pending_actions:
+                        providerWorkflow.operator_autopilot.last_result.pending_actions.map(
+                          (pendingAction) => ({
+                            kind: pendingAction.kind,
+                            issue_id: pendingAction.issue_id,
+                            issue_identifier: pendingAction.issue_identifier,
+                            summary: pendingAction.summary,
+                            merge_closeout_reason: pendingAction.merge_closeout_reason,
+                            shared_root_status: pendingAction.shared_root_status,
+                            linear_transition_status: pendingAction.linear_transition_status
+                          })
+                        )
                     }
                   : null
               }

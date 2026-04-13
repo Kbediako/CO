@@ -36,7 +36,7 @@ codex-orchestrator delegation setup --yes
 Manual equivalent:
 
 ```bash
-codex mcp add delegation -- codex-orchestrator delegate-server
+codex mcp add delegation -- node /path/to/@kbediako/codex-orchestrator/dist/bin/codex-orchestrator.js delegate-server
 ```
 
 If you skip this, `delegate.*` tools will not be available even if the MCP is enabled.
@@ -49,7 +49,7 @@ If you skip this, `delegate.*` tools will not be available even if the MCP is en
 codex mcp remove delegation
 codex mcp add delegation \
   --env 'CODEX_MCP_CONFIG_OVERRIDES=delegate.mode="full"' \
-  -- codex-orchestrator delegate-server
+  -- node /path/to/@kbediako/codex-orchestrator/dist/bin/codex-orchestrator.js delegate-server
 ```
 
 ### 0b) Optional: raise RLM depth/time budgets
@@ -59,7 +59,7 @@ For deeper recursion and longer wall-clock budgets on delegated runs, register w
 ```bash
 codex mcp add delegation \
   --env 'CODEX_MCP_CONFIG_OVERRIDES=rlm.max_subcall_depth=8;rlm.wall_clock_timeout_ms=14400000' \
-  -- codex-orchestrator delegate-server
+  -- node /path/to/@kbediako/codex-orchestrator/dist/bin/codex-orchestrator.js delegate-server
 ```
 
 For the `rlm` pipeline specifically, set `RLM_MAX_MINUTES=240` (4 hours).
@@ -170,7 +170,13 @@ node scripts/subagent-edit-guard.mjs finish --stream <stream-id> --format json
 - If you run Codex outside the repo (or want to pin the delegation server to one repo regardless of cwd), register with `--repo`.
 
 ```bash
-codex mcp add delegation -- codex-orchestrator delegate-server --repo /path/to/repo
+codex-orchestrator delegation setup --yes --repo /path/to/repo
+```
+
+If stale delegate-server processes build up after previous sessions, clear only the orphaned ones with:
+
+```bash
+codex-orchestrator delegation cleanup-stale --yes
 ```
 
 ## 5) Summary

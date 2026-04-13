@@ -1,43 +1,307 @@
 import { access, readdir } from 'node:fs/promises';
-import { isAbsolute, join, resolve } from 'node:path';
+import { existsSync } from 'node:fs';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import process from 'node:process';
 
 const DEFAULT_TASK_ID = '0101';
 const DEFAULT_RUN_LAYOUT = 'cli';
+const PROVIDER_WORKSPACE_ROOT_DIRNAME = '.workspaces';
+const PROVIDER_LINEAR_WORKER_PIPELINE_ID = 'provider-linear-worker';
+const PRESERVE_PROVIDER_ARTIFACT_ROOTS_ENV =
+  'CODEX_ORCHESTRATOR_PRESERVE_PROVIDER_ARTIFACT_ROOTS';
 
-function resolveRepoRoot() {
-  const configured = process.env.CODEX_ORCHESTRATOR_ROOT;
+function resolveConfiguredPath(configured, cwd) {
+  if (isAbsolute(configured)) {
+    return resolve(configured);
+  }
+  return resolve(cwd, configured);
+}
+
+function normalizeTaskId(value) { return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null; }
+
+function resolveConfiguredTaskId(env) { return normalizeTaskId(env.MCP_RUNNER_TASK_ID) ?? normalizeTaskId(env.CODEX_ORCHESTRATOR_TASK_ID) ?? normalizeTaskId(env.TASK); }
+
+function resolveProviderTaskId(env, cwd) { const cwdRoot = resolve(cwd), cwdTask = basename(dirname(cwdRoot)) === PROVIDER_WORKSPACE_ROOT_DIRNAME ? basename(cwdRoot) : null; return cwdTask && [normalizeTaskId(env.CODEX_ORCHESTRATOR_TASK_ID), normalizeTaskId(env.MCP_RUNNER_TASK_ID), normalizeTaskId(env.TASK)].includes(cwdTask) ? cwdTask : resolveConfiguredTaskId(env); }
+
+function isProviderIssueWorkspaceRootForTask(candidate, taskId) {
+  return (
+    typeof candidate === 'string' &&
+    candidate.length > 0 &&
+    basename(candidate) === taskId &&
+    basename(dirname(candidate)) === PROVIDER_WORKSPACE_ROOT_DIRNAME
+  );
+}
+
+function providerIssueWorkspaceOverrideForCwd(configuredRoot, env, cwd) {
+  if (env.CODEX_ORCHESTRATOR_PIPELINE_ID !== PROVIDER_LINEAR_WORKER_PIPELINE_ID) {
+    return null;
+  }
+  const taskId = resolveProviderTaskId(env, cwd);
+  if (!taskId) {
+    return null;
+  }
+  const resolvedCwd = resolve(cwd);
+  if (!isProviderIssueWorkspaceRootForTask(resolvedCwd, taskId)) {
+    return null;
+  }
+  const sharedRoot = dirname(dirname(resolvedCwd));
+  return sharedRoot === configuredRoot ? resolvedCwd : null;
+}
+
+function resolveRepoRoot(env, cwd) {
+  const configured = env.CODEX_ORCHESTRATOR_ROOT;
   if (!configured) {
-    return process.cwd();
+    return cwd;
   }
-  if (isAbsolute(configured)) {
-    return configured;
-  }
-  return resolve(process.cwd(), configured);
+  const configuredRoot = resolveConfiguredPath(configured, cwd);
+  return providerIssueWorkspaceOverrideForCwd(configuredRoot, env, cwd) ?? configuredRoot;
 }
 
-function resolveRunsDir(repoRoot) {
-  const configured = process.env.CODEX_ORCHESTRATOR_RUNS_DIR || '.runs';
-  if (isAbsolute(configured)) {
-    return configured;
+function resolveProviderSharedRootForIssueWorkspace(repoRoot, env, cwd) {
+  const taskId = resolveProviderTaskId(env, repoRoot);
+  if (!taskId || !isProviderIssueWorkspaceRootForTask(repoRoot, taskId)) {
+    return null;
   }
-  return resolve(repoRoot, configured);
+  const configured = env.CODEX_ORCHESTRATOR_ROOT;
+  if (!configured) {
+    return null;
+  }
+  const configuredRoot = resolveConfiguredPath(configured, cwd);
+  const sharedRoot = dirname(dirname(repoRoot));
+  return configuredRoot === sharedRoot ? sharedRoot : null;
 }
 
-function resolveOutDir(repoRoot) {
-  const configured = process.env.CODEX_ORCHESTRATOR_OUT_DIR || 'out';
-  if (isAbsolute(configured)) {
-    return configured;
+function isPathWithinRoot(root, candidate) {
+  const relativePath = relative(root, candidate);
+  return (
+    relativePath === '' ||
+    (!relativePath.startsWith('..') &&
+      !relativePath.startsWith(`..${sep}`) &&
+      !isAbsolute(relativePath))
+  );
+}
+
+function firstPathSegment(relativePath) {
+  return relativePath.split(sep).filter((segment) => segment.length > 0)[0] ?? '';
+}
+
+function isDefaultRunsLayoutSegment(segment) {
+  return segment === '.runs' || segment === 'runs';
+}
+
+function resolveConfiguredArtifactRoot(baseRoot, configured, fallbackDirname) {
+  if (!configured) {
+    return resolve(baseRoot, fallbackDirname);
   }
-  return resolve(repoRoot, configured);
+  return isAbsolute(configured) ? resolve(configured) : resolve(baseRoot, configured);
+}
+
+function resolveWorkspaceArtifactRootForSharedRoot(
+  repoRoot,
+  sharedRoot,
+  sharedArtifactRoot,
+  fallbackDirname,
+  allowCustomCounterpart = false
+) {
+  if (!sharedRoot || !isPathWithinRoot(sharedRoot, sharedArtifactRoot)) {
+    return null;
+  }
+  const relativeArtifactRoot = relative(sharedRoot, sharedArtifactRoot);
+  const firstSegment = firstPathSegment(relativeArtifactRoot);
+  if (
+    (fallbackDirname === '.runs' && isDefaultRunsLayoutSegment(firstSegment)) ||
+    firstSegment === fallbackDirname ||
+    allowCustomCounterpart
+  ) {
+    return resolve(repoRoot, relativeArtifactRoot);
+  }
+  return null;
+}
+
+function resolveProviderWorkspaceManifestCounterpartPath(repoRoot, env, cwd) {
+  const manifestPath = env.CODEX_ORCHESTRATOR_MANIFEST_PATH || env.MANIFEST;
+  if (!manifestPath) {
+    return null;
+  }
+  const inheritedSharedRoot = resolveProviderSharedRootForIssueWorkspace(repoRoot, env, cwd);
+  const sharedRoot = dirname(dirname(repoRoot));
+  const resolvedManifestPath = resolveConfiguredPath(manifestPath, inheritedSharedRoot ?? repoRoot);
+  if (isPathWithinRoot(repoRoot, resolvedManifestPath)) {
+    return resolvedManifestPath;
+  }
+  const sharedRunsRoot = resolveConfiguredArtifactRoot(
+    inheritedSharedRoot ?? sharedRoot,
+    env.CODEX_ORCHESTRATOR_RUNS_DIR || '.runs',
+    '.runs'
+  );
+  if (!isPathWithinRoot(sharedRunsRoot, resolvedManifestPath)) {
+    return null;
+  }
+  const workspaceRunsRoot = resolveWorkspaceArtifactRootForSharedRoot(
+    repoRoot,
+    sharedRoot,
+    sharedRunsRoot,
+    '.runs',
+    true
+  );
+  if (!workspaceRunsRoot) {
+    return null;
+  }
+  const workspaceManifestPath = resolve(
+    workspaceRunsRoot,
+    relative(sharedRunsRoot, resolvedManifestPath)
+  );
+  return existsSync(workspaceManifestPath) ? workspaceManifestPath : null;
+}
+
+function shouldScopeProviderArtifactDirs(repoRoot, env, cwd) {
+  if (env.CODEX_ORCHESTRATOR_PIPELINE_ID !== PROVIDER_LINEAR_WORKER_PIPELINE_ID) {
+    return false;
+  }
+  const taskId = resolveProviderTaskId(env, repoRoot);
+  if (!taskId || !isProviderIssueWorkspaceRootForTask(repoRoot, taskId)) {
+    return false;
+  }
+  if (
+    env[PRESERVE_PROVIDER_ARTIFACT_ROOTS_ENV] === '1' &&
+    !providerWorkspaceManifestCounterpartExists(repoRoot, env, cwd)
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function providerWorkspaceManifestCounterpartExists(repoRoot, env, cwd) {
+  const manifestPath = env.CODEX_ORCHESTRATOR_MANIFEST_PATH || env.MANIFEST;
+  if (!manifestPath) {
+    return true;
+  }
+  const counterpartPath = resolveProviderWorkspaceManifestCounterpartPath(repoRoot, env, cwd);
+  if (counterpartPath) {
+    return true;
+  }
+  const inheritedSharedRoot = resolveProviderSharedRootForIssueWorkspace(repoRoot, env, cwd);
+  const sharedRoot = dirname(dirname(repoRoot));
+  const resolvedManifestPath = resolveConfiguredPath(manifestPath, inheritedSharedRoot ?? repoRoot);
+  if (isPathWithinRoot(repoRoot, resolvedManifestPath)) {
+    return true;
+  }
+  const sharedRunsRoot = resolveConfiguredArtifactRoot(
+    inheritedSharedRoot ?? sharedRoot,
+    env.CODEX_ORCHESTRATOR_RUNS_DIR || '.runs',
+    '.runs'
+  );
+  if (!isPathWithinRoot(sharedRunsRoot, resolvedManifestPath)) {
+    return false;
+  }
+  return false;
+}
+
+function resolveArtifactDir(
+  repoRoot,
+  configured,
+  fallbackDirname,
+  scopeToRepoRoot,
+  baseRoot = repoRoot,
+  hasProviderWorkspaceManifestCounterpart = false,
+  sharedRootForCounterpart = baseRoot
+) {
+  const relativeBaseRoot = scopeToRepoRoot ? repoRoot : baseRoot;
+  const fallback = resolve(relativeBaseRoot, fallbackDirname);
+  if (!configured) {
+    return fallback;
+  }
+  const candidate =
+    scopeToRepoRoot && !isAbsolute(configured)
+      ? resolve(repoRoot, configured)
+      : resolveConfiguredArtifactRoot(baseRoot, configured, fallbackDirname);
+  if (scopeToRepoRoot && !isPathWithinRoot(repoRoot, candidate)) {
+    const workspaceArtifactRoot = resolveWorkspaceArtifactRootForSharedRoot(
+      repoRoot,
+      sharedRootForCounterpart,
+      candidate,
+      fallbackDirname,
+      hasProviderWorkspaceManifestCounterpart
+    );
+    if (workspaceArtifactRoot) {
+      return workspaceArtifactRoot;
+    }
+  }
+  return candidate;
+}
+
+function resolveRunsDir(
+  repoRoot,
+  env,
+  scopeToRepoRoot,
+  baseRoot = repoRoot,
+  hasProviderWorkspaceManifestCounterpart = false,
+  sharedRootForCounterpart = baseRoot
+) {
+  return resolveArtifactDir(
+    repoRoot,
+    env.CODEX_ORCHESTRATOR_RUNS_DIR || '.runs',
+    '.runs',
+    scopeToRepoRoot,
+    baseRoot,
+    hasProviderWorkspaceManifestCounterpart,
+    sharedRootForCounterpart
+  );
+}
+
+function resolveOutDir(
+  repoRoot,
+  env,
+  scopeToRepoRoot,
+  baseRoot = repoRoot,
+  hasProviderWorkspaceManifestCounterpart = false,
+  sharedRootForCounterpart = baseRoot
+) {
+  return resolveArtifactDir(
+    repoRoot,
+    env.CODEX_ORCHESTRATOR_OUT_DIR || 'out',
+    'out',
+    scopeToRepoRoot,
+    baseRoot,
+    hasProviderWorkspaceManifestCounterpart,
+    sharedRootForCounterpart
+  );
+}
+
+export function resolveEnvironmentPathsForProcess(env = process.env, cwd = process.cwd()) {
+  const repoRoot = resolveRepoRoot(env, cwd);
+  const providerSharedRoot = resolveProviderSharedRootForIssueWorkspace(repoRoot, env, cwd);
+  const providerWorkspaceManifestCounterpartPath = resolveProviderWorkspaceManifestCounterpartPath(
+    repoRoot,
+    env,
+    cwd
+  );
+  const scopeProviderArtifacts = shouldScopeProviderArtifactDirs(repoRoot, env, cwd);
+  const artifactBaseRoot = providerSharedRoot ?? repoRoot;
+  const sharedRootForCounterpart = providerSharedRoot ?? dirname(dirname(repoRoot));
+  const hasProviderWorkspaceManifestCounterpart = Boolean(providerWorkspaceManifestCounterpartPath);
+  const runsRoot = resolveRunsDir(
+    repoRoot,
+    env,
+    scopeProviderArtifacts,
+    artifactBaseRoot,
+    hasProviderWorkspaceManifestCounterpart,
+    sharedRootForCounterpart
+  );
+  const outRoot = resolveOutDir(
+    repoRoot,
+    env,
+    scopeProviderArtifacts,
+    artifactBaseRoot,
+    hasProviderWorkspaceManifestCounterpart,
+    sharedRootForCounterpart
+  );
+  const taskId = (env.CODEX_ORCHESTRATOR_PIPELINE_ID === PROVIDER_LINEAR_WORKER_PIPELINE_ID ? resolveProviderTaskId(env, repoRoot) : resolveConfiguredTaskId(env)) ?? DEFAULT_TASK_ID;
+  return { repoRoot, runsRoot, outRoot, taskId };
 }
 
 export function resolveEnvironmentPaths() {
-  const repoRoot = resolveRepoRoot();
-  const runsRoot = resolveRunsDir(repoRoot);
-  const outRoot = resolveOutDir(repoRoot);
-  const taskId = process.env.MCP_RUNNER_TASK_ID ?? DEFAULT_TASK_ID;
-  return { repoRoot, runsRoot, outRoot, taskId };
+  return resolveEnvironmentPathsForProcess(process.env, process.cwd());
 }
 
 export function resolveRunDir(options) {

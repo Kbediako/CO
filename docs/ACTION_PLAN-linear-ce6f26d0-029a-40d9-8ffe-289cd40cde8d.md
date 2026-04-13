@@ -68,5 +68,5 @@
   - Mitigation: pin the planner consumer to the symbolic RLM planner path in the docs and tests.
 
 ## Approvals
-- Reviewer: Pre-implementation local self-review approved; audited `docs-review` child stream pending
-- Date: 2026-04-09
+- Reviewer: Pre-implementation local self-review approved; audited `docs-review` child stream recorded clean-success on 2026-04-09. Current-base validation resumed on 2026-04-14 after `CO-94` moved back to `In Progress`.
+- Date: 2026-04-14

@@ -3,6 +3,7 @@
 ## Summary
 - Problem Statement: The design reference pipeline produces raw captures, but teams still lack an automated path to convert those captures into reusable tokens, documentation, and component libraries. Today each team reimplements CSS extraction, tokenization, and self-correction flows, often without manifest evidence or retention controls.
 - Desired Outcome: Launch a standalone "hi-fi design toolkit" pipeline that orchestrates CSS extraction, token generation, reference page creation, style guide docs, self-correction loops, and package updates using the autonomous hi-fi design starter. The pipeline must log approvals, surface artifacts under `.runs/0410-hi-fi-design-toolkit/**`, and publish summaries to `out/0410-hi-fi-design-toolkit/design/runs/<run>.json` so downstream agents can act without bespoke setup.
+- Current repo truth after `CO-88`: the checked-in `packages/design-system` package is still a thin scaffold/token sink and its `test:visual` command is placeholder smoke. Treat this PRD as toolkit intent plus historical evidence, not as proof that the current branch ships a mature published design-system surface.
 
 ## Goals
 - Provide CLI/pipeline entrypoints (`npx codex-orchestrator start diagnostics --pipeline hi-fi-design-toolkit`) that wrap the external toolkit commands (`pnpm -C tools/extractor extract|tokens|refpage|self-correct`, `pnpm -C tools/styleguide build`, `pnpm -C packages/design-tokens build`) with orchestrator telemetry and approval logging.

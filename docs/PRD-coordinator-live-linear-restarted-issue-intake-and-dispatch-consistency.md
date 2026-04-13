@@ -60,7 +60,7 @@
 
 ## Technical Considerations
 - Architectural Notes:
-  - the handoff symptom spans both persisted intake state and `/api/v1/dispatch`, so the likely ownership surfaces are `providerIntakeState`, `providerIssueHandoff`, `linearWebhookController`, `linearDispatchSource`, `selectedRunProjection`, `selectedRunPresenter`, `uiDataController`, and `observabilitySurface`
+  - the handoff symptom spans both persisted intake state and `/api/v1/dispatch`, so the likely ownership surfaces are `providerIntakeState`, `providerIssueHandoff`, `linearWebhookController`, `linearDispatchSource`, `selectedRunProjection`, `operatorDashboardPresenter`, `uiDataController`, and `observabilitySurface`
   - current live recheck shows the merged code plus live rehydration already converged for persisted intake: advisory state accepted the `CO-1` delivery at `2026-03-22T04:01:03.255Z`, provider-intake state rehydrated `CO-1` as `running` at `2026-03-22T04:01:04.257Z`, and `/api/v1/dispatch` is internally consistent at `2026-03-22T04:05:10.980Z`
   - the code-path audit found the remaining latent bug in dispatch shaping: `evaluateTrackerDispatchPilotAsync()` could emit `recommendation.issue_identifier` from `defaultIssueIdentifier`, and `createControlRuntimeSnapshot().readDispatchEvaluation()` could surface that stale selected-run issue identifier outward even when `recommendation.tracked_issue.identifier` had already changed
 - Dependencies / Integrations:
@@ -70,7 +70,7 @@
   - `.runs/local-mcp/cli/control-host/control_auth.json`
   - `.runs/local-mcp/cli/control-host-tmux.log`
   - `orchestrator/src/cli/control/selectedRunProjection.ts`
-  - `orchestrator/src/cli/control/selectedRunPresenter.ts`
+  - `orchestrator/src/cli/control/operatorDashboardPresenter.ts`
   - `orchestrator/src/cli/control/uiDataController.ts`
   - `orchestrator/src/cli/control/observabilitySurface.ts`
   - `orchestrator/src/cli/control/providerIssueHandoff.ts`

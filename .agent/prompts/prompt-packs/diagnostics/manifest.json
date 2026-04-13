@@ -1,8 +1,21 @@
 {
   "id": "tfgrpo-diagnostics",
   "domain": "diagnostics",
-  "stamp": "318c254d1a868bffe9e3dd78bd1b92cad7f20d130bd31c4573d2fceda333f838",
+  "stamp": "4827f080d4469f9be988752b5729a562859e740c1d3635758cff6b38edb17083",
   "experienceSlots": 1,
+  "retrievalPolicy": {
+    "kind": "competitive_scoring_v1",
+    "minScore": 0.1,
+    "scoreWeights": {
+      "gtScore": 1,
+      "relativeRank": 1
+    },
+    "antiDominanceNormalization": {
+      "enabled": true,
+      "strength": 0.5,
+      "sourceGrouping": "provenance_fallback_v1"
+    }
+  },
   "system": ".agent/prompts/mcp-diagnostics.md",
   "inject": [
     ".agent/prompts/mcp-diagnostics.md"

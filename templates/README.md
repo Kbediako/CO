@@ -18,5 +18,6 @@ Current codex template payload includes:
 - provider onboarding examples under `.codex/providers/`
 
 Next steps (recommended):
-  codex mcp add delegation -- codex-orchestrator delegate-server --repo /path/to/repo
+  codex-orchestrator delegation setup --yes --repo /path/to/repo
+  codex-orchestrator delegation cleanup-stale --yes   # when stale delegate-server processes build up
   codex-orchestrator codex setup   # optional: CO-managed Codex CLI (activate only when needed via CODEX_CLI_USE_MANAGED=1)

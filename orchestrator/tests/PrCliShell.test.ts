@@ -62,6 +62,7 @@ describe('runPrCliShell', () => {
     expect(runPrWatchMergeMock).toHaveBeenCalledWith(['--pr', '211'], {
       usage: 'codex-orchestrator pr resolve-merge',
       defaultExitOnActionRequired: true,
+      enableAutomaticBranchRecovery: true,
       readinessMode: 'merge'
     });
   });

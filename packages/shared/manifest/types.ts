@@ -218,10 +218,45 @@ export interface CodexOrchestratorCLIManifest {
         stamp: string;
         experience_slots: number;
         sources: string[];
+        retrieval_policy?: {
+          kind: "competitive_scoring_v1";
+          min_score: number | null;
+          score_weights: {
+            gt_score: number;
+            relative_rank: number;
+          };
+          anti_dominance_normalization: {
+            enabled: boolean;
+            strength: number;
+            source_grouping: "provenance_fallback_v1";
+          };
+        } | null;
+        retrieval_selection?: {
+          candidate_count: number;
+          selected_count: number;
+          diagnostics_path: string | null;
+          selected_ids: string[];
+          suppressed_source_keys: string[];
+          selected: {
+            id: string;
+            source_key: string;
+            source_kind: "group_id" | "run_id" | "manifest_path" | "stamp_signature";
+            raw_score: number;
+            competitive_score: number;
+            dominance_penalty: number;
+          }[];
+        } | null;
         experiences?: string[] | null;
       }[]
     | null;
   memory?: {
+    block_memory?: {
+      schema_version: number;
+      kind: "index";
+      index_path: string;
+      generated_at: string;
+      block_count: number;
+    } | null;
     source_0?: {
       schema_version: number;
       kind: "context_object";
@@ -243,6 +278,72 @@ export interface CodexOrchestratorCLIManifest {
         task_id: string;
         manifest_path: string;
       } | null;
+    } | null;
+    observability?: {
+      schema_version: number;
+      recorded_at: string;
+      selected_memory: {
+        selection: "root" | "inherited_reuse" | "fresh_rebuild";
+        pointer: string;
+        object_id: string;
+        dir_path: string;
+        index_path: string;
+        source_path: string;
+        created_at: string;
+        origin: {
+          run_id: string;
+          task_id: string;
+          manifest_path: string;
+        };
+        inherited_from: {
+          run_id: string;
+          task_id: string;
+          manifest_path: string;
+        } | null;
+      };
+      rejected_candidates: {
+        pointer: string;
+        object_id: string;
+        dir_path: string;
+        index_path: string;
+        source_path: string;
+        created_at: string;
+        origin: {
+          run_id: string;
+          task_id: string;
+          manifest_path: string;
+        };
+        inherited_from: {
+          run_id: string;
+          task_id: string;
+          manifest_path: string;
+        } | null;
+        reason: "missing_artifacts" | "provenance_contradiction";
+        detail: string | null;
+      }[];
+      rediscovered_memory: {
+        from_pointer: string;
+        from_object_id: string;
+        to_pointer: string;
+        to_object_id: string;
+        reason: "missing_artifacts" | "provenance_contradiction";
+      } | null;
+      manual_repairs: {
+        timestamp: string;
+        actor: string;
+        reason: string;
+        outcome: "accepted";
+        detail: string | null;
+      }[];
+      counters: {
+        contradiction_count: number;
+        rediscovery_count: number;
+        resume_latency_ms: number | null;
+        manual_repair_count: number;
+        repeated_failure_streak: number;
+        retrieval_hits: number;
+        retrieval_misses: number;
+      };
     } | null;
   } | null;
   tfgrpo?: {

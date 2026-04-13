@@ -2,6 +2,7 @@ export interface PrWatchMergeOptions {
   usage?: string;
   defaultAutoMerge?: boolean;
   defaultExitOnActionRequired?: boolean;
+  enableAutomaticBranchRecovery?: boolean;
   readinessMode?: 'merge' | 'review';
 }
 
@@ -26,9 +27,21 @@ export interface PrWatchMergeCoderabbitReviewMeta {
 
 export interface PrWatchMergeBotRereviewSignals {
   fetchError: boolean;
+  rateLimit?: PrWatchMergeGitHubRateLimitStatus | null;
   pendingBots: string[];
   inProgressBots: string[];
   coderabbit: PrWatchMergeCoderabbitReviewMeta;
+}
+
+export interface PrWatchMergeGitHubRateLimitStatus {
+  kind: 'github_rate_limited';
+  surface: 'graphql' | 'rest' | 'unknown' | string;
+  limit_type: 'primary' | 'secondary' | string;
+  status: number | null;
+  reset_at: string | null;
+  retry_after_seconds: number | null;
+  retry_at: string | null;
+  message: string | null;
 }
 
 export interface PrWatchMergeSnapshot {
@@ -57,11 +70,24 @@ export interface PrWatchMergeSnapshot {
   readinessMode: 'merge' | 'review';
   readyToMerge: boolean;
   headOid: string | null;
+  fanoutCacheHit: boolean;
+  githubRateLimit: PrWatchMergeGitHubRateLimitStatus | null;
+  githubRateLimits: PrWatchMergeGitHubRateLimitStatus[];
 }
 
 export interface PrWatchMergeRequiredChecksCache {
   headOid: string | null;
-  summary: PrWatchMergeCheckSummary;
+  updatedAt?: string | null;
+  summary?: PrWatchMergeCheckSummary;
+  requiredChecks?: PrWatchMergeCheckSummary | null;
+  requiredChecksFetchError?: boolean;
+  requiredChecksForNextPoll?: PrWatchMergeRequiredChecksCache | null;
+  inlineBotFeedback?: {
+    fetchError: boolean;
+    rateLimit?: PrWatchMergeGitHubRateLimitStatus | null;
+    unacknowledgedCount: number;
+  } | null;
+  botRereviewSignals?: PrWatchMergeBotRereviewSignals | null;
 }
 
 export interface PrWatchMergeArgsOptions {
@@ -71,6 +97,12 @@ export interface PrWatchMergeArgsOptions {
   mergeMethod: 'merge' | 'squash' | 'rebase' | string;
   deleteBranch: boolean;
   headOid?: string | null;
+}
+
+export interface PrWatchMergeUpdateBranchArgsOptions {
+  owner: string;
+  repo: string;
+  prNumber: number;
 }
 
 export interface PrWatchMergeSnapshotInput {
@@ -94,6 +126,11 @@ export function isHumanReviewActor(
 
 export function parseGitHubRepoFromRemoteUrl(rawUrl: string): { owner: string; repo: string } | null;
 export function buildPrNumberViewArgs(owner?: string, repo?: string): string[];
+export function buildPrUpdateBranchArgs(options: PrWatchMergeUpdateBranchArgsOptions): string[];
+export function buildAutomaticBranchRecoveryKey(
+  snapshot: Pick<PrWatchMergeSnapshot, 'headOid'> | null | undefined,
+  recoveryReason: string
+): string;
 export function isNoRequiredChecksReportedErrorMessage(value: string | null | undefined): boolean;
 
 export function summarizeRequiredChecks(entries: unknown): PrWatchMergeCheckSummary;
@@ -114,18 +151,66 @@ export function buildStatusSnapshot(
   requiredChecks?: PrWatchMergeCheckSummary | null,
   inlineBotFeedback?: {
     fetchError: boolean;
+    rateLimit?: PrWatchMergeGitHubRateLimitStatus | null;
     unacknowledgedCount: number;
     rereview?: PrWatchMergeBotRereviewSignals | null;
   } | null,
   options?: Pick<PrWatchMergeOptions, 'readinessMode'> & {
     requiredChecksQueryFailed?: boolean;
+    fanoutCacheHit?: boolean;
+    githubRateLimits?: PrWatchMergeGitHubRateLimitStatus[];
   }
 ): PrWatchMergeSnapshot;
+
+export function resolveGitHubRateLimitStatus(
+  input: unknown,
+  options?: {
+    surface?: 'graphql' | 'rest' | 'unknown' | string;
+    nowMs?: number;
+  }
+): PrWatchMergeGitHubRateLimitStatus | null;
+
+export function formatGitHubRateLimitStatus(
+  rateLimit: PrWatchMergeGitHubRateLimitStatus | null | undefined
+): string;
+
+export function planGitHubRateLimitBackoff(
+  rateLimit: PrWatchMergeGitHubRateLimitStatus | null | undefined,
+  options?: {
+    nowMs?: number;
+    fallbackMs?: number;
+    maxJitterMs?: number;
+    remainingMs?: number;
+    jitterSeed?: string;
+  }
+): number;
 
 export function resolveActionRequiredReasons(
   snapshot: PrWatchMergeSnapshot,
   options?: Pick<PrWatchMergeOptions, 'readinessMode'>
 ): string[];
+
+export interface AutomaticBranchRecoverySnapshotLike {
+  action_required_reasons?: string[] | null;
+  gate_reasons?: string[] | null;
+  gateReasons?: string[] | null;
+}
+
+export function resolveAutomaticBranchRecoveryReason(
+  snapshotOrReasons: PrWatchMergeSnapshot | AutomaticBranchRecoverySnapshotLike | string[],
+  options?: Pick<PrWatchMergeOptions, 'readinessMode'> & {
+    requireExclusive?: boolean;
+  }
+): 'merge_state=BEHIND' | 'merge_state=DIRTY' | null;
+
+export function shouldAttemptAutomaticBranchRecovery(
+  snapshotOrReasons: PrWatchMergeSnapshot | AutomaticBranchRecoverySnapshotLike | string[],
+  options?: Pick<PrWatchMergeOptions, 'readinessMode'>
+): boolean;
+
+export function isConflictLikeBranchRecoveryFailureMessage(
+  value: string | null | undefined
+): boolean;
 
 export function shouldSucceedAfterTimeout(
   snapshot: PrWatchMergeSnapshot | null | undefined,

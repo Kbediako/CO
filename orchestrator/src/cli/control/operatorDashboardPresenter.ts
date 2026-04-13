@@ -14,6 +14,7 @@ import type {
   ControlTrackedPayload,
   ControlProviderWorkflowPayload
 } from './observabilityReadModel.js';
+import { resolveProviderWorkerHost } from './observabilityReadModel.js';
 import { isoTimestamp } from '../utils/time.js';
 
 const LOCAL_HOSTNAME = hostname();
@@ -36,6 +37,7 @@ export interface OperatorDashboardSessionPayload {
   turn_count: number | null;
   workspace_path: string | null;
   host: string;
+  worker_host?: string | null;
   last_event: string | null;
   last_message: string | null;
   display_event?: string | null;
@@ -57,6 +59,7 @@ export interface OperatorDashboardRetryPayload {
   turn_count: number | null;
   workspace_path: string | null;
   host: string;
+  worker_host?: string | null;
   attempt: number | null;
   due_at: string | null;
   error: string | null;
@@ -81,6 +84,7 @@ export interface OperatorDashboardIssuePayload {
     path: string | null;
     host: string;
   };
+  worker_host?: string | null;
   session: {
     session_id: string | null;
     thread_id: string | null;
@@ -192,6 +196,18 @@ function buildIssuePayload(
   const proof = issue.provider_linear_worker_proof ?? null;
   const trackedLinear = issue.tracked && 'linear' in issue.tracked ? issue.tracked.linear : null;
   const running = issue.running ?? null;
+  const stageStartedAt =
+    running?.started_at ??
+    issue.retry?.started_at ??
+    issue.provider_debug_snapshot?.claim?.launch_started_at ??
+    null;
+  const workerHost =
+    issue.worker_host ??
+    resolveProviderWorkerHost({
+      providerLinearWorkerProof: proof,
+      providerDebugSnapshot: issue.provider_debug_snapshot ?? null,
+      stageStartedAt
+    });
 
   return {
     issue_identifier: issue.issue_identifier,
@@ -208,6 +224,7 @@ function buildIssuePayload(
       path: issue.workspace.path ?? proof?.workspace_path ?? null,
       host: LOCAL_HOSTNAME
     },
+    ...(workerHost !== null ? { worker_host: workerHost } : {}),
     session: {
       session_id: proof?.latest_session_id ?? running?.session_id ?? issue.retry?.session_id ?? null,
       thread_id: proof?.thread_id ?? null,
@@ -239,6 +256,18 @@ function buildRunningSessionPayload(
   issue: ControlIssuePayload | null
 ): OperatorDashboardSessionPayload {
   const proof = issue?.provider_linear_worker_proof ?? null;
+  const workerHost =
+    entry.worker_host ??
+    issue?.worker_host ??
+    resolveProviderWorkerHost({
+      providerLinearWorkerProof: proof,
+      providerDebugSnapshot: issue?.provider_debug_snapshot ?? null,
+      stageStartedAt:
+        entry.started_at ??
+        issue?.running?.started_at ??
+        issue?.provider_debug_snapshot?.claim?.launch_started_at ??
+        null
+    });
   return {
     issue_identifier: entry.issue_identifier,
     issue_id: entry.issue_id,
@@ -253,6 +282,7 @@ function buildRunningSessionPayload(
     turn_count: proof?.turn_count ?? entry.turn_count,
     workspace_path: issue?.workspace.path ?? proof?.workspace_path ?? null,
     host: LOCAL_HOSTNAME,
+    ...(workerHost !== null ? { worker_host: workerHost } : {}),
     last_event: entry.last_event,
     last_message: entry.last_message,
     display_event: entry.display_event ?? null,
@@ -266,6 +296,19 @@ function buildRetryQueuePayload(
   entry: ControlRetryPayload,
   issue: ControlIssuePayload | null
 ): OperatorDashboardRetryPayload {
+  const proof = issue?.provider_linear_worker_proof ?? null;
+  const workerHost =
+    entry.worker_host ??
+    issue?.worker_host ??
+    resolveProviderWorkerHost({
+      providerLinearWorkerProof: proof,
+      providerDebugSnapshot: issue?.provider_debug_snapshot ?? null,
+      stageStartedAt:
+        entry.started_at ??
+        issue?.retry?.started_at ??
+        issue?.provider_debug_snapshot?.claim?.launch_started_at ??
+        null
+    });
   return {
     issue_identifier: entry.issue_identifier,
     issue_id: entry.issue_id,
@@ -279,6 +322,7 @@ function buildRetryQueuePayload(
     turn_count: entry.turn_count ?? null,
     workspace_path: entry.workspace_path ?? null,
     host: LOCAL_HOSTNAME,
+    ...(workerHost !== null ? { worker_host: workerHost } : {}),
     attempt: entry.attempt,
     due_at: entry.due_at,
     error: entry.error,

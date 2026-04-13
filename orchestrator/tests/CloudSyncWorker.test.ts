@@ -161,10 +161,10 @@ describe('CloudSyncWorker', () => {
       void writer.write(summary);
     }, 10);
 
-    await new Promise((resolve) => setTimeout(resolve, 80));
+    await waitForCondition(() => upload.mock.calls.length >= 1);
 
     expect(upload).toHaveBeenCalledTimes(1);
-    const audit = await readAuditLog(outDir, summary);
+    const audit = await waitForAuditLogEntry(outDir, summary, 'Cloud sync completed');
     expect(audit).toContain('Cloud sync completed');
   });
 
@@ -210,10 +210,10 @@ describe('CloudSyncWorker', () => {
     });
 
     await finalizeManifest;
-    await new Promise((resolve) => setTimeout(resolve, 80));
+    await waitForCondition(() => upload.mock.calls.length >= 1);
 
     expect(upload).toHaveBeenCalledTimes(1);
-    const audit = await readAuditLog(outDir, summary);
+    const audit = await waitForAuditLogEntry(outDir, summary, 'Cloud sync completed');
     expect(audit).toContain('Cloud sync completed');
   });
 

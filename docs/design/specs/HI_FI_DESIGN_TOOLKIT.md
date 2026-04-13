@@ -8,6 +8,7 @@ last_review: 2026-04-09
 - Objective: Ship a standalone hi-fi design toolkit pipeline that wraps the autonomous hi-fi design starter commands, orchestrates CSS extraction through token publication, logs approvals/retention data, and publishes evidence usable by downstream agents without manual setup.
 - Scope: Config-driven pipeline activation, CLI surface area, stage wrappers (context acquisition, token/styleguide generation, reference/self-correction, toolkit publication), manifest/schema updates, approval logging, retention/privacy enforcement, integration with `packages/design-system`, testing/rollout hooks, and spec guard coverage.
 - Out of Scope: Reimplementing extractor logic, delivering production deployment automation, or bypassing existing orchestrator guardrails.
+- Current repo truth after `CO-88`: the checked-in `packages/design-system` package remains scaffold-level and `npm --prefix packages/design-system run test:visual` is placeholder smoke. Treat this spec as toolkit intent plus historical evidence, not as proof of a mature current-branch publication/regression surface.
 
 ## Requirements Mapping
 | PRD Goal | Spec Section |

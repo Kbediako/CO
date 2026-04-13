@@ -4,7 +4,7 @@ title: CO: Add run memory controller with role-specific retrieval profiles
 status: in_progress
 owner: Codex
 created: 2026-04-09
-last_review: 2026-04-09
+last_review: 2026-04-14
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d.md
@@ -20,6 +20,7 @@ review_notes:
   - 2026-04-09: Implementation now lands one shared `run memory controller` in `orchestrator/src/cli/run/runMemoryController.ts`, migrates reviewer/cloud/provider-worker/child-lane/symbolic planner consumption to that shared selector, and pins role-specific differences with focused controller and consumer tests.
   - 2026-04-09: Manifest-backed standalone review against `/Users/kbediako/Code/CO/.runs/linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d/cli/2026-04-09T08-36-05-967Z-014680f3/manifest.json` recorded `review_outcome: failed-boundary` with `termination_boundary.kind: command-intent` / `provenance: validation-runner` at `/Users/kbediako/Code/CO/.runs/linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d/cli/2026-04-09T08-36-05-967Z-014680f3/review/telemetry.json`; manual fallback review then found no correctness or regression findings, kept the shared controller seam as the minimal design, and landed one small fail-soft planner manifest-read refinement plus focused reruns. `npm run pack:smoke` also passed; the only remaining handoff blocker is the unrelated broad `npm run test` timeout lane.
   - 2026-04-09: The unrelated repo-wide test-lane blocker is now tracked separately as `CO-132` / `87d23327-3ee6-429c-a25f-8bd9c84cde58`, and `CO-94` moved from `In Progress` to `Blocked` pending that follow-up or an explicit validation waiver.
+  - 2026-04-14: Resumed after the team moved `CO-94` back to `Ready`; rechecked live workflow states, moved the issue to `In Progress`, recorded the required `stay_serial` / `overlapping_scope` parallelization decision, committed the existing controller patch as `6d21d49de`, and merged current `origin/main` so validation can run against the current base instead of the older repo-wide blocker snapshot.
 ---
 
 # Technical Specification

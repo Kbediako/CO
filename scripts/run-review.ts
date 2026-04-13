@@ -12,9 +12,11 @@
  */
 
 import { spawn } from 'node:child_process';
+import { existsSync, realpathSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
+import { pathToFileURL } from 'node:url';
 
 import {
   parseRuntimeMode,
@@ -68,13 +70,16 @@ import {
 } from './lib/review-scope-advisory.js';
 import { collectManifests, resolveEnvironmentPaths } from './lib/run-manifests.js';
 
-const { repoRoot, runsRoot: defaultRunsDir } = resolveEnvironmentPaths();
 const BENIGN_STDIO_ERROR_CODES = new Set(['EPIPE', 'ERR_STREAM_DESTROYED']);
 const REVIEW_AUTO_ISSUE_LOG_ENV_KEY = 'CODEX_REVIEW_AUTO_ISSUE_LOG';
 const REVIEW_ENABLE_DELEGATION_MCP_ENV_KEY = 'CODEX_REVIEW_ENABLE_DELEGATION_MCP';
 const REVIEW_DISABLE_DELEGATION_MCP_ENV_KEY = 'CODEX_REVIEW_DISABLE_DELEGATION_MCP';
 const REVIEW_TELEMETRY_DEBUG_ENV_KEY = 'CODEX_REVIEW_DEBUG_TELEMETRY';
 const REVIEW_SURFACE_ENV_KEY = 'CODEX_REVIEW_SURFACE';
+const PROVIDER_LINEAR_WORKER_PIPELINE_ID = 'provider-linear-worker';
+const PROVIDER_WORKSPACE_ROOT_DIRNAME = '.workspaces';
+const PRESERVE_PROVIDER_ARTIFACT_ROOTS_ENV =
+  'CODEX_ORCHESTRATOR_PRESERVE_PROVIDER_ARTIFACT_ROOTS';
 
 interface CliOptions {
   manifest?: string;
@@ -196,8 +201,244 @@ function inferTaskFromManifestPath(manifestPath: string): string | null {
   return null;
 }
 
-function parseArgs(argv: string[]): CliOptions {
-  const options: CliOptions = { runsDir: defaultRunsDir };
+function resolveReviewEnvironmentPaths(): { repoRoot: string; defaultRunsDir: string; defaultOutDir: string } {
+  const { repoRoot, runsRoot, outRoot } = resolveEnvironmentPaths();
+  return {
+    repoRoot,
+    defaultRunsDir: runsRoot,
+    defaultOutDir: outRoot
+  };
+}
+
+function resolveProviderTaskIdFromEnv(env: NodeJS.ProcessEnv, repoRoot?: string): string | null {
+  const candidates = [env.CODEX_ORCHESTRATOR_TASK_ID?.trim(), env.MCP_RUNNER_TASK_ID?.trim(), env.TASK?.trim()].filter(Boolean) as string[];
+  const repoTask = repoRoot && env.CODEX_ORCHESTRATOR_PIPELINE_ID === PROVIDER_LINEAR_WORKER_PIPELINE_ID && path.basename(path.dirname(repoRoot)) === PROVIDER_WORKSPACE_ROOT_DIRNAME ? path.basename(repoRoot) : null;
+  if (repoTask && candidates.includes(repoTask)) return repoTask;
+  return env.MCP_RUNNER_TASK_ID?.trim() || env.TASK?.trim() || env.CODEX_ORCHESTRATOR_TASK_ID?.trim() || null;
+}
+
+function isPathWithinRoot(root: string, candidate: string): boolean {
+  const relativePath = path.relative(root, candidate);
+  return (
+    relativePath === '' ||
+    (!relativePath.startsWith('..') &&
+      !relativePath.startsWith(`..${path.sep}`) &&
+      !path.isAbsolute(relativePath))
+  );
+}
+
+function firstPathSegment(relativePath: string): string {
+  return relativePath.split(path.sep).filter((segment) => segment.length > 0)[0] ?? '';
+}
+
+function isDefaultRunsLayoutSegment(segment: string): boolean {
+  return segment === '.runs' || segment === 'runs';
+}
+
+function isProviderIssueWorkspaceRootForEnv(repoRoot: string, env: NodeJS.ProcessEnv): boolean {
+  if (env.CODEX_ORCHESTRATOR_PIPELINE_ID !== PROVIDER_LINEAR_WORKER_PIPELINE_ID) {
+    return false;
+  }
+  const taskId = resolveProviderTaskIdFromEnv(env, repoRoot);
+  return Boolean(
+    taskId &&
+      path.basename(repoRoot) === taskId &&
+      path.basename(path.dirname(repoRoot)) === PROVIDER_WORKSPACE_ROOT_DIRNAME
+  );
+}
+
+function resolveConfiguredReviewRoot(env: NodeJS.ProcessEnv): string | null {
+  const configuredRoot = env.CODEX_ORCHESTRATOR_ROOT?.trim();
+  if (!configuredRoot) {
+    return null;
+  }
+  return path.isAbsolute(configuredRoot)
+    ? path.resolve(configuredRoot)
+    : path.resolve(process.cwd(), configuredRoot);
+}
+
+function resolveProviderSharedRootForEnv(repoRoot: string, env: NodeJS.ProcessEnv): string | null {
+  if (!isProviderIssueWorkspaceRootForEnv(repoRoot, env)) {
+    return null;
+  }
+  const sharedRoot = path.dirname(path.dirname(repoRoot));
+  return resolveConfiguredReviewRoot(env) === sharedRoot ? sharedRoot : null;
+}
+
+function resolveConfiguredReviewArtifactRoot(
+  repoRoot: string,
+  env: NodeJS.ProcessEnv,
+  configured: string | undefined,
+  fallbackDirname: string
+): string {
+  const inheritedSharedRoot = resolveProviderSharedRootForEnv(repoRoot, env);
+  const baseRoot = inheritedSharedRoot ?? repoRoot;
+  const normalized = configured?.trim();
+  if (!normalized) {
+    return path.resolve(baseRoot, fallbackDirname);
+  }
+  return path.isAbsolute(normalized) ? path.resolve(normalized) : path.resolve(baseRoot, normalized);
+}
+
+function resolveWorkspaceArtifactRootForSharedRoot(
+  repoRoot: string,
+  env: NodeJS.ProcessEnv,
+  sharedArtifactRoot: string,
+  fallbackDirname: string,
+  allowCustomCounterpart = false
+): string | null {
+  const inheritedSharedRoot = resolveProviderSharedRootForEnv(repoRoot, env);
+  const sharedRoot = inheritedSharedRoot ?? path.dirname(path.dirname(repoRoot));
+  if (!isPathWithinRoot(sharedRoot, sharedArtifactRoot)) {
+    return null;
+  }
+  const relativeArtifactRoot = path.relative(sharedRoot, sharedArtifactRoot);
+  const firstSegment = firstPathSegment(relativeArtifactRoot);
+  if (
+    (fallbackDirname === '.runs' && isDefaultRunsLayoutSegment(firstSegment)) ||
+    firstSegment === fallbackDirname ||
+    allowCustomCounterpart
+  ) {
+    return path.resolve(repoRoot, relativeArtifactRoot);
+  }
+  return null;
+}
+
+function resolveReviewEnvPath(raw: string, repoRoot: string, env: NodeJS.ProcessEnv = process.env): string {
+  const inheritedSharedRoot = resolveProviderSharedRootForEnv(repoRoot, env);
+  const relativeBaseRoot = inheritedSharedRoot ?? repoRoot;
+  const resolved = path.isAbsolute(raw) ? path.resolve(raw) : path.resolve(relativeBaseRoot, raw);
+  if (!isProviderIssueWorkspaceRootForEnv(repoRoot, env) || isPathWithinRoot(repoRoot, resolved)) {
+    return resolved;
+  }
+  const sharedRunsRoot = resolveConfiguredReviewArtifactRoot(
+    repoRoot,
+    env,
+    env.CODEX_ORCHESTRATOR_RUNS_DIR || '.runs',
+    '.runs'
+  );
+  if (!isPathWithinRoot(sharedRunsRoot, resolved)) {
+    return resolved;
+  }
+  const workspaceRunsRoot = resolveWorkspaceArtifactRootForSharedRoot(
+    repoRoot,
+    env,
+    sharedRunsRoot,
+    '.runs',
+    true
+  );
+  if (!workspaceRunsRoot) {
+    return resolved;
+  }
+  const workspaceCandidate = path.resolve(workspaceRunsRoot, path.relative(sharedRunsRoot, resolved));
+  return existsSync(workspaceCandidate) ? workspaceCandidate : resolved;
+}
+
+function resolveReviewRunsDirPath(raw: string, repoRoot: string, env: NodeJS.ProcessEnv = process.env): string {
+  const inheritedSharedRoot = resolveProviderSharedRootForEnv(repoRoot, env);
+  return path.isAbsolute(raw) ? path.resolve(raw) : path.resolve(inheritedSharedRoot ?? repoRoot, raw);
+}
+
+function inferRunsRootFromManifestPath(
+  manifestPath: string,
+  env: NodeJS.ProcessEnv = process.env,
+  repoRoot: string | null = null
+): string | null {
+  const resolvedManifestPath = path.resolve(manifestPath);
+  if (path.basename(resolvedManifestPath) !== 'manifest.json') {
+    return null;
+  }
+  const runDir = path.dirname(resolvedManifestPath);
+  const layoutDir = path.dirname(runDir);
+  if (path.basename(layoutDir) !== 'cli' && path.basename(layoutDir) !== 'mcp') {
+    return null;
+  }
+  const taskDir = path.dirname(layoutDir);
+  const runsRoot = path.dirname(taskDir);
+  if (path.basename(runsRoot) === '.runs' || path.basename(runsRoot) === 'runs') {
+    return runsRoot;
+  }
+  if (repoRoot) {
+    const configuredRunsRoot = resolveConfiguredReviewArtifactRoot(
+      repoRoot,
+      env,
+      env.CODEX_ORCHESTRATOR_RUNS_DIR,
+      '.runs'
+    );
+    if (isPathWithinRoot(configuredRunsRoot, resolvedManifestPath)) {
+      return configuredRunsRoot;
+    }
+  }
+  return null;
+}
+
+function resolveReviewExecutionArtifactRoots(
+  env: NodeJS.ProcessEnv,
+  environmentPaths: { repoRoot: string; defaultRunsDir: string; defaultOutDir: string },
+  manifestPath: string
+): { runsDir: string; outDir: string; preserveProviderArtifactRoots: boolean } {
+  const manifestRunsRoot = inferRunsRootFromManifestPath(manifestPath, env, environmentPaths.repoRoot);
+  if (
+    !manifestRunsRoot ||
+    !isProviderIssueWorkspaceRootForEnv(environmentPaths.repoRoot, env) ||
+    isPathWithinRoot(environmentPaths.defaultRunsDir, manifestPath)
+  ) {
+    return {
+      runsDir: environmentPaths.defaultRunsDir,
+      outDir: environmentPaths.defaultOutDir,
+      preserveProviderArtifactRoots: false
+    };
+  }
+
+  const configuredOutDir = env.CODEX_ORCHESTRATOR_OUT_DIR?.trim();
+  const resolvedConfiguredOutDir = configuredOutDir
+    ? resolveConfiguredReviewArtifactRoot(environmentPaths.repoRoot, env, configuredOutDir, 'out')
+    : null;
+  const workspaceConfiguredOutDir = resolvedConfiguredOutDir
+    ? resolveWorkspaceArtifactRootForSharedRoot(
+        environmentPaths.repoRoot,
+        env,
+        resolvedConfiguredOutDir,
+        'out',
+        isPathWithinRoot(environmentPaths.repoRoot, manifestPath)
+      )
+    : null;
+  const outDir = workspaceConfiguredOutDir ?? resolvedConfiguredOutDir ?? environmentPaths.defaultOutDir;
+  return {
+    runsDir: manifestRunsRoot,
+    outDir,
+    preserveProviderArtifactRoots: true
+  };
+}
+
+function buildReviewExecutionEnv(
+  env: NodeJS.ProcessEnv,
+  environmentPaths: { repoRoot: string; defaultRunsDir: string; defaultOutDir: string },
+  manifestPath: string
+): NodeJS.ProcessEnv {
+  const artifactRoots = resolveReviewExecutionArtifactRoots(env, environmentPaths, manifestPath);
+  const preserveProviderArtifactRoots =
+    artifactRoots.preserveProviderArtifactRoots ||
+    env[PRESERVE_PROVIDER_ARTIFACT_ROOTS_ENV] === '1';
+  const reviewEnv: NodeJS.ProcessEnv = {
+    ...env,
+    CODEX_ORCHESTRATOR_ROOT: environmentPaths.repoRoot,
+    CODEX_ORCHESTRATOR_RUNS_DIR: artifactRoots.runsDir,
+    CODEX_ORCHESTRATOR_OUT_DIR: artifactRoots.outDir,
+    CODEX_ORCHESTRATOR_RUN_DIR: path.dirname(manifestPath),
+    CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath
+  };
+  if (preserveProviderArtifactRoots) {
+    reviewEnv[PRESERVE_PROVIDER_ARTIFACT_ROOTS_ENV] = '1';
+  }
+  return reviewEnv;
+}
+
+function parseArgs(
+  argv: string[],
+  environmentPaths: { repoRoot: string; defaultRunsDir: string }
+): CliOptions {
+  const options: CliOptions = { runsDir: environmentPaths.defaultRunsDir };
   const { args, entries, positionals } = parseCliArgs(argv);
   if (hasFlag(args, 'help') || hasFlag(args, 'h') || positionals.includes('help')) {
     options.help = true;
@@ -206,9 +447,9 @@ function parseArgs(argv: string[]): CliOptions {
 
   for (const entry of entries) {
     if (entry.key === 'manifest' && typeof entry.value === 'string') {
-      options.manifest = path.resolve(repoRoot, entry.value);
+      options.manifest = resolveReviewEnvPath(entry.value, environmentPaths.repoRoot);
     } else if (entry.key === 'runs-dir' && typeof entry.value === 'string') {
-      options.runsDir = path.resolve(repoRoot, entry.value);
+      options.runsDir = resolveReviewRunsDirPath(entry.value, environmentPaths.repoRoot);
     } else if (entry.key === 'task' && typeof entry.value === 'string') {
       options.task = entry.value;
     } else if (entry.key === 'runtime-mode') {
@@ -253,7 +494,7 @@ function parseArgs(argv: string[]): CliOptions {
   if (!options.manifest) {
     const envManifest = process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH ?? process.env.MANIFEST;
     if (envManifest && envManifest.trim().length > 0) {
-      options.manifest = path.resolve(repoRoot, envManifest.trim());
+      options.manifest = resolveReviewEnvPath(envManifest.trim(), environmentPaths.repoRoot);
     }
   }
 
@@ -265,7 +506,7 @@ function parseArgs(argv: string[]): CliOptions {
   }
 
   if (!options.task && !options.manifest) {
-    const taskFromEnv = process.env.MCP_RUNNER_TASK_ID?.trim() || process.env.TASK?.trim();
+    const taskFromEnv = resolveProviderTaskIdFromEnv(process.env, environmentPaths.repoRoot);
     if (taskFromEnv) {
       options.task = taskFromEnv;
     }
@@ -305,12 +546,13 @@ function parseArgs(argv: string[]): CliOptions {
   return options;
 }
 
-async function resolveManifestPath(options: CliOptions): Promise<string> {
+async function resolveManifestPath(options: CliOptions, repoRoot: string): Promise<string> {
   if (options.manifest) {
+    if (!(await pathExists(options.manifest))) throw new Error(`Manifest not found: ${options.manifest}`);
     return options.manifest;
   }
 
-  const runDirManifest = await resolveManifestPathFromRunDir();
+  const runDirManifest = await resolveManifestPathFromRunDir(repoRoot);
   const requestedTask = options.task?.trim();
   const runDirTask = runDirManifest ? inferTaskFromManifestPath(runDirManifest) : null;
   if (
@@ -337,209 +579,185 @@ async function resolveManifestPath(options: CliOptions): Promise<string> {
   );
 
   scored.sort((a, b) => b.mtimeMs - a.mtimeMs);
-  return scored[0]?.manifestPath ?? manifests[0];
+  return resolveReviewEnvPath(scored[0]?.manifestPath ?? manifests[0], repoRoot);
 }
 
-async function resolveManifestPathFromRunDir(): Promise<string | null> {
+async function resolveManifestPathFromRunDir(repoRoot: string): Promise<string | null> {
   const configuredRunDir = process.env.CODEX_ORCHESTRATOR_RUN_DIR?.trim();
   if (!configuredRunDir) {
     return null;
   }
 
-  const manifestPath = path.join(path.resolve(repoRoot, configuredRunDir), 'manifest.json');
+  const manifestPath = path.join(resolveReviewEnvPath(configuredRunDir, repoRoot), 'manifest.json');
   return (await pathExists(manifestPath)) ? manifestPath : null;
 }
 
-async function main(): Promise<void> {
-  const options = parseArgs(process.argv.slice(2));
-  if (options.help) {
-    printReviewWrapperHelp();
-    return;
-  }
-  const reviewSurface = options.surface ?? 'diff';
-  const explicitScopeSurfaceGateError = buildExplicitScopeSurfaceGateError(options, reviewSurface);
-  if (explicitScopeSurfaceGateError) {
-    throw new Error(explicitScopeSurfaceGateError);
-  }
-  if (shouldRunDiffBudget()) {
-    await runDiffBudget(options);
-  } else {
-    console.log('[run-review] skipping diff budget (already executed by pipeline).');
-  }
-  const manifestPath = await resolveManifestPath(options);
-
-  const relativeManifest = path.relative(repoRoot, manifestPath);
-  const runnerLogPath = path.join(path.dirname(manifestPath), 'runner.ndjson');
-  const runnerLogExists = await pathExists(runnerLogPath);
-  const relativeRunnerLog = path.relative(repoRoot, runnerLogPath);
-  const manifestTask = inferTaskFromManifestPath(manifestPath);
-  const envTask = process.env.MCP_RUNNER_TASK_ID ?? process.env.TASK;
-  const taskKey = options.task ?? envTask ?? manifestTask;
-  const taskLabel = taskKey ?? 'unknown-task';
-  const diffBudgetOverride = process.env.DIFF_BUDGET_OVERRIDE_REASON?.trim();
-  const scopeMode = resolveEffectiveScopeMode(options);
-  const allowHeavyCommands = allowHeavyReviewCommands();
-  const {
-    promptLines,
-    reviewTaskContext,
-    activeCloseoutBundleRoots,
-    scopedReviewerVisibleTitle
-  } = await buildReviewPromptContext({
-    repoRoot,
-    taskKey,
-    taskLabel,
-    reviewSurface,
-    relativeManifest,
-    runnerLogExists,
-    relativeRunnerLog,
-    notes: process.env.NOTES,
-    scopeMode,
-    includeBoundedReviewConstraints: !allowHeavyCommands
-  });
-  const explicitScopedReview = Boolean(options.base || options.commit || options.uncommitted);
-  const explicitReviewTitle =
-    typeof options.title === 'string' && options.title.trim().length > 0 ? options.title.trim() : null;
-  const effectiveReviewTitle =
-    explicitReviewTitle ?? (explicitScopedReview ? scopedReviewerVisibleTitle : null);
-  const effectiveTitleSource = explicitReviewTitle
-    ? 'user'
-    : explicitScopedReview
-      ? 'notes-surface'
-      : undefined;
-  const enforceBoundedMode = !allowHeavyCommands && enforceBoundedReviewMode();
-  if (allowHeavyCommands) {
-    console.log(
-      `[run-review] heavy review commands allowed (${REVIEW_ALLOW_HEAVY_COMMANDS_ENV_KEY}=1).`
-    );
-  } else {
-    console.log(
-      `[run-review] bounded review guidance enabled by default (set ${REVIEW_ALLOW_HEAVY_COMMANDS_ENV_KEY}=1 to opt into unrestricted heavy-command execution).`
-    );
-    if (enforceBoundedMode) {
-      console.log(
-        `[run-review] bounded enforcement enabled (${REVIEW_ENFORCE_BOUNDED_MODE_ENV_KEY}=1); heavy command starts will terminate the review.`
-      );
+export async function runReviewCli(argv: string[] = process.argv.slice(2)): Promise<number> {
+  process.exitCode = 0;
+  try {
+    const environmentPaths = resolveReviewEnvironmentPaths();
+    const { repoRoot } = environmentPaths;
+    const options = parseArgs(argv, environmentPaths);
+    if (options.help) {
+      printReviewWrapperHelp();
+      return 0;
     }
-  }
+    const reviewSurface = options.surface ?? 'diff';
+    const explicitScopeSurfaceGateError = buildExplicitScopeSurfaceGateError(options, reviewSurface);
+    if (explicitScopeSurfaceGateError) {
+      throw new Error(explicitScopeSurfaceGateError);
+    }
+    if (shouldRunDiffBudget()) {
+      await runDiffBudget(options, repoRoot);
+    } else {
+      console.log('[run-review] skipping diff budget (already executed by pipeline).');
+    }
+    const manifestPath = await resolveManifestPath(options, repoRoot);
 
-  const scopePathCollection = await collectReviewScopePaths(options, repoRoot);
-  const scopeNotes = buildScopeNotes(options, scopePathCollection);
-  if (scopeNotes.length > 0) {
-    promptLines.push('', ...scopeNotes);
-  }
-  const activeCloseoutProvenanceLines = buildActiveCloseoutProvenanceLines(
-    repoRoot,
-    activeCloseoutBundleRoots
-  );
-  if (activeCloseoutProvenanceLines.length > 0) {
-    promptLines.push('', ...activeCloseoutProvenanceLines);
-  }
-  const scopeAssessment = await assessReviewScope(options, repoRoot);
-  const scopeMetrics = formatScopeMetrics(scopeAssessment);
-  const largeScopeOverrideReason = resolveLargeScopeOverrideReason(process.env);
-  const stdinIsTTY = process.stdin?.isTTY === true;
-  const promptOnlyHandoff = shouldPrintNonInteractiveHandoff({
-    env: process.env,
-    nonInteractive:
-      options.nonInteractive ?? shouldForceNonInteractive(process.env, stdinIsTTY),
-    stdinIsTTY
-  });
-  logReviewScopeAssessment(scopeAssessment, scopeMetrics, console, largeScopeOverrideReason);
-  const largeScopeGateError = getLargeScopeGateError(
-    scopeAssessment,
-    scopeMetrics,
-    largeScopeOverrideReason
-  );
-  const explicitScopeRetryGateError = buildExplicitScopeRetryGateError(options);
-  const retryWithoutScopeFlagsAssessment =
-    explicitScopeRetryGateError !== null || resolveEffectiveScopeMode(options) === 'uncommitted'
-      ? null
-      : await assessReviewScope({}, repoRoot);
-  const retryWithoutScopeFlagsGateError =
-    explicitScopeRetryGateError ??
-    (retryWithoutScopeFlagsAssessment === null
-      ? null
-      : getLargeScopeGateError(
-          retryWithoutScopeFlagsAssessment,
-          formatScopeMetrics(retryWithoutScopeFlagsAssessment),
-          null
-        ));
-  if (largeScopeGateError && !promptOnlyHandoff) {
-    throw new Error(largeScopeGateError);
-  }
-  const scopeAdvisoryPromptLines = buildLargeScopeAdvisoryPromptLines(
-    scopeAssessment,
-    scopeMetrics,
-    largeScopeOverrideReason
-  );
-  if (scopeAdvisoryPromptLines.length > 0) {
-    promptLines.push('', ...scopeAdvisoryPromptLines);
-  }
-
-  if (reviewSurface === 'audit' && diffBudgetOverride) {
-    promptLines.push('', `Diff budget override: ${diffBudgetOverride}`);
-  }
-
-  const prompt = promptLines.join('\n');
-  const { artifactPaths, nonInteractive, reviewEnv, handedOff } =
-    await prepareReviewNonInteractiveHandoffShell({
-      cliNonInteractive: options.nonInteractive,
-      env: process.env,
-      manifestPath,
-      prompt,
+    const relativeManifest = path.relative(repoRoot, manifestPath);
+    const runnerLogPath = path.join(path.dirname(manifestPath), 'runner.ndjson');
+    const runnerLogExists = await pathExists(runnerLogPath);
+    const relativeRunnerLog = path.relative(repoRoot, runnerLogPath);
+    const manifestTask = inferTaskFromManifestPath(manifestPath);
+    const envTask = resolveProviderTaskIdFromEnv(process.env, repoRoot);
+    const taskKey = options.task ?? envTask ?? manifestTask;
+    const taskLabel = taskKey ?? 'unknown-task';
+    const diffBudgetOverride = process.env.DIFF_BUDGET_OVERRIDE_REASON?.trim();
+    const scopeMode = resolveEffectiveScopeMode(options);
+    const allowHeavyCommands = allowHeavyReviewCommands();
+    const {
+      promptLines,
+      reviewTaskContext,
+      activeCloseoutBundleRoots,
+      scopedReviewerVisibleTitle
+    } = await buildReviewPromptContext({
       repoRoot,
+      taskKey,
+      taskLabel,
+      reviewSurface,
+      relativeManifest,
       runnerLogExists,
-      runnerLogPath,
+      relativeRunnerLog,
+      notes: process.env.NOTES,
+      scopeMode,
+      includeBoundedReviewConstraints: !allowHeavyCommands
+    });
+    const explicitScopedReview = Boolean(options.base || options.commit || options.uncommitted);
+    const explicitReviewTitle =
+      typeof options.title === 'string' && options.title.trim().length > 0 ? options.title.trim() : null;
+    const effectiveReviewTitle =
+      explicitReviewTitle ?? (explicitScopedReview ? scopedReviewerVisibleTitle : null);
+    const effectiveTitleSource = explicitReviewTitle
+      ? 'user'
+      : explicitScopedReview
+        ? 'notes-surface'
+        : undefined;
+    const enforceBoundedMode = !allowHeavyCommands && enforceBoundedReviewMode();
+    if (allowHeavyCommands) {
+      console.log(
+        `[run-review] heavy review commands allowed (${REVIEW_ALLOW_HEAVY_COMMANDS_ENV_KEY}=1).`
+      );
+    } else {
+      console.log(
+        `[run-review] bounded review guidance enabled by default (set ${REVIEW_ALLOW_HEAVY_COMMANDS_ENV_KEY}=1 to opt into unrestricted heavy-command execution).`
+      );
+      if (enforceBoundedMode) {
+        console.log(
+          `[run-review] bounded enforcement enabled (${REVIEW_ENFORCE_BOUNDED_MODE_ENV_KEY}=1); heavy command starts will terminate the review.`
+        );
+      }
+    }
+
+    const scopePathCollection = await collectReviewScopePaths(options, repoRoot);
+    const scopeNotes = buildScopeNotes(options, scopePathCollection);
+    if (scopeNotes.length > 0) {
+      promptLines.push('', ...scopeNotes);
+    }
+    const activeCloseoutProvenanceLines = buildActiveCloseoutProvenanceLines(
+      repoRoot,
+      activeCloseoutBundleRoots
+    );
+    if (activeCloseoutProvenanceLines.length > 0) {
+      promptLines.push('', ...activeCloseoutProvenanceLines);
+    }
+    const scopeAssessment = await assessReviewScope(options, repoRoot);
+    const scopeMetrics = formatScopeMetrics(scopeAssessment);
+    const largeScopeOverrideReason = resolveLargeScopeOverrideReason(process.env);
+    const stdinIsTTY = process.stdin?.isTTY === true;
+    const promptOnlyHandoff = shouldPrintNonInteractiveHandoff({
+      env: process.env,
+      nonInteractive:
+        options.nonInteractive ?? shouldForceNonInteractive(process.env, stdinIsTTY),
       stdinIsTTY
     });
-  if (handedOff) {
-    return;
-  }
+    logReviewScopeAssessment(scopeAssessment, scopeMetrics, console, largeScopeOverrideReason);
+    const largeScopeGateError = getLargeScopeGateError(
+      scopeAssessment,
+      scopeMetrics,
+      largeScopeOverrideReason
+    );
+    const explicitScopeRetryGateError = buildExplicitScopeRetryGateError(options);
+    const retryWithoutScopeFlagsAssessment =
+      explicitScopeRetryGateError !== null || resolveEffectiveScopeMode(options) === 'uncommitted'
+        ? null
+        : await assessReviewScope({}, repoRoot);
+    const retryWithoutScopeFlagsGateError =
+      explicitScopeRetryGateError ??
+      (retryWithoutScopeFlagsAssessment === null
+        ? null
+        : getLargeScopeGateError(
+            retryWithoutScopeFlagsAssessment,
+            formatScopeMetrics(retryWithoutScopeFlagsAssessment),
+            null
+          ));
+    if (largeScopeGateError && !promptOnlyHandoff) {
+      throw new Error(largeScopeGateError);
+    }
+    const scopeAdvisoryPromptLines = buildLargeScopeAdvisoryPromptLines(
+      scopeAssessment,
+      scopeMetrics,
+      largeScopeOverrideReason
+    );
+    if (scopeAdvisoryPromptLines.length > 0) {
+      promptLines.push('', ...scopeAdvisoryPromptLines);
+    }
 
-  const boundaryPreflight = await prepareReviewExecutionBoundaryPreflight({
-    cliOptions: options,
-    manifestPath,
-    env: reviewEnv,
-    repoRoot,
-    reviewSurface,
-    architectureSurfacePaths: reviewTaskContext.architectureSurfacePaths,
-    scopeTouchedPaths: scopePathCollection.paths,
-    activeCloseoutBundleRoots,
-    runnerLogExists,
-    runnerLogPath,
-    allowHeavyCommands
-  });
-  const {
-    runtimeContext,
-    timeoutMs,
-    stallTimeoutMs,
-    startupLoopTimeoutMs,
-    startupLoopMinEvents,
-    monitorIntervalMs,
-    lowSignalTimeoutMs,
-    verdictStabilityTimeoutMs,
-    metaSurfaceTimeoutMs,
-    allowedMetaSurfaceKinds,
-    touchedPaths,
-    startupAnchorMode,
-    enforceStartupAnchorBoundary,
-    enforceActiveCloseoutBundleRereadBoundary,
-    enforceRelevantReinspectionDwellBoundary,
-    auditStartupAnchorPaths,
-    allowedMetaSurfacePaths,
-    auditStartupAnchorEnvVarPaths,
-    allowedMetaSurfaceEnvVarPaths
-  } = boundaryPreflight;
-  const autoIssueLogEnabled = options.autoIssueLog ?? false;
-  const runReview = async (resolved: { command: string; args: string[] }) =>
-    runCodexReview({
-      command: resolved.command,
-      args: resolved.args,
-      env: runtimeContext.env,
-      stdio: nonInteractive ? ['ignore', 'pipe', 'pipe'] : ['inherit', 'pipe', 'pipe'],
+    if (reviewSurface === 'audit' && diffBudgetOverride) {
+      promptLines.push('', `Diff budget override: ${diffBudgetOverride}`);
+    }
+
+    const prompt = promptLines.join('\n');
+    const reviewBaseEnv = buildReviewExecutionEnv(process.env, environmentPaths, manifestPath);
+    const { artifactPaths, nonInteractive, reviewEnv, handedOff } =
+      await prepareReviewNonInteractiveHandoffShell({
+        cliNonInteractive: options.nonInteractive,
+        env: reviewBaseEnv,
+        manifestPath,
+        prompt,
+        repoRoot,
+        runnerLogExists,
+        runnerLogPath,
+        stdinIsTTY
+      });
+    if (handedOff) {
+      return typeof process.exitCode === 'number' ? process.exitCode : 0;
+    }
+
+    const boundaryPreflight = await prepareReviewExecutionBoundaryPreflight({
+      cliOptions: options,
+      manifestPath,
+      env: reviewEnv,
+      repoRoot,
+      reviewSurface,
+      architectureSurfacePaths: reviewTaskContext.architectureSurfacePaths,
+      scopeTouchedPaths: scopePathCollection.paths,
       activeCloseoutBundleRoots,
-      blockHeavyCommands: enforceBoundedMode,
-      allowValidationCommandIntents: allowHeavyCommands,
+      runnerLogExists,
+      runnerLogPath,
+      allowHeavyCommands
+    });
+    const {
+      runtimeContext,
       timeoutMs,
       stallTimeoutMs,
       startupLoopTimeoutMs,
@@ -548,68 +766,122 @@ async function main(): Promise<void> {
       lowSignalTimeoutMs,
       verdictStabilityTimeoutMs,
       metaSurfaceTimeoutMs,
+      allowedMetaSurfaceKinds,
+      touchedPaths,
+      startupAnchorMode,
       enforceStartupAnchorBoundary,
       enforceActiveCloseoutBundleRereadBoundary,
       enforceRelevantReinspectionDwellBoundary,
-      allowedMetaSurfaceKinds: [...allowedMetaSurfaceKinds],
-      scopeMode,
-      startupAnchorMode,
       auditStartupAnchorPaths,
       allowedMetaSurfacePaths,
       auditStartupAnchorEnvVarPaths,
-      allowedMetaSurfaceEnvVarPaths,
+      allowedMetaSurfaceEnvVarPaths
+    } = boundaryPreflight;
+    const autoIssueLogEnabled = options.autoIssueLog ?? false;
+    const runReview = async (resolved: { command: string; args: string[] }) =>
+      runCodexReview({
+        command: resolved.command,
+        args: resolved.args,
+        env: runtimeContext.env,
+        stdio: nonInteractive ? ['ignore', 'pipe', 'pipe'] : ['inherit', 'pipe', 'pipe'],
+        activeCloseoutBundleRoots,
+        blockHeavyCommands: enforceBoundedMode,
+        allowValidationCommandIntents: allowHeavyCommands,
+        timeoutMs,
+        stallTimeoutMs,
+        startupLoopTimeoutMs,
+        startupLoopMinEvents,
+        monitorIntervalMs,
+        lowSignalTimeoutMs,
+        verdictStabilityTimeoutMs,
+        metaSurfaceTimeoutMs,
+        enforceStartupAnchorBoundary,
+        enforceActiveCloseoutBundleRereadBoundary,
+        enforceRelevantReinspectionDwellBoundary,
+        allowedMetaSurfaceKinds: [...allowedMetaSurfaceKinds],
+        scopeMode,
+        startupAnchorMode,
+        auditStartupAnchorPaths,
+        allowedMetaSurfacePaths,
+        auditStartupAnchorEnvVarPaths,
+        allowedMetaSurfaceEnvVarPaths,
+        repoRoot,
+        touchedPaths,
+        outputLogPath: artifactPaths.outputLogPath
+      });
+    const writeTelemetry = async (
+      state: ReviewExecutionState,
+      status: 'succeeded' | 'failed',
+      errorMessage?: string | null,
+      terminationBoundary?: ReviewTerminationBoundaryRecord | null,
+      launchContext?: ReviewLaunchContext | null
+    ): Promise<ReviewTelemetryPayload | null> =>
+      writeReviewExecutionTelemetry({
+        state,
+        status,
+        error: errorMessage ?? null,
+        terminationBoundary,
+        launchContext: launchContext ?? null,
+        outputLogPath: artifactPaths.outputLogPath,
+        repoRoot,
+        telemetryPath: artifactPaths.telemetryPath,
+        includeRawTelemetry: envFlagEnabled(process.env[REVIEW_TELEMETRY_DEBUG_ENV_KEY]),
+        telemetryDebugEnvKey: REVIEW_TELEMETRY_DEBUG_ENV_KEY
+      });
+
+    await runReviewLaunchAttemptShell({
+      cliOptions: {
+        ...options,
+        title: effectiveReviewTitle ?? undefined,
+        titleSource: effectiveTitleSource
+      },
+      prompt,
+      retryWithoutScopeFlagsGateError,
+      runtimeContext,
       repoRoot,
-      touchedPaths,
-      outputLogPath: artifactPaths.outputLogPath
-    });
-  const writeTelemetry = async (
-    state: ReviewExecutionState,
-    status: 'succeeded' | 'failed',
-    errorMessage?: string | null,
-    terminationBoundary?: ReviewTerminationBoundaryRecord | null,
-    launchContext?: ReviewLaunchContext | null
-  ): Promise<ReviewTelemetryPayload | null> =>
-    writeReviewExecutionTelemetry({
-      state,
-      status,
-      error: errorMessage ?? null,
-      terminationBoundary,
-      launchContext: launchContext ?? null,
-      outputLogPath: artifactPaths.outputLogPath,
-      repoRoot,
-      telemetryPath: artifactPaths.telemetryPath,
-      includeRawTelemetry: envFlagEnabled(process.env[REVIEW_TELEMETRY_DEBUG_ENV_KEY]),
-      telemetryDebugEnvKey: REVIEW_TELEMETRY_DEBUG_ENV_KEY
+      manifestPath,
+      artifactPaths,
+      autoIssueLogEnabled,
+      telemetryDebugEnabled: envFlagEnabled(process.env[REVIEW_TELEMETRY_DEBUG_ENV_KEY]),
+      telemetryDebugEnvKey: REVIEW_TELEMETRY_DEBUG_ENV_KEY,
+      runReview,
+      writeTelemetry,
+      logTelemetrySummary: logReviewExecutionTelemetrySummary,
+      logTerminationBoundaryFallback
     });
 
-  await runReviewLaunchAttemptShell({
-    cliOptions: {
-      ...options,
-      title: effectiveReviewTitle ?? undefined,
-      titleSource: effectiveTitleSource
-    },
-    prompt,
-    retryWithoutScopeFlagsGateError,
-    runtimeContext,
-    repoRoot,
-    manifestPath,
-    artifactPaths,
-    autoIssueLogEnabled,
-    telemetryDebugEnabled: envFlagEnabled(process.env[REVIEW_TELEMETRY_DEBUG_ENV_KEY]),
-    telemetryDebugEnvKey: REVIEW_TELEMETRY_DEBUG_ENV_KEY,
-    runReview,
-    writeTelemetry,
-    logTelemetrySummary: logReviewExecutionTelemetrySummary,
-    logTerminationBoundaryFallback
-  });
+    return typeof process.exitCode === 'number' ? process.exitCode : 0;
+  } catch (error) {
+    console.error('[run-review] failed:', error instanceof Error ? error.message : String(error));
+    process.exitCode = typeof (error as { exitCode?: unknown })?.exitCode === 'number' ? (error as { exitCode: number }).exitCode : 1;
+    return process.exitCode;
+  }
 }
 
-main().catch((error) => {
-  console.error('[run-review] failed:', error.message ?? error);
-  process.exitCode = typeof error?.exitCode === 'number' ? error.exitCode : 1;
-});
+export function isDirectExecution(entryArg = process.argv[1], metaUrl = import.meta.url): boolean {
+  if (typeof entryArg !== 'string' || entryArg.length === 0) {
+    return false;
+  }
 
-async function runDiffBudget(options: CliOptions): Promise<void> {
+  const candidateUrls = new Set<string>();
+  try {
+    candidateUrls.add(pathToFileURL(path.resolve(entryArg)).href);
+  } catch {
+    // Fall through to the realpath candidate so missing/cwd issues still fail closed.
+  }
+  try {
+    candidateUrls.add(pathToFileURL(realpathSync(entryArg)).href);
+  } catch {
+    // Missing or unreadable entry points should not be treated as direct execution.
+  }
+  return candidateUrls.has(metaUrl);
+}
+
+if (isDirectExecution()) {
+  void runReviewCli();
+}
+
+async function runDiffBudget(options: CliOptions, repoRoot: string): Promise<void> {
   const scriptPath = path.join(repoRoot, 'scripts', 'diff-budget.mjs');
   const relativeScriptPath = path.relative(repoRoot, scriptPath);
   if (!(await pathExists(scriptPath))) {
@@ -633,13 +905,29 @@ async function runDiffBudget(options: CliOptions): Promise<void> {
   delete diffBudgetEnv.DIFF_BUDGET_BASE;
 
   await new Promise<void>((resolve, reject) => {
-    const child = spawn('node', args, { stdio: 'inherit', env: diffBudgetEnv, cwd: repoRoot });
+    const child = spawn('node', args, {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: diffBudgetEnv,
+      cwd: repoRoot
+    });
+    child.stdout?.on('data', (chunk: Buffer) => {
+      process.stdout.write(chunk);
+    });
+    child.stderr?.on('data', (chunk: Buffer) => {
+      process.stderr.write(chunk);
+    });
     child.once('error', (error) => reject(error instanceof Error ? error : new Error(String(error))));
-    child.once('exit', (code) => {
+    child.once('close', (code, signal) => {
       if (code === 0) {
         resolve();
       } else {
-        reject(new Error(`diff budget exited with code ${code}`));
+        reject(
+          new Error(
+            code === null
+              ? `diff budget terminated by signal ${signal ?? 'unknown'}`
+              : `diff budget exited with code ${code}`
+          )
+        );
       }
     });
   });

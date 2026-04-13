@@ -17,8 +17,9 @@ export interface CreateCloudSyncWorkerResult {
 
 /**
  * Convenience factory that wires the CloudRuns HTTP client to the CloudSync worker using
- * the credential broker defined in the architecture spec. Callers can override client or
- * worker options as needed.
+ * the credential broker defined in the architecture spec. This remains opt-in integration
+ * glue: the default CLI does not construct or start a CloudSyncWorker unless a caller wires
+ * it explicitly. Callers can override client or worker options as needed.
  */
 export function createCloudSyncWorker(params: CreateCloudSyncWorkerParams): CreateCloudSyncWorkerResult {
   const client = new CloudRunsHttpClient({

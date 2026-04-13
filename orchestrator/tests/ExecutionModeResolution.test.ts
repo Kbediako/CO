@@ -138,6 +138,14 @@ describe('execution-mode resolution', () => {
     expect(mode).toBe('cloud');
   });
 
+  it('manager still accepts the legacy requiresCloud alias', async () => {
+    const mode = await resolveManagerMode(
+      { execution: { parallel: false } },
+      { requiresCloud: true }
+    );
+    expect(mode).toBe('cloud');
+  });
+
   it('cli treats explicit requires_cloud as final even when parallel is set', () => {
     const requiresCloud = resolveCliRequiresCloud(
       { execution: { parallel: true } },
@@ -158,6 +166,14 @@ describe('execution-mode resolution', () => {
     const requiresCloud = resolveCliRequiresCloud(
       { execution: { parallel: false } },
       { metadata: { executionMode: 'ClOuD' } }
+    );
+    expect(requiresCloud).toBe(true);
+  });
+
+  it('cli still accepts the legacy requiresCloud alias', () => {
+    const requiresCloud = resolveCliRequiresCloud(
+      { execution: { parallel: false } },
+      { requiresCloud: true }
     );
     expect(requiresCloud).toBe(true);
   });
@@ -191,7 +207,9 @@ describe('execution-mode resolution', () => {
   it('planner trims executionMode and maps it to requires_cloud', async () => {
     const item = await resolvePlannerItem({ plan: { executionMode: ' Cloud ' } });
     expect(item.requires_cloud).toBe(true);
+    expect(item.requiresCloud).toBe(true);
     expect(item.metadata?.executionMode).toBe('cloud');
+    expect(item.metadata?.requiresCloud).toBe(true);
   });
 
   it('planner honors boolean flags before executionMode', async () => {
@@ -200,5 +218,12 @@ describe('execution-mode resolution', () => {
       plan: { executionMode: 'cloud' }
     });
     expect(item.requires_cloud).toBe(false);
+  });
+
+  it('planner still accepts the legacy requiresCloud plan hint', async () => {
+    const item = await resolvePlannerItem({ plan: { requiresCloud: true } });
+    expect(item.requires_cloud).toBe(true);
+    expect(item.requiresCloud).toBe(true);
+    expect(item.metadata?.requiresCloud).toBe(true);
   });
 });

@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-import { existsSync, writeSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { opendir } from 'node:fs/promises';
-import { basename, join } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import process from 'node:process';
+import { pathToFileURL } from 'node:url';
 
 import { CodexOrchestrator } from '../orchestrator/src/cli/orchestrator.js';
 import { type ExecOutputMode } from '../orchestrator/src/cli/exec/command.js';
@@ -51,6 +52,7 @@ import {
   DEFAULT_PROVIDER_START_PIPELINE_ID,
   runControlHostCliShell
 } from '../orchestrator/src/cli/controlHostCliShell.js';
+import { runControlHostSupervisionCliShell } from '../orchestrator/src/cli/controlHostSupervisionCliShell.js';
 import { runCoStatusAttachCliShell } from '../orchestrator/src/cli/coStatusAttachCliShell.js';
 import { runCoStatusCliShell } from '../orchestrator/src/cli/coStatusCliShell.js';
 import { REPO_CONFIG_REQUIRED_ENV_KEY } from '../orchestrator/src/cli/config/repoConfigPolicy.js';
@@ -85,34 +87,43 @@ interface RunOutputPayload {
 }
 
 function writeStderrLine(message: string): void {
-  const line = `${message}\n`;
-  const stderrFd = process.stderr.fd;
-  if (typeof stderrFd === 'number') {
-    try {
-      writeSync(stderrFd, line);
-      return;
-    } catch {
-      // Fall through to the standard stream write when direct fd access is unavailable.
-    }
-  }
-  process.stderr.write(line);
+  process.stderr.write(`${message}\n`);
 }
 
-async function main(): Promise<void> {
-  const args = process.argv.slice(2);
+export function isDirectExecution(entryArg = process.argv[1], metaUrl = import.meta.url): boolean {
+  if (typeof entryArg !== 'string' || entryArg.length === 0) {
+    return false;
+  }
+
+  const candidateUrls = new Set<string>();
+  try {
+    candidateUrls.add(pathToFileURL(resolve(entryArg)).href);
+  } catch {
+    // Fall through to the realpath check so missing/cwd issues still fail closed.
+  }
+  try {
+    candidateUrls.add(pathToFileURL(realpathSync(entryArg)).href);
+  } catch {
+    // Missing or unreadable entry points should not be treated as direct execution.
+  }
+  return candidateUrls.has(metaUrl);
+}
+
+export async function runCodexOrchestratorCli(rawArgs: string[] = process.argv.slice(2)): Promise<number> {
+  process.exitCode = 0;
+  const args = [...rawArgs];
   const command = args.shift();
   if (!command || command === 'help' || command === '--help' || command === '-h') {
     printHelp();
-    return;
+    return 0;
   }
   if (command === '--version' || command === '-v') {
     printVersion();
-    return;
+    return 0;
   }
 
-  const orchestrator = new CodexOrchestrator();
-
   try {
+    const orchestrator = new CodexOrchestrator();
     switch (command) {
       case 'start':
         await handleStart(orchestrator, args);
@@ -196,6 +207,8 @@ async function main(): Promise<void> {
     writeStderrLine((error as Error)?.message ?? String(error));
     process.exitCode = 1;
   }
+
+  return typeof process.exitCode === 'number' ? process.exitCode : 0;
 }
 
 function parseArgs(raw: string[]): { positionals: string[]; flags: ArgMap } {
@@ -754,7 +767,23 @@ async function handleStatus(orchestrator: CodexOrchestrator, rawArgs: string[]):
 }
 
 async function handleControlHost(rawArgs: string[]): Promise<void> {
-  const { flags } = parseArgs(rawArgs);
+  if (rawArgs[0] === 'supervise') {
+    const { positionals, flags } = parseArgs(rawArgs.slice(1));
+    await runControlHostSupervisionCliShell({
+      positionals,
+      flags,
+      printHelp: printControlHostSupervisionHelp
+    });
+    return;
+  }
+  const { positionals, flags } = parseArgs(rawArgs);
+  if (isHelpRequest(positionals, flags)) {
+    printControlHostHelp();
+    return;
+  }
+  if (positionals.length > 0) {
+    throw new Error(`Unknown control-host argument(s): ${positionals.join(' ')}`);
+  }
   await runControlHostCliShell({
     flags,
     printHelp: printControlHostHelp
@@ -1466,6 +1495,9 @@ Commands:
     --repo <path>         Repo root for delegation server (default cwd).
     --yes                 Apply setup by running "codex mcp add ...".
     --format json         Emit machine-readable output (dry-run only).
+  delegation cleanup-stale
+    --yes                 Terminate stale delegate-server processes not rooted in a live codex client.
+    --format json         Emit machine-readable output.
   skills install          Install bundled skills into $CODEX_HOME/skills.
     --force               Overwrite existing skill files.
     --only <skills>       Install only selected skills (comma-separated).
@@ -1511,7 +1543,9 @@ Notes:
 `);
 }
 
-void main();
+if (isDirectExecution()) {
+  void runCodexOrchestratorCli();
+}
 
 function printVersion(): void {
   const pkg = loadPackageInfo();
@@ -1674,7 +1708,9 @@ Options:
 }
 
 function printControlHostHelp(): void {
-  console.log(`Usage: codex-orchestrator control-host [options]
+  console.log(`Usage:
+  codex-orchestrator control-host [options]
+  codex-orchestrator control-host supervise <install|status|restart|uninstall|run> [options]
 
 Options:
   --task <id>           Artifact task id for the host state (default: local-mcp).
@@ -1682,6 +1718,44 @@ Options:
   --pipeline <id>       Pipeline used for provider-driven starts (default: ${DEFAULT_PROVIDER_START_PIPELINE_ID}).
   --format json         Emit the startup readiness payload to stdout, then keep the host running.
   --help                Show this message.
+
+Supervision subcommands:
+  supervise install     Install a launchd LaunchAgent-backed local control-host supervisor.
+  supervise status      Show the installed launchd/config/state status.
+  supervise restart     Restart the installed control-host supervisor.
+  supervise uninstall   Remove the installed launchd supervisor and generated artifacts.
+  supervise run         Internal long-lived runner for launchd ProgramArguments.
+`);
+}
+
+function printControlHostSupervisionHelp(): void {
+  console.log(`Usage: codex-orchestrator control-host supervise <install|status|restart|uninstall|run> [options]
+
+Subcommands:
+  install               Install the macOS launchd LaunchAgent plus generated config/state files.
+  status                Show the current install, launchctl, and restart-reason state.
+  restart               Kickstart the installed launchd service.
+  uninstall             Boot out the launchd service and remove generated artifacts.
+  run                   Internal long-lived supervision runner for launchd use.
+
+Common options:
+  --label <value>             LaunchAgent label (default: com.kbediako.co.control-host).
+  --config <path>             Explicit config path for status, restart, uninstall, or run.
+  --format json               Emit machine-readable output for install, status, restart, or uninstall.
+
+Install options:
+  --repo-root <path>          Repo root used as the supervised control-host working directory.
+  --node <path>               Explicit Node executable for launchd ProgramArguments.
+  --cli-entrypoint <path>     Explicit codex-orchestrator JS entrypoint for launchd ProgramArguments.
+  --task <id>                 Control-host task id (default: local-mcp).
+  --run <id>                  Control-host run id (default: control-host).
+  --pipeline <id>             Provider start pipeline (default: provider-linear-worker).
+  --health-interval <sec>     Health poll interval in seconds (default: 30).
+  --unhealthy-threshold <n>   Consecutive unhealthy samples before launchd restart (default: 3).
+  --launchd-throttle <sec>    LaunchAgent ThrottleInterval value (default: 15).
+  --kill-timeout <sec>        Grace period before force-killing the child host (default: 10).
+  --env-files <csv|none>      Comma-separated env/bootstrap files to source before launch.
+  --shell <path>              Shell used to source env/bootstrap files (default: $SHELL or /bin/zsh).
 `);
 }
 

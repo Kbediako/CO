@@ -328,7 +328,13 @@ function isPackageManagerValidationSuiteCommand(command: string, args: string[])
     return false;
   }
   const scriptTarget = resolvePackageScriptTarget(args);
-  return scriptTarget !== null && REVIEW_VALIDATION_SUITE_SCRIPT_TARGETS.has(scriptTarget);
+  if (scriptTarget === null) {
+    return false;
+  }
+  // Keep package-manager `test` launches inside the validation-suite boundary even
+  // when they pass file selectors: repo-defined scripts can still expand them into
+  // broader suites or chained wrappers.
+  return REVIEW_VALIDATION_SUITE_SCRIPT_TARGETS.has(scriptTarget);
 }
 
 function pythonOptionConsumesValue(token: string): boolean {

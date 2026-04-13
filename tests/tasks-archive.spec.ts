@@ -1,0 +1,116 @@
+import { afterEach, describe, expect, it } from 'vitest';
+import { execFile } from 'node:child_process';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
+const scriptPath = join(process.cwd(), 'scripts', 'tasks-archive.mjs');
+const createdDirs: string[] = [];
+const completedAt = '2026-04-13';
+const archiveYear = completedAt.slice(0, 4);
+
+afterEach(async () => {
+  while (createdDirs.length > 0) {
+    const dir = createdDirs.pop();
+    if (dir) {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+});
+
+async function initRepository(): Promise<string> {
+  const repo = await mkdtemp(join(tmpdir(), 'tasks-archive-'));
+  createdDirs.push(repo);
+
+  await mkdir(join(repo, 'docs'), { recursive: true });
+  await mkdir(join(repo, 'tasks'), { recursive: true });
+
+  await writeFile(
+    join(repo, 'docs', 'tasks-archive-policy.json'),
+    JSON.stringify(
+      {
+        version: 1,
+        max_lines: 4,
+        archive_branch: 'task-archives',
+        archive_file_pattern: 'docs/TASKS-archive-YYYY.md',
+        repo_url: 'https://github.com/example/repo'
+      },
+      null,
+      2
+    )
+  );
+
+  await writeFile(
+    join(repo, 'tasks', 'index.json'),
+    JSON.stringify(
+      {
+        items: [
+          {
+            id: '20260413-linear-6ed6ef11-538e-48f0-936c-8547632bf92e',
+            title: 'Completed linear archive candidate',
+            status: 'completed',
+            completed_at: completedAt,
+            gate: {
+              status: 'succeeded'
+            },
+            paths: {
+              task: 'tasks/tasks-linear-6ed6ef11-538e-48f0-936c-8547632bf92e.md'
+            }
+          },
+          {
+            id: '1001',
+            title: 'Active numeric task',
+            status: 'in_progress',
+            paths: {
+              task: 'tasks/tasks-1001-active-task.md'
+            }
+          }
+        ]
+      },
+      null,
+      2
+    )
+  );
+
+  await writeFile(
+    join(repo, 'docs', 'TASKS.md'),
+    [
+      '# Task List Snapshot - Completed linear archive candidate (linear-6ed6ef11-538e-48f0-936c-8547632bf92e)',
+      '',
+      `<!-- tasks-archive-index:begin --> ## Archive index - archived task snapshots live on the task-archives branch. ${archiveYear}: https://github.com/example/repo/blob/task-archives/docs/TASKS-archive-${archiveYear}.md <!-- tasks-archive-index:end -->`,
+      '',
+      '# Task List Snapshot - Active numeric task (1001-active-task)',
+      ''
+    ].join('\n')
+  );
+
+  return repo;
+}
+
+describe('tasks-archive script', () => {
+  it('archives completed linear snapshots and keeps the active snapshot in docs/TASKS.md', async () => {
+    const repo = await initRepository();
+
+    await execFileAsync('node', [scriptPath, '--out', 'docs/TASKS-archive-YYYY.md'], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const tasksContent = await readFile(join(repo, 'docs', 'TASKS.md'), 'utf8');
+    const archiveContent = await readFile(
+      join(repo, 'docs', `TASKS-archive-${archiveYear}.md`),
+      'utf8'
+    );
+
+    expect(tasksContent).toContain('1001-active-task');
+    expect(tasksContent).not.toContain('linear-6ed6ef11-538e-48f0-936c-8547632bf92e');
+    expect(archiveContent).toContain('linear-6ed6ef11-538e-48f0-936c-8547632bf92e');
+    expect(archiveContent).toContain('Task Archive');
+  });
+});
