@@ -388,8 +388,6 @@ describe('providerWorkflowConfigStore', () => {
       }
     ]);
   });
-
-
   it('loads operator autopilot metadata and records the latest autopilot result', async () => {
     await writeRepoConfig(buildValidProviderConfig('v1'));
     const store = createProviderWorkflowConfigStore({

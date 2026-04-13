@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260413-linear-09012cec-1a78-408c-a7a7-a53e2fce5612",
+      "title": "CO validation: stabilize unrelated provider-worker full-suite blockers surfaced during CO-164",
+      "relates_to": "tasks/tasks-linear-09012cec-1a78-408c-a7a7-a53e2fce5612.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-13",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-09012cec-1a78-408c-a7a7-a53e2fce5612.md",
+        "task": "tasks/tasks-linear-09012cec-1a78-408c-a7a7-a53e2fce5612.md",
+        "agent_task": ".agent/task/linear-09012cec-1a78-408c-a7a7-a53e2fce5612.md",
+        "docs": "docs/TECH_SPEC-linear-09012cec-1a78-408c-a7a7-a53e2fce5612.md"
+      }
+    },
+    {
       "id": "20260412-linear-b84c9a78-b62f-48fa-b1c4-88f8222535da",
       "title": "CO: harden control-host supervise restart against orphaned duplicate host burn",
       "relates_to": "tasks/tasks-linear-b84c9a78-b62f-48fa-b1c4-88f8222535da.md",

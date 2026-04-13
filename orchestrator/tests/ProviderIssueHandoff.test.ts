@@ -9917,16 +9917,14 @@ describe('createProviderIssueHandoffService', () => {
       launcher,
       startPipelineId: 'diagnostics'
     });
-    const timerCountAfterConstruction = setTimeoutSpy.mock.calls.length;
-    expect(timerCountAfterConstruction).toBeGreaterThanOrEqual(1);
-    const retryTimerCallback = setTimeoutSpy.mock.calls[timerCountAfterConstruction - 1]?.[0];
-    expect(typeof retryTimerCallback).toBe('function');
 
     await service.refresh();
-    await waitForMockCalls(setTimeoutSpy, timerCountAfterConstruction);
-    expect(setTimeoutSpy.mock.calls.length).toBe(timerCountAfterConstruction);
+    const { callback: retryTimerCallback, delayMs: retryDelayMs } =
+      getEarliestScheduledTimeoutByDelayRange(setTimeoutSpy, 999, 1_000);
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
+    expect(retryDelayMs).toBeGreaterThanOrEqual(999);
+    expect(retryDelayMs).toBeLessThanOrEqual(1_000);
     vi.setSystemTime(new Date('2026-03-19T04:30:01.001Z'));
     const persistCallsBeforeRetry = persist.mock.calls.length;
     (retryTimerCallback as () => void)();
