@@ -1559,7 +1559,7 @@ describe('controlHostSupervision shell helpers', () => {
     });
   });
 
-  it('kills the detached process group before escalating the wrapper after a timeout', async () => {
+  it('kills only the stale process group while preserving detached descendants during timeout cleanup', async () => {
     const child = Object.assign(new EventEmitter(), {
       pid: 4200,
       exitCode: null as number | null,
@@ -1574,23 +1574,19 @@ describe('controlHostSupervision shell helpers', () => {
         return true;
       })
     });
-    const listProcessGroupPids = vi.fn().mockResolvedValue([4200, 4201, 4202]);
+    const listProcessGroupPids = vi.fn().mockResolvedValue([4200, 4201]);
     const killProcessGroup = vi.fn();
-    const listDescendantPids = vi.fn().mockResolvedValue([4201, 4202]);
-    const killProcess = vi.fn();
+    const listDescendantPids = vi.fn().mockResolvedValue([4201, 4300]);
 
     await terminateChildProcess(child as never, 0, {
       listProcessGroupPids,
       killProcessGroup,
-      listDescendantPids,
-      killProcess
+      listDescendantPids
     });
 
     expect(listProcessGroupPids).toHaveBeenCalledWith(4200);
     expect(killProcessGroup).toHaveBeenCalledWith(4200, 'SIGKILL');
     expect(listDescendantPids).toHaveBeenCalledWith(4200);
-    expect(killProcess).toHaveBeenNthCalledWith(1, 4201, 'SIGKILL');
-    expect(killProcess).toHaveBeenNthCalledWith(2, 4202, 'SIGKILL');
     expect(child.kill).toHaveBeenNthCalledWith(1, 'SIGTERM');
     expect(child.kill).toHaveBeenNthCalledWith(2, 'SIGKILL');
   });

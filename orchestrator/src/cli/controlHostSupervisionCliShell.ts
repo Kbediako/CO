@@ -1238,7 +1238,6 @@ async function terminateChildProcess(
     listProcessGroupPids?: (rootPid: number) => Promise<number[]>;
     killProcessGroup?: (pid: number, signal: NodeJS.Signals) => void;
     listDescendantPids?: (rootPid: number) => Promise<number[]>;
-    killProcess?: (pid: number, signal: NodeJS.Signals) => void;
   }
 ): Promise<void> {
   if (child.exitCode !== null || child.signalCode !== null) {
@@ -1278,13 +1277,13 @@ async function terminateChildProcess(
   }
   if (child.exitCode === null && child.signalCode === null) {
     if (rootPid !== null) {
-      const descendantPids = await (
+      await (
         options?.listDescendantPids ?? listDescendantProcessIds
       )(rootPid).catch(() => []);
-      for (const pid of descendantPids) {
-        killTrackedPid(pid, 'SIGKILL', options?.killProcess);
-      }
     }
+    // Generic timeout cleanup is process-group-scoped. Detached provider-worker
+    // issue runs can remain descendants until reparenting and must stay
+    // diagnostic-only here instead of becoming additional kill targets.
     child.kill('SIGKILL');
     await exitPromise.catch(() => undefined);
   }
@@ -1398,20 +1397,6 @@ async function listProcessGroupProcessIds(rootPid: number): Promise<number[]> {
     }
   }
   return processGroupPids;
-}
-
-function killTrackedPid(
-  pid: number,
-  signal: NodeJS.Signals,
-  killProcess: (pid: number, signal: NodeJS.Signals) => void = process.kill.bind(process)
-): void {
-  try {
-    killProcess(pid, signal);
-  } catch (error) {
-    if (!isMissingProcessError(error)) {
-      throw error;
-    }
-  }
 }
 
 function killTrackedProcessGroup(

@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260413-linear-abca2add-198d-40a6-b1c0-35e49f4c78cd",
+      "title": "CO: narrow generic control-host forced cleanup to avoid detached provider-worker collateral",
+      "relates_to": "tasks/tasks-linear-abca2add-198d-40a6-b1c0-35e49f4c78cd.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-13",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-abca2add-198d-40a6-b1c0-35e49f4c78cd.md",
+        "task": "tasks/tasks-linear-abca2add-198d-40a6-b1c0-35e49f4c78cd.md",
+        "agent_task": ".agent/task/linear-abca2add-198d-40a6-b1c0-35e49f4c78cd.md",
+        "docs": "docs/TECH_SPEC-linear-abca2add-198d-40a6-b1c0-35e49f4c78cd.md"
+      }
+    },
+    {
       "id": "20260413-linear-d26b2799-a4a1-41d0-87cb-ee64eabcdbba",
       "title": "CO: decouple released-claim deferred-poll suppression from unrelated fresh discovery",
       "relates_to": "tasks/tasks-linear-d26b2799-a4a1-41d0-87cb-ee64eabcdbba.md",
