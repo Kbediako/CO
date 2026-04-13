@@ -130,6 +130,25 @@ describe('resolveEnvironmentPaths', () => {
     expect(env.taskId).toBe(taskId);
   });
 
+  it('scopes relative custom artifact roots to the provider issue workspace', async () => {
+    const repoRoot = resolve(workspaceRoot, 'repo-root');
+    const taskId = 'linear-lin-issue-1';
+    const issueWorkspacePath = join(repoRoot, '.workspaces', taskId);
+    await mkdir(issueWorkspacePath, { recursive: true });
+    process.env.CODEX_ORCHESTRATOR_ROOT = repoRoot;
+    process.env.CODEX_ORCHESTRATOR_PIPELINE_ID = 'provider-linear-worker';
+    process.env.MCP_RUNNER_TASK_ID = taskId;
+    process.env.CODEX_ORCHESTRATOR_RUNS_DIR = join('artifacts', 'runs');
+    process.env.CODEX_ORCHESTRATOR_OUT_DIR = join('artifacts', 'out');
+
+    const env = resolveEnvironmentPathsForProcess(process.env, issueWorkspacePath);
+
+    expect(env.repoRoot).toBe(issueWorkspacePath);
+    expect(env.runsRoot).toBe(join(issueWorkspacePath, 'artifacts', 'runs'));
+    expect(env.outRoot).toBe(join(issueWorkspacePath, 'artifacts', 'out'));
+    expect(env.taskId).toBe(taskId);
+  });
+
   it('rebases default shared roots when the configured provider root is already the issue workspace', async () => {
     const repoRoot = resolve(workspaceRoot, 'repo-root');
     const taskId = 'linear-lin-issue-1';

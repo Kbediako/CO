@@ -211,7 +211,10 @@ function resolveArtifactDir(
   if (!configured) {
     return fallback;
   }
-  const candidate = resolveConfiguredArtifactRoot(baseRoot, configured, fallbackDirname);
+  const candidate =
+    scopeToRepoRoot && !isAbsolute(configured)
+      ? resolve(repoRoot, configured)
+      : resolveConfiguredArtifactRoot(baseRoot, configured, fallbackDirname);
   if (scopeToRepoRoot && !isPathWithinRoot(repoRoot, candidate)) {
     const workspaceArtifactRoot = resolveWorkspaceArtifactRootForSharedRoot(
       repoRoot,
