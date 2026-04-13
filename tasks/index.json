@@ -9,7 +9,14 @@
         "Codex"
       ],
       "last_review": "2026-04-13",
-      "approvals": {},
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (direct fallback after provider provenance boundary)",
+          "date": "2026-04-13",
+          "manifest": ".runs/linear-72e9f13e-0899-4769-9ca3-82586077fca9-co-167-docs-review/cli/2026-04-13T01-21-57-946Z-0b933108/manifest.json",
+          "fallback_note": "out/linear-72e9f13e-0899-4769-9ca3-82586077fca9/manual/20260413T012358Z-docs-review-fallback.md"
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-72e9f13e-0899-4769-9ca3-82586077fca9.md",
         "task": "tasks/tasks-linear-72e9f13e-0899-4769-9ca3-82586077fca9.md",
