@@ -347,6 +347,7 @@ export async function runLinearCliShell(
         const issueId = requireFlag(params.flags, 'issue-id');
         const decision = requireParallelizationDecision(params.flags);
         const reason = requireParallelizationReason(params.flags, decision);
+        const summary = requireParallelizationSummary(params.flags, decision, reason);
         const proofRefreshContext = await resolveParallelizationProofRefreshContext(issueId, env, dependencies);
         const result: ProviderLinearParallelizationResult = {
           ok: true,
@@ -356,7 +357,7 @@ export async function runLinearCliShell(
           source_setup: resolveAuditSourceSetup(params.flags, env),
           decision,
           reason,
-          summary: readRawStringFlag(params.flags, 'summary') ?? null
+          summary
         };
         await recordAuditResult(result, params.flags, env, dependencies);
         await refreshParallelizationProofSnapshotBestEffort(
@@ -725,6 +726,32 @@ function requireParallelizationReason(
     );
   }
   return reason;
+}
+
+function requireParallelizationSummary(
+  flags: ArgMap,
+  decision: ProviderLinearParallelizationDecision,
+  reason: ProviderLinearParallelizationReason
+): string {
+  const summary = readStringFlag(flags, 'summary');
+  if (!summary) {
+    throw usageError(
+      'linear_parallelization_summary_missing',
+      'linear parallelization requires --summary with matrix/cap evidence for the decision.'
+    );
+  }
+  if (decision === 'stay_serial' && reason === 'single_bounded_change') {
+    const missingSlices = ['docs', 'test', 'research', 'review'].filter(
+      (slice) => !new RegExp(`(?:^|;)\\s*${slice}\\s*:\\s*[^;\\s][^;]*`, 'i').test(summary)
+    );
+    if (missingSlices.length > 0) {
+      throw usageError(
+        'linear_parallelization_single_bounded_change_summary_incomplete',
+        `linear parallelization single_bounded_change summaries must explain why no docs/test/research/review slice can be separated safely with labeled slice evidence; missing: ${missingSlices.join(', ')}.`
+      );
+    }
+  }
+  return summary;
 }
 
 function readCommaSeparatedFlag(flags: ArgMap, key: string): string[] {

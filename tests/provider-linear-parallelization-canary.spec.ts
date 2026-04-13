@@ -1,0 +1,88 @@
+import { describe, expect, it } from 'vitest';
+
+import {
+  PARALLELIZATION_AUDIT_BASELINE,
+  buildProviderLinearParallelizationCanaryReport,
+  buildProviderLinearParallelizationCanaryScenarios,
+  validateProviderLinearParallelizationCanaryReport
+} from '../scripts/provider-linear-parallelization-canary.mjs';
+
+describe('provider-linear parallelization canary', () => {
+  it('proves higher safe parallelize_now adoption without metric-only child lanes', () => {
+    const report = buildProviderLinearParallelizationCanaryReport({
+      generatedAt: '2026-04-14T00:00:00.000Z',
+      taskId: 'linear-co-174'
+    });
+
+    expect(validateProviderLinearParallelizationCanaryReport(report)).toEqual({
+      ok: true,
+      failures: []
+    });
+    expect(report.baseline.total_decisions).toBe(PARALLELIZATION_AUDIT_BASELINE.total_decisions);
+    expect(report.baseline.decisions.parallelize_now).toBe(5);
+    expect(report.summary.decision_counts.parallelize_now).toBeGreaterThan(0);
+    expect(report.summary.canary_parallelize_now_rate).toBeGreaterThan(
+      report.baseline.parallelize_now_rate
+    );
+    expect(report.summary.adoption_increased).toBe(true);
+    expect(report.summary.metric_only_child_lane_count).toBe(0);
+    expect(report.summary.launched_child_lane_outcomes).toMatchObject({
+      accepted: 1,
+      rejected: 1,
+      invalidated: 1
+    });
+    expect(report.child_lane_cap).toMatchObject({
+      value: 2,
+      counts: ['active', 'pending', 'unaccepted'],
+      preserves: 'CO-125 provider admission constraints'
+    });
+  });
+
+  it('fails a malformed canary that serializes while a safe child lane remains', () => {
+    const badSerial = {
+      ...buildProviderLinearParallelizationCanaryScenarios()[0],
+      id: 'bad-serial',
+      decision: 'stay_serial',
+      reason: 'single_bounded_change',
+      launched_child_lanes: [],
+      serial_evidence: {
+        summary: 'bad serial choice',
+        separable_slices_considered: ['docs', 'test', 'research', 'review'],
+        safe_independent_candidates: 1
+      }
+    };
+    delete badSerial.launched_child_lanes;
+    const report = buildProviderLinearParallelizationCanaryReport({
+      generatedAt: '2026-04-14T00:00:00.000Z',
+      taskId: 'linear-co-174-malformed',
+      scenarios: [badSerial]
+    });
+
+    expect(validateProviderLinearParallelizationCanaryReport(report).ok).toBe(false);
+    expect(report.summary.failures).toEqual(
+      expect.arrayContaining([
+        'bad-serial: launched_child_lanes is missing or invalid',
+        'bad-serial: stay_serial chosen while safe independent candidates remain',
+        'canary parallelize_now rate did not exceed the audit baseline'
+      ])
+    );
+  });
+
+  it('recomputes validation instead of trusting a tampered summary', () => {
+    const report = buildProviderLinearParallelizationCanaryReport({
+      generatedAt: '2026-04-14T00:00:00.000Z',
+      taskId: 'linear-co-174'
+    });
+
+    report.summary.decision_counts.parallelize_now = 0;
+    report.summary.failures = ['tampered failure'];
+
+    expect(validateProviderLinearParallelizationCanaryReport(report)).toEqual({
+      ok: false,
+      failures: expect.arrayContaining([
+        'report summary failures do not match recomputed validation',
+        'report summary decision counts do not match recomputed validation'
+      ])
+    });
+  });
+});

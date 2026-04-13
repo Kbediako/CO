@@ -102,6 +102,25 @@ codex-orchestrator linear attach-pr \
   --format json
 ```
 
+## Parallelization Decision
+
+Ordinary active provider-worker turns are parallel-first where safe. Before recording `linear parallelization`, write a pre-turn decomposition matrix in the workpad or notes. The matrix must include candidate child lanes, file/phase scope, dependencies, overlap risk, expected validation artifact, child-lane owner, and cap-slot use.
+
+```bash
+codex-orchestrator linear parallelization \
+  --issue-id "$ISSUE_ID" \
+  --decision parallelize_now \
+  --reason independent_scope_available \
+  --summary "matrix found a safe docs/test child lane; cap 0/2 -> 1/2" \
+  --format json
+```
+
+Use `parallelize_now` when the matrix contains at least one safe independent child-lane candidate. Do not use `stay_serial` while a safe independent candidate remains unless the cap is exhausted. When `single_bounded_change` is the reason, the summary must include labeled per-slice evidence: `docs: ...; test: ...; research: ...; review: ...`.
+
+The same-issue child-lane cap is `2`. It counts active, pending, and unaccepted child lanes and does not bypass provider admission constraints from CO-125. If the cap is exhausted, do not launch another lane; record `stay_serial` with reason `existing_child_lane_active` and include `cap_exhausted` in the summary.
+
+Parent ownership remains strict. While a child lane is active, the parent avoids delegated files/phases. If parent edits collide with delegated scope, invalidate or reject the child lane, or record explicit rebase/collision reasoning before accepting the child patch.
+
 ## Runtime Proof
 
 For app-touching lanes, use the runtime-proof helper to turn permit policy into an explicit screenshot / external-link / video posture and, when allowed, generate reviewer-usable workpad and PR markdown. This is the reviewer-URL path, not the local macOS capture path.

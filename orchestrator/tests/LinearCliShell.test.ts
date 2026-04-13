@@ -1235,7 +1235,7 @@ describe('runLinearCliShell', () => {
           'issue-id': 'lin-issue-1',
           decision: 'stay_serial',
           reason: 'single_bounded_change',
-          summary: 'One bounded file change.'
+          summary: 'docs: no docs slice separates; test: no test slice separates; research: no research slice separates; review: no review slice separates.'
         },
         printHelp: vi.fn()
       },
@@ -1262,7 +1262,7 @@ describe('runLinearCliShell', () => {
       issue_identifier: 'CO-101',
       source_setup: null,
       action: 'stay_serial',
-      via: 'One bounded file change.',
+      via: 'docs: no docs slice separates; test: no test slice separates; research: no research slice separates; review: no review slice separates.',
       state: 'single_bounded_change',
       follow_up_issue_id: null,
       follow_up_issue_identifier: null,
@@ -1313,7 +1313,7 @@ describe('runLinearCliShell', () => {
           'issue-id': 'lin-issue-1',
           decision: 'stay_serial',
           reason: 'single_bounded_change',
-          summary: 'One bounded file change.'
+          summary: 'docs: no docs slice separates; test: no test slice separates; research: no research slice separates; review: no review slice separates.'
         },
         printHelp: vi.fn()
       },
@@ -1338,7 +1338,7 @@ describe('runLinearCliShell', () => {
       issue_identifier: null,
       source_setup: null,
       action: 'stay_serial',
-      via: 'One bounded file change.',
+      via: 'docs: no docs slice separates; test: no test slice separates; research: no research slice separates; review: no review slice separates.',
       state: 'single_bounded_change',
       follow_up_issue_id: null,
       follow_up_issue_identifier: null,
@@ -1353,6 +1353,72 @@ describe('runLinearCliShell', () => {
       operation: 'parallelization',
       issue_id: 'lin-issue-1',
       issue_identifier: null
+    });
+  });
+
+  it('fails closed when a parallelization decision omits the required summary evidence', async () => {
+    const log = vi.fn();
+    const setExitCode = vi.fn();
+
+    await runLinearCliShell(
+      {
+        positionals: ['parallelization'],
+        flags: {
+          format: 'json',
+          'issue-id': 'lin-issue-1',
+          decision: 'parallelize_now',
+          reason: 'independent_scope_available'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        log,
+        setExitCode
+      }
+    );
+
+    expect(setExitCode).toHaveBeenCalledWith(1);
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual({
+      ok: false,
+      error: {
+        code: 'linear_parallelization_summary_missing',
+        message: 'linear parallelization requires --summary with matrix/cap evidence for the decision.',
+        status: 422
+      }
+    });
+  });
+
+  it('requires single_bounded_change summaries to account for docs, test, research, and review slices', async () => {
+    const log = vi.fn();
+    const setExitCode = vi.fn();
+
+    await runLinearCliShell(
+      {
+        positionals: ['parallelization'],
+        flags: {
+          format: 'json',
+          'issue-id': 'lin-issue-1',
+          decision: 'stay_serial',
+          reason: 'single_bounded_change',
+          summary: 'docs test research review'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        log,
+        setExitCode
+      }
+    );
+
+    expect(setExitCode).toHaveBeenCalledWith(1);
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual({
+      ok: false,
+      error: {
+        code: 'linear_parallelization_single_bounded_change_summary_incomplete',
+        message:
+          'linear parallelization single_bounded_change summaries must explain why no docs/test/research/review slice can be separated safely with labeled slice evidence; missing: docs, test, research, review.',
+        status: 422
+      }
     });
   });
 

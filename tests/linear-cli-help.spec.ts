@@ -29,5 +29,11 @@ describe('codex-orchestrator linear help', () => {
     expect(result.stdout).toMatch(
       /--reachability-mode <mode>\s+Optional reviewer reachability mode: deterministic \(default\) or dns-public\./
     );
+    expect(result.stdout).toContain('parallelization');
+    expect(result.stdout).toContain('Parallel-first rule: create a pre-turn decomposition matrix before the decision.');
+    expect(result.stdout).toContain('Matrix columns: candidate lane, file/phase scope, dependencies, overlap risk,');
+    expect(result.stdout).toContain('stay_serial is invalid while any safe independent child-lane candidate remains');
+    expect(result.stdout).toContain('Child-lane cap: at most 2 active, pending, or unaccepted same-issue child lanes.');
+    expect(result.stdout).toContain('Parent ownership: avoid delegated files/phases while a child lane is active');
   });
 });
