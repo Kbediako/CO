@@ -29,20 +29,20 @@
 - [x] `node scripts/delegation-guard.mjs`. Evidence: passed (`Delegation guard: OK (2 subagent manifest(s) found).`).
 - [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: passed (`Spec guard: OK`).
 - [x] `npm run build`. Evidence: passed.
-- [x] `npm run lint`. Evidence: passed.
-- [ ] `npm run test`. Evidence: pending.
-- [ ] `npm run docs:check`. Evidence: pending.
-- [ ] `npm run docs:freshness`. Evidence: pending.
-- [ ] `npm run repo:stewardship`. Evidence: pending.
-- [ ] `node scripts/diff-budget.mjs`. Evidence: pending.
-- [ ] Standalone review plus explicit elegance review before review handoff. Evidence: pending.
-- [ ] `npm run pack:smoke` if downstream-facing CLI surfaces change. Evidence: pending.
+- [x] `npm run lint`. Evidence: initially failed on an unused `killTrackedPid` helper left behind by the cleanup narrowing; rerun passed after removing the dead helper and again after the final dead-option trim.
+- [x] `npm run test`. Evidence: passed after merging the latest `origin/main`, including the formerly unrelated suites that had been tracked in `CO-165` (`3723` tests green).
+- [x] `npm run docs:check`. Evidence: passed before and after restoring displaced snapshots into tracked `docs/TASKS-archive-2026.md`.
+- [x] `npm run docs:freshness`. Evidence: passed before and after the archive restore.
+- [x] `npm run repo:stewardship`. Evidence: passed.
+- [x] `node scripts/diff-budget.mjs`. Evidence: passed (`files=9/25`, `lines=483/1200`).
+- [x] Standalone review plus explicit elegance review before review handoff. Evidence: `npm run review -- --base origin/main` executed under `FORCE_CODEX_REVIEW=1`, but telemetry `../../.runs/linear-abca2add-198d-40a6-b1c0-35e49f4c78cd/cli/2026-04-13T12-07-50-943Z-63517b12/review/telemetry.json` ended `review_outcome=failed-boundary` / `termination_boundary.kind=startup-anchor`, so manual fallback and elegance notes were recorded at `out/linear-abca2add-198d-40a6-b1c0-35e49f4c78cd/manual/standalone-review-fallback.md` and `out/linear-abca2add-198d-40a6-b1c0-35e49f4c78cd/manual/elegance-review.md`.
+- [x] `npm run pack:smoke` if downstream-facing CLI surfaces change. Evidence: passed.
 
 ## Handoff
-- [ ] PR attached to the issue. Evidence: pending.
-- [ ] Latest `origin/main` merged into the branch before review-state transition. Evidence: pending.
-- [ ] PR checks green and `pr ready-review` drain clean before review-state transition. Evidence: pending.
-- [ ] Unresolved actionable review threads: `0` or explicit pushback recorded. Evidence: pending.
+- [x] PR attached to the issue. Evidence: PR `#464` (`https://github.com/Kbediako/CO/pull/464`) is attached on `CO-164`; `linear attach-pr --issue-id abca2add-198d-40a6-b1c0-35e49f4c78cd --url https://github.com/Kbediako/CO/pull/464 --title "CO-164: narrow generic control-host forced cleanup"` returned `via=existing`.
+- [x] Latest `origin/main` merged into the branch before review-state transition. Evidence: merge commit `f1d14c24b` merged `origin/main`, and `git rev-list --left-right --count HEAD...origin/main` returned `3 0` before PR creation.
+- [ ] PR checks green and `pr ready-review` drain clean before review-state transition. Evidence: `pr ready-review --pr 464 --quiet-minutes 15` reached the quiet-window start, then exited action-required when CodeRabbit posted `CHANGES_REQUESTED`.
+- [ ] Unresolved actionable review threads: `0` or explicit pushback recorded. Evidence: pending CodeRabbit threads on `.agent/task/linear-abca2add-198d-40a6-b1c0-35e49f4c78cd.md` and `tasks/tasks-linear-abca2add-198d-40a6-b1c0-35e49f4c78cd.md`.
 - [ ] Issue moved to `In Review`. Evidence: pending.
 
 ## Progress Log
