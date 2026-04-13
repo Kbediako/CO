@@ -149,6 +149,28 @@ describe('resolveEnvironmentPaths', () => {
     expect(env.taskId).toBe(taskId);
   });
 
+  it('preserves configured runs layout roots when a stale manifest is outside that runs root', async () => {
+    const repoRoot = resolve(workspaceRoot, 'repo-root');
+    const taskId = 'linear-lin-issue-1';
+    const issueWorkspacePath = join(repoRoot, '.workspaces', taskId);
+    const staleManifestPath = join(repoRoot, '.runs', taskId, 'cli', 'provider-parent-run', 'manifest.json');
+    await mkdir(issueWorkspacePath, { recursive: true });
+    process.env.CODEX_ORCHESTRATOR_ROOT = repoRoot;
+    process.env.CODEX_ORCHESTRATOR_PIPELINE_ID = 'provider-linear-worker';
+    process.env.MCP_RUNNER_TASK_ID = taskId;
+    process.env.CODEX_ORCHESTRATOR_RUNS_DIR = join(repoRoot, 'runs');
+    process.env.CODEX_ORCHESTRATOR_OUT_DIR = join(repoRoot, 'out');
+    process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH = staleManifestPath;
+    process.env.CODEX_ORCHESTRATOR_PRESERVE_PROVIDER_ARTIFACT_ROOTS = '1';
+
+    const env = resolveEnvironmentPathsForProcess(process.env, issueWorkspacePath);
+
+    expect(env.repoRoot).toBe(issueWorkspacePath);
+    expect(env.runsRoot).toBe(join(repoRoot, 'runs'));
+    expect(env.outRoot).toBe(join(repoRoot, 'out'));
+    expect(env.taskId).toBe(taskId);
+  });
+
   it('rebases default shared roots when the configured provider root is already the issue workspace', async () => {
     const repoRoot = resolve(workspaceRoot, 'repo-root');
     const taskId = 'linear-lin-issue-1';

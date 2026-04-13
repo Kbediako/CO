@@ -4289,6 +4289,50 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     await expect(readFile(sharedPromptPath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
+  it('keeps default out root when only provider-worker runs-dir is configured', async () => {
+    const sharedRoot = await mkdtemp(join(process.cwd(), '.tmp-run-review-provider-'));
+    createdSandboxes.push(sharedRoot);
+    const taskId = 'linear-lin-issue-1';
+    const issueWorkspacePath = join(sharedRoot, '.workspaces', taskId);
+    const sharedRunsRoot = join(sharedRoot, 'artifacts', 'runs');
+    const workspaceRunsRoot = join(issueWorkspacePath, 'artifacts', 'runs');
+    const sharedRunDir = join(sharedRunsRoot, taskId, 'cli', 'provider-parent-run');
+    const workspaceRunDir = join(workspaceRunsRoot, taskId, 'cli', 'provider-parent-run');
+    const sharedManifestPath = join(sharedRunDir, 'manifest.json');
+    const workspaceManifestPath = join(workspaceRunDir, 'manifest.json');
+    await mkdir(sharedRunDir, { recursive: true });
+    await mkdir(workspaceRunDir, { recursive: true });
+    await writeFile(sharedManifestPath, JSON.stringify({ run: 'shared' }), 'utf8');
+    await writeFile(join(sharedRunDir, 'runner.ndjson'), '{"event":"shared"}\n', 'utf8');
+    await writeFile(workspaceManifestPath, JSON.stringify({ run: 'workspace' }), 'utf8');
+    await writeFile(join(workspaceRunDir, 'runner.ndjson'), '{"event":"workspace"}\n', 'utf8');
+    const codexBin = await makeFakeCodex(sharedRoot);
+    const envLogPath = join(sharedRoot, 'review-env-custom-runs-default-out.log');
+
+    const result = await runReviewCommandSubprocess(
+      null,
+      {
+        ...baseEnv(sharedRoot, codexBin),
+        MCP_RUNNER_TASK_ID: 'stale-linear-issue',
+        CODEX_ORCHESTRATOR_TASK_ID: taskId,
+        CODEX_ORCHESTRATOR_PIPELINE_ID: 'provider-linear-worker',
+        CODEX_ORCHESTRATOR_RUNS_DIR: sharedRunsRoot,
+        CODEX_ORCHESTRATOR_PRESERVE_PROVIDER_ARTIFACT_ROOTS: '1',
+        RUN_REVIEW_ENV_LOG: envLogPath
+      },
+      ['--runs-dir', sharedRunsRoot, '--surface', 'audit'],
+      issueWorkspacePath
+    );
+
+    expect(result.exitCode).toBe(0);
+    const reviewEnvLog = await readFile(envLogPath, 'utf8');
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_ROOT=${issueWorkspacePath}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_MANIFEST_PATH=${workspaceManifestPath}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_RUNS_DIR=${workspaceRunsRoot}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_OUT_DIR=${join(issueWorkspacePath, 'out')}`);
+    expect(reviewEnvLog).toContain(`MANIFEST=${workspaceManifestPath}`);
+  });
+
   it('keeps inherited provider-worker manifest envs on the real shared manifest when no workspace counterpart exists', async () => {
     const sharedRoot = await mkdtemp(join(process.cwd(), '.tmp-run-review-provider-'));
     createdSandboxes.push(sharedRoot);

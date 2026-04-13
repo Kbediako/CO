@@ -135,7 +135,7 @@ function resolveProviderWorkspaceManifestCounterpartPath(repoRoot, env, cwd) {
     '.runs'
   );
   if (!isPathWithinRoot(sharedRunsRoot, resolvedManifestPath)) {
-    return resolvedManifestPath;
+    return null;
   }
   const workspaceRunsRoot = resolveWorkspaceArtifactRootForSharedRoot(
     repoRoot,
@@ -192,7 +192,7 @@ function providerWorkspaceManifestCounterpartExists(repoRoot, env, cwd) {
     '.runs'
   );
   if (!isPathWithinRoot(sharedRunsRoot, resolvedManifestPath)) {
-    return true;
+    return false;
   }
   return false;
 }

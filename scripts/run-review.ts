@@ -390,7 +390,6 @@ function resolveReviewExecutionArtifactRoots(
     };
   }
 
-  const manifestRepoRoot = path.dirname(manifestRunsRoot);
   const configuredOutDir = env.CODEX_ORCHESTRATOR_OUT_DIR?.trim();
   const resolvedConfiguredOutDir = configuredOutDir
     ? resolveConfiguredReviewArtifactRoot(environmentPaths.repoRoot, env, configuredOutDir, 'out')
@@ -404,7 +403,7 @@ function resolveReviewExecutionArtifactRoots(
         isPathWithinRoot(environmentPaths.repoRoot, manifestPath)
       )
     : null;
-  const outDir = workspaceConfiguredOutDir ?? resolvedConfiguredOutDir ?? path.join(manifestRepoRoot, 'out');
+  const outDir = workspaceConfiguredOutDir ?? resolvedConfiguredOutDir ?? environmentPaths.defaultOutDir;
   return {
     runsDir: manifestRunsRoot,
     outDir,
