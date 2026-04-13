@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
-import { access } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
 
 import { ExecClient } from '../src/orchestrator.js';
 import type { JsonlEvent, RunSummaryEvent } from '../../shared/events/types.js';
@@ -46,20 +47,17 @@ describe('ExecClient', () => {
     expect(handle.summary?.payload.result.exitCode).toBe(0);
     expect(result.summary.payload.outputs.stdout).toBe('ok');
     expect(result.exitCode).toBe(0);
-
-    const deadline = Date.now() + 2000;
-    let eventsExist = true;
-    while (Date.now() < deadline) {
-      eventsExist = await access(result.eventsPath).then(
-        () => true,
-        () => false
-      );
-      if (!eventsExist) {
-        break;
-      }
-      await new Promise((resolve) => setTimeout(resolve, 25));
+    try {
+      expect(result.rawStderr).toEqual([]);
+      expect(result.eventsPath).toContain('events.ndjson');
+      expect(result.stderrPath).toContain('stderr.log');
+      await expect(readFile(result.eventsPath, 'utf8')).resolves.toContain('"type":"run:summary"');
+      await expect(readFile(result.stderrPath, 'utf8')).resolves.toBe('');
+    } finally {
+      await handle.cleanupArtifacts();
     }
-    expect(eventsExist).toBe(false);
+    await expect(access(result.eventsPath)).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(access(result.stderrPath)).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
   it('supports retrying with overrides', async () => {
@@ -98,7 +96,89 @@ describe('ExecClient', () => {
 
     await expect(handle.result).rejects.toThrow('Exec command exited without emitting a summary event');
   });
+
+  it('preserves the original spawn error when startup fails before any summary', async () => {
+    const spawnError = Object.assign(new Error('spawn missing-cli ENOENT'), {
+      code: 'ENOENT'
+    });
+    spawnMock.mockImplementationOnce(() => createMockProcess([], { error: spawnError }));
+
+    const client = new ExecClient({ cliPath: 'missing-cli' });
+    const handle = client.run({ command: 'npm' });
+
+    await expect(handle.result).rejects.toMatchObject({
+      code: 'ENOENT',
+      message: 'spawn missing-cli ENOENT'
+    });
+  });
+
+  it('keeps exit-time artifact cleanup registered until async removal settles', async () => {
+    const exitHandlers: Array<(code?: number) => void> = [];
+    const actualProcessOnce = process.once.bind(process);
+    const rmGate = createDeferred<void>();
+    const spawnIsolated = vi.fn(() => createMockProcess(buildEventStream()));
+    const processOnceSpy = vi
+      .spyOn(process, 'once')
+      .mockImplementation(((event: string | symbol, listener: (...args: unknown[]) => void) => {
+        if (event === 'exit') {
+          exitHandlers.push(listener as (code?: number) => void);
+          return process;
+        }
+        return actualProcessOnce(event, listener as never);
+      }) as typeof process.once);
+
+    vi.resetModules();
+    vi.doMock('node:child_process', () => ({
+      spawn: (...args: unknown[]) => spawnIsolated(...args)
+    }));
+    vi.doMock('node:fs/promises', async () => {
+      const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+      return {
+        ...actual,
+        rm: vi.fn(async (...args: Parameters<typeof actual.rm>) => {
+          await rmGate.promise;
+          return actual.rm(...args);
+        })
+      };
+    });
+
+    try {
+      const { ExecClient: IsolatedExecClient } = await import('../src/orchestrator.js');
+      expect(exitHandlers).toHaveLength(1);
+
+      const client = new IsolatedExecClient({ cliPath: 'codex-orchestrator' });
+      const handle = client.run({ command: 'npm', args: ['test'] });
+      const result = await handle.result;
+      const artifactRoot = dirname(result.eventsPath);
+
+      const cleanupPromise = handle.cleanupArtifacts();
+      await Promise.resolve();
+      await expect(access(artifactRoot)).resolves.toBeUndefined();
+
+      exitHandlers[0]?.(0);
+      await expect(access(artifactRoot)).rejects.toMatchObject({ code: 'ENOENT' });
+
+      rmGate.resolve();
+      await cleanupPromise;
+    } finally {
+      rmGate.resolve();
+      vi.doUnmock('node:child_process');
+      vi.doUnmock('node:fs/promises');
+      vi.resetModules();
+      processOnceSpy.mockRestore();
+    }
+  });
 });
+
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((innerResolve, innerReject) => {
+    resolve = innerResolve;
+    reject = innerReject;
+  });
+  return { promise, resolve, reject };
+}
 
 function buildEventStream(overrides: Partial<{ exitCode: number | null; status: 'succeeded' | 'failed' }> = {}): string[] {
   const begin: JsonlEvent = {
@@ -163,7 +243,10 @@ function buildEventStream(overrides: Partial<{ exitCode: number | null; status: 
   return [JSON.stringify(begin), JSON.stringify(summary)];
 }
 
-function createMockProcess(lines: string[]): ChildProcessWithoutNullStreams {
+function createMockProcess(
+  lines: string[],
+  options: { error?: Error } = {}
+): ChildProcessWithoutNullStreams {
   const stdout = new PassThrough();
   const stderr = new PassThrough();
   const child = new EventEmitter() as ChildProcessWithoutNullStreams;
@@ -175,6 +258,13 @@ function createMockProcess(lines: string[]): ChildProcessWithoutNullStreams {
   });
 
   setTimeout(() => {
+    if (options.error) {
+      child.emit('error', options.error);
+      stdout.end();
+      stderr.end();
+      child.emit('close', null, null);
+      return;
+    }
     for (const line of lines) {
       stdout.write(`${line}\n`);
     }

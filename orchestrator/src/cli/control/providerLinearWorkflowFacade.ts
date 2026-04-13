@@ -337,6 +337,8 @@ export interface ProviderLinearIssueContext {
   description: string | null;
   url: string | null;
   updated_at: string | null;
+  archived_at: string | null;
+  trashed: boolean | null;
   workspace_id: string | null;
   state: ProviderLinearWorkflowState | null;
   team: {
@@ -356,7 +358,7 @@ export interface ProviderLinearIssueContext {
 
 type ProviderLinearIssueSummary = Pick<
   ProviderLinearIssueContext,
-  'id' | 'identifier' | 'url' | 'updated_at' | 'workspace_id' | 'state' | 'team' | 'project'
+  'id' | 'identifier' | 'url' | 'updated_at' | 'archived_at' | 'trashed' | 'workspace_id' | 'state' | 'team' | 'project'
 >;
 
 export type ProviderLinearIssueContextResult =
@@ -492,6 +494,8 @@ interface LinearIssueContextQueryResponse {
     description?: string | null;
     url?: string | null;
     updatedAt?: string | null;
+    archivedAt?: string | null;
+    trashed?: boolean | null;
     state?: {
       id?: string | null;
       name?: string | null;
@@ -563,6 +567,8 @@ interface LinearIssueSummaryQueryResponse {
     identifier?: string | null;
     url?: string | null;
     updatedAt?: string | null;
+    archivedAt?: string | null;
+    trashed?: boolean | null;
     state?: {
       id?: string | null;
       name?: string | null;
@@ -880,34 +886,53 @@ export async function upsertProviderLinearWorkpadComment(input: {
   const budgetError = await preflightProviderLinearBudget({
     session: session.session,
     operation: 'upsert-workpad',
-    minimumRequestsRemaining: 1
+    minimumRequestsRemaining: 1,
+    allowBelowRequestReserve: true
   });
   if (budgetError) {
     return failureFromWorkflowError('upsert-workpad', budgetError);
   }
+  let allowBelowRequestReserveForRead = true;
+  const readWorkpadIssueContext = () => {
+    const allowBelowRequestReserve = allowBelowRequestReserveForRead;
+    allowBelowRequestReserveForRead = false;
+    return readIssueContext(session.session, 'upsert-workpad', issueId, {
+      includeAttachments: false,
+      allowBelowRequestReserve
+    });
+  };
   const context = cachedContext
     ? {
         ok: true as const,
         issue: cachedContext
       }
-    : await readIssueContext(session.session, 'upsert-workpad', issueId, {
-        includeAttachments: false
-      });
+    : await readWorkpadIssueContext();
   if (!context.ok) {
     return failureFromWorkflowError('upsert-workpad', context.error);
   }
 
   let issueContext = context.issue;
-  if (cachedContext && !canTrustCachedMutationContext) {
+  let issueContextFreshForMutation = cachedContext === null;
+  const revalidatedCachedMutability =
+    cachedContext && issueHasMutabilityBlock(issueContext)
+      ? await readWorkpadIssueContext()
+      : null;
+  if (revalidatedCachedMutability && !revalidatedCachedMutability.ok) {
+    return failureFromWorkflowError('upsert-workpad', revalidatedCachedMutability.error);
+  }
+  if (revalidatedCachedMutability?.ok) {
+    issueContext = revalidatedCachedMutability.issue;
+    issueContextFreshForMutation = true;
+  }
+  if (cachedContext && !canTrustCachedMutationContext && !revalidatedCachedMutability) {
     // Re-read live comment state before any mutation so cached workpad ids cannot
     // cause duplicate comments or updates against deleted/replaced workpads.
-    const liveContext = await readIssueContext(session.session, 'upsert-workpad', issueId, {
-      includeAttachments: false
-    });
+    const liveContext = await readWorkpadIssueContext();
     if (!liveContext.ok) {
       return failureFromWorkflowError('upsert-workpad', liveContext.error);
     }
     issueContext = liveContext.issue;
+    issueContextFreshForMutation = true;
   }
 
   const requestedCommentId = normalizeRequiredString(input.commentId ?? null);
@@ -964,6 +989,7 @@ export async function upsertProviderLinearWorkpadComment(input: {
   }
   const currentLocalImageCacheEntries = localImageCacheEntriesResult.local_images;
   const shouldRevalidateCachedNoop = Boolean(
+    !issueContextFreshForMutation &&
     selectedComment &&
     cachedContext &&
     canTrustCachedMutationContext &&
@@ -979,13 +1005,12 @@ export async function upsertProviderLinearWorkpadComment(input: {
   );
 
   if (shouldRevalidateCachedNoop) {
-    const liveContext = await readIssueContext(session.session, 'upsert-workpad', issueId, {
-      includeAttachments: false
-    });
+    const liveContext = await readWorkpadIssueContext();
     if (!liveContext.ok) {
       return failureFromWorkflowError('upsert-workpad', liveContext.error);
     }
     issueContext = liveContext.issue;
+    issueContextFreshForMutation = true;
     selectedCommentResult = resolveWorkpadMutationContext(issueContext);
     if (!selectedCommentResult.ok) {
       return failure(
@@ -1036,6 +1061,69 @@ export async function upsertProviderLinearWorkpadComment(input: {
       comment: selectedComment,
       source_setup: session.session.sourceSetup
     };
+  }
+
+  if (!issueContextFreshForMutation) {
+    const liveContext = await readWorkpadIssueContext();
+    if (!liveContext.ok) {
+      return failureFromWorkflowError('upsert-workpad', liveContext.error);
+    }
+    issueContext = liveContext.issue;
+    issueContextFreshForMutation = true;
+    selectedCommentResult = resolveWorkpadMutationContext(issueContext);
+    if (!selectedCommentResult.ok) {
+      return failure(
+        'upsert-workpad',
+        selectedCommentResult.error.code,
+        selectedCommentResult.error.message,
+        selectedCommentResult.error.status,
+        selectedCommentResult.error.details
+      );
+    }
+    selectedComment = selectedCommentResult.comment;
+    if (selectedComment && !bodyHasLocalImageReferences && selectedComment.body === body) {
+      await writeCachedIssueContextRecord(input.env, issueContext, session.session.sourceSetup, {
+        embeddedWorkpad: null
+      });
+      return {
+        ok: true,
+        operation: 'upsert-workpad',
+        action: 'noop',
+        issue: {
+          id: issueContext.id,
+          identifier: issueContext.identifier
+        },
+        comment: selectedComment,
+        source_setup: session.session.sourceSetup
+      };
+    }
+    const liveMatchingEmbeddedWorkpadNoopCache = resolveEmbeddedWorkpadNoopCache({
+      cachedWorkpad: cachedEmbeddedWorkpad,
+      comment: selectedComment,
+      originalBody: body,
+      localImages: currentLocalImageCacheEntries
+    });
+    if (selectedComment && liveMatchingEmbeddedWorkpadNoopCache) {
+      await writeCachedIssueContextRecord(input.env, issueContext, session.session.sourceSetup, {
+        embeddedWorkpad: liveMatchingEmbeddedWorkpadNoopCache
+      });
+      return {
+        ok: true,
+        operation: 'upsert-workpad',
+        action: 'noop',
+        issue: {
+          id: issueContext.id,
+          identifier: issueContext.identifier
+        },
+        comment: selectedComment,
+        source_setup: session.session.sourceSetup
+      };
+    }
+  }
+
+  const mutabilityFailure = failureIfIssueNotMutable('upsert-workpad', issueContext);
+  if (mutabilityFailure) {
+    return mutabilityFailure;
   }
 
   const resolvedEmbeddedWorkpad = bodyHasLocalImageReferences
@@ -1172,14 +1260,16 @@ export async function deleteProviderLinearWorkpadComment(input: {
   const budgetError = await preflightProviderLinearBudget({
     session: session.session,
     operation: 'delete-workpad',
-    minimumRequestsRemaining: 1
+    minimumRequestsRemaining: 1,
+    allowBelowRequestReserve: true
   });
   if (budgetError) {
     return failureFromWorkflowError('delete-workpad', budgetError);
   }
 
   const context = await readIssueContext(session.session, 'delete-workpad', issueId, {
-    includeAttachments: false
+    includeAttachments: false,
+    allowBelowRequestReserve: true
   });
   if (!context.ok) {
     return failureFromWorkflowError('delete-workpad', context.error);
@@ -1323,40 +1413,64 @@ export async function transitionProviderLinearIssueState(input: {
   const budgetError = await preflightProviderLinearBudget({
     session: session.session,
     operation: 'transition',
-    minimumRequestsRemaining: 1
+    minimumRequestsRemaining: 1,
+    allowBelowRequestReserve: true
   });
   if (budgetError) {
     return failureFromWorkflowError('transition', budgetError);
   }
+  let allowBelowRequestReserveForSummaryRead = true;
+  const readTransitionIssueSummary = () => {
+    const allowBelowRequestReserve = allowBelowRequestReserveForSummaryRead;
+    allowBelowRequestReserveForSummaryRead = false;
+    return readIssueSummary(session.session, 'transition', issueId, {
+      allowBelowRequestReserve
+    });
+  };
   const initialSummary = cachedContext
     ? {
         ok: true as const,
         issue: summarizeIssueContext(cachedContext)
       }
-    : await readIssueSummary(session.session, 'transition', issueId);
+    : await readTransitionIssueSummary();
   if (!initialSummary.ok) {
     return failureFromWorkflowError('transition', initialSummary.error);
   }
 
   let summary = initialSummary.issue;
   let cacheContext = cachedContext;
-  if (cachedContext && !canTrustCachedMutationContext) {
-    const liveSummary = await readIssueSummary(session.session, 'transition', issueId);
+  let summaryFreshForTransition = cachedContext === null;
+  const revalidatedCachedMutability =
+    cachedContext && issueHasMutabilityBlock(summary)
+      ? await readTransitionIssueSummary()
+      : null;
+  if (revalidatedCachedMutability && !revalidatedCachedMutability.ok) {
+    return failureFromWorkflowError('transition', revalidatedCachedMutability.error);
+  }
+  if (revalidatedCachedMutability?.ok && cachedContext) {
+    summary = revalidatedCachedMutability.issue;
+    cacheContext = mergeCachedIssueContextSummary(cachedContext, summary);
+    summaryFreshForTransition = true;
+  }
+  if (cachedContext && !canTrustCachedMutationContext && !revalidatedCachedMutability) {
+    const liveSummary = await readTransitionIssueSummary();
     if (!liveSummary.ok) {
       return failureFromWorkflowError('transition', liveSummary.error);
     }
     summary = liveSummary.issue;
     cacheContext = mergeCachedIssueContextSummary(cachedContext, summary);
+    summaryFreshForTransition = true;
   }
 
   let targetState = resolveWorkflowStateByName(summary.team?.states ?? [], stateName);
-  if (!targetState && cachedContext && canTrustCachedMutationContext) {
-    const liveSummary = await readIssueSummary(session.session, 'transition', issueId);
+  if (!targetState && cachedContext && canTrustCachedMutationContext && !summaryFreshForTransition) {
+    const liveSummary = await readTransitionIssueSummary();
     if (!liveSummary.ok) {
       return failureFromWorkflowError('transition', liveSummary.error);
     }
     summary = liveSummary.issue;
     cacheContext = mergeCachedIssueContextSummary(cachedContext, summary);
+    summaryFreshForTransition = true;
     targetState = resolveWorkflowStateByName(summary.team?.states ?? [], stateName);
   }
   if (!targetState) {
@@ -1368,13 +1482,19 @@ export async function transitionProviderLinearIssueState(input: {
     );
   }
 
-  if (sameWorkflowState(summary.state, targetState) && cachedContext && canTrustCachedMutationContext) {
-    const liveSummary = await readIssueSummary(session.session, 'transition', issueId);
+  if (
+    sameWorkflowState(summary.state, targetState) &&
+    cachedContext &&
+    canTrustCachedMutationContext &&
+    !summaryFreshForTransition
+  ) {
+    const liveSummary = await readTransitionIssueSummary();
     if (!liveSummary.ok) {
       return failureFromWorkflowError('transition', liveSummary.error);
     }
     summary = liveSummary.issue;
     cacheContext = mergeCachedIssueContextSummary(cachedContext, summary);
+    summaryFreshForTransition = true;
     targetState = resolveWorkflowStateByName(summary.team?.states ?? [], stateName);
     if (!targetState) {
       return failure(
@@ -1401,6 +1521,46 @@ export async function transitionProviderLinearIssueState(input: {
       target_state: targetState,
       source_setup: session.session.sourceSetup
     };
+  }
+
+  if (!summaryFreshForTransition) {
+    const liveSummary = await readTransitionIssueSummary();
+    if (!liveSummary.ok) {
+      return failureFromWorkflowError('transition', liveSummary.error);
+    }
+    summary = liveSummary.issue;
+    cacheContext = cacheContext ? mergeCachedIssueContextSummary(cacheContext, summary) : null;
+    summaryFreshForTransition = true;
+    targetState = resolveWorkflowStateByName(summary.team?.states ?? [], stateName);
+    if (!targetState) {
+      return failure(
+        'transition',
+        'linear_state_not_found',
+        `Linear team state "${stateName}" was not found for issue ${summary.identifier}.`,
+        422
+      );
+    }
+    if (sameWorkflowState(summary.state, targetState)) {
+      return {
+        ok: true,
+        operation: 'transition',
+        action: 'noop',
+        issue: {
+          id: summary.id,
+          identifier: summary.identifier,
+          state: summary.state,
+          updated_at: summary.updated_at
+        },
+        previous_state: summary.state,
+        target_state: targetState,
+        source_setup: session.session.sourceSetup
+      };
+    }
+  }
+
+  const mutabilityFailure = failureIfIssueNotMutable('transition', summary);
+  if (mutabilityFailure) {
+    return mutabilityFailure;
   }
 
   const transitionBudgetError = await preflightProviderLinearBudget({
@@ -1498,14 +1658,16 @@ export async function attachProviderLinearIssuePr(input: {
   const budgetError = await preflightProviderLinearBudget({
     session: session.session,
     operation: 'attach-pr',
-    minimumRequestsRemaining: 1
+    minimumRequestsRemaining: 1,
+    allowBelowRequestReserve: true
   });
   if (budgetError) {
     return failureFromWorkflowError('attach-pr', budgetError);
   }
 
   const context = await readIssueContext(session.session, 'attach-pr', issueId, {
-    includeComments: false
+    includeComments: false,
+    allowBelowRequestReserve: true
   });
   if (!context.ok) {
     return failureFromWorkflowError('attach-pr', context.error);
@@ -1528,6 +1690,11 @@ export async function attachProviderLinearIssuePr(input: {
       attachment: existingAttachment,
       source_setup: session.session.sourceSetup
     };
+  }
+
+  const mutabilityFailure = failureIfIssueNotMutable('attach-pr', context.issue);
+  if (mutabilityFailure) {
+    return mutabilityFailure;
   }
 
   const attachBudgetError = await preflightProviderLinearBudget({
@@ -1970,6 +2137,7 @@ async function preflightProviderLinearBudget(input: {
   session: ResolvedLinearWorkflowSession;
   operation: ProviderLinearOperation;
   minimumRequestsRemaining?: number;
+  allowBelowRequestReserve?: boolean;
 }): Promise<ProviderLinearWorkflowError | null> {
   const budget = await readSharedLinearBudgetStatus(input.session.env, {
     operation: `provider-linear:${input.operation}`
@@ -1977,7 +2145,8 @@ async function preflightProviderLinearBudget(input: {
   const preflight = resolveLinearBudgetPreflight({
     budget,
     operation: `provider-linear:${input.operation}`,
-    minimum_requests_remaining: input.minimumRequestsRemaining
+    minimum_requests_remaining: input.minimumRequestsRemaining,
+    allow_below_request_reserve: input.allowBelowRequestReserve === true
   });
   return preflight.ok ? null : preflight.error;
 }
@@ -1988,6 +2157,7 @@ async function executeProviderLinearGraphql<TData>(input: {
   step: string;
   query: string;
   variables?: Record<string, unknown>;
+  allowBelowRequestReserve?: boolean;
 }):
   Promise<
     | {
@@ -2006,7 +2176,8 @@ async function executeProviderLinearGraphql<TData>(input: {
   }).catch(() => null);
   const preflight = resolveLinearBudgetPreflight({
     budget,
-    operation: operationName
+    operation: operationName,
+    allow_below_request_reserve: input.allowBelowRequestReserve === true
   });
   if (!preflight.ok) {
     return {
@@ -2017,7 +2188,8 @@ async function executeProviderLinearGraphql<TData>(input: {
 
   const reservation = await reserveLinearBudgetReservation({
     env: input.session.env,
-    operation: operationName
+    operation: operationName,
+    allow_below_request_reserve: input.allowBelowRequestReserve === true
   });
   if (!reservation.ok) {
     return {
@@ -2900,6 +3072,8 @@ function summarizeIssueContext(issue: ProviderLinearIssueContext): ProviderLinea
     identifier: issue.identifier,
     url: issue.url,
     updated_at: issue.updated_at,
+    archived_at: issue.archived_at,
+    trashed: issue.trashed,
     workspace_id: issue.workspace_id,
     state: issue.state,
     team: issue.team,
@@ -2915,11 +3089,45 @@ function mergeCachedIssueContextSummary(
     ...issue,
     url: summary.url,
     updated_at: summary.updated_at,
+    archived_at: summary.archived_at,
+    trashed: summary.trashed,
     workspace_id: summary.workspace_id,
     state: summary.state,
     team: summary.team,
     project: summary.project
   };
+}
+
+function failureIfIssueNotMutable<T extends ProviderLinearOperation>(
+  operation: T,
+  issue: Pick<ProviderLinearIssueSummary, 'id' | 'identifier' | 'archived_at' | 'trashed'>
+): ProviderLinearOperationFailure<T> | null {
+  const mutabilityStates = issueHasMutabilityBlock(issue)
+    ? [issue.archived_at ? 'archived' : null, issue.trashed ? 'trashed' : null].filter(
+        (value): value is string => Boolean(value)
+      )
+    : [];
+  if (mutabilityStates.length === 0) {
+    return null;
+  }
+  return failure(
+    operation,
+    'linear_issue_not_mutable',
+    `Linear issue ${issue.identifier} is ${mutabilityStates.join(' and ')} and cannot accept provider mutations.`,
+    409,
+    {
+      issue_id: issue.id,
+      issue_identifier: issue.identifier,
+      archived_at: issue.archived_at,
+      trashed: issue.trashed
+    }
+  );
+}
+
+function issueHasMutabilityBlock(
+  issue: Pick<ProviderLinearIssueSummary, 'archived_at' | 'trashed'>
+): boolean {
+  return Boolean(issue.archived_at) || issue.trashed === true;
 }
 
 function resolveIssueContextCachePath(env: NodeJS.ProcessEnv | undefined): string | null {
@@ -3156,6 +3364,8 @@ function parseCachedIssueContext(value: unknown): ProviderLinearIssueContext | n
     description: normalizeOptionalString(issue.description as string | null | undefined),
     url: normalizeOptionalString(issue.url as string | null | undefined),
     updated_at: normalizeIso(issue.updated_at as string | null | undefined),
+    archived_at: normalizeIso(issue.archived_at as string | null | undefined),
+    trashed: normalizeOptionalBoolean(issue.trashed),
     workspace_id: normalizeOptionalString(issue.workspace_id as string | null | undefined),
     state,
     team,
@@ -3350,7 +3560,10 @@ function removeIssueContextComment(issue: ProviderLinearIssueContext, commentId:
 async function readIssueSummary(
   session: ResolvedLinearWorkflowSession,
   operation: ProviderLinearOperation,
-  issueId: string
+  issueId: string,
+  options: {
+    allowBelowRequestReserve?: boolean;
+  } = {}
 ):
   Promise<
     | {
@@ -3369,7 +3582,8 @@ async function readIssueSummary(
     query: buildIssueSummaryQuery(),
     variables: {
       issueId
-    }
+    },
+    allowBelowRequestReserve: options.allowBelowRequestReserve === true
   });
   if (!result.ok) {
     return {
@@ -3415,6 +3629,7 @@ async function readIssueContext(
   options: {
     includeComments?: boolean;
     includeAttachments?: boolean;
+    allowBelowRequestReserve?: boolean;
   } = {}
 ):
   Promise<
@@ -3441,6 +3656,7 @@ async function readIssueContext(
   let firstPage = true;
 
   while (firstPage || hasNextCommentPage) {
+    const allowBelowRequestReserve = firstPage && options.allowBelowRequestReserve === true;
     const result = await executeProviderLinearGraphql<LinearIssueContextQueryResponse>({
       session,
       operation,
@@ -3457,7 +3673,8 @@ async function readIssueContext(
             }
           : {
               issueId
-            }
+            },
+      allowBelowRequestReserve
     });
     if (!result.ok) {
       return {
@@ -3622,6 +3839,8 @@ function parseIssueSummary(
       identifier,
       url: normalizeOptionalString(issueNode.url),
       updated_at: normalizeIso(issueNode.updatedAt),
+      archived_at: normalizeIso(issueNode.archivedAt),
+      trashed: normalizeOptionalBoolean(issueNode.trashed),
       workspace_id: normalizedWorkspaceId,
       state: parseWorkflowState(issueNode.state ?? null),
       team: issueNode.team
@@ -3707,6 +3926,8 @@ function parseIssueContext(
       description: normalizeOptionalString(issueNode.description),
       url: normalizeOptionalString(issueNode.url),
       updated_at: normalizeIso(issueNode.updatedAt),
+      archived_at: normalizeIso(issueNode.archivedAt),
+      trashed: normalizeOptionalBoolean(issueNode.trashed),
       workspace_id: normalizedWorkspaceId,
       state: parseWorkflowState(issueNode.state ?? null),
       team: issueNode.team
@@ -3792,6 +4013,8 @@ function buildIssueContextQuery(options: {
       description
       url
       updatedAt
+      archivedAt
+      trashed
       state {
         id
         name
@@ -3832,6 +4055,8 @@ function buildIssueSummaryQuery(): string {
       identifier
       url
       updatedAt
+      archivedAt
+      trashed
       state {
         id
         name
@@ -5623,6 +5848,10 @@ function normalizeRequiredString(value: string | null | undefined): string | nul
 
 function normalizeOptionalString(value: string | null | undefined): string | null {
   return normalizeRequiredString(value);
+}
+
+function normalizeOptionalBoolean(value: unknown): boolean | null {
+  return typeof value === 'boolean' ? value : null;
 }
 
 function buildFollowUpIssueDescription(input: {

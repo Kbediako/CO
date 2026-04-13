@@ -1,7 +1,7 @@
 {
   "id": "crystalizer-v1",
   "domain": "learning",
-  "stamp": "d111894654b09369a0057cad64e44f44ee6f30ef0a4f43c99769e61115549517",
+  "stamp": "a5ee792f78a983df5720909e8a47c1e7396c8be06962f4e0c98b0afd1c3aa771",
   "experienceSlots": 0,
   "system": ".agent/prompts/crystalizer.md",
   "inject": [

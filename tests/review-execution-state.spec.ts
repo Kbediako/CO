@@ -4372,6 +4372,22 @@ describe('ReviewExecutionState', () => {
     expect(boundary.violationCount).toBe(0);
   });
 
+  it('keeps scoped package-manager test-file launches inside the validation-suite boundary', () => {
+    const state = new ReviewExecutionState({ startedAtMs: 0 });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'npm test -- --runInBand tests/run-review.spec.ts'\n`,
+      'stdout',
+      110
+    );
+
+    const boundary = state.getCommandIntentBoundaryState(2_000);
+    expect(boundary.triggered).toBe(true);
+    expect(boundary.violationKind).toBe('validation-suite');
+    expect(boundary.violationCount).toBe(1);
+  });
+
   it('does not classify typecheck and check scripts as command-intent validation suites', () => {
     const state = new ReviewExecutionState({ startedAtMs: 0 });
 

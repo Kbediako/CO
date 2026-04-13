@@ -1,6 +1,7 @@
 import type { ProviderIssueHandoffService } from './providerIssueHandoff.js';
 import { logger } from '../../logger.js';
 import type { LinearBudgetStatus } from './linearBudgetState.js';
+import type { ControlHostOwnershipPollingPayload } from './controlHostOwnership.js';
 
 export type ControlPollingMode = 'poll' | 'refresh';
 export type ControlNextRefreshState = 'cooldown' | 'checking' | 'scheduled' | 'unknown';
@@ -31,6 +32,7 @@ export interface ControlPollingHealthPayload {
   restart_required: boolean;
   reason: string | null;
   linear_budget: LinearBudgetStatus | null;
+  control_host_owner?: ControlHostOwnershipPollingPayload | null;
 }
 
 interface MutableProviderPollingHealthState {
@@ -50,6 +52,7 @@ interface MutableProviderPollingHealthState {
   stuckAtMs: number | null;
   reason: string | null;
   linearBudget: LinearBudgetStatus | null;
+  controlHostOwner: ControlHostOwnershipPollingPayload | null;
   onUpdate: ((payload: ControlPollingHealthPayload) => Promise<void> | void) | null;
   updateChain: Promise<void>;
 }
@@ -66,6 +69,7 @@ export function initializeProviderPollingHealth(
   input: {
     intervalMs: number | null;
     stuckAfterMs?: number | null;
+    controlHostOwner?: ControlHostOwnershipPollingPayload | null;
     onUpdate?: ((payload: ControlPollingHealthPayload) => Promise<void> | void) | null;
     skipInitialUpdate?: boolean;
   }
@@ -77,6 +81,9 @@ export function initializeProviderPollingHealth(
   }
   if (input.onUpdate !== undefined) {
     state.onUpdate = input.onUpdate;
+  }
+  if (input.controlHostOwner !== undefined) {
+    state.controlHostOwner = input.controlHostOwner;
   }
   if (state.nextPollAtMs === null && input.intervalMs !== null) {
     state.nextPollAtMs = Date.now();
@@ -139,6 +146,7 @@ export function markProviderPollingCompleted(
 ): void {
   const atMs = input.atMs ?? Date.now();
   const state = getOrCreateProviderPollingHealthState(providerIssueHandoff);
+  const preserveStuckState = isProviderLifecycleStuckError(input.error);
   state.checking = false;
   state.lastCompletedAtMs = atMs;
   if (input.error === undefined) {
@@ -149,11 +157,22 @@ export function markProviderPollingCompleted(
     state.lastErrorAtMs = atMs;
     state.lastError = normalizePollingError(input.error);
   }
-  state.nextPollAtMs = state.intervalMs !== null ? atMs + state.intervalMs : null;
+  state.nextPollAtMs =
+    preserveStuckState || state.intervalMs === null ? null : atMs + state.intervalMs;
   state.updatedAtMs = atMs;
   state.operationStartedAtMs = null;
-  state.stuckAtMs = null;
-  state.reason = null;
+  if (preserveStuckState) {
+    if (state.stuckAtMs === null) {
+      state.stuckAtMs =
+        state.stuckAfterMs !== null && state.lastRequestedAtMs !== null
+          ? state.lastRequestedAtMs + state.stuckAfterMs
+          : atMs;
+    }
+    state.reason = state.reason ?? buildProviderPollingStuckReason(state);
+  } else {
+    state.stuckAtMs = null;
+    state.reason = null;
+  }
   queueProviderPollingHealthUpdate(providerIssueHandoff, state, atMs);
 }
 
@@ -170,9 +189,14 @@ export function scheduleProviderPolling(
   const state = getOrCreateProviderPollingHealthState(providerIssueHandoff);
   const intervalMs = normalizeScheduledPollingIntervalMs(input.intervalMs, state.intervalMs);
   state.intervalMs = intervalMs;
-  state.nextPollAtMs = atMs + intervalMs;
+  if (state.stuckAtMs !== null) {
+    state.nextPollAtMs = null;
+    state.reason = state.reason ?? buildProviderPollingStuckReason(state);
+  } else {
+    state.nextPollAtMs = atMs + intervalMs;
+    state.reason = normalizeOptionalString(input.reason) ?? null;
+  }
   state.updatedAtMs = atMs;
-  state.reason = normalizeOptionalString(input.reason) ?? null;
   state.linearBudget = input.linearBudget ?? null;
   queueProviderPollingHealthUpdate(providerIssueHandoff, state, atMs);
 }
@@ -301,7 +325,8 @@ function buildProviderPollingHealthPayload(
     stuck_since_at: toIsoTimestamp(state.stuckAtMs),
     restart_required: stuck,
     reason,
-    linear_budget: state.linearBudget
+    linear_budget: state.linearBudget,
+    control_host_owner: state.controlHostOwner
   };
 }
 
@@ -403,6 +428,7 @@ function getOrCreateProviderPollingHealthState(
     stuckAtMs: null,
     reason: null,
     linearBudget: null,
+    controlHostOwner: null,
     onUpdate: null,
     updateChain: Promise.resolve()
   };
@@ -500,6 +526,18 @@ function normalizePollingError(error: unknown): string {
     return error;
   }
   return String(error);
+}
+
+function isProviderLifecycleStuckError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (
+      error.name === 'ProviderRefreshLifecycleStuckError' ||
+      error.name === 'ProviderPollLifecycleStuckError' ||
+      error.message === 'provider_refresh_lifecycle_stuck' ||
+      error.message === 'provider_poll_lifecycle_stuck'
+    )
+  );
 }
 
 function normalizeOptionalString(value: unknown): string | null {

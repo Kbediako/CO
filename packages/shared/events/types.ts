@@ -1,4 +1,13 @@
-import type { SandboxState, ToolRunRecord, ToolRunStatus } from '../manifest/types.js';
+import type {
+  CliManifest,
+  SandboxState,
+  ToolRunRecord,
+  ToolRunStatus
+} from '../manifest/types.js';
+
+export type RunMemoryObservabilityEventPayload = NonNullable<
+  NonNullable<CliManifest['memory']>['observability']
+>;
 
 export type ExecEventType = 'exec:begin' | 'exec:chunk' | 'exec:end' | 'exec:retry';
 
@@ -127,6 +136,7 @@ export interface RunSummaryEventPayload {
   };
   toolRun: ToolRunRecord | null;
   metrics?: RunMetricSummary;
+  memory?: RunMemoryObservabilityEventPayload;
   notifications?: {
     targets: string[];
     delivered: string[];

@@ -131,4 +131,143 @@ describe('spec-guard script', () => {
 
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
   });
+
+  it('skips completed specs during freshness checks', async () => {
+    const repo = await initRepository();
+
+    await writeFile(
+      join(repo, 'tasks/specs/0001-initial.md'),
+      ['---', 'status: completed', 'last_review: 2000-01-01', '---', '', 'Completed spec.'].join('\n')
+    );
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout.trim()).toContain('✅ Spec guard: OK');
+  });
+
+  it('skips archived spec stubs during freshness checks', async () => {
+    const repo = await initRepository();
+
+    await writeFile(
+      join(repo, 'tasks/specs/0001-initial.md'),
+      [
+        '# Archived Document',
+        '',
+        'last_review: 2000-01-01',
+        '',
+        '<!-- docs-archive:stub -->',
+        '> Archived on 2026-04-08. Full content: https://example.com/archive.md',
+        '',
+        '- Archive branch: doc-archives',
+        '- Archive path: tasks/specs/0001-initial.md',
+        ''
+      ].join('\n')
+    );
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout.trim()).toContain('✅ Spec guard: OK');
+  });
+
+  it('does not skip archive stubs whose archive path targets another file', async () => {
+    const repo = await initRepository();
+
+    await writeFile(
+      join(repo, 'tasks/specs/0001-initial.md'),
+      [
+        '# Archived Document',
+        '',
+        'last_review: 2000-01-01',
+        '',
+        '<!-- docs-archive:stub -->',
+        '> Archived on 2026-04-08. Full content: https://example.com/archive.md',
+        '',
+        '- Archive branch: doc-archives',
+        '- Archive path: tasks/specs/other-spec.md',
+        ''
+      ].join('\n')
+    );
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain("tasks/specs/0001-initial.md: last_review 2000-01-01");
+  });
+
+  it('skips archived spec stubs when archive metadata uses Windows separators', async () => {
+    const repo = await initRepository();
+
+    await writeFile(
+      join(repo, 'tasks/specs/0001-initial.md'),
+      [
+        '# Archived Document',
+        '',
+        'last_review: 2000-01-01',
+        '',
+        '<!-- docs-archive:stub -->',
+        '> Archived on 2026-04-08. Full content: https://example.com/archive.md',
+        '',
+        '- Archive branch: doc-archives',
+        '- Archive path: tasks\\specs\\0001-initial.md',
+        ''
+      ].join('\n')
+    );
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout.trim()).toContain('✅ Spec guard: OK');
+  });
+
+  it('still reports stale active specs', async () => {
+    const repo = await initRepository();
+
+    await writeFile(
+      join(repo, 'tasks/specs/0001-initial.md'),
+      ['---', 'status: in_progress', 'last_review: 2000-01-01', '---', '', 'Active spec.'].join('\n')
+    );
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain("tasks/specs/0001-initial.md: last_review 2000-01-01");
+  });
+
+  it('does not skip active specs that mention the archive marker in their body', async () => {
+    const repo = await initRepository();
+
+    await writeFile(
+      join(repo, 'tasks/specs/0001-initial.md'),
+      [
+        '---',
+        'status: in_progress',
+        'last_review: 2000-01-01',
+        '---',
+        '',
+        'Documentation can mention `<!-- docs-archive:stub -->` without becoming an archive stub.'
+      ].join('\n')
+    );
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain("tasks/specs/0001-initial.md: last_review 2000-01-01");
+  });
 });

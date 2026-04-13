@@ -9,6 +9,10 @@ import {
   appendSummary,
   upsertGuardrailSummary
 } from '../run/manifest.js';
+import {
+  buildRunMemoryObservabilityMetrics,
+  refreshRunMemoryObservability
+} from '../run/source0.js';
 import { isoTimestamp } from '../utils/time.js';
 import { persistManifest, type ManifestPersister } from '../run/manifestPersister.js';
 import type { RunPaths } from '../run/runPaths.js';
@@ -56,6 +60,8 @@ export async function appendMetricsEntry(
   const privacyEvents = shouldTruncatePrivacy
     ? privacyDecisions.slice(0, maxPrivacyEvents)
     : privacyDecisions;
+  refreshRunMemoryObservability(manifest);
+  const memoryMetrics = buildRunMemoryObservabilityMetrics(manifest.memory?.observability);
 
   const metricsRoot = join(env.runsRoot, env.taskId);
   const metricsPath = join(metricsRoot, 'metrics.json');
@@ -92,6 +98,7 @@ export async function appendMetricsEntry(
     privacy_event_count: privacyEventCount,
     privacy_events_truncated: shouldTruncatePrivacy ? true : undefined,
     privacy_events: privacyEvents,
+    memory: memoryMetrics,
     handle_count: manifest.handles?.length ?? 0,
     tfgrpo_epoch: manifest.tfgrpo?.epoch ?? null,
     tfgrpo_group_id: manifest.tfgrpo?.group_id ?? null,

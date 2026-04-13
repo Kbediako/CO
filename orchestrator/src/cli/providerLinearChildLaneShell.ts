@@ -51,6 +51,10 @@ import {
   providerLinearChildLanePathSelectorsOverlap,
   resolveProviderLinearChildLaneScopeContract
 } from './providerLinearChildLanePhaseContract.js';
+import {
+  applyResolvedProgramInvocationEnvOverrides,
+  resolveCodexOrchestratorBootstrapInvocation
+} from './utils/packageProgramResolver.js';
 import { slugify } from './utils/strings.js';
 import { parseTrailingJsonObject } from './utils/trailingJsonObject.js';
 
@@ -516,6 +520,7 @@ async function launchChildLane(
     },
     sourceSetup
   });
+  applyResolvedProgramInvocationEnvOverrides(childStartEnv, invocation.envOverrides);
 
   let execResult: ProviderLinearWorkerExecResult;
   try {
@@ -2033,20 +2038,10 @@ function buildProviderLinearChildLaneStartEnv(
 function resolveCodexOrchestratorInvocation(env: NodeJS.ProcessEnv): {
   command: string;
   argsPrefix: string[];
+  envOverrides?: NodeJS.ProcessEnv;
 } {
-  const packageRoot = typeof env.CODEX_ORCHESTRATOR_PACKAGE_ROOT === 'string'
-    ? env.CODEX_ORCHESTRATOR_PACKAGE_ROOT.trim()
-    : '';
-  if (packageRoot.length > 0) {
-    return {
-      command: process.execPath,
-      argsPrefix: [join(packageRoot, 'dist', 'bin', 'codex-orchestrator.js')]
-    };
-  }
-  return {
-    command: 'codex-orchestrator',
-    argsPrefix: []
-  };
+  const invocation = resolveCodexOrchestratorBootstrapInvocation({ env, execPath: process.execPath });
+  return { command: invocation.command, argsPrefix: invocation.args, envOverrides: invocation.envOverrides };
 }
 
 function parseProviderChildLaneRunResult(

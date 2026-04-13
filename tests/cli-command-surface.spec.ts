@@ -1,21 +1,28 @@
 import { execFile } from 'node:child_process';
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, realpath, rm, symlink, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, relative } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 
 import { afterEach, describe, expect, it } from 'vitest';
+import { isDirectExecution, runCodexOrchestratorCli } from '../bin/codex-orchestrator.ts';
 import { REPO_CONFIG_PATH_ENV_KEY } from '../orchestrator/src/cli/config/userConfig.js';
 import {
   PROVIDER_OVERRIDE_ENV_KEYS,
   sanitizeProviderOverrideEnv
 } from '../orchestrator/src/cli/utils/providerOverrideEnv.js';
+import { shouldUseFreshDist } from './helpers/distFreshness.js';
+import { runEntrypointLikeExec } from './helpers/inProcessEntrypoint.js';
 
 const execFileAsync = promisify(execFile);
 const CLI_ENTRY = join(process.cwd(), 'bin', 'codex-orchestrator.ts');
-const TEST_TIMEOUT = 15000;
+const CLI_ENTRY_DIST = join(process.cwd(), 'dist', 'bin', 'codex-orchestrator.js');
 const CLI_BOOT_TIMEOUT = 30000;
+const CLI_SOURCE_ENTRY_TIMEOUT = 60000;
+const TEST_TIMEOUT = CLI_BOOT_TIMEOUT;
 const CLI_EXEC_TIMEOUT_MS = TEST_TIMEOUT;
+const CLI_BINARY_SHELL_TIMEOUT = 60000;
 const FLOW_TARGET_TEST_TIMEOUT = 70000;
 const SKILLS_INSTALL_JSON_TIMEOUT = 70000;
 const RUNTIME_TEST_ENV_KEYS = [
@@ -51,15 +58,420 @@ afterEach(async () => {
 async function runCli(
   args: string[],
   env?: NodeJS.ProcessEnv,
+  _timeoutMs: number = CLI_EXEC_TIMEOUT_MS,
+  explicitProviderOverrideKeys: ReadonlySet<string> = new Set()
+): Promise<{ stdout: string; stderr: string }> {
+  return await runEntrypointLikeExec({
+    args,
+    env: buildCliEnv(env, explicitProviderOverrideKeys),
+    runner: runCodexOrchestratorCli
+  });
+}
+
+async function runCliSubprocess(
+  args: string[],
+  env?: NodeJS.ProcessEnv,
   timeoutMs: number = CLI_EXEC_TIMEOUT_MS,
   explicitProviderOverrideKeys: ReadonlySet<string> = new Set()
 ): Promise<{ stdout: string; stderr: string }> {
   const cliEnv = buildCliEnv(env, explicitProviderOverrideKeys);
-  return await execFileAsync(process.execPath, ['--loader', 'ts-node/esm', CLI_ENTRY, ...args], {
+  const entryArgs = (await shouldUseFreshDist(CLI_ENTRY, CLI_ENTRY_DIST))
+    ? [CLI_ENTRY_DIST, ...args]
+    : ['--loader', 'ts-node/esm', CLI_ENTRY, ...args];
+  return await execFileAsync(process.execPath, entryArgs, {
     env: cliEnv,
     timeout: timeoutMs
   });
 }
+
+async function runCliSourceSubprocess(
+  args: string[],
+  env?: NodeJS.ProcessEnv,
+  timeoutMs: number = CLI_SOURCE_ENTRY_TIMEOUT,
+  explicitProviderOverrideKeys: ReadonlySet<string> = new Set()
+): Promise<{ stdout: string; stderr: string }> {
+  return await execFileAsync(process.execPath, ['--loader', 'ts-node/esm', CLI_ENTRY, ...args], {
+    env: buildCliEnv(env, explicitProviderOverrideKeys),
+    timeout: timeoutMs
+  });
+}
+
+describe('shouldUseFreshDist', () => {
+  it('uses dist when the source entry is missing but the built entry exists', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'cli-fresh-dist-'));
+    const distEntry = join(tempRoot, 'dist-entry.js');
+    try {
+      await writeFile(distEntry, 'console.log("dist");', 'utf8');
+      await expect(shouldUseFreshDist(join(tempRoot, 'missing-source.ts'), distEntry)).resolves.toBe(
+        true
+      );
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('treats dist as stale when a newer transitive CLI dependency exists', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'cli-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'bin', 'codex-orchestrator.ts');
+    const transitiveDependency = join(
+      tempRoot,
+      'orchestrator',
+      'src',
+      'cli',
+      'controlHostCliShell.ts'
+    );
+    const deeperDependency = join(tempRoot, 'scripts', 'lib', 'provider-run-contract.ts');
+    const distEntry = join(tempRoot, 'dist', 'bin', 'codex-orchestrator.js');
+
+    try {
+      await mkdir(join(tempRoot, 'bin'), { recursive: true });
+      await mkdir(join(tempRoot, 'orchestrator', 'src', 'cli'), { recursive: true });
+      await mkdir(join(tempRoot, 'scripts', 'lib'), { recursive: true });
+      await mkdir(join(tempRoot, 'dist', 'bin'), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "import { runControlHostCliShell } from '../orchestrator/src/cli/controlHostCliShell.js';\nexport { runControlHostCliShell };\n",
+        'utf8'
+      );
+      await writeFile(
+        transitiveDependency,
+        "export { runProviderContract } from '../../../scripts/lib/provider-run-contract.js';\n",
+        'utf8'
+      );
+      await writeFile(deeperDependency, 'export function runProviderContract() {}\n', 'utf8');
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const distAt = new Date('2026-01-01T00:00:01.000Z');
+      const dependencyAt = new Date('2026-01-01T00:00:02.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(transitiveDependency, sourceAt, sourceAt);
+      await utimes(distEntry, distAt, distAt);
+      await utimes(deeperDependency, dependencyAt, dependencyAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('ignores newer sibling files outside the tracked CLI dependency closure', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'cli-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'bin', 'codex-orchestrator.ts');
+    const transitiveDependency = join(tempRoot, 'orchestrator', 'src', 'cli', 'doctorCliShell.ts');
+    const unrelatedSibling = join(tempRoot, 'orchestrator', 'src', 'cli', 'unusedCliShell.ts');
+    const distEntry = join(tempRoot, 'dist', 'bin', 'codex-orchestrator.js');
+
+    try {
+      await mkdir(join(tempRoot, 'bin'), { recursive: true });
+      await mkdir(join(tempRoot, 'orchestrator', 'src', 'cli'), { recursive: true });
+      await mkdir(join(tempRoot, 'dist', 'bin'), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "export { runDoctorCliShell } from '../orchestrator/src/cli/doctorCliShell.js';\n",
+        'utf8'
+      );
+      await writeFile(transitiveDependency, 'export function runDoctorCliShell() {}\n', 'utf8');
+      await writeFile(unrelatedSibling, 'export const unused = true;\n', 'utf8');
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const distAt = new Date('2026-01-01T00:00:01.000Z');
+      const siblingAt = new Date('2026-01-01T00:00:02.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(transitiveDependency, sourceAt, sourceAt);
+      await utimes(distEntry, distAt, distAt);
+      await utimes(unrelatedSibling, siblingAt, siblingAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('refreshes a cached dependency closure when a tracked file adds a new runtime import', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'cli-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'bin', 'codex-orchestrator.ts');
+    const transitiveDependency = join(tempRoot, 'orchestrator', 'src', 'cli', 'doctorCliShell.ts');
+    const newlyTrackedDependency = join(tempRoot, 'scripts', 'lib', 'provider-run-contract.ts');
+    const distEntry = join(tempRoot, 'dist', 'bin', 'codex-orchestrator.js');
+
+    try {
+      await mkdir(join(tempRoot, 'bin'), { recursive: true });
+      await mkdir(join(tempRoot, 'orchestrator', 'src', 'cli'), { recursive: true });
+      await mkdir(join(tempRoot, 'scripts', 'lib'), { recursive: true });
+      await mkdir(join(tempRoot, 'dist', 'bin'), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "export { runDoctorCliShell } from '../orchestrator/src/cli/doctorCliShell.js';\n",
+        'utf8'
+      );
+      await writeFile(transitiveDependency, 'export function runDoctorCliShell() {}\n', 'utf8');
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const distAt = new Date('2026-01-01T00:00:01.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(transitiveDependency, sourceAt, sourceAt);
+      await utimes(distEntry, distAt, distAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+
+      const trackedUpdateAt = new Date('2026-01-01T00:00:02.000Z');
+      await writeFile(
+        transitiveDependency,
+        "export { runProviderContract } from '../../../scripts/lib/provider-run-contract.js';\n",
+        'utf8'
+      );
+      await writeFile(newlyTrackedDependency, 'export function runProviderContract() {}\n', 'utf8');
+      await utimes(transitiveDependency, trackedUpdateAt, trackedUpdateAt);
+      await utimes(newlyTrackedDependency, trackedUpdateAt, trackedUpdateAt);
+
+      await writeFile(distEntry, 'export const rebuiltProviderContract = true;\n', 'utf8');
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+
+      await writeFile(newlyTrackedDependency, 'export function runProviderContract() { return true; }\n', 'utf8');
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('refreshes a cached dependency closure when a higher-priority source candidate appears with an older mtime', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'cli-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'bin', 'codex-orchestrator.ts');
+    const transitiveDependencyTs = join(tempRoot, 'orchestrator', 'src', 'cli', 'doctorCliShell.ts');
+    const transitiveDependencyJs = join(tempRoot, 'orchestrator', 'src', 'cli', 'doctorCliShell.js');
+    const distEntry = join(tempRoot, 'dist', 'bin', 'codex-orchestrator.js');
+
+    try {
+      await mkdir(join(tempRoot, 'bin'), { recursive: true });
+      await mkdir(join(tempRoot, 'orchestrator', 'src', 'cli'), { recursive: true });
+      await mkdir(join(tempRoot, 'dist', 'bin'), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "export { runDoctorCliShell } from '../orchestrator/src/cli/doctorCliShell.js';\n",
+        'utf8'
+      );
+      await writeFile(transitiveDependencyTs, 'export function runDoctorCliShell() {}\n', 'utf8');
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const distAt = new Date('2026-01-01T00:00:05.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(transitiveDependencyTs, sourceAt, sourceAt);
+      await utimes(distEntry, distAt, distAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+
+      const higherPriorityAt = new Date('2026-01-01T00:00:01.000Z');
+      await writeFile(
+        transitiveDependencyJs,
+        'export function runDoctorCliShell() { return true; }\n',
+        'utf8'
+      );
+      await utimes(transitiveDependencyJs, higherPriorityAt, higherPriorityAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps dist stale after a higher-priority source candidate appears until dist mtime changes', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'cli-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'bin', 'codex-orchestrator.ts');
+    const transitiveDependencyTs = join(tempRoot, 'orchestrator', 'src', 'cli', 'doctorCliShell.ts');
+    const transitiveDependencyJs = join(tempRoot, 'orchestrator', 'src', 'cli', 'doctorCliShell.js');
+    const distEntry = join(tempRoot, 'dist', 'bin', 'codex-orchestrator.js');
+
+    try {
+      await mkdir(join(tempRoot, 'bin'), { recursive: true });
+      await mkdir(join(tempRoot, 'orchestrator', 'src', 'cli'), { recursive: true });
+      await mkdir(join(tempRoot, 'dist', 'bin'), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "export { runDoctorCliShell } from '../orchestrator/src/cli/doctorCliShell.js';\n",
+        'utf8'
+      );
+      await writeFile(transitiveDependencyTs, 'export function runDoctorCliShell() {}\n', 'utf8');
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const distAt = new Date('2026-01-01T00:00:05.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(transitiveDependencyTs, sourceAt, sourceAt);
+      await utimes(distEntry, distAt, distAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+
+      const higherPriorityAt = new Date('2026-01-01T00:00:01.000Z');
+      await writeFile(
+        transitiveDependencyJs,
+        'export function runDoctorCliShell() { return true; }\n',
+        'utf8'
+      );
+      await utimes(transitiveDependencyJs, higherPriorityAt, higherPriorityAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
+
+      await chmod(distEntry, 0o755);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('treats dist as stale when the winning CLI source candidate disappears and resolution falls back to an older file', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'cli-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'bin', 'codex-orchestrator.ts');
+    const transitiveDependencyTs = join(tempRoot, 'orchestrator', 'src', 'cli', 'doctorCliShell.ts');
+    const transitiveDependencyJs = join(tempRoot, 'orchestrator', 'src', 'cli', 'doctorCliShell.js');
+    const distEntry = join(tempRoot, 'dist', 'bin', 'codex-orchestrator.js');
+
+    try {
+      await mkdir(join(tempRoot, 'bin'), { recursive: true });
+      await mkdir(join(tempRoot, 'orchestrator', 'src', 'cli'), { recursive: true });
+      await mkdir(join(tempRoot, 'dist', 'bin'), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "export { runDoctorCliShell } from '../orchestrator/src/cli/doctorCliShell.js';\n",
+        'utf8'
+      );
+      await writeFile(transitiveDependencyTs, 'export function runDoctorCliShell() { return "ts"; }\n', 'utf8');
+      await writeFile(transitiveDependencyJs, 'export function runDoctorCliShell() { return "js"; }\n', 'utf8');
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const fallbackAt = new Date('2026-01-01T00:00:00.000Z');
+      const winningAt = new Date('2026-01-01T00:00:01.000Z');
+      const distAt = new Date('2026-01-01T00:00:05.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(transitiveDependencyTs, fallbackAt, fallbackAt);
+      await utimes(transitiveDependencyJs, winningAt, winningAt);
+      await utimes(distEntry, distAt, distAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+
+      await rm(transitiveDependencyJs);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps dist fresh when the winning CLI source candidate disappears and dist is rebuilt first', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'cli-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'bin', 'codex-orchestrator.ts');
+    const transitiveDependencyTs = join(tempRoot, 'orchestrator', 'src', 'cli', 'doctorCliShell.ts');
+    const transitiveDependencyJs = join(tempRoot, 'orchestrator', 'src', 'cli', 'doctorCliShell.js');
+    const distEntry = join(tempRoot, 'dist', 'bin', 'codex-orchestrator.js');
+
+    try {
+      await mkdir(join(tempRoot, 'bin'), { recursive: true });
+      await mkdir(join(tempRoot, 'orchestrator', 'src', 'cli'), { recursive: true });
+      await mkdir(join(tempRoot, 'dist', 'bin'), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "export { runDoctorCliShell } from '../orchestrator/src/cli/doctorCliShell.js';\n",
+        'utf8'
+      );
+      await writeFile(transitiveDependencyTs, 'export function runDoctorCliShell() { return "ts"; }\n', 'utf8');
+      await writeFile(transitiveDependencyJs, 'export function runDoctorCliShell() { return "js"; }\n', 'utf8');
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const fallbackAt = new Date('2026-01-01T00:00:00.000Z');
+      const winningAt = new Date('2026-01-01T00:00:01.000Z');
+      const distAt = new Date('2026-01-01T00:00:05.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(transitiveDependencyTs, fallbackAt, fallbackAt);
+      await utimes(transitiveDependencyJs, winningAt, winningAt);
+      await utimes(distEntry, distAt, distAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+
+      await rm(transitiveDependencyJs);
+
+      await writeFile(distEntry, 'export const rebuiltDoctorCliShell = "ts";\n', 'utf8');
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('refreshes a cached unresolved dependency when the missing runtime import becomes resolvable', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'cli-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'bin', 'codex-orchestrator.ts');
+    const transitiveDependency = join(tempRoot, 'orchestrator', 'src', 'cli', 'doctorCliShell.ts');
+    const initiallyMissingDependency = join(tempRoot, 'scripts', 'lib', 'provider-run-contract.ts');
+    const distEntry = join(tempRoot, 'dist', 'bin', 'codex-orchestrator.js');
+
+    try {
+      await mkdir(join(tempRoot, 'bin'), { recursive: true });
+      await mkdir(join(tempRoot, 'orchestrator', 'src', 'cli'), { recursive: true });
+      await mkdir(join(tempRoot, 'scripts', 'lib'), { recursive: true });
+      await mkdir(join(tempRoot, 'dist', 'bin'), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "export { runDoctorCliShell } from '../orchestrator/src/cli/doctorCliShell.js';\n",
+        'utf8'
+      );
+      await writeFile(
+        transitiveDependency,
+        "export { runProviderContract } from '../../../scripts/lib/provider-run-contract.js';\n",
+        'utf8'
+      );
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const distAt = new Date('2026-01-01T00:00:01.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(transitiveDependency, sourceAt, sourceAt);
+      await utimes(distEntry, distAt, distAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
+
+      const dependencyAt = new Date('2026-01-01T00:00:02.000Z');
+      await writeFile(
+        initiallyMissingDependency,
+        'export function runProviderContract() { return true; }\n',
+        'utf8'
+      );
+      await utimes(initiallyMissingDependency, dependencyAt, dependencyAt);
+
+      await writeFile(distEntry, 'export const rebuiltProviderContract = true;\n', 'utf8');
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('isDirectExecution', () => {
+  it('treats symlink-preserved entrypoints as direct execution', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'cli-direct-exec-'));
+    const targetEntry = join(tempRoot, 'target.js');
+    const symlinkEntry = join(tempRoot, 'symlink.js');
+    try {
+      await writeFile(targetEntry, 'export {};', 'utf8');
+      await symlink(targetEntry, symlinkEntry);
+
+      expect(isDirectExecution(symlinkEntry, pathToFileURL(await realpath(symlinkEntry)).href)).toBe(
+        true
+      );
+      expect(isDirectExecution(symlinkEntry, pathToFileURL(symlinkEntry).href)).toBe(true);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+});
 
 function buildCliEnv(
   env?: NodeJS.ProcessEnv,
@@ -188,7 +600,7 @@ async function writeFakeCodexBinary(dir: string): Promise<string> {
 
 describe('codex-orchestrator command surface', () => {
   it('prints root help with quickstart guidance', async () => {
-    const { stdout } = await runCli(['--help'], undefined, CLI_BOOT_TIMEOUT);
+    const { stdout } = await runCliSourceSubprocess(['--help'], undefined, CLI_SOURCE_ENTRY_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator <command> [options]');
     expect(stdout).toContain('review [options]');
     expect(stdout).toContain('codex defaults');
@@ -196,9 +608,13 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('codex-orchestrator flow --task <task-id>');
     expect(stdout).toContain('NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --task <task-id>');
     expect(stdout).toContain('codex-orchestrator doctor --usage --window-days 30');
-  }, CLI_BOOT_TIMEOUT);
+  }, CLI_SOURCE_ENTRY_TIMEOUT);
 
   it('prints usage for unknown commands and exits non-zero', async () => {
+    let stdout = '';
+    let stderr = '';
+    let exitCode = 0;
+
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-unknown-command-'));
     const stdoutPath = join(tempDir, 'stdout.txt');
     const stderrPath = join(tempDir, 'stderr.txt');
@@ -219,19 +635,20 @@ describe('codex-orchestrator command surface', () => {
           CLI_STDERR_PATH: stderrPath,
           CLI_EXIT_CODE_PATH: exitCodePath
         },
-        timeout: CLI_BOOT_TIMEOUT
+        timeout: CLI_BINARY_SHELL_TIMEOUT
       }
     );
 
-    const stdout = await readFile(stdoutPath, 'utf8');
-    const stderr = await readFile(stderrPath, 'utf8');
-    const exitCode = Number((await readFile(exitCodePath, 'utf8')).trim());
+    stdout = await readFile(stdoutPath, 'utf8');
+    stderr = await readFile(stderrPath, 'utf8');
+    exitCode = Number((await readFile(exitCodePath, 'utf8')).trim());
+
     expect(exitCode).not.toBe(0);
     if (stderr.trim().length > 0) {
       expect(stderr).toMatch(/Unknown command: unknown-command|Command failed:/);
     }
     expect(stdout).toContain('Usage: codex-orchestrator <command> [options]');
-  }, CLI_BOOT_TIMEOUT);
+  }, CLI_BINARY_SHELL_TIMEOUT);
 
   it('falls back to exec failure message detail when stderr is empty', () => {
     const parsed = parseCliFailure({
@@ -357,7 +774,11 @@ describe('codex-orchestrator command surface', () => {
   }, CLI_BOOT_TIMEOUT);
 
   it('prints pr ready-review help', async () => {
-    const { stdout } = await runCli(['pr', 'ready-review', '--help'], undefined, CLI_BOOT_TIMEOUT);
+    const { stdout } = await runCliSubprocess(
+      ['pr', 'ready-review', '--help'],
+      undefined,
+      CLI_BOOT_TIMEOUT
+    );
     expect(stdout).toContain('Usage: codex-orchestrator pr ready-review');
     expect(stdout).toContain('review handoff is safe after a bounded automated-feedback drain');
     expect(stdout).not.toContain('--auto-merge');
@@ -455,7 +876,7 @@ describe('codex-orchestrator command surface', () => {
   }, CLI_BOOT_TIMEOUT);
 
   it('prints review help without invoking run-review', async () => {
-    const { stdout } = await runCli(['review', '--help'], undefined, CLI_BOOT_TIMEOUT);
+    const { stdout } = await runCliSubprocess(['review', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator review');
     expect(stdout).toContain('Runs the standalone review wrapper');
     expect(stdout).toContain('--manifest <path>');
@@ -471,7 +892,7 @@ describe('codex-orchestrator command surface', () => {
     await writeFile(manifestPath, JSON.stringify({ run: 'sample' }), 'utf8');
     await writeFile(join(runDir, 'runner.ndjson'), '{"event":"sample"}\n', 'utf8');
 
-    const { stdout } = await runCli(
+    const { stdout } = await runCliSubprocess(
       ['review', '--manifest', manifestPath, '--non-interactive', '--surface', 'audit', '--task', taskId],
       {
         ...process.env,
@@ -889,16 +1310,16 @@ describe('codex-orchestrator command surface', () => {
   }, CLI_BOOT_TIMEOUT);
 
   it('rejects init without a template', async () => {
-    await expect(runCli(['init'])).rejects.toMatchObject({
+    await expect(runCli(['init'], undefined, CLI_BOOT_TIMEOUT)).rejects.toMatchObject({
       stderr: expect.stringContaining('init requires a template name (e.g. init codex).')
     });
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('rejects unknown init templates', async () => {
-    await expect(runCli(['init', 'ship-it'])).rejects.toMatchObject({
+    await expect(runCli(['init', 'ship-it'], undefined, CLI_BOOT_TIMEOUT)).rejects.toMatchObject({
       stderr: expect.stringContaining('Unknown init template: ship-it')
     });
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('writes init codex templates to the requested cwd', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-init-codex-'));
@@ -1039,29 +1460,37 @@ describe('codex-orchestrator command surface', () => {
 
   it('rejects conflicting multi-agent and collab flag values', async () => {
     await expect(
-      runCli(['rlm', 'write tests', '--multi-agent', 'true', '--collab', 'false'])
+      runCliSourceSubprocess(
+        ['rlm', 'write tests', '--multi-agent', 'true', '--collab', 'false'],
+        undefined,
+        CLI_SOURCE_ENTRY_TIMEOUT
+      )
     ).rejects.toMatchObject({
       stderr: expect.stringContaining('Conflicting --multi-agent and --collab values.')
     });
-  }, TEST_TIMEOUT);
+  }, CLI_SOURCE_ENTRY_TIMEOUT);
 
   it('requires a goal for rlm runs', async () => {
-    await expect(runCli(['rlm'])).rejects.toMatchObject({
+    await expect(runCliSourceSubprocess(['rlm'], undefined, CLI_SOURCE_ENTRY_TIMEOUT)).rejects.toMatchObject({
       stderr: expect.stringContaining('rlm requires a goal. Use: codex-orchestrator rlm "<goal>".')
     });
-  }, TEST_TIMEOUT);
+  }, CLI_SOURCE_ENTRY_TIMEOUT);
 
   it('prints self-check text output through the binary shell', async () => {
-    const { stdout } = await runCli(['self-check']);
+    const { stdout } = await runCliSubprocess(['self-check'], undefined, CLI_BINARY_SHELL_TIMEOUT);
     expect(stdout).toContain('Status: ok');
     expect(stdout).toContain('Name: @kbediako/codex-orchestrator');
     expect(stdout).toContain('Version: 0.1.38');
     expect(stdout).toContain(`Node: ${process.version}`);
     expect(stdout).toContain('Timestamp: ');
-  }, TEST_TIMEOUT);
+  }, CLI_BINARY_SHELL_TIMEOUT);
 
   it('prints self-check json output through the binary shell', async () => {
-    const { stdout } = await runCli(['self-check', '--format', 'json']);
+    const { stdout } = await runCliSubprocess(
+      ['self-check', '--format', 'json'],
+      undefined,
+      CLI_BINARY_SHELL_TIMEOUT
+    );
     const payload = JSON.parse(stdout) as {
       status?: string;
       name?: string;
@@ -1075,7 +1504,7 @@ describe('codex-orchestrator command surface', () => {
     expect(payload.version).toBe('0.1.38');
     expect(payload.node).toBe(process.version);
     expect(new Date(String(payload.timestamp)).toISOString()).toBe(payload.timestamp);
-  }, TEST_TIMEOUT);
+  }, CLI_BINARY_SHELL_TIMEOUT);
 
   it('prints doctor apply plan when wiring is missing', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-doctor-apply-'));
@@ -1083,11 +1512,11 @@ describe('codex-orchestrator command surface', () => {
       ...process.env,
       CODEX_HOME: tempDir
     };
-    const { stdout } = await runCli(['doctor', '--apply'], env);
+    const { stdout } = await runCliSubprocess(['doctor', '--apply'], env, CLI_BINARY_SHELL_TIMEOUT);
     expect(stdout).toContain('Doctor apply plan:');
     expect(stdout).toContain('chrome-devtools');
     expect(stdout).toContain('delegation');
-  }, TEST_TIMEOUT);
+  }, CLI_BINARY_SHELL_TIMEOUT);
 
   it('rejects doctor --apply with --format json', async () => {
     await expect(runCli(['doctor', '--apply', '--format', 'json'])).rejects.toMatchObject({
@@ -1099,13 +1528,13 @@ describe('codex-orchestrator command surface', () => {
     await expect(runCli(['devtools'])).rejects.toMatchObject({
       stderr: expect.stringContaining('devtools requires a subcommand (setup).')
     });
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('rejects unknown devtools subcommands', async () => {
     await expect(runCli(['devtools', 'ship-it'])).rejects.toMatchObject({
       stderr: expect.stringContaining('Unknown devtools subcommand: ship-it')
     });
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('emits devtools setup plan json', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-devtools-setup-json-'));
@@ -2327,11 +2756,11 @@ describe('codex-orchestrator command surface', () => {
     expect(payload.payload?.outputs?.stdout).toContain('quoted-smoke');
   }, TEST_TIMEOUT);
 
-  it('rejects exec without a command through the binary shell', async () => {
-    await expect(runCli(['exec'])).rejects.toMatchObject({
+  it('rejects exec without a command through the source entry subprocess', async () => {
+    await expect(runCliSourceSubprocess(['exec'], undefined, CLI_SOURCE_ENTRY_TIMEOUT)).rejects.toMatchObject({
       stderr: expect.stringContaining('exec requires a command to run.')
     });
-  }, TEST_TIMEOUT);
+  }, CLI_SOURCE_ENTRY_TIMEOUT);
 
   it('preserves backslashes in quoted single-token exec commands', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-surface-'));
@@ -2343,7 +2772,11 @@ describe('codex-orchestrator command surface', () => {
       MCP_RUNNER_TASK_ID: 'cli-surface'
     };
 
-    const { stdout } = await runCli(['exec', 'echo C:\\tmp\\foo', '--json', 'compact'], env);
+    const { stdout } = await runCliSourceSubprocess(
+      ['exec', 'echo C:\\tmp\\foo', '--json', 'compact'],
+      env,
+      CLI_SOURCE_ENTRY_TIMEOUT
+    );
     const lines = stdout
       .split(/\r?\n/u)
       .map((line) => line.trim())
@@ -2353,7 +2786,7 @@ describe('codex-orchestrator command surface', () => {
     };
 
     expect(payload.payload?.command?.argv).toEqual(['echo', 'C:\\tmp\\foo']);
-  }, TEST_TIMEOUT);
+  }, CLI_SOURCE_ENTRY_TIMEOUT);
 
   it('handles escaped quotes inside quoted single-token exec commands', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-surface-'));
@@ -2365,9 +2798,10 @@ describe('codex-orchestrator command surface', () => {
       MCP_RUNNER_TASK_ID: 'cli-surface'
     };
 
-    const { stdout } = await runCli(
+    const { stdout } = await runCliSourceSubprocess(
       ['exec', 'node -e "console.log(\\\"x y\\\")"', '--json', 'compact'],
-      env
+      env,
+      CLI_SOURCE_ENTRY_TIMEOUT
     );
     const lines = stdout
       .split(/\r?\n/u)
@@ -2379,5 +2813,5 @@ describe('codex-orchestrator command surface', () => {
 
     expect(payload.payload?.command?.argv).toEqual(['node', '-e', 'console.log("x y")']);
     expect(payload.payload?.outputs?.stdout).toContain('x y');
-  }, CLI_BOOT_TIMEOUT);
+  }, CLI_SOURCE_ENTRY_TIMEOUT);
 });

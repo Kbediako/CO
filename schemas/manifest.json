@@ -473,6 +473,88 @@
             "type": "array",
             "items": { "type": "string", "minLength": 1 }
           },
+          "retrieval_policy": {
+            "type": ["object", "null"],
+            "additionalProperties": false,
+            "required": ["kind", "min_score", "score_weights", "anti_dominance_normalization"],
+            "properties": {
+              "kind": { "type": "string", "const": "competitive_scoring_v1" },
+              "min_score": {
+                "type": ["number", "null"],
+                "minimum": 0
+              },
+              "score_weights": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["gt_score", "relative_rank"],
+                "properties": {
+                  "gt_score": { "type": "number", "minimum": 0 },
+                  "relative_rank": { "type": "number", "minimum": 0 }
+                }
+              },
+              "anti_dominance_normalization": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["enabled", "strength", "source_grouping"],
+                "properties": {
+                  "enabled": { "type": "boolean" },
+                  "strength": { "type": "number", "minimum": 0 },
+                  "source_grouping": { "type": "string", "const": "provenance_fallback_v1" }
+                }
+              }
+            }
+          },
+          "retrieval_selection": {
+            "type": ["object", "null"],
+            "additionalProperties": false,
+            "required": [
+              "candidate_count",
+              "selected_count",
+              "diagnostics_path",
+              "selected_ids",
+              "suppressed_source_keys",
+              "selected"
+            ],
+            "properties": {
+              "candidate_count": { "type": "integer", "minimum": 0 },
+              "selected_count": { "type": "integer", "minimum": 0 },
+              "diagnostics_path": { "type": ["string", "null"] },
+              "selected_ids": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 }
+              },
+              "suppressed_source_keys": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 }
+              },
+              "selected": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "source_key",
+                    "source_kind",
+                    "raw_score",
+                    "competitive_score",
+                    "dominance_penalty"
+                  ],
+                  "properties": {
+                    "id": { "type": "string", "minLength": 1 },
+                    "source_key": { "type": "string", "minLength": 1 },
+                    "source_kind": {
+                      "type": "string",
+                      "enum": ["group_id", "run_id", "manifest_path", "stamp_signature"]
+                    },
+                    "raw_score": { "type": "number" },
+                    "competitive_score": { "type": "number" },
+                    "dominance_penalty": { "type": "number", "minimum": 0 }
+                  }
+                }
+              }
+            }
+          },
           "experiences": {
             "type": ["array", "null"],
             "items": { "type": "string", "minLength": 1 }
@@ -558,6 +640,204 @@
                 "run_id": { "type": "string", "minLength": 1 },
                 "task_id": { "type": "string", "minLength": 1 },
                 "manifest_path": { "type": "string", "minLength": 1 }
+              }
+            }
+          }
+        },
+        "observability": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": [
+            "schema_version",
+            "recorded_at",
+            "selected_memory",
+            "rejected_candidates",
+            "rediscovered_memory",
+            "manual_repairs",
+            "counters"
+          ],
+          "properties": {
+            "schema_version": { "type": "integer", "minimum": 1 },
+            "recorded_at": { "type": "string", "minLength": 1 },
+            "selected_memory": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "selection",
+                "pointer",
+                "object_id",
+                "dir_path",
+                "index_path",
+                "source_path",
+                "created_at",
+                "origin",
+                "inherited_from"
+              ],
+              "properties": {
+                "selection": {
+                  "type": "string",
+                  "enum": ["root", "inherited_reuse", "fresh_rebuild"]
+                },
+                "pointer": { "type": "string", "minLength": 1 },
+                "object_id": { "type": "string", "minLength": 1 },
+                "dir_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^(?![A-Za-z]:[\\\\/])(?![\\\\/])(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+$"
+                },
+                "index_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^(?![A-Za-z]:[\\\\/])(?![\\\\/])(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+$"
+                },
+                "source_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^(?![A-Za-z]:[\\\\/])(?![\\\\/])(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+$"
+                },
+                "created_at": { "type": "string", "minLength": 1 },
+                "origin": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["run_id", "task_id", "manifest_path"],
+                  "properties": {
+                    "run_id": { "type": "string", "minLength": 1 },
+                    "task_id": { "type": "string", "minLength": 1 },
+                    "manifest_path": { "type": "string", "minLength": 1 }
+                  }
+                },
+                "inherited_from": {
+                  "type": ["object", "null"],
+                  "additionalProperties": false,
+                  "required": ["run_id", "task_id", "manifest_path"],
+                  "properties": {
+                    "run_id": { "type": "string", "minLength": 1 },
+                    "task_id": { "type": "string", "minLength": 1 },
+                    "manifest_path": { "type": "string", "minLength": 1 }
+                  }
+                }
+              }
+            },
+            "rejected_candidates": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "pointer",
+                  "object_id",
+                  "dir_path",
+                  "index_path",
+                  "source_path",
+                  "created_at",
+                  "origin",
+                  "inherited_from",
+                  "reason",
+                  "detail"
+                ],
+                "properties": {
+                  "pointer": { "type": "string", "minLength": 1 },
+                  "object_id": { "type": "string", "minLength": 1 },
+                  "dir_path": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^(?![A-Za-z]:[\\\\/])(?![\\\\/])(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+$"
+                  },
+                  "index_path": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^(?![A-Za-z]:[\\\\/])(?![\\\\/])(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+$"
+                  },
+                  "source_path": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^(?![A-Za-z]:[\\\\/])(?![\\\\/])(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+$"
+                  },
+                  "created_at": { "type": "string", "minLength": 1 },
+                  "origin": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["run_id", "task_id", "manifest_path"],
+                    "properties": {
+                      "run_id": { "type": "string", "minLength": 1 },
+                      "task_id": { "type": "string", "minLength": 1 },
+                      "manifest_path": { "type": "string", "minLength": 1 }
+                    }
+                  },
+                  "inherited_from": {
+                    "type": ["object", "null"],
+                    "additionalProperties": false,
+                    "required": ["run_id", "task_id", "manifest_path"],
+                    "properties": {
+                      "run_id": { "type": "string", "minLength": 1 },
+                      "task_id": { "type": "string", "minLength": 1 },
+                      "manifest_path": { "type": "string", "minLength": 1 }
+                    }
+                  },
+                  "reason": {
+                    "type": "string",
+                    "enum": ["missing_artifacts", "provenance_contradiction"]
+                  },
+                  "detail": { "type": ["string", "null"] }
+                }
+              }
+            },
+            "rediscovered_memory": {
+              "type": ["object", "null"],
+              "additionalProperties": false,
+              "required": [
+                "from_pointer",
+                "from_object_id",
+                "to_pointer",
+                "to_object_id",
+                "reason"
+              ],
+              "properties": {
+                "from_pointer": { "type": "string", "minLength": 1 },
+                "from_object_id": { "type": "string", "minLength": 1 },
+                "to_pointer": { "type": "string", "minLength": 1 },
+                "to_object_id": { "type": "string", "minLength": 1 },
+                "reason": {
+                  "type": "string",
+                  "enum": ["missing_artifacts", "provenance_contradiction"]
+                }
+              }
+            },
+            "manual_repairs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["timestamp", "actor", "reason", "outcome", "detail"],
+                "properties": {
+                  "timestamp": { "type": "string", "minLength": 1 },
+                  "actor": { "type": "string", "minLength": 1 },
+                  "reason": { "type": "string", "minLength": 1 },
+                  "outcome": { "type": "string", "const": "accepted" },
+                  "detail": { "type": ["string", "null"] }
+                }
+              }
+            },
+            "counters": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "contradiction_count",
+                "rediscovery_count",
+                "resume_latency_ms",
+                "manual_repair_count",
+                "repeated_failure_streak",
+                "retrieval_hits",
+                "retrieval_misses"
+              ],
+              "properties": {
+                "contradiction_count": { "type": "integer", "minimum": 0 },
+                "rediscovery_count": { "type": "integer", "minimum": 0 },
+                "resume_latency_ms": { "type": ["integer", "null"], "minimum": 0 },
+                "manual_repair_count": { "type": "integer", "minimum": 0 },
+                "repeated_failure_streak": { "type": "integer", "minimum": 0 },
+                "retrieval_hits": { "type": "integer", "minimum": 0 },
+                "retrieval_misses": { "type": "integer", "minimum": 0 }
               }
             }
           }

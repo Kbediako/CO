@@ -1,4 +1,4 @@
-name: Docs Truthfulness Weekly
+name: Repo Stewardship Weekly
 
 on:
   schedule:
@@ -6,12 +6,12 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: docs-truthfulness-weekly
+  group: repo-stewardship-weekly
   cancel-in-progress: false
 
 jobs:
-  docs-truthfulness-weekly:
-    name: Docs Truthfulness Weekly
+  repo-stewardship-weekly:
+    name: Repo Stewardship Weekly
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -32,20 +32,32 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Generate weekly docs drift report
+      - name: Validate front-door docs truth
+        run: npm run docs:check
+
+      - name: Generate weekly docs drift and repo stewardship reports
         run: |
           npm run docs:freshness -- \
             --warn \
             --report "$REPORT_DIR/docs-freshness.json" \
             --summary-markdown "$REPORT_DIR/docs-freshness-summary.md"
+          npm run repo:stewardship -- \
+            --warn \
+            --report "$REPORT_DIR/repo-stewardship.json" \
+            --summary-markdown "$REPORT_DIR/repo-stewardship-summary.md"
 
       - name: Publish workflow summary
-        run: cat "$REPORT_DIR/docs-freshness-summary.md" >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          cat "$REPORT_DIR/docs-freshness-summary.md" >> "$GITHUB_STEP_SUMMARY"
+          printf '\n' >> "$GITHUB_STEP_SUMMARY"
+          cat "$REPORT_DIR/repo-stewardship-summary.md" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload docs drift artifacts
+      - name: Upload repo stewardship artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: docs-truthfulness-weekly
+          name: repo-stewardship-weekly
           path: |
             ${{ env.REPORT_DIR }}/docs-freshness.json
             ${{ env.REPORT_DIR }}/docs-freshness-summary.md
+            ${{ env.REPORT_DIR }}/repo-stewardship.json
+            ${{ env.REPORT_DIR }}/repo-stewardship-summary.md

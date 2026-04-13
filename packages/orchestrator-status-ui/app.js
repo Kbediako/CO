@@ -1,7 +1,6 @@
 const params = new URLSearchParams(window.location.search);
 const runnerHosted = isRunnerHosted();
-const dataUrl =
-  params.get('data') || (runnerHosted ? '/ui/data.json' : '../../out/0911-orchestrator-status-ui/data.json');
+const dataUrl = resolveDataUrl();
 const refreshMs = clampNumber(Number(params.get('refresh') || 4000), 2000, 15000);
 
 const elements = {
@@ -59,7 +58,9 @@ let refreshTimer = null;
 let activeLoadPromise = null;
 let queuedLoadAfterCurrent = false;
 
-elements.dataSource.textContent = `Data source: ${dataUrl}`;
+elements.dataSource.textContent = dataUrl
+  ? `Data source: ${dataUrl}`
+  : 'Data source: add ?data=<url> when opening the static bundle outside /ui';
 elements.refreshButton.addEventListener('click', () => {
   requestRefresh();
 });
@@ -96,6 +97,12 @@ async function boot() {
     await initSession();
   }
   await loadData();
+  if (!dataUrl) {
+    return;
+  }
+  if (refreshTimer !== null) {
+    window.clearInterval(refreshTimer);
+  }
   refreshTimer = window.setInterval(() => {
     void loadData();
   }, refreshMs);
@@ -132,6 +139,12 @@ async function initSession() {
 }
 
 async function loadData(retriedAfterUnauthorized = false, options = {}) {
+  if (!dataUrl) {
+    setSyncStatus('Provide ?data=<url> or serve this bundle behind /ui/data.json', false, true);
+    render();
+    return;
+  }
+
   if (activeLoadPromise) {
     if (options.queueIfBusy) {
       queuedLoadAfterCurrent = true;
@@ -766,7 +779,7 @@ function buildAuthHeaders(includeCsrf) {
 }
 
 function buildDataHeaders() {
-  if (!state.auth.token) {
+  if (!state.auth.token || !dataUrl) {
     return null;
   }
   try {
@@ -778,6 +791,14 @@ function buildDataHeaders() {
     return null;
   }
   return null;
+}
+
+function resolveDataUrl() {
+  const explicit = params.get('data');
+  if (explicit) {
+    return explicit;
+  }
+  return runnerHosted ? '/ui/data.json' : null;
 }
 
 function formatAuthStatus(status) {
