@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { readDelegationFallbackConfig } from '../src/cli/utils/delegationConfigParser.js';
+import { classifyDelegationTransport } from '../src/cli/utils/delegationMcpHealth.js';
 
 describe('readDelegationFallbackConfig', () => {
   it('parses args and env vars from a quoted delegation section', async () => {
@@ -135,6 +136,42 @@ describe('readDelegationFallbackConfig', () => {
           MODE: 'debug'
         }
       });
+    } finally {
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('decodes Windows basic-string escapes so direct-dist fallback configs stay classifiable', async () => {
+    const tempHome = await mkdtemp(join(tmpdir(), 'delegation-config-parser-'));
+    const configPath = join(tempHome, 'config.toml');
+    try {
+      await writeFile(
+        configPath,
+        [
+          '[mcp_servers.delegation]',
+          'command = "C:\\\\Program Files\\\\nodejs\\\\node.exe"',
+          'args = ["C:\\\\tmp\\\\local-checkout\\\\dist\\\\bin\\\\codex-orchestrator.js", "delegate-server", "--repo", "C:\\\\tmp\\\\local-checkout"]'
+        ].join('\n'),
+        'utf8'
+      );
+
+      const parsed = readDelegationFallbackConfig(configPath);
+      expect(parsed).toEqual({
+        command: 'C:\\Program Files\\nodejs\\node.exe',
+        args: ['C:\\tmp\\local-checkout\\dist\\bin\\codex-orchestrator.js', 'delegate-server', '--repo', 'C:\\tmp\\local-checkout'],
+        envVars: {}
+      });
+      expect(
+        classifyDelegationTransport({
+          source: 'fallback',
+          command: parsed?.command ?? null,
+          args: parsed?.args ?? [],
+          envVars: parsed?.envVars ?? {},
+          pinnedRepo: 'C:\\tmp\\local-checkout',
+          commandLine:
+            "'C:\\Program Files\\nodejs\\node.exe' 'C:\\tmp\\local-checkout\\dist\\bin\\codex-orchestrator.js' delegate-server --repo 'C:\\tmp\\local-checkout'"
+        })
+      ).toMatchObject({ status: 'safe', kind: 'direct-dist' });
     } finally {
       await rm(tempHome, { recursive: true, force: true });
     }

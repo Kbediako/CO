@@ -73,10 +73,9 @@ function readDelegationEnvVarsFromConfig(raw: string): Record<string, string> {
   let match = linePattern.exec(section);
   while (match) {
     const key = match[1];
-    const rawValue = match[2] ?? '';
-    if (key) {
-      const unquoted = rawValue.slice(1, -1);
-      const decoded = unquoted.replace(/\\"/gu, '"').replace(/\\'/gu, '\'');
+    const rawValue = match[2];
+    const decoded = rawValue ? decodeQuotedTomlString(rawValue) : null;
+    if (key && decoded !== null) {
       envVars[key] = decoded;
     }
     match = linePattern.exec(section);
@@ -122,10 +121,9 @@ function readInlineEnvVars(raw: string): Record<string, string> {
   let match = linePattern.exec(envRaw);
   while (match) {
     const key = match[1];
-    const rawValue = match[2] ?? '';
-    if (key) {
-      const unquoted = rawValue.slice(1, -1);
-      const decoded = unquoted.replace(/\\"/gu, '"').replace(/\\'/gu, '\'');
+    const rawValue = match[2];
+    const decoded = rawValue ? decodeQuotedTomlString(rawValue) : null;
+    if (key && decoded !== null) {
       envVars[key] = decoded;
     }
     match = linePattern.exec(envRaw);
@@ -216,12 +214,13 @@ function readDelimitedContents(raw: string, openIndex: number, open: string, clo
 
 function readQuotedTokens(raw: string): string[] {
   const tokens: string[] = [];
-  const tokenPattern = /"((?:\\"|[^"])*)"|'((?:\\'|[^'])*)'/gu;
+  const tokenPattern = /("(?:\\.|[^"])*"|'(?:\\.|[^'])*')/gu;
   let token = tokenPattern.exec(raw);
   while (token) {
-    const quoted = token[1] ?? token[2] ?? '';
-    const decoded = quoted.replace(/\\"/gu, '"').replace(/\\'/gu, '\'');
-    tokens.push(decoded);
+    const decoded = decodeQuotedTomlString(token[1] ?? '');
+    if (decoded !== null) {
+      tokens.push(decoded);
+    }
     token = tokenPattern.exec(raw);
   }
   return tokens;
@@ -231,8 +230,19 @@ function decodeQuotedTomlString(raw: string): string | null {
   if (!raw || raw.length < 2) {
     return null;
   }
+  if (raw.startsWith('"') && raw.endsWith('"')) {
+    try {
+      return JSON.parse(raw) as string;
+    } catch {
+      const unquoted = raw.slice(1, -1);
+      return unquoted
+        .replace(/\\\\/gu, '\\')
+        .replace(/\\"/gu, '"')
+        .replace(/\\'/gu, '\'');
+    }
+  }
   const unquoted = raw.slice(1, -1);
-  return unquoted.replace(/\\"/gu, '"').replace(/\\'/gu, '\'');
+  return unquoted.replace(/\\'/gu, '\'');
 }
 
 function stripTomlComment(line: string): string {
