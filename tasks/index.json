@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260414-linear-a560f416-c80a-473b-96fb-9f1ec090c968",
+      "title": "CO: keep provider-worker handoff manifests truthful when guardrail summaries fail",
+      "relates_to": "tasks/tasks-linear-a560f416-c80a-473b-96fb-9f1ec090c968.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-14",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-a560f416-c80a-473b-96fb-9f1ec090c968.md",
+        "task": "tasks/tasks-linear-a560f416-c80a-473b-96fb-9f1ec090c968.md",
+        "agent_task": ".agent/task/linear-a560f416-c80a-473b-96fb-9f1ec090c968.md",
+        "docs": "docs/TECH_SPEC-linear-a560f416-c80a-473b-96fb-9f1ec090c968.md"
+      }
+    },
+    {
       "id": "20260414-linear-e3bc507e-c33d-48c7-9474-196a6ef9a28c",
       "title": "CO workflow: align provider issue-worktree resolution for configured artifact roots",
       "relates_to": "tasks/tasks-linear-e3bc507e-c33d-48c7-9474-196a6ef9a28c.md",
