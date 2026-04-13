@@ -16,7 +16,7 @@ describe('runDelegationSetup', () => {
         [
           '#!/bin/sh',
           'if [ "$1" = "mcp" ] && [ "$2" = "get" ] && [ "$3" = "delegation" ] && [ "$4" = "--json" ]; then',
-          `  printf '%s\\n' '{\"transport\":{\"command\":\"codex-orchestrator\",\"args\":[\"delegate-server\",\"--repo\",\"${process.cwd().replace(/'/g, "'\\''")}\"]}}'`,
+          `  printf '%s\\n' '{"transport":{"command":"codex-orchestrator","args":["delegate-server","--repo","${process.cwd().replace(/'/g, "'\\''")}"]}}'`,
           '  exit 0',
           'fi',
           'exit 1'
