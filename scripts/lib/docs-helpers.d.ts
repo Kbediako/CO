@@ -4,6 +4,7 @@ export function pathExists(target: string, options?: {
 }): Promise<boolean>;
 export function collectMarkdownFiles(repoRoot: string, relativeDir: string): Promise<string[]>;
 export function collectDocFiles(repoRoot: string): Promise<string[]>;
+export function listTrackedFiles(repoRoot: string, pathspecs?: string[]): string[];
 export function normalizeTaskKey(
   item:
     | {

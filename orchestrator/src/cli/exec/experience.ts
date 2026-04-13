@@ -1,5 +1,10 @@
 import type { ExecEvent } from '../../../../packages/shared/events/types.js';
-import type { ExperienceInput, ExperienceRecord, ExperienceToolStat } from '../../persistence/ExperienceStore.js';
+import type {
+  ExperienceInput,
+  ExperienceRecord,
+  ExperienceSelectionDiagnostics,
+  ExperienceToolStat
+} from '../../persistence/ExperienceStore.js';
 import type { ToolMetricSummary } from '../../../../packages/shared/events/types.js';
 
 export interface TrajectoryFrame {
@@ -80,16 +85,36 @@ export function framesFromToolMetrics(
   }));
 }
 
-export function formatExperienceInjections(experiences: ExperienceRecord[], slots: number): string[] {
+export function formatExperienceInjections(
+  experiences: ExperienceRecord[],
+  slots: number,
+  diagnostics?: Pick<ExperienceSelectionDiagnostics, 'selected'>
+): string[] {
   if (slots <= 0) {
     return [];
   }
+  const selectedMetadata = new Map(
+    (diagnostics?.selected ?? []).map((entry) => [entry.id, entry] as const)
+  );
   return experiences.slice(0, slots).map((experience) => {
+    const selected = selectedMetadata.get(experience.id);
     const rewardScore = (experience.reward.gtScore + experience.reward.relativeRank).toFixed(2);
     const statText = experience.toolStats
       .map((stat) => `${stat.tool}: ${stat.tokens}t/${stat.costUsd.toFixed(3)}usd/${Math.round(stat.latencyMs)}ms`)
       .join('; ');
-    return `[exp ${experience.id} | epoch ${experience.epoch ?? 'n/a'} | reward ${rewardScore}] ${experience.summary32} (stats: ${statText})`;
+    const metadataParts = [
+      `exp ${experience.id}`,
+      `epoch ${experience.epoch ?? 'n/a'}`,
+      `reward ${rewardScore}`
+    ];
+    if (selected) {
+      metadataParts.push(`source ${selected.source_kind}:${selected.source_key}`);
+      metadataParts.push(`competitive ${selected.competitive_score.toFixed(2)}`);
+      if (selected.dominance_penalty > 0) {
+        metadataParts.push(`anti-dom ${selected.dominance_penalty.toFixed(2)}`);
+      }
+    }
+    return `[${metadataParts.join(' | ')}] ${experience.summary32} (stats: ${statText})`;
   });
 }
 

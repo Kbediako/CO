@@ -4,15 +4,49 @@ import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 
 export type PromptPackSection = 'system' | 'inject' | 'summarize' | 'extract' | 'optimize';
+export type PromptPackRetrievalPolicyKind = 'competitive_scoring_v1';
+export type PromptPackRetrievalSourceGrouping = 'provenance_fallback_v1';
 
 const PROMPT_SECTIONS: PromptPackSection[] = ['system', 'inject', 'summarize', 'extract', 'optimize'];
 const PROMPT_PACK_DIR = ['.agent', 'prompts', 'prompt-packs'];
+const DEFAULT_PROMPT_PACK_RETRIEVAL_POLICY_KIND: PromptPackRetrievalPolicyKind = 'competitive_scoring_v1';
+const DEFAULT_PROMPT_PACK_SOURCE_GROUPING: PromptPackRetrievalSourceGrouping = 'provenance_fallback_v1';
+const DEFAULT_ANTI_DOMINANCE_STRENGTH = 0.5;
+
+export interface PromptPackRetrievalPolicyFile {
+  kind?: string;
+  minScore?: number | null;
+  scoreWeights?: {
+    gtScore?: number;
+    relativeRank?: number;
+  };
+  antiDominanceNormalization?: {
+    enabled?: boolean;
+    strength?: number;
+    sourceGrouping?: string;
+  };
+}
+
+export interface PromptPackRetrievalPolicy {
+  kind: PromptPackRetrievalPolicyKind;
+  minScore: number | null;
+  scoreWeights: {
+    gtScore: number;
+    relativeRank: number;
+  };
+  antiDominanceNormalization: {
+    enabled: boolean;
+    strength: number;
+    sourceGrouping: PromptPackRetrievalSourceGrouping;
+  };
+}
 
 export interface PromptPackManifestFile {
   id: string;
   domain: string;
   stamp: string;
   experienceSlots?: number;
+  retrievalPolicy?: PromptPackRetrievalPolicyFile;
   system: string;
   inject?: string[];
   summarize?: string[];
@@ -31,6 +65,7 @@ export interface PromptPack {
   domain: string;
   stamp: string;
   experienceSlots: number;
+  retrievalPolicy: PromptPackRetrievalPolicy;
   sections: Record<PromptPackSection, PromptPackSectionSource[]>;
   sources: PromptPackSectionSource[];
 }
@@ -39,6 +74,11 @@ export interface PromptPackMetadata {
   id: string;
   domain: string;
   experienceSlots: number;
+}
+
+export interface PromptPackStampConfig {
+  experienceSlots: number;
+  retrievalPolicy: PromptPackRetrievalPolicy;
 }
 
 export async function loadPromptPacks(repoRoot: string): Promise<PromptPack[]> {
@@ -128,7 +168,12 @@ async function loadPromptPack(manifestPath: string, repoRoot: string): Promise<P
     );
   }
 
-  const computedStamp = computePromptPackStamp(allSources);
+  const experienceSlots = resolvePromptPackExperienceSlots(parsed, manifestPath, repoRoot);
+  const retrievalPolicy = normalizePromptPackRetrievalPolicy(parsed.retrievalPolicy);
+  const computedStamp = computePromptPackStamp(allSources, {
+    experienceSlots,
+    retrievalPolicy
+  });
   if (!parsed.stamp) {
     throw new Error(`Prompt pack ${parsed.id} is missing a stamp (manifest: ${relative(repoRoot, manifestPath)})`);
   }
@@ -141,13 +186,12 @@ async function loadPromptPack(manifestPath: string, repoRoot: string): Promise<P
     );
   }
 
-  const experienceSlots = resolveExperienceSlots(parsed);
-
   return {
     id: parsed.id,
     domain: parsed.domain,
     stamp: parsed.stamp,
     experienceSlots,
+    retrievalPolicy,
     sections,
     sources: allSources
   };
@@ -162,7 +206,7 @@ async function loadPromptPackMetadataEntry(manifestPath: string, repoRoot: strin
   return {
     id: parsed.id,
     domain: parsed.domain,
-    experienceSlots: resolveExperienceSlots(parsed)
+    experienceSlots: resolvePromptPackExperienceSlots(parsed, manifestPath, repoRoot)
   };
 }
 
@@ -175,10 +219,26 @@ async function readPromptPackManifestFile(manifestPath: string, repoRoot: string
   }
 }
 
-function resolveExperienceSlots(parsed: PromptPackManifestFile): number {
-  return Number.isInteger(parsed.experienceSlots) && parsed.experienceSlots! >= 0
-    ? parsed.experienceSlots!
-    : 0;
+function resolvePromptPackExperienceSlots(
+  parsed: PromptPackManifestFile,
+  manifestPath: string,
+  repoRoot: string
+): number {
+  if (
+    parsed.experienceSlots !== undefined &&
+    (typeof parsed.experienceSlots !== 'number' ||
+      !Number.isInteger(parsed.experienceSlots) ||
+      parsed.experienceSlots < 0)
+  ) {
+    throw new Error(
+      `Prompt pack ${parsed.id} has invalid experienceSlots; expected a non-negative integer (${relative(
+        repoRoot,
+        manifestPath
+      )})`
+    );
+  }
+
+  return parsed.experienceSlots ?? 0;
 }
 
 function validateManifest(manifest: PromptPackManifestFile, manifestPath: string, repoRoot: string): void {
@@ -197,6 +257,95 @@ function validateManifest(manifest: PromptPackManifestFile, manifestPath: string
       `Prompt pack manifest ${relative(repoRoot, manifestPath)} missing required fields: ${missing.join(', ')}`
     );
   }
+}
+
+function normalizePromptPackRetrievalPolicy(
+  input: PromptPackRetrievalPolicyFile | undefined
+): PromptPackRetrievalPolicy {
+  const antiDominance = input?.antiDominanceNormalization;
+  return {
+    kind: normalizeRetrievalPolicyKind(input?.kind),
+    minScore:
+      input?.minScore === null || input?.minScore === undefined
+        ? null
+        : normalizeNonNegativeNumber(input.minScore, 'retrievalPolicy.minScore'),
+    scoreWeights: {
+      gtScore: normalizeNonNegativeNumber(
+        input?.scoreWeights?.gtScore,
+        'retrievalPolicy.scoreWeights.gtScore',
+        1
+      ),
+      relativeRank: normalizeNonNegativeNumber(
+        input?.scoreWeights?.relativeRank,
+        'retrievalPolicy.scoreWeights.relativeRank',
+        1
+      )
+    },
+    antiDominanceNormalization: {
+      enabled: normalizeBoolean(
+        antiDominance?.enabled,
+        'retrievalPolicy.antiDominanceNormalization.enabled',
+        true
+      ),
+      strength: normalizeNonNegativeNumber(
+        antiDominance?.strength,
+        'retrievalPolicy.antiDominanceNormalization.strength',
+        DEFAULT_ANTI_DOMINANCE_STRENGTH
+      ),
+      sourceGrouping: normalizeSourceGrouping(antiDominance?.sourceGrouping)
+    }
+  };
+}
+
+function normalizeRetrievalPolicyKind(value: string | undefined): PromptPackRetrievalPolicyKind {
+  if (!value || !value.trim()) {
+    return DEFAULT_PROMPT_PACK_RETRIEVAL_POLICY_KIND;
+  }
+  if (value !== DEFAULT_PROMPT_PACK_RETRIEVAL_POLICY_KIND) {
+    throw new Error(
+      `Unsupported prompt-pack retrieval policy kind '${value}'. Expected '${DEFAULT_PROMPT_PACK_RETRIEVAL_POLICY_KIND}'.`
+    );
+  }
+  return DEFAULT_PROMPT_PACK_RETRIEVAL_POLICY_KIND;
+}
+
+function normalizeSourceGrouping(value: string | undefined): PromptPackRetrievalSourceGrouping {
+  if (!value || !value.trim()) {
+    return DEFAULT_PROMPT_PACK_SOURCE_GROUPING;
+  }
+  if (value !== DEFAULT_PROMPT_PACK_SOURCE_GROUPING) {
+    throw new Error(
+      `Unsupported prompt-pack source grouping '${value}'. Expected '${DEFAULT_PROMPT_PACK_SOURCE_GROUPING}'.`
+    );
+  }
+  return DEFAULT_PROMPT_PACK_SOURCE_GROUPING;
+}
+
+function normalizeNonNegativeNumber(
+  value: number | undefined,
+  field: string,
+  defaultValue?: number
+): number {
+  if (value === undefined) {
+    if (defaultValue === undefined) {
+      throw new Error(`${field} is required.`);
+    }
+    return defaultValue;
+  }
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error(`${field} must be a finite non-negative number.`);
+  }
+  return value;
+}
+
+function normalizeBoolean(value: boolean | undefined, field: string, defaultValue: boolean): boolean {
+  if (value === undefined) {
+    return defaultValue;
+  }
+  if (typeof value !== 'boolean') {
+    throw new Error(`${field} must be a boolean.`);
+  }
+  return value;
 }
 
 async function loadSectionArray(
@@ -246,7 +395,10 @@ async function loadSectionSource(
   };
 }
 
-export function computePromptPackStamp(sources: PromptPackSectionSource[]): string {
+export function computePromptPackStamp(
+  sources: PromptPackSectionSource[],
+  config?: PromptPackStampConfig
+): string {
   const hash = createHash('sha256');
   const sorted = [...sources].sort((a, b) => {
     if (a.section === b.section) {
@@ -258,6 +410,29 @@ export function computePromptPackStamp(sources: PromptPackSectionSource[]): stri
   for (const source of sorted) {
     hash.update(`${source.section}:${source.path}\n`, 'utf8');
     hash.update(source.content, 'utf8');
+    hash.update('\n', 'utf8');
+  }
+
+  if (config) {
+    hash.update(
+      JSON.stringify({
+        experienceSlots: config.experienceSlots,
+        retrievalPolicy: {
+          kind: config.retrievalPolicy.kind,
+          minScore: config.retrievalPolicy.minScore,
+          scoreWeights: {
+            gtScore: config.retrievalPolicy.scoreWeights.gtScore,
+            relativeRank: config.retrievalPolicy.scoreWeights.relativeRank
+          },
+          antiDominanceNormalization: {
+            enabled: config.retrievalPolicy.antiDominanceNormalization.enabled,
+            strength: config.retrievalPolicy.antiDominanceNormalization.strength,
+            sourceGrouping: config.retrievalPolicy.antiDominanceNormalization.sourceGrouping
+          }
+        }
+      }),
+      'utf8'
+    );
     hash.update('\n', 'utf8');
   }
 

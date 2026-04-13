@@ -18,6 +18,7 @@ import { resolveLinearWebhookSourceSetup } from './linearWebhookController.js';
 import type {
   ProviderIssueHandoffPollInput,
   ProviderIssueHandoffService,
+  ProviderTrackedIssueRefetchInput,
   ProviderTrackedIssuePollResolution
 } from './providerIssueHandoff.js';
 import type { ProviderIntakeState } from './providerIntakeState.js';
@@ -39,10 +40,15 @@ import {
   type ControlServerOwnedLifecycleState
 } from './controlServerReadyInstanceLifecycle.js';
 import { prepareControlServerStartupInputs } from './controlServerStartupInputPreparation.js';
+import {
+  acquireControlHostOwnership,
+  type ControlHostOwnershipHandle
+} from './controlHostOwnership.js';
 
 const EXPIRY_INTERVAL_MS = 15_000;
 const PROVIDER_REFRESH_INTERVAL_MS = 15_000;
 const PROVIDER_REFRESH_STUCK_AFTER_MS = 45_000;
+const PROVIDER_FULL_RECOVERY_SWEEP_INTERVAL_MS = 10 * 60 * 1000;
 const SESSION_TTL_MS = 15 * 60 * 1000;
 interface ProviderIssueHandoffOperationState {
   active: Promise<void> | null;
@@ -69,6 +75,11 @@ export interface StartControlServerPublicLifecycleOptions {
   config: EffectiveDelegationConfig;
   eventStream?: Pick<RunEventStream, 'append'>;
   runId: string;
+  controlHostOwnership?: {
+    repoRoot?: string | null;
+    taskId?: string | null;
+    pipelineId?: string | null;
+  } | false;
   providerWorkflowConfigStore?: ProviderWorkflowConfigStore;
   createProviderIssueHandoff?: ((input: {
     providerIntakeState: ProviderIntakeState;
@@ -85,6 +96,7 @@ export interface ControlServerPublicLifecycleState {
   providerRefreshTimer?: ProviderRefreshTimerHandle | null;
   providerRefreshStartupTrigger?: NodeJS.Timeout | null;
   triggerProviderRefresh?: (() => Promise<void>) | null;
+  controlHostOwnership?: ControlHostOwnershipHandle | null;
 }
 
 export interface StartedControlServerPublicLifecycle extends ControlServerPublicLifecycleState {
@@ -102,82 +114,101 @@ export interface ProviderIssueHandoffRefreshRequestOutcome {
 export async function startControlServerPublicLifecycle(
   options: StartControlServerPublicLifecycleOptions
 ): Promise<StartedControlServerPublicLifecycle> {
-  const startupInputs = await prepareControlServerStartupInputs({
-    paths: options.paths,
-    config: options.config,
-    eventStream: options.eventStream,
-    runId: options.runId,
-    sessionTtlMs: SESSION_TTL_MS,
-    providerWorkflowConfigStore: options.providerWorkflowConfigStore,
-    createProviderIssueHandoff: options.createProviderIssueHandoff
-  });
+  let controlHostOwnership: ControlHostOwnershipHandle | null = null;
+  try {
+    controlHostOwnership =
+      !options.controlHostOwnership
+        ? null
+        : await acquireControlHostOwnership({
+            paths: options.paths,
+            runId: options.runId,
+            repoRoot: options.controlHostOwnership?.repoRoot,
+            taskId: options.controlHostOwnership?.taskId,
+            pipelineId: options.controlHostOwnership?.pipelineId
+          });
 
-  const readyInstance = await startControlServerReadyInstanceLifecycle({
-    requestContextShared: startupInputs.requestContextShared,
-    host: startupInputs.host,
-    controlToken: startupInputs.controlToken,
-    intervalMs: EXPIRY_INTERVAL_MS
-  });
-
-  const providerRefreshCoordinator = startupInputs.requestContextShared.providerIssueHandoff
-    ? createProviderRefreshCoordinator(
-        startupInputs.requestContextShared.providerIssueHandoff,
-        {
-          readFeatureToggles:
-            startupInputs.requestContextShared.controlStore
-              ? () => startupInputs.requestContextShared.controlStore.snapshot().feature_toggles
-              : null
-        }
-      )
-    : null;
-  if (startupInputs.requestContextShared.providerIssueHandoff) {
-    const persistProviderIntakePolling =
-      startupInputs.requestContextShared.persist?.providerIntakePolling ?? null;
-    const persistedPollingSnapshot =
-      startupInputs.requestContextShared.providerIntakeState?.polling ?? null;
-    initializeProviderPollingHealth(startupInputs.requestContextShared.providerIssueHandoff, {
-      intervalMs: PROVIDER_REFRESH_INTERVAL_MS,
-      stuckAfterMs: PROVIDER_REFRESH_STUCK_AFTER_MS,
-      skipInitialUpdate: persistedPollingSnapshot !== null,
-      onUpdate:
-        startupInputs.requestContextShared.providerIntakeState && persistProviderIntakePolling
-          ? async (polling) => {
-              const pollingUpdatedAt =
-                typeof polling.updated_at === 'string' && polling.updated_at.trim().length > 0
-                  ? polling.updated_at
-                  : isoTimestamp();
-              const stateUpdatedAt = pickLatestTimestamp(
-                startupInputs.requestContextShared.providerIntakeState!.updated_at,
-                pollingUpdatedAt
-              );
-              const nextPolling = {
-                ...polling,
-                updated_at: pollingUpdatedAt
-              };
-              startupInputs.requestContextShared.providerIntakeState!.polling = nextPolling;
-              startupInputs.requestContextShared.providerIntakeState!.updated_at = stateUpdatedAt;
-              await persistProviderIntakePolling(nextPolling, stateUpdatedAt);
-            }
-          : null
+    const startupInputs = await prepareControlServerStartupInputs({
+      paths: options.paths,
+      config: options.config,
+      eventStream: options.eventStream,
+      runId: options.runId,
+      sessionTtlMs: SESSION_TTL_MS,
+      providerWorkflowConfigStore: options.providerWorkflowConfigStore,
+      createProviderIssueHandoff: options.createProviderIssueHandoff
     });
-  }
-  const providerRefreshStartupTrigger = providerRefreshCoordinator
-    ? scheduleStartupProviderRefresh(providerRefreshCoordinator.trigger)
-    : null;
 
-  return {
-    server: readyInstance.server,
-    requestContextShared: startupInputs.requestContextShared,
-    lifecycleState: readyInstance.lifecycleState,
-    ...(providerRefreshCoordinator
-      ? {
-          providerRefreshTimer: providerRefreshCoordinator.timer,
-          providerRefreshStartupTrigger,
-          triggerProviderRefresh: providerRefreshCoordinator.trigger
-        }
-      : {}),
-    baseUrl: readyInstance.baseUrl
-  };
+    const readyInstance = await startControlServerReadyInstanceLifecycle({
+      requestContextShared: startupInputs.requestContextShared,
+      host: startupInputs.host,
+      controlToken: startupInputs.controlToken,
+      intervalMs: EXPIRY_INTERVAL_MS
+    });
+
+    const providerRefreshCoordinator = startupInputs.requestContextShared.providerIssueHandoff
+      ? createProviderRefreshCoordinator(
+          startupInputs.requestContextShared.providerIssueHandoff,
+          {
+            readFeatureToggles:
+              startupInputs.requestContextShared.controlStore
+                ? () => startupInputs.requestContextShared.controlStore.snapshot().feature_toggles
+                : null
+          }
+        )
+      : null;
+    if (startupInputs.requestContextShared.providerIssueHandoff) {
+      const persistProviderIntakePolling =
+        startupInputs.requestContextShared.persist?.providerIntakePolling ?? null;
+      const persistedPollingSnapshot =
+        startupInputs.requestContextShared.providerIntakeState?.polling ?? null;
+      initializeProviderPollingHealth(startupInputs.requestContextShared.providerIssueHandoff, {
+        intervalMs: PROVIDER_REFRESH_INTERVAL_MS,
+        stuckAfterMs: PROVIDER_REFRESH_STUCK_AFTER_MS,
+        controlHostOwner: controlHostOwnership?.polling ?? null,
+        skipInitialUpdate: persistedPollingSnapshot !== null,
+        onUpdate:
+          startupInputs.requestContextShared.providerIntakeState && persistProviderIntakePolling
+            ? async (polling) => {
+                const pollingUpdatedAt =
+                  typeof polling.updated_at === 'string' && polling.updated_at.trim().length > 0
+                    ? polling.updated_at
+                    : isoTimestamp();
+                const stateUpdatedAt = pickLatestTimestamp(
+                  startupInputs.requestContextShared.providerIntakeState!.updated_at,
+                  pollingUpdatedAt
+                );
+                const nextPolling = {
+                  ...polling,
+                  updated_at: pollingUpdatedAt
+                };
+                startupInputs.requestContextShared.providerIntakeState!.polling = nextPolling;
+                startupInputs.requestContextShared.providerIntakeState!.updated_at = stateUpdatedAt;
+                await persistProviderIntakePolling(nextPolling, stateUpdatedAt);
+              }
+            : null
+      });
+    }
+    const providerRefreshStartupTrigger = providerRefreshCoordinator
+      ? scheduleStartupProviderRefresh(providerRefreshCoordinator.trigger)
+      : null;
+
+    return {
+      server: readyInstance.server,
+      requestContextShared: startupInputs.requestContextShared,
+      lifecycleState: readyInstance.lifecycleState,
+      ...(controlHostOwnership ? { controlHostOwnership } : {}),
+      ...(providerRefreshCoordinator
+        ? {
+            providerRefreshTimer: providerRefreshCoordinator.timer,
+            providerRefreshStartupTrigger,
+            triggerProviderRefresh: providerRefreshCoordinator.trigger
+          }
+        : {}),
+      baseUrl: readyInstance.baseUrl
+    };
+  } catch (error) {
+    await controlHostOwnership?.release().catch(() => undefined);
+    throw error;
+  }
 }
 
 export async function closeControlServerPublicLifecycle(
@@ -189,18 +220,28 @@ export async function closeControlServerPublicLifecycle(
   if (state.providerRefreshTimer) {
     state.providerRefreshTimer.cancel();
   }
-  return closeControlServerOwnedRuntime({
-    server: state.server,
-    requestContextShared: state.requestContextShared,
-    lifecycleState: state.lifecycleState
-  });
+  let closeError: unknown = null;
+  try {
+    await closeControlServerOwnedRuntime({
+      server: state.server,
+      requestContextShared: state.requestContextShared,
+      lifecycleState: state.lifecycleState
+    });
+  } catch (error) {
+    closeError = error;
+  }
+  if (closeError) {
+    throw closeError;
+  }
+  await state.controlHostOwnership?.release();
 }
 
 export function runProviderIssueHandoffRefresh(
   providerIssueHandoff: ProviderIssueHandoffService,
-  options?: { queueIfBusy?: boolean }
+  options?: { queueIfBusy?: boolean; acknowledgeAccepted?: boolean }
 ): Promise<ProviderIssueHandoffRefreshRequestOutcome> {
   const state = getProviderIssueHandoffOperationState(providerIssueHandoff);
+  const acknowledgeAccepted = options?.acknowledgeAccepted === true;
   if (state.active) {
     const continueWhileBusy = (): Promise<ProviderIssueHandoffRefreshRequestOutcome> => {
       if (!options?.queueIfBusy) {
@@ -219,21 +260,29 @@ export function runProviderIssueHandoffRefresh(
         preserveActiveMode: true
       });
       if (state.queuedRefresh) {
-        return mapProviderIssueHandoffRefreshOutcome(providerIssueHandoff, state.queuedRefresh, {
+        const queuedOutcome: ProviderIssueHandoffRefreshRequestOutcome = {
           queued: true,
           coalesced: true
-        });
+        };
+        return acknowledgeAccepted
+          ? acknowledgeProviderIssueHandoffAccepted(state.queuedRefresh, queuedOutcome)
+          : mapProviderIssueHandoffRefreshOutcome(providerIssueHandoff, state.queuedRefresh, queuedOutcome);
       }
-      return mapProviderIssueHandoffRefreshOutcome(
+      const queuedRefresh = queueProviderIssueHandoffRefresh(
         providerIssueHandoff,
-        queueProviderIssueHandoffRefresh(providerIssueHandoff, state, () => providerIssueHandoff.refresh(), {
-          mode: 'refresh'
-        }),
+        state,
+        () => providerIssueHandoff.refresh(),
         {
-          queued: true,
-          coalesced: false
+          mode: 'refresh'
         }
       );
+      const queuedOutcome: ProviderIssueHandoffRefreshRequestOutcome = {
+        queued: true,
+        coalesced: false
+      };
+      return acknowledgeAccepted
+        ? acknowledgeProviderIssueHandoffAccepted(queuedRefresh, queuedOutcome)
+        : mapProviderIssueHandoffRefreshOutcome(providerIssueHandoff, queuedRefresh, queuedOutcome);
     };
     if (isProviderPollingStuck(providerIssueHandoff)) {
       return (async () => {
@@ -252,19 +301,31 @@ export function runProviderIssueHandoffRefresh(
     }
     return continueWhileBusy();
   }
-  return mapProviderIssueHandoffRefreshOutcome(
-    providerIssueHandoff,
-    waitForProviderIssueHandoffPending(
+  const idleStuckError = buildProviderIssueHandoffRestartRequiredError(providerIssueHandoff);
+  if (idleStuckError) {
+    clearProviderIssueHandoffOperationState(providerIssueHandoff, state);
+    return mapProviderIssueHandoffRefreshOutcome(
       providerIssueHandoff,
-      startProviderIssueHandoffOperation(providerIssueHandoff, state, () => providerIssueHandoff.refresh(), {
-        mode: 'refresh'
-      })
-    ),
-    {
-      queued: true,
-      coalesced: false
-    }
+      Promise.reject(idleStuckError),
+      {
+        queued: true,
+        coalesced: true
+      }
+    );
+  }
+  const activeRefresh = waitForProviderIssueHandoffPending(
+    providerIssueHandoff,
+    startProviderIssueHandoffOperation(providerIssueHandoff, state, () => providerIssueHandoff.refresh(), {
+      mode: 'refresh'
+    })
   );
+  const activeOutcome: ProviderIssueHandoffRefreshRequestOutcome = {
+    queued: true,
+    coalesced: false
+  };
+  return acknowledgeAccepted
+    ? acknowledgeProviderIssueHandoffAccepted(activeRefresh, activeOutcome)
+    : mapProviderIssueHandoffRefreshOutcome(providerIssueHandoff, activeRefresh, activeOutcome);
 }
 
 export function runProviderIssueHandoffRehydrate(
@@ -301,6 +362,7 @@ function createProviderRefreshCoordinator(
   let stopped = false;
   let timer: NodeJS.Timeout | null = null;
   let rescheduleGeneration = 0;
+  let lastSuccessfulFullRecoverySweepAtMs: number | null = null;
 
   const clearScheduledTrigger = (): void => {
     if (!timer) {
@@ -355,11 +417,19 @@ function createProviderRefreshCoordinator(
     return Math.max(0, PROVIDER_REFRESH_STUCK_AFTER_MS - health.operation_elapsed_ms);
   };
 
+  const shouldRunFullRecoverySweep = (nowMs: number): boolean =>
+    lastSuccessfulFullRecoverySweepAtMs === null ||
+    nowMs - lastSuccessfulFullRecoverySweepAtMs >= PROVIDER_FULL_RECOVERY_SWEEP_INTERVAL_MS;
+
   const trigger = async (): Promise<void> => {
     if (stopped) {
       return;
     }
     const preflightSchedule = await resolveProviderRefreshSchedule().catch(() => null);
+    if (stopped) {
+      clearScheduledTrigger();
+      return;
+    }
     if (preflightSchedule?.linear_budget?.cooldown_active) {
       clearScheduledTrigger();
       await scheduleNextTriggerAsync();
@@ -381,25 +451,42 @@ function createProviderRefreshCoordinator(
             return;
           }
 
-          const refetchTrackedIssues = async (): Promise<ProviderTrackedIssuePollResolution> =>
-            await resolveProviderPollTrackedIssues(context);
-          const pollResolution = await refetchTrackedIssues();
-          if (pollResolution.kind === 'ready') {
-            await providerIssueHandoff.poll({
-              trackedIssues: pollResolution.trackedIssues,
-              refetchTrackedIssues
+          const refetchTrackedIssues = async (
+            input?: ProviderTrackedIssueRefetchInput
+          ): Promise<ProviderTrackedIssuePollResolution> =>
+            await resolveProviderPollTrackedIssues(context, input);
+
+          if (shouldRunFullRecoverySweep(Date.now())) {
+            const pollResolution = await refetchTrackedIssues({
+              mode: 'recovery_sweep'
             });
+            if (pollResolution.kind === 'ready') {
+              await providerIssueHandoff.poll({
+                trackedIssues: pollResolution.trackedIssues,
+                refetchTrackedIssues,
+                allowPollFailClosed: true
+              });
+              lastSuccessfulFullRecoverySweepAtMs = Date.now();
+              return;
+            }
+            if (pollResolution.reason === 'dispatch_source_provider_rate_limited') {
+              return;
+            }
+            noteProviderPollingRequest(providerIssueHandoff, {
+              mode: 'refresh',
+              queued: getProviderIssueHandoffOperationState(providerIssueHandoff).queuedRefresh !== null,
+              replaceQueued: true
+            });
+            await providerIssueHandoff.refresh();
             return;
           }
-          if (pollResolution.reason === 'dispatch_source_provider_rate_limited') {
-            return;
-          }
-          noteProviderPollingRequest(providerIssueHandoff, {
-            mode: 'refresh',
-            queued: getProviderIssueHandoffOperationState(providerIssueHandoff).queuedRefresh !== null,
-            replaceQueued: true
+
+          await providerIssueHandoff.poll({
+            trackedIssues: [],
+            refetchTrackedIssues,
+            deferFreshDiscovery: true
           });
-          await providerIssueHandoff.refresh();
+          return;
         },
         undefined,
         {
@@ -441,7 +528,8 @@ function scheduleStartupProviderRefresh(trigger: () => Promise<void>): NodeJS.Ti
 }
 
 async function resolveProviderPollTrackedIssues(
-  context: ProviderPollTrackedIssueContext
+  context: ProviderPollTrackedIssueContext,
+  input?: ProviderTrackedIssueRefetchInput
 ): Promise<ProviderTrackedIssuePollResolution> {
   if (!context.readFeatureToggles) {
     return {
@@ -460,7 +548,11 @@ async function resolveProviderPollTrackedIssues(
 
   const resolution = await resolveLiveLinearTrackedIssues({
     sourceSetup: sourceSetup.sourceSetup,
-    env: process.env
+    env: process.env,
+    queryMode: input?.mode,
+    eligibleIssueTargetCount: input?.eligibleTargetCount,
+    eligibleStateSlotCounts: input?.eligibleStateSlotCounts,
+    excludedIssueIds: input?.excludedIssueIds
   });
   if (resolution.kind !== 'ready') {
     return {
@@ -542,9 +634,25 @@ function runProviderIssueHandoffOperation(
     }
     return continueWhileBusy();
   }
+  const idleStuckError = buildProviderIssueHandoffRestartRequiredError(providerIssueHandoff);
+  if (idleStuckError) {
+    clearProviderIssueHandoffOperationState(providerIssueHandoff, state);
+    return Promise.reject(idleStuckError);
+  }
   return waitForProviderIssueHandoffPending(
     providerIssueHandoff,
     startProviderIssueHandoffOperation(providerIssueHandoff, state, operation, healthContext)
+  );
+}
+
+function buildProviderIssueHandoffRestartRequiredError(
+  providerIssueHandoff: ProviderIssueHandoffService
+): Error | null {
+  if (!isProviderPollingStuck(providerIssueHandoff)) {
+    return null;
+  }
+  return new Error(
+    readProviderPollingHealth(providerIssueHandoff)?.reason ?? 'provider_refresh_lifecycle_stuck'
   );
 }
 
@@ -725,6 +833,17 @@ function mapProviderIssueHandoffRefreshOutcome(
       throw error;
     }
   );
+}
+
+function acknowledgeProviderIssueHandoffAccepted(
+  pending: Promise<void>,
+  successOutcome: ProviderIssueHandoffRefreshRequestOutcome
+): Promise<ProviderIssueHandoffRefreshRequestOutcome> {
+  // Public refresh routes return as soon as the lifecycle accepts the work, so
+  // keep the detached refresh promise from surfacing later failures as
+  // unhandled rejections.
+  void pending.catch(() => undefined);
+  return Promise.resolve(successOutcome);
 }
 
 function waitForProviderIssueHandoffPending(

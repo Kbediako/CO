@@ -32,6 +32,7 @@ import { readSharedLinearBudgetStatus, type LinearBudgetStatus } from './control
 import {
   classifyProviderLinearWorkerLifecycle,
 } from './control/providerLinearWorkflowStates.js';
+import { readControlHostOwnershipOperatorHint } from './control/controlHostOwnership.js';
 import {
   PROVIDER_LINEAR_AUDIT_ENV_VAR,
   PROVIDER_LINEAR_PARALLELIZATION_REASONS,
@@ -44,6 +45,7 @@ import {
 import { deriveDeterministicProviderMutationSuppressions } from './control/providerLinearWorkerTruth.js';
 import {
   deriveProviderLinearWorkerProgressSnapshot,
+  isHighSignalProviderProgressSummary,
   type ProviderLinearWorkerProgressSnapshot
 } from './control/providerIssueObservability.js';
 import type { DispatchPilotSourceSetup } from './control/trackerDispatchPilot.js';
@@ -68,11 +70,18 @@ import {
   normalizeProviderLinearChildLanePathSelectors,
   type ProviderLinearChildLanePathSelector
 } from './providerLinearChildLanePhaseContract.js';
+import {
+  PROVIDER_WORKER_HOST_ENV_KEY,
+  normalizeProviderWorkerHostName
+} from './control/providerWorkerHosts.js';
+import { resolveCodexOrchestratorBootstrapInvocation } from './utils/packageProgramResolver.js';
 
 export const PROVIDER_LINEAR_WORKER_PROOF_FILENAME = 'provider-linear-worker-proof.json';
 export const PROVIDER_LINEAR_WORKER_AUDIT_FILENAME = 'provider-linear-worker-linear-audit.jsonl';
 export const PROVIDER_LINEAR_WORKER_CHILD_STREAMS_FILENAME = 'provider-linear-worker-child-streams.json';
 export const PROVIDER_LINEAR_WORKER_CHILD_LANES_FILENAME = 'provider-linear-worker-child-lanes.json';
+export const PROVIDER_LINEAR_RESIDENT_SESSION_SEED_ENV =
+  'CODEX_ORCHESTRATOR_PROVIDER_RESIDENT_SESSION_SEED';
 const PROVIDER_LINEAR_WORKER_SESSION_LOG_HYDRATION_FILENAME =
   'provider-linear-worker-session-log-hydration.json';
 const PROVIDER_LINEAR_WORKER_PROOF_LOCK_FILENAME = `${PROVIDER_LINEAR_WORKER_PROOF_FILENAME}.lock`;
@@ -118,10 +127,12 @@ const PROVIDER_LINEAR_WORKER_PROOF_LOCK_RETRY: LockRetryOptions = {
   // prefer a short wait over allowing stale snapshots to overwrite newer state.
   maxDelayMs: 250
 };
-const PROVIDER_CONTROL_HOST_REFRESH_SUCCESS_END_REASONS = new Set<string>([
+export const PROVIDER_LINEAR_RESIDENT_SESSION_CONTINUITY_END_REASONS = new Set<string>([
   'max_turns_reached_issue_still_active'
 ]);
-const PROVIDER_SEMANTIC_STALL_RECHECK_DELAY_MS = 15 * 60 * 1000 + 1_000;
+const PROVIDER_CONTROL_HOST_REFRESH_SUCCESS_END_REASONS =
+  PROVIDER_LINEAR_RESIDENT_SESSION_CONTINUITY_END_REASONS;
+export const PROVIDER_SEMANTIC_STALL_RECHECK_DELAY_MS = 15 * 60 * 1000 + 1_000;
 const PROVIDER_WORKER_SESSION_LOG_POLL_INTERVAL_MS = 250;
 const PROVIDER_WORKER_SESSION_LOG_DISCOVERY_WINDOW_MS = 15 * 60 * 1000;
 const PROVIDER_WORKER_SESSION_LOG_HEADER_BYTES = 256 * 1024;
@@ -133,6 +144,8 @@ const toml = require('@iarna/toml') as {
 export interface ProviderLinearWorkerContext {
   manifest: Record<string, unknown>;
   manifestPath: string;
+  controlHostManifest: Record<string, unknown>;
+  controlHostManifestPath: string;
   runDir: string;
   repoRoot: string;
   runId: string;
@@ -143,17 +156,39 @@ export interface ProviderLinearWorkerContext {
   providerControlHostRecordedInManifest: boolean;
   providerControlHostMatchesManifest: boolean;
   workspacePath: string | null;
+  workerHost: string | null;
   sourceSetup: DispatchPilotSourceSetup | null;
   issueId: string;
   issueIdentifier: string;
   issueUpdatedAt: string | null;
   maxTurns: number;
+  residentSessionSeed: ProviderLinearResidentSessionSeed | null;
 }
 
 export interface ProviderLinearWorkerTokenUsage {
   input_tokens: number | null;
   output_tokens: number | null;
   total_tokens: number | null;
+}
+
+export interface ProviderLinearResidentSessionSeed {
+  source_run_id: string;
+  source_updated_at: string;
+  source_end_reason: string;
+  source_thread_id: string;
+  logical_turn_count: number;
+  restart_count: number;
+}
+
+export interface ProviderLinearResidentSessionState {
+  logical_session_id: string;
+  logical_turn_count: number;
+  restart_count: number;
+  continuity_state: 'fresh' | 'guarded_resume_pending' | 'guarded_resume_active';
+  source_run_id: string | null;
+  source_updated_at: string | null;
+  source_end_reason: string | null;
+  source_thread_id: string | null;
 }
 
 export interface ProviderLinearWorkerChildStreamRecord {
@@ -242,11 +277,13 @@ export interface ProviderLinearWorkerProof {
   last_event: string | null;
   last_message: string | null;
   last_event_at: string | null;
+  current_turn_activity?: ProviderLinearWorkerCurrentTurnActivity | null;
   tokens: ProviderLinearWorkerTokenUsage;
   rate_limits: Record<string, unknown> | null;
   owner_phase: string;
   owner_status: 'in_progress' | 'succeeded' | 'failed';
   workspace_path: string | null;
+  worker_host?: string | null;
   source_setup?: DispatchPilotSourceSetup | null;
   linear_audit: ProviderLinearAuditSummary | null;
   child_streams?: ProviderLinearWorkerChildStreamRecord[];
@@ -255,8 +292,22 @@ export interface ProviderLinearWorkerProof {
   progress?: ProviderLinearWorkerProgressSnapshot | null;
   linear_budget?: LinearBudgetStatus | null;
   tracked_issue_error?: ProviderLinearTrackedIssueError | null;
+  resident_session?: ProviderLinearResidentSessionState | null;
   end_reason: string | null;
   updated_at: string;
+}
+
+export type ProviderLinearWorkerCurrentTurnActivitySource =
+  | 'stdout_jsonl'
+  | 'session_log_hydration';
+
+export interface ProviderLinearWorkerCurrentTurnActivity {
+  event: string | null;
+  message_or_payload: string | null;
+  recorded_at: string | null;
+  source: ProviderLinearWorkerCurrentTurnActivitySource;
+  turn_id: string | null;
+  session_id: string | null;
 }
 
 export interface ProviderLinearWorkerParallelizationRecord
@@ -279,6 +330,7 @@ export interface ProviderLinearWorkerJsonlParseResult {
   finalMessage: string | null;
   lastEvent: string | null;
   lastEventAt: string | null;
+  currentTurnActivity: ProviderLinearWorkerCurrentTurnActivity | null;
   tokens: ProviderLinearWorkerTokenUsage;
   rateLimits: Record<string, unknown> | null;
 }
@@ -462,6 +514,16 @@ function normalizeOptionalInteger(value: unknown): number | null {
   return null;
 }
 
+function normalizeNonNegativeInteger(value: unknown): number | null {
+  const normalized = normalizeOptionalInteger(value);
+  return normalized !== null && normalized >= 0 ? normalized : null;
+}
+
+function normalizePositiveInteger(value: unknown): number | null {
+  const normalized = normalizeOptionalInteger(value);
+  return normalized !== null && normalized > 0 ? normalized : null;
+}
+
 function normalizeStringArray(value: unknown): string[] | null {
   if (!Array.isArray(value)) {
     return null;
@@ -558,16 +620,221 @@ function resolveProviderLinearWorkerSourceSetup(
   return hasLinearSourceBinding(sourceSetup) ? sourceSetup : null;
 }
 
+interface ProviderLinearWorkerRootAuthority {
+  repoRoot: string;
+  workspacePath: string | null;
+}
+
+function isProviderIssueWorkspaceRootForTask(
+  candidate: string | null,
+  taskId: string
+): candidate is string {
+  return Boolean(
+    candidate &&
+      basename(candidate) === taskId &&
+      basename(dirname(candidate)) === PROVIDER_WORKSPACE_ROOT_DIRNAME
+  );
+}
+
+function resolveProviderLinearWorkerConfiguredPath(input: {
+  rawPath: string;
+  cwd: string;
+  taskId: string | null;
+  envRepoRoot?: string | null;
+}): string {
+  const normalizedCwd = resolve(input.cwd);
+  if (isAbsolute(input.rawPath) || !input.taskId || !isProviderIssueWorkspaceRootForTask(normalizedCwd, input.taskId)) {
+    return resolve(normalizedCwd, input.rawPath);
+  }
+  const sharedRoot = dirname(dirname(normalizedCwd));
+  const envRepoRoot = input.envRepoRoot ? resolve(isAbsolute(input.envRepoRoot) ? input.envRepoRoot : resolve(normalizedCwd, input.envRepoRoot)) : null;
+  return envRepoRoot === sharedRoot ? resolve(sharedRoot, input.rawPath) : resolve(normalizedCwd, input.rawPath);
+}
+
+function resolveProviderLinearWorkerRootAuthority(input: {
+  manifestWorkspacePath: string | null;
+  envRepoRoot: string | null;
+  taskId: string | null;
+  cwd: string;
+}): ProviderLinearWorkerRootAuthority {
+  const normalizedManifestWorkspacePath = input.manifestWorkspacePath
+    ? resolveProviderLinearWorkerConfiguredPath({ rawPath: input.manifestWorkspacePath, cwd: input.cwd, taskId: input.taskId, envRepoRoot: input.envRepoRoot })
+    : null;
+  const normalizedEnvRepoRoot = input.envRepoRoot
+    ? resolveProviderLinearWorkerConfiguredPath({ rawPath: input.envRepoRoot, cwd: input.cwd, taskId: input.taskId })
+    : null;
+  const normalizedCwd = resolve(input.cwd);
+  const activeIssueWorkspacePath = input.taskId
+    ? [normalizedEnvRepoRoot, normalizedCwd, normalizedManifestWorkspacePath].find((candidate) =>
+        isProviderIssueWorkspaceRootForTask(candidate, input.taskId ?? '')
+      ) ?? null
+    : null;
+
+  if (activeIssueWorkspacePath) {
+    const activeSharedRoot = dirname(dirname(activeIssueWorkspacePath));
+    const explicitRootsAreCompatible = [normalizedManifestWorkspacePath, normalizedEnvRepoRoot].every(
+      (candidate) =>
+        !candidate ||
+        candidate === activeIssueWorkspacePath ||
+        candidate === activeSharedRoot
+    );
+    if (explicitRootsAreCompatible) {
+      return {
+        repoRoot: activeIssueWorkspacePath,
+        workspacePath: activeIssueWorkspacePath
+      };
+    }
+  }
+
+  if (
+    normalizedManifestWorkspacePath &&
+    normalizedEnvRepoRoot &&
+    normalizedEnvRepoRoot !== normalizedManifestWorkspacePath
+  ) {
+    throw new Error(
+      `Provider worker root mismatch between env (${normalizedEnvRepoRoot}) and manifest (${normalizedManifestWorkspacePath}).`
+    );
+  }
+
+  const repoRoot = normalizedManifestWorkspacePath ?? normalizedEnvRepoRoot ?? normalizedCwd;
+  return {
+    repoRoot,
+    workspacePath: normalizedManifestWorkspacePath ?? repoRoot
+  };
+}
+
+function resolveProviderLinearWorkerManifestPathForRoot(input: {
+  manifestPath: string;
+  repoRoot: string;
+  taskId: string;
+  configuredRunsDir?: string | null;
+}): string {
+  const normalizedManifestPath = resolve(input.manifestPath);
+  if (!isProviderIssueWorkspaceRootForTask(input.repoRoot, input.taskId)) {
+    return normalizedManifestPath;
+  }
+  if (isPathWithinRoot(normalizedManifestPath, input.repoRoot)) {
+    return normalizedManifestPath;
+  }
+
+  const sharedRoot = dirname(dirname(input.repoRoot));
+  const sharedRunsRoot = resolveProviderLinearWorkerSharedRunsRoot({
+    sharedRoot,
+    configuredRunsDir: input.configuredRunsDir,
+    manifestPath: normalizedManifestPath
+  });
+  if (!isPathWithinRoot(normalizedManifestPath, sharedRunsRoot)) {
+    return normalizedManifestPath;
+  }
+
+  const workspaceRunsRoot = resolveProviderLinearWorkerWorkspaceRunsRoot(
+    input.repoRoot,
+    sharedRoot,
+    sharedRunsRoot
+  );
+  if (!workspaceRunsRoot) {
+    return normalizedManifestPath;
+  }
+  const workspaceManifestPath = resolve(workspaceRunsRoot, relative(sharedRunsRoot, normalizedManifestPath));
+  return existsSync(workspaceManifestPath) ? workspaceManifestPath : normalizedManifestPath;
+}
+
+function resolveProviderLinearWorkerSharedRunsRoot(input: {
+  sharedRoot: string;
+  configuredRunsDir?: string | null;
+  manifestPath: string;
+}): string {
+  const normalizedConfiguredRunsDir = normalizeOptionalString(input.configuredRunsDir);
+  if (normalizedConfiguredRunsDir) {
+    return isAbsolute(normalizedConfiguredRunsDir)
+      ? resolve(normalizedConfiguredRunsDir)
+      : resolve(input.sharedRoot, normalizedConfiguredRunsDir);
+  }
+  const runDir = dirname(input.manifestPath);
+  const layoutDir = dirname(runDir);
+  const taskDir = dirname(layoutDir);
+  const runsRoot = dirname(taskDir);
+  return ['.runs', 'runs'].includes(basename(runsRoot)) ? runsRoot : join(input.sharedRoot, '.runs');
+}
+
+function resolveProviderLinearWorkerWorkspaceRunsRoot(
+  repoRoot: string,
+  sharedRoot: string,
+  sharedRunsRoot: string
+): string | null {
+  if (!isPathWithinRoot(sharedRunsRoot, sharedRoot)) {
+    return null;
+  }
+  const relativeRunsRoot = relative(sharedRoot, sharedRunsRoot);
+  return resolve(repoRoot, relativeRunsRoot);
+}
+
 export async function loadProviderLinearWorkerContext(
   env: NodeJS.ProcessEnv = process.env,
   readManifest: (path: string) => Promise<Record<string, unknown>> = async (path) =>
-    JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>
+    JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>,
+  cwd: string = process.cwd()
 ): Promise<ProviderLinearWorkerContext> {
-  const manifestPath = normalizeOptionalString(env.CODEX_ORCHESTRATOR_MANIFEST_PATH);
+  let manifestPath = normalizeOptionalString(env.CODEX_ORCHESTRATOR_MANIFEST_PATH);
   if (!manifestPath) {
     throw new Error('CODEX_ORCHESTRATOR_MANIFEST_PATH is required for provider-linear-worker.');
   }
-  const manifest = await readManifest(manifestPath);
+  const initialEnvTaskId =
+    normalizeOptionalString(env.CODEX_ORCHESTRATOR_TASK_ID) ??
+    normalizeOptionalString(env.MCP_RUNNER_TASK_ID) ??
+    normalizeOptionalString(env.TASK);
+  const envRepoRoot = normalizeOptionalString(env.CODEX_ORCHESTRATOR_ROOT);
+  manifestPath = resolveProviderLinearWorkerConfiguredPath({
+    rawPath: manifestPath,
+    cwd,
+    taskId: initialEnvTaskId ?? contextTaskIdFromManifestPath(manifestPath),
+    envRepoRoot
+  });
+  let manifest = await readManifest(manifestPath);
+  const controlHostManifestPath = manifestPath;
+  const controlHostManifest = manifest;
+  const residentSessionSeed = parseProviderLinearResidentSessionSeed(
+    env[PROVIDER_LINEAR_RESIDENT_SESSION_SEED_ENV]
+  );
+  const initialManifestTaskId =
+    normalizeOptionalString(manifest.task_id) ??
+    normalizeOptionalString(manifest.taskId);
+  const initialTaskId = initialManifestTaskId
+    ? sanitizeTaskId(initialManifestTaskId)
+    : contextTaskIdFromManifestPath(manifestPath);
+  const envTaskId = initialEnvTaskId;
+  if (!initialTaskId || (envTaskId && envTaskId !== initialTaskId)) {
+    throw new Error(initialTaskId ? `Provider worker task id mismatch between env (${envTaskId}) and manifest (${initialTaskId}).` : 'Provider worker task id unavailable.');
+  }
+  const manifestWorkspacePath =
+    normalizeOptionalString(manifest.workspace_path) ??
+    normalizeOptionalString(manifest.workspacePath);
+  const rootAuthority = resolveProviderLinearWorkerRootAuthority({
+    manifestWorkspacePath,
+    envRepoRoot,
+    taskId: initialTaskId,
+    cwd
+  });
+  const repoRoot = rootAuthority.repoRoot;
+  const selectedManifestPath = resolveProviderLinearWorkerManifestPathForRoot({
+    manifestPath,
+    repoRoot,
+    taskId: initialTaskId,
+    configuredRunsDir: env.CODEX_ORCHESTRATOR_RUNS_DIR
+  });
+  if (selectedManifestPath !== manifestPath) {
+    manifestPath = selectedManifestPath;
+    manifest = await readManifest(manifestPath);
+  }
+  const manifestTaskId =
+    normalizeOptionalString(manifest.task_id) ??
+    normalizeOptionalString(manifest.taskId);
+  const taskId = manifestTaskId
+    ? sanitizeTaskId(manifestTaskId)
+    : contextTaskIdFromManifestPath(manifestPath);
+  if (!taskId || taskId !== initialTaskId || (envTaskId && envTaskId !== taskId)) {
+    throw new Error(taskId ? `Provider worker task id mismatch between env (${envTaskId ?? initialTaskId}) and manifest (${taskId}).` : 'Provider worker task id unavailable.');
+  }
   const manifestIssueId =
     normalizeOptionalString(manifest.issue_id) ??
     normalizeOptionalString(manifest.issueId);
@@ -592,37 +859,21 @@ export async function loadProviderLinearWorkerContext(
   if (!issueId || !issueIdentifier) {
     throw new Error('Provider worker requires issue_id and issue_identifier in env or manifest.');
   }
-  const manifestWorkspacePath =
-    normalizeOptionalString(manifest.workspace_path) ??
-    normalizeOptionalString(manifest.workspacePath);
-  const envRepoRoot = normalizeOptionalString(env.CODEX_ORCHESTRATOR_ROOT);
-  const normalizedManifestWorkspacePath = manifestWorkspacePath ? resolve(manifestWorkspacePath) : null;
-  const normalizedEnvRepoRoot = envRepoRoot ? resolve(envRepoRoot) : null;
-  if (normalizedManifestWorkspacePath && normalizedEnvRepoRoot && normalizedEnvRepoRoot !== normalizedManifestWorkspacePath) {
-    throw new Error(`Provider worker root mismatch between env (${normalizedEnvRepoRoot}) and manifest (${normalizedManifestWorkspacePath}).`);
-  }
-  const repoRoot = normalizedManifestWorkspacePath ?? normalizedEnvRepoRoot ?? resolve(process.cwd());
   const manifestRunId = normalizeOptionalString(manifest.run_id), envRunId = normalizeOptionalString(env.CODEX_ORCHESTRATOR_RUN_ID);
   if (manifestRunId && envRunId && envRunId !== manifestRunId) throw new Error(`Provider worker run id mismatch between env (${envRunId}) and manifest (${manifestRunId}).`);
   const runId = manifestRunId ?? envRunId ?? `provider-linear-worker-${Date.now()}`;
-  const manifestTaskId =
-    normalizeOptionalString(manifest.task_id) ??
-    normalizeOptionalString(manifest.taskId);
-  const taskId = manifestTaskId
-    ? sanitizeTaskId(manifestTaskId)
-    : contextTaskIdFromManifestPath(manifestPath);
-  const envTaskId = normalizeOptionalString(env.CODEX_ORCHESTRATOR_TASK_ID);
-  if (!taskId || (envTaskId && envTaskId !== taskId)) {
-    throw new Error(taskId ? `Provider worker task id mismatch between env (${envTaskId}) and manifest (${taskId}).` : 'Provider worker task id unavailable.');
-  }
   const manifestPipelineId = normalizeOptionalString(manifest.pipeline_id) ?? normalizeOptionalString(manifest.pipelineId), envPipelineId = normalizeOptionalString(env.CODEX_ORCHESTRATOR_PIPELINE_ID);
   if (manifestPipelineId && envPipelineId && envPipelineId !== manifestPipelineId) throw new Error(`Provider worker pipeline id mismatch between env (${envPipelineId}) and manifest (${manifestPipelineId}).`);
   const manifestProviderControlHostTaskId =
     normalizeOptionalString(manifest.provider_control_host_task_id) ??
-    normalizeOptionalString(manifest.providerControlHostTaskId);
+    normalizeOptionalString(manifest.providerControlHostTaskId) ??
+    normalizeOptionalString(controlHostManifest.provider_control_host_task_id) ??
+    normalizeOptionalString(controlHostManifest.providerControlHostTaskId);
   const manifestProviderControlHostRunId =
     normalizeOptionalString(manifest.provider_control_host_run_id) ??
-    normalizeOptionalString(manifest.providerControlHostRunId);
+    normalizeOptionalString(manifest.providerControlHostRunId) ??
+    normalizeOptionalString(controlHostManifest.provider_control_host_run_id) ??
+    normalizeOptionalString(controlHostManifest.providerControlHostRunId);
   const envProviderControlHostTaskId =
     normalizeOptionalString(env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID);
   const envProviderControlHostRunId =
@@ -635,9 +886,18 @@ export async function loadProviderLinearWorkerContext(
       envProviderControlHostTaskId === manifestProviderControlHostTaskId &&
       envProviderControlHostRunId === manifestProviderControlHostRunId
   );
+  const hasExplicitWorkerHostOverride = Object.prototype.hasOwnProperty.call(
+    env,
+    PROVIDER_WORKER_HOST_ENV_KEY
+  );
+  const envWorkerHost = hasExplicitWorkerHostOverride
+    ? normalizeProviderWorkerHostName(env[PROVIDER_WORKER_HOST_ENV_KEY])
+    : undefined;
   return {
     manifest,
     manifestPath,
+    controlHostManifest,
+    controlHostManifestPath,
     runDir: dirname(manifestPath),
     repoRoot,
     runId,
@@ -654,7 +914,11 @@ export async function loadProviderLinearWorkerContext(
     providerControlHostRecordedInManifest:
       Boolean(manifestProviderControlHostTaskId && manifestProviderControlHostRunId),
     providerControlHostMatchesManifest,
-    workspacePath: normalizedManifestWorkspacePath ?? repoRoot,
+    workspacePath: rootAuthority.workspacePath,
+    workerHost:
+      envWorkerHost !== undefined
+        ? envWorkerHost
+        : normalizeProviderWorkerHostName(manifest.worker_host ?? manifest.workerHost),
     sourceSetup: resolveProviderLinearWorkerSourceSetup(env),
     issueId,
     issueIdentifier,
@@ -662,7 +926,8 @@ export async function loadProviderLinearWorkerContext(
       normalizeOptionalString(env.CODEX_ORCHESTRATOR_ISSUE_UPDATED_AT) ??
       normalizeOptionalString(manifest.issue_updated_at) ??
       normalizeOptionalString(manifest.issueUpdatedAt),
-    maxTurns: await resolveProviderWorkerMaxTurns(env)
+    maxTurns: await resolveProviderWorkerMaxTurns(env),
+    residentSessionSeed
   };
 }
 
@@ -675,12 +940,91 @@ function contextTaskIdFromManifestPath(manifestPath: string): string | null {
   if (
     basename(resolvedManifestPath) !== 'manifest.json' ||
     basename(cliDir) !== 'cli' ||
-    basename(runsDir) !== '.runs'
+    !['.runs', 'runs'].includes(basename(runsDir))
   ) {
     return null;
   }
   const taskId = sanitizeTaskId(basename(resolve(dirname(manifestPath), '..', '..')));
   return taskId.length > 0 ? taskId : null;
+}
+
+function parseProviderLinearResidentSessionSeed(
+  raw: string | null | undefined
+): ProviderLinearResidentSessionSeed | null {
+  const normalizedRaw = normalizeOptionalString(raw);
+  if (!normalizedRaw) {
+    return null;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(normalizedRaw);
+  } catch {
+    return null;
+  }
+  if (!isRecord(parsed)) {
+    return null;
+  }
+  const sourceRunId = normalizeOptionalString(parsed.source_run_id);
+  const sourceUpdatedAt = normalizeOptionalString(parsed.source_updated_at);
+  const sourceEndReason = normalizeOptionalString(parsed.source_end_reason);
+  const sourceThreadId = normalizeOptionalString(parsed.source_thread_id);
+  const logicalTurnCount = normalizeNonNegativeInteger(parsed.logical_turn_count);
+  const restartCount = normalizePositiveInteger(parsed.restart_count);
+  if (
+    !sourceRunId ||
+    !sourceUpdatedAt ||
+    !sourceEndReason ||
+    !sourceThreadId ||
+    logicalTurnCount === null ||
+    restartCount === null
+  ) {
+    return null;
+  }
+  return {
+    source_run_id: sourceRunId,
+    source_updated_at: sourceUpdatedAt,
+    source_end_reason: sourceEndReason,
+    source_thread_id: sourceThreadId,
+    logical_turn_count: logicalTurnCount,
+    restart_count: restartCount
+  };
+}
+
+function buildProviderLinearResidentLogicalSessionId(issueId: string): string {
+  return `linear:${issueId}:resident-session`;
+}
+
+function buildInitialProviderLinearResidentSessionState(input: {
+  issueId: string;
+  seed: ProviderLinearResidentSessionSeed | null;
+}): ProviderLinearResidentSessionState {
+  return {
+    logical_session_id: buildProviderLinearResidentLogicalSessionId(input.issueId),
+    logical_turn_count: input.seed?.logical_turn_count ?? 0,
+    restart_count: input.seed?.restart_count ?? 0,
+    continuity_state: input.seed ? 'guarded_resume_pending' : 'fresh',
+    source_run_id: input.seed?.source_run_id ?? null,
+    source_updated_at: input.seed?.source_updated_at ?? null,
+    source_end_reason: input.seed?.source_end_reason ?? null,
+    source_thread_id: input.seed?.source_thread_id ?? null
+  };
+}
+
+function buildActiveProviderLinearResidentSessionState(input: {
+  issueId: string;
+  logicalTurnCount: number;
+  seed: ProviderLinearResidentSessionSeed | null;
+}): ProviderLinearResidentSessionState {
+  return {
+    logical_session_id: buildProviderLinearResidentLogicalSessionId(input.issueId),
+    logical_turn_count: input.logicalTurnCount,
+    restart_count: input.seed?.restart_count ?? 0,
+    continuity_state: input.seed ? 'guarded_resume_active' : 'fresh',
+    source_run_id: input.seed?.source_run_id ?? null,
+    source_updated_at: input.seed?.source_updated_at ?? null,
+    source_end_reason: input.seed?.source_end_reason ?? null,
+    source_thread_id: input.seed?.source_thread_id ?? null
+  };
 }
 
 function buildIssueDescriptionSection(issue: LiveLinearTrackedIssue): string[] {
@@ -711,6 +1055,16 @@ function buildBlockersSection(issue: LiveLinearTrackedIssue): string[] {
     'Known blockers:',
     ...issue.blocked_by.map((entry) => `- ${entry.identifier ?? entry.id ?? 'unknown'} (${entry.state ?? 'unknown'})`)
   ];
+}
+
+function buildCurrentIssueContextSection(issue: LiveLinearTrackedIssue): string[] {
+  return [
+    issue.url ? `- Linear URL: ${issue.url}` : null,
+    issue.state ? `- Current state: ${issue.state}` : null,
+    ...buildIssueDescriptionSection(issue),
+    ...buildRecentActivitySection(issue),
+    ...buildBlockersSection(issue)
+  ].filter((line): line is string => Boolean(line));
 }
 
 function buildPreReviewHandoffGateSection(): string[] {
@@ -771,7 +1125,8 @@ function buildParallelizationGuidance(helperCommand: string, issueId: string): s
     `- Ordinary eligible same-issue child-lane parallelisation is a runtime contract in this lane, not optional prompt advice. During every active turn, record exactly one explicit decision with \`${helperCommand} parallelization --issue-id ${issueId} --decision <parallelize_now|stay_serial|forbid_parallel> --reason <reason-code> --summary <why>\`.`,
     `- Allowed decision and reason-code pairs: ${buildParallelizationReasonCodesSummary()}.`,
     `- If you record \`parallelize_now\`, you must actually launch at least one same-issue child lane in that turn with \`${helperCommand} child-lane --action launch ...\`, and at least one of those lanes must complete successfully before the turn ends; otherwise the provider worker fails closed.`,
-    '- If you record `stay_serial` or `forbid_parallel`, choose the bounded reason code that truthfully explains why `child_lanes: []` is acceptable for this turn so the proof and debug surfaces are explicit rather than silent.'
+    '- If you record `stay_serial` or `forbid_parallel`, choose the bounded reason code that truthfully explains why `child_lanes: []` is acceptable for this turn so the proof and debug surfaces are explicit rather than silent.',
+    '- For forced child-lane validation follow-ups, if fresh current-main evidence shows the originally named `clean-main-baseline-failures` and `cli-orchestrator-cleanup-fallout` clusters are both clean non-repros and no independent live cluster remains, do not invent child lanes or finish as `stay_serial`; record `forbid_parallel` with the bounded reason that matches the remaining work: use `parent_only_mutation` and close the issue directly when no live dependent work remains, and use `blocked_by_dependency` only when a real remaining dependency still exists and the issue should move to `Blocked`.'
   ];
 }
 
@@ -801,6 +1156,8 @@ export function buildProviderWorkerPrompt(
     linearAudit?: ProviderLinearAuditSummary | null;
     attemptStartedAt?: string | null;
     manifest?: Record<string, unknown> | null;
+    residentSession?: ProviderLinearResidentSessionState | null;
+    continueResidentSessionOnBoot?: boolean;
   } = {}
 ): string {
   const deterministicMutationSuppressions = buildDeterministicMutationSuppressionSection(
@@ -808,12 +1165,18 @@ export function buildProviderWorkerPrompt(
     attemptContext.attemptStartedAt ?? null
   );
   const source0PromptLines = buildRunSource0PromptLines(readRunSource0Descriptor(attemptContext.manifest ?? null));
-  if (turnNumber > 1) {
+  const continueResidentSessionOnBoot = attemptContext.continueResidentSessionOnBoot === true;
+  const logicalTurnCount = attemptContext.residentSession?.logical_turn_count ?? 0;
+  if (turnNumber > 1 || continueResidentSessionOnBoot) {
     return [
       'Continuation guidance:',
       '',
-      '- The previous Codex turn completed normally, but the Linear issue is still in an active state.',
-      `- This is continuation turn #${turnNumber} of ${maxTurns} for the current provider worker run.`,
+      continueResidentSessionOnBoot
+        ? '- The previous provider worker drained at a guarded restart boundary; resume the same resident session instead of starting a fresh thread.'
+        : '- The previous Codex turn completed normally, but the Linear issue is still in an active state.',
+      continueResidentSessionOnBoot
+        ? `- This is worker turn #1 of ${maxTurns} for the restarted provider worker process, continuing logical resident turn #${logicalTurnCount + 1}.`
+        : `- This is continuation turn #${turnNumber} of ${maxTurns} for the current provider worker run.`,
       '- The original task instructions and prior turn context are already present in this thread, so do not restate them before acting.',
       `- Keep the same workflow contract and continue using \`${helperCommand}\` for ticket updates with Linear issue id \`${issue.id}\` (not the human identifier \`${issue.identifier}\`).`,
       '- Follow the repo-local workflow skills: `skills/linear/SKILL.md` for workpad, review, and rework behavior, and `skills/land/SKILL.md` for the merge shepherding loop once the issue reaches `Merging`.',
@@ -840,6 +1203,9 @@ export function buildProviderWorkerPrompt(
       ...buildMergedCloseoutGuidance(sharedRepoCheckoutPath),
       '- If the issue is in `Rework`, treat it as a full approach reset: close the previous PR, remove the previous workpad, create a fresh branch from `origin/main`, then restart execution under a new workpad before handing back to review.',
       ...(source0PromptLines.length > 0 ? ['', ...source0PromptLines] : []),
+      ...(continueResidentSessionOnBoot
+        ? ['', 'Fresh Linear context for this guarded restart:', ...buildCurrentIssueContextSection(issue)]
+        : []),
       '- Keep final closeout in that same workpad comment instead of creating a separate terminal summary comment.',
       '- Stop coding once the issue reaches the team\'s review handoff state (`Human Review` or `In Review`) and end the turn after the handoff is complete.',
       '- Focus on the remaining ticket work and do not end the turn while the issue stays active unless you are truly blocked.'
@@ -881,12 +1247,8 @@ export function buildProviderWorkerPrompt(
     ...buildMergedCloseoutGuidance(sharedRepoCheckoutPath),
     '- If the issue is in `Rework`, treat it as a full approach reset: close the previous PR, remove the previous workpad, create a fresh branch from `origin/main`, then restart execution under a new workpad before handing back to review.',
     ...(source0PromptLines.length > 0 ? ['', ...source0PromptLines] : []),
-    issue.url ? `- Linear URL: ${issue.url}` : null,
-    issue.state ? `- Current state: ${issue.state}` : null,
     `- This is turn #1 of ${maxTurns} for the current worker run.`,
-    ...buildIssueDescriptionSection(issue),
-    ...buildRecentActivitySection(issue),
-    ...buildBlockersSection(issue)
+    ...buildCurrentIssueContextSection(issue)
   ]
     .filter((line): line is string => Boolean(line))
     .join('\n');
@@ -909,6 +1271,7 @@ function buildEmptyProviderLinearWorkerJsonlParseResult(): ProviderLinearWorkerJ
     finalMessage: null,
     lastEvent: null,
     lastEventAt: null,
+    currentTurnActivity: null,
     tokens: buildEmptyProviderLinearWorkerTokenUsage(),
     rateLimits: null
   };
@@ -916,7 +1279,8 @@ function buildEmptyProviderLinearWorkerJsonlParseResult(): ProviderLinearWorkerJ
 
 function applyProviderLinearWorkerJsonlLine(
   state: ProviderLinearWorkerJsonlParseResult,
-  line: string
+  line: string,
+  activitySource: ProviderLinearWorkerCurrentTurnActivitySource = 'stdout_jsonl'
 ): boolean {
   const trimmed = line.trim();
   if (!trimmed.startsWith('{')) {
@@ -924,7 +1288,7 @@ function applyProviderLinearWorkerJsonlLine(
   }
   try {
     const parsed = JSON.parse(trimmed) as Record<string, unknown>;
-    return applyProviderLinearWorkerJsonlRecord(state, parsed);
+    return applyProviderLinearWorkerJsonlRecord(state, parsed, activitySource);
   } catch {
     return false;
   }
@@ -932,9 +1296,62 @@ function applyProviderLinearWorkerJsonlLine(
 
 function applyProviderLinearWorkerJsonlRecord(
   state: ProviderLinearWorkerJsonlParseResult,
-  parsed: Record<string, unknown>
+  parsed: Record<string, unknown>,
+  activitySource: ProviderLinearWorkerCurrentTurnActivitySource
 ): boolean {
   let changed = false;
+  let threadChanged = false;
+  const payload = isRecord(parsed.payload) ? parsed.payload : null;
+  if (parsed.type === 'session_meta' && payload) {
+    const nextThreadId = normalizeOptionalString(payload.id);
+    if (nextThreadId && nextThreadId !== state.threadId) {
+      threadChanged = state.threadId !== null;
+      state.threadId = nextThreadId;
+      changed = true;
+    }
+  }
+  if (parsed.type === 'thread.started' && typeof parsed.thread_id === 'string') {
+    if (parsed.thread_id !== state.threadId) {
+      threadChanged = state.threadId !== null;
+      state.threadId = parsed.thread_id;
+      changed = true;
+    }
+  }
+  if (threadChanged) {
+    // A bookkeeping-only thread swap should not relabel stale turn-scoped activity onto the new session.
+    resetProviderLinearWorkerTurnScopedTelemetry(state);
+    state.turnId = null;
+  }
+  if (parsed.type === 'turn_context' && payload) {
+    const nextTurnId = normalizeOptionalString(payload.turn_id);
+    if (nextTurnId && nextTurnId !== state.turnId) {
+      resetProviderLinearWorkerTurnScopedTelemetry(state);
+      state.turnId = nextTurnId;
+      changed = true;
+    }
+  }
+  if (parsed.type === 'event_msg' && payload && payload.type === 'task_complete') {
+    const nextTurnId = normalizeOptionalString(payload.turn_id);
+    if (nextTurnId && nextTurnId !== state.turnId) {
+      resetProviderLinearWorkerTurnScopedTelemetry(state);
+      state.turnId = nextTurnId;
+      changed = true;
+    }
+  }
+  if (isProviderLinearWorkerBookkeepingRecord(parsed)) {
+    const synchronizedCurrentTurnActivity = synchronizeProviderLinearWorkerCurrentTurnActivity(
+      state.currentTurnActivity,
+      state.threadId,
+      state.turnId
+    );
+    if (
+      JSON.stringify(synchronizedCurrentTurnActivity) !== JSON.stringify(state.currentTurnActivity)
+    ) {
+      state.currentTurnActivity = synchronizedCurrentTurnActivity;
+      changed = true;
+    }
+    return changed;
+  }
   const eventSummary = extractProviderWorkerEventSummary(parsed);
   if (eventSummary.event && eventSummary.event !== state.lastEvent) {
     state.lastEvent = eventSummary.event;
@@ -948,6 +1365,22 @@ function applyProviderLinearWorkerJsonlRecord(
     state.finalMessage = eventSummary.message;
     changed = true;
   }
+  const nextCurrentTurnActivity = selectPreferredProviderLinearWorkerCurrentTurnActivity(
+    state.currentTurnActivity,
+    buildProviderLinearWorkerCurrentTurnActivityCandidate({
+      parsed,
+      eventSummary,
+      threadId: state.threadId,
+      defaultTurnId: state.turnId,
+      source: activitySource
+    })
+  );
+  if (
+    JSON.stringify(nextCurrentTurnActivity) !== JSON.stringify(state.currentTurnActivity)
+  ) {
+    state.currentTurnActivity = nextCurrentTurnActivity;
+    changed = true;
+  }
   const observedTokens = extractProviderWorkerTokenUsage(parsed);
   if (observedTokens && hasProviderWorkerTokenUsage(observedTokens)) {
     state.tokens = observedTokens;
@@ -958,63 +1391,16 @@ function applyProviderLinearWorkerJsonlRecord(
     state.rateLimits = observedRateLimits;
     changed = true;
   }
-  if (parsed.type === 'session_meta' && isRecord(parsed.payload)) {
-    const nextThreadId = normalizeOptionalString(parsed.payload.id);
-    if (nextThreadId && nextThreadId !== state.threadId) {
-      state.threadId = nextThreadId;
-      changed = true;
-    }
-    return changed;
-  }
-  if (parsed.type === 'thread.started' && typeof parsed.thread_id === 'string') {
-    if (parsed.thread_id !== state.threadId) {
-      state.threadId = parsed.thread_id;
-      changed = true;
-    }
-    return changed;
-  }
-  if (parsed.type === 'turn_context' && isRecord(parsed.payload)) {
-    const nextTurnId = normalizeOptionalString(parsed.payload.turn_id);
-    if (nextTurnId && nextTurnId !== state.turnId) {
-      state.turnId = nextTurnId;
-      changed = true;
-    }
-    return changed;
-  }
-  if (parsed.type === 'event_msg' && isRecord(parsed.payload)) {
-    if (parsed.payload.type === 'task_complete') {
-      const nextTurnId = normalizeOptionalString(parsed.payload.turn_id);
-      if (nextTurnId && nextTurnId !== state.turnId) {
-        state.turnId = nextTurnId;
-        changed = true;
-      }
-    }
-    if (parsed.payload.type === 'agent_message') {
-      const nextMessage = normalizeOptionalString(parsed.payload.message);
-      if (nextMessage && nextMessage !== state.finalMessage) {
-        state.finalMessage = nextMessage;
-        changed = true;
-      }
-    }
-    return changed;
-  }
+  const synchronizedCurrentTurnActivity = synchronizeProviderLinearWorkerCurrentTurnActivity(
+    state.currentTurnActivity,
+    state.threadId,
+    state.turnId
+  );
   if (
-    parsed.type === 'response_item' &&
-    isRecord(parsed.payload) &&
-    parsed.payload.type === 'message' &&
-    Array.isArray(parsed.payload.content)
+    JSON.stringify(synchronizedCurrentTurnActivity) !== JSON.stringify(state.currentTurnActivity)
   ) {
-    for (const item of parsed.payload.content) {
-      if (
-        isRecord(item) &&
-        item.type === 'output_text' &&
-        typeof item.text === 'string' &&
-        item.text !== state.finalMessage
-      ) {
-        state.finalMessage = item.text;
-        changed = true;
-      }
-    }
+    state.currentTurnActivity = synchronizedCurrentTurnActivity;
+    changed = true;
   }
   return changed;
 }
@@ -1034,45 +1420,24 @@ function applyProviderLinearWorkerSessionJsonlRecord(
   state: ProviderLinearWorkerJsonlParseResult,
   parsed: Record<string, unknown>
 ): boolean {
-  let changed = false;
-  const observedTokens = extractProviderWorkerTokenUsage(parsed);
-  if (observedTokens && hasProviderWorkerTokenUsage(observedTokens)) {
-    state.tokens = observedTokens;
-    changed = true;
-  }
-  const observedRateLimits = extractProviderWorkerRateLimits(parsed);
-  if (observedRateLimits) {
-    state.rateLimits = observedRateLimits;
-    changed = true;
-  }
-  if (parsed.type === 'session_meta' && isRecord(parsed.payload)) {
-    const nextThreadId = normalizeOptionalString(parsed.payload.id);
-    if (nextThreadId && nextThreadId !== state.threadId) {
-      state.threadId = nextThreadId;
-      changed = true;
-    }
-    return changed;
-  }
-  if (parsed.type === 'turn_context' && isRecord(parsed.payload)) {
-    const nextTurnId = normalizeOptionalString(parsed.payload.turn_id);
-    if (nextTurnId && nextTurnId !== state.turnId) {
-      state.turnId = nextTurnId;
-      changed = true;
-    }
-    return changed;
-  }
-  if (parsed.type === 'event_msg' && isRecord(parsed.payload) && parsed.payload.type === 'task_complete') {
-    const nextTurnId = normalizeOptionalString(parsed.payload.turn_id);
-    if (nextTurnId && nextTurnId !== state.turnId) {
-      state.turnId = nextTurnId;
-      changed = true;
-    }
-  }
-  return changed;
+  return applyProviderLinearWorkerJsonlRecord(state, parsed, 'session_log_hydration');
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function resetProviderLinearWorkerTurnScopedTelemetry(
+  state: ProviderLinearWorkerJsonlParseResult
+): void {
+  state.lastEvent = null;
+  state.finalMessage = null;
+  state.lastEventAt = null;
+  state.currentTurnActivity = null;
+}
+
+function isProviderLinearWorkerBookkeepingRecord(parsed: Record<string, unknown>): boolean {
+  return parsed.type === 'session_meta' || parsed.type === 'turn_context' || parsed.type === 'thread.started';
 }
 
 function hasProviderWorkerTokenUsage(value: ProviderLinearWorkerTokenUsage): boolean {
@@ -1176,6 +1541,119 @@ function extractProviderWorkerEventSummary(input: Record<string, unknown>): {
     message: null,
     at: timestamp
   };
+}
+
+function buildProviderLinearWorkerCurrentTurnActivityCandidate(input: {
+  parsed: Record<string, unknown>;
+  eventSummary: { event: string | null; message: string | null; at: string | null };
+  threadId: string | null;
+  defaultTurnId: string | null;
+  source: ProviderLinearWorkerCurrentTurnActivitySource;
+}): ProviderLinearWorkerCurrentTurnActivity | null {
+  const event = normalizeOptionalString(input.eventSummary.event);
+  const message = normalizeOptionalString(input.eventSummary.message);
+  const recordedAt = normalizeOptionalString(input.eventSummary.at);
+  if (!event && !message) {
+    return null;
+  }
+  const turnId = extractProviderWorkerActivityTurnId(input.parsed) ?? input.defaultTurnId;
+  const session = deriveLatestTurnSessionId({
+    threadId: input.threadId,
+    turnId
+  });
+  return {
+    event,
+    message_or_payload: message,
+    recorded_at: recordedAt,
+    source: input.source,
+    turn_id: turnId,
+    session_id: session.sessionId
+  };
+}
+
+function extractProviderWorkerActivityTurnId(parsed: Record<string, unknown>): string | null {
+  if (typeof parsed.turn_id === 'string') {
+    return normalizeOptionalString(parsed.turn_id);
+  }
+  const payload = isRecord(parsed.payload) ? parsed.payload : null;
+  return normalizeOptionalString(payload?.turn_id);
+}
+
+function synchronizeProviderLinearWorkerCurrentTurnActivity(
+  activity: ProviderLinearWorkerCurrentTurnActivity | null,
+  threadId: string | null,
+  defaultTurnId: string | null
+): ProviderLinearWorkerCurrentTurnActivity | null {
+  if (!activity) {
+    return null;
+  }
+  const turnId = activity.turn_id ?? defaultTurnId;
+  const session = deriveLatestTurnSessionId({
+    threadId,
+    turnId
+  });
+  return {
+    ...activity,
+    turn_id: turnId,
+    session_id: session.sessionId
+  };
+}
+
+function selectPreferredProviderLinearWorkerCurrentTurnActivity(
+  current: ProviderLinearWorkerCurrentTurnActivity | null,
+  candidate: ProviderLinearWorkerCurrentTurnActivity | null
+): ProviderLinearWorkerCurrentTurnActivity | null {
+  if (!candidate) {
+    return current;
+  }
+  if (!current) {
+    return candidate;
+  }
+  const currentSignalRank = scoreProviderLinearWorkerCurrentTurnActivity(current);
+  const candidateSignalRank = scoreProviderLinearWorkerCurrentTurnActivity(candidate);
+  if (candidateSignalRank !== currentSignalRank) {
+    return candidateSignalRank > currentSignalRank ? candidate : current;
+  }
+  const recordedAtComparison = compareIsoTimestamp(candidate.recorded_at, current.recorded_at);
+  if (recordedAtComparison !== 0) {
+    return recordedAtComparison > 0 ? candidate : current;
+  }
+  const sourcePriorityComparison =
+    providerLinearWorkerCurrentTurnActivitySourcePriority(candidate.source) -
+    providerLinearWorkerCurrentTurnActivitySourcePriority(current.source);
+  if (sourcePriorityComparison !== 0) {
+    return sourcePriorityComparison > 0 ? candidate : current;
+  }
+  return current;
+}
+
+function scoreProviderLinearWorkerCurrentTurnActivity(
+  activity: ProviderLinearWorkerCurrentTurnActivity
+): number {
+  const message = normalizeOptionalString(activity.message_or_payload);
+  if (message && isHighSignalProviderProgressSummary(message)) {
+    return 3;
+  }
+  if (message) {
+    return 2;
+  }
+  if (normalizeOptionalString(activity.event)) {
+    return 1;
+  }
+  return 0;
+}
+
+function providerLinearWorkerCurrentTurnActivitySourcePriority(
+  source: ProviderLinearWorkerCurrentTurnActivitySource
+): number {
+  switch (source) {
+    case 'stdout_jsonl':
+      return 2;
+    case 'session_log_hydration':
+      return 1;
+    default:
+      return 0;
+  }
 }
 
 function extractProviderWorkerTokenUsage(input: unknown): ProviderLinearWorkerTokenUsage | null {
@@ -1748,6 +2226,37 @@ function snapshotProviderWorkerSessionLogTailState(
   };
 }
 
+function selectProviderLinearWorkerCurrentTurnActivity(
+  proof: ProviderLinearWorkerProof
+): ProviderLinearWorkerCurrentTurnActivity | null {
+  const hydrated = proof.current_turn_activity ?? null;
+  if (hydrated) {
+    return synchronizeProviderLinearWorkerCurrentTurnActivity(
+      hydrated,
+      proof.thread_id ?? null,
+      proof.latest_turn_id ?? null
+    );
+  }
+  const legacyEvent = normalizeOptionalString(proof.last_event);
+  const legacyMessage = normalizeOptionalString(proof.last_message);
+  const legacyRecordedAt = normalizeOptionalString(proof.last_event_at);
+  if (!legacyEvent && !legacyMessage) {
+    return null;
+  }
+  return synchronizeProviderLinearWorkerCurrentTurnActivity(
+    {
+      event: legacyEvent,
+      message_or_payload: legacyMessage,
+      recorded_at: legacyRecordedAt,
+      source: 'stdout_jsonl',
+      turn_id: proof.latest_turn_id ?? null,
+      session_id: proof.latest_session_id ?? null
+    },
+    proof.thread_id ?? null,
+    proof.latest_turn_id ?? null
+  );
+}
+
 function buildProviderWorkerSessionLogHydrationProofSignature(
   proof: ProviderLinearWorkerProof
 ): string {
@@ -1759,6 +2268,15 @@ function buildProviderWorkerSessionLogHydrationProofSignature(
     last_event: proof.last_event ?? null,
     last_message: proof.last_message ?? null,
     last_event_at: proof.last_event_at ?? null,
+    current_turn_activity:
+      synchronizeProviderLinearWorkerCurrentTurnActivity(
+        selectPreferredProviderLinearWorkerCurrentTurnActivity(
+          null,
+          selectProviderLinearWorkerCurrentTurnActivity(proof)
+        ),
+        proof.thread_id ?? null,
+        proof.latest_turn_id ?? null
+      ) ?? null,
     tokens: proof.tokens ?? null,
     rate_limits: proof.rate_limits ?? null
   });
@@ -1935,11 +2453,13 @@ function selectProviderLinearWorkerProofTelemetryFields(
     last_event: proof.last_event ?? null,
     last_message: proof.last_message ?? null,
     last_event_at: proof.last_event_at ?? null,
+    current_turn_activity: selectProviderLinearWorkerCurrentTurnActivity(proof) ?? null,
     tokens: proof.tokens,
     rate_limits: proof.rate_limits ?? null,
     owner_phase: proof.owner_phase,
     owner_status: proof.owner_status,
     tracked_issue_error: proof.tracked_issue_error ?? null,
+    resident_session: proof.resident_session ?? null,
     end_reason: proof.end_reason ?? null
   };
 }
@@ -1981,6 +2501,7 @@ function buildProviderLinearWorkerTurnBootstrapProof(
     last_event: null,
     last_message: null,
     last_event_at: null,
+    current_turn_activity: null,
     tokens: buildEmptyProviderLinearWorkerTokenUsage(),
     rate_limits: null,
     owner_phase: 'turn_running',
@@ -2108,10 +2629,13 @@ function resolveProviderLinearWorkerParallelizationFailure(input: {
 }
 
 function shouldPreservePreviousTurnTelemetryOnLaunchFailure(
-  parseState: ProviderLinearWorkerJsonlParseResult
+  parseState: ProviderLinearWorkerJsonlParseResult,
+  previousThreadId: string | null
 ): boolean {
   const lastEvent = normalizeOptionalString(parseState.lastEvent);
+  const nextThreadId = normalizeOptionalString(parseState.threadId);
   return (
+    (nextThreadId === null || nextThreadId === previousThreadId) &&
     parseState.turnId === null &&
     (lastEvent === null || lastEvent === 'thread.started') &&
     parseState.finalMessage === null &&
@@ -2179,14 +2703,24 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     };
   }
 
+  const proofCurrentTurnActivity = selectProviderLinearWorkerCurrentTurnActivity(proof);
   const parseState: ProviderLinearWorkerJsonlParseResult = {
     threadId: proof.thread_id,
     turnId: proof.latest_turn_id,
     lastEvent: proof.last_event,
     finalMessage: proof.last_message,
     lastEventAt: proof.last_event_at,
+    currentTurnActivity: proofCurrentTurnActivity,
     tokens: proof.tokens ?? buildEmptyProviderLinearWorkerTokenUsage(),
     rateLimits: proof.rate_limits
+  };
+  const restoreProofTelemetryFloor = () => {
+    parseState.threadId = proof.thread_id;
+    parseState.turnId = proof.latest_turn_id;
+    parseState.lastEvent = proof.last_event;
+    parseState.finalMessage = proof.last_message;
+    parseState.lastEventAt = proof.last_event_at;
+    parseState.currentTurnActivity = proofCurrentTurnActivity;
   };
   let tailState = buildProviderWorkerSessionLogTailState(sessionLogPath, hydrationState);
   let preserveProofTelemetryFloor = false;
@@ -2239,22 +2773,22 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     parseState.turnId !== proof.latest_turn_id &&
     !providerWorkerTokenUsageAdvancesFloor(proofTokenFloor, parseState.tokens)
   ) {
-    parseState.threadId = proof.thread_id;
-    parseState.turnId = proof.latest_turn_id;
+    restoreProofTelemetryFloor();
   }
   if (
     preserveProofTelemetryFloor &&
     providerWorkerTokenUsageFallsBehindFloor(proofTokenFloor, parseState.tokens)
   ) {
-    parseState.threadId = proof.thread_id;
-    parseState.turnId = proof.latest_turn_id;
+    restoreProofTelemetryFloor();
     parseState.tokens = mergeProviderWorkerTokenUsageFloor(proofTokenFloor, parseState.tokens);
     parseState.rateLimits = proof.rate_limits;
   }
 
   const liveThreadId = parseState.threadId ?? proof.thread_id;
-  const liveTurnId = parseState.turnId ?? proof.latest_turn_id;
+  const liveThreadChanged = Boolean(liveThreadId && liveThreadId !== proof.thread_id);
+  const liveTurnId = parseState.turnId ?? (liveThreadChanged ? null : proof.latest_turn_id);
   const liveTurnChanged = Boolean(liveTurnId && liveTurnId !== proof.latest_turn_id);
+  const liveScopeChanged = liveThreadChanged || liveTurnChanged;
   const session = deriveLatestTurnSessionId({
     threadId: liveThreadId,
     turnId: liveTurnId
@@ -2269,8 +2803,17 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     ...proof,
     thread_id: liveThreadId,
     latest_turn_id: liveTurnId,
-    latest_session_id: session.sessionId ?? proof.latest_session_id,
-    latest_session_id_source: session.source ?? proof.latest_session_id_source,
+    latest_session_id: session.sessionId,
+    latest_session_id_source: session.source,
+    last_event: parseState.lastEvent ?? null,
+    last_message: parseState.finalMessage ?? null,
+    last_event_at: parseState.lastEventAt ?? null,
+    current_turn_activity:
+      synchronizeProviderLinearWorkerCurrentTurnActivity(
+        parseState.currentTurnActivity,
+        liveThreadId,
+        liveTurnId
+      ) ?? (liveScopeChanged ? null : proofCurrentTurnActivity),
     tokens: hasProviderWorkerTokenUsage(parseState.tokens)
       ? parseState.tokens
       : liveTurnChanged
@@ -3172,6 +3715,7 @@ async function requestProviderControlHostRefresh(input: {
   if (!shouldRefresh) {
     return;
   }
+  let controlHostRunDir: string | null = null;
   try {
     const manifestTarget = await resolveProviderControlHostManifestPath(
       input.currentManifestPath,
@@ -3183,6 +3727,7 @@ async function requestProviderControlHostRefresh(input: {
     }
     const canonicalRunsRoot = manifestTarget.currentRun.canonicalRunsRoot;
     const canonicalRunDir = await realpathOrResolveIfMissing(dirname(manifestTarget.manifestPath));
+    controlHostRunDir = canonicalRunDir;
     const canonicalManifestPath = await realpathOrResolveIfMissing(
       resolve(canonicalRunDir, basename(manifestTarget.manifestPath))
     );
@@ -3268,8 +3813,13 @@ async function requestProviderControlHostRefresh(input: {
     const message = (error as Error)?.name === 'AbortError'
       ? 'refresh request timeout'
       : (error as Error)?.message ?? String(error);
+    const ownershipHint = controlHostRunDir
+      ? await readControlHostOwnershipOperatorHint(controlHostRunDir).catch(() => null)
+      : null;
     input.log.warn(
-      `provider-linear-worker could not request control-host refresh for ${input.proof.issue_identifier}: ${message}`
+      `provider-linear-worker could not request control-host refresh for ${input.proof.issue_identifier}: ${message}${
+        ownershipHint ? `; ${ownershipHint}` : ''
+      }`
     );
   }
 }
@@ -3413,6 +3963,8 @@ export async function runProviderLinearWorker(
   const workerPid = String(process.pid);
   childEnv[PROVIDER_LINEAR_AUDIT_ENV_VAR] = auditPath;
   const helperCommand = resolveProviderLinearHelperCommand(childEnv);
+  const residentSessionSeed = context.residentSessionSeed;
+  const residentLogicalTurnBase = residentSessionSeed?.logical_turn_count ?? 0;
   if (shouldForceNonInteractive(childEnv)) {
     childEnv.CODEX_REVIEW_NON_INTERACTIVE = '1';
     childEnv.FORCE_CODEX_REVIEW = '1';
@@ -3428,7 +3980,7 @@ export async function runProviderLinearWorker(
     attempt_started_at: attemptStartedAt,
     current_turn_started_at: null,
     pid: workerPid,
-    thread_id: null,
+    thread_id: residentSessionSeed?.source_thread_id ?? null,
     latest_turn_id: null,
     latest_session_id: null,
     latest_session_id_source: null,
@@ -3436,11 +3988,13 @@ export async function runProviderLinearWorker(
     last_event: null,
     last_message: null,
     last_event_at: null,
+    current_turn_activity: null,
     tokens: buildEmptyProviderLinearWorkerTokenUsage(),
     rate_limits: null,
     owner_phase: 'bootstrapping',
     owner_status: 'in_progress',
     workspace_path: context.workspacePath,
+    worker_host: context.workerHost,
     source_setup: context.sourceSetup,
     linear_audit: null,
     child_streams: [],
@@ -3449,6 +4003,10 @@ export async function runProviderLinearWorker(
     progress: null,
     tracked_issue_error: null,
     linear_budget: null,
+    resident_session: buildInitialProviderLinearResidentSessionState({
+      issueId: context.issueId,
+      seed: residentSessionSeed
+    }),
     end_reason: null,
     updated_at: attemptStartedAt
   };
@@ -3474,9 +4032,9 @@ export async function runProviderLinearWorker(
     const hydratedProof = await writeProofSnapshot(deps, context.runDir, auditPath, nextProof, childEnv);
     emitSemanticProgressIfChanged(hydratedProof);
     await requestProviderControlHostRefresh({
-      currentManifestPath: context.manifestPath,
+      currentManifestPath: context.controlHostManifestPath,
       env,
-      manifest: context.manifest,
+      manifest: context.controlHostManifest,
       proof: hydratedProof,
       repoRoot: context.repoRoot,
       log: deps.log
@@ -3533,7 +4091,7 @@ export async function runProviderLinearWorker(
   };
 
   let issue = await readTrackedIssueWithFailClosedProof();
-  let threadId: string | null = null;
+  let threadId: string | null = residentSessionSeed?.source_thread_id ?? null;
   let turnId: string | null = null;
   let lifecycle = classifyProviderLinearWorkerLifecycle(issue);
   let liveRefreshRequestedAtMs = 0;
@@ -3601,9 +4159,9 @@ export async function runProviderLinearWorker(
           const abortController = new AbortController();
           liveRefreshAbortController = abortController;
           liveRefreshRequest = requestProviderControlHostRefresh({
-            currentManifestPath: context.manifestPath,
+            currentManifestPath: context.controlHostManifestPath,
             env,
-            manifest: context.manifest,
+            manifest: context.controlHostManifest,
             proof: finalProof,
             repoRoot: context.repoRoot,
             log: deps.log,
@@ -3633,9 +4191,9 @@ export async function runProviderLinearWorker(
         const abortController = new AbortController();
         liveRefreshAbortController = abortController;
         liveRefreshRequest = requestProviderControlHostRefresh({
-          currentManifestPath: context.manifestPath,
+          currentManifestPath: context.controlHostManifestPath,
           env,
-          manifest: context.manifest,
+          manifest: context.controlHostManifest,
           proof,
           repoRoot: context.repoRoot,
           log: deps.log,
@@ -3697,7 +4255,9 @@ export async function runProviderLinearWorker(
       const queueLiveProofWrite = (): void => {
         const liveThreadId = liveParseState.threadId ?? threadId;
         const liveTurnId = liveParseState.turnId;
+        const liveThreadChanged = Boolean(liveThreadId && liveThreadId !== finalProof.thread_id);
         const liveTurnChanged = Boolean(liveTurnId && liveTurnId !== finalProof.latest_turn_id);
+        const liveScopeChanged = liveThreadChanged || liveTurnChanged;
         const session = deriveLatestTurnSessionId({
           threadId: liveThreadId,
           turnId: liveTurnId
@@ -3710,9 +4270,18 @@ export async function runProviderLinearWorker(
           latest_session_id: session.sessionId,
           latest_session_id_source: session.source,
           turn_count: turnNumber,
-          last_event: liveParseState.lastEvent ?? (liveTurnChanged ? null : finalProof.last_event),
-          last_message: liveParseState.finalMessage ?? (liveTurnChanged ? null : finalProof.last_message),
-          last_event_at: liveParseState.lastEventAt ?? (liveTurnChanged ? null : finalProof.last_event_at),
+          last_event: liveParseState.lastEvent ?? (liveScopeChanged ? null : finalProof.last_event),
+          last_message:
+            liveParseState.finalMessage ?? (liveScopeChanged ? null : finalProof.last_message),
+          last_event_at:
+            liveParseState.lastEventAt ?? (liveScopeChanged ? null : finalProof.last_event_at),
+          current_turn_activity:
+            synchronizeProviderLinearWorkerCurrentTurnActivity(
+              liveParseState.currentTurnActivity,
+              liveThreadId,
+              liveTurnId
+            ) ??
+            (liveScopeChanged ? null : selectProviderLinearWorkerCurrentTurnActivity(finalProof)),
           tokens: hasProviderWorkerTokenUsage(liveParseState.tokens)
             ? liveParseState.tokens
             : liveTurnChanged
@@ -3733,6 +4302,7 @@ export async function runProviderLinearWorker(
           last_event: nextProof.last_event,
           last_message: nextProof.last_message,
           last_event_at: nextProof.last_event_at,
+          current_turn_activity: nextProof.current_turn_activity ?? null,
           tokens: nextProof.tokens,
           rate_limits: nextProof.rate_limits,
           owner_phase: nextProof.owner_phase
@@ -3791,6 +4361,7 @@ export async function runProviderLinearWorker(
           taskId: context.taskId
         })) ??
         deriveSharedRepoCheckoutPathFallback(context.repoRoot, context.taskId);
+      const continueResidentSessionOnBoot = turnNumber === 1 && residentSessionSeed !== null;
       const prompt = buildProviderWorkerPrompt(
         issue,
         turnNumber,
@@ -3800,11 +4371,15 @@ export async function runProviderLinearWorker(
         {
           linearAudit: finalProof.linear_audit,
           attemptStartedAt: finalProof.attempt_started_at ?? null,
-          manifest: context.manifest
+          manifest: context.manifest,
+          residentSession: finalProof.resident_session ?? null,
+          continueResidentSessionOnBoot
         }
       );
       const args =
-        turnNumber === 1
+        continueResidentSessionOnBoot
+          ? ['exec', 'resume', '--json', residentSessionSeed?.source_thread_id ?? '', prompt]
+          : turnNumber === 1
           ? ['exec', '--json', prompt]
           : ['exec', 'resume', '--json', threadId ?? '', prompt];
       const resolved = resolveRuntimeCodexCommand(args, runtimeContext);
@@ -3916,7 +4491,10 @@ export async function runProviderLinearWorker(
         clearLiveSemanticStallTimer();
         flushLiveStdoutTail();
         await liveProofWrite;
-        const failedProofBase = shouldPreservePreviousTurnTelemetryOnLaunchFailure(liveParseState)
+        const failedProofBase = shouldPreservePreviousTurnTelemetryOnLaunchFailure(
+          liveParseState,
+          previousTurnProof.thread_id ?? null
+        )
           ? {
               ...finalProof,
               thread_id: finalProof.thread_id ?? previousTurnProof.thread_id,
@@ -3926,10 +4504,17 @@ export async function runProviderLinearWorker(
               last_event: previousTurnProof.last_event,
               last_message: previousTurnProof.last_message,
               last_event_at: previousTurnProof.last_event_at,
+              current_turn_activity: selectProviderLinearWorkerCurrentTurnActivity(previousTurnProof),
               tokens: previousTurnProof.tokens,
               rate_limits: previousTurnProof.rate_limits
             }
-          : finalProof;
+          : {
+              ...finalProof,
+              tokens: hasProviderWorkerTokenUsage(finalProof.tokens)
+                ? finalProof.tokens
+                : previousTurnProof.tokens,
+              rate_limits: finalProof.rate_limits ?? previousTurnProof.rate_limits
+            };
         finalProof = {
           ...failedProofBase,
           owner_phase: 'ended',
@@ -3949,7 +4534,29 @@ export async function runProviderLinearWorker(
       await liveProofWrite;
       const parsed = parseProviderLinearWorkerJsonl(execResult.stdout);
       threadId = parsed.threadId ?? finalProof.thread_id ?? threadId;
-      turnId = parsed.turnId ?? finalProof.latest_turn_id ?? turnId;
+      const parsedThreadChanged = Boolean(threadId && threadId !== finalProof.thread_id);
+      if (
+        continueResidentSessionOnBoot &&
+        residentSessionSeed &&
+        threadId &&
+        threadId !== residentSessionSeed.source_thread_id
+      ) {
+        finalProof = {
+          ...finalProof,
+          thread_id: threadId,
+          owner_phase: 'ended',
+          owner_status: 'failed',
+          end_reason: 'guarded_resume_thread_mismatch',
+          updated_at: deps.now()
+        };
+        finalProof = await persistProof(finalProof);
+        throw new Error(
+          `provider-linear-worker guarded resident resume changed thread identity from ${residentSessionSeed.source_thread_id} to ${threadId}`
+        );
+      }
+      turnId = parsed.turnId ?? (parsedThreadChanged ? null : finalProof.latest_turn_id ?? turnId);
+      const parsedTurnChanged = Boolean(turnId && turnId !== finalProof.latest_turn_id);
+      const parsedScopeChanged = parsedThreadChanged || parsedTurnChanged;
       const session = deriveLatestTurnSessionId({ threadId, turnId });
 
       finalProof = {
@@ -3963,14 +4570,22 @@ export async function runProviderLinearWorker(
         latest_session_id: session.sessionId,
         latest_session_id_source: session.source,
         turn_count: turnNumber,
-        last_event: parsed.lastEvent ?? finalProof.last_event,
-        last_message: parsed.finalMessage ?? finalProof.last_message,
-        last_event_at: parsed.lastEventAt ?? finalProof.last_event_at,
+        last_event: parsed.lastEvent ?? (parsedScopeChanged ? null : finalProof.last_event),
+        last_message: parsed.finalMessage ?? (parsedScopeChanged ? null : finalProof.last_message),
+        last_event_at:
+          parsed.lastEventAt ?? (parsedScopeChanged ? null : finalProof.last_event_at),
+        current_turn_activity:
+          synchronizeProviderLinearWorkerCurrentTurnActivity(
+            parsed.currentTurnActivity,
+            threadId,
+            turnId
+          ) ?? (parsedScopeChanged ? null : selectProviderLinearWorkerCurrentTurnActivity(finalProof)),
         tokens: hasProviderWorkerTokenUsage(parsed.tokens) ? parsed.tokens : finalProof.tokens,
         rate_limits: parsed.rateLimits ?? finalProof.rate_limits,
         owner_phase: execResult.exitCode === 0 ? 'turn_completed' : 'turn_failed',
         owner_status: execResult.exitCode === 0 ? 'in_progress' : 'failed',
         workspace_path: context.workspacePath,
+        worker_host: context.workerHost,
         source_setup: context.sourceSetup,
         linear_audit: finalProof.linear_audit,
         child_streams: finalProof.child_streams,
@@ -3978,6 +4593,11 @@ export async function runProviderLinearWorker(
         parallelization: finalProof.parallelization ?? null,
         progress: finalProof.progress ?? null,
         tracked_issue_error: null,
+        resident_session: buildActiveProviderLinearResidentSessionState({
+          issueId: context.issueId,
+          logicalTurnCount: residentLogicalTurnBase + turnNumber,
+          seed: residentSessionSeed
+        }),
         end_reason: null,
         updated_at: deps.now()
       };
@@ -4066,13 +4686,14 @@ export async function runProviderLinearWorker(
   }
 }
 
-function resolveProviderLinearHelperCommand(env: NodeJS.ProcessEnv): string {
-  const packageRoot = normalizeOptionalString(env.CODEX_ORCHESTRATOR_PACKAGE_ROOT);
+export function resolveProviderLinearHelperCommand(env: NodeJS.ProcessEnv): string {
   const nodeBin = normalizeOptionalString(env.CODEX_ORCHESTRATOR_NODE_BIN) ?? 'node';
-  if (!packageRoot) {
-    return 'codex-orchestrator linear';
-  }
-  return `"${nodeBin}" "${join(packageRoot, 'dist', 'bin', 'codex-orchestrator.js')}" linear`;
+  const invocation = resolveCodexOrchestratorBootstrapInvocation({ env, execPath: nodeBin });
+  return [...[invocation.command, ...invocation.args].map(quoteShellArg), 'linear'].join(' ');
+}
+
+function quoteShellArg(value: string): string {
+  return `"${value.replace(/(["\\$`])/gu, '\\$1')}"`;
 }
 
 async function main(): Promise<void> {

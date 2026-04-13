@@ -2,6 +2,12 @@
 
 > Use for both fresh and clone-informed design runs. Keep results distinctive, accessible, and free of AI slop. Respect `do_not_copy` markers from Hifi captures (no logos, wordmarks, proprietary shapes).
 
+## Metadata
+- `snippetVersion`: `v1`
+- `status`: `active`
+- `ownerEvidence`: `docs/repo-stewardship-catalog.json` classifies `prompt-snippets/**/*` as a `validate` surface owned by `Codex (top-level agent), Review agent`.
+- `consumerEvidence`: `docs/design/PRD-frontend-design-pipeline-v2.md`, `docs/design/specs/FRONTEND_DESIGN_PIPELINE_V2.md`, and `tasks/frontend-design-pipeline-v2.md` reference this snippet as the frontend aesthetics prompt surface.
+
 ## Tone & Defaults
 - Aim for confident, editorial clarity—high contrast, minimal chrome, decisive spacing.
 - Accessibility first: WCAG AA contrast, keyboard-first nav, focus rings with visible offsets; always provide `prefers-reduced-motion` fallbacks.

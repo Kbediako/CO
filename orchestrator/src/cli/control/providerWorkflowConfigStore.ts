@@ -11,10 +11,20 @@ import type { PipelineDefinition } from '../types.js';
 import type { EnvironmentPaths } from '../run/environment.js';
 import { isoTimestamp } from '../utils/time.js';
 import {
+  resolveProviderOperatorAutopilotAuditPath,
+  resolveProviderOperatorAutopilotConfig,
+  type ProviderOperatorAutopilotResult
+} from './providerOperatorAutopilot.js';
+import {
   resolveProviderTerminalCleanupConfig,
   type ProviderTerminalCleanupResult
 } from './providerTerminalCleanup.js';
+import {
+  cloneProviderWorkerHostConfigs,
+  resolveProviderWorkerHostConfig
+} from './providerWorkerHosts.js';
 import type {
+  ControlProviderOperatorAutopilotLastResultPayload,
   ControlProviderTerminalCleanupLastResultPayload,
   ControlProviderWorkflowPayload
 } from './observabilityReadModel.js';
@@ -25,6 +35,7 @@ export interface ProviderWorkflowConfigStore {
   snapshot(): ControlProviderWorkflowPayload;
   getLaunchConfigPath(): Promise<string>;
   recordTerminalCleanupResult(result: ProviderTerminalCleanupResult): void;
+  recordOperatorAutopilotResult(result: ProviderOperatorAutopilotResult): void;
 }
 
 interface CreateProviderWorkflowConfigStoreOptions {
@@ -60,7 +71,9 @@ export function createProviderWorkflowConfigStore(
     last_success_at: null,
     last_error_at: null,
     last_error: null,
-    terminal_cleanup: buildDefaultTerminalCleanupPayload()
+    terminal_cleanup: buildDefaultTerminalCleanupPayload(),
+    worker_hosts: [],
+    operator_autopilot: buildDefaultOperatorAutopilotPayload(createOptions.runDir)
   };
 
   async function snapshotIsUsable(path: string | null): Promise<boolean> {
@@ -73,7 +86,12 @@ export function createProviderWorkflowConfigStore(
       }
       const raw = await readFile(path, 'utf8');
       const config = parseUserConfigRaw(raw, 'repo');
-      return Boolean(config && findPipeline(config, createOptions.pipelineId));
+      const pipeline = config ? findPipeline(config, createOptions.pipelineId) : null;
+      if (!pipeline) {
+        return false;
+      }
+      buildWorkerHostsPayload(pipeline.metadata);
+      return true;
     } catch {
       return false;
     }
@@ -169,6 +187,11 @@ export function createProviderWorkflowConfigStore(
 
       const raw = await readFile(sourcePath, 'utf8');
       const pipeline = parseRequiredPipelineFromRaw(raw, sourcePath, createOptions.pipelineId);
+      const nextTerminalCleanup = buildTerminalCleanupPayload(
+        pipeline.metadata,
+        state.terminal_cleanup?.last_result ?? null
+      );
+      const nextWorkerHosts = buildWorkerHostsPayload(pipeline.metadata);
 
       await mkdir(dirname(snapshotPath), { recursive: true });
       await replaceSnapshotAtomically(raw);
@@ -183,9 +206,12 @@ export function createProviderWorkflowConfigStore(
         last_success_at: attemptedAt,
         last_error_at: null,
         last_error: null,
-        terminal_cleanup: buildTerminalCleanupPayload(
+        terminal_cleanup: nextTerminalCleanup,
+        worker_hosts: nextWorkerHosts,
+        operator_autopilot: buildOperatorAutopilotPayload(
           pipeline.metadata,
-          state.terminal_cleanup?.last_result ?? null
+          state.operator_autopilot?.last_result ?? null,
+          createOptions.runDir
         )
       };
       if (!reloadOptions.startup && previousStatus === 'reload_failed') {
@@ -221,6 +247,12 @@ export function createProviderWorkflowConfigStore(
           terminal_cleanup: buildTerminalCleanupPayload(
             pipeline.metadata,
             state.terminal_cleanup?.last_result ?? null
+          ),
+          worker_hosts: buildWorkerHostsPayload(pipeline.metadata),
+          operator_autopilot: buildOperatorAutopilotPayload(
+            pipeline.metadata,
+            state.operator_autopilot?.last_result ?? null,
+            createOptions.runDir
           )
         };
         return state;
@@ -262,6 +294,15 @@ export function createProviderWorkflowConfigStore(
           last_result: mapTerminalCleanupResult(result)
         }
       };
+    },
+    recordOperatorAutopilotResult: (result) => {
+      state = {
+        ...state,
+        operator_autopilot: {
+          ...(state.operator_autopilot ?? buildDefaultOperatorAutopilotPayload(createOptions.runDir)),
+          last_result: cloneOperatorAutopilotLastResult(result)
+        }
+      };
     }
   };
 }
@@ -276,6 +317,33 @@ function buildDefaultTerminalCleanupPayload(): NonNullable<
       comment_template:
         resolveProviderTerminalCleanupConfig(null).closeAttachedPr.commentTemplate
     },
+    last_result: null
+  };
+}
+
+function buildDefaultOperatorAutopilotPayload(
+  runDir: string
+): NonNullable<ControlProviderWorkflowPayload['operator_autopilot']> {
+  const config = resolveProviderOperatorAutopilotConfig(null);
+  return {
+    enabled: config.enabled,
+    backlog_promotion: {
+      enabled: config.backlog_promotion.enabled,
+      state_name: config.backlog_promotion.state_name,
+      target_state_name: config.backlog_promotion.target_state_name
+    },
+    review_handoff_rework: {
+      enabled: config.review_handoff_rework.enabled,
+      target_state_name: config.review_handoff_rework.target_state_name,
+      excluded_action_required_reasons: [
+        ...config.review_handoff_rework.excluded_action_required_reasons
+      ]
+    },
+    post_merge_rollout: {
+      enabled: config.post_merge_rollout.enabled,
+      summary: config.post_merge_rollout.summary
+    },
+    audit_path: resolveProviderOperatorAutopilotAuditPath(runDir),
     last_result: null
   };
 }
@@ -313,6 +381,35 @@ function buildTerminalCleanupPayload(
   };
 }
 
+function buildOperatorAutopilotPayload(
+  metadata: unknown,
+  lastResult: ControlProviderOperatorAutopilotLastResultPayload | null,
+  runDir: string
+): NonNullable<ControlProviderWorkflowPayload['operator_autopilot']> {
+  const config = resolveProviderOperatorAutopilotConfig(metadata);
+  return {
+    enabled: config.enabled,
+    backlog_promotion: {
+      enabled: config.backlog_promotion.enabled,
+      state_name: config.backlog_promotion.state_name,
+      target_state_name: config.backlog_promotion.target_state_name
+    },
+    review_handoff_rework: {
+      enabled: config.review_handoff_rework.enabled,
+      target_state_name: config.review_handoff_rework.target_state_name,
+      excluded_action_required_reasons: [
+        ...config.review_handoff_rework.excluded_action_required_reasons
+      ]
+    },
+    post_merge_rollout: {
+      enabled: config.post_merge_rollout.enabled,
+      summary: config.post_merge_rollout.summary
+    },
+    audit_path: resolveProviderOperatorAutopilotAuditPath(runDir),
+    last_result: lastResult ? cloneOperatorAutopilotLastResult(lastResult) : null
+  };
+}
+
 function mapTerminalCleanupResult(
   result: ProviderTerminalCleanupResult
 ): ControlProviderTerminalCleanupLastResultPayload {
@@ -346,5 +443,55 @@ function cloneTerminalCleanupLastResult(
     attached_pr_urls: [...result.attached_pr_urls],
     matching_open_pr_urls: [...result.matching_open_pr_urls],
     closed_pr_urls: [...result.closed_pr_urls]
+  };
+}
+
+function buildWorkerHostsPayload(metadata: unknown): ControlProviderWorkflowPayload['worker_hosts'] {
+  return cloneProviderWorkerHostConfigs(resolveProviderWorkerHostConfig(metadata));
+}
+
+function cloneOperatorAutopilotLastResult(
+  result: ControlProviderOperatorAutopilotLastResultPayload
+): ControlProviderOperatorAutopilotLastResultPayload {
+  return {
+    recorded_at: result.recorded_at,
+    status: result.status,
+    summary: result.summary,
+    error: result.error,
+    actions: result.actions.map((action) => ({
+      kind: action.kind,
+      issue_id: action.issue_id,
+      issue_identifier: action.issue_identifier,
+      reason: action.reason,
+      summary: action.summary,
+      transition: {
+        status: action.transition.status,
+        attempted_at: action.transition.attempted_at,
+        previous_state: action.transition.previous_state,
+        target_state: action.transition.target_state,
+        issue_state: action.transition.issue_state,
+        issue_state_type: action.transition.issue_state_type,
+        issue_updated_at: action.transition.issue_updated_at,
+        error: action.transition.error
+      },
+      action_required_reasons: [...action.action_required_reasons]
+    })),
+    holds: result.holds.map((hold) => ({
+      kind: hold.kind,
+      issue_id: hold.issue_id,
+      issue_identifier: hold.issue_identifier,
+      reason: hold.reason,
+      summary: hold.summary,
+      action_required_reasons: [...hold.action_required_reasons]
+    })),
+    pending_actions: result.pending_actions.map((pendingAction) => ({
+      kind: pendingAction.kind,
+      issue_id: pendingAction.issue_id,
+      issue_identifier: pendingAction.issue_identifier,
+      summary: pendingAction.summary,
+      merge_closeout_reason: pendingAction.merge_closeout_reason,
+      shared_root_status: pendingAction.shared_root_status,
+      linear_transition_status: pendingAction.linear_transition_status
+    }))
   };
 }

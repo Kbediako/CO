@@ -5,7 +5,7 @@ status: completed
 owners:
   - Codex
 created: 2026-03-13
-last_review: 2026-03-13
+last_review: 2026-04-13
 review_cadence_days: 30
 related_prd: docs/PRD-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction.md
 related_action_plan: docs/ACTION_PLAN-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction.md

@@ -1,14 +1,19 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { execFile } from 'node:child_process';
-import { chmod, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, mkdir, readFile, realpath, rm, symlink, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join, relative } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 
 import type { ReviewOutcomeDisposition } from '../scripts/lib/review-execution-telemetry.js';
+import { isDirectExecution, runReviewCli } from '../scripts/run-review.js';
+import { shouldUseFreshDist } from './helpers/distFreshness.js';
+import { runEntrypointInProcess } from './helpers/inProcessEntrypoint.js';
 
 const execFileAsync = promisify(execFile);
 const runReviewScript = join(process.cwd(), 'scripts', 'run-review.ts');
+const runReviewScriptDist = join(process.cwd(), 'dist', 'scripts', 'run-review.js');
 const createdSandboxes: string[] = [];
 const shellBinary = 'bash';
 const LONG_WAIT_TEST_TIMEOUT_MS = 20_000;
@@ -146,6 +151,18 @@ if [[ -n "\${RUN_REVIEW_ARGS_LOG:-}" ]]; then
     fi
     echo "argv=$*"
   } >> "\${RUN_REVIEW_ARGS_LOG}"
+fi
+if [[ -n "\${RUN_REVIEW_ENV_LOG:-}" ]]; then
+  {
+    echo "---"
+    echo "CODEX_ORCHESTRATOR_ROOT=\${CODEX_ORCHESTRATOR_ROOT-}"
+    echo "CODEX_ORCHESTRATOR_MANIFEST_PATH=\${CODEX_ORCHESTRATOR_MANIFEST_PATH-}"
+    echo "CODEX_ORCHESTRATOR_RUN_DIR=\${CODEX_ORCHESTRATOR_RUN_DIR-}"
+    echo "CODEX_ORCHESTRATOR_RUNS_DIR=\${CODEX_ORCHESTRATOR_RUNS_DIR-}"
+    echo "CODEX_ORCHESTRATOR_OUT_DIR=\${CODEX_ORCHESTRATOR_OUT_DIR-}"
+    echo "CODEX_ORCHESTRATOR_PRESERVE_PROVIDER_ARTIFACT_ROOTS=\${CODEX_ORCHESTRATOR_PRESERVE_PROVIDER_ARTIFACT_ROOTS-}"
+    echo "MANIFEST=\${MANIFEST-}"
+  } >> "\${RUN_REVIEW_ENV_LOG}"
 fi
 has_arg() {
   local needle="$1"
@@ -1111,6 +1128,12 @@ fi
         sleep 1
       done
     fi
+    if [[ "$mode" == "heavy-fast-scoped-test-file" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'npm test -- --runInBand tests/run-review.spec.ts' in /tmp/run-review-heavy"
+      exit 0
+    fi
     if [[ "$mode" == "heavy-hang-npm-cmd-launcher" ]]; then
       echo "thinking"
       echo "exec"
@@ -1273,6 +1296,8 @@ function baseEnv(sandbox: string, codexBin: string): Record<string, string | und
   delete env.CODEX_ORCHESTRATOR_RUN_DIR;
   delete env.CODEX_ORCHESTRATOR_RUNS_DIR;
   delete env.CODEX_ORCHESTRATOR_OUT_DIR;
+  delete env.CODEX_ORCHESTRATOR_PIPELINE_ID;
+  delete env.CODEX_ORCHESTRATOR_PRESERVE_PROVIDER_ARTIFACT_ROOTS;
   delete env.MCP_RUNNER_TASK_ID;
   delete env.TASK;
   delete env.CODEX_ORCHESTRATOR_TASK_ID;
@@ -1288,7 +1313,28 @@ async function runReviewCommand(
   env: Record<string, string | undefined>,
   extraArgs: string[] = []
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
-  const args = ['--loader', 'ts-node/esm', runReviewScript, ...extraArgs];
+  const args = [...extraArgs];
+  if (manifestPath) {
+    args.push('--manifest', manifestPath);
+  }
+  args.push('--non-interactive');
+  return await runEntrypointInProcess({
+    args,
+    env,
+    runner: runReviewCli
+  });
+}
+
+async function runReviewCommandSubprocess(
+  manifestPath: string | null,
+  env: Record<string, string | undefined>,
+  extraArgs: string[] = [],
+  cwd = process.cwd()
+): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+  const entryArgs = (await shouldUseFreshDist(runReviewScript, runReviewScriptDist))
+    ? [runReviewScriptDist, ...extraArgs]
+    : ['--loader', 'ts-node/esm', runReviewScript, ...extraArgs];
+  const args = [...entryArgs];
   if (manifestPath) {
     args.push('--manifest', manifestPath);
   }
@@ -1297,7 +1343,7 @@ async function runReviewCommand(
     const { stdout, stderr } = await execFileAsync(
       process.execPath,
       args,
-      { cwd: process.cwd(), env, maxBuffer: 16 * 1024 * 1024, timeout: 30_000 }
+      { cwd, env, maxBuffer: 16 * 1024 * 1024, timeout: 30_000 }
     );
     return { exitCode: 0, stdout: String(stdout ?? ''), stderr: String(stderr ?? '') };
   } catch (error) {
@@ -1323,6 +1369,411 @@ async function runReviewCommand(
   }
 }
 
+describe('shouldUseFreshDist', () => {
+  it('treats dist as stale when a newer transitive runtime dependency exists', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'run-review-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'scripts', 'run-review.ts');
+    const boundaryHelper = join(tempRoot, 'scripts', 'lib', 'review-execution-boundary-preflight.ts');
+    const runtimeIndex = join(tempRoot, 'orchestrator', 'src', 'cli', 'runtime', 'index.ts');
+    const runtimeProvider = join(tempRoot, 'orchestrator', 'src', 'cli', 'runtime', 'provider.ts');
+    const runtimeUtility = join(tempRoot, 'orchestrator', 'src', 'cli', 'utils', 'codexCli.ts');
+    const distEntry = join(tempRoot, 'dist', 'scripts', 'run-review.js');
+
+    try {
+      await mkdir(dirname(sourceEntry), { recursive: true });
+      await mkdir(dirname(boundaryHelper), { recursive: true });
+      await mkdir(dirname(runtimeIndex), { recursive: true });
+      await mkdir(dirname(runtimeUtility), { recursive: true });
+      await mkdir(dirname(distEntry), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "export { prepareReviewExecutionBoundaryPreflight } from './lib/review-execution-boundary-preflight.js';\n",
+        'utf8'
+      );
+      await writeFile(
+        boundaryHelper,
+        "export { resolveRuntimeSelection } from '../../orchestrator/src/cli/runtime/index.js';\n",
+        'utf8'
+      );
+      await writeFile(
+        runtimeIndex,
+        "export { resolveRuntimeSelection } from './provider.js';\n",
+        'utf8'
+      );
+      await writeFile(
+        runtimeProvider,
+        "export { resolveCodexCliBin as resolveRuntimeSelection } from '../utils/codexCli.js';\n",
+        'utf8'
+      );
+      await writeFile(runtimeUtility, 'export function resolveCodexCliBin() {}\n', 'utf8');
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const distAt = new Date('2026-01-01T00:00:01.000Z');
+      const dependencyAt = new Date('2026-01-01T00:00:02.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(boundaryHelper, sourceAt, sourceAt);
+      await utimes(runtimeIndex, sourceAt, sourceAt);
+      await utimes(runtimeProvider, sourceAt, sourceAt);
+      await utimes(distEntry, distAt, distAt);
+      await utimes(runtimeUtility, dependencyAt, dependencyAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('treats dist as stale when a tracked transitive dependency cannot be resolved', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'run-review-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'scripts', 'run-review.ts');
+    const boundaryHelper = join(tempRoot, 'scripts', 'lib', 'review-execution-boundary-preflight.ts');
+    const distEntry = join(tempRoot, 'dist', 'scripts', 'run-review.js');
+
+    try {
+      await mkdir(dirname(sourceEntry), { recursive: true });
+      await mkdir(dirname(boundaryHelper), { recursive: true });
+      await mkdir(dirname(distEntry), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "export { prepareReviewExecutionBoundaryPreflight } from './lib/review-execution-boundary-preflight.js';\n",
+        'utf8'
+      );
+      await writeFile(
+        boundaryHelper,
+        "export { resolveRuntimeSelection } from '../../orchestrator/src/cli/runtime/missing.js';\n",
+        'utf8'
+      );
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('treats dist as stale when a higher-priority runtime source candidate appears with an older mtime', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'run-review-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'scripts', 'run-review.ts');
+    const boundaryHelperTs = join(tempRoot, 'scripts', 'lib', 'review-execution-boundary-preflight.ts');
+    const boundaryHelperJs = join(tempRoot, 'scripts', 'lib', 'review-execution-boundary-preflight.js');
+    const distEntry = join(tempRoot, 'dist', 'scripts', 'run-review.js');
+
+    try {
+      await mkdir(dirname(sourceEntry), { recursive: true });
+      await mkdir(dirname(boundaryHelperTs), { recursive: true });
+      await mkdir(dirname(distEntry), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "export { prepareReviewExecutionBoundaryPreflight } from './lib/review-execution-boundary-preflight.js';\n",
+        'utf8'
+      );
+      await writeFile(
+        boundaryHelperTs,
+        'export function prepareReviewExecutionBoundaryPreflight() { return "ts"; }\n',
+        'utf8'
+      );
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const distAt = new Date('2026-01-01T00:00:05.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(boundaryHelperTs, sourceAt, sourceAt);
+      await utimes(distEntry, distAt, distAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+
+      const higherPriorityAt = new Date('2026-01-01T00:00:01.000Z');
+      await writeFile(
+        boundaryHelperJs,
+        'export function prepareReviewExecutionBoundaryPreflight() { return "js"; }\n',
+        'utf8'
+      );
+      await utimes(boundaryHelperJs, higherPriorityAt, higherPriorityAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('treats dist as stale when the winning runtime source candidate disappears and resolution falls back to an older file', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'run-review-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'scripts', 'run-review.ts');
+    const boundaryHelperTs = join(tempRoot, 'scripts', 'lib', 'review-execution-boundary-preflight.ts');
+    const boundaryHelperJs = join(tempRoot, 'scripts', 'lib', 'review-execution-boundary-preflight.js');
+    const distEntry = join(tempRoot, 'dist', 'scripts', 'run-review.js');
+
+    try {
+      await mkdir(dirname(sourceEntry), { recursive: true });
+      await mkdir(dirname(boundaryHelperTs), { recursive: true });
+      await mkdir(dirname(distEntry), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "export { prepareReviewExecutionBoundaryPreflight } from './lib/review-execution-boundary-preflight.js';\n",
+        'utf8'
+      );
+      await writeFile(
+        boundaryHelperTs,
+        'export function prepareReviewExecutionBoundaryPreflight() { return "ts"; }\n',
+        'utf8'
+      );
+      await writeFile(
+        boundaryHelperJs,
+        'export function prepareReviewExecutionBoundaryPreflight() { return "js"; }\n',
+        'utf8'
+      );
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const fallbackAt = new Date('2026-01-01T00:00:00.000Z');
+      const winningAt = new Date('2026-01-01T00:00:01.000Z');
+      const distAt = new Date('2026-01-01T00:00:05.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(boundaryHelperTs, fallbackAt, fallbackAt);
+      await utimes(boundaryHelperJs, winningAt, winningAt);
+      await utimes(distEntry, distAt, distAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+
+      await rm(boundaryHelperJs);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps dist stale after a winning runtime source candidate disappears until dist mtime changes', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'run-review-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'scripts', 'run-review.ts');
+    const boundaryHelperTs = join(tempRoot, 'scripts', 'lib', 'review-execution-boundary-preflight.ts');
+    const boundaryHelperJs = join(tempRoot, 'scripts', 'lib', 'review-execution-boundary-preflight.js');
+    const distEntry = join(tempRoot, 'dist', 'scripts', 'run-review.js');
+
+    try {
+      await mkdir(dirname(sourceEntry), { recursive: true });
+      await mkdir(dirname(boundaryHelperTs), { recursive: true });
+      await mkdir(dirname(distEntry), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "export { prepareReviewExecutionBoundaryPreflight } from './lib/review-execution-boundary-preflight.js';\n",
+        'utf8'
+      );
+      await writeFile(
+        boundaryHelperTs,
+        'export function prepareReviewExecutionBoundaryPreflight() { return "ts"; }\n',
+        'utf8'
+      );
+      await writeFile(
+        boundaryHelperJs,
+        'export function prepareReviewExecutionBoundaryPreflight() { return "js"; }\n',
+        'utf8'
+      );
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const fallbackAt = new Date('2026-01-01T00:00:00.000Z');
+      const winningAt = new Date('2026-01-01T00:00:01.000Z');
+      const distAt = new Date('2026-01-01T00:00:05.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(boundaryHelperTs, fallbackAt, fallbackAt);
+      await utimes(boundaryHelperJs, winningAt, winningAt);
+      await utimes(distEntry, distAt, distAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+
+      await rm(boundaryHelperJs);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
+
+      await chmod(distEntry, 0o755);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps dist fresh when the winning runtime source candidate disappears and dist is rebuilt first', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'run-review-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'scripts', 'run-review.ts');
+    const boundaryHelperTs = join(tempRoot, 'scripts', 'lib', 'review-execution-boundary-preflight.ts');
+    const boundaryHelperJs = join(tempRoot, 'scripts', 'lib', 'review-execution-boundary-preflight.js');
+    const distEntry = join(tempRoot, 'dist', 'scripts', 'run-review.js');
+
+    try {
+      await mkdir(dirname(sourceEntry), { recursive: true });
+      await mkdir(dirname(boundaryHelperTs), { recursive: true });
+      await mkdir(dirname(distEntry), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "export { prepareReviewExecutionBoundaryPreflight } from './lib/review-execution-boundary-preflight.js';\n",
+        'utf8'
+      );
+      await writeFile(
+        boundaryHelperTs,
+        'export function prepareReviewExecutionBoundaryPreflight() { return "ts"; }\n',
+        'utf8'
+      );
+      await writeFile(
+        boundaryHelperJs,
+        'export function prepareReviewExecutionBoundaryPreflight() { return "js"; }\n',
+        'utf8'
+      );
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const fallbackAt = new Date('2026-01-01T00:00:00.000Z');
+      const winningAt = new Date('2026-01-01T00:00:01.000Z');
+      const distAt = new Date('2026-01-01T00:00:05.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(boundaryHelperTs, fallbackAt, fallbackAt);
+      await utimes(boundaryHelperJs, winningAt, winningAt);
+      await utimes(distEntry, distAt, distAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+
+      await rm(boundaryHelperJs);
+
+      await writeFile(distEntry, 'export const rebuiltReviewBoundary = "ts";\n', 'utf8');
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('ignores newer sibling scripts outside the run-review dependency closure', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'run-review-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'scripts', 'run-review.ts');
+    const boundaryHelper = join(tempRoot, 'scripts', 'lib', 'review-execution-boundary-preflight.ts');
+    const unrelatedSibling = join(tempRoot, 'scripts', 'other-script.ts');
+    const distEntry = join(tempRoot, 'dist', 'scripts', 'run-review.js');
+
+    try {
+      await mkdir(dirname(sourceEntry), { recursive: true });
+      await mkdir(dirname(boundaryHelper), { recursive: true });
+      await mkdir(dirname(distEntry), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "export { prepareReviewExecutionBoundaryPreflight } from './lib/review-execution-boundary-preflight.js';\n",
+        'utf8'
+      );
+      await writeFile(boundaryHelper, 'export function prepareReviewExecutionBoundaryPreflight() {}\n', 'utf8');
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+      await writeFile(unrelatedSibling, 'export {};\n', 'utf8');
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const distAt = new Date('2026-01-01T00:00:01.000Z');
+      const siblingAt = new Date('2026-01-01T00:00:02.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(boundaryHelper, sourceAt, sourceAt);
+      await utimes(distEntry, distAt, distAt);
+      await utimes(unrelatedSibling, siblingAt, siblingAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('ignores newer type-only re-export dependencies outside the runtime closure', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'run-review-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'scripts', 'run-review.ts');
+    const boundaryHelper = join(tempRoot, 'scripts', 'lib', 'review-execution-boundary-preflight.ts');
+    const typeOnlyDependency = join(tempRoot, 'scripts', 'lib', 'review-execution-types.ts');
+    const distEntry = join(tempRoot, 'dist', 'scripts', 'run-review.js');
+
+    try {
+      await mkdir(dirname(sourceEntry), { recursive: true });
+      await mkdir(dirname(boundaryHelper), { recursive: true });
+      await mkdir(dirname(distEntry), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "export { prepareReviewExecutionBoundaryPreflight } from './lib/review-execution-boundary-preflight.js';\n",
+        'utf8'
+      );
+      await writeFile(
+        boundaryHelper,
+        "export { type ReviewExecutionBoundaryPreflightResult } from './review-execution-types.js';\nexport function prepareReviewExecutionBoundaryPreflight() {}\n",
+        'utf8'
+      );
+      await writeFile(
+        typeOnlyDependency,
+        'export interface ReviewExecutionBoundaryPreflightResult { ok: boolean; }\n',
+        'utf8'
+      );
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const distAt = new Date('2026-01-01T00:00:01.000Z');
+      const typeOnlyAt = new Date('2026-01-01T00:00:02.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(boundaryHelper, sourceAt, sourceAt);
+      await utimes(distEntry, distAt, distAt);
+      await utimes(typeOnlyDependency, typeOnlyAt, typeOnlyAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('isDirectExecution', () => {
+  it('accepts both resolved and realpath entry urls for same-directory symlinked direct exec', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'run-review-direct-exec-'));
+    const targetEntry = join(tempRoot, 'run-review.js');
+    const symlinkEntry = join(tempRoot, 'run-review-link.js');
+
+    try {
+      await writeFile(targetEntry, 'export {};\n', 'utf8');
+      await symlink(targetEntry, symlinkEntry);
+
+      expect(isDirectExecution(targetEntry, pathToFileURL(targetEntry).href)).toBe(true);
+      expect(isDirectExecution(symlinkEntry, pathToFileURL(await realpath(symlinkEntry)).href)).toBe(true);
+      expect(isDirectExecution(symlinkEntry, pathToFileURL(symlinkEntry).href)).toBe(true);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('runs help output through a same-directory symlink under preserve-symlinks-main', async () => {
+    const directEntry = (await shouldUseFreshDist(runReviewScript, runReviewScriptDist))
+      ? runReviewScriptDist
+      : runReviewScript;
+    const linkPath = join(
+      dirname(directEntry),
+      `run-review-link-${process.pid}-${Date.now()}${directEntry.endsWith('.ts') ? '.ts' : '.js'}`
+    );
+
+    try {
+      await symlink(basename(directEntry), linkPath);
+
+      const directArgs = directEntry.endsWith('.ts')
+        ? ['--loader', 'ts-node/esm', linkPath, '--help']
+        : [linkPath, '--help'];
+
+      const { stdout } = await execFileAsync(
+        process.execPath,
+        directArgs,
+        {
+          cwd: process.cwd(),
+          env: {
+            ...process.env,
+            NODE_OPTIONS: [process.env.NODE_OPTIONS, '--preserve-symlinks-main'].filter(Boolean).join(' ')
+          },
+          maxBuffer: 16 * 1024 * 1024
+        }
+      );
+
+      expect(String(stdout ?? '')).toContain('Usage: npm run review -- [options]');
+      expect(String(stdout ?? '')).toContain('Standalone review wrapper for Codex review with manifest-backed context.');
+    } finally {
+      await rm(linkPath, { force: true });
+    }
+  }, 15_000);
+});
+
 afterEach(async () => {
   while (createdSandboxes.length > 0) {
     const dir = createdSandboxes.pop();
@@ -1337,7 +1788,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
     const codexBin = await makeFakeCodex(sandbox);
-    const result = await runReviewCommand(manifestPath, baseEnv(sandbox, codexBin));
+    const result = await runReviewCommandSubprocess(manifestPath, baseEnv(sandbox, codexBin));
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain('skipping diff budget (missing scripts/diff-budget.mjs');
@@ -1456,6 +1907,9 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(boundedPrompt).not.toContain('Evidence + checklist mirroring requirements are satisfied');
     expect(boundedPrompt).toContain('Execution constraints (bounded review mode):');
     expect(boundedPrompt).toContain('Avoid full validation suites');
+    expect(boundedPrompt).toContain(
+      'If changed docs, task packets, or checklists mention validation commands, treat them as evidence or follow-up suggestions only; do not execute those commands during bounded review.'
+    );
     expect(boundedPrompt).toContain('Keep this pass diff-focused.');
     expect(boundedPrompt).toContain(
       'Concrete same-diff progress can be shown by citing touched paths with explicit locations'
@@ -1475,7 +1929,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const heavyPromptPath = join(dirname(heavyManifestPath), 'review', 'prompt.txt');
     const heavyPrompt = await readFile(heavyPromptPath, 'utf8');
     expect(heavyPrompt).not.toContain('Execution constraints (bounded review mode):');
-  });
+  }, LONG_WAIT_TEST_TIMEOUT_MS * 2);
 
   it('uses a generated NOTES fallback when NOTES is absent', async () => {
     const sandbox = await makeSandbox();
@@ -1846,7 +2300,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
     const codexBin = await makeFakeCodex(sandbox);
-    const result = await runReviewCommand(manifestPath, {
+    const result = await runReviewCommandSubprocess(manifestPath, {
       ...baseEnv(sandbox, codexBin),
       RUN_REVIEW_MODE: 'heavy-hang',
       CODEX_REVIEW_ALLOW_HEAVY_COMMANDS: '1',
@@ -2230,6 +2684,21 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const result = await runReviewCommand(manifestPath, {
       ...baseEnv(sandbox, codexBin),
       RUN_REVIEW_MODE: 'heavy-hang-test-alias',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('bounded command-intent boundary (validation suite launch)');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded review on scoped package-manager test-file launches', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'heavy-fast-scoped-test-file',
       CODEX_REVIEW_TIMEOUT_SECONDS: '60',
       CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
     });
@@ -3360,7 +3829,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.stderr).not.toContain('termination boundary: stall (output-stall).');
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
-  it('defaults manifest selection to active task env when --task is omitted', async () => {
+  it('defaults manifest selection to canonical task env when --task is omitted', async () => {
     const sandbox = await makeSandbox();
     await makeManifestForTask(
       sandbox,
@@ -3373,7 +3842,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const codexBin = await makeFakeCodex(sandbox);
     const result = await runReviewCommand(null, {
       ...baseEnv(sandbox, codexBin),
-      MCP_RUNNER_TASK_ID: '0975-codex-cli-capability-adoption-redesign'
+      CODEX_ORCHESTRATOR_TASK_ID: '0975-codex-cli-capability-adoption-redesign'
     });
 
     expect(result.exitCode).toBe(0);
@@ -3664,6 +4133,306 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const activePrompt = await readFile(activePromptPath, 'utf8');
     expect(activePrompt).toContain('Evidence manifest: .runs/sample-task/cli/active-manifest/manifest.json');
     await expect(readFile(stalePromptPath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('rebases provider-worker explicit manifest and inherited run-dir envs to issue workspace artifacts', async () => {
+    const sharedRoot = await mkdtemp(join(process.cwd(), '.tmp-run-review-provider-'));
+    createdSandboxes.push(sharedRoot);
+    const taskId = 'linear-lin-issue-1';
+    const issueWorkspacePath = join(sharedRoot, '.workspaces', taskId);
+    const sharedManifestPath = await makeManifestForTask(sharedRoot, taskId, 'provider-parent-run');
+    const workspaceManifestPath = await makeManifestForTask(
+      issueWorkspacePath,
+      taskId,
+      'provider-parent-run'
+    );
+    const codexBin = await makeFakeCodex(sharedRoot);
+    const envLogPath = join(sharedRoot, 'review-env.log');
+
+    const result = await runReviewCommandSubprocess(
+      null,
+      {
+        ...baseEnv(sharedRoot, codexBin),
+        MCP_RUNNER_TASK_ID: 'stale-linear-issue',
+        CODEX_ORCHESTRATOR_TASK_ID: taskId,
+        CODEX_ORCHESTRATOR_PIPELINE_ID: 'provider-linear-worker',
+        CODEX_ORCHESTRATOR_RUN_DIR: dirname(sharedManifestPath),
+        CODEX_ORCHESTRATOR_RUNS_DIR: join(sharedRoot, '.runs'),
+        CODEX_ORCHESTRATOR_OUT_DIR: join(sharedRoot, 'out'),
+        CODEX_ORCHESTRATOR_PRESERVE_PROVIDER_ARTIFACT_ROOTS: '1',
+        RUN_REVIEW_ENV_LOG: envLogPath
+      },
+      ['--manifest', relative(sharedRoot, sharedManifestPath), '--surface', 'audit'],
+      issueWorkspacePath
+    );
+
+    expect(result.exitCode).toBe(0);
+    const workspacePromptPath = join(dirname(workspaceManifestPath), 'review', 'prompt.txt');
+    const sharedPromptPath = join(dirname(sharedManifestPath), 'review', 'prompt.txt');
+    const workspacePrompt = await readFile(workspacePromptPath, 'utf8');
+    expect(workspacePrompt).toContain(
+      'Evidence manifest: .runs/linear-lin-issue-1/cli/provider-parent-run/manifest.json'
+    );
+    const reviewEnvLog = await readFile(envLogPath, 'utf8');
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_ROOT=${issueWorkspacePath}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_MANIFEST_PATH=${workspaceManifestPath}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_RUN_DIR=${dirname(workspaceManifestPath)}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_RUNS_DIR=${join(issueWorkspacePath, '.runs')}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_OUT_DIR=${join(issueWorkspacePath, 'out')}`);
+    expect(reviewEnvLog).toContain('CODEX_ORCHESTRATOR_PRESERVE_PROVIDER_ARTIFACT_ROOTS=1');
+    expect(reviewEnvLog).toContain(`MANIFEST=${workspaceManifestPath}`);
+    await expect(readFile(sharedPromptPath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('rebases provider-worker explicit manifest from configured runs layout roots to issue workspace artifacts', async () => {
+    const sharedRoot = await mkdtemp(join(process.cwd(), '.tmp-run-review-provider-'));
+    createdSandboxes.push(sharedRoot);
+    const taskId = 'linear-lin-issue-1';
+    const issueWorkspacePath = join(sharedRoot, '.workspaces', taskId);
+    const sharedRunDir = join(sharedRoot, 'runs', taskId, 'cli', 'provider-parent-run');
+    const workspaceRunDir = join(issueWorkspacePath, 'runs', taskId, 'cli', 'provider-parent-run');
+    const sharedManifestPath = join(sharedRunDir, 'manifest.json');
+    const workspaceManifestPath = join(workspaceRunDir, 'manifest.json');
+    await mkdir(sharedRunDir, { recursive: true });
+    await mkdir(workspaceRunDir, { recursive: true });
+    await writeFile(sharedManifestPath, JSON.stringify({ run: 'shared' }), 'utf8');
+    await writeFile(join(sharedRunDir, 'runner.ndjson'), '{"event":"shared"}\n', 'utf8');
+    await writeFile(workspaceManifestPath, JSON.stringify({ run: 'workspace' }), 'utf8');
+    await writeFile(join(workspaceRunDir, 'runner.ndjson'), '{"event":"workspace"}\n', 'utf8');
+    const codexBin = await makeFakeCodex(sharedRoot);
+    const envLogPath = join(sharedRoot, 'review-env-runs-layout.log');
+
+    const result = await runReviewCommandSubprocess(
+      null,
+      {
+        ...baseEnv(sharedRoot, codexBin),
+        MCP_RUNNER_TASK_ID: 'stale-linear-issue',
+        CODEX_ORCHESTRATOR_TASK_ID: taskId,
+        CODEX_ORCHESTRATOR_PIPELINE_ID: 'provider-linear-worker',
+        CODEX_ORCHESTRATOR_RUN_DIR: dirname(sharedManifestPath),
+        CODEX_ORCHESTRATOR_RUNS_DIR: join(sharedRoot, 'runs'),
+        CODEX_ORCHESTRATOR_OUT_DIR: join(sharedRoot, 'out'),
+        CODEX_ORCHESTRATOR_PRESERVE_PROVIDER_ARTIFACT_ROOTS: '1',
+        RUN_REVIEW_ENV_LOG: envLogPath
+      },
+      ['--manifest', relative(sharedRoot, sharedManifestPath), '--surface', 'audit'],
+      issueWorkspacePath
+    );
+
+    expect(result.exitCode).toBe(0);
+    const workspacePromptPath = join(dirname(workspaceManifestPath), 'review', 'prompt.txt');
+    await expect(readFile(workspacePromptPath, 'utf8')).resolves.toContain(
+      'Evidence manifest: runs/linear-lin-issue-1/cli/provider-parent-run/manifest.json'
+    );
+    const reviewEnvLog = await readFile(envLogPath, 'utf8');
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_ROOT=${issueWorkspacePath}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_MANIFEST_PATH=${workspaceManifestPath}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_RUN_DIR=${dirname(workspaceManifestPath)}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_RUNS_DIR=${join(issueWorkspacePath, 'runs')}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_OUT_DIR=${join(issueWorkspacePath, 'out')}`);
+    expect(reviewEnvLog).toContain('CODEX_ORCHESTRATOR_PRESERVE_PROVIDER_ARTIFACT_ROOTS=1');
+    expect(reviewEnvLog).toContain(`MANIFEST=${workspaceManifestPath}`);
+  });
+
+  it('rebases provider-worker manifests selected from configured absolute runs-dir roots to issue workspace artifacts', async () => {
+    const sharedRoot = await mkdtemp(join(process.cwd(), '.tmp-run-review-provider-'));
+    createdSandboxes.push(sharedRoot);
+    const taskId = 'linear-lin-issue-1';
+    const issueWorkspacePath = join(sharedRoot, '.workspaces', taskId);
+    const sharedRunsRoot = join(sharedRoot, 'artifacts', 'runs');
+    const sharedOutRoot = join(sharedRoot, 'artifacts', 'out');
+    const workspaceRunsRoot = join(issueWorkspacePath, 'artifacts', 'runs');
+    const workspaceOutRoot = join(issueWorkspacePath, 'artifacts', 'out');
+    const sharedRunDir = join(sharedRunsRoot, taskId, 'cli', 'provider-parent-run');
+    const workspaceRunDir = join(workspaceRunsRoot, taskId, 'cli', 'provider-parent-run');
+    const sharedManifestPath = join(sharedRunDir, 'manifest.json');
+    const workspaceManifestPath = join(workspaceRunDir, 'manifest.json');
+    await mkdir(sharedRunDir, { recursive: true });
+    await mkdir(workspaceRunDir, { recursive: true });
+    await writeFile(sharedManifestPath, JSON.stringify({ run: 'shared' }), 'utf8');
+    await writeFile(join(sharedRunDir, 'runner.ndjson'), '{"event":"shared"}\n', 'utf8');
+    await writeFile(workspaceManifestPath, JSON.stringify({ run: 'workspace' }), 'utf8');
+    await writeFile(join(workspaceRunDir, 'runner.ndjson'), '{"event":"workspace"}\n', 'utf8');
+    const codexBin = await makeFakeCodex(sharedRoot);
+    const envLogPath = join(sharedRoot, 'review-env-custom-runs-dir.log');
+
+    const result = await runReviewCommandSubprocess(
+      null,
+      {
+        ...baseEnv(sharedRoot, codexBin),
+        MCP_RUNNER_TASK_ID: 'stale-linear-issue',
+        CODEX_ORCHESTRATOR_TASK_ID: taskId,
+        CODEX_ORCHESTRATOR_PIPELINE_ID: 'provider-linear-worker',
+        CODEX_ORCHESTRATOR_RUNS_DIR: sharedRunsRoot,
+        CODEX_ORCHESTRATOR_OUT_DIR: sharedOutRoot,
+        CODEX_ORCHESTRATOR_PRESERVE_PROVIDER_ARTIFACT_ROOTS: '1',
+        RUN_REVIEW_ENV_LOG: envLogPath
+      },
+      ['--runs-dir', sharedRunsRoot, '--surface', 'audit'],
+      issueWorkspacePath
+    );
+
+    expect(result.exitCode).toBe(0);
+    const workspacePromptPath = join(workspaceRunDir, 'review', 'prompt.txt');
+    const sharedPromptPath = join(sharedRunDir, 'review', 'prompt.txt');
+    await expect(readFile(workspacePromptPath, 'utf8')).resolves.toContain(
+      'Evidence manifest: artifacts/runs/linear-lin-issue-1/cli/provider-parent-run/manifest.json'
+    );
+    const reviewEnvLog = await readFile(envLogPath, 'utf8');
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_ROOT=${issueWorkspacePath}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_MANIFEST_PATH=${workspaceManifestPath}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_RUN_DIR=${workspaceRunDir}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_RUNS_DIR=${workspaceRunsRoot}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_OUT_DIR=${workspaceOutRoot}`);
+    expect(reviewEnvLog).toContain('CODEX_ORCHESTRATOR_PRESERVE_PROVIDER_ARTIFACT_ROOTS=1');
+    expect(reviewEnvLog).toContain(`MANIFEST=${workspaceManifestPath}`);
+    await expect(readFile(sharedPromptPath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('keeps default out root when only provider-worker runs-dir is configured', async () => {
+    const sharedRoot = await mkdtemp(join(process.cwd(), '.tmp-run-review-provider-'));
+    createdSandboxes.push(sharedRoot);
+    const taskId = 'linear-lin-issue-1';
+    const issueWorkspacePath = join(sharedRoot, '.workspaces', taskId);
+    const sharedRunsRoot = join(sharedRoot, 'artifacts', 'runs');
+    const workspaceRunsRoot = join(issueWorkspacePath, 'artifacts', 'runs');
+    const sharedRunDir = join(sharedRunsRoot, taskId, 'cli', 'provider-parent-run');
+    const workspaceRunDir = join(workspaceRunsRoot, taskId, 'cli', 'provider-parent-run');
+    const sharedManifestPath = join(sharedRunDir, 'manifest.json');
+    const workspaceManifestPath = join(workspaceRunDir, 'manifest.json');
+    await mkdir(sharedRunDir, { recursive: true });
+    await mkdir(workspaceRunDir, { recursive: true });
+    await writeFile(sharedManifestPath, JSON.stringify({ run: 'shared' }), 'utf8');
+    await writeFile(join(sharedRunDir, 'runner.ndjson'), '{"event":"shared"}\n', 'utf8');
+    await writeFile(workspaceManifestPath, JSON.stringify({ run: 'workspace' }), 'utf8');
+    await writeFile(join(workspaceRunDir, 'runner.ndjson'), '{"event":"workspace"}\n', 'utf8');
+    const codexBin = await makeFakeCodex(sharedRoot);
+    const envLogPath = join(sharedRoot, 'review-env-custom-runs-default-out.log');
+
+    const result = await runReviewCommandSubprocess(
+      null,
+      {
+        ...baseEnv(sharedRoot, codexBin),
+        MCP_RUNNER_TASK_ID: 'stale-linear-issue',
+        CODEX_ORCHESTRATOR_TASK_ID: taskId,
+        CODEX_ORCHESTRATOR_PIPELINE_ID: 'provider-linear-worker',
+        CODEX_ORCHESTRATOR_RUNS_DIR: sharedRunsRoot,
+        CODEX_ORCHESTRATOR_PRESERVE_PROVIDER_ARTIFACT_ROOTS: '1',
+        RUN_REVIEW_ENV_LOG: envLogPath
+      },
+      ['--runs-dir', sharedRunsRoot, '--surface', 'audit'],
+      issueWorkspacePath
+    );
+
+    expect(result.exitCode).toBe(0);
+    const reviewEnvLog = await readFile(envLogPath, 'utf8');
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_ROOT=${issueWorkspacePath}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_MANIFEST_PATH=${workspaceManifestPath}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_RUNS_DIR=${workspaceRunsRoot}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_OUT_DIR=${join(issueWorkspacePath, 'out')}`);
+    expect(reviewEnvLog).toContain(`MANIFEST=${workspaceManifestPath}`);
+  });
+
+  it('keeps inherited provider-worker manifest envs on the real shared manifest when no workspace counterpart exists', async () => {
+    const sharedRoot = await mkdtemp(join(process.cwd(), '.tmp-run-review-provider-'));
+    createdSandboxes.push(sharedRoot);
+    const taskId = 'linear-lin-issue-1';
+    const issueWorkspacePath = join(sharedRoot, '.workspaces', taskId);
+    await mkdir(issueWorkspacePath, { recursive: true });
+    const sharedManifestPath = await makeManifestForTask(sharedRoot, taskId, 'provider-parent-run');
+    const codexBin = await makeFakeCodex(sharedRoot);
+    const envLogPath = join(sharedRoot, 'review-env-no-counterpart.log');
+
+    const result = await runReviewCommandSubprocess(
+      null,
+      {
+        ...baseEnv(sharedRoot, codexBin),
+        MCP_RUNNER_TASK_ID: taskId,
+        CODEX_ORCHESTRATOR_PIPELINE_ID: 'provider-linear-worker',
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: sharedManifestPath,
+        CODEX_ORCHESTRATOR_RUN_DIR: dirname(sharedManifestPath),
+        CODEX_ORCHESTRATOR_RUNS_DIR: join(sharedRoot, '.runs'),
+        CODEX_ORCHESTRATOR_OUT_DIR: join(sharedRoot, 'out'),
+        RUN_REVIEW_ENV_LOG: envLogPath
+      },
+      ['--surface', 'audit'],
+      issueWorkspacePath
+    );
+
+    expect(result.exitCode).toBe(0);
+    const sharedPromptPath = join(dirname(sharedManifestPath), 'review', 'prompt.txt');
+    const workspacePromptPath = join(
+      issueWorkspacePath,
+      '.runs',
+      taskId,
+      'cli',
+      'provider-parent-run',
+      'review',
+      'prompt.txt'
+    );
+    const sharedPrompt = await readFile(sharedPromptPath, 'utf8');
+    expect(sharedPrompt).toContain(
+      'Evidence manifest: ../../.runs/linear-lin-issue-1/cli/provider-parent-run/manifest.json'
+    );
+    const reviewEnvLog = await readFile(envLogPath, 'utf8');
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_ROOT=${issueWorkspacePath}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_MANIFEST_PATH=${sharedManifestPath}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_RUN_DIR=${dirname(sharedManifestPath)}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_RUNS_DIR=${join(sharedRoot, '.runs')}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_OUT_DIR=${join(issueWorkspacePath, 'out')}`);
+    expect(reviewEnvLog).toContain('CODEX_ORCHESTRATOR_PRESERVE_PROVIDER_ARTIFACT_ROOTS=1');
+    expect(reviewEnvLog).toContain(`MANIFEST=${sharedManifestPath}`);
+    await expect(readFile(workspacePromptPath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('keeps explicit relative provider-worker runs-dir on the real shared manifest without a workspace counterpart', async () => {
+    const sharedRoot = await mkdtemp(join(process.cwd(), '.tmp-run-review-provider-'));
+    createdSandboxes.push(sharedRoot);
+    const taskId = 'linear-lin-issue-1';
+    const issueWorkspacePath = join(sharedRoot, '.workspaces', taskId);
+    await mkdir(issueWorkspacePath, { recursive: true });
+    await mkdir(join(issueWorkspacePath, '.runs'), { recursive: true });
+    const sharedManifestPath = await makeManifestForTask(sharedRoot, taskId, 'provider-parent-run');
+    const codexBin = await makeFakeCodex(sharedRoot);
+    const envLogPath = join(sharedRoot, 'review-env-relative-no-counterpart.log');
+
+    const result = await runReviewCommandSubprocess(
+      null,
+      {
+        ...baseEnv(sharedRoot, codexBin),
+        MCP_RUNNER_TASK_ID: taskId,
+        CODEX_ORCHESTRATOR_PIPELINE_ID: 'provider-linear-worker',
+        CODEX_ORCHESTRATOR_RUNS_DIR: '.runs',
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out',
+        RUN_REVIEW_ENV_LOG: envLogPath
+      },
+      ['--runs-dir', '.runs', '--surface', 'audit'],
+      issueWorkspacePath
+    );
+
+    expect(result.exitCode).toBe(0);
+    const sharedPromptPath = join(dirname(sharedManifestPath), 'review', 'prompt.txt');
+    const workspacePromptPath = join(
+      issueWorkspacePath,
+      '.runs',
+      taskId,
+      'cli',
+      'provider-parent-run',
+      'review',
+      'prompt.txt'
+    );
+    await expect(readFile(sharedPromptPath, 'utf8')).resolves.toContain(
+      'Evidence manifest: ../../.runs/linear-lin-issue-1/cli/provider-parent-run/manifest.json'
+    );
+    const reviewEnvLog = await readFile(envLogPath, 'utf8');
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_ROOT=${issueWorkspacePath}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_MANIFEST_PATH=${sharedManifestPath}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_RUN_DIR=${dirname(sharedManifestPath)}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_RUNS_DIR=${join(sharedRoot, '.runs')}`);
+    expect(reviewEnvLog).toContain(`CODEX_ORCHESTRATOR_OUT_DIR=${join(issueWorkspacePath, 'out')}`);
+    expect(reviewEnvLog).toContain('CODEX_ORCHESTRATOR_PRESERVE_PROVIDER_ARTIFACT_ROOTS=1');
+    expect(reviewEnvLog).toContain(`MANIFEST=${sharedManifestPath}`);
+    await expect(readFile(workspacePromptPath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
   it('ignores CODEX_ORCHESTRATOR_RUN_DIR when --task requests a different task', async () => {

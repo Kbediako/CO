@@ -1,6 +1,11 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 
+import {
+  buildRunBlockMemoryPromptLines,
+  readRunBlockMemoryDescriptor,
+  readRunBlockMemoryIndex
+} from '../../orchestrator/src/cli/run/blockMemory.js';
 import { buildRunSource0PromptLines, readRunSource0Descriptor } from '../../orchestrator/src/cli/run/source0.js';
 import { normalizeTaskKey, pathExists } from './docs-helpers.js';
 
@@ -406,6 +411,19 @@ export async function buildReviewPromptContext(
       if (source0PromptLines.length > 0) {
         promptLines.push('', ...source0PromptLines);
       }
+      const blockMemoryDescriptor = readRunBlockMemoryDescriptor(rawManifest);
+      if (blockMemoryDescriptor) {
+        const blockMemoryIndex = await readRunBlockMemoryIndex(options.repoRoot, blockMemoryDescriptor).catch(
+          () => null
+        );
+        const blockMemoryPromptLines = buildRunBlockMemoryPromptLines({
+          descriptor: blockMemoryDescriptor,
+          index: blockMemoryIndex
+        });
+        if (blockMemoryPromptLines.length > 0) {
+          promptLines.push('', ...blockMemoryPromptLines);
+        }
+      }
     } catch {
       // Ignore malformed manifests here and preserve the existing prompt scaffold.
     }
@@ -467,6 +485,7 @@ export async function buildReviewPromptContext(
       boundedFocusLine,
       '- Avoid full validation suites (for example `npm run test`, `npm run lint`, `npm run build`, `npm run docs:check`, `npm run docs:freshness`) during this pass.',
       '- Do not launch direct validation runners (for example `npx vitest`, `npm exec jest`) or nested review/pipeline/delegation flows during this pass.',
+      '- If changed docs, task packets, or checklists mention validation commands, treat them as evidence or follow-up suggestions only; do not execute those commands during bounded review.',
       '- If broader validation would improve confidence, list follow-up commands instead of executing them.'
     );
   }

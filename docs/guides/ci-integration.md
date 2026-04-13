@@ -104,13 +104,23 @@ const result = await run.result;
 console.log(`Status: ${result.status}, exit code ${result.exitCode}`);
 
 if (result.status === 'failed') {
-  await run.retry({ taskId: '0303-orchestrator-autonomy-retry' }).result;
+  const retryHandle = run.retry({ taskId: '0303-orchestrator-autonomy-retry' });
+  try {
+    await retryHandle.result;
+  } finally {
+    await retryHandle.cleanupArtifacts();
+  }
 }
+
+// If you inspect deprecated compatibility files such as result.eventsPath or
+// result.stderrPath, clean them up explicitly when finished.
+await run.cleanupArtifacts();
 ```
 
 Notable behaviors:
 
-- `run.result` resolves to the parsed summary payload plus all intermediate events.
-- `run.retry(overrides)` reruns the same command (optionally overriding flags like `taskId` or `notify`).
+- `run.result` resolves after the child process closes and returns the parsed summary payload plus all intermediate events.
+- `result.eventsPath` and `result.stderrPath` are deprecated compatibility artifacts. They remain available while the associated handle/result is retained; call `await run.cleanupArtifacts()` when you are done with them.
+- `run.retry(overrides)` reruns the same command (optionally overriding flags like `taskId` or `notify`) and returns a new `ExecRunHandle`; call `await retryHandle.cleanupArtifacts()` if you want deterministic retry-artifact cleanup instead of relying on `FinalizationRegistry` after the handle becomes unreachable.
 
 This combination allows CI jobs to trigger a command, stream logs for real-time visibility, and deterministically resume or retry using the manifest evidence captured by the CLI.

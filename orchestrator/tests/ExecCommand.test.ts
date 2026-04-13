@@ -52,7 +52,19 @@ async function seedPromptPack(root: string): Promise<void> {
     { section: 'extract', path: promptRel, content },
     { section: 'optimize', path: promptRel, content }
   ];
-  const stamp = computePromptPackStamp(sections);
+  const stamp = computePromptPackStamp(sections, {
+    experienceSlots: 1,
+    retrievalPolicy: {
+      kind: 'competitive_scoring_v1',
+      minScore: null,
+      scoreWeights: { gtScore: 1, relativeRank: 1 },
+      antiDominanceNormalization: {
+        enabled: true,
+        strength: 0.5,
+        sourceGrouping: 'provenance_fallback_v1'
+      }
+    }
+  });
   const manifestDir = join(root, '.agent', 'prompts', 'prompt-packs', 'tfgrpo');
   await mkdir(manifestDir, { recursive: true });
   await writeFile(
@@ -128,6 +140,9 @@ describe('executeExecCommand', () => {
 
     expect(result.status).toBe('succeeded');
     expect(result.exitCode).toBe(0);
+    await vi.waitFor(() => {
+      expect(output).not.toBe('');
+    });
     const parsed = JSON.parse(output.trim());
     expect(parsed.type).toBe('run:summary');
     expect(parsed.payload.outputs.stdout).toContain('hello-json');

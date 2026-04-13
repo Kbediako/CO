@@ -14,11 +14,15 @@ import {
   resolveLinearBudgetPreflight
 } from './linearBudgetState.js';
 import { mapLinearRateLimitedFailure } from './linearRateLimit.js';
-import { isProviderLinearTrackedIssueEligibleForExecution } from './providerLinearWorkflowStates.js';
+import {
+  isProviderLinearTrackedIssueEligibleForExecution,
+  normalizeProviderLinearWorkflowState
+} from './providerLinearWorkflowStates.js';
 
 const LINEAR_RECENT_ACTIVITY_LIMIT = 3;
 const LINEAR_BLOCKER_LIMIT = 50;
 const DEFAULT_LINEAR_TRACKED_ISSUE_PAGE_SIZE = 50;
+const LINEAR_FRESH_DISCOVERY_PRIORITY_BUCKETS = [1, 2, 3, 4, 0] as const;
 
 export interface LiveLinearTrackedActivity {
   id: string;
@@ -43,6 +47,8 @@ export interface LiveLinearTrackedIssue {
   url: string | null;
   state: string | null;
   state_type: string | null;
+  archived_at: string | null;
+  trashed: boolean | null;
   viewer_id: string | null;
   assignee_id: string | null;
   assignee_name: string | null;
@@ -98,6 +104,9 @@ export type LiveLinearTrackedIssuesResolution =
     }
   | LiveLinearFailureResolution;
 
+export type LiveLinearTrackedIssuesQueryMode = 'full' | 'recovery_sweep' | 'fresh_discovery';
+type FreshDiscoveryPriorityBucket = (typeof LINEAR_FRESH_DISCOVERY_PRIORITY_BUCKETS)[number];
+
 interface LinearIssueQueryResponse {
   viewer?: {
     id?: string | null;
@@ -111,6 +120,8 @@ interface LinearIssueQueryResponse {
     pageInfo?: {
       hasNextPage?: boolean | null;
       endCursor?: string | null;
+      hasPreviousPage?: boolean | null;
+      startCursor?: string | null;
     } | null;
   } | null;
 }
@@ -124,6 +135,8 @@ interface LinearIssueNode {
   priority?: number | null;
   createdAt?: string | null;
   updatedAt?: string | null;
+  archivedAt?: string | null;
+  trashed?: boolean | null;
   state?: {
     name?: string | null;
     type?: string | null;
@@ -320,6 +333,10 @@ export async function resolveLiveLinearTrackedIssues(input: {
   limit?: number;
   sortForDispatch?: boolean;
   stopWhenEligibleForExecution?: boolean;
+  eligibleIssueTargetCount?: number;
+  eligibleStateSlotCounts?: Record<string, number>;
+  excludedIssueIds?: string[];
+  queryMode?: LiveLinearTrackedIssuesQueryMode;
 }): Promise<LiveLinearTrackedIssuesResolution> {
   const env = input.env ?? process.env;
   const fetchImpl = input.fetchImpl ?? fetch;
@@ -334,20 +351,43 @@ export async function resolveLiveLinearTrackedIssues(input: {
     return malformed('dispatch_source_binding_missing');
   }
 
+  const queryMode = resolveLiveLinearTrackedIssuesQueryMode(input.queryMode);
+  const eligibleIssueTargetCount = resolveEligibleIssueTargetCount({
+    stopWhenEligibleForExecution: input.stopWhenEligibleForExecution,
+    eligibleIssueTargetCount: input.eligibleIssueTargetCount
+  });
+  const eligibleStateSlotCounts = normalizeEligibleStateSlotCounts(input.eligibleStateSlotCounts);
+  const excludedIssueIds = new Set(input.excludedIssueIds ?? []);
+  if (queryMode === 'fresh_discovery') {
+    return await resolveFreshDiscoveryTrackedIssues({
+      sourceSetup,
+      env,
+      token,
+      timeoutMs,
+      fetchImpl,
+      limit: input.limit,
+      eligibleIssueTargetCount,
+      eligibleStateSlotCounts,
+      excludedIssueIds,
+      sortForDispatch: input.sortForDispatch !== false
+    });
+  }
   const trackedIssues: LiveLinearTrackedIssue[] = [];
   const seenIssueIds = new Set<string>();
   let workspaceId: string | null = null;
   let afterCursor: string | null = null;
   let hasNextPage = true;
+  let eligibleIssueCount = 0;
+  const consumedEligibleStateSlots = new Map<string, number>();
 
   while (hasNextPage) {
-    const query = buildLinearTrackedIssuesQuery(sourceSetup, input.limit, afterCursor);
+    const query = buildLinearTrackedIssuesQuery(sourceSetup, input.limit, afterCursor, queryMode);
     const queryResult = await executeLinearQuery({
       env,
       token,
       timeoutMs,
       fetchImpl,
-      source: 'dispatch_source_tracked_issues',
+      source: resolveTrackedIssuesQuerySource(queryMode),
       query: query.query,
       variables: query.variables
     });
@@ -385,8 +425,18 @@ export async function resolveLiveLinearTrackedIssues(input: {
       seenIssueIds.add(trackedIssue.id);
       trackedIssues.push(trackedIssue);
       if (
-        input.stopWhenEligibleForExecution === true &&
-        isLiveLinearTrackedIssueEligibleForFreshDispatch(trackedIssue)
+        !excludedIssueIds.has(trackedIssue.id) &&
+        shouldCountTrackedIssueTowardEligibilityTarget(
+          trackedIssue,
+          eligibleStateSlotCounts,
+          consumedEligibleStateSlots
+        )
+      ) {
+        eligibleIssueCount += 1;
+      }
+      if (
+        eligibleIssueTargetCount !== null &&
+        eligibleIssueCount >= eligibleIssueTargetCount
       ) {
         stopScanning = true;
         break;
@@ -398,7 +448,10 @@ export async function resolveLiveLinearTrackedIssues(input: {
       continue;
     }
 
-    const nextCursor = resolveLinearTrackedIssuesNextCursor(queryResult.payload.data?.issues?.pageInfo ?? null);
+    const nextCursor = resolveLinearTrackedIssuesNextCursor(
+      queryResult.payload.data?.issues?.pageInfo ?? null,
+      queryMode
+    );
     if (nextCursor === null) {
       hasNextPage = false;
       continue;
@@ -416,6 +469,135 @@ export async function resolveLiveLinearTrackedIssues(input: {
         ? trackedIssues
         : sortLiveLinearTrackedIssuesForDispatch(trackedIssues),
     source_setup: sourceSetup
+  };
+}
+
+async function resolveFreshDiscoveryTrackedIssues(input: {
+  sourceSetup: DispatchPilotSourceSetup;
+  env: NodeJS.ProcessEnv;
+  token: string;
+  timeoutMs: number;
+  fetchImpl: typeof fetch;
+  limit?: number;
+  eligibleIssueTargetCount: number | null;
+  eligibleStateSlotCounts: Map<string, number>;
+  excludedIssueIds: Set<string>;
+  sortForDispatch: boolean;
+}): Promise<LiveLinearTrackedIssuesResolution> {
+  const trackedIssues: LiveLinearTrackedIssue[] = [];
+  const seenIssueIds = new Set<string>();
+  let workspaceId: string | null = null;
+  let eligibleIssueCount = 0;
+  const consumedEligibleStateSlots = new Map<string, number>();
+
+  for (const priorityBucket of LINEAR_FRESH_DISCOVERY_PRIORITY_BUCKETS) {
+    let beforeCursor: string | null = null;
+    let hasPreviousPage = true;
+
+    while (hasPreviousPage) {
+      const query = buildLinearTrackedIssuesQuery(
+        input.sourceSetup,
+        input.limit,
+        beforeCursor,
+        'fresh_discovery',
+        priorityBucket
+      );
+      const queryResult = await executeLinearQuery({
+        env: input.env,
+        token: input.token,
+        timeoutMs: input.timeoutMs,
+        fetchImpl: input.fetchImpl,
+        source: resolveTrackedIssuesQuerySource('fresh_discovery'),
+        query: query.query,
+        variables: query.variables
+      });
+      if (!queryResult.ok) {
+        return queryResult.resolution;
+      }
+
+      const responseWorkspaceId = queryResult.payload.data?.viewer?.organization?.id?.trim() ?? null;
+      if (workspaceId === null) {
+        workspaceId = responseWorkspaceId;
+      }
+      if (
+        input.sourceSetup.workspace_id &&
+        responseWorkspaceId &&
+        input.sourceSetup.workspace_id !== responseWorkspaceId
+      ) {
+        return malformed('dispatch_source_workspace_mismatch');
+      }
+
+      const nodes = Array.isArray(queryResult.payload.data?.issues?.nodes)
+        ? queryResult.payload.data?.issues?.nodes ?? []
+        : [];
+      let stopScanning = false;
+      for (const node of nodes) {
+        const trackedIssue = parseTrackedIssue(node ?? {}, {
+          workspaceId: input.sourceSetup.workspace_id ?? workspaceId,
+          viewerId: queryResult.payload.data?.viewer?.id?.trim() ?? null
+        });
+        if (!trackedIssue) {
+          continue;
+        }
+        const scopeMismatch = validateTrackedIssueScope(trackedIssue, input.sourceSetup);
+        if (scopeMismatch) {
+          return scopeMismatch;
+        }
+        if (seenIssueIds.has(trackedIssue.id)) {
+          continue;
+        }
+        seenIssueIds.add(trackedIssue.id);
+        trackedIssues.push(trackedIssue);
+        if (
+          !input.excludedIssueIds.has(trackedIssue.id) &&
+          shouldCountTrackedIssueTowardEligibilityTarget(
+            trackedIssue,
+            input.eligibleStateSlotCounts,
+            consumedEligibleStateSlots
+          )
+        ) {
+          eligibleIssueCount += 1;
+        }
+        if (
+          input.eligibleIssueTargetCount !== null &&
+          eligibleIssueCount >= input.eligibleIssueTargetCount
+        ) {
+          stopScanning = true;
+          break;
+        }
+      }
+
+      if (stopScanning) {
+        return {
+          kind: 'ready',
+          tracked_issues: input.sortForDispatch
+            ? sortLiveLinearTrackedIssuesForDispatch(trackedIssues)
+            : trackedIssues,
+          source_setup: input.sourceSetup
+        };
+      }
+
+      const nextCursor = resolveLinearTrackedIssuesNextCursor(
+        queryResult.payload.data?.issues?.pageInfo ?? null,
+        'fresh_discovery'
+      );
+      if (nextCursor === null) {
+        hasPreviousPage = false;
+        continue;
+      }
+      if (nextCursor === undefined) {
+        return malformed('dispatch_source_provider_response_invalid');
+      }
+      beforeCursor = nextCursor;
+    }
+  }
+
+  return {
+    kind: 'ready',
+    tracked_issues: input.sortForDispatch
+      ? sortLiveLinearTrackedIssuesForDispatch(trackedIssues)
+      : trackedIssues,
+    source_setup: input.sourceSetup
   };
 }
 
@@ -453,7 +635,13 @@ export function isLiveLinearTrackedIssueOwnedByCurrentViewerOrUnassigned(
 export function isLiveLinearTrackedIssueEligibleForFreshDispatch(
   issue: Pick<
     LiveLinearTrackedIssue,
-    'state' | 'state_type' | 'blocked_by' | 'viewer_id' | 'assignee_id'
+    | 'state'
+    | 'state_type'
+    | 'blocked_by'
+    | 'archived_at'
+    | 'trashed'
+    | 'viewer_id'
+    | 'assignee_id'
   >
 ): boolean {
   return (
@@ -465,16 +653,19 @@ export function isLiveLinearTrackedIssueEligibleForFreshDispatch(
 function buildLinearTrackedIssuesQuery(
   sourceSetup: DispatchPilotSourceSetup,
   limit: number | undefined,
-  afterCursor: string | null
+  cursor: string | null,
+  queryMode: LiveLinearTrackedIssuesQueryMode,
+  priorityBucket?: FreshDiscoveryPriorityBucket
 ): {
   query: string;
   variables: Record<string, string | number | null>;
 } {
-  const variableDefinitions = ['$limit: Int!', '$after: String'];
+  const discoveryMode = queryMode === 'fresh_discovery';
+  const variableDefinitions = ['$limit: Int!', discoveryMode ? '$before: String' : '$after: String'];
   const filterParts: string[] = [];
   const variables: Record<string, string | number | null> = {
     limit: normalizeLinearTrackedIssueLimit(limit),
-    after: afterCursor
+    ...(discoveryMode ? { before: cursor } : { after: cursor })
   };
 
   if (sourceSetup.team_id) {
@@ -488,9 +679,23 @@ function buildLinearTrackedIssuesQuery(
     variables.projectId = sourceSetup.project_id;
   }
   filterParts.push('state: { type: { nin: ["completed", "canceled"] } }');
+  if (discoveryMode) {
+    if (priorityBucket === 0) {
+      filterParts.push('priority: { eq: 0 }');
+    } else if (priorityBucket !== undefined) {
+      variableDefinitions.push('$priority: Float!');
+      filterParts.push('priority: { eq: $priority }');
+      variables.priority = priorityBucket;
+    }
+  }
 
   const variableSection = `(${variableDefinitions.join(', ')})`;
   const filterSection = `, filter: { ${filterParts.join(' ')} }`;
+  const includeRichIssueDetails = queryMode !== 'fresh_discovery';
+  const orderBy = queryMode === 'fresh_discovery' ? 'createdAt' : 'updatedAt';
+  const paginationClause = discoveryMode
+    ? 'last: $limit, before: $before'
+    : 'first: $limit, after: $after';
 
   return {
     query: `query ResolveLiveLinearTrackedIssues${variableSection} {
@@ -500,16 +705,18 @@ function buildLinearTrackedIssuesQuery(
           id
         }
       }
-      issues(orderBy: updatedAt, first: $limit, after: $after${filterSection}) {
+      issues(orderBy: ${orderBy}, ${paginationClause}${filterSection}) {
         nodes {
           id
           identifier
           title
-          description
           url
           priority
           createdAt
           updatedAt
+          archivedAt
+          trashed
+          ${includeRichIssueDetails ? 'description' : ''}
           assignee {
             id
             name
@@ -541,7 +748,9 @@ function buildLinearTrackedIssuesQuery(
               }
             }
           }
-          history(first: ${LINEAR_RECENT_ACTIVITY_LIMIT}) {
+          ${
+            includeRichIssueDetails
+              ? `history(first: ${LINEAR_RECENT_ACTIVITY_LIMIT}) {
             nodes {
               id
               createdAt
@@ -564,16 +773,106 @@ function buildLinearTrackedIssuesQuery(
               fromTitle
               toTitle
             }
+          }`
+              : ''
           }
         }
         pageInfo {
           hasNextPage
           endCursor
+          hasPreviousPage
+          startCursor
         }
       }
     }`,
     variables
   };
+}
+
+function resolveLiveLinearTrackedIssuesQueryMode(
+  mode: LiveLinearTrackedIssuesQueryMode | undefined
+): LiveLinearTrackedIssuesQueryMode {
+  if (mode === 'recovery_sweep' || mode === 'fresh_discovery') {
+    return mode;
+  }
+  return 'full';
+}
+
+function resolveEligibleIssueTargetCount(input: {
+  stopWhenEligibleForExecution?: boolean;
+  eligibleIssueTargetCount?: number;
+}): number | null {
+  if (
+    typeof input.eligibleIssueTargetCount === 'number' &&
+    Number.isInteger(input.eligibleIssueTargetCount) &&
+    input.eligibleIssueTargetCount > 0
+  ) {
+    return input.eligibleIssueTargetCount;
+  }
+  return input.stopWhenEligibleForExecution === true ? 1 : null;
+}
+
+function normalizeEligibleStateSlotCounts(
+  input: Record<string, number> | undefined
+): Map<string, number> {
+  const normalized = new Map<string, number>();
+  if (!input) {
+    return normalized;
+  }
+  for (const [rawState, rawCount] of Object.entries(input)) {
+    const state = normalizeProviderLinearWorkflowState(rawState);
+    if (!state || !Number.isInteger(rawCount) || rawCount < 0) {
+      continue;
+    }
+    normalized.set(state, rawCount);
+  }
+  return normalized;
+}
+
+function shouldCountTrackedIssueTowardEligibilityTarget(
+  trackedIssue: Pick<
+    LiveLinearTrackedIssue,
+    | 'state'
+    | 'state_type'
+    | 'blocked_by'
+    | 'archived_at'
+    | 'trashed'
+    | 'viewer_id'
+    | 'assignee_id'
+  >,
+  eligibleStateSlotCounts: Map<string, number>,
+  consumedEligibleStateSlots: Map<string, number>
+): boolean {
+  if (!isLiveLinearTrackedIssueEligibleForFreshDispatch(trackedIssue)) {
+    return false;
+  }
+
+  const normalizedState = normalizeProviderLinearWorkflowState(trackedIssue.state);
+  if (!normalizedState) {
+    return true;
+  }
+
+  const stateLimit = eligibleStateSlotCounts.get(normalizedState);
+  if (stateLimit === undefined) {
+    return true;
+  }
+
+  const consumed = consumedEligibleStateSlots.get(normalizedState) ?? 0;
+  if (consumed >= stateLimit) {
+    return false;
+  }
+  consumedEligibleStateSlots.set(normalizedState, consumed + 1);
+  return true;
+}
+
+function resolveTrackedIssuesQuerySource(queryMode: LiveLinearTrackedIssuesQueryMode): string {
+  if (queryMode === 'recovery_sweep') {
+    return 'dispatch_source_tracked_issues:recovery_sweep';
+  }
+  if (queryMode === 'fresh_discovery') {
+    return 'dispatch_source_tracked_issues:fresh_discovery';
+  }
+  return 'dispatch_source_tracked_issues';
 }
 
 function buildLinearIssueByIdQuery(issueId: string): {
@@ -595,6 +894,8 @@ function buildLinearIssueByIdQuery(issueId: string): {
         description
         url
         updatedAt
+        archivedAt
+        trashed
         assignee {
           id
           name
@@ -766,8 +1067,22 @@ async function executeLinearQuery(input: {
 }
 
 function resolveLinearTrackedIssuesNextCursor(
-  pageInfo: { hasNextPage?: boolean | null; endCursor?: string | null } | null
+  pageInfo: {
+    hasNextPage?: boolean | null;
+    endCursor?: string | null;
+    hasPreviousPage?: boolean | null;
+    startCursor?: string | null;
+  } | null,
+  queryMode: LiveLinearTrackedIssuesQueryMode
 ): string | null | undefined {
+  if (queryMode === 'fresh_discovery') {
+    if (pageInfo?.hasPreviousPage !== true) {
+      return null;
+    }
+    const startCursor = normalizeEnvValue(pageInfo.startCursor);
+    return startCursor ?? undefined;
+  }
+
   if (pageInfo?.hasNextPage !== true) {
     return null;
   }
@@ -825,6 +1140,8 @@ function parseTrackedIssue(
     url: normalizeEnvValue(issue.url),
     state: normalizeEnvValue(issue.state?.name),
     state_type: normalizeEnvValue(issue.state?.type),
+    archived_at: normalizeIso(issue.archivedAt),
+    trashed: normalizeOptionalBoolean(issue.trashed),
     viewer_id: input.viewerId,
     assignee_id: normalizeEnvValue(issue.assignee?.id),
     assignee_name: normalizeEnvValue(issue.assignee?.displayName ?? issue.assignee?.name),
@@ -863,6 +1180,10 @@ function normalizeTrackedIssuePriority(value: number | null | undefined): number
   return Number.isInteger(value) && (value as number) >= 1 && (value as number) <= 4
     ? (value as number)
     : null;
+}
+
+function normalizeOptionalBoolean(value: unknown): boolean | null {
+  return typeof value === 'boolean' ? value : null;
 }
 
 function validateTrackedIssueScope(

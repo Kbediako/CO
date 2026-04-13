@@ -9,6 +9,7 @@ import {
   classifyProviderLinearWorkflowState,
   normalizeProviderLinearWorkflowState
 } from './providerLinearWorkflowStates.js';
+import { normalizeProviderWorkerHostName } from './providerWorkerHosts.js';
 
 const PROVIDER_SEMANTIC_STALL_THRESHOLD_MS = 15 * 60 * 1000;
 
@@ -75,15 +76,42 @@ export interface ProviderLinearWorkerProgressSnapshot {
   status: ProviderLinearWorkerProgressStatus;
   summary: string;
   summary_recorded_at?: string | null;
+  message_recorded_at?: string | null;
+  source_updated_at?: string | null;
+  selected_event?: string | null;
+  event_source?: string | null;
+  event_candidates?: ProviderLinearWorkerProgressCandidate[];
   last_semantic_progress_at: string | null;
   stall_classification: ProviderLinearWorkerStallClassification;
   stall_reason: string | null;
   recovery_recommendation: ProviderLinearWorkerRecoveryRecommendation;
 }
 
+export interface ProviderLinearWorkerProgressCandidate {
+  source: string;
+  event: string | null;
+  summary: string | null;
+  message_recorded_at: string | null;
+  source_updated_at: string | null;
+  derived: boolean;
+  accepted: boolean;
+  rejection_reason: string | null;
+}
+
 interface ProviderChildProgressSummaryCandidate {
+  source: string;
+  event: string | null;
   summary: string;
   recorded_at: string | null;
+}
+
+interface ProviderIssueCurrentTurnActivityLike {
+  event?: string | null;
+  message_or_payload?: string | null;
+  recorded_at?: string | null;
+  source?: string | null;
+  turn_id?: string | null;
+  session_id?: string | null;
 }
 
 interface ProviderIssueClaimLike {
@@ -91,6 +119,7 @@ interface ProviderIssueClaimLike {
   reason?: string | null;
   updated_at?: string | null;
   run_id?: string | null;
+  worker_host?: string | null;
   launch_source?: string | null;
   launch_started_at?: string | null;
   issue_state?: string | null;
@@ -131,6 +160,18 @@ interface ProviderIssuePullRequestLifecycleLike {
     number?: number | null;
   } | null;
   snapshot?: ProviderIssuePullRequestSnapshotLike | null;
+  branch_recovery?: {
+    attempted_at?: string | null;
+    head_oid?: string | null;
+    recovery_reason?: string | null;
+    command?: string | null;
+    args?: string[] | null;
+    exit_code?: number | null;
+    ok?: boolean | null;
+    stdout?: string | null;
+    stderr?: string | null;
+    failure_kind?: string | null;
+  } | null;
 }
 
 interface ProviderIssueReviewPromotionLike extends ProviderIssuePullRequestLifecycleLike {
@@ -183,12 +224,14 @@ interface ProviderIssueProofLike {
   current_turn_started_at?: string | null;
   issue_id?: string | null;
   pid?: string | null;
+  worker_host?: string | null;
   thread_id?: string | null;
   latest_session_id?: string | null;
   turn_count?: number | null;
   last_event?: string | null;
   last_message?: string | null;
   last_event_at?: string | null;
+  current_turn_activity?: ProviderIssueCurrentTurnActivityLike | null;
   owner_phase?: string | null;
   owner_status?: string | null;
   updated_at?: string | null;
@@ -198,6 +241,14 @@ interface ProviderIssueProofLike {
   parallelization?: (ProviderLinearParallelizationSnapshot & {
     child_lane_count?: number | null;
   }) | null;
+  resident_session?: {
+    logical_session_id?: string | null;
+    logical_turn_count?: number | null;
+    restart_count?: number | null;
+    continuity_state?: string | null;
+    source_run_id?: string | null;
+    source_end_reason?: string | null;
+  } | null;
   end_reason?: string | null;
 }
 
@@ -212,6 +263,7 @@ export interface ControlProviderDebugSnapshot {
     reason: string | null;
     updated_at: string | null;
     run_id: string | null;
+    worker_host?: string | null;
     launch_source: string | null;
     launch_started_at: string | null;
     freshness: ProviderIntakeClaimFreshness | null;
@@ -222,11 +274,27 @@ export interface ControlProviderDebugSnapshot {
     owner_phase: string | null;
     owner_status: string | null;
     pid: string | null;
+    worker_host?: string | null;
     thread_id: string | null;
     latest_session_id: string | null;
     turn_count: number | null;
+    resident_logical_session_id: string | null;
+    resident_logical_turn_count: number | null;
+    resident_restart_count: number | null;
+    resident_continuity_state: string | null;
+    resident_source_run_id: string | null;
+    resident_source_end_reason: string | null;
     last_event: string | null;
+    last_message: string | null;
     last_event_at: string | null;
+    current_turn_activity: {
+      event: string | null;
+      message_or_payload: string | null;
+      recorded_at: string | null;
+      source: string | null;
+      turn_id: string | null;
+      session_id: string | null;
+    } | null;
     updated_at: string | null;
   } | null;
   parallelization: {
@@ -264,6 +332,18 @@ export interface ControlProviderDebugSnapshot {
     action_required_reasons: string[];
     updated_at: string | null;
     merged_at: string | null;
+    branch_recovery: {
+      attempted_at: string | null;
+      head_oid: string | null;
+      recovery_reason: string | null;
+      command: string | null;
+      args: string[];
+      exit_code: number | null;
+      ok: boolean | null;
+      stdout: string | null;
+      stderr: string | null;
+      failure_kind: string | null;
+    } | null;
   } | null;
   progress: ProviderLinearWorkerProgressSnapshot | null;
   last_audit_operation: {
@@ -357,6 +437,7 @@ export function buildProviderIssueDebugSnapshot(input: {
           reason: normalizeOptionalString(claim.reason),
           updated_at: normalizeOptionalString(claim.updated_at),
           run_id: normalizeOptionalString(claim.run_id),
+          worker_host: normalizeProviderWorkerHostName(claim.worker_host),
           launch_source: normalizeOptionalString(claim.launch_source),
           launch_started_at: normalizeOptionalString(claim.launch_started_at),
           freshness: claimFreshness,
@@ -369,11 +450,31 @@ export function buildProviderIssueDebugSnapshot(input: {
           owner_phase: normalizeOptionalString(proof.owner_phase),
           owner_status: normalizeOptionalString(proof.owner_status),
           pid: normalizeOptionalString(proof.pid),
+          worker_host: normalizeProviderWorkerHostName(proof.worker_host),
           thread_id: normalizeOptionalString(proof.thread_id),
           latest_session_id: normalizeOptionalString(proof.latest_session_id),
           turn_count: normalizeOptionalInteger(proof.turn_count),
+          resident_logical_session_id: normalizeOptionalString(proof.resident_session?.logical_session_id),
+          resident_logical_turn_count: normalizeOptionalInteger(proof.resident_session?.logical_turn_count),
+          resident_restart_count: normalizeOptionalInteger(proof.resident_session?.restart_count),
+          resident_continuity_state: normalizeOptionalString(proof.resident_session?.continuity_state),
+          resident_source_run_id: normalizeOptionalString(proof.resident_session?.source_run_id),
+          resident_source_end_reason: normalizeOptionalString(proof.resident_session?.source_end_reason),
           last_event: normalizeOptionalString(proof.last_event),
+          last_message: normalizeOptionalString(proof.last_message),
           last_event_at: normalizeOptionalString(proof.last_event_at),
+          current_turn_activity: proof.current_turn_activity
+            ? {
+                event: normalizeOptionalString(proof.current_turn_activity.event),
+                message_or_payload: normalizeOptionalString(
+                  proof.current_turn_activity.message_or_payload
+                ),
+                recorded_at: normalizeOptionalString(proof.current_turn_activity.recorded_at),
+                source: normalizeOptionalString(proof.current_turn_activity.source),
+                turn_id: normalizeOptionalString(proof.current_turn_activity.turn_id),
+                session_id: normalizeOptionalString(proof.current_turn_activity.session_id)
+              }
+            : null,
           updated_at: normalizeOptionalString(proof.updated_at)
         }
       : null,
@@ -485,6 +586,7 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
     currentTurnStartedAt
   );
   const lastSemanticProgressAt = latestIsoTimestamp(
+    normalizeOptionalString(proof?.current_turn_activity?.recorded_at),
     normalizeOptionalString(proof?.last_event_at),
     latestAudit?.recorded_at ?? null,
     latestChildProgressAt,
@@ -506,7 +608,7 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
       kind: 'worker',
       status: 'failed',
       summary:
-        normalizeOptionalString(proof?.last_message) ??
+        selectProofPreferredMessage(proof) ??
         'Provider worker failed.',
       last_semantic_progress_at: lastSemanticProgressAt,
       stall_classification: 'failed',
@@ -546,7 +648,7 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
         kind: 'worker',
         status: 'stalled',
         summary:
-          normalizeOptionalString(proof?.last_message) ??
+          selectProofPreferredMessage(proof) ??
           'Provider worker exhausted max turns while the issue remained active.',
         last_semantic_progress_at: lastSemanticProgressAt,
         stall_classification: 'stalled',
@@ -559,7 +661,7 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
       kind: trackedWorkflowState?.isHandoff ? 'workflow' : 'worker',
       status: 'completed',
       summary:
-        normalizeOptionalString(proof?.last_message) ??
+        selectProofPreferredMessage(proof) ??
         'Provider worker completed successfully.',
       last_semantic_progress_at: lastSemanticProgressAt,
       stall_classification: 'completed',
@@ -642,7 +744,9 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
     const authoritativeWorkerProgress = resolveAuthoritativeWorkerProgress({
       proof,
       currentTurnStartedAt,
-      latestChildSummaryCandidate
+      latestChildSummaryCandidate,
+      lastSemanticProgressAt,
+      phase
     });
     const summary =
       authoritativeWorkerProgress.summary ?? defaultProgressSummaryForPhase(phase);
@@ -653,6 +757,11 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
         status: 'stalled',
         summary,
         summary_recorded_at: authoritativeWorkerProgress.summary_recorded_at,
+        message_recorded_at: authoritativeWorkerProgress.message_recorded_at,
+        source_updated_at: authoritativeWorkerProgress.source_updated_at,
+        selected_event: authoritativeWorkerProgress.event,
+        event_source: authoritativeWorkerProgress.source,
+        event_candidates: authoritativeWorkerProgress.candidates,
         last_semantic_progress_at: lastSemanticProgressAt,
         stall_classification: 'stalled',
         stall_reason:
@@ -668,6 +777,11 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
       status: 'progressing',
       summary,
       summary_recorded_at: authoritativeWorkerProgress.summary_recorded_at,
+      message_recorded_at: authoritativeWorkerProgress.message_recorded_at,
+      source_updated_at: authoritativeWorkerProgress.source_updated_at,
+      selected_event: authoritativeWorkerProgress.event,
+      event_source: authoritativeWorkerProgress.source,
+      event_candidates: authoritativeWorkerProgress.candidates,
       last_semantic_progress_at: lastSemanticProgressAt,
       stall_classification: 'progressing',
       stall_reason: null,
@@ -709,31 +823,300 @@ function resolveAuthoritativeWorkerProgress(input: {
   proof: ProviderIssueProofLike | null;
   currentTurnStartedAt?: string | null;
   latestChildSummaryCandidate?: ProviderChildProgressSummaryCandidate | null;
-}): { summary: string | null; summary_recorded_at: string | null } {
-  const proofMessage = normalizeOptionalString(input.proof?.last_message);
-  const proofMessageAt = normalizeOptionalString(input.proof?.last_event_at);
-  if (isHighSignalProviderProgressSummary(proofMessage)) {
-    return {
-      summary: proofMessage,
-      summary_recorded_at: proofMessageAt
-    };
+  lastSemanticProgressAt: string | null;
+  phase: ProviderLinearWorkerProgressPhase;
+}): {
+  event: string | null;
+  source: string | null;
+  summary: string | null;
+  summary_recorded_at: string | null;
+  message_recorded_at: string | null;
+  source_updated_at: string | null;
+  candidates: ProviderLinearWorkerProgressCandidate[];
+} {
+  const childCandidates = collectCurrentTurnChildProgressSummaryCandidates(
+    input.proof,
+    normalizeOptionalString(input.currentTurnStartedAt)
+  );
+  if (childCandidates.length === 0 && input.latestChildSummaryCandidate) {
+    childCandidates.push({
+      source: input.latestChildSummaryCandidate.source,
+      event: input.latestChildSummaryCandidate.event,
+      summary: input.latestChildSummaryCandidate.summary,
+      message_recorded_at: input.latestChildSummaryCandidate.recorded_at,
+      source_updated_at: input.latestChildSummaryCandidate.recorded_at,
+      derived: true
+    });
   }
-  const latestChildSummaryCandidate =
-    input.latestChildSummaryCandidate ??
-    selectLatestChildProgressSummaryCandidate(
-      input.proof,
-      normalizeOptionalString(input.currentTurnStartedAt)
-    );
-  if (latestChildSummaryCandidate) {
+  const candidates = [
+    buildCurrentTurnActivityProgressCandidate(input.proof),
+    buildLegacyProofMessageProgressCandidate(input.proof),
+    ...childCandidates,
+    buildGenericPhaseFallbackProgressCandidate(input.phase, input.lastSemanticProgressAt)
+  ].filter((candidate): candidate is RankedProviderLinearWorkerProgressCandidate => Boolean(candidate));
+  const winner = selectBestProviderLinearWorkerProgressCandidate(candidates);
+  if (!winner) {
     return {
-      summary: latestChildSummaryCandidate.summary,
-      summary_recorded_at: latestChildSummaryCandidate.recorded_at
+      event: null,
+      source: null,
+      summary: null,
+      summary_recorded_at: null,
+      message_recorded_at: null,
+      source_updated_at: null,
+      candidates: []
     };
   }
   return {
-    summary: proofMessage,
-    summary_recorded_at: proofMessageAt
+    event: winner.event,
+    source: winner.source,
+    summary: winner.summary,
+    summary_recorded_at: winner.message_recorded_at,
+    message_recorded_at: winner.message_recorded_at,
+    source_updated_at: winner.source_updated_at,
+    candidates: candidates.map((candidate) => ({
+      source: candidate.source,
+      event: candidate.event,
+      summary: candidate.summary,
+      message_recorded_at: candidate.message_recorded_at,
+      source_updated_at: candidate.source_updated_at,
+      derived: candidate.derived,
+      accepted: candidate === winner,
+      rejection_reason:
+        candidate === winner ? null : explainProviderLinearWorkerProgressCandidateRejection(candidate, winner)
+    }))
   };
+}
+
+interface RankedProviderLinearWorkerProgressCandidate {
+  source: string;
+  event: string | null;
+  summary: string | null;
+  message_recorded_at: string | null;
+  source_updated_at: string | null;
+  derived: boolean;
+}
+
+function selectProofPreferredMessage(proof: ProviderIssueProofLike | null): string | null {
+  return (
+    normalizeOptionalString(proof?.current_turn_activity?.message_or_payload) ??
+    normalizeOptionalString(proof?.last_message)
+  );
+}
+
+function buildCurrentTurnActivityProgressCandidate(
+  proof: ProviderIssueProofLike | null
+): RankedProviderLinearWorkerProgressCandidate | null {
+  const activity = proof?.current_turn_activity ?? null;
+  if (!activity) {
+    return null;
+  }
+  const summary = normalizeOptionalString(activity.message_or_payload);
+  const event = normalizeOptionalString(activity.event);
+  const recordedAt = normalizeOptionalString(activity.recorded_at);
+  if (!summary && !event) {
+    return null;
+  }
+  const source =
+    normalizeOptionalString(activity.source) === 'session_log_hydration'
+      ? 'canonical_session_log_hydration'
+      : 'canonical_stdout_jsonl';
+  return {
+    source,
+    event,
+    summary,
+    message_recorded_at: summary ? recordedAt : null,
+    source_updated_at: recordedAt,
+    derived: false
+  };
+}
+
+function buildLegacyProofMessageProgressCandidate(
+  proof: ProviderIssueProofLike | null
+): RankedProviderLinearWorkerProgressCandidate | null {
+  const summary = normalizeOptionalString(proof?.last_message);
+  const event = normalizeOptionalString(proof?.last_event);
+  if (!summary && !event) {
+    return null;
+  }
+  return {
+    source: summary ? 'legacy_proof_last_message' : 'legacy_proof_fields',
+    event,
+    summary,
+    // Legacy proof does not preserve an authoritative last-message timestamp.
+    // `last_event_at` can advance on non-message events (for example token_count),
+    // so treating it as message freshness can incorrectly outrank canonical activity.
+    message_recorded_at: null,
+    source_updated_at: latestIsoTimestamp(
+      normalizeOptionalString(proof?.last_event_at),
+      normalizeOptionalString(proof?.updated_at)
+    ),
+    derived: false
+  };
+}
+
+function buildGenericPhaseFallbackProgressCandidate(
+  phase: ProviderLinearWorkerProgressPhase,
+  lastSemanticProgressAt: string | null
+): RankedProviderLinearWorkerProgressCandidate {
+  return {
+    source: 'generic_phase_fallback',
+    event: phase,
+    summary: defaultProgressSummaryForPhase(phase),
+    message_recorded_at: null,
+    source_updated_at: lastSemanticProgressAt,
+    derived: true
+  };
+}
+
+function collectCurrentTurnChildProgressSummaryCandidates(
+  proof: ProviderIssueProofLike | null,
+  currentTurnStartedAt: string | null
+): RankedProviderLinearWorkerProgressCandidate[] {
+  return [
+    ...selectCurrentTurnChildLanes(proof?.child_lanes ?? null, currentTurnStartedAt).flatMap((childLane) => {
+      const summary = normalizeOptionalString(childLane.summary);
+      return summary
+        ? [
+            {
+              source: 'child_lane_summary',
+              event: null,
+              summary,
+              message_recorded_at: latestIsoTimestamp(
+                normalizeOptionalString(childLane.decision_at),
+                normalizeOptionalString(childLane.launched_at)
+              ),
+              source_updated_at: latestIsoTimestamp(
+                normalizeOptionalString(childLane.decision_at),
+                normalizeOptionalString(childLane.launched_at)
+              ),
+              derived: true
+            } satisfies RankedProviderLinearWorkerProgressCandidate
+          ]
+        : [];
+    }),
+    ...selectCurrentTurnChildStreams(proof?.child_streams ?? null, currentTurnStartedAt).flatMap((childStream) => {
+      const summary = normalizeOptionalString(childStream.summary);
+      return summary
+        ? [
+            {
+              source: 'child_stream_summary',
+              event: null,
+              summary,
+              message_recorded_at: latestIsoTimestamp(
+                normalizeOptionalString(childStream.recorded_at),
+                normalizeOptionalString(childStream.launched_at)
+              ),
+              source_updated_at: latestIsoTimestamp(
+                normalizeOptionalString(childStream.recorded_at),
+                normalizeOptionalString(childStream.launched_at)
+              ),
+              derived: true
+            } satisfies RankedProviderLinearWorkerProgressCandidate
+          ]
+        : [];
+    })
+  ];
+}
+
+function selectBestProviderLinearWorkerProgressCandidate(
+  candidates: RankedProviderLinearWorkerProgressCandidate[]
+): RankedProviderLinearWorkerProgressCandidate | null {
+  return candidates.reduce<RankedProviderLinearWorkerProgressCandidate | null>((current, candidate) => {
+    if (!current) {
+      return candidate;
+    }
+    return compareProviderLinearWorkerProgressCandidatePriority(candidate, current) > 0
+      ? candidate
+      : current;
+  }, null);
+}
+
+function compareProviderLinearWorkerProgressCandidatePriority(
+  left: RankedProviderLinearWorkerProgressCandidate,
+  right: RankedProviderLinearWorkerProgressCandidate
+): number {
+  const signalComparison =
+    scoreProviderLinearWorkerProgressCandidate(left) -
+    scoreProviderLinearWorkerProgressCandidate(right);
+  if (signalComparison !== 0) {
+    return signalComparison;
+  }
+  if (left.message_recorded_at && right.message_recorded_at) {
+    const messageFreshnessComparison = compareIsoTimestamp(
+      left.message_recorded_at,
+      right.message_recorded_at
+    );
+    if (messageFreshnessComparison !== 0) {
+      return messageFreshnessComparison;
+    }
+  }
+  const sourceComparison =
+    providerLinearWorkerProgressCandidateSourcePriority(left.source) -
+    providerLinearWorkerProgressCandidateSourcePriority(right.source);
+  if (sourceComparison !== 0) {
+    return sourceComparison;
+  }
+  return compareIsoTimestamp(left.source_updated_at, right.source_updated_at);
+}
+
+function scoreProviderLinearWorkerProgressCandidate(
+  candidate: RankedProviderLinearWorkerProgressCandidate
+): number {
+  if (isHighSignalProviderProgressSummary(candidate.summary)) {
+    return 3;
+  }
+  return candidate.summary || candidate.event ? 1 : 0;
+}
+
+function providerLinearWorkerProgressCandidateSourcePriority(source: string): number {
+  switch (source) {
+    case 'canonical_stdout_jsonl':
+      return 60;
+    case 'canonical_session_log_hydration':
+      return 50;
+    case 'legacy_proof_fields':
+    case 'legacy_proof_last_message':
+      return 40;
+    case 'child_lane_summary':
+      return 30;
+    case 'child_stream_summary':
+      return 20;
+    case 'generic_phase_fallback':
+      return 0;
+    default:
+      return 0;
+  }
+}
+
+function explainProviderLinearWorkerProgressCandidateRejection(
+  candidate: RankedProviderLinearWorkerProgressCandidate,
+  winner: RankedProviderLinearWorkerProgressCandidate
+): string {
+  if (
+    scoreProviderLinearWorkerProgressCandidate(candidate) <
+    scoreProviderLinearWorkerProgressCandidate(winner)
+  ) {
+    return 'lower_signal_than_winner';
+  }
+  if (candidate.message_recorded_at && winner.message_recorded_at) {
+    const messageFreshnessComparison = compareIsoTimestamp(
+      candidate.message_recorded_at,
+      winner.message_recorded_at
+    );
+    if (messageFreshnessComparison < 0) {
+      return 'older_than_winner';
+    }
+  }
+  if (
+    providerLinearWorkerProgressCandidateSourcePriority(candidate.source) <
+    providerLinearWorkerProgressCandidateSourcePriority(winner.source)
+  ) {
+    return 'less_authoritative_than_winner';
+  }
+  if (compareIsoTimestamp(candidate.source_updated_at, winner.source_updated_at) < 0) {
+    return 'older_than_winner';
+  }
+  return 'ranked_below_winner';
 }
 
 export function selectLatestProviderLinearAuditEntry(
@@ -763,6 +1146,8 @@ function hasAuthoritativeWorkerProgressSignal(input: {
     || input.ownerStatus
     || input.endReason
     || input.lastSemanticProgressAt
+    || normalizeOptionalString(input.proof.current_turn_activity?.event)
+    || normalizeOptionalString(input.proof.current_turn_activity?.message_or_payload)
     || normalizeOptionalString(input.proof.last_event)
     || normalizeOptionalString(input.proof.last_message)
   );
@@ -854,6 +1239,19 @@ function deriveMergeCloseoutProgressSnapshot(
       stall_classification: 'failed',
       stall_reason: normalizeOptionalString(mergeCloseout.reason) ?? mergeStatus,
       recovery_recommendation: 'inspect_merge_closeout'
+    };
+  }
+
+  if (hasPendingBranchRecovery(mergeCloseout)) {
+    return {
+      phase: 'watching_merge',
+      kind: 'merge_closeout',
+      status: 'progressing',
+      summary,
+      last_semantic_progress_at: lastSemanticProgressAt,
+      stall_classification: 'progressing',
+      stall_reason: null,
+      recovery_recommendation: 'continue_waiting'
     };
   }
 
@@ -997,6 +1395,19 @@ function deriveReviewPromotionProgressSnapshot(
     };
   }
 
+  if (hasPendingBranchRecovery(reviewPromotion)) {
+    return {
+      phase: 'review_handoff',
+      kind: 'workflow',
+      status: 'progressing',
+      summary,
+      last_semantic_progress_at: lastSemanticProgressAt,
+      stall_classification: 'progressing',
+      stall_reason: null,
+      recovery_recommendation: 'continue_waiting'
+    };
+  }
+
   if (
     reviewBlockerReason
     || (unresolvedThreadCount ?? 0) > 0
@@ -1092,6 +1503,14 @@ function derivePendingMergeCloseoutProgressSnapshot(
   };
 }
 
+function hasPendingBranchRecovery(record: ProviderIssuePullRequestLifecycleLike): boolean {
+  return (
+    normalizeOptionalString(record.reason) === 'branch_refresh_requested'
+    && record.branch_recovery?.ok === true
+    && Boolean(normalizeOptionalString(record.branch_recovery.recovery_reason))
+  );
+}
+
 function resolveMergeCloseoutReviewBlockerReason(input: {
   unresolvedThreadCount: number | null;
   actionRequiredReasons: string[];
@@ -1175,7 +1594,24 @@ function buildProviderDebugPullRequestSnapshot(input: {
     gate_reasons: normalizeStringArray(snapshot?.gate_reasons),
     action_required_reasons: normalizeStringArray(snapshot?.action_required_reasons),
     updated_at: normalizeOptionalString(snapshot?.updated_at),
-    merged_at: normalizeOptionalString(snapshot?.merged_at)
+    merged_at: normalizeOptionalString(snapshot?.merged_at),
+    branch_recovery: selectedRecord.branch_recovery
+      ? {
+          attempted_at: normalizeOptionalString(selectedRecord.branch_recovery.attempted_at),
+          head_oid: normalizeOptionalString(selectedRecord.branch_recovery.head_oid),
+          recovery_reason: normalizeOptionalString(selectedRecord.branch_recovery.recovery_reason),
+          command: normalizeOptionalString(selectedRecord.branch_recovery.command),
+          args: normalizeStringArray(selectedRecord.branch_recovery.args),
+          exit_code: normalizeOptionalInteger(selectedRecord.branch_recovery.exit_code),
+          ok:
+            typeof selectedRecord.branch_recovery.ok === 'boolean'
+              ? selectedRecord.branch_recovery.ok
+              : null,
+          stdout: normalizeOptionalString(selectedRecord.branch_recovery.stdout),
+          stderr: normalizeOptionalString(selectedRecord.branch_recovery.stderr),
+          failure_kind: normalizeOptionalString(selectedRecord.branch_recovery.failure_kind)
+        }
+      : null
   };
 }
 
@@ -1222,21 +1658,39 @@ function selectLatestChildProgressSummaryCandidate(
   currentTurnStartedAt: string | null = null
 ): ProviderChildProgressSummaryCandidate | null {
   const childSummaries = [
-    ...selectCurrentTurnChildLanes(proof?.child_lanes ?? null, currentTurnStartedAt).map((childLane) => ({
-      summary: normalizeOptionalString(childLane.summary),
-      recorded_at: latestIsoTimestamp(
-        normalizeOptionalString(childLane.decision_at),
-        normalizeOptionalString(childLane.launched_at)
-      )
-    })),
-    ...selectCurrentTurnChildStreams(proof?.child_streams ?? null, currentTurnStartedAt).map((childStream) => ({
-      summary: normalizeOptionalString(childStream.summary),
-      recorded_at: latestIsoTimestamp(
-        normalizeOptionalString(childStream.recorded_at),
-        normalizeOptionalString(childStream.launched_at)
-      )
-    }))
-  ].filter((candidate): candidate is ProviderChildProgressSummaryCandidate => Boolean(candidate.summary));
+    ...selectCurrentTurnChildLanes(proof?.child_lanes ?? null, currentTurnStartedAt).flatMap((childLane) => {
+      const summary = normalizeOptionalString(childLane.summary);
+      return summary
+        ? [
+            {
+              source: 'child_lane_summary',
+              event: null,
+              summary,
+              recorded_at: latestIsoTimestamp(
+                normalizeOptionalString(childLane.decision_at),
+                normalizeOptionalString(childLane.launched_at)
+              )
+            } satisfies ProviderChildProgressSummaryCandidate
+          ]
+        : [];
+    }),
+    ...selectCurrentTurnChildStreams(proof?.child_streams ?? null, currentTurnStartedAt).flatMap((childStream) => {
+      const summary = normalizeOptionalString(childStream.summary);
+      return summary
+        ? [
+            {
+              source: 'child_stream_summary',
+              event: null,
+              summary,
+              recorded_at: latestIsoTimestamp(
+                normalizeOptionalString(childStream.recorded_at),
+                normalizeOptionalString(childStream.launched_at)
+              )
+            } satisfies ProviderChildProgressSummaryCandidate
+          ]
+        : [];
+    })
+  ];
   if (childSummaries.length === 0) {
     return null;
   }
@@ -1372,7 +1826,7 @@ function isSemanticallyStalled(lastSemanticProgressAt: string | null, now: strin
   return nowMs - lastProgressMs >= PROVIDER_SEMANTIC_STALL_THRESHOLD_MS;
 }
 
-function isHighSignalProviderProgressSummary(value: string | null): value is string {
+export function isHighSignalProviderProgressSummary(value: string | null): value is string {
   if (!value) {
     return false;
   }

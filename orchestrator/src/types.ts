@@ -37,7 +37,8 @@ export interface PlanItem {
   description: string;
   requires_cloud?: boolean;
   /**
-   * Backwards-compatible alias for legacy planner outputs. Prefer `requires_cloud`.
+   * Backwards-compatible alias for planner outputs and legacy consumers. Prefer
+   * `requires_cloud` in new code.
    */
   requiresCloud?: boolean;
   runnable?: boolean;

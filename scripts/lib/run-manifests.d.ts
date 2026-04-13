@@ -4,6 +4,12 @@ export function resolveEnvironmentPaths(): {
   outRoot: string;
   taskId: string;
 };
+export function resolveEnvironmentPathsForProcess(env?: NodeJS.ProcessEnv, cwd?: string): {
+  repoRoot: string;
+  runsRoot: string;
+  outRoot: string;
+  taskId: string;
+};
 export function resolveRunDir(options: {
   runsRoot: string;
   taskId: string;

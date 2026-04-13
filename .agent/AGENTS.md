@@ -1,5 +1,7 @@
-<!-- codex:instruction-stamp eb458bce7b72bd01307b8eea13caf1aaaffec8e0a40b6e898e09bb9926620a7c -->
+<!-- codex:instruction-stamp 818381476fde939f844aab6960e4f99ad2df6131506afbcb48ea9701f5eb4739 -->
 # Agent Enablement
+
+Task-specific project blocks were removed from this file in `CO-88`. Keep repo-wide guidance here and use `.agent/task/**` for active task-scoped instructions.
 
 ## Added by Bootstrap 2025-10-16
 
@@ -45,6 +47,7 @@
 - `npx vitest run <pattern>` — Use this non-watch mode for focused suites; plain `npx vitest` launches an interactive watcher that never exits (we can’t press `q`), so always prefer the `run` form in automation.
 - `npm run eval:test` — Exercises evaluation harness scenarios; depends on local `python3` for cross-language fixtures.
 - `npm run docs:freshness` — Docs freshness audit; writes `out/<task-id>/docs-freshness.json`.
+- `npm run repo:stewardship` — Repo-wide tracked-file stewardship audit; writes `out/<task-id>/repo-stewardship.json` and classifies each tracked surface as `validate`, `update`, `delete`, or `retain_with_rationale`.
 - `npm run build:patterns` — Compile codemods/linters/templates; run whenever `patterns/**` changes.
 - `node --loader ts-node/esm evaluation/harness/run-all.ts --mode=mcp` — Manual sweep to generate scenario artifacts for manifests.
 - `node scripts/diff-budget.mjs` — Enforces a small-diff budget before review; set `DIFF_BUDGET_OVERRIDE_REASON` to bypass with justification.
@@ -107,19 +110,6 @@ Note: pipelines already set `CODEX_NON_INTERACTIVE=1`; keep it for shortcut runs
 - When writing PR summaries, avoid literal `\n` sequences; use `gh pr create --body-file` or a here-doc so line breaks render correctly in GitHub.
 - Keep `docs/TASKS.md` under the line threshold in `docs/tasks-archive-policy.json`; the tasks archive automation workflow opens a PR and updates the `task-archives` branch when the limit is exceeded. Use `npm run docs:archive-tasks` for manual fallback.
 - Archive implementation docs using `docs/implementation-docs-archive-policy.json`; the automation workflow syncs payloads to `doc-archives` and opens a PR with stubs. Use `npm run docs:archive-implementation` for manual fallback.
-
-## Project 0303 — Codex Orchestrator Autonomy Enhancements
-- Set `MCP_RUNNER_TASK_ID=0303-orchestrator-autonomy` for all diagnostics and orchestrator executions; confirm manifests land in `.runs/0303-orchestrator-autonomy/cli/`.
-- Log approvals/escalations inside each run manifest and reference the same path when you flip checkmarks in `tasks/tasks-0303-orchestrator-autonomy.md`, `docs/TASKS.md`, and `.agent/task/0303-orchestrator-autonomy.md`.
-- Keep metrics in `.runs/0303-orchestrator-autonomy/metrics.json` and summarize outcomes in `out/0303-orchestrator-autonomy/state.json`; update docs when these files change.
-- Before requesting review, run `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, and `npm run eval:test` (if fixtures exist), then capture the manifest path documenting those executions.
-- Follow `.agent/SOPs/orchestrator-autonomy.md` for guardrail, evidence, and hand-off requirements specific to Task 0303.
-
-## Project 0506 — TF-GRPO Integration Foundations
-- Set `MCP_RUNNER_TASK_ID=0506-tfgrpo-integration` before invoking TF-GRPO pipelines so manifests, metrics, and state snapshots land under `.runs/0506-tfgrpo-integration/**` and `out/0506-tfgrpo-integration/**`.
-- Only use stamped prompt packs from `.agent/prompts/prompt-packs/**`; their SHA-256 signatures must match the manifest or the loader will reject the run. Manifests expose these values via the `prompt_packs` array for auditors.
-- Persist ≤32-word experiences and reward evidence inside `out/0506-tfgrpo-integration/experiences.jsonl` and cross-link the manifest path each time you flip checklist items in `tasks/tasks-0506-tfgrpo.md` and `.agent/task/0506-tfgrpo-integration.md`.
-- Guardrails still require `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, and `npm run test` prior to review; attach the TF-GRPO manifest path documenting these validations.
 
 ### Database Safety Safeguards
 - Treat production data as immutable; require read-only replicas or sanitized fixtures for testing.

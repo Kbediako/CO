@@ -55,6 +55,72 @@ export interface ExperienceRecord {
   manifestPath: string;
 }
 
+export type ExperienceSourceKind = 'group_id' | 'run_id' | 'manifest_path' | 'stamp_signature';
+export type ExperienceExclusionReason = 'raw_score_below_min_score' | 'competitive_score_below_min_score' | 'outcompeted';
+
+export interface ExperienceSelectionPolicy {
+  kind: 'competitive_scoring_v1';
+  minScore: number | null;
+  scoreWeights: {
+    gtScore: number;
+    relativeRank: number;
+  };
+  antiDominanceNormalization: {
+    enabled: boolean;
+    strength: number;
+    sourceGrouping: 'provenance_fallback_v1';
+  };
+}
+
+export interface ExperienceSelectionCandidate {
+  id: string;
+  source_key: string;
+  source_kind: ExperienceSourceKind;
+  raw_score: number;
+  competitive_score: number;
+  dominance_penalty: number;
+  selected: boolean;
+  selected_slot: number | null;
+  exclusion_reason: ExperienceExclusionReason | null;
+}
+
+export interface ExperienceSelectionDiagnostics {
+  policy: ExperienceSelectionPolicy;
+  candidate_count: number;
+  selected_count: number;
+  selected_ids: string[];
+  suppressed_source_keys: string[];
+  selected: Array<{
+    id: string;
+    source_key: string;
+    source_kind: ExperienceSourceKind;
+    raw_score: number;
+    competitive_score: number;
+    dominance_penalty: number;
+  }>;
+  candidates: ExperienceSelectionCandidate[];
+}
+
+export interface ExperienceSelectionResult {
+  records: ExperienceRecord[];
+  diagnostics: ExperienceSelectionDiagnostics;
+}
+
+interface ExperienceSelectionEntry {
+  record?: ExperienceRecord;
+  id: string;
+  createdAt: string;
+  sourceKey: string;
+  sourceKind: ExperienceSourceKind;
+  sourceBucketKey: string;
+  rawScore: number;
+  competitiveScore: number;
+  dominancePenalty: number;
+  selected: boolean;
+  selectedSlot: number | null;
+  exclusionReason: ExperienceExclusionReason | null;
+}
+
 export class ExperienceStoreLockError extends Error {
   constructor(message: string, public readonly taskId: string) {
     super(message);
@@ -118,16 +184,37 @@ export class ExperienceStore {
   }
 
   async fetchTop(params: { domain: string; limit: number; minReward?: number; taskId?: string }): Promise<ExperienceRecord[]> {
+    const result = await this.selectTop({
+      domain: params.domain,
+      limit: params.limit,
+      minScore: params.minReward,
+      taskId: params.taskId
+    });
+    return result.records;
+  }
+
+  async selectTop(params: {
+    domain: string;
+    limit: number;
+    minScore?: number;
+    taskId?: string;
+    policy?: Partial<ExperienceSelectionPolicy>;
+  }): Promise<ExperienceSelectionResult> {
     const safeDomain = params.domain.trim();
+    const policy = resolveExperienceSelectionPolicy(params.policy, params.minScore);
     if (!safeDomain) {
-      return [];
+      return emptySelection(policy);
     }
     const taskFilter = params.taskId ? sanitizeTaskId(params.taskId) : null;
     const limit = Math.max(0, params.limit);
     if (limit === 0) {
-      return [];
+      return emptySelection(policy);
     }
-    const collector = createTopKCollector(limit, params.minReward);
+    const entries: ExperienceSelectionEntry[] = [];
+    const selectedRecordEntriesBySource = new Map<string, ExperienceSelectionEntry[]>();
+    const selectedRecordLookup = new Map<string, ExperienceRecord>();
+    const sourceCandidateCounts = new Map<string, number>();
+    let candidateCount = 0;
     const applyRecord = (record: ExperienceRecord) => {
       if (record.domain !== safeDomain) {
         return;
@@ -135,7 +222,20 @@ export class ExperienceStore {
       if (taskFilter && record.taskId !== taskFilter) {
         return;
       }
-      collector.add(record);
+      const entry = createSelectionEntry(record, policy);
+      entries.push(entry);
+      candidateCount += 1;
+      sourceCandidateCounts.set(
+        entry.sourceBucketKey,
+        (sourceCandidateCounts.get(entry.sourceBucketKey) ?? 0) + 1
+      );
+      // Keep full diagnostics for every candidate while retaining only bounded records for materialization.
+      const retainedEntry: ExperienceSelectionEntry = { ...entry, record };
+      selectedRecordLookup.set(retainedEntry.id, record);
+      const prunedEntry = insertSourceCandidate(selectedRecordEntriesBySource, retainedEntry, limit);
+      if (prunedEntry?.record) {
+        selectedRecordLookup.delete(prunedEntry.id);
+      }
     };
 
     if (taskFilter) {
@@ -147,7 +247,14 @@ export class ExperienceStore {
       }
     }
 
-    return collector.finalize();
+    return selectCompetitiveTop(
+      entries,
+      limit,
+      policy,
+      candidateCount,
+      sourceCandidateCounts,
+      selectedRecordLookup
+    );
   }
 
   verifyStamp(record: ExperienceRecord): boolean {
@@ -271,63 +378,286 @@ export class ExperienceStore {
   }
 }
 
-function createTopKCollector(limit: number, minReward?: number): {
-  add: (record: ExperienceRecord) => void;
-  finalize: () => ExperienceRecord[];
-} {
-  const entries: Array<{ record: ExperienceRecord; score: number }> = [];
-  const threshold = typeof minReward === 'number' ? minReward : null;
-
-  const compare = (
-    a: { record: ExperienceRecord; score: number },
-    b: { record: ExperienceRecord; score: number }
-  ): number => {
-    if (a.score !== b.score) {
-      return a.score - b.score;
-    }
-    const aTime = a.record.createdAt ?? '';
-    const bTime = b.record.createdAt ?? '';
-    return aTime.localeCompare(bTime);
-  };
-
-  const add = (record: ExperienceRecord) => {
-    const score = record.reward.gtScore + record.reward.relativeRank;
-    if (threshold !== null && score < threshold) {
-      return;
-    }
-    const entry = { record, score };
-    if (entries.length === 0) {
-      entries.push(entry);
-      return;
-    }
-    const worst = entries[0];
-    if (entries.length >= limit && worst && compare(entry, worst) <= 0) {
-      return;
-    }
-    let index = 0;
-    while (index < entries.length && compare(entries[index]!, entry) <= 0) {
-      index += 1;
-    }
-    entries.splice(index, 0, entry);
-    if (entries.length > limit) {
-      entries.shift();
+function emptySelection(policy: ExperienceSelectionPolicy): ExperienceSelectionResult {
+  return {
+    records: [],
+    diagnostics: {
+      policy,
+      candidate_count: 0,
+      selected_count: 0,
+      selected_ids: [],
+      suppressed_source_keys: [],
+      selected: [],
+      candidates: []
     }
   };
+}
 
-  const finalize = () =>
-    entries
-      .slice()
-      .sort((a, b) => {
-        if (a.score !== b.score) {
-          return b.score - a.score;
-        }
-        const aTime = a.record.createdAt ?? '';
-        const bTime = b.record.createdAt ?? '';
-        return bTime.localeCompare(aTime);
-      })
-      .map((entry) => entry.record);
+function resolveExperienceSelectionPolicy(
+  policy: Partial<ExperienceSelectionPolicy> | undefined,
+  minScoreFallback?: number
+): ExperienceSelectionPolicy {
+  return {
+    kind: 'competitive_scoring_v1',
+    minScore: normalizeOptionalScore(
+      policy?.minScore ?? minScoreFallback,
+      'selection.policy.minScore',
+      null
+    ),
+    scoreWeights: {
+      gtScore: normalizeNonNegativeScore(
+        policy?.scoreWeights?.gtScore,
+        'selection.policy.scoreWeights.gtScore',
+        1
+      ),
+      relativeRank: normalizeNonNegativeScore(
+        policy?.scoreWeights?.relativeRank,
+        'selection.policy.scoreWeights.relativeRank',
+        1
+      )
+    },
+    antiDominanceNormalization: {
+      enabled: normalizeBoolean(
+        policy?.antiDominanceNormalization?.enabled,
+        'selection.policy.antiDominanceNormalization.enabled',
+        true
+      ),
+      strength: normalizeNonNegativeScore(
+        policy?.antiDominanceNormalization?.strength,
+        'selection.policy.antiDominanceNormalization.strength',
+        0.5
+      ),
+      sourceGrouping: 'provenance_fallback_v1'
+    }
+  };
+}
 
-  return { add, finalize };
+function createSelectionEntry(
+  record: ExperienceRecord,
+  policy: ExperienceSelectionPolicy
+): ExperienceSelectionEntry {
+  const source = deriveExperienceSource(record);
+  const rawScore = roundScore(
+    record.reward.gtScore * policy.scoreWeights.gtScore +
+      record.reward.relativeRank * policy.scoreWeights.relativeRank
+  );
+  return {
+    id: record.id,
+    createdAt: record.createdAt,
+    sourceKey: source.key,
+    sourceKind: source.kind,
+    sourceBucketKey: formatExperienceSourceBucketKey(source.kind, source.key),
+    rawScore,
+    competitiveScore: rawScore,
+    dominancePenalty: 0,
+    selected: false,
+    selectedSlot: null,
+    exclusionReason:
+      policy.minScore !== null && rawScore < policy.minScore ? 'raw_score_below_min_score' : null
+  };
+}
+
+function insertSourceCandidate(
+  entriesBySource: Map<string, ExperienceSelectionEntry[]>,
+  entry: ExperienceSelectionEntry,
+  limit: number
+): ExperienceSelectionEntry | null {
+  const bucket = entriesBySource.get(entry.sourceBucketKey) ?? [];
+  let insertAt = 0;
+  while (
+    insertAt < bucket.length &&
+    compareSelectionEntriesByRaw(bucket[insertAt]!, entry) <= 0
+  ) {
+    insertAt += 1;
+  }
+  bucket.splice(insertAt, 0, entry);
+  let prunedEntry: ExperienceSelectionEntry | null = null;
+  if (bucket.length > limit) {
+    prunedEntry = bucket.pop() ?? null;
+  }
+  entriesBySource.set(entry.sourceBucketKey, bucket);
+  return prunedEntry;
+}
+
+function selectCompetitiveTop(
+  entries: ExperienceSelectionEntry[],
+  limit: number,
+  policy: ExperienceSelectionPolicy,
+  candidateCount = entries.length,
+  sourceCandidateCounts: Map<string, number> = new Map(),
+  selectedRecordLookup: Map<string, ExperienceRecord> = new Map()
+): ExperienceSelectionResult {
+  const remaining = entries.filter((entry) => entry.exclusionReason === null);
+  const selectedCounts = new Map<string, number>();
+  const selectedEntries: ExperienceSelectionEntry[] = [];
+
+  for (let slot = 1; slot <= limit && remaining.length > 0; slot += 1) {
+    for (const entry of remaining) {
+      const priorSelections = selectedCounts.get(entry.sourceBucketKey) ?? 0;
+      const dominancePenalty =
+        policy.antiDominanceNormalization.enabled
+          ? roundScore(policy.antiDominanceNormalization.strength * priorSelections)
+          : 0;
+      entry.dominancePenalty = dominancePenalty;
+      entry.competitiveScore = roundScore(entry.rawScore - dominancePenalty);
+    }
+
+    remaining.sort(compareSelectionEntries);
+    const best = remaining[0];
+    if (!best || (policy.minScore !== null && best.competitiveScore < policy.minScore)) {
+      for (const entry of remaining) {
+        entry.exclusionReason = 'competitive_score_below_min_score';
+      }
+      break;
+    }
+
+    best.selected = true;
+    best.selectedSlot = slot;
+    best.exclusionReason = null;
+    selectedEntries.push(best);
+    selectedCounts.set(best.sourceBucketKey, (selectedCounts.get(best.sourceBucketKey) ?? 0) + 1);
+    remaining.shift();
+  }
+
+  for (const entry of remaining) {
+    if (entry.exclusionReason === null) {
+      entry.exclusionReason = 'outcompeted';
+    }
+  }
+
+  if (sourceCandidateCounts.size === 0) {
+    for (const entry of entries) {
+      sourceCandidateCounts.set(
+        entry.sourceBucketKey,
+        (sourceCandidateCounts.get(entry.sourceBucketKey) ?? 0) + 1
+      );
+    }
+  }
+  const suppressedSourceKeys = [...sourceCandidateCounts.entries()]
+    .filter(([sourceBucketKey, count]) => count > (selectedCounts.get(sourceBucketKey) ?? 0))
+    .map(([sourceBucketKey]) => sourceBucketKey)
+    .sort((a, b) => a.localeCompare(b));
+
+  return {
+    records: selectedEntries.map((entry) => {
+      const record = entry.record ?? selectedRecordLookup.get(entry.id);
+      if (!record) {
+        throw new Error(`Selected experience ${entry.id} is missing a retained record`);
+      }
+      return record;
+    }),
+    diagnostics: {
+      policy,
+      candidate_count: candidateCount,
+      selected_count: selectedEntries.length,
+      selected_ids: selectedEntries.map((entry) => entry.id),
+      suppressed_source_keys: suppressedSourceKeys,
+      selected: selectedEntries.map((entry) => ({
+        id: entry.id,
+        source_key: entry.sourceKey,
+        source_kind: entry.sourceKind,
+        raw_score: entry.rawScore,
+        competitive_score: entry.competitiveScore,
+        dominance_penalty: entry.dominancePenalty
+      })),
+      candidates: entries
+        .slice()
+        .sort((a, b) => compareSelectionEntries(a, b))
+        .map((entry) => ({
+          id: entry.id,
+          source_key: entry.sourceKey,
+          source_kind: entry.sourceKind,
+          raw_score: entry.rawScore,
+          competitive_score: entry.competitiveScore,
+          dominance_penalty: entry.dominancePenalty,
+          selected: entry.selected,
+          selected_slot: entry.selectedSlot,
+          exclusion_reason: entry.exclusionReason
+        }))
+    }
+  };
+}
+
+function deriveExperienceSource(record: ExperienceRecord): { kind: ExperienceSourceKind; key: string } {
+  if (record.groupId && record.groupId.trim()) {
+    return { kind: 'group_id', key: record.groupId.trim() };
+  }
+  if (record.runId && record.runId.trim()) {
+    return { kind: 'run_id', key: record.runId.trim() };
+  }
+  if (record.manifestPath && record.manifestPath.trim()) {
+    return { kind: 'manifest_path', key: record.manifestPath.trim() };
+  }
+  return { kind: 'stamp_signature', key: record.stampSignature };
+}
+
+function compareSelectionEntries(
+  a: Pick<ExperienceSelectionEntry, 'id' | 'createdAt' | 'rawScore' | 'competitiveScore'>,
+  b: Pick<ExperienceSelectionEntry, 'id' | 'createdAt' | 'rawScore' | 'competitiveScore'>
+): number {
+  if (a.competitiveScore !== b.competitiveScore) {
+    return b.competitiveScore - a.competitiveScore;
+  }
+  return compareSelectionEntriesByRaw(a, b);
+}
+
+function compareSelectionEntriesByRaw(
+  a: Pick<ExperienceSelectionEntry, 'id' | 'createdAt' | 'rawScore'>,
+  b: Pick<ExperienceSelectionEntry, 'id' | 'createdAt' | 'rawScore'>
+): number {
+  if (a.rawScore !== b.rawScore) {
+    return b.rawScore - a.rawScore;
+  }
+  const aTime = a.createdAt ?? '';
+  const bTime = b.createdAt ?? '';
+  const timeCompare = bTime.localeCompare(aTime);
+  if (timeCompare !== 0) {
+    return timeCompare;
+  }
+  return a.id.localeCompare(b.id);
+}
+
+function formatExperienceSourceBucketKey(kind: ExperienceSourceKind, key: string): string {
+  return `${kind}:${key}`;
+}
+
+function roundScore(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.round(value * 1_000_000) / 1_000_000;
+}
+
+function normalizeOptionalScore(
+  value: number | null | undefined,
+  field: string,
+  defaultValue: number | null
+): number | null {
+  if (value === null || value === undefined) {
+    return defaultValue;
+  }
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error(`${field} must be a finite non-negative number.`);
+  }
+  return value;
+}
+
+function normalizeNonNegativeScore(value: number | undefined, field: string, defaultValue: number): number {
+  const normalized = normalizeOptionalScore(value, field, defaultValue);
+  if (normalized === null) {
+    throw new Error(`${field} must be a finite non-negative number.`);
+  }
+  return normalized;
+}
+
+function normalizeBoolean(value: boolean | undefined, field: string, defaultValue: boolean): boolean {
+  if (value === undefined) {
+    return defaultValue;
+  }
+  if (typeof value !== 'boolean') {
+    throw new Error(`${field} must be a boolean.`);
+  }
+  return value;
 }
 
 function truncateSummary(value: string, maxWords: number): string {

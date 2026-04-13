@@ -1,0 +1,420 @@
+{
+  "version": 1,
+  "classes": {
+    "front_door": {
+      "label": "Front Door",
+      "report_order": 10
+    },
+    "public_onboarding": {
+      "label": "Public Onboarding",
+      "report_order": 20
+    },
+    "agent_instruction": {
+      "label": "Agent Instruction",
+      "report_order": 30
+    },
+    "tasking_and_docs": {
+      "label": "Tasking and Docs",
+      "report_order": 40
+    },
+    "workflow": {
+      "label": "Workflow",
+      "report_order": 50
+    },
+    "repo_config": {
+      "label": "Repo Config",
+      "report_order": 60
+    },
+    "code_surface": {
+      "label": "Code Surface",
+      "report_order": 70
+    },
+    "repo_script": {
+      "label": "Repo Script",
+      "report_order": 80
+    },
+    "shipped_skill": {
+      "label": "Shipped Skill",
+      "report_order": 90
+    },
+    "template_surface": {
+      "label": "Template Surface",
+      "report_order": 100
+    },
+    "test_and_fixture": {
+      "label": "Test and Fixture",
+      "report_order": 110
+    },
+    "pattern_surface": {
+      "label": "Pattern Surface",
+      "report_order": 120
+    },
+    "reference_history": {
+      "label": "Reference History",
+      "report_order": 130
+    },
+    "archive_history": {
+      "label": "Archive History",
+      "report_order": 140
+    },
+    "asset": {
+      "label": "Asset",
+      "report_order": 150
+    },
+    "uncatalogued": {
+      "label": "Uncatalogued",
+      "report_order": 999
+    }
+  },
+  "entries": [
+    {
+      "path": "README.md",
+      "surface_class": "front_door",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Root front door remains under the existing docs truth checks for CLI version, runtime posture, and bundled skill roster."
+    },
+    {
+      "path": "docs/public/downstream-setup.md",
+      "surface_class": "public_onboarding",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Public downstream onboarding stays validated by the existing docs truth checks rather than file age alone."
+    },
+    {
+      "path": "docs/public/provider-onboarding.md",
+      "surface_class": "public_onboarding",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Public provider onboarding stays validated by the existing docs truth checks rather than file age alone."
+    },
+    {
+      "path": "AGENTS.md",
+      "surface_class": "agent_instruction",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "The root instruction chain stays under active validation and is not governed by raw file age."
+    },
+    {
+      "path": "docs/AGENTS.md",
+      "surface_class": "agent_instruction",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Docs-side instruction guidance remains an active validation surface."
+    },
+    {
+      "path": ".agent/AGENTS.md",
+      "surface_class": "agent_instruction",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Agent-facing quick-reference guidance remains an active validation surface."
+    },
+    {
+      "path": ".agent/readme.md",
+      "surface_class": "agent_instruction",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "The `.agent` front door remains an active validation surface."
+    },
+    {
+      "path": ".ai-dev-tasks/create-prd.md",
+      "surface_class": "tasking_and_docs",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "The retained PRD tasking guide must point at the current docs-first templates and packet layout.",
+      "checks": {
+        "required_text": [
+          ".agent/task/templates/prd-template.md",
+          ".agent/task/templates/tech-spec-template.md",
+          ".agent/task/templates/action-plan-template.md",
+          "linear-<issue-id>"
+        ]
+      }
+    },
+    {
+      "path": ".ai-dev-tasks/generate-tasks.md",
+      "surface_class": "tasking_and_docs",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "The retained checklist guide must reflect the current task template, registry mirrors, and archive fallback.",
+      "checks": {
+        "required_text": [
+          ".agent/task/templates/tasks-template.md",
+          "tasks/index.json",
+          "docs/docs-freshness-registry.json",
+          "npm run docs:archive-tasks"
+        ]
+      }
+    },
+    {
+      "path": ".ai-dev-tasks/process-task-list.md",
+      "surface_class": "tasking_and_docs",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "The retained execution guide must match the current validation and review handoff floor.",
+      "checks": {
+        "required_text": [
+          "node scripts/delegation-guard.mjs",
+          "npm run docs:freshness",
+          "npm run repo:stewardship",
+          "npm run review"
+        ]
+      }
+    },
+    {
+      "path": "docs/README.md",
+      "surface_class": "tasking_and_docs",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Contributor-facing docs remain active validation surfaces."
+    },
+    {
+      "path": "package.json",
+      "surface_class": "repo_config",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "The root package manifest must keep the repo stewardship command wired into the local command surface.",
+      "checks": {
+        "required_scripts": [
+          "docs:check",
+          "docs:freshness",
+          "repo:stewardship"
+        ]
+      }
+    },
+    {
+      "path": ".github/workflows/docs-truthfulness-weekly.yml",
+      "surface_class": "workflow",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "The weekly upkeep workflow must run docs truth plus repo stewardship and publish both report artifacts.",
+      "checks": {
+        "required_text": [
+          "npm run docs:check",
+          "npm run repo:stewardship",
+          "repo-stewardship-summary.md"
+        ]
+      }
+    },
+    {
+      "path": "prompt-snippets/frontend-aesthetics-v1.md",
+      "surface_class": "pattern_surface",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "The retained frontend aesthetics prompt remains active only when it carries local owner and consumer evidence.",
+      "checks": {
+        "required_text": [
+          "## Metadata",
+          "`ownerEvidence`",
+          "`consumerEvidence`"
+        ]
+      }
+    }
+  ],
+  "patterns": [
+    {
+      "glob": "**/*.{png,svg,jpg,jpeg,gif,webp,ico}",
+      "surface_class": "asset",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Tracked assets remain explicit validation surfaces."
+    },
+    {
+      "glob": ".agent/**/*",
+      "surface_class": "agent_instruction",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Tracked `.agent` surfaces remain active agent-instruction or task mirrors that should stay reviewable."
+    },
+    {
+      "glob": ".ai-dev-tasks/**/*",
+      "surface_class": "tasking_and_docs",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Tracked `.ai-dev-tasks` surfaces remain explicit tasking/docs inputs."
+    },
+    {
+      "glob": ".github/**/*.yml",
+      "surface_class": "workflow",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Automation workflows are active stewardship contracts."
+    },
+    {
+      "glob": "docs/**/*",
+      "surface_class": "tasking_and_docs",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Tracked docs remain explicit stewardship surfaces; front-door truth still runs through the existing docs checks."
+    },
+    {
+      "glob": "tasks/**/*",
+      "surface_class": "tasking_and_docs",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Task registry, checklists, and specs remain explicit stewardship surfaces."
+    },
+    {
+      "glob": "orchestrator/**/*",
+      "surface_class": "code_surface",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "The orchestrator implementation remains an active validation surface."
+    },
+    {
+      "glob": "packages/**/*",
+      "surface_class": "code_surface",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Shared packages remain active validation surfaces."
+    },
+    {
+      "glob": "adapters/**/*",
+      "surface_class": "code_surface",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Adapter implementations remain active validation surfaces."
+    },
+    {
+      "glob": "bin/**/*",
+      "surface_class": "code_surface",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "CLI entrypoint sources remain active validation surfaces."
+    },
+    {
+      "glob": "scripts/**/*",
+      "surface_class": "repo_script",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Tracked repo scripts remain active stewardship surfaces."
+    },
+    {
+      "glob": "skills/**/*",
+      "surface_class": "shipped_skill",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Bundled skills and companions remain active shipped surfaces."
+    },
+    {
+      "glob": "templates/**/*",
+      "surface_class": "template_surface",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Seeded templates remain explicit validation surfaces."
+    },
+    {
+      "glob": "evaluation/**/*",
+      "surface_class": "test_and_fixture",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Evaluation harness and fixtures remain explicit validation surfaces."
+    },
+    {
+      "glob": "tests/**/*",
+      "surface_class": "test_and_fixture",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Repository tests remain explicit validation surfaces."
+    },
+    {
+      "glob": "patterns/**/*",
+      "surface_class": "pattern_surface",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Patterns, templates, codemods, and linters remain explicit stewardship surfaces."
+    },
+    {
+      "glob": "prompt-snippets/**/*",
+      "surface_class": "pattern_surface",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Prompt snippets remain explicit prompt-surface stewardship artifacts."
+    },
+    {
+      "glob": "reference/**",
+      "surface_class": "reference_history",
+      "decision": "retain_with_rationale",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Historical reference payloads are only retained when they are backed by a local README/rationale anchor inside `reference/`.",
+      "checks": {
+        "requires_local_readme": true,
+        "readme_boundary": "reference"
+      }
+    },
+    {
+      "glob": "archives/**",
+      "surface_class": "archive_history",
+      "decision": "retain_with_rationale",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Historical archive payloads are only retained when they are backed by a local README/rationale anchor inside `archives/`.",
+      "checks": {
+        "requires_local_readme": true,
+        "readme_boundary": "archives"
+      }
+    },
+    {
+      "glob": "schemas/**/*",
+      "surface_class": "repo_config",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Schemas remain explicit config/contract surfaces."
+    },
+    {
+      "glob": "types/**/*",
+      "surface_class": "repo_config",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Shared type declarations remain explicit contract surfaces."
+    },
+    {
+      "glob": "compliance/**/*",
+      "surface_class": "repo_config",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Compliance permit fixtures remain explicit config surfaces."
+    },
+    {
+      "glob": "eslint-plugin-patterns/**/*",
+      "surface_class": "code_surface",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Bundled eslint-plugin-patterns surfaces remain active validation surfaces."
+    },
+    {
+      "glob": ".codex/**/*",
+      "surface_class": "repo_config",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Tracked Codex repo-local config remains an explicit validation surface."
+    },
+    {
+      "glob": "*.md",
+      "surface_class": "tasking_and_docs",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Tracked root markdown surfaces remain explicit validation surfaces."
+    },
+    {
+      "glob": "*.{json,yaml,yml,cjs,ts}",
+      "surface_class": "repo_config",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Tracked root config and contract files remain explicit validation surfaces."
+    },
+    {
+      "glob": ".*",
+      "surface_class": "repo_config",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Tracked root dotfiles remain explicit validation surfaces."
+    },
+    {
+      "glob": "LICENSE",
+      "surface_class": "repo_config",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "The repository license remains an explicit retained config surface."
+    }
+  ]
+}
