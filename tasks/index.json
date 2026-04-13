@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260413-linear-6af47129-33cc-45fa-9a55-e49423536752",
+      "title": "CO validation: classify current-main docs:freshness stale-doc baseline after CO-165 rebase",
+      "relates_to": "tasks/tasks-linear-6af47129-33cc-45fa-9a55-e49423536752.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-13",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-6af47129-33cc-45fa-9a55-e49423536752.md",
+        "task": "tasks/tasks-linear-6af47129-33cc-45fa-9a55-e49423536752.md",
+        "agent_task": ".agent/task/linear-6af47129-33cc-45fa-9a55-e49423536752.md",
+        "docs": "docs/TECH_SPEC-linear-6af47129-33cc-45fa-9a55-e49423536752.md"
+      }
+    },
+    {
       "id": "20260412-linear-b84c9a78-b62f-48fa-b1c4-88f8222535da",
       "title": "CO: harden control-host supervise restart against orphaned duplicate host burn",
       "relates_to": "tasks/tasks-linear-b84c9a78-b62f-48fa-b1c4-88f8222535da.md",
