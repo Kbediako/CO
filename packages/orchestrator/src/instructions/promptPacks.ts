@@ -146,6 +146,9 @@ async function loadPromptPack(manifestPath: string, repoRoot: string): Promise<P
   const parsed = await readPromptPackManifestFile(manifestPath, repoRoot);
 
   validateManifest(parsed, manifestPath, repoRoot);
+  const id = requireNonEmptyManifestString(parsed.id, 'id', manifestPath, repoRoot);
+  const domain = requireNonEmptyManifestString(parsed.domain, 'domain', manifestPath, repoRoot);
+  const system = requireNonEmptyManifestString(parsed.system, 'system', manifestPath, repoRoot);
 
   const sections: Record<PromptPackSection, PromptPackSectionSource[]> = {
     system: [],
@@ -155,7 +158,7 @@ async function loadPromptPack(manifestPath: string, repoRoot: string): Promise<P
     optimize: []
   };
 
-  sections.system = [await loadSectionSource(repoRoot, 'system', parsed.system, manifestPath)];
+  sections.system = [await loadSectionSource(repoRoot, 'system', system, manifestPath)];
   sections.inject = await loadSectionArray(repoRoot, 'inject', parsed.inject ?? [], manifestPath);
   sections.summarize = await loadSectionArray(repoRoot, 'summarize', parsed.summarize ?? [], manifestPath);
   sections.extract = await loadSectionArray(repoRoot, 'extract', parsed.extract ?? [], manifestPath);
@@ -164,7 +167,7 @@ async function loadPromptPack(manifestPath: string, repoRoot: string): Promise<P
   const allSources = PROMPT_SECTIONS.flatMap((section) => sections[section]);
   if (allSources.length === 0) {
     throw new Error(
-      `Prompt pack ${parsed.id} ${parsed.domain} has no sources defined (${relative(repoRoot, manifestPath)})`
+      `Prompt pack ${id} ${domain} has no sources defined (${relative(repoRoot, manifestPath)})`
     );
   }
 
@@ -175,11 +178,11 @@ async function loadPromptPack(manifestPath: string, repoRoot: string): Promise<P
     retrievalPolicy
   });
   if (!parsed.stamp) {
-    throw new Error(`Prompt pack ${parsed.id} is missing a stamp (manifest: ${relative(repoRoot, manifestPath)})`);
+    throw new Error(`Prompt pack ${id} is missing a stamp (manifest: ${relative(repoRoot, manifestPath)})`);
   }
   if (computedStamp !== parsed.stamp) {
     throw new Error(
-      `Prompt pack ${parsed.id} stamp mismatch. expected ${parsed.stamp}, computed ${computedStamp} (${relative(
+      `Prompt pack ${id} stamp mismatch. expected ${parsed.stamp}, computed ${computedStamp} (${relative(
         repoRoot,
         manifestPath
       )})`
@@ -187,8 +190,8 @@ async function loadPromptPack(manifestPath: string, repoRoot: string): Promise<P
   }
 
   return {
-    id: parsed.id,
-    domain: parsed.domain,
+    id,
+    domain,
     stamp: parsed.stamp,
     experienceSlots,
     retrievalPolicy,
@@ -200,12 +203,15 @@ async function loadPromptPack(manifestPath: string, repoRoot: string): Promise<P
 async function loadPromptPackMetadataEntry(manifestPath: string, repoRoot: string): Promise<PromptPackMetadata> {
   const parsed = await readPromptPackManifestFile(manifestPath, repoRoot);
   validateManifest(parsed, manifestPath, repoRoot);
+  const id = requireNonEmptyManifestString(parsed.id, 'id', manifestPath, repoRoot);
+  const domain = requireNonEmptyManifestString(parsed.domain, 'domain', manifestPath, repoRoot);
+  requireNonEmptyManifestString(parsed.system, 'system', manifestPath, repoRoot);
   if (!parsed.stamp) {
-    throw new Error(`Prompt pack ${parsed.id} is missing a stamp (manifest: ${relative(repoRoot, manifestPath)})`);
+    throw new Error(`Prompt pack ${id} is missing a stamp (manifest: ${relative(repoRoot, manifestPath)})`);
   }
   return {
-    id: parsed.id,
-    domain: parsed.domain,
+    id,
+    domain,
     experienceSlots: resolvePromptPackExperienceSlots(parsed, manifestPath, repoRoot)
   };
 }
@@ -257,6 +263,23 @@ function validateManifest(manifest: PromptPackManifestFile, manifestPath: string
       `Prompt pack manifest ${relative(repoRoot, manifestPath)} missing required fields: ${missing.join(', ')}`
     );
   }
+}
+
+function requireNonEmptyManifestString(
+  value: unknown,
+  field: 'id' | 'domain' | 'system',
+  manifestPath: string,
+  repoRoot: string
+): string {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new Error(
+      `Prompt pack manifest ${relative(
+        repoRoot,
+        manifestPath
+      )} has invalid '${field}'; expected a non-empty string (repoRoot: ${repoRoot})`
+    );
+  }
+  return value.trim();
 }
 
 function normalizePromptPackRetrievalPolicy(

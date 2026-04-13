@@ -165,6 +165,47 @@ describe('loadPromptPacks', () => {
     }
   });
 
+  it.each([
+    {
+      field: 'id',
+      manifest: { id: ['metadata-pack'], domain: 'diagnostics', system: PROMPT_PATH },
+      message: /invalid 'id'.*repoRoot:/i
+    },
+    {
+      field: 'domain',
+      manifest: { id: 'metadata-pack', domain: { slug: 'diagnostics' }, system: PROMPT_PATH },
+      message: /invalid 'domain'.*repoRoot:/i
+    },
+    {
+      field: 'system',
+      manifest: { id: 'metadata-pack', domain: 'diagnostics', system: 42 },
+      message: /invalid 'system'.*repoRoot:/i
+    }
+  ])('rejects malformed manifest $field fields before metadata sorting', async ({ field, manifest, message }) => {
+    const root = await mkdtemp(join(tmpdir(), `prompt-pack-invalid-${field}-`));
+    try {
+      const manifestDir = join(root, '.agent', 'prompts', 'prompt-packs', `invalid-${field}`);
+      await mkdir(manifestDir, { recursive: true });
+      await writeFile(
+        join(manifestDir, 'manifest.json'),
+        JSON.stringify(
+          {
+            ...manifest,
+            stamp: 'metadata-stamp',
+            experienceSlots: 1
+          },
+          null,
+          2
+        ),
+        'utf8'
+      );
+
+      await expect(loadPromptPackMetadata(root)).rejects.toThrow(message);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('loads explicit retrieval policy overrides from the manifest', async () => {
     const root = await mkdtemp(join(tmpdir(), 'prompt-pack-policy-'));
     try {

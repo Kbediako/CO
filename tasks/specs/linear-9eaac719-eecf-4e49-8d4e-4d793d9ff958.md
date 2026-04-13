@@ -132,5 +132,5 @@ The repo now has the ingredients for bounded fixed-model memory, but the planner
 - `MCP_RUNNER_TASK_ID=linear-9eaac719-eecf-4e49-8d4e-4d793d9ff958 npm run pack:smoke`
 
 ## Approvals
-- Reviewer: Pending audited docs-review child stream after packet creation
+- Reviewer: Audited docs-review child stream; no issues found (`.runs/linear-9eaac719-eecf-4e49-8d4e-4d793d9ff958-co-92-docs-review-rerun/cli/2026-04-09T08-44-19-435Z-f73f3b53/manifest.json`)
 - Date: 2026-04-09
