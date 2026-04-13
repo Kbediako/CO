@@ -117,6 +117,51 @@
       "rationale": "The `.agent` front door remains an active validation surface."
     },
     {
+      "path": ".ai-dev-tasks/create-prd.md",
+      "surface_class": "tasking_and_docs",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "The retained PRD tasking guide must point at the current docs-first templates and packet layout.",
+      "checks": {
+        "required_text": [
+          ".agent/task/templates/prd-template.md",
+          ".agent/task/templates/tech-spec-template.md",
+          ".agent/task/templates/action-plan-template.md",
+          "linear-<issue-id>"
+        ]
+      }
+    },
+    {
+      "path": ".ai-dev-tasks/generate-tasks.md",
+      "surface_class": "tasking_and_docs",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "The retained checklist guide must reflect the current task template, registry mirrors, and archive fallback.",
+      "checks": {
+        "required_text": [
+          ".agent/task/templates/tasks-template.md",
+          "tasks/index.json",
+          "docs/docs-freshness-registry.json",
+          "npm run docs:archive-tasks"
+        ]
+      }
+    },
+    {
+      "path": ".ai-dev-tasks/process-task-list.md",
+      "surface_class": "tasking_and_docs",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "The retained execution guide must match the current validation and review handoff floor.",
+      "checks": {
+        "required_text": [
+          "node scripts/delegation-guard.mjs",
+          "npm run docs:freshness",
+          "npm run repo:stewardship",
+          "npm run review"
+        ]
+      }
+    },
+    {
       "path": "docs/README.md",
       "surface_class": "tasking_and_docs",
       "decision": "validate",
@@ -148,6 +193,20 @@
           "npm run docs:check",
           "npm run repo:stewardship",
           "repo-stewardship-summary.md"
+        ]
+      }
+    },
+    {
+      "path": "prompt-snippets/frontend-aesthetics-v1.md",
+      "surface_class": "pattern_surface",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "The retained frontend aesthetics prompt remains active only when it carries local owner and consumer evidence.",
+      "checks": {
+        "required_text": [
+          "## Metadata",
+          "`ownerEvidence`",
+          "`consumerEvidence`"
         ]
       }
     }
