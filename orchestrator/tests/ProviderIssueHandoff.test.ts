@@ -2433,7 +2433,28 @@ describe('createProviderIssueHandoffService', () => {
     }));
     const refetchTrackedIssues = vi.fn(async () => ({
       kind: 'ready' as const,
-      trackedIssues: []
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-issue-1',
+          identifier: 'CO-1600',
+          title: 'Released replay 1',
+          state: 'In Review',
+          state_type: 'started',
+          updated_at: '2026-04-12T08:00:00.000Z',
+          archived_at: '2026-04-12T07:59:00.000Z',
+          trashed: true
+        }),
+        createTrackedIssue({
+          id: 'lin-issue-128',
+          identifier: 'CO-1727',
+          title: 'Released replay 128',
+          state: 'In Review',
+          state_type: 'started',
+          updated_at: '2026-04-12T08:45:00.000Z',
+          archived_at: '2026-04-12T07:59:30.000Z',
+          trashed: true
+        })
+      ]
     }));
 
     const service = createProviderIssueHandoffService({
@@ -2682,7 +2703,7 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.resume).not.toHaveBeenCalled();
   });
 
-  it('fails closed for retained released inactive and non-mutable claims during deferred polls without direct reads or fresh discovery churn', async () => {
+  it('fails closed for retained released inactive and non-mutable claims during deferred polls without direct reads and keeps released claims stable across fresh-discovery checks', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
     const initialClaimSnapshots: Array<{
@@ -2767,7 +2788,11 @@ describe('createProviderIssueHandoffService', () => {
     });
 
     expect(resolveTrackedIssue).not.toHaveBeenCalled();
-    expect(refetchTrackedIssues).not.toHaveBeenCalled();
+    expect(refetchTrackedIssues).toHaveBeenCalledTimes(2);
+    expect(refetchTrackedIssues.mock.calls).toEqual([
+      [expect.objectContaining({ mode: 'fresh_discovery' })],
+      [expect.objectContaining({ mode: 'fresh_discovery' })]
+    ]);
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
     expect(state.claims).toHaveLength(128);
@@ -2782,6 +2807,155 @@ describe('createProviderIssueHandoffService', () => {
     ).toEqual(initialClaimSnapshots);
     expect(state.claims.filter((claim) => claim.reason === 'provider_issue_released:not_active')).toHaveLength(123);
     expect(state.claims.filter((claim) => claim.reason === 'provider_issue_released:not_mutable')).toHaveLength(5);
+  });
+
+  it('still admits unrelated runnable work through fresh discovery when retained deferred-poll claims are fully released', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-released-a',
+      issue_id: 'lin-issue-released-a',
+      issue_identifier: 'CO-1610',
+      issue_title: 'Released inactive claim',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-04-13T10:00:00.000Z',
+      issue_archived_at: null,
+      issue_trashed: false,
+      task_id: 'task-released-a',
+      mapping_source: 'provider_id_fallback',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      accepted_at: '2026-04-13T10:00:05.000Z',
+      updated_at: '2026-04-13T10:00:10.000Z',
+      last_delivery_id: 'delivery-released-a',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_744_531_200_000,
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: null,
+      launch_token: null
+    });
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-released-b',
+      issue_id: 'lin-issue-released-b',
+      issue_identifier: 'CO-1611',
+      issue_title: 'Released not-mutable claim',
+      issue_state: 'In Review',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-13T10:01:00.000Z',
+      issue_archived_at: '2026-04-13T09:59:00.000Z',
+      issue_trashed: true,
+      task_id: 'task-released-b',
+      mapping_source: 'provider_id_fallback',
+      state: 'released',
+      reason: 'provider_issue_released:not_mutable',
+      accepted_at: '2026-04-13T10:01:05.000Z',
+      updated_at: '2026-04-13T10:01:10.000Z',
+      last_delivery_id: 'delivery-released-b',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_744_531_260_000,
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-unrelated-discovered',
+        manifestPath: '/tmp/provider-run/unrelated-discovered-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => {
+      throw new Error('retained released claims should stay local-first during deferred polls');
+    });
+    const refetchTrackedIssues = vi.fn(async (input?: { mode?: string }) => {
+      if (input?.mode === 'fresh_discovery') {
+        return {
+          kind: 'ready' as const,
+          trackedIssues: [
+            createTrackedIssue({
+              id: 'lin-issue-released-a',
+              identifier: 'CO-1610',
+              title: 'Released replay should stay released',
+              state: 'In Review',
+              state_type: 'started',
+              updated_at: '2026-04-13T10:01:30.000Z',
+              archived_at: '2026-04-13T09:59:30.000Z',
+              trashed: true
+            }),
+            createTrackedIssue({
+              id: 'lin-issue-unrelated-runnable',
+              identifier: 'CO-1612',
+              title: 'Unrelated runnable issue',
+              state: 'In Progress',
+              state_type: 'started',
+              updated_at: '2026-04-13T10:02:00.000Z'
+            })
+          ]
+        };
+      }
+      return {
+        kind: 'ready' as const,
+        trackedIssues: []
+      };
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(refetchTrackedIssues).toHaveBeenCalledWith(expect.objectContaining({
+      mode: 'fresh_discovery'
+    }));
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-issue-unrelated-runnable',
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-issue-unrelated-runnable',
+      issueIdentifier: 'CO-1612',
+      issueUpdatedAt: '2026-04-13T10:02:00.000Z',
+      launchToken: expect.any(String)
+    }));
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-issue-unrelated-runnable')).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-13T10:02:00.000Z',
+      task_id: 'linear-lin-issue-unrelated-runnable',
+      run_id: 'run-unrelated-discovered',
+      run_manifest_path: '/tmp/provider-run/unrelated-discovered-manifest.json'
+    });
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-issue-released-a')).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active'
+    });
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-issue-released-b')).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_mutable'
+    });
   });
 
   it('fails closed for retained released inactive and non-mutable claims during startup recovery sweeps while still reopening sweep-returned work', async () => {
