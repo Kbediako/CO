@@ -66,6 +66,29 @@ describe('delegationMcpHealth', () => {
     expect(result.stalePids).toEqual([]);
   });
 
+  it('keeps delegate-server children active when the parent uses a configured non-default codex binary', () => {
+    const previousCodexBin = process.env.CODEX_CLI_BIN;
+    process.env.CODEX_CLI_BIN = '/tmp/fake-codex';
+    try {
+      const snapshot = [
+        '101     1 00:20  10240 /tmp/fake-codex exec --model gpt-5.4 "task"',
+        '202   101 00:10   4096 /opt/homebrew/bin/node /repo/dist/bin/codex-orchestrator.js delegate-server'
+      ].join('\n');
+
+      const result = inspectDelegateServerProcesses({ snapshot });
+      expect(result.activeCount).toBe(1);
+      expect(result.activePids).toEqual([202]);
+      expect(result.staleCount).toBe(0);
+      expect(result.stalePids).toEqual([]);
+    } finally {
+      if (previousCodexBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = previousCodexBin;
+      }
+    }
+  });
+
   it('formats unavailable cleanup results without claiming a successful apply', () => {
     const lines = formatDelegateServerCleanupSummary({
       status: 'unavailable',

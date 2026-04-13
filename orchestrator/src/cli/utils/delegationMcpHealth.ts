@@ -740,7 +740,18 @@ function isDelegateServerRootedInCodex(
 
 function isCodexClientCommand(command: string): boolean {
   const args = parseShellStyleArguments(command);
-  return args.some((arg) => basename(arg) === 'codex');
+  const recognizedBasenames = buildRecognizedCodexClientBasenames();
+  return args.some((arg) => recognizedBasenames.has(basename(arg).toLowerCase()));
+}
+
+function buildRecognizedCodexClientBasenames(env: NodeJS.ProcessEnv = process.env): Set<string> {
+  const basenames = new Set(['codex', 'codex.exe', 'codex.cmd']);
+  try {
+    basenames.add(basename(resolveCodexCliBin(env)).toLowerCase());
+  } catch {
+    // Ignore local codex binary resolution failures and keep the default names.
+  }
+  return basenames;
 }
 
 function parseShellStyleArguments(command: string): string[] {
