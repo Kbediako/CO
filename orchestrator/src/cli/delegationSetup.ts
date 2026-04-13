@@ -40,7 +40,11 @@ export async function runDelegationSetup(options: DelegationSetupOptions = {}): 
   const codexBin = resolveCodexCliBin(env);
   const codexHome = resolveCodexHome(env);
   const configPath = join(codexHome, 'config.toml');
-  const delegateServer = resolveDelegationServerInvocation({ env, execPath: process.execPath });
+  const delegateServer = resolveDelegationServerInvocation({
+    allowMissingDist: !options.apply,
+    env,
+    execPath: process.execPath
+  });
 
   const plan = {
     codexBin,
@@ -216,9 +220,8 @@ function inspectDelegationReadinessFallback(
   if (!config) {
     return { configured: false, removeExisting: false, envVars: {} };
   }
-  const command = config.command ?? '';
   const isDelegationServer = config.args.includes('delegate-server') || config.args.includes('delegation-server');
-  if (!isDelegationServer || !command.includes('codex-orchestrator')) {
+  if (!isDelegationServer) {
     return {
       configured: false,
       removeExisting: true,

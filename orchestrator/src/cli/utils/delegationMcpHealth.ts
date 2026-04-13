@@ -106,12 +106,13 @@ const DEFAULT_DELEGATE_SERVER_CLEANUP_DEPENDENCIES: DelegateServerCleanupDepende
 };
 
 export function resolveDelegationServerInvocation(options: {
+  allowMissingDist?: boolean;
   env?: NodeJS.ProcessEnv;
   execPath?: string;
 } = {}): DelegationServerInvocation {
   const command = options.execPath ?? process.execPath;
   const bootstrap = resolveCodexOrchestratorBootstrapInvocation({ env: options.env, execPath: command });
-  if (!existsSync(bootstrap.distPath)) {
+  if (!options.allowMissingDist && !existsSync(bootstrap.distPath)) {
     throw new Error(
       `Delegation MCP requires a built dist entrypoint for stdio startup; missing ${bootstrap.distPath}.`
     );
