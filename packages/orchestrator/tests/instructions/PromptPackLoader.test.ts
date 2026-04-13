@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 
 import {
   loadPromptPacks,
+  loadPromptPackMetadata,
   computePromptPackStamp,
   type PromptPackSectionSource
 } from '../../src/instructions/promptPacks.js';
@@ -103,6 +104,41 @@ describe('loadPromptPacks', () => {
       expect(pack.experienceSlots).toBe(4);
       expect(pack.sections.system[0]?.content).toContain('Stamped');
       expect(pack.sources).toHaveLength(5);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('loads planner-facing prompt-pack metadata without reading prompt sources', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'prompt-pack-metadata-'));
+    try {
+      const manifestDir = join(root, '.agent', 'prompts', 'prompt-packs', 'metadata-only');
+      await mkdir(manifestDir, { recursive: true });
+      await writeFile(
+        join(manifestDir, 'manifest.json'),
+        JSON.stringify(
+          {
+            id: 'metadata-pack',
+            domain: 'diagnostics',
+            stamp: 'metadata-stamp',
+            experienceSlots: 2,
+            system: '.agent/prompts/missing-source.md',
+            inject: ['.agent/prompts/missing-source.md']
+          },
+          null,
+          2
+        ),
+        'utf8'
+      );
+
+      await expect(loadPromptPacks(root)).rejects.toThrow(/Failed to read prompt source/i);
+      await expect(loadPromptPackMetadata(root)).resolves.toEqual([
+        {
+          id: 'metadata-pack',
+          domain: 'diagnostics',
+          experienceSlots: 2
+        }
+      ]);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

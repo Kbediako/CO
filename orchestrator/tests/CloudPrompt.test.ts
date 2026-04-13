@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import type { PlanItem, TaskContext } from '../src/types.js';
 import type { CliManifest, PipelineDefinition } from '../src/cli/types.js';
 import { buildCloudPrompt } from '../src/cli/services/orchestratorCloudPromptBuilder.js';
+import {
+  createPromptPackTaskMemoryRefId,
+  TASK_MEMORY_SOURCE0_REF_ID
+} from '../src/cli/services/plannerMemory.js';
 
 function invokeBuildCloudPrompt(params: {
   task: TaskContext;
@@ -230,5 +234,122 @@ describe('buildCloudPrompt experience injection', () => {
     expect(prompt).toContain('Shared source 0 anchor:');
     expect(prompt).toContain('- Pointer: `ctx:sha256:source0#chunk:c000001`');
     expect(prompt).toContain('- Origin: run=`run-1`, task=`task-1`, manifest=`.runs/task-1/cli/run-1/manifest.json`');
+  });
+
+  it('honors planner-selected prompt-pack refs before local cloud heuristics', () => {
+    const prompt = invokeBuildCloudPrompt({
+      task,
+      target: {
+        ...target,
+        metadata: {
+          selectedMemoryRefs: [
+            TASK_MEMORY_SOURCE0_REF_ID,
+            createPromptPackTaskMemoryRefId('pp-impl')
+          ]
+        }
+      },
+      pipeline,
+      manifest: {
+        prompt_packs: [
+          {
+            id: 'pp-impl',
+            domain: 'implementation',
+            stamp: 'impl',
+            experience_slots: 3,
+            sources: [],
+            experiences: ['[exp impl-1] Implementation fallback snippet.']
+          },
+          {
+            id: 'pp-diagnostics',
+            domain: 'diagnostics',
+            stamp: 'diag',
+            experience_slots: 3,
+            sources: [],
+            experiences: ['[exp diag-1] Diagnostics snippet that should be ignored.']
+          }
+        ]
+      }
+    });
+
+    expect(prompt).toContain('Domain: implementation');
+    expect(prompt).toContain('[exp impl-1]');
+    expect(prompt).not.toContain('[exp diag-1]');
+  });
+
+  it('falls back to heuristic snippets when the selected prompt-pack ref has no usable snippets', () => {
+    const prompt = invokeBuildCloudPrompt({
+      task,
+      target: {
+        ...target,
+        metadata: {
+          selectedMemoryRefs: [
+            TASK_MEMORY_SOURCE0_REF_ID,
+            createPromptPackTaskMemoryRefId('pp-diagnostics')
+          ]
+        }
+      },
+      pipeline: {
+        ...pipeline,
+        id: 'custom-pipeline',
+        title: 'Custom Pipeline',
+        tags: ['custom']
+      },
+      manifest: {
+        prompt_packs: [
+          {
+            id: 'pp-diagnostics',
+            domain: 'diagnostics',
+            stamp: 'diag',
+            experience_slots: 3,
+            sources: [],
+            experiences: []
+          },
+          {
+            id: 'pp-implementation',
+            domain: 'implementation',
+            stamp: 'impl',
+            experience_slots: 3,
+            sources: [],
+            experiences: ['[exp impl-1] Implementation fallback snippet.']
+          }
+        ]
+      }
+    });
+
+    expect(prompt).toContain('Domain: implementation');
+    expect(prompt).toContain('[exp impl-1]');
+    expect(prompt).not.toContain('Domain: diagnostics');
+  });
+
+  it('omits shared source 0 anchor lines when planner-selected refs exclude source_0', () => {
+    const prompt = invokeBuildCloudPrompt({
+      task,
+      target: {
+        ...target,
+        metadata: {
+          selectedMemoryRefs: [createPromptPackTaskMemoryRefId('pp-diagnostics')]
+        }
+      },
+      pipeline,
+      manifest: {
+        prompt_packs: [
+          {
+            id: 'pp-diagnostics',
+            domain: 'diagnostics',
+            stamp: 'diag',
+            experience_slots: 3,
+            sources: [],
+            experiences: ['[exp diag-1] Diagnostics snippet.']
+          }
+        ],
+        memory: {
+          source_0: buildSource0Descriptor()
+        }
+      }
+    });
+
+    expect(prompt).toContain('Domain: diagnostics');
+    expect(prompt).not.toContain('Shared source 0 anchor:');
+    expect(prompt).not.toContain('ctx:sha256:source0#chunk:c000001');
   });
 });

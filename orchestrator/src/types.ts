@@ -9,11 +9,27 @@ export interface TaskMetadata {
   [key: string]: unknown;
 }
 
+export type TaskMemoryRefKind = 'source_0' | 'prompt_pack';
+
+export interface TaskMemoryRef {
+  id: string;
+  kind: TaskMemoryRefKind;
+  label: string;
+  domain?: string | null;
+  packId?: string | null;
+  experienceSlots?: number | null;
+}
+
+export interface TaskMemoryContext {
+  refs: TaskMemoryRef[];
+}
+
 export interface TaskContext {
   id: string;
   title: string;
   description?: string;
   metadata?: TaskMetadata;
+  memory?: TaskMemoryContext;
 }
 
 export interface PlanItem {

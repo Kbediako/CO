@@ -35,11 +35,32 @@ export interface PromptPack {
   sources: PromptPackSectionSource[];
 }
 
+export interface PromptPackMetadata {
+  id: string;
+  domain: string;
+  experienceSlots: number;
+}
+
 export async function loadPromptPacks(repoRoot: string): Promise<PromptPack[]> {
   const manifestPaths = await discoverPromptPackManifests(repoRoot);
   const packs: PromptPack[] = [];
   for (const manifestPath of manifestPaths) {
     packs.push(await loadPromptPack(manifestPath, repoRoot));
+  }
+  packs.sort((a, b) => {
+    if (a.domain === b.domain) {
+      return a.id.localeCompare(b.id);
+    }
+    return a.domain.localeCompare(b.domain);
+  });
+  return packs;
+}
+
+export async function loadPromptPackMetadata(repoRoot: string): Promise<PromptPackMetadata[]> {
+  const manifestPaths = await discoverPromptPackManifests(repoRoot);
+  const packs: PromptPackMetadata[] = [];
+  for (const manifestPath of manifestPaths) {
+    packs.push(await loadPromptPackMetadataEntry(manifestPath, repoRoot));
   }
   packs.sort((a, b) => {
     if (a.domain === b.domain) {
@@ -82,13 +103,7 @@ async function discoverPromptPackManifests(repoRoot: string): Promise<string[]> 
 }
 
 async function loadPromptPack(manifestPath: string, repoRoot: string): Promise<PromptPack> {
-  let parsed: PromptPackManifestFile;
-  try {
-    const raw = await readFile(manifestPath, 'utf8');
-    parsed = JSON.parse(raw) as PromptPackManifestFile;
-  } catch (error) {
-    throw new Error(`Failed to read prompt pack manifest at ${relative(repoRoot, manifestPath)}: ${String(error)}`);
-  }
+  const parsed = await readPromptPackManifestFile(manifestPath, repoRoot);
 
   validateManifest(parsed, manifestPath, repoRoot);
 
@@ -126,9 +141,7 @@ async function loadPromptPack(manifestPath: string, repoRoot: string): Promise<P
     );
   }
 
-  const experienceSlots = Number.isInteger(parsed.experienceSlots) && parsed.experienceSlots! >= 0
-    ? parsed.experienceSlots!
-    : 0;
+  const experienceSlots = resolveExperienceSlots(parsed);
 
   return {
     id: parsed.id,
@@ -138,6 +151,34 @@ async function loadPromptPack(manifestPath: string, repoRoot: string): Promise<P
     sections,
     sources: allSources
   };
+}
+
+async function loadPromptPackMetadataEntry(manifestPath: string, repoRoot: string): Promise<PromptPackMetadata> {
+  const parsed = await readPromptPackManifestFile(manifestPath, repoRoot);
+  validateManifest(parsed, manifestPath, repoRoot);
+  if (!parsed.stamp) {
+    throw new Error(`Prompt pack ${parsed.id} is missing a stamp (manifest: ${relative(repoRoot, manifestPath)})`);
+  }
+  return {
+    id: parsed.id,
+    domain: parsed.domain,
+    experienceSlots: resolveExperienceSlots(parsed)
+  };
+}
+
+async function readPromptPackManifestFile(manifestPath: string, repoRoot: string): Promise<PromptPackManifestFile> {
+  try {
+    const raw = await readFile(manifestPath, 'utf8');
+    return JSON.parse(raw) as PromptPackManifestFile;
+  } catch (error) {
+    throw new Error(`Failed to read prompt pack manifest at ${relative(repoRoot, manifestPath)}: ${String(error)}`);
+  }
+}
+
+function resolveExperienceSlots(parsed: PromptPackManifestFile): number {
+  return Number.isInteger(parsed.experienceSlots) && parsed.experienceSlots! >= 0
+    ? parsed.experienceSlots!
+    : 0;
 }
 
 function validateManifest(manifest: PromptPackManifestFile, manifestPath: string, repoRoot: string): void {
