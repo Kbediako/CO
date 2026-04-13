@@ -433,10 +433,11 @@ export function buildRunBlockMemoryPromptLines(params: {
     return [];
   }
   const maxBlocks = Math.max(1, Math.trunc(params.maxBlocks ?? 3));
+  const blockCount = index.blocks.length;
   const lines = [
     'Shared block memory:',
     `- Index: \`${descriptor.index_path}\``,
-    `- Blocks: ${descriptor.block_count}`
+    `- Blocks: ${blockCount}`
   ];
   for (const block of index.blocks.slice(0, maxBlocks)) {
     lines.push(`- Block \`${block.id}\` (${block.phase_kind}, ${block.status}): \`${block.pointer}\``);
@@ -445,6 +446,17 @@ export function buildRunBlockMemoryPromptLines(params: {
     lines.push(`- Additional blocks: ${index.blocks.length - maxBlocks} more in \`${descriptor.index_path}\``);
   }
   return lines;
+}
+
+function resolveRunSummaryArtifactPath(params: {
+  env: EnvironmentPaths;
+  paths: RunPaths;
+  manifest: CliManifest;
+}): string {
+  return (
+    params.manifest.run_summary_path ??
+    relativeToRepo(params.env, join(params.paths.runDir, 'run-summary.json'))
+  );
 }
 
 function sanitizeBlockSegment(input: string): string {
@@ -474,7 +486,7 @@ function buildRunTraceability(params: {
 }): RunBlockMemoryTraceability {
   return {
     manifest_path: relativeToRepo(params.env, params.paths.manifestPath),
-    run_summary_path: params.manifest.run_summary_path,
+    run_summary_path: resolveRunSummaryArtifactPath(params),
     events_path: relativeToRepo(params.env, params.paths.eventsPath),
     runner_log_path: params.manifest.log_path ?? relativeToRepo(params.env, params.paths.logPath),
     command_log_path: null,
@@ -495,7 +507,7 @@ function buildStageTraceability(params: {
 }): RunBlockMemoryTraceability {
   return {
     manifest_path: relativeToRepo(params.env, params.paths.manifestPath),
-    run_summary_path: params.manifest.run_summary_path,
+    run_summary_path: resolveRunSummaryArtifactPath(params),
     events_path: relativeToRepo(params.env, params.paths.eventsPath),
     runner_log_path: params.manifest.log_path ?? relativeToRepo(params.env, params.paths.logPath),
     command_log_path: params.command.log_path ?? null,
@@ -652,7 +664,7 @@ export async function materializeRunBlockMemory(params: {
   },
   artifacts: {
       manifest_path: relativeToRepo(params.env, params.paths.manifestPath),
-      run_summary_path: params.manifest.run_summary_path,
+      run_summary_path: resolveRunSummaryArtifactPath(params),
       events_path: relativeToRepo(params.env, params.paths.eventsPath),
       runner_log_path: params.manifest.log_path ?? relativeToRepo(params.env, params.paths.logPath)
     },

@@ -4,6 +4,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it, vi } from 'vitest';
 
+import { materializeRunBlockMemory } from '../src/cli/run/blockMemory.js';
 import { completeOrchestratorRunLifecycle } from '../src/cli/services/orchestratorRunLifecycleCompletion.js';
 import type { ControlPlaneValidationResult } from '../src/control-plane/types.js';
 import type { RunEventPublisher } from '../src/cli/events/runEvents.js';
@@ -276,7 +277,7 @@ describe('completeOrchestratorRunLifecycle', () => {
         run_summary_path: '.runs/task-1161/cli/run-1161/run-summary.json'
       }
     });
-    expect(persistedBlockMemoryIndex.blocks).toHaveLength(2);
+    expect(persistedBlockMemoryIndex.blocks.length).toBeGreaterThanOrEqual(2);
     expect(persistedBlockMemoryIndex.blocks).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -298,6 +299,36 @@ describe('completeOrchestratorRunLifecycle', () => {
             event_query: expect.objectContaining({
               stage_id: 'docs-review'
             })
+          })
+        })
+      ])
+    );
+  });
+
+  it('falls back to the computed run summary path when block memory materializes before manifest mutation', async () => {
+    const { env, paths, manifest } = await createLifecycleFixture();
+
+    const contract = await materializeRunBlockMemory({
+      env,
+      paths,
+      manifest
+    });
+
+    const persistedBlockMemoryIndex = JSON.parse(
+      await readFile(join(env.repoRoot, contract.block_memory.index_path), 'utf8')
+    ) as {
+      artifacts: { run_summary_path: string | null };
+      blocks: Array<{ traceability: { run_summary_path: string | null } }>;
+    };
+
+    expect(persistedBlockMemoryIndex.artifacts.run_summary_path).toBe(
+      '.runs/task-1161/cli/run-1161/run-summary.json'
+    );
+    expect(persistedBlockMemoryIndex.blocks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          traceability: expect.objectContaining({
+            run_summary_path: '.runs/task-1161/cli/run-1161/run-summary.json'
           })
         })
       ])

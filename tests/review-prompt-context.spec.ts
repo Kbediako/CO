@@ -313,7 +313,7 @@ describe('review-prompt-context', () => {
         run_id: 'sample-run',
         task_id: 'sample-task',
         memory: {
-          block_memory: buildBlockMemoryDescriptor()
+          block_memory: buildBlockMemoryDescriptor({ block_count: 9 })
         }
       }),
       'utf8'
