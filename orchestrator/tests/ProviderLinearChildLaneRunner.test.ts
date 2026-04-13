@@ -11,7 +11,7 @@ describe('provider linear child lane runner', () => {
         files: ['orchestrator/src/cli/run/source0.ts'],
         phases: ['implementation']
       },
-      source0PromptLines: [
+      runMemoryPromptLines: [
         'Shared source 0 anchor:',
         '- Pointer: `ctx:sha256:source0#chunk:c000001`',
         '- Source payload: `.runs/linear-lin-issue-1/cli/run-child/memory/source-0/source.txt`'

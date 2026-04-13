@@ -16,6 +16,10 @@ import {
   readRunSource0Descriptor,
   resolveRunSource0Paths
 } from './run/source0.js';
+import {
+  buildRunMemoryPromptLines,
+  selectRunMemoryForRole
+} from './run/runMemoryController.js';
 import { runSymbolicLoop, type SymbolicBudgets } from './rlm/symbolic.js';
 import {
   COLLAB_ALLOW_DEFAULT_ROLE_ENV_CANONICAL,
@@ -372,6 +376,30 @@ async function resolveContextSource(
     bytes: Buffer.byteLength(text, 'utf8'),
     explicit: false
   };
+}
+
+async function resolvePlannerRunMemoryPromptLines(
+  env: NodeJS.ProcessEnv,
+  repoRoot: string,
+  goal: string
+): Promise<string[]> {
+  const manifestPath = env.CODEX_ORCHESTRATOR_MANIFEST_PATH?.trim();
+  if (!manifestPath) {
+    return [];
+  }
+  try {
+    const rawManifestPath = resolve(repoRoot, manifestPath);
+    const rawManifest = JSON.parse(await readFile(rawManifestPath, 'utf8')) as Record<string, unknown>;
+    return buildRunMemoryPromptLines(
+      selectRunMemoryForRole({
+        role: 'planner',
+        manifest: rawManifest,
+        hints: [goal]
+      })
+    );
+  } catch {
+    return [];
+  }
 }
 
 async function promptForValidator(candidates: ValidatorCandidate[]): Promise<string | null> {
@@ -1005,6 +1033,8 @@ async function main(): Promise<void> {
     });
 
     const contextStore = new ContextStore(contextObject);
+    const runMemoryPromptLines =
+      mode === 'symbolic' ? await resolvePlannerRunMemoryPromptLines(env, repoRoot, goal) : [];
     const result = await runSymbolicLoop({
       goal,
       baseState,
@@ -1014,6 +1044,7 @@ async function main(): Promise<void> {
       runDir: rlmRoot,
       contextStore,
       budgets,
+      runMemoryPromptLines,
       alignment: alignmentCheckerEnabled
         ? {
             enabled: true,
@@ -1119,6 +1150,7 @@ export const __test__ = {
   resolveAlignmentCheckerEnforce,
   resolveSymbolicMultiAgentConfig,
   resolveContextSource,
+  resolvePlannerRunMemoryPromptLines,
   resolveRlmMode,
   DEFAULT_MAX_ITERATIONS,
   DEFAULT_MAX_MINUTES,

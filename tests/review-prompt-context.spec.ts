@@ -166,7 +166,7 @@ describe('review-prompt-context', () => {
     expect(olderCloseout).not.toBe(result.activeCloseoutBundleRoots[1]);
   });
 
-  it('adds shared source 0 prompt lines when the manifest exposes the anchor', async () => {
+  it('uses the reviewer profile when the manifest exposes source 0 and prompt packs', async () => {
     const sandbox = await makeSandbox();
     const manifestDir = join(sandbox, '.runs', 'sample-task', 'cli', 'sample-run');
     await mkdir(manifestDir, { recursive: true });
@@ -183,7 +183,17 @@ describe('review-prompt-context', () => {
               manifest_path: '.runs/parent-task/cli/parent-run/manifest.json'
             }
           })
-        }
+        },
+        prompt_packs: [
+          {
+            id: 'pp-implementation',
+            domain: 'implementation',
+            stamp: 'impl',
+            experience_slots: 3,
+            sources: ['docs/PRD-sample-task.md'],
+            experiences: ['[exp impl-1] This reviewer should not see prompt-pack snippets.']
+          }
+        ]
       }),
       'utf8'
     );
@@ -209,5 +219,6 @@ describe('review-prompt-context', () => {
     expect(result.promptLines).toContain(
       '- Inherited from: run=`parent-run`, task=`parent-task`, manifest=`.runs/parent-task/cli/parent-run/manifest.json`'
     );
+    expect(result.promptLines).not.toContain('Relevant prior experiences (hints, not strict instructions):');
   });
 });

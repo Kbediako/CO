@@ -1,7 +1,10 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 
-import { buildRunSource0PromptLines, readRunSource0Descriptor } from '../../orchestrator/src/cli/run/source0.js';
+import {
+  buildRunMemoryPromptLines,
+  selectRunMemoryForRole
+} from '../../orchestrator/src/cli/run/runMemoryController.js';
 import { normalizeTaskKey, pathExists } from './docs-helpers.js';
 
 export type ReviewSurface = 'diff' | 'audit' | 'architecture';
@@ -402,9 +405,14 @@ export async function buildReviewPromptContext(
   if (await pathExists(absoluteManifestPath)) {
     try {
       const rawManifest = JSON.parse(await readFile(absoluteManifestPath, 'utf8')) as Record<string, unknown>;
-      const source0PromptLines = buildRunSource0PromptLines(readRunSource0Descriptor(rawManifest));
-      if (source0PromptLines.length > 0) {
-        promptLines.push('', ...source0PromptLines);
+      const runMemoryPromptLines = buildRunMemoryPromptLines(
+        selectRunMemoryForRole({
+          role: 'reviewer',
+          manifest: rawManifest
+        })
+      );
+      if (runMemoryPromptLines.length > 0) {
+        promptLines.push('', ...runMemoryPromptLines);
       }
     } catch {
       // Ignore malformed manifests here and preserve the existing prompt scaffold.

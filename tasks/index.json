@@ -1,6 +1,29 @@
 {
   "items": [
     {
+      "id": "20260409-linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d",
+      "title": "CO: Add run memory controller with role-specific retrieval profiles",
+      "relates_to": "tasks/tasks-linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-09",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (clean-success)",
+          "date": "2026-04-09",
+          "manifest": ".runs/linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d-co-94-docs-review/cli/2026-04-09T08-52-01-943Z-a900f3f5/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d.md",
+        "task": "tasks/tasks-linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d.md",
+        "agent_task": ".agent/task/linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d.md",
+        "docs": "docs/TECH_SPEC-linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d.md"
+      }
+    },
+    {
       "id": "20260409-linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad",
       "title": "CO: automate truthful In Review -> Merging promotion after clean review handoff",
       "relates_to": "tasks/tasks-linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad.md",
