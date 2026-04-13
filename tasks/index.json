@@ -1,6 +1,39 @@
 {
   "items": [
     {
+      "id": "20260413-linear-6ed6ef11-538e-48f0-936c-8547632bf92e",
+      "title": "CO: Stabilize timeout-sensitive repo validation suites blocking handoff",
+      "relates_to": "tasks/tasks-linear-6ed6ef11-538e-48f0-936c-8547632bf92e.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-13",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (clean-success)",
+          "date": "2026-04-13",
+          "status": "succeeded",
+          "manifest": ".runs/linear-6ed6ef11-538e-48f0-936c-8547632bf92e-co-131-docs-review-r2/cli/2026-04-13T04-11-25-614Z-4835aea7/manifest.json",
+          "telemetry": ".runs/linear-6ed6ef11-538e-48f0-936c-8547632bf92e-co-131-docs-review-r2/cli/2026-04-13T04-11-25-614Z-4835aea7/review/telemetry.json"
+        },
+        "review": {
+          "reviewer": "codex-orchestrator review (clean-success)",
+          "date": "2026-04-13",
+          "status": "succeeded",
+          "manifest": ".runs/linear-6ed6ef11-538e-48f0-936c-8547632bf92e/cli/2026-04-13T04-00-32-650Z-dd6d8cac/manifest.json",
+          "telemetry": ".runs/linear-6ed6ef11-538e-48f0-936c-8547632bf92e/cli/2026-04-13T04-00-32-650Z-dd6d8cac/review/telemetry.json",
+          "elegance_note": "out/linear-6ed6ef11-538e-48f0-936c-8547632bf92e/manual/elegance-review.md"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-6ed6ef11-538e-48f0-936c-8547632bf92e.md",
+        "task": "tasks/tasks-linear-6ed6ef11-538e-48f0-936c-8547632bf92e.md",
+        "agent_task": ".agent/task/linear-6ed6ef11-538e-48f0-936c-8547632bf92e.md",
+        "docs": "docs/TECH_SPEC-linear-6ed6ef11-538e-48f0-936c-8547632bf92e.md"
+      }
+    },
+    {
       "id": "20260413-linear-72e9f13e-0899-4769-9ca3-82586077fca9",
       "title": "CO workflow: refresh current-main docs:freshness stale cohorts 1138-1163 plus release docs",
       "relates_to": "tasks/tasks-linear-72e9f13e-0899-4769-9ca3-82586077fca9.md",

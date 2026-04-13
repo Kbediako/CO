@@ -58,7 +58,7 @@ function extractSnapshotKey(line) {
   if (typeof line !== 'string') {
     return null;
   }
-  const match = line.match(/\(([0-9]{4,}-[A-Za-z0-9-]+)\)/u);
+  const match = line.match(/\(((?:[0-9]{4,}|linear)-[A-Za-z0-9-]+)\)/u);
   if (!match) {
     return null;
   }
