@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  buildDelegationEnablementGuidance,
   buildDelegationDirectTransportGuidance,
   formatDoctorCloudPreflightSummary,
   formatDoctorSummary,
@@ -261,6 +262,29 @@ describe('runDoctor', () => {
 
     expect(guidance).toContain('Direct dist transport unavailable until dist is built:');
     expect(guidance).toContain('/tmp/repo/dist/bin/codex-orchestrator.js');
+  });
+
+  it('does not advertise doctor --apply as the quick fix when stale delegation processes are the only issue', () => {
+    const guidance = buildDelegationEnablementGuidance({
+      configStatus: 'ok',
+      transportStatus: 'safe',
+      directTransportGuidance:
+        'Direct dist transport: /usr/bin/node /repo/dist/bin/codex-orchestrator.js delegate-server --repo <path>'
+    });
+
+    expect(guidance).not.toContain('Quick fix: codex-orchestrator doctor --apply --yes');
+    expect(guidance).toContain('Run: codex-orchestrator delegation cleanup-stale --yes');
+  });
+
+  it('does not advertise doctor --apply when startup is slow but delegation is already configured safely', () => {
+    const guidance = buildDelegationEnablementGuidance({
+      configStatus: 'ok',
+      transportStatus: 'safe',
+      directTransportGuidance:
+        'Direct dist transport: /usr/bin/node /repo/dist/bin/codex-orchestrator.js delegate-server --repo <path>'
+    });
+
+    expect(guidance).not.toContain('Quick fix: codex-orchestrator doctor --apply --yes');
   });
 
   it('keeps overall doctor status at warning when providers are incomplete', async () => {

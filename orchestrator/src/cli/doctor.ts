@@ -433,14 +433,11 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
         threshold_minutes: delegationProcesses.thresholdSeconds / 60,
         detail: delegationProcesses.detail
       },
-      enablement: [
-        'Quick fix: codex-orchestrator doctor --apply --yes',
-        'Run: codex-orchestrator delegation setup --yes',
-        'Run: codex-orchestrator delegation cleanup-stale --yes',
-        buildDelegationDirectTransportGuidance(),
-        "Enable for a run with: codex -c 'mcp_servers.delegation.enabled=true' ...",
-        'See: codex-orchestrator init codex'
-      ]
+      enablement: buildDelegationEnablementGuidance({
+        configStatus: delegationSnapshot.status,
+        transportStatus: delegationTransport.status,
+        directTransportGuidance: buildDelegationDirectTransportGuidance()
+      })
     },
     providers
   };
@@ -745,6 +742,26 @@ export function buildDelegationDirectTransportGuidance(
     const detail = error instanceof Error ? error.message : String(error);
     return `Direct dist transport unavailable until dist is built: ${detail}`;
   }
+}
+
+export function buildDelegationEnablementGuidance(options: {
+  configStatus: 'ok' | 'missing';
+  transportStatus: 'safe' | 'unsafe' | 'missing';
+  directTransportGuidance?: string;
+}): string[] {
+  const lines: string[] = [];
+  const setupApplyWouldHelp = options.configStatus !== 'ok' || options.transportStatus !== 'safe';
+
+  if (setupApplyWouldHelp) {
+    lines.push('Quick fix: codex-orchestrator doctor --apply --yes');
+  }
+
+  lines.push('Run: codex-orchestrator delegation setup --yes');
+  lines.push('Run: codex-orchestrator delegation cleanup-stale --yes');
+  lines.push(options.directTransportGuidance ?? buildDelegationDirectTransportGuidance());
+  lines.push("Enable for a run with: codex -c 'mcp_servers.delegation.enabled=true' ...");
+  lines.push('See: codex-orchestrator init codex');
+  return lines;
 }
 
 function inspectProviderReadiness(

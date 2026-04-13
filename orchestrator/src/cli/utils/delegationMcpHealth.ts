@@ -7,6 +7,7 @@ import { buildCommandPreview } from './commandPreview.js';
 import { resolveCodexCliBin } from './codexCli.js';
 import { resolveCodexHome } from './codexPaths.js';
 import { readDelegationFallbackConfig } from './delegationConfigParser.js';
+import { findPackageRoot } from './packageInfo.js';
 import { resolveCodexOrchestratorBootstrapInvocation } from './packageProgramResolver.js';
 
 const DEFAULT_STARTUP_TIMEOUT_MS = 3000;
@@ -111,19 +112,48 @@ export function resolveDelegationServerInvocation(options: {
   execPath?: string;
 } = {}): DelegationServerInvocation {
   const command = options.execPath ?? process.execPath;
-  const bootstrap = resolveCodexOrchestratorBootstrapInvocation({ env: options.env, execPath: command });
-  if (!options.allowMissingDist && !existsSync(bootstrap.distPath)) {
+  const distPath = resolveDelegationDistPath({
+    allowMissingDist: options.allowMissingDist === true,
+    command,
+    env: options.env
+  });
+  if (!options.allowMissingDist && !existsSync(distPath)) {
     throw new Error(
-      `Delegation MCP requires a built dist entrypoint for stdio startup; missing ${bootstrap.distPath}.`
+      `Delegation MCP requires a built dist entrypoint for stdio startup; missing ${distPath}.`
     );
   }
-  const args = [bootstrap.distPath, 'delegate-server'];
+  const args = [distPath, 'delegate-server'];
   return {
     command,
     args,
-    distPath: bootstrap.distPath,
+    distPath,
     commandLine: buildCommandPreview(command, args)
   };
+}
+
+function resolveDelegationDistPath(options: {
+  allowMissingDist: boolean;
+  command: string;
+  env?: NodeJS.ProcessEnv;
+}): string {
+  try {
+    return resolveCodexOrchestratorBootstrapInvocation({
+      env: options.env,
+      execPath: options.command
+    }).distPath;
+  } catch (error) {
+    if (!options.allowMissingDist || !isSourceFallbackBootstrapDistError(error)) {
+      throw error;
+    }
+    return join(findPackageRoot(import.meta.url), 'dist', 'bin', 'codex-orchestrator.js');
+  }
+}
+
+function isSourceFallbackBootstrapDistError(error: unknown): boolean {
+  const detail = error instanceof Error ? error.message : String(error);
+  return detail.includes('Unable to run ')
+    && detail.includes('ts-node/esm is unavailable')
+    && /dist(?:\/|\\)bin(?:\/|\\)codex-orchestrator\.js/u.test(detail);
 }
 
 export function inspectDelegationMcpConfig(env: NodeJS.ProcessEnv = process.env): DelegationMcpConfigSnapshot {

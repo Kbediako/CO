@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   cleanupStaleDelegateServerProcesses,
@@ -8,6 +8,12 @@ import {
 } from '../src/cli/utils/delegationMcpHealth.js';
 
 describe('delegationMcpHealth', () => {
+  afterEach(() => {
+    vi.resetModules();
+    vi.doUnmock('../src/cli/utils/packageInfo.js');
+    vi.doUnmock('../src/cli/utils/packageProgramResolver.js');
+  });
+
   it('classifies direct-dist and wrapper delegation transports distinctly', () => {
     expect(
       classifyDelegationTransport({
@@ -279,5 +285,93 @@ describe('delegationMcpHealth', () => {
     expect(result.terminatedPids).toEqual([404]);
     expect(result.forcedPids).toEqual([]);
     expect(result.remainingPids).toEqual([]);
+  });
+
+  it('keeps plan-only delegation preview available when bootstrap resolution cannot use ts-node and dist is missing', async () => {
+    vi.resetModules();
+    vi.doMock('../src/cli/utils/packageInfo.js', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('../src/cli/utils/packageInfo.js')>();
+      return {
+        ...actual,
+        findPackageRoot: () => '/tmp/local-checkout'
+      };
+    });
+    vi.doMock('../src/cli/utils/packageProgramResolver.js', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('../src/cli/utils/packageProgramResolver.js')>();
+      return {
+        ...actual,
+        resolveCodexOrchestratorBootstrapInvocation: () => {
+          throw new Error(
+            'Unable to run /tmp/local-checkout/bin/codex-orchestrator.ts because ts-node/esm is unavailable, and fallback dist artifact /tmp/local-checkout/dist/bin/codex-orchestrator.js is missing.'
+          );
+        }
+      };
+    });
+
+    const { resolveDelegationServerInvocation } = await import('../src/cli/utils/delegationMcpHealth.js');
+    const invocation = resolveDelegationServerInvocation({
+      allowMissingDist: true,
+      execPath: '/usr/bin/node'
+    });
+
+    expect(invocation.distPath).toBe('/tmp/local-checkout/dist/bin/codex-orchestrator.js');
+    expect(invocation.commandLine).toBe('/usr/bin/node /tmp/local-checkout/dist/bin/codex-orchestrator.js delegate-server');
+  });
+
+  it('keeps plan-only delegation preview available when bootstrap resolution uses Windows path separators', async () => {
+    vi.resetModules();
+    vi.doMock('../src/cli/utils/packageInfo.js', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('../src/cli/utils/packageInfo.js')>();
+      return {
+        ...actual,
+        findPackageRoot: () => 'C:\\tmp\\local-checkout'
+      };
+    });
+    vi.doMock('../src/cli/utils/packageProgramResolver.js', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('../src/cli/utils/packageProgramResolver.js')>();
+      return {
+        ...actual,
+        resolveCodexOrchestratorBootstrapInvocation: () => {
+          throw new Error(
+            'Unable to run C:\\tmp\\local-checkout\\bin\\codex-orchestrator.ts because ts-node/esm is unavailable, and fallback dist artifact C:\\tmp\\local-checkout\\dist\\bin\\codex-orchestrator.js is missing.'
+          );
+        }
+      };
+    });
+
+    const { resolveDelegationServerInvocation } = await import('../src/cli/utils/delegationMcpHealth.js');
+    const invocation = resolveDelegationServerInvocation({
+      allowMissingDist: true,
+      execPath: 'C:\\Program Files\\nodejs\\node.exe'
+    });
+
+    expect(invocation.distPath).toBe('C:\\tmp\\local-checkout/dist/bin/codex-orchestrator.js');
+    expect(invocation.commandLine).toBe(
+      "'C:\\Program Files\\nodejs\\node.exe' 'C:\\tmp\\local-checkout/dist/bin/codex-orchestrator.js' delegate-server"
+    );
+  });
+
+  it('does not synthesize a preview dist path when bootstrap resolution cannot locate any packaged entrypoint', async () => {
+    vi.resetModules();
+    vi.doMock('../src/cli/utils/packageProgramResolver.js', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('../src/cli/utils/packageProgramResolver.js')>();
+      return {
+        ...actual,
+        resolveCodexOrchestratorBootstrapInvocation: () => {
+          throw new Error('Unable to locate packaged program. Expected /tmp/local-checkout/dist/bin/codex-orchestrator.js.');
+        }
+      };
+    });
+
+    const { resolveDelegationServerInvocation } = await import('../src/cli/utils/delegationMcpHealth.js');
+
+    expect(() =>
+      resolveDelegationServerInvocation({
+        allowMissingDist: true,
+        execPath: '/usr/bin/node'
+      })
+    ).toThrowError(
+      'Unable to locate packaged program. Expected /tmp/local-checkout/dist/bin/codex-orchestrator.js.'
+    );
   });
 });
