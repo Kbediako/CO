@@ -3563,6 +3563,7 @@ export function createProviderIssueHandoffService(
         const existingProviderKeys = new Set(options.state.claims.map((claim) => claim.provider_key));
         const pollDispatchBudget = createProviderPollDispatchBudget(options.readFeatureToggles?.() ?? null);
         const occupiedPollDispatchKeys = new Set<string>();
+        const releasedFreshDiscoveryReplayBlockedProviderKeys = new Set<string>();
         let suppressFreshDiscovery = false;
         const noteOccupiedPollDispatchSlot = (
           providerKey: string,
@@ -3613,7 +3614,10 @@ export function createProviderIssueHandoffService(
           assertRefreshCycleNotStuck();
 
           if (resolution.kind === 'skip') {
-            if (isProviderIssuePollFailClosedReason(resolution.reason)) {
+            if (isReleasedProviderIssuePollFailClosedReason(resolution.reason)) {
+              releasedFreshDiscoveryReplayBlockedProviderKeys.add(claimProviderKey);
+            }
+            if (shouldSuppressFreshDiscoveryForPollFailClosedReason(resolution.reason)) {
               suppressFreshDiscovery = true;
             }
             if (claim.state === 'released') {
@@ -4046,6 +4050,7 @@ export function createProviderIssueHandoffService(
             excludedIssueIds: Array.from(
               new Set([
                 ...freshDiscoveryBlockedProviderKeys,
+                ...releasedFreshDiscoveryReplayBlockedProviderKeys,
                 ...occupiedPollDispatchKeys,
                 ...dispatchSkippedConsumedTrackedIssueKeys
               ])
@@ -4061,6 +4066,7 @@ export function createProviderIssueHandoffService(
           const providerKey = buildProviderIssueKey(trackedIssue.provider, trackedIssue.id);
           if (
             freshDiscoveryBlockedProviderKeys.has(providerKey) ||
+            releasedFreshDiscoveryReplayBlockedProviderKeys.has(providerKey) ||
             dispatchSkippedConsumedTrackedIssueKeys.has(providerKey)
           ) {
             continue;
@@ -5700,6 +5706,21 @@ function resolveReleasedProviderIssuePollFailClosedReason(
 
 function isProviderIssuePollFailClosedReason(reason: string | null | undefined): boolean {
   return typeof reason === 'string' && reason.startsWith('provider_issue_poll_cached_');
+}
+
+function shouldSuppressFreshDiscoveryForPollFailClosedReason(
+  reason: string | null | undefined
+): boolean {
+  return (
+    isProviderIssuePollFailClosedReason(reason) &&
+    !isReleasedProviderIssuePollFailClosedReason(reason)
+  );
+}
+
+function isReleasedProviderIssuePollFailClosedReason(
+  reason: string | null | undefined
+): boolean {
+  return typeof reason === 'string' && reason.startsWith('provider_issue_poll_cached_released_');
 }
 
 function resolveProviderMergeCloseoutClaimState(

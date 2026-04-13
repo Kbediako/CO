@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260413-linear-d26b2799-a4a1-41d0-87cb-ee64eabcdbba",
+      "title": "CO: decouple released-claim deferred-poll suppression from unrelated fresh discovery",
+      "relates_to": "tasks/tasks-linear-d26b2799-a4a1-41d0-87cb-ee64eabcdbba.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-13",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-d26b2799-a4a1-41d0-87cb-ee64eabcdbba.md",
+        "task": "tasks/tasks-linear-d26b2799-a4a1-41d0-87cb-ee64eabcdbba.md",
+        "agent_task": ".agent/task/linear-d26b2799-a4a1-41d0-87cb-ee64eabcdbba.md",
+        "docs": "docs/TECH_SPEC-linear-d26b2799-a4a1-41d0-87cb-ee64eabcdbba.md"
+      }
+    },
+    {
       "id": "20260413-linear-6ed6ef11-538e-48f0-936c-8547632bf92e",
       "title": "CO: Stabilize timeout-sensitive repo validation suites blocking handoff",
       "relates_to": "tasks/tasks-linear-6ed6ef11-538e-48f0-936c-8547632bf92e.md",
