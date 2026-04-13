@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -7,6 +7,42 @@ import { describe, expect, it } from 'vitest';
 import { runDelegationSetup } from '../src/cli/delegationSetup.js';
 
 describe('runDelegationSetup', () => {
+  it('does not treat wrapper transport from codex mcp get as already configured', async () => {
+    const tempHome = await mkdtemp(join(tmpdir(), 'delegation-setup-home-'));
+    const fakeCodex = join(tempHome, 'codex');
+    try {
+      await writeFile(
+        fakeCodex,
+        [
+          '#!/bin/sh',
+          'if [ "$1" = "mcp" ] && [ "$2" = "get" ] && [ "$3" = "delegation" ] && [ "$4" = "--json" ]; then',
+          `  printf '%s\\n' '{"transport":{"command":"codex-orchestrator","args":["delegate-server","--repo","${process.cwd().replace(/'/g, "'\\''")}"]}}'`,
+          '  exit 0',
+          'fi',
+          'exit 1'
+        ].join('\n'),
+        'utf8'
+      );
+      await chmod(fakeCodex, 0o755);
+
+      const result = await runDelegationSetup({
+        apply: false,
+        repoRoot: process.cwd(),
+        env: {
+          ...process.env,
+          CODEX_HOME: tempHome,
+          CODEX_CLI_BIN: fakeCodex
+        }
+      });
+
+      expect(result.status).toBe('planned');
+      expect(result.readiness.configured).toBe(false);
+      expect(result.plan.commandLine).toContain('dist/bin/codex-orchestrator.js');
+    } finally {
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
   it('uses config fallback readiness when the codex mcp probe is unavailable', async () => {
     const tempHome = await mkdtemp(join(tmpdir(), 'delegation-setup-home-'));
     try {
@@ -14,8 +50,8 @@ describe('runDelegationSetup', () => {
         join(tempHome, 'config.toml'),
         [
           '[mcp_servers."delegation"]',
-          'command = "codex-orchestrator"',
-          `args = ["delegate-server", "--repo", "${process.cwd().replace(/\\/g, '\\\\')}"]`
+          `command = "${process.execPath.replace(/\\/g, '\\\\')}"`,
+          `args = ["${join(process.cwd(), 'dist', 'bin', 'codex-orchestrator.js').replace(/\\/g, '\\\\')}", "delegate-server", "--repo", "${process.cwd().replace(/\\/g, '\\\\')}"]`
         ].join('\n'),
         'utf8'
       );
@@ -33,6 +69,8 @@ describe('runDelegationSetup', () => {
       expect(result.status).toBe('planned');
       expect(result.readiness.configured).toBe(true);
       expect(result.readiness.configPath).toBe(join(tempHome, 'config.toml'));
+      expect(result.plan.commandLine).toContain('dist/bin/codex-orchestrator.js');
+      expect(result.plan.commandLine).not.toContain('codex-orchestrator delegate-server --repo');
     } finally {
       await rm(tempHome, { recursive: true, force: true });
     }
@@ -45,8 +83,8 @@ describe('runDelegationSetup', () => {
         join(tempHome, 'config.toml'),
         [
           "[mcp_servers.'delegation']",
-          'command = "codex-orchestrator"',
-          `args = ["delegate-server", "--repo", "${process.cwd().replace(/\\/g, '\\\\')}"]`,
+          `command = "${process.execPath.replace(/\\/g, '\\\\')}"`,
+          `args = ["${join(process.cwd(), 'dist', 'bin', 'codex-orchestrator.js').replace(/\\/g, '\\\\')}", "delegate-server", "--repo", "${process.cwd().replace(/\\/g, '\\\\')}"]`,
           '',
           "[mcp_servers.'delegation'.env]",
           'CODEX_LOG_LEVEL = "debug"'
@@ -79,7 +117,7 @@ describe('runDelegationSetup', () => {
         join(tempHome, 'config.toml'),
         [
           '[mcp_servers]',
-          `"delegation" = { command = "codex-orchestrator", args = ["delegate-server", "--repo", "${process.cwd().replace(/\\/g, '\\\\')}"], env = { CODEX_LOG_LEVEL = "debug" } }`
+          `"delegation" = { command = "${process.execPath.replace(/\\/g, '\\\\')}", args = ["${join(process.cwd(), 'dist', 'bin', 'codex-orchestrator.js').replace(/\\/g, '\\\\')}", "delegate-server", "--repo", "${process.cwd().replace(/\\/g, '\\\\')}"], env = { CODEX_LOG_LEVEL = "debug" } }`
         ].join('\n'),
         'utf8'
       );
@@ -127,6 +165,37 @@ describe('runDelegationSetup', () => {
       expect(result.status).toBe('planned');
       expect(result.readiness.configured).toBe(false);
       expect(result.readiness.configPath).toBe(join(tempHome, 'config.toml'));
+    } finally {
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('does not treat wrapper transport in fallback config as already configured', async () => {
+    const tempHome = await mkdtemp(join(tmpdir(), 'delegation-setup-home-'));
+    try {
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        [
+          '[mcp_servers.delegation]',
+          'command = "codex-orchestrator"',
+          `args = ["delegate-server", "--repo", "${process.cwd().replace(/\\/g, '\\\\')}"]`
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = await runDelegationSetup({
+        apply: false,
+        repoRoot: process.cwd(),
+        env: {
+          ...process.env,
+          CODEX_HOME: tempHome,
+          CODEX_CLI_BIN: join(tempHome, 'missing-codex')
+        }
+      });
+
+      expect(result.status).toBe('planned');
+      expect(result.readiness.configured).toBe(false);
+      expect(result.plan.commandLine).toContain('dist/bin/codex-orchestrator.js');
     } finally {
       await rm(tempHome, { recursive: true, force: true });
     }

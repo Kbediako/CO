@@ -5,7 +5,7 @@ Use this guide for deeper context on delegation behavior, tool surfaces, and tro
 
 ## Mental model
 
-- The delegation MCP server is a local stdio process (`codex-orchestrator delegate-server`; `delegation-server` is an alias).
+- The delegation MCP server is a local stdio process. Register the direct dist entrypoint (`node /path/to/@kbediako/codex-orchestrator/dist/bin/codex-orchestrator.js delegate-server`); `delegation-server` is still accepted as an alias.
 - It does **not** provide general tools itself; it only exposes `delegate.*` + optional `github.*` tools.
 - Child runs get tools based on `delegate.mode` + `delegate.tool_profile` + repo caps.
 - Delegation MCP stays enabled by default (only MCP on by default); disable it only when required by safety constraints.
@@ -63,7 +63,7 @@ Fix by re-registering the server with a TOML-quoted override:
 codex mcp remove delegation
 codex mcp add delegation \
   --env 'CODEX_MCP_CONFIG_OVERRIDES=delegate.mode="full"' \
-  -- codex-orchestrator delegate-server
+  -- node /path/to/@kbediako/codex-orchestrator/dist/bin/codex-orchestrator.js delegate-server
 ```
 
 ## Server mode vs child mode (don’t mix them up)
@@ -108,11 +108,17 @@ If you want deeper recursion or longer wall-clock time for delegated runs, set R
 ```bash
 codex mcp add delegation \
   --env 'CODEX_MCP_CONFIG_OVERRIDES=rlm.max_subcall_depth=8;rlm.wall_clock_timeout_ms=14400000' \
-  -- codex-orchestrator delegate-server
+  -- node /path/to/@kbediako/codex-orchestrator/dist/bin/codex-orchestrator.js delegate-server
 ```
 
 For the `rlm` pipeline specifically, use:
 - `RLM_MAX_MINUTES=240` for a 4-hour cap.
+
+If stale delegate-server processes accumulate from prior sessions, remove only the orphaned ones with:
+
+```bash
+codex-orchestrator delegation cleanup-stale --yes
+```
 
 ## delegate.spawn start-only (default)
 

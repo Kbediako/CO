@@ -61,9 +61,9 @@ Optional (only if you need it):
 - If the task needs external docs or APIs, enable only the relevant MCP server for that environment.
 - If `delegate.spawn` is missing, re-register the MCP server with full mode (server config controls tool surface):
   - `codex mcp remove delegation`
-  - `codex mcp add delegation --env 'CODEX_MCP_CONFIG_OVERRIDES=delegate.mode="full"' -- codex-orchestrator delegate-server`
+  - `codex mcp add delegation --env 'CODEX_MCP_CONFIG_OVERRIDES=delegate.mode="full"' -- node /path/to/@kbediako/codex-orchestrator/dist/bin/codex-orchestrator.js delegate-server`
 - To raise RLM budgets for delegated runs, re-register with an override (TOML-quoted):
-  - `codex mcp add delegation --env 'CODEX_MCP_CONFIG_OVERRIDES=rlm.max_subcall_depth=8;rlm.wall_clock_timeout_ms=14400000' -- codex-orchestrator delegate-server`
+  - `codex mcp add delegation --env 'CODEX_MCP_CONFIG_OVERRIDES=rlm.max_subcall_depth=8;rlm.wall_clock_timeout_ms=14400000' -- node /path/to/@kbediako/codex-orchestrator/dist/bin/codex-orchestrator.js delegate-server`
 
 For deeper background patterns and troubleshooting, see `DELEGATION_GUIDE.md`.
 For runner + delegation coordination (short `--task` flow), see `docs/delegation-runner-workflow.md`.
@@ -89,10 +89,12 @@ For runner + delegation coordination (short `--task` flow), see `docs/delegation
   - Optional low-friction MCP enable pass: `codex-orchestrator mcp enable --yes`
     - Enables disabled MCP servers from existing Codex config entries (plan mode redacts env/secret values in displayed command lines).
   - `codex-orchestrator delegation setup --yes`
-    - Delegation-only setup (wraps `codex mcp add delegation ...` and keeps wiring discoverable via `codex-orchestrator doctor`).
-  - `codex mcp add delegation -- codex-orchestrator delegate-server`
+    - Delegation-only setup (registers the direct dist transport and keeps wiring discoverable via `codex-orchestrator doctor`).
+  - `codex mcp add delegation -- node /path/to/@kbediako/codex-orchestrator/dist/bin/codex-orchestrator.js delegate-server`
   - Optional: append `--repo /path/to/repo` to pin the server to one repo (not recommended if you work across repos).
   - `delegate-server` is the canonical name; `delegation-server` is supported as an alias.
+  - `codex-orchestrator delegation cleanup-stale --yes`
+    - Safe cleanup for orphaned delegate-server processes that are no longer rooted in a live Codex client.
 - Per-run `-c 'mcp_servers.delegation.enabled=true'` only works **after** registration.
 - If `delegate.*` tools are missing mid-task, start a new run with:
   - `codex -c 'mcp_servers.delegation.enabled=true' ...`

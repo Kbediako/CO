@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 
 import type { EnvironmentPaths } from '../run/environment.js';
+import { materializeRunBlockMemory } from '../run/blockMemory.js';
 import type { RunPaths } from '../run/runPaths.js';
 import { relativeToRepo } from '../run/runPaths.js';
 import { writeJsonAtomic } from '../utils/fs.js';
@@ -122,5 +123,13 @@ export async function persistRunSummary(
   const summaryPath = join(paths.runDir, 'run-summary.json');
   await writeJsonAtomic(summaryPath, runSummary);
   manifest.run_summary_path = relativeToRepo(env, summaryPath);
+  manifest.memory = {
+    ...(manifest.memory ?? {}),
+    ...(await materializeRunBlockMemory({
+      env,
+      paths,
+      manifest
+    }))
+  };
   await persistManifest(paths, manifest, persister, { force: true });
 }

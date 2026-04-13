@@ -4,6 +4,8 @@ import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  buildDelegationEnablementGuidance,
+  buildDelegationDirectTransportGuidance,
   formatDoctorCloudPreflightSummary,
   formatDoctorSummary,
   runDoctor,
@@ -181,28 +183,214 @@ describe('runDoctor', () => {
     }
   });
 
-  it('reports delegation readiness when config declares the delegation MCP entry', async () => {
+  it('flags wrapper-based delegation config as warning', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
     process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_CLI_BIN = join(tempHome, 'missing-codex');
     try {
       await writeFile(
         join(tempHome, 'config.toml'),
-        ['mcp_servers."delegation" = { command = "codex-orchestrator" } # keep enabled'].join('\n'),
+        ['mcp_servers."delegation" = { command = "codex-orchestrator", args = ["delegate-server"] }'].join('\n'),
         'utf8'
       );
 
       const result = runDoctor(process.cwd());
-      expect(result.delegation.status).toBe('ok');
+      expect(result.delegation.status).toBe('warning');
       expect(result.delegation.config.status).toBe('ok');
-      expect(formatDoctorSummary(result).join('\n')).toContain('Delegation: ok');
+      expect(result.delegation.transport.kind).toBe('wrapper');
+      expect(result.delegation.startup.status).toBe('skipped');
+      expect(formatDoctorSummary(result).join('\n')).toContain('Delegation: warning');
     } finally {
       if (originalCodexHome === undefined) {
         delete process.env.CODEX_HOME;
       } else {
         process.env.CODEX_HOME = originalCodexHome;
       }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
       await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('reports direct-dist delegation readiness and initialize latency', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
+    process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_CLI_BIN = join(tempHome, 'missing-codex');
+    try {
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        [
+          '[mcp_servers.delegation]',
+          `command = "${process.execPath.replace(/\\/g, '\\\\')}"`,
+          `args = ["${join(process.cwd(), 'dist', 'bin', 'codex-orchestrator.js').replace(/\\/g, '\\\\')}", "delegate-server"]`
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = runDoctor(process.cwd());
+      expect(result.delegation.status).not.toBe('missing-config');
+      expect(result.delegation.transport.kind).toBe('direct-dist');
+      expect(result.delegation.startup.status).not.toBe('failed');
+      expect(result.delegation.startup.latency_ms).not.toBeNull();
+      expect(formatDoctorSummary(result).join('\n')).toContain('transport: safe (direct-dist)');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('degrades delegation direct-transport guidance instead of throwing when dist is unavailable', () => {
+    const guidance = buildDelegationDirectTransportGuidance(() => {
+      throw new Error('Unable to locate packaged program. Expected /tmp/repo/dist/bin/codex-orchestrator.js.');
+    });
+
+    expect(guidance).toContain('Direct dist transport unavailable until dist is built:');
+    expect(guidance).toContain('/tmp/repo/dist/bin/codex-orchestrator.js');
+  });
+
+  it('does not advertise doctor --apply as the quick fix when stale delegation processes are the only issue', () => {
+    const guidance = buildDelegationEnablementGuidance({
+      configStatus: 'ok',
+      transportStatus: 'safe',
+      directTransportGuidance:
+        'Direct dist transport: /usr/bin/node /repo/dist/bin/codex-orchestrator.js delegate-server --repo <path>'
+    });
+
+    expect(guidance).not.toContain('Quick fix: codex-orchestrator doctor --apply --yes');
+    expect(guidance).toContain('Run: codex-orchestrator delegation cleanup-stale --yes');
+  });
+
+  it('does not advertise doctor --apply when startup is slow but delegation is already configured safely', () => {
+    const guidance = buildDelegationEnablementGuidance({
+      configStatus: 'ok',
+      transportStatus: 'safe',
+      directTransportGuidance:
+        'Direct dist transport: /usr/bin/node /repo/dist/bin/codex-orchestrator.js delegate-server --repo <path>'
+    });
+
+    expect(guidance).not.toContain('Quick fix: codex-orchestrator doctor --apply --yes');
+  });
+
+  it('keeps top-level doctor status ok when delegation is advisory but the rest of the install is healthy', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const previousEnv = {
+      CO_LINEAR_API_TOKEN: process.env.CO_LINEAR_API_TOKEN,
+      CO_LINEAR_WORKSPACE_ID: process.env.CO_LINEAR_WORKSPACE_ID,
+      CO_LINEAR_WEBHOOK_SECRET: process.env.CO_LINEAR_WEBHOOK_SECRET,
+      CO_TELEGRAM_POLLING_ENABLED: process.env.CO_TELEGRAM_POLLING_ENABLED,
+      CO_TELEGRAM_BOT_TOKEN: process.env.CO_TELEGRAM_BOT_TOKEN,
+      CO_TELEGRAM_ALLOWED_CHAT_IDS: process.env.CO_TELEGRAM_ALLOWED_CHAT_IDS,
+      CO_TELEGRAM_ENABLE_MUTATIONS: process.env.CO_TELEGRAM_ENABLE_MUTATIONS,
+      CO_TELEGRAM_PUSH_ENABLED: process.env.CO_TELEGRAM_PUSH_ENABLED
+    };
+    const tempHome = await mkdtemp(join(tmpdir(), 'doctor-advisory-home-'));
+    const tempRepo = await mkdtemp(join(tmpdir(), 'doctor-advisory-repo-'));
+    process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_CLI_BIN = join(tempHome, 'missing-codex');
+
+    try {
+      const skillDir = join(tempHome, 'skills', 'chrome-devtools');
+      await mkdir(skillDir, { recursive: true });
+      await writeFile(join(skillDir, 'SKILL.md'), '# devtools skill', 'utf8');
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        [
+          'model = "gpt-5.4"',
+          'review_model = "gpt-5.4"',
+          'model_reasoning_effort = "xhigh"',
+          '',
+          '[agents]',
+          'max_threads = 12',
+          '',
+          '[mcp_servers.chrome-devtools]',
+          'command = "npx"',
+          'args = ["-y", "chrome-devtools-mcp@latest"]',
+          '',
+          '[mcp_servers.delegation]',
+          'command = "codex-orchestrator"',
+          'args = ["delegate-server"]'
+        ].join('\n'),
+        'utf8'
+      );
+
+      const providersDir = join(tempRepo, '.codex', 'providers');
+      await mkdir(providersDir, { recursive: true });
+      await writeFile(join(providersDir, 'README.md'), '# Providers', 'utf8');
+      await writeFile(join(providersDir, 'provider.env.example'), 'CO_LINEAR_API_TOKEN=', 'utf8');
+      await writeFile(
+        join(providersDir, 'control.example.json'),
+        JSON.stringify(
+          {
+            feature_toggles: {
+              dispatch_pilot: {
+                enabled: true,
+                source: {
+                  provider: 'linear',
+                  live: true,
+                  workspace_id: 'workspace-id'
+                }
+              },
+              transport_mutating_controls: {
+                enabled: true,
+                allowed_transports: ['telegram']
+              }
+            }
+          },
+          null,
+          2
+        ),
+        'utf8'
+      );
+
+      process.env.CO_LINEAR_API_TOKEN = 'token';
+      process.env.CO_LINEAR_WORKSPACE_ID = 'workspace-id';
+      process.env.CO_LINEAR_WEBHOOK_SECRET = 'secret';
+      process.env.CO_TELEGRAM_POLLING_ENABLED = 'true';
+      process.env.CO_TELEGRAM_BOT_TOKEN = 'bot-token';
+      process.env.CO_TELEGRAM_ALLOWED_CHAT_IDS = '12345,67890';
+      process.env.CO_TELEGRAM_ENABLE_MUTATIONS = 'true';
+      process.env.CO_TELEGRAM_PUSH_ENABLED = 'true';
+
+      const result = runDoctor(tempRepo);
+      expect(result.delegation.status).toBe('warning');
+      expect(result.status).toBe('ok');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
+      for (const [key, value] of Object.entries(previousEnv)) {
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
+      }
+      await rm(tempHome, { recursive: true, force: true });
+      await rm(tempRepo, { recursive: true, force: true });
     }
   });
 

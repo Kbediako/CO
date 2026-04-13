@@ -17,13 +17,20 @@ import {
   type CodexCliReadiness
 } from './utils/codexCli.js';
 import { resolveCodexHome } from './utils/codexPaths.js';
-import { hasMcpServerEntry } from './utils/mcpServerEntry.js';
 import { resolveOptionalDependency, type OptionalResolutionSource } from './utils/optionalDeps.js';
 import {
   buildCloudPreflightRequest,
   runCloudPreflight,
   type CloudPreflightIssue
 } from './utils/cloudPreflight.js';
+import {
+  classifyDelegationTransport,
+  inspectDelegateServerProcesses,
+  inspectDelegationMcpConfig,
+  probeDelegationInitialize,
+  resolveDelegationServerInvocation,
+  type DelegationTransportKind
+} from './utils/delegationMcpHealth.js';
 import { sanitizeProviderOverrideEnv } from './utils/providerOverrideEnv.js';
 import {
   hasLinearApiCredentials,
@@ -155,11 +162,34 @@ export interface DoctorResult {
     enablement: string[];
   };
   delegation: {
-    status: 'ok' | 'missing-config' | 'unavailable';
+    status: 'ok' | 'warning' | 'missing-config' | 'unavailable';
     config: {
       status: 'ok' | 'missing';
       path: string;
       detail?: string;
+      source?: 'codex-cli' | 'fallback';
+      pinned_repo?: string | null;
+    };
+    transport: {
+      status: 'safe' | 'unsafe' | 'missing';
+      kind: DelegationTransportKind;
+      command_line: string | null;
+      detail: string;
+    };
+    startup: {
+      status: 'ok' | 'slow' | 'failed' | 'skipped';
+      latency_ms: number | null;
+      threshold_ms: number;
+      detail: string;
+    };
+    processes: {
+      status: 'ok' | 'stale' | 'unavailable';
+      active_count: number;
+      stale_count: number;
+      stale_pids: number[];
+      stale_rss_mb: number;
+      threshold_minutes: number;
+      detail: string;
     };
     enablement: string[];
   };
@@ -316,14 +346,33 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
     !cloudCmdAvailable ? 'unavailable' : cloudEnvIdConfigured ? 'ok' : 'not_configured';
   const cloudFallbackPolicy: DoctorResult['cloud']['fallback_policy'] = resolveCloudFallbackPolicy();
 
-  const delegationConfig = inspectDelegationConfig();
+  const delegationSnapshot = inspectDelegationMcpConfig(process.env);
+  const delegationTransport = classifyDelegationTransport(delegationSnapshot.entry);
+  const delegationStartup = probeDelegationInitialize(delegationSnapshot.entry, { env: process.env });
+  const delegationProcesses = inspectDelegateServerProcesses();
   const delegationStatus: DoctorResult['delegation']['status'] =
-    delegationConfig.status === 'ok' ? 'ok' : 'missing-config';
+    delegationSnapshot.status !== 'ok'
+      ? 'missing-config'
+      : delegationTransport.status !== 'safe'
+        || delegationStartup.status === 'slow'
+        || delegationStartup.status === 'failed'
+        || delegationProcesses.status === 'stale'
+        ? 'warning'
+        : delegationProcesses.status === 'unavailable'
+          ? 'unavailable'
+          : 'ok';
+  const delegationBlocksOverallStatus = delegationStatus === 'missing-config';
   const repoRoot = resolveDoctorRepoRoot(cwd);
   const providers = inspectProviderReadiness(repoRoot, process.env);
 
   return {
-    status: missing.length === 0 && codexDefaults.status === 'ok' && providers.status === 'ok' ? 'ok' : 'warning',
+    status:
+      missing.length === 0 &&
+      codexDefaults.status === 'ok' &&
+      providers.status === 'ok' &&
+      !delegationBlocksOverallStatus
+        ? 'ok'
+        : 'warning',
     missing,
     dependencies,
     devtools,
@@ -357,14 +406,39 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
     },
     delegation: {
       status: delegationStatus,
-      config: delegationConfig,
-      enablement: [
-        'Quick fix: codex-orchestrator doctor --apply --yes',
-        'Run: codex-orchestrator delegation setup --yes',
-        'Or manually: codex mcp add delegation -- codex-orchestrator delegate-server',
-        "Enable for a run with: codex -c 'mcp_servers.delegation.enabled=true' ...",
-        'See: codex-orchestrator init codex'
-      ]
+      config: {
+        status: delegationSnapshot.status,
+        path: delegationSnapshot.path,
+        detail: delegationSnapshot.detail,
+        source: delegationSnapshot.entry?.source,
+        pinned_repo: delegationSnapshot.entry?.pinnedRepo ?? null
+      },
+      transport: {
+        status: delegationTransport.status,
+        kind: delegationTransport.kind,
+        command_line: delegationTransport.commandLine,
+        detail: delegationTransport.detail
+      },
+      startup: {
+        status: delegationStartup.status,
+        latency_ms: delegationStartup.latencyMs,
+        threshold_ms: delegationStartup.thresholdMs,
+        detail: delegationStartup.detail
+      },
+      processes: {
+        status: delegationProcesses.status,
+        active_count: delegationProcesses.activeCount,
+        stale_count: delegationProcesses.staleCount,
+        stale_pids: delegationProcesses.stalePids,
+        stale_rss_mb: Number((delegationProcesses.staleRssKb / 1024).toFixed(1)),
+        threshold_minutes: delegationProcesses.thresholdSeconds / 60,
+        detail: delegationProcesses.detail
+      },
+      enablement: buildDelegationEnablementGuidance({
+        configStatus: delegationSnapshot.status,
+        transportStatus: delegationTransport.status,
+        directTransportGuidance: buildDelegationDirectTransportGuidance()
+      })
     },
     providers
   };
@@ -599,6 +673,25 @@ export function formatDoctorSummary(result: DoctorResult): string[] {
   if (result.delegation.config.detail) {
     lines.push(`    detail: ${result.delegation.config.detail}`);
   }
+  if (result.delegation.config.source) {
+    lines.push(`  - source: ${result.delegation.config.source}`);
+  }
+  lines.push(`  - transport: ${result.delegation.transport.status} (${result.delegation.transport.kind})`);
+  if (result.delegation.transport.command_line) {
+    lines.push(`    command: ${result.delegation.transport.command_line}`);
+  }
+  lines.push(`    detail: ${result.delegation.transport.detail}`);
+  lines.push(
+    `  - initialize: ${result.delegation.startup.status} (latency: ${result.delegation.startup.latency_ms ?? '<skipped>'} ms, threshold: ${result.delegation.startup.threshold_ms} ms)`
+  );
+  lines.push(`    detail: ${result.delegation.startup.detail}`);
+  lines.push(
+    `  - processes: ${result.delegation.processes.status} (active: ${result.delegation.processes.active_count}, stale: ${result.delegation.processes.stale_count}, stale rss: ${result.delegation.processes.stale_rss_mb.toFixed(1)} MB)`
+  );
+  lines.push(`    detail: ${result.delegation.processes.detail}`);
+  if (result.delegation.processes.stale_pids.length > 0) {
+    lines.push(`    stale pids: ${result.delegation.processes.stale_pids.join(', ')}`);
+  }
   for (const line of result.delegation.enablement) {
     lines.push(`  - ${line}`);
   }
@@ -637,6 +730,38 @@ export function formatDoctorSummary(result: DoctorResult): string[] {
     lines.push(`  - ${line}`);
   }
 
+  return lines;
+}
+
+export function buildDelegationDirectTransportGuidance(
+  resolver: () => { commandLine: string } = () =>
+    resolveDelegationServerInvocation({ env: process.env, execPath: process.execPath })
+): string {
+  try {
+    return `Direct dist transport: ${resolver().commandLine} --repo <path>`;
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return `Direct dist transport unavailable until dist is built: ${detail}`;
+  }
+}
+
+export function buildDelegationEnablementGuidance(options: {
+  configStatus: 'ok' | 'missing';
+  transportStatus: 'safe' | 'unsafe' | 'missing';
+  directTransportGuidance?: string;
+}): string[] {
+  const lines: string[] = [];
+  const setupApplyWouldHelp = options.configStatus !== 'ok' || options.transportStatus !== 'safe';
+
+  if (setupApplyWouldHelp) {
+    lines.push('Quick fix: codex-orchestrator doctor --apply --yes');
+  }
+
+  lines.push('Run: codex-orchestrator delegation setup --yes');
+  lines.push('Run: codex-orchestrator delegation cleanup-stale --yes');
+  lines.push(options.directTransportGuidance ?? buildDelegationDirectTransportGuidance());
+  lines.push("Enable for a run with: codex -c 'mcp_servers.delegation.enabled=true' ...");
+  lines.push('See: codex-orchestrator init codex');
   return lines;
 }
 
@@ -1241,26 +1366,4 @@ function canRunCommand(command: string, args: string[]): boolean {
     return false;
   }
   return result.status === 0;
-}
-
-function inspectDelegationConfig(env: NodeJS.ProcessEnv = process.env): { status: 'ok' | 'missing'; path: string; detail?: string } {
-  const codexHome = resolveCodexHome(env);
-  const configPath = join(codexHome, 'config.toml');
-  if (!existsSync(configPath)) {
-    return { status: 'missing', path: configPath, detail: 'config.toml not found' };
-  }
-  try {
-    const raw = readFileSync(configPath, 'utf8');
-    const hasEntry = hasMcpServerEntry(raw, 'delegation');
-    if (hasEntry) {
-      return { status: 'ok', path: configPath };
-    }
-    return { status: 'missing', path: configPath, detail: 'mcp_servers.delegation entry not found' };
-  } catch (error) {
-    return {
-      status: 'missing',
-      path: configPath,
-      detail: error instanceof Error ? error.message : String(error)
-    };
-  }
 }
