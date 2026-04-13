@@ -390,12 +390,21 @@ async function resolvePlannerRunMemoryPromptLines(
   try {
     const rawManifestPath = resolve(repoRoot, manifestPath);
     const rawManifest = JSON.parse(await readFile(rawManifestPath, 'utf8')) as Record<string, unknown>;
+    const source0Descriptor = readRunSource0Descriptor(rawManifest);
+    const includeSource0 =
+      !source0Descriptor || (await hasRunSource0Artifacts(repoRoot, source0Descriptor));
+    const selection = selectRunMemoryForRole({
+      role: 'planner',
+      manifest: rawManifest,
+      hints: [goal]
+    });
     return buildRunMemoryPromptLines(
-      selectRunMemoryForRole({
-        role: 'planner',
-        manifest: rawManifest,
-        hints: [goal]
-      })
+      includeSource0
+        ? selection
+        : {
+            ...selection,
+            refs: selection.refs.filter((ref) => ref.kind !== 'source_0')
+          }
     );
   } catch {
     return [];
