@@ -8,6 +8,8 @@ import { promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
 const scriptPath = join(process.cwd(), 'scripts', 'tasks-archive.mjs');
 const createdDirs: string[] = [];
+const completedAt = '2026-04-13';
+const archiveYear = completedAt.slice(0, 4);
 
 afterEach(async () => {
   while (createdDirs.length > 0) {
@@ -49,7 +51,7 @@ async function initRepository(): Promise<string> {
             id: '20260413-linear-6ed6ef11-538e-48f0-936c-8547632bf92e',
             title: 'Completed linear archive candidate',
             status: 'completed',
-            completed_at: '2026-04-13',
+            completed_at: completedAt,
             gate: {
               status: 'succeeded'
             },
@@ -77,7 +79,7 @@ async function initRepository(): Promise<string> {
     [
       '# Task List Snapshot - Completed linear archive candidate (linear-6ed6ef11-538e-48f0-936c-8547632bf92e)',
       '',
-      '<!-- tasks-archive-index:begin --> ## Archive index - archived task snapshots live on the task-archives branch. 2026: https://github.com/example/repo/blob/task-archives/docs/TASKS-archive-2026.md <!-- tasks-archive-index:end -->',
+      `<!-- tasks-archive-index:begin --> ## Archive index - archived task snapshots live on the task-archives branch. ${archiveYear}: https://github.com/example/repo/blob/task-archives/docs/TASKS-archive-${archiveYear}.md <!-- tasks-archive-index:end -->`,
       '',
       '# Task List Snapshot - Active numeric task (1001-active-task)',
       ''
@@ -101,7 +103,10 @@ describe('tasks-archive script', () => {
     });
 
     const tasksContent = await readFile(join(repo, 'docs', 'TASKS.md'), 'utf8');
-    const archiveContent = await readFile(join(repo, 'docs', 'TASKS-archive-2026.md'), 'utf8');
+    const archiveContent = await readFile(
+      join(repo, 'docs', `TASKS-archive-${archiveYear}.md`),
+      'utf8'
+    );
 
     expect(tasksContent).toContain('1001-active-task');
     expect(tasksContent).not.toContain('linear-6ed6ef11-538e-48f0-936c-8547632bf92e');
