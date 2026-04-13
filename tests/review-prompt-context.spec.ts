@@ -3,6 +3,7 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { readRunBlockMemoryIndex, type RunBlockMemoryDescriptor } from '../orchestrator/src/cli/run/blockMemory.js';
 import {
   buildActiveCloseoutProvenanceLines,
   buildReviewPromptContext,
@@ -341,5 +342,14 @@ describe('review-prompt-context', () => {
     expect(result.promptLines).toContain(
       '- Block `stage:docs-review` (stage, succeeded): `ctx:sha256:block-stage#chunk:c000001`'
     );
+  });
+
+  it('rejects Windows drive-relative block memory index paths', async () => {
+    await expect(
+      readRunBlockMemoryIndex(
+        '/tmp/repo',
+        buildBlockMemoryDescriptor({ index_path: 'C:foo\\index.json' }) as RunBlockMemoryDescriptor
+      )
+    ).rejects.toThrow('block_memory index_path must be repo-relative');
   });
 });

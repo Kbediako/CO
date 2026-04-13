@@ -1,5 +1,5 @@
 import { mkdir, readFile } from 'node:fs/promises';
-import { isAbsolute, join, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 
 import type { CliManifest, CliManifestCommand } from '../types.js';
 import { buildContextObject } from '../rlm/context.js';
@@ -14,7 +14,7 @@ const RUN_BLOCK_MEMORY_INDEX_KIND = 'run_block_memory';
 const RUN_BLOCK_MEMORY_BLOCK_KIND = 'run_block_memory_block';
 const RUN_BLOCK_MEMORY_CHUNK_TARGET_BYTES = 65_536;
 const RUN_BLOCK_MEMORY_CHUNK_OVERLAP_BYTES = 4_096;
-const WINDOWS_DRIVE_ABSOLUTE_PATH_RE = /^[A-Za-z]:[\\/]/u;
+const WINDOWS_DRIVE_PATH_RE = /^[A-Za-z]:/u;
 
 export interface RunBlockMemoryDescriptor {
   schema_version: number;
@@ -294,14 +294,29 @@ function readRunBlockMemoryBlockDescriptor(input: unknown): RunBlockMemoryBlockD
 }
 
 function resolveRepoRelativePath(repoRoot: string, candidate: string, field: string): string {
-  if (isAbsolute(candidate) || WINDOWS_DRIVE_ABSOLUTE_PATH_RE.test(candidate)) {
+  const normalizedCandidate = candidate.replaceAll('\\', '/');
+  if (
+    isAbsolute(candidate) ||
+    WINDOWS_DRIVE_PATH_RE.test(candidate) ||
+    normalizedCandidate.startsWith('/')
+  ) {
     throw new Error(`block_memory ${field} must be repo-relative`);
   }
-  const normalizedCandidate = candidate.replaceAll('\\', '/');
   if (normalizedCandidate.split('/').some((segment) => segment === '..')) {
     throw new Error(`block_memory ${field} must not traverse outside the repo root`);
   }
-  return resolve(repoRoot, candidate);
+  const resolvedPath = resolve(repoRoot, candidate);
+  const relativePath = relative(repoRoot, resolvedPath);
+  if (
+    !relativePath ||
+    relativePath === '.' ||
+    isAbsolute(relativePath) ||
+    WINDOWS_DRIVE_PATH_RE.test(relativePath) ||
+    relativePath.split(/[\\/]+/u).some((segment) => segment === '..')
+  ) {
+    throw new Error(`block_memory ${field} escapes the repo root`);
+  }
+  return resolvedPath;
 }
 
 export async function readRunBlockMemoryIndex(
