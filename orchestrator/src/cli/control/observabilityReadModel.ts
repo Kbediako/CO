@@ -246,7 +246,6 @@ export interface ControlProviderWorkflowPayload {
   terminal_cleanup?: ControlProviderTerminalCleanupPayload | null;
   operator_autopilot?: ControlProviderOperatorAutopilotPayload | null;
   worker_hosts?: ControlProviderWorkerHostPayload[] | null;
-  operator_autopilot?: ControlProviderOperatorAutopilotPayload | null;
 }
 
 type ResolvedWorkerHost =
@@ -864,77 +863,7 @@ export function buildSelectedRunRuntimeFingerprintInput(
                 ...host,
                 ssh_options: [...host.ssh_options]
               }))
-            : [],
-          operator_autopilot: providerWorkflow.operator_autopilot
-            ? {
-                enabled: providerWorkflow.operator_autopilot.enabled,
-                backlog_promotion: {
-                  enabled: providerWorkflow.operator_autopilot.backlog_promotion.enabled,
-                  state_name: providerWorkflow.operator_autopilot.backlog_promotion.state_name,
-                  target_state_name:
-                    providerWorkflow.operator_autopilot.backlog_promotion.target_state_name
-                },
-                review_handoff_rework: {
-                  enabled: providerWorkflow.operator_autopilot.review_handoff_rework.enabled,
-                  target_state_name:
-                    providerWorkflow.operator_autopilot.review_handoff_rework.target_state_name,
-                  excluded_action_required_reasons: [
-                    ...providerWorkflow.operator_autopilot.review_handoff_rework.excluded_action_required_reasons
-                  ]
-                },
-                post_merge_rollout: {
-                  enabled: providerWorkflow.operator_autopilot.post_merge_rollout.enabled,
-                  summary: providerWorkflow.operator_autopilot.post_merge_rollout.summary
-                },
-                audit_path: providerWorkflow.operator_autopilot.audit_path,
-                last_result: providerWorkflow.operator_autopilot.last_result
-                  ? {
-                      recorded_at: providerWorkflow.operator_autopilot.last_result.recorded_at,
-                      status: providerWorkflow.operator_autopilot.last_result.status,
-                      summary: providerWorkflow.operator_autopilot.last_result.summary,
-                      error: providerWorkflow.operator_autopilot.last_result.error,
-                      actions: providerWorkflow.operator_autopilot.last_result.actions.map((action) => ({
-                        kind: action.kind,
-                        issue_id: action.issue_id,
-                        issue_identifier: action.issue_identifier,
-                        reason: action.reason,
-                        summary: action.summary,
-                        transition: {
-                          status: action.transition.status,
-                          attempted_at: action.transition.attempted_at,
-                          previous_state: action.transition.previous_state,
-                          target_state: action.transition.target_state,
-                          issue_state: action.transition.issue_state,
-                          issue_state_type: action.transition.issue_state_type,
-                          issue_updated_at: action.transition.issue_updated_at,
-                          error: action.transition.error
-                        },
-                        action_required_reasons: [...action.action_required_reasons]
-                      })),
-                      holds: providerWorkflow.operator_autopilot.last_result.holds.map((hold) => ({
-                        kind: hold.kind,
-                        issue_id: hold.issue_id,
-                        issue_identifier: hold.issue_identifier,
-                        reason: hold.reason,
-                        summary: hold.summary,
-                        action_required_reasons: [...hold.action_required_reasons]
-                      })),
-                      pending_actions:
-                        providerWorkflow.operator_autopilot.last_result.pending_actions.map(
-                          (pendingAction) => ({
-                            kind: pendingAction.kind,
-                            issue_id: pendingAction.issue_id,
-                            issue_identifier: pendingAction.issue_identifier,
-                            summary: pendingAction.summary,
-                            merge_closeout_reason: pendingAction.merge_closeout_reason,
-                            shared_root_status: pendingAction.shared_root_status,
-                            linear_transition_status: pendingAction.linear_transition_status
-                          })
-                        )
-                    }
-                  : null
-              }
-            : null
+            : []
         }
       : null
   };

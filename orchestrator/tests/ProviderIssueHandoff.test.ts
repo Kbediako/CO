@@ -9821,10 +9821,13 @@ describe('createProviderIssueHandoffService', () => {
     });
 
     await service.refresh();
-    await waitForMockCalls(setTimeoutSpy);
+    const { callback: retryTimerCallback, delayMs: retryDelayMs } =
+      getEarliestScheduledTimeoutByDelayRange(setTimeoutSpy, 999, 1_000);
+    expect(retryDelayMs).toBeGreaterThanOrEqual(999);
+    expect(retryDelayMs).toBeLessThanOrEqual(1_000);
     vi.setSystemTime(new Date('2026-03-19T04:30:01.001Z'));
     const persistCallsBeforeRetry = persist.mock.calls.length;
-    getLatestScheduledTimeoutCallback(setTimeoutSpy)();
+    retryTimerCallback();
     await flushAsyncWork();
     await waitForMockCalls(persist, persistCallsBeforeRetry + 1, QUEUED_RETRY_SETTLE_TURNS);
 

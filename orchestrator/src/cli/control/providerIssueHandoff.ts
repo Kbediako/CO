@@ -4178,7 +4178,7 @@ export function createProviderIssueHandoffService(
       }
     }
     if (resultChanged) {
-      options.providerWorkflowConfigStore.recordOperatorAutopilotResult(nextResult);
+      options.providerWorkflowConfigStore.recordOperatorAutopilotResult?.(nextResult);
     }
     if (resultChanged && nextResult.status === 'failed' && !loggedAutopilotFailure) {
       logger.warn(
