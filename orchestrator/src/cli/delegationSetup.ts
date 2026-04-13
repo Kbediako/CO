@@ -7,6 +7,7 @@ import { resolveCodexHome } from './utils/codexPaths.js';
 import { buildCommandPreview } from './utils/commandPreview.js';
 import { readDelegationFallbackConfig } from './utils/delegationConfigParser.js';
 import {
+  classifyDelegationTransport,
   inspectDelegationMcpConfig,
   readPinnedRepo,
   resolveDelegationServerInvocation
@@ -116,6 +117,15 @@ function inspectDelegationReadiness(options: {
         reason: 'Existing delegation MCP entry does not point to codex-orchestrator delegate-server; reconfiguring.'
       };
     }
+    const transport = classifyDelegationTransport(existing);
+    if (transport.status !== 'safe') {
+      return {
+        configured: false,
+        removeExisting: true,
+        envVars,
+        reason: `Existing delegation MCP entry uses ${transport.kind} transport; reconfiguring to the direct dist entrypoint.`
+      };
+    }
     if (existing.pinnedRepo) {
       const pinnedRepo = resolve(existing.pinnedRepo);
       if (pinnedRepo !== requestedRepo) {
@@ -214,6 +224,22 @@ function inspectDelegationReadinessFallback(
       removeExisting: true,
       envVars: config.envVars,
       reason: 'Existing delegation MCP entry does not point to codex-orchestrator delegate-server; reconfiguring.'
+    };
+  }
+  const transport = classifyDelegationTransport({
+    source: 'fallback',
+    command: config.command,
+    args: config.args,
+    envVars: config.envVars,
+    pinnedRepo: readPinnedRepo(config.args),
+    commandLine: buildCommandPreview(config.command ?? '<missing>', config.args)
+  });
+  if (transport.status !== 'safe') {
+    return {
+      configured: false,
+      removeExisting: true,
+      envVars: config.envVars,
+      reason: `Existing delegation MCP entry uses ${transport.kind} transport; reconfiguring to the direct dist entrypoint.`
     };
   }
 
