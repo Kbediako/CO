@@ -58,6 +58,38 @@
       }
     },
     {
+      "id": "20260413-linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb",
+      "title": "CO: Fix delegation MCP startup/perf and stale delegate-server process lifecycle",
+      "relates_to": "tasks/tasks-linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-13",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (direct fallback after provider provenance boundary)",
+          "date": "2026-04-13",
+          "audit_log": ".runs/linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb/cli/2026-04-13T05-44-46-601Z-d94802bb/provider-linear-worker-linear-audit.jsonl",
+          "fallback_note": "out/linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb/manual/20260413T055822Z-docs-review-fallback.md"
+        },
+        "review": {
+          "reviewer": "codex-orchestrator review (clean-success)",
+          "date": "2026-04-13",
+          "status": "succeeded",
+          "manifest": ".runs/linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb/cli/2026-04-13T05-44-46-601Z-d94802bb/manifest.json",
+          "telemetry": ".runs/linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb/cli/2026-04-13T05-44-46-601Z-d94802bb/review/telemetry.json",
+          "elegance_note": "out/linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb/manual/elegance-review.md"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb.md",
+        "task": "tasks/tasks-linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb.md",
+        "agent_task": ".agent/task/linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb.md",
+        "docs": "docs/TECH_SPEC-linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb.md"
+      }
+    },
+    {
       "id": "20260412-linear-2136ea50-1fdf-44c2-ae3c-0e8d8a364b59",
       "title": "CO: audit remaining top-level non-doc and config stewardship surfaces and prune low-value residue",
       "relates_to": "tasks/tasks-linear-2136ea50-1fdf-44c2-ae3c-0e8d8a364b59.md",
