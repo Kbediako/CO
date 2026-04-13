@@ -83,7 +83,7 @@ const RUN_MEMORY_ROLE_PROFILES: Record<RunMemoryRole, RunMemoryRoleProfile> = {
 
 interface PromptPackCandidate {
   packRef: RunMemoryPromptPackRefPack;
-  experiences: string[];
+  experiences: Array<{ index: number; value: string }>;
   domain_lower: string;
 }
 
@@ -138,9 +138,11 @@ function readPromptPackCandidates(manifest: unknown): PromptPackCandidate[] {
     const stamp = typeof entry.stamp === 'string' ? entry.stamp.trim() : '';
     const experiences = Array.isArray(entry.experiences)
       ? entry.experiences
-          .filter((item): item is string => typeof item === 'string')
-          .map((item) => normalizePromptSnippet(item))
-          .filter((item) => item.length > 0)
+          .map((item, index) => ({
+            index,
+            value: typeof item === 'string' ? normalizePromptSnippet(item) : ''
+          }))
+          .filter((item) => item.value.length > 0)
       : [];
     if (!domain || !id || !stamp || experiences.length === 0) {
       return [];
@@ -234,12 +236,12 @@ export function selectRunMemoryForRole(params: {
     refs.push(
       ...selectedPromptPack.candidate.experiences
         .slice(0, experienceLimit)
-        .map((experience, experienceIndex) => ({
+        .map((experience) => ({
           kind: 'prompt_pack_experience' as const,
           pack: selectedPromptPack.candidate.packRef,
-          experience_index: experienceIndex,
+          experience_index: experience.index,
           experience: truncatePromptSnippet(
-            experience,
+            experience.value,
             profile.max_prompt_pack_experience_chars
           ),
           selection_reason: selectedPromptPack.reason

@@ -46,6 +46,8 @@ function buildManifest() {
         experience_slots: 3,
         sources: ['docs/TECH_SPEC-task-1.md'],
         experiences: [
+          '',
+          42,
           '[exp diag-1] Diagnostics fixes should keep log parsing deterministic.',
           '[exp diag-2] Prefer stable evidence artifacts when debugging flaky checks.'
         ]
@@ -79,7 +81,7 @@ describe('run memory controller', () => {
         stamp: 'diag',
         sources: ['docs/TECH_SPEC-task-1.md']
       },
-      experience_index: 0
+      experience_index: 2
     });
   });
 
