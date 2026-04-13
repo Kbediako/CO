@@ -46,9 +46,32 @@ async function createLifecycleFixture() {
   const manifest = {
     run_id: 'run-1161',
     task_id: env.taskId,
+    pipeline_id: 'pipeline-1161',
+    pipeline_title: 'Pipeline 1161',
     status: 'succeeded',
     summary: 'completed',
+    started_at: '2026-03-13T00:00:00.000Z',
+    completed_at: '2026-03-13T00:01:00.000Z',
+    updated_at: '2026-03-13T00:01:00.000Z',
+    artifact_root: '.runs/task-1161/cli/run-1161',
+    log_path: '.runs/task-1161/cli/run-1161/runner.ndjson',
     run_summary_path: null,
+    commands: [
+      {
+        index: 0,
+        id: 'docs-review',
+        title: 'Docs review',
+        kind: 'pipeline',
+        status: 'succeeded',
+        summary: 'docs ok',
+        started_at: '2026-03-13T00:00:05.000Z',
+        completed_at: '2026-03-13T00:00:30.000Z',
+        exit_code: 0,
+        log_path: '.runs/task-1161/cli/run-1161/commands/docs-review.ndjson',
+        sub_run_id: null
+      }
+    ],
+    child_runs: [],
     runtime_mode_requested: 'appserver',
     runtime_mode: 'appserver',
     runtime_provider: 'AppServerRuntimeProvider',
@@ -223,6 +246,62 @@ describe('completeOrchestratorRunLifecycle', () => {
         requestId: 'req-1161'
       }
     });
+
+    expect(manifest.memory?.block_memory).toMatchObject({
+      schema_version: 1,
+      kind: 'index',
+      block_count: 2
+    });
+    const blockMemoryIndexPath = manifest.memory?.block_memory?.index_path;
+    expect(blockMemoryIndexPath).toBe('.runs/task-1161/cli/run-1161/memory/block-memory/index.json');
+    const persistedBlockMemoryIndex = JSON.parse(
+      await readFile(join(env.repoRoot, blockMemoryIndexPath!), 'utf8')
+    ) as {
+      kind: string;
+      artifacts: { manifest_path: string; run_summary_path: string | null };
+      blocks: Array<{
+        id: string;
+        phase_kind: string;
+        traceability: {
+          manifest_path: string;
+          command_log_path: string | null;
+          event_query: { stage_id: string | null };
+        };
+      }>;
+    };
+    expect(persistedBlockMemoryIndex).toMatchObject({
+      kind: 'run_block_memory',
+      artifacts: {
+        manifest_path: '.runs/task-1161/cli/run-1161/manifest.json',
+        run_summary_path: '.runs/task-1161/cli/run-1161/run-summary.json'
+      }
+    });
+    expect(persistedBlockMemoryIndex.blocks).toHaveLength(2);
+    expect(persistedBlockMemoryIndex.blocks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'run:completion',
+          phase_kind: 'run',
+          traceability: expect.objectContaining({
+            manifest_path: '.runs/task-1161/cli/run-1161/manifest.json',
+            command_log_path: null,
+            event_query: expect.objectContaining({
+              stage_id: null
+            })
+          })
+        }),
+        expect.objectContaining({
+          id: 'stage:docs-review',
+          phase_kind: 'stage',
+          traceability: expect.objectContaining({
+            command_log_path: '.runs/task-1161/cli/run-1161/commands/docs-review.ndjson',
+            event_query: expect.objectContaining({
+              stage_id: 'docs-review'
+            })
+          })
+        })
+      ])
+    );
   });
 
   it('stops before apply and runCompleted when finalizePlan fails', async () => {

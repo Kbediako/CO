@@ -1,6 +1,30 @@
 {
   "items": [
     {
+      "id": "20260409-linear-a87ae732-0cf0-475e-b7af-a2dec20933e1",
+      "title": "CO: Emit structured pointer-based block memory from run lifecycle seams",
+      "relates_to": "tasks/tasks-linear-a87ae732-0cf0-475e-b7af-a2dec20933e1.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-09",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (stalled-review fallback accepted)",
+          "date": "2026-04-09",
+          "manifest": ".runs/linear-a87ae732-0cf0-475e-b7af-a2dec20933e1-co-93-docs-review-rerun/cli/2026-04-09T08-45-44-860Z-1bacbce2/manifest.json",
+          "override_reason": "The first audited docs-review child stream failed only because the task spec referenced the planned helper path before the file existed. After narrowing that path reference, the rerun passed spec-guard, docs:check, and docs:freshness, then stalled in the nested forced-review stage without terminal review telemetry or a concrete verdict during multiple bounded wait windows. The packet-shape defect was fixed and the deterministic docs gates passed, so the rerun is recorded as truthful manual fallback evidence rather than a docs packet blocker. See out/linear-a87ae732-0cf0-475e-b7af-a2dec20933e1/manual/20260409T084843Z-docs-review-fallback.md."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-a87ae732-0cf0-475e-b7af-a2dec20933e1.md",
+        "task": "tasks/tasks-linear-a87ae732-0cf0-475e-b7af-a2dec20933e1.md",
+        "agent_task": ".agent/task/linear-a87ae732-0cf0-475e-b7af-a2dec20933e1.md",
+        "docs": "docs/TECH_SPEC-linear-a87ae732-0cf0-475e-b7af-a2dec20933e1.md"
+      }
+    },
+    {
       "id": "20260409-linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad",
       "title": "CO: automate truthful In Review -> Merging promotion after clean review handoff",
       "relates_to": "tasks/tasks-linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad.md",

@@ -484,6 +484,22 @@
       "type": ["object", "null"],
       "additionalProperties": false,
       "properties": {
+        "block_memory": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["schema_version", "kind", "index_path", "generated_at", "block_count"],
+          "properties": {
+            "schema_version": { "type": "integer", "minimum": 1 },
+            "kind": { "type": "string", "const": "index" },
+            "index_path": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^(?![A-Za-z]:[\\\\/])(?![\\\\/])(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+$"
+            },
+            "generated_at": { "type": "string", "minLength": 1 },
+            "block_count": { "type": "integer", "minimum": 1 }
+          }
+        },
         "source_0": {
           "type": ["object", "null"],
           "additionalProperties": false,

@@ -222,6 +222,13 @@ export interface CodexOrchestratorCLIManifest {
       }[]
     | null;
   memory?: {
+    block_memory?: {
+      schema_version: number;
+      kind: "index";
+      index_path: string;
+      generated_at: string;
+      block_count: number;
+    } | null;
     source_0?: {
       schema_version: number;
       kind: "context_object";

@@ -1,6 +1,11 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 
+import {
+  buildRunBlockMemoryPromptLines,
+  readRunBlockMemoryDescriptor,
+  readRunBlockMemoryIndex
+} from '../../orchestrator/src/cli/run/blockMemory.js';
 import { buildRunSource0PromptLines, readRunSource0Descriptor } from '../../orchestrator/src/cli/run/source0.js';
 import { normalizeTaskKey, pathExists } from './docs-helpers.js';
 
@@ -405,6 +410,19 @@ export async function buildReviewPromptContext(
       const source0PromptLines = buildRunSource0PromptLines(readRunSource0Descriptor(rawManifest));
       if (source0PromptLines.length > 0) {
         promptLines.push('', ...source0PromptLines);
+      }
+      const blockMemoryDescriptor = readRunBlockMemoryDescriptor(rawManifest);
+      if (blockMemoryDescriptor) {
+        const blockMemoryIndex = await readRunBlockMemoryIndex(options.repoRoot, blockMemoryDescriptor).catch(
+          () => null
+        );
+        const blockMemoryPromptLines = buildRunBlockMemoryPromptLines({
+          descriptor: blockMemoryDescriptor,
+          index: blockMemoryIndex
+        });
+        if (blockMemoryPromptLines.length > 0) {
+          promptLines.push('', ...blockMemoryPromptLines);
+        }
       }
     } catch {
       // Ignore malformed manifests here and preserve the existing prompt scaffold.

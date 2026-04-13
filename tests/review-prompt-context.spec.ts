@@ -79,6 +79,96 @@ function buildSource0Descriptor(overrides: Partial<Record<string, unknown>> = {}
   };
 }
 
+function buildBlockMemoryDescriptor(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    schema_version: 1,
+    kind: 'index',
+    index_path: '.runs/sample-task/cli/sample-run/memory/block-memory/index.json',
+    generated_at: '2026-04-01T00:00:00.000Z',
+    block_count: 2,
+    ...overrides
+  };
+}
+
+function buildBlockMemoryIndex(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    schema_version: 1,
+    kind: 'run_block_memory',
+    generated_at: '2026-04-01T00:00:00.000Z',
+    run_contract: {
+      task_id: 'sample-task',
+      run_id: 'sample-run',
+      pipeline_id: 'implementation-gate',
+      pipeline_title: 'Implementation Gate'
+    },
+    artifacts: {
+      manifest_path: '.runs/sample-task/cli/sample-run/manifest.json',
+      run_summary_path: '.runs/sample-task/cli/sample-run/run-summary.json',
+      events_path: '.runs/sample-task/cli/sample-run/events.jsonl',
+      runner_log_path: '.runs/sample-task/cli/sample-run/runner.ndjson'
+    },
+    blocks: [
+      {
+        id: 'run:completion',
+        phase_kind: 'run',
+        title: 'Run completion',
+        status: 'succeeded',
+        summary: 'completed',
+        pointer: 'ctx:sha256:block-run#chunk:c000001',
+        object_id: 'sha256:block-run',
+        dir_path: '.runs/sample-task/cli/sample-run/memory/block-memory/blocks/00-run-completion',
+        index_path: '.runs/sample-task/cli/sample-run/memory/block-memory/blocks/00-run-completion/index.json',
+        source_path: '.runs/sample-task/cli/sample-run/memory/block-memory/blocks/00-run-completion/source.txt',
+        byte_length: 256,
+        chunk_count: 1,
+        created_at: '2026-04-01T00:00:00.000Z',
+        traceability: {
+          manifest_path: '.runs/sample-task/cli/sample-run/manifest.json',
+          run_summary_path: '.runs/sample-task/cli/sample-run/run-summary.json',
+          events_path: '.runs/sample-task/cli/sample-run/events.jsonl',
+          runner_log_path: '.runs/sample-task/cli/sample-run/runner.ndjson',
+          command_log_path: null,
+          sub_run_manifest_path: null,
+          event_query: {
+            event_types: ['run_started', 'run_completed'],
+            stage_id: null,
+            stage_index: null
+          }
+        }
+      },
+      {
+        id: 'stage:docs-review',
+        phase_kind: 'stage',
+        title: 'Docs review',
+        status: 'succeeded',
+        summary: 'docs ok',
+        pointer: 'ctx:sha256:block-stage#chunk:c000001',
+        object_id: 'sha256:block-stage',
+        dir_path: '.runs/sample-task/cli/sample-run/memory/block-memory/blocks/01-docs-review',
+        index_path: '.runs/sample-task/cli/sample-run/memory/block-memory/blocks/01-docs-review/index.json',
+        source_path: '.runs/sample-task/cli/sample-run/memory/block-memory/blocks/01-docs-review/source.txt',
+        byte_length: 256,
+        chunk_count: 1,
+        created_at: '2026-04-01T00:00:00.000Z',
+        traceability: {
+          manifest_path: '.runs/sample-task/cli/sample-run/manifest.json',
+          run_summary_path: '.runs/sample-task/cli/sample-run/run-summary.json',
+          events_path: '.runs/sample-task/cli/sample-run/events.jsonl',
+          runner_log_path: '.runs/sample-task/cli/sample-run/runner.ndjson',
+          command_log_path: '.runs/sample-task/cli/sample-run/commands/docs-review.ndjson',
+          sub_run_manifest_path: null,
+          event_query: {
+            event_types: ['step_started', 'step_completed', 'step_failed'],
+            stage_id: 'docs-review',
+            stage_index: 0
+          }
+        }
+      }
+    ],
+    ...overrides
+  };
+}
+
 afterEach(async () => {
   await Promise.all(
     createdSandboxes.splice(0).map((sandbox) => rm(sandbox, { recursive: true, force: true }))
@@ -208,6 +298,48 @@ describe('review-prompt-context', () => {
     );
     expect(result.promptLines).toContain(
       '- Inherited from: run=`parent-run`, task=`parent-task`, manifest=`.runs/parent-task/cli/parent-run/manifest.json`'
+    );
+  });
+
+  it('adds shared block memory prompt lines when the manifest exposes the index', async () => {
+    const sandbox = await makeSandbox();
+    const manifestDir = join(sandbox, '.runs', 'sample-task', 'cli', 'sample-run', 'memory', 'block-memory');
+    await mkdir(manifestDir, { recursive: true });
+    await writeFile(join(manifestDir, 'index.json'), JSON.stringify(buildBlockMemoryIndex()), 'utf8');
+    await writeFile(
+      join(sandbox, '.runs', 'sample-task', 'cli', 'sample-run', 'manifest.json'),
+      JSON.stringify({
+        run_id: 'sample-run',
+        task_id: 'sample-task',
+        memory: {
+          block_memory: buildBlockMemoryDescriptor()
+        }
+      }),
+      'utf8'
+    );
+
+    const result = await buildReviewPromptContext({
+      repoRoot: sandbox,
+      taskKey: 'sample-task',
+      taskLabel: 'sample-task',
+      reviewSurface: 'diff',
+      relativeManifest: '.runs/sample-task/cli/sample-run/manifest.json',
+      runnerLogExists: false,
+      relativeRunnerLog: '.runs/sample-task/cli/sample-run/runner.ndjson',
+      notes: 'Goal: helper test | Summary: block memory | Risks: none',
+      scopeMode: 'uncommitted'
+    });
+
+    expect(result.promptLines).toContain('Shared block memory:');
+    expect(result.promptLines).toContain(
+      '- Index: `.runs/sample-task/cli/sample-run/memory/block-memory/index.json`'
+    );
+    expect(result.promptLines).toContain('- Blocks: 2');
+    expect(result.promptLines).toContain(
+      '- Block `run:completion` (run, succeeded): `ctx:sha256:block-run#chunk:c000001`'
+    );
+    expect(result.promptLines).toContain(
+      '- Block `stage:docs-review` (stage, succeeded): `ctx:sha256:block-stage#chunk:c000001`'
     );
   });
 });
