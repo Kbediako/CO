@@ -1142,6 +1142,23 @@
       }
     },
     {
+      "id": "20260409-linear-9eaac719-eecf-4e49-8d4e-4d793d9ff958",
+      "title": "CO: Make planner memory selection real instead of leaving TaskContext as dead input",
+      "relates_to": "tasks/tasks-linear-9eaac719-eecf-4e49-8d4e-4d793d9ff958.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-09",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-9eaac719-eecf-4e49-8d4e-4d793d9ff958.md",
+        "task": "tasks/tasks-linear-9eaac719-eecf-4e49-8d4e-4d793d9ff958.md",
+        "agent_task": ".agent/task/linear-9eaac719-eecf-4e49-8d4e-4d793d9ff958.md",
+        "docs": "docs/TECH_SPEC-linear-9eaac719-eecf-4e49-8d4e-4d793d9ff958.md"
+      }
+    },
+    {
       "id": "20260409-linear-4a7e540f-b47d-4fa3-a083-e6e9047e68a5",
       "title": "CO STATUS: preserve canonical provider-worker activity truth and EVENT provenance end to end",
       "relates_to": "tasks/tasks-linear-4a7e540f-b47d-4fa3-a083-e6e9047e68a5.md",

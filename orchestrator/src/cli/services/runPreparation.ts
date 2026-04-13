@@ -5,6 +5,7 @@ import { PipelineResolver } from './pipelineResolver.js';
 import { sanitizeTaskId } from '../run/environment.js';
 import type { EnvironmentPaths } from '../run/environment.js';
 import { loadTaskMetadata } from '../tasks/taskMetadata.js';
+import { loadPromptPackMetadata } from '../../../../packages/orchestrator/src/instructions/promptPacks.js';
 import type { TaskContext, PlanResult } from '../../types.js';
 import type { PipelineDefinition } from '../types.js';
 import { resolvePipeline } from '../pipelines/index.js';
@@ -13,6 +14,7 @@ import { findPipeline } from '../config/userConfig.js';
 import type { CliManifest } from '../types.js';
 import { logger } from '../../logger.js';
 import type { RuntimeMode } from '../runtime/types.js';
+import { buildTaskMemoryContext } from './plannerMemory.js';
 
 export interface RunPreparationResult {
   env: EnvironmentPaths;
@@ -89,7 +91,8 @@ export async function prepareRun(options: PrepareRunOptions): Promise<RunPrepara
 
   const metadata = await loadTaskMetadata(env);
   logger.info(`prepareRun loaded metadata for task ${metadata.id}`);
-  const taskContext = createTaskContext(metadata);
+  const promptPackMetadata = await loadPromptPackMetadata(env.repoRoot);
+  const taskContext = createTaskContext(metadata, buildTaskMemoryContext(promptPackMetadata));
   const targetId = resolveTargetStageId(options.targetStageId, options.planTargetFallback ?? null);
   const planner = options.planner ?? new CommandPlanner(resolvedPipeline.pipeline, { targetStageId: targetId });
   logger.info(`prepareRun running planner for pipeline ${resolvedPipeline.pipeline.id}`);
@@ -133,13 +136,17 @@ export function resolvePipelineForResume(
   return pipeline;
 }
 
-export function createTaskContext(metadata: { id: string; slug: string; title: string }): TaskContext {
+export function createTaskContext(
+  metadata: { id: string; slug: string; title: string },
+  memory = buildTaskMemoryContext([])
+): TaskContext {
   return {
     id: metadata.id,
     title: metadata.title,
     description: undefined,
     metadata: {
       slug: metadata.slug
-    }
+    },
+    memory
   };
 }

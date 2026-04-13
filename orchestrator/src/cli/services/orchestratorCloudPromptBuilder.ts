@@ -1,6 +1,11 @@
 import type { TaskContext, PlanItem } from '../../types.js';
 import type { CliManifest, PipelineDefinition, PromptPackManifestEntry } from '../types.js';
 import { buildRunSource0PromptLines, readRunSource0Descriptor } from '../run/source0.js';
+import {
+  readPromptPackIdFromTaskMemoryRefId,
+  readSelectedMemoryRefs,
+  TASK_MEMORY_SOURCE0_REF_ID
+} from './plannerMemory.js';
 
 const MAX_CLOUD_PROMPT_EXPERIENCES = 3;
 const MAX_CLOUD_PROMPT_EXPERIENCE_CHARS = 320;
@@ -94,12 +99,18 @@ function buildCloudExperiencePromptLines(params: {
   target: PlanItem;
   stage: PipelineDefinition['stages'][number];
 }): string[] {
-  const selectedPack = selectPromptPackForCloudPrompt({
-    promptPacks: params.manifest.prompt_packs,
-    pipeline: params.pipeline,
-    target: params.target,
-    stage: params.stage
-  });
+  const selectedMemoryRefs = readSelectedMemoryRefs(params.target);
+  const explicitPackIds = selectedMemoryRefs
+    .map((refId) => readPromptPackIdFromTaskMemoryRefId(refId))
+    .filter((packId): packId is string => packId !== null);
+  const selectedPack =
+    selectExplicitPromptPackForCloudPrompt(params.manifest.prompt_packs, explicitPackIds)
+    ?? selectPromptPackForCloudPrompt({
+      promptPacks: params.manifest.prompt_packs,
+      pipeline: params.pipeline,
+      target: params.target,
+      stage: params.stage
+    });
   if (!selectedPack || !Array.isArray(selectedPack.experiences)) {
     return [];
   }
@@ -122,6 +133,24 @@ function buildCloudExperiencePromptLines(params: {
     `Domain: ${domainLabel}`,
     ...snippets.map((entry, index) => `${index + 1}. ${entry}`)
   ];
+}
+
+function selectExplicitPromptPackForCloudPrompt(
+  promptPacks: PromptPackManifestEntry[] | null | undefined,
+  explicitPackIds: string[]
+): PromptPackManifestEntry | null {
+  if (explicitPackIds.length === 0) {
+    return null;
+  }
+
+  for (const packId of explicitPackIds) {
+    const candidate = (promptPacks ?? []).find((pack) => pack.id === packId) ?? null;
+    if (candidate && hasPromptPackExperiences(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
 }
 
 export function buildCloudPrompt(params: {
@@ -149,7 +178,12 @@ export function buildCloudPrompt(params: {
       stage: params.stage
     })
   );
-  const source0PromptLines = buildRunSource0PromptLines(readRunSource0Descriptor(params.manifest));
+  const selectedMemoryRefs = readSelectedMemoryRefs(params.target);
+  const shouldIncludeSource0 =
+    selectedMemoryRefs.length === 0 || selectedMemoryRefs.includes(TASK_MEMORY_SOURCE0_REF_ID);
+  const source0PromptLines = shouldIncludeSource0
+    ? buildRunSource0PromptLines(readRunSource0Descriptor(params.manifest))
+    : [];
   if (source0PromptLines.length > 0) {
     lines.push('', ...source0PromptLines);
   }
