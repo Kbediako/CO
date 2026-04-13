@@ -53,6 +53,19 @@ describe('delegationMcpHealth', () => {
     expect(result.stalePids).toEqual([303]);
   });
 
+  it('keeps delegate-server children active when the codex parent argv mentions codex-orchestrator text', () => {
+    const snapshot = [
+      '101     1 00:20  10240 codex exec --model gpt-5.4 "debug codex-orchestrator startup"',
+      '202   101 00:10   4096 /opt/homebrew/bin/node /repo/dist/bin/codex-orchestrator.js delegate-server'
+    ].join('\n');
+
+    const result = inspectDelegateServerProcesses({ snapshot });
+    expect(result.activeCount).toBe(1);
+    expect(result.activePids).toEqual([202]);
+    expect(result.staleCount).toBe(0);
+    expect(result.stalePids).toEqual([]);
+  });
+
   it('formats unavailable cleanup results without claiming a successful apply', () => {
     const lines = formatDelegateServerCleanupSummary({
       status: 'unavailable',
@@ -216,7 +229,7 @@ describe('delegationMcpHealth', () => {
       { pid: 202, signal: 'SIGKILL' }
     ]);
     expect(result.replacedPids).toEqual([606, 505]);
-    expect(result.terminatedPids).toEqual([303, 202]);
+    expect(result.terminatedPids).toEqual([303]);
     expect(result.forcedPids).toEqual([202]);
     expect(result.remainingPids).toEqual([404]);
   });

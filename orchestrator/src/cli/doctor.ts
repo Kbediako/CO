@@ -361,6 +361,7 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
         : delegationProcesses.status === 'unavailable'
           ? 'unavailable'
           : 'ok';
+  const delegationBlocksOverallStatus = delegationStatus === 'missing-config';
   const repoRoot = resolveDoctorRepoRoot(cwd);
   const providers = inspectProviderReadiness(repoRoot, process.env);
 
@@ -369,7 +370,7 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
       missing.length === 0 &&
       codexDefaults.status === 'ok' &&
       providers.status === 'ok' &&
-      delegationStatus === 'ok'
+      !delegationBlocksOverallStatus
         ? 'ok'
         : 'warning',
     missing,

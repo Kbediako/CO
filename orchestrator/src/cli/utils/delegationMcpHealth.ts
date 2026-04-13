@@ -489,10 +489,14 @@ export async function cleanupStaleDelegateServerProcesses(options: {
   }
 
   const stalePids = stalePidRecords.map((record) => record.pid);
-  const replacedPids = stalePids.filter((pid) => replacedSet.has(pid));
-  const terminatedPids = stalePids.filter((pid) => terminatedSet.has(pid));
   const forcedPids = stalePids.filter((pid) => forcedSet.has(pid));
-  const remainingPids = stalePids.filter((pid) => remainingSet.has(pid));
+  const terminatedPids = stalePids.filter((pid) => !forcedSet.has(pid) && terminatedSet.has(pid));
+  const replacedPids = stalePids.filter(
+    (pid) => !forcedSet.has(pid) && !terminatedSet.has(pid) && replacedSet.has(pid)
+  );
+  const remainingPids = stalePids.filter(
+    (pid) => !forcedSet.has(pid) && !terminatedSet.has(pid) && !replacedSet.has(pid) && remainingSet.has(pid)
+  );
 
   return {
     ...inspection,
@@ -735,9 +739,6 @@ function isDelegateServerRootedInCodex(
 }
 
 function isCodexClientCommand(command: string): boolean {
-  if (command.includes('codex-orchestrator')) {
-    return false;
-  }
   const args = parseShellStyleArguments(command);
   return args.some((arg) => basename(arg) === 'codex');
 }
