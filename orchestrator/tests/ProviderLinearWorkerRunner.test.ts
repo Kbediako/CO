@@ -528,6 +528,57 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(context.runDir).toBe(workspaceRunDir);
   });
 
+  it('rebases provider manifests from configured runs layout roots to the issue workspace counterpart', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-worker-runs-layout-'));
+    const taskId = 'linear-lin-issue-1';
+    const issueWorkspacePath = join(tempRoot, '.workspaces', taskId);
+    const sharedRunDir = join(tempRoot, 'runs', taskId, 'cli', 'run-child');
+    const workspaceRunDir = join(issueWorkspacePath, 'runs', taskId, 'cli', 'run-child');
+    const sharedManifestPath = join(sharedRunDir, 'manifest.json');
+    const workspaceManifestPath = join(workspaceRunDir, 'manifest.json');
+    await mkdir(sharedRunDir, { recursive: true });
+    await mkdir(workspaceRunDir, { recursive: true });
+    await writeFile(
+      sharedManifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: taskId,
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: tempRoot
+      }),
+      'utf8'
+    );
+    await writeFile(
+      workspaceManifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: taskId,
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: issueWorkspacePath
+      }),
+      'utf8'
+    );
+
+    const context = await loadProviderLinearWorkerContext(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: sharedManifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot,
+        CODEX_ORCHESTRATOR_TASK_ID: taskId,
+        CODEX_ORCHESTRATOR_RUNS_DIR: join(tempRoot, 'runs')
+      },
+      undefined,
+      issueWorkspacePath
+    );
+
+    expect(context.repoRoot).toBe(issueWorkspacePath);
+    expect(context.workspacePath).toBe(issueWorkspacePath);
+    expect(context.manifestPath).toBe(workspaceManifestPath);
+    expect(context.controlHostManifestPath).toBe(sharedManifestPath);
+    expect(context.runDir).toBe(workspaceRunDir);
+  });
+
   it('keeps the original manifest when the authoritative issue workspace has no mirror', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
     const issueWorkspacePath = join(tempRoot ?? '', '.workspaces', 'linear-lin-issue-1');
@@ -707,7 +758,27 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     ).rejects.toThrow('slashes are not allowed');
   });
 
-  it('rejects manifest-path task fallback outside the canonical .runs layout', async () => {
+  it('uses manifest-path task fallback inside the runs layout', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-worker-runs-fallback-'));
+    const manifestDir = join(tempRoot, 'runs', 'linear-lin-issue-1', 'cli', 'run-child');
+    await mkdir(manifestDir, { recursive: true });
+    const manifestPath = join(manifestDir, 'manifest.json');
+    await writeFile(manifestPath, JSON.stringify({
+      run_id: 'run-child',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      workspace_path: tempRoot
+    }), 'utf8');
+
+    const context = await loadProviderLinearWorkerContext({
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+      CODEX_ORCHESTRATOR_ROOT: tempRoot
+    });
+
+    expect(context.taskId).toBe('linear-lin-issue-1');
+  });
+
+  it('rejects manifest-path task fallback outside the canonical artifact layout', async () => {
     tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-worker-noncanonical-'));
     const manifestDir = join(tempRoot, 'not-runs', 'run-child');
     await mkdir(manifestDir, { recursive: true });

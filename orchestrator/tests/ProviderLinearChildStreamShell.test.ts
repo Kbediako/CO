@@ -326,6 +326,58 @@ describe('runProviderLinearChildStreamShell', () => {
     });
     expect(execRunner.mock.calls[0]?.[0]?.env.CODEX_ORCHESTRATOR_RUNS_DIR).toBe(join(tempRoot ?? '', '.runs'));
   });
+  it('maps configured shared runs layout roots to workspace-local child stream evidence', async () => {
+    externalRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-stream-shared-root-'));
+    tempRoot = join(externalRoot, '.workspaces', TASK_ID);
+    const runDir = join(tempRoot, '.runs', TASK_ID, 'cli', RUN_ID);
+    const manifestPath = join(runDir, 'manifest.json');
+    await mkdir(runDir, { recursive: true });
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: RUN_ID,
+        task_id: TASK_ID,
+        pipeline_id: 'provider-linear-worker',
+        ...ISSUE,
+        issue_updated_at: '2026-03-26T14:32:20.815Z',
+        provider_control_host_task_id: CONTROL_HOST_TASK_ID,
+        provider_control_host_run_id: CONTROL_HOST_RUN_ID,
+        workspace_path: tempRoot
+      }),
+      'utf8'
+    );
+    const execRunner = vi.fn(async () => ({
+      exitCode: 0,
+      stdout: JSON.stringify({
+        run_id: 'docs-run-1',
+        status: 'succeeded',
+        artifact_root: `runs/${TASK_ID}-docs-review/cli/docs-run-1`,
+        manifest: `runs/${TASK_ID}-docs-review/cli/docs-run-1/manifest.json`,
+        summary: 'ok'
+      }),
+      stderr: ''
+    }));
+
+    const result = await runProviderLinearChildStreamShell(
+      {
+        pipelineId: 'docs-review',
+        env: buildProviderWorkerEnv(manifestPath, {
+          CODEX_ORCHESTRATOR_RUNS_DIR: join(externalRoot, 'runs')
+        })
+      },
+      { execRunner: execRunner as never }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      child_run: {
+        manifest_path: join(tempRoot, 'runs', `${TASK_ID}-docs-review`, 'cli', 'docs-run-1', 'manifest.json')
+      }
+    });
+    expect(execRunner.mock.calls[0]?.[0]?.env.CODEX_ORCHESTRATOR_RUNS_DIR).toBe(
+      join(tempRoot, 'runs')
+    );
+  });
   it('parses a valid trailing child-run json object after prelude logs', async () => {
     const { manifestPath } = await createProviderWorkerManifest();
     const result = await runProviderLinearChildStreamShell(

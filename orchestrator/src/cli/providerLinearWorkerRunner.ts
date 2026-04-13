@@ -707,6 +707,7 @@ function resolveProviderLinearWorkerManifestPathForRoot(input: {
   manifestPath: string;
   repoRoot: string;
   taskId: string;
+  configuredRunsDir?: string | null;
 }): string {
   const normalizedManifestPath = resolve(input.manifestPath);
   if (!isProviderIssueWorkspaceRootForTask(input.repoRoot, input.taskId)) {
@@ -716,17 +717,56 @@ function resolveProviderLinearWorkerManifestPathForRoot(input: {
     return normalizedManifestPath;
   }
 
-  const sharedRunsRoot = join(dirname(dirname(input.repoRoot)), '.runs');
+  const sharedRoot = dirname(dirname(input.repoRoot));
+  const sharedRunsRoot = resolveProviderLinearWorkerSharedRunsRoot({
+    sharedRoot,
+    configuredRunsDir: input.configuredRunsDir,
+    manifestPath: normalizedManifestPath
+  });
   if (!isPathWithinRoot(normalizedManifestPath, sharedRunsRoot)) {
     return normalizedManifestPath;
   }
 
-  const workspaceManifestPath = resolve(
+  const workspaceRunsRoot = resolveProviderLinearWorkerWorkspaceRunsRoot(
     input.repoRoot,
-    '.runs',
-    relative(sharedRunsRoot, normalizedManifestPath)
+    sharedRoot,
+    sharedRunsRoot
   );
+  if (!workspaceRunsRoot) {
+    return normalizedManifestPath;
+  }
+  const workspaceManifestPath = resolve(workspaceRunsRoot, relative(sharedRunsRoot, normalizedManifestPath));
   return existsSync(workspaceManifestPath) ? workspaceManifestPath : normalizedManifestPath;
+}
+
+function resolveProviderLinearWorkerSharedRunsRoot(input: {
+  sharedRoot: string;
+  configuredRunsDir?: string | null;
+  manifestPath: string;
+}): string {
+  const normalizedConfiguredRunsDir = normalizeOptionalString(input.configuredRunsDir);
+  if (normalizedConfiguredRunsDir) {
+    return isAbsolute(normalizedConfiguredRunsDir)
+      ? resolve(normalizedConfiguredRunsDir)
+      : resolve(input.sharedRoot, normalizedConfiguredRunsDir);
+  }
+  const runDir = dirname(input.manifestPath);
+  const layoutDir = dirname(runDir);
+  const taskDir = dirname(layoutDir);
+  const runsRoot = dirname(taskDir);
+  return ['.runs', 'runs'].includes(basename(runsRoot)) ? runsRoot : join(input.sharedRoot, '.runs');
+}
+
+function resolveProviderLinearWorkerWorkspaceRunsRoot(
+  repoRoot: string,
+  sharedRoot: string,
+  sharedRunsRoot: string
+): string | null {
+  if (!isPathWithinRoot(sharedRunsRoot, sharedRoot)) {
+    return null;
+  }
+  const relativeRunsRoot = relative(sharedRoot, sharedRunsRoot);
+  return resolve(repoRoot, relativeRunsRoot);
 }
 
 export async function loadProviderLinearWorkerContext(
@@ -779,7 +819,8 @@ export async function loadProviderLinearWorkerContext(
   const selectedManifestPath = resolveProviderLinearWorkerManifestPathForRoot({
     manifestPath,
     repoRoot,
-    taskId: initialTaskId
+    taskId: initialTaskId,
+    configuredRunsDir: env.CODEX_ORCHESTRATOR_RUNS_DIR
   });
   if (selectedManifestPath !== manifestPath) {
     manifestPath = selectedManifestPath;
@@ -899,7 +940,7 @@ function contextTaskIdFromManifestPath(manifestPath: string): string | null {
   if (
     basename(resolvedManifestPath) !== 'manifest.json' ||
     basename(cliDir) !== 'cli' ||
-    basename(runsDir) !== '.runs'
+    !['.runs', 'runs'].includes(basename(runsDir))
   ) {
     return null;
   }

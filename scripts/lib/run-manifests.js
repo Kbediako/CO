@@ -81,6 +81,79 @@ function isPathWithinRoot(root, candidate) {
   );
 }
 
+function firstPathSegment(relativePath) {
+  return relativePath.split(sep).filter((segment) => segment.length > 0)[0] ?? '';
+}
+
+function isDefaultRunsLayoutSegment(segment) {
+  return segment === '.runs' || segment === 'runs';
+}
+
+function resolveConfiguredArtifactRoot(baseRoot, configured, fallbackDirname) {
+  if (!configured) {
+    return resolve(baseRoot, fallbackDirname);
+  }
+  return isAbsolute(configured) ? resolve(configured) : resolve(baseRoot, configured);
+}
+
+function resolveWorkspaceArtifactRootForSharedRoot(
+  repoRoot,
+  sharedRoot,
+  sharedArtifactRoot,
+  fallbackDirname,
+  allowCustomCounterpart = false
+) {
+  if (!sharedRoot || !isPathWithinRoot(sharedRoot, sharedArtifactRoot)) {
+    return null;
+  }
+  const relativeArtifactRoot = relative(sharedRoot, sharedArtifactRoot);
+  const firstSegment = firstPathSegment(relativeArtifactRoot);
+  if (
+    (fallbackDirname === '.runs' && isDefaultRunsLayoutSegment(firstSegment)) ||
+    firstSegment === fallbackDirname ||
+    allowCustomCounterpart
+  ) {
+    return resolve(repoRoot, relativeArtifactRoot);
+  }
+  return null;
+}
+
+function resolveProviderWorkspaceManifestCounterpartPath(repoRoot, env, cwd) {
+  const manifestPath = env.CODEX_ORCHESTRATOR_MANIFEST_PATH || env.MANIFEST;
+  if (!manifestPath) {
+    return null;
+  }
+  const inheritedSharedRoot = resolveProviderSharedRootForIssueWorkspace(repoRoot, env, cwd);
+  const sharedRoot = dirname(dirname(repoRoot));
+  const resolvedManifestPath = resolveConfiguredPath(manifestPath, inheritedSharedRoot ?? repoRoot);
+  if (isPathWithinRoot(repoRoot, resolvedManifestPath)) {
+    return resolvedManifestPath;
+  }
+  const sharedRunsRoot = resolveConfiguredArtifactRoot(
+    inheritedSharedRoot ?? sharedRoot,
+    env.CODEX_ORCHESTRATOR_RUNS_DIR || '.runs',
+    '.runs'
+  );
+  if (!isPathWithinRoot(sharedRunsRoot, resolvedManifestPath)) {
+    return null;
+  }
+  const workspaceRunsRoot = resolveWorkspaceArtifactRootForSharedRoot(
+    repoRoot,
+    sharedRoot,
+    sharedRunsRoot,
+    '.runs',
+    true
+  );
+  if (!workspaceRunsRoot) {
+    return null;
+  }
+  const workspaceManifestPath = resolve(
+    workspaceRunsRoot,
+    relative(sharedRunsRoot, resolvedManifestPath)
+  );
+  return existsSync(workspaceManifestPath) ? workspaceManifestPath : null;
+}
+
 function shouldScopeProviderArtifactDirs(repoRoot, env, cwd) {
   if (env.CODEX_ORCHESTRATOR_PIPELINE_ID !== PROVIDER_LINEAR_WORKER_PIPELINE_ID) {
     return false;
@@ -103,70 +176,126 @@ function providerWorkspaceManifestCounterpartExists(repoRoot, env, cwd) {
   if (!manifestPath) {
     return true;
   }
+  const counterpartPath = resolveProviderWorkspaceManifestCounterpartPath(repoRoot, env, cwd);
+  if (counterpartPath) {
+    return true;
+  }
   const inheritedSharedRoot = resolveProviderSharedRootForIssueWorkspace(repoRoot, env, cwd);
+  const sharedRoot = dirname(dirname(repoRoot));
   const resolvedManifestPath = resolveConfiguredPath(manifestPath, inheritedSharedRoot ?? repoRoot);
   if (isPathWithinRoot(repoRoot, resolvedManifestPath)) {
     return true;
   }
-  const sharedRunsRoot = join(dirname(dirname(repoRoot)), '.runs');
-  if (!isPathWithinRoot(sharedRunsRoot, resolvedManifestPath)) {
-    return true;
-  }
-  const workspaceManifestPath = resolve(
-    repoRoot,
-    '.runs',
-    relative(sharedRunsRoot, resolvedManifestPath)
+  const sharedRunsRoot = resolveConfiguredArtifactRoot(
+    inheritedSharedRoot ?? sharedRoot,
+    env.CODEX_ORCHESTRATOR_RUNS_DIR || '.runs',
+    '.runs'
   );
-  return existsSync(workspaceManifestPath);
+  if (!isPathWithinRoot(sharedRunsRoot, resolvedManifestPath)) {
+    return false;
+  }
+  return false;
 }
 
-function resolveArtifactDir(repoRoot, configured, fallbackDirname, scopeToRepoRoot, baseRoot = repoRoot) {
+function resolveArtifactDir(
+  repoRoot,
+  configured,
+  fallbackDirname,
+  scopeToRepoRoot,
+  baseRoot = repoRoot,
+  hasProviderWorkspaceManifestCounterpart = false,
+  sharedRootForCounterpart = baseRoot
+) {
   const relativeBaseRoot = scopeToRepoRoot ? repoRoot : baseRoot;
   const fallback = resolve(relativeBaseRoot, fallbackDirname);
   if (!configured) {
     return fallback;
   }
-  const candidate = isAbsolute(configured) ? resolve(configured) : resolve(relativeBaseRoot, configured);
-  if (
-    scopeToRepoRoot &&
-    !isPathWithinRoot(repoRoot, candidate) &&
-    candidate === resolve(dirname(dirname(repoRoot)), fallbackDirname)
-  ) {
-    return fallback;
+  const candidate =
+    scopeToRepoRoot && !isAbsolute(configured)
+      ? resolve(repoRoot, configured)
+      : resolveConfiguredArtifactRoot(baseRoot, configured, fallbackDirname);
+  if (scopeToRepoRoot && !isPathWithinRoot(repoRoot, candidate)) {
+    const workspaceArtifactRoot = resolveWorkspaceArtifactRootForSharedRoot(
+      repoRoot,
+      sharedRootForCounterpart,
+      candidate,
+      fallbackDirname,
+      hasProviderWorkspaceManifestCounterpart
+    );
+    if (workspaceArtifactRoot) {
+      return workspaceArtifactRoot;
+    }
   }
   return candidate;
 }
 
-function resolveRunsDir(repoRoot, env, scopeToRepoRoot, baseRoot = repoRoot) {
+function resolveRunsDir(
+  repoRoot,
+  env,
+  scopeToRepoRoot,
+  baseRoot = repoRoot,
+  hasProviderWorkspaceManifestCounterpart = false,
+  sharedRootForCounterpart = baseRoot
+) {
   return resolveArtifactDir(
     repoRoot,
     env.CODEX_ORCHESTRATOR_RUNS_DIR || '.runs',
     '.runs',
     scopeToRepoRoot,
-    baseRoot
+    baseRoot,
+    hasProviderWorkspaceManifestCounterpart,
+    sharedRootForCounterpart
   );
 }
 
-function resolveOutDir(repoRoot, env, scopeToRepoRoot, baseRoot = repoRoot) {
+function resolveOutDir(
+  repoRoot,
+  env,
+  scopeToRepoRoot,
+  baseRoot = repoRoot,
+  hasProviderWorkspaceManifestCounterpart = false,
+  sharedRootForCounterpart = baseRoot
+) {
   return resolveArtifactDir(
     repoRoot,
     env.CODEX_ORCHESTRATOR_OUT_DIR || 'out',
     'out',
     scopeToRepoRoot,
-    baseRoot
+    baseRoot,
+    hasProviderWorkspaceManifestCounterpart,
+    sharedRootForCounterpart
   );
 }
 
 export function resolveEnvironmentPathsForProcess(env = process.env, cwd = process.cwd()) {
   const repoRoot = resolveRepoRoot(env, cwd);
+  const providerSharedRoot = resolveProviderSharedRootForIssueWorkspace(repoRoot, env, cwd);
+  const providerWorkspaceManifestCounterpartPath = resolveProviderWorkspaceManifestCounterpartPath(
+    repoRoot,
+    env,
+    cwd
+  );
   const scopeProviderArtifacts = shouldScopeProviderArtifactDirs(repoRoot, env, cwd);
-  const providerSharedRoot =
-    scopeProviderArtifacts
-      ? null
-      : resolveProviderSharedRootForIssueWorkspace(repoRoot, env, cwd);
   const artifactBaseRoot = providerSharedRoot ?? repoRoot;
-  const runsRoot = resolveRunsDir(repoRoot, env, scopeProviderArtifacts, artifactBaseRoot);
-  const outRoot = resolveOutDir(repoRoot, env, scopeProviderArtifacts, artifactBaseRoot);
+  const sharedRootForCounterpart = providerSharedRoot ?? dirname(dirname(repoRoot));
+  const hasProviderWorkspaceManifestCounterpart = Boolean(providerWorkspaceManifestCounterpartPath);
+  const runsRoot = resolveRunsDir(
+    repoRoot,
+    env,
+    scopeProviderArtifacts,
+    artifactBaseRoot,
+    hasProviderWorkspaceManifestCounterpart,
+    sharedRootForCounterpart
+  );
+  const outRoot = resolveOutDir(
+    repoRoot,
+    env,
+    scopeProviderArtifacts,
+    artifactBaseRoot,
+    hasProviderWorkspaceManifestCounterpart,
+    sharedRootForCounterpart
+  );
   const taskId = (env.CODEX_ORCHESTRATOR_PIPELINE_ID === PROVIDER_LINEAR_WORKER_PIPELINE_ID ? resolveProviderTaskId(env, repoRoot) : resolveConfiguredTaskId(env)) ?? DEFAULT_TASK_ID;
   return { repoRoot, runsRoot, outRoot, taskId };
 }
