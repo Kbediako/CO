@@ -352,4 +352,27 @@ describe('review-prompt-context', () => {
       )
     ).rejects.toThrow('block_memory index_path must be repo-relative');
   });
+
+  it('returns null when the block memory index file is unreadable', async () => {
+    await expect(
+      readRunBlockMemoryIndex(
+        '/tmp/repo',
+        buildBlockMemoryDescriptor({
+          index_path: '.runs/sample-task/cli/sample-run/memory/block-memory/missing.json'
+        }) as RunBlockMemoryDescriptor
+      )
+    ).resolves.toBeNull();
+  });
+
+  it('returns null when any decoded block entry is invalid', async () => {
+    const sandbox = await makeSandbox();
+    const manifestDir = join(sandbox, '.runs', 'sample-task', 'cli', 'sample-run', 'memory', 'block-memory');
+    await mkdir(manifestDir, { recursive: true });
+    const malformedIndex = buildBlockMemoryIndex();
+    malformedIndex.blocks[1] = { ...malformedIndex.blocks[1], pointer: null } as never;
+    await writeFile(join(manifestDir, 'index.json'), JSON.stringify(malformedIndex), 'utf8');
+
+    await expect(readRunBlockMemoryIndex(sandbox, buildBlockMemoryDescriptor() as RunBlockMemoryDescriptor)).resolves
+      .toBeNull();
+  });
 });

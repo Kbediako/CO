@@ -58,10 +58,10 @@ async function createLifecycleFixture() {
     run_summary_path: null,
     commands: [
       {
-        index: 0,
+        index: 1,
         id: 'docs-review',
         title: 'Docs review',
-        kind: 'pipeline',
+        kind: 'subpipeline',
         status: 'succeeded',
         summary: 'docs ok',
         started_at: '2026-03-13T00:00:05.000Z',

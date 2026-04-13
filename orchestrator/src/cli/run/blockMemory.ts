@@ -323,11 +323,14 @@ export async function readRunBlockMemoryIndex(
   repoRoot: string,
   descriptor: RunBlockMemoryDescriptor
 ): Promise<RunBlockMemoryIndex | null> {
-  const raw = await readFile(
-    resolveRepoRelativePath(resolve(repoRoot), descriptor.index_path, 'index_path'),
-    'utf8'
-  );
-  const parsed = JSON.parse(raw) as unknown;
+  const resolvedIndexPath = resolveRepoRelativePath(resolve(repoRoot), descriptor.index_path, 'index_path');
+  let parsed: unknown;
+  try {
+    const raw = await readFile(resolvedIndexPath, 'utf8');
+    parsed = JSON.parse(raw) as unknown;
+  } catch {
+    return null;
+  }
   if (!isRecord(parsed)) {
     return null;
   }
@@ -336,18 +339,20 @@ export async function readRunBlockMemoryIndex(
   const generatedAt = readNonEmptyString(parsed.generated_at);
   const runContract = isRecord(parsed.run_contract) ? parsed.run_contract : null;
   const artifacts = isRecord(parsed.artifacts) ? parsed.artifacts : null;
-  const blocks = Array.isArray(parsed.blocks)
-    ? parsed.blocks
-        .map((entry) => readRunBlockMemoryBlockDescriptor(entry))
-        .filter((entry): entry is RunBlockMemoryBlockDescriptor => entry !== null)
+  const decodedBlocks = Array.isArray(parsed.blocks)
+    ? parsed.blocks.map((entry) => readRunBlockMemoryBlockDescriptor(entry))
     : null;
+  const blocks =
+    decodedBlocks?.filter((entry): entry is RunBlockMemoryBlockDescriptor => entry !== null) ?? null;
   if (
     schemaVersion !== RUN_BLOCK_MEMORY_SCHEMA_VERSION ||
     kind !== RUN_BLOCK_MEMORY_INDEX_KIND ||
     !generatedAt ||
     !runContract ||
     !artifacts ||
-    !blocks
+    !decodedBlocks ||
+    !blocks ||
+    blocks.length !== decodedBlocks.length
   ) {
     return null;
   }
