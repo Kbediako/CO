@@ -10,7 +10,7 @@ cp .agent/task/templates/tasks-template.md tasks/tasks-<task-id>.md
 
 Checklist requirements in this repo:
 - every item starts as `[ ]` and flips to `[x]` only with concrete evidence
-- evidence should point at a manifest path, review artifact, or equivalent machine-checkable file
+- evidence should point at a manifest path, review artifact, or other truthful, checkable proof suitable for the action; for non-manifest steps, command output, source-file paths, or `out/...` summaries are acceptable
 - validation should match the lane’s real guardrails (`spec-guard`, build/lint/test, docs gates, review, and any required extras)
 
 ## 2) Mirror the checklist under `.agent/task/`

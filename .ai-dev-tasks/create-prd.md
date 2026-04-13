@@ -36,7 +36,7 @@ Fill in the PRD with:
 ## 3) Keep the packet aligned with the current workflow
 - Link both the canonical task spec and docs-side TECH_SPEC mirror from `tasks/index.json` (`paths.spec` and `paths.docs`).
 - Update `docs/TASKS.md` and `docs/docs-freshness-registry.json` when you register or rename the packet.
-- Use the bundled `skills/docs-first/SKILL.md` when the lane needs the full repo workflow, not a one-off doc.
+- Prefer `$CODEX_HOME/skills/docs-first` when available, and fall back to `skills/docs-first/SKILL.md` when a global install is not present.
 
 ## 4) Run docs-review before implementation
 Use the packet task id for the pre-implementation docs gate:
@@ -44,4 +44,9 @@ Use the packet task id for the pre-implementation docs gate:
 npx codex-orchestrator start docs-review --format json --no-interactive --task <task-id>
 ```
 
-Provider-worker lanes should use the `linear child-stream --pipeline docs-review` helper so the child manifest stays scoped under the issue workspace.
+After the run, record the emitted manifest path in:
+- `tasks/tasks-<task-id>.md`
+- `.agent/task/<task-id>.md`
+- `tasks/index.json` under the task's docs-review approval evidence
+
+Provider-worker lanes should use the `linear child-stream --pipeline docs-review` helper, so the child manifest stays scoped under the issue workspace and is the exact path recorded in those mirrors.

@@ -40,7 +40,7 @@
 - [x] `MCP_RUNNER_TASK_ID=linear-2136ea50-1fdf-44c2-ae3c-0e8d8a364b59 npm run docs:check`.
 - [x] `MCP_RUNNER_TASK_ID=linear-2136ea50-1fdf-44c2-ae3c-0e8d8a364b59 npm run docs:freshness`.
 - [x] `MCP_RUNNER_TASK_ID=linear-2136ea50-1fdf-44c2-ae3c-0e8d8a364b59 node scripts/diff-budget.mjs`.
-- [x] Manifest-backed standalone review plus explicit elegance review before handoff. Evidence: manual fallback note `out/linear-2136ea50-1fdf-44c2-ae3c-0e8d8a364b59/manual/20260413T071602Z-manual-review-fallback.md`, elegance note `out/linear-2136ea50-1fdf-44c2-ae3c-0e8d8a364b59/manual/20260413T071602Z-elegance-review.md`, wrapper manifest `../../.runs/linear-2136ea50-1fdf-44c2-ae3c-0e8d8a364b59/cli/2026-04-13T06-52-54-173Z-efcd8ca6/manifest.json`, telemetry `../../.runs/linear-2136ea50-1fdf-44c2-ae3c-0e8d8a364b59/cli/2026-04-13T06-52-54-173Z-efcd8ca6/review/telemetry.json`.
+- [x] Manifest-backed standalone review plus explicit elegance review before handoff. Evidence: manual fallback note `out/linear-2136ea50-1fdf-44c2-ae3c-0e8d8a364b59/manual/20260413T071602Z-manual-review-fallback.md`, elegance note `out/linear-2136ea50-1fdf-44c2-ae3c-0e8d8a364b59/manual/20260413T071602Z-elegance-review.md`, wrapper manifest `.runs/linear-2136ea50-1fdf-44c2-ae3c-0e8d8a364b59/cli/2026-04-13T06-52-54-173Z-efcd8ca6/manifest.json`, telemetry `.runs/linear-2136ea50-1fdf-44c2-ae3c-0e8d8a364b59/cli/2026-04-13T06-52-54-173Z-efcd8ca6/review/telemetry.json`.
 
 ## Handoff
 - [x] Workpad refreshed after docs-first, after the current-main sync, and before review handoff.

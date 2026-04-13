@@ -57,7 +57,7 @@ Before handoff, run the required floor in order:
 - `npm run docs:freshness`
 - `npm run repo:stewardship`
 - `node scripts/diff-budget.mjs`
-- `NOTES=\"Goal: ... | Summary: ... | Risks: ...\" npm run review`
+- `NOTES="Goal: ... | Summary: ... | Risks: ..." npm run review`
 - `npm run pack:smoke` when touching downstream-facing CLI/package/skills/review-wrapper surfaces
 
 If the diff is non-trivial, record an explicit elegance/minimality pass before handoff.
