@@ -53,7 +53,10 @@ import {
   PROVIDER_WORKSPACE_ROOT_DIRNAME,
   resolveProviderWorkspacePath
 } from './run/workspacePath.js';
-import { buildRunSource0PromptLines, readRunSource0Descriptor } from './run/source0.js';
+import {
+  buildRunMemoryPromptLines,
+  selectRunMemoryForRole
+} from './run/runMemoryController.js';
 import { writeJsonAtomic } from './utils/fs.js';
 import {
   createRuntimeCodexCommandContext,
@@ -1164,7 +1167,13 @@ export function buildProviderWorkerPrompt(
     attemptContext.linearAudit ?? null,
     attemptContext.attemptStartedAt ?? null
   );
-  const source0PromptLines = buildRunSource0PromptLines(readRunSource0Descriptor(attemptContext.manifest ?? null));
+  const runMemoryPromptLines = buildRunMemoryPromptLines(
+    selectRunMemoryForRole({
+      role: 'executor',
+      manifest: attemptContext.manifest ?? null,
+      hints: [issue.identifier, issue.title, issue.description ?? '']
+    })
+  );
   const continueResidentSessionOnBoot = attemptContext.continueResidentSessionOnBoot === true;
   const logicalTurnCount = attemptContext.residentSession?.logical_turn_count ?? 0;
   if (turnNumber > 1 || continueResidentSessionOnBoot) {
@@ -1202,7 +1211,7 @@ export function buildProviderWorkerPrompt(
       '- `Merging` and `Rework` are optional active workflow states only when the team exposes them.',
       ...buildMergedCloseoutGuidance(sharedRepoCheckoutPath),
       '- If the issue is in `Rework`, treat it as a full approach reset: close the previous PR, remove the previous workpad, create a fresh branch from `origin/main`, then restart execution under a new workpad before handing back to review.',
-      ...(source0PromptLines.length > 0 ? ['', ...source0PromptLines] : []),
+      ...(runMemoryPromptLines.length > 0 ? ['', ...runMemoryPromptLines] : []),
       ...(continueResidentSessionOnBoot
         ? ['', 'Fresh Linear context for this guarded restart:', ...buildCurrentIssueContextSection(issue)]
         : []),
@@ -1246,7 +1255,7 @@ export function buildProviderWorkerPrompt(
     '- Treat `Merging` and `Rework` as active workflow states only when the team exposes them.',
     ...buildMergedCloseoutGuidance(sharedRepoCheckoutPath),
     '- If the issue is in `Rework`, treat it as a full approach reset: close the previous PR, remove the previous workpad, create a fresh branch from `origin/main`, then restart execution under a new workpad before handing back to review.',
-    ...(source0PromptLines.length > 0 ? ['', ...source0PromptLines] : []),
+    ...(runMemoryPromptLines.length > 0 ? ['', ...runMemoryPromptLines] : []),
     `- This is turn #1 of ${maxTurns} for the current worker run.`,
     ...buildCurrentIssueContextSection(issue)
   ]

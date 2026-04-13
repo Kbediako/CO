@@ -879,7 +879,17 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     const manifest = {
       memory: {
         source_0: buildSource0Descriptor()
-      }
+      },
+      prompt_packs: [
+        {
+          id: 'pp-implementation',
+          domain: 'implementation',
+          stamp: 'impl',
+          experience_slots: 3,
+          sources: ['docs/PRD-linear-lin-issue-1.md'],
+          experiences: ['[exp impl-1] Keep provider-worker changes narrowly scoped.']
+        }
+      ]
     };
     const firstPrompt = buildProviderWorkerPrompt(issue, 1, 5, helperCommand, sharedRepoCheckoutPath, {
       manifest
@@ -955,6 +965,10 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(firstPrompt).toContain('close the previous PR, remove the previous workpad, create a fresh branch from `origin/main`');
     expect(firstPrompt).toContain('Shared source 0 anchor:');
     expect(firstPrompt).toContain('- Pointer: `ctx:sha256:source0#chunk:c000001`');
+    expect(firstPrompt).toContain('Relevant prior experiences (hints, not strict instructions):');
+    expect(firstPrompt).toContain('- Retrieval profile: executor');
+    expect(firstPrompt).toContain('- Pack id: pp-implementation');
+    expect(firstPrompt).toContain('[exp impl-1] Keep provider-worker changes narrowly scoped.');
     expect(continuationPrompt).toContain('Continuation guidance:');
     expect(continuationPrompt).toContain('do not restate them before acting');
     expect(continuationPrompt).not.toContain('Resume from the current workspace and workpad state instead of restarting from scratch.');
@@ -1021,6 +1035,10 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(continuationPrompt).toContain('Stop coding once the issue reaches the team\'s review handoff state (`Human Review` or `In Review`) and end the turn after the handoff is complete.');
     expect(continuationPrompt).toContain('Shared source 0 anchor:');
     expect(continuationPrompt).toContain('- Source payload: `.runs/linear-lin-issue-1/cli/run-child/memory/source-0/source.txt`');
+    expect(continuationPrompt).toContain('Relevant prior experiences (hints, not strict instructions):');
+    expect(continuationPrompt).toContain('- Retrieval profile: executor');
+    expect(continuationPrompt).toContain('- Pack id: pp-implementation');
+    expect(continuationPrompt).toContain('[exp impl-1] Keep provider-worker changes narrowly scoped.');
   });
 
   it('builds continuation guidance for first-turn guarded resident restarts', () => {
