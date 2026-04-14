@@ -44,8 +44,8 @@
 - [x] `npm run docs:freshness`. Evidence: `out/linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d/manual/validation/07-docs-freshness.log`.
 - [x] `npm run repo:stewardship`. Evidence: `out/linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d/manual/validation/08-repo-stewardship.log`.
 - [x] `node scripts/diff-budget.mjs`. Evidence: `out/linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d/manual/validation/09-diff-budget.log`.
-- [x] Standalone review completed before review handoff. Evidence: `../../.runs/linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d/cli/2026-04-14T09-55-23-458Z-4aa0e89b/review/telemetry.json` reports `status: succeeded`, `review_outcome: bounded-success`; reviewer reported no actionable issues in `out/linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d/manual/validation/10-standalone-review.log`.
-- [x] Elegance review completed before review handoff. Evidence: `out/linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d/manual/validation/11-elegance-review.md`.
+- [x] Standalone review attempted before review handoff with manifest-backed wrapper execution, then completed through manual fallback after a wrapper boundary failure. Evidence: `../../.runs/linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d/cli/2026-04-14T09-55-23-458Z-4aa0e89b/review/telemetry.json` reports `status: failed`, `review_outcome: failed-boundary`, `termination_boundary.kind: startup-anchor`; manual fallback found no blocking issues in `out/linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d/manual/validation/12-post-merge-manual-review.md`.
+- [x] Elegance review completed before review handoff. Evidence: `out/linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d/manual/validation/11-elegance-review.md` and the post-merge fallback review in `out/linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d/manual/validation/12-post-merge-manual-review.md`.
 - [x] `npm run pack:smoke` considered and skipped because this lane changed docs/task/policy surfaces only, not CLI/package/skills/review-wrapper downstream packaging paths. Evidence: `out/linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d/manual/validation/11-elegance-review.md`.
 
 ## Handoff

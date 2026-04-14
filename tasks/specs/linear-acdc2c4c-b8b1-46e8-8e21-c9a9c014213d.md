@@ -68,5 +68,5 @@ Explicit non-goals carried forward: no broad public-doc cleanup, no app-server/p
 
 ## Approvals
 - Docs-review: clean-success in `.runs/linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d-co-180-docs-review-r2/cli/2026-04-14T10-06-30-092Z-440706ce/manifest.json`.
-- Standalone review: pending before PR handoff.
+- Standalone review: wrapper executed before PR handoff and failed at `failed-boundary` / `startup-anchor`; manual post-merge fallback review found no blocking issues in `out/linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d/manual/validation/12-post-merge-manual-review.md`.
 - Date: 2026-04-14
