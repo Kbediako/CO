@@ -140,4 +140,40 @@ describe('provider-linear parallelization canary', () => {
       ])
     });
   });
+
+  it('rejects reason codes that do not match the selected decision', () => {
+    const scenario = buildProviderLinearParallelizationCanaryScenarios()[0];
+    scenario.id = 'bad-reason-pair';
+    scenario.reason = 'merge_or_handoff_state';
+    const report = buildProviderLinearParallelizationCanaryReport({
+      generatedAt: '2026-04-14T00:00:00.000Z',
+      taskId: 'linear-co-174-bad-reason',
+      scenarios: [scenario]
+    });
+
+    expect(validateProviderLinearParallelizationCanaryReport(report)).toEqual({
+      ok: false,
+      failures: expect.arrayContaining([
+        'bad-reason-pair: reason merge_or_handoff_state is invalid for decision parallelize_now'
+      ])
+    });
+  });
+
+  it('rejects existing_child_lane_active scenarios without cap_exhausted summary evidence', () => {
+    const scenario = buildProviderLinearParallelizationCanaryScenarios()[3];
+    scenario.id = 'bad-cap-exhausted-evidence';
+    scenario.serial_evidence.summary = 'Two active lanes remain unresolved.';
+    const report = buildProviderLinearParallelizationCanaryReport({
+      generatedAt: '2026-04-14T00:00:00.000Z',
+      taskId: 'linear-co-174-bad-cap-evidence',
+      scenarios: [scenario]
+    });
+
+    expect(validateProviderLinearParallelizationCanaryReport(report)).toEqual({
+      ok: false,
+      failures: expect.arrayContaining([
+        'bad-cap-exhausted-evidence: existing_child_lane_active summary missing labeled cap_exhausted evidence'
+      ])
+    });
+  });
 });

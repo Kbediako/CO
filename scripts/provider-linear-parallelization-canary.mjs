@@ -18,6 +18,16 @@ export const PARALLEL_FIRST_CHILD_LANE_CAP = 2;
 
 const OUTCOME_VALUES = new Set(['accepted', 'rejected', 'invalidated']);
 const DECISION_VALUES = new Set(['parallelize_now', 'stay_serial', 'forbid_parallel']);
+const REASONS_BY_DECISION = Object.freeze({
+  parallelize_now: new Set(['independent_scope_available']),
+  stay_serial: new Set([
+    'single_bounded_change',
+    'overlapping_scope',
+    'existing_child_lane_active',
+    'review_or_validation_only'
+  ]),
+  forbid_parallel: new Set(['parent_only_mutation', 'merge_or_handoff_state', 'blocked_by_dependency'])
+});
 
 function rate(numerator, denominator) {
   return denominator > 0 ? numerator / denominator : 0;
@@ -327,6 +337,8 @@ function validateScenario(scenario) {
   const safeCandidates = findSafeIndependentCandidates(scenario);
   if (!DECISION_VALUES.has(scenario.decision)) {
     failures.push(`${id}: decision ${scenario.decision} is invalid`);
+  } else if (!REASONS_BY_DECISION[scenario.decision].has(scenario.reason)) {
+    failures.push(`${id}: reason ${scenario.reason} is invalid for decision ${scenario.decision}`);
   }
   for (const candidate of matrix) {
     const cap = candidate?.cap_slot_use;
@@ -378,6 +390,14 @@ function validateScenario(scenario) {
       }
     }
   }
+  if (scenario.decision === 'stay_serial' && scenario.reason === 'existing_child_lane_active') {
+    const summary = typeof scenario.serial_evidence?.summary === 'string'
+      ? scenario.serial_evidence.summary
+      : '';
+    if (!hasLabeledCapExhaustedEvidence(summary)) {
+      failures.push(`${id}: existing_child_lane_active summary missing labeled cap_exhausted evidence`);
+    }
+  }
   for (const lane of launched) {
     if (!OUTCOME_VALUES.has(lane.outcome)) {
       failures.push(`${id}: child lane ${lane.stream} has invalid outcome ${lane.outcome}`);
@@ -393,6 +413,10 @@ function findMissingLabeledSliceEvidence(summary) {
   return ['docs', 'test', 'research', 'review'].filter(
     (slice) => !new RegExp(`(?:^|;)\\s*${slice}\\s*:\\s*[^;\\s][^;]*`, 'i').test(summary)
   );
+}
+
+function hasLabeledCapExhaustedEvidence(summary) {
+  return /(?:^|;)\s*cap_exhausted\s*:\s*[^;\s][^;]*/i.test(summary);
 }
 
 export function buildProviderLinearParallelizationCanaryReport(options = {}) {
