@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-04-14T05:59:45.000Z",
+  "rehydrated_at": "2026-04-14T05:59:45.000Z",
+  "polling": {
+    "enabled": true,
+    "last_success_at": "2026-04-14T05:00:00.000Z",
+    "last_completed_at": "2026-04-14T05:00:00.000Z",
+    "stuck": false,
+    "restart_required": false
+  },
+  "claims": [
+    {
+      "provider": "linear",
+      "provider_key": "linear:recent-write",
+      "issue_id": "recent-write",
+      "issue_identifier": "CO-RECENT-WRITE",
+      "issue_title": "Recent claim write with stale polling",
+      "issue_state": "Ready",
+      "issue_state_type": "unstarted",
+      "task_id": "linear-recent-write",
+      "mapping_source": "provider_id_fallback",
+      "state": "accepted",
+      "accepted_at": "2026-04-14T05:58:00.000Z",
+      "updated_at": "2026-04-14T05:59:45.000Z",
+      "run_id": null
+    }
+  ]
+}

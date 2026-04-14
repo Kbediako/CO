@@ -1,0 +1,9 @@
+{
+  "task_id": "linear-terminal-active",
+  "run_id": "run-terminal-active",
+  "pipeline_id": "provider-linear-worker",
+  "status": "succeeded",
+  "started_at": "2026-04-14T05:36:00.000Z",
+  "completed_at": "2026-04-14T05:40:00.000Z",
+  "updated_at": "2026-04-14T05:40:00.000Z"
+}

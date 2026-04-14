@@ -1,0 +1,12 @@
+{
+  "issue_id": "stale-heartbeat",
+  "issue_identifier": "CO-STALE-HEARTBEAT",
+  "run_id": "run-stale-heartbeat",
+  "attempt_started_at": "2026-04-14T05:29:00.000Z",
+  "owner_phase": "turn_running",
+  "owner_status": "in_progress",
+  "last_event": "message_delta",
+  "last_event_at": "2026-04-14T05:30:00.000Z",
+  "updated_at": "2026-04-14T05:30:00.000Z",
+  "child_lanes": []
+}

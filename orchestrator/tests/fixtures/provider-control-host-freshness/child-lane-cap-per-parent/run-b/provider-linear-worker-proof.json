@@ -1,0 +1,18 @@
+{
+  "run_id": "parent-b",
+  "attempt_started_at": "2026-04-14T05:59:00.000Z",
+  "first_heartbeat_at": "2026-04-14T05:59:20.000Z",
+  "current_turn_activity": {
+    "recorded_at": "2026-04-14T05:59:20.000Z"
+  },
+  "owner_phase": "turn_running",
+  "owner_status": "in_progress",
+  "child_lanes": [
+    {
+      "stream": "fixture-b",
+      "status": "running",
+      "decision": "pending"
+    }
+  ],
+  "updated_at": "2026-04-14T05:59:50.000Z"
+}

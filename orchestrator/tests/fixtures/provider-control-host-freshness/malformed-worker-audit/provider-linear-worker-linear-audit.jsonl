@@ -1,0 +1,2 @@
+{"recorded_at":"2026-04-14T05:58:30.000Z","operation":"parallelization","ok":true,"issue_id":"malformed-audit","issue_identifier":"CO-MALFORMED","action":"stay_serial","state":"single_bounded_change","via":"fixture","source_setup":{"provider":"linear","workspace_id":"workspace","team_id":"team","project_id":"project"},"follow_up_issue_id":null,"follow_up_issue_identifier":null,"failed_relation_type":null,"comment_id":null,"attachment_id":null,"error_code":null,"error_message":null}
+{"recorded_at":

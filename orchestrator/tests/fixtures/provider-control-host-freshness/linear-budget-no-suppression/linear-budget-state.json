@@ -1,0 +1,8 @@
+{
+  "observed_at": "2026-04-14T05:59:30.000Z",
+  "requests": {
+    "limit": 1000,
+    "remaining": 500,
+    "reset_at": "2026-04-14T07:00:00.000Z"
+  }
+}

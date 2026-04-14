@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-04-14T05:59:30.000Z",
+  "polling": {
+    "last_success_at": "2026-04-14T05:59:30.000Z",
+    "stuck": false,
+    "restart_required": false
+  },
+  "claims": [
+    {
+      "provider": "linear",
+      "provider_key": "linear:retry-terminal",
+      "issue_id": "retry-terminal",
+      "issue_identifier": "CO-RETRY-TERMINAL",
+      "issue_title": "Retry claim for a terminal failed run",
+      "issue_state": "In Progress",
+      "issue_state_type": "started",
+      "task_id": "linear-retry-terminal",
+      "mapping_source": "provider_id_fallback",
+      "state": "resumable",
+      "accepted_at": "2026-04-14T05:20:00.000Z",
+      "updated_at": "2026-04-14T05:59:30.000Z",
+      "run_id": "run-retry-terminal",
+      "retry_queued": true,
+      "retry_attempt": 1,
+      "retry_due_at": "2026-04-14T06:05:00.000Z",
+      "retry_error": "fixture retry pending"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "claims": [
+    {
+      "run_id": "duplicate-run-id",
+      "state": "running",
+      "accepted_at": "2026-04-14T05:58:00.000Z"
+    }
+  ],
+  "polling": {
+    "last_success_at": "2026-04-14T05:59:30.000Z"
+  }
+}
