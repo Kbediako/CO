@@ -113,18 +113,24 @@ function hasExplicitLinearIdentity(line) {
 function lineMatchesIssue(line, issueSummary, context = {}) {
   const linearId = normalizeLine(issueSummary?.linear_id);
   const identifier = normalizeLine(issueSummary?.identifier);
+  if (isTaskSnapshotPath(context.pathName)) {
+    const identitySegment = taskSnapshotIdentitySegment(line);
+    if (lineContainsToken(identitySegment, linearId)) {
+      return true;
+    }
+    if (!identifier) {
+      return false;
+    }
+    if (hasExplicitLinearIdentity(identitySegment)) {
+      return false;
+    }
+    return lineContainsToken(identitySegment, identifier);
+  }
   if (lineContainsToken(line, linearId)) {
     return true;
   }
   if (!identifier) {
     return false;
-  }
-  if (isTaskSnapshotPath(context.pathName)) {
-    const identitySegment = taskSnapshotIdentitySegment(line);
-    if (hasExplicitLinearIdentity(identitySegment)) {
-      return false;
-    }
-    return lineContainsToken(identitySegment, identifier);
   }
   return lineContainsToken(line, identifier);
 }

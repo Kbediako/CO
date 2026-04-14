@@ -183,10 +183,12 @@ describe('done closeout provenance check', () => {
       '# Task List Snapshot - CO-94 memory lane - Update 2026-04-14: Remaining work is PR attachment.';
     const differentLinearIdentitySnapshot =
       '# Task List Snapshot - CO: Restore unrelated blocker for CO-9 handoff (linear-00000000-0000-4000-8000-000000000094) - Update 2026-04-14: Remaining work is PR attachment.';
+    const evidenceOnlyLinearIdSnapshot =
+      '# Task List Snapshot - CO-1 unrelated lane (linear-00000000-0000-4000-8000-000000000001) - Update 2026-04-14: Remaining work is PR attachment; evidence mentions linear-00000000-0000-4000-8000-000000000009.';
     await writeMirror(
       repoRoot,
       'docs/TASKS.md',
-      `${scopedSnapshot}\n${unrelatedSnapshot}\n${differentLinearIdentitySnapshot}\n`
+      `${scopedSnapshot}\n${unrelatedSnapshot}\n${differentLinearIdentitySnapshot}\n${evidenceOnlyLinearIdSnapshot}\n`
     );
     await writeManifest(repoRoot, [
       staleIssue({
