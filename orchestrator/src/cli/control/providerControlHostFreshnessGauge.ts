@@ -800,7 +800,7 @@ function evaluateTerminalReconciliationLag(
       timestampMs(proof.value.updated_at),
       timestampMs(proof.value.last_event_at)
     );
-    return terminalAt === null ? [] : [{ lagMs: Math.max(0, nowMs - terminalAt), proof }];
+    return [{ lagMs: terminalAt === null ? null : Math.max(0, nowMs - terminalAt), proof }];
   });
   if (candidates.length === 0) {
     const unreconcilableTerminalProof = unreconcilableTerminalProofs[0];
@@ -817,12 +817,14 @@ function evaluateTerminalReconciliationLag(
     return metric(0, 'ms', 'healthy', intakeState?.path ?? null, null, null);
   }
   const worst = candidates.reduce((winner, candidate) =>
-    candidate.lagMs > winner.lagMs ? candidate : winner
+    (candidate.lagMs ?? 0) > (winner.lagMs ?? 0) ? candidate : winner
   );
   findings.push({
     code: 'terminal_proof_with_active_claim',
     verdict: 'contradictory',
-    message: `Terminal provider proof/manifest still has an active intake claim after ${worst.lagMs}ms.`,
+    message: worst.lagMs === null
+      ? 'Terminal provider proof/manifest still has an active intake claim; terminal timestamp is unavailable.'
+      : `Terminal provider proof/manifest still has an active intake claim after ${worst.lagMs}ms.`,
     source_path: worst.proof.path,
     source_field: 'owner_status'
   });

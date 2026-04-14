@@ -126,6 +126,23 @@ describe('provider/control-host freshness gauge', () => {
     expect(report.findings.map((finding) => finding.code)).not.toContain('terminal_proof_with_active_claim');
   });
 
+  it('flags terminal proof contradictions even when terminal timestamps are missing', async () => {
+    const report = await evaluateProviderControlHostFreshnessGauge({
+      artifactRoot: join(FIXTURE_ROOT, 'terminal-proof-active-claim-no-timestamp'),
+      now: NOW,
+      strict: true
+    });
+
+    expect(report.verdict).toBe('contradictory');
+    expect(report.strict_failed).toBe(true);
+    expect(report.metrics.terminal_reconciliation_lag_ms).toMatchObject({
+      value: null,
+      verdict: 'contradictory',
+      source_field: 'owner_status'
+    });
+    expect(report.findings.map((finding) => finding.code)).toContain('terminal_proof_with_active_claim');
+  });
+
   it('uses the newest proof Linear budget snapshot when no explicit budget artifact exists', async () => {
     const report = await evaluateProviderControlHostFreshnessGauge({
       artifactRoot: join(FIXTURE_ROOT, 'proof-budget-newest'),
