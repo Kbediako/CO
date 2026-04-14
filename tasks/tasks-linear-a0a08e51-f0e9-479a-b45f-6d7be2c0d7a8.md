@@ -43,4 +43,5 @@
 ## Handoff
 - [ ] Workpad refreshed after docs-first, after implementation, and immediately before review handoff. Evidence: pending.
 - [ ] PR attached to the Linear issue before any review-state transition. Evidence: pending.
+- [ ] Unresolved actionable review threads verified as zero, or waiver recorded with evidence in the checklist. Evidence: pending.
 - [ ] Latest `origin/main` merged into the branch before review-state transition, PR checks are green, and `pr ready-review` drains cleanly. Evidence: pending.

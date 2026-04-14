@@ -33,14 +33,15 @@
 - [x] `node scripts/spec-guard.mjs`. Evidence: passed with 14 CO-175-owned rolling spec entries.
 - [x] `npm run build`. Evidence: passed.
 - [x] `npm run lint`. Evidence: passed.
-- [x] `npm run test`. Evidence: passed, 338 files / 3778 tests.
+- [x] `npm run test`. Evidence: passed, 338 files / 3780 tests.
 - [x] `npm run docs:check`. Evidence: passed.
 - [x] `npm run docs:freshness`. Evidence: passed with `rolling freshness cohort entries: 221` and zero blocking stale rows.
-- [x] `npm run repo:stewardship`. Evidence: passed, 4786 tracked files, 0 action-required.
-- [x] `node scripts/diff-budget.mjs`. Evidence: passed working-tree scope, files=7/25 and lines=347/1200 after feedback patch; stacked aggregate advisory is 13 files / 1343 lines.
-- [x] Standalone review and elegance review are captured before review handoff. Evidence: review wrapper telemetry `../../.runs/linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8/cli/2026-04-14T01-14-59-466Z-39f8823e/review/telemetry.json` recorded `review_outcome=failed-boundary` / `command-intent`; manual review and elegance fallback recorded in `out/linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8/manual/review-and-elegance.md`.
+- [x] `npm run repo:stewardship`. Evidence: passed, 4793 tracked files, 0 action-required.
+- [x] `node scripts/diff-budget.mjs`. Evidence: passed for the latest review patch; `BASE_SHA=cac56ec8916562197967098443a3b6da7f0eb7da node scripts/diff-budget.mjs` passed, files=13/25 and lines=1092/1200.
+- [x] Standalone review and elegance review are captured before review handoff. Evidence: review wrapper telemetry `../.runs/linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8/cli/2026-04-14T01-14-59-466Z-39f8823e/review/telemetry.json` recorded `review_outcome=failed-boundary` / `command-intent`; manual review and elegance fallback recorded in `out/linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8/manual/review-and-elegance.md`.
 
 ## Handoff
 - [ ] Workpad refreshed after docs-first, after implementation, and immediately before review handoff. Evidence: pending.
 - [ ] PR attached to the Linear issue before any review-state transition. Evidence: pending.
+- [ ] Unresolved actionable review threads verified as zero, or waiver recorded with evidence in the checklist. Evidence: pending.
 - [ ] Latest `origin/main` merged into the branch before review-state transition, PR checks are green, and `pr ready-review` drains cleanly. Evidence: pending.
