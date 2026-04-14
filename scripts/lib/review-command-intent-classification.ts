@@ -249,12 +249,7 @@ function hasCliHelpRequest(
       sawNonBareHelpToken = true;
     }
   }
-  return Boolean(
-    options.allowBareHelp &&
-      !sawNonBareHelpToken &&
-      positionals.length === 1 &&
-      positionals[0] === 'help'
-  );
+  return Boolean(options.allowBareHelp && !sawNonBareHelpToken && positionals.length === 1 && positionals[0] === 'help');
 }
 
 function resolvePackageReviewScriptArgs(args: string[]): string[] | null {

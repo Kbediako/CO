@@ -979,11 +979,9 @@ fi
     fi
     if [[ "$mode" == "command-intent-validation-then-ok" ]]; then
       if [[ "$*" == *"Strict bounded review retry."* ]]; then
-        if has_inline_prompt "$@"; then
-          if has_arg "--base" "$@" || has_arg "--commit" "$@" || has_arg "--uncommitted" "$@"; then
-            echo "custom prompt cannot be combined with explicit scope flags" >&2
-            exit 1
-          fi
+        if has_inline_prompt "$@" && { has_arg "--base" "$@" || has_arg "--commit" "$@" || has_arg "--uncommitted" "$@"; }; then
+          echo "custom prompt cannot be combined with explicit scope flags" >&2
+          exit 1
         fi
         echo "stdout-ok"
         echo "stderr-ok" >&2
@@ -6285,12 +6283,9 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       expect(reviewInvocations[1]).toContain('Strict bounded review retry.');
       expect(reviewInvocations[1]).toContain('config=sandbox_mode="read-only"');
       expect(reviewInvocations[0]).not.toContain('config=sandbox_mode="read-only"');
-      const retryArgvLine =
-        reviewInvocations[1].split('\n').find((line) => line.startsWith('argv=')) ?? '';
+      const retryArgvLine = reviewInvocations[1].split('\n').find((line) => line.startsWith('argv=')) ?? '';
       expect(retryArgvLine).toContain('argv=review Strict bounded review retry.');
-      expect(retryArgvLine).not.toContain('argv=review --base');
-      expect(retryArgvLine).not.toContain('argv=review --commit');
-      expect(retryArgvLine).not.toContain('argv=review --uncommitted');
+      for (const forbidden of ['argv=review --base', 'argv=review --commit', 'argv=review --uncommitted']) expect(retryArgvLine).not.toContain(forbidden);
       for (const scopeArg of scopeArgs) {
         expect(reviewInvocations[0]).toContain(scopeArg);
       }
