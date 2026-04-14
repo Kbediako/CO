@@ -2737,7 +2737,7 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.resume).not.toHaveBeenCalled();
   });
 
-  it('fails closed for retained released inactive and non-mutable claims during deferred polls without direct reads and keeps released claims stable across fresh-discovery checks', async () => {
+  it('fails closed for fully released retained claims during deferred polls without direct reads or fresh-discovery burn', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
     const initialClaimSnapshots: Array<{
@@ -2822,11 +2822,7 @@ describe('createProviderIssueHandoffService', () => {
     });
 
     expect(resolveTrackedIssue).not.toHaveBeenCalled();
-    expect(refetchTrackedIssues).toHaveBeenCalledTimes(2);
-    expect(refetchTrackedIssues.mock.calls).toEqual([
-      [expect.objectContaining({ mode: 'fresh_discovery' })],
-      [expect.objectContaining({ mode: 'fresh_discovery' })]
-    ]);
+    expect(refetchTrackedIssues).not.toHaveBeenCalled();
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
     expect(state.claims).toHaveLength(128);
@@ -2843,7 +2839,7 @@ describe('createProviderIssueHandoffService', () => {
     expect(state.claims.filter((claim) => claim.reason === 'provider_issue_released:not_mutable')).toHaveLength(5);
   });
 
-  it('still admits unrelated runnable work through fresh discovery when retained deferred-poll claims are fully released', async () => {
+  it('still admits unrelated runnable work through fresh discovery when deferred-poll retained claims are not all released', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
     state.claims.push(
@@ -2869,6 +2865,17 @@ describe('createProviderIssueHandoffService', () => {
         task_id: 'task-released-b',
         state: 'released',
         reason: 'provider_issue_released:not_mutable'
+      }),
+      createProviderClaim({
+        issue_id: 'lin-issue-retained-ready',
+        issue_identifier: 'CO-1613',
+        issue_title: 'Retained Ready claim',
+        issue_state: 'Ready',
+        issue_state_type: 'unstarted',
+        issue_updated_at: '2026-04-13T10:01:30.000Z',
+        task_id: 'task-retained-ready',
+        state: 'handoff_failed',
+        reason: 'provider_issue_start_failed:worker host at capacity'
       })
     );
 
@@ -2921,7 +2928,12 @@ describe('createProviderIssueHandoffService', () => {
       persist,
       launcher,
       resolveTrackedIssue,
-      startPipelineId: 'diagnostics'
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
     });
 
     await service.poll?.({
@@ -2963,6 +2975,10 @@ describe('createProviderIssueHandoffService', () => {
     expect(state.claims.find((claim) => claim.issue_id === 'lin-issue-released-b')).toMatchObject({
       state: 'released',
       reason: 'provider_issue_released:not_mutable'
+    });
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-issue-retained-ready')).toMatchObject({
+      state: 'handoff_failed',
+      reason: 'provider_issue_start_failed:worker host at capacity'
     });
   });
 
@@ -3371,6 +3387,75 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
     expect(state.claims.find((claim) => claim.issue_id === 'lin-ready-blocked-by-foreign')).toBeUndefined();
+  });
+
+  it('counts synthetic starting claims before normal fresh dispatch', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(
+      createProviderClaim({
+        issue_id: 'lin-starting-synthetic',
+        issue_identifier: 'CO-181O',
+        issue_title: 'Synthetic starting claim',
+        issue_state: 'Ready',
+        issue_state_type: 'unstarted',
+        issue_updated_at: '2026-04-14T10:20:00.000Z',
+        task_id: 'task-starting-synthetic',
+        state: 'starting',
+        reason: 'provider_issue_start_launched',
+        run_id: null,
+        run_manifest_path: null,
+        updated_at: new Date().toISOString()
+      })
+    );
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-should-not-start-synthetic',
+        manifestPath: '/tmp/provider-run/should-not-start-synthetic-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async (input: { provider: 'linear'; issueId: string }) => {
+      throw new Error(`unexpected issue-by-id sweep for ${input.issueId}`);
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-ready-blocked-by-starting',
+          identifier: 'CO-181P',
+          title: 'Ready issue blocked by synthetic starting claim',
+          state: 'Ready',
+          state_type: 'unstarted',
+          updated_at: '2026-04-14T10:21:00.000Z'
+        })
+      ]
+    });
+
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-ready-blocked-by-starting')).toBeUndefined();
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-starting-synthetic')).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_start_launched'
+    });
   });
 
   it('preserves the last Ready state slot for unrelated fresh discovery before retained direct launches', async () => {

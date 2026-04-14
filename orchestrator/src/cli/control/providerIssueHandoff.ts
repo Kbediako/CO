@@ -3598,6 +3598,7 @@ export function createProviderIssueHandoffService(
         >();
         const releasedFreshDiscoveryReplayBlockedProviderKeys = new Set<string>();
         const deferredClaimFreshDiscoveryBlockedProviderKeys = new Set<string>();
+        let releasedFailClosedSkipCount = 0;
         let suppressFreshDiscovery = false;
         const noteOccupiedPollDispatchSlot = (
           providerKey: string,
@@ -3644,10 +3645,17 @@ export function createProviderIssueHandoffService(
           const claimProviderKey = buildProviderIssueKey(claim.provider, claim.issue_id);
           const claimRuns = activeRunsByProviderIssue.get(claimProviderKey) ?? [];
           const activeRun = resolveProviderClaimRunIdentity(claim, claimRuns) ?? claimRuns[0] ?? null;
-          if (!activeRun) {
+          const occupancyKey =
+            activeRun
+              ? resolveProviderPollRunOccupancyKey(activeRun)
+              : claim.state === 'running'
+                ? null
+                : claim.run_manifest_path ??
+                  claim.run_id ??
+                  `claim:${claimProviderKey}:${claim.state}`;
+          if (!occupancyKey) {
             continue;
           }
-          const occupancyKey = resolveProviderPollRunOccupancyKey(activeRun);
           if (seededPollOccupancyKeys.has(occupancyKey)) {
             continue;
           }
@@ -3742,6 +3750,7 @@ export function createProviderIssueHandoffService(
 
           if (resolution.kind === 'skip') {
             if (isReleasedProviderIssuePollFailClosedReason(resolution.reason)) {
+              releasedFailClosedSkipCount += 1;
               releasedFreshDiscoveryReplayBlockedProviderKeys.add(claimProviderKey);
             }
             if (resolution.reason === 'provider_issue_poll_deferred_for_fresh_discovery') {
@@ -4166,6 +4175,13 @@ export function createProviderIssueHandoffService(
             );
             continue;
           }
+        }
+
+        if (
+          refreshCounts.claims_scanned > 0 &&
+          releasedFailClosedSkipCount === refreshCounts.claims_scanned
+        ) {
+          suppressFreshDiscovery = true;
         }
 
         if (!pollInput) {
