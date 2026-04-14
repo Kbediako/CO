@@ -132,29 +132,37 @@ describe('providerPollingHealth next-refresh projection', () => {
       atMs: Date.parse('2026-04-14T09:00:01.000Z')
     });
 
-    expect(readProviderPollingHealth(service, Date.parse('2026-04-14T09:00:02.000Z'))).toMatchObject({
+    const activeHealth = readProviderPollingHealth(
+      service,
+      Date.parse('2026-04-14T09:00:02.000Z')
+    );
+    expect(activeHealth).toMatchObject({
       checking: true,
       stuck: false,
-      refresh_phase: 'refresh:claim_issue_by_id_reconcile',
-      refresh_counts: {
-        claims_scanned: 2,
-        issue_by_id_reads: 1
-      }
+      refresh_phase: 'refresh:claim_issue_by_id_reconcile'
+    });
+    expect(activeHealth.refresh_counts).toEqual({
+      claims_scanned: 2,
+      issue_by_id_reads: 1
     });
 
     await markProviderPollingStuck(service, {
       atMs: Date.parse('2026-04-14T09:00:03.000Z')
     });
 
-    expect(readProviderPollingHealth(service, Date.parse('2026-04-14T09:00:04.000Z'))).toMatchObject({
+    const stuckHealth = readProviderPollingHealth(
+      service,
+      Date.parse('2026-04-14T09:00:04.000Z')
+    );
+    expect(stuckHealth).toMatchObject({
       stuck: true,
       restart_required: true,
       reason: 'provider_refresh_lifecycle_stuck',
-      refresh_phase: 'refresh:claim_issue_by_id_reconcile',
-      refresh_counts: {
-        claims_scanned: 2,
-        issue_by_id_reads: 1
-      }
+      refresh_phase: 'refresh:claim_issue_by_id_reconcile'
+    });
+    expect(stuckHealth.refresh_counts).toEqual({
+      claims_scanned: 2,
+      issue_by_id_reads: 1
     });
 
     markProviderPollingCompleted(service, {

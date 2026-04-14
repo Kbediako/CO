@@ -3216,6 +3216,163 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('reserves fresh dispatch capacity on the normal poll path before retained direct reads', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(
+      createProviderClaim({
+        issue_id: 'lin-retained-normal',
+        issue_identifier: 'CO-181K',
+        issue_title: 'Retained normal poll claim',
+        issue_state: 'Ready',
+        issue_state_type: 'unstarted',
+        issue_updated_at: '2026-04-14T10:15:00.000Z',
+        task_id: 'task-retained-normal',
+        state: 'handoff_failed',
+        reason: 'provider_issue_start_failed:worker host at capacity'
+      })
+    );
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-ready-normal',
+        manifestPath: '/tmp/provider-run/ready-normal-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async (input: { provider: 'linear'; issueId: string }) => {
+      throw new Error(`unexpected issue-by-id sweep for ${input.issueId}`);
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-ready-normal',
+          identifier: 'CO-181L',
+          title: 'Normal poll fresh Ready issue',
+          state: 'Ready',
+          state_type: 'unstarted',
+          updated_at: '2026-04-14T10:16:00.000Z'
+        })
+      ]
+    });
+
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-ready-normal',
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-ready-normal',
+      issueIdentifier: 'CO-181L',
+      issueUpdatedAt: '2026-04-14T10:16:00.000Z',
+      launchToken: expect.any(String)
+    }));
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-retained-normal')).toMatchObject({
+      state: 'handoff_failed',
+      reason: 'provider_issue_start_failed:worker host at capacity'
+    });
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-ready-normal')).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-14T10:16:00.000Z',
+      run_id: 'run-ready-normal',
+      run_manifest_path: '/tmp/provider-run/ready-normal-manifest.json'
+    });
+  });
+
+  it('counts live non-start-pipeline workers before normal fresh dispatch', async () => {
+    const { root, paths } = await createHostPaths();
+    const foreignActivePaths = resolveRunPaths(
+      {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'task-foreign-active'
+      },
+      'run-foreign-active'
+    );
+    await mkdir(foreignActivePaths.runDir, { recursive: true });
+    await writeFile(
+      foreignActivePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-foreign-active',
+        task_id: 'task-foreign-active',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-foreign-active',
+        issue_identifier: 'CO-181M',
+        issue_updated_at: '2026-04-14T10:17:00.000Z',
+        updated_at: '2026-04-14T10:18:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-should-not-start',
+        manifestPath: '/tmp/provider-run/should-not-start-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async (input: { provider: 'linear'; issueId: string }) => {
+      throw new Error(`unexpected issue-by-id sweep for ${input.issueId}`);
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-ready-blocked-by-foreign',
+          identifier: 'CO-181N',
+          title: 'Ready issue blocked by foreign live worker',
+          state: 'Ready',
+          state_type: 'unstarted',
+          updated_at: '2026-04-14T10:19:00.000Z'
+        })
+      ]
+    });
+
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-ready-blocked-by-foreign')).toBeUndefined();
+  });
+
   it('preserves the last Ready state slot for unrelated fresh discovery before retained direct launches', async () => {
     const { root, paths } = await createHostPaths();
     const activePaths = resolveRunPaths(

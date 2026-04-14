@@ -580,8 +580,8 @@ function copyFiniteRefreshCounts(value: Record<string, number> | null): Record<s
     return null;
   }
   const entries = Object.entries(value)
-    .filter(([key, count]) => key.trim().length > 0 && Number.isFinite(count))
-    .map(([key, count]) => [key, count] as const);
+    .map(([key, count]) => [key.trim(), count] as const)
+    .filter(([key, count]) => key.length > 0 && Number.isFinite(count));
   return entries.length > 0 ? Object.fromEntries(entries) : null;
 }
 

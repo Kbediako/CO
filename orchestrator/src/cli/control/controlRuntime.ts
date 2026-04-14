@@ -385,8 +385,9 @@ function normalizePollingRefreshCounts(value: unknown): Record<string, number> |
     return null;
   }
   const normalized: Record<string, number> = {};
-  for (const [key, count] of Object.entries(value)) {
-    if (key.trim().length === 0 || typeof count !== 'number' || !Number.isFinite(count)) {
+  for (const [rawKey, count] of Object.entries(value)) {
+    const key = rawKey.trim();
+    if (key.length === 0 || typeof count !== 'number' || !Number.isFinite(count)) {
       continue;
     }
     normalized[key] = count;

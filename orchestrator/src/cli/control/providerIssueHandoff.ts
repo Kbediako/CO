@@ -3628,20 +3628,21 @@ export function createProviderIssueHandoffService(
           pollDispatchBudget.releaseOccupied(trackedIssue);
         };
 
-        const activeDiscoveredRuns = filterProviderIssueRunsForStartPipeline(
-          discoveredRuns,
-          startPipelineId
-        ).filter((run) => run.status === 'in_progress');
+        // Host-global capacity must count every live provider worker before a
+        // refresh cycle spends retained-claim reads or starts fresh work.
+        const activeDiscoveredRuns = discoveredRuns.filter((run) => run.status === 'in_progress');
+        const activeRunsByProviderIssue = groupProviderIssueRuns(activeDiscoveredRuns);
+        const claimStateByProviderKey = new Map<string, string | null>();
+        for (const claim of options.state.claims) {
+          claimStateByProviderKey.set(claim.provider_key, claim.issue_state ?? null);
+        }
         const seededPollOccupancyKeys = new Set<string>();
         for (const claim of options.state.claims) {
           if (!shouldProviderClaimOccupyPollDispatchSlot(claim)) {
             continue;
           }
           const claimProviderKey = buildProviderIssueKey(claim.provider, claim.issue_id);
-          const claimRuns = filterProviderIssueRunsForStartPipeline(
-            runsByProviderIssue.get(claimProviderKey) ?? [],
-            startPipelineId
-          ).filter((run) => run.status === 'in_progress');
+          const claimRuns = activeRunsByProviderIssue.get(claimProviderKey) ?? [];
           const activeRun = resolveProviderClaimRunIdentity(claim, claimRuns) ?? claimRuns[0] ?? null;
           if (!activeRun) {
             continue;
@@ -3666,16 +3667,35 @@ export function createProviderIssueHandoffService(
           const providerKey = buildProviderIssueKey(run.provider, run.issueId);
           noteOccupiedPollDispatchSlot(
             providerKey,
-            trackedIssuesByKey?.get(providerKey) ?? { state: null }
+            trackedIssuesByKey?.get(providerKey) ?? { state: claimStateByProviderKey.get(providerKey) ?? null }
+          );
+        }
+        const unreadableAdmissionOccupancy =
+          await discoverUnreadableProviderAdmissionOccupancyForCurrentOperation();
+        for (const record of unreadableAdmissionOccupancy) {
+          if (seededPollOccupancyKeys.has(record.manifestPath)) {
+            continue;
+          }
+          seededPollOccupancyKeys.add(record.manifestPath);
+          const providerKey = buildProviderIssueKey(record.provider, record.issueId);
+          noteOccupiedPollDispatchSlot(
+            providerKey,
+            trackedIssuesByKey?.get(providerKey) ?? { state: claimStateByProviderKey.get(providerKey) ?? null }
           );
         }
         recordRefreshProgress('refresh:claim_reconcile');
-        const boundPreDiscoveryIssueByIdReads =
-          pollInput?.deferFreshDiscovery === true || pollInput?.allowPollFailClosed === true;
-        const shouldReserveFreshDiscoverySlot =
-          boundPreDiscoveryIssueByIdReads &&
+        const hasFreshDiscoveryCandidates =
           pollInput !== undefined &&
           (trackedIssueRefetch !== null || pollInput.trackedIssues.length > 0);
+        const boundPreDiscoveryIssueByIdReads =
+          pollInput !== undefined &&
+          (
+            hasFreshDiscoveryCandidates ||
+            pollInput.deferFreshDiscovery === true ||
+            pollInput.allowPollFailClosed === true
+          );
+        const shouldReserveFreshDiscoverySlot =
+          boundPreDiscoveryIssueByIdReads && hasFreshDiscoveryCandidates;
         const preDiscoveryIssueByIdReadLimit = boundPreDiscoveryIssueByIdReads
           ? shouldReserveFreshDiscoverySlot
             ? Math.max(0, pollDispatchBudget.remainingGlobalSlots() - 1)
