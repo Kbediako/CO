@@ -271,6 +271,9 @@ function extractParallelizationMetrics(proof, promptArtifacts) {
     (lane) => asString(lane.status) === 'succeeded'
   );
   const acceptedChildLanes = childLanes.filter((lane) => asString(lane.decision) === 'accepted');
+  const acceptedSameTurnChildLanes = sameTurnChildLanes.filter(
+    (lane) => asString(lane.decision) === 'accepted'
+  );
   const safeCandidateCount = asNumber(
     parallelizationConfig.safe_independent_child_lane_candidates,
     0
@@ -289,7 +292,8 @@ function extractParallelizationMetrics(proof, promptArtifacts) {
     child_lane_launch_count: childLanes.length,
     same_turn_child_lane_launch_count: sameTurnChildLanes.length,
     successful_same_turn_child_lane_count: successfulSameTurnChildLanes.length,
-    accepted_child_lane_count: acceptedChildLanes.length,
+    accepted_child_lane_count: acceptedSameTurnChildLanes.length,
+    historical_accepted_child_lane_count: acceptedChildLanes.length,
     child_lane_acceptance_states: uniqueStrings(
       childLanes.map((lane) => asString(lane.decision) ?? asString(lane.status) ?? 'unknown')
     ),

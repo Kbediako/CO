@@ -114,6 +114,43 @@ describe('provider-linear adoption eval', () => {
     );
   });
 
+  it('fails when parallelize_now only has stale accepted child-lane proof', async () => {
+    const { root, fixtureDir } = await copyFixture('parallel-child-lane-accepted');
+    await mutateJson(path.join(fixtureDir, 'provider-linear-worker-proof.json'), (value) => {
+      const [acceptedLane] = value.child_lanes as Array<Record<string, unknown>>;
+      value.child_lanes = [
+        {
+          ...acceptedLane,
+          launched_at: '2026-04-14T00:40:00.000Z',
+          decision_at: '2026-04-14T00:40:30.000Z'
+        },
+        {
+          ...acceptedLane,
+          stream: 'fixture-eval-tests-current-turn',
+          launched_at: '2026-04-14T00:42:00.000Z',
+          decision: 'pending',
+          decision_at: null
+        }
+      ];
+      const parallelization = value.parallelization as Record<string, unknown>;
+      parallelization.child_lane_count = 2;
+    });
+
+    const report = await buildProviderLinearAdoptionEvalReport({
+      fixtureRoot: root,
+      generatedAt: '2026-04-14T00:00:00.000Z',
+      taskId: 'linear-co-176-stale-accepted-child-lane'
+    });
+
+    const parallelRun = report.runs.find((run) => run.id === 'parallel-child-lane-accepted');
+    expect(parallelRun?.metrics.parallelization.successful_same_turn_child_lane_count).toBe(1);
+    expect(parallelRun?.metrics.parallelization.accepted_child_lane_count).toBe(0);
+    expect(parallelRun?.metrics.parallelization.historical_accepted_child_lane_count).toBe(1);
+    expect(report.summary.failures).toContain(
+      'parallel-child-lane-accepted: parallelize_now lacks accepted child-lane proof'
+    );
+  });
+
   it('fails when source-0 prompt adoption artifacts disappear', async () => {
     const { root, fixtureDir } = await copyFixture('memory-adopting-run');
     await mutateJson(path.join(fixtureDir, 'prompt-artifacts.json'), (value) => {
