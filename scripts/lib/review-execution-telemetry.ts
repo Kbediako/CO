@@ -224,6 +224,11 @@ export function logReviewTelemetrySummary(
   console.error(
     `[run-review] review telemetry: ${summary.commandStarts.length} command start(s), ${summary.heavyCommandStarts.length} heavy command start(s), ${summary.startupEvents} delegation startup event(s), ${summary.reviewProgressSignals} review progress signal(s).`
   );
+  if (summary.commandIntentViolationCount > 0) {
+    console.error(
+      `[run-review] command-intent violations detected: ${summary.commandIntentViolationCount} sample(s) across ${summary.commandIntentViolationKinds.join(', ')}.`
+    );
+  }
   if (payload.termination_boundary) {
     console.error(
       `[run-review] termination boundary: ${payload.termination_boundary.kind} (${payload.termination_boundary.provenance}).`
