@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-04-14T05:59:30.000Z",
+  "polling": {
+    "last_success_at": "2026-04-14T05:59:30.000Z",
+    "stuck": false,
+    "restart_required": false
+  },
+  "claims": [
+    {
+      "provider": "linear",
+      "provider_key": "linear:missing-proof",
+      "issue_id": "missing-proof",
+      "issue_identifier": "CO-MISSING-PROOF",
+      "issue_title": "Running claim without proof fixture",
+      "issue_state": "In Progress",
+      "issue_state_type": "started",
+      "task_id": "linear-missing-proof",
+      "mapping_source": "provider_id_fallback",
+      "state": "running",
+      "accepted_at": "2026-04-14T05:50:00.000Z",
+      "updated_at": "2026-04-14T05:59:30.000Z",
+      "run_id": "run-missing-proof",
+      "launch_started_at": "2026-04-14T05:51:00.000Z"
+    }
+  ]
+}

@@ -19,9 +19,9 @@
 - [x] Operator documentation explains interpretation and artifact citation paths.
 
 ## Validation
-- [x] Sanitized healthy/degraded fixtures include stale refresh, active manifest with stale proof, terminal proof with active claim, low Linear headroom, stale retry queue, child-lane cap pressure, stale refresh with a recent intake write, nested status Linear budget, and retry claims tied to terminal failed runs.
-- [x] Focused parser/evaluator/CLI tests pass. Evidence: `npx vitest run orchestrator/tests/ProviderControlHostFreshnessGauge.test.ts` passed 25 tests; strict CLI healthy exit `0`; strict CLI contradictory exit `1`.
-- [x] Required validation floor passed after the final P2 review fixes: `npm run build`, `npm run lint`, `npm run test` (340 files / 3846 tests), `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run docs:check`, `npm run docs:freshness`, `npm run repo:stewardship`, `DIFF_BUDGET_OVERRIDE_REASON=... node scripts/diff-budget.mjs`, and `npm run pack:smoke`.
+- [x] Sanitized healthy/degraded fixtures include stale refresh, active manifest with stale proof, terminal proof with active claim, low Linear headroom, stale retry queue, child-lane cap pressure, stale refresh with a recent intake write, nested status Linear budget, retry claims tied to terminal failed runs, stale last-success with failed polling completion, and missing active worker proof evidence.
+- [x] Focused parser/evaluator/CLI tests pass. Evidence: `npx vitest run orchestrator/tests/ProviderControlHostFreshnessGauge.test.ts` passed 28 tests; strict CLI healthy exit `0`; strict CLI contradictory exit `1`.
+- [x] Required validation floor passed after the latest missing-evidence P2 review fixes: `npx tsc -p tsconfig.build.json --noEmit --pretty false`, `npm run build`, `npm run lint`, `npm run test` (340 files / 3849 tests), `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run docs:check`, `npm run docs:freshness`, `npm run repo:stewardship`, `DIFF_BUDGET_OVERRIDE_REASON=... node scripts/diff-budget.mjs`, and `npm run pack:smoke`.
 - [ ] Manifest-backed standalone review rerun after final P2 fixes.
 
 ## Handoff
@@ -41,7 +41,8 @@
 - 2026-04-14: Addressed follow-up Codex review feedback by matching proof manifests by `run_id` for explicit path layouts and excluding terminal proofs from child-lane cap pressure; added focused regressions and reran build, lint, focused gauge tests, TypeScript, and the full test suite.
 - 2026-04-14: Addressed CodeRabbit artifact-root validation feedback by rejecting file paths passed to `--artifact-root` / `--run-dir`; added a focused CLI regression and reran build, lint, focused gauge tests, TypeScript, and the full test suite.
 - 2026-04-14: Merged latest `origin/main` into the branch after GitHub marked the PR behind; reran build, lint, and full tests on the merged branch.
-- 2026-04-14: Addressed final standalone-review P2 findings by excluding intake top-level `updated_at` from refresh-success candidates, selecting nested `rate_limits.linear_budget` from combined CO STATUS datasets, and excluding retry states from active/queued claim checks while keeping retry/backoff metrics; reran focused gauge tests, TypeScript, build, lint, full tests, guards, docs checks, stewardship, diff budget, and pack smoke.
+- 2026-04-14: Addressed standalone-review P2 findings by excluding intake top-level `updated_at` from refresh-success candidates, selecting nested `rate_limits.linear_budget` from combined CO STATUS datasets, and excluding retry states from active/queued claim checks while keeping retry/backoff metrics; reran focused gauge tests, TypeScript, build, lint, full tests, guards, docs checks, stewardship, diff budget, and pack smoke.
+- 2026-04-14: Addressed follow-up standalone-review P2 findings by rejecting failed polling completions as successful refresh evidence and reporting `unknown` when a running intake claim lacks matching active worker proof; added focused regressions and reran focused gauge tests, TypeScript, build, lint, full tests, guards, docs checks, stewardship, diff budget, and pack smoke.
 
 ## Relevant Files
 - `docs/PRD-linear-1d94880c-44bb-46cd-8fcd-ec8df8245d25.md`

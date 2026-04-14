@@ -226,7 +226,7 @@ export async function evaluateProviderControlHostFreshnessGauge(
       thresholds,
       findings
     ),
-    active_heartbeat_age_ms: evaluateActiveHeartbeatAge(proofs, nowMs, thresholds, findings),
+    active_heartbeat_age_ms: evaluateActiveHeartbeatAge(intakeState, proofs, nowMs, thresholds, findings),
     terminal_reconciliation_lag_ms: evaluateTerminalReconciliationLag(
       intakeState,
       proofs,
@@ -555,9 +555,7 @@ function evaluateRefreshAge(
 ): ProviderControlHostFreshnessGaugeMetric<number> {
   const observedRefreshCandidates = [
     timestampCandidate(input.pollingHealth, 'last_success_at'),
-    timestampCandidate(input.pollingHealth, 'last_completed_at'),
     timestampCandidate(input.intakeState, 'polling.last_success_at'),
-    timestampCandidate(input.intakeState, 'polling.last_completed_at'),
     timestampCandidate(input.statusDataset, 'polling.last_success_at')
   ].filter((candidate): candidate is TimestampCandidate => candidate !== null);
   const candidates = observedRefreshCandidates.length > 0
@@ -714,12 +712,29 @@ function evaluateStartToHeartbeatLatency(
 }
 
 function evaluateActiveHeartbeatAge(
+  intakeState: JsonArtifact | null,
   proofs: ProofArtifact[],
   nowMs: number,
   thresholds: ProviderControlHostFreshnessGaugeThresholds,
   findings: ProviderControlHostFreshnessGaugeFinding[]
 ): ProviderControlHostFreshnessGaugeMetric<number> {
-  const candidates = proofs.flatMap((proof) => {
+  const activeProofs = proofs.filter(isActiveProof);
+  const missingProofClaims = collectClaims(intakeState)
+    .filter((claim) => readState(claim) === 'running')
+    .filter((claim) => {
+      const runId = normalizeOptionalString(claim.run_id);
+      return !runId || !activeProofs.some((proof) => resolveProofRunId(proof) === runId);
+    });
+  if (missingProofClaims.length > 0) {
+    findings.push({
+      code: 'active_worker_proof_missing',
+      verdict: 'unknown',
+      message: 'Provider intake has a running claim without matching active provider-worker proof evidence.',
+      source_path: intakeState?.path ?? null,
+      source_field: 'claims[].run_id'
+    });
+  }
+  const candidates = activeProofs.flatMap((proof) => {
     if (!isActiveProof(proof)) {
       return [];
     }
@@ -733,7 +748,16 @@ function evaluateActiveHeartbeatAge(
     return heartbeatAt === null ? [] : [{ ageMs: Math.max(0, nowMs - heartbeatAt), proof }];
   });
   if (candidates.length === 0) {
-    return metric<number>(null, 'ms', 'unknown', null, null, 'no active provider proof observed');
+    return metric<number>(
+      null,
+      'ms',
+      'unknown',
+      missingProofClaims.length > 0 ? intakeState?.path ?? null : null,
+      missingProofClaims.length > 0 ? 'claims[].run_id' : null,
+      missingProofClaims.length > 0
+        ? 'running claim has no matching active provider proof'
+        : 'no active provider proof observed'
+    );
   }
   const stalest = candidates.reduce((winner, candidate) =>
     candidate.ageMs > winner.ageMs ? candidate : winner
@@ -1073,6 +1097,10 @@ function findManifestForProof(proof: ProofArtifact, manifests: ManifestArtifact[
     return runMatches.find((manifest) => manifest.runDir === proof.runDir) ?? runMatches[0] ?? null;
   }
   return manifests.find((manifest) => manifest.runDir === proof.runDir) ?? null;
+}
+
+function resolveProofRunId(proof: ProofArtifact): string | null {
+  return normalizeOptionalString(proof.manifest?.value.run_id) ?? normalizeOptionalString(proof.value.run_id);
 }
 
 function collectClaims(intakeState: JsonArtifact | null): Record<string, unknown>[] {

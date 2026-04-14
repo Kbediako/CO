@@ -60,6 +60,7 @@ describe('provider/control-host freshness gauge', () => {
   it.each([
     ['stale-refresh', 'stale', 'stale_refresh'],
     ['stale-refresh-recent-intake-write', 'stale', 'stale_refresh'],
+    ['stale-success-failed-completed', 'stale', 'stale_refresh'],
     ['active-manifest-stale-proof', 'stale', 'active_heartbeat_stale'],
     ['terminal-proof-active-claim', 'contradictory', 'terminal_proof_with_active_claim'],
     ['low-linear-headroom', 'degraded', 'linear_headroom_low'],
@@ -81,6 +82,22 @@ describe('provider/control-host freshness gauge', () => {
   it('does not let intake claim writes mask stale polling refresh evidence', async () => {
     const report = await evaluateProviderControlHostFreshnessGauge({
       artifactRoot: join(FIXTURE_ROOT, 'stale-refresh-recent-intake-write'),
+      now: NOW,
+      strict: true
+    });
+
+    expect(report.verdict).toBe('stale');
+    expect(report.metrics.last_successful_refresh_age_ms).toMatchObject({
+      value: 3_600_000,
+      verdict: 'stale',
+      source_field: 'last_success_at'
+    });
+    expect(report.findings.map((finding) => finding.code)).toContain('stale_refresh');
+  });
+
+  it('does not treat failed polling completion as successful refresh evidence', async () => {
+    const report = await evaluateProviderControlHostFreshnessGauge({
+      artifactRoot: join(FIXTURE_ROOT, 'stale-success-failed-completed'),
       now: NOW,
       strict: true
     });
@@ -262,6 +279,23 @@ describe('provider/control-host freshness gauge', () => {
     });
     expect(report.findings.map((finding) => finding.code)).not.toContain('claim_queue_stale');
     expect(report.findings.map((finding) => finding.code)).not.toContain('terminal_proof_with_active_claim');
+  });
+
+  it('flags running intake claims that have no matching active worker proof', async () => {
+    const report = await evaluateProviderControlHostFreshnessGauge({
+      artifactRoot: join(FIXTURE_ROOT, 'missing-active-worker-proof'),
+      now: NOW,
+      strict: true
+    });
+
+    expect(report.verdict).toBe('unknown');
+    expect(report.strict_failed).toBe(false);
+    expect(report.metrics.active_heartbeat_age_ms).toMatchObject({
+      value: null,
+      verdict: 'unknown',
+      source_field: 'claims[].run_id'
+    });
+    expect(report.findings.map((finding) => finding.code)).toContain('active_worker_proof_missing');
   });
 
   it('rejects invalid now values instead of using wall-clock time', async () => {
