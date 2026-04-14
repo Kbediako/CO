@@ -34,7 +34,8 @@ describe('codex-orchestrator linear help', () => {
     expect(result.stdout).toContain('Matrix columns: candidate lane, file/phase scope, dependencies, overlap risk,');
     expect(result.stdout).toContain('stay_serial is invalid while any safe independent child-lane candidate remains');
     expect(result.stdout).toContain('Child-lane cap: at most 2 active, pending, or unaccepted same-issue child lanes.');
-    expect(result.stdout).toContain('Stale in-flight accept claims older than 30 minutes are recoverable');
+    expect(result.stdout).toContain('include cap_exhausted: evidence');
+    expect(result.stdout).toContain('legacy claims without timestamps, are recoverable');
     expect(result.stdout).toContain('Parent ownership: avoid delegated files/phases while a child lane is active');
   });
 });

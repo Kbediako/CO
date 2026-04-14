@@ -219,7 +219,7 @@ export function buildProviderLinearParallelizationCanaryScenarios() {
       reason: 'single_bounded_change',
       launched_child_lanes: [],
       serial_evidence: {
-        summary: 'No docs/test/research/review slice can separate from the single parent-owned line.',
+        summary: 'docs: no docs-only slice separates safely; test: no test-only slice separates safely; research: no research-only slice separates safely; review: no review-only slice separates safely.',
         separable_slices_considered: ['docs', 'test', 'research', 'review'],
         safe_independent_candidates: 0
       }
@@ -305,8 +305,8 @@ function validateScenario(scenario) {
       failures.push(`${id}: candidate ${candidate?.lane ?? 'unknown'} has invalid cap-slot use`);
       continue;
     }
-    if (cap.after > cap.cap && !cap.exhausted) {
-      failures.push(`${id}: cap overrun for ${candidate.lane} is not marked exhausted`);
+    if (cap.after > cap.cap) {
+      failures.push(`${id}: cap overrun for ${candidate.lane} exceeds cap ${cap.cap}`);
     }
   }
   if (scenario.decision === 'parallelize_now') {
@@ -325,6 +325,15 @@ function validateScenario(scenario) {
     }
   }
   if (scenario.decision === 'stay_serial' && scenario.reason === 'single_bounded_change') {
+    const summary = typeof scenario.serial_evidence?.summary === 'string'
+      ? scenario.serial_evidence.summary
+      : '';
+    const missingSummarySlices = findMissingLabeledSliceEvidence(summary);
+    if (missingSummarySlices.length > 0) {
+      failures.push(
+        `${id}: single_bounded_change summary missing labeled slice evidence for ${missingSummarySlices.join(', ')}`
+      );
+    }
     const considered = new Set(scenario.serial_evidence?.separable_slices_considered ?? []);
     for (const required of ['docs', 'test', 'research', 'review']) {
       if (!considered.has(required)) {
@@ -341,6 +350,12 @@ function validateScenario(scenario) {
     }
   }
   return failures;
+}
+
+function findMissingLabeledSliceEvidence(summary) {
+  return ['docs', 'test', 'research', 'review'].filter(
+    (slice) => !new RegExp(`(?:^|;)\\s*${slice}\\s*:\\s*[^;\\s][^;]*`, 'i').test(summary)
+  );
 }
 
 export function buildProviderLinearParallelizationCanaryReport(options = {}) {
@@ -442,8 +457,35 @@ export function validateProviderLinearParallelizationCanaryReport(report) {
   ) {
     failures.push('report summary decision counts do not match recomputed validation');
   }
+  if (report.summary?.canary_parallelize_now_rate !== recomputed.summary.canary_parallelize_now_rate) {
+    failures.push('report summary canary parallelize_now rate does not match recomputed validation');
+  }
+  if (report.summary?.adoption_increased !== recomputed.summary.adoption_increased) {
+    failures.push('report summary adoption flag does not match recomputed validation');
+  }
+  if (report.summary?.launched_child_lane_count !== recomputed.summary.launched_child_lane_count) {
+    failures.push('report summary launched child lane count does not match recomputed validation');
+  }
+  if (
+    JSON.stringify(report.summary?.launched_child_lanes) !==
+    JSON.stringify(recomputed.summary.launched_child_lanes)
+  ) {
+    failures.push('report summary launched child lanes do not match recomputed validation');
+  }
+  if (
+    JSON.stringify(report.summary?.launched_child_lane_outcomes) !==
+    JSON.stringify(recomputed.summary.launched_child_lane_outcomes)
+  ) {
+    failures.push('report summary launched child lane outcomes do not match recomputed validation');
+  }
   if (report.summary?.metric_only_child_lane_count !== recomputed.summary.metric_only_child_lane_count) {
     failures.push('report summary metric-only child lane count does not match recomputed validation');
+  }
+  if (
+    JSON.stringify(report.summary?.metric_only_child_lanes) !==
+    JSON.stringify(recomputed.summary.metric_only_child_lanes)
+  ) {
+    failures.push('report summary metric-only child lanes do not match recomputed validation');
   }
   if (report.child_lane_cap?.value !== PARALLEL_FIRST_CHILD_LANE_CAP) {
     failures.push('report child-lane cap does not match the parallel-first cap');

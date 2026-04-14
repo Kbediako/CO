@@ -1422,6 +1422,40 @@ describe('runLinearCliShell', () => {
     });
   });
 
+  it('requires cap_exhausted evidence for cap-driven serial decisions', async () => {
+    const log = vi.fn();
+    const setExitCode = vi.fn();
+
+    await runLinearCliShell(
+      {
+        positionals: ['parallelization'],
+        flags: {
+          format: 'json',
+          'issue-id': 'lin-issue-1',
+          decision: 'stay_serial',
+          reason: 'existing_child_lane_active',
+          summary: 'two active child lanes remain'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        log,
+        setExitCode
+      }
+    );
+
+    expect(setExitCode).toHaveBeenCalledWith(1);
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual({
+      ok: false,
+      error: {
+        code: 'linear_parallelization_cap_exhausted_summary_missing',
+        message:
+          'linear parallelization existing_child_lane_active summaries must include labeled cap_exhausted evidence, for example `cap_exhausted: 2/2 active child lanes`.',
+        status: 422
+      }
+    });
+  });
+
   it('routes child-stream into the provider worker launcher and audits the result', async () => {
     const log = vi.fn();
     const appendAuditEntry = vi.fn();

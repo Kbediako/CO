@@ -2194,11 +2194,10 @@ describe('runProviderLinearChildLaneShell', () => {
     });
   });
 
-  it('lets the parent invalidate a stale in-flight acceptance claim', async () => {
+  it('lets the parent invalidate a legacy in-flight acceptance claim without a timestamp', async () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
     const childLane = createLaneRecord({
-      in_flight_action: 'accept',
-      in_flight_started_at: '2026-03-30T07:00:00.000Z'
+      in_flight_action: 'accept'
     });
     await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
 

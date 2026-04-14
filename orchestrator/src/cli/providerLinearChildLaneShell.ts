@@ -1510,12 +1510,12 @@ function isStaleInFlightChildLane(
   }
   const startedAt = normalizeOptionalString(entry.in_flight_started_at);
   if (!startedAt) {
-    return false;
+    return true;
   }
   const startedMs = Date.parse(startedAt);
   const nowMs = Date.parse(now);
   if (!Number.isFinite(startedMs) || !Number.isFinite(nowMs)) {
-    return false;
+    return true;
   }
   return nowMs - startedMs >= PROVIDER_LINEAR_CHILD_LANE_IN_FLIGHT_STALE_MS;
 }

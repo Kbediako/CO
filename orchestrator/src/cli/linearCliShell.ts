@@ -751,6 +751,16 @@ function requireParallelizationSummary(
       );
     }
   }
+  if (
+    decision === 'stay_serial' &&
+    reason === 'existing_child_lane_active' &&
+    !/(?:^|;)\s*cap_exhausted\s*:\s*[^;\s][^;]*/iu.test(summary)
+  ) {
+    throw usageError(
+      'linear_parallelization_cap_exhausted_summary_missing',
+      'linear parallelization existing_child_lane_active summaries must include labeled cap_exhausted evidence, for example `cap_exhausted: 2/2 active child lanes`.'
+    );
+  }
   return summary;
 }
 

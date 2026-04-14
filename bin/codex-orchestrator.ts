@@ -1621,8 +1621,8 @@ Subcommands:
     stay_serial is invalid while any safe independent child-lane candidate remains;
       single_bounded_change must label docs/test/research/review slice justifications.
     Child-lane cap: at most 2 active, pending, or unaccepted same-issue child lanes.
-      On cap exhaustion, use stay_serial/existing_child_lane_active and mention cap_exhausted.
-      Stale in-flight accept claims older than 30 minutes are recoverable and do not consume cap.
+      On cap exhaustion, use stay_serial/existing_child_lane_active and include cap_exhausted: evidence.
+      Stale in-flight accept claims older than 30 minutes, or legacy claims without timestamps, are recoverable and do not consume cap.
     Parent ownership: avoid delegated files/phases while a child lane is active; collisions
       require invalidate/reject/rebase reasoning before child patch acceptance.
     --format json         Emit machine-readable output.

@@ -2046,7 +2046,8 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(firstTurnPrompt).toContain('`stay_serial` is rejected while any safe independent candidate remains');
     expect(firstTurnPrompt).toContain('`single_bounded_change` must explain why no docs, test, research, or review slice can be separated safely');
     expect(firstTurnPrompt).toContain('at most 2 active, pending, or unaccepted same-issue child lanes may exist at once');
-    expect(firstTurnPrompt).toContain('record the serial/no-go evidence with `stay_serial` / `existing_child_lane_active` and make `cap_exhausted` explicit in the summary');
+    expect(firstTurnPrompt).toContain('record the serial/no-go evidence with `stay_serial` / `existing_child_lane_active` and labeled `cap_exhausted:` evidence in the summary');
+    expect(firstTurnPrompt).toContain('legacy in-flight claims without timestamps, are recoverable and do not consume cap slots');
     expect(firstTurnPrompt).toContain('while a child lane is active, avoid editing its delegated files or phases');
     expect(firstTurnPrompt).toContain('invalidate/reject the child lane or record explicit rebase/collision reasoning before accepting any child patch');
     expect(firstTurnPrompt).toContain('linear parallelization --issue-id lin-issue-1 --decision <parallelize_now|stay_serial|forbid_parallel> --reason <reason-code> --summary <why>');
@@ -2071,7 +2072,8 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(continuationPrompt).toContain('`stay_serial` is rejected while any safe independent candidate remains');
     expect(continuationPrompt).toContain('`single_bounded_change` must explain why no docs, test, research, or review slice can be separated safely');
     expect(continuationPrompt).toContain('at most 2 active, pending, or unaccepted same-issue child lanes may exist at once');
-    expect(continuationPrompt).toContain('record the serial/no-go evidence with `stay_serial` / `existing_child_lane_active` and make `cap_exhausted` explicit in the summary');
+    expect(continuationPrompt).toContain('record the serial/no-go evidence with `stay_serial` / `existing_child_lane_active` and labeled `cap_exhausted:` evidence in the summary');
+    expect(continuationPrompt).toContain('legacy in-flight claims without timestamps, are recoverable and do not consume cap slots');
     expect(continuationPrompt).toContain('while a child lane is active, avoid editing its delegated files or phases');
     expect(continuationPrompt).toContain('invalidate/reject the child lane or record explicit rebase/collision reasoning before accepting any child patch');
     expect(continuationPrompt).toContain('linear parallelization --issue-id lin-issue-1 --decision <parallelize_now|stay_serial|forbid_parallel> --reason <reason-code> --summary <why>');

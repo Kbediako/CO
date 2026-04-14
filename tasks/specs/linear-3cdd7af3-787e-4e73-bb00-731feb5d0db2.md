@@ -29,7 +29,7 @@ review_notes:
 
 1. Require a pre-turn decomposition matrix with candidate child lanes, file/phase scope, dependencies, overlap risk, expected validation artifact, owner, and cap-slot use.
 2. Reject `stay_serial` while any safe independent candidate exists; `single_bounded_change` must explain why no docs/test/research/review slice separates safely.
-3. Count active, pending, and unaccepted child lanes against a safe cap; report cap exhaustion explicitly and preserve `CO-125`, while excluding recoverable stale in-flight accept claims older than 30 minutes from cap occupancy.
+3. Count active, pending, and unaccepted child lanes against a safe cap; report cap exhaustion explicitly and preserve `CO-125`, while excluding recoverable stale in-flight accept claims older than 30 minutes, or legacy in-flight claims without timestamps, from cap occupancy.
 4. Make parent ownership explicit: no parent edits to active delegated files/phases except to invalidate/reject or resolve a collision before acceptance.
 5. Expose the policy in packaged help/agent docs and prove it with a shaped canary that beats `5/235`, records accepted/rejected/invalidated lane outcomes with reasons, and launches zero metric-only lanes.
 6. Keep `CO-35`, `CO-101`, and `CO-125` behavior valid.
@@ -46,7 +46,7 @@ review_notes:
 | --- | --- | --- | --- |
 | Decision posture | One decision per turn exists, but ordinary adoption is serial-heavy. | User wants child lanes as the main/default safe mode. | Eligible turns look for safe child lanes before serializing. |
 | Serial evidence | `stay_serial` can be broad. | Serial mode should be exceptional and evidence-backed. | The matrix must prove no safe independent candidate before `stay_serial`. |
-| Cap accounting | Child-lane launch and acceptance exist. | `CO-125` admission constraints remain binding. | Active, pending, and unaccepted child lanes count against a safe cap; cap exhaustion is explicit; stale in-flight accept claims older than 30 minutes are recoverable without occupying cap. |
+| Cap accounting | Child-lane launch and acceptance exist. | `CO-125` admission constraints remain binding. | Active, pending, and unaccepted child lanes count against a safe cap; cap exhaustion is explicit; stale in-flight accept claims older than 30 minutes and legacy in-flight claims without timestamps are recoverable without occupying cap. |
 | Parent ownership | Parent acceptance exists. | Child lanes own bounded slices. | Parent avoids active delegated files/phases and handles collisions before acceptance. |
 | Adoption proof | Baseline is `5/235` `parallelize_now`. | Adoption should increase where safe. | Shaped canary proves a higher safe rate and zero metric-only lanes. |
 

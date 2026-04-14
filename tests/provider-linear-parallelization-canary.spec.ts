@@ -62,6 +62,7 @@ describe('provider-linear parallelization canary', () => {
     expect(report.summary.failures).toEqual(
       expect.arrayContaining([
         'bad-serial: launched_child_lanes is missing or invalid',
+        'bad-serial: single_bounded_change summary missing labeled slice evidence for docs, test, research, review',
         'bad-serial: stay_serial chosen while safe independent candidates remain',
         'canary parallelize_now rate did not exceed the audit baseline'
       ])
@@ -75,13 +76,38 @@ describe('provider-linear parallelization canary', () => {
     });
 
     report.summary.decision_counts.parallelize_now = 0;
+    report.summary.adoption_increased = false;
+    report.summary.launched_child_lane_count = 0;
+    report.summary.launched_child_lane_outcomes.accepted = 0;
     report.summary.failures = ['tampered failure'];
 
     expect(validateProviderLinearParallelizationCanaryReport(report)).toEqual({
       ok: false,
       failures: expect.arrayContaining([
         'report summary failures do not match recomputed validation',
-        'report summary decision counts do not match recomputed validation'
+        'report summary decision counts do not match recomputed validation',
+        'report summary adoption flag does not match recomputed validation',
+        'report summary launched child lane count does not match recomputed validation',
+        'report summary launched child lane outcomes do not match recomputed validation'
+      ])
+    });
+  });
+
+  it('rejects malformed cap overruns even when a candidate marks the cap exhausted', () => {
+    const scenario = buildProviderLinearParallelizationCanaryScenarios()[0];
+    scenario.id = 'bad-cap-overrun';
+    scenario.matrix[0].cap_slot_use.after = scenario.matrix[0].cap_slot_use.cap + 1;
+    scenario.matrix[0].cap_slot_use.exhausted = true;
+    const report = buildProviderLinearParallelizationCanaryReport({
+      generatedAt: '2026-04-14T00:00:00.000Z',
+      taskId: 'linear-co-174-bad-cap',
+      scenarios: [scenario]
+    });
+
+    expect(validateProviderLinearParallelizationCanaryReport(report)).toEqual({
+      ok: false,
+      failures: expect.arrayContaining([
+        'bad-cap-overrun: cap overrun for docs-contract exceeds cap 2'
       ])
     });
   });

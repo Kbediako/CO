@@ -117,7 +117,7 @@ codex-orchestrator linear parallelization \
 
 Use `parallelize_now` when the matrix contains at least one safe independent child-lane candidate. Do not use `stay_serial` while a safe independent candidate remains unless the cap is exhausted. When `single_bounded_change` is the reason, the summary must include labeled per-slice evidence: `docs: ...; test: ...; research: ...; review: ...`.
 
-The same-issue child-lane cap is `2`. It counts active, pending, and unaccepted child lanes and does not bypass provider admission constraints from CO-125. If the cap is exhausted, do not launch another lane; record `stay_serial` with reason `existing_child_lane_active` and include `cap_exhausted` in the summary. Stale in-flight accept claims older than 30 minutes are recoverable and do not consume cap slots.
+The same-issue child-lane cap is `2`. It counts active, pending, and unaccepted child lanes and does not bypass provider admission constraints from CO-125. If the cap is exhausted, do not launch another lane; record `stay_serial` with reason `existing_child_lane_active` and include labeled `cap_exhausted:` evidence in the summary. Stale in-flight accept claims older than 30 minutes, and legacy in-flight claims without timestamps, are recoverable and do not consume cap slots.
 
 Parent ownership remains strict. While a child lane is active, the parent avoids delegated files/phases. If parent edits collide with delegated scope, invalidate or reject the child lane, or record explicit rebase/collision reasoning before accepting the child patch.
 
