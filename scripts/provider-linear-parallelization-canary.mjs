@@ -538,6 +538,9 @@ export function validateProviderLinearParallelizationCanaryReport(report) {
   ) {
     failures.push('report summary decision counts do not match recomputed validation');
   }
+  if (report.summary?.total_scenarios !== recomputed.summary.total_scenarios) {
+    failures.push('report summary total scenarios does not match recomputed validation');
+  }
   if (report.summary?.canary_parallelize_now_rate !== recomputed.summary.canary_parallelize_now_rate) {
     failures.push('report summary canary parallelize_now rate does not match recomputed validation');
   }

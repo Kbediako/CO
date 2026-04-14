@@ -76,6 +76,7 @@ describe('provider-linear parallelization canary', () => {
     });
 
     report.summary.decision_counts.parallelize_now = 0;
+    report.summary.total_scenarios = 999;
     report.summary.adoption_increased = false;
     report.summary.launched_child_lane_count = 0;
     report.summary.launched_child_lane_outcomes.accepted = 0;
@@ -86,6 +87,7 @@ describe('provider-linear parallelization canary', () => {
       failures: expect.arrayContaining([
         'report summary failures do not match recomputed validation',
         'report summary decision counts do not match recomputed validation',
+        'report summary total scenarios does not match recomputed validation',
         'report summary adoption flag does not match recomputed validation',
         'report summary launched child lane count does not match recomputed validation',
         'report summary launched child lane outcomes do not match recomputed validation'
