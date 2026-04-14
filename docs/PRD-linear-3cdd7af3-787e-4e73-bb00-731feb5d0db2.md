@@ -12,7 +12,7 @@
 
 ## User Request Translation (Context Anchor)
 - Intent: make parent-owned same-issue child-lane parallelization the ordinary safe default without unsafe splits, admission bypasses, or weakened parent acceptance.
-- Success: matrix before `linear parallelization`; `stay_serial` only when no safe candidate exists; cap counts active/pending/unaccepted lanes; parent avoids delegated scope until accept/reject/invalidate; shaped canary beats `5/235` without metric-only lanes.
+- Success: matrix before `linear parallelization`; `stay_serial` only when no safe candidate exists; cap counts active/pending/unaccepted lanes while excluding recoverable stale in-flight accept claims older than 30 minutes; parent avoids delegated scope until accept/reject/invalidate; shaped canary beats `5/235` without metric-only lanes.
 - Constraints: do not rebuild `CO-35`/`CO-101`, force every issue parallel, exceed `CO-125`, launch metric-hack lanes, or weaken parent-only Linear mutation.
 
 ## Intent Checksum
@@ -26,7 +26,7 @@
 | --- | --- | --- | --- |
 | Decision posture | One explicit decision per active turn exists, but audit shows only `5/235` `parallelize_now` decisions. | User wants parent-owned same-issue child lanes adopted as the main safe mode. | Every eligible turn starts by actively looking for safe child lanes before choosing serial mode. |
 | Serial evidence | `stay_serial` reasons can be broad, especially `single_bounded_change`. | Serial mode should be an evidence-backed exception. | `stay_serial` is rejected unless the matrix proves no safe independent child lane exists. |
-| Child-lane bounds | Runtime supports launch, accept, reject, and invalidate. | Parallel-first still needs bounded resource use. | A cap counts active, pending, and unaccepted child lanes; cap exhaustion is explicit and cannot bypass `CO-125`. |
+| Child-lane bounds | Runtime supports launch, accept, reject, and invalidate. | Parallel-first still needs bounded resource use. | A cap counts active, pending, and unaccepted child lanes; stale in-flight accept claims older than 30 minutes are recoverable; cap exhaustion is explicit and cannot bypass `CO-125`. |
 | Parent ownership | Parent authority exists, but delegated-file restraint is not first-class in the ordinary prompt/policy. | Parent owns the issue; child lanes own bounded slices. | Parent avoids delegated files/phases while a child lane is active, except to invalidate/reject or resolve explicit collision. |
 | Adoption proof | Baseline is `parallelize_now=5`, `stay_serial=161`, `forbid_parallel=69`. | Adoption should increase only where safe. | A shaped canary demonstrates higher safe `parallelize_now` adoption and no metric-only child work. |
 

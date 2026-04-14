@@ -262,6 +262,7 @@ export interface ProviderLinearWorkerChildLaneRecord {
   patch_bytes: number | null;
   decision: ProviderLinearWorkerChildLaneDecision;
   in_flight_action?: ProviderLinearWorkerChildLaneInFlightAction | null;
+  in_flight_started_at?: string | null;
   decision_at: string | null;
   decision_reason: string | null;
 }
@@ -1128,7 +1129,7 @@ function buildParallelizationGuidance(helperCommand: string, issueId: string): s
     `- Ordinary eligible same-issue child-lane parallelisation is a runtime contract in this lane, not optional prompt advice. During every active turn, record exactly one explicit decision with \`${helperCommand} parallelization --issue-id ${issueId} --decision <parallelize_now|stay_serial|forbid_parallel> --reason <reason-code> --summary <why>\`.`,
     '- Start each ordinary active turn with a pre-turn decomposition matrix before choosing that decision. The matrix must list candidate child lanes, file/phase scope, dependencies, overlap risk, expected validation artifact, child-lane owner, and cap-slot use.',
     '- Default to `parallelize_now` when the matrix contains at least one safe independent child-lane candidate, unless the same-issue cap is already exhausted. Outside that cap-exhausted case, `stay_serial` is rejected while any safe independent candidate remains; `single_bounded_change` must explain why no docs, test, research, or review slice can be separated safely.',
-    '- Safe child-lane cap: at most 2 active, pending, or unaccepted same-issue child lanes may exist at once, and that cap never bypasses CO-125 provider admission constraints. If the cap is exhausted, do not launch another lane; record the serial/no-go evidence with `stay_serial` / `existing_child_lane_active` and make `cap_exhausted` explicit in the summary.',
+    '- Safe child-lane cap: at most 2 active, pending, or unaccepted same-issue child lanes may exist at once, and that cap never bypasses CO-125 provider admission constraints. If the cap is exhausted, do not launch another lane; record the serial/no-go evidence with `stay_serial` / `existing_child_lane_active` and make `cap_exhausted` explicit in the summary. Stale in-flight accept claims older than 30 minutes are recoverable and do not consume cap slots.',
     '- Parent ownership discipline: while a child lane is active, avoid editing its delegated files or phases. If parent edits collide with delegated scope, invalidate/reject the child lane or record explicit rebase/collision reasoning before accepting any child patch.',
     `- Allowed decision and reason-code pairs: ${buildParallelizationReasonCodesSummary()}.`,
     `- If you record \`parallelize_now\`, you must actually launch at least one same-issue child lane in that turn with \`${helperCommand} child-lane --action launch ...\`, and at least one of those lanes must complete successfully before the turn ends; otherwise the provider worker fails closed.`,
@@ -3389,6 +3390,7 @@ function normalizeProviderLinearWorkerChildLaneRecord(
     patch_bytes: normalizeOptionalInteger(value.patch_bytes),
     decision,
     in_flight_action: inFlightAction,
+    in_flight_started_at: normalizeOptionalString(value.in_flight_started_at),
     decision_at: normalizeOptionalString(value.decision_at),
     decision_reason: normalizeOptionalString(value.decision_reason)
   };

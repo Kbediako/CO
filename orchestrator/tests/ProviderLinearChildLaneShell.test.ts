@@ -118,6 +118,7 @@ function createLaneRecord(overrides: Partial<ProviderLinearWorkerChildLaneRecord
     patch_artifact_path: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-1', 'provider-linear-child-lane.patch'),
     patch_bytes: 128,
     decision: 'pending',
+    in_flight_started_at: null,
     decision_at: null,
     decision_reason: null,
     ...restOverrides
@@ -503,6 +504,100 @@ describe('runProviderLinearChildLaneShell', () => {
     expect(await readProviderLinearWorkerChildLanes(runDir)).toHaveLength(
       PROVIDER_LINEAR_CHILD_LANE_PARALLEL_FIRST_CAP
     );
+  });
+
+  it('excludes stale in-flight accept claims from the parallel-first cap for independent launches', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    await appendProviderLinearWorkerChildLaneRecord(
+      runDir,
+      createLaneRecord({
+        stream: 'impl-a',
+        task_id: `${TASK_ID}-impl-a`,
+        run_id: 'child-run-1',
+        scope: {
+          files: ['orchestrator/src/cli/providerLinearChildStreamShell.ts'],
+          phases: []
+        }
+      })
+    );
+    await appendProviderLinearWorkerChildLaneRecord(
+      runDir,
+      createLaneRecord({
+        stream: 'impl-b',
+        task_id: `${TASK_ID}-impl-b`,
+        run_id: 'child-run-2',
+        in_flight_action: 'accept',
+        in_flight_started_at: '2026-03-30T07:00:00.000Z',
+        scope: {
+          files: ['orchestrator/src/cli/providerLinearChildLaneShell.ts'],
+          phases: []
+        }
+      })
+    );
+    const childRunDir = join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-c`, 'cli', 'child-run-3');
+    const launchedLane = createLaneRecord({
+      stream: 'impl-c',
+      task_id: `${TASK_ID}-impl-c`,
+      run_id: 'child-run-3',
+      artifact_root: childRunDir,
+      manifest_path: join(childRunDir, 'manifest.json'),
+      log_path: join(childRunDir, 'run.log'),
+      scope: {
+        files: ['orchestrator/src/cli/providerLinearWorkerRunner.ts'],
+        phases: []
+      }
+    });
+    const execRunner = vi.fn(async () => {
+      await writeChildLaneProof(launchedLane);
+      return {
+        exitCode: 0,
+        stdout: JSON.stringify({
+          run_id: 'child-run-3',
+          status: 'succeeded',
+          artifact_root: `.runs/${TASK_ID}-impl-c/cli/child-run-3`,
+          manifest: `.runs/${TASK_ID}-impl-c/cli/child-run-3/manifest.json`,
+          log_path: `.runs/${TASK_ID}-impl-c/cli/child-run-3/run.log`,
+          summary: 'child lane finished'
+        }),
+        stderr: ''
+      };
+    });
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'launch',
+        streamName: 'impl-c',
+        purpose: 'Implement another independent bounded slice',
+        files: ['orchestrator/src/cli/providerLinearWorkerRunner.ts'],
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        execRunner,
+        now: vi.fn(() => '2026-03-30T07:45:00.000Z'),
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: '2026-03-30T07:10:00.000Z',
+          state: 'In Progress',
+          state_type: 'started'
+        })) as never,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
+        readParentHeadSha: vi.fn(async () => 'parent-base-sha'),
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'child-lane',
+      action: 'launched',
+      stream: 'impl-c',
+      child_lane: {
+        stream: 'impl-c',
+        decision: 'pending'
+      }
+    });
+    expect(execRunner).toHaveBeenCalledOnce();
   });
 
   it('lets the parent invalidate a launching reservation so stale cap slots are recoverable', async () => {
@@ -2071,7 +2166,8 @@ describe('runProviderLinearChildLaneShell', () => {
   it('rejects concurrent child-lane decisions while acceptance is already in flight', async () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
     const childLane = createLaneRecord({
-      in_flight_action: 'accept'
+      in_flight_action: 'accept',
+      in_flight_started_at: '2026-03-30T07:25:00.000Z'
     });
     await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
 
@@ -2082,6 +2178,7 @@ describe('runProviderLinearChildLaneShell', () => {
         env: buildProviderWorkerEnv(manifestPath)
       },
       {
+        now: vi.fn(() => '2026-03-30T07:30:00.000Z'),
         refreshProofSnapshot: vi.fn(async () => undefined)
       }
     );
@@ -2095,6 +2192,49 @@ describe('runProviderLinearChildLaneShell', () => {
         status: 409
       }
     });
+  });
+
+  it('lets the parent invalidate a stale in-flight acceptance claim', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const childLane = createLaneRecord({
+      in_flight_action: 'accept',
+      in_flight_started_at: '2026-03-30T07:00:00.000Z'
+    });
+    await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'invalidate',
+        streamName: childLane.stream,
+        reason: 'Parent invalidated stale in-flight accept claim.',
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        now: vi.fn(() => '2026-03-30T07:45:00.000Z'),
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'child-lane',
+      action: 'invalidated',
+      child_lane: {
+        stream: childLane.stream,
+        decision: 'invalidated',
+        in_flight_action: null,
+        in_flight_started_at: null,
+        decision_reason: 'Parent invalidated stale in-flight accept claim.'
+      }
+    });
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
+      expect.objectContaining({
+        stream: childLane.stream,
+        decision: 'invalidated',
+        in_flight_action: null,
+        in_flight_started_at: null
+      })
+    ]);
   });
 
   it('accepts phase-scoped patches when the proof and patch both satisfy the declared contract', async () => {
