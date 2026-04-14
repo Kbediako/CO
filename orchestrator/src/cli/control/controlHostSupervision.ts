@@ -90,7 +90,7 @@ export interface ControlHostSupervisionState {
 
 export interface ControlHostSupervisionHealthEvaluation {
   healthy: boolean;
-  reason: 'ok' | 'restart_required' | 'invalid_payload';
+  reason: 'ok' | 'restart_required' | 'stale_restart_required' | 'invalid_payload';
   message: string;
 }
 
@@ -309,7 +309,12 @@ export function buildInitialControlHostSupervisionState(input: {
 }
 
 export function evaluateControlHostSupervisionHealthPayload(
-  payload: unknown
+  payload: unknown,
+  options: {
+    minPollingUpdatedAt?: string | null;
+    staleRestartRequiredGraceMs?: number | null;
+    now?: string | null;
+  } = {}
 ): ControlHostSupervisionHealthEvaluation {
   if (!isRecord(payload)) {
     return {
@@ -327,6 +332,26 @@ export function evaluateControlHostSupervisionHealthPayload(
     };
   }
   if (polling.restart_required === true) {
+    if (
+      isStaleRecoverableProviderRestartRequiredPolling(polling, {
+        minPollingUpdatedAt: options.minPollingUpdatedAt,
+        staleRestartRequiredGraceMs: options.staleRestartRequiredGraceMs,
+        now: options.now
+      })
+    ) {
+      const graceSeconds =
+        typeof options.staleRestartRequiredGraceMs === 'number' &&
+        Number.isFinite(options.staleRestartRequiredGraceMs)
+          ? Math.max(0, Math.round(options.staleRestartRequiredGraceMs / 1_000))
+          : null;
+      return {
+        healthy: true,
+        reason: 'stale_restart_required',
+        message: `co-status reported a stale provider_refresh_lifecycle_stuck restart_required snapshot from before the current supervised child start; treating it as quiescent${
+          graceSeconds === null ? '' : ` for the bounded ${graceSeconds}s startup grace window`
+        } while the current host refreshes.`
+      };
+    }
     return {
       healthy: false,
       reason: 'restart_required',
@@ -338,6 +363,43 @@ export function evaluateControlHostSupervisionHealthPayload(
     reason: 'ok',
     message: 'co-status reported a healthy polling state.'
   };
+}
+
+function isStaleRecoverableProviderRestartRequiredPolling(
+  polling: Record<string, unknown>,
+  options: {
+    minPollingUpdatedAt: string | null | undefined;
+    staleRestartRequiredGraceMs?: number | null;
+    now?: string | null;
+  }
+): boolean {
+  if (
+    polling.reason !== 'provider_refresh_lifecycle_stuck' &&
+    polling.last_error !== 'provider_refresh_lifecycle_stuck'
+  ) {
+    return false;
+  }
+  const pollingUpdatedAt = parseIsoTimestampToMs(polling.updated_at);
+  const minimumUpdatedAt = parseIsoTimestampToMs(options.minPollingUpdatedAt);
+  if (pollingUpdatedAt === null || minimumUpdatedAt === null || pollingUpdatedAt >= minimumUpdatedAt) {
+    return false;
+  }
+  if (
+    typeof options.staleRestartRequiredGraceMs !== 'number' ||
+    !Number.isFinite(options.staleRestartRequiredGraceMs)
+  ) {
+    return true;
+  }
+  const now = parseIsoTimestampToMs(options.now ?? new Date().toISOString());
+  return now !== null && now - minimumUpdatedAt <= Math.max(0, options.staleRestartRequiredGraceMs);
+}
+
+function parseIsoTimestampToMs(value: unknown): number | null {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return null;
+  }
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 export function parseControlHostSupervisionCsv(raw: string | null | undefined): string[] | null {

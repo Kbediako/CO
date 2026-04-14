@@ -1806,6 +1806,9 @@ function printCoStatusAttachHelp(): void {
 Attach a read-only CO STATUS viewer to an already-running local JSON control-host.
 This reads persisted endpoint/auth artifacts and does not start another control-host,
 Linear poller, or Telegram poller.
+If the supervised control-host restarts and rotates control_endpoint.json while
+attached, the viewer re-resolves the endpoint on fetch failures and reports
+stale endpoint, unavailable host, auth, and timeout guidance in the dashboard.
 
 Options:
   --task <id>               Artifact task id for the host state (default: local-mcp).
