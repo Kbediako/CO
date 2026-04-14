@@ -522,6 +522,32 @@ describe('docs freshness reporting', () => {
     ]);
   });
 
+  it('keeps too many rolling cohorts as blocking failures', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-rolling-too-many-cohorts-'));
+    createdDirs.push(repoRoot);
+
+    await writeRollingDocsFixture(repoRoot, {
+      entries: [
+        { path: 'tasks/tasks-1234-example.md', daysOld: 31 },
+        { path: 'tasks/tasks-1235-example.md', daysOld: 32 }
+      ],
+      policy: rollingFreshnessPolicy({ max_cohorts: 1, max_entries: 10 })
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.totals.stale_entries).toBe(2);
+    expect(report.totals.rolling_cohort_entries).toBe(0);
+    expect(report.stale_entries).toEqual([
+      expect.objectContaining({ path: 'tasks/tasks-1234-example.md' }),
+      expect.objectContaining({ path: 'tasks/tasks-1235-example.md' })
+    ]);
+  });
+
   it('keeps stale docs blocking when rolling policy classes are invalid', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-rolling-invalid-classes-'));
     createdDirs.push(repoRoot);
