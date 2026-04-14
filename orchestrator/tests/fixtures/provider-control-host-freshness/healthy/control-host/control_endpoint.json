@@ -1,0 +1,4 @@
+{
+  "base_url": "http://127.0.0.1:14567",
+  "token_path": "control_auth.json"
+}

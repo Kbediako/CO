@@ -1,0 +1,28 @@
+{
+  "issue_id": "child-lane-pressure",
+  "issue_identifier": "CO-CHILD-CAP",
+  "attempt_started_at": "2026-04-14T05:59:00.000Z",
+  "current_turn_activity": {
+    "event": "agent_reasoning",
+    "message_or_payload": "active",
+    "recorded_at": "2026-04-14T05:59:20.000Z",
+    "source": "stdout_jsonl",
+    "turn_id": "turn-1",
+    "session_id": "session-1"
+  },
+  "owner_phase": "turn_running",
+  "owner_status": "in_progress",
+  "child_lanes": [
+    {
+      "stream": "fixture-a",
+      "status": "running",
+      "decision": "pending"
+    },
+    {
+      "stream": "fixture-b",
+      "status": "pending",
+      "decision": "pending"
+    }
+  ],
+  "updated_at": "2026-04-14T05:59:50.000Z"
+}

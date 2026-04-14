@@ -1,0 +1,21 @@
+{
+  "generated_at": "2026-04-14T05:59:55.000Z",
+  "mode": "operator_dashboard",
+  "read_only": true,
+  "polling": {
+    "last_success_at": "2026-04-14T05:59:30.000Z",
+    "stuck": false,
+    "restart_required": false
+  },
+  "rate_limits": {
+    "observed_at": "2026-04-14T05:59:30.000Z",
+    "suppression": "none",
+    "cooldown_active": false,
+    "requests": {
+      "limit": 1000,
+      "remaining": 500,
+      "reset_at": "2026-04-14T07:00:00.000Z"
+    }
+  },
+  "retrying": []
+}

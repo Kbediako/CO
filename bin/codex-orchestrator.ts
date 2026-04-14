@@ -52,6 +52,7 @@ import {
   DEFAULT_PROVIDER_START_PIPELINE_ID,
   runControlHostCliShell
 } from '../orchestrator/src/cli/controlHostCliShell.js';
+import { runControlHostFreshnessGaugeCliShell } from '../orchestrator/src/cli/controlHostFreshnessGaugeCliShell.js';
 import { runControlHostSupervisionCliShell } from '../orchestrator/src/cli/controlHostSupervisionCliShell.js';
 import { runCoStatusAttachCliShell } from '../orchestrator/src/cli/coStatusAttachCliShell.js';
 import { runCoStatusCliShell } from '../orchestrator/src/cli/coStatusCliShell.js';
@@ -767,6 +768,21 @@ async function handleStatus(orchestrator: CodexOrchestrator, rawArgs: string[]):
 }
 
 async function handleControlHost(rawArgs: string[]): Promise<void> {
+  if (rawArgs[0] === 'freshness-gauge') {
+    const { positionals, flags } = parseArgs(rawArgs.slice(1));
+    if (isHelpRequest(positionals, flags)) {
+      printControlHostFreshnessGaugeHelp();
+      return;
+    }
+    if (positionals.length > 0) {
+      throw new Error(`Unknown control-host freshness-gauge argument(s): ${positionals.join(' ')}`);
+    }
+    await runControlHostFreshnessGaugeCliShell({
+      flags,
+      printHelp: printControlHostFreshnessGaugeHelp
+    });
+    return;
+  }
   if (rawArgs[0] === 'supervise') {
     const { positionals, flags } = parseArgs(rawArgs.slice(1));
     await runControlHostSupervisionCliShell({
@@ -1439,6 +1455,8 @@ Commands:
     --run <id>              Host run id for persisted state files (default: control-host).
     --pipeline <id>         Pipeline used for provider-driven starts (default: diagnostics).
     --format json           Emit machine-readable readiness output.
+  control-host freshness-gauge [options]
+    Replay local provider/control-host artifacts and emit throughput/freshness health JSON.
 
   co-status [options]
     Attach the CO STATUS terminal viewer or emit the current snapshot from an already-running local control-host.
@@ -1727,6 +1745,7 @@ Options:
 function printControlHostHelp(): void {
   console.log(`Usage:
   codex-orchestrator control-host [options]
+  codex-orchestrator control-host freshness-gauge [options]
   codex-orchestrator control-host supervise <install|status|restart|uninstall|run> [options]
 
 Options:
@@ -1736,12 +1755,34 @@ Options:
   --format json         Emit the startup readiness payload to stdout, then keep the host running.
   --help                Show this message.
 
+Read-only gauge subcommand:
+  freshness-gauge      Replay existing local/sanitized artifacts and classify provider/control-host freshness.
+
 Supervision subcommands:
   supervise install     Install a launchd LaunchAgent-backed local control-host supervisor.
   supervise status      Show the installed launchd/config/state status.
   supervise restart     Restart the installed control-host supervisor.
   supervise uninstall   Remove the installed launchd supervisor and generated artifacts.
   supervise run         Internal long-lived runner for launchd ProgramArguments.
+`);
+}
+
+function printControlHostFreshnessGaugeHelp(): void {
+  console.log(`Usage: codex-orchestrator control-host freshness-gauge [options]
+
+Replay existing provider/control-host artifacts without starting a host or polling Linear/GitHub.
+
+Options:
+  --artifact-root <path>        Directory to scan for local artifacts (default: current directory).
+  --run-dir <path>              Alias for --artifact-root when checking one run directory.
+  --now <iso>                   Deterministic reference time for age/latency calculations.
+  --strict                      Exit non-zero when the verdict is stale or contradictory.
+  --max-depth <n>               Recursive artifact scan depth (default: 8).
+  --stale-refresh-after-ms <n>  Refresh age threshold (default: 300000).
+  --stale-heartbeat-after-ms <n> Active heartbeat age threshold (default: 600000).
+  --stale-retry-after-ms <n>    Retry/backoff overdue threshold (default: 600000).
+  --format json                 Emit machine-readable gauge output.
+  --help                        Show this message.
 `);
 }
 

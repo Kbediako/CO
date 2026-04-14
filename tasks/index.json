@@ -1,6 +1,32 @@
 {
   "items": [
     {
+      "id": "20260414-linear-1d94880c-44bb-46cd-8fcd-ec8df8245d25",
+      "title": "CO: add provider/control-host throughput and freshness gauge",
+      "relates_to": "tasks/tasks-linear-1d94880c-44bb-46cd-8fcd-ec8df8245d25.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-14",
+      "approvals": {
+        "docs_review": {
+          "status": "succeeded",
+          "date": "2026-04-14",
+          "reviewer": "docs-review child stream linear-1d94880c-44bb-46cd-8fcd-ec8df8245d25-co-177-docs-review-r2",
+          "manifest": ".runs/linear-1d94880c-44bb-46cd-8fcd-ec8df8245d25-co-177-docs-review-r2/cli/2026-04-14T05-20-05-166Z-23f9d876/manifest.json",
+          "review_telemetry": ".runs/linear-1d94880c-44bb-46cd-8fcd-ec8df8245d25-co-177-docs-review-r2/cli/2026-04-14T05-20-05-166Z-23f9d876/review/telemetry.json",
+          "review_outcome": "clean-success"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-1d94880c-44bb-46cd-8fcd-ec8df8245d25.md",
+        "task": "tasks/tasks-linear-1d94880c-44bb-46cd-8fcd-ec8df8245d25.md",
+        "agent_task": ".agent/task/linear-1d94880c-44bb-46cd-8fcd-ec8df8245d25.md",
+        "docs": "docs/TECH_SPEC-linear-1d94880c-44bb-46cd-8fcd-ec8df8245d25.md"
+      }
+    },
+    {
       "id": "20260414-linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8",
       "title": "CO workflow: add rolling docs:freshness cohort policy for Apr 14 stale baseline",
       "relates_to": "tasks/tasks-linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8.md",
