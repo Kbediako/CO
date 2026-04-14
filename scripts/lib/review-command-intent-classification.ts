@@ -178,7 +178,7 @@ function classifyCommandIntentSegment(
 export function isReviewOrchestrationCommand(command: string, args: string[]): boolean {
   if (command === 'npm' || command === 'pnpm' || command === 'yarn' || command === 'bun') {
     const reviewScriptArgs = resolvePackageReviewScriptArgs(args);
-    return reviewScriptArgs !== null && !hasCliHelpRequest(reviewScriptArgs, { allowBareHelp: true });
+    return reviewScriptArgs !== null && !hasCliHelpRequest(reviewScriptArgs);
   }
 
   const firstArg = normalizeCommandToken(args[0] ?? '');
