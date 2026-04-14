@@ -339,6 +339,22 @@ describe('spec-guard script', () => {
     expect(stdout).toContain(`tasks/specs/0001-initial.md: last_review ${staleReviewDate}`);
   });
 
+  it('fails closed when docs catalog parsing fails', async () => {
+    const repo = await initRepository();
+    await mkdir(join(repo, 'docs'), { recursive: true });
+    await writeFile(join(repo, 'docs/docs-catalog.json'), '{not json', 'utf8');
+
+    await expect(
+      execFileAsync('node', [scriptPath], {
+        cwd: repo,
+        env: { ...process.env }
+      })
+    ).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining('Spec guard failed:')
+    });
+  });
+
   it('does not skip active specs that mention the archive marker in their body', async () => {
     const repo = await initRepository();
 

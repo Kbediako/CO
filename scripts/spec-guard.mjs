@@ -265,8 +265,13 @@ function applyRollingFreshnessPolicy(staleSpecs, docsCatalog) {
 async function loadRollingFreshnessCatalog() {
   try {
     return await maybeLoadDocsCatalog(process.cwd());
-  } catch {
-    return null;
+  } catch (error) {
+    const code =
+      error && typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
+    if (code === 'ENOENT') {
+      return null;
+    }
+    throw error;
   }
 }
 
