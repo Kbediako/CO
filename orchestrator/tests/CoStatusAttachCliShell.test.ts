@@ -247,6 +247,33 @@ describe('runCoStatusAttachCliShell', () => {
     expect(output).toContain('control_endpoint.json');
   });
 
+  it('renders refreshed endpoint guidance when a rotated endpoint is still unreachable', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-attach-shell-'));
+    tempDirs.push(root);
+    const runDir = await writeAttachRunDir(root);
+
+    const refreshedServer = await startUiServer();
+    await closeServer(refreshedServer.instance);
+    const staleServer = await startUiServer({
+      failNetwork: true,
+      beforeNetworkFailure: async () => {
+        await writeEndpointArtifacts(runDir, refreshedServer.baseUrl);
+      }
+    });
+    servers.add(staleServer.instance);
+    await writeEndpointArtifacts(runDir, staleServer.baseUrl);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const writes = await runInteractiveAttachAndStop(runDir);
+
+    const output = stripAnsi(writes.join(''));
+    const warningOutput = warn.mock.calls.map((call) => String(call[0])).join('\n');
+    expect(output).toContain('Dashboard error');
+    expect(output).toContain('control-host endpoint rotated');
+    expect(warningOutput).toContain('refreshed control-host endpoint is still unreachable');
+    expect(warningOutput).not.toContain('control_endpoint.json has not rotated to a reachable host');
+  });
+
   it('renders auth guidance when the current endpoint rejects attach credentials', async () => {
     const root = await mkdtemp(join(tmpdir(), 'co-status-attach-shell-'));
     tempDirs.push(root);

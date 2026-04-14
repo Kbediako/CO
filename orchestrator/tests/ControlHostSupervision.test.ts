@@ -167,6 +167,29 @@ describe('controlHostSupervision helpers', () => {
     });
   });
 
+  it('expires stale provider refresh restart_required quiescence after the startup grace window', () => {
+    expect(
+      evaluateControlHostSupervisionHealthPayload(
+        {
+          polling: {
+            restart_required: true,
+            reason: 'provider_refresh_lifecycle_stuck',
+            updated_at: '2026-04-14T05:02:27.000Z'
+          }
+        },
+        {
+          minPollingUpdatedAt: '2026-04-14T05:04:59.000Z',
+          staleRestartRequiredGraceMs: 90_000,
+          now: '2026-04-14T05:06:30.000Z'
+        }
+      )
+    ).toEqual({
+      healthy: false,
+      reason: 'restart_required',
+      message: 'co-status reported restart_required=true.'
+    });
+  });
+
   it('keeps current provider refresh restart_required snapshots unhealthy', () => {
     expect(
       evaluateControlHostSupervisionHealthPayload(

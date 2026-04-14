@@ -318,7 +318,7 @@ async function readUiDatasetWithEndpointRecovery(input: {
           throw retryError;
         }
         throw new Error(
-          `control-host endpoint rotated from ${previousTarget.baseUrl.toString()} to ${resolvedTarget.baseUrl.toString()}, but the refreshed endpoint is not readable. ${formatAttachRequestFailure(retryError, resolvedTarget)}`
+          `control-host endpoint rotated from ${previousTarget.baseUrl.toString()} to ${resolvedTarget.baseUrl.toString()}, but the refreshed endpoint is not readable. ${formatAttachRequestFailure(retryError, resolvedTarget, { endpointAlreadyRotated: true })}`
         );
       }
     }
@@ -337,9 +337,16 @@ function isCancelledAttachRequestError(error: unknown): boolean {
   return error instanceof CoStatusAttachRequestError && error.kind === 'cancelled';
 }
 
-function formatAttachRequestFailure(error: unknown, target: CoStatusAttachTarget): string {
+function formatAttachRequestFailure(
+  error: unknown,
+  target: CoStatusAttachTarget,
+  options: { endpointAlreadyRotated?: boolean } = {}
+): string {
   if (error instanceof CoStatusAttachRequestError) {
     if (error.kind === 'network') {
+      if (options.endpointAlreadyRotated) {
+        return `${error.message}. The refreshed control-host endpoint is still unreachable; wait for the new host to come up or rerun co-status attach.`;
+      }
       return `stale endpoint after control-host restart; control-host unavailable; control_endpoint.json has not rotated to a reachable host. ${error.message}. Waiting for ${resolve(target.runDir, 'control_endpoint.json')} to rotate or rerun co-status attach.`;
     }
     if (error.kind === 'timeout') {

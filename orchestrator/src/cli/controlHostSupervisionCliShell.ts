@@ -457,7 +457,7 @@ async function runControlHostSupervision(flags: ArgMap): Promise<void> {
             status: 'healthy',
             updated_at: checkedAt,
             last_health_check_at: checkedAt,
-            last_health_status: 'ok',
+            last_health_status: probe.reason,
             consecutive_unhealthy_samples: 0,
             message: probe.message
           });
@@ -734,7 +734,8 @@ async function probeControlHostHealth(
   }
 
   const evaluation = evaluateControlHostSupervisionHealthPayload(payload, {
-    minPollingUpdatedAt: options.minPollingUpdatedAt ?? null
+    minPollingUpdatedAt: options.minPollingUpdatedAt ?? null,
+    staleRestartRequiredGraceMs: config.healthIntervalSeconds * config.unhealthyThreshold * 1_000
   });
   return {
     healthy: evaluation.healthy,

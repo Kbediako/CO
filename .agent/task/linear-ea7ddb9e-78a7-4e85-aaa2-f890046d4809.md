@@ -21,7 +21,7 @@
 - [x] Child lane stayed docs-only and did not mutate Linear state or workpad. Evidence: this checklist.
 - [x] Child lane did not edit implementation or test files. Evidence: final diff.
 - [x] Child lane left changes uncommitted for parent patch export. Evidence: `git status --short`.
-- [ ] Parent lane handles Linear workpad, PR attach, review handoff, and patch integration. Evidence: pending parent lane.
+- [x] Parent lane handles Linear workpad, PR attach, review handoff, and patch integration. Evidence: PR `#475` attached to CO-179; workpad comment `d8636f3f-85c4-45ec-bbc3-5cd618036aa1`; review/elegance evidence in `.runs/linear-ea7ddb9e-78a7-4e85-aaa2-f890046d4809/cli/2026-04-14T06-59-19-608Z-0566cb5c/review/telemetry.json`.
 
 ## Implementation Acceptance
 - [x] `co-status attach` reloads endpoint/auth artifacts after stale endpoint rotation. Evidence: `orchestrator/src/cli/coStatusAttachCliShell.ts`, `orchestrator/tests/CoStatusAttachCliShell.test.ts`.
