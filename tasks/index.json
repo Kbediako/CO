@@ -13,7 +13,7 @@
       "paths": {
         "spec": "tasks/specs/linear-ba9a1c35-c8d1-4b76-aa33-4937502d1964-co-status-prune-terminal-released-issues.md",
         "task": "tasks/tasks-linear-ba9a1c35-c8d1-4b76-aa33-4937502d1964.md",
-        "docs": "docs/PRD-linear-ba9a1c35-c8d1-4b76-aa33-4937502d1964.md"
+        "docs": "docs/TECH_SPEC-linear-ba9a1c35-c8d1-4b76-aa33-4937502d1964.md"
       }
     },
     {
