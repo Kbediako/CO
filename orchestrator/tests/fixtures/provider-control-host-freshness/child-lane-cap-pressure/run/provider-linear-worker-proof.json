@@ -16,7 +16,7 @@
     {
       "stream": "fixture-a",
       "status": "running",
-      "decision": "pending"
+      "decision": "parallelize_now"
     },
     {
       "stream": "fixture-b",

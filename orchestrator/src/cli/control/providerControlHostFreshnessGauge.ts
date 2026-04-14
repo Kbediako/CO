@@ -251,7 +251,6 @@ export async function evaluateProviderControlHostFreshnessGauge(
     sources.provider_manifests.length === 0 &&
     sources.provider_proofs.length === 0 &&
     sources.worker_audit_jsonl.length === 0 &&
-    sources.control_endpoint_metadata.length === 0 &&
     sources.status_datasets.length === 0 &&
     sources.polling_health.length === 0 &&
     sources.linear_budget_state.length === 0
@@ -632,7 +631,7 @@ function evaluateClaimToStartLatency(
   thresholds: ProviderControlHostFreshnessGaugeThresholds,
   findings: ProviderControlHostFreshnessGaugeFinding[]
 ): ProviderControlHostFreshnessGaugeMetric<number> {
-  const claims = collectClaims(intakeState);
+  const claims = collectClaims(intakeState).filter(isActiveClaim);
   const candidates = claims.flatMap((claim) => {
     const acceptedAt = timestampMs(claim.accepted_at);
     const runId = normalizeOptionalString(claim.run_id);
@@ -677,6 +676,9 @@ function evaluateStartToHeartbeatLatency(
   findings: ProviderControlHostFreshnessGaugeFinding[]
 ): ProviderControlHostFreshnessGaugeMetric<number> {
   const candidates = proofs.flatMap((proof) => {
+    if (!isActiveProof(proof)) {
+      return [];
+    }
     const startedAt =
       timestampMs(proof.manifest?.value.started_at) ??
       timestampMs(proof.value.attempt_started_at) ??
@@ -886,17 +888,30 @@ function evaluateChildLaneCapPressure(
   const lanes = proofs.flatMap((proof) =>
     collectArrayRecords(proof.value.child_lanes).map((lane) => ({ lane, proof }))
   );
-  const active = lanes.filter(({ lane }) => isActiveChildLane(lane));
-  if (active.length === 0) {
+  const activeByParent = new Map<string, { count: number; proof: ProofArtifact }>();
+  for (const { lane, proof } of lanes) {
+    if (!isActiveChildLane(lane)) {
+      continue;
+    }
+    const parentKey = childLaneParentKey(proof);
+    const bucket = activeByParent.get(parentKey);
+    activeByParent.set(parentKey, {
+      count: (bucket?.count ?? 0) + 1,
+      proof: bucket?.proof ?? proof
+    });
+  }
+  const buckets = [...activeByParent.values()];
+  if (buckets.length === 0) {
     return metric(0, 'ratio', 'healthy', proofs[0]?.path ?? null, 'child_lanes', null);
   }
-  const pressure = thresholds.childLaneCap > 0 ? active.length / thresholds.childLaneCap : active.length;
+  const busiest = buckets.reduce((winner, bucket) => bucket.count > winner.count ? bucket : winner);
+  const pressure = thresholds.childLaneCap > 0 ? busiest.count / thresholds.childLaneCap : busiest.count;
   if (pressure >= 1) {
     findings.push({
       code: 'child_lane_cap_pressure',
       verdict: 'degraded',
-      message: `Child-lane cap pressure is ${active.length}/${thresholds.childLaneCap}.`,
-      source_path: active[0]?.proof.path ?? null,
+      message: `Child-lane cap pressure is ${busiest.count}/${thresholds.childLaneCap} for one parent run.`,
+      source_path: busiest.proof.path,
       source_field: 'child_lanes'
     });
   }
@@ -904,9 +919,9 @@ function evaluateChildLaneCapPressure(
     pressure,
     'ratio',
     pressure >= 1 ? 'degraded' : 'healthy',
-    active[0]?.proof.path ?? null,
+    busiest.proof.path,
     'child_lanes',
-    `${active.length}/${thresholds.childLaneCap} active, pending, or unaccepted child lanes`
+    `${busiest.count}/${thresholds.childLaneCap} active, pending, or unaccepted child lanes for one parent run`
   );
 }
 
@@ -1024,6 +1039,10 @@ function collectClaims(intakeState: JsonArtifact | null): Record<string, unknown
   return collectArrayRecords(value?.claims);
 }
 
+function isActiveClaim(claim: Record<string, unknown>): boolean {
+  return ACTIVE_CLAIM_STATES.has(readState(claim));
+}
+
 function collectStatusRetrying(statusDataset: JsonArtifact | null): Record<string, unknown>[] {
   const value = asRecord(statusDataset?.value);
   return collectArrayRecords(value?.retrying);
@@ -1051,15 +1070,26 @@ function isTerminalProof(proof: ProofArtifact): boolean {
 }
 
 function isActiveChildLane(lane: Record<string, unknown>): boolean {
-  const decision = normalizeOptionalString(lane.decision);
-  const status = normalizeOptionalString(lane.status)?.toLowerCase() ?? null;
-  if (decision && decision !== 'pending') {
-    return false;
-  }
   if (lane.in_flight_action) {
     return true;
   }
+  const decision = normalizeOptionalString(lane.decision);
+  const status = normalizeOptionalString(lane.status)?.toLowerCase() ?? null;
+  if (decision && decision !== 'pending' && decision !== 'parallelize_now') {
+    return false;
+  }
   return !status || !TERMINAL_MANIFEST_STATUSES.has(status);
+}
+
+function childLaneParentKey(proof: ProofArtifact): string {
+  return (
+    normalizeOptionalString(proof.value.parent_run_id) ??
+    normalizeOptionalString(proof.value.parentRunId) ??
+    normalizeOptionalString(proof.value.run_id) ??
+    normalizeOptionalString(proof.manifest?.value.parent_run_id) ??
+    normalizeOptionalString(proof.manifest?.value.run_id) ??
+    proof.runDir
+  );
 }
 
 function readState(record: Record<string, unknown>): string {
@@ -1186,16 +1216,24 @@ function appendUnique(target: string[], values: string[]): void {
 
 function normalizeNowMs(value: string | number | Date | null | undefined): number {
   if (value instanceof Date) {
-    return value.getTime();
+    const timestamp = value.getTime();
+    if (!Number.isFinite(timestamp)) {
+      throw new Error(`Invalid now value: ${String(value)}.`);
+    }
+    return timestamp;
   }
-  if (typeof value === 'number' && Number.isFinite(value)) {
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
+      throw new Error(`Invalid now value: ${String(value)}.`);
+    }
     return value;
   }
   if (typeof value === 'string' && value.trim().length > 0) {
     const parsed = Date.parse(value);
-    if (Number.isFinite(parsed)) {
-      return parsed;
+    if (!Number.isFinite(parsed)) {
+      throw new Error(`Invalid now value: ${value}.`);
     }
+    return parsed;
   }
   return Date.now();
 }

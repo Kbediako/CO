@@ -1773,8 +1773,16 @@ function printControlHostFreshnessGaugeHelp(): void {
 Replay existing provider/control-host artifacts without starting a host or polling Linear/GitHub.
 
 Options:
-  --artifact-root <path>        Directory to scan for local artifacts (default: current directory).
+  --artifact-root <path>        Directory to scan for local artifacts (required unless explicit paths are provided).
   --run-dir <path>              Alias for --artifact-root when checking one run directory.
+  --provider-intake-state <csv> Explicit provider-intake-state.json path(s).
+  --provider-manifest <csv>     Explicit manifest.json path(s).
+  --provider-proof <csv>        Explicit provider-linear-worker-proof.json path(s).
+  --worker-audit-jsonl <csv>    Explicit provider worker audit JSONL path(s).
+  --control-endpoint-metadata <csv> Explicit control endpoint metadata path(s).
+  --status-dataset <csv>        Explicit CO STATUS/status dataset path(s).
+  --polling-health <csv>        Explicit provider polling health path(s).
+  --linear-budget-state <csv>   Explicit Linear shared-budget state path(s).
   --now <iso>                   Deterministic reference time for age/latency calculations.
   --strict                      Exit non-zero when the verdict is stale or contradictory.
   --max-depth <n>               Recursive artifact scan depth (default: 8).

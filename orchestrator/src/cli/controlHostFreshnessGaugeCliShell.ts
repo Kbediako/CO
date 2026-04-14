@@ -6,6 +6,7 @@ import {
   assertProviderControlHostFreshnessArtifactRoot,
   evaluateProviderControlHostFreshnessGauge,
   formatProviderControlHostFreshnessGaugeText,
+  type ProviderControlHostFreshnessGaugeSources,
   type ProviderControlHostFreshnessGaugeThresholds
 } from './control/providerControlHostFreshnessGauge.js';
 
@@ -24,14 +25,23 @@ export async function runControlHostFreshnessGaugeCliShell(
     params.printHelp();
     return;
   }
-  const artifactRoot = readStringFlag(params.flags, 'artifact-root') ?? readStringFlag(params.flags, 'run-dir') ?? '.';
-  await assertProviderControlHostFreshnessArtifactRoot(artifactRoot);
+  const artifactRoot = readStringFlag(params.flags, 'artifact-root') ?? readStringFlag(params.flags, 'run-dir');
+  const paths = readExplicitPathFlags(params.flags);
+  if (!artifactRoot && !hasExplicitPaths(paths)) {
+    throw new Error(
+      'control-host freshness-gauge requires --artifact-root <path>, --run-dir <path>, or explicit artifact path flags.'
+    );
+  }
+  if (artifactRoot) {
+    await assertProviderControlHostFreshnessArtifactRoot(artifactRoot);
+  }
   const report = await evaluateProviderControlHostFreshnessGauge({
     artifactRoot,
     now: readStringFlag(params.flags, 'now'),
     strict: readBooleanFlag(params.flags, 'strict'),
     maxDepth: readIntegerFlag(params.flags, 'max-depth'),
-    thresholds: readThresholdFlags(params.flags)
+    thresholds: readThresholdFlags(params.flags),
+    paths
   });
   const format: OutputFormat = readStringFlag(params.flags, 'format') === 'json' ? 'json' : 'text';
   if (format === 'json') {
@@ -42,6 +52,40 @@ export async function runControlHostFreshnessGaugeCliShell(
   if (report.strict_failed) {
     process.exitCode = 1;
   }
+}
+
+function readExplicitPathFlags(flags: ArgMap): Partial<Omit<ProviderControlHostFreshnessGaugeSources, 'artifact_root'>> {
+  return compactPathOptions({
+    provider_intake_state: readPathListFlag(flags, 'provider-intake-state'),
+    provider_manifests: readPathListFlag(flags, 'provider-manifest', 'provider-manifests'),
+    provider_proofs: readPathListFlag(flags, 'provider-proof', 'provider-proofs'),
+    worker_audit_jsonl: readPathListFlag(flags, 'worker-audit-jsonl'),
+    control_endpoint_metadata: readPathListFlag(flags, 'control-endpoint-metadata'),
+    status_datasets: readPathListFlag(flags, 'status-dataset', 'status-datasets'),
+    polling_health: readPathListFlag(flags, 'polling-health'),
+    linear_budget_state: readPathListFlag(flags, 'linear-budget-state')
+  });
+}
+
+function compactPathOptions(
+  paths: Omit<ProviderControlHostFreshnessGaugeSources, 'artifact_root'>
+): Partial<Omit<ProviderControlHostFreshnessGaugeSources, 'artifact_root'>> {
+  return Object.fromEntries(
+    Object.entries(paths).filter(([, value]) => Array.isArray(value) && value.length > 0)
+  ) as Partial<Omit<ProviderControlHostFreshnessGaugeSources, 'artifact_root'>>;
+}
+
+function hasExplicitPaths(paths: Partial<Omit<ProviderControlHostFreshnessGaugeSources, 'artifact_root'>>): boolean {
+  return Object.values(paths).some((value) => Array.isArray(value) && value.length > 0);
+}
+
+function readPathListFlag(flags: ArgMap, ...keys: string[]): string[] {
+  return keys.flatMap((key) => {
+    const raw = readStringFlag(flags, key);
+    return raw === undefined
+      ? []
+      : raw.split(',').map((entry) => entry.trim()).filter((entry) => entry.length > 0);
+  });
 }
 
 function readThresholdFlags(flags: ArgMap): Partial<ProviderControlHostFreshnessGaugeThresholds> {

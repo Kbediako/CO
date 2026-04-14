@@ -63,7 +63,7 @@ describe('provider/control-host freshness gauge', () => {
     ['low-linear-headroom', 'degraded', 'linear_headroom_low'],
     ['stale-retry-queue', 'stale', 'retry_queue_stale'],
     ['child-lane-cap-pressure', 'degraded', 'child_lane_cap_pressure']
-  ] as const)('classifies degraded fixture %s as %s', async (fixture, verdict, findingCode) => {
+  ] as const)('classifies fixture %s as %s', async (fixture, verdict, findingCode) => {
     const report = await evaluateProviderControlHostFreshnessGauge({
       artifactRoot: join(FIXTURE_ROOT, fixture),
       now: NOW,
@@ -134,5 +134,75 @@ describe('provider/control-host freshness gauge', () => {
 
     expect(report.verdict).toBe('healthy');
     expect(report.findings.map((finding) => finding.code)).not.toContain('linear_headroom_low');
+  });
+
+  it('does not treat control endpoint metadata alone as provider/control-host evidence', async () => {
+    const report = await evaluateProviderControlHostFreshnessGauge({
+      artifactRoot: join(FIXTURE_ROOT, 'control-endpoint-only'),
+      now: NOW
+    });
+
+    expect(report.sources.control_endpoint_metadata).toHaveLength(1);
+    expect(report.verdict).toBe('unknown');
+    expect(report.findings.map((finding) => finding.code)).toContain('no_provider_control_host_artifacts');
+  });
+
+  it('scopes launch and heartbeat latency to active claims and proofs', async () => {
+    const report = await evaluateProviderControlHostFreshnessGauge({
+      artifactRoot: join(FIXTURE_ROOT, 'active-scope-latencies'),
+      now: NOW
+    });
+
+    expect(report.verdict).toBe('healthy');
+    expect(report.metrics.claim_to_start_latency_ms.value).toBe(20_000);
+    expect(report.metrics.start_to_first_heartbeat_latency_ms.value).toBe(15_000);
+    expect(report.findings.map((finding) => finding.code)).not.toContain('claim_to_start_latency_degraded');
+    expect(report.findings.map((finding) => finding.code)).not.toContain('start_to_first_heartbeat_latency_degraded');
+  });
+
+  it('scopes child-lane cap pressure to the busiest parent run', async () => {
+    const report = await evaluateProviderControlHostFreshnessGauge({
+      artifactRoot: join(FIXTURE_ROOT, 'child-lane-cap-per-parent'),
+      now: NOW
+    });
+
+    expect(report.verdict).toBe('healthy');
+    expect(report.metrics.child_lane_cap_pressure.value).toBe(0.5);
+    expect(report.findings.map((finding) => finding.code)).not.toContain('child_lane_cap_pressure');
+  });
+
+  it('rejects invalid now values instead of using wall-clock time', async () => {
+    await expect(evaluateProviderControlHostFreshnessGauge({
+      artifactRoot: join(FIXTURE_ROOT, 'healthy'),
+      now: 'not-a-timestamp'
+    })).rejects.toThrow(/Invalid now value/);
+  });
+
+  it('requires an explicit artifact root or artifact path flags for CLI replay', async () => {
+    await expect(runControlHostFreshnessGaugeCliShell({
+      flags: { format: 'json', now: NOW },
+      printHelp: vi.fn()
+    })).rejects.toThrow(/requires --artifact-root/);
+  });
+
+  it('supports explicit path flags without recursively scanning an artifact root', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await runControlHostFreshnessGaugeCliShell({
+      flags: {
+        'provider-intake-state': join(FIXTURE_ROOT, 'stale-refresh/provider-intake-state.json'),
+        format: 'json',
+        now: NOW,
+        strict: true
+      },
+      printHelp: vi.fn()
+    });
+
+    expect(process.exitCode).toBe(1);
+    const payload = JSON.parse(String(log.mock.calls[0]?.[0])) as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      verdict: 'stale',
+      strict_failed: true
+    });
   });
 });

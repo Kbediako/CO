@@ -12,6 +12,7 @@ Useful inputs:
 
 - `--artifact-root <path>` scans a run directory, `.runs` subset, or sanitized fixture root.
 - `--run-dir <path>` is an alias when checking one run directory.
+- Explicit path flags such as `--provider-intake-state <path>` or `--provider-proof <path>` can narrow replay scope without recursively scanning a root.
 - `--now <iso>` makes age and latency fields deterministic for replay/evals.
 - `--strict` exits non-zero when the overall verdict is `stale` or `contradictory`.
 
