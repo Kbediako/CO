@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260414-linear-0022f975-905a-4974-aa8e-d689df90167c",
+      "title": "CO: reconcile Done issue mirrors and validation-only closeout provenance",
+      "relates_to": "tasks/tasks-linear-0022f975-905a-4974-aa8e-d689df90167c.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-14",
+      "paths": {
+        "spec": "tasks/specs/linear-0022f975-905a-4974-aa8e-d689df90167c.md",
+        "task": "tasks/tasks-linear-0022f975-905a-4974-aa8e-d689df90167c.md",
+        "agent_task": ".agent/task/linear-0022f975-905a-4974-aa8e-d689df90167c.md",
+        "docs": "docs/TECH_SPEC-linear-0022f975-905a-4974-aa8e-d689df90167c.md"
+      }
+    },
+    {
       "id": "20260414-linear-ea7ddb9e-78a7-4e85-aaa2-f890046d4809",
       "title": "CO: prevent provider refresh restart loop from breaking co-status attach",
       "relates_to": "tasks/tasks-linear-ea7ddb9e-78a7-4e85-aaa2-f890046d4809.md",
@@ -10378,6 +10394,22 @@
     }
   ],
   "specs": [
+    {
+      "id": "20260414-linear-0022f975-905a-4974-aa8e-d689df90167c",
+      "title": "CO: reconcile Done issue mirrors and validation-only closeout provenance",
+      "relates_to": "tasks/tasks-linear-0022f975-905a-4974-aa8e-d689df90167c.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-14",
+      "paths": {
+        "spec": "tasks/specs/linear-0022f975-905a-4974-aa8e-d689df90167c.md",
+        "task": "tasks/tasks-linear-0022f975-905a-4974-aa8e-d689df90167c.md",
+        "agent_task": ".agent/task/linear-0022f975-905a-4974-aa8e-d689df90167c.md",
+        "docs": "docs/TECH_SPEC-linear-0022f975-905a-4974-aa8e-d689df90167c.md"
+      }
+    },
     {
       "id": "20260306-1011-coordinator-discord-enablement-after-telegram-evidence",
       "title": "Coordinator Discord Enablement After Telegram Evidence",

@@ -3,6 +3,62 @@
   "generated_at": "2026-04-14",
   "entries": [
     {
+      "path": ".agent/task/linear-0022f975-905a-4974-aa8e-d689df90167c.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-14",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-0022f975-905a-4974-aa8e-d689df90167c.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-14",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-linear-0022f975-905a-4974-aa8e-d689df90167c.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-14",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-0022f975-905a-4974-aa8e-d689df90167c.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-14",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/linear-0022f975-905a-4974-aa8e-d689df90167c.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-14",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-linear-0022f975-905a-4974-aa8e-d689df90167c.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-14",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/guides/done-closeout-provenance.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-14",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/closeout-provenance/linear-ae5b2b98-f03e-44fd-9c13-a4d58457d8cb.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-14",
+      "cadence_days": 30
+    },
+    {
       "path": "docs/guides/docs-freshness-cohorts.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",

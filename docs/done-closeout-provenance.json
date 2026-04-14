@@ -1,0 +1,504 @@
+{
+  "version": 1,
+  "generated_at": "2026-04-14",
+  "policy_doc": "docs/guides/done-closeout-provenance.md",
+  "required_pr_checks": [
+    "Cloud Canary",
+    "Core Lane",
+    "CodeRabbit"
+  ],
+  "issues": [
+    {
+      "identifier": "CO-92",
+      "linear_id": "9eaac719-eecf-4e49-8d4e-4d793d9ff958",
+      "linear_state": "Done",
+      "classification": "stale_mirror_only",
+      "linear_workpad": {
+        "comment_id": "c757a92c-6912-4dd8-86a2-4751ef776cb1"
+      },
+      "pr": {
+        "number": 467,
+        "url": "https://github.com/Kbediako/CO/pull/467",
+        "title": "CO-92: add planner memory selection seam",
+        "state": "MERGED",
+        "merged_at": "2026-04-13T22:11:23Z",
+        "merge_commit": "01b2095ee1a7f03c36622a4084fcca7be6d4630c",
+        "checks": [
+          { "name": "Cloud Canary", "conclusion": "SUCCESS" },
+          { "name": "Core Lane", "conclusion": "SUCCESS" },
+          { "name": "CodeRabbit", "state": "SUCCESS" }
+        ]
+      },
+      "mirror_paths": [
+        "tasks/tasks-linear-9eaac719-eecf-4e49-8d4e-4d793d9ff958.md",
+        ".agent/task/linear-9eaac719-eecf-4e49-8d4e-4d793d9ff958.md",
+        "docs/ACTION_PLAN-linear-9eaac719-eecf-4e49-8d4e-4d793d9ff958.md",
+        "docs/TECH_SPEC-linear-9eaac719-eecf-4e49-8d4e-4d793d9ff958.md",
+        "docs/PRD-linear-9eaac719-eecf-4e49-8d4e-4d793d9ff958.md",
+        "docs/TASKS.md"
+      ],
+      "waivers": [
+        {
+          "path": "tasks/tasks-linear-9eaac719-eecf-4e49-8d4e-4d793d9ff958.md",
+          "scope": "pending_rows_hash",
+          "pending_rows_count": 20,
+          "pending_rows_sha256": "150815ce700d208c20c230b319f8e8cd5f4668486cd84ecc3a52d5ef8f823b39",
+          "reason": "stale_mirror_only",
+          "reviewed_at": "2026-04-14",
+          "context_summary": "Historical task checklist still says docs-review, implementation, validation, PR attachment, and review handoff are pending after Linear Done plus merged PR evidence.",
+          "evidence": ["https://github.com/Kbediako/CO/pull/467", "linear-workpad:c757a92c-6912-4dd8-86a2-4751ef776cb1"]
+        },
+        {
+          "path": ".agent/task/linear-9eaac719-eecf-4e49-8d4e-4d793d9ff958.md",
+          "scope": "pending_rows_hash",
+          "pending_rows_count": 20,
+          "pending_rows_sha256": "150815ce700d208c20c230b319f8e8cd5f4668486cd84ecc3a52d5ef8f823b39",
+          "reason": "stale_mirror_only",
+          "reviewed_at": "2026-04-14",
+          "context_summary": "Historical agent mirror still says docs-review, implementation, validation, PR attachment, and review handoff are pending after Linear Done plus merged PR evidence.",
+          "evidence": ["https://github.com/Kbediako/CO/pull/467", "linear-workpad:c757a92c-6912-4dd8-86a2-4751ef776cb1"]
+        },
+        {
+          "path": "docs/ACTION_PLAN-linear-9eaac719-eecf-4e49-8d4e-4d793d9ff958.md",
+          "scope": "pending_rows_hash",
+          "pending_rows_count": 1,
+          "pending_rows_sha256": "fe7d980b46aeaef55a1323129a4bd09aeb9cdab10fc99f002dacbdf512e40636",
+          "reason": "stale_mirror_only",
+          "reviewed_at": "2026-04-14",
+          "context_summary": "Reviewer-pending docs-review note is stale after merged PR closeout.",
+          "evidence": ["https://github.com/Kbediako/CO/pull/467"]
+        },
+        {
+          "path": "docs/TECH_SPEC-linear-9eaac719-eecf-4e49-8d4e-4d793d9ff958.md",
+          "scope": "pending_rows_hash",
+          "pending_rows_count": 1,
+          "pending_rows_sha256": "fe7d980b46aeaef55a1323129a4bd09aeb9cdab10fc99f002dacbdf512e40636",
+          "reason": "stale_mirror_only",
+          "reviewed_at": "2026-04-14",
+          "context_summary": "Reviewer-pending docs-review note is stale after merged PR closeout.",
+          "evidence": ["https://github.com/Kbediako/CO/pull/467"]
+        },
+        {
+          "path": "docs/PRD-linear-9eaac719-eecf-4e49-8d4e-4d793d9ff958.md",
+          "scope": "pending_rows_hash",
+          "pending_rows_count": 1,
+          "pending_rows_sha256": "ac3098265c921b373f70df4e988117ac822ee5b3771a7020a621a5c58d6363fa",
+          "reason": "stale_mirror_only",
+          "reviewed_at": "2026-04-14",
+          "context_summary": "Engineering-pending docs-review note is stale after merged PR closeout.",
+          "evidence": ["https://github.com/Kbediako/CO/pull/467"]
+        },
+        {
+          "path": "docs/TASKS.md",
+          "scope": "pending_rows_hash",
+          "pending_rows_count": 1,
+          "pending_rows_sha256": "c49904e1911451f206d1267c9e36997c3ace3290a7cf7d6fee657d738fd79e3b",
+          "reason": "stale_mirror_only",
+          "reviewed_at": "2026-04-14",
+          "context_summary": "Active task snapshot still describes CO-92 as an implementation lane after Linear Done plus merged PR evidence.",
+          "evidence": ["https://github.com/Kbediako/CO/pull/467", "linear-workpad:c757a92c-6912-4dd8-86a2-4751ef776cb1"]
+        }
+      ]
+    },
+    {
+      "identifier": "CO-94",
+      "linear_id": "ce6f26d0-029a-40d9-8ffe-289cd40cde8d",
+      "linear_state": "Done",
+      "classification": "stale_mirror_only",
+      "linear_workpad": {
+        "comment_id": "b43e072e-4002-4299-beae-fb9298ba1b49"
+      },
+      "pr": {
+        "number": 468,
+        "url": "https://github.com/Kbediako/CO/pull/468",
+        "title": "CO-94: add run memory controller",
+        "state": "MERGED",
+        "merged_at": "2026-04-13T22:35:38Z",
+        "merge_commit": "2247bca1f669856ec991f57f5c8dcc6fb1f55939",
+        "checks": [
+          { "name": "Cloud Canary", "conclusion": "SUCCESS" },
+          { "name": "Core Lane", "conclusion": "SUCCESS" },
+          { "name": "CodeRabbit", "state": "SUCCESS" }
+        ]
+      },
+      "mirror_paths": [
+        "tasks/tasks-linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d.md",
+        ".agent/task/linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d.md",
+        "docs/TASKS.md"
+      ],
+      "waivers": [
+        {
+          "path": "tasks/tasks-linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d.md",
+          "scope": "pending_rows_hash",
+          "pending_rows_count": 3,
+          "pending_rows_sha256": "f279ca2f31c9ffaaa6054c5c8f585c2e05f80cbeaf93838fd140c1c6b8f1366c",
+          "reason": "stale_mirror_only",
+          "reviewed_at": "2026-04-14",
+          "context_summary": "Historical checklist still says final closeout, PR attach, and ready-review drain are pending after Linear Done plus merged PR evidence.",
+          "evidence": ["https://github.com/Kbediako/CO/pull/468", "linear-workpad:b43e072e-4002-4299-beae-fb9298ba1b49"]
+        },
+        {
+          "path": ".agent/task/linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d.md",
+          "scope": "pending_rows_hash",
+          "pending_rows_count": 3,
+          "pending_rows_sha256": "f279ca2f31c9ffaaa6054c5c8f585c2e05f80cbeaf93838fd140c1c6b8f1366c",
+          "reason": "stale_mirror_only",
+          "reviewed_at": "2026-04-14",
+          "context_summary": "Historical agent mirror still says final closeout, PR attach, and ready-review drain are pending after Linear Done plus merged PR evidence.",
+          "evidence": ["https://github.com/Kbediako/CO/pull/468", "linear-workpad:b43e072e-4002-4299-beae-fb9298ba1b49"]
+        },
+        {
+          "path": "docs/TASKS.md",
+          "scope": "pending_rows_hash",
+          "pending_rows_count": 1,
+          "pending_rows_sha256": "dee10492aa35faf942674875862da4b12c7f85108baa2493f9d7714f8e6a0f65",
+          "reason": "stale_mirror_only",
+          "reviewed_at": "2026-04-14",
+          "context_summary": "Active task snapshot still says PR creation, attachment, and ready-review drain remain after Linear Done plus merged PR evidence.",
+          "evidence": ["https://github.com/Kbediako/CO/pull/468", "linear-workpad:b43e072e-4002-4299-beae-fb9298ba1b49"]
+        }
+      ]
+    },
+    {
+      "identifier": "CO-78",
+      "linear_id": "bea56fb8-c601-4554-8ece-0a63c5fd34bc",
+      "linear_state": "Done",
+      "classification": "stale_mirror_only",
+      "linear_workpad": {
+        "comment_id": "fa4d6da0-c2f6-4bdb-bfe2-6a09b6533c9a"
+      },
+      "pr": {
+        "number": 359,
+        "url": "https://github.com/Kbediako/CO/pull/359",
+        "title": "CO-78: restore truthful default CO STATUS telemetry",
+        "state": "MERGED",
+        "merged_at": "2026-04-04T10:30:36Z",
+        "merge_commit": "b1c619c2f3cdb2d199f712f960582817bdc08bd1",
+        "checks": [
+          { "name": "Cloud Canary", "conclusion": "SUCCESS" },
+          { "name": "Core Lane", "conclusion": "SUCCESS" },
+          { "name": "CodeRabbit", "state": "SUCCESS" }
+        ]
+      },
+      "related_prs": [
+        {
+          "number": 358,
+          "url": "https://github.com/Kbediako/CO/pull/358",
+          "state": "CLOSED",
+          "note": "Also attached in Linear; superseded by merged PR 359."
+        }
+      ],
+      "mirror_paths": [
+        "tasks/tasks-linear-bea56fb8-c601-4554-8ece-0a63c5fd34bc.md",
+        ".agent/task/linear-bea56fb8-c601-4554-8ece-0a63c5fd34bc.md",
+        "docs/ACTION_PLAN-linear-bea56fb8-c601-4554-8ece-0a63c5fd34bc.md",
+        "docs/TASKS.md"
+      ],
+      "waivers": [
+        {
+          "path": "tasks/tasks-linear-bea56fb8-c601-4554-8ece-0a63c5fd34bc.md",
+          "scope": "pending_rows_hash",
+          "pending_rows_count": 25,
+          "pending_rows_sha256": "bcb994cdc943dd854ab1fc463e2a6fd8e98a88f6900220872f960d2a9ae9f821",
+          "reason": "stale_mirror_only",
+          "reviewed_at": "2026-04-14",
+          "context_summary": "Historical checklist still says implementation, screenshots, validation, review, PR checks, and review transition are pending after Linear Done plus merged PR evidence.",
+          "evidence": ["https://github.com/Kbediako/CO/pull/359", "linear-workpad:fa4d6da0-c2f6-4bdb-bfe2-6a09b6533c9a"]
+        },
+        {
+          "path": ".agent/task/linear-bea56fb8-c601-4554-8ece-0a63c5fd34bc.md",
+          "scope": "pending_rows_hash",
+          "pending_rows_count": 25,
+          "pending_rows_sha256": "bcb994cdc943dd854ab1fc463e2a6fd8e98a88f6900220872f960d2a9ae9f821",
+          "reason": "stale_mirror_only",
+          "reviewed_at": "2026-04-14",
+          "context_summary": "Historical agent mirror still says implementation, screenshots, validation, review, PR checks, and review transition are pending after Linear Done plus merged PR evidence.",
+          "evidence": ["https://github.com/Kbediako/CO/pull/359", "linear-workpad:fa4d6da0-c2f6-4bdb-bfe2-6a09b6533c9a"]
+        },
+        {
+          "path": "docs/ACTION_PLAN-linear-bea56fb8-c601-4554-8ece-0a63c5fd34bc.md",
+          "scope": "pending_rows_hash",
+          "pending_rows_count": 1,
+          "pending_rows_sha256": "23daf037a02a0e65fed085e09020fcdf83e7784d775b1028b49b238a33818d92",
+          "reason": "stale_mirror_only",
+          "reviewed_at": "2026-04-14",
+          "context_summary": "Historical ACTION_PLAN still says final review-handoff drain is pending after Linear Done plus merged PR evidence.",
+          "evidence": ["https://github.com/Kbediako/CO/pull/359"]
+        },
+        {
+          "path": "docs/TASKS.md",
+          "scope": "pending_rows_hash",
+          "pending_rows_count": 1,
+          "pending_rows_sha256": "56372705d5efc0ba71c05e1116dde0bbe28aedff6c81cc0e284bb963f85ee178",
+          "reason": "stale_mirror_only",
+          "reviewed_at": "2026-04-14",
+          "context_summary": "Active task snapshot still describes CO-78 as an implementation lane after Linear Done plus merged PR evidence.",
+          "evidence": ["https://github.com/Kbediako/CO/pull/359", "linear-workpad:fa4d6da0-c2f6-4bdb-bfe2-6a09b6533c9a"]
+        }
+      ]
+    },
+    {
+      "identifier": "CO-89",
+      "linear_id": "70e83230-4f52-4850-b494-41fd0ec32f13",
+      "linear_state": "Done",
+      "classification": "stale_mirror_only",
+      "linear_workpad": {
+        "comment_id": "c3a291ab-080b-4ad5-af1d-cdd9f6345517"
+      },
+      "pr": {
+        "number": 396,
+        "url": "https://github.com/Kbediako/CO/pull/396",
+        "title": "Add guarded resident app-server control seam",
+        "state": "MERGED",
+        "merged_at": "2026-04-09T13:32:34Z",
+        "merge_commit": "2a0e6320c1e35fbaf5ebe7709599221112ceaec0",
+        "checks": [
+          { "name": "Cloud Canary", "conclusion": "SUCCESS" },
+          { "name": "Core Lane", "conclusion": "SUCCESS" },
+          { "name": "CodeRabbit", "state": "SUCCESS" }
+        ]
+      },
+      "mirror_paths": [
+        "tasks/tasks-linear-70e83230-4f52-4850-b494-41fd0ec32f13.md",
+        ".agent/task/linear-70e83230-4f52-4850-b494-41fd0ec32f13.md",
+        "tasks/specs/linear-70e83230-4f52-4850-b494-41fd0ec32f13.md",
+        "docs/ACTION_PLAN-linear-70e83230-4f52-4850-b494-41fd0ec32f13.md",
+        "docs/TECH_SPEC-linear-70e83230-4f52-4850-b494-41fd0ec32f13.md",
+        "docs/PRD-linear-70e83230-4f52-4850-b494-41fd0ec32f13.md"
+      ],
+      "waivers": [
+        {
+          "path": "tasks/tasks-linear-70e83230-4f52-4850-b494-41fd0ec32f13.md",
+          "scope": "pending_rows_hash",
+          "pending_rows_count": 24,
+          "pending_rows_sha256": "c05f8a5e575593c47e55b2b724ed65abce7094973aef7a58d6e7534d548ff817",
+          "reason": "stale_mirror_only",
+          "reviewed_at": "2026-04-14",
+          "context_summary": "Historical checklist still says packet, implementation, validation, review, PR attach, and handoff are pending after Linear Done plus merged PR evidence.",
+          "evidence": ["https://github.com/Kbediako/CO/pull/396", "linear-workpad:c3a291ab-080b-4ad5-af1d-cdd9f6345517"]
+        },
+        {
+          "path": ".agent/task/linear-70e83230-4f52-4850-b494-41fd0ec32f13.md",
+          "scope": "pending_rows_hash",
+          "pending_rows_count": 16,
+          "pending_rows_sha256": "8ea370b6a67d6aa5e88a2c54588d1bf8c619a0dbda0e27ace9c6d8ef0395d937",
+          "reason": "stale_mirror_only",
+          "reviewed_at": "2026-04-14",
+          "context_summary": "Historical agent mirror still says implementation, validation, review, PR attach, and handoff are pending after Linear Done plus merged PR evidence.",
+          "evidence": ["https://github.com/Kbediako/CO/pull/396", "linear-workpad:c3a291ab-080b-4ad5-af1d-cdd9f6345517"]
+        },
+        {
+          "path": "tasks/specs/linear-70e83230-4f52-4850-b494-41fd0ec32f13.md",
+          "scope": "pending_rows_hash",
+          "pending_rows_count": 1,
+          "pending_rows_sha256": "2ea760fb93c7fc1c13e7977abe69bec5291af56f165bca726d02ec9a786c6e50",
+          "reason": "stale_mirror_only",
+          "reviewed_at": "2026-04-14",
+          "context_summary": "Reviewer-pending docs-review note is stale after merged PR closeout.",
+          "evidence": ["https://github.com/Kbediako/CO/pull/396"]
+        },
+        {
+          "path": "docs/ACTION_PLAN-linear-70e83230-4f52-4850-b494-41fd0ec32f13.md",
+          "scope": "pending_rows_hash",
+          "pending_rows_count": 1,
+          "pending_rows_sha256": "2ea760fb93c7fc1c13e7977abe69bec5291af56f165bca726d02ec9a786c6e50",
+          "reason": "stale_mirror_only",
+          "reviewed_at": "2026-04-14",
+          "context_summary": "Reviewer-pending docs-review note is stale after merged PR closeout.",
+          "evidence": ["https://github.com/Kbediako/CO/pull/396"]
+        },
+        {
+          "path": "docs/TECH_SPEC-linear-70e83230-4f52-4850-b494-41fd0ec32f13.md",
+          "scope": "pending_rows_hash",
+          "pending_rows_count": 1,
+          "pending_rows_sha256": "2ea760fb93c7fc1c13e7977abe69bec5291af56f165bca726d02ec9a786c6e50",
+          "reason": "stale_mirror_only",
+          "reviewed_at": "2026-04-14",
+          "context_summary": "Reviewer-pending docs-review note is stale after merged PR closeout.",
+          "evidence": ["https://github.com/Kbediako/CO/pull/396"]
+        },
+        {
+          "path": "docs/PRD-linear-70e83230-4f52-4850-b494-41fd0ec32f13.md",
+          "scope": "pending_rows_hash",
+          "pending_rows_count": 1,
+          "pending_rows_sha256": "4b1fc34829fc596f7ca74175c47fd18bc94ce86add8e9861533fc72775be0372",
+          "reason": "stale_mirror_only",
+          "reviewed_at": "2026-04-14",
+          "context_summary": "Engineering-pending docs-review note is stale after merged PR closeout.",
+          "evidence": ["https://github.com/Kbediako/CO/pull/396"]
+        }
+      ]
+    },
+    {
+      "identifier": "CO-43",
+      "linear_id": "9ff97d4a-dead-4bbf-b6e8-ee9423fa1612",
+      "linear_state": "Done",
+      "classification": "stale_mirror_only",
+      "linear_workpad": {
+        "comment_id": "24f742f4-23e5-42a2-81d9-332064744d23"
+      },
+      "pr": {
+        "number": 340,
+        "url": "https://github.com/Kbediako/CO/pull/340",
+        "title": "CO-43: preserve scoped standalone-review context",
+        "state": "MERGED",
+        "merged_at": "2026-04-01T01:17:21Z",
+        "merge_commit": "028c85ccd7b342221322ee276e0e1ef202fa7795",
+        "checks": [
+          { "name": "Cloud Canary", "conclusion": "SUCCESS" },
+          { "name": "Core Lane", "conclusion": "SUCCESS" },
+          { "name": "CodeRabbit", "state": "SUCCESS" }
+        ]
+      },
+      "mirror_paths": [
+        "tasks/tasks-linear-9ff97d4a-dead-4bbf-b6e8-ee9423fa1612.md",
+        ".agent/task/linear-9ff97d4a-dead-4bbf-b6e8-ee9423fa1612.md",
+        "docs/TASKS.md"
+      ],
+      "waivers": [
+        {
+          "path": "tasks/tasks-linear-9ff97d4a-dead-4bbf-b6e8-ee9423fa1612.md",
+          "scope": "pending_rows_hash",
+          "pending_rows_count": 19,
+          "pending_rows_sha256": "c884b9309c3b8d87339ec67b4bf290b7a7237bfff3cfbb25ccd311e2b43d938f",
+          "reason": "stale_mirror_only",
+          "reviewed_at": "2026-04-14",
+          "context_summary": "Historical checklist still says implementation, validation, PR attach, and review handoff are pending after Linear Done plus merged PR evidence.",
+          "evidence": ["https://github.com/Kbediako/CO/pull/340", "linear-workpad:24f742f4-23e5-42a2-81d9-332064744d23"]
+        },
+        {
+          "path": ".agent/task/linear-9ff97d4a-dead-4bbf-b6e8-ee9423fa1612.md",
+          "scope": "pending_rows_hash",
+          "pending_rows_count": 19,
+          "pending_rows_sha256": "c884b9309c3b8d87339ec67b4bf290b7a7237bfff3cfbb25ccd311e2b43d938f",
+          "reason": "stale_mirror_only",
+          "reviewed_at": "2026-04-14",
+          "context_summary": "Historical agent mirror still says implementation, validation, PR attach, and review handoff are pending after Linear Done plus merged PR evidence.",
+          "evidence": ["https://github.com/Kbediako/CO/pull/340", "linear-workpad:24f742f4-23e5-42a2-81d9-332064744d23"]
+        },
+        {
+          "path": "docs/TASKS.md",
+          "scope": "pending_rows_hash",
+          "pending_rows_count": 1,
+          "pending_rows_sha256": "108c6f1f5952d8b645f0af896456a12d5126d27fe49a6b05820fee4a2480140b",
+          "reason": "stale_mirror_only",
+          "reviewed_at": "2026-04-14",
+          "context_summary": "Active task snapshot still describes CO-43 as an implementation lane after Linear Done plus merged PR evidence.",
+          "evidence": ["https://github.com/Kbediako/CO/pull/340", "linear-workpad:24f742f4-23e5-42a2-81d9-332064744d23"]
+        }
+      ]
+    },
+    {
+      "identifier": "CO-62",
+      "linear_id": "95b040bc-b150-4c39-bc56-64b13f55579f",
+      "linear_state": "Done",
+      "classification": "stale_mirror_only",
+      "linear_workpad": {
+        "comment_id": "831b4405-7c5d-4eeb-8b2f-8479ad7f87e9"
+      },
+      "pr": {
+        "number": 341,
+        "url": "https://github.com/Kbediako/CO/pull/341",
+        "title": "CO-62: reduce steady-state Linear request burn",
+        "state": "MERGED",
+        "merged_at": "2026-04-01T15:10:57Z",
+        "merge_commit": "2b3fc540b0aab011109ce98f1415c667de448e1f",
+        "checks": [
+          { "name": "Cloud Canary", "conclusion": "SUCCESS" },
+          { "name": "Core Lane", "conclusion": "SUCCESS" },
+          { "name": "CodeRabbit", "state": "SUCCESS" }
+        ]
+      },
+      "mirror_paths": [
+        "tasks/tasks-linear-95b040bc-b150-4c39-bc56-64b13f55579f.md",
+        ".agent/task/linear-95b040bc-b150-4c39-bc56-64b13f55579f.md",
+        "docs/ACTION_PLAN-linear-95b040bc-b150-4c39-bc56-64b13f55579f.md",
+        "docs/TECH_SPEC-linear-95b040bc-b150-4c39-bc56-64b13f55579f.md",
+        "docs/PRD-linear-95b040bc-b150-4c39-bc56-64b13f55579f.md",
+        "docs/TASKS.md"
+      ],
+      "waivers": [
+        {
+          "path": "tasks/tasks-linear-95b040bc-b150-4c39-bc56-64b13f55579f.md",
+          "scope": "pending_rows_hash",
+          "pending_rows_count": 22,
+          "pending_rows_sha256": "9f59be341f048a761036af6bf4bf7975659f7d6f241446e37ec03efea29a53fa",
+          "reason": "stale_mirror_only",
+          "reviewed_at": "2026-04-14",
+          "context_summary": "Historical checklist still says docs-review, implementation, validation, workpad refresh, PR attach, and handoff are pending after Linear Done plus merged PR evidence.",
+          "evidence": ["https://github.com/Kbediako/CO/pull/341", "linear-workpad:831b4405-7c5d-4eeb-8b2f-8479ad7f87e9"]
+        },
+        {
+          "path": ".agent/task/linear-95b040bc-b150-4c39-bc56-64b13f55579f.md",
+          "scope": "pending_rows_hash",
+          "pending_rows_count": 4,
+          "pending_rows_sha256": "a4e55fc7ccaccb69fc7f12c5a5206b5412b66315b6dd078911f35d36366ac589",
+          "reason": "stale_mirror_only",
+          "reviewed_at": "2026-04-14",
+          "context_summary": "Historical agent mirror still says docs:freshness, PR attach, origin/main merge, and PR feedback closeout are pending after Linear Done plus merged PR evidence.",
+          "evidence": ["https://github.com/Kbediako/CO/pull/341", "linear-workpad:831b4405-7c5d-4eeb-8b2f-8479ad7f87e9"]
+        },
+        {
+          "path": "docs/ACTION_PLAN-linear-95b040bc-b150-4c39-bc56-64b13f55579f.md",
+          "scope": "pending_rows_hash",
+          "pending_rows_count": 1,
+          "pending_rows_sha256": "9cc215243424787dbd8c58c30aaa196164450cca621cf9918852dba389205f18",
+          "reason": "stale_mirror_only",
+          "reviewed_at": "2026-04-14",
+          "context_summary": "Reviewer-pending docs-review note is stale after merged PR closeout.",
+          "evidence": ["https://github.com/Kbediako/CO/pull/341"]
+        },
+        {
+          "path": "docs/TECH_SPEC-linear-95b040bc-b150-4c39-bc56-64b13f55579f.md",
+          "scope": "pending_rows_hash",
+          "pending_rows_count": 1,
+          "pending_rows_sha256": "9cc215243424787dbd8c58c30aaa196164450cca621cf9918852dba389205f18",
+          "reason": "stale_mirror_only",
+          "reviewed_at": "2026-04-14",
+          "context_summary": "Reviewer-pending docs-review note is stale after merged PR closeout.",
+          "evidence": ["https://github.com/Kbediako/CO/pull/341"]
+        },
+        {
+          "path": "docs/PRD-linear-95b040bc-b150-4c39-bc56-64b13f55579f.md",
+          "scope": "pending_rows_hash",
+          "pending_rows_count": 1,
+          "pending_rows_sha256": "5d67151216b506c70743a088e5a9ccfc5cf6c5fea41d083f6138a094d4540697",
+          "reason": "stale_mirror_only",
+          "reviewed_at": "2026-04-14",
+          "context_summary": "Engineering-pending docs-review and validation note is stale after merged PR closeout.",
+          "evidence": ["https://github.com/Kbediako/CO/pull/341"]
+        },
+        {
+          "path": "docs/TASKS.md",
+          "scope": "pending_rows_hash",
+          "pending_rows_count": 1,
+          "pending_rows_sha256": "c811fe2c14042ff5decce9e92630ad528166e69afa6255506adc788f5b276018",
+          "reason": "stale_mirror_only",
+          "reviewed_at": "2026-04-14",
+          "context_summary": "Active task snapshot still records a CO-62 continuation and handoff point after Linear Done plus merged PR evidence.",
+          "evidence": ["https://github.com/Kbediako/CO/pull/341", "linear-workpad:831b4405-7c5d-4eeb-8b2f-8479ad7f87e9"]
+        }
+      ]
+    },
+    {
+      "identifier": "CO-170",
+      "linear_id": "ae5b2b98-f03e-44fd-9c13-a4d58457d8cb",
+      "linear_state": "Done",
+      "classification": "validation_only_provenance_gap",
+      "gap_status": "backfilled",
+      "pr_required": false,
+      "linear_workpad": {
+        "comment_id": "edc04f8d-c645-40b2-af51-706cae08b743"
+      },
+      "mirror_paths": [],
+      "local_closeout_pointers": [
+        "docs/closeout-provenance/linear-ae5b2b98-f03e-44fd-9c13-a4d58457d8cb.md"
+      ],
+      "evidence": [
+        "Linear workpad records current-main docs:freshness non-repro evidence.",
+        "Tracked closeout pointer backfilled because original out artifacts are not present in the CO-178 worker workspace."
+      ],
+      "waivers": []
+    }
+  ]
+}
