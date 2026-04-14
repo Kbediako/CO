@@ -90,7 +90,7 @@ export interface ControlHostSupervisionState {
 
 export interface ControlHostSupervisionHealthEvaluation {
   healthy: boolean;
-  reason: 'ok' | 'restart_required' | 'invalid_payload';
+  reason: 'ok' | 'restart_required' | 'stale_restart_required' | 'invalid_payload';
   message: string;
 }
 
@@ -309,7 +309,8 @@ export function buildInitialControlHostSupervisionState(input: {
 }
 
 export function evaluateControlHostSupervisionHealthPayload(
-  payload: unknown
+  payload: unknown,
+  options: { minPollingUpdatedAt?: string | null } = {}
 ): ControlHostSupervisionHealthEvaluation {
   if (!isRecord(payload)) {
     return {
@@ -327,6 +328,14 @@ export function evaluateControlHostSupervisionHealthPayload(
     };
   }
   if (polling.restart_required === true) {
+    if (isStaleRecoverableProviderRestartRequiredPolling(polling, options.minPollingUpdatedAt)) {
+      return {
+        healthy: true,
+        reason: 'stale_restart_required',
+        message:
+          'co-status reported a stale provider_refresh_lifecycle_stuck restart_required snapshot from before the current supervised child start; treating it as quiescent while the current host refreshes.'
+      };
+    }
     return {
       healthy: false,
       reason: 'restart_required',
@@ -338,6 +347,29 @@ export function evaluateControlHostSupervisionHealthPayload(
     reason: 'ok',
     message: 'co-status reported a healthy polling state.'
   };
+}
+
+function isStaleRecoverableProviderRestartRequiredPolling(
+  polling: Record<string, unknown>,
+  minPollingUpdatedAt: string | null | undefined
+): boolean {
+  if (
+    polling.reason !== 'provider_refresh_lifecycle_stuck' &&
+    polling.last_error !== 'provider_refresh_lifecycle_stuck'
+  ) {
+    return false;
+  }
+  const pollingUpdatedAt = parseIsoTimestampToMs(polling.updated_at);
+  const minimumUpdatedAt = parseIsoTimestampToMs(minPollingUpdatedAt);
+  return pollingUpdatedAt !== null && minimumUpdatedAt !== null && pollingUpdatedAt < minimumUpdatedAt;
+}
+
+function parseIsoTimestampToMs(value: unknown): number | null {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return null;
+  }
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 export function parseControlHostSupervisionCsv(raw: string | null | undefined): string[] | null {

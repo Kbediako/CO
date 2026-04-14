@@ -145,6 +145,49 @@ describe('controlHostSupervision helpers', () => {
     });
   });
 
+  it('treats stale provider refresh restart_required snapshots from before child start as quiescent', () => {
+    expect(
+      evaluateControlHostSupervisionHealthPayload(
+        {
+          polling: {
+            restart_required: true,
+            reason: 'provider_refresh_lifecycle_stuck',
+            updated_at: '2026-04-14T05:02:27.000Z'
+          }
+        },
+        {
+          minPollingUpdatedAt: '2026-04-14T05:04:59.000Z'
+        }
+      )
+    ).toEqual({
+      healthy: true,
+      reason: 'stale_restart_required',
+      message:
+        'co-status reported a stale provider_refresh_lifecycle_stuck restart_required snapshot from before the current supervised child start; treating it as quiescent while the current host refreshes.'
+    });
+  });
+
+  it('keeps current provider refresh restart_required snapshots unhealthy', () => {
+    expect(
+      evaluateControlHostSupervisionHealthPayload(
+        {
+          polling: {
+            restart_required: true,
+            reason: 'provider_refresh_lifecycle_stuck',
+            updated_at: '2026-04-14T05:07:38.000Z'
+          }
+        },
+        {
+          minPollingUpdatedAt: '2026-04-14T05:04:59.000Z'
+        }
+      )
+    ).toEqual({
+      healthy: false,
+      reason: 'restart_required',
+      message: 'co-status reported restart_required=true.'
+    });
+  });
+
   it('treats missing polling state as healthy until restart_required is explicit', () => {
     expect(evaluateControlHostSupervisionHealthPayload({})).toEqual({
       healthy: true,
@@ -859,6 +902,7 @@ describe('controlHostSupervision shell helpers', () => {
 
     const result = await probeControlHostHealth(
       config,
+      {},
       {},
       async (
         _command: string,

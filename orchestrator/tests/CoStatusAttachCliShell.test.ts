@@ -5,7 +5,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { runCoStatusAttachCliShell } from '../src/cli/coStatusAttachCliShell.js';
+import { fetchUiDataset, runCoStatusAttachCliShell } from '../src/cli/coStatusAttachCliShell.js';
 
 const tempDirs: string[] = [];
 const servers = new Set<http.Server>();
@@ -203,6 +203,138 @@ describe('runCoStatusAttachCliShell', () => {
     expect(output).toContain('Dashboard error');
     expect(output).toContain('control-host ui dataset invalid');
   });
+
+  it('re-resolves endpoint artifacts and recovers when the attached endpoint rotates', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-attach-shell-'));
+    tempDirs.push(root);
+    const runDir = await writeAttachRunDir(root);
+
+    const currentServer = await startUiServer();
+    servers.add(currentServer.instance);
+    const staleServer = await startUiServer({
+      failNetwork: true,
+      beforeNetworkFailure: async () => {
+        await writeEndpointArtifacts(runDir, currentServer.baseUrl);
+      }
+    });
+    servers.add(staleServer.instance);
+    await writeEndpointArtifacts(runDir, staleServer.baseUrl);
+
+    const writes = await runInteractiveAttachAndStop(runDir);
+
+    expect(staleServer.requests).toHaveLength(1);
+    expect(currentServer.requests).toHaveLength(1);
+    const output = stripAnsi(writes.join(''));
+    expect(output).toContain('CO STATUS');
+    expect(output).not.toContain('Dashboard error');
+  });
+
+  it('renders stale endpoint guidance when the attached endpoint is dead and does not rotate', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-attach-shell-'));
+    tempDirs.push(root);
+    const runDir = await writeAttachRunDir(root);
+
+    const staleServer = await startUiServer();
+    await closeServer(staleServer.instance);
+    await writeEndpointArtifacts(runDir, staleServer.baseUrl);
+
+    const writes = await runInteractiveAttachAndStop(runDir);
+
+    const output = stripAnsi(writes.join(''));
+    expect(output).toContain('Dashboard error');
+    expect(output).toContain('control-host unavailable');
+    expect(output).toContain('stale endpoint after control-host restart');
+    expect(output).toContain('control_endpoint.json');
+  });
+
+  it('renders auth guidance when the current endpoint rejects attach credentials', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-attach-shell-'));
+    tempDirs.push(root);
+    const runDir = await writeAttachRunDir(root);
+
+    const server = await startUiServer();
+    servers.add(server.instance);
+    await writeEndpointArtifacts(runDir, server.baseUrl, 'stale-token');
+
+    const writes = await runInteractiveAttachAndStop(runDir);
+
+    const output = stripAnsi(writes.join(''));
+    expect(output).toContain('Dashboard error');
+    expect(output).toContain('control-host ui auth failed: 401');
+    expect(output).toContain('control_auth.json');
+  });
+
+  it('re-resolves auth artifacts and recovers when the attach token rotates', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-attach-shell-'));
+    tempDirs.push(root);
+    const runDir = await writeAttachRunDir(root);
+
+    const serverRef: { current?: Awaited<ReturnType<typeof startUiServer>> } = {};
+    const server = await startUiServer({
+      beforeUnauthorized: async () => {
+        const currentServer = serverRef.current;
+        if (!currentServer) {
+          throw new Error('expected test server reference before unauthorized retry');
+        }
+        await writeEndpointArtifacts(runDir, currentServer.baseUrl, 'attach-token');
+      }
+    });
+    serverRef.current = server;
+    servers.add(server.instance);
+    await writeEndpointArtifacts(runDir, server.baseUrl, 'stale-token');
+
+    const writes = await runInteractiveAttachAndStop(runDir);
+
+    expect(server.requests).toHaveLength(2);
+    expect(server.requests[0]).toMatchObject({
+      authorization: 'Bearer stale-token',
+      csrfToken: 'stale-token'
+    });
+    expect(server.requests[1]).toMatchObject({
+      authorization: 'Bearer attach-token',
+      csrfToken: 'attach-token'
+    });
+    const output = stripAnsi(writes.join(''));
+    expect(output).toContain('CO STATUS');
+    expect(output).not.toContain('Dashboard error');
+  });
+
+  it('classifies attach ui request timeouts', async () => {
+    let resolveRequestObserved: (() => void) | null = null;
+    const requestObserved = new Promise<void>((resolve) => {
+      resolveRequestObserved = resolve;
+    });
+    const server = await startUiServer({
+      holdOpen: true,
+      onRequest: () => {
+        resolveRequestObserved?.();
+        resolveRequestObserved = null;
+      }
+    });
+    servers.add(server.instance);
+
+    const timeoutPromise = fetchUiDataset(new URL(server.baseUrl), 'attach-token', {
+      requestTimeoutMs: 500
+    });
+    await Promise.race([
+      requestObserved,
+      timeoutPromise.then(
+        () => {
+          throw new Error('expected held-open request to time out');
+        },
+        (error: unknown) => {
+          throw new Error(
+            `fetch timed out before the server observed the request: ${
+              (error as Error)?.message ?? String(error)
+            }`
+          );
+        }
+      )
+    ]);
+
+    await expect(timeoutPromise).rejects.toThrow('control-host ui request timeout after 500ms');
+    expect(server.requests).toHaveLength(1);
+  });
 });
 
 async function writeAttachRunDir(root: string): Promise<string> {
@@ -220,8 +352,12 @@ async function writeAttachRunDir(root: string): Promise<string> {
   return runDir;
 }
 
-async function writeEndpointArtifacts(runDir: string, baseUrl: string): Promise<void> {
-  await writeFile(join(runDir, 'control_auth.json'), JSON.stringify({ token: 'attach-token' }), 'utf8');
+async function writeEndpointArtifacts(
+  runDir: string,
+  baseUrl: string,
+  token = 'attach-token'
+): Promise<void> {
+  await writeFile(join(runDir, 'control_auth.json'), JSON.stringify({ token }), 'utf8');
   await writeFile(
     join(runDir, 'control_endpoint.json'),
     JSON.stringify({
@@ -294,25 +430,51 @@ async function runInteractiveAttachAndStop(runDir: string): Promise<string[]> {
   }
 }
 
+async function closeServer(server: http.Server): Promise<void> {
+  await new Promise<void>((resolve) => {
+    try {
+      server.close(() => resolve());
+    } catch {
+      resolve();
+    }
+  });
+  servers.delete(server);
+}
+
 function stripAnsi(value: string): string {
   return value.replace(ANSI_PATTERN, '');
 }
 
 async function startUiServer(options: {
   payload?: unknown;
+  failNetwork?: boolean;
+  beforeNetworkFailure?: () => Promise<void> | void;
+  beforeUnauthorized?: () => Promise<void> | void;
+  holdOpen?: boolean;
+  onRequest?: () => Promise<void> | void;
 } = {}): Promise<{
   instance: http.Server;
   baseUrl: string;
   requests: Array<{ authorization: string | null; csrfToken: string | null }>;
 }> {
   const requests: Array<{ authorization: string | null; csrfToken: string | null }> = [];
-  const server = http.createServer((req, res) => {
+  const server = http.createServer(async (req, res) => {
     if (req.url === '/ui/data.json') {
       requests.push({
         authorization: typeof req.headers.authorization === 'string' ? req.headers.authorization : null,
         csrfToken: typeof req.headers['x-csrf-token'] === 'string' ? req.headers['x-csrf-token'] : null
       });
+      await options.onRequest?.();
+      if (options.failNetwork) {
+        await options.beforeNetworkFailure?.();
+        req.socket.destroy();
+        return;
+      }
+      if (options.holdOpen) {
+        return;
+      }
       if (req.headers.authorization !== 'Bearer attach-token') {
+        await options.beforeUnauthorized?.();
         res.writeHead(401, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'unauthorised' }));
         return;

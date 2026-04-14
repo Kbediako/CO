@@ -447,7 +447,9 @@ async function runControlHostSupervision(flags: ArgMap): Promise<void> {
       tickWaiter.dispose();
 
       if (event.type === 'tick') {
-        const probe = await probeControlHostHealth(config, childEnv);
+        const probe = await probeControlHostHealth(config, childEnv, {
+          minPollingUpdatedAt: startedAt
+        });
         const checkedAt = new Date().toISOString();
         if (probe.healthy) {
           consecutiveUnhealthySamples = 0;
@@ -682,6 +684,7 @@ async function loadBootstrapEnvironment(
 async function probeControlHostHealth(
   config: ControlHostSupervisionConfig,
   env: NodeJS.ProcessEnv,
+  options: { minPollingUpdatedAt?: string | null } = {},
   commandRunner: typeof runCommand = runCommand
 ): Promise<{ healthy: boolean; reason: string; message: string }> {
   const probeTimeoutMs = resolveControlHostSupervisionProbeTimeoutMs(config.healthIntervalSeconds);
@@ -730,7 +733,9 @@ async function probeControlHostHealth(
     };
   }
 
-  const evaluation = evaluateControlHostSupervisionHealthPayload(payload);
+  const evaluation = evaluateControlHostSupervisionHealthPayload(payload, {
+    minPollingUpdatedAt: options.minPollingUpdatedAt ?? null
+  });
   return {
     healthy: evaluation.healthy,
     reason: evaluation.reason,
