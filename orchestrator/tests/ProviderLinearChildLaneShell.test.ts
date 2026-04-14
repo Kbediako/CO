@@ -703,6 +703,76 @@ describe('runProviderLinearChildLaneShell', () => {
     ]);
   });
 
+  it('preserves parent invalidation when launch cleanup follows malformed child output', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const env = buildProviderWorkerEnv(manifestPath);
+    const invalidationReason = 'Parent invalidated pre-launch reservation before malformed child output landed.';
+    const execRunner = vi.fn(async () => {
+      const invalidation = await runProviderLinearChildLaneShell(
+        {
+          action: 'invalidate',
+          streamName: 'impl-a',
+          reason: invalidationReason,
+          env
+        },
+        {
+          refreshProofSnapshot: vi.fn(async () => undefined)
+        }
+      );
+      expect(invalidation).toMatchObject({
+        ok: true,
+        action: 'invalidated',
+        child_lane: {
+          decision: 'invalidated',
+          decision_reason: invalidationReason
+        }
+      });
+      return {
+        exitCode: 0,
+        stdout: 'malformed child lane output',
+        stderr: ''
+      };
+    });
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'launch',
+        streamName: 'impl-a',
+        purpose: 'Implement bounded child lane support',
+        files: ['orchestrator/src/cli/providerLinearChildStreamShell.ts'],
+        env
+      },
+      {
+        execRunner,
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: '2026-03-30T07:10:00.000Z',
+          state: 'In Progress',
+          state_type: 'started'
+        })) as never,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
+        readParentHeadSha: vi.fn(async () => 'parent-base-sha'),
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        code: 'provider_worker_child_lane_output_invalid'
+      }
+    });
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
+      expect.objectContaining({
+        stream: 'impl-a',
+        status: 'launching',
+        decision: 'invalidated',
+        decision_reason: invalidationReason
+      })
+    ]);
+  });
+
   it('lets the parent invalidate a launching reservation so stale cap slots are recoverable', async () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
     const launchingLane = createLaneRecord({

@@ -1414,13 +1414,6 @@ function replaceChildLaneRecord(
   return replaced ? next : null;
 }
 
-function removeChildLaneRecord(
-  records: ProviderLinearWorkerChildLaneRecord[],
-  target: ProviderLinearWorkerChildLaneRecord
-): ProviderLinearWorkerChildLaneRecord[] {
-  return records.filter((entry) => !matchesChildLaneRecordIdentity(entry, target));
-}
-
 function matchesChildLaneRecordIdentity(
   left: Pick<ProviderLinearWorkerChildLaneRecord, 'stream' | 'task_id' | 'run_id'>,
   right: Pick<ProviderLinearWorkerChildLaneRecord, 'stream' | 'task_id' | 'run_id'>
@@ -1570,9 +1563,18 @@ async function removeReservedChildLane(
   deps: ProviderLinearChildLaneShellDependencies
 ): Promise<void> {
   await deps.transactChildLanes(runDir, async (records) => ({
-    records: removeChildLaneRecord(records, reserved),
+    records: removePendingChildLaneRecord(records, reserved),
     result: undefined
   }));
+}
+
+function removePendingChildLaneRecord(
+  records: ProviderLinearWorkerChildLaneRecord[],
+  target: ProviderLinearWorkerChildLaneRecord
+): ProviderLinearWorkerChildLaneRecord[] {
+  return records.filter(
+    (entry) => !matchesChildLaneRecordIdentity(entry, target) || entry.decision !== 'pending'
+  );
 }
 
 function resolveChildLaneDecisionProvenanceViolation(
