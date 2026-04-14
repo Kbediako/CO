@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260414-linear-ba9a1c35-c8d1-4b76-aa33-4937502d1964",
+      "title": "CO: prune terminal released provider rows from CO STATUS JSON active counts",
+      "relates_to": "tasks/tasks-linear-ba9a1c35-c8d1-4b76-aa33-4937502d1964.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-14",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-ba9a1c35-c8d1-4b76-aa33-4937502d1964-co-status-prune-terminal-released-issues.md",
+        "task": "tasks/tasks-linear-ba9a1c35-c8d1-4b76-aa33-4937502d1964.md",
+        "docs": "docs/TECH_SPEC-linear-ba9a1c35-c8d1-4b76-aa33-4937502d1964.md"
+      }
+    },
+    {
       "id": "20260414-linear-8720424f-56b0-4539-bebe-041c759fcb74",
       "title": "CO: keep fresh Ready issue admission fair under retained/released refresh residue",
       "relates_to": "tasks/tasks-linear-8720424f-56b0-4539-bebe-041c759fcb74.md",
