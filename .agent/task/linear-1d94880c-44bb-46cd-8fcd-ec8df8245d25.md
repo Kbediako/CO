@@ -19,12 +19,13 @@
 - [x] Operator documentation explains interpretation and artifact citation paths.
 
 ## Validation
-- [x] Sanitized healthy/degraded fixtures include stale refresh, active manifest with stale proof, terminal proof with active claim, low Linear headroom, and stale retry queue.
-- [x] Focused parser/evaluator/CLI tests pass. Evidence: `npm run test:orchestrator -- orchestrator/tests/ProviderControlHostFreshnessGauge.test.ts`; strict CLI healthy exit `0`; strict CLI contradictory exit `1`.
-- [x] Required validation floor passes or has explicit bounded fallback evidence: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test` (340 files / 3818 tests after PR feedback fixes), `npm run docs:check`, `npm run docs:freshness`, `npm run repo:stewardship`, `DIFF_BUDGET_OVERRIDE_REASON=... node scripts/diff-budget.mjs`, and `npm run pack:smoke` all passed. Manifest-backed standalone review executed with `FORCE_CODEX_REVIEW=1` but failed the bounded wrapper boundary because the reviewer launched a validation suite; telemetry `../../.runs/linear-1d94880c-44bb-46cd-8fcd-ec8df8245d25/cli/2026-04-14T05-05-31-161Z-b6edbfdf/review/telemetry.json` reports `status=failed`, `review_outcome=failed-boundary`, `termination_boundary.kind=command-intent`, `provenance=validation-suite`. Manual review/elegance fallback found no P0/P1 regressions: replay remains filesystem-only, no live API polling was added, verdict precedence is deterministic, degraded/stale/contradictory fixtures cover required cases, and the large diff is limited to docs-first packet + fixtures + evaluator/CLI.
+- [x] Sanitized healthy/degraded fixtures include stale refresh, active manifest with stale proof, terminal proof with active claim, low Linear headroom, stale retry queue, child-lane cap pressure, stale refresh with a recent intake write, nested status Linear budget, and retry claims tied to terminal failed runs.
+- [x] Focused parser/evaluator/CLI tests pass. Evidence: `npx vitest run orchestrator/tests/ProviderControlHostFreshnessGauge.test.ts` passed 25 tests; strict CLI healthy exit `0`; strict CLI contradictory exit `1`.
+- [x] Required validation floor passed after the final P2 review fixes: `npm run build`, `npm run lint`, `npm run test` (340 files / 3846 tests), `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run docs:check`, `npm run docs:freshness`, `npm run repo:stewardship`, `DIFF_BUDGET_OVERRIDE_REASON=... node scripts/diff-budget.mjs`, and `npm run pack:smoke`.
+- [ ] Manifest-backed standalone review rerun after final P2 fixes.
 
 ## Handoff
-- [ ] PR attached to the Linear issue before review-state transition.
+- [x] PR attached to the Linear issue before review-state transition. Evidence: PR #474 / Linear attachment `59ef361b-66f7-4b56-99d1-2c0ffb52c36b`.
 - [x] Latest `origin/main` merged into the branch before review-state transition. Evidence: `git fetch origin refs/heads/main:refs/remotes/origin/main && git merge --ff-only origin/main` returned `Already up to date`.
 - [ ] PR checks green and `pr ready-review` drain clean before review-state transition.
 - [ ] Unresolved actionable review threads: `0` or explicit waiver with evidence.
@@ -36,6 +37,7 @@
 - 2026-04-14: Implemented the read-only gauge command, audit JSONL parsing, fixtures, operator docs, and focused tests.
 - 2026-04-14: Committed `454c4f4f3` and reran the full required validation floor from a clean tree; standalone review execution failed only the bounded command-intent wrapper boundary after attempting a validation suite, then manual review/elegance fallback found no blocking findings.
 - 2026-04-14: Addressed PR review feedback by requiring `run_id` before terminal-proof/active-claim contradiction matching and by choosing the newest proof Linear budget snapshot; added focused regressions and reran the required local validation floor.
+- 2026-04-14: Addressed final standalone-review P2 findings by excluding intake top-level `updated_at` from refresh-success candidates, selecting nested `rate_limits.linear_budget` from combined CO STATUS datasets, and excluding retry states from active/queued claim checks while keeping retry/backoff metrics; reran focused gauge tests, TypeScript, build, lint, full tests, guards, docs checks, stewardship, diff budget, and pack smoke.
 
 ## Relevant Files
 - `docs/PRD-linear-1d94880c-44bb-46cd-8fcd-ec8df8245d25.md`

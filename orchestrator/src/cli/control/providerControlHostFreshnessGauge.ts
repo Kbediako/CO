@@ -153,9 +153,7 @@ const SKIPPED_SCAN_DIRS = new Set([
 const QUEUED_CLAIM_STATES = new Set([
   'accepted',
   'starting',
-  'resuming',
-  'resumable',
-  'handoff_failed'
+  'resuming'
 ]);
 
 const ACTIVE_CLAIM_STATES = new Set([
@@ -560,7 +558,6 @@ function evaluateRefreshAge(
     timestampCandidate(input.pollingHealth, 'last_completed_at'),
     timestampCandidate(input.intakeState, 'polling.last_success_at'),
     timestampCandidate(input.intakeState, 'polling.last_completed_at'),
-    timestampCandidate(input.intakeState, 'updated_at'),
     timestampCandidate(input.statusDataset, 'polling.last_success_at')
   ].filter((candidate): candidate is TimestampCandidate => candidate !== null);
   const candidates = observedRefreshCandidates.length > 0
@@ -968,6 +965,23 @@ function evaluateLinearBudget(
   }
 }
 
+function looksLikeLinearBudget(value: unknown): boolean {
+  const budget = asRecord(value);
+  if (!budget) {
+    return false;
+  }
+  if (
+    budget.cooldown_active !== undefined ||
+    budget.suppression !== undefined ||
+    budget.retry_after_seconds !== undefined ||
+    budget.retryAfterSeconds !== undefined
+  ) {
+    return true;
+  }
+  return ['requests', 'endpoint_requests', 'complexity', 'endpoint_complexity']
+    .some((field) => asRecord(budget[field]) !== null);
+}
+
 function evaluateWorkerAuditHealth(
   workerAudits: WorkerAuditArtifact[],
   findings: ProviderControlHostFreshnessGaugeFinding[]
@@ -1031,10 +1045,25 @@ function selectLinearBudgetArtifact(input: {
   return (
     selectLatestJsonArtifact(input.explicit) ??
     nestedJsonArtifact(input.pollingHealth, 'linear_budget') ??
-    nestedJsonArtifact(input.statusDataset, 'rate_limits') ??
-    nestedJsonArtifact(input.statusDataset, 'polling.linear_budget') ??
+    selectStatusDatasetLinearBudgetArtifact(input.statusDataset) ??
     selectLatestJsonArtifact(proofBudgets)
   );
+}
+
+function selectStatusDatasetLinearBudgetArtifact(statusDataset: JsonArtifact | null): JsonArtifact | null {
+  const combinedLinearBudget = nestedJsonArtifact(statusDataset, 'rate_limits.linear_budget');
+  if (combinedLinearBudget) {
+    return combinedLinearBudget;
+  }
+  const pollingLinearBudget = nestedJsonArtifact(statusDataset, 'polling.linear_budget');
+  if (pollingLinearBudget) {
+    return pollingLinearBudget;
+  }
+  const rateLimits = nestedJsonArtifact(statusDataset, 'rate_limits');
+  if (looksLikeLinearBudget(rateLimits?.value)) {
+    return rateLimits;
+  }
+  return null;
 }
 
 function findManifestForProof(proof: ProofArtifact, manifests: ManifestArtifact[]): ManifestArtifact | null {

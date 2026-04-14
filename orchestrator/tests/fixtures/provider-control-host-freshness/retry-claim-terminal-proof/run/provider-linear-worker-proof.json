@@ -1,0 +1,13 @@
+{
+  "issue_id": "retry-terminal",
+  "issue_identifier": "CO-RETRY-TERMINAL",
+  "run_id": "run-retry-terminal",
+  "attempt_started_at": "2026-04-14T05:21:00.000Z",
+  "owner_phase": "ended",
+  "owner_status": "failed",
+  "end_reason": "codex_exit_1",
+  "last_event": "task_failed",
+  "last_event_at": "2026-04-14T05:30:00.000Z",
+  "updated_at": "2026-04-14T05:30:00.000Z",
+  "child_lanes": []
+}

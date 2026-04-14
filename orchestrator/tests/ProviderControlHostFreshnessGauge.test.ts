@@ -53,11 +53,13 @@ describe('provider/control-host freshness gauge', () => {
     expect(report.metrics.start_to_first_heartbeat_latency_ms.value).toBe(25_000);
     expect(report.metrics.active_heartbeat_age_ms.value).toBe(10_000);
     expect(report.metrics.stale_source_verdict.value).toBe('healthy');
+    expect(report.findings.map((finding) => finding.code)).not.toContain('linear_budget_suppressed');
     expect(report.findings).toEqual([]);
   });
 
   it.each([
     ['stale-refresh', 'stale', 'stale_refresh'],
+    ['stale-refresh-recent-intake-write', 'stale', 'stale_refresh'],
     ['active-manifest-stale-proof', 'stale', 'active_heartbeat_stale'],
     ['terminal-proof-active-claim', 'contradictory', 'terminal_proof_with_active_claim'],
     ['low-linear-headroom', 'degraded', 'linear_headroom_low'],
@@ -74,6 +76,22 @@ describe('provider/control-host freshness gauge', () => {
     expect(report.findings.map((finding) => finding.code)).toContain(findingCode);
     expect(report.metrics.stale_source_verdict.value).toBe(verdict);
     expect(report.strict_failed).toBe(verdict === 'stale' || verdict === 'contradictory');
+  });
+
+  it('does not let intake claim writes mask stale polling refresh evidence', async () => {
+    const report = await evaluateProviderControlHostFreshnessGauge({
+      artifactRoot: join(FIXTURE_ROOT, 'stale-refresh-recent-intake-write'),
+      now: NOW,
+      strict: true
+    });
+
+    expect(report.verdict).toBe('stale');
+    expect(report.metrics.last_successful_refresh_age_ms).toMatchObject({
+      value: 3_600_000,
+      verdict: 'stale',
+      source_field: 'last_success_at'
+    });
+    expect(report.findings.map((finding) => finding.code)).toContain('stale_refresh');
   });
 
   it('parses worker audit JSONL and flags malformed audit evidence', async () => {
@@ -153,6 +171,17 @@ describe('provider/control-host freshness gauge', () => {
     expect(report.findings.map((finding) => finding.code)).not.toContain('linear_headroom_low');
   });
 
+  it('reads nested Linear budget state from combined status rate limits', async () => {
+    const report = await evaluateProviderControlHostFreshnessGauge({
+      artifactRoot: join(FIXTURE_ROOT, 'healthy'),
+      now: NOW
+    });
+
+    expect(report.verdict).toBe('healthy');
+    expect(report.findings.map((finding) => finding.code)).not.toContain('linear_budget_suppressed');
+    expect(report.findings.map((finding) => finding.code)).not.toContain('linear_headroom_low');
+  });
+
   it('does not treat control endpoint metadata alone as provider/control-host evidence', async () => {
     const report = await evaluateProviderControlHostFreshnessGauge({
       artifactRoot: join(FIXTURE_ROOT, 'control-endpoint-only'),
@@ -215,6 +244,24 @@ describe('provider/control-host freshness gauge', () => {
     expect(report.verdict).toBe('healthy');
     expect(report.metrics.child_lane_cap_pressure.value).toBe(0);
     expect(report.findings.map((finding) => finding.code)).not.toContain('child_lane_cap_pressure');
+  });
+
+  it('keeps retry claims out of active queue and terminal proof contradiction checks', async () => {
+    const report = await evaluateProviderControlHostFreshnessGauge({
+      artifactRoot: join(FIXTURE_ROOT, 'retry-claim-terminal-proof'),
+      now: NOW,
+      strict: true
+    });
+
+    expect(report.verdict).toBe('healthy');
+    expect(report.strict_failed).toBe(false);
+    expect(report.metrics.claim_queue_age_ms.value).toBeNull();
+    expect(report.metrics.retry_backoff_age_ms).toMatchObject({
+      value: 0,
+      verdict: 'healthy'
+    });
+    expect(report.findings.map((finding) => finding.code)).not.toContain('claim_queue_stale');
+    expect(report.findings.map((finding) => finding.code)).not.toContain('terminal_proof_with_active_claim');
   });
 
   it('rejects invalid now values instead of using wall-clock time', async () => {

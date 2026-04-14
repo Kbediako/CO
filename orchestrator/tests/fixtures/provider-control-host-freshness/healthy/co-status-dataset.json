@@ -8,13 +8,23 @@
     "restart_required": false
   },
   "rate_limits": {
-    "observed_at": "2026-04-14T05:59:30.000Z",
-    "suppression": "none",
-    "cooldown_active": false,
-    "requests": {
-      "limit": 1000,
-      "remaining": 500,
-      "reset_at": "2026-04-14T07:00:00.000Z"
+    "codex": {
+      "primary": {
+        "windowDurationMins": 300,
+        "limit": 1000,
+        "remaining": 700,
+        "reset_at": "2026-04-14T07:00:00.000Z"
+      }
+    },
+    "linear_budget": {
+      "observed_at": "2026-04-14T05:59:30.000Z",
+      "suppression": "none",
+      "cooldown_active": false,
+      "requests": {
+        "limit": 1000,
+        "remaining": 500,
+        "reset_at": "2026-04-14T07:00:00.000Z"
+      }
     }
   },
   "retrying": []
