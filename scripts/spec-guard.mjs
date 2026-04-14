@@ -160,6 +160,63 @@ function normalizeStringArray(value) {
   return value.map((item) => (typeof item === 'string' ? item.trim() : '')).filter(Boolean);
 }
 
+function normalizeTaskNumberRange(value) {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const start = typeof value.start === 'string' ? value.start.trim() : '';
+  const end = typeof value.end === 'string' ? value.end.trim() : '';
+  if (!/^\d{4}$/.test(start) || !/^\d{4}$/.test(end) || Number(start) > Number(end)) {
+    return null;
+  }
+  return { start, end };
+}
+
+function normalizePolicyPathPrefix(value) {
+  const normalized = posix.normalize(value.replace(/\\/g, '/')).replace(/^\.\//, '');
+  return normalized === '.' ? '' : normalized;
+}
+
+function normalizeBaselineCohorts(value) {
+  if (!Array.isArray(value)) {
+    return { cohorts: [], isValid: false };
+  }
+
+  const cohorts = value.map((item) => {
+    if (!item || typeof item !== 'object') {
+      return null;
+    }
+    const id = typeof item.id === 'string' ? item.id.trim() || null : null;
+    const lastReview = typeof item.last_review === 'string' && parseIsoDate(item.last_review) ? item.last_review : null;
+    const cadenceDays = Number.isInteger(item.cadence_days) && item.cadence_days > 0 ? item.cadence_days : null;
+    const pathFamilies = normalizeStringArray(item.path_families);
+    const pathPrefixes = normalizeStringArray(item.path_prefixes).map(normalizePolicyPathPrefix).filter(Boolean);
+    const taskNumberRange = normalizeTaskNumberRange(item.task_number_range);
+    if (
+      !id ||
+      !lastReview ||
+      cadenceDays === null ||
+      pathFamilies.length === 0 ||
+      (!taskNumberRange && pathPrefixes.length === 0)
+    ) {
+      return null;
+    }
+    return {
+      id,
+      last_review: lastReview,
+      cadence_days: cadenceDays,
+      path_families: pathFamilies,
+      path_prefixes: pathPrefixes,
+      task_number_range: taskNumberRange
+    };
+  });
+
+  if (cohorts.some((item) => item === null)) {
+    return { cohorts: cohorts.filter(Boolean), isValid: false };
+  }
+  return { cohorts, isValid: cohorts.length > 0 };
+}
+
 function normalizeRollingFreshnessPolicy(rawPolicy) {
   if (!rawPolicy || typeof rawPolicy !== 'object' || rawPolicy.enabled !== true) {
     return {
@@ -170,7 +227,8 @@ function normalizeRollingFreshnessPolicy(rawPolicy) {
       window_days: 0,
       max_cohorts: 0,
       max_entries: 0,
-      eligible_doc_classes: []
+      eligible_doc_classes: [],
+      baseline_cohorts: []
     };
   }
 
@@ -180,6 +238,7 @@ function normalizeRollingFreshnessPolicy(rawPolicy) {
   const maxCohorts = Number.isInteger(rawPolicy.max_cohorts) && rawPolicy.max_cohorts > 0 ? rawPolicy.max_cohorts : null;
   const maxEntries = Number.isInteger(rawPolicy.max_entries) && rawPolicy.max_entries > 0 ? rawPolicy.max_entries : null;
   const eligibleDocClasses = normalizeStringArray(rawPolicy.eligible_doc_classes);
+  const baselineCohorts = normalizeBaselineCohorts(rawPolicy.baseline_cohorts);
 
   return {
     enabled: true,
@@ -189,19 +248,58 @@ function normalizeRollingFreshnessPolicy(rawPolicy) {
         windowDays !== null &&
         maxCohorts !== null &&
         maxEntries !== null &&
-        eligibleDocClasses.length > 0
+        eligibleDocClasses.length > 0 &&
+        baselineCohorts.isValid
     ),
     owner_issue: ownerIssue,
     policy_doc: policyDoc,
     window_days: windowDays ?? 0,
     max_cohorts: maxCohorts ?? 0,
     max_entries: maxEntries ?? 0,
-    eligible_doc_classes: eligibleDocClasses
+    eligible_doc_classes: eligibleDocClasses,
+    baseline_cohorts: baselineCohorts.cohorts
   };
 }
 
 function classifySpecPath(file, docsCatalog) {
   return resolveDocsCatalogEntry(file, docsCatalog)?.doc_class ?? null;
+}
+
+function classifySpecPathFamily(file) {
+  if (file.startsWith('tasks/specs/')) {
+    return 'tasks/specs';
+  }
+  if (file.startsWith('docs/design/specs/')) {
+    return 'docs/design/specs';
+  }
+  return null;
+}
+
+function extractTaskNumber(file) {
+  const basename = posix.basename(file.replace(/\\/g, '/'));
+  const directMatch = basename.match(/^(\d{4})-/);
+  return directMatch ? directMatch[1] : null;
+}
+
+function isTaskNumberInRange(taskNumber, range) {
+  return Boolean(taskNumber && range && Number(taskNumber) >= Number(range.start) && Number(taskNumber) <= Number(range.end));
+}
+
+function matchesDeclaredPath(entry, cohort) {
+  return (
+    isTaskNumberInRange(entry.task_number, cohort.task_number_range) ||
+    cohort.path_prefixes.some((prefix) => entry.file.startsWith(prefix))
+  );
+}
+
+function findMatchingBaselineCohort(entry, policy) {
+  return policy.baseline_cohorts.find(
+    (cohort) =>
+      entry.last_review === cohort.last_review &&
+      entry.cadence_days === cohort.cadence_days &&
+      cohort.path_families.includes(entry.path_family) &&
+      matchesDeclaredPath(entry, cohort)
+  );
 }
 
 function applyRollingFreshnessPolicy(staleSpecs, docsCatalog) {
@@ -216,16 +314,22 @@ function applyRollingFreshnessPolicy(staleSpecs, docsCatalog) {
   }
 
   const eligibleClasses = new Set(policy.eligible_doc_classes);
-  const eligibleSpecs = staleSpecs.filter(
-    (entry) =>
-      eligibleClasses.has(entry.doc_class) &&
-      entry.overdue_days > 0 &&
-      entry.overdue_days <= policy.window_days
-  );
+  const eligibleSpecs = staleSpecs.flatMap((entry) => {
+    const baselineCohort = findMatchingBaselineCohort(entry, policy);
+    if (
+      !baselineCohort ||
+      !eligibleClasses.has(entry.doc_class) ||
+      entry.overdue_days <= 0 ||
+      entry.overdue_days > policy.window_days
+    ) {
+      return [];
+    }
+    return [{ ...entry, baseline_cohort_id: baselineCohort.id }];
+  });
 
   const cohortsByKey = new Map();
   for (const entry of eligibleSpecs) {
-    const key = `${entry.last_review}|${entry.cadence_days}|${entry.age_days}`;
+    const key = `${entry.baseline_cohort_id}|${entry.last_review}|${entry.cadence_days}|${entry.age_days}`;
     if (!cohortsByKey.has(key)) {
       cohortsByKey.set(key, []);
     }
@@ -244,6 +348,7 @@ function applyRollingFreshnessPolicy(staleSpecs, docsCatalog) {
 
   const rollingPaths = new Set(eligibleSpecs.map((entry) => entry.file));
   const rollingCohorts = [...cohortsByKey.values()].map((entries) => ({
+    baseline_cohort_id: entries[0].baseline_cohort_id,
     owner_issue: policy.owner_issue,
     stale_entries: entries.length,
     last_review: entries[0].last_review,
@@ -327,7 +432,9 @@ async function checkSpecFreshness(specFiles) {
         cadence_days: SPEC_FRESHNESS_CADENCE_DAYS,
         age_days: ageDays,
         overdue_days: ageDays - SPEC_FRESHNESS_CADENCE_DAYS,
-        doc_class: classifySpecPath(file, docsCatalog)
+        doc_class: classifySpecPath(file, docsCatalog),
+        path_family: classifySpecPathFamily(file),
+        task_number: extractTaskNumber(file)
       });
     }
   }
@@ -335,7 +442,7 @@ async function checkSpecFreshness(specFiles) {
   const { blockingStaleSpecs, rollingStaleSpecs, rollingCohorts } = applyRollingFreshnessPolicy(staleSpecs, docsCatalog);
   for (const entry of blockingStaleSpecs) {
     failures.push(
-      `${entry.file}: last_review ${entry.last_review} is ${entry.age_days} days old (must be ≤30 days)`
+      `${entry.file}: last_review ${entry.last_review} is ${entry.age_days} days old (must be ≤${entry.cadence_days} days)`
     );
   }
 

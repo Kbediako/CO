@@ -80,6 +80,15 @@ function rollingFreshnessPolicy(overrides: Record<string, unknown> = {}) {
     max_cohorts: 1,
     max_entries: 10,
     eligible_doc_classes: ['task_packet'],
+    baseline_cohorts: [
+      {
+        id: 'fixture-rolling-baseline',
+        last_review: reviewDateDaysAgo(31),
+        cadence_days: 30,
+        path_families: ['tasks/tasks-*'],
+        task_number_range: { start: '1234', end: '1235' }
+      }
+    ],
     ...overrides
   };
 }
@@ -430,11 +439,13 @@ describe('docs freshness reporting', () => {
       expect.objectContaining({
         path: 'tasks/tasks-1234-example.md',
         doc_class: 'task_packet',
+        baseline_cohort_id: 'fixture-rolling-baseline',
         overdue_days: 1
       })
     ]);
     expect(report.rolling_freshness_cohorts).toEqual([
       expect.objectContaining({
+        baseline_cohort_id: 'fixture-rolling-baseline',
         owner_issue: 'CO-175',
         stale_entries: 1,
         overdue_days: 1,
@@ -474,12 +485,94 @@ describe('docs freshness reporting', () => {
     ]);
   });
 
+  it('keeps undeclared same-class stale docs as blocking failures', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-rolling-undeclared-'));
+    createdDirs.push(repoRoot);
+
+    await writeRollingDocsFixture(repoRoot, {
+      entries: [{ path: 'tasks/tasks-9999-new-feature.md', daysOld: 31 }]
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.totals.stale_entries).toBe(1);
+    expect(report.totals.rolling_cohort_entries).toBe(0);
+    expect(report.stale_entries).toEqual([
+      expect.objectContaining({
+        path: 'tasks/tasks-9999-new-feature.md',
+        doc_class: 'task_packet',
+        overdue_days: 1
+      })
+    ]);
+  });
+
+  it('reports declared path-prefix stale docs as rolling cohort debt without task numbers', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-rolling-prefix-'));
+    createdDirs.push(repoRoot);
+    const docPath = 'docs/PRD-baseline-packet.md';
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(join(repoRoot, docPath), '# Baseline packet\n', 'utf8');
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: docPath,
+          owner: 'Codex',
+          status: 'active',
+          last_review: reviewDateDaysAgo(31),
+          cadence_days: 30
+        }
+      ],
+      catalogPatterns: [{ glob: 'docs/PRD-*.md', doc_class: 'task_packet' }],
+      catalogPolicies: {
+        rolling_freshness_cohorts: rollingFreshnessPolicy({
+          baseline_cohorts: [
+            {
+              id: 'fixture-prefix-baseline',
+              last_review: reviewDateDaysAgo(31),
+              cadence_days: 30,
+              path_families: ['docs/PRD-*'],
+              path_prefixes: ['docs/PRD-baseline-']
+            }
+          ]
+        })
+      }
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(false);
+    expect(report.totals.stale_entries).toBe(0);
+    expect(report.totals.rolling_cohort_entries).toBe(1);
+    expect(report.rolling_cohort_entries).toEqual([
+      expect.objectContaining({ path: docPath, baseline_cohort_id: 'fixture-prefix-baseline' })
+    ]);
+  });
+
   it('keeps expired rolling cohort candidates as blocking failures', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-rolling-expired-'));
     createdDirs.push(repoRoot);
 
     await writeRollingDocsFixture(repoRoot, {
-      entries: [{ path: 'tasks/tasks-1234-example.md', daysOld: 45 }]
+      entries: [{ path: 'tasks/tasks-1234-example.md', daysOld: 45 }],
+      policy: rollingFreshnessPolicy({
+        baseline_cohorts: [
+          {
+            id: 'fixture-expired-baseline',
+            last_review: reviewDateDaysAgo(45),
+            cadence_days: 30,
+            path_families: ['tasks/tasks-*'],
+            task_number_range: { start: '1234', end: '1234' }
+          }
+        ]
+      })
     });
 
     const { report, hasFailures } = await runDocsFreshness(repoRoot, {
@@ -531,7 +624,26 @@ describe('docs freshness reporting', () => {
         { path: 'tasks/tasks-1234-example.md', daysOld: 31 },
         { path: 'tasks/tasks-1235-example.md', daysOld: 32 }
       ],
-      policy: rollingFreshnessPolicy({ max_cohorts: 1, max_entries: 10 })
+      policy: rollingFreshnessPolicy({
+        max_cohorts: 1,
+        max_entries: 10,
+        baseline_cohorts: [
+          {
+            id: 'fixture-rolling-baseline-31',
+            last_review: reviewDateDaysAgo(31),
+            cadence_days: 30,
+            path_families: ['tasks/tasks-*'],
+            task_number_range: { start: '1234', end: '1234' }
+          },
+          {
+            id: 'fixture-rolling-baseline-32',
+            last_review: reviewDateDaysAgo(32),
+            cadence_days: 30,
+            path_families: ['tasks/tasks-*'],
+            task_number_range: { start: '1235', end: '1235' }
+          }
+        ]
+      })
     });
 
     const { report, hasFailures } = await runDocsFreshness(repoRoot, {

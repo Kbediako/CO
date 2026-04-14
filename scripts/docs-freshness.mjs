@@ -143,6 +143,58 @@ function normalizeNonNegativeInteger(value, fallback) {
   return Number.isInteger(value) && value >= 0 ? value : fallback;
 }
 
+function normalizeTaskNumberRange(value) {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const start = typeof value.start === 'string' ? value.start.trim() : '';
+  const end = typeof value.end === 'string' ? value.end.trim() : '';
+  if (!/^\d{4}$/.test(start) || !/^\d{4}$/.test(end) || Number(start) > Number(end)) {
+    return null;
+  }
+  return { start, end };
+}
+
+function normalizeBaselineCohorts(value) {
+  if (!Array.isArray(value)) {
+    return { cohorts: [], isValid: false };
+  }
+
+  const cohorts = value.map((item) => {
+    if (!item || typeof item !== 'object') {
+      return null;
+    }
+    const id = typeof item.id === 'string' ? item.id.trim() || null : null;
+    const lastReview = typeof item.last_review === 'string' && parseIsoDate(item.last_review) ? item.last_review : null;
+    const cadenceDays = Number.isInteger(item.cadence_days) && item.cadence_days > 0 ? item.cadence_days : null;
+    const pathFamilies = normalizeStringArray(item.path_families, []);
+    const pathPrefixes = normalizeStringArray(item.path_prefixes, []).map(normalizeDocPath).filter(Boolean);
+    const taskNumberRange = normalizeTaskNumberRange(item.task_number_range);
+    if (
+      !id ||
+      !lastReview ||
+      cadenceDays === null ||
+      pathFamilies.length === 0 ||
+      (!taskNumberRange && pathPrefixes.length === 0)
+    ) {
+      return null;
+    }
+    return {
+      id,
+      last_review: lastReview,
+      cadence_days: cadenceDays,
+      path_families: pathFamilies,
+      path_prefixes: pathPrefixes,
+      task_number_range: taskNumberRange
+    };
+  });
+
+  if (cohorts.some((item) => item === null)) {
+    return { cohorts: cohorts.filter(Boolean), isValid: false };
+  }
+  return { cohorts, isValid: cohorts.length > 0 };
+}
+
 function normalizeRollingFreshnessPolicy(rawPolicy) {
   if (!rawPolicy || typeof rawPolicy !== 'object' || rawPolicy.enabled !== true) {
     return {
@@ -154,6 +206,7 @@ function normalizeRollingFreshnessPolicy(rawPolicy) {
       max_cohorts: 0,
       max_entries: 0,
       eligible_doc_classes: [],
+      baseline_cohorts: [],
       action_after_window: null
     };
   }
@@ -164,16 +217,26 @@ function normalizeRollingFreshnessPolicy(rawPolicy) {
   const maxCohorts = Number.isInteger(rawPolicy.max_cohorts) && rawPolicy.max_cohorts > 0 ? rawPolicy.max_cohorts : null;
   const maxEntries = Number.isInteger(rawPolicy.max_entries) && rawPolicy.max_entries > 0 ? rawPolicy.max_entries : null;
   const eligibleDocClasses = normalizeStringArray(rawPolicy.eligible_doc_classes, []);
+  const baselineCohorts = normalizeBaselineCohorts(rawPolicy.baseline_cohorts);
 
   return {
     enabled: true,
-    is_valid: Boolean(ownerIssue && policyDoc && windowDays !== null && maxCohorts !== null && maxEntries !== null && eligibleDocClasses.length > 0),
+    is_valid: Boolean(
+      ownerIssue &&
+        policyDoc &&
+        windowDays !== null &&
+        maxCohorts !== null &&
+        maxEntries !== null &&
+        eligibleDocClasses.length > 0 &&
+        baselineCohorts.isValid
+    ),
     owner_issue: ownerIssue,
     policy_doc: policyDoc,
     window_days: normalizeNonNegativeInteger(rawPolicy.window_days, 0),
     max_cohorts: normalizePositiveInteger(rawPolicy.max_cohorts, 0),
     max_entries: normalizePositiveInteger(rawPolicy.max_entries, 0),
     eligible_doc_classes: eligibleDocClasses,
+    baseline_cohorts: baselineCohorts.cohorts,
     action_after_window:
       typeof rawPolicy.action_after_window === 'string' ? rawPolicy.action_after_window.trim() || null : null
   };
@@ -207,7 +270,8 @@ function buildRollingCohortSummary(entries, policy) {
   const first = entries[0];
   const expiresAfter = addDaysToIsoDate(first.last_review, first.cadence_days + policy.window_days);
   return {
-    id: `${first.last_review}-cadence-${first.cadence_days}-age-${first.age_days}`,
+    id: `${first.baseline_cohort_id}-${first.last_review}-cadence-${first.cadence_days}-age-${first.age_days}`,
+    baseline_cohort_id: first.baseline_cohort_id,
     owner_issue: policy.owner_issue,
     status: 'rolling_window',
     last_review: first.last_review,
@@ -225,6 +289,27 @@ function buildRollingCohortSummary(entries, policy) {
   };
 }
 
+function isTaskNumberInRange(taskNumber, range) {
+  return Boolean(taskNumber && range && Number(taskNumber) >= Number(range.start) && Number(taskNumber) <= Number(range.end));
+}
+
+function matchesDeclaredPath(entry, cohort) {
+  return (
+    isTaskNumberInRange(entry.task_number, cohort.task_number_range) ||
+    cohort.path_prefixes.some((prefix) => entry.path.startsWith(prefix))
+  );
+}
+
+function findMatchingBaselineCohort(entry, policy) {
+  return policy.baseline_cohorts.find(
+    (cohort) =>
+      entry.last_review === cohort.last_review &&
+      entry.cadence_days === cohort.cadence_days &&
+      cohort.path_families.includes(entry.path_family) &&
+      matchesDeclaredPath(entry, cohort)
+  );
+}
+
 function applyRollingFreshnessPolicy(rawStaleEntries, docsCatalog) {
   const policy = normalizeRollingFreshnessPolicy(docsCatalog?.policies?.rolling_freshness_cohorts);
   if (!policy.enabled || !policy.is_valid || rawStaleEntries.length === 0) {
@@ -237,17 +322,23 @@ function applyRollingFreshnessPolicy(rawStaleEntries, docsCatalog) {
   }
 
   const eligibleClasses = new Set(policy.eligible_doc_classes);
-  const eligibleEntries = rawStaleEntries.filter(
-    (entry) =>
-      eligibleClasses.has(entry.doc_class) &&
-      Number.isInteger(entry.overdue_days) &&
-      entry.overdue_days > 0 &&
-      entry.overdue_days <= policy.window_days
-  );
+  const eligibleEntries = rawStaleEntries.flatMap((entry) => {
+    const baselineCohort = findMatchingBaselineCohort(entry, policy);
+    if (
+      !baselineCohort ||
+      !eligibleClasses.has(entry.doc_class) ||
+      !Number.isInteger(entry.overdue_days) ||
+      entry.overdue_days <= 0 ||
+      entry.overdue_days > policy.window_days
+    ) {
+      return [];
+    }
+    return [{ ...entry, baseline_cohort_id: baselineCohort.id }];
+  });
 
   const cohortsByKey = new Map();
   for (const entry of eligibleEntries) {
-    const key = `${entry.last_review}|${entry.cadence_days}|${entry.age_days}`;
+    const key = `${entry.baseline_cohort_id}|${entry.last_review}|${entry.cadence_days}|${entry.age_days}`;
     if (!cohortsByKey.has(key)) {
       cohortsByKey.set(key, []);
     }

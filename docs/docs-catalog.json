@@ -122,6 +122,31 @@
         "task_mirror",
         "report_only"
       ],
+      "baseline_cohorts": [
+        {
+          "id": "co-175-apr-14-march-14-tasks-1164-1195",
+          "last_review": "2026-03-14",
+          "cadence_days": 30,
+          "path_families": [
+            ".agent/task",
+            "tasks/specs",
+            "tasks/tasks-*",
+            "docs/findings",
+            "docs/PRD-*",
+            "docs/TECH_SPEC-*",
+            "docs/ACTION_PLAN-*"
+          ],
+          "path_prefixes": [
+            "docs/ACTION_PLAN-coordinator-symphony-aligned-orchestrator-",
+            "docs/PRD-coordinator-symphony-aligned-orchestrator-",
+            "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-"
+          ],
+          "task_number_range": {
+            "start": "1164",
+            "end": "1195"
+          }
+        }
+      ],
       "action_after_window": "refresh, archive, reclassify, or file a new same-project baseline owner before feature-lane review handoff"
     }
   },
