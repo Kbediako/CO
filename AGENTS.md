@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 8a251b41d9509838ee94cf6df8ac29a7e8d4f1b7990dba342b593b5e8aa45492 -->
+<!-- codex:instruction-stamp 419477f92de3490d49a7597b572f93c061241d9dcc80d6faa3c02e3f1baa911e -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -32,8 +32,8 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Keep top-level defaults on the current CO target by setting `model = "gpt-5.4"` in `~/.codex/config.toml`.
 - Under ChatGPT auth, keep delegated subagent and review surfaces on `gpt-5.4` unless a fresh provider lane explicitly validates `gpt-5.4-codex`.
 - Set `model_reasoning_effort` to at least `high` (CO default: `xhigh`) so spawned agents inherit high-reasoning behavior unless role overrides change it.
-- Built-in `explorer` now inherits top-level model defaults unless you attach a custom `config_file`; keep an explicit `agents.explorer` entry only when you want a custom description/override, and keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception.
-- Caveat: spark models are text-only; use non-spark roles when image inputs are required.
+- Built-in `explorer` now inherits top-level model defaults unless you attach a custom `config_file`; keep an explicit `agents.explorer` entry only when you want a custom description/override, and keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only.
+- Caveat: spark roles are file/codebase search only; use non-spark roles when image inputs are required.
 - Prefer built-ins-first for RLM/collab flows; add custom specialist roles only with a measured benefit, explicit owner, and validation evidence.
 - Set `[agents] max_threads = 12` as the seeded baseline. Keep explicit `max_depth = 4` only when your local Codex parser accepts it; do not treat `max_spawn_depth` as a current CO baseline recommendation.
 - Fallback policy is contingency-only (not routine): use `max_threads = 8` and `max_depth = 2` for constrained/high-risk lanes; use legacy `6/1/1` only as a break-glass profile when an older local parser/runtime still consumes spawn-depth caps.
@@ -43,7 +43,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 ## Codex Version Policy (CO Scope)
 - Current CO compatibility/adoption target is stable Codex CLI `0.118.0`.
 - Current `0.118.0` posture re-audit confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, and `codex review --help` exposing `[PROMPT]` alongside scoped review flags.
-- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.3-codex-spark`.
+- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
 - In ChatGPT-auth sessions, keep delegated/review surfaces on `gpt-5.4` unless a fresh provider lane explicitly validates `gpt-5.4-codex`.
 - Evaluate newer stable/prerelease Codex builds only in explicit, task-scoped CO lanes where evidence is captured under `.runs/<task-id>/` and `out/<task-id>/manual/`.
 - Newer-version adoption remains evidence-gated: no P0/P1 regressions, runtime-mode canary pass, and required cloud canary contract pass.

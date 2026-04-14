@@ -31,6 +31,7 @@ export type DocsCheckRule =
   | 'doc-posture-unresolved'
   | 'doc-posture-stale'
   | 'doc-runtime-posture-stale'
+  | 'spark-policy-overbroad'
   | 'bundled-skill-roster-drift'
   | 'front-door-budget-exceeded'
   | 'tracked-runtime-artifact'
@@ -58,6 +59,21 @@ const DEFAULT_PUBLIC_DOC_CLASSES = [
   'shipped_companion',
   'seeded_template'
 ] as const;
+
+const SPARK_POLICY_DOC_CLASSES = new Set([
+  'front_door',
+  'public_guide',
+  'repo_guide',
+  'agent_policy',
+  'active_guide',
+  'shipped_skill',
+  'shipped_companion',
+  'seeded_template'
+]);
+
+const SPARK_POLICY_FILE_SEARCH_PATTERN =
+  /(?:file[-/ ]search|codebase[-/ ]search|file\/codebase search|file search|codebase search)/i;
+const SPARK_POLICY_FORBIDDEN_USAGE_PATTERN = /(?:search\/synthesis|\bsynthesis\b|\bplanning\b|\bimplementation\b|\breview\b|\bexploration\b|\bbroad exploration\b)/i;
 
 const MACHINE_LOCAL_PATH_PATTERNS = [
   /(?:file:\/\/)?\/Users\/[^\s`)>"]+/,
@@ -277,6 +293,15 @@ export async function runDocsCheck(repoRoot: string): Promise<DocsCheckError[]> 
       }
     }
 
+    errors.push(
+      ...checkSparkFileSearchPolicy({
+        file,
+        content,
+        catalogDocClass: catalogEntry?.doc_class ?? null,
+        enabledByTruthCheck: truthChecks.has('spark-file-search-policy') || truthChecks.has('model-posture')
+      })
+    );
+
     if (truthChecks.has('default-runtime')) {
       if (!codexPosture?.default_runtime) {
         errors.push({
@@ -325,6 +350,59 @@ export async function runDocsCheck(repoRoot: string): Promise<DocsCheckError[]> 
   }
 
   return dedupeErrors(errors);
+}
+
+function checkSparkFileSearchPolicy(input: {
+  file: string;
+  content: string;
+  catalogDocClass: string | null;
+  enabledByTruthCheck: boolean;
+}): DocsCheckError[] {
+  const shouldCheck =
+    input.enabledByTruthCheck || (input.catalogDocClass !== null && SPARK_POLICY_DOC_CLASSES.has(input.catalogDocClass));
+  if (!shouldCheck) {
+    return [];
+  }
+
+  const errors: DocsCheckError[] = [];
+  const lines = input.content.split('\n');
+  for (const [index, line] of lines.entries()) {
+    const markerIndex = findSparkPolicyMarkerIndex(line);
+    if (markerIndex === -1) {
+      continue;
+    }
+
+    const relevantText = line.slice(markerIndex);
+    const lineNumber = index + 1;
+    if (SPARK_POLICY_FORBIDDEN_USAGE_PATTERN.test(relevantText)) {
+      errors.push({
+        file: input.file,
+        rule: 'spark-policy-overbroad',
+        reference: `line ${lineNumber}: spark role must be file/codebase search only`
+      });
+      continue;
+    }
+
+    if (!SPARK_POLICY_FILE_SEARCH_PATTERN.test(relevantText)) {
+      errors.push({
+        file: input.file,
+        rule: 'spark-policy-overbroad',
+        reference: `line ${lineNumber}: spark role missing file/codebase search-only scope`
+      });
+    }
+  }
+  return errors;
+}
+
+function findSparkPolicyMarkerIndex(line: string): number {
+  const markers = [/explorer_fast/i, /gpt-5\.3-codex-spark/i, /\bspark\b/i];
+  const indexes = markers
+    .map((marker) => {
+      const match = marker.exec(line);
+      return match ? match.index : -1;
+    })
+    .filter((index) => index >= 0);
+  return indexes.length === 0 ? -1 : Math.min(...indexes);
 }
 
 function checkTrackedRuntimeArtifacts(

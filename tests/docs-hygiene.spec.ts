@@ -35,7 +35,7 @@ async function writeDocsCatalogFixture(
       '',
       '- Current CO compatibility/adoption target remains stable Codex CLI `0.117.0` for the current upstream-aligned main baseline.',
       '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
-      '- Keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception (fast text-only search/synthesis).',
+      '- Keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only.',
       '- When authenticating through ChatGPT, do not target delegated or review surfaces at `gpt-5.4-codex`; those runs currently fail immediately. Use `gpt-5.4` instead until provider compatibility changes.',
       '- Local appserver remains the expected default runtime path after the `CO-22` canary.',
       ''
@@ -479,7 +479,7 @@ describe('docs hygiene tooling', () => {
         '',
         '- Current CO compatibility/adoption target remains stable Codex CLI (`0.117.0`) for the current upstream-aligned main baseline.',
         '- Current model posture: `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
-        '- Keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception (fast text-only search/synthesis).',
+        '- Keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only.',
         '- When authenticating through ChatGPT, do not target delegated or review surfaces at `gpt-5.4-codex`; those runs currently fail immediately. Use `gpt-5.4` instead until provider compatibility changes.',
         '- Local appserver remains the expected default runtime path after the `CO-22` canary.',
         ''
@@ -492,7 +492,7 @@ describe('docs hygiene tooling', () => {
         '# Codex Orchestrator',
         '',
         '- Current model posture: `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
-        '- `explorer_fast` remains the only explicit `gpt-5.3-codex-spark` exception.',
+        '- `explorer_fast` remains the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only.',
         ''
       ].join('\n'),
       'utf8'
@@ -540,7 +540,7 @@ describe('docs hygiene tooling', () => {
         '',
         '- Current CO compatibility/adoption target remains stable Codex CLI (`0.117.0`) for the current upstream-aligned main baseline.',
         '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
-        '- Keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception (fast text-only search/synthesis).',
+        '- Keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only.',
         '- When authenticating through ChatGPT, do not target delegated/review surfaces at `gpt-5.4-codex`; those runs currently fail immediately. Use `gpt-5.4` instead until provider compatibility changes.',
         '- Local appserver remains the expected default runtime path after the `CO-22` canary.',
         ''
@@ -601,7 +601,7 @@ describe('docs hygiene tooling', () => {
         '',
         '- Current CO compatibility/adoption target remains stable Codex CLI (`0.117.0`) for the current upstream-aligned main baseline.',
         '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
-        '- Keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception (fast text-only search/synthesis).',
+        '- Keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only.',
         '- Keep delegated subagent and review surfaces on `gpt-5.4` as well when using ChatGPT auth; `gpt-5.4-codex` is currently unsupported there.',
         '- Local appserver remains the expected default runtime path after the `CO-22` canary.',
         ''
@@ -892,7 +892,7 @@ describe('docs hygiene tooling', () => {
         '# Codex Orchestrator',
         '',
         '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
-        '- `explorer_fast` remains the only explicit `gpt-5.3-codex-spark` exception.',
+        '- `explorer_fast` remains the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only.',
         ''
       ].join('\n'),
       'utf8'
@@ -903,6 +903,103 @@ describe('docs hygiene tooling', () => {
     expect(
       errors.find((error) => error.file === 'README.md' && error.rule === 'doc-posture-stale')
     ).toBeUndefined();
+    expect(
+      errors.find((error) => error.file === 'README.md' && error.rule === 'spark-policy-overbroad')
+    ).toBeUndefined();
+  });
+
+  it('rejects overbroad spark role wording in posture-checked docs', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-spark-policy-overbroad-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['model-posture']
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      [
+        '# Codex Orchestrator',
+        '',
+        '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
+        '- `explorer_fast` remains the only explicit `gpt-5.3-codex-spark` exception for fast search/synthesis.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 4: spark role must be file/codebase search only'
+      })
+    );
+  });
+
+  it('requires spark role lines to name file or codebase search scope', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-spark-policy-missing-scope-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['model-posture']
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      [
+        '# Codex Orchestrator',
+        '',
+        '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
+        '- `explorer_fast` remains the only explicit `gpt-5.3-codex-spark` exception.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 4: spark role missing file/codebase search-only scope'
+      })
+    );
   });
 
   it('does not let a stale split explorer_fast exception line hide behind a current primary posture line', async () => {

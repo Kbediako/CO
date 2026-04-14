@@ -6,7 +6,7 @@ model_reasoning_effort = "xhigh"
 max_threads = 12
 
 [agents.explorer_fast]
-description = "Fast explorer (spark text-only)."
+description = "Fast explorer (spark file/codebase search only)."
 config_file = "./agents/explorer-fast.toml"
 
 [agents.worker_complex]
