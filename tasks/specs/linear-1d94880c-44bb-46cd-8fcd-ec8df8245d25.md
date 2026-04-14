@@ -75,7 +75,7 @@ CO-177 adds one read-only gauge over those local artifacts. It must consume exis
 - Interfaces / contracts: `codex-orchestrator control-host freshness-gauge --artifact-root <path> --format json [--strict]`; one reusable evaluator module; fixture test helpers; operator docs section with citation map.
 
 ## Architecture & Data
-- Architecture / design adjustments: add a small artifact reader plus evaluator. Keep data extraction separate from verdict precedence so tests can cover both parser and classification behavior.
+- Architecture / design adjustments: add a small artifact reader plus evaluator. Keep data extraction separate from verdict precedence, so tests can cover both parser and classification behavior.
 - Data model changes / migrations: none. The gauge reads existing artifacts and sanitized fixtures only.
 - External dependencies / integrations: none beyond Node filesystem and existing repo CLI/test tooling.
 
