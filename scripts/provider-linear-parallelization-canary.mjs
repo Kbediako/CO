@@ -314,7 +314,7 @@ function countDecisions(scenarios) {
 
 function findSafeIndependentCandidates(scenario) {
   return Array.isArray(scenario?.matrix)
-    ? scenario.matrix.filter((candidate) => candidate.safe_independent === true)
+    ? scenario.matrix.filter((candidate) => isObjectRecord(candidate) && candidate.safe_independent === true)
     : [];
 }
 
@@ -340,7 +340,11 @@ function validateScenario(scenario) {
   } else if (!REASONS_BY_DECISION[scenario.decision].has(scenario.reason)) {
     failures.push(`${id}: reason ${scenario.reason} is invalid for decision ${scenario.decision}`);
   }
-  for (const candidate of matrix) {
+  for (const [index, candidate] of matrix.entries()) {
+    if (!isObjectRecord(candidate)) {
+      failures.push(`${id}: matrix candidate ${index} is missing or invalid`);
+      continue;
+    }
     const cap = candidate?.cap_slot_use;
     if (
       !cap ||
@@ -401,7 +405,11 @@ function validateScenario(scenario) {
       failures.push(`${id}: existing_child_lane_active without exhausted cap-slot matrix evidence`);
     }
   }
-  for (const lane of launched) {
+  for (const [index, lane] of launched.entries()) {
+    if (!isObjectRecord(lane)) {
+      failures.push(`${id}: child lane ${index} is missing or invalid`);
+      continue;
+    }
     if (!OUTCOME_VALUES.has(lane.outcome)) {
       failures.push(`${id}: child lane ${lane.stream} has invalid outcome ${lane.outcome}`);
     }
@@ -413,6 +421,14 @@ function validateScenario(scenario) {
     }
   }
   return failures;
+}
+
+function isObjectRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function validObjectRecords(value) {
+  return Array.isArray(value) ? value.filter(isObjectRecord) : [];
 }
 
 function findMissingLabeledSliceEvidence(summary) {
@@ -443,7 +459,7 @@ export function buildProviderLinearParallelizationCanaryReport(options = {}) {
   const scenarioFailures = scenarios.flatMap(validateScenario);
   const decisionCounts = countDecisions(scenarios);
   const launchedChildLanes = scenarios.flatMap((scenario) =>
-    (Array.isArray(scenario?.launched_child_lanes) ? scenario.launched_child_lanes : []).map((lane) => ({
+    validObjectRecords(scenario?.launched_child_lanes).map((lane) => ({
       scenario_id: scenario.id,
       ...lane
     }))
@@ -452,7 +468,7 @@ export function buildProviderLinearParallelizationCanaryReport(options = {}) {
     const safeCandidateStreams = new Set(
       findSafeIndependentCandidates(scenario).map((candidate) => candidate.lane)
     );
-    return (Array.isArray(scenario?.launched_child_lanes) ? scenario.launched_child_lanes : [])
+    return validObjectRecords(scenario?.launched_child_lanes)
       .filter((lane) => !safeCandidateStreams.has(lane.stream))
       .map((lane) => ({
         scenario_id: scenario.id,

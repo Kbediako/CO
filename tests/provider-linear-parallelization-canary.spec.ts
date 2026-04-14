@@ -95,6 +95,44 @@ describe('provider-linear parallelization canary', () => {
     });
   });
 
+  it('returns validation failures for malformed matrix entries instead of throwing', () => {
+    const scenario = buildProviderLinearParallelizationCanaryScenarios()[0];
+    scenario.id = 'bad-matrix-entry';
+    scenario.matrix = [null];
+    const report = buildProviderLinearParallelizationCanaryReport({
+      generatedAt: '2026-04-14T00:00:00.000Z',
+      taskId: 'linear-co-174-bad-matrix-entry',
+      scenarios: [scenario]
+    });
+
+    expect(validateProviderLinearParallelizationCanaryReport(report)).toEqual({
+      ok: false,
+      failures: expect.arrayContaining([
+        'bad-matrix-entry: matrix candidate 0 is missing or invalid',
+        'bad-matrix-entry: parallelize_now without a safe independent candidate'
+      ])
+    });
+  });
+
+  it('returns validation failures for malformed launched-lane entries instead of throwing', () => {
+    const scenario = buildProviderLinearParallelizationCanaryScenarios()[0];
+    scenario.id = 'bad-launched-entry';
+    scenario.launched_child_lanes = [null];
+    const report = buildProviderLinearParallelizationCanaryReport({
+      generatedAt: '2026-04-14T00:00:00.000Z',
+      taskId: 'linear-co-174-bad-launched-entry',
+      scenarios: [scenario]
+    });
+
+    expect(validateProviderLinearParallelizationCanaryReport(report)).toEqual({
+      ok: false,
+      failures: expect.arrayContaining([
+        'bad-launched-entry: child lane 0 is missing or invalid',
+        'bad-launched-entry: parallelize_now without an accepted child lane outcome'
+      ])
+    });
+  });
+
   it('rejects tampered baseline and cap metadata', () => {
     const report = buildProviderLinearParallelizationCanaryReport({
       generatedAt: '2026-04-14T00:00:00.000Z',
