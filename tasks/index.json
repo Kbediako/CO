@@ -1,6 +1,37 @@
 {
   "items": [
     {
+      "id": "20260414-linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d",
+      "title": "CO: Re-audit and decide Codex CLI 0.120.0 adoption posture",
+      "relates_to": "tasks/tasks-linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-14",
+      "paths": {
+        "spec": "tasks/specs/linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d.md",
+        "task": "tasks/tasks-linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d.md",
+        "agent_task": ".agent/task/linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d.md",
+        "docs": "docs/TECH_SPEC-linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d.md"
+      },
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (clean-success)",
+          "date": "2026-04-14",
+          "status": "succeeded",
+          "manifest": ".runs/linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d-co-180-docs-review-r2/cli/2026-04-14T10-06-30-092Z-440706ce/manifest.json",
+          "telemetry": ".runs/linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d-co-180-docs-review-r2/cli/2026-04-14T10-06-30-092Z-440706ce/review/telemetry.json"
+        },
+        "codex_0120_audit": {
+          "decision": "hold-0.118.0",
+          "date": "2026-04-14",
+          "summary": "0.120.0 command surfaces and runtime canary passed; required cloud canary blocked by missing CODEX_CLOUD_ENV_ID.",
+          "decision_summary": "out/linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d/manual/codex-version-canary/compare/decision-go-no-go.md"
+        }
+      }
+    },
+    {
       "id": "20260414-linear-0022f975-905a-4974-aa8e-d689df90167c",
       "title": "CO: reconcile Done issue mirrors and validation-only closeout provenance",
       "relates_to": "tasks/tasks-linear-0022f975-905a-4974-aa8e-d689df90167c.md",
