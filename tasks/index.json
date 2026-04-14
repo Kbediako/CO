@@ -1,6 +1,29 @@
 {
   "items": [
     {
+      "id": "20260414-linear-a560f416-c80a-473b-96fb-9f1ec090c968",
+      "title": "CO: keep provider-worker handoff manifests truthful when guardrail summaries fail",
+      "relates_to": "tasks/tasks-linear-a560f416-c80a-473b-96fb-9f1ec090c968.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-14",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (clean-success)",
+          "date": "2026-04-14",
+          "manifest": ".runs/linear-a560f416-c80a-473b-96fb-9f1ec090c968-docs-review-r3/cli/2026-04-13T22-30-05-481Z-fb8b4b92/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-a560f416-c80a-473b-96fb-9f1ec090c968.md",
+        "task": "tasks/tasks-linear-a560f416-c80a-473b-96fb-9f1ec090c968.md",
+        "agent_task": ".agent/task/linear-a560f416-c80a-473b-96fb-9f1ec090c968.md",
+        "docs": "docs/TECH_SPEC-linear-a560f416-c80a-473b-96fb-9f1ec090c968.md"
+      }
+    },
+    {
       "id": "20260409-linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d",
       "title": "CO: Add run memory controller with role-specific retrieval profiles",
       "relates_to": "tasks/tasks-linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d.md",
