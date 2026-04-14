@@ -385,18 +385,20 @@ describe('review-launch-attempt', () => {
       logTerminationBoundaryFallback
     });
 
-    expect(launchArgs).toEqual([
-      ['review', '--title', 'Surface: diff | Goal: scoped transport', '--base', 'origin/main'],
-      ['review', '--base', 'origin/main'],
-      ['--ask-for-approval', 'untrusted', 'review', '--base', 'origin/main']
-    ]);
+    expect(launchArgs).toHaveLength(3);
+    expect(launchArgs[0]).toEqual(['review', '--title', 'Surface: diff | Goal: scoped transport', '--base', 'origin/main']);
+    expect(launchArgs[1]).toEqual(['review', '--base', 'origin/main']);
+    expect(launchArgs[2]?.slice(0, 3)).toEqual(['-c', 'sandbox_mode="read-only"', 'review']);
+    expect(launchArgs[2]?.[3]).toContain('Strict bounded review retry');
+    expect(launchArgs[2]?.[3]).toContain('Retry review scope: --base origin/main.');
+    expect(launchArgs[2]?.[3]).toContain('Prompt body');
     expect(writeTelemetry).toHaveBeenCalledTimes(1);
     expect(writeTelemetry).toHaveBeenCalledWith(
       successState,
       'succeeded',
       null,
       commandIntentBoundary,
-      reviewLaunchContext('base')
+      reviewLaunchContext(null)
     );
     expect(successState.buildOutputSummary()).toEqual(
       expect.objectContaining({
@@ -480,34 +482,22 @@ describe('review-launch-attempt', () => {
       logTerminationBoundaryFallback
     });
 
-    expect(launchArgs).toEqual([
-      [
-        'review',
-        '--title',
-        'Surface: diff | Bounded: no validation; list follow-up commands only | Goal: scoped transport',
-        '--base',
-        'origin/main'
-      ],
-      [
-        '--ask-for-approval',
-        'untrusted',
-        'review',
-        '--title',
-        'Strict retry: previous validation command was blocked; do not run validation | Surface: diff | Bounded: no validation; list follow-up commands only | Goal: scoped transport',
-        '--base',
-        'origin/main'
-      ]
-    ]);
+    expect(launchArgs).toHaveLength(2);
+    expect(launchArgs[0]).toEqual(['review', '--title', 'Surface: diff | Bounded: no validation; list follow-up commands only | Goal: scoped transport', '--base', 'origin/main']);
+    expect(launchArgs[1]?.slice(0, 3)).toEqual(['-c', 'sandbox_mode="read-only"', 'review']);
+    expect(launchArgs[1]?.[3]).toContain('Strict bounded review retry');
+    expect(launchArgs[1]?.[3]).toContain('Retry review scope: --base origin/main.');
+    expect(launchArgs[1]?.[3]).toContain(
+      'Treat this as a follow-up command only, not something to rerun: npm run test -- tests/run-review.spec.ts'
+    );
+    expect(launchArgs[1]?.[3]).toContain('Prompt body');
     expect(writeTelemetry).toHaveBeenCalledTimes(1);
     expect(writeTelemetry).toHaveBeenCalledWith(
       successState,
       'succeeded',
       null,
       commandIntentBoundary,
-      reviewLaunchContext('base', 'artifact-only', {
-        reviewerVisibleContextTransport: 'scoped-title',
-        reviewerVisibleTitleSource: 'notes-surface'
-      })
+      reviewLaunchContext(null)
     );
     expect(successState.buildOutputSummary()).toEqual(
       expect.objectContaining({
@@ -521,93 +511,100 @@ describe('review-launch-attempt', () => {
     expect(logTerminationBoundaryFallback).not.toHaveBeenCalled();
   });
 
-  it('uses inline prompt transport for command-intent retry under appserver runtime', async () => {
-    const sandbox = await makeSandbox();
-    const manifestPath = await makeManifest(sandbox);
-    const artifactPaths = await prepareReviewArtifacts(manifestPath, 'Prompt body', sandbox);
-    const launchArgs: string[][] = [];
-    const failureState = makeState(sandbox);
-    const successState = makeState(sandbox);
+  it('carries explicit scope in an inline command-intent retry prompt under appserver runtime', async () => {
+    const title =
+      'Surface: diff | Bounded: no validation; list follow-up commands only | Goal: scoped transport';
     const commandIntentBoundary = {
       kind: 'command-intent',
       provenance: 'validation-suite',
       reason: 'bounded review command-intent boundary violated after 1000ms.',
       sample: 'npm run build'
     } as const;
-    failureState.observeChunk('thinking\nexec\n', 'stdout', 100);
-    failureState.observeChunk(`/bin/zsh -lc 'npm run build'\n`, 'stdout', 110);
-    const writeTelemetry = vi.fn().mockResolvedValue(null);
-    const logTerminationBoundaryFallback = vi.fn();
+    const scopeCases = [
+      { scopeMode: 'base', scopeOptions: { base: 'origin/main' }, scopeArgs: ['--base', 'origin/main'] },
+      { scopeMode: 'commit', scopeOptions: { commit: 'abc123' }, scopeArgs: ['--commit', 'abc123'] },
+      { scopeMode: 'uncommitted', scopeOptions: { uncommitted: true }, scopeArgs: ['--uncommitted'] }
+    ] as const;
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    await runReviewLaunchAttemptShell({
-      cliOptions: {
-        task: 'sample-task',
-        base: 'origin/main',
-        title:
-          'Surface: diff | Bounded: no validation; list follow-up commands only | Goal: scoped transport',
-        titleSource: 'notes-surface'
-      },
-      prompt: 'Prompt body',
-      retryWithoutScopeFlagsGateError:
-        'explicit `--base` review scope must remain auditable; rerun without that flag only if you intentionally want the wrapper default working-tree review.',
-      runtimeContext: {
-        runtime: { selected_mode: 'appserver' },
-        env: {}
-      } as any,
-      repoRoot: sandbox,
-      manifestPath,
-      artifactPaths,
-      autoIssueLogEnabled: false,
-      telemetryDebugEnabled: false,
-      telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY',
-      ensureReviewCommandAvailableFn: async () => {},
-      resolveReviewCommandFn: (reviewArgs) => ({ command: 'codex', args: reviewArgs }),
-      runReview: async (resolved) => {
-        launchArgs.push(resolved.args);
-        if (launchArgs.length === 1) {
-          throw new CodexReviewError(
-            'codex review crossed the bounded command-intent boundary (validation suite launch).',
-            {
-              exitCode: null,
-              signal: 'SIGTERM',
-              timedOut: false,
-              outputPreview: 'npm run build',
-              reviewState: failureState,
-              terminationBoundary: commandIntentBoundary
-            }
-          );
-        }
-        return {
-          preview: 'stdout-ok',
-          state: successState,
-          terminationBoundary: null
-        };
-      },
-      writeTelemetry,
-      logTelemetrySummary: () => {
-        throw new Error('telemetry summary should not run when telemetry persistence returns null');
-      },
-      logTerminationBoundaryFallback
-    });
+    for (const scopeCase of scopeCases) {
+      const sandbox = await makeSandbox();
+      const manifestPath = await makeManifest(sandbox);
+      const artifactPaths = await prepareReviewArtifacts(manifestPath, 'Prompt body', sandbox);
+      const launchArgs: string[][] = [];
+      const failureState = makeState(sandbox);
+      const successState = makeState(sandbox);
+      failureState.observeChunk('thinking\nexec\n', 'stdout', 100);
+      failureState.observeChunk(`/bin/zsh -lc 'npm run build'\n`, 'stdout', 110);
+      const writeTelemetry = vi.fn().mockResolvedValue(null);
+      const logTerminationBoundaryFallback = vi.fn();
 
-    expect(launchArgs).toHaveLength(2);
-    expect(launchArgs[0]).toContain('--base');
-    expect(launchArgs[1]).not.toContain('--base');
-    expect(launchArgs[1]).not.toContain('--title');
-    expect(launchArgs[1]).toEqual(
-      expect.arrayContaining(['--ask-for-approval', 'untrusted', 'review'])
-    );
-    expect(launchArgs[1].at(-1)).toContain('Strict command-intent retry:');
-    expect(launchArgs[1].at(-1)).toContain('Prompt body');
-    expect(writeTelemetry).toHaveBeenCalledWith(
-      successState,
-      'succeeded',
-      null,
-      commandIntentBoundary,
-      reviewLaunchContext(null, 'inline')
-    );
+      await runReviewLaunchAttemptShell({
+        cliOptions: {
+          task: 'sample-task',
+          ...scopeCase.scopeOptions,
+          title,
+          titleSource: 'notes-surface'
+        },
+        prompt: 'Prompt body',
+        retryWithoutScopeFlagsGateError: `explicit \`--${scopeCase.scopeMode}\` review scope must remain auditable; rerun without that flag only if you intentionally want the wrapper default working-tree review.`,
+        runtimeContext: {
+          runtime: { selected_mode: 'appserver' },
+          env: {}
+        } as any,
+        repoRoot: sandbox,
+        manifestPath,
+        artifactPaths,
+        autoIssueLogEnabled: false,
+        telemetryDebugEnabled: false,
+        telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY',
+        ensureReviewCommandAvailableFn: async () => {},
+        resolveReviewCommandFn: (reviewArgs) => ({ command: 'codex', args: reviewArgs }),
+        runReview: async (resolved) => {
+          launchArgs.push(resolved.args);
+          if (launchArgs.length === 1) {
+            throw new CodexReviewError(
+              'codex review crossed the bounded command-intent boundary (validation suite launch).',
+              {
+                exitCode: null,
+                signal: 'SIGTERM',
+                timedOut: false,
+                outputPreview: 'npm run build',
+                reviewState: failureState,
+                terminationBoundary: commandIntentBoundary
+              }
+            );
+          }
+          return {
+            preview: 'stdout-ok',
+            state: successState,
+            terminationBoundary: null
+          };
+        },
+        writeTelemetry,
+        logTelemetrySummary: () => {
+          throw new Error('telemetry summary should not run when telemetry persistence returns null');
+        },
+        logTerminationBoundaryFallback
+      });
+
+      expect(launchArgs).toHaveLength(2);
+      for (const scopeArg of scopeCase.scopeArgs) {
+        expect(launchArgs[0]).toContain(scopeArg);
+      }
+      expect(launchArgs[1]?.slice(0, 3)).toEqual(['-c', 'sandbox_mode="read-only"', 'review']);
+      expect(launchArgs[1]?.[3]).toContain('Strict bounded review retry');
+      expect(launchArgs[1]?.[3]).toContain(`Retry review scope: ${scopeCase.scopeArgs.join(' ')}.`);
+      expect(launchArgs[1]?.[3]).toContain('Prompt body');
+      expect(writeTelemetry).toHaveBeenCalledWith(
+        successState,
+        'succeeded',
+        null,
+        commandIntentBoundary,
+        reviewLaunchContext(null)
+      );
+    }
   });
 
   it('launches explicit uncommitted scope without an inline prompt argument', async () => {

@@ -978,7 +978,7 @@ fi
       done
     fi
     if [[ "$mode" == "command-intent-validation-then-ok" ]]; then
-      if [[ "$*" == *"Strict retry: previous validation command was blocked; do not run validation"* ]]; then
+      if [[ "$*" == *"Strict bounded review retry."* ]]; then
         echo "stdout-ok"
         echo "stderr-ok" >&2
         exit 0
@@ -3480,7 +3480,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.exitCode).toBe(0);
     const normalizedHelp = result.stdout.replace(/\s+/g, ' ').trim();
     expect(normalizedHelp).toContain(
-      'Behavior: Explicit --uncommitted/--base/--commit wrapper runs keep prompt/context in review/prompt.txt and launch codex review without any prompt argument because current CLI still treats stdin (`-`) as [PROMPT]; reviewer-visible scoped context first rides on --title (user-provided when present, otherwise synthesized from NOTES + surface) with bounded no-validation guidance visible in the title. If Codex rejects a synthesized scoped title, the wrapper retries the same explicit scope without `--title` and falls back to artifact-only context. If bounded review blocks a validation command, the wrapper retries once with stricter no-validation guidance, uses --ask-for-approval untrusted where the runtime honors approval policy, switches appserver retries to inline prompt transport so the constraint is visible at the review boundary, and preserves the command-intent boundary in telemetry when the retry produces a verdict.'
+      'Behavior: Explicit --uncommitted/--base/--commit wrapper runs keep prompt/context in review/prompt.txt and launch codex review without any prompt argument because current CLI still treats stdin (`-`) as [PROMPT]; reviewer-visible scoped context first rides on --title (user-provided when present, otherwise synthesized from NOTES + surface) with bounded no-validation guidance visible where the current Codex review surface honors titles. If Codex rejects a synthesized scoped title, the wrapper retries the same explicit scope without `--title` and falls back to artifact-only context. If bounded review blocks a validation command, the wrapper retries once with a reviewer-visible inline no-validation prompt that names the original scope and runs under a read-only sandbox override; successful retry preserves the command-intent boundary in telemetry as bounded-success.'
     );
     expect(normalizedHelp).toContain(
       'Explicit scoped wrapper runs Support only the default diff surface; audit/architecture still require prompt-capable unscoped review.'
@@ -6265,7 +6265,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
 
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain(
-        'retrying once with stricter reviewer-visible no-validation context'
+        'retrying once with reviewer-visible inline no-validation context'
       );
       expect(result.stdout).toContain('review outcome: bounded success via command-intent');
       const argsLog = await readFile(argsLogPath, 'utf8');
@@ -6276,15 +6276,13 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       expect(reviewInvocations[0]).toContain(
         'Surface: diff | Bounded: no validation; list follow-up commands only'
       );
-      expect(reviewInvocations[1]).toContain(
-        'Strict retry: previous validation command was blocked; do not run validation'
-      );
-      expect(reviewInvocations[0]).not.toContain('approval=untrusted');
-      expect(reviewInvocations[1]).toContain('approval=untrusted');
+      expect(reviewInvocations[1]).toContain('Strict bounded review retry.');
+      expect(reviewInvocations[1]).toContain('config=sandbox_mode="read-only"');
+      expect(reviewInvocations[0]).not.toContain('config=sandbox_mode="read-only"');
       for (const scopeArg of scopeArgs) {
         expect(reviewInvocations[0]).toContain(scopeArg);
-        expect(reviewInvocations[1]).toContain(scopeArg);
       }
+      expect(reviewInvocations[1]).toContain(`Retry review scope: ${scopeArgs.join(' ')}.`);
 
       const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
       const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
@@ -6314,10 +6312,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
         })
       );
       expect(telemetry.launch_context).toEqual(
-        reviewLaunchContext(scopeMode, 'artifact-only', {
-          reviewerVisibleContextTransport: 'scoped-title',
-          reviewerVisibleTitleSource: 'notes-surface'
-        })
+        reviewLaunchContext(null)
       );
       expect(telemetry.summary.commandIntentViolationCount).toBeGreaterThan(0);
       expect(telemetry.summary.commandIntentViolationKinds).toEqual(['validation-runner']);
