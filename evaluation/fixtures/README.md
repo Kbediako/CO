@@ -8,6 +8,8 @@ Fixtures provide deterministic workspaces for exercising language adapters in th
 - `rlm-context-scale` — Synthetic, deterministic context-length benchmark fixture for RLM context management. Scenario: `rlm-context-scale`.
 - `rlm-oolong` — OOLONG-inspired linear aggregation fixture (local sample + optional HF fetch). Scenario: `rlm-oolong`.
 - `rlm-oolong-pairs` — OOLONG-Pairs fixture (pairwise constraints, local sample + optional HF fetch). Scenario: `rlm-oolong-pairs`.
+- `provider-linear-adoption` — Sanitized provider-linear run artifacts for `npm run eval:provider-adoption`, covering source-0, prompt-pack, parallelization, child-lane, follow-up, link, and workpad adoption metrics.
 
 All fixtures are treated as read-only source material. The harness copies the fixture to a temporary directory when a scenario or adapter command sets `requiresCleanFixture` to `true`.
 The OOLONG fixtures also support optional fallback length matching and repeatability checks; see each fixture README for configuration.
+Provider adoption fixtures must contain pointer metadata only. Do not commit raw provider transcripts, live Linear payloads, secrets, PII, or unsanitized operator text; add new provider-run cases by trimming artifacts to `manifest.json`, `provider-linear-worker-proof.json`, and `prompt-artifacts.json` with synthetic summaries and stable pointer references.

@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260414-linear-afb6ebc9-1341-4dbd-a522-6531a15aab90",
+      "title": "CO workflow: add provider adoption eval for source-0, child lanes, and follow-up traceability",
+      "relates_to": "tasks/tasks-linear-afb6ebc9-1341-4dbd-a522-6531a15aab90.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-14",
+      "paths": {
+        "spec": "tasks/specs/linear-afb6ebc9-1341-4dbd-a522-6531a15aab90.md",
+        "task": "tasks/tasks-linear-afb6ebc9-1341-4dbd-a522-6531a15aab90.md",
+        "agent_task": ".agent/task/linear-afb6ebc9-1341-4dbd-a522-6531a15aab90.md",
+        "docs": "docs/TECH_SPEC-linear-afb6ebc9-1341-4dbd-a522-6531a15aab90.md"
+      }
+    },
+    {
       "id": "20260414-linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8",
       "title": "CO workflow: add rolling docs:freshness cohort policy for Apr 14 stale baseline",
       "relates_to": "tasks/tasks-linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8.md",
