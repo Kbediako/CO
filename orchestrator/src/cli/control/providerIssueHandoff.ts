@@ -3592,39 +3592,79 @@ export function createProviderIssueHandoffService(
         const runsByProviderIssue = groupProviderIssueRuns(discoveredRuns);
         const pollDispatchBudget = createProviderPollDispatchBudget(options.readFeatureToggles?.() ?? null);
         const occupiedPollDispatchKeys = new Set<string>();
+        const occupiedPollDispatchProviderKeys = new Set<string>();
         const occupiedPollDispatchStateByKey = new Map<
           string,
           Pick<LiveLinearTrackedIssue, 'state'>
         >();
+        const occupiedPollDispatchProviderKeyByKey = new Map<string, string>();
         const releasedFreshDiscoveryReplayBlockedProviderKeys = new Set<string>();
         const deferredClaimFreshDiscoveryBlockedProviderKeys = new Set<string>();
         let releasedFailClosedSkipCount = 0;
+        let releasedFailClosedEligibleCount = 0;
+        let releasedFailClosedDisqualifyingRetainedCount = 0;
         let suppressFreshDiscovery = false;
+        const resolveClaimPollDispatchSlotKey = (
+          providerKey: string,
+          claim: Pick<ProviderIntakeClaimRecord, 'state' | 'run_id' | 'run_manifest_path'>,
+          run: Pick<ProviderIssueRunRecord, 'provider' | 'issueId' | 'runId' | 'manifestPath'> | null = null
+        ): string | null => {
+          if (run) {
+            return resolveProviderPollRunOccupancyKey(run);
+          }
+          if (claim.state === 'running') {
+            return null;
+          }
+          return claim.run_manifest_path ?? claim.run_id ?? `claim:${providerKey}:${claim.state}`;
+        };
         const noteOccupiedPollDispatchSlot = (
+          occupancyKey: string | null,
           providerKey: string,
           trackedIssue: Pick<LiveLinearTrackedIssue, 'state'>
         ): void => {
-          const occupiedTrackedIssue = occupiedPollDispatchStateByKey.get(providerKey);
-          if (occupiedPollDispatchKeys.has(providerKey)) {
+          if (!occupancyKey) {
+            return;
+          }
+          occupiedPollDispatchProviderKeys.add(providerKey);
+          const occupiedTrackedIssue = occupiedPollDispatchStateByKey.get(occupancyKey);
+          if (occupiedPollDispatchKeys.has(occupancyKey)) {
             if (occupiedTrackedIssue && occupiedTrackedIssue.state !== trackedIssue.state) {
               pollDispatchBudget.releaseOccupied(occupiedTrackedIssue);
-              occupiedPollDispatchStateByKey.set(providerKey, { state: trackedIssue.state });
+              occupiedPollDispatchStateByKey.set(occupancyKey, { state: trackedIssue.state });
               pollDispatchBudget.noteOccupied(trackedIssue);
             }
             return;
           }
-          occupiedPollDispatchKeys.add(providerKey);
-          occupiedPollDispatchStateByKey.set(providerKey, { state: trackedIssue.state });
+          occupiedPollDispatchKeys.add(occupancyKey);
+          occupiedPollDispatchStateByKey.set(occupancyKey, { state: trackedIssue.state });
+          occupiedPollDispatchProviderKeyByKey.set(occupancyKey, providerKey);
           refreshCounts.occupied_slots += 1;
           pollDispatchBudget.noteOccupied(trackedIssue);
         };
-        const releaseOccupiedPollDispatchSlot = (providerKey: string): void => {
-          const trackedIssue = occupiedPollDispatchStateByKey.get(providerKey);
+        const releaseOccupiedPollDispatchSlot = (occupancyKey: string | null): void => {
+          if (!occupancyKey) {
+            return;
+          }
+          const trackedIssue = occupiedPollDispatchStateByKey.get(occupancyKey);
           if (!trackedIssue) {
             return;
           }
-          occupiedPollDispatchKeys.delete(providerKey);
-          occupiedPollDispatchStateByKey.delete(providerKey);
+          const providerKey = occupiedPollDispatchProviderKeyByKey.get(occupancyKey) ?? null;
+          occupiedPollDispatchKeys.delete(occupancyKey);
+          occupiedPollDispatchStateByKey.delete(occupancyKey);
+          occupiedPollDispatchProviderKeyByKey.delete(occupancyKey);
+          if (providerKey) {
+            let providerStillOccupied = false;
+            for (const existingProviderKey of occupiedPollDispatchProviderKeyByKey.values()) {
+              if (existingProviderKey === providerKey) {
+                providerStillOccupied = true;
+                break;
+              }
+            }
+            if (!providerStillOccupied) {
+              occupiedPollDispatchProviderKeys.delete(providerKey);
+            }
+          }
           refreshCounts.occupied_slots = Math.max(0, refreshCounts.occupied_slots - 1);
           pollDispatchBudget.releaseOccupied(trackedIssue);
         };
@@ -3645,14 +3685,7 @@ export function createProviderIssueHandoffService(
           const claimProviderKey = buildProviderIssueKey(claim.provider, claim.issue_id);
           const claimRuns = activeRunsByProviderIssue.get(claimProviderKey) ?? [];
           const activeRun = resolveProviderClaimRunIdentity(claim, claimRuns) ?? claimRuns[0] ?? null;
-          const occupancyKey =
-            activeRun
-              ? resolveProviderPollRunOccupancyKey(activeRun)
-              : claim.state === 'running'
-                ? null
-                : claim.run_manifest_path ??
-                  claim.run_id ??
-                  `claim:${claimProviderKey}:${claim.state}`;
+          const occupancyKey = resolveClaimPollDispatchSlotKey(claimProviderKey, claim, activeRun);
           if (!occupancyKey) {
             continue;
           }
@@ -3661,6 +3694,7 @@ export function createProviderIssueHandoffService(
           }
           seededPollOccupancyKeys.add(occupancyKey);
           noteOccupiedPollDispatchSlot(
+            occupancyKey,
             claimProviderKey,
             trackedIssuesByKey?.get(claimProviderKey) ?? { state: claim.issue_state ?? null }
           );
@@ -3674,6 +3708,7 @@ export function createProviderIssueHandoffService(
           seededPollOccupancyKeys.add(occupancyKey);
           const providerKey = buildProviderIssueKey(run.provider, run.issueId);
           noteOccupiedPollDispatchSlot(
+            occupancyKey,
             providerKey,
             trackedIssuesByKey?.get(providerKey) ?? { state: claimStateByProviderKey.get(providerKey) ?? null }
           );
@@ -3687,6 +3722,7 @@ export function createProviderIssueHandoffService(
           seededPollOccupancyKeys.add(record.manifestPath);
           const providerKey = buildProviderIssueKey(record.provider, record.issueId);
           noteOccupiedPollDispatchSlot(
+            record.manifestPath,
             providerKey,
             trackedIssuesByKey?.get(providerKey) ?? { state: claimStateByProviderKey.get(providerKey) ?? null }
           );
@@ -3714,6 +3750,11 @@ export function createProviderIssueHandoffService(
         for (const claim of [...options.state.claims]) {
           assertRefreshCycleNotStuck();
           const claimProviderKey = buildProviderIssueKey(claim.provider, claim.issue_id);
+          if (resolveReleasedProviderIssuePollFailClosedReason(claim)) {
+            releasedFailClosedEligibleCount += 1;
+          } else if (shouldProviderClaimDisqualifyAllReleasedSuppressor(claim)) {
+            releasedFailClosedDisqualifyingRetainedCount += 1;
+          }
           refreshCounts.claims_scanned += 1;
           recordRefreshProgress('refresh:claim_reconcile');
           try {
@@ -3778,7 +3819,9 @@ export function createProviderIssueHandoffService(
               cleanupWorkspace: resolution.cleanupWorkspace
             });
             if (!activeRun) {
-              releaseOccupiedPollDispatchSlot(claimProviderKey);
+              releaseOccupiedPollDispatchSlot(
+                resolveClaimPollDispatchSlotKey(claimProviderKey, claim, activeRun)
+              );
             }
             continue;
           }
@@ -3806,13 +3849,19 @@ export function createProviderIssueHandoffService(
                       trackedIssueRefetch
                     })
                   : claim;
+              const reviewPromotionRun =
+                resolveProviderClaimRunIdentity(currentClaim, attachableClaimRuns) ?? latestRun;
               const reviewPromotionClaim = await maybeHandleReviewHandoffPromotion({
                 claim: currentClaim,
                 trackedIssue: resolution.trackedIssue,
-                latestRun: resolveProviderClaimRunIdentity(currentClaim, attachableClaimRuns) ?? latestRun
+                latestRun: reviewPromotionRun
               });
               if (reviewPromotionClaim) {
-                noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+                noteOccupiedPollDispatchSlot(
+                  resolveClaimPollDispatchSlotKey(claimProviderKey, reviewPromotionClaim, reviewPromotionRun),
+                  claimProviderKey,
+                  resolution.trackedIssue
+                );
                 continue;
               }
               await retainOwnedHandoffClaim({
@@ -3850,7 +3899,11 @@ export function createProviderIssueHandoffService(
               previousRun: latestRun
             });
             if (shouldCountProviderAdmissionResultForPollBudget(handoffResult)) {
-              noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+              noteOccupiedPollDispatchSlot(
+                resolveClaimPollDispatchSlotKey(claimProviderKey, handoffResult.claim),
+                claimProviderKey,
+                resolution.trackedIssue
+              );
             }
             continue;
           }
@@ -3867,9 +3920,13 @@ export function createProviderIssueHandoffService(
                 (
                   isProviderMergeCloseoutWatchingClaim(claim) ||
                   isTerminalProviderMergeCloseoutClaim(claim)
-                );
+              );
               if (preserveRecoveredMergeCloseoutClaim) {
-                noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+                noteOccupiedPollDispatchSlot(
+                  resolveProviderPollRunOccupancyKey(activeRun),
+                  claimProviderKey,
+                  resolution.trackedIssue
+                );
                 continue;
               }
               if (trackedIssueFreshEnoughForClaim) {
@@ -3879,7 +3936,11 @@ export function createProviderIssueHandoffService(
                   latestRun: activeRun
                 });
                 if (mergeCloseoutClaim) {
-                  noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+                  noteOccupiedPollDispatchSlot(
+                    resolveProviderPollRunOccupancyKey(activeRun),
+                    claimProviderKey,
+                    resolution.trackedIssue
+                  );
                   continue;
                 }
               }
@@ -3921,7 +3982,11 @@ export function createProviderIssueHandoffService(
                 await persistStateOrRollback(refreshActiveRunSnapshot);
                 options.publishRuntime?.('provider-intake.refresh');
               }
-              noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+              noteOccupiedPollDispatchSlot(
+                resolveProviderPollRunOccupancyKey(activeRun),
+                claimProviderKey,
+                resolution.trackedIssue
+              );
               continue;
             }
 
@@ -3945,7 +4010,11 @@ export function createProviderIssueHandoffService(
                 latestRun
               });
               if (reviewPromotionClaim) {
-                noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+                noteOccupiedPollDispatchSlot(
+                  resolveClaimPollDispatchSlotKey(claimProviderKey, reviewPromotionClaim, latestRun),
+                  claimProviderKey,
+                  resolution.trackedIssue
+                );
                 continue;
               }
               const mergeCloseoutClaim = await maybeHandleDeterministicMergingCloseout({
@@ -3954,23 +4023,36 @@ export function createProviderIssueHandoffService(
                 latestRun
               });
               if (mergeCloseoutClaim) {
-                noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+                noteOccupiedPollDispatchSlot(
+                  resolveClaimPollDispatchSlotKey(claimProviderKey, mergeCloseoutClaim, latestRun),
+                  claimProviderKey,
+                  resolution.trackedIssue
+                );
                 continue;
               }
             }
+            const ownedRun = resolveProviderClaimRunIdentity(currentClaim, attachableClaimRuns) ?? latestRun;
             await retainOwnedHandoffClaim({
               claim: currentClaim,
               trackedIssue: resolution.trackedIssue,
-              run: resolveProviderClaimRunIdentity(currentClaim, attachableClaimRuns) ?? latestRun,
+              run: ownedRun,
               state: currentClaim.state,
               reason: 'provider_issue_handoff_owned'
             });
-            noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+            noteOccupiedPollDispatchSlot(
+              resolveClaimPollDispatchSlotKey(claimProviderKey, currentClaim, ownedRun),
+              claimProviderKey,
+              resolution.trackedIssue
+            );
             continue;
           }
 
           if (claim.state === 'starting' || claim.state === 'resuming') {
-            noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+            noteOccupiedPollDispatchSlot(
+              resolveClaimPollDispatchSlotKey(claimProviderKey, claim, latestRun),
+              claimProviderKey,
+              resolution.trackedIssue
+            );
             continue;
           }
 
@@ -3985,9 +4067,13 @@ export function createProviderIssueHandoffService(
               (
                 isProviderMergeCloseoutWatchingClaim(claim) ||
                 isTerminalProviderMergeCloseoutClaim(claim)
-              );
+            );
             if (preserveRecoveredMergeCloseoutClaim) {
-              noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+              noteOccupiedPollDispatchSlot(
+                resolveProviderPollRunOccupancyKey(activeRun),
+                claimProviderKey,
+                resolution.trackedIssue
+              );
               continue;
             }
             if (trackedIssueFreshEnoughForClaim) {
@@ -3997,7 +4083,11 @@ export function createProviderIssueHandoffService(
                 latestRun: activeRun
               });
               if (mergeCloseoutClaim) {
-                noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+                noteOccupiedPollDispatchSlot(
+                  resolveProviderPollRunOccupancyKey(activeRun),
+                  claimProviderKey,
+                  resolution.trackedIssue
+                );
                 continue;
               }
             }
@@ -4039,7 +4129,11 @@ export function createProviderIssueHandoffService(
               await persistStateOrRollback(refreshActiveRunSnapshot);
               options.publishRuntime?.('provider-intake.refresh');
             }
-            noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+            noteOccupiedPollDispatchSlot(
+              resolveProviderPollRunOccupancyKey(activeRun),
+              claimProviderKey,
+              resolution.trackedIssue
+            );
             continue;
           }
 
@@ -4059,12 +4153,20 @@ export function createProviderIssueHandoffService(
               latestRun
             });
             if (mergeCloseoutClaim) {
-              noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+              noteOccupiedPollDispatchSlot(
+                resolveClaimPollDispatchSlotKey(claimProviderKey, mergeCloseoutClaim, latestRun),
+                claimProviderKey,
+                resolution.trackedIssue
+              );
               continue;
             }
           }
           if (currentClaim.retry_queued === true) {
-            noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+            noteOccupiedPollDispatchSlot(
+              resolveClaimPollDispatchSlotKey(claimProviderKey, currentClaim, latestRun),
+              claimProviderKey,
+              resolution.trackedIssue
+            );
             continue;
           }
 
@@ -4103,7 +4205,11 @@ export function createProviderIssueHandoffService(
               options.publishRuntime?.('provider-intake.refresh');
             }
             if (queuedRetryFields.retry_queued === true) {
-              noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+              noteOccupiedPollDispatchSlot(
+                resolveProviderPollRunOccupancyKey(latestRun),
+                claimProviderKey,
+                resolution.trackedIssue
+              );
             }
             continue;
           }
@@ -4137,7 +4243,11 @@ export function createProviderIssueHandoffService(
               options.publishRuntime?.('provider-intake.refresh');
             }
             if (completedState.retry_queued === true) {
-              noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+              noteOccupiedPollDispatchSlot(
+                resolveProviderPollRunOccupancyKey(latestRun),
+                claimProviderKey,
+                resolution.trackedIssue
+              );
             }
             continue;
           }
@@ -4161,7 +4271,11 @@ export function createProviderIssueHandoffService(
               reason: 'provider_issue_refresh_start_launched'
             });
             if (shouldCountProviderAdmissionResultForPollBudget(handoffResult)) {
-              noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+              noteOccupiedPollDispatchSlot(
+                resolveClaimPollDispatchSlotKey(claimProviderKey, handoffResult.claim),
+                claimProviderKey,
+                resolution.trackedIssue
+              );
             }
           }
           } catch (error) {
@@ -4178,8 +4292,9 @@ export function createProviderIssueHandoffService(
         }
 
         if (
-          refreshCounts.claims_scanned > 0 &&
-          releasedFailClosedSkipCount === refreshCounts.claims_scanned
+          releasedFailClosedEligibleCount > 0 &&
+          releasedFailClosedDisqualifyingRetainedCount === 0 &&
+          releasedFailClosedSkipCount === releasedFailClosedEligibleCount
         ) {
           suppressFreshDiscovery = true;
         }
@@ -4233,7 +4348,11 @@ export function createProviderIssueHandoffService(
               });
               if (shouldCountProviderAdmissionResultForPollBudget(handoffResult)) {
                 refreshCounts.fresh_discovery_started += 1;
-                noteOccupiedPollDispatchSlot(providerKey, trackedIssue);
+                noteOccupiedPollDispatchSlot(
+                  resolveClaimPollDispatchSlotKey(providerKey, handoffResult.claim),
+                  providerKey,
+                  trackedIssue
+                );
                 recordRefreshProgress('refresh:fresh_dispatch');
               }
             } catch (error) {
@@ -4270,7 +4389,7 @@ export function createProviderIssueHandoffService(
                 ...freshDiscoveryBlockedProviderKeys,
                 ...releasedFreshDiscoveryReplayBlockedProviderKeys,
                 ...deferredClaimFreshDiscoveryBlockedProviderKeys,
-                ...occupiedPollDispatchKeys,
+                ...occupiedPollDispatchProviderKeys,
                 ...dispatchSkippedConsumedTrackedIssueKeys
               ])
             ).map((providerKey) => providerKey.slice(providerKey.indexOf(':') + 1))
@@ -5937,6 +6056,37 @@ function resolveReleasedProviderIssuePollFailClosedReason(
     return 'provider_issue_poll_cached_released_not_mutable';
   }
   return null;
+}
+
+function shouldProviderClaimDisqualifyAllReleasedSuppressor(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'state' | 'reason' | 'issue_state' | 'issue_state_type' | 'review_promotion' | 'merge_closeout'
+  >
+): boolean {
+  if (claim.state === 'ignored') {
+    return false;
+  }
+  if (
+    claim.state === 'completed' &&
+    !isProviderReviewPromotionWatchingClaim(claim) &&
+    !isProviderMergeCloseoutWatchingClaim(claim)
+  ) {
+    return false;
+  }
+  const workflowState = classifyProviderLinearWorkflowState({
+    state: claim.issue_state,
+    state_type: claim.issue_state_type
+  });
+  if (
+    claim.state === 'handoff_failed' &&
+    !workflowState.isActive &&
+    !isProviderReviewPromotionWatchingClaim(claim) &&
+    !isProviderMergeCloseoutWatchingClaim(claim)
+  ) {
+    return false;
+  }
+  return true;
 }
 
 function isProviderIssuePollFailClosedReason(reason: string | null | undefined): boolean {

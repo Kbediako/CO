@@ -2839,6 +2839,118 @@ describe('createProviderIssueHandoffService', () => {
     expect(state.claims.filter((claim) => claim.reason === 'provider_issue_released:not_mutable')).toHaveLength(5);
   });
 
+  it('keeps all-released deferred-poll suppression when inert historical claims are scanned', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(
+      createProviderClaim({
+        issue_id: 'lin-released-inactive',
+        issue_identifier: 'CO-1614',
+        issue_title: 'Released inactive claim',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        state: 'released',
+        reason: 'provider_issue_released:not_active'
+      }),
+      createProviderClaim({
+        issue_id: 'lin-released-immutable',
+        issue_identifier: 'CO-1615',
+        issue_title: 'Released immutable claim',
+        issue_state: 'In Review',
+        issue_state_type: 'started',
+        issue_archived_at: '2026-04-13T09:59:00.000Z',
+        issue_trashed: true,
+        state: 'released',
+        reason: 'provider_issue_released:not_mutable'
+      }),
+      createProviderClaim({
+        issue_id: 'lin-completed-history',
+        issue_identifier: 'CO-1616',
+        issue_title: 'Completed historical claim',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        state: 'completed',
+        reason: 'provider_issue_completed'
+      }),
+      createProviderClaim({
+        issue_id: 'lin-ignored-history',
+        issue_identifier: 'CO-1617',
+        issue_title: 'Ignored historical claim',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        state: 'ignored',
+        reason: 'provider_issue_ignored'
+      }),
+      createProviderClaim({
+        issue_id: 'lin-handoff-failed-history',
+        issue_identifier: 'CO-1618',
+        issue_title: 'Historical handoff failure',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        state: 'handoff_failed',
+        reason: 'provider_issue_start_failed:old worker failure'
+      })
+    );
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => {
+      throw new Error('all-released suppression should not burn issue-by-id reads');
+    });
+    const refetchTrackedIssues = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-unrelated-runnable-history',
+          identifier: 'CO-1619',
+          title: 'Runnable issue that should not be fetched on all-released suppression',
+          state: 'Ready',
+          state_type: 'unstarted',
+          updated_at: '2026-04-13T10:03:00.000Z'
+        })
+      ]
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue,
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(refetchTrackedIssues).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-completed-history')).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_completed'
+    });
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-ignored-history')).toMatchObject({
+      state: 'ignored',
+      reason: 'provider_issue_ignored'
+    });
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-handoff-failed-history')).toMatchObject({
+      state: 'handoff_failed',
+      reason: 'provider_issue_start_failed:old worker failure'
+    });
+  });
+
   it('still admits unrelated runnable work through fresh discovery when deferred-poll retained claims are not all released', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
@@ -3387,6 +3499,82 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
     expect(state.claims.find((claim) => claim.issue_id === 'lin-ready-blocked-by-foreign')).toBeUndefined();
+  });
+
+  it('counts duplicate live workers for the same issue by run identity before normal fresh dispatch', async () => {
+    const { root, paths } = await createHostPaths();
+    for (const suffix of ['a', 'b']) {
+      const activePaths = resolveRunPaths(
+        {
+          repoRoot: root,
+          runsRoot: join(root, '.runs'),
+          outRoot: join(root, 'out'),
+          taskId: `task-duplicate-active-${suffix}`
+        },
+        `run-duplicate-active-${suffix}`
+      );
+      await mkdir(activePaths.runDir, { recursive: true });
+      await writeFile(
+        activePaths.manifestPath,
+        JSON.stringify({
+          run_id: `run-duplicate-active-${suffix}`,
+          task_id: `task-duplicate-active-${suffix}`,
+          pipeline_id: 'provider-linear-worker',
+          status: 'in_progress',
+          issue_provider: 'linear',
+          issue_id: 'lin-duplicate-active',
+          issue_identifier: 'CO-181Q',
+          issue_updated_at: '2026-04-14T10:22:00.000Z',
+          updated_at: `2026-04-14T10:22:0${suffix === 'a' ? '1' : '2'}.000Z`
+        }),
+        'utf8'
+      );
+    }
+
+    const state = createProviderIntakeState();
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-should-not-start-duplicate',
+        manifestPath: '/tmp/provider-run/should-not-start-duplicate-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async (input: { provider: 'linear'; issueId: string }) => {
+      throw new Error(`unexpected issue-by-id sweep for ${input.issueId}`);
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 2
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-ready-blocked-by-duplicates',
+          identifier: 'CO-181R',
+          title: 'Ready issue blocked by duplicate live workers',
+          state: 'Ready',
+          state_type: 'unstarted',
+          updated_at: '2026-04-14T10:23:00.000Z'
+        })
+      ]
+    });
+
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-ready-blocked-by-duplicates')).toBeUndefined();
   });
 
   it('counts synthetic starting claims before normal fresh dispatch', async () => {
