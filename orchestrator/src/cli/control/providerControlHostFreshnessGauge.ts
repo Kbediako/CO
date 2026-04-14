@@ -161,14 +161,6 @@ const ACTIVE_CLAIM_STATES = new Set([
   'running'
 ]);
 
-const TERMINAL_CLAIM_STATES = new Set([
-  'completed',
-  'released',
-  'stale',
-  'duplicate',
-  'ignored'
-]);
-
 const TERMINAL_MANIFEST_STATUSES = new Set([
   'cancelled',
   'canceled',
@@ -1162,8 +1154,7 @@ function childLaneParentKey(proof: ProofArtifact): string {
 }
 
 function readState(record: Record<string, unknown>): string {
-  const state = normalizeOptionalString(record.state)?.toLowerCase() ?? 'unknown';
-  return TERMINAL_CLAIM_STATES.has(state) || ACTIVE_CLAIM_STATES.has(state) ? state : state;
+  return normalizeOptionalString(record.state)?.toLowerCase() ?? 'unknown';
 }
 
 function selectLatestJsonArtifact(artifacts: JsonArtifact[]): JsonArtifact | null {

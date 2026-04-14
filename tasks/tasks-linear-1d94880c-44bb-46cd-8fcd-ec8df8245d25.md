@@ -24,6 +24,7 @@
 - [x] Required validation floor passed after the latest missing-evidence P2 review fixes: `npx tsc -p tsconfig.build.json --noEmit --pretty false`, `npm run build`, `npm run lint`, `npm run test` (340 files / 3849 tests), `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run docs:check`, `npm run docs:freshness`, `npm run repo:stewardship`, `DIFF_BUDGET_OVERRIDE_REASON=... node scripts/diff-budget.mjs`, and `npm run pack:smoke`.
 - [x] Manifest-backed standalone review rerun after final P2 fixes. Evidence: `.runs/linear-1d94880c-44bb-46cd-8fcd-ec8df8245d25/cli/2026-04-14T07-50-37-426Z-aadb2487/review/telemetry.json` reported `status=succeeded`, `review_outcome=bounded-success`, and `termination_boundary.kind=command-intent`; saved output contained no formal actionable P0-P3 findings.
 - [x] Final elegance/minimality pass completed after the review rerun. Evidence: final missing-evidence fixes stayed local to refresh/proof evaluation and focused fixtures; no avoidable abstraction or unrelated scope kept.
+- [x] Final PR feedback cleanup passed local validation. Evidence: CodeRabbit `readState` simplification applied without behavior change; invalid `--now` strictness was already present and covered; `npx vitest run orchestrator/tests/ProviderControlHostFreshnessGauge.test.ts`, `npx tsc -p tsconfig.build.json --noEmit --pretty false`, `npm run build`, `npm run lint`, and `npm run test` (340 files / 3849 tests) passed.
 
 ## Handoff
 - [x] PR attached to the Linear issue before review-state transition. Evidence: PR #474 / Linear attachment `59ef361b-66f7-4b56-99d1-2c0ffb52c36b`.
@@ -45,6 +46,7 @@
 - 2026-04-14: Addressed standalone-review P2 findings by excluding intake top-level `updated_at` from refresh-success candidates, selecting nested `rate_limits.linear_budget` from combined CO STATUS datasets, and excluding retry states from active/queued claim checks while keeping retry/backoff metrics; reran focused gauge tests, TypeScript, build, lint, full tests, guards, docs checks, stewardship, diff budget, and pack smoke.
 - 2026-04-14: Addressed follow-up standalone-review P2 findings by rejecting failed polling completions as successful refresh evidence and reporting `unknown` when a running intake claim lacks matching active worker proof; added focused regressions and reran focused gauge tests, TypeScript, build, lint, full tests, guards, docs checks, stewardship, diff budget, and pack smoke.
 - 2026-04-14: Reran manifest-backed standalone review after final P2 fixes; wrapper completed with `review_outcome=bounded-success` via `command-intent` retry boundary and no formal actionable findings in the saved output. Manual elegance pass kept the final changes narrow.
+- 2026-04-14: Addressed final CodeRabbit minor feedback by simplifying `readState`; verified the existing invalid-`--now` regression and unknown/start-to-heartbeat threads as already fixed; reran focused gauge tests, TypeScript, build, lint, and the full test suite.
 
 ## Relevant Files
 - `docs/PRD-linear-1d94880c-44bb-46cd-8fcd-ec8df8245d25.md`
