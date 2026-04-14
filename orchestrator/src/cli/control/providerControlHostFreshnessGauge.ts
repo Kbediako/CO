@@ -617,7 +617,7 @@ function evaluateClaimToStartLatency(
   const candidates = claims.flatMap((claim) => {
     const acceptedAt = timestampMs(claim.accepted_at);
     const runId = normalizeOptionalString(claim.run_id);
-    const manifest = runId ? manifests.find((entry) => readString(entry.value.run_id) === runId) : null;
+    const manifest = runId ? findLatestManifestForRunId(manifests, runId) : null;
     const startedAt =
       timestampMs(claim.launch_started_at) ??
       timestampMs(manifest?.value.started_at) ??
@@ -1081,9 +1081,16 @@ function findManifestForProof(proof: ProofArtifact, manifests: ManifestArtifact[
   const proofRunId = normalizeOptionalString(proof.value.run_id);
   if (proofRunId) {
     const runMatches = manifests.filter((manifest) => normalizeOptionalString(manifest.value.run_id) === proofRunId);
-    return runMatches.find((manifest) => manifest.runDir === proof.runDir) ?? runMatches[0] ?? null;
+    const directoryMatches = runMatches.filter((manifest) => manifest.runDir === proof.runDir);
+    return selectLatestManifestArtifact(directoryMatches) ?? selectLatestManifestArtifact(runMatches);
   }
-  return manifests.find((manifest) => manifest.runDir === proof.runDir) ?? null;
+  return selectLatestManifestArtifact(manifests.filter((manifest) => manifest.runDir === proof.runDir));
+}
+
+function findLatestManifestForRunId(manifests: ManifestArtifact[], runId: string): ManifestArtifact | null {
+  return selectLatestManifestArtifact(
+    manifests.filter((manifest) => normalizeOptionalString(manifest.value.run_id) === runId)
+  );
 }
 
 function resolveProofRunId(proof: ProofArtifact): string | null {
@@ -1157,6 +1164,10 @@ function selectLatestJsonArtifact(artifacts: JsonArtifact[]): JsonArtifact | nul
     return null;
   }
   return [...artifacts].sort(compareJsonArtifactsByFreshness).at(-1) ?? null;
+}
+
+function selectLatestManifestArtifact(manifests: ManifestArtifact[]): ManifestArtifact | null {
+  return [...manifests].sort(compareJsonArtifactsByFreshness).at(-1) ?? null;
 }
 
 function compareJsonArtifactsByFreshness(left: JsonArtifact, right: JsonArtifact): number {
@@ -1318,10 +1329,6 @@ function latestTimestampMs(...values: (number | null | undefined)[]): number | n
 
 function finiteNumber(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
-
-function readString(value: unknown): string | null {
-  return normalizeOptionalString(value);
 }
 
 function normalizeOptionalString(value: unknown): string | null {

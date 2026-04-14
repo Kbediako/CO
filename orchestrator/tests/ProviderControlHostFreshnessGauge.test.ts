@@ -245,6 +245,48 @@ describe('provider/control-host freshness gauge', () => {
     expect(reverse.metrics.last_successful_refresh_age_ms.source_path).toBe(healthyPath);
   });
 
+  it('selects duplicate run-id manifests deterministically by freshness', async () => {
+    const fixtureRoot = join(FIXTURE_ROOT, 'duplicate-run-id-manifests');
+    const intakePath = join(fixtureRoot, 'provider-intake-state.json');
+    const proofPath = join(fixtureRoot, 'proofs/provider-linear-worker-proof.json');
+    const oldManifestPath = join(fixtureRoot, 'manifests/a-old/manifest.json');
+    const currentManifestPath = join(fixtureRoot, 'manifests/z-current/manifest.json');
+
+    const forward = await evaluateProviderControlHostFreshnessGauge({
+      paths: {
+        provider_intake_state: [intakePath],
+        provider_manifests: [oldManifestPath, currentManifestPath],
+        provider_proofs: [proofPath]
+      },
+      now: NOW,
+      strict: true
+    });
+    const reverse = await evaluateProviderControlHostFreshnessGauge({
+      paths: {
+        provider_intake_state: [intakePath],
+        provider_manifests: [currentManifestPath, oldManifestPath],
+        provider_proofs: [proofPath]
+      },
+      now: NOW,
+      strict: true
+    });
+
+    expect(forward.verdict).toBe('healthy');
+    expect(reverse.verdict).toBe('healthy');
+    expect(forward.metrics.claim_to_start_latency_ms).toMatchObject({
+      value: 20_000,
+      verdict: 'healthy',
+      source_path: currentManifestPath
+    });
+    expect(reverse.metrics.claim_to_start_latency_ms).toMatchObject({
+      value: 20_000,
+      verdict: 'healthy',
+      source_path: currentManifestPath
+    });
+    expect(forward.findings.map((finding) => finding.code)).not.toContain('active_worker_proof_missing');
+    expect(reverse.findings.map((finding) => finding.code)).not.toContain('active_worker_proof_missing');
+  });
+
   it('scopes launch and heartbeat latency to active claims and proofs', async () => {
     const report = await evaluateProviderControlHostFreshnessGauge({
       artifactRoot: join(FIXTURE_ROOT, 'active-scope-latencies'),
