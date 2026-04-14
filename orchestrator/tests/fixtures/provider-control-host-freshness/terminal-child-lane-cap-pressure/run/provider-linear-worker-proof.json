@@ -1,0 +1,18 @@
+{
+  "run_id": "terminal-child-parent",
+  "owner_phase": "ended",
+  "owner_status": "succeeded",
+  "updated_at": "2026-04-14T05:59:00.000Z",
+  "child_lanes": [
+    {
+      "stream": "terminal-a",
+      "decision": "parallelize_now",
+      "status": "running"
+    },
+    {
+      "stream": "terminal-b",
+      "decision": "parallelize_now",
+      "status": "running"
+    }
+  ]
+}

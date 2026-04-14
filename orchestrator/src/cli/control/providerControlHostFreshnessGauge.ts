@@ -193,7 +193,7 @@ export async function evaluateProviderControlHostFreshnessGauge(
   const manifests = artifacts.providerManifests;
   const proofs = artifacts.providerProofs.map((proof) => ({
     ...proof,
-    manifest: manifests.find((manifest) => manifest.runDir === proof.runDir) ?? null
+    manifest: findManifestForProof(proof, manifests)
   }));
   const pollingHealth = selectPollingHealthArtifact({
     explicit: artifacts.pollingHealth,
@@ -887,7 +887,8 @@ function evaluateChildLaneCapPressure(
   thresholds: ProviderControlHostFreshnessGaugeThresholds,
   findings: ProviderControlHostFreshnessGaugeFinding[]
 ): ProviderControlHostFreshnessGaugeMetric<number> {
-  const lanes = proofs.flatMap((proof) =>
+  const activeProofs = proofs.filter(isActiveProof);
+  const lanes = activeProofs.flatMap((proof) =>
     collectArrayRecords(proof.value.child_lanes).map((lane) => ({ lane, proof }))
   );
   const activeByParent = new Map<string, { count: number; proof: ProofArtifact }>();
@@ -904,7 +905,7 @@ function evaluateChildLaneCapPressure(
   }
   const buckets = [...activeByParent.values()];
   if (buckets.length === 0) {
-    return metric(0, 'ratio', 'healthy', proofs[0]?.path ?? null, 'child_lanes', null);
+    return metric(0, 'ratio', 'healthy', activeProofs[0]?.path ?? proofs[0]?.path ?? null, 'child_lanes', null);
   }
   const busiest = buckets.reduce((winner, bucket) => bucket.count > winner.count ? bucket : winner);
   const pressure = thresholds.childLaneCap > 0 ? busiest.count / thresholds.childLaneCap : busiest.count;
@@ -1034,6 +1035,15 @@ function selectLinearBudgetArtifact(input: {
     nestedJsonArtifact(input.statusDataset, 'polling.linear_budget') ??
     selectLatestJsonArtifact(proofBudgets)
   );
+}
+
+function findManifestForProof(proof: ProofArtifact, manifests: ManifestArtifact[]): ManifestArtifact | null {
+  const proofRunId = normalizeOptionalString(proof.value.run_id);
+  if (proofRunId) {
+    const runMatches = manifests.filter((manifest) => normalizeOptionalString(manifest.value.run_id) === proofRunId);
+    return runMatches.find((manifest) => manifest.runDir === proof.runDir) ?? runMatches[0] ?? null;
+  }
+  return manifests.find((manifest) => manifest.runDir === proof.runDir) ?? null;
 }
 
 function collectClaims(intakeState: JsonArtifact | null): Record<string, unknown>[] {

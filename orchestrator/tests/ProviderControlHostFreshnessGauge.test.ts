@@ -188,6 +188,35 @@ describe('provider/control-host freshness gauge', () => {
     expect(report.findings.map((finding) => finding.code)).not.toContain('child_lane_cap_pressure');
   });
 
+  it('matches explicitly supplied proofs and manifests by run id across artifact directories', async () => {
+    const fixtureRoot = join(FIXTURE_ROOT, 'separate-manifest-proof-run-id');
+    const report = await evaluateProviderControlHostFreshnessGauge({
+      now: NOW,
+      strict: true,
+      paths: {
+        provider_intake_state: [join(fixtureRoot, 'provider-intake-state.json')],
+        provider_manifests: [join(fixtureRoot, 'manifests/manifest.json')],
+        provider_proofs: [join(fixtureRoot, 'proofs/provider-linear-worker-proof.json')]
+      }
+    });
+
+    expect(report.verdict).toBe('contradictory');
+    expect(report.strict_failed).toBe(true);
+    expect(report.metrics.terminal_reconciliation_lag_ms.source_path).toContain('provider-linear-worker-proof.json');
+    expect(report.findings.map((finding) => finding.code)).toContain('terminal_proof_with_active_claim');
+  });
+
+  it('excludes terminal proofs from child-lane cap pressure', async () => {
+    const report = await evaluateProviderControlHostFreshnessGauge({
+      artifactRoot: join(FIXTURE_ROOT, 'terminal-child-lane-cap-pressure'),
+      now: NOW
+    });
+
+    expect(report.verdict).toBe('healthy');
+    expect(report.metrics.child_lane_cap_pressure.value).toBe(0);
+    expect(report.findings.map((finding) => finding.code)).not.toContain('child_lane_cap_pressure');
+  });
+
   it('rejects invalid now values instead of using wall-clock time', async () => {
     await expect(evaluateProviderControlHostFreshnessGauge({
       artifactRoot: join(FIXTURE_ROOT, 'healthy'),
