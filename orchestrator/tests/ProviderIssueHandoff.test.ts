@@ -24,6 +24,7 @@ import { resolveRunPaths } from '../src/cli/run/runPaths.js';
 import { resolveProviderWorkspacePath } from '../src/cli/run/workspacePath.js';
 import {
   normalizeProviderIntakeState,
+  type ProviderIntakeClaimRecord,
   type ProviderIntakeState
 } from '../src/cli/control/providerIntakeState.js';
 import {
@@ -109,6 +110,39 @@ function createProviderIntakeState(): ProviderIntakeState {
     latest_provider_key: null,
     latest_reason: null,
     claims: []
+  };
+}
+
+function createProviderClaim(
+  overrides: Partial<ProviderIntakeClaimRecord> & Pick<ProviderIntakeClaimRecord, 'issue_id'>
+): ProviderIntakeClaimRecord {
+  const issueId = overrides.issue_id;
+  return {
+    provider: 'linear',
+    provider_key: `linear:${issueId}`,
+    issue_id: issueId,
+    issue_identifier: 'CO-2',
+    issue_title: 'Provider issue',
+    issue_state: 'In Progress',
+    issue_state_type: 'started',
+    issue_updated_at: '2026-04-14T09:00:00.000Z',
+    issue_archived_at: null,
+    issue_trashed: false,
+    task_id: `task-${issueId}`,
+    mapping_source: 'provider_id_fallback',
+    state: 'accepted',
+    reason: null,
+    accepted_at: '2026-04-14T09:00:05.000Z',
+    updated_at: '2026-04-14T09:00:10.000Z',
+    last_delivery_id: null,
+    last_event: 'Issue',
+    last_action: 'update',
+    last_webhook_timestamp: null,
+    run_id: null,
+    run_manifest_path: null,
+    launch_source: null,
+    launch_token: null,
+    ...overrides
   };
 }
 
@@ -2812,58 +2846,31 @@ describe('createProviderIssueHandoffService', () => {
   it('still admits unrelated runnable work through fresh discovery when retained deferred-poll claims are fully released', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
-    state.claims.push({
-      provider: 'linear',
-      provider_key: 'linear:lin-issue-released-a',
-      issue_id: 'lin-issue-released-a',
-      issue_identifier: 'CO-1610',
-      issue_title: 'Released inactive claim',
-      issue_state: 'Done',
-      issue_state_type: 'completed',
-      issue_updated_at: '2026-04-13T10:00:00.000Z',
-      issue_archived_at: null,
-      issue_trashed: false,
-      task_id: 'task-released-a',
-      mapping_source: 'provider_id_fallback',
-      state: 'released',
-      reason: 'provider_issue_released:not_active',
-      accepted_at: '2026-04-13T10:00:05.000Z',
-      updated_at: '2026-04-13T10:00:10.000Z',
-      last_delivery_id: 'delivery-released-a',
-      last_event: 'Issue',
-      last_action: 'update',
-      last_webhook_timestamp: 1_744_531_200_000,
-      run_id: null,
-      run_manifest_path: null,
-      launch_source: null,
-      launch_token: null
-    });
-    state.claims.push({
-      provider: 'linear',
-      provider_key: 'linear:lin-issue-released-b',
-      issue_id: 'lin-issue-released-b',
-      issue_identifier: 'CO-1611',
-      issue_title: 'Released not-mutable claim',
-      issue_state: 'In Review',
-      issue_state_type: 'started',
-      issue_updated_at: '2026-04-13T10:01:00.000Z',
-      issue_archived_at: '2026-04-13T09:59:00.000Z',
-      issue_trashed: true,
-      task_id: 'task-released-b',
-      mapping_source: 'provider_id_fallback',
-      state: 'released',
-      reason: 'provider_issue_released:not_mutable',
-      accepted_at: '2026-04-13T10:01:05.000Z',
-      updated_at: '2026-04-13T10:01:10.000Z',
-      last_delivery_id: 'delivery-released-b',
-      last_event: 'Issue',
-      last_action: 'update',
-      last_webhook_timestamp: 1_744_531_260_000,
-      run_id: null,
-      run_manifest_path: null,
-      launch_source: null,
-      launch_token: null
-    });
+    state.claims.push(
+      createProviderClaim({
+        issue_id: 'lin-issue-released-a',
+        issue_identifier: 'CO-1610',
+        issue_title: 'Released inactive claim',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        issue_updated_at: '2026-04-13T10:00:00.000Z',
+        task_id: 'task-released-a',
+        state: 'released',
+        reason: 'provider_issue_released:not_active'
+      }),
+      createProviderClaim({
+        issue_id: 'lin-issue-released-b',
+        issue_identifier: 'CO-1611',
+        issue_title: 'Released not-mutable claim',
+        issue_state: 'In Review',
+        issue_updated_at: '2026-04-13T10:01:00.000Z',
+        issue_archived_at: '2026-04-13T09:59:00.000Z',
+        issue_trashed: true,
+        task_id: 'task-released-b',
+        state: 'released',
+        reason: 'provider_issue_released:not_mutable'
+      })
+    );
 
     const persist = vi.fn(async () => undefined);
     const launcher = {
@@ -2956,6 +2963,731 @@ describe('createProviderIssueHandoffService', () => {
     expect(state.claims.find((claim) => claim.issue_id === 'lin-issue-released-b')).toMatchObject({
       state: 'released',
       reason: 'provider_issue_released:not_mutable'
+    });
+  });
+
+  it('admits unrelated Ready work after bounded active issue-by-id checks when two active claims leave one free slot', async () => {
+    const { root, paths } = await createHostPaths();
+    const firstActivePaths = resolveRunPaths(
+      {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'task-active-a'
+      },
+      'run-active-a'
+    );
+    const secondActivePaths = resolveRunPaths(
+      {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'task-active-b'
+      },
+      'run-active-b'
+    );
+    await mkdir(firstActivePaths.runDir, { recursive: true });
+    await mkdir(secondActivePaths.runDir, { recursive: true });
+    await writeFile(
+      firstActivePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-active-a',
+        task_id: 'task-active-a',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-active-a',
+        issue_identifier: 'CO-177',
+        issue_updated_at: '2026-04-14T09:00:00.000Z',
+        updated_at: '2026-04-14T09:20:00.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      secondActivePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-active-b',
+        task_id: 'task-active-b',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-active-b',
+        issue_identifier: 'CO-178',
+        issue_updated_at: '2026-04-14T09:01:00.000Z',
+        updated_at: '2026-04-14T09:21:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(
+      createProviderClaim({
+        issue_id: 'lin-active-a',
+        issue_identifier: 'CO-177',
+        issue_title: 'Active worker A',
+        issue_state: null,
+        issue_state_type: null,
+        task_id: 'task-active-a',
+        state: 'running',
+        reason: 'provider_issue_handoff_owned',
+        updated_at: '2026-04-14T09:20:00.000Z',
+        run_id: 'run-active-a',
+        run_manifest_path: firstActivePaths.manifestPath
+      }),
+      createProviderClaim({
+        issue_id: 'lin-active-b',
+        issue_identifier: 'CO-178',
+        issue_title: 'Active worker B',
+        issue_state: null,
+        issue_state_type: null,
+        issue_updated_at: '2026-04-14T09:01:00.000Z',
+        task_id: 'task-active-b',
+        state: 'running',
+        reason: 'provider_issue_handoff_owned',
+        updated_at: '2026-04-14T09:21:00.000Z',
+        run_id: 'run-active-b',
+        run_manifest_path: secondActivePaths.manifestPath
+      }),
+      createProviderClaim({
+        issue_id: 'lin-released-residue',
+        issue_identifier: 'CO-161',
+        issue_title: 'Released residue',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        issue_updated_at: '2026-04-14T08:00:00.000Z',
+        task_id: 'task-released-residue',
+        state: 'released',
+        reason: 'provider_issue_released:not_active'
+      }),
+      createProviderClaim({
+        issue_id: 'lin-retained-ready',
+        issue_identifier: 'CO-181G',
+        issue_title: 'Retained Ready claim',
+        issue_state: 'Ready',
+        issue_state_type: 'unstarted',
+        issue_updated_at: '2026-04-14T09:10:00.000Z',
+        task_id: 'task-retained-ready',
+        state: 'handoff_failed',
+        reason: 'provider_issue_start_failed:worker host at capacity'
+      })
+    );
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-ready-fresh',
+        manifestPath: '/tmp/provider-run/ready-fresh-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async (input: { provider: 'linear'; issueId: string }) => {
+      if (input.issueId === 'lin-active-a') {
+        return {
+          kind: 'ready' as const,
+          trackedIssue: createTrackedIssue({
+            id: 'lin-active-a',
+            identifier: 'CO-177',
+            title: 'Active worker A',
+            state: 'In Progress',
+            state_type: 'started',
+            updated_at: '2026-04-14T09:00:00.000Z'
+          })
+        };
+      }
+      if (input.issueId === 'lin-active-b') {
+        return {
+          kind: 'ready' as const,
+          trackedIssue: createTrackedIssue({
+            id: 'lin-active-b',
+            identifier: 'CO-178',
+            title: 'Active worker B',
+            state: 'In Progress',
+            state_type: 'started',
+            updated_at: '2026-04-14T09:01:00.000Z'
+          })
+        };
+      }
+      throw new Error(`unexpected issue-by-id sweep for ${input.issueId}`);
+    });
+    const refetchTrackedIssues = vi.fn(async (input?: {
+      mode?: string;
+      eligibleTargetCount?: number;
+      excludedIssueIds?: string[];
+    }) => {
+      if (input?.mode === 'fresh_discovery') {
+        return {
+          kind: 'ready' as const,
+          trackedIssues: [
+            createTrackedIssue({
+              id: 'lin-ready-fresh',
+              identifier: 'CO-180',
+              title: 'Fresh Ready issue',
+              state: 'Ready',
+              state_type: 'unstarted',
+              updated_at: '2026-04-14T09:30:00.000Z'
+            })
+          ]
+        };
+      }
+      return {
+        kind: 'ready' as const,
+        trackedIssues: []
+      };
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 3,
+          max_concurrent_agents_by_state: {
+            Ready: 1,
+            'In Progress': 2
+          }
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue.mock.calls).toEqual([
+      [{ provider: 'linear', issueId: 'lin-active-a' }],
+      [{ provider: 'linear', issueId: 'lin-active-b' }]
+    ]);
+    expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(refetchTrackedIssues.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        mode: 'fresh_discovery',
+        eligibleTargetCount: 1,
+        excludedIssueIds: expect.arrayContaining([
+          'lin-active-a',
+          'lin-active-b',
+          'lin-released-residue',
+          'lin-retained-ready'
+        ])
+      })
+    );
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-ready-fresh',
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-ready-fresh',
+      issueIdentifier: 'CO-180',
+      issueUpdatedAt: '2026-04-14T09:30:00.000Z',
+      launchToken: expect.any(String)
+    }));
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-active-a')).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: 'run-active-a',
+      run_manifest_path: firstActivePaths.manifestPath
+    });
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-active-b')).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: 'run-active-b',
+      run_manifest_path: secondActivePaths.manifestPath
+    });
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-released-residue')).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active'
+    });
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-retained-ready')).toMatchObject({
+      state: 'handoff_failed',
+      reason: 'provider_issue_start_failed:worker host at capacity'
+    });
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-ready-fresh')).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-14T09:30:00.000Z',
+      run_id: 'run-ready-fresh',
+      run_manifest_path: '/tmp/provider-run/ready-fresh-manifest.json'
+    });
+  });
+
+  it('preserves the last Ready state slot for unrelated fresh discovery before retained direct launches', async () => {
+    const { root, paths } = await createHostPaths();
+    const activePaths = resolveRunPaths(
+      {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'task-active-state-cap'
+      },
+      'run-active-state-cap'
+    );
+    await mkdir(activePaths.runDir, { recursive: true });
+    await writeFile(
+      activePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-active-state-cap',
+        task_id: 'task-active-state-cap',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-active-state-cap',
+        issue_identifier: 'CO-181H',
+        issue_updated_at: '2026-04-14T10:00:00.000Z',
+        updated_at: '2026-04-14T10:10:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(
+      createProviderClaim({
+        issue_id: 'lin-active-state-cap',
+        issue_identifier: 'CO-181H',
+        issue_title: 'Active In Progress worker',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-14T10:00:00.000Z',
+        task_id: 'task-active-state-cap',
+        state: 'running',
+        reason: 'provider_issue_handoff_owned',
+        run_id: 'run-active-state-cap',
+        run_manifest_path: activePaths.manifestPath
+      }),
+      createProviderClaim({
+        issue_id: 'lin-retained-ready-state-cap',
+        issue_identifier: 'CO-181I',
+        issue_title: 'Retained Ready state-cap claim',
+        issue_state: 'Ready',
+        issue_state_type: 'unstarted',
+        issue_updated_at: '2026-04-14T10:05:00.000Z',
+        task_id: 'task-retained-ready-state-cap',
+        state: 'handoff_failed',
+        reason: 'provider_issue_start_failed:worker host at capacity'
+      })
+    );
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-fresh-state-cap',
+        manifestPath: '/tmp/provider-run/fresh-state-cap-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async (input: { provider: 'linear'; issueId: string }) => {
+      if (input.issueId === 'lin-retained-ready-state-cap') {
+        return {
+          kind: 'ready' as const,
+          trackedIssue: createTrackedIssue({
+            id: 'lin-retained-ready-state-cap',
+            identifier: 'CO-181I',
+            title: 'Retained Ready state-cap claim',
+            state: 'Ready',
+            state_type: 'unstarted',
+            updated_at: '2026-04-14T10:05:30.000Z'
+          })
+        };
+      }
+      throw new Error(`unexpected issue-by-id sweep for ${input.issueId}`);
+    });
+    const refetchTrackedIssues = vi.fn(async (input?: {
+      mode?: string;
+      eligibleTargetCount?: number;
+      eligibleStateSlotCounts?: Record<string, number>;
+      excludedIssueIds?: string[];
+    }) => {
+      if (input?.mode === 'fresh_discovery') {
+        return {
+          kind: 'ready' as const,
+          trackedIssues: [
+            createTrackedIssue({
+              id: 'lin-retained-ready-state-cap',
+              identifier: 'CO-181I',
+              title: 'Retained Ready state-cap claim',
+              state: 'Ready',
+              state_type: 'unstarted',
+              updated_at: '2026-04-14T10:05:30.000Z'
+            }),
+            createTrackedIssue({
+              id: 'lin-fresh-ready-state-cap',
+              identifier: 'CO-181J',
+              title: 'Fresh Ready state-cap claim',
+              state: 'Ready',
+              state_type: 'unstarted',
+              updated_at: '2026-04-14T10:06:00.000Z'
+            })
+          ]
+        };
+      }
+      return {
+        kind: 'ready' as const,
+        trackedIssues: []
+      };
+    });
+
+    const activeTrackedIssue = createTrackedIssue({
+      id: 'lin-active-state-cap',
+      identifier: 'CO-181H',
+      title: 'Active In Progress worker',
+      state: 'In Progress',
+      state_type: 'started',
+      updated_at: '2026-04-14T10:00:00.000Z'
+    });
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 3,
+          max_concurrent_agents_by_state: {
+            Ready: 1,
+            'In Progress': 1
+          }
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [activeTrackedIssue],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue.mock.calls).toEqual([
+      [{ provider: 'linear', issueId: 'lin-retained-ready-state-cap' }]
+    ]);
+    expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(refetchTrackedIssues.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        mode: 'fresh_discovery',
+        eligibleTargetCount: 2,
+        eligibleStateSlotCounts: expect.objectContaining({
+          ready: 1,
+          'in progress': 0
+        }),
+        excludedIssueIds: expect.arrayContaining([
+          'lin-active-state-cap',
+          'lin-retained-ready-state-cap'
+        ])
+      })
+    );
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-fresh-ready-state-cap',
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-fresh-ready-state-cap',
+      issueIdentifier: 'CO-181J',
+      issueUpdatedAt: '2026-04-14T10:06:00.000Z',
+      launchToken: expect.any(String)
+    }));
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-retained-ready-state-cap')).toMatchObject({
+      state: 'handoff_failed',
+      reason: 'provider_issue_start_failed:worker host at capacity',
+      run_id: null,
+      run_manifest_path: null
+    });
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-fresh-ready-state-cap')).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      run_id: 'run-fresh-state-cap',
+      run_manifest_path: '/tmp/provider-run/fresh-state-cap-manifest.json'
+    });
+  });
+
+  it('does not let a stale starting release occupy the slot before fresh discovery', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-14T09:40:00.000Z'));
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(
+      createProviderClaim({
+        issue_id: 'lin-stale-starting',
+        issue_identifier: 'CO-181A',
+        issue_title: 'Stale starting claim',
+        issue_updated_at: '2026-04-14T09:39:00.000Z',
+        task_id: 'task-stale-starting',
+        state: 'starting',
+        reason: 'provider_issue_start_launched',
+        accepted_at: '2026-04-14T09:39:50.000Z',
+        updated_at: '2026-04-14T09:39:55.000Z'
+      }),
+      createProviderClaim({
+        issue_id: 'lin-stale-starting-extra',
+        issue_identifier: 'CO-181C',
+        issue_title: 'Extra stale starting claim',
+        issue_updated_at: '2026-04-14T09:38:00.000Z',
+        task_id: 'task-stale-starting-extra',
+        state: 'starting',
+        reason: 'provider_issue_start_launched',
+        accepted_at: '2026-04-14T09:38:50.000Z',
+        updated_at: '2026-04-14T09:38:55.000Z'
+      })
+    );
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-fresh-after-release',
+        manifestPath: '/tmp/provider-run/fresh-after-release-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async (input: { provider: 'linear'; issueId: string }) => {
+      if (input.issueId === 'lin-stale-starting') {
+        return {
+          kind: 'ready' as const,
+          trackedIssue: createTrackedIssue({
+            id: 'lin-stale-starting',
+            identifier: 'CO-181A',
+            title: 'Stale starting claim',
+            state: 'Done',
+            state_type: 'completed',
+            updated_at: '2026-04-14T09:40:00.000Z'
+          })
+        };
+      }
+      throw new Error(`unexpected issue-by-id sweep for ${input.issueId}`);
+    });
+    const refetchTrackedIssues = vi.fn(async (input?: {
+      mode?: string;
+      eligibleTargetCount?: number;
+      excludedIssueIds?: string[];
+    }) => {
+      if (input?.mode === 'fresh_discovery') {
+        return {
+          kind: 'ready' as const,
+          trackedIssues: [
+            createTrackedIssue({
+              id: 'lin-ready-after-release',
+              identifier: 'CO-181B',
+              title: 'Fresh Ready after release',
+              state: 'Ready',
+              state_type: 'unstarted',
+              updated_at: '2026-04-14T09:40:01.000Z'
+            })
+          ]
+        };
+      }
+      return {
+        kind: 'ready' as const,
+        trackedIssues: []
+      };
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 2
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue.mock.calls).toEqual([
+      [{ provider: 'linear', issueId: 'lin-stale-starting' }]
+    ]);
+    expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(refetchTrackedIssues.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        mode: 'fresh_discovery',
+        eligibleTargetCount: 2
+      })
+    );
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-ready-after-release',
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-ready-after-release',
+      issueIdentifier: 'CO-181B',
+      issueUpdatedAt: '2026-04-14T09:40:01.000Z',
+      launchToken: expect.any(String)
+    }));
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-stale-starting')).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active'
+    });
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-stale-starting-extra')).toMatchObject({
+      state: 'handoff_failed',
+      reason: 'provider_issue_rehydration_timeout'
+    });
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-ready-after-release')).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      run_id: 'run-fresh-after-release',
+      run_manifest_path: '/tmp/provider-run/fresh-after-release-manifest.json'
+    });
+  });
+
+  it('does not let a deferred retry-owned claim bypass its retry deadline through fresh discovery', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(
+      createProviderClaim({
+        issue_id: 'lin-retry-primer',
+        issue_identifier: 'CO-181D',
+        issue_title: 'Retry primer claim',
+        issue_state: 'Ready',
+        issue_state_type: 'unstarted',
+        issue_updated_at: '2026-04-14T10:20:00.000Z',
+        task_id: 'task-retry-primer',
+        state: 'handoff_failed',
+        reason: 'provider_issue_start_failed:worker host at capacity',
+        updated_at: '2026-04-14T10:20:10.000Z',
+        retry_queued: true,
+        retry_attempt: 1,
+        retry_due_at: '2026-04-14T10:30:00.000Z',
+        retry_error: 'worker host at capacity'
+      }),
+      createProviderClaim({
+        issue_id: 'lin-retry-deferred',
+        issue_identifier: 'CO-181E',
+        issue_title: 'Deferred retry owned claim',
+        issue_state: 'Ready',
+        issue_state_type: 'unstarted',
+        issue_updated_at: '2026-04-14T10:01:00.000Z',
+        task_id: 'task-retry-deferred',
+        state: 'handoff_failed',
+        reason: 'provider_issue_start_failed:worker host at capacity',
+        retry_queued: true,
+        retry_attempt: 1,
+        retry_due_at: '2026-04-14T10:30:00.000Z',
+        retry_error: 'worker host at capacity'
+      })
+    );
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-unrelated-ready',
+        manifestPath: '/tmp/provider-run/unrelated-ready-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async (input: { provider: 'linear'; issueId: string }) => {
+      if (input.issueId === 'lin-retry-primer') {
+        return {
+          kind: 'ready' as const,
+          trackedIssue: createTrackedIssue({
+            id: 'lin-retry-primer',
+            identifier: 'CO-181D',
+            title: 'Retry primer claim',
+            state: 'Ready',
+            state_type: 'unstarted',
+            updated_at: '2026-04-14T10:21:00.000Z'
+          })
+        };
+      }
+      throw new Error(`unexpected issue-by-id sweep for ${input.issueId}`);
+    });
+    const refetchTrackedIssues = vi.fn(async (input?: {
+      mode?: string;
+      eligibleTargetCount?: number;
+      excludedIssueIds?: string[];
+    }) => {
+      if (input?.mode === 'fresh_discovery') {
+        return {
+          kind: 'ready' as const,
+          trackedIssues: [
+            createTrackedIssue({
+              id: 'lin-retry-deferred',
+              identifier: 'CO-181E',
+              title: 'Deferred retry owned claim',
+              state: 'Ready',
+              state_type: 'unstarted',
+              updated_at: '2026-04-14T10:06:00.000Z'
+            }),
+            createTrackedIssue({
+              id: 'lin-unrelated-ready',
+              identifier: 'CO-181F',
+              title: 'Unrelated Ready claim',
+              state: 'Ready',
+              state_type: 'unstarted',
+              updated_at: '2026-04-14T10:06:01.000Z'
+            })
+          ]
+        };
+      }
+      return {
+        kind: 'ready' as const,
+        trackedIssues: []
+      };
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 2
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue.mock.calls).toEqual([
+      [{ provider: 'linear', issueId: 'lin-retry-primer' }]
+    ]);
+    expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(refetchTrackedIssues.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        mode: 'fresh_discovery',
+        eligibleTargetCount: 1,
+        excludedIssueIds: expect.arrayContaining(['lin-retry-primer', 'lin-retry-deferred'])
+      })
+    );
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-unrelated-ready',
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-unrelated-ready',
+      issueIdentifier: 'CO-181F',
+      issueUpdatedAt: '2026-04-14T10:06:01.000Z',
+      launchToken: expect.any(String)
+    }));
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-retry-deferred')).toMatchObject({
+      state: 'handoff_failed',
+      reason: 'provider_issue_start_failed:worker host at capacity',
+      retry_queued: true,
+      retry_attempt: 1,
+      retry_due_at: '2026-04-14T10:30:00.000Z'
+    });
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-unrelated-ready')).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      run_id: 'run-unrelated-ready',
+      run_manifest_path: '/tmp/provider-run/unrelated-ready-manifest.json'
     });
   });
 
