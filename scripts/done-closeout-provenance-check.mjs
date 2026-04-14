@@ -2,7 +2,7 @@
 
 import { createHash } from 'node:crypto';
 import { realpathSync } from 'node:fs';
-import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, realpath, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
@@ -188,6 +188,57 @@ async function pathExists(absPath) {
   }
 }
 
+function isInsidePath(root, candidate) {
+  const relative = path.relative(root, candidate);
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
+async function readCheckedRepoFile(repoRoot, pathName, report, issueSummary, options = {}) {
+  const {
+    missingCode,
+    missingMessage,
+    symlinkCode,
+    symlinkMessage,
+    nonFileCode,
+    nonFileMessage,
+    onMissing
+  } = options;
+  const absPath = path.resolve(repoRoot, pathName);
+  let realRepoRoot;
+  let realPath;
+  try {
+    [realRepoRoot, realPath] = await Promise.all([realpath(repoRoot), realpath(absPath)]);
+  } catch (error) {
+    if (error?.code !== 'ENOENT') {
+      throw error;
+    }
+    pushFailure(report, issueSummary, missingCode, `${missingMessage}: ${pathName}`, { path: pathName });
+    onMissing?.();
+    return null;
+  }
+
+  if (!isInsidePath(realRepoRoot, realPath)) {
+    pushFailure(report, issueSummary, symlinkCode, `${symlinkMessage}: ${pathName}`, {
+      path: pathName,
+      target: realPath
+    });
+    onMissing?.();
+    return null;
+  }
+
+  const targetStat = await stat(realPath);
+  if (!targetStat.isFile()) {
+    pushFailure(report, issueSummary, nonFileCode, `${nonFileMessage}: ${pathName}`, {
+      path: pathName,
+      target: realPath
+    });
+    onMissing?.();
+    return null;
+  }
+
+  return readFile(realPath, 'utf8');
+}
+
 async function loadJson(absPath, label) {
   const raw = await readFile(absPath, 'utf8');
   try {
@@ -354,16 +405,19 @@ function collectHashWaiverMismatches(pathName, rows, waivers) {
 }
 
 async function validateMirrorPath(repoRoot, report, issueSummary, pathName, waivers) {
-  const absPath = path.resolve(repoRoot, pathName);
-  if (!(await pathExists(absPath))) {
-    pushFailure(report, issueSummary, 'missing_mirror_path', `Mirror path is missing: ${pathName}`, {
-      path: pathName
-    });
-    issueSummary.missing_mirror_paths.push(pathName);
+  const content = await readCheckedRepoFile(repoRoot, pathName, report, issueSummary, {
+    missingCode: 'missing_mirror_path',
+    missingMessage: 'Mirror path is missing',
+    symlinkCode: 'mirror_path_symlink_escape',
+    symlinkMessage: 'Mirror path resolves outside the repository',
+    nonFileCode: 'mirror_path_non_file_target',
+    nonFileMessage: 'Mirror path is not a regular file',
+    onMissing: () => issueSummary.missing_mirror_paths.push(pathName)
+  });
+  if (content === null) {
     return;
   }
 
-  const content = await readFile(absPath, 'utf8');
   const pendingRows = collectPendingRows(content, { pathName, issueSummary });
   const hashWaiver = pendingRows.length > 0 ? findHashWaiver(pathName, pendingRows, waivers) : null;
   const mismatches = collectHashWaiverMismatches(pathName, pendingRows, waivers);
@@ -420,14 +474,17 @@ async function validateLocalCloseoutPointers(repoRoot, report, issueSummary, iss
   }
 
   for (const pointer of pointers) {
-    const absPath = path.resolve(repoRoot, pointer);
-    if (!(await pathExists(absPath))) {
-      pushFailure(report, issueSummary, 'missing_local_closeout_pointer', `Local closeout pointer is missing: ${pointer}`, {
-        path: pointer
-      });
+    const content = await readCheckedRepoFile(repoRoot, pointer, report, issueSummary, {
+      missingCode: 'missing_local_closeout_pointer',
+      missingMessage: 'Local closeout pointer is missing',
+      symlinkCode: 'local_closeout_pointer_symlink_escape',
+      symlinkMessage: 'Local closeout pointer resolves outside the repository',
+      nonFileCode: 'local_closeout_pointer_non_file_target',
+      nonFileMessage: 'Local closeout pointer is not a regular file'
+    });
+    if (content === null) {
       continue;
     }
-    const content = await readFile(absPath, 'utf8');
     if (!content.trim()) {
       pushFailure(report, issueSummary, 'empty_local_closeout_pointer', `Local closeout pointer is empty: ${pointer}`, {
         path: pointer
@@ -583,13 +640,14 @@ export async function runDoneCloseoutProvenanceCheck(repoRoot, options = {}) {
   report.ok = report.failures.length === 0;
   report.status = report.ok ? 'succeeded' : 'failed';
 
-  const reportPath = options.reportPath
-    ? normalizeRepoPath(options.reportPath)
-    : path.posix.join(
+  const reportPath = normalizeRepoPath(
+    options.reportPath ??
+      path.posix.join(
         path.relative(repoRoot, options.outRoot ?? path.resolve(repoRoot, 'out')).replace(/\\/g, '/') || 'out',
         options.taskId ?? '0101',
         DEFAULT_REPORT_NAME
-      );
+      )
+  );
   if (!reportPath) {
     throw new Error('Report path must be a relative repo path.');
   }

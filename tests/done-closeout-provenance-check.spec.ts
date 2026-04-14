@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { copyFile, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -151,6 +151,71 @@ describe('done closeout provenance check', () => {
     expect(driveQualified.report.totals.invalid_mirror_paths).toBe(1);
     expect(driveQualified.report.failures.map((failure) => failure.code)).toContain('invalid_mirror_path');
     expect(driveQualified.report.failures.map((failure) => failure.code)).toContain('stale_mirror_paths_missing');
+  });
+
+  it('rejects mirror symlink escapes and non-file targets before reading', async () => {
+    const symlinkRepo = await makeRepo();
+    await mkdir(join(symlinkRepo, 'tasks'), { recursive: true });
+    await symlink('/etc/passwd', join(symlinkRepo, 'tasks', 'tasks-linear-id.md'));
+    await writeManifest(symlinkRepo, [staleIssue()]);
+
+    const escaped = await runDoneCloseoutProvenanceCheck(symlinkRepo, {
+      outRoot: join(symlinkRepo, 'out'),
+      taskId: 'fixture'
+    });
+    expect(escaped.hasFailures).toBe(true);
+    expect(escaped.report.failures.map((failure) => failure.code)).toContain('mirror_path_symlink_escape');
+    expect(escaped.report.issues[0].missing_mirror_paths).toEqual(['tasks/tasks-linear-id.md']);
+
+    const directoryRepo = await makeRepo();
+    await mkdir(join(directoryRepo, 'tasks', 'tasks-linear-id.md'), { recursive: true });
+    await writeManifest(directoryRepo, [staleIssue()]);
+
+    const directoryTarget = await runDoneCloseoutProvenanceCheck(directoryRepo, {
+      outRoot: join(directoryRepo, 'out'),
+      taskId: 'fixture'
+    });
+    expect(directoryTarget.hasFailures).toBe(true);
+    expect(directoryTarget.report.failures.map((failure) => failure.code)).toContain('mirror_path_non_file_target');
+    expect(directoryTarget.report.issues[0].missing_mirror_paths).toEqual(['tasks/tasks-linear-id.md']);
+  });
+
+  it('rejects local closeout pointer symlink escapes', async () => {
+    const repoRoot = await makeRepo();
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await symlink('/etc/passwd', join(repoRoot, 'docs', 'closeout.md'));
+    await writeManifest(repoRoot, [
+      {
+        identifier: 'CO-170',
+        linear_id: 'linear-validation',
+        linear_state: 'Done',
+        classification: 'validation_only_provenance_gap',
+        pr_required: false,
+        mirror_paths: [],
+        local_closeout_pointers: ['docs/closeout.md']
+      }
+    ]);
+
+    const { report, hasFailures } = await runDoneCloseoutProvenanceCheck(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.failures.map((failure) => failure.code)).toContain('local_closeout_pointer_symlink_escape');
+  });
+
+  it('rejects derived default report paths outside the repository', async () => {
+    const repoRoot = await makeRepo();
+    await writeMirror(repoRoot, 'tasks/tasks-linear-id.md', '# Task\n\n- [x] PR attached.\n');
+    await writeManifest(repoRoot, [staleIssue()]);
+
+    await expect(
+      runDoneCloseoutProvenanceCheck(repoRoot, {
+        outRoot: join(repoRoot, '..', 'outside-out'),
+        taskId: 'fixture'
+      })
+    ).rejects.toThrow('Report path must be a relative repo path.');
   });
 
   it('detects pending docs/TASKS snapshot prose for the scoped issue', async () => {
