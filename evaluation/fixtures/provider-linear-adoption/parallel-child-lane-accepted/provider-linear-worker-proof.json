@@ -1,0 +1,77 @@
+{
+  "issue_id": "fixture-parallel-child-lane-accepted",
+  "issue_identifier": "CO-FIXTURE-PARALLEL",
+  "attempt_started_at": "2026-04-14T00:40:00.000Z",
+  "current_turn_started_at": "2026-04-14T00:41:00.000Z",
+  "linear_audit": {
+    "path": "provider-linear-worker-linear-audit.jsonl",
+    "attempted_count": 3,
+    "success_count": 3,
+    "failure_count": 0,
+    "latest_recorded_at": "2026-04-14T00:46:00.000Z",
+    "latest_by_operation": {
+      "parallelization": {
+        "recorded_at": "2026-04-14T00:41:05.000Z",
+        "operation": "parallelization",
+        "ok": true,
+        "issue_id": "fixture-parallel-child-lane-accepted",
+        "issue_identifier": "CO-FIXTURE-PARALLEL",
+        "source_setup": null,
+        "action": "parallelize_now",
+        "via": "safe test-only fixture lane available; cap 0/2",
+        "state": "independent_scope_available",
+        "follow_up_issue_id": null,
+        "follow_up_issue_identifier": null,
+        "failed_relation_type": null,
+        "comment_id": null,
+        "attachment_id": null,
+        "error_code": null,
+        "error_message": null
+      }
+    },
+    "parallelization_entries": []
+  },
+  "child_lanes": [
+    {
+      "stream": "fixture-eval-tests",
+      "status": "succeeded",
+      "manifest_path": ".runs/linear-parallel-child-lane-accepted-fixture-eval-tests/cli/2026-04-14T00-42-00-000Z/manifest.json",
+      "artifact_root": ".runs/linear-parallel-child-lane-accepted-fixture-eval-tests/cli/2026-04-14T00-42-00-000Z",
+      "log_path": ".runs/linear-parallel-child-lane-accepted-fixture-eval-tests/cli/2026-04-14T00-42-00-000Z/runner.ndjson",
+      "summary": "sanitized child lane completed focused eval tests",
+      "issue_id": "fixture-parallel-child-lane-accepted",
+      "issue_identifier": "CO-FIXTURE-PARALLEL",
+      "workspace_path": null,
+      "source_setup": null,
+      "launched_at": "2026-04-14T00:42:00.000Z",
+      "purpose": "Add fixture-only eval tests",
+      "instructions": null,
+      "scope": {
+        "files": [
+          "evaluation/tests/provider-linear-adoption.test.ts"
+        ],
+        "phases": [
+          "tests"
+        ]
+      },
+      "parent_snapshot": {
+        "head_sha": "fixture-head"
+      },
+      "lane_workspace_path": null,
+      "patch_artifact_path": ".runs/linear-parallel-child-lane-accepted-fixture-eval-tests/cli/2026-04-14T00-42-00-000Z/provider-linear-child-lane.patch",
+      "patch_bytes": 2048,
+      "decision": "accepted",
+      "decision_at": "2026-04-14T00:46:00.000Z",
+      "decision_reason": "Parent accepted the bounded fixture test patch."
+    }
+  ],
+  "parallelization": {
+    "decision": "parallelize_now",
+    "reason": "independent_scope_available",
+    "summary": "safe test-only fixture lane available; cap 0/2",
+    "recorded_at": "2026-04-14T00:41:05.000Z",
+    "child_lane_count": 1
+  },
+  "owner_status": "succeeded",
+  "updated_at": "2026-04-14T00:47:00.000Z"
+}

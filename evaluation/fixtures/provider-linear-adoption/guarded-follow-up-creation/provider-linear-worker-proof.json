@@ -1,0 +1,80 @@
+{
+  "issue_id": "fixture-guarded-follow-up-creation",
+  "issue_identifier": "CO-FIXTURE-FOLLOWUP",
+  "attempt_started_at": "2026-04-14T01:00:00.000Z",
+  "current_turn_started_at": "2026-04-14T01:01:00.000Z",
+  "linear_audit": {
+    "path": "provider-linear-worker-linear-audit.jsonl",
+    "attempted_count": 3,
+    "success_count": 3,
+    "failure_count": 0,
+    "latest_recorded_at": "2026-04-14T01:08:00.000Z",
+    "latest_by_operation": {
+      "parallelization": {
+        "recorded_at": "2026-04-14T01:01:05.000Z",
+        "operation": "parallelization",
+        "ok": true,
+        "issue_id": "fixture-guarded-follow-up-creation",
+        "issue_identifier": "CO-FIXTURE-FOLLOWUP",
+        "source_setup": null,
+        "action": "stay_serial",
+        "via": "parent-only follow-up mutation; no separable child-lane work remains",
+        "state": "single_bounded_change",
+        "follow_up_issue_id": null,
+        "follow_up_issue_identifier": null,
+        "failed_relation_type": null,
+        "comment_id": null,
+        "attachment_id": null,
+        "error_code": null,
+        "error_message": null
+      },
+      "upsert-workpad": {
+        "recorded_at": "2026-04-14T01:04:00.000Z",
+        "operation": "upsert-workpad",
+        "ok": true,
+        "issue_id": "fixture-guarded-follow-up-creation",
+        "issue_identifier": "CO-FIXTURE-FOLLOWUP",
+        "source_setup": null,
+        "action": "updated",
+        "via": null,
+        "state": null,
+        "follow_up_issue_id": null,
+        "follow_up_issue_identifier": null,
+        "failed_relation_type": null,
+        "comment_id": "fixture-workpad-comment",
+        "attachment_id": null,
+        "error_code": null,
+        "error_message": null
+      },
+      "create-follow-up": {
+        "recorded_at": "2026-04-14T01:06:00.000Z",
+        "operation": "create-follow-up",
+        "ok": true,
+        "issue_id": "fixture-guarded-follow-up-creation",
+        "issue_identifier": "CO-FIXTURE-FOLLOWUP",
+        "source_setup": null,
+        "action": "created",
+        "via": "related",
+        "state": "Backlog",
+        "follow_up_issue_id": "fixture-follow-up-id",
+        "follow_up_issue_identifier": "CO-FIXTURE-FOLLOWUP-2",
+        "failed_relation_type": null,
+        "comment_id": null,
+        "attachment_id": null,
+        "error_code": null,
+        "error_message": null
+      }
+    },
+    "parallelization_entries": []
+  },
+  "child_lanes": [],
+  "parallelization": {
+    "decision": "stay_serial",
+    "reason": "single_bounded_change",
+    "summary": "parent-only follow-up mutation; no separable child-lane work remains",
+    "recorded_at": "2026-04-14T01:01:05.000Z",
+    "child_lane_count": 0
+  },
+  "owner_status": "succeeded",
+  "updated_at": "2026-04-14T01:08:00.000Z"
+}

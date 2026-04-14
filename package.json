@@ -67,6 +67,7 @@
     "test:adapters": "vitest run --passWithNoTests --config vitest.config.ts adapters",
     "test:evaluation": "vitest run --passWithNoTests --config vitest.config.ts evaluation/tests",
     "eval:test": "vitest run evaluation/tests",
+    "eval:provider-adoption": "node scripts/provider-linear-adoption-eval.mjs",
     "test:watch": "vitest",
     "review": "node --loader ts-node/esm scripts/run-review.ts",
     "pr:watch-merge": "node scripts/pr-monitor-merge.mjs",

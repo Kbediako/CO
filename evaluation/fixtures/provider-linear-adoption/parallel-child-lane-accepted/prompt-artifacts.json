@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "sanitized": true,
+  "eval": {
+    "description": "parallelize_now provider turn with same-turn successful and accepted child-lane proof.",
+    "memory_required": true,
+    "prompt_pack_required": true,
+    "follow_up_required": false,
+    "parallelization": {
+      "expected_decision": "parallelize_now",
+      "expected_reason": "independent_scope_available",
+      "safe_independent_child_lane_candidates": 1,
+      "require_accepted_child_lane": true
+    }
+  },
+  "source_0": {
+    "pointer": "ctx:sha256:f10048ebd85a93d68cf83a955517b1aeb516eab4c50716c338e126d73a259b9d#chunk:c000001",
+    "object_id": "sha256:f10048ebd85a93d68cf83a955517b1aeb516eab4c50716c338e126d73a259b9d",
+    "source_path": ".runs/linear-parallel-child-lane-accepted/cli/2026-04-14T00-40-00-000Z-parallel/memory/source-0/source.txt",
+    "included_in_provider_prompt": true
+  },
+  "prompt_pack": {
+    "selected_id": "tfgrpo-implementation",
+    "selected_domain": "implementation",
+    "prior_experience_source_run": "2026-04-14T00-00-00.000Z-memory",
+    "missing_experience_reason": null,
+    "included_in_provider_prompt": true
+  },
+  "planner": {
+    "selectedMemoryRefs": [
+      "source_0",
+      "prompt_pack:tfgrpo-implementation"
+    ]
+  },
+  "follow_up_trace": {
+    "workpad_trace_present": true,
+    "related_link_present": false,
+    "blocker_link_present": false,
+    "intent_checksum": false,
+    "non_goals": false,
+    "not_done_if": false,
+    "acceptance_criteria": false
+  }
+}
