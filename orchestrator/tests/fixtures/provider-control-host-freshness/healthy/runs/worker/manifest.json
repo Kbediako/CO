@@ -1,0 +1,9 @@
+{
+  "task_id": "linear-healthy-issue",
+  "run_id": "run-healthy",
+  "pipeline_id": "provider-linear-worker",
+  "status": "in_progress",
+  "started_at": "2026-04-14T05:58:20.000Z",
+  "updated_at": "2026-04-14T05:59:50.000Z",
+  "heartbeat_at": "2026-04-14T05:59:50.000Z"
+}

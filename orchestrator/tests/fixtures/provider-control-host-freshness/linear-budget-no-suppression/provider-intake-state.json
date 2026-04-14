@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-04-14T05:59:30.000Z",
+  "polling": {
+    "last_success_at": "2026-04-14T05:59:30.000Z",
+    "stuck": false,
+    "restart_required": false
+  },
+  "claims": []
+}

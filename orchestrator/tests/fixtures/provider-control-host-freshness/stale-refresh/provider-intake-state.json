@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-04-14T05:00:00.000Z",
+  "rehydrated_at": null,
+  "polling": {
+    "enabled": true,
+    "last_success_at": "2026-04-14T05:00:00.000Z",
+    "last_completed_at": "2026-04-14T05:00:00.000Z",
+    "stuck": false,
+    "restart_required": false
+  },
+  "claims": []
+}

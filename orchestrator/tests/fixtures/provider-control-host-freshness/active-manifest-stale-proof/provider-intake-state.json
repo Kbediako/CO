@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-04-14T05:59:30.000Z",
+  "rehydrated_at": null,
+  "polling": {
+    "last_success_at": "2026-04-14T05:59:30.000Z",
+    "stuck": false,
+    "restart_required": false
+  },
+  "claims": [
+    {
+      "provider": "linear",
+      "provider_key": "linear:stale-heartbeat",
+      "issue_id": "stale-heartbeat",
+      "issue_identifier": "CO-STALE-HEARTBEAT",
+      "issue_title": "Stale heartbeat fixture",
+      "issue_state": "In Progress",
+      "issue_state_type": "started",
+      "task_id": "linear-stale-heartbeat",
+      "mapping_source": "provider_id_fallback",
+      "state": "running",
+      "accepted_at": "2026-04-14T05:28:00.000Z",
+      "updated_at": "2026-04-14T05:59:30.000Z",
+      "run_id": "run-stale-heartbeat",
+      "launch_started_at": "2026-04-14T05:29:00.000Z"
+    }
+  ]
+}

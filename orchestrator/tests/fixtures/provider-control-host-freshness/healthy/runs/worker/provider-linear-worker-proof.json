@@ -1,0 +1,35 @@
+{
+  "issue_id": "healthy-issue",
+  "issue_identifier": "CO-HEALTHY",
+  "run_id": "run-healthy",
+  "attempt_started_at": "2026-04-14T05:58:20.000Z",
+  "current_turn_started_at": "2026-04-14T05:58:40.000Z",
+  "first_heartbeat_at": "2026-04-14T05:58:45.000Z",
+  "current_turn_activity": {
+    "event": "message_delta",
+    "recorded_at": "2026-04-14T05:58:45.000Z",
+    "source": "session-log"
+  },
+  "owner_phase": "turn_running",
+  "owner_status": "in_progress",
+  "last_event": "message_delta",
+  "last_event_at": "2026-04-14T05:59:50.000Z",
+  "updated_at": "2026-04-14T05:59:50.000Z",
+  "child_lanes": [],
+  "parallelization": {
+    "decision": "stay_serial",
+    "reason": "single_bounded_change",
+    "summary": "fixture",
+    "recorded_at": "2026-04-14T05:58:30.000Z"
+  },
+  "linear_budget": {
+    "observed_at": "2026-04-14T05:59:30.000Z",
+    "suppression": "none",
+    "cooldown_active": false,
+    "requests": {
+      "limit": 1000,
+      "remaining": 500,
+      "reset_at": "2026-04-14T07:00:00.000Z"
+    }
+  }
+}
