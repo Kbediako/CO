@@ -222,6 +222,7 @@ function hasCliHelpRequest(
   options: { allowBareHelp?: boolean } = {}
 ): boolean {
   const positionals: string[] = [];
+  let sawNonBareHelpToken = false;
   for (let index = 0; index < tokens.length; index += 1) {
     const token = tokens[index] ?? '';
     const optionName = normalizeCliOptionName(token);
@@ -239,11 +240,21 @@ function hasCliHelpRequest(
       ) {
         index += 1;
       }
+      sawNonBareHelpToken = true;
       continue;
     }
-    positionals.push(normalizeCommandToken(token));
+    const positional = normalizeCommandToken(token);
+    positionals.push(positional);
+    if (positional !== 'help') {
+      sawNonBareHelpToken = true;
+    }
   }
-  return Boolean(options.allowBareHelp && positionals.length === 1 && positionals[0] === 'help');
+  return Boolean(
+    options.allowBareHelp &&
+      !sawNonBareHelpToken &&
+      positionals.length === 1 &&
+      positionals[0] === 'help'
+  );
 }
 
 function resolvePackageReviewScriptArgs(args: string[]): string[] | null {

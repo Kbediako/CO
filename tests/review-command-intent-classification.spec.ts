@@ -140,7 +140,8 @@ describe('review command intent classification', () => {
       `codex review --title foo help`,
       `codex-orchestrator review --title=help --manifest x`,
       `node scripts/run-review.ts --title help`,
-      `npm run review -- --title help`
+      `npm run review -- --title help`,
+      `npm run review -- --title foo help`
     ]) {
       expect(
         classifyCommandIntentCommandLine(commandLine, {
