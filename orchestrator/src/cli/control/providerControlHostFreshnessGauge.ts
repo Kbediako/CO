@@ -1300,15 +1300,6 @@ function readPath(value: unknown, fieldPath: string): unknown {
   return fieldPath.split('.').reduce<unknown>((current, key) => asRecord(current)?.[key], value);
 }
 
-async function pathExists(path: string): Promise<boolean> {
-  try {
-    await stat(path);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -1335,7 +1326,14 @@ function relativeOrOriginal(from: string, path: string): string {
 }
 
 export async function assertProviderControlHostFreshnessArtifactRoot(path: string): Promise<void> {
-  if (!(await pathExists(resolve(path)))) {
+  const resolvedPath = resolve(path);
+  let stats;
+  try {
+    stats = await stat(resolvedPath);
+  } catch {
     throw new Error(`Artifact root does not exist: ${path}`);
+  }
+  if (!stats.isDirectory()) {
+    throw new Error(`Artifact root must be a directory: ${path}`);
   }
 }

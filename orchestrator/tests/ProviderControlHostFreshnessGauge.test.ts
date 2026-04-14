@@ -231,6 +231,17 @@ describe('provider/control-host freshness gauge', () => {
     })).rejects.toThrow(/requires --artifact-root/);
   });
 
+  it('rejects file paths passed as artifact roots', async () => {
+    await expect(runControlHostFreshnessGaugeCliShell({
+      flags: {
+        'artifact-root': join(FIXTURE_ROOT, 'healthy/runs/worker/manifest.json'),
+        format: 'json',
+        now: NOW
+      },
+      printHelp: vi.fn()
+    })).rejects.toThrow(/must be a directory/);
+  });
+
   it('supports explicit path flags without recursively scanning an artifact root', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
