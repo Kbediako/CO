@@ -26,6 +26,7 @@ last_review: 2026-04-14
   - bootstrap the `CO-175` docs-first packet, workpad source, and registry mirrors
   - add durable policy documentation
   - extend `scripts/docs-freshness.mjs` report semantics for rolling cohorts
+  - align `scripts/spec-guard.mjs` with the same owner-backed rolling cohort window for stale specs
   - add focused test coverage
   - save before/after artifacts
 - Constraints:
@@ -38,6 +39,8 @@ last_review: 2026-04-14
   - `docs:freshness` must separate blocking stale rows from policy-covered rolling rows
   - rolling rows must remain present in JSON and markdown reports
   - configured policy must include owner issue, window, eligible classes, max cohorts, and max entries
+  - malformed rolling policy fields must fail closed instead of falling back to permissive defaults
+  - `spec-guard` must report eligible stale specs as rolling cohort debt and continue to fail for invalid, expired, over-budget, or non-eligible stale specs
   - stale rows outside policy must fail exactly as before
 - Non-functional requirements:
   - no network dependency
@@ -46,7 +49,9 @@ last_review: 2026-04-14
 - Interfaces / contracts:
   - `docs/docs-catalog.json` policy key `rolling_freshness_cohorts`
   - `scripts/docs-freshness.mjs`
+  - `scripts/spec-guard.mjs`
   - `tests/docs-freshness.spec.ts`
+  - `tests/spec-guard.spec.ts`
 
 ## Execution Notes
 - Baseline artifact:
@@ -63,6 +68,8 @@ last_review: 2026-04-14
 - Focused tests:
   - policy-covered task/report stale rows move to `rolling_cohort_entries`
   - non-eligible stale rows remain blocking failures
+  - malformed rolling policy classes leave stale docs blocking
+  - `spec-guard` honors eligible owner-backed spec cohorts and fails closed on invalid classes
   - markdown summarizes rolling cohorts even when blocking drift is absent
 - Required gates:
   - `node scripts/delegation-guard.mjs`

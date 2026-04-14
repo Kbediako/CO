@@ -25,18 +25,19 @@
 ## Implementation
 - [x] Rolling freshness cohort policy is documented in a durable guide and `docs/docs-catalog.json`. Evidence: `docs/guides/docs-freshness-cohorts.md`, `docs/docs-catalog.json`.
 - [x] `scripts/docs-freshness.mjs` separates blocking stale rows from policy-covered rolling cohort rows. Evidence: `scripts/docs-freshness.mjs`, `out/linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8/manual/post-policy-docs-freshness-report.json`, `out/linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8/manual/post-policy-docs-freshness-summary.md`.
-- [x] Focused tests cover eligible rolling cohorts, non-eligible stale failures, expired cohort candidates, and over-budget cohort candidates. Evidence: `tests/docs-freshness.spec.ts`, `npx vitest run --config vitest.config.core.ts tests/docs-freshness.spec.ts` passed 10 tests.
+- [x] `scripts/spec-guard.mjs` reports eligible owner-backed stale specs as rolling cohort debt while keeping invalid/out-of-policy specs blocking. Evidence: `node scripts/spec-guard.mjs` passed with `Spec guard rolling freshness cohort entries: 14`.
+- [x] Focused tests cover eligible rolling cohorts, non-eligible stale failures, expired cohort candidates, over-budget cohort candidates, invalid policy classes, and spec-guard rolling/fail-closed behavior. Evidence: `npx vitest run --config vitest.config.core.ts tests/docs-freshness.spec.ts tests/spec-guard.spec.ts` passed 23 tests.
 
 ## Validation
 - [x] `node scripts/delegation-guard.mjs`. Evidence: passed with `1 subagent manifest(s) found`.
-- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: exited 0; dry-run still reports the existing March 14 stale spec cohort for 1182-1195, outside this docs:freshness policy slice.
+- [x] `node scripts/spec-guard.mjs`. Evidence: passed with 14 CO-175-owned rolling spec entries.
 - [x] `npm run build`. Evidence: passed.
 - [x] `npm run lint`. Evidence: passed.
-- [x] `npm run test`. Evidence: passed, 338 files / 3775 tests.
+- [x] `npm run test`. Evidence: passed, 338 files / 3778 tests.
 - [x] `npm run docs:check`. Evidence: passed.
 - [x] `npm run docs:freshness`. Evidence: passed with `rolling freshness cohort entries: 221` and zero blocking stale rows.
 - [x] `npm run repo:stewardship`. Evidence: passed, 4786 tracked files, 0 action-required.
-- [x] `node scripts/diff-budget.mjs`. Evidence: passed, files=11/25 and lines=1016/1200.
+- [x] `node scripts/diff-budget.mjs`. Evidence: passed working-tree scope, files=7/25 and lines=347/1200 after feedback patch; stacked aggregate advisory is 13 files / 1343 lines.
 - [x] Standalone review and elegance review are captured before review handoff. Evidence: review wrapper telemetry `../../.runs/linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8/cli/2026-04-14T01-14-59-466Z-39f8823e/review/telemetry.json` recorded `review_outcome=failed-boundary` / `command-intent`; manual review and elegance fallback recorded in `out/linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8/manual/review-and-elegance.md`.
 
 ## Handoff

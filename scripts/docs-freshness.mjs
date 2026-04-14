@@ -22,7 +22,6 @@ import { resolveEnvironmentPaths } from './lib/run-manifests.js';
 const DEFAULT_REGISTRY_PATH = 'docs/docs-freshness-registry.json';
 const STATUS_VALUES = new Set(['active', 'archived', 'deprecated']);
 const OWNER_PLACEHOLDERS = new Set(['tbd', 'unassigned', 'owner']);
-const DEFAULT_ROLLING_COHORT_CLASSES = ['task_packet', 'task_mirror', 'report_only'];
 
 function showUsage() {
   console.log(`Usage: node scripts/docs-freshness.mjs [options]
@@ -148,6 +147,7 @@ function normalizeRollingFreshnessPolicy(rawPolicy) {
   if (!rawPolicy || typeof rawPolicy !== 'object' || rawPolicy.enabled !== true) {
     return {
       enabled: false,
+      is_valid: false,
       owner_issue: null,
       policy_doc: null,
       window_days: 0,
@@ -158,14 +158,22 @@ function normalizeRollingFreshnessPolicy(rawPolicy) {
     };
   }
 
+  const ownerIssue = typeof rawPolicy.owner_issue === 'string' ? rawPolicy.owner_issue.trim() || null : null;
+  const policyDoc = typeof rawPolicy.policy_doc === 'string' ? rawPolicy.policy_doc.trim() || null : null;
+  const windowDays = Number.isInteger(rawPolicy.window_days) && rawPolicy.window_days >= 0 ? rawPolicy.window_days : null;
+  const maxCohorts = Number.isInteger(rawPolicy.max_cohorts) && rawPolicy.max_cohorts > 0 ? rawPolicy.max_cohorts : null;
+  const maxEntries = Number.isInteger(rawPolicy.max_entries) && rawPolicy.max_entries > 0 ? rawPolicy.max_entries : null;
+  const eligibleDocClasses = normalizeStringArray(rawPolicy.eligible_doc_classes, []);
+
   return {
     enabled: true,
-    owner_issue: typeof rawPolicy.owner_issue === 'string' ? rawPolicy.owner_issue.trim() || null : null,
-    policy_doc: typeof rawPolicy.policy_doc === 'string' ? rawPolicy.policy_doc.trim() || null : null,
+    is_valid: Boolean(ownerIssue && policyDoc && windowDays !== null && maxCohorts !== null && maxEntries !== null && eligibleDocClasses.length > 0),
+    owner_issue: ownerIssue,
+    policy_doc: policyDoc,
     window_days: normalizeNonNegativeInteger(rawPolicy.window_days, 0),
-    max_cohorts: normalizePositiveInteger(rawPolicy.max_cohorts, 1),
-    max_entries: normalizePositiveInteger(rawPolicy.max_entries, 100),
-    eligible_doc_classes: normalizeStringArray(rawPolicy.eligible_doc_classes, DEFAULT_ROLLING_COHORT_CLASSES),
+    max_cohorts: normalizePositiveInteger(rawPolicy.max_cohorts, 0),
+    max_entries: normalizePositiveInteger(rawPolicy.max_entries, 0),
+    eligible_doc_classes: eligibleDocClasses,
     action_after_window:
       typeof rawPolicy.action_after_window === 'string' ? rawPolicy.action_after_window.trim() || null : null
   };
@@ -219,7 +227,7 @@ function buildRollingCohortSummary(entries, policy) {
 
 function applyRollingFreshnessPolicy(rawStaleEntries, docsCatalog) {
   const policy = normalizeRollingFreshnessPolicy(docsCatalog?.policies?.rolling_freshness_cohorts);
-  if (!policy.enabled || !policy.owner_issue || !policy.policy_doc || rawStaleEntries.length === 0) {
+  if (!policy.enabled || !policy.is_valid || rawStaleEntries.length === 0) {
     return {
       policy,
       blockingStaleEntries: rawStaleEntries,

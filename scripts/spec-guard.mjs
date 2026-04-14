@@ -6,6 +6,7 @@ import { join, posix } from 'node:path';
 import { promisify } from 'node:util';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
 import { computeAgeInDays, parseIsoDate } from './lib/docs-helpers.js';
+import { maybeLoadDocsCatalog, resolveDocsCatalogEntry } from './lib/docs-catalog.js';
 
 const execFileAsync = promisify(execFile);
 const ARCHIVE_STUB_MARKER = '<!-- docs-archive:stub -->';
@@ -19,6 +20,7 @@ const INACTIVE_SPEC_STATUSES = new Set([
   'done',
   'succeeded'
 ]);
+const SPEC_FRESHNESS_CADENCE_DAYS = 30;
 
 /**
  * Print usage information and available command-line options for the spec-guard script.
@@ -151,10 +153,129 @@ async function listSpecFiles() {
   return files.sort();
 }
 
+function normalizeStringArray(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.map((item) => (typeof item === 'string' ? item.trim() : '')).filter(Boolean);
+}
+
+function normalizeRollingFreshnessPolicy(rawPolicy) {
+  if (!rawPolicy || typeof rawPolicy !== 'object' || rawPolicy.enabled !== true) {
+    return {
+      enabled: false,
+      is_valid: false,
+      owner_issue: null,
+      policy_doc: null,
+      window_days: 0,
+      max_cohorts: 0,
+      max_entries: 0,
+      eligible_doc_classes: []
+    };
+  }
+
+  const ownerIssue = typeof rawPolicy.owner_issue === 'string' ? rawPolicy.owner_issue.trim() || null : null;
+  const policyDoc = typeof rawPolicy.policy_doc === 'string' ? rawPolicy.policy_doc.trim() || null : null;
+  const windowDays = Number.isInteger(rawPolicy.window_days) && rawPolicy.window_days >= 0 ? rawPolicy.window_days : null;
+  const maxCohorts = Number.isInteger(rawPolicy.max_cohorts) && rawPolicy.max_cohorts > 0 ? rawPolicy.max_cohorts : null;
+  const maxEntries = Number.isInteger(rawPolicy.max_entries) && rawPolicy.max_entries > 0 ? rawPolicy.max_entries : null;
+  const eligibleDocClasses = normalizeStringArray(rawPolicy.eligible_doc_classes);
+
+  return {
+    enabled: true,
+    is_valid: Boolean(
+      ownerIssue &&
+        policyDoc &&
+        windowDays !== null &&
+        maxCohorts !== null &&
+        maxEntries !== null &&
+        eligibleDocClasses.length > 0
+    ),
+    owner_issue: ownerIssue,
+    policy_doc: policyDoc,
+    window_days: windowDays ?? 0,
+    max_cohorts: maxCohorts ?? 0,
+    max_entries: maxEntries ?? 0,
+    eligible_doc_classes: eligibleDocClasses
+  };
+}
+
+function classifySpecPath(file, docsCatalog) {
+  return resolveDocsCatalogEntry(file, docsCatalog)?.doc_class ?? null;
+}
+
+function applyRollingFreshnessPolicy(staleSpecs, docsCatalog) {
+  const policy = normalizeRollingFreshnessPolicy(docsCatalog?.policies?.rolling_freshness_cohorts);
+  if (!policy.enabled || !policy.is_valid || staleSpecs.length === 0) {
+    return {
+      policy,
+      blockingStaleSpecs: staleSpecs,
+      rollingStaleSpecs: [],
+      rollingCohorts: []
+    };
+  }
+
+  const eligibleClasses = new Set(policy.eligible_doc_classes);
+  const eligibleSpecs = staleSpecs.filter(
+    (entry) =>
+      eligibleClasses.has(entry.doc_class) &&
+      entry.overdue_days > 0 &&
+      entry.overdue_days <= policy.window_days
+  );
+
+  const cohortsByKey = new Map();
+  for (const entry of eligibleSpecs) {
+    const key = `${entry.last_review}|${entry.cadence_days}|${entry.age_days}`;
+    if (!cohortsByKey.has(key)) {
+      cohortsByKey.set(key, []);
+    }
+    cohortsByKey.get(key).push(entry);
+  }
+
+  const policyCapacityExceeded = cohortsByKey.size > policy.max_cohorts || eligibleSpecs.length > policy.max_entries;
+  if (policyCapacityExceeded) {
+    return {
+      policy,
+      blockingStaleSpecs: staleSpecs,
+      rollingStaleSpecs: [],
+      rollingCohorts: []
+    };
+  }
+
+  const rollingPaths = new Set(eligibleSpecs.map((entry) => entry.file));
+  const rollingCohorts = [...cohortsByKey.values()].map((entries) => ({
+    owner_issue: policy.owner_issue,
+    stale_entries: entries.length,
+    last_review: entries[0].last_review,
+    cadence_days: entries[0].cadence_days,
+    age_days: entries[0].age_days,
+    overdue_days: entries[0].overdue_days,
+    window_days: policy.window_days,
+    sample_paths: entries.slice(0, 5).map((entry) => entry.file)
+  }));
+
+  return {
+    policy,
+    blockingStaleSpecs: staleSpecs.filter((entry) => !rollingPaths.has(entry.file)),
+    rollingStaleSpecs: eligibleSpecs,
+    rollingCohorts
+  };
+}
+
+async function loadRollingFreshnessCatalog() {
+  try {
+    return await maybeLoadDocsCatalog(process.cwd());
+  } catch {
+    return null;
+  }
+}
+
 async function checkSpecFreshness(specFiles) {
   const failures = [];
+  const staleSpecs = [];
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
+  const docsCatalog = await loadRollingFreshnessCatalog();
 
   for (const file of specFiles) {
     let content;
@@ -194,14 +315,26 @@ async function checkSpecFreshness(specFiles) {
     }
 
     const ageDays = computeAgeInDays(reviewDate, today);
-    if (ageDays > 30) {
-      failures.push(
-        `${file}: last_review ${rawValue} is ${ageDays} days old (must be ≤30 days)`
-      );
+    if (ageDays > SPEC_FRESHNESS_CADENCE_DAYS) {
+      staleSpecs.push({
+        file,
+        last_review: rawValue,
+        cadence_days: SPEC_FRESHNESS_CADENCE_DAYS,
+        age_days: ageDays,
+        overdue_days: ageDays - SPEC_FRESHNESS_CADENCE_DAYS,
+        doc_class: classifySpecPath(file, docsCatalog)
+      });
     }
   }
 
-  return failures;
+  const { blockingStaleSpecs, rollingStaleSpecs, rollingCohorts } = applyRollingFreshnessPolicy(staleSpecs, docsCatalog);
+  for (const entry of blockingStaleSpecs) {
+    failures.push(
+      `${entry.file}: last_review ${entry.last_review} is ${entry.age_days} days old (must be ≤30 days)`
+    );
+  }
+
+  return { failures, rollingStaleSpecs, rollingCohorts };
 }
 
 function isInactiveSpec(content) {
@@ -320,7 +453,16 @@ async function main() {
 
   const specFiles = await listSpecFiles();
   if (specFiles.length > 0) {
-    failures.push(...(await checkSpecFreshness(specFiles)));
+    const freshness = await checkSpecFreshness(specFiles);
+    failures.push(...freshness.failures);
+    if (freshness.rollingStaleSpecs.length > 0) {
+      console.log(`Spec guard rolling freshness cohort entries: ${freshness.rollingStaleSpecs.length}`);
+      for (const cohort of freshness.rollingCohorts) {
+        console.log(
+          ` - rolling cohort ${cohort.owner_issue ?? 'unassigned'}: ${cohort.stale_entries} specs, last_review=${cohort.last_review}, overdue=${cohort.overdue_days}/${cohort.window_days} days`
+        );
+      }
+    }
   }
 
   if (failures.length > 0) {

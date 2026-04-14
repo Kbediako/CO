@@ -36,6 +36,45 @@ async function initRepository(): Promise<string> {
   return dir;
 }
 
+async function writeDocsCatalog(
+  repo: string,
+  policy: Record<string, unknown> = {
+    enabled: true,
+    owner_issue: 'CO-175',
+    policy_doc: 'docs/guides/docs-freshness-cohorts.md',
+    window_days: 7,
+    max_cohorts: 1,
+    max_entries: 10,
+    eligible_doc_classes: ['task_packet']
+  }
+) {
+  await mkdir(join(repo, 'docs'), { recursive: true });
+  await writeFile(
+    join(repo, 'docs/docs-catalog.json'),
+    JSON.stringify(
+      {
+        version: 1,
+        classes: {
+          task_packet: { label: 'Task Packet', report_order: 200 }
+        },
+        policies: {
+          rolling_freshness_cohorts: policy
+        },
+        entries: [],
+        patterns: [
+          {
+            glob: 'tasks/**/*.md',
+            doc_class: 'task_packet'
+          }
+        ]
+      },
+      null,
+      2
+    ),
+    'utf8'
+  );
+}
+
 afterEach(async () => {
   while (createdDirs.length > 0) {
     const dir = createdDirs.pop();
@@ -245,6 +284,59 @@ describe('spec-guard script', () => {
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
     expect(stdout).toContain("tasks/specs/0001-initial.md: last_review 2000-01-01");
+  });
+
+  it('reports owner-backed stale active specs as rolling freshness cohort debt', async () => {
+    const repo = await initRepository();
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    today.setUTCDate(today.getUTCDate() - 31);
+    const staleReviewDate = today.toISOString().slice(0, 10);
+    await writeDocsCatalog(repo);
+
+    await writeFile(
+      join(repo, 'tasks/specs/0001-initial.md'),
+      ['---', 'status: in_progress', `last_review: ${staleReviewDate}`, '---', '', 'Active spec.'].join('\n')
+    );
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('Spec guard rolling freshness cohort entries: 1');
+    expect(stdout).toContain('rolling cohort CO-175: 1 specs');
+    expect(stdout.trim()).toContain('✅ Spec guard: OK');
+  });
+
+  it('does not skip stale active specs when rolling freshness classes are invalid', async () => {
+    const repo = await initRepository();
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    today.setUTCDate(today.getUTCDate() - 31);
+    const staleReviewDate = today.toISOString().slice(0, 10);
+    await writeDocsCatalog(repo, {
+      enabled: true,
+      owner_issue: 'CO-175',
+      policy_doc: 'docs/guides/docs-freshness-cohorts.md',
+      window_days: 7,
+      max_cohorts: 1,
+      max_entries: 10,
+      eligible_doc_classes: []
+    });
+
+    await writeFile(
+      join(repo, 'tasks/specs/0001-initial.md'),
+      ['---', 'status: in_progress', `last_review: ${staleReviewDate}`, '---', '', 'Active spec.'].join('\n')
+    );
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain(`tasks/specs/0001-initial.md: last_review ${staleReviewDate}`);
   });
 
   it('does not skip active specs that mention the archive marker in their body', async () => {

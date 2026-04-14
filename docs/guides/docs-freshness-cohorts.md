@@ -25,6 +25,8 @@ When an eligible cohort is inside policy bounds, `docs:freshness` exits successf
 
 Those report fields are not waivers. They are the repo-wide freshness debt ledger for the owner issue.
 
+`spec-guard` uses the same catalog policy for stale active specs under the docs catalog. When the only stale specs are eligible, owner-backed, in-window cohort entries, `spec-guard` prints the rolling spec cohort and exits successfully. It still fails for stale specs when the policy is missing, invalid, over budget, expired, or when the spec class is not eligible.
+
 ## Required Handling
 A rolling cohort must be resolved before the window expires by one of these explicit outcomes:
 
@@ -39,6 +41,7 @@ Feature lanes may cite the owner issue for the rolling cohort, but they must sti
 - Do not use rolling cohorts for public docs, agent policy, active guides, skills, templates, or missing/invalid registry drift.
 - Do not silently bump `last_review` dates without a review rationale.
 - Do not increase the rolling window or row cap to make an unrelated validation failure disappear.
+- Do not configure empty or malformed eligible classes; invalid policy fields make rolling deferral fail closed.
 - Do not treat a green `docs:freshness` exit as proof that rolling freshness debt is zero; inspect the report totals.
 
 ## Apr 14 Baseline

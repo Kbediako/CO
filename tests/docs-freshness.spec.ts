@@ -596,4 +596,55 @@ describe('docs freshness reporting', () => {
       expect.objectContaining({ path: 'tasks/tasks-1235-example.md' })
     ]);
   });
+
+  it('keeps stale docs blocking when rolling policy classes are invalid', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-rolling-invalid-classes-'));
+    createdDirs.push(repoRoot);
+
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    today.setUTCDate(today.getUTCDate() - 31);
+    const staleReviewDate = today.toISOString().slice(0, 10);
+
+    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+    await writeFile(join(repoRoot, 'tasks', 'tasks-1234-example.md'), '# Task packet\n', 'utf8');
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: 'tasks/tasks-1234-example.md',
+          owner: 'Codex',
+          status: 'active',
+          last_review: staleReviewDate,
+          cadence_days: 30
+        }
+      ],
+      catalogPatterns: [
+        {
+          glob: 'tasks/**/*.md',
+          doc_class: 'task_packet'
+        }
+      ],
+      catalogPolicies: {
+        rolling_freshness_cohorts: {
+          enabled: true,
+          owner_issue: 'CO-175',
+          policy_doc: 'docs/guides/docs-freshness-cohorts.md',
+          window_days: 7,
+          max_cohorts: 1,
+          max_entries: 10,
+          eligible_doc_classes: []
+        }
+      }
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.rolling_freshness_policy).toEqual(expect.objectContaining({ enabled: true, is_valid: false }));
+    expect(report.totals.stale_entries).toBe(1);
+    expect(report.totals.rolling_cohort_entries).toBe(0);
+  });
 });

@@ -16,6 +16,7 @@ review_notes:
   - 2026-04-14: Baseline repro saved `221` stale entries with `0` missing registry, missing disk, invalid entry, or uncatalogued drift. Evidence: `out/linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8/manual/baseline-docs-freshness-report.json`.
   - 2026-04-14: Classification found one coherent `2026-03-14` cohort, cadence `30`, age `31`, spanning task/spec lineage `1164-1195` across task packet, task mirror, and report-only path families. Evidence: `out/linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8/manual/baseline-cohort-classification.json`.
   - 2026-04-14: Pre-implementation issue-quality review approves a policy/tooling lane instead of another blind cohort date bump because the acceptance criteria require per-PR diff health to stay separate from repo-wide freshness debt.
+  - 2026-04-14: PR feedback and Core Lane CI showed the same owned March 14 stale spec cohort also blocks non-dry-run `spec-guard`; the lane now keeps `spec-guard` aligned with the catalog-backed rolling cohort policy while failing closed for invalid, expired, over-budget, or non-eligible stale specs.
 ---
 
 # Technical Specification
@@ -28,8 +29,9 @@ review_notes:
 2. Add a machine-readable rolling freshness cohort policy for eligible repo-wide task/report cohorts.
 3. Keep rolling cohort entries visible in JSON and markdown reports with owner issue, expiry, class breakdown, path family breakdown, and representative paths.
 4. Ensure eligible rolling cohort debt does not make unrelated feature lanes fail blocking `docs:freshness` during the configured window.
-5. Document the policy in a durable contributor guide and in this task packet.
-6. Save before/after report artifacts and workpad evidence.
+5. Ensure the same eligible, owner-backed stale spec cohort does not make unrelated feature lanes fail non-dry-run `spec-guard` during the configured window.
+6. Document the policy in a durable contributor guide and in this task packet.
+7. Save before/after report artifacts and workpad evidence.
 
 ## Issue-Shaping Contract
 - User-request translation carried forward:
@@ -39,6 +41,7 @@ review_notes:
   - preserve per-PR diff health without hiding repo-wide freshness debt
 - Protected terms / exact artifact and surface names:
   - `docs:freshness`
+  - `spec-guard`
   - `repo-wide freshness debt`
   - `per-PR diff health`
   - `date-boundary stale cohort`
@@ -48,6 +51,7 @@ review_notes:
   - `docs/docs-catalog.json`
 - Nearby wrong interpretations to reject:
   - a warning-only freshness gate
+  - a warning-only spec guard
   - a mass `last_review` bump
   - CO-173/CO-174 implementation changes
   - hiding non-task or expired stale docs
@@ -59,7 +63,7 @@ review_notes:
 ## Parity / Alignment Matrix
 - Current truth: all stale rows are `Task Packet`, `Task Mirror`, or `Report Only`; no stale public guide, agent policy, active guide, skill, template, missing, or invalid drift exists.
 - Reference truth: feature-lane validation should fail on its own diff health and on truly blocking docs drift, not on a newly rolled historical cohort that has a repo-wide owner.
-- Target truth / intended delta: `docs:freshness` returns green for blocking validation when only eligible owned rolling cohorts are stale, while the report still lists those stale rows under `rolling_freshness_cohorts`.
+- Target truth / intended delta: `docs:freshness` returns green for blocking validation when only eligible owned rolling cohorts are stale, while the report still lists those stale rows under `rolling_freshness_cohorts`; `spec-guard` likewise reports eligible stale active specs as rolling cohort debt and remains blocking for invalid or out-of-policy stale specs.
 - Explicitly out-of-scope differences: long-term archiving cadence, task archive automation redesign, and unrelated historical packet cleanup.
 
 ## Readiness Gate
@@ -68,6 +72,7 @@ review_notes:
   - eligible rolling debt is invisible in JSON/markdown
   - stale public/active/agent policy docs can pass under the rolling rule
   - stale cohorts older than the configured window can pass
+  - malformed policy fields, including empty eligible classes, can defer stale docs or specs
 - Pre-implementation issue-quality review evidence:
   - baseline report and classification prove the current failure is a coherent date-boundary cohort, not mixed registry drift
   - the issue explicitly asks for policy/tooling separation rather than another refresh-only lane
@@ -81,9 +86,11 @@ review_notes:
   - read `docs/docs-catalog.json` policy `rolling_freshness_cohorts`
   - group eligible stale rows by `last_review`, `cadence_days`, and `age_days`
   - defer only groups inside `window_days`, `max_cohorts`, and `max_entries`
+  - require explicit owner issue, policy doc, and non-empty eligible classes before deferring rows
   - keep deferred rows in `rolling_cohort_entries` and grouped metadata
   - exclude deferred rows from blocking `stale_entries`
   - emit console and markdown summaries for rolling cohorts
+  - have `spec-guard` use the same catalog policy for active stale specs while preserving blocking behavior for invalid/out-of-policy specs
 - Non-functional requirements:
   - keep behavior deterministic and local
   - keep report schema backward-compatible for existing failure fields
@@ -91,13 +98,16 @@ review_notes:
 - Interfaces / contracts:
   - `runDocsFreshness(...)`
   - `renderDocsFreshnessMarkdown(...)`
+  - `scripts/spec-guard.mjs`
   - `docs/docs-catalog.json`
   - `tests/docs-freshness.spec.ts`
+  - `tests/spec-guard.spec.ts`
 
 ## Architecture & Data
 - Architecture / design adjustments:
   - The docs catalog owns the policy. The script remains the evaluator and report writer.
   - Raw stale rows are split into blocking stale rows and policy-covered rolling rows after registry validation.
+  - Spec freshness uses the same policy, but only for active spec files that resolve to eligible catalog classes.
   - Missing/invalid/uncatalogued drift remains independent and always fails.
 - Data model changes / migrations:
   - Report version increments to include `totals.rolling_cohort_entries`, `rolling_cohort_entries`, and `rolling_freshness_cohorts`.
@@ -108,7 +118,8 @@ review_notes:
 ## Validation Plan
 - Tests / checks:
   - focused `tests/docs-freshness.spec.ts`
-  - `node scripts/spec-guard.mjs --dry-run`
+  - focused `tests/spec-guard.spec.ts`
+  - `node scripts/spec-guard.mjs`
   - `npm run build`
   - `npm run lint`
   - `npm run test`
