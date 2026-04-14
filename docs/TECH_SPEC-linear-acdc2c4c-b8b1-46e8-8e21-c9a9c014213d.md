@@ -18,7 +18,7 @@ last_review: 2026-04-14
 CO-180 is a version-policy adoption lane. It audits local Codex CLI `0.120.0` against the current `0.118.0` posture gates, records the decision, and updates active truth surfaces only after evidence supports the posture.
 
 ## Requirements
-- Preserve command-surface audit outputs for `codex --version`, `codex exec --help`, `codex exec resume --help`, `codex review --help`, and `codex login --help`.
+- Preserve command-surface audit outputs for `codex --version`, `codex exec --help`, `codex exec resume --help`, `codex review --help`, and the `codex login --device-auth` surface.
 - Run `node scripts/runtime-mode-canary.mjs` or record an exact blocker.
 - Run or explicitly waive the required cloud canary contract and cloud fallback contract with command and environment evidence.
 - Decide promotion versus hold before editing active version truth surfaces.

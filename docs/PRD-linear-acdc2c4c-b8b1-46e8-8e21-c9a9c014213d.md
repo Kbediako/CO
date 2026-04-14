@@ -40,7 +40,7 @@ Wrong interpretations to reject: version-string-only bump, unrelated CO-77 publi
 - No broad CO-77 public release cleanup.
 
 ## Metrics & Guardrails
-- Command-surface evidence covers `codex --version`, `codex exec --help`, `codex exec resume --help`, `codex review --help`, and `codex login --help`.
+- Command-surface evidence covers `codex --version`, `codex exec --help`, `codex exec resume --help`, `codex review --help`, and the `codex login --device-auth` surface.
 - Policy-required gates are either green or recorded as blocked/waived with exact environment constraints.
 - `docs:check` and `docs:freshness` verify docs-catalog version posture consistency after edits.
 
