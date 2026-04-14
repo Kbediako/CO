@@ -1,6 +1,8 @@
+import { execFile } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { promisify } from 'node:util';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import {
@@ -10,6 +12,7 @@ import {
 
 const fixtureRoot = path.join(process.cwd(), 'evaluation', 'fixtures', 'provider-linear-adoption');
 const tempDirs: string[] = [];
+const execFileAsync = promisify(execFile);
 
 afterAll(async () => {
   for (const dir of tempDirs) {
@@ -128,6 +131,51 @@ describe('provider-linear adoption eval', () => {
     expect(report.summary.failures).toContain(
       'memory-adopting-run: source_0 prompt artifact metadata is missing or not included'
     );
+  });
+
+  it('fails when source_0 prompt source_path does not match the manifest', async () => {
+    const { root, fixtureDir } = await copyFixture('memory-adopting-run');
+    await mutateJson(path.join(fixtureDir, 'prompt-artifacts.json'), (value) => {
+      const source0 = value.source_0 as Record<string, unknown>;
+      source0.source_path = '.runs/linear-memory-adopting-run/cli/wrong/source-0/source.txt';
+    });
+
+    const report = await buildProviderLinearAdoptionEvalReport({
+      fixtureRoot: root,
+      generatedAt: '2026-04-14T00:00:00.000Z',
+      taskId: 'linear-co-176-wrong-source-path'
+    });
+
+    expect(report.summary.ok).toBe(false);
+    expect(report.summary.source_0_adopting_runs).toBe(0);
+    expect(report.summary.failures).toContain(
+      'memory-adopting-run: source_0 prompt metadata does not match manifest descriptor'
+    );
+  });
+
+  it('runs directly when the script path contains spaces', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'provider adoption eval-'));
+    tempDirs.push(root);
+    const scriptPath = path.join(root, 'provider adoption eval.mjs');
+    const outputPath = path.join(root, 'report.json');
+    await fs.copyFile(
+      path.join(process.cwd(), 'scripts', 'provider-linear-adoption-eval.mjs'),
+      scriptPath
+    );
+
+    const { stdout } = await execFileAsync(process.execPath, [
+      scriptPath,
+      '--fixtures',
+      fixtureRoot,
+      '--output',
+      outputPath
+    ]);
+
+    expect(stdout).toContain('Provider-linear adoption eval passed.');
+    const report = JSON.parse(await fs.readFile(outputPath, 'utf8')) as {
+      summary: { ok: boolean; total_runs: number };
+    };
+    expect(report.summary).toMatchObject({ ok: true, total_runs: 4 });
   });
 
   it('fails when required follow-up shaping and related-link traceability disappear', async () => {

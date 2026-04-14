@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
+import { realpathSync } from 'node:fs';
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import path, { dirname, join } from 'node:path';
 import process from 'node:process';
+import { pathToFileURL } from 'node:url';
 
 const DEFAULT_FIXTURE_ROOT = join(
   process.cwd(),
@@ -211,9 +213,12 @@ function extractSource0Metrics(manifest, promptArtifacts) {
     prompt_object_id: promptObjectId,
     prompt_source_path: promptSourcePath,
     prompt_matches_manifest:
-      Boolean(pointer && objectId && promptPointer && promptObjectId) &&
+      Boolean(
+        pointer && objectId && sourcePath && promptPointer && promptObjectId && promptSourcePath
+      ) &&
       pointer === promptPointer &&
-      objectId === promptObjectId
+      objectId === promptObjectId &&
+      sourcePath === promptSourcePath
   };
 }
 
@@ -511,7 +516,11 @@ function buildSummary(runs) {
     } else {
       decisionCounts.missing += 1;
     }
-    if (run.metrics.memory.source_0.present && run.metrics.memory.source_0.prompt_included) {
+    if (
+      run.metrics.memory.source_0.present &&
+      run.metrics.memory.source_0.prompt_included &&
+      run.metrics.memory.source_0.prompt_matches_manifest
+    ) {
       source0AdoptingRuns += 1;
     }
     if (
@@ -641,7 +650,11 @@ async function main() {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+const executedScriptUrl = process.argv[1]
+  ? pathToFileURL(realpathSync(path.resolve(process.argv[1]))).href
+  : null;
+
+if (import.meta.url === executedScriptUrl) {
   main().catch((error) => {
     console.error(error?.stack || error?.message || String(error));
     process.exit(1);
