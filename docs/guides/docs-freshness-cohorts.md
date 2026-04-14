@@ -1,0 +1,56 @@
+# Docs Freshness Cohorts
+
+## Purpose
+`docs:freshness` remains a repo-wide truthfulness gate. It must fail for missing registry rows, registry entries that point at missing files, invalid registry metadata, uncatalogued docs, stale public or active guidance, and stale cohorts that are no longer inside an explicit rolling window.
+
+The rolling cohort policy exists for one narrower case: a large historical task/report cohort can age one or more days past cadence at a date boundary while unrelated feature lanes still have healthy current diffs. In that case, the stale rows must stay machine-visible and owned by a baseline issue instead of forcing every active feature worker to refresh unrelated historical packets.
+
+## Policy
+The machine-readable policy lives in `docs/docs-catalog.json` under `policies.rolling_freshness_cohorts`.
+
+Current CO policy:
+
+- Owner issue: `CO-175`
+- Window: `7` days after the normal freshness cadence expires
+- Maximum active rolling cohorts: `2`
+- Maximum rolling rows: `300`
+- Eligible doc classes: `Task Packet`, `Task Mirror`, and `Report Only`
+- Ineligible docs: Front Door, Public Guide, Repository Guide, Agent Policy, Active Guide, shipped skills, companions, templates, and uncatalogued docs
+
+When an eligible cohort is inside policy bounds, `docs:freshness` exits successfully for blocking validation but still writes:
+
+- `totals.rolling_cohort_entries`
+- `rolling_cohort_entries`
+- `rolling_freshness_cohorts`
+
+Those report fields are not waivers. They are the repo-wide freshness debt ledger for the owner issue.
+
+## Required Handling
+A rolling cohort must be resolved before the window expires by one of these explicit outcomes:
+
+- refresh the cohort after a real review
+- archive completed historical packets through the repo archive policy
+- reclassify docs only when their class is wrong
+- file a new same-project owner issue with acceptance criteria and evidence when the debt is still intentionally deferred
+
+Feature lanes may cite the owner issue for the rolling cohort, but they must still fix their own docs packet drift and any blocking freshness failures in their diff.
+
+## Not Allowed
+- Do not use rolling cohorts for public docs, agent policy, active guides, skills, templates, or missing/invalid registry drift.
+- Do not silently bump `last_review` dates without a review rationale.
+- Do not increase the rolling window or row cap to make an unrelated validation failure disappear.
+- Do not treat a green `docs:freshness` exit as proof that rolling freshness debt is zero; inspect the report totals.
+
+## Apr 14 Baseline
+CO-175 reproduced the Apr 14 baseline at `cac56ec89`:
+
+- `221` stale entries
+- `0` missing registry rows
+- `0` missing-on-disk rows
+- `0` invalid registry entries
+- `0` uncatalogued docs
+- one cohort: `last_review=2026-03-14`, `cadence_days=30`, `age_days=31`
+- classes: Task Packet `157`, Task Mirror `32`, Report Only `32`
+- lineage: `1164-1195`
+
+The saved baseline report is `out/linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8/manual/baseline-docs-freshness-report.json`, and the cohort classification is `out/linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8/manual/baseline-cohort-classification.json`.

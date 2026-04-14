@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260414-linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8",
+      "title": "CO workflow: add rolling docs:freshness cohort policy for Apr 14 stale baseline",
+      "relates_to": "tasks/tasks-linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-14",
+      "paths": {
+        "spec": "tasks/specs/linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8.md",
+        "task": "tasks/tasks-linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8.md",
+        "agent_task": ".agent/task/linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8.md",
+        "docs": "docs/TECH_SPEC-linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8.md"
+      }
+    },
+    {
       "id": "20260414-linear-a560f416-c80a-473b-96fb-9f1ec090c968",
       "title": "CO: keep provider-worker handoff manifests truthful when guardrail summaries fail",
       "relates_to": "tasks/tasks-linear-a560f416-c80a-473b-96fb-9f1ec090c968.md",
