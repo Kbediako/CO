@@ -1789,6 +1789,11 @@ Options:
   --stale-refresh-after-ms <n>  Refresh age threshold (default: 300000).
   --stale-heartbeat-after-ms <n> Active heartbeat age threshold (default: 600000).
   --stale-retry-after-ms <n>    Retry/backoff overdue threshold (default: 600000).
+  --stale-claim-queue-after-ms <n> Claim queue age threshold (default: 1800000).
+  --claim-to-start-degraded-after-ms <n> Claim-to-start degraded threshold (default: 300000).
+  --start-to-heartbeat-degraded-after-ms <n> Start-to-first-heartbeat degraded threshold (default: 120000).
+  --linear-headroom-low-ratio <n> Low Linear shared-budget remaining ratio (default: 0.05).
+  --child-lane-cap <n>          Same-parent active/pending child-lane cap (default: 2).
   --format json                 Emit machine-readable gauge output.
   --help                        Show this message.
 `);

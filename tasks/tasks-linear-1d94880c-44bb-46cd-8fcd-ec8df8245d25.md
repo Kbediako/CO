@@ -58,14 +58,14 @@
 
 ## Relevant Files
 - `docs/PRD-linear-1d94880c-44bb-46cd-8fcd-ec8df8245d25.md`
-- `docs/TECH_SPEC-linear-1d94880c-44bb-46cd-8fcd-ec8df8245d25.md`
+- `tasks/specs/linear-1d94880c-44bb-46cd-8fcd-ec8df8245d25.md`
 - `docs/ACTION_PLAN-linear-1d94880c-44bb-46cd-8fcd-ec8df8245d25.md`
 - `docs/guides/provider-control-host-freshness-gauge.md`
 - `orchestrator/src/cli/control/providerControlHostFreshnessGauge.ts`
 - `orchestrator/src/cli/controlHostFreshnessGaugeCliShell.ts`
 - `orchestrator/tests/ProviderControlHostFreshnessGauge.test.ts`
 - `orchestrator/tests/fixtures/provider-control-host-freshness/`
-- `tasks/specs/linear-1d94880c-44bb-46cd-8fcd-ec8df8245d25.md`
+- `tasks/index.json`
 - `.agent/task/linear-1d94880c-44bb-46cd-8fcd-ec8df8245d25.md`
 
 ## Notes

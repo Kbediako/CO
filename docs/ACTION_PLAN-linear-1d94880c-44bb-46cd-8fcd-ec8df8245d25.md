@@ -25,7 +25,7 @@
 
 ## Validation
 - Checks / tests:
-  - `linear child-stream --pipeline docs-review --stream co-177-docs-review --format json`
+  - `codex-orchestrator linear child-stream --pipeline docs-review --stream co-177-docs-review --format json`
   - focused gauge parser/evaluator fixture tests
   - direct gauge CLI fixture runs with JSON output and failure behavior
   - required floor: delegation guard, spec guard, build, lint, test, docs check/freshness, repo stewardship, and diff budget
