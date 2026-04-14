@@ -124,6 +124,7 @@ interface ProviderIssueClaimLike {
   launch_started_at?: string | null;
   issue_state?: string | null;
   issue_state_type?: string | null;
+  issue_updated_at?: string | null;
   review_promotion?: ProviderIssueReviewPromotionLike | null;
   merge_closeout?: ProviderIssueMergeCloseoutLike | null;
 }
@@ -263,6 +264,9 @@ export interface ControlProviderDebugSnapshot {
     reason: string | null;
     updated_at: string | null;
     run_id: string | null;
+    issue_state: string | null;
+    issue_state_type: string | null;
+    issue_updated_at: string | null;
     worker_host?: string | null;
     launch_source: string | null;
     launch_started_at: string | null;
@@ -437,6 +441,9 @@ export function buildProviderIssueDebugSnapshot(input: {
           reason: normalizeOptionalString(claim.reason),
           updated_at: normalizeOptionalString(claim.updated_at),
           run_id: normalizeOptionalString(claim.run_id),
+          issue_state: normalizeOptionalString(claim.issue_state),
+          issue_state_type: normalizeOptionalString(claim.issue_state_type),
+          issue_updated_at: normalizeOptionalString(claim.issue_updated_at),
           worker_host: normalizeProviderWorkerHostName(claim.worker_host),
           launch_source: normalizeOptionalString(claim.launch_source),
           launch_started_at: normalizeOptionalString(claim.launch_started_at),
