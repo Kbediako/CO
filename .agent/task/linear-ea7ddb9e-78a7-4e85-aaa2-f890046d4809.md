@@ -38,6 +38,7 @@
 - [x] `MCP_RUNNER_TASK_ID=linear-ea7ddb9e-78a7-4e85-aaa2-f890046d4809 npx vitest run orchestrator/tests/CoStatusAttachCliShell.test.ts`. Evidence: passed.
 - [x] `MCP_RUNNER_TASK_ID=linear-ea7ddb9e-78a7-4e85-aaa2-f890046d4809 npx vitest run orchestrator/tests/ControlHostSupervision.test.ts`. Evidence: passed with `orchestrator/tests/CodexOrchestratorCli.test.ts`.
 - [x] Provider refresh lifecycle focused tests if implementation changes refresh recovery. Evidence: stale/fresh `provider_refresh_lifecycle_stuck` `restart_required` coverage in `orchestrator/tests/ControlHostSupervision.test.ts`.
+- [x] Unresolved actionable review threads = 0. Evidence: PR `#475` review-thread sweep; actionable CodeRabbit/Codex threads were handled with in-thread replies and the ready-review drain must pass before Linear review-state handoff.
 - [x] Parent runs full required validation and review/elegance gates before handoff. Evidence: build, lint, test, docs gates, pack smoke, manifest-backed review, and elegance pass completed.
 
 ## Progress Log

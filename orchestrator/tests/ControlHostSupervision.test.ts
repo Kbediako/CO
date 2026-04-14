@@ -167,6 +167,28 @@ describe('controlHostSupervision helpers', () => {
     });
   });
 
+  it('treats stale provider refresh last_error snapshots from before child start as quiescent', () => {
+    expect(
+      evaluateControlHostSupervisionHealthPayload(
+        {
+          polling: {
+            restart_required: true,
+            last_error: 'provider_refresh_lifecycle_stuck',
+            updated_at: '2026-04-14T05:02:27.000Z'
+          }
+        },
+        {
+          minPollingUpdatedAt: '2026-04-14T05:04:59.000Z'
+        }
+      )
+    ).toEqual({
+      healthy: true,
+      reason: 'stale_restart_required',
+      message:
+        'co-status reported a stale provider_refresh_lifecycle_stuck restart_required snapshot from before the current supervised child start; treating it as quiescent while the current host refreshes.'
+    });
+  });
+
   it('expires stale provider refresh restart_required quiescence after the startup grace window', () => {
     expect(
       evaluateControlHostSupervisionHealthPayload(
