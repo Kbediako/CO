@@ -41,6 +41,28 @@ const NODE_OPTION_VALUE_FLAGS = new Set([
 const NODE_NON_SCRIPT_EXECUTION_FLAGS = new Set(['-e', '--eval', '-p', '--print', '-c', '--check']);
 const NODE_RUNTIME_SCRIPT_FLAGS = new Set(['--run']);
 const PYTHON_OPTION_VALUE_FLAGS = new Set(['-W', '-X', '--check-hash-based-pycs']);
+const REVIEW_HELP_REQUEST_OPTION_VALUE_FLAGS = new Set([
+  '-c',
+  '-C',
+  '--ask-for-approval',
+  '--base',
+  '--cd',
+  '--commit',
+  '--config',
+  '--config-file',
+  '--cwd',
+  '--manifest',
+  '--model',
+  '--profile',
+  '--reasoning-effort',
+  '--runtime-mode',
+  '--runs-dir',
+  '--surface',
+  '--task',
+  '--title'
+]);
+const REVIEW_PACKAGE_RUN_SUBCOMMAND_ALIASES = new Set(['run', 'run-script', 'rum', 'urn']);
+const REVIEW_PACKAGE_OPTION_VALUE_FLAGS = new Set(['--prefix', '--workspace', '--filter', '--cwd', '-C', '-w']);
 
 export type ReviewCommandIntentViolationKind =
   | 'validation-suite'
@@ -155,32 +177,174 @@ function classifyCommandIntentSegment(
 
 export function isReviewOrchestrationCommand(command: string, args: string[]): boolean {
   if (command === 'npm' || command === 'pnpm' || command === 'yarn' || command === 'bun') {
-    return resolvePackageScriptTarget(args) === 'review';
+    const reviewScriptArgs = resolvePackageReviewScriptArgs(args);
+    return reviewScriptArgs !== null && !hasCliHelpRequest(reviewScriptArgs);
   }
 
   const firstArg = normalizeCommandToken(args[0] ?? '');
-  const secondArg = normalizeCommandToken(args[1] ?? '');
+  const startPipelineIndex = firstArg === 'start' ? findStartReviewPipelineArgIndex(args) : null;
   if (command === 'codex-orchestrator') {
-    return (
-      firstArg === 'review' ||
-      (firstArg === 'start' &&
-        (secondArg === 'docs-review' ||
-          secondArg === 'implementation-gate' ||
-          secondArg === 'diagnostics'))
-    );
+    if (
+      (firstArg === 'review' && hasCliHelpRequest(args.slice(1))) ||
+      (startPipelineIndex !== null &&
+        (hasCliHelpRequest(args.slice(1, startPipelineIndex)) ||
+          hasCliHelpRequest(args.slice(startPipelineIndex + 1))))
+    ) {
+      return false;
+    }
+    return firstArg === 'review' || startPipelineIndex !== null;
   }
   if (command === 'codex') {
-    return firstArg === 'review';
+    return firstArg === 'review' && !hasCliHelpRequest(args.slice(1));
   }
   if (command === 'node') {
     const runtimeScriptTarget = resolveNodeRuntimeScriptTarget(args);
     if (runtimeScriptTarget === 'review') {
-      return true;
+      return !hasCliHelpRequest(args);
     }
     const entryScript = resolveNodeEntryScriptToken(args);
-    return entryScript !== null && isReviewRunnerScriptToken(entryScript);
+    return (
+      entryScript !== null &&
+      isReviewRunnerScriptToken(entryScript) &&
+      !hasCliHelpRequest(args)
+    );
   }
   return false;
+}
+
+function isReviewPipelineTarget(target: string): boolean {
+  return target === 'docs-review' || target === 'implementation-gate' || target === 'diagnostics';
+}
+
+const CLI_BOOLEAN_FLAG_KEYS = new Set([
+  'apply',
+  'auto-issue-log',
+  'blocked-by-source',
+  'cloud',
+  'cloud-preflight',
+  'codex-cli',
+  'codex-force',
+  'collab',
+  'devtools',
+  'dry-run',
+  'force',
+  'help',
+  'interactive',
+  'issue-log',
+  'multi-agent',
+  'no-interactive',
+  'repo-config-required',
+  'refresh-skills',
+  'ui',
+  'usage',
+  'watch',
+  'yes'
+]);
+
+function findStartReviewPipelineArgIndex(args: string[]): number | null {
+  for (let index = 1; index < args.length; index += 1) {
+    const token = args[index] ?? '';
+    if (token === '--') {
+      const next = args[index + 1] ?? '';
+      return isReviewPipelineTarget(normalizeCommandToken(next)) ? index + 1 : null;
+    }
+    if (!token.startsWith('--')) {
+      return isReviewPipelineTarget(normalizeCommandToken(token)) ? index : null;
+    }
+    const key = token.slice(2);
+    if (key.includes('=') || CLI_BOOLEAN_FLAG_KEYS.has(key)) {
+      continue;
+    }
+    const next = args[index + 1];
+    if (next && !next.startsWith('--')) {
+      index += 1;
+    }
+  }
+  return null;
+}
+
+function hasCliHelpRequest(
+  tokens: string[],
+  options: { allowBareHelp?: boolean } = {}
+): boolean {
+  const positionals: string[] = [];
+  let sawNonBareHelpToken = false;
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index] ?? '';
+    const optionName = normalizeCliOptionName(token);
+    if (optionName === '--') {
+      break;
+    }
+    if (optionName === '--help' || optionName === '-h') {
+      return true;
+    }
+    if (token.startsWith('-')) {
+      if (
+        REVIEW_HELP_REQUEST_OPTION_VALUE_FLAGS.has(optionName) &&
+        !hasInlineOptionValue(token) &&
+        tokens[index + 1]
+      ) {
+        index += 1;
+      }
+      sawNonBareHelpToken = true;
+      continue;
+    }
+    const positional = normalizeCommandToken(token);
+    positionals.push(positional);
+    if (positional !== 'help') {
+      sawNonBareHelpToken = true;
+    }
+  }
+  return Boolean(options.allowBareHelp && !sawNonBareHelpToken && positionals.length === 1 && positionals[0] === 'help');
+}
+
+function resolvePackageReviewScriptArgs(args: string[]): string[] | null {
+  let index = 0;
+  while (index < args.length) {
+    const token = args[index] ?? '';
+    const normalized = normalizeCommandToken(token);
+
+    if (normalized === '--') {
+      const target = normalizeCommandToken(args[index + 1] ?? '');
+      return target === 'review' ? stripPackageRunSeparator(args.slice(index + 2)) : null;
+    }
+
+    if (REVIEW_PACKAGE_RUN_SUBCOMMAND_ALIASES.has(normalized)) {
+      index += 1;
+      while (index < args.length) {
+        const candidate = args[index] ?? '';
+        const candidateNormalized = normalizeCommandToken(candidate);
+        if (candidateNormalized === '--') {
+          index += 1;
+          continue;
+        }
+        if (candidate.startsWith('-')) {
+          index += packageReviewOptionConsumesValue(candidate) && !hasInlineOptionValue(candidate) ? 2 : 1;
+          continue;
+        }
+        return candidateNormalized === 'review'
+          ? stripPackageRunSeparator(args.slice(index + 1))
+          : null;
+      }
+      return null;
+    }
+
+    if (token.startsWith('-')) {
+      index += packageReviewOptionConsumesValue(token) && !hasInlineOptionValue(token) ? 2 : 1;
+      continue;
+    }
+
+    return normalized === 'review' ? stripPackageRunSeparator(args.slice(index + 1)) : null;
+  }
+  return null;
+}
+
+function stripPackageRunSeparator(args: string[]): string[] {
+  return normalizeCommandToken(args[0] ?? '') === '--' ? args.slice(1) : args;
+}
+
+function packageReviewOptionConsumesValue(token: string): boolean {
+  return REVIEW_PACKAGE_OPTION_VALUE_FLAGS.has(normalizeCliOptionName(token));
 }
 
 function isReviewRunnerScriptToken(token: string): boolean {

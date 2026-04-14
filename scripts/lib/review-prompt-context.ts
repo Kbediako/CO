@@ -15,6 +15,8 @@ import { normalizeTaskKey, pathExists } from './docs-helpers.js';
 export type ReviewSurface = 'diff' | 'audit' | 'architecture';
 export type ReviewScopeMode = 'uncommitted' | 'base' | 'commit';
 const DEFAULT_SCOPED_REVIEW_TITLE_MAX_LENGTH = 180;
+const BOUNDED_SCOPED_REVIEW_TITLE_SEGMENT =
+  'Bounded: no validation; list follow-up commands only';
 
 interface TaskIndexEntry {
   id?: string;
@@ -340,6 +342,20 @@ function normalizeScopedReviewTitleSegment(value: string): string {
   return value.replace(/\s+/g, ' ').replace(/\s*\|\s*/g, ' | ').trim();
 }
 
+function compactScopedReviewTitleSegments(value: string): string {
+  return value
+    .split('|')
+    .map((segment) => segment.replace(/\s+/g, ' ').trim())
+    .filter((segment) => segment.length > 0)
+    .join(' | ');
+}
+
+function removeBoundedScopedReviewTitleSegment(title: string): string {
+  return compactScopedReviewTitleSegments(
+    title.split(BOUNDED_SCOPED_REVIEW_TITLE_SEGMENT).join(' ')
+  );
+}
+
 function truncateScopedReviewTitle(title: string, maxLength: number): string {
   const normalizedMax = Number.isFinite(maxLength) ? Math.max(1, Math.trunc(maxLength)) : 1;
   if (title.length <= normalizedMax) {
@@ -351,13 +367,40 @@ function truncateScopedReviewTitle(title: string, maxLength: number): string {
   return `${title.slice(0, normalizedMax - 1).trimEnd()}…`;
 }
 
+export function addBoundedReviewConstraintsToScopedTitle(options: {
+  title: string;
+  maxLength?: number;
+}): string {
+  const normalizedTitle = normalizeScopedReviewTitleSegment(options.title);
+  const maxLength = options.maxLength ?? DEFAULT_SCOPED_REVIEW_TITLE_MAX_LENGTH;
+  const untaggedTitle = removeBoundedScopedReviewTitleSegment(normalizedTitle);
+  if (untaggedTitle.length === 0) {
+    return truncateScopedReviewTitle(BOUNDED_SCOPED_REVIEW_TITLE_SEGMENT, maxLength);
+  }
+  const title = `${untaggedTitle} | ${BOUNDED_SCOPED_REVIEW_TITLE_SEGMENT}`;
+  if (title.length <= maxLength) {
+    return title;
+  }
+  const suffix = ` | ${BOUNDED_SCOPED_REVIEW_TITLE_SEGMENT}`;
+  const prefixBudget = maxLength - suffix.length;
+  if (prefixBudget <= 1) {
+    return truncateScopedReviewTitle(BOUNDED_SCOPED_REVIEW_TITLE_SEGMENT, maxLength);
+  }
+  return `${truncateScopedReviewTitle(untaggedTitle, prefixBudget)}${suffix}`;
+}
+
 export function buildScopedReviewTitle(options: {
   notes: string;
   reviewSurface: ReviewSurface;
+  includeBoundedReviewConstraints?: boolean;
   maxLength?: number;
 }): string {
   const normalizedNotes = normalizeScopedReviewTitleSegment(options.notes);
-  const title = [`Surface: ${options.reviewSurface}`, normalizedNotes]
+  const title = [
+    `Surface: ${options.reviewSurface}`,
+    options.includeBoundedReviewConstraints ? BOUNDED_SCOPED_REVIEW_TITLE_SEGMENT : '',
+    normalizedNotes
+  ]
     .filter((segment) => segment.length > 0)
     .join(' | ');
   return truncateScopedReviewTitle(
@@ -376,7 +419,8 @@ export async function buildReviewPromptContext(
   });
   const scopedReviewerVisibleTitle = buildScopedReviewTitle({
     notes,
-    reviewSurface: options.reviewSurface
+    reviewSurface: options.reviewSurface,
+    includeBoundedReviewConstraints: options.includeBoundedReviewConstraints
   });
   const activeCloseoutBundleRoots =
     options.reviewSurface === 'diff'
