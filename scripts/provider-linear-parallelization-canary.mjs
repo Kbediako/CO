@@ -128,6 +128,18 @@ export function buildProviderLinearParallelizationCanaryScenarios() {
           cap_use: 1,
           safe_independent: true,
           safety_rationale: 'Runtime cap guard is isolated from canary report generation.'
+        }),
+        buildCandidate({
+          lane: 'cap-validation',
+          file_phase_scope: ['orchestrator/tests/ProviderLinearChildLaneShell.test.ts'],
+          dependencies: 'Depends on the cap-runtime contract but owns only focused validation.',
+          overlap_risk: 'low',
+          expected_validation_artifact: 'accepted cap accounting regression test',
+          child_lane_owner: 'child:cap-validation',
+          cap_before: 1,
+          cap_use: 1,
+          safe_independent: true,
+          safety_rationale: 'Validation can be accepted independently from a rejected runtime patch.'
         })
       ],
       decision: 'parallelize_now',
@@ -137,6 +149,11 @@ export function buildProviderLinearParallelizationCanaryScenarios() {
           stream: 'cap-runtime',
           outcome: 'rejected',
           reason: 'Parent rejected the patch because it exceeded the declared file scope, not for metric counting.'
+        },
+        {
+          stream: 'cap-validation',
+          outcome: 'accepted',
+          reason: 'Parent accepted the bounded validation artifact after reconciling it with the parent-owned runtime patch.'
         }
       ],
       serial_evidence: null
@@ -157,6 +174,18 @@ export function buildProviderLinearParallelizationCanaryScenarios() {
           cap_use: 1,
           safe_independent: true,
           safety_rationale: 'Research/review lane is independent from parent Linear mutation.'
+        }),
+        buildCandidate({
+          lane: 'policy-review',
+          file_phase_scope: ['review phase', 'docs/review notes'],
+          dependencies: 'Reads current policy surfaces after surface inventory completes.',
+          overlap_risk: 'low',
+          expected_validation_artifact: 'accepted policy-review notes',
+          child_lane_owner: 'child:policy-review',
+          cap_before: 1,
+          cap_use: 1,
+          safe_independent: true,
+          safety_rationale: 'Review notes are independently accept-ready even if another inventory lane becomes stale.'
         })
       ],
       decision: 'parallelize_now',
@@ -166,6 +195,11 @@ export function buildProviderLinearParallelizationCanaryScenarios() {
           stream: 'surface-inventory',
           outcome: 'invalidated',
           reason: 'Parent invalidated stale child output after the issue updated_at changed.'
+        },
+        {
+          stream: 'policy-review',
+          outcome: 'accepted',
+          reason: 'Parent accepted the review artifact because it stayed within declared read-only scope.'
         }
       ],
       serial_evidence: null
@@ -315,6 +349,9 @@ function validateScenario(scenario) {
     }
     if (launched.length === 0) {
       failures.push(`${id}: parallelize_now without a launched child lane outcome`);
+    }
+    if (!launched.some((lane) => lane?.outcome === 'accepted')) {
+      failures.push(`${id}: parallelize_now without an accepted child lane outcome`);
     }
   } else {
     if (safeCandidates.length > 0) {

@@ -27,7 +27,7 @@ describe('provider-linear parallelization canary', () => {
     expect(report.summary.adoption_increased).toBe(true);
     expect(report.summary.metric_only_child_lane_count).toBe(0);
     expect(report.summary.launched_child_lane_outcomes).toMatchObject({
-      accepted: 1,
+      accepted: 3,
       rejected: 1,
       invalidated: 1
     });
@@ -108,6 +108,35 @@ describe('provider-linear parallelization canary', () => {
       ok: false,
       failures: expect.arrayContaining([
         'bad-cap-overrun: cap overrun for docs-contract exceeds cap 2'
+      ])
+    });
+  });
+
+  it('rejects parallelize_now canary scenarios without an accepted child lane', () => {
+    const scenario = buildProviderLinearParallelizationCanaryScenarios()[0];
+    scenario.id = 'bad-parallelize-no-accepted';
+    scenario.launched_child_lanes = [
+      {
+        stream: 'docs-contract',
+        outcome: 'rejected',
+        reason: 'Parent rejected the output.'
+      },
+      {
+        stream: 'prompt-test',
+        outcome: 'invalidated',
+        reason: 'Parent invalidated stale output.'
+      }
+    ];
+    const report = buildProviderLinearParallelizationCanaryReport({
+      generatedAt: '2026-04-14T00:00:00.000Z',
+      taskId: 'linear-co-174-no-accepted',
+      scenarios: [scenario]
+    });
+
+    expect(validateProviderLinearParallelizationCanaryReport(report)).toEqual({
+      ok: false,
+      failures: expect.arrayContaining([
+        'bad-parallelize-no-accepted: parallelize_now without an accepted child lane outcome'
       ])
     });
   });

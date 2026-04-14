@@ -680,9 +680,18 @@ async function launchChildLane(
     decision_reason: null
   };
 
+  let recordedChildLaneForResult = childLane;
   try {
     const recorded = await deps.transactChildLanes(context.runDir, async (records) => {
-      const next = replaceChildLaneRecord(records, launchReservation, childLane);
+      const current = findChildLaneByIdentity(records, launchReservation);
+      if (!current) {
+        return {
+          records,
+          result: null as ProviderLinearWorkerChildLaneRecord | null
+        };
+      }
+      const recordedChildLane = mergeCompletedChildLaneWithParentDecision(current, childLane);
+      const next = replaceChildLaneRecord(records, current, recordedChildLane);
       if (!next) {
         return {
           records,
@@ -691,7 +700,7 @@ async function launchChildLane(
       }
       return {
         records: next,
-        result: childLane
+        result: recordedChildLane
       };
     });
     if (!recorded) {
@@ -709,6 +718,7 @@ async function launchChildLane(
         status: 502
       });
     }
+    recordedChildLaneForResult = recorded;
   } catch (error) {
     await removeReservedChildLane(context.runDir, launchReservation, deps).catch(() => undefined);
     return failureResult({
@@ -739,7 +749,7 @@ async function launchChildLane(
       sourceSetup,
       stream,
       childRun,
-      childLane,
+      childLane: recordedChildLaneForResult,
       code: 'provider_worker_child_lane_run_failed',
       message: `Child lane ${stream} completed with status ${childRun.status}. ${PROVIDER_LINEAR_CHILD_LANE_MUTATION_REASON}`,
       status: 502
@@ -756,7 +766,7 @@ async function launchChildLane(
     source_setup: sourceSetup,
     stream,
     child_run: childRun,
-    child_lane: childLane
+    child_lane: recordedChildLaneForResult
   };
 }
 
@@ -1369,6 +1379,23 @@ function findChildLaneByIdentity(
   target: ProviderLinearWorkerChildLaneRecord
 ): ProviderLinearWorkerChildLaneRecord | null {
   return records.find((entry) => matchesChildLaneRecordIdentity(entry, target)) ?? null;
+}
+
+function mergeCompletedChildLaneWithParentDecision(
+  current: ProviderLinearWorkerChildLaneRecord,
+  completed: ProviderLinearWorkerChildLaneRecord
+): ProviderLinearWorkerChildLaneRecord {
+  if (current.decision === 'pending') {
+    return completed;
+  }
+  return {
+    ...completed,
+    decision: current.decision,
+    in_flight_action: null,
+    in_flight_started_at: null,
+    decision_at: current.decision_at,
+    decision_reason: current.decision_reason
+  };
 }
 
 function replaceChildLaneRecord(
