@@ -3,6 +3,7 @@ import { execFile } from 'node:child_process';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
@@ -285,6 +286,26 @@ describe('spec-guard script', () => {
     });
 
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
+  });
+
+  it('normalizes Windows spec paths before rolling cohort provenance matching', async () => {
+    const { specGuardInternalsForTests } = await import(pathToFileURL(scriptPath).href);
+    const windowsSpecPath = 'tasks\\specs\\0001-initial.md';
+
+    expect(specGuardInternalsForTests.normalizeSpecFilePath(windowsSpecPath)).toBe(
+      'tasks/specs/0001-initial.md'
+    );
+    expect(specGuardInternalsForTests.classifySpecPathFamily(windowsSpecPath)).toBe('tasks/specs');
+    expect(specGuardInternalsForTests.extractTaskNumber(windowsSpecPath)).toBe('0001');
+    expect(
+      specGuardInternalsForTests.matchesDeclaredPath(
+        { file: windowsSpecPath, task_number: null },
+        {
+          path_prefixes: ['tasks/specs/0001-'],
+          task_number_range: null
+        }
+      )
+    ).toBe(true);
   });
 
   it('still reports stale active specs', async () => {

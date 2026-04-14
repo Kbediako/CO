@@ -2,7 +2,8 @@
 
 import { execFile } from 'node:child_process';
 import { readFile, readdir } from 'node:fs/promises';
-import { join, posix } from 'node:path';
+import { join, posix, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
 import { computeAgeInDays, parseIsoDate } from './lib/docs-helpers.js';
@@ -262,21 +263,27 @@ function normalizeRollingFreshnessPolicy(rawPolicy) {
 }
 
 function classifySpecPath(file, docsCatalog) {
-  return resolveDocsCatalogEntry(file, docsCatalog)?.doc_class ?? null;
+  return resolveDocsCatalogEntry(normalizeSpecFilePath(file), docsCatalog)?.doc_class ?? null;
+}
+
+function normalizeSpecFilePath(file) {
+  const normalized = posix.normalize(String(file).replace(/\\/g, '/')).replace(/^\.\//, '');
+  return normalized === '.' ? '' : normalized;
 }
 
 function classifySpecPathFamily(file) {
-  if (file.startsWith('tasks/specs/')) {
+  const normalizedFile = normalizeSpecFilePath(file);
+  if (normalizedFile.startsWith('tasks/specs/')) {
     return 'tasks/specs';
   }
-  if (file.startsWith('docs/design/specs/')) {
+  if (normalizedFile.startsWith('docs/design/specs/')) {
     return 'docs/design/specs';
   }
   return null;
 }
 
 function extractTaskNumber(file) {
-  const basename = posix.basename(file.replace(/\\/g, '/'));
+  const basename = posix.basename(normalizeSpecFilePath(file));
   const directMatch = basename.match(/^(\d{4})-/);
   return directMatch ? directMatch[1] : null;
 }
@@ -286,9 +293,10 @@ function isTaskNumberInRange(taskNumber, range) {
 }
 
 function matchesDeclaredPath(entry, cohort) {
+  const normalizedFile = normalizeSpecFilePath(entry.file);
   return (
     isTaskNumberInRange(entry.task_number, cohort.task_number_range) ||
-    cohort.path_prefixes.some((prefix) => entry.file.startsWith(prefix))
+    cohort.path_prefixes.some((prefix) => normalizedFile.startsWith(prefix))
   );
 }
 
@@ -426,15 +434,16 @@ async function checkSpecFreshness(specFiles) {
 
     const ageDays = computeAgeInDays(reviewDate, today);
     if (ageDays > SPEC_FRESHNESS_CADENCE_DAYS) {
+      const normalizedFile = normalizeSpecFilePath(file);
       staleSpecs.push({
-        file,
+        file: normalizedFile,
         last_review: rawValue,
         cadence_days: SPEC_FRESHNESS_CADENCE_DAYS,
         age_days: ageDays,
         overdue_days: ageDays - SPEC_FRESHNESS_CADENCE_DAYS,
-        doc_class: classifySpecPath(file, docsCatalog),
-        path_family: classifySpecPathFamily(file),
-        task_number: extractTaskNumber(file)
+        doc_class: classifySpecPath(normalizedFile, docsCatalog),
+        path_family: classifySpecPathFamily(normalizedFile),
+        task_number: extractTaskNumber(normalizedFile)
       });
     }
   }
@@ -593,11 +602,24 @@ async function main() {
   console.log('✅ Spec guard: OK');
 }
 
-main().catch((error) => {
-  const message =
-    error && typeof error === 'object' && error !== null && 'message' in error
-      ? error.message
-      : String(error);
-  console.error(`Spec guard failed: ${message}`);
-  process.exit(1);
-});
+function isDirectExecution(entryArg = process.argv[1]) {
+  return Boolean(entryArg) && import.meta.url === pathToFileURL(resolve(entryArg)).href;
+}
+
+if (isDirectExecution()) {
+  main().catch((error) => {
+    const message =
+      error && typeof error === 'object' && error !== null && 'message' in error
+        ? error.message
+        : String(error);
+    console.error(`Spec guard failed: ${message}`);
+    process.exit(1);
+  });
+}
+
+export const specGuardInternalsForTests = {
+  classifySpecPathFamily,
+  extractTaskNumber,
+  matchesDeclaredPath,
+  normalizeSpecFilePath
+};
