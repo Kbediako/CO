@@ -63,6 +63,8 @@ const execFileAsync = promisify(execFile);
 const PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID = 'provider-linear-child-lane';
 const PROVIDER_LINEAR_CHILD_LANE_MUTATION_REASON =
   'Only the parent provider-linear-worker may mutate the issue lifecycle. Same-issue child lanes are bounded helpers that must return patch artifacts for parent review.';
+export const PROVIDER_LINEAR_CHILD_LANE_PARALLEL_FIRST_CAP = 2;
+const PROVIDER_LINEAR_CHILD_LANE_IN_FLIGHT_STALE_MS = 30 * 60 * 1000;
 const PROVIDER_LINEAR_CHILD_LANE_ENV_KEYS_TO_REMOVE = [
   'MCP_RUNNER_TASK_ID',
   'CODEX_ORCHESTRATOR_TASK_ID',
@@ -432,6 +434,7 @@ async function launchChildLane(
     params.env.CODEX_ORCHESTRATOR_RUNS_DIR,
     '.runs'
   );
+  const now = deps.now();
   const launchReservation = buildReservedChildLaneRecord({
     stream,
     childRunsRoot,
@@ -445,22 +448,30 @@ async function launchChildLane(
       ...parentSnapshot,
       base_sha: baseSha
     },
-    now: deps.now()
+    now
   });
   const reservation = await deps.transactChildLanes<{
     conflicting: ProviderLinearWorkerChildLaneRecord | null;
+    capExhausted: ProviderLinearWorkerChildLaneRecord[];
     reserved: ProviderLinearWorkerChildLaneRecord | null;
   }>(context.runDir, async (records) => {
     const conflicting = findPendingChildLaneConflict(records, stream, scope);
     if (conflicting) {
       return {
         records,
-        result: { conflicting, reserved: null }
+        result: { conflicting, capExhausted: [], reserved: null }
+      };
+    }
+    const countedLanes = selectChildLanesCountingTowardParallelFirstCap(records, now);
+    if (countedLanes.length >= PROVIDER_LINEAR_CHILD_LANE_PARALLEL_FIRST_CAP) {
+      return {
+        records,
+        result: { conflicting: null, capExhausted: countedLanes, reserved: null }
       };
     }
     return {
       records: [...records, launchReservation],
-      result: { conflicting: null, reserved: launchReservation }
+      result: { conflicting: null, capExhausted: [], reserved: launchReservation }
     };
   });
   if (reservation.conflicting) {
@@ -474,6 +485,20 @@ async function launchChildLane(
       childLane: reservation.conflicting,
       code: 'provider_worker_child_lane_scope_conflict',
       message: describePendingChildLaneConflict(stream, reservation.conflicting),
+      status: 409
+    });
+  }
+  if (reservation.capExhausted.length > 0) {
+    return failureResult({
+      action: 'launch',
+      issueId: context.issueId,
+      issueIdentifier: context.issueIdentifier,
+      sourceSetup,
+      stream,
+      childRun: null,
+      childLane: null,
+      code: 'provider_worker_child_lane_cap_exhausted',
+      message: describeChildLaneCapExhaustion(reservation.capExhausted),
       status: 409
     });
   }
@@ -655,9 +680,18 @@ async function launchChildLane(
     decision_reason: null
   };
 
+  let recordedChildLaneForResult = childLane;
   try {
     const recorded = await deps.transactChildLanes(context.runDir, async (records) => {
-      const next = replaceChildLaneRecord(records, launchReservation, childLane);
+      const current = findChildLaneByIdentity(records, launchReservation);
+      if (!current) {
+        return {
+          records,
+          result: null as ProviderLinearWorkerChildLaneRecord | null
+        };
+      }
+      const recordedChildLane = mergeCompletedChildLaneWithParentDecision(current, childLane);
+      const next = replaceChildLaneRecord(records, current, recordedChildLane);
       if (!next) {
         return {
           records,
@@ -666,7 +700,7 @@ async function launchChildLane(
       }
       return {
         records: next,
-        result: childLane
+        result: recordedChildLane
       };
     });
     if (!recorded) {
@@ -684,6 +718,7 @@ async function launchChildLane(
         status: 502
       });
     }
+    recordedChildLaneForResult = recorded;
   } catch (error) {
     await removeReservedChildLane(context.runDir, launchReservation, deps).catch(() => undefined);
     return failureResult({
@@ -714,7 +749,7 @@ async function launchChildLane(
       sourceSetup,
       stream,
       childRun,
-      childLane,
+      childLane: recordedChildLaneForResult,
       code: 'provider_worker_child_lane_run_failed',
       message: `Child lane ${stream} completed with status ${childRun.status}. ${PROVIDER_LINEAR_CHILD_LANE_MUTATION_REASON}`,
       status: 502
@@ -731,7 +766,7 @@ async function launchChildLane(
     source_setup: sourceSetup,
     stream,
     child_run: childRun,
-    child_lane: childLane
+    child_lane: recordedChildLaneForResult
   };
 }
 
@@ -802,7 +837,8 @@ async function resolveChildLaneDecision(
   const claimed = await claimPendingChildLaneAcceptance({
     context,
     stream,
-    deps
+    deps,
+    now: deps.now()
   });
   if (claimed.kind !== 'claimed') {
     return childLaneDecisionFailureResult({
@@ -1193,7 +1229,7 @@ async function finalizePendingChildLaneDecision(input: {
     if (!target) {
       return { records, result: { kind: 'not_found' } };
     }
-    const blocked = resolveChildLaneDecisionBlockedOutcome(input.context, input.stream, target);
+    const blocked = resolveChildLaneDecisionBlockedOutcome(input.context, input.stream, target, input.action, input.now);
     if (blocked) {
       return { records, result: blocked };
     }
@@ -1201,6 +1237,7 @@ async function finalizePendingChildLaneDecision(input: {
       ...target,
       decision,
       in_flight_action: null,
+      in_flight_started_at: null,
       decision_at: input.now,
       decision_reason: input.reason ?? defaultDecisionReason(input.action, target)
     };
@@ -1219,6 +1256,7 @@ async function claimPendingChildLaneAcceptance(input: {
   context: Pick<Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>, 'runDir' | 'issueId' | 'issueIdentifier' | 'taskId'>;
   stream: string;
   deps: ProviderLinearChildLaneShellDependencies;
+  now: string;
 }): Promise<ChildLaneDecisionFailureOutcome | { kind: 'claimed'; childLane: ProviderLinearWorkerChildLaneRecord }> {
   return await input.deps.transactChildLanes<
     ChildLaneDecisionFailureOutcome | { kind: 'claimed'; childLane: ProviderLinearWorkerChildLaneRecord }
@@ -1227,13 +1265,14 @@ async function claimPendingChildLaneAcceptance(input: {
     if (!target) {
       return { records, result: { kind: 'not_found' } };
     }
-    const blocked = resolveChildLaneDecisionBlockedOutcome(input.context, input.stream, target);
+    const blocked = resolveChildLaneDecisionBlockedOutcome(input.context, input.stream, target, 'accept', input.now);
     if (blocked) {
       return { records, result: blocked };
     }
     const claimed: ProviderLinearWorkerChildLaneRecord = {
       ...target,
-      in_flight_action: 'accept'
+      in_flight_action: 'accept',
+      in_flight_started_at: input.now
     };
     const next = replaceChildLaneRecord(records, target, claimed);
     if (!next) {
@@ -1254,7 +1293,8 @@ async function releaseClaimedChildLaneAcceptance(
   await deps.transactChildLanes(runDir, async (records) => {
     const next = replaceChildLaneRecord(records, target, {
       ...target,
-      in_flight_action: null
+      in_flight_action: null,
+      in_flight_started_at: null
     });
     return {
       records: next ?? records,
@@ -1276,6 +1316,7 @@ async function finalizeClaimedChildLaneDecision(input: {
       ...input.target,
       decision: input.decision,
       in_flight_action: null,
+      in_flight_started_at: null,
       decision_at: input.now,
       decision_reason: input.decisionReason
     });
@@ -1296,7 +1337,9 @@ async function finalizeClaimedChildLaneDecision(input: {
 function resolveChildLaneDecisionBlockedOutcome(
   context: Pick<Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>, 'issueId' | 'issueIdentifier' | 'taskId'>,
   stream: string,
-  target: ProviderLinearWorkerChildLaneRecord
+  target: ProviderLinearWorkerChildLaneRecord,
+  action: 'accept' | 'reject' | 'invalidate',
+  now: string
 ): ChildLaneDecisionBlockedOutcome | null {
   const provenanceViolation = resolveChildLaneDecisionProvenanceViolation(context, stream, target);
   if (provenanceViolation) {
@@ -1306,14 +1349,14 @@ function resolveChildLaneDecisionBlockedOutcome(
       message: provenanceViolation
     };
   }
-  if (target.in_flight_action) {
+  if (target.in_flight_action && !isStaleInFlightChildLane(target, now)) {
     return {
       kind: 'in_flight',
       childLane: target,
       inFlightAction: target.in_flight_action
     };
   }
-  if (target.status === 'launching') {
+  if (action === 'accept' && target.status === 'launching') {
     return {
       kind: 'not_ready',
       childLane: target
@@ -1338,6 +1381,23 @@ function findChildLaneByIdentity(
   return records.find((entry) => matchesChildLaneRecordIdentity(entry, target)) ?? null;
 }
 
+function mergeCompletedChildLaneWithParentDecision(
+  current: ProviderLinearWorkerChildLaneRecord,
+  completed: ProviderLinearWorkerChildLaneRecord
+): ProviderLinearWorkerChildLaneRecord {
+  if (current.decision === 'pending') {
+    return completed;
+  }
+  return {
+    ...completed,
+    decision: current.decision,
+    in_flight_action: null,
+    in_flight_started_at: null,
+    decision_at: current.decision_at,
+    decision_reason: current.decision_reason
+  };
+}
+
 function replaceChildLaneRecord(
   records: ProviderLinearWorkerChildLaneRecord[],
   target: ProviderLinearWorkerChildLaneRecord,
@@ -1352,13 +1412,6 @@ function replaceChildLaneRecord(
     return replacement;
   });
   return replaced ? next : null;
-}
-
-function removeChildLaneRecord(
-  records: ProviderLinearWorkerChildLaneRecord[],
-  target: ProviderLinearWorkerChildLaneRecord
-): ProviderLinearWorkerChildLaneRecord[] {
-  return records.filter((entry) => !matchesChildLaneRecordIdentity(entry, target));
 }
 
 function matchesChildLaneRecordIdentity(
@@ -1435,6 +1488,7 @@ function buildReservedChildLaneRecord(input: {
     patch_bytes: null,
     decision: 'pending',
     in_flight_action: null,
+    in_flight_started_at: null,
     decision_at: null,
     decision_reason: null
   };
@@ -1456,6 +1510,44 @@ function findPendingChildLaneConflict(
   ) ?? null;
 }
 
+function selectChildLanesCountingTowardParallelFirstCap(
+  records: ProviderLinearWorkerChildLaneRecord[],
+  now: string
+): ProviderLinearWorkerChildLaneRecord[] {
+  return records.filter(
+    (entry) =>
+      !isStaleInFlightChildLane(entry, now) &&
+      (entry.decision === 'pending' || entry.in_flight_action !== null)
+  );
+}
+
+function isStaleInFlightChildLane(
+  entry: ProviderLinearWorkerChildLaneRecord,
+  now: string
+): boolean {
+  if (!entry.in_flight_action) {
+    return false;
+  }
+  const startedAt = normalizeOptionalString(entry.in_flight_started_at);
+  if (!startedAt) {
+    return true;
+  }
+  const startedMs = Date.parse(startedAt);
+  const nowMs = Date.parse(now);
+  if (!Number.isFinite(startedMs) || !Number.isFinite(nowMs)) {
+    return true;
+  }
+  return nowMs - startedMs >= PROVIDER_LINEAR_CHILD_LANE_IN_FLIGHT_STALE_MS;
+}
+
+function describeChildLaneCapExhaustion(records: ProviderLinearWorkerChildLaneRecord[]): string {
+  const sample = records
+    .slice(0, PROVIDER_LINEAR_CHILD_LANE_PARALLEL_FIRST_CAP)
+    .map((entry) => `${entry.stream}:${entry.run_id}`)
+    .join(', ');
+  return `Same-issue child-lane cap exhausted: ${records.length}/${PROVIDER_LINEAR_CHILD_LANE_PARALLEL_FIRST_CAP} active, pending, or unaccepted lane(s) already count toward the parallel-first cap (${sample}). Do not launch another lane; record \`stay_serial\` with reason \`existing_child_lane_active\` and include \`cap_exhausted\` in the summary. This cap preserves provider admission constraints instead of bypassing them.`;
+}
+
 function describePendingChildLaneConflict(
   stream: string,
   conflict: ProviderLinearWorkerChildLaneRecord
@@ -1471,9 +1563,18 @@ async function removeReservedChildLane(
   deps: ProviderLinearChildLaneShellDependencies
 ): Promise<void> {
   await deps.transactChildLanes(runDir, async (records) => ({
-    records: removeChildLaneRecord(records, reserved),
+    records: removePendingChildLaneRecord(records, reserved),
     result: undefined
   }));
+}
+
+function removePendingChildLaneRecord(
+  records: ProviderLinearWorkerChildLaneRecord[],
+  target: ProviderLinearWorkerChildLaneRecord
+): ProviderLinearWorkerChildLaneRecord[] {
+  return records.filter(
+    (entry) => !matchesChildLaneRecordIdentity(entry, target) || entry.decision !== 'pending'
+  );
 }
 
 function resolveChildLaneDecisionProvenanceViolation(
