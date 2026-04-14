@@ -1,0 +1,37 @@
+{
+  "issue_id": "fixture-justified-serial-review-run",
+  "issue_identifier": "CO-FIXTURE-REVIEW",
+  "attempt_started_at": "2026-04-14T00:20:00.000Z",
+  "current_turn_started_at": "2026-04-14T00:21:00.000Z",
+  "linear_audit": {
+    "path": "provider-linear-worker-linear-audit.jsonl",
+    "attempted_count": 1,
+    "success_count": 1,
+    "failure_count": 0,
+    "latest_recorded_at": "2026-04-14T00:21:05.000Z",
+    "latest_by_operation": {},
+    "parallelization_entries": [
+      {
+        "recorded_at": "2026-04-14T00:21:05.000Z",
+        "operation": "parallelization",
+        "ok": true,
+        "issue_id": "fixture-justified-serial-review-run",
+        "issue_identifier": "CO-FIXTURE-REVIEW",
+        "source_setup": null,
+        "action": "stay_serial",
+        "via": "review_or_validation_only: review handoff and validation drain are parent-owned; no child_lanes allowed",
+        "state": "review_or_validation_only",
+        "follow_up_issue_id": null,
+        "follow_up_issue_identifier": null,
+        "failed_relation_type": null,
+        "comment_id": null,
+        "attachment_id": null,
+        "error_code": null,
+        "error_message": null
+      }
+    ]
+  },
+  "child_lanes": [],
+  "owner_status": "succeeded",
+  "updated_at": "2026-04-14T00:25:00.000Z"
+}

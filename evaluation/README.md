@@ -5,6 +5,7 @@ The evaluation harness runs adapter commands against managed fixtures to verify 
 ## Usage
 
 - `npm run eval:test` — Executes Vitest suites under `evaluation/tests/**`.
+- `npm run eval:provider-adoption` — Replays sanitized provider-linear run fixtures and writes machine-readable adoption metrics to `out/<task>/provider-linear-adoption-eval.json`.
 - Programmatic helpers live in `evaluation/harness/index.ts` for invoking scenarios from scripts/tests; the unused CLI wrappers were removed in Task 0801.
 
 Harness helpers:
@@ -19,3 +20,5 @@ Scenario options include:
 - `defaultTimeoutMs`: Override the default 30s timeout per command.
 
 Fixtures live under `evaluation/fixtures/**` and include per-scenario READMEs describing their checks.
+
+Provider adoption reports should be read from the top-level `summary` first. `source_0_adopting_runs`, `prompt_pack_adopting_runs`, `parallelization_decision_counts`, `child_lane_launch_count`, `accepted_child_lane_count`, and `traceable_follow_up_runs` are intended for CO STATUS, CI artifact, or dashboard ingestion. Per-run failures explain the exact missing artifact, such as absent `memory.source_0`, weak `stay_serial`, missing same-turn child-lane proof, or incomplete follow-up shaping.
