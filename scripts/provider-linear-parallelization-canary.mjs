@@ -568,8 +568,11 @@ export function validateProviderLinearParallelizationCanaryReport(report) {
   ) {
     failures.push('report summary metric-only child lanes do not match recomputed validation');
   }
-  if (report.child_lane_cap?.value !== PARALLEL_FIRST_CHILD_LANE_CAP) {
-    failures.push('report child-lane cap does not match the parallel-first cap');
+  if (JSON.stringify(report.baseline) !== JSON.stringify(recomputed.baseline)) {
+    failures.push('report baseline does not match recomputed validation');
+  }
+  if (JSON.stringify(report.child_lane_cap) !== JSON.stringify(recomputed.child_lane_cap)) {
+    failures.push('report child-lane cap metadata does not match recomputed validation');
   }
 
   if (failures.length > 0) {

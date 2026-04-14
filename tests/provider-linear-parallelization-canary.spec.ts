@@ -93,6 +93,26 @@ describe('provider-linear parallelization canary', () => {
     });
   });
 
+  it('rejects tampered baseline and cap metadata', () => {
+    const report = buildProviderLinearParallelizationCanaryReport({
+      generatedAt: '2026-04-14T00:00:00.000Z',
+      taskId: 'linear-co-174'
+    });
+
+    report.baseline.total_decisions = 1;
+    report.baseline.parallelize_now_rate = 1;
+    report.child_lane_cap.counts = ['active'];
+    report.child_lane_cap.preserves = 'tampered';
+
+    expect(validateProviderLinearParallelizationCanaryReport(report)).toEqual({
+      ok: false,
+      failures: expect.arrayContaining([
+        'report baseline does not match recomputed validation',
+        'report child-lane cap metadata does not match recomputed validation'
+      ])
+    });
+  });
+
   it('rejects malformed cap overruns even when a candidate marks the cap exhausted', () => {
     const scenario = buildProviderLinearParallelizationCanaryScenarios()[0];
     scenario.id = 'bad-cap-overrun';
