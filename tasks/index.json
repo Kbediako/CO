@@ -1,6 +1,46 @@
 {
   "items": [
     {
+      "id": "20260414-linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8",
+      "title": "CO workflow: add rolling docs:freshness cohort policy for Apr 14 stale baseline",
+      "relates_to": "tasks/tasks-linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-14",
+      "paths": {
+        "spec": "tasks/specs/linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8.md",
+        "task": "tasks/tasks-linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8.md",
+        "agent_task": ".agent/task/linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8.md",
+        "docs": "docs/TECH_SPEC-linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8.md"
+      }
+    },
+    {
+      "id": "20260414-linear-3cdd7af3-787e-4e73-bb00-731feb5d0db2",
+      "title": "CO workflow: make parent-owned same-issue child lanes parallel-first by default where safe",
+      "relates_to": "tasks/tasks-linear-3cdd7af3-787e-4e73-bb00-731feb5d0db2.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-14",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (clean-success)",
+          "date": "2026-04-14",
+          "manifest": ".runs/linear-3cdd7af3-787e-4e73-bb00-731feb5d0db2-co-174-docs-review/cli/2026-04-13T23-05-04-374Z-17c6fed0/manifest.json",
+          "telemetry": ".runs/linear-3cdd7af3-787e-4e73-bb00-731feb5d0db2-co-174-docs-review/cli/2026-04-13T23-05-04-374Z-17c6fed0/review/telemetry.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-3cdd7af3-787e-4e73-bb00-731feb5d0db2.md",
+        "task": "tasks/tasks-linear-3cdd7af3-787e-4e73-bb00-731feb5d0db2.md",
+        "agent_task": ".agent/task/linear-3cdd7af3-787e-4e73-bb00-731feb5d0db2.md",
+        "docs": "docs/TECH_SPEC-linear-3cdd7af3-787e-4e73-bb00-731feb5d0db2.md"
+      }
+    },
+    {
       "id": "20260414-linear-0f7f6994-db41-4b0a-91f3-9b8f32ea427c",
       "title": "CO: harden forced standalone review so boundary fallbacks do not replace review verdicts",
       "relates_to": "tasks/tasks-linear-0f7f6994-db41-4b0a-91f3-9b8f32ea427c.md",

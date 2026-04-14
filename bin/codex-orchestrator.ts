@@ -1610,6 +1610,23 @@ Subcommands:
     --project-id <id>     Optional project scope check.
     --format json         Emit machine-readable output.
 
+  parallelization
+    --issue-id <id>       Linear issue id/key for the active provider-worker turn.
+    --decision <mode>     parallelize_now, stay_serial, or forbid_parallel.
+    --reason <code>       Reason code allowed for the selected decision.
+    --summary <text>      Required operator summary. Include matrix/cap evidence.
+    Parallel-first rule: create a pre-turn decomposition matrix before the decision.
+    Matrix columns: candidate lane, file/phase scope, dependencies, overlap risk,
+      expected validation artifact, child-lane owner, and cap-slot use.
+    stay_serial is invalid while any safe independent child-lane candidate remains;
+      single_bounded_change must label docs/test/research/review slice justifications.
+    Child-lane cap: at most 2 active, pending, or unaccepted same-issue child lanes.
+      On cap exhaustion, use stay_serial/existing_child_lane_active and include cap_exhausted: evidence.
+      Stale in-flight accept claims older than 30 minutes, or legacy claims without timestamps, are recoverable and do not consume cap.
+    Parent ownership: avoid delegated files/phases while a child lane is active; collisions
+      require invalidate/reject/rebase reasoning before child patch acceptance.
+    --format json         Emit machine-readable output.
+
   create-follow-up
     --issue-id <id>                   Source Linear issue id/key.
     --title <title>                   Follow-up issue title.
