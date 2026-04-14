@@ -1247,6 +1247,13 @@ export class ReviewExecutionState {
   }
 
   private recordCommandIntentViolation(violation: ReviewCommandIntentViolation): void {
+    if (
+      this.commandIntentViolationSamples.some(
+        (sample) => sample.kind === violation.kind && sample.sample === violation.sample
+      )
+    ) {
+      return;
+    }
     if (!this.commandIntentViolation) {
       this.commandIntentViolation = violation;
     }

@@ -182,18 +182,15 @@ export function isReviewOrchestrationCommand(command: string, args: string[]): b
   }
 
   const firstArg = normalizeCommandToken(args[0] ?? '');
-  const secondArg = normalizeCommandToken(args[1] ?? '');
+  const startPipelineIndex = firstArg === 'start' ? findStartReviewPipelineArgIndex(args) : null;
   if (command === 'codex-orchestrator') {
     if (
       (firstArg === 'review' && hasCliHelpRequest(args.slice(1))) ||
-      (firstArg === 'start' && isReviewPipelineTarget(secondArg) && hasCliHelpRequest(args.slice(2)))
+      (startPipelineIndex !== null && hasCliHelpRequest(args.slice(startPipelineIndex + 1)))
     ) {
       return false;
     }
-    return (
-      firstArg === 'review' ||
-      (firstArg === 'start' && isReviewPipelineTarget(secondArg))
-    );
+    return firstArg === 'review' || startPipelineIndex !== null;
   }
   if (command === 'codex') {
     return firstArg === 'review' && !hasCliHelpRequest(args.slice(1));
@@ -215,6 +212,53 @@ export function isReviewOrchestrationCommand(command: string, args: string[]): b
 
 function isReviewPipelineTarget(target: string): boolean {
   return target === 'docs-review' || target === 'implementation-gate' || target === 'diagnostics';
+}
+
+const CLI_BOOLEAN_FLAG_KEYS = new Set([
+  'apply',
+  'auto-issue-log',
+  'blocked-by-source',
+  'cloud',
+  'cloud-preflight',
+  'codex-cli',
+  'codex-force',
+  'collab',
+  'devtools',
+  'dry-run',
+  'force',
+  'help',
+  'interactive',
+  'issue-log',
+  'multi-agent',
+  'no-interactive',
+  'repo-config-required',
+  'refresh-skills',
+  'ui',
+  'usage',
+  'watch',
+  'yes'
+]);
+
+function findStartReviewPipelineArgIndex(args: string[]): number | null {
+  for (let index = 1; index < args.length; index += 1) {
+    const token = args[index] ?? '';
+    if (token === '--') {
+      const next = args[index + 1] ?? '';
+      return isReviewPipelineTarget(normalizeCommandToken(next)) ? index + 1 : null;
+    }
+    if (!token.startsWith('--')) {
+      return isReviewPipelineTarget(normalizeCommandToken(token)) ? index : null;
+    }
+    const key = token.slice(2);
+    if (key.includes('=') || CLI_BOOLEAN_FLAG_KEYS.has(key)) {
+      continue;
+    }
+    const next = args[index + 1];
+    if (next && !next.startsWith('--')) {
+      index += 1;
+    }
+  }
+  return null;
 }
 
 function hasCliHelpRequest(

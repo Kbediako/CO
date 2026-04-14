@@ -6321,7 +6321,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       expect(telemetry.launch_context).toEqual(
         reviewLaunchContext(null)
       );
-      expect(telemetry.summary.commandIntentViolationCount).toBeGreaterThan(0);
+      expect(telemetry.summary.commandIntentViolationCount).toBe(1);
       expect(telemetry.summary.commandIntentViolationKinds).toEqual(['validation-runner']);
     }
   }, LONG_WAIT_TEST_TIMEOUT_MS);

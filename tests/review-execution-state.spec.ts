@@ -4309,6 +4309,22 @@ describe('ReviewExecutionState', () => {
     expect(boundary.violationSample).toContain('npx vitest run');
   });
 
+  it('counts repeated command-intent output for the same command once', () => {
+    const state = new ReviewExecutionState({ startedAtMs: 0 });
+    const command =
+      `/bin/zsh -lc 'npx vitest run --config vitest.config.core.ts tests/run-review.spec.ts'\n`;
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(command, 'stdout', 110);
+    state.observeChunk('thinking\nexec\n', 'stdout', 120);
+    state.observeChunk(command, 'stdout', 130);
+
+    const boundary = state.getCommandIntentBoundaryState(2_000);
+    expect(boundary.triggered).toBe(true);
+    expect(boundary.violationKind).toBe('validation-runner');
+    expect(boundary.violationCount).toBe(1);
+  });
+
   it('allows direct validation runners when heavy review commands are explicitly allowed', () => {
     const state = new ReviewExecutionState({
       startedAtMs: 0,

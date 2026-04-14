@@ -109,6 +109,16 @@ describe('review command intent classification', () => {
       })?.kind
     ).toBe('review-orchestration');
     expect(
+      classifyCommandIntentCommandLine(`codex-orchestrator start --task sample-task implementation-gate`, {
+        allowValidationCommandIntents: false
+      })?.kind
+    ).toBe('review-orchestration');
+    expect(
+      classifyCommandIntentCommandLine(`codex-orchestrator start --task diagnostics non-review`, {
+        allowValidationCommandIntents: false
+      })
+    ).toBeNull();
+    expect(
       classifyCommandIntentCommandLine(`codex review --uncommitted`, {
         allowValidationCommandIntents: false
       })?.kind
@@ -121,6 +131,7 @@ describe('review command intent classification', () => {
       `codex review -h`,
       `codex-orchestrator review --help`,
       `codex-orchestrator start docs-review --help`,
+      `codex-orchestrator start --task sample-task docs-review --help`,
       `node scripts/run-review.ts --help`,
       `npm run review -- --help`,
       `/bin/zsh -lc 'codex --help; codex review --help'`
