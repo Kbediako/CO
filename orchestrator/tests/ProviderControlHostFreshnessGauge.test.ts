@@ -520,6 +520,17 @@ describe('provider/control-host freshness gauge', () => {
     })).rejects.toThrow(/must be a directory/);
   });
 
+  it('rejects unknown CLI output formats', async () => {
+    await expect(runControlHostFreshnessGaugeCliShell({
+      flags: {
+        'artifact-root': join(FIXTURE_ROOT, 'healthy'),
+        format: 'jsno',
+        now: NOW
+      },
+      printHelp: vi.fn()
+    })).rejects.toThrow(/Invalid --format: expected text\|json/);
+  });
+
   it('supports explicit path flags without recursively scanning an artifact root', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
 

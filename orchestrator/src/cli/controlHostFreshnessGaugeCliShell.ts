@@ -43,7 +43,7 @@ export async function runControlHostFreshnessGaugeCliShell(
     thresholds: readThresholdFlags(params.flags),
     paths
   });
-  const format: OutputFormat = readStringFlag(params.flags, 'format') === 'json' ? 'json' : 'text';
+  const format = readOutputFormatFlag(params.flags);
   if (format === 'json') {
     console.log(JSON.stringify(report, null, 2));
   } else {
@@ -149,4 +149,15 @@ function readNumberFlag(flags: ArgMap, key: string): number | null {
     throw new Error(`Invalid --${key}: expected non-negative number.`);
   }
   return parsed;
+}
+
+function readOutputFormatFlag(flags: ArgMap): OutputFormat {
+  const raw = readStringFlag(flags, 'format');
+  if (raw === undefined || raw === 'text') {
+    return 'text';
+  }
+  if (raw === 'json') {
+    return 'json';
+  }
+  throw new Error(`Invalid --format: expected text|json, got ${JSON.stringify(raw)}.`);
 }
