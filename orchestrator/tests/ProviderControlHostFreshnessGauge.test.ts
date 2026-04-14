@@ -286,6 +286,27 @@ describe('provider/control-host freshness gauge', () => {
     expect(reverse.metrics.last_successful_refresh_age_ms.source_path).toBe(healthyPath);
   });
 
+  it('orders standalone polling health artifacts by polling timestamps', async () => {
+    const fixtureRoot = join(FIXTURE_ROOT, 'polling-health-freshness-order');
+    const currentPath = join(fixtureRoot, 'a-current/provider-polling-health.json');
+    const stalePath = join(fixtureRoot, 'z-stale/provider-polling-health.json');
+
+    const report = await evaluateProviderControlHostFreshnessGauge({
+      paths: { polling_health: [stalePath, currentPath] },
+      now: NOW,
+      strict: true
+    });
+
+    expect(report.verdict).toBe('healthy');
+    expect(report.metrics.last_successful_refresh_age_ms).toMatchObject({
+      value: 30_000,
+      verdict: 'healthy',
+      source_path: currentPath,
+      source_field: 'last_success_at'
+    });
+    expect(report.findings.map((finding) => finding.code)).not.toContain('stale_refresh');
+  });
+
   it('selects duplicate run-id manifests deterministically by freshness', async () => {
     const fixtureRoot = join(FIXTURE_ROOT, 'duplicate-run-id-manifests');
     const intakePath = join(fixtureRoot, 'provider-intake-state.json');
@@ -359,6 +380,28 @@ describe('provider/control-host freshness gauge', () => {
     expect(report.findings.map((finding) => finding.code)).not.toContain('start_to_first_heartbeat_latency_degraded');
   });
 
+  it('uses explicit first-heartbeat evidence instead of latest activity for start latency', async () => {
+    const fixtureRoot = join(FIXTURE_ROOT, 'latest-activity-not-first-heartbeat');
+    const healthyRoot = join(FIXTURE_ROOT, 'healthy');
+    const report = await evaluateProviderControlHostFreshnessGauge({
+      now: NOW,
+      paths: {
+        provider_intake_state: [join(healthyRoot, 'control-host/provider-intake-state.json')],
+        polling_health: [join(healthyRoot, 'control-host/provider-polling-health.json')],
+        provider_manifests: [join(healthyRoot, 'runs/worker/manifest.json')],
+        provider_proofs: [join(fixtureRoot, 'run/provider-linear-worker-proof.json')]
+      }
+    });
+
+    expect(report.verdict).toBe('healthy');
+    expect(report.metrics.start_to_first_heartbeat_latency_ms).toMatchObject({
+      value: 10_000,
+      verdict: 'healthy',
+      source_field: 'first_heartbeat_at'
+    });
+    expect(report.findings.map((finding) => finding.code)).not.toContain('start_to_first_heartbeat_latency_degraded');
+  });
+
   it('scopes child-lane cap pressure to the busiest parent run', async () => {
     const report = await evaluateProviderControlHostFreshnessGauge({
       artifactRoot: join(FIXTURE_ROOT, 'child-lane-cap-per-parent'),
@@ -367,6 +410,24 @@ describe('provider/control-host freshness gauge', () => {
 
     expect(report.verdict).toBe('healthy');
     expect(report.metrics.child_lane_cap_pressure.value).toBe(0.5);
+    expect(report.findings.map((finding) => finding.code)).not.toContain('child_lane_cap_pressure');
+  });
+
+  it('excludes recoverable stale in-flight child lanes from cap pressure', async () => {
+    const fixtureRoot = join(FIXTURE_ROOT, 'stale-in-flight-child-lane');
+    const healthyRoot = join(FIXTURE_ROOT, 'healthy');
+    const report = await evaluateProviderControlHostFreshnessGauge({
+      now: NOW,
+      paths: {
+        provider_intake_state: [join(healthyRoot, 'control-host/provider-intake-state.json')],
+        polling_health: [join(healthyRoot, 'control-host/provider-polling-health.json')],
+        provider_manifests: [join(healthyRoot, 'runs/worker/manifest.json')],
+        provider_proofs: [join(fixtureRoot, 'run/provider-linear-worker-proof.json')]
+      }
+    });
+
+    expect(report.verdict).toBe('healthy');
+    expect(report.metrics.child_lane_cap_pressure.value).toBe(0);
     expect(report.findings.map((finding) => finding.code)).not.toContain('child_lane_cap_pressure');
   });
 

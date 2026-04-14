@@ -122,6 +122,8 @@ const DEFAULT_THRESHOLDS: ProviderControlHostFreshnessGaugeThresholds = {
   childLaneCap: 2
 };
 
+const PROVIDER_LINEAR_CHILD_LANE_IN_FLIGHT_STALE_MS = 30 * 60 * 1000;
+
 const STATUS_DATASET_NAMES = new Set([
   'co-status-dataset.json',
   'operator-dashboard-dataset.json',
@@ -231,7 +233,7 @@ export async function evaluateProviderControlHostFreshnessGauge(
       thresholds,
       findings
     ),
-    child_lane_cap_pressure: evaluateChildLaneCapPressure(proofs, thresholds, findings),
+    child_lane_cap_pressure: evaluateChildLaneCapPressure(proofs, nowMs, thresholds, findings),
     stale_source_verdict: buildUnknownVerdictMetric()
   };
   evaluateLinearBudget(linearBudget, thresholds, findings);
@@ -683,10 +685,7 @@ function evaluateStartToHeartbeatLatency(
       timestampMs(proof.value.current_turn_started_at) ??
       timestampMs(proof.manifest?.value.started_at) ??
       timestampMs(proof.manifest?.value.startedAt);
-    const heartbeatAt = firstTimestampMs(
-      proof.value.current_turn_activity,
-      'recorded_at'
-    ) ?? timestampMs(proof.value.last_event_at) ?? timestampMs(proof.value.updated_at);
+    const heartbeatAt = firstHeartbeatTimestampMs(proof);
     return startedAt !== null && heartbeatAt !== null
       ? [{ latencyMs: Math.max(0, heartbeatAt - startedAt), proof }]
       : [];
@@ -703,7 +702,7 @@ function evaluateStartToHeartbeatLatency(
       verdict: 'degraded',
       message: `Provider start-to-first-heartbeat latency is ${slowest.latencyMs}ms.`,
       source_path: slowest.proof.path,
-      source_field: 'updated_at'
+      source_field: 'first_heartbeat_at'
     });
   }
   return metric(
@@ -711,7 +710,7 @@ function evaluateStartToHeartbeatLatency(
     'ms',
     slowest.latencyMs > thresholds.startToHeartbeatDegradedAfterMs ? 'degraded' : 'healthy',
     slowest.proof.path,
-    'updated_at',
+    'first_heartbeat_at',
     null
   );
 }
@@ -910,6 +909,7 @@ function evaluateRetryBackoffAge(
 
 function evaluateChildLaneCapPressure(
   proofs: ProofArtifact[],
+  nowMs: number,
   thresholds: ProviderControlHostFreshnessGaugeThresholds,
   findings: ProviderControlHostFreshnessGaugeFinding[]
 ): ProviderControlHostFreshnessGaugeMetric<number> {
@@ -919,7 +919,7 @@ function evaluateChildLaneCapPressure(
   );
   const activeByParent = new Map<string, { count: number; proof: ProofArtifact }>();
   for (const { lane, proof } of lanes) {
-    if (!isActiveChildLane(lane)) {
+    if (!isActiveChildLane(lane, nowMs)) {
       continue;
     }
     const parentKey = childLaneParentKey(proof);
@@ -1168,9 +1168,25 @@ function isTerminalProof(proof: ProofArtifact): boolean {
   return ownerPhase === 'ended' && (ownerStatus === 'succeeded' || ownerStatus === 'failed');
 }
 
-function isActiveChildLane(lane: Record<string, unknown>): boolean {
+function firstHeartbeatTimestampMs(proof: ProofArtifact): number | null {
+  return earliestTimestampMs(
+    timestampMs(proof.value.first_heartbeat_at),
+    timestampMs(proof.value.firstHeartbeatAt),
+    timestampMs(proof.value.first_activity_at),
+    timestampMs(proof.value.firstActivityAt),
+    timestampMs(proof.value.first_event_at),
+    timestampMs(proof.value.firstEventAt),
+    timestampMs(proof.manifest?.value.first_heartbeat_at),
+    timestampMs(proof.manifest?.value.firstHeartbeatAt),
+    timestampMs(proof.manifest?.value.first_activity_at),
+    timestampMs(proof.manifest?.value.firstActivityAt)
+  );
+}
+
+function isActiveChildLane(lane: Record<string, unknown>, nowMs: number): boolean {
   if (lane.in_flight_action) {
-    return true;
+    const startedAt = timestampMs(lane.in_flight_started_at);
+    return startedAt !== null && nowMs - startedAt < PROVIDER_LINEAR_CHILD_LANE_IN_FLIGHT_STALE_MS;
   }
   const decision = normalizeOptionalString(lane.decision);
   return decision === 'pending';
@@ -1217,7 +1233,11 @@ function artifactTimestampMs(artifact: JsonArtifact): number | null {
     timestampMs(value?.updated_at),
     timestampMs(value?.generated_at),
     timestampMs(value?.observed_at),
-    timestampMs(value?.recorded_at)
+    timestampMs(value?.recorded_at),
+    timestampMs(value?.last_success_at),
+    timestampMs(value?.lastSuccessAt),
+    timestampMs(value?.last_completed_at),
+    timestampMs(value?.lastCompletedAt)
   );
 }
 
@@ -1357,6 +1377,11 @@ function firstTimestampMs(record: unknown, field: string): number | null {
 function latestTimestampMs(...values: (number | null | undefined)[]): number | null {
   const finite = values.filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
   return finite.length === 0 ? null : Math.max(...finite);
+}
+
+function earliestTimestampMs(...values: (number | null | undefined)[]): number | null {
+  const finite = values.filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+  return finite.length === 0 ? null : Math.min(...finite);
 }
 
 function finiteNumber(value: unknown): number | null {

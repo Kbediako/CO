@@ -1,6 +1,7 @@
 {
   "run_id": "parent-a",
   "attempt_started_at": "2026-04-14T05:59:00.000Z",
+  "first_heartbeat_at": "2026-04-14T05:59:20.000Z",
   "current_turn_activity": {
     "recorded_at": "2026-04-14T05:59:20.000Z"
   },

@@ -41,6 +41,8 @@ The `metrics` object includes source-backed fields for:
 
 Each metric includes `value`, `unit`, `verdict`, `source_path`, `source_field`, and `reason`. The `findings` array carries machine-readable `code`, `verdict`, `message`, `source_path`, and `source_field`.
 
+`start_to_first_heartbeat_latency_ms` uses explicit first-heartbeat fields such as `first_heartbeat_at`; latest activity fields remain reserved for active heartbeat age. When first-heartbeat evidence is absent, the metric reports `unknown` instead of treating later activity as startup latency. `child_lane_cap_pressure` mirrors the provider child-lane launcher by counting pending child lanes and non-stale in-flight decisions, while ignoring recoverable stale in-flight claims older than 30 minutes or missing `in_flight_started_at`.
+
 ## Citation Paths
 
 When reporting a failure, cite the specific `findings[].source_path` and `findings[].source_field`. Common sources:
