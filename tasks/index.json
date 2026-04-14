@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260414-linear-8720424f-56b0-4539-bebe-041c759fcb74",
+      "title": "CO: keep fresh Ready issue admission fair under retained/released refresh residue",
+      "relates_to": "tasks/tasks-linear-8720424f-56b0-4539-bebe-041c759fcb74.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-14",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-8720424f-56b0-4539-bebe-041c759fcb74.md",
+        "task": "tasks/tasks-linear-8720424f-56b0-4539-bebe-041c759fcb74.md",
+        "agent_task": ".agent/task/linear-8720424f-56b0-4539-bebe-041c759fcb74.md",
+        "docs": "docs/TECH_SPEC-linear-8720424f-56b0-4539-bebe-041c759fcb74.md"
+      }
+    },
+    {
       "id": "20260414-linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d",
       "title": "CO: Re-audit and decide Codex CLI 0.120.0 adoption posture",
       "relates_to": "tasks/tasks-linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d.md",

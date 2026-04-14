@@ -27,6 +27,8 @@ export interface ControlPollingHealthPayload {
   operation_started_at: string | null;
   operation_elapsed_ms: number | null;
   stalled_after_ms: number | null;
+  refresh_phase: string | null;
+  refresh_counts: Record<string, number> | null;
   stuck: boolean;
   stuck_since_at: string | null;
   restart_required: boolean;
@@ -49,6 +51,8 @@ interface MutableProviderPollingHealthState {
   nextPollAtMs: number | null;
   updatedAtMs: number | null;
   operationStartedAtMs: number | null;
+  refreshPhase: string | null;
+  refreshCounts: Record<string, number> | null;
   stuckAtMs: number | null;
   reason: string | null;
   linearBudget: LinearBudgetStatus | null;
@@ -132,8 +136,29 @@ export function markProviderPollingStarted(
   state.nextPollAtMs = null;
   state.updatedAtMs = atMs;
   state.operationStartedAtMs = atMs;
+  state.refreshPhase = `${input.mode}:started`;
+  state.refreshCounts = null;
   state.stuckAtMs = null;
   state.reason = null;
+  queueProviderPollingHealthUpdate(providerIssueHandoff, state, atMs);
+}
+
+export function recordProviderPollingProgress(
+  providerIssueHandoff: ProviderIssueHandoffService,
+  input: {
+    phase: string;
+    counts?: Record<string, number> | null;
+    atMs?: number;
+  }
+): void {
+  const state = providerPollingHealthStates.get(providerIssueHandoff);
+  if (!state) {
+    return;
+  }
+  const atMs = input.atMs ?? Date.now();
+  state.refreshPhase = normalizeOptionalString(input.phase) ?? null;
+  state.refreshCounts = copyFiniteRefreshCounts(input.counts ?? null);
+  state.updatedAtMs = atMs;
   queueProviderPollingHealthUpdate(providerIssueHandoff, state, atMs);
 }
 
@@ -170,6 +195,8 @@ export function markProviderPollingCompleted(
     }
     state.reason = state.reason ?? buildProviderPollingStuckReason(state);
   } else {
+    state.refreshPhase = null;
+    state.refreshCounts = null;
     state.stuckAtMs = null;
     state.reason = null;
   }
@@ -321,6 +348,8 @@ function buildProviderPollingHealthPayload(
     operation_started_at: toIsoTimestamp(state.operationStartedAtMs),
     operation_elapsed_ms: operationElapsedMs,
     stalled_after_ms: state.stuckAfterMs,
+    refresh_phase: state.refreshPhase,
+    refresh_counts: state.refreshCounts ? { ...state.refreshCounts } : null,
     stuck,
     stuck_since_at: toIsoTimestamp(state.stuckAtMs),
     restart_required: stuck,
@@ -425,6 +454,8 @@ function getOrCreateProviderPollingHealthState(
     nextPollAtMs: intervalMs !== null ? Date.now() : null,
     updatedAtMs: null,
     operationStartedAtMs: null,
+    refreshPhase: null,
+    refreshCounts: null,
     stuckAtMs: null,
     reason: null,
     linearBudget: null,
@@ -542,6 +573,16 @@ function isProviderLifecycleStuckError(error: unknown): boolean {
 
 function normalizeOptionalString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+}
+
+function copyFiniteRefreshCounts(value: Record<string, number> | null): Record<string, number> | null {
+  if (!value) {
+    return null;
+  }
+  const entries = Object.entries(value)
+    .map(([key, count]) => [key.trim(), count] as const)
+    .filter(([key, count]) => key.length > 0 && Number.isFinite(count));
+  return entries.length > 0 ? Object.fromEntries(entries) : null;
 }
 
 function normalizeScheduledPollingIntervalMs(

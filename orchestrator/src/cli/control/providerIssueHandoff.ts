@@ -51,7 +51,10 @@ import {
   upsertProviderIntakeClaim
 } from './providerIntakeState.js';
 import { createProviderIssueRetryQueue } from './providerIssueRetryQueue.js';
-import { isProviderPollingStuck } from './providerPollingHealth.js';
+import {
+  isProviderPollingStuck,
+  recordProviderPollingProgress
+} from './providerPollingHealth.js';
 import type { ProviderWorkflowConfigStore } from './providerWorkflowConfigStore.js';
 import {
   findProviderWorkerHost,
@@ -2331,6 +2334,8 @@ export function createProviderIssueHandoffService(
     consumedTrackedIssueKeys?: Set<string>;
     allowPollFailClosed?: boolean;
     allowReleasedPollFailClosed?: boolean;
+    allowDirectIssueById?: boolean;
+    onDirectIssueById?: () => void;
   }): Promise<ProviderTrackedIssueRefreshDisposition> => {
     if (shouldAbortRefreshCycle()) {
       return buildRefreshCycleStuckSkipResolution();
@@ -2346,7 +2351,9 @@ export function createProviderIssueHandoffService(
         resolveTrackedIssueWhenNotStuck,
         {
           allowPollFailClosed: input.allowPollFailClosed === true,
-          allowReleasedPollFailClosed: input.allowReleasedPollFailClosed === true
+          allowReleasedPollFailClosed: input.allowReleasedPollFailClosed === true,
+          allowDirectIssueById: input.allowDirectIssueById !== false,
+          onDirectIssueById: input.onDirectIssueById
         }
       );
     }
@@ -2355,6 +2362,7 @@ export function createProviderIssueHandoffService(
       return { kind: 'skip', reason: 'provider_issue_refresh_resolution_unavailable' };
     }
 
+    input.onDirectIssueById?.();
     const resolution = await resolveTrackedIssueWhenNotStuck({
       provider: input.claim.provider,
       issueId: input.claim.issue_id
@@ -3539,14 +3547,36 @@ export function createProviderIssueHandoffService(
       } finally {
         scheduleBestEffortRehydrateWithRefreshLock();
       }
-    };
+  };
 
   const runRefreshCycle = async (pollInput?: ProviderIssueHandoffPollInput): Promise<void> => {
     const trackedIssueRefetch = wrapTrackedIssueRefetch(pollInput?.refetchTrackedIssues ?? null);
+    const refreshCounts: Record<string, number> = {
+      claims_total: 0,
+      claims_scanned: 0,
+      issue_by_id_reads: 0,
+      issue_by_id_deferred: 0,
+      occupied_slots: 0,
+      fresh_discovery_runs: 0,
+      fresh_discovery_candidates: 0,
+      fresh_discovery_started: 0
+    };
+    const recordRefreshProgress = (phase: string): void => {
+      if (!providerIssueHandoffService) {
+        return;
+      }
+      recordProviderPollingProgress(providerIssueHandoffService, {
+        phase,
+        counts: refreshCounts
+      });
+    };
       await runWithProviderIssueRunDiscoveryCache(async () => {
         await runWithRefreshLifecycleLock(async () => {
+          recordRefreshProgress('refresh:rehydrate');
           assertRefreshCycleNotStuck();
           const result = await rehydrateNow();
+          refreshCounts.claims_total = options.state.claims.length;
+          recordRefreshProgress('refresh:rehydrated');
           assertRefreshCycleNotStuck();
           if (result.hasPendingClaims) {
             scheduleBestEffortRehydrateWithRefreshLock();
@@ -3560,39 +3590,173 @@ export function createProviderIssueHandoffService(
 
         const discoveredRuns = await discoverProviderIssueRunsForCurrentOperation();
         const runsByProviderIssue = groupProviderIssueRuns(discoveredRuns);
-        const existingProviderKeys = new Set(options.state.claims.map((claim) => claim.provider_key));
         const pollDispatchBudget = createProviderPollDispatchBudget(options.readFeatureToggles?.() ?? null);
         const occupiedPollDispatchKeys = new Set<string>();
+        const occupiedPollDispatchProviderKeys = new Set<string>();
+        const occupiedPollDispatchStateByKey = new Map<
+          string,
+          Pick<LiveLinearTrackedIssue, 'state'>
+        >();
+        const occupiedPollDispatchProviderKeyByKey = new Map<string, string>();
         const releasedFreshDiscoveryReplayBlockedProviderKeys = new Set<string>();
+        const deferredClaimFreshDiscoveryBlockedProviderKeys = new Set<string>();
+        let releasedFailClosedSkipCount = 0;
+        let releasedFailClosedEligibleCount = 0;
+        let releasedFailClosedDisqualifyingRetainedCount = 0;
         let suppressFreshDiscovery = false;
+        const resolveClaimPollDispatchSlotKey = (
+          providerKey: string,
+          claim: Pick<ProviderIntakeClaimRecord, 'state' | 'run_id' | 'run_manifest_path'>,
+          run: Pick<ProviderIssueRunRecord, 'provider' | 'issueId' | 'runId' | 'manifestPath'> | null = null
+        ): string | null => {
+          if (run) {
+            return resolveProviderPollRunOccupancyKey(run);
+          }
+          if (claim.state === 'running') {
+            return null;
+          }
+          return claim.run_manifest_path ?? claim.run_id ?? `claim:${providerKey}:${claim.state}`;
+        };
         const noteOccupiedPollDispatchSlot = (
+          occupancyKey: string | null,
           providerKey: string,
           trackedIssue: Pick<LiveLinearTrackedIssue, 'state'>
         ): void => {
-          if (occupiedPollDispatchKeys.has(providerKey)) {
+          if (!occupancyKey) {
             return;
           }
-          occupiedPollDispatchKeys.add(providerKey);
+          occupiedPollDispatchProviderKeys.add(providerKey);
+          const occupiedTrackedIssue = occupiedPollDispatchStateByKey.get(occupancyKey);
+          if (occupiedPollDispatchKeys.has(occupancyKey)) {
+            if (occupiedTrackedIssue && occupiedTrackedIssue.state !== trackedIssue.state) {
+              pollDispatchBudget.releaseOccupied(occupiedTrackedIssue);
+              occupiedPollDispatchStateByKey.set(occupancyKey, { state: trackedIssue.state });
+              pollDispatchBudget.noteOccupied(trackedIssue);
+            }
+            return;
+          }
+          occupiedPollDispatchKeys.add(occupancyKey);
+          occupiedPollDispatchStateByKey.set(occupancyKey, { state: trackedIssue.state });
+          occupiedPollDispatchProviderKeyByKey.set(occupancyKey, providerKey);
+          refreshCounts.occupied_slots += 1;
           pollDispatchBudget.noteOccupied(trackedIssue);
         };
+        const releaseOccupiedPollDispatchSlot = (occupancyKey: string | null): void => {
+          if (!occupancyKey) {
+            return;
+          }
+          const trackedIssue = occupiedPollDispatchStateByKey.get(occupancyKey);
+          if (!trackedIssue) {
+            return;
+          }
+          const providerKey = occupiedPollDispatchProviderKeyByKey.get(occupancyKey) ?? null;
+          occupiedPollDispatchKeys.delete(occupancyKey);
+          occupiedPollDispatchStateByKey.delete(occupancyKey);
+          occupiedPollDispatchProviderKeyByKey.delete(occupancyKey);
+          if (providerKey) {
+            let providerStillOccupied = false;
+            for (const existingProviderKey of occupiedPollDispatchProviderKeyByKey.values()) {
+              if (existingProviderKey === providerKey) {
+                providerStillOccupied = true;
+                break;
+              }
+            }
+            if (!providerStillOccupied) {
+              occupiedPollDispatchProviderKeys.delete(providerKey);
+            }
+          }
+          refreshCounts.occupied_slots = Math.max(0, refreshCounts.occupied_slots - 1);
+          pollDispatchBudget.releaseOccupied(trackedIssue);
+        };
 
-        for (const run of filterProviderIssueRunsForStartPipeline(discoveredRuns, startPipelineId)) {
-          if (run.status !== 'in_progress') {
+        // Host-global capacity must count every live provider worker before a
+        // refresh cycle spends retained-claim reads or starts fresh work.
+        const activeDiscoveredRuns = discoveredRuns.filter((run) => run.status === 'in_progress');
+        const activeRunsByProviderIssue = groupProviderIssueRuns(activeDiscoveredRuns);
+        const claimStateByProviderKey = new Map<string, string | null>();
+        for (const claim of options.state.claims) {
+          claimStateByProviderKey.set(claim.provider_key, claim.issue_state ?? null);
+        }
+        const seededPollOccupancyKeys = new Set<string>();
+        for (const claim of options.state.claims) {
+          if (!shouldProviderClaimOccupyPollDispatchSlot(claim)) {
             continue;
           }
-          const providerKey = buildProviderIssueKey(run.provider, run.issueId);
-          if (existingProviderKeys.has(providerKey)) {
+          const claimProviderKey = buildProviderIssueKey(claim.provider, claim.issue_id);
+          const claimRuns = activeRunsByProviderIssue.get(claimProviderKey) ?? [];
+          const activeRun = resolveProviderClaimRunIdentity(claim, claimRuns) ?? claimRuns[0] ?? null;
+          const occupancyKey = resolveClaimPollDispatchSlotKey(claimProviderKey, claim, activeRun);
+          if (!occupancyKey) {
             continue;
           }
+          if (seededPollOccupancyKeys.has(occupancyKey)) {
+            continue;
+          }
+          seededPollOccupancyKeys.add(occupancyKey);
           noteOccupiedPollDispatchSlot(
-            providerKey,
-            trackedIssuesByKey?.get(providerKey) ?? { state: null }
+            occupancyKey,
+            claimProviderKey,
+            trackedIssuesByKey?.get(claimProviderKey) ?? { state: claim.issue_state ?? null }
           );
         }
+
+        for (const run of activeDiscoveredRuns) {
+          const occupancyKey = resolveProviderPollRunOccupancyKey(run);
+          if (seededPollOccupancyKeys.has(occupancyKey)) {
+            continue;
+          }
+          seededPollOccupancyKeys.add(occupancyKey);
+          const providerKey = buildProviderIssueKey(run.provider, run.issueId);
+          noteOccupiedPollDispatchSlot(
+            occupancyKey,
+            providerKey,
+            trackedIssuesByKey?.get(providerKey) ?? { state: claimStateByProviderKey.get(providerKey) ?? null }
+          );
+        }
+        const unreadableAdmissionOccupancy =
+          await discoverUnreadableProviderAdmissionOccupancyForCurrentOperation();
+        for (const record of unreadableAdmissionOccupancy) {
+          if (seededPollOccupancyKeys.has(record.manifestPath)) {
+            continue;
+          }
+          seededPollOccupancyKeys.add(record.manifestPath);
+          const providerKey = buildProviderIssueKey(record.provider, record.issueId);
+          noteOccupiedPollDispatchSlot(
+            record.manifestPath,
+            providerKey,
+            trackedIssuesByKey?.get(providerKey) ?? { state: claimStateByProviderKey.get(providerKey) ?? null }
+          );
+        }
+        recordRefreshProgress('refresh:claim_reconcile');
+        const hasFreshDiscoveryCandidates =
+          pollInput !== undefined &&
+          (trackedIssueRefetch !== null || pollInput.trackedIssues.length > 0);
+        const boundPreDiscoveryIssueByIdReads =
+          pollInput !== undefined &&
+          (
+            hasFreshDiscoveryCandidates ||
+            pollInput.deferFreshDiscovery === true ||
+            pollInput.allowPollFailClosed === true
+          );
+        const shouldReserveFreshDiscoverySlot =
+          boundPreDiscoveryIssueByIdReads && hasFreshDiscoveryCandidates;
+        const preDiscoveryIssueByIdReadLimit = boundPreDiscoveryIssueByIdReads
+          ? shouldReserveFreshDiscoverySlot
+            ? Math.max(0, pollDispatchBudget.remainingGlobalSlots() - 1)
+            : Math.max(1, refreshCounts.occupied_slots)
+          : Number.POSITIVE_INFINITY;
+        let preDiscoveryNonActiveIssueByIdReads = 0;
 
         for (const claim of [...options.state.claims]) {
           assertRefreshCycleNotStuck();
           const claimProviderKey = buildProviderIssueKey(claim.provider, claim.issue_id);
+          if (resolveReleasedProviderIssuePollFailClosedReason(claim)) {
+            releasedFailClosedEligibleCount += 1;
+          } else if (shouldProviderClaimDisqualifyAllReleasedSuppressor(claim)) {
+            releasedFailClosedDisqualifyingRetainedCount += 1;
+          }
+          refreshCounts.claims_scanned += 1;
+          recordRefreshProgress('refresh:claim_reconcile');
           try {
           const claimRuns =
             runsByProviderIssue.get(claimProviderKey) ?? [];
@@ -3603,19 +3767,37 @@ export function createProviderIssueHandoffService(
           const activeRun = attachableClaimRuns.find((run) => run.status === 'in_progress') ?? null;
           const releaseRun = resolveProviderReleaseRun(claim, attachableClaimRuns);
           const latestRun = resolveLatestKnownProviderRun(attachableClaimRuns);
+          const allowDirectIssueById =
+            !boundPreDiscoveryIssueByIdReads ||
+            activeRun !== null ||
+            preDiscoveryNonActiveIssueByIdReads < preDiscoveryIssueByIdReadLimit;
           const resolution = await resolveRefreshTrackedIssueResolution({
             claim,
             trackedIssuesByKey,
             consumedTrackedIssueKeys,
             allowPollFailClosed: pollInput?.deferFreshDiscovery === true,
             allowReleasedPollFailClosed:
-              pollInput?.allowPollFailClosed === true || pollInput?.deferFreshDiscovery === true
+              pollInput?.allowPollFailClosed === true || pollInput?.deferFreshDiscovery === true,
+            allowDirectIssueById,
+            onDirectIssueById: () => {
+              refreshCounts.issue_by_id_reads += 1;
+              if (boundPreDiscoveryIssueByIdReads && activeRun === null) {
+                preDiscoveryNonActiveIssueByIdReads += 1;
+              }
+              recordRefreshProgress('refresh:claim_issue_by_id_reconcile');
+            }
           });
           assertRefreshCycleNotStuck();
 
           if (resolution.kind === 'skip') {
             if (isReleasedProviderIssuePollFailClosedReason(resolution.reason)) {
+              releasedFailClosedSkipCount += 1;
               releasedFreshDiscoveryReplayBlockedProviderKeys.add(claimProviderKey);
+            }
+            if (resolution.reason === 'provider_issue_poll_deferred_for_fresh_discovery') {
+              refreshCounts.issue_by_id_deferred += 1;
+              deferredClaimFreshDiscoveryBlockedProviderKeys.add(claimProviderKey);
+              recordRefreshProgress('refresh:claim_issue_by_id_reconcile');
             }
             if (shouldSuppressFreshDiscoveryForPollFailClosedReason(resolution.reason)) {
               suppressFreshDiscovery = true;
@@ -3636,6 +3818,11 @@ export function createProviderIssueHandoffService(
               trackedIssue: resolution.trackedIssue,
               cleanupWorkspace: resolution.cleanupWorkspace
             });
+            if (!activeRun) {
+              releaseOccupiedPollDispatchSlot(
+                resolveClaimPollDispatchSlotKey(claimProviderKey, claim, activeRun)
+              );
+            }
             continue;
           }
 
@@ -3662,13 +3849,19 @@ export function createProviderIssueHandoffService(
                       trackedIssueRefetch
                     })
                   : claim;
+              const reviewPromotionRun =
+                resolveProviderClaimRunIdentity(currentClaim, attachableClaimRuns) ?? latestRun;
               const reviewPromotionClaim = await maybeHandleReviewHandoffPromotion({
                 claim: currentClaim,
                 trackedIssue: resolution.trackedIssue,
-                latestRun: resolveProviderClaimRunIdentity(currentClaim, attachableClaimRuns) ?? latestRun
+                latestRun: reviewPromotionRun
               });
               if (reviewPromotionClaim) {
-                noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+                noteOccupiedPollDispatchSlot(
+                  resolveClaimPollDispatchSlotKey(claimProviderKey, reviewPromotionClaim, reviewPromotionRun),
+                  claimProviderKey,
+                  resolution.trackedIssue
+                );
                 continue;
               }
               await retainOwnedHandoffClaim({
@@ -3687,7 +3880,16 @@ export function createProviderIssueHandoffService(
             })) {
               continue;
             }
-            if (!pollDispatchBudget.canDispatch(resolution.trackedIssue)) {
+            if (
+              !pollDispatchBudget.canDispatch(resolution.trackedIssue) ||
+              (
+                shouldReserveFreshDiscoverySlot &&
+                !pollDispatchBudget.canDispatchWhilePreservingFreshDiscoverySlot(
+                  resolution.trackedIssue
+                )
+              )
+            ) {
+              deferredClaimFreshDiscoveryBlockedProviderKeys.add(claimProviderKey);
               continue;
             }
             const handoffResult = await launchStartForTrackedIssue({
@@ -3697,7 +3899,11 @@ export function createProviderIssueHandoffService(
               previousRun: latestRun
             });
             if (shouldCountProviderAdmissionResultForPollBudget(handoffResult)) {
-              noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+              noteOccupiedPollDispatchSlot(
+                resolveClaimPollDispatchSlotKey(claimProviderKey, handoffResult.claim),
+                claimProviderKey,
+                resolution.trackedIssue
+              );
             }
             continue;
           }
@@ -3714,9 +3920,13 @@ export function createProviderIssueHandoffService(
                 (
                   isProviderMergeCloseoutWatchingClaim(claim) ||
                   isTerminalProviderMergeCloseoutClaim(claim)
-                );
+              );
               if (preserveRecoveredMergeCloseoutClaim) {
-                noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+                noteOccupiedPollDispatchSlot(
+                  resolveProviderPollRunOccupancyKey(activeRun),
+                  claimProviderKey,
+                  resolution.trackedIssue
+                );
                 continue;
               }
               if (trackedIssueFreshEnoughForClaim) {
@@ -3726,7 +3936,11 @@ export function createProviderIssueHandoffService(
                   latestRun: activeRun
                 });
                 if (mergeCloseoutClaim) {
-                  noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+                  noteOccupiedPollDispatchSlot(
+                    resolveProviderPollRunOccupancyKey(activeRun),
+                    claimProviderKey,
+                    resolution.trackedIssue
+                  );
                   continue;
                 }
               }
@@ -3768,7 +3982,11 @@ export function createProviderIssueHandoffService(
                 await persistStateOrRollback(refreshActiveRunSnapshot);
                 options.publishRuntime?.('provider-intake.refresh');
               }
-              noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+              noteOccupiedPollDispatchSlot(
+                resolveProviderPollRunOccupancyKey(activeRun),
+                claimProviderKey,
+                resolution.trackedIssue
+              );
               continue;
             }
 
@@ -3792,7 +4010,11 @@ export function createProviderIssueHandoffService(
                 latestRun
               });
               if (reviewPromotionClaim) {
-                noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+                noteOccupiedPollDispatchSlot(
+                  resolveClaimPollDispatchSlotKey(claimProviderKey, reviewPromotionClaim, latestRun),
+                  claimProviderKey,
+                  resolution.trackedIssue
+                );
                 continue;
               }
               const mergeCloseoutClaim = await maybeHandleDeterministicMergingCloseout({
@@ -3801,23 +4023,36 @@ export function createProviderIssueHandoffService(
                 latestRun
               });
               if (mergeCloseoutClaim) {
-                noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+                noteOccupiedPollDispatchSlot(
+                  resolveClaimPollDispatchSlotKey(claimProviderKey, mergeCloseoutClaim, latestRun),
+                  claimProviderKey,
+                  resolution.trackedIssue
+                );
                 continue;
               }
             }
+            const ownedRun = resolveProviderClaimRunIdentity(currentClaim, attachableClaimRuns) ?? latestRun;
             await retainOwnedHandoffClaim({
               claim: currentClaim,
               trackedIssue: resolution.trackedIssue,
-              run: resolveProviderClaimRunIdentity(currentClaim, attachableClaimRuns) ?? latestRun,
+              run: ownedRun,
               state: currentClaim.state,
               reason: 'provider_issue_handoff_owned'
             });
-            noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+            noteOccupiedPollDispatchSlot(
+              resolveClaimPollDispatchSlotKey(claimProviderKey, currentClaim, ownedRun),
+              claimProviderKey,
+              resolution.trackedIssue
+            );
             continue;
           }
 
           if (claim.state === 'starting' || claim.state === 'resuming') {
-            noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+            noteOccupiedPollDispatchSlot(
+              resolveClaimPollDispatchSlotKey(claimProviderKey, claim, latestRun),
+              claimProviderKey,
+              resolution.trackedIssue
+            );
             continue;
           }
 
@@ -3832,9 +4067,13 @@ export function createProviderIssueHandoffService(
               (
                 isProviderMergeCloseoutWatchingClaim(claim) ||
                 isTerminalProviderMergeCloseoutClaim(claim)
-              );
+            );
             if (preserveRecoveredMergeCloseoutClaim) {
-              noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+              noteOccupiedPollDispatchSlot(
+                resolveProviderPollRunOccupancyKey(activeRun),
+                claimProviderKey,
+                resolution.trackedIssue
+              );
               continue;
             }
             if (trackedIssueFreshEnoughForClaim) {
@@ -3844,7 +4083,11 @@ export function createProviderIssueHandoffService(
                 latestRun: activeRun
               });
               if (mergeCloseoutClaim) {
-                noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+                noteOccupiedPollDispatchSlot(
+                  resolveProviderPollRunOccupancyKey(activeRun),
+                  claimProviderKey,
+                  resolution.trackedIssue
+                );
                 continue;
               }
             }
@@ -3886,7 +4129,11 @@ export function createProviderIssueHandoffService(
               await persistStateOrRollback(refreshActiveRunSnapshot);
               options.publishRuntime?.('provider-intake.refresh');
             }
-            noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+            noteOccupiedPollDispatchSlot(
+              resolveProviderPollRunOccupancyKey(activeRun),
+              claimProviderKey,
+              resolution.trackedIssue
+            );
             continue;
           }
 
@@ -3906,12 +4153,20 @@ export function createProviderIssueHandoffService(
               latestRun
             });
             if (mergeCloseoutClaim) {
-              noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+              noteOccupiedPollDispatchSlot(
+                resolveClaimPollDispatchSlotKey(claimProviderKey, mergeCloseoutClaim, latestRun),
+                claimProviderKey,
+                resolution.trackedIssue
+              );
               continue;
             }
           }
           if (currentClaim.retry_queued === true) {
-            noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+            noteOccupiedPollDispatchSlot(
+              resolveClaimPollDispatchSlotKey(claimProviderKey, currentClaim, latestRun),
+              claimProviderKey,
+              resolution.trackedIssue
+            );
             continue;
           }
 
@@ -3950,7 +4205,11 @@ export function createProviderIssueHandoffService(
               options.publishRuntime?.('provider-intake.refresh');
             }
             if (queuedRetryFields.retry_queued === true) {
-              noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+              noteOccupiedPollDispatchSlot(
+                resolveProviderPollRunOccupancyKey(latestRun),
+                claimProviderKey,
+                resolution.trackedIssue
+              );
             }
             continue;
           }
@@ -3984,13 +4243,26 @@ export function createProviderIssueHandoffService(
               options.publishRuntime?.('provider-intake.refresh');
             }
             if (completedState.retry_queued === true) {
-              noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+              noteOccupiedPollDispatchSlot(
+                resolveProviderPollRunOccupancyKey(latestRun),
+                claimProviderKey,
+                resolution.trackedIssue
+              );
             }
             continue;
           }
 
           if (!latestRun) {
-            if (!pollDispatchBudget.canDispatch(resolution.trackedIssue)) {
+            if (
+              !pollDispatchBudget.canDispatch(resolution.trackedIssue) ||
+              (
+                shouldReserveFreshDiscoverySlot &&
+                !pollDispatchBudget.canDispatchWhilePreservingFreshDiscoverySlot(
+                  resolution.trackedIssue
+                )
+              )
+            ) {
+              deferredClaimFreshDiscoveryBlockedProviderKeys.add(claimProviderKey);
               continue;
             }
             const handoffResult = await launchStartForTrackedIssue({
@@ -3999,7 +4271,11 @@ export function createProviderIssueHandoffService(
               reason: 'provider_issue_refresh_start_launched'
             });
             if (shouldCountProviderAdmissionResultForPollBudget(handoffResult)) {
-              noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+              noteOccupiedPollDispatchSlot(
+                resolveClaimPollDispatchSlotKey(claimProviderKey, handoffResult.claim),
+                claimProviderKey,
+                resolution.trackedIssue
+              );
             }
           }
           } catch (error) {
@@ -4015,6 +4291,14 @@ export function createProviderIssueHandoffService(
           }
         }
 
+        if (
+          releasedFailClosedEligibleCount > 0 &&
+          releasedFailClosedDisqualifyingRetainedCount === 0 &&
+          releasedFailClosedSkipCount === releasedFailClosedEligibleCount
+        ) {
+          suppressFreshDiscovery = true;
+        }
+
         if (!pollInput) {
           return;
         }
@@ -4025,16 +4309,67 @@ export function createProviderIssueHandoffService(
         });
 
         assertRefreshCycleNotStuck();
-        let freshDiscoveryTrackedIssues = autopilotDispatch.trackedIssues;
         const freshDiscoveryBlockedProviderKeys = buildFreshDiscoveryBlockedProviderKeys(
           options.state.claims
         );
         let dispatchSkippedConsumedTrackedIssueKeys = autopilotDispatch.allowConsumedRedispatch
           ? buildFreshDiscoveryConsumedProviderKeys(consumedTrackedIssueKeys, options.state.claims)
           : consumedTrackedIssueKeys;
+        const dispatchFreshDiscoveryCandidates = async (
+          trackedIssues: LiveLinearTrackedIssue[]
+        ): Promise<void> => {
+          refreshCounts.fresh_discovery_candidates += trackedIssues.length;
+          recordRefreshProgress('refresh:fresh_dispatch');
+          for (const trackedIssue of sortLiveLinearTrackedIssuesForDispatch(trackedIssues)) {
+            assertRefreshCycleNotStuck();
+            const providerKey = buildProviderIssueKey(trackedIssue.provider, trackedIssue.id);
+            if (
+              freshDiscoveryBlockedProviderKeys.has(providerKey) ||
+              releasedFreshDiscoveryReplayBlockedProviderKeys.has(providerKey) ||
+              deferredClaimFreshDiscoveryBlockedProviderKeys.has(providerKey) ||
+              dispatchSkippedConsumedTrackedIssueKeys.has(providerKey)
+            ) {
+              continue;
+            }
+            if (!pollDispatchBudget.canDispatch(trackedIssue)) {
+              if (!pollDispatchBudget.hasGlobalSlots()) {
+                break;
+              }
+              continue;
+            }
+            consumedTrackedIssueKeys.add(providerKey);
+            try {
+              const handoffResult = await processTrackedIssueCandidate({
+                trackedIssue,
+                deliveryId: null,
+                event: 'poll_tick',
+                action: 'reconcile',
+                webhookTimestamp: null
+              });
+              if (shouldCountProviderAdmissionResultForPollBudget(handoffResult)) {
+                refreshCounts.fresh_discovery_started += 1;
+                noteOccupiedPollDispatchSlot(
+                  resolveClaimPollDispatchSlotKey(providerKey, handoffResult.claim),
+                  providerKey,
+                  trackedIssue
+                );
+                recordRefreshProgress('refresh:fresh_dispatch');
+              }
+            } catch (error) {
+              logger.warn(
+                `Provider issue poll dispatch failed for ${providerKey}: ${
+                  (error as Error)?.message ?? String(error)
+                }`
+              );
+              continue;
+            }
+          }
+        };
+
+        await dispatchFreshDiscoveryCandidates(autopilotDispatch.trackedIssues);
+
         if (
-          pollInput.deferFreshDiscovery === true &&
-          freshDiscoveryTrackedIssues.length === 0 &&
+          (pollInput.deferFreshDiscovery === true || pollInput.allowPollFailClosed === true) &&
           trackedIssueRefetch &&
           !suppressFreshDiscovery &&
           pollDispatchBudget.remainingGlobalSlots() > 0
@@ -4043,6 +4378,8 @@ export function createProviderIssueHandoffService(
             consumedTrackedIssueKeys,
             options.state.claims
           );
+          refreshCounts.fresh_discovery_runs += 1;
+          recordRefreshProgress('refresh:fresh_discovery');
           const freshDiscoveryResolution = await trackedIssueRefetch({
             mode: 'fresh_discovery',
             eligibleTargetCount: pollDispatchBudget.remainingGlobalSlots(),
@@ -4051,51 +4388,14 @@ export function createProviderIssueHandoffService(
               new Set([
                 ...freshDiscoveryBlockedProviderKeys,
                 ...releasedFreshDiscoveryReplayBlockedProviderKeys,
-                ...occupiedPollDispatchKeys,
+                ...deferredClaimFreshDiscoveryBlockedProviderKeys,
+                ...occupiedPollDispatchProviderKeys,
                 ...dispatchSkippedConsumedTrackedIssueKeys
               ])
             ).map((providerKey) => providerKey.slice(providerKey.indexOf(':') + 1))
           });
           if (freshDiscoveryResolution.kind === 'ready') {
-            freshDiscoveryTrackedIssues = freshDiscoveryResolution.trackedIssues;
-          }
-        }
-
-        for (const trackedIssue of sortLiveLinearTrackedIssuesForDispatch(freshDiscoveryTrackedIssues)) {
-          assertRefreshCycleNotStuck();
-          const providerKey = buildProviderIssueKey(trackedIssue.provider, trackedIssue.id);
-          if (
-            freshDiscoveryBlockedProviderKeys.has(providerKey) ||
-            releasedFreshDiscoveryReplayBlockedProviderKeys.has(providerKey) ||
-            dispatchSkippedConsumedTrackedIssueKeys.has(providerKey)
-          ) {
-            continue;
-          }
-          if (!pollDispatchBudget.canDispatch(trackedIssue)) {
-            if (!pollDispatchBudget.hasGlobalSlots()) {
-              break;
-            }
-            continue;
-          }
-          consumedTrackedIssueKeys.add(providerKey);
-          try {
-            const handoffResult = await processTrackedIssueCandidate({
-              trackedIssue,
-              deliveryId: null,
-              event: 'poll_tick',
-              action: 'reconcile',
-              webhookTimestamp: null
-            });
-            if (shouldCountProviderAdmissionResultForPollBudget(handoffResult)) {
-              noteOccupiedPollDispatchSlot(providerKey, trackedIssue);
-            }
-          } catch (error) {
-            logger.warn(
-              `Provider issue poll dispatch failed for ${providerKey}: ${
-                (error as Error)?.message ?? String(error)
-              }`
-            );
-            continue;
+            await dispatchFreshDiscoveryCandidates(freshDiscoveryResolution.trackedIssues);
           }
         }
       });
@@ -4652,7 +4952,11 @@ function shouldCleanupReleasedProviderWorkspace(claim: ProviderIntakeClaimRecord
 
 function createProviderPollDispatchBudget(featureToggles: Record<string, unknown> | null | undefined): {
   canDispatch(trackedIssue: Pick<LiveLinearTrackedIssue, 'state'>): boolean;
+  canDispatchWhilePreservingFreshDiscoverySlot(
+    trackedIssue: Pick<LiveLinearTrackedIssue, 'state'>
+  ): boolean;
   noteOccupied(trackedIssue: Pick<LiveLinearTrackedIssue, 'state'>): void;
+  releaseOccupied(trackedIssue: Pick<LiveLinearTrackedIssue, 'state'>): void;
   hasGlobalSlots(): boolean;
   remainingGlobalSlots(): number;
   remainingStateSlots(): Record<string, number>;
@@ -4690,6 +4994,27 @@ function createProviderPollDispatchBudget(featureToggles: Record<string, unknown
     const stateLimit = limits.maxConcurrentAgentsByState.get(normalizedState) ?? limits.maxConcurrentAgents;
     return usedSlots < stateLimit;
   };
+  const canDispatchWhilePreservingFreshDiscoverySlot = (
+    trackedIssue: Pick<LiveLinearTrackedIssue, 'state'>
+  ): boolean => {
+    if (remainingGlobalSlots() <= 1) {
+      return false;
+    }
+    if (limits.maxConcurrentAgentsByState.size === 0) {
+      return true;
+    }
+    const normalizedState = normalizeProviderLinearWorkflowState(trackedIssue.state);
+    if (!normalizedState) {
+      return false;
+    }
+    const stateLimit = limits.maxConcurrentAgentsByState.get(normalizedState);
+    if (stateLimit === undefined) {
+      return true;
+    }
+    const usedSlots =
+      (occupiedStateSlots.get(normalizedState) ?? 0) + occupiedUnknownStateSlots;
+    return stateLimit - usedSlots > 1;
+  };
 
   const noteOccupied = (trackedIssue: Pick<LiveLinearTrackedIssue, 'state'>): void => {
     occupiedGlobalSlots += 1;
@@ -4701,14 +5026,43 @@ function createProviderPollDispatchBudget(featureToggles: Record<string, unknown
     }
     occupiedStateSlots.set(normalizedState, (occupiedStateSlots.get(normalizedState) ?? 0) + 1);
   };
+  const releaseOccupied = (trackedIssue: Pick<LiveLinearTrackedIssue, 'state'>): void => {
+    occupiedGlobalSlots = Math.max(0, occupiedGlobalSlots - 1);
+    const normalizedState = normalizeProviderLinearWorkflowState(trackedIssue.state);
+    if (!normalizedState) {
+      occupiedUnknownStateSlots = Math.max(0, occupiedUnknownStateSlots - 1);
+      hasPartialStateSnapshot = occupiedUnknownStateSlots > 0;
+      return;
+    }
+    const nextCount = Math.max(0, (occupiedStateSlots.get(normalizedState) ?? 0) - 1);
+    if (nextCount === 0) {
+      occupiedStateSlots.delete(normalizedState);
+      return;
+    }
+    occupiedStateSlots.set(normalizedState, nextCount);
+  };
 
   return {
     canDispatch,
+    canDispatchWhilePreservingFreshDiscoverySlot,
     noteOccupied,
+    releaseOccupied,
     hasGlobalSlots,
     remainingGlobalSlots,
     remainingStateSlots
   };
+}
+
+function shouldProviderClaimOccupyPollDispatchSlot(
+  claim: Pick<ProviderIntakeClaimRecord, 'state'>
+): boolean {
+  return claim.state === 'starting' || claim.state === 'resuming' || claim.state === 'running';
+}
+
+function resolveProviderPollRunOccupancyKey(
+  run: Pick<ProviderIssueRunRecord, 'provider' | 'issueId' | 'runId' | 'manifestPath'>
+): string {
+  return run.manifestPath || run.runId || `run:${buildProviderIssueKey(run.provider, run.issueId)}`;
 }
 
 async function cleanupReleasedProviderWorkspace(input: {
@@ -5704,6 +6058,37 @@ function resolveReleasedProviderIssuePollFailClosedReason(
   return null;
 }
 
+function shouldProviderClaimDisqualifyAllReleasedSuppressor(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'state' | 'reason' | 'issue_state' | 'issue_state_type' | 'review_promotion' | 'merge_closeout'
+  >
+): boolean {
+  if (claim.state === 'ignored') {
+    return false;
+  }
+  if (
+    claim.state === 'completed' &&
+    !isProviderReviewPromotionWatchingClaim(claim) &&
+    !isProviderMergeCloseoutWatchingClaim(claim)
+  ) {
+    return false;
+  }
+  const workflowState = classifyProviderLinearWorkflowState({
+    state: claim.issue_state,
+    state_type: claim.issue_state_type
+  });
+  if (
+    claim.state === 'handoff_failed' &&
+    !workflowState.isActive &&
+    !isProviderReviewPromotionWatchingClaim(claim) &&
+    !isProviderMergeCloseoutWatchingClaim(claim)
+  ) {
+    return false;
+  }
+  return true;
+}
+
 function isProviderIssuePollFailClosedReason(reason: string | null | undefined): boolean {
   return typeof reason === 'string' && reason.startsWith('provider_issue_poll_cached_');
 }
@@ -6242,6 +6627,8 @@ async function resolveTrackedIssuePollResolutionWithFallback(
   options?: {
     allowPollFailClosed?: boolean;
     allowReleasedPollFailClosed?: boolean;
+    allowDirectIssueById?: boolean;
+    onDirectIssueById?: () => void;
   }
 ):
   Promise<ProviderTrackedIssueRefreshDisposition | { kind: 'skip'; reason: string }> {
@@ -6268,7 +6655,14 @@ async function resolveTrackedIssuePollResolutionWithFallback(
       reason: failClosedReason
     };
   }
+  if (options?.allowDirectIssueById === false) {
+    return {
+      kind: 'skip',
+      reason: 'provider_issue_poll_deferred_for_fresh_discovery'
+    };
+  }
 
+  options?.onDirectIssueById?.();
   const directResolution = await resolveTrackedIssue({
     provider: claim.provider,
     issueId: claim.issue_id

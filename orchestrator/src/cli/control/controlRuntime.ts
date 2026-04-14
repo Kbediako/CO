@@ -369,6 +369,8 @@ function normalizePersistedProviderPollingSnapshot(
       typeof polling.stalled_after_ms === 'number' && Number.isFinite(polling.stalled_after_ms)
         ? polling.stalled_after_ms
         : null,
+    refresh_phase: normalizeOptionalPollingString(polling.refresh_phase),
+    refresh_counts: normalizePollingRefreshCounts(polling.refresh_counts),
     stuck: polling.stuck === true,
     stuck_since_at: typeof polling.stuck_since_at === 'string' ? polling.stuck_since_at : null,
     restart_required: polling.restart_required === true,
@@ -376,6 +378,25 @@ function normalizePersistedProviderPollingSnapshot(
     linear_budget: linearBudget,
     control_host_owner: normalizeControlHostOwnershipPollingPayload(polling.control_host_owner)
   };
+}
+
+function normalizePollingRefreshCounts(value: unknown): Record<string, number> | null {
+  if (!isRecordLike(value)) {
+    return null;
+  }
+  const normalized: Record<string, number> = {};
+  for (const [rawKey, count] of Object.entries(value)) {
+    const key = rawKey.trim();
+    if (key.length === 0 || typeof count !== 'number' || !Number.isFinite(count)) {
+      continue;
+    }
+    normalized[key] = count;
+  }
+  return Object.keys(normalized).length > 0 ? normalized : null;
+}
+
+function normalizeOptionalPollingString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 }
 
 function normalizeLinearBudgetSnapshot(value: unknown): LinearBudgetStatus | null {

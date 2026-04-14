@@ -1,0 +1,146 @@
+---
+id: 20260414-linear-8720424f-56b0-4539-bebe-041c759fcb74
+title: CO: keep fresh Ready issue admission fair under retained/released refresh residue
+relates_to: docs/PRD-linear-8720424f-56b0-4539-bebe-041c759fcb74.md
+risk: high
+owners:
+  - Codex
+last_review: 2026-04-14
+---
+
+## Canonical Reference
+- Canonical TECH_SPEC: `tasks/specs/linear-8720424f-56b0-4539-bebe-041c759fcb74.md`
+- PRD: `docs/PRD-linear-8720424f-56b0-4539-bebe-041c759fcb74.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-linear-8720424f-56b0-4539-bebe-041c759fcb74.md`
+- Task checklist: `tasks/tasks-linear-8720424f-56b0-4539-bebe-041c759fcb74.md`
+
+## Traceability
+- Linear issue: `CO-181` / `8720424f-56b0-4539-bebe-041c759fcb74`
+- Linear URL: https://linear.app/asabeko/issue/CO-181
+- Source anchor: `ctx:sha256:f07789cf67b164ff0da18a7de09f4cdc573f00594d83f8093d481ce7e2aa293c#chunk:c000001`
+
+## Summary
+- Objective: bound retained/released refresh reconciliation so fair `fresh_discovery` still admits unrelated `Ready` issues under remaining provider capacity.
+- Scope:
+  - docs-first registration for `CO-181`
+  - per-refresh retained/released reconciliation bounds
+  - fair `fresh_discovery` under remaining `max_concurrent_agents` capacity
+  - retained/released replay protection and no-burn preservation from `CO-160` / `CO-161`
+  - stuck phase/count diagnostics in `provider-intake-state.json` or CO STATUS
+- Constraints:
+  - reject Linear label/filter interpretations
+  - reject broad scheduler redesign
+  - preserve `provider_refresh_lifecycle_stuck` / `restart_required` truth
+  - preserve active provider workers and adjacent `CO-180` work
+  - keep child-lane output docs-only
+
+## Issue-Shaping Contract
+- User-request translation carried forward: retained/released claim residue must not starve fresh unrelated `Ready` issue admission when provider capacity remains; the fix must preserve released-claim no-burn behavior and add diagnostics that explain refresh starvation.
+- Protected terms / exact artifact and surface names: `provider_refresh_lifecycle_stuck`, `restart_required`, `dispatch_source_issue_by_id`, `dispatch_source_tracked_issues:fresh_discovery`, `fresh_discovery`, `provider-intake-state.json`, retained claims, released claims, `Ready issue admission`, `CO-160`, `CO-161`, `CO-180`.
+- Nearby wrong interpretations to reject: label/filter fixes, unconditional discovery, broad scheduler rewrite, reintroducing direct issue-by-id reads for retained released claims, or killing active workers to clear capacity.
+- Explicit non-goals carried forward: no Linear mutation from this child lane, no implementation/test edits from this child lane, no provider workflow policy redesign, and no weakening of stuck/restart truth.
+
+## Parity / Alignment Matrix
+- Current truth:
+  - `CO-160` protects retained released claims from deferred-poll direct issue-by-id request burn.
+  - `CO-161` prevents released-only cached skip reasons from globally suppressing unrelated `fresh_discovery`.
+  - retained/released residue may still dominate a refresh cycle while active claims are below `max_concurrent_agents`.
+  - stuck health can report `provider_refresh_lifecycle_stuck` / `restart_required`, but phase/count detail is not sufficient for this admission-starvation class.
+- Reference truth:
+  - active provider claims, not released residue, should consume provider concurrency capacity.
+  - retained released claims should remain local-first and zero-direct-read unless a bounded newer-evidence reopen path applies.
+  - `fresh_discovery` should run when capacity remains and request-budget/cooldown guards permit it.
+  - diagnostics should explain whether the refresh was reconciling retained claims, released claims, direct reads, discovery, capacity, or budget.
+- Target truth / intended delta:
+  - retained/released reconciliation has an explicit per-refresh bound or ordering rule that yields to fair `fresh_discovery`.
+  - `fresh_discovery` can claim unrelated `Ready` work without duplicating active claims or replaying released claims.
+  - all-released no-burn scenarios remain zero `dispatch_source_issue_by_id`.
+  - `provider-intake-state.json` or CO STATUS exposes stuck phase/count details for operator triage.
+- Explicitly out-of-scope differences:
+  - Linear label/filter changes
+  - broad scheduler or cap redesign
+  - shared-budget threshold redesign
+  - active worker termination/release workarounds
+
+## Readiness Gate
+- Not done if:
+  - remaining capacity exists but `fresh_discovery` is skipped solely because retained/released residue consumed the refresh
+  - `dispatch_source_issue_by_id` returns for retained released no-burn scenarios
+  - a regression with two active claims, retained/released residue, `max_concurrent_agents=3`, and a new `Ready` issue does not claim the new issue
+  - diagnostics cannot distinguish retained/released reconciliation starvation from Linear eligibility/cooldown
+  - implementation broadens into labels, filters, generic scheduler policy, or active worker cleanup
+- Pre-implementation issue-quality review evidence:
+  - 2026-04-14: child lane self-review confirms the issue is a capacity/admission fairness lane with exact protected terms and prior-lane invariants. The micro-task path is ineligible because correctness depends on protected wording, retained/released parity, and diagnostics.
+- Safeguard ownership split:
+  - child lane owns docs packet and task registration only
+  - parent lane owns Linear state, workpad, source/test implementation, validation, PR lifecycle, and patch integration
+
+## Technical Requirements
+- Functional requirements:
+  - compute active provider capacity from active/running claims without counting released residue as occupying a slot
+  - bound retained/released reconciliation per refresh before it can delay or suppress fair `fresh_discovery`
+  - run `fresh_discovery` when active claims are below `max_concurrent_agents` and request-budget/cooldown guards allow it
+  - keep retained active claims from duplicate ownership when `fresh_discovery` returns an already-owned issue
+  - keep retained released claims released when unrelated `fresh_discovery` returns other runnable work
+  - keep `CO-160` / `CO-161` all-released deferred-poll and replay-blocking behavior zero-direct-read
+  - preserve explicit newer-evidence reopen paths for released claims that genuinely become runnable again
+  - preserve `provider_refresh_lifecycle_stuck` / `restart_required` failure truth for real refresh stalls
+  - record refresh phase/count diagnostics for retained count, released count, active count, max capacity, direct issue-by-id count, discovery attempted/skipped reason, and last stuck phase where practical
+  - preserve active provider workers and adjacent `CO-180` work during recovery
+- Non-functional requirements:
+  - no unbounded per-claim live read loop over retained/released residue
+  - no unconditional `fresh_discovery` when capacity is full or budget/cooldown guards fail closed
+  - no token, auth, or private Linear payload leakage in diagnostics
+  - minimal source changes localized to existing provider refresh/admission seams
+  - tests must encode the mixed active plus retained/released plus one-free-slot shape
+- Interfaces / contracts:
+  - `orchestrator/src/cli/control/providerIssueHandoff.ts`
+  - `orchestrator/src/cli/control/controlServerPublicLifecycle.ts`
+  - `orchestrator/src/cli/control/providerPollingHealth.ts`
+  - `orchestrator/src/cli/control/providerIntakeState.ts`
+  - `provider-intake-state.json`
+
+## Architecture & Data
+- Architecture / design adjustments:
+  - add or reuse a narrow refresh-cycle accounting structure for active count, retained count, released count, reconciliation work, and discovery outcome
+  - gate retained/released direct reconciliation behind a per-refresh bound that cannot consume the only opportunity for fair discovery under remaining capacity
+  - keep released-claim cached fail-closed behavior in the existing `providerIssueHandoff` poll fallback path
+  - keep discovery/admission ordering local to the refresh cycle rather than adding a new scheduler layer
+  - enrich persisted polling health/stuck diagnostics without changing broad status rendering
+- Data model changes / migrations:
+  - no migration expected
+  - additive diagnostic fields may be persisted under existing provider polling health or refresh metadata in `provider-intake-state.json`
+  - diagnostic fields should tolerate older snapshots where the new counts are absent
+- External dependencies / integrations:
+  - Linear tracked-issue query for `dispatch_source_tracked_issues:fresh_discovery`
+  - existing request-budget/cooldown gate before live Linear reads
+  - local control-host persisted intake state
+
+## Validation Plan
+- Tests / checks:
+  - parent-owned focused regression in `orchestrator/tests/ProviderIssueHandoff.test.ts`
+  - parent-owned focused lifecycle/diagnostic coverage in `orchestrator/tests/ControlServerPublicLifecycle.test.ts` if lifecycle diagnostics change
+  - parent runs `node scripts/spec-guard.mjs --dry-run` after accepting the docs packet
+  - parent runs normal validation/review gates after implementation
+- Required focused coverage:
+  - seed two active claims, retained/released residue, `max_concurrent_agents=3`, and an unrelated fresh `Ready` issue; assert `fresh_discovery` runs and the new issue is claimed
+  - assert retained active claims are not duplicated
+  - assert retained released claims stay released and do not trigger `dispatch_source_issue_by_id`
+  - assert `CO-160` all-released no-burn behavior still performs zero direct reads and zero inappropriate discovery churn
+  - assert `CO-161` unrelated discovery split remains intact when released-only cached reasons are present
+  - assert stuck diagnostics include phase/count data when refresh work stalls or exceeds the threshold
+  - assert active provider workers and adjacent `CO-180` claims are not killed or forcibly released
+- Rollout verification:
+  - inspect `provider-intake-state.json` or CO STATUS output after a simulated mixed residue refresh and confirm active count, retained/released counts, discovery outcome, and stuck phase reason are visible
+  - inspect request-burn attribution and confirm no renewed `dispatch_source_issue_by_id` burn for retained released no-burn scenarios
+- Monitoring / alerts:
+  - rely on existing provider polling health plus additive phase/count diagnostics; no new alerting system required
+
+## Open Questions
+- Should the first implementation use a fixed retained/released reconciliation count limit, a time budget, or a capacity-slot based admission-first rule?
+- Which exact `provider-intake-state.json` object should own the additive phase/count diagnostics so older snapshots remain compatible?
+- Should CO STATUS surface all counts, or only summarize the last stuck phase plus discovery attempted/skipped reason?
+
+## Approvals
+- Reviewer: pending parent docs-review and implementation validation
+- Date: 2026-04-14

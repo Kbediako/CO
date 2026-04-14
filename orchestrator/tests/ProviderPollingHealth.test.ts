@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveControlPollingNextRefreshProjection } from '../src/cli/control/providerPollingHealth.js';
+import {
+  markProviderPollingCompleted,
+  markProviderPollingStarted,
+  markProviderPollingStuck,
+  readProviderPollingHealth,
+  recordProviderPollingProgress,
+  resolveControlPollingNextRefreshProjection
+} from '../src/cli/control/providerPollingHealth.js';
 import type { LinearBudgetStatus } from '../src/cli/control/linearBudgetState.js';
+import type { ProviderIssueHandoffService } from '../src/cli/control/providerIssueHandoff.js';
 
 function buildLinearBudget(
   overrides: Partial<LinearBudgetStatus> = {}
@@ -104,6 +112,68 @@ describe('providerPollingHealth next-refresh projection', () => {
       state: 'scheduled',
       at: '2026-04-08T00:15:00.000Z',
       in_ms: 15_000
+    });
+  });
+
+  it('exposes refresh phase counts while a refresh is active or stuck', async () => {
+    const service = {} as ProviderIssueHandoffService;
+
+    markProviderPollingStarted(service, {
+      mode: 'refresh',
+      atMs: Date.parse('2026-04-14T09:00:00.000Z')
+    });
+    recordProviderPollingProgress(service, {
+      phase: 'refresh:claim_issue_by_id_reconcile',
+      counts: {
+        claims_scanned: 2,
+        issue_by_id_reads: 1,
+        ignored_non_finite: Number.POSITIVE_INFINITY
+      },
+      atMs: Date.parse('2026-04-14T09:00:01.000Z')
+    });
+
+    const activeHealth = readProviderPollingHealth(
+      service,
+      Date.parse('2026-04-14T09:00:02.000Z')
+    );
+    expect(activeHealth).toMatchObject({
+      checking: true,
+      stuck: false,
+      refresh_phase: 'refresh:claim_issue_by_id_reconcile'
+    });
+    expect(activeHealth.refresh_counts).toEqual({
+      claims_scanned: 2,
+      issue_by_id_reads: 1
+    });
+
+    await markProviderPollingStuck(service, {
+      atMs: Date.parse('2026-04-14T09:00:03.000Z')
+    });
+
+    const stuckHealth = readProviderPollingHealth(
+      service,
+      Date.parse('2026-04-14T09:00:04.000Z')
+    );
+    expect(stuckHealth).toMatchObject({
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck',
+      refresh_phase: 'refresh:claim_issue_by_id_reconcile'
+    });
+    expect(stuckHealth.refresh_counts).toEqual({
+      claims_scanned: 2,
+      issue_by_id_reads: 1
+    });
+
+    markProviderPollingCompleted(service, {
+      atMs: Date.parse('2026-04-14T09:00:05.000Z')
+    });
+
+    expect(readProviderPollingHealth(service, Date.parse('2026-04-14T09:00:06.000Z'))).toMatchObject({
+      stuck: false,
+      restart_required: false,
+      refresh_phase: null,
+      refresh_counts: null
     });
   });
 });
