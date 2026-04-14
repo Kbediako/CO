@@ -17,6 +17,30 @@
       }
     },
     {
+      "id": "20260414-linear-3cdd7af3-787e-4e73-bb00-731feb5d0db2",
+      "title": "CO workflow: make parent-owned same-issue child lanes parallel-first by default where safe",
+      "relates_to": "tasks/tasks-linear-3cdd7af3-787e-4e73-bb00-731feb5d0db2.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-14",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (clean-success)",
+          "date": "2026-04-14",
+          "manifest": ".runs/linear-3cdd7af3-787e-4e73-bb00-731feb5d0db2-co-174-docs-review/cli/2026-04-13T23-05-04-374Z-17c6fed0/manifest.json",
+          "telemetry": ".runs/linear-3cdd7af3-787e-4e73-bb00-731feb5d0db2-co-174-docs-review/cli/2026-04-13T23-05-04-374Z-17c6fed0/review/telemetry.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-3cdd7af3-787e-4e73-bb00-731feb5d0db2.md",
+        "task": "tasks/tasks-linear-3cdd7af3-787e-4e73-bb00-731feb5d0db2.md",
+        "agent_task": ".agent/task/linear-3cdd7af3-787e-4e73-bb00-731feb5d0db2.md",
+        "docs": "docs/TECH_SPEC-linear-3cdd7af3-787e-4e73-bb00-731feb5d0db2.md"
+      }
+    },
+    {
       "id": "20260414-linear-a560f416-c80a-473b-96fb-9f1ec090c968",
       "title": "CO: keep provider-worker handoff manifests truthful when guardrail summaries fail",
       "relates_to": "tasks/tasks-linear-a560f416-c80a-473b-96fb-9f1ec090c968.md",

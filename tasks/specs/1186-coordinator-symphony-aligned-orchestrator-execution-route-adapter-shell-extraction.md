@@ -5,7 +5,7 @@ status: draft
 owners:
   - Codex
 created: 2026-03-14
-last_review: 2026-03-14
+last_review: 2026-04-14
 review_cadence_days: 30
 related_prd: docs/PRD-coordinator-symphony-aligned-orchestrator-execution-route-adapter-shell-extraction.md
 related_action_plan: docs/ACTION_PLAN-coordinator-symphony-aligned-orchestrator-execution-route-adapter-shell-extraction.md
