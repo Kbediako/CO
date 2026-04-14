@@ -782,6 +782,12 @@ export class ReviewExecutionState {
     });
   }
 
+  recordCommandIntentViolationsFrom(other: ReviewExecutionState): void {
+    for (const violation of other.commandIntentViolationSamples) {
+      this.recordCommandIntentViolation(violation);
+    }
+  }
+
   getTerminationBoundaryRecordForKind(
     kind: ReviewTerminationBoundaryKind,
     nowMs = Date.now()

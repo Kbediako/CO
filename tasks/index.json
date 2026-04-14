@@ -1,6 +1,31 @@
 {
   "items": [
     {
+      "id": "20260414-linear-0f7f6994-db41-4b0a-91f3-9b8f32ea427c",
+      "title": "CO: harden forced standalone review so boundary fallbacks do not replace review verdicts",
+      "relates_to": "tasks/tasks-linear-0f7f6994-db41-4b0a-91f3-9b8f32ea427c.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-14",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (succeeded)",
+          "date": "2026-04-14",
+          "status": "succeeded",
+          "manifest": ".runs/linear-0f7f6994-db41-4b0a-91f3-9b8f32ea427c-co-173-docs-review/cli/2026-04-13T22-43-47-842Z-4ced90a2/manifest.json",
+          "telemetry": ".runs/linear-0f7f6994-db41-4b0a-91f3-9b8f32ea427c-co-173-docs-review/cli/2026-04-13T22-43-47-842Z-4ced90a2/review/telemetry.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-0f7f6994-db41-4b0a-91f3-9b8f32ea427c.md",
+        "task": "tasks/tasks-linear-0f7f6994-db41-4b0a-91f3-9b8f32ea427c.md",
+        "agent_task": ".agent/task/linear-0f7f6994-db41-4b0a-91f3-9b8f32ea427c.md",
+        "docs": "docs/TECH_SPEC-linear-0f7f6994-db41-4b0a-91f3-9b8f32ea427c.md"
+      }
+    },
+    {
       "id": "20260409-linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d",
       "title": "CO: Add run memory controller with role-specific retrieval profiles",
       "relates_to": "tasks/tasks-linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d.md",

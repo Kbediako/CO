@@ -108,6 +108,60 @@ describe('review command intent classification', () => {
         allowValidationCommandIntents: false
       })?.kind
     ).toBe('review-orchestration');
+    expect(
+      classifyCommandIntentCommandLine(`codex review --uncommitted`, {
+        allowValidationCommandIntents: false
+      })?.kind
+    ).toBe('review-orchestration');
+  });
+
+  it('keeps help-only review orchestration lookups outside the command-intent boundary', () => {
+    for (const commandLine of [
+      `codex review --help`,
+      `codex review -h`,
+      `codex-orchestrator review --help`,
+      `codex-orchestrator start docs-review --help`,
+      `node scripts/run-review.ts --help`,
+      `npm run review -- --help`,
+      `/bin/zsh -lc 'codex --help; codex review --help'`
+    ]) {
+      expect(
+        classifyCommandIntentCommandLine(commandLine, {
+          allowValidationCommandIntents: false
+        })
+      ).toBeNull();
+    }
+  });
+
+  it('does not treat help argument values as help-only review orchestration lookups', () => {
+    for (const commandLine of [
+      `codex review --title help --uncommitted`,
+      `codex review help`,
+      `codex review --title foo help`,
+      `codex-orchestrator review --title=help --manifest x`,
+      `node scripts/run-review.ts --title help`,
+      `npm run review -- --title help`
+    ]) {
+      expect(
+        classifyCommandIntentCommandLine(commandLine, {
+          allowValidationCommandIntents: false
+        })?.kind
+      ).toBe('review-orchestration');
+    }
+  });
+
+  it('does not treat post-separator help-looking prompt text as help-only review orchestration', () => {
+    for (const commandLine of [
+      `codex review -- --help`,
+      `codex review -- --help --uncommitted`,
+      `npm run review -- -- --help`
+    ]) {
+      expect(
+        classifyCommandIntentCommandLine(commandLine, {
+          allowValidationCommandIntents: false
+        })?.kind
+      ).toBe('review-orchestration');
+    }
   });
 
   it('does not treat quoted rg regex alternation as nested review orchestration', () => {

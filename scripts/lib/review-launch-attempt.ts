@@ -33,6 +33,10 @@ const REVIEW_COMMAND_CHECK_TIMEOUT_MS = 30_000;
 const REVIEW_ARTIFACTS_DIRNAME = 'review';
 const REVIEW_DISABLE_DELEGATION_CONFIG_OVERRIDE = 'mcp_servers.delegation.enabled=false';
 const REVIEW_PARTIAL_OUTPUT_HINT_BOUNDARY_KINDS = new Set(['timeout', 'stall', 'startup-loop']);
+const REVIEW_UNTRUSTED_APPROVAL_ARGS = ['--ask-for-approval', 'untrusted'] as const;
+const COMMAND_INTENT_RETRY_TITLE_PREFIX =
+  'Strict retry: previous validation command was blocked; do not run validation';
+const REVIEW_RETRY_TITLE_MAX_LENGTH = 180;
 
 type ScopeFlagMode = 'commit' | 'base' | 'uncommitted';
 type ReviewTitleSource = 'user' | 'notes-surface';
@@ -47,6 +51,7 @@ export interface ReviewLaunchCliOptions {
   uncommitted?: boolean;
   enableDelegationMcp?: boolean;
   disableDelegationMcp?: boolean;
+  untrustedApproval?: boolean;
 }
 
 interface ReviewArgsOptions {
@@ -219,13 +224,14 @@ export async function runReviewLaunchAttemptShell(
 
   const reportSuccess = async (
     execution: ReviewRunResult,
-    launchContext: ReviewLaunchContext
+    launchContext: ReviewLaunchContext,
+    preservedTerminationBoundary?: ReviewTerminationBoundaryRecord | null
   ): Promise<void> => {
     const telemetryPayload = await options.writeTelemetry(
       execution.state,
       'succeeded',
       null,
-      execution.terminationBoundary ?? null,
+      preservedTerminationBoundary ?? execution.terminationBoundary ?? null,
       launchContext
     );
     console.log(`Review output saved to: ${path.relative(options.repoRoot, options.artifactPaths.outputLogPath)}`);
@@ -293,11 +299,92 @@ export async function runReviewLaunchAttemptShell(
     }
   };
 
+  const maybeRetryAfterCommandIntentBoundary = async (
+    error: unknown,
+    launchContext: ReviewLaunchContext,
+    resolvedFailedLaunch: ResolvedReviewCommand,
+    retryOptions: { omitTitle?: boolean } = {}
+  ): Promise<boolean> => {
+    if (!shouldRetryAfterCommandIntentBoundary(error, launchContext)) {
+      return false;
+    }
+    const commandIntentBoundary =
+      error instanceof CodexReviewError ? error.terminationBoundary : null;
+    const commandIntentFailureState =
+      error instanceof CodexReviewError && error.reviewState instanceof ReviewExecutionState
+        ? error.reviewState
+        : null;
+    const useInlinePromptRetry = shouldUseInlinePromptCommandIntentRetry(options.runtimeContext);
+    const omitTitle = retryOptions.omitTitle ?? useInlinePromptRetry;
+    const commandIntentRetryOptions = buildCommandIntentRetryOptions(
+      options.cliOptions,
+      { omitTitle }
+    );
+    const commandIntentRetryPrompt = useInlinePromptRetry
+      ? buildCommandIntentRetryPrompt(options.prompt)
+      : options.prompt;
+    const commandIntentRetryArgs = buildReviewArgs(
+      commandIntentRetryOptions,
+      commandIntentRetryPrompt,
+      {
+        includeScopeFlags: !useInlinePromptRetry,
+        disableDelegationMcp
+      }
+    );
+    const commandIntentRetryLaunchContext = buildReviewLaunchContext(
+      commandIntentRetryOptions,
+      {
+        includeScopeFlags: !useInlinePromptRetry
+      }
+    );
+    const resolvedCommandIntentRetry = resolveCommand(
+      commandIntentRetryArgs,
+      options.runtimeContext
+    );
+    if (resolvedReviewCommandsEqual(resolvedFailedLaunch, resolvedCommandIntentRetry)) {
+      await reportFailure(error, launchContext);
+      throw error;
+    }
+    const retryContext =
+      commandIntentRetryLaunchContext.reviewer_visible_context_transport === 'artifact-only'
+        ? 'stricter command controls'
+        : 'stricter reviewer-visible no-validation context';
+    console.log(
+      `[run-review] bounded review blocked a validation command; retrying once with ${retryContext} so the reviewer can produce a verdict without running validation.`
+    );
+    console.log(
+      '[run-review] command-intent retry uses --ask-for-approval untrusted so validation commands are denied before execution and can be listed as follow-up commands.'
+    );
+    if (useInlinePromptRetry) {
+      console.log(
+        '[run-review] command-intent retry is using inline prompt transport because the selected appserver runtime does not reliably expose scoped artifact/title constraints at the review boundary.'
+      );
+    }
+    try {
+      const retryExecution = await options.runReview(resolvedCommandIntentRetry);
+      if (commandIntentFailureState) {
+        retryExecution.state.recordCommandIntentViolationsFrom(commandIntentFailureState);
+      }
+      await reportSuccess(
+        retryExecution,
+        commandIntentRetryLaunchContext,
+        commandIntentBoundary
+      );
+      return true;
+    } catch (retryError) {
+      await reportFailure(retryError, commandIntentRetryLaunchContext);
+      throw retryError;
+    }
+  };
+
   try {
     const execution = await options.runReview(resolvedScoped);
     await reportSuccess(execution, scopedLaunchContext);
     return;
   } catch (error) {
+    if (await maybeRetryAfterCommandIntentBoundary(error, scopedLaunchContext, resolvedScoped)) {
+      return;
+    }
     if (shouldRetryScopedWithoutSynthesizedTitle(error, options.cliOptions)) {
       const scopedArtifactOnlyOptions = {
         ...options.cliOptions,
@@ -327,6 +414,16 @@ export async function runReviewLaunchAttemptShell(
         await reportSuccess(retryExecution, scopedArtifactOnlyLaunchContext);
         return;
       } catch (retryError) {
+        if (
+          await maybeRetryAfterCommandIntentBoundary(
+            retryError,
+            scopedArtifactOnlyLaunchContext,
+            resolvedScopedArtifactOnly,
+            { omitTitle: true }
+          )
+        ) {
+          return;
+        }
         await reportFailure(retryError, scopedArtifactOnlyLaunchContext);
         throw retryError;
       }
@@ -484,13 +581,19 @@ function resolveScopeFlag(
 }
 
 function buildReviewArgs(
-  options: Pick<ReviewLaunchCliOptions, 'base' | 'commit' | 'title' | 'titleSource' | 'uncommitted'>,
+  options: Pick<
+    ReviewLaunchCliOptions,
+    'base' | 'commit' | 'title' | 'titleSource' | 'uncommitted' | 'untrustedApproval'
+  >,
   prompt: string,
   opts: ReviewArgsOptions
 ): string[] {
   const args: string[] = [];
   if (opts.disableDelegationMcp) {
     args.push('-c', REVIEW_DISABLE_DELEGATION_CONFIG_OVERRIDE);
+  }
+  if (options.untrustedApproval) {
+    args.push(...REVIEW_UNTRUSTED_APPROVAL_ARGS);
   }
   args.push('review');
   const reviewTitle = resolveReviewTitle(options);
@@ -613,6 +716,56 @@ function resolvedReviewCommandsEqual(
     left.args.length === right.args.length &&
     left.args.every((arg, index) => arg === right.args[index])
   );
+}
+
+function shouldRetryAfterCommandIntentBoundary(
+  error: unknown,
+  launchContext: ReviewLaunchContext
+): boolean {
+  return (
+    error instanceof CodexReviewError &&
+    error.terminationBoundary?.kind === 'command-intent' &&
+    launchContext.prompt_delivery === 'artifact-only' &&
+    launchContext.scope_flag_mode !== null
+  );
+}
+
+function shouldUseInlinePromptCommandIntentRetry(context: RuntimeCodexCommandContext): boolean {
+  return context.runtime?.selected_mode === 'appserver';
+}
+
+function buildCommandIntentRetryOptions(
+  options: ReviewLaunchCliOptions,
+  retryOptions: { omitTitle?: boolean } = {}
+): ReviewLaunchCliOptions {
+  const reviewTitle = resolveReviewTitle(options);
+  return {
+    ...options,
+    title: retryOptions.omitTitle ? undefined : buildCommandIntentRetryTitle(reviewTitle.title),
+    titleSource: retryOptions.omitTitle ? undefined : reviewTitle.source ?? 'notes-surface',
+    untrustedApproval: true
+  };
+}
+
+function buildCommandIntentRetryPrompt(prompt: string): string {
+  return [
+    'Strict command-intent retry:',
+    '- The previous bounded review attempt was stopped because it launched validation or another blocked command.',
+    '- Do not run validation commands, direct validation runners, nested review flows, or mutating delegation control.',
+    '- If broader validation would help, list the exact command as a follow-up instead of executing it.',
+    '- Produce the review verdict from code inspection now.',
+    '',
+    prompt
+  ].join('\n');
+}
+
+function buildCommandIntentRetryTitle(title: string | null): string {
+  const baseTitle = title && title.length > 0 ? title : 'Bounded review';
+  const retryTitle = `${COMMAND_INTENT_RETRY_TITLE_PREFIX} | ${baseTitle}`;
+  if (retryTitle.length <= REVIEW_RETRY_TITLE_MAX_LENGTH) {
+    return retryTitle;
+  }
+  return `${retryTitle.slice(0, REVIEW_RETRY_TITLE_MAX_LENGTH - 1).trimEnd()}…`;
 }
 
 function shouldRetryWithoutScopeFlags(error: unknown): boolean {

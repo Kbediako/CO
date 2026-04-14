@@ -133,13 +133,26 @@ async function makeFakeCodex(sandbox: string): Promise<string> {
   const script = `#!/usr/bin/env bash
 set -euo pipefail
 config_overrides=()
-while [[ "\${1:-}" == "-c" ]]; do
-  if [[ "$#" -lt 2 ]]; then
-    echo "missing value for -c" >&2
-    exit 2
-  fi
-  config_overrides+=("\${2}")
-  shift 2
+approval_policy=""
+while [[ "\${1:-}" == "-c" || "\${1:-}" == "--config" || "\${1:-}" == "-a" || "\${1:-}" == "--ask-for-approval" ]]; do
+  case "\${1:-}" in
+    -c|--config)
+      if [[ "$#" -lt 2 ]]; then
+        echo "missing value for $1" >&2
+        exit 2
+      fi
+      config_overrides+=("\${2}")
+      shift 2
+      ;;
+    -a|--ask-for-approval)
+      if [[ "$#" -lt 2 ]]; then
+        echo "missing value for $1" >&2
+        exit 2
+      fi
+      approval_policy="\${2}"
+      shift 2
+      ;;
+  esac
 done
 if [[ -n "\${RUN_REVIEW_ARGS_LOG:-}" ]]; then
   {
@@ -148,6 +161,9 @@ if [[ -n "\${RUN_REVIEW_ARGS_LOG:-}" ]]; then
       for override in "\${config_overrides[@]}"; do
         echo "config=$override"
       done
+    fi
+    if [[ -n "$approval_policy" ]]; then
+      echo "approval=$approval_policy"
     fi
     echo "argv=$*"
   } >> "\${RUN_REVIEW_ARGS_LOG}"
@@ -954,6 +970,19 @@ fi
       while true; do sleep 1; done
     fi
     if [[ "$mode" == "command-intent-validation" ]]; then
+      while true; do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'npx vitest run --config vitest.config.core.ts tests/run-review.spec.ts' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+    fi
+    if [[ "$mode" == "command-intent-validation-then-ok" ]]; then
+      if [[ "$*" == *"Strict retry: previous validation command was blocked; do not run validation"* ]]; then
+        echo "stdout-ok"
+        echo "stderr-ok" >&2
+        exit 0
+      fi
       while true; do
         echo "thinking"
         echo "exec"
@@ -3042,7 +3071,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     );
     expect(reviewInvocations).toHaveLength(1);
     expect(reviewInvocations[0]).toContain(
-      'argv=review --title Surface: diff | Goal: run-review regression tests | Summary: verify timeout/stall handling | Risks: none'
+      'argv=review --title Surface: diff | Bounded: no validation; list follow-up commands only | Goal: run-review regression tests | Summary: verify timeout/stall handling | Risks: none'
     );
     expect(reviewInvocations[0]).toContain(`--base ${baseRef}`);
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
@@ -3093,7 +3122,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       entry.includes('argv=review')
     );
     expect(reviewInvocations).toEqual([
-      'argv=review --title Surface: diff | Goal: run-review regression tests | Summary: verify timeout/stall handling | Risks: none --base ' +
+      'argv=review --title Surface: diff | Bounded: no validation; list follow-up commands only | Goal: run-review regression tests | Summary: verify timeout/stall handling | Risks: none --base ' +
         baseRef,
       `argv=review --base ${baseRef}`
     ]);
@@ -3318,7 +3347,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     );
     expect(reviewInvocations).toHaveLength(1);
     expect(reviewInvocations[0]).toContain(
-      'argv=review --title Surface: diff | Goal: run-review regression tests | Summary: verify timeout/stall handling | Risks: none'
+      'argv=review --title Surface: diff | Bounded: no validation; list follow-up commands only | Goal: run-review regression tests | Summary: verify timeout/stall handling | Risks: none'
     );
     expect(reviewInvocations[0]).toContain(`--commit ${commitSha}`);
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
@@ -3370,7 +3399,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     );
     expect(reviewInvocations).toHaveLength(1);
     expect(reviewInvocations[0]).toContain(
-      'argv=review --title Surface: diff | Goal: run-review regression tests | Summary: verify timeout/stall handling | Risks: none'
+      'argv=review --title Surface: diff | Bounded: no validation; list follow-up commands only | Goal: run-review regression tests | Summary: verify timeout/stall handling | Risks: none'
     );
     expect(reviewInvocations[0]).toContain('--uncommitted');
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
@@ -3421,8 +3450,10 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       entry.includes('argv=review')
     );
     expect(reviewInvocations).toHaveLength(1);
-    expect(reviewInvocations[0]).toContain('--title Sample review');
-    expect(reviewInvocations[0]).not.toContain('Surface: diff | Goal: run-review regression tests');
+    expect(reviewInvocations[0]).toContain(
+      '--title Sample review | Bounded: no validation; list follow-up commands only'
+    );
+    expect(reviewInvocations[0]).not.toContain('Goal: run-review regression tests');
 
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
@@ -3449,7 +3480,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.exitCode).toBe(0);
     const normalizedHelp = result.stdout.replace(/\s+/g, ' ').trim();
     expect(normalizedHelp).toContain(
-      'Behavior: Explicit --uncommitted/--base/--commit wrapper runs keep prompt/context in review/prompt.txt and launch codex review without any prompt argument because current CLI still treats stdin (`-`) as [PROMPT]; reviewer-visible scoped context first rides on --title (user-provided when present, otherwise synthesized from NOTES + surface), and if Codex rejects a synthesized scoped title the wrapper retries the same explicit scope without `--title` and falls back to artifact-only context.'
+      'Behavior: Explicit --uncommitted/--base/--commit wrapper runs keep prompt/context in review/prompt.txt and launch codex review without any prompt argument because current CLI still treats stdin (`-`) as [PROMPT]; reviewer-visible scoped context first rides on --title (user-provided when present, otherwise synthesized from NOTES + surface) with bounded no-validation guidance visible in the title. If Codex rejects a synthesized scoped title, the wrapper retries the same explicit scope without `--title` and falls back to artifact-only context. If bounded review blocks a validation command, the wrapper retries once with stricter no-validation guidance, uses --ask-for-approval untrusted where the runtime honors approval policy, switches appserver retries to inline prompt transport so the constraint is visible at the review boundary, and preserves the command-intent boundary in telemetry when the retry produces a verdict.'
     );
     expect(normalizedHelp).toContain(
       'Explicit scoped wrapper runs Support only the default diff surface; audit/architecture still require prompt-capable unscoped review.'
@@ -6190,6 +6221,107 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(telemetry.summary.commandIntentViolationCount).toBeGreaterThanOrEqual(1);
     expect(telemetry.summary.commandIntentViolationKinds).toContain('validation-runner');
     expect(telemetry.summary.commandIntentViolationSamples[0]).toContain('[redacted command-intent');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('retries explicit scoped bounded review after validation command intent and preserves a bounded-success verdict', async () => {
+    for (const scopeMode of ['base', 'commit', 'uncommitted'] as const) {
+      const sandbox = await makeSandbox();
+      const manifestPath = await makeManifest(sandbox);
+      const codexBin = await makeFakeCodex(sandbox);
+      await initGitRepoWithCommittedFiles(sandbox, 1);
+      const argsLogPath = join(sandbox, `review-${scopeMode}-args.log`);
+      let scopeArgs: string[];
+
+      if (scopeMode === 'base') {
+        const { stdout: baseStdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+          cwd: sandbox
+        });
+        const baseRef = baseStdout.trim();
+        await writeFile(join(sandbox, 'file-1.txt'), 'updated-base-scope\n', 'utf8');
+        scopeArgs = ['--base', baseRef];
+      } else if (scopeMode === 'commit') {
+        await writeFile(join(sandbox, 'file-1.txt'), 'updated-commit-scope\n', 'utf8');
+        await runGit(['commit', '-am', 'commit-scope review retry'], sandbox);
+        const { stdout: commitStdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+          cwd: sandbox
+        });
+        scopeArgs = ['--commit', commitStdout.trim()];
+      } else {
+        await writeFile(join(sandbox, 'file-1.txt'), 'updated-uncommitted-scope\n', 'utf8');
+        scopeArgs = ['--uncommitted'];
+      }
+
+      const result = await runReviewCommand(
+        manifestPath,
+        {
+          ...baseEnv(sandbox, codexBin),
+          RUN_REVIEW_MODE: 'command-intent-validation-then-ok',
+          RUN_REVIEW_ARGS_LOG: argsLogPath,
+          CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+          CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+        },
+        scopeArgs
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain(
+        'retrying once with stricter reviewer-visible no-validation context'
+      );
+      expect(result.stdout).toContain('review outcome: bounded success via command-intent');
+      const argsLog = await readFile(argsLogPath, 'utf8');
+      const reviewInvocations = parseArgsLogInvocations(argsLog).filter((entry) =>
+        entry.includes('argv=review')
+      );
+      expect(reviewInvocations).toHaveLength(2);
+      expect(reviewInvocations[0]).toContain(
+        'Surface: diff | Bounded: no validation; list follow-up commands only'
+      );
+      expect(reviewInvocations[1]).toContain(
+        'Strict retry: previous validation command was blocked; do not run validation'
+      );
+      expect(reviewInvocations[0]).not.toContain('approval=untrusted');
+      expect(reviewInvocations[1]).toContain('approval=untrusted');
+      for (const scopeArg of scopeArgs) {
+        expect(reviewInvocations[0]).toContain(scopeArg);
+        expect(reviewInvocations[1]).toContain(scopeArg);
+      }
+
+      const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+      const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+        status: string;
+        review_outcome: string;
+        termination_boundary: {
+          kind: string;
+          provenance: string;
+        } | null;
+        launch_context: {
+          scope_flag_mode: 'base' | 'commit' | 'uncommitted' | null;
+          prompt_delivery: 'inline' | 'artifact-only';
+          reviewer_visible_context_transport: 'inline-prompt' | 'scoped-title' | 'artifact-only';
+          reviewer_visible_title_source: 'user' | 'notes-surface' | null;
+        } | null;
+        summary: {
+          commandIntentViolationCount: number;
+          commandIntentViolationKinds: string[];
+        };
+      };
+      expect(telemetry.status).toBe('succeeded');
+      expect(telemetry.review_outcome).toBe('bounded-success');
+      expect(telemetry.termination_boundary).toEqual(
+        expect.objectContaining({
+          kind: 'command-intent',
+          provenance: 'validation-runner'
+        })
+      );
+      expect(telemetry.launch_context).toEqual(
+        reviewLaunchContext(scopeMode, 'artifact-only', {
+          reviewerVisibleContextTransport: 'scoped-title',
+          reviewerVisibleTitleSource: 'notes-surface'
+        })
+      );
+      expect(telemetry.summary.commandIntentViolationCount).toBeGreaterThan(0);
+      expect(telemetry.summary.commandIntentViolationKinds).toEqual(['validation-runner']);
+    }
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('waits for graceful child termination before surfacing timeout failure', async () => {

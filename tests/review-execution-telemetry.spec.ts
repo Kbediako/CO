@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ReviewExecutionState } from '../scripts/lib/review-execution-state.js';
 import {
   formatReviewOutcomeSummary,
+  logReviewTelemetrySummary,
   writeReviewExecutionTelemetry
 } from '../scripts/lib/review-execution-telemetry.js';
 
@@ -170,6 +171,47 @@ describe('review-execution-telemetry', () => {
       })
     ).toBe(
       'review command failed without termination-boundary classification; not an explicit wrapper-boundary failure'
+    );
+  });
+
+  it('prints command-intent aggregate counts in telemetry summaries', async () => {
+    const sandbox = await makeSandbox();
+    const outputLogPath = join(sandbox, 'review', 'output.log');
+    const telemetryPath = join(sandbox, 'review', 'telemetry.json');
+    await mkdir(join(sandbox, 'review'), { recursive: true });
+    const state = new ReviewExecutionState({ repoRoot: sandbox });
+    state.observeChunk(
+      Buffer.from(
+        [
+          'thinking',
+          'exec',
+          "/bin/zsh -lc 'npx vitest run --config vitest.config.core.ts tests/run-review.spec.ts' in /Users/kbediako/Code/CO"
+        ].join('\n') + '\n'
+      ),
+      'stdout'
+    );
+    const terminationBoundary = state.getTerminationBoundaryRecordForKind('command-intent', 1_000);
+
+    const payload = await writeReviewExecutionTelemetry({
+      state,
+      status: 'failed',
+      error: 'codex review crossed the bounded command-intent boundary (direct validation runner launch).',
+      terminationBoundary,
+      outputLogPath,
+      repoRoot: sandbox,
+      telemetryPath,
+      includeRawTelemetry: false,
+      telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY'
+    });
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    logReviewTelemetrySummary(payload!, 'review/telemetry.json', {
+      debugTelemetry: false,
+      telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY'
+    });
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      '[run-review] command-intent violations detected: 1 sample(s) across validation-runner.'
     );
   });
 

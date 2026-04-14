@@ -4436,6 +4436,51 @@ describe('ReviewExecutionState', () => {
     expect(boundary.violationKinds).toEqual(['delegation-control', 'review-orchestration']);
   });
 
+  it('keeps help-only review orchestration lookups outside command-intent violations', () => {
+    const state = new ReviewExecutionState({ startedAtMs: 0 });
+    let nowMs = 100;
+
+    for (const command of [
+      `/bin/zsh -lc 'codex review --help'\n`,
+      `/bin/zsh -lc 'codex-orchestrator review --help'\n`,
+      `/bin/zsh -lc 'codex-orchestrator start docs-review --help'\n`,
+      `/bin/zsh -lc 'node scripts/run-review.ts --help'\n`,
+      `/bin/zsh -lc 'npm run review -- --help'\n`
+    ]) {
+      state.observeChunk('thinking\nexec\n', 'stdout', nowMs);
+      state.observeChunk(command, 'stdout', nowMs + 10);
+      nowMs += 100;
+    }
+
+    const boundary = state.getCommandIntentBoundaryState(2_000);
+    expect(boundary.triggered).toBe(false);
+    expect(boundary.violationCount).toBe(0);
+  });
+
+  it('still flags nested review orchestration when help is only an option value', () => {
+    const state = new ReviewExecutionState({ startedAtMs: 0 });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(`/bin/zsh -lc 'codex review --title help --uncommitted'\n`, 'stdout', 110);
+
+    const boundary = state.getCommandIntentBoundaryState(2_000);
+    expect(boundary.triggered).toBe(true);
+    expect(boundary.violationKind).toBe('review-orchestration');
+    expect(boundary.violationCount).toBe(1);
+  });
+
+  it('still flags nested review orchestration when help-looking text follows a separator', () => {
+    const state = new ReviewExecutionState({ startedAtMs: 0 });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(`/bin/zsh -lc 'codex review -- --help'\n`, 'stdout', 110);
+
+    const boundary = state.getCommandIntentBoundaryState(2_000);
+    expect(boundary.triggered).toBe(true);
+    expect(boundary.violationKind).toBe('review-orchestration');
+    expect(boundary.violationCount).toBe(1);
+  });
+
   it('does not classify low-signal drift when the guard is disabled', () => {
     const state = new ReviewExecutionState({
       startedAtMs: 0,

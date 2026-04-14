@@ -40,6 +40,7 @@ import {
   shouldPrintNonInteractiveHandoff
 } from './lib/review-non-interactive-handoff.js';
 import {
+  addBoundedReviewConstraintsToScopedTitle,
   buildActiveCloseoutProvenanceLines,
   buildReviewPromptContext,
   type ReviewSurface
@@ -645,8 +646,13 @@ export async function runReviewCli(argv: string[] = process.argv.slice(2)): Prom
     const explicitScopedReview = Boolean(options.base || options.commit || options.uncommitted);
     const explicitReviewTitle =
       typeof options.title === 'string' && options.title.trim().length > 0 ? options.title.trim() : null;
-    const effectiveReviewTitle =
-      explicitReviewTitle ?? (explicitScopedReview ? scopedReviewerVisibleTitle : null);
+    const effectiveReviewTitle = explicitReviewTitle
+      ? explicitScopedReview && !allowHeavyCommands
+        ? addBoundedReviewConstraintsToScopedTitle({ title: explicitReviewTitle })
+        : explicitReviewTitle
+      : explicitScopedReview
+        ? scopedReviewerVisibleTitle
+        : null;
     const effectiveTitleSource = explicitReviewTitle
       ? 'user'
       : explicitScopedReview
@@ -986,7 +992,7 @@ Environment:
 
 Behavior:
   Explicit --uncommitted/--base/--commit wrapper runs keep prompt/context in review/prompt.txt
-                                and launch codex review without any prompt argument because current CLI still treats stdin (\`-\`) as [PROMPT]; reviewer-visible scoped context first rides on --title (user-provided when present, otherwise synthesized from NOTES + surface), and if Codex rejects a synthesized scoped title the wrapper retries the same explicit scope without \`--title\` and falls back to artifact-only context.
+                                and launch codex review without any prompt argument because current CLI still treats stdin (\`-\`) as [PROMPT]; reviewer-visible scoped context first rides on --title (user-provided when present, otherwise synthesized from NOTES + surface) with bounded no-validation guidance visible in the title. If Codex rejects a synthesized scoped title, the wrapper retries the same explicit scope without \`--title\` and falls back to artifact-only context. If bounded review blocks a validation command, the wrapper retries once with stricter no-validation guidance, uses --ask-for-approval untrusted where the runtime honors approval policy, switches appserver retries to inline prompt transport so the constraint is visible at the review boundary, and preserves the command-intent boundary in telemetry when the retry produces a verdict.
   Explicit scoped wrapper runs  Support only the default diff surface; audit/architecture still require prompt-capable unscoped review.
   Unscoped wrapper runs         Pass the saved prompt/context inline to codex review.
 `);
