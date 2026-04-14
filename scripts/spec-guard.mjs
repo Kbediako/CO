@@ -2,10 +2,12 @@
 
 import { execFile } from 'node:child_process';
 import { readFile, readdir } from 'node:fs/promises';
-import { join, posix } from 'node:path';
+import { join, posix, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
 import { computeAgeInDays, parseIsoDate } from './lib/docs-helpers.js';
+import { maybeLoadDocsCatalog, resolveDocsCatalogEntry } from './lib/docs-catalog.js';
 
 const execFileAsync = promisify(execFile);
 const ARCHIVE_STUB_MARKER = '<!-- docs-archive:stub -->';
@@ -19,6 +21,7 @@ const INACTIVE_SPEC_STATUSES = new Set([
   'done',
   'succeeded'
 ]);
+const SPEC_FRESHNESS_CADENCE_DAYS = 30;
 
 /**
  * Print usage information and available command-line options for the spec-guard script.
@@ -151,10 +154,246 @@ async function listSpecFiles() {
   return files.sort();
 }
 
+function normalizeStringArray(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.map((item) => (typeof item === 'string' ? item.trim() : '')).filter(Boolean);
+}
+
+function normalizeTaskNumberRange(value) {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const start = typeof value.start === 'string' ? value.start.trim() : '';
+  const end = typeof value.end === 'string' ? value.end.trim() : '';
+  if (!/^\d{4}$/.test(start) || !/^\d{4}$/.test(end) || Number(start) > Number(end)) {
+    return null;
+  }
+  return { start, end };
+}
+
+function normalizePolicyPathPrefix(value) {
+  const normalized = posix.normalize(value.replace(/\\/g, '/')).replace(/^\.\//, '');
+  return normalized === '.' ? '' : normalized;
+}
+
+function normalizeBaselineCohorts(value) {
+  if (!Array.isArray(value)) {
+    return { cohorts: [], isValid: false };
+  }
+
+  const cohorts = value.map((item) => {
+    if (!item || typeof item !== 'object') {
+      return null;
+    }
+    const id = typeof item.id === 'string' ? item.id.trim() || null : null;
+    const lastReview = typeof item.last_review === 'string' && parseIsoDate(item.last_review) ? item.last_review : null;
+    const cadenceDays = Number.isInteger(item.cadence_days) && item.cadence_days > 0 ? item.cadence_days : null;
+    const pathFamilies = normalizeStringArray(item.path_families);
+    const pathPrefixes = normalizeStringArray(item.path_prefixes).map(normalizePolicyPathPrefix).filter(Boolean);
+    const taskNumberRange = normalizeTaskNumberRange(item.task_number_range);
+    if (
+      !id ||
+      !lastReview ||
+      cadenceDays === null ||
+      pathFamilies.length === 0 ||
+      (!taskNumberRange && pathPrefixes.length === 0)
+    ) {
+      return null;
+    }
+    return {
+      id,
+      last_review: lastReview,
+      cadence_days: cadenceDays,
+      path_families: pathFamilies,
+      path_prefixes: pathPrefixes,
+      task_number_range: taskNumberRange
+    };
+  });
+
+  if (cohorts.some((item) => item === null)) {
+    return { cohorts: cohorts.filter(Boolean), isValid: false };
+  }
+  return { cohorts, isValid: cohorts.length > 0 };
+}
+
+function normalizeRollingFreshnessPolicy(rawPolicy) {
+  if (!rawPolicy || typeof rawPolicy !== 'object' || rawPolicy.enabled !== true) {
+    return {
+      enabled: false,
+      is_valid: false,
+      owner_issue: null,
+      policy_doc: null,
+      window_days: 0,
+      max_cohorts: 0,
+      max_entries: 0,
+      eligible_doc_classes: [],
+      baseline_cohorts: []
+    };
+  }
+
+  const ownerIssue = typeof rawPolicy.owner_issue === 'string' ? rawPolicy.owner_issue.trim() || null : null;
+  const policyDoc = typeof rawPolicy.policy_doc === 'string' ? rawPolicy.policy_doc.trim() || null : null;
+  const windowDays = Number.isInteger(rawPolicy.window_days) && rawPolicy.window_days >= 0 ? rawPolicy.window_days : null;
+  const maxCohorts = Number.isInteger(rawPolicy.max_cohorts) && rawPolicy.max_cohorts > 0 ? rawPolicy.max_cohorts : null;
+  const maxEntries = Number.isInteger(rawPolicy.max_entries) && rawPolicy.max_entries > 0 ? rawPolicy.max_entries : null;
+  const eligibleDocClasses = normalizeStringArray(rawPolicy.eligible_doc_classes);
+  const baselineCohorts = normalizeBaselineCohorts(rawPolicy.baseline_cohorts);
+
+  return {
+    enabled: true,
+    is_valid: Boolean(
+      ownerIssue &&
+        policyDoc &&
+        windowDays !== null &&
+        maxCohorts !== null &&
+        maxEntries !== null &&
+        eligibleDocClasses.length > 0 &&
+        baselineCohorts.isValid
+    ),
+    owner_issue: ownerIssue,
+    policy_doc: policyDoc,
+    window_days: windowDays ?? 0,
+    max_cohorts: maxCohorts ?? 0,
+    max_entries: maxEntries ?? 0,
+    eligible_doc_classes: eligibleDocClasses,
+    baseline_cohorts: baselineCohorts.cohorts
+  };
+}
+
+function classifySpecPath(file, docsCatalog) {
+  return resolveDocsCatalogEntry(normalizeSpecFilePath(file), docsCatalog)?.doc_class ?? null;
+}
+
+function normalizeSpecFilePath(file) {
+  const normalized = posix.normalize(String(file).replace(/\\/g, '/')).replace(/^\.\//, '');
+  return normalized === '.' ? '' : normalized;
+}
+
+function classifySpecPathFamily(file) {
+  const normalizedFile = normalizeSpecFilePath(file);
+  if (normalizedFile.startsWith('tasks/specs/')) {
+    return 'tasks/specs';
+  }
+  if (normalizedFile.startsWith('docs/design/specs/')) {
+    return 'docs/design/specs';
+  }
+  return null;
+}
+
+function extractTaskNumber(file) {
+  const basename = posix.basename(normalizeSpecFilePath(file));
+  const directMatch = basename.match(/^(\d{4})-/);
+  return directMatch ? directMatch[1] : null;
+}
+
+function isTaskNumberInRange(taskNumber, range) {
+  return Boolean(taskNumber && range && Number(taskNumber) >= Number(range.start) && Number(taskNumber) <= Number(range.end));
+}
+
+function matchesDeclaredPath(entry, cohort) {
+  const normalizedFile = normalizeSpecFilePath(entry.file);
+  return (
+    isTaskNumberInRange(entry.task_number, cohort.task_number_range) ||
+    cohort.path_prefixes.some((prefix) => normalizedFile.startsWith(prefix))
+  );
+}
+
+function findMatchingBaselineCohort(entry, policy) {
+  return policy.baseline_cohorts.find(
+    (cohort) =>
+      entry.last_review === cohort.last_review &&
+      entry.cadence_days === cohort.cadence_days &&
+      cohort.path_families.includes(entry.path_family) &&
+      matchesDeclaredPath(entry, cohort)
+  );
+}
+
+function applyRollingFreshnessPolicy(staleSpecs, docsCatalog) {
+  const policy = normalizeRollingFreshnessPolicy(docsCatalog?.policies?.rolling_freshness_cohorts);
+  if (!policy.enabled || !policy.is_valid || staleSpecs.length === 0) {
+    return {
+      policy,
+      blockingStaleSpecs: staleSpecs,
+      rollingStaleSpecs: [],
+      rollingCohorts: []
+    };
+  }
+
+  const eligibleClasses = new Set(policy.eligible_doc_classes);
+  const eligibleSpecs = staleSpecs.flatMap((entry) => {
+    const baselineCohort = findMatchingBaselineCohort(entry, policy);
+    if (
+      !baselineCohort ||
+      !eligibleClasses.has(entry.doc_class) ||
+      entry.overdue_days <= 0 ||
+      entry.overdue_days > policy.window_days
+    ) {
+      return [];
+    }
+    return [{ ...entry, baseline_cohort_id: baselineCohort.id }];
+  });
+
+  const cohortsByKey = new Map();
+  for (const entry of eligibleSpecs) {
+    const key = `${entry.baseline_cohort_id}|${entry.last_review}|${entry.cadence_days}|${entry.age_days}`;
+    if (!cohortsByKey.has(key)) {
+      cohortsByKey.set(key, []);
+    }
+    cohortsByKey.get(key).push(entry);
+  }
+
+  const policyCapacityExceeded = cohortsByKey.size > policy.max_cohorts || eligibleSpecs.length > policy.max_entries;
+  if (policyCapacityExceeded) {
+    return {
+      policy,
+      blockingStaleSpecs: staleSpecs,
+      rollingStaleSpecs: [],
+      rollingCohorts: []
+    };
+  }
+
+  const rollingPaths = new Set(eligibleSpecs.map((entry) => entry.file));
+  const rollingCohorts = [...cohortsByKey.values()].map((entries) => ({
+    baseline_cohort_id: entries[0].baseline_cohort_id,
+    owner_issue: policy.owner_issue,
+    stale_entries: entries.length,
+    last_review: entries[0].last_review,
+    cadence_days: entries[0].cadence_days,
+    age_days: entries[0].age_days,
+    overdue_days: entries[0].overdue_days,
+    window_days: policy.window_days,
+    sample_paths: entries.slice(0, 5).map((entry) => entry.file)
+  }));
+
+  return {
+    policy,
+    blockingStaleSpecs: staleSpecs.filter((entry) => !rollingPaths.has(entry.file)),
+    rollingStaleSpecs: eligibleSpecs,
+    rollingCohorts
+  };
+}
+
+async function loadRollingFreshnessCatalog() {
+  try {
+    return await maybeLoadDocsCatalog(process.cwd());
+  } catch (error) {
+    const code =
+      error && typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
+    if (code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
+}
+
 async function checkSpecFreshness(specFiles) {
   const failures = [];
+  const staleSpecs = [];
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
+  const docsCatalog = await loadRollingFreshnessCatalog();
 
   for (const file of specFiles) {
     let content;
@@ -194,14 +433,29 @@ async function checkSpecFreshness(specFiles) {
     }
 
     const ageDays = computeAgeInDays(reviewDate, today);
-    if (ageDays > 30) {
-      failures.push(
-        `${file}: last_review ${rawValue} is ${ageDays} days old (must be ≤30 days)`
-      );
+    if (ageDays > SPEC_FRESHNESS_CADENCE_DAYS) {
+      const normalizedFile = normalizeSpecFilePath(file);
+      staleSpecs.push({
+        file: normalizedFile,
+        last_review: rawValue,
+        cadence_days: SPEC_FRESHNESS_CADENCE_DAYS,
+        age_days: ageDays,
+        overdue_days: ageDays - SPEC_FRESHNESS_CADENCE_DAYS,
+        doc_class: classifySpecPath(normalizedFile, docsCatalog),
+        path_family: classifySpecPathFamily(normalizedFile),
+        task_number: extractTaskNumber(normalizedFile)
+      });
     }
   }
 
-  return failures;
+  const { blockingStaleSpecs, rollingStaleSpecs, rollingCohorts } = applyRollingFreshnessPolicy(staleSpecs, docsCatalog);
+  for (const entry of blockingStaleSpecs) {
+    failures.push(
+      `${entry.file}: last_review ${entry.last_review} is ${entry.age_days} days old (must be ≤${entry.cadence_days} days)`
+    );
+  }
+
+  return { failures, rollingStaleSpecs, rollingCohorts };
 }
 
 function isInactiveSpec(content) {
@@ -320,7 +574,16 @@ async function main() {
 
   const specFiles = await listSpecFiles();
   if (specFiles.length > 0) {
-    failures.push(...(await checkSpecFreshness(specFiles)));
+    const freshness = await checkSpecFreshness(specFiles);
+    failures.push(...freshness.failures);
+    if (freshness.rollingStaleSpecs.length > 0) {
+      console.log(`Spec guard rolling freshness cohort entries: ${freshness.rollingStaleSpecs.length}`);
+      for (const cohort of freshness.rollingCohorts) {
+        console.log(
+          ` - rolling cohort ${cohort.owner_issue ?? 'unassigned'}: ${cohort.stale_entries} specs, last_review=${cohort.last_review}, overdue=${cohort.overdue_days}/${cohort.window_days} days`
+        );
+      }
+    }
   }
 
   if (failures.length > 0) {
@@ -339,11 +602,24 @@ async function main() {
   console.log('✅ Spec guard: OK');
 }
 
-main().catch((error) => {
-  const message =
-    error && typeof error === 'object' && error !== null && 'message' in error
-      ? error.message
-      : String(error);
-  console.error(`Spec guard failed: ${message}`);
-  process.exit(1);
-});
+function isDirectExecution(entryArg = process.argv[1]) {
+  return Boolean(entryArg) && import.meta.url === pathToFileURL(resolve(entryArg)).href;
+}
+
+if (isDirectExecution()) {
+  main().catch((error) => {
+    const message =
+      error && typeof error === 'object' && error !== null && 'message' in error
+        ? error.message
+        : String(error);
+    console.error(`Spec guard failed: ${message}`);
+    process.exit(1);
+  });
+}
+
+export const specGuardInternalsForTests = {
+  classifySpecPathFamily,
+  extractTaskNumber,
+  matchesDeclaredPath,
+  normalizeSpecFilePath
+};

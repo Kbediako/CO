@@ -72,6 +72,302 @@ function classifyPath(docPath, catalog) {
   return entry?.doc_class || null;
 }
 
+function getClassLabel(docClass, catalog) {
+  if (!docClass) {
+    return 'Uncatalogued';
+  }
+  return catalog?.classes?.[docClass]?.label || docClass;
+}
+
+function classifyPathFamily(docPath) {
+  const normalizedPath = normalizeDocPath(docPath);
+  if (normalizedPath.startsWith('.agent/task/')) {
+    return '.agent/task';
+  }
+  if (normalizedPath.startsWith('tasks/specs/')) {
+    return 'tasks/specs';
+  }
+  if (normalizedPath.startsWith('tasks/tasks-')) {
+    return 'tasks/tasks-*';
+  }
+  if (normalizedPath.startsWith('docs/PRD-')) {
+    return 'docs/PRD-*';
+  }
+  if (normalizedPath.startsWith('docs/TECH_SPEC-')) {
+    return 'docs/TECH_SPEC-*';
+  }
+  if (normalizedPath.startsWith('docs/ACTION_PLAN-')) {
+    return 'docs/ACTION_PLAN-*';
+  }
+  if (normalizedPath.startsWith('docs/findings/')) {
+    return 'docs/findings';
+  }
+  const parts = normalizedPath.split('/').filter(Boolean);
+  return parts.length <= 1 ? normalizedPath : `${parts[0]}/${parts[1]}`;
+}
+
+function extractTaskNumber(docPath) {
+  const normalizedPath = normalizeDocPath(docPath);
+  const basename = path.posix.basename(normalizedPath);
+  const directMatch = basename.match(/^(?:tasks-)?(\d{4})-/);
+  if (directMatch) {
+    return directMatch[1];
+  }
+  const pathMatch = normalizedPath.match(/(?:^|\/)(\d{4})-/);
+  return pathMatch ? pathMatch[1] : null;
+}
+
+function addDaysToIsoDate(isoDate, days) {
+  const parsed = parseIsoDate(isoDate);
+  if (!parsed || !Number.isFinite(days)) {
+    return null;
+  }
+  const next = new Date(parsed);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next.toISOString().slice(0, 10);
+}
+
+function normalizeStringArray(value, fallback = []) {
+  if (!Array.isArray(value)) {
+    return fallback;
+  }
+  const normalized = value.map((item) => (typeof item === 'string' ? item.trim() : '')).filter(Boolean);
+  return normalized.length > 0 ? normalized : fallback;
+}
+
+function normalizePositiveInteger(value, fallback) {
+  return Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
+function normalizeNonNegativeInteger(value, fallback) {
+  return Number.isInteger(value) && value >= 0 ? value : fallback;
+}
+
+function normalizeTaskNumberRange(value) {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const start = typeof value.start === 'string' ? value.start.trim() : '';
+  const end = typeof value.end === 'string' ? value.end.trim() : '';
+  if (!/^\d{4}$/.test(start) || !/^\d{4}$/.test(end) || Number(start) > Number(end)) {
+    return null;
+  }
+  return { start, end };
+}
+
+function normalizeBaselineCohorts(value) {
+  if (!Array.isArray(value)) {
+    return { cohorts: [], isValid: false };
+  }
+
+  const cohorts = value.map((item) => {
+    if (!item || typeof item !== 'object') {
+      return null;
+    }
+    const id = typeof item.id === 'string' ? item.id.trim() || null : null;
+    const lastReview = typeof item.last_review === 'string' && parseIsoDate(item.last_review) ? item.last_review : null;
+    const cadenceDays = Number.isInteger(item.cadence_days) && item.cadence_days > 0 ? item.cadence_days : null;
+    const pathFamilies = normalizeStringArray(item.path_families, []);
+    const pathPrefixes = normalizeStringArray(item.path_prefixes, []).map(normalizeDocPath).filter(Boolean);
+    const taskNumberRange = normalizeTaskNumberRange(item.task_number_range);
+    if (
+      !id ||
+      !lastReview ||
+      cadenceDays === null ||
+      pathFamilies.length === 0 ||
+      (!taskNumberRange && pathPrefixes.length === 0)
+    ) {
+      return null;
+    }
+    return {
+      id,
+      last_review: lastReview,
+      cadence_days: cadenceDays,
+      path_families: pathFamilies,
+      path_prefixes: pathPrefixes,
+      task_number_range: taskNumberRange
+    };
+  });
+
+  if (cohorts.some((item) => item === null)) {
+    return { cohorts: cohorts.filter(Boolean), isValid: false };
+  }
+  return { cohorts, isValid: cohorts.length > 0 };
+}
+
+function normalizeRollingFreshnessPolicy(rawPolicy) {
+  if (!rawPolicy || typeof rawPolicy !== 'object' || rawPolicy.enabled !== true) {
+    return {
+      enabled: false,
+      is_valid: false,
+      owner_issue: null,
+      policy_doc: null,
+      window_days: 0,
+      max_cohorts: 0,
+      max_entries: 0,
+      eligible_doc_classes: [],
+      baseline_cohorts: [],
+      action_after_window: null
+    };
+  }
+
+  const ownerIssue = typeof rawPolicy.owner_issue === 'string' ? rawPolicy.owner_issue.trim() || null : null;
+  const policyDoc = typeof rawPolicy.policy_doc === 'string' ? rawPolicy.policy_doc.trim() || null : null;
+  const windowDays = Number.isInteger(rawPolicy.window_days) && rawPolicy.window_days >= 0 ? rawPolicy.window_days : null;
+  const maxCohorts = Number.isInteger(rawPolicy.max_cohorts) && rawPolicy.max_cohorts > 0 ? rawPolicy.max_cohorts : null;
+  const maxEntries = Number.isInteger(rawPolicy.max_entries) && rawPolicy.max_entries > 0 ? rawPolicy.max_entries : null;
+  const eligibleDocClasses = normalizeStringArray(rawPolicy.eligible_doc_classes, []);
+  const baselineCohorts = normalizeBaselineCohorts(rawPolicy.baseline_cohorts);
+
+  return {
+    enabled: true,
+    is_valid: Boolean(
+      ownerIssue &&
+        policyDoc &&
+        windowDays !== null &&
+        maxCohorts !== null &&
+        maxEntries !== null &&
+        eligibleDocClasses.length > 0 &&
+        baselineCohorts.isValid
+    ),
+    owner_issue: ownerIssue,
+    policy_doc: policyDoc,
+    window_days: normalizeNonNegativeInteger(rawPolicy.window_days, 0),
+    max_cohorts: normalizePositiveInteger(rawPolicy.max_cohorts, 0),
+    max_entries: normalizePositiveInteger(rawPolicy.max_entries, 0),
+    eligible_doc_classes: eligibleDocClasses,
+    baseline_cohorts: baselineCohorts.cohorts,
+    action_after_window:
+      typeof rawPolicy.action_after_window === 'string' ? rawPolicy.action_after_window.trim() || null : null
+  };
+}
+
+function incrementCount(map, key) {
+  const normalizedKey = key || 'unknown';
+  map.set(normalizedKey, (map.get(normalizedKey) || 0) + 1);
+}
+
+function mapToSortedObject(map) {
+  return Object.fromEntries([...map.entries()].sort(([left], [right]) => String(left).localeCompare(String(right))));
+}
+
+function summarizeTaskLineage(entries) {
+  const taskNumbers = [...new Set(entries.map((entry) => entry.task_number).filter(Boolean))].sort();
+  return {
+    task_numbers: taskNumbers,
+    task_count: taskNumbers.length,
+    task_number_range: taskNumbers.length > 0 ? `${taskNumbers[0]}-${taskNumbers[taskNumbers.length - 1]}` : null
+  };
+}
+
+function buildRollingCohortSummary(entries, policy) {
+  const classBreakdown = new Map();
+  const pathFamilyBreakdown = new Map();
+  for (const entry of entries) {
+    incrementCount(classBreakdown, entry.doc_class_label || entry.doc_class);
+    incrementCount(pathFamilyBreakdown, entry.path_family);
+  }
+  const first = entries[0];
+  const expiresAfter = addDaysToIsoDate(first.last_review, first.cadence_days + policy.window_days);
+  return {
+    id: `${first.baseline_cohort_id}-${first.last_review}-cadence-${first.cadence_days}-age-${first.age_days}`,
+    baseline_cohort_id: first.baseline_cohort_id,
+    owner_issue: policy.owner_issue,
+    status: 'rolling_window',
+    last_review: first.last_review,
+    cadence_days: first.cadence_days,
+    age_days: first.age_days,
+    overdue_days: first.overdue_days,
+    window_days: policy.window_days,
+    expires_after: expiresAfter,
+    action_after_window: policy.action_after_window,
+    stale_entries: entries.length,
+    class_breakdown: mapToSortedObject(classBreakdown),
+    path_family_breakdown: mapToSortedObject(pathFamilyBreakdown),
+    lineage: summarizeTaskLineage(entries),
+    sample_paths: entries.slice(0, 10).map((entry) => entry.path)
+  };
+}
+
+function isTaskNumberInRange(taskNumber, range) {
+  return Boolean(taskNumber && range && Number(taskNumber) >= Number(range.start) && Number(taskNumber) <= Number(range.end));
+}
+
+function matchesDeclaredPath(entry, cohort) {
+  return (
+    isTaskNumberInRange(entry.task_number, cohort.task_number_range) ||
+    cohort.path_prefixes.some((prefix) => entry.path.startsWith(prefix))
+  );
+}
+
+function findMatchingBaselineCohort(entry, policy) {
+  return policy.baseline_cohorts.find(
+    (cohort) =>
+      entry.last_review === cohort.last_review &&
+      entry.cadence_days === cohort.cadence_days &&
+      cohort.path_families.includes(entry.path_family) &&
+      matchesDeclaredPath(entry, cohort)
+  );
+}
+
+function applyRollingFreshnessPolicy(rawStaleEntries, docsCatalog) {
+  const policy = normalizeRollingFreshnessPolicy(docsCatalog?.policies?.rolling_freshness_cohorts);
+  if (!policy.enabled || !policy.is_valid || rawStaleEntries.length === 0) {
+    return {
+      policy,
+      blockingStaleEntries: rawStaleEntries,
+      rollingCohortEntries: [],
+      rollingFreshnessCohorts: []
+    };
+  }
+
+  const eligibleClasses = new Set(policy.eligible_doc_classes);
+  const eligibleEntries = rawStaleEntries.flatMap((entry) => {
+    const baselineCohort = findMatchingBaselineCohort(entry, policy);
+    if (
+      !baselineCohort ||
+      !eligibleClasses.has(entry.doc_class) ||
+      !Number.isInteger(entry.overdue_days) ||
+      entry.overdue_days <= 0 ||
+      entry.overdue_days > policy.window_days
+    ) {
+      return [];
+    }
+    return [{ ...entry, baseline_cohort_id: baselineCohort.id }];
+  });
+
+  const cohortsByKey = new Map();
+  for (const entry of eligibleEntries) {
+    const key = `${entry.baseline_cohort_id}|${entry.last_review}|${entry.cadence_days}|${entry.age_days}`;
+    if (!cohortsByKey.has(key)) {
+      cohortsByKey.set(key, []);
+    }
+    cohortsByKey.get(key).push(entry);
+  }
+
+  const policyCapacityExceeded = cohortsByKey.size > policy.max_cohorts || eligibleEntries.length > policy.max_entries;
+  if (policyCapacityExceeded) {
+    return {
+      policy,
+      blockingStaleEntries: rawStaleEntries,
+      rollingCohortEntries: [],
+      rollingFreshnessCohorts: []
+    };
+  }
+
+  const rollingPaths = new Set(eligibleEntries.map((entry) => entry.path));
+  const rollingFreshnessCohorts = [...cohortsByKey.values()]
+    .map((entries) => buildRollingCohortSummary(entries, policy))
+    .sort((left, right) => left.last_review.localeCompare(right.last_review));
+
+  return {
+    policy,
+    blockingStaleEntries: rawStaleEntries.filter((entry) => !rollingPaths.has(entry.path)),
+    rollingCohortEntries: eligibleEntries,
+    rollingFreshnessCohorts
+  };
+}
+
 function summarizeItems(items, renderItem) {
   if (!Array.isArray(items) || items.length === 0) {
     return 'none';
@@ -109,6 +405,7 @@ export function renderDocsFreshnessMarkdown(report) {
     `- Missing on disk: ${report.totals.missing_on_disk}`,
     `- Invalid entries: ${report.totals.invalid_entries}`,
     `- Stale entries: ${report.totals.stale_entries}`,
+    `- Rolling cohort entries: ${report.totals.rolling_cohort_entries ?? 0}`,
     `- Uncatalogued docs: ${report.totals.uncatalogued_docs}`,
     '',
     '## Class Summary',
@@ -124,6 +421,31 @@ export function renderDocsFreshnessMarkdown(report) {
   }
 
   const failingClasses = (report.class_summary ?? []).filter((entry) => countClassFailures(entry) > 0);
+  const rollingCohorts = Array.isArray(report.rolling_freshness_cohorts) ? report.rolling_freshness_cohorts : [];
+
+  if (rollingCohorts.length > 0) {
+    lines.push('', '## Rolling Freshness Cohorts', '');
+    for (const cohort of rollingCohorts) {
+      lines.push(`### ${cohort.id}`, '');
+      lines.push(`- Owner issue: ${cohort.owner_issue ?? 'unassigned'}`);
+      if (report.rolling_freshness_policy?.policy_doc) {
+        lines.push(`- Policy doc: ${report.rolling_freshness_policy.policy_doc}`);
+      }
+      lines.push(`- Stale entries: ${cohort.stale_entries}`);
+      lines.push(
+        `- Review window: last_review=${cohort.last_review}, cadence=${cohort.cadence_days}, age=${cohort.age_days}, overdue=${cohort.overdue_days}, window=${cohort.window_days}`
+      );
+      lines.push(`- Expires after: ${cohort.expires_after ?? 'unknown'}`);
+      lines.push(`- Class breakdown: ${JSON.stringify(cohort.class_breakdown ?? {})}`);
+      lines.push(`- Path family breakdown: ${JSON.stringify(cohort.path_family_breakdown ?? {})}`);
+      if (cohort.lineage?.task_number_range) {
+        lines.push(`- Task lineage: ${cohort.lineage.task_number_range} (${cohort.lineage.task_count} task ids)`);
+      }
+      lines.push(`- Sample paths: ${summarizeItems(cohort.sample_paths, (item) => item)}`);
+      lines.push('');
+    }
+  }
+
   lines.push('', '## Drift By Class', '');
 
   if (failingClasses.length === 0) {
@@ -181,7 +503,7 @@ export async function runDocsFreshness(
 
   const registryEntries = registryResult.entries;
   const invalidEntries = [];
-  const staleEntries = [];
+  const rawStaleEntries = [];
   const missingOnDisk = [];
   const registryPaths = new Set();
   const metricsByClass = [];
@@ -207,6 +529,7 @@ export async function runDocsFreshness(
     const cadenceDays = Number.isFinite(entry?.cadence_days) ? Number(entry.cadence_days) : NaN;
     const reviewDate = parseIsoDate(entry?.last_review);
     const docClass = classifyPath(entryPath, docsCatalog);
+    const docClassLabel = getClassLabel(docClass || 'uncatalogued', docsCatalog);
 
     metricsByClass.push({ doc_class: docClass, metric: 'registry_entries' });
 
@@ -253,16 +576,27 @@ export async function runDocsFreshness(
       if (status === 'active' || status === 'deprecated') {
         const ageDays = computeAgeInDays(reviewDate, today);
         if (ageDays > cadenceDays) {
-          staleEntries.push({
+          rawStaleEntries.push({
             path: entryPath,
             last_review: entry.last_review,
             cadence_days: cadenceDays,
-            age_days: ageDays
+            age_days: ageDays,
+            overdue_days: ageDays - cadenceDays,
+            doc_class: docClass || 'uncatalogued',
+            doc_class_label: docClassLabel,
+            path_family: classifyPathFamily(entryPath),
+            task_number: extractTaskNumber(entryPath)
           });
-          metricsByClass.push({ doc_class: docClass, metric: 'stale_entries' });
         }
       }
     }
+  }
+
+  const { policy: rollingFreshnessPolicy, blockingStaleEntries, rollingCohortEntries, rollingFreshnessCohorts } =
+    applyRollingFreshnessPolicy(rawStaleEntries, docsCatalog);
+  const staleEntries = blockingStaleEntries;
+  for (const entry of staleEntries) {
+    metricsByClass.push({ doc_class: entry.doc_class, metric: 'stale_entries' });
   }
 
   const missingInRegistry = normalizedDocFiles.filter((doc) => !registryPaths.has(doc));
@@ -297,7 +631,7 @@ export async function runDocsFreshness(
         }, {});
 
   const report = {
-    version: 2,
+    version: 3,
     generated_at: new Date().toISOString(),
     task_id: taskId,
     registry_path: toPosixPath(path.relative(repoRoot, absoluteRegistryPath)),
@@ -309,15 +643,19 @@ export async function runDocsFreshness(
       missing_on_disk: missingOnDisk.length,
       invalid_entries: invalidEntries.length,
       stale_entries: staleEntries.length,
+      rolling_cohort_entries: rollingCohortEntries.length,
       uncatalogued_docs: uncataloguedDocs.length
     },
+    rolling_freshness_policy: rollingFreshnessPolicy,
     class_summary: classSummary,
     grouped_failures: groupedFailures,
     uncatalogued_docs: uncataloguedDocs,
     missing_in_registry: missingInRegistry,
     missing_on_disk: missingOnDisk,
     invalid_entries: invalidEntries,
-    stale_entries: staleEntries
+    stale_entries: staleEntries,
+    rolling_cohort_entries: rollingCohortEntries,
+    rolling_freshness_cohorts: rollingFreshnessCohorts
   };
 
   const absoluteReportPath = reportPath
@@ -395,6 +733,14 @@ async function main() {
   }
   if (report.totals.stale_entries > 0) {
     console.log(`- stale docs: ${report.totals.stale_entries}`);
+  }
+  if ((report.totals.rolling_cohort_entries ?? 0) > 0) {
+    console.log(`- rolling freshness cohort entries: ${report.totals.rolling_cohort_entries}`);
+    for (const cohort of report.rolling_freshness_cohorts ?? []) {
+      console.log(
+        `- rolling cohort ${cohort.owner_issue ?? 'unassigned'}: ${cohort.stale_entries} docs, last_review=${cohort.last_review}, overdue=${cohort.overdue_days}/${cohort.window_days} days`
+      );
+    }
   }
   if (report.totals.uncatalogued_docs > 0) {
     console.log(`- uncatalogued docs: ${report.totals.uncatalogued_docs}`);
