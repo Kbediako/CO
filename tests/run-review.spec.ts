@@ -979,6 +979,10 @@ fi
     fi
     if [[ "$mode" == "command-intent-validation-then-ok" ]]; then
       if [[ "$*" == *"Strict bounded review retry."* ]]; then
+        if has_inline_prompt "$@" && has_arg "--title" "$@"; then
+          echo "custom prompt cannot be combined with --title" >&2
+          exit 1
+        fi
         if has_inline_prompt "$@" && { has_arg "--base" "$@" || has_arg "--commit" "$@" || has_arg "--uncommitted" "$@"; }; then
           echo "custom prompt cannot be combined with explicit scope flags" >&2
           exit 1
@@ -6286,6 +6290,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       const retryArgvLine = reviewInvocations[1].split('\n').find((line) => line.startsWith('argv=')) ?? '';
       expect(retryArgvLine).toContain('argv=review Strict bounded review retry.');
       for (const forbidden of ['argv=review --base', 'argv=review --commit', 'argv=review --uncommitted']) expect(retryArgvLine).not.toContain(forbidden);
+      expect(reviewInvocations[1]).not.toContain('--title');
       for (const scopeArg of scopeArgs) {
         expect(reviewInvocations[0]).toContain(scopeArg);
       }

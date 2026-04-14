@@ -131,6 +131,8 @@ describe('review command intent classification', () => {
       `codex review -h`,
       `codex-orchestrator review --help`,
       `codex-orchestrator start docs-review --help`,
+      `codex-orchestrator start --help docs-review`,
+      `codex-orchestrator start -h docs-review`,
       `codex-orchestrator start --task sample-task docs-review --help`,
       `node scripts/run-review.ts --help`,
       `npm run review -- --help`,

@@ -186,7 +186,9 @@ export function isReviewOrchestrationCommand(command: string, args: string[]): b
   if (command === 'codex-orchestrator') {
     if (
       (firstArg === 'review' && hasCliHelpRequest(args.slice(1))) ||
-      (startPipelineIndex !== null && hasCliHelpRequest(args.slice(startPipelineIndex + 1)))
+      (startPipelineIndex !== null &&
+        (hasCliHelpRequest(args.slice(1, startPipelineIndex)) ||
+          hasCliHelpRequest(args.slice(startPipelineIndex + 1))))
     ) {
       return false;
     }
