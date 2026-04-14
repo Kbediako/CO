@@ -397,6 +397,9 @@ function validateScenario(scenario) {
     if (!hasLabeledCapExhaustedEvidence(summary)) {
       failures.push(`${id}: existing_child_lane_active summary missing labeled cap_exhausted evidence`);
     }
+    if (!hasExhaustedCapSlotCandidate(matrix)) {
+      failures.push(`${id}: existing_child_lane_active without exhausted cap-slot matrix evidence`);
+    }
   }
   for (const lane of launched) {
     if (!OUTCOME_VALUES.has(lane.outcome)) {
@@ -404,6 +407,9 @@ function validateScenario(scenario) {
     }
     if (typeof lane.reason !== 'string' || lane.reason.trim().length === 0) {
       failures.push(`${id}: child lane ${lane.stream} is missing outcome reason`);
+    }
+    if (!safeCandidates.some((candidate) => candidate.lane === lane.stream)) {
+      failures.push(`${id}: child lane ${lane.stream} lacks a matching safe independent matrix candidate`);
     }
   }
   return failures;
@@ -419,6 +425,18 @@ function hasLabeledCapExhaustedEvidence(summary) {
   return /(?:^|;)\s*cap_exhausted\s*:\s*[^;\s][^;]*/i.test(summary);
 }
 
+function hasExhaustedCapSlotCandidate(matrix) {
+  return matrix.some((candidate) => {
+    const cap = candidate?.cap_slot_use;
+    return (
+      cap?.exhausted === true &&
+      typeof cap.before === 'number' &&
+      typeof cap.cap === 'number' &&
+      cap.before >= cap.cap
+    );
+  });
+}
+
 export function buildProviderLinearParallelizationCanaryReport(options = {}) {
   const taskId = options.taskId ?? process.env.MCP_RUNNER_TASK_ID ?? process.env.TASK ?? 'provider-linear-parallelization-canary';
   const scenarios = options.scenarios ?? buildProviderLinearParallelizationCanaryScenarios();
@@ -431,14 +449,16 @@ export function buildProviderLinearParallelizationCanaryReport(options = {}) {
     }))
   );
   const metricOnlyChildLanes = scenarios.flatMap((scenario) => {
-    if (findSafeIndependentCandidates(scenario).length > 0) {
-      return [];
-    }
-    return (Array.isArray(scenario?.launched_child_lanes) ? scenario.launched_child_lanes : []).map((lane) => ({
-      scenario_id: scenario.id,
-      stream: lane.stream,
-      reason: 'launched without a safe independent matrix candidate'
-    }));
+    const safeCandidateStreams = new Set(
+      findSafeIndependentCandidates(scenario).map((candidate) => candidate.lane)
+    );
+    return (Array.isArray(scenario?.launched_child_lanes) ? scenario.launched_child_lanes : [])
+      .filter((lane) => !safeCandidateStreams.has(lane.stream))
+      .map((lane) => ({
+        scenario_id: scenario.id,
+        stream: lane.stream,
+        reason: 'launched without a matching safe independent matrix candidate'
+      }));
   });
   const baselineParallelizeRate = rate(
     PARALLELIZATION_AUDIT_BASELINE.decisions.parallelize_now,

@@ -176,4 +176,55 @@ describe('provider-linear parallelization canary', () => {
       ])
     });
   });
+
+  it('rejects launched child lanes that do not match a safe matrix candidate', () => {
+    const scenario = buildProviderLinearParallelizationCanaryScenarios()[0];
+    scenario.id = 'bad-metric-only-stream';
+    scenario.launched_child_lanes = [
+      {
+        stream: 'unrelated-metric-lane',
+        outcome: 'accepted',
+        reason: 'Forged launch that does not match the matrix.'
+      }
+    ];
+    const report = buildProviderLinearParallelizationCanaryReport({
+      generatedAt: '2026-04-14T00:00:00.000Z',
+      taskId: 'linear-co-174-metric-only-stream',
+      scenarios: [scenario]
+    });
+
+    expect(validateProviderLinearParallelizationCanaryReport(report)).toEqual({
+      ok: false,
+      failures: expect.arrayContaining([
+        'bad-metric-only-stream: child lane unrelated-metric-lane lacks a matching safe independent matrix candidate',
+        'canary launched child lanes without safe independent matrix candidates'
+      ])
+    });
+    expect(report.summary.metric_only_child_lane_count).toBe(1);
+    expect(report.summary.metric_only_child_lanes[0]).toMatchObject({
+      scenario_id: 'bad-metric-only-stream',
+      stream: 'unrelated-metric-lane',
+      reason: 'launched without a matching safe independent matrix candidate'
+    });
+  });
+
+  it('rejects existing_child_lane_active scenarios without exhausted matrix cap evidence', () => {
+    const scenario = buildProviderLinearParallelizationCanaryScenarios()[3];
+    scenario.id = 'bad-cap-exhausted-matrix';
+    scenario.matrix[0].cap_slot_use.before = 1;
+    scenario.matrix[0].cap_slot_use.after = 1;
+    scenario.matrix[0].cap_slot_use.exhausted = false;
+    const report = buildProviderLinearParallelizationCanaryReport({
+      generatedAt: '2026-04-14T00:00:00.000Z',
+      taskId: 'linear-co-174-bad-cap-matrix',
+      scenarios: [scenario]
+    });
+
+    expect(validateProviderLinearParallelizationCanaryReport(report)).toEqual({
+      ok: false,
+      failures: expect.arrayContaining([
+        'bad-cap-exhausted-matrix: existing_child_lane_active without exhausted cap-slot matrix evidence'
+      ])
+    });
+  });
 });
