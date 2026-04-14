@@ -1,0 +1,35 @@
+{
+  "task_id": "linear-justified-serial-review-run",
+  "run_id": "2026-04-14T00-20-00-000Z-review",
+  "memory": {
+    "source_0": {
+      "pointer": "ctx:sha256:f10048ebd85a93d68cf83a955517b1aeb516eab4c50716c338e126d73a259b9d#chunk:c000001",
+      "object_id": "sha256:f10048ebd85a93d68cf83a955517b1aeb516eab4c50716c338e126d73a259b9d",
+      "dir_path": ".runs/linear-justified-serial-review-run/cli/2026-04-14T00-20-00-000Z-review/memory/source-0",
+      "index_path": ".runs/linear-justified-serial-review-run/cli/2026-04-14T00-20-00-000Z-review/memory/source-0/index.json",
+      "source_path": ".runs/linear-justified-serial-review-run/cli/2026-04-14T00-20-00-000Z-review/memory/source-0/source.txt"
+    }
+  },
+  "prompt_packs": [
+    {
+      "id": "tfgrpo-diagnostics",
+      "domain": "diagnostics",
+      "stamp": "fixture-diagnostics-stamp",
+      "source_count": 5,
+      "experience_count": 0
+    }
+  ],
+  "plan": {
+    "items": [
+      {
+        "id": "provider-linear-review",
+        "metadata": {
+          "selectedMemoryRefs": [
+            "source_0",
+            "prompt_pack:tfgrpo-diagnostics"
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "issue_id": "fixture-memory-adopting-run",
+  "issue_identifier": "CO-FIXTURE-MEMORY",
+  "attempt_started_at": "2026-04-14T00:00:00.000Z",
+  "current_turn_started_at": "2026-04-14T00:01:00.000Z",
+  "linear_audit": {
+    "path": "provider-linear-worker-linear-audit.jsonl",
+    "attempted_count": 2,
+    "success_count": 2,
+    "failure_count": 0,
+    "latest_recorded_at": "2026-04-14T00:01:10.000Z",
+    "latest_by_operation": {
+      "parallelization": {
+        "recorded_at": "2026-04-14T00:01:10.000Z",
+        "operation": "parallelization",
+        "ok": true,
+        "issue_id": "fixture-memory-adopting-run",
+        "issue_identifier": "CO-FIXTURE-MEMORY",
+        "source_setup": null,
+        "action": "stay_serial",
+        "via": "single eval implementation path; docs, test, research, and review slices have no independent child-lane owner in this sanitized fixture",
+        "state": "single_bounded_change",
+        "follow_up_issue_id": null,
+        "follow_up_issue_identifier": null,
+        "failed_relation_type": null,
+        "comment_id": null,
+        "attachment_id": null,
+        "error_code": null,
+        "error_message": null
+      }
+    },
+    "parallelization_entries": []
+  },
+  "child_lanes": [],
+  "parallelization": {
+    "decision": "stay_serial",
+    "reason": "single_bounded_change",
+    "summary": "single eval implementation path; no safe independent child lane remained",
+    "recorded_at": "2026-04-14T00:01:10.000Z",
+    "child_lane_count": 0
+  },
+  "owner_status": "succeeded",
+  "updated_at": "2026-04-14T00:10:00.000Z"
+}
