@@ -27,6 +27,7 @@ import { EnvUtils } from '../../../../packages/shared/config/index.js';
 
 const TERMINAL_STATES = new Set(['succeeded', 'failed', 'cancelled']);
 const METRICS_PENDING_DIRNAME = 'metrics.pending';
+const PROVIDER_LINEAR_WORKER_PIPELINE_ID = 'provider-linear-worker';
 
 export async function appendMetricsEntry(
   env: EnvironmentPaths,
@@ -149,6 +150,8 @@ export async function appendMetricsEntry(
     throw new Error(`Failed to create pending metrics entry for ${entry.run_id}`);
   };
   const finalizeManifest = async (metricsRecorded: boolean) => {
+    preserveProviderLinearWorkerPrimarySummary(manifest, guardrailStatus);
+
     if (!guardrailsPresent && guardrailStatus.recommendation) {
       logger.warn(guardrailStatus.recommendation);
       appendSummary(manifest, guardrailStatus.recommendation);
@@ -173,4 +176,70 @@ export async function appendMetricsEntry(
       `Metrics aggregation skipped for ${env.taskId}: queued metrics entry in ${pendingPath}.`
     );
   }
+}
+
+function preserveProviderLinearWorkerPrimarySummary(
+  manifest: CliManifest,
+  guardrailStatus: NonNullable<CliManifest['guardrail_status']>
+): void {
+  const primarySummary = resolveProviderLinearWorkerPrimarySummary(manifest, guardrailStatus);
+  if (!primarySummary) {
+    return;
+  }
+
+  const currentLines = splitSummaryLines(manifest.summary);
+  const secondaryLines = currentLines.filter((line) => line !== primarySummary);
+  manifest.summary = [primarySummary, ...secondaryLines].join('\n');
+}
+
+function resolveProviderLinearWorkerPrimarySummary(
+  manifest: CliManifest,
+  guardrailStatus: NonNullable<CliManifest['guardrail_status']>
+): string | null {
+  if (manifest.status !== 'succeeded' || manifest.pipeline_id !== PROVIDER_LINEAR_WORKER_PIPELINE_ID) {
+    return null;
+  }
+  const providerWorkerCommand = manifest.commands.find((command) => {
+    const id = command.id?.trim().toLowerCase() ?? '';
+    const title = command.title?.trim().toLowerCase() ?? '';
+    const commandLine = command.command?.trim().toLowerCase() ?? '';
+    return (
+      id === PROVIDER_LINEAR_WORKER_PIPELINE_ID ||
+      title.includes('provider linear worker') ||
+      commandLine.includes('providerlinearworkerrunner')
+    );
+  });
+  if (providerWorkerCommand?.status !== 'succeeded') {
+    return null;
+  }
+  const summary = providerWorkerCommand.summary?.trim();
+  if (!summary || isGuardrailCloseoutSummaryLine(summary, guardrailStatus)) {
+    return null;
+  }
+  return summary;
+}
+
+function splitSummaryLines(summary: string | null | undefined): string[] {
+  return (summary ?? '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+}
+
+function isGuardrailCloseoutSummaryLine(
+  line: string,
+  guardrailStatus: NonNullable<CliManifest['guardrail_status']>
+): boolean {
+  const trimmed = line.trim();
+  if (trimmed.length === 0) {
+    return true;
+  }
+  if (trimmed.toLowerCase().startsWith('guardrails:')) {
+    return true;
+  }
+  const recommendation = guardrailStatus.recommendation?.trim();
+  if (recommendation && trimmed === recommendation) {
+    return true;
+  }
+  return trimmed.startsWith('Guardrail command missing;');
 }

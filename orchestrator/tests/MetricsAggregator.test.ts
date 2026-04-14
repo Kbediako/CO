@@ -399,6 +399,61 @@ describe('metricsAggregator', () => {
     });
   });
 
+  it('keeps provider-worker success summary primary when guardrail summary collection is missing spec-guard', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'metrics-provider-worker-guardrail-'));
+    const runsRoot = join(repoRoot, '.runs');
+    const outRoot = join(repoRoot, 'out');
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot,
+      outRoot,
+      taskId: 'linear-provider-worker'
+    };
+
+    const runId = 'run-provider-worker';
+    const paths = resolveRunPaths(env, runId);
+    const manifest = createManifest(env.taskId, runId);
+    const providerSummary = 'Provider linear worker stopped because the issue was no longer active.';
+    const refreshSummary = 'Linear refresh failed after successful handoff.';
+    manifest.pipeline_id = 'provider-linear-worker';
+    manifest.pipeline_title = 'Provider Linear Worker';
+    manifest.summary =
+      `${refreshSummary}\n` +
+      'Guardrail command missing; run "codex-orchestrator start diagnostics --approval-policy never --format json --no-interactive" to capture reviewer diagnostics.';
+    const providerCommand = manifest.commands[0];
+    if (!providerCommand) {
+      throw new Error('Expected seeded command in metrics manifest fixture.');
+    }
+    manifest.commands = [
+      {
+        ...providerCommand,
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker',
+        command: 'node providerLinearWorkerRunner.js',
+        status: 'succeeded',
+        summary: providerSummary
+      }
+    ];
+
+    await appendMetricsEntry(env, paths, manifest);
+
+    const summaryLines = manifest.summary?.split('\n') ?? [];
+    expect(manifest.status).toBe('succeeded');
+    expect(summaryLines[0]).toBe(providerSummary);
+    expect(summaryLines[1]).toBe(refreshSummary);
+    expect(manifest.summary).toContain(
+      'Guardrail command missing; run "codex-orchestrator start diagnostics --approval-policy never --format json --no-interactive" to capture reviewer diagnostics.'
+    );
+    expect(manifest.summary).toContain('Guardrails: spec-guard command not found.');
+    expect(manifest.guardrail_status).toMatchObject({
+      present: false,
+      summary: 'Guardrails: spec-guard command not found.',
+      counts: {
+        total: 0
+      }
+    });
+  });
+
   it('flushes pending metrics entries on the next lock acquisition', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'metrics-aggregator-flush-'));
     const runsRoot = join(repoRoot, '.runs');
