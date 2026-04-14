@@ -64,6 +64,62 @@ async function writeDocsFreshnessFixture(
   );
 }
 
+function reviewDateDaysAgo(daysOld: number) {
+  const date = new Date();
+  date.setUTCHours(0, 0, 0, 0);
+  date.setUTCDate(date.getUTCDate() - daysOld);
+  return date.toISOString().slice(0, 10);
+}
+
+function rollingFreshnessPolicy(overrides: Record<string, unknown> = {}) {
+  return {
+    enabled: true,
+    owner_issue: 'CO-175',
+    policy_doc: 'docs/guides/docs-freshness-cohorts.md',
+    window_days: 7,
+    max_cohorts: 1,
+    max_entries: 10,
+    eligible_doc_classes: ['task_packet'],
+    ...overrides
+  };
+}
+
+async function writeRollingDocsFixture(
+  repoRoot: string,
+  {
+    entries = [{ path: 'tasks/tasks-1234-example.md', daysOld: 31 }],
+    policy = rollingFreshnessPolicy()
+  }: {
+    entries?: Array<{ path: string; daysOld?: number }>;
+    policy?: Record<string, unknown>;
+  } = {}
+) {
+  for (const entry of entries) {
+    const parent = entry.path.split('/').slice(0, -1).join('/');
+    if (parent) {
+      await mkdir(join(repoRoot, parent), { recursive: true });
+    }
+    await writeFile(join(repoRoot, entry.path), '# Fixture doc\n', 'utf8');
+  }
+
+  await writeDocsFreshnessFixture(repoRoot, {
+    registryEntries: entries.map((entry) => ({
+      path: entry.path,
+      owner: 'Codex',
+      status: 'active',
+      last_review: reviewDateDaysAgo(entry.daysOld ?? 31),
+      cadence_days: 30
+    })),
+    catalogPatterns: [
+      { glob: 'tasks/**/*.md', doc_class: 'task_packet' },
+      { glob: 'docs/*.md', doc_class: 'repo_guide' }
+    ],
+    catalogPolicies: {
+      rolling_freshness_cohorts: policy
+    }
+  });
+}
+
 describe('docs freshness reporting', () => {
   it('fails closed when the docs catalog is missing', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-missing-catalog-'));
@@ -360,41 +416,7 @@ describe('docs freshness reporting', () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-rolling-cohort-'));
     createdDirs.push(repoRoot);
 
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
-    today.setUTCDate(today.getUTCDate() - 31);
-    const staleReviewDate = today.toISOString().slice(0, 10);
-
-    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
-    await writeFile(join(repoRoot, 'tasks', 'tasks-1234-example.md'), '# Task packet\n', 'utf8');
-    await writeDocsFreshnessFixture(repoRoot, {
-      registryEntries: [
-        {
-          path: 'tasks/tasks-1234-example.md',
-          owner: 'Codex',
-          status: 'active',
-          last_review: staleReviewDate,
-          cadence_days: 30
-        }
-      ],
-      catalogPatterns: [
-        {
-          glob: 'tasks/**/*.md',
-          doc_class: 'task_packet'
-        }
-      ],
-      catalogPolicies: {
-        rolling_freshness_cohorts: {
-          enabled: true,
-          owner_issue: 'CO-175',
-          policy_doc: 'docs/guides/docs-freshness-cohorts.md',
-          window_days: 7,
-          max_cohorts: 1,
-          max_entries: 10,
-          eligible_doc_classes: ['task_packet']
-        }
-      }
-    });
+    await writeRollingDocsFixture(repoRoot);
 
     const { report, hasFailures } = await runDocsFreshness(repoRoot, {
       outRoot: join(repoRoot, 'out'),
@@ -431,35 +453,9 @@ describe('docs freshness reporting', () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-rolling-noneligible-'));
     createdDirs.push(repoRoot);
 
-    await mkdir(join(repoRoot, 'docs'), { recursive: true });
-    await writeFile(join(repoRoot, 'docs', 'README.md'), '# Repo guide\n', 'utf8');
-    await writeDocsFreshnessFixture(repoRoot, {
-      registryEntries: [
-        {
-          path: 'docs/README.md',
-          owner: 'Codex',
-          status: 'active',
-          last_review: '2025-01-01',
-          cadence_days: 30
-        }
-      ],
-      catalogPatterns: [
-        {
-          glob: 'docs/*.md',
-          doc_class: 'repo_guide'
-        }
-      ],
-      catalogPolicies: {
-        rolling_freshness_cohorts: {
-          enabled: true,
-          owner_issue: 'CO-175',
-          policy_doc: 'docs/guides/docs-freshness-cohorts.md',
-          window_days: 365,
-          max_cohorts: 2,
-          max_entries: 10,
-          eligible_doc_classes: ['task_packet']
-        }
-      }
+    await writeRollingDocsFixture(repoRoot, {
+      entries: [{ path: 'docs/README.md', daysOld: 365 }],
+      policy: rollingFreshnessPolicy({ window_days: 365, max_cohorts: 2 })
     });
 
     const { report, hasFailures } = await runDocsFreshness(repoRoot, {
@@ -482,40 +478,8 @@ describe('docs freshness reporting', () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-rolling-expired-'));
     createdDirs.push(repoRoot);
 
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
-    today.setUTCDate(today.getUTCDate() - 45);
-    const staleReviewDate = today.toISOString().slice(0, 10);
-
-    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
-    await writeFile(join(repoRoot, 'tasks', 'tasks-1234-example.md'), '# Task packet\n', 'utf8');
-    await writeDocsFreshnessFixture(repoRoot, {
-      registryEntries: [
-        {
-          path: 'tasks/tasks-1234-example.md',
-          owner: 'Codex',
-          status: 'active',
-          last_review: staleReviewDate,
-          cadence_days: 30
-        }
-      ],
-      catalogPatterns: [
-        {
-          glob: 'tasks/**/*.md',
-          doc_class: 'task_packet'
-        }
-      ],
-      catalogPolicies: {
-        rolling_freshness_cohorts: {
-          enabled: true,
-          owner_issue: 'CO-175',
-          policy_doc: 'docs/guides/docs-freshness-cohorts.md',
-          window_days: 7,
-          max_cohorts: 1,
-          max_entries: 10,
-          eligible_doc_classes: ['task_packet']
-        }
-      }
+    await writeRollingDocsFixture(repoRoot, {
+      entries: [{ path: 'tasks/tasks-1234-example.md', daysOld: 45 }]
     });
 
     const { report, hasFailures } = await runDocsFreshness(repoRoot, {
@@ -539,48 +503,9 @@ describe('docs freshness reporting', () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-rolling-over-budget-'));
     createdDirs.push(repoRoot);
 
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
-    today.setUTCDate(today.getUTCDate() - 31);
-    const staleReviewDate = today.toISOString().slice(0, 10);
-
-    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
-    await writeFile(join(repoRoot, 'tasks', 'tasks-1234-example.md'), '# Task packet\n', 'utf8');
-    await writeFile(join(repoRoot, 'tasks', 'tasks-1235-example.md'), '# Task packet\n', 'utf8');
-    await writeDocsFreshnessFixture(repoRoot, {
-      registryEntries: [
-        {
-          path: 'tasks/tasks-1234-example.md',
-          owner: 'Codex',
-          status: 'active',
-          last_review: staleReviewDate,
-          cadence_days: 30
-        },
-        {
-          path: 'tasks/tasks-1235-example.md',
-          owner: 'Codex',
-          status: 'active',
-          last_review: staleReviewDate,
-          cadence_days: 30
-        }
-      ],
-      catalogPatterns: [
-        {
-          glob: 'tasks/**/*.md',
-          doc_class: 'task_packet'
-        }
-      ],
-      catalogPolicies: {
-        rolling_freshness_cohorts: {
-          enabled: true,
-          owner_issue: 'CO-175',
-          policy_doc: 'docs/guides/docs-freshness-cohorts.md',
-          window_days: 7,
-          max_cohorts: 1,
-          max_entries: 1,
-          eligible_doc_classes: ['task_packet']
-        }
-      }
+    await writeRollingDocsFixture(repoRoot, {
+      entries: [{ path: 'tasks/tasks-1234-example.md' }, { path: 'tasks/tasks-1235-example.md' }],
+      policy: rollingFreshnessPolicy({ max_entries: 1 })
     });
 
     const { report, hasFailures } = await runDocsFreshness(repoRoot, {
@@ -601,40 +526,8 @@ describe('docs freshness reporting', () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-rolling-invalid-classes-'));
     createdDirs.push(repoRoot);
 
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
-    today.setUTCDate(today.getUTCDate() - 31);
-    const staleReviewDate = today.toISOString().slice(0, 10);
-
-    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
-    await writeFile(join(repoRoot, 'tasks', 'tasks-1234-example.md'), '# Task packet\n', 'utf8');
-    await writeDocsFreshnessFixture(repoRoot, {
-      registryEntries: [
-        {
-          path: 'tasks/tasks-1234-example.md',
-          owner: 'Codex',
-          status: 'active',
-          last_review: staleReviewDate,
-          cadence_days: 30
-        }
-      ],
-      catalogPatterns: [
-        {
-          glob: 'tasks/**/*.md',
-          doc_class: 'task_packet'
-        }
-      ],
-      catalogPolicies: {
-        rolling_freshness_cohorts: {
-          enabled: true,
-          owner_issue: 'CO-175',
-          policy_doc: 'docs/guides/docs-freshness-cohorts.md',
-          window_days: 7,
-          max_cohorts: 1,
-          max_entries: 10,
-          eligible_doc_classes: []
-        }
-      }
+    await writeRollingDocsFixture(repoRoot, {
+      policy: rollingFreshnessPolicy({ eligible_doc_classes: [] })
     });
 
     const { report, hasFailures } = await runDocsFreshness(repoRoot, {
