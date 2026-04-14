@@ -210,6 +210,41 @@ describe('provider/control-host freshness gauge', () => {
     expect(report.findings.map((finding) => finding.code)).toContain('no_provider_control_host_artifacts');
   });
 
+  it('does not let worker audit evidence alone render core freshness healthy', async () => {
+    const report = await evaluateProviderControlHostFreshnessGauge({
+      artifactRoot: join(FIXTURE_ROOT, 'worker-audit-only'),
+      now: NOW,
+      strict: true
+    });
+
+    expect(report.sources.worker_audit_jsonl).toHaveLength(1);
+    expect(report.verdict).toBe('unknown');
+    expect(report.strict_failed).toBe(false);
+    expect(report.findings.map((finding) => finding.code)).toContain('missing_core_freshness_artifacts');
+  });
+
+  it('selects timestamp-less artifacts deterministically by path tie-break', async () => {
+    const fixtureRoot = join(FIXTURE_ROOT, 'timestampless-tie');
+    const stalePath = join(fixtureRoot, 'a-status-dataset.json');
+    const healthyPath = join(fixtureRoot, 'z-status-dataset.json');
+
+    const forward = await evaluateProviderControlHostFreshnessGauge({
+      paths: { status_datasets: [stalePath, healthyPath] },
+      now: NOW,
+      strict: true
+    });
+    const reverse = await evaluateProviderControlHostFreshnessGauge({
+      paths: { status_datasets: [healthyPath, stalePath] },
+      now: NOW,
+      strict: true
+    });
+
+    expect(forward.verdict).toBe('healthy');
+    expect(reverse.verdict).toBe('healthy');
+    expect(forward.metrics.last_successful_refresh_age_ms.source_path).toBe(healthyPath);
+    expect(reverse.metrics.last_successful_refresh_age_ms.source_path).toBe(healthyPath);
+  });
+
   it('scopes launch and heartbeat latency to active claims and proofs', async () => {
     const report = await evaluateProviderControlHostFreshnessGauge({
       artifactRoot: join(FIXTURE_ROOT, 'active-scope-latencies'),

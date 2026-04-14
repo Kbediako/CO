@@ -236,20 +236,15 @@ export async function evaluateProviderControlHostFreshnessGauge(
   };
   evaluateLinearBudget(linearBudget, thresholds, findings);
   evaluateWorkerAuditHealth(artifacts.workerAudits, findings);
-  if (
-    sources.provider_intake_state.length === 0 &&
-    sources.provider_manifests.length === 0 &&
-    sources.provider_proofs.length === 0 &&
-    sources.worker_audit_jsonl.length === 0 &&
-    sources.status_datasets.length === 0 &&
-    sources.polling_health.length === 0 &&
-    sources.linear_budget_state.length === 0
-  ) {
+  if (!hasCoreFreshnessSources(sources)) {
+    const auxiliarySourcePath = firstAuxiliarySourcePath(sources);
     findings.push({
-      code: 'no_provider_control_host_artifacts',
+      code: auxiliarySourcePath ? 'missing_core_freshness_artifacts' : 'no_provider_control_host_artifacts',
       verdict: 'unknown',
-      message: 'No provider/control-host freshness artifacts were discovered.',
-      source_path: sources.artifact_root,
+      message: auxiliarySourcePath
+        ? 'Auxiliary provider/control-host artifacts were discovered, but no core freshness source was available.'
+        : 'No provider/control-host freshness artifacts were discovered.',
+      source_path: auxiliarySourcePath ?? sources.artifact_root,
       source_field: null
     });
   }
@@ -1161,11 +1156,16 @@ function selectLatestJsonArtifact(artifacts: JsonArtifact[]): JsonArtifact | nul
   if (artifacts.length === 0) {
     return null;
   }
-  return artifacts.reduce((winner, artifact) => {
-    const winnerTs = artifactTimestampMs(winner);
-    const artifactTs = artifactTimestampMs(artifact);
-    return artifactTs !== null && (winnerTs === null || artifactTs > winnerTs) ? artifact : winner;
-  });
+  return [...artifacts].sort(compareJsonArtifactsByFreshness).at(-1) ?? null;
+}
+
+function compareJsonArtifactsByFreshness(left: JsonArtifact, right: JsonArtifact): number {
+  const leftTs = artifactTimestampMs(left) ?? Number.NEGATIVE_INFINITY;
+  const rightTs = artifactTimestampMs(right) ?? Number.NEGATIVE_INFINITY;
+  if (leftTs !== rightTs) {
+    return leftTs - rightTs;
+  }
+  return left.path.localeCompare(right.path);
 }
 
 function artifactTimestampMs(artifact: JsonArtifact): number | null {
@@ -1342,6 +1342,20 @@ function collectArrayRecords(value: unknown): Record<string, unknown>[] {
   return Array.isArray(value)
     ? value.filter((entry): entry is Record<string, unknown> => asRecord(entry) !== null)
     : [];
+}
+
+function hasCoreFreshnessSources(sources: ProviderControlHostFreshnessGaugeSources): boolean {
+  return [
+    sources.provider_intake_state,
+    sources.provider_manifests,
+    sources.provider_proofs,
+    sources.status_datasets,
+    sources.polling_health
+  ].some((entries) => entries.length > 0);
+}
+
+function firstAuxiliarySourcePath(sources: ProviderControlHostFreshnessGaugeSources): string | null {
+  return sources.worker_audit_jsonl[0] ?? sources.linear_budget_state[0] ?? null;
 }
 
 function readPath(value: unknown, fieldPath: string): unknown {
