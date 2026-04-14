@@ -766,6 +766,7 @@ function evaluateTerminalReconciliationLag(
 ): ProviderControlHostFreshnessGaugeMetric<number> {
   const claims = collectClaims(intakeState);
   const activeClaims = claims.filter((claim) => ACTIVE_CLAIM_STATES.has(readState(claim)));
+  const unreconcilableTerminalProofs: ProofArtifact[] = [];
   const candidates = proofs.flatMap((proof) => {
     if (!isTerminalProof(proof)) {
       return [];
@@ -773,6 +774,7 @@ function evaluateTerminalReconciliationLag(
     const runId = normalizeOptionalString(proof.manifest?.value.run_id) ?? normalizeOptionalString(proof.value.run_id);
     if (!runId) {
       if (activeClaims.length > 0) {
+        unreconcilableTerminalProofs.push(proof);
         findings.push({
           code: 'terminal_proof_missing_run_id',
           verdict: 'unknown',
@@ -799,6 +801,17 @@ function evaluateTerminalReconciliationLag(
     return terminalAt === null ? [] : [{ lagMs: Math.max(0, nowMs - terminalAt), proof }];
   });
   if (candidates.length === 0) {
+    const unreconcilableTerminalProof = unreconcilableTerminalProofs[0];
+    if (unreconcilableTerminalProof) {
+      return metric<number>(
+        null,
+        'ms',
+        'unknown',
+        unreconcilableTerminalProof.path,
+        'run_id',
+        'terminal proof/manifest missing run_id while active claims exist'
+      );
+    }
     return metric(0, 'ms', 'healthy', intakeState?.path ?? null, null, null);
   }
   const worst = candidates.reduce((winner, candidate) =>

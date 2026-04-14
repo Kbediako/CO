@@ -117,6 +117,11 @@ describe('provider/control-host freshness gauge', () => {
 
     expect(report.verdict).toBe('unknown');
     expect(report.strict_failed).toBe(false);
+    expect(report.metrics.terminal_reconciliation_lag_ms).toMatchObject({
+      value: null,
+      verdict: 'unknown',
+      source_field: 'run_id'
+    });
     expect(report.findings.map((finding) => finding.code)).toContain('terminal_proof_missing_run_id');
     expect(report.findings.map((finding) => finding.code)).not.toContain('terminal_proof_with_active_claim');
   });
