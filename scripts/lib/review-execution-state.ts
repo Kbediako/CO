@@ -782,6 +782,12 @@ export class ReviewExecutionState {
     });
   }
 
+  recordCommandIntentViolationsFrom(other: ReviewExecutionState): void {
+    for (const violation of other.commandIntentViolationSamples) {
+      this.recordCommandIntentViolation(violation);
+    }
+  }
+
   getTerminationBoundaryRecordForKind(
     kind: ReviewTerminationBoundaryKind,
     nowMs = Date.now()
@@ -1241,6 +1247,13 @@ export class ReviewExecutionState {
   }
 
   private recordCommandIntentViolation(violation: ReviewCommandIntentViolation): void {
+    if (
+      this.commandIntentViolationSamples.some(
+        (sample) => sample.kind === violation.kind && sample.sample === violation.sample
+      )
+    ) {
+      return;
+    }
     if (!this.commandIntentViolation) {
       this.commandIntentViolation = violation;
     }

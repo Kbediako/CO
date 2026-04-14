@@ -17,6 +17,23 @@
       }
     },
     {
+      "id": "20260414-linear-ea7ddb9e-78a7-4e85-aaa2-f890046d4809",
+      "title": "CO: prevent provider refresh restart loop from breaking co-status attach",
+      "relates_to": "tasks/tasks-linear-ea7ddb9e-78a7-4e85-aaa2-f890046d4809.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-14",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-ea7ddb9e-78a7-4e85-aaa2-f890046d4809.md",
+        "task": "tasks/tasks-linear-ea7ddb9e-78a7-4e85-aaa2-f890046d4809.md",
+        "agent_task": ".agent/task/linear-ea7ddb9e-78a7-4e85-aaa2-f890046d4809.md",
+        "docs": "docs/TECH_SPEC-linear-ea7ddb9e-78a7-4e85-aaa2-f890046d4809.md"
+      }
+    },
+    {
       "id": "20260414-linear-afb6ebc9-1341-4dbd-a522-6531a15aab90",
       "title": "CO workflow: add provider adoption eval for source-0, child lanes, and follow-up traceability",
       "relates_to": "tasks/tasks-linear-afb6ebc9-1341-4dbd-a522-6531a15aab90.md",
@@ -70,6 +87,31 @@
         "task": "tasks/tasks-linear-3cdd7af3-787e-4e73-bb00-731feb5d0db2.md",
         "agent_task": ".agent/task/linear-3cdd7af3-787e-4e73-bb00-731feb5d0db2.md",
         "docs": "docs/TECH_SPEC-linear-3cdd7af3-787e-4e73-bb00-731feb5d0db2.md"
+      }
+    },
+    {
+      "id": "20260414-linear-0f7f6994-db41-4b0a-91f3-9b8f32ea427c",
+      "title": "CO: harden forced standalone review so boundary fallbacks do not replace review verdicts",
+      "relates_to": "tasks/tasks-linear-0f7f6994-db41-4b0a-91f3-9b8f32ea427c.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-14",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (succeeded)",
+          "date": "2026-04-14",
+          "status": "succeeded",
+          "manifest": ".runs/linear-0f7f6994-db41-4b0a-91f3-9b8f32ea427c-co-173-docs-review/cli/2026-04-13T22-43-47-842Z-4ced90a2/manifest.json",
+          "telemetry": ".runs/linear-0f7f6994-db41-4b0a-91f3-9b8f32ea427c-co-173-docs-review/cli/2026-04-13T22-43-47-842Z-4ced90a2/review/telemetry.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-0f7f6994-db41-4b0a-91f3-9b8f32ea427c.md",
+        "task": "tasks/tasks-linear-0f7f6994-db41-4b0a-91f3-9b8f32ea427c.md",
+        "agent_task": ".agent/task/linear-0f7f6994-db41-4b0a-91f3-9b8f32ea427c.md",
+        "docs": "docs/TECH_SPEC-linear-0f7f6994-db41-4b0a-91f3-9b8f32ea427c.md"
       }
     },
     {

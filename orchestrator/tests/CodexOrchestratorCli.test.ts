@@ -65,6 +65,7 @@ describe('codex-orchestrator CLI monitor alias', () => {
     );
     expect(stdout).toContain('This reads persisted endpoint/auth artifacts and does not start another control-host,');
     expect(stdout).toContain('Linear poller, or Telegram poller.');
+    expect(stdout).toContain('the viewer re-resolves the endpoint on fetch failures');
     expect(stdout).toContain('--run-dir <path>');
     expect(stdout).toContain('--manifest-path <path>');
   }, cliHelpTimeoutMs);

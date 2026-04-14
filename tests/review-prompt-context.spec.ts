@@ -5,8 +5,10 @@ import { join } from 'node:path';
 
 import { readRunBlockMemoryIndex, type RunBlockMemoryDescriptor } from '../orchestrator/src/cli/run/blockMemory.js';
 import {
+  addBoundedReviewConstraintsToScopedTitle,
   buildActiveCloseoutProvenanceLines,
   buildReviewPromptContext,
+  buildScopedReviewTitle,
   resolveReviewNotes
 } from '../scripts/lib/review-prompt-context.js';
 
@@ -187,6 +189,42 @@ describe('review-prompt-context', () => {
     expect(fallback).toContain('Goal: standalone review handoff');
     expect(fallback).toContain('task=sample-task');
     expect(fallback).toContain('surface=diff');
+  });
+
+  it('keeps bounded no-validation guidance visible in scoped review titles', () => {
+    const title = buildScopedReviewTitle({
+      notes: 'Goal: run-review regression tests | Summary: verify timeout/stall handling | Risks: none',
+      reviewSurface: 'diff',
+      includeBoundedReviewConstraints: true
+    });
+
+    expect(title).toBe(
+      'Surface: diff | Bounded: no validation; list follow-up commands only | Goal: run-review regression tests | Summary: verify timeout/stall handling | Risks: none'
+    );
+  });
+
+  it('preserves the bounded scoped title segment when long notes are truncated', () => {
+    const title = buildScopedReviewTitle({
+      notes: `Goal: ${'long '.repeat(80)} | Summary: extra context | Risks: truncation`,
+      reviewSurface: 'diff',
+      includeBoundedReviewConstraints: true,
+      maxLength: 100
+    });
+
+    expect(title).toContain('Bounded: no validation; list follow-up commands only');
+    expect(title.length).toBeLessThanOrEqual(100);
+    expect(title.endsWith('…')).toBe(true);
+  });
+
+  it('re-anchors bounded guidance when a long pre-tagged scoped title is truncated', () => {
+    const title = addBoundedReviewConstraintsToScopedTitle({
+      title: `Goal: ${'long '.repeat(60)} | Bounded: no validation; list follow-up commands only`,
+      maxLength: 100
+    });
+
+    expect(title).toContain('Bounded: no validation; list follow-up commands only');
+    expect(title.length).toBeLessThanOrEqual(100);
+    expect(title.endsWith('Bounded: no validation; list follow-up commands only')).toBe(true);
   });
 
   it('returns architecture context paths and prompt lines from docs-first task metadata', async () => {

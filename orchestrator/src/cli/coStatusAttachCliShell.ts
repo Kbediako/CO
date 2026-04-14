@@ -24,6 +24,7 @@ type OutputFormat = 'json' | 'text';
 const DEFAULT_ATTACH_REFRESH_INTERVAL_MS = 1_000;
 const DEFAULT_ATTACH_REQUEST_TIMEOUT_MS = 15_000;
 const CSRF_HEADER = 'x-csrf-token';
+type CoStatusAttachRequestErrorKind = 'auth' | 'cancelled' | 'http' | 'network' | 'timeout';
 
 export interface RunCoStatusAttachCliShellParams {
   flags: ArgMap;
@@ -37,6 +38,22 @@ export interface CoStatusAttachTarget {
   runDir: string;
   baseUrl: URL;
   token: string;
+}
+
+export class CoStatusAttachRequestError extends Error {
+  readonly kind: CoStatusAttachRequestErrorKind;
+  readonly statusCode: number | null;
+
+  constructor(
+    kind: CoStatusAttachRequestErrorKind,
+    message: string,
+    options: { cause?: unknown; statusCode?: number | null } = {}
+  ) {
+    super(message, options.cause === undefined ? undefined : { cause: options.cause });
+    this.name = 'CoStatusAttachRequestError';
+    this.kind = kind;
+    this.statusCode = options.statusCode ?? null;
+  }
 }
 
 export async function runCoStatusAttachCliShell(
@@ -90,10 +107,16 @@ export async function runCoStatusAttachCliShell(
 
   let dashboard: ControlStatusDashboardHandle | null = null;
   const attachAbortController = new AbortController();
+  let activeTarget = target;
   try {
     dashboard = startAttachedControlStatusDashboard({
       readDataset: async (signal) =>
-        await fetchUiDataset(target.baseUrl, target.token, {
+        await readUiDatasetWithEndpointRecovery({
+          flags: params.flags,
+          getTarget: () => activeTarget,
+          setTarget: (nextTarget) => {
+            activeTarget = nextTarget;
+          },
           signal: AbortSignal.any([attachAbortController.signal, signal])
         }),
       baseUrl: target.baseUrl.toString(),
@@ -188,7 +211,7 @@ async function readAttachManifest(
 export async function fetchUiDataset(
   baseUrl: URL,
   token: string,
-  options: { signal?: AbortSignal } = {}
+  options: { signal?: AbortSignal; requestTimeoutMs?: number } = {}
 ): Promise<OperatorDashboardDataset> {
   const url = new URL('/ui/data.json', baseUrl);
   const controller = new AbortController();
@@ -201,7 +224,8 @@ export async function fetchUiDataset(
       linkedSignal.addEventListener('abort', onAbort, { once: true });
     }
   }
-  const timer = setTimeout(() => controller.abort(), DEFAULT_ATTACH_REQUEST_TIMEOUT_MS);
+  const requestTimeoutMs = options.requestTimeoutMs ?? DEFAULT_ATTACH_REQUEST_TIMEOUT_MS;
+  const timer = setTimeout(() => controller.abort(), requestTimeoutMs);
   let response: Response;
   try {
     response = await fetch(url.toString(), {
@@ -215,23 +239,140 @@ export async function fetchUiDataset(
   } catch (error) {
     if ((error as Error)?.name === 'AbortError') {
       if (linkedSignal?.aborted) {
-        throw new Error('control-host ui request cancelled');
+        throw new CoStatusAttachRequestError(
+          'cancelled',
+          'control-host ui request cancelled',
+          { cause: error }
+        );
       }
-      throw new Error('control-host ui request timeout');
+      throw new CoStatusAttachRequestError(
+        'timeout',
+        `control-host ui request timeout after ${requestTimeoutMs}ms`,
+        { cause: error }
+      );
     }
-    throw error;
+    throw new CoStatusAttachRequestError(
+      'network',
+      `control-host unavailable at ${url.toString()}: ${formatFetchNetworkError(error)}`,
+      { cause: error }
+    );
   } finally {
     clearTimeout(timer);
     linkedSignal?.removeEventListener('abort', onAbort);
   }
   if (!response.ok) {
-    throw new Error(`control-host ui request failed: ${response.status} ${response.statusText}`);
+    const statusText = response.statusText.trim() || 'HTTP error';
+    if (response.status === 401 || response.status === 403) {
+      throw new CoStatusAttachRequestError(
+        'auth',
+        `control-host ui auth failed: ${response.status} ${statusText}; refresh control_auth.json or restart co-status attach against the current control-host.`,
+        { statusCode: response.status }
+      );
+    }
+    throw new CoStatusAttachRequestError(
+      'http',
+      `control-host ui request failed: ${response.status} ${statusText}`,
+      { statusCode: response.status }
+    );
   }
   const payload = (await response.json()) as unknown;
   if (!isOperatorDashboardDataset(payload)) {
     throw new Error('control-host ui dataset invalid');
   }
   return payload;
+}
+
+async function readUiDatasetWithEndpointRecovery(input: {
+  flags: ArgMap;
+  getTarget: () => CoStatusAttachTarget;
+  setTarget: (target: CoStatusAttachTarget) => void;
+  signal?: AbortSignal;
+}): Promise<OperatorDashboardDataset> {
+  const previousTarget = input.getTarget();
+  try {
+    return await fetchUiDataset(previousTarget.baseUrl, previousTarget.token, {
+      signal: input.signal
+    });
+  } catch (error) {
+    if (isCancelledAttachRequestError(error)) {
+      throw error;
+    }
+    let resolvedTarget: CoStatusAttachTarget;
+    try {
+      resolvedTarget = await resolveAttachTarget(input.flags);
+    } catch (resolveError) {
+      throw new Error(
+        `${formatAttachRequestFailure(error, previousTarget)} Re-resolving control_endpoint.json failed: ${
+          (resolveError as Error)?.message ?? String(resolveError)
+        }.`
+      );
+    }
+    if (!isAttachTargetEndpointEquivalent(previousTarget, resolvedTarget)) {
+      input.setTarget(resolvedTarget);
+      try {
+        return await fetchUiDataset(resolvedTarget.baseUrl, resolvedTarget.token, {
+          signal: input.signal
+        });
+      } catch (retryError) {
+        if (isCancelledAttachRequestError(retryError)) {
+          throw retryError;
+        }
+        throw new Error(
+          `control-host endpoint rotated from ${previousTarget.baseUrl.toString()} to ${resolvedTarget.baseUrl.toString()}, but the refreshed endpoint is not readable. ${formatAttachRequestFailure(retryError, resolvedTarget, { endpointAlreadyRotated: true })}`
+        );
+      }
+    }
+    throw new Error(formatAttachRequestFailure(error, previousTarget));
+  }
+}
+
+function isAttachTargetEndpointEquivalent(
+  left: CoStatusAttachTarget,
+  right: CoStatusAttachTarget
+): boolean {
+  return left.baseUrl.toString() === right.baseUrl.toString() && left.token === right.token;
+}
+
+function isCancelledAttachRequestError(error: unknown): boolean {
+  return error instanceof CoStatusAttachRequestError && error.kind === 'cancelled';
+}
+
+function formatAttachRequestFailure(
+  error: unknown,
+  target: CoStatusAttachTarget,
+  options: { endpointAlreadyRotated?: boolean } = {}
+): string {
+  if (error instanceof CoStatusAttachRequestError) {
+    if (error.kind === 'network') {
+      if (options.endpointAlreadyRotated) {
+        return `${error.message}. The refreshed control-host endpoint is still unreachable; wait for the new host to come up or rerun co-status attach.`;
+      }
+      return `stale endpoint after control-host restart; control-host unavailable; control_endpoint.json has not rotated to a reachable host. ${error.message}. Waiting for ${resolve(target.runDir, 'control_endpoint.json')} to rotate or rerun co-status attach.`;
+    }
+    if (error.kind === 'timeout') {
+      return `${error.message}. The control-host did not answer before the attach timeout; if restart is in progress, wait for endpoint rotation or rerun co-status attach.`;
+    }
+    return error.message;
+  }
+  return `control-host ui request failed: ${(error as Error)?.message ?? String(error)}`;
+}
+
+function formatFetchNetworkError(error: unknown): string {
+  const message = (error as Error)?.message ?? String(error);
+  const code = extractFetchErrorCode(error);
+  return code ? `${message} (${code})` : message;
+}
+
+function extractFetchErrorCode(error: unknown): string | null {
+  if (!error || typeof error !== 'object') {
+    return null;
+  }
+  const cause = (error as { cause?: unknown }).cause;
+  if (!cause || typeof cause !== 'object') {
+    return null;
+  }
+  const code = (cause as { code?: unknown }).code;
+  return typeof code === 'string' && code.trim().length > 0 ? code : null;
 }
 
 function readStringFlag(flags: ArgMap, key: string): string | undefined {
