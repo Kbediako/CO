@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-04-14T05:59:30.000Z",
+  "polling": {
+    "last_success_at": "2026-04-14T05:59:30.000Z",
+    "stuck": false,
+    "restart_required": false
+  },
+  "claims": [
+    {
+      "provider": "linear",
+      "provider_key": "linear:stale-retry",
+      "issue_id": "stale-retry",
+      "issue_identifier": "CO-STALE-RETRY",
+      "issue_title": "Stale retry fixture",
+      "issue_state": "In Progress",
+      "issue_state_type": "started",
+      "task_id": "linear-stale-retry",
+      "mapping_source": "provider_id_fallback",
+      "state": "resumable",
+      "accepted_at": "2026-04-14T05:50:00.000Z",
+      "updated_at": "2026-04-14T05:50:00.000Z",
+      "run_id": "run-stale-retry",
+      "retry_queued": true,
+      "retry_attempt": 2,
+      "retry_due_at": "2026-04-14T05:30:00.000Z",
+      "retry_error": "fixture transient failure"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "run_id": "duplicate-run-id",
+  "attempt_started_at": "2026-04-14T05:58:20.000Z",
+  "current_turn_activity": {
+    "recorded_at": "2026-04-14T05:58:35.000Z"
+  },
+  "owner_phase": "turn_running",
+  "owner_status": "in_progress",
+  "last_event_at": "2026-04-14T05:59:50.000Z",
+  "updated_at": "2026-04-14T05:59:50.000Z"
+}

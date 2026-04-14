@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-04-14T05:59:30.000Z",
+  "polling": {
+    "enabled": true,
+    "last_success_at": "2026-04-14T05:59:30.000Z",
+    "last_completed_at": "2026-04-14T05:59:30.000Z",
+    "stuck": false,
+    "restart_required": false
+  },
+  "claims": [
+    {
+      "issue_id": "terminal-history",
+      "state": "completed",
+      "accepted_at": "2026-04-14T01:00:00.000Z",
+      "launch_started_at": "2026-04-14T04:00:00.000Z",
+      "run_id": "run-terminal"
+    },
+    {
+      "issue_id": "active-now",
+      "state": "running",
+      "accepted_at": "2026-04-14T05:58:00.000Z",
+      "launch_started_at": "2026-04-14T05:58:20.000Z",
+      "run_id": "run-active"
+    }
+  ]
+}

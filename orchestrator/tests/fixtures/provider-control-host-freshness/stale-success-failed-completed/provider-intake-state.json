@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-04-14T05:59:30.000Z",
+  "polling": {
+    "enabled": true,
+    "last_success_at": "2026-04-14T05:00:00.000Z",
+    "last_completed_at": "2026-04-14T05:59:30.000Z",
+    "last_error": "fixture refresh failed after last success",
+    "stuck": false,
+    "restart_required": false
+  },
+  "claims": []
+}

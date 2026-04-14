@@ -1,0 +1,15 @@
+{
+  "updated_at": "2026-04-14T05:59:20.000Z",
+  "polling": {
+    "last_success_at": "2026-04-14T05:59:20.000Z"
+  },
+  "claims": [
+    {
+      "issue_id": "1d94880c-44bb-46cd-8fcd-ec8df8245d25",
+      "run_id": "run-without-terminal-timestamp",
+      "state": "running",
+      "accepted_at": "2026-04-14T05:58:00.000Z",
+      "launch_started_at": "2026-04-14T05:58:10.000Z"
+    }
+  ]
+}

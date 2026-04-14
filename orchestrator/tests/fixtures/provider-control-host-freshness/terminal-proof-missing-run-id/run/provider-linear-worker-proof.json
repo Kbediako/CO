@@ -1,0 +1,11 @@
+{
+  "issue_id": "terminal-missing-run-id",
+  "issue_identifier": "CO-MISSING-RUN-ID",
+  "attempt_started_at": "2026-04-14T05:36:00.000Z",
+  "owner_phase": "ended",
+  "owner_status": "succeeded",
+  "last_event": "task_complete",
+  "last_event_at": "2026-04-14T05:37:00.000Z",
+  "updated_at": "2026-04-14T05:37:00.000Z",
+  "child_lanes": []
+}

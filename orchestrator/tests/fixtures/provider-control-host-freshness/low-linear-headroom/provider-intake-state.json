@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-04-14T05:59:30.000Z",
+  "polling": {
+    "last_success_at": "2026-04-14T05:59:30.000Z",
+    "stuck": false,
+    "restart_required": false,
+    "linear_budget": {
+      "observed_at": "2026-04-14T05:59:30.000Z",
+      "suppression": "none",
+      "cooldown_active": false,
+      "requests": {
+        "limit": 1000,
+        "remaining": 20,
+        "reset_at": "2026-04-14T07:00:00.000Z"
+      }
+    }
+  },
+  "claims": []
+}

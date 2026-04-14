@@ -1,0 +1,22 @@
+{
+  "issue_id": "new-budget",
+  "issue_identifier": "CO-NEW-BUDGET",
+  "run_id": "run-new-budget",
+  "attempt_started_at": "2026-04-14T05:58:00.000Z",
+  "owner_phase": "turn_running",
+  "owner_status": "in_progress",
+  "last_event": "message_delta",
+  "last_event_at": "2026-04-14T05:59:50.000Z",
+  "updated_at": "2026-04-14T05:59:50.000Z",
+  "child_lanes": [],
+  "linear_budget": {
+    "observed_at": "2026-04-14T05:59:00.000Z",
+    "suppression": "none",
+    "cooldown_active": false,
+    "requests": {
+      "limit": 1000,
+      "remaining": 500,
+      "reset_at": "2026-04-14T07:00:00.000Z"
+    }
+  }
+}

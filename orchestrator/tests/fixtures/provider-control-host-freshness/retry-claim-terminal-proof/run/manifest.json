@@ -1,0 +1,9 @@
+{
+  "task_id": "linear-retry-terminal",
+  "run_id": "run-retry-terminal",
+  "pipeline_id": "provider-linear-worker",
+  "status": "failed",
+  "started_at": "2026-04-14T05:21:00.000Z",
+  "completed_at": "2026-04-14T05:30:00.000Z",
+  "updated_at": "2026-04-14T05:30:00.000Z"
+}

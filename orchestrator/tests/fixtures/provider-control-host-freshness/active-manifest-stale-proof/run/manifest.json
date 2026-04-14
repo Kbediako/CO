@@ -1,0 +1,9 @@
+{
+  "task_id": "linear-stale-heartbeat",
+  "run_id": "run-stale-heartbeat",
+  "pipeline_id": "provider-linear-worker",
+  "status": "in_progress",
+  "started_at": "2026-04-14T05:29:00.000Z",
+  "updated_at": "2026-04-14T05:30:00.000Z",
+  "heartbeat_at": "2026-04-14T05:30:00.000Z"
+}

@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-04-14T05:59:30.000Z",
+  "rehydrated_at": null,
+  "latest_provider_key": "linear:healthy-issue",
+  "latest_reason": "provider_issue_active",
+  "polling": {
+    "enabled": true,
+    "last_success_at": "2026-04-14T05:59:30.000Z",
+    "last_completed_at": "2026-04-14T05:59:30.000Z",
+    "last_error": null,
+    "stuck": false,
+    "restart_required": false,
+    "linear_budget": {
+      "observed_at": "2026-04-14T05:59:30.000Z",
+      "suppression": "none",
+      "cooldown_active": false,
+      "requests": {
+        "limit": 1000,
+        "remaining": 500,
+        "reset_at": "2026-04-14T07:00:00.000Z"
+      }
+    }
+  },
+  "claims": [
+    {
+      "provider": "linear",
+      "provider_key": "linear:healthy-issue",
+      "issue_id": "healthy-issue",
+      "issue_identifier": "CO-HEALTHY",
+      "issue_title": "Healthy fixture",
+      "issue_state": "In Progress",
+      "issue_state_type": "started",
+      "issue_updated_at": "2026-04-14T05:58:00.000Z",
+      "task_id": "linear-healthy-issue",
+      "mapping_source": "provider_id_fallback",
+      "state": "running",
+      "reason": null,
+      "accepted_at": "2026-04-14T05:58:00.000Z",
+      "updated_at": "2026-04-14T05:59:30.000Z",
+      "last_delivery_id": null,
+      "last_event": null,
+      "last_action": null,
+      "last_webhook_timestamp": null,
+      "run_id": "run-healthy",
+      "run_manifest_path": "runs/worker/manifest.json",
+      "launch_source": "control-host",
+      "launch_token": "fixture-token",
+      "launch_started_at": "2026-04-14T05:58:20.000Z",
+      "retry_queued": false,
+      "retry_due_at": null
+    }
+  ]
+}
