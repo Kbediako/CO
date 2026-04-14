@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-04-14T05:59:30.000Z",
+  "polling": {
+    "last_success_at": "2026-04-14T05:59:30.000Z",
+    "stuck": false,
+    "restart_required": false
+  },
+  "claims": [
+    {
+      "provider": "linear",
+      "provider_key": "linear:active-unrelated",
+      "issue_id": "active-unrelated",
+      "issue_identifier": "CO-ACTIVE",
+      "issue_title": "Active unrelated claim fixture",
+      "issue_state": "In Progress",
+      "issue_state_type": "started",
+      "task_id": "linear-active-unrelated",
+      "mapping_source": "provider_id_fallback",
+      "state": "running",
+      "accepted_at": "2026-04-14T05:35:00.000Z",
+      "updated_at": "2026-04-14T05:59:30.000Z",
+      "run_id": "run-active-unrelated",
+      "launch_started_at": "2026-04-14T05:36:00.000Z"
+    }
+  ]
+}

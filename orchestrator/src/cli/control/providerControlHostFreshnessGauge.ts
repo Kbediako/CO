@@ -771,9 +771,21 @@ function evaluateTerminalReconciliationLag(
       return [];
     }
     const runId = normalizeOptionalString(proof.manifest?.value.run_id) ?? normalizeOptionalString(proof.value.run_id);
+    if (!runId) {
+      if (activeClaims.length > 0) {
+        findings.push({
+          code: 'terminal_proof_missing_run_id',
+          verdict: 'unknown',
+          message: 'Terminal provider proof/manifest cannot be reconciled against active claims because run_id is missing.',
+          source_path: proof.path,
+          source_field: 'run_id'
+        });
+      }
+      return [];
+    }
     const matchingClaim = activeClaims.find((claim) => {
       const claimRunId = normalizeOptionalString(claim.run_id);
-      return runId ? claimRunId === runId : true;
+      return claimRunId === runId;
     });
     if (!matchingClaim) {
       return [];
@@ -981,15 +993,16 @@ function selectLinearBudgetArtifact(input: {
   statusDataset: JsonArtifact | null;
   proofs: ProofArtifact[];
 }): JsonArtifact | null {
+  const proofBudgets = input.proofs.flatMap((proof) => {
+    const artifact = nestedJsonArtifact({ path: proof.path, value: proof.value }, 'linear_budget');
+    return artifact ? [artifact] : [];
+  });
   return (
     selectLatestJsonArtifact(input.explicit) ??
     nestedJsonArtifact(input.pollingHealth, 'linear_budget') ??
     nestedJsonArtifact(input.statusDataset, 'rate_limits') ??
     nestedJsonArtifact(input.statusDataset, 'polling.linear_budget') ??
-    input.proofs
-      .map((proof) => nestedJsonArtifact({ path: proof.path, value: proof.value }, 'linear_budget'))
-      .find((artifact) => artifact !== null) ??
-    null
+    selectLatestJsonArtifact(proofBudgets)
   );
 }
 

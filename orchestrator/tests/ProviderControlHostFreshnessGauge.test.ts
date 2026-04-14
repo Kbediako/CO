@@ -107,4 +107,27 @@ describe('provider/control-host freshness gauge', () => {
       strict_failed: true
     });
   });
+
+  it('does not flag terminal proof contradictions without a run id match', async () => {
+    const report = await evaluateProviderControlHostFreshnessGauge({
+      artifactRoot: join(FIXTURE_ROOT, 'terminal-proof-missing-run-id'),
+      now: NOW,
+      strict: true
+    });
+
+    expect(report.verdict).toBe('unknown');
+    expect(report.strict_failed).toBe(false);
+    expect(report.findings.map((finding) => finding.code)).toContain('terminal_proof_missing_run_id');
+    expect(report.findings.map((finding) => finding.code)).not.toContain('terminal_proof_with_active_claim');
+  });
+
+  it('uses the newest proof Linear budget snapshot when no explicit budget artifact exists', async () => {
+    const report = await evaluateProviderControlHostFreshnessGauge({
+      artifactRoot: join(FIXTURE_ROOT, 'proof-budget-newest'),
+      now: NOW
+    });
+
+    expect(report.verdict).toBe('healthy');
+    expect(report.findings.map((finding) => finding.code)).not.toContain('linear_headroom_low');
+  });
 });
