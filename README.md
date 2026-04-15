@@ -11,7 +11,7 @@ codex-orchestrator --version
 
 Node.js `>=20` is required.
 
-CO currently targets Codex CLI `0.118.0`.
+CO currently targets Codex CLI `0.118.0`; newer candidates stay evidence-gated in the version policy.
 
 ## 2-minute quickstart
 
