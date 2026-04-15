@@ -37,6 +37,7 @@ import {
   type ObservabilityUpdateNotifier
 } from './observabilityUpdateNotifier.js';
 import { resolveProviderPollDispatchLimits } from './providerAgentCapacity.js';
+import { isProviderLinearWorkerProofFreshForStage } from './providerLinearWorkerTruth.js';
 import { classifyProviderLinearWorkflowState } from './providerLinearWorkflowStates.js';
 import type { QuestionRecord } from './questions.js';
 import {
@@ -528,11 +529,15 @@ function isAuthoritativeSelectedCurrentRunningSource(
     );
   }
   if (source.taskId !== 'local-mcp') {
+    if (isProviderIntakeScopedRunningSource(source)) {
+      const claim = findMatchingProviderIntakeClaim(providerIntakeState, source);
+      return claim === null || isProviderIntakeClaimActiveForSourceCurrentActivity(claim, source);
+    }
     return true;
   }
   const claim = findMatchingProviderIntakeClaim(providerIntakeState, source);
   if (claim !== null) {
-    return isProviderIntakeClaimActiveCurrentActivity(claim);
+    return isProviderIntakeClaimActiveForSourceCurrentActivity(claim, source);
   }
   if (source.taskId === 'local-mcp' && !hasExplicitCompatibilityIssueIdentity(source)) {
     return false;
@@ -739,7 +744,7 @@ function isAuthoritativeCurrentRunningSource(
   const claim = findMatchingProviderIntakeClaim(providerIntakeState, source);
   if (source.issueProvider === null) {
     if (claim !== null) {
-      return isProviderIntakeClaimActiveCurrentActivity(claim);
+      return isProviderIntakeClaimActiveForSourceCurrentActivity(claim, source);
     }
     return (
       hasExplicitCompatibilityIssueIdentity(source) &&
@@ -749,7 +754,7 @@ function isAuthoritativeCurrentRunningSource(
   if (!isProviderIntakeScopedRunningSource(source)) {
     return true;
   }
-  return claim !== null && isProviderIntakeClaimActiveCurrentActivity(claim);
+  return claim !== null && isProviderIntakeClaimActiveForSourceCurrentActivity(claim, source);
 }
 
 function isProviderIntakeScopedRunningSource(
@@ -950,6 +955,114 @@ function isProviderIntakeClaimActiveCurrentActivity(
     return true;
   }
   return false;
+}
+
+function isProviderIntakeClaimActiveForSourceCurrentActivity(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'state' | 'reason' | 'issue_state' | 'issue_state_type' | 'issue_updated_at'
+  >,
+  source: Pick<ControlCompatibilitySourceContext, 'tracked' | 'providerLinearWorkerProof' | 'startedAt'>
+): boolean {
+  if (isStaleTerminalPendingReopenProviderSource(claim, source)) {
+    return false;
+  }
+  return isProviderIntakeClaimActiveCurrentActivity(claim);
+}
+
+function isStaleTerminalPendingReopenProviderSource(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'state' | 'reason' | 'issue_state' | 'issue_state_type' | 'issue_updated_at'
+  >,
+  source: Pick<ControlCompatibilitySourceContext, 'tracked' | 'providerLinearWorkerProof' | 'startedAt'>
+): boolean {
+  if (
+    claim.state !== 'released' ||
+    !isProviderIssueReleasedPendingReopen(claim.reason) ||
+    !isProviderStartedWorkerIssueState({
+      state: claim.issue_state,
+      state_type: claim.issue_state_type
+    })
+  ) {
+    return false;
+  }
+  if (!hasFreshTerminalSelectedTrackedIssue(source.tracked, claim)) {
+    return false;
+  }
+  return hasStaleLocalProviderInProgressProof(
+    source.providerLinearWorkerProof,
+    source.startedAt
+  );
+}
+
+function hasFreshTerminalSelectedTrackedIssue(
+  tracked: ControlCompatibilitySourceContext['tracked'],
+  claim: Pick<ProviderIntakeClaimRecord, 'issue_updated_at'>
+): boolean {
+  const linear = tracked?.linear ?? null;
+  if (!linear) {
+    return false;
+  }
+  if (!classifyProviderLinearWorkflowState({
+    state: linear.state,
+    state_type: linear.state_type
+  }).isTerminal) {
+    return false;
+  }
+  const trackedUpdatedAt = Date.parse(linear.updated_at ?? '');
+  const claimIssueUpdatedAt = Date.parse(claim.issue_updated_at ?? '');
+  if (!Number.isFinite(claimIssueUpdatedAt)) {
+    return true;
+  }
+  return Number.isFinite(trackedUpdatedAt) && trackedUpdatedAt >= claimIssueUpdatedAt;
+}
+
+function hasStaleLocalProviderInProgressProof(
+  proof: ControlCompatibilitySourceContext['providerLinearWorkerProof'],
+  startedAt: ControlCompatibilitySourceContext['startedAt']
+): boolean {
+  if (!proof) {
+    return false;
+  }
+  if (!isProviderLinearWorkerProofFreshForStage(proof as unknown as Record<string, unknown>, startedAt)) {
+    return false;
+  }
+  if (
+    (proof.owner_status && proof.owner_status !== 'in_progress') ||
+    proof.owner_phase === 'ended'
+  ) {
+    return false;
+  }
+  if (normalizeManifestString(proof.worker_host) !== null) {
+    return false;
+  }
+  const pid = readProviderProofPid(proof.pid);
+  return pid !== null && pid > 0 && !isLocalProcessAlive(pid);
+}
+
+function readProviderProofPid(pid: string | number | null | undefined): number | null {
+  if (typeof pid === 'number') {
+    return Number.isInteger(pid) ? pid : null;
+  }
+  if (typeof pid !== 'string') {
+    return null;
+  }
+  const trimmed = pid.trim();
+  if (!/^\d+$/.test(trimmed)) {
+    return null;
+  }
+  const parsed = Number.parseInt(trimmed, 10);
+  return Number.isSafeInteger(parsed) ? parsed : null;
+}
+
+function isLocalProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException)?.code !== 'ESRCH';
+  }
 }
 
 function isProviderIssueReleasedPendingReopen(reason: string | null | undefined): boolean {

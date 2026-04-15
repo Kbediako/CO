@@ -140,6 +140,7 @@ interface ProviderIssueRunRecord {
   manifestPath: string;
   pipelineId: string | null;
   status: string | null;
+  hasDeadLocalInProgressProof: boolean;
   proofTerminalStatus: 'failed' | 'succeeded' | null;
   summary: string | null;
   issueUpdatedAt: string | null;
@@ -5582,6 +5583,12 @@ async function discoverProviderIssueRunSnapshot(
           manifestStartedAt
         )
       );
+      const hasDeadLocalInProgressProof =
+        hasFreshWorkerHostContext &&
+        hasDeadLocalProviderLinearWorkerInProgressProof(
+          proof,
+          isProcessAlive
+        );
       discovered.push({
         provider: issueProvider,
         issueId,
@@ -5590,6 +5597,7 @@ async function discoverProviderIssueRunSnapshot(
         manifestPath,
         pipelineId,
         status: resolveProviderIssueRunStatus(manifest, proof, isProcessAlive),
+        hasDeadLocalInProgressProof,
         proofTerminalStatus: resolveAuthoritativeProviderLinearWorkerTerminalStatus(
           manifest,
           proof
@@ -5676,15 +5684,34 @@ function isProviderLinearWorkerInProgressProofLive(
   if (ownerPhase === 'ended') {
     return false;
   }
-  const workerHost = normalizeProviderWorkerHostName(proof.worker_host);
-  const pid = readIntegerValue(proof, 'pid');
-  if (!workerHost && pid !== null && pid > 0 && !isProcessAlive(pid)) {
+  if (hasDeadLocalProviderLinearWorkerInProgressProof(proof, isProcessAlive)) {
     return false;
   }
   if (!runStartedAt) {
     return true;
   }
   return isProviderLinearWorkerProofFreshForStage(proof, runStartedAt);
+}
+
+function hasDeadLocalProviderLinearWorkerInProgressProof(
+  proof: ProviderLinearWorkerProofRecord | Record<string, unknown> | null,
+  isProcessAlive: (pid: number) => boolean
+): boolean {
+  if (!proof) {
+    return false;
+  }
+  const proofRecord = proof as Record<string, unknown>;
+  const ownerStatus = readStringValue(proofRecord, 'owner_status');
+  if (ownerStatus && ownerStatus !== 'in_progress') {
+    return false;
+  }
+  const ownerPhase = readStringValue(proofRecord, 'owner_phase');
+  if (ownerPhase === 'ended') {
+    return false;
+  }
+  const workerHost = normalizeProviderWorkerHostName(proofRecord.worker_host);
+  const pid = readIntegerValue(proofRecord, 'pid');
+  return !workerHost && pid !== null && pid > 0 && !isProcessAlive(pid);
 }
 
 function resolveProviderIssueRunStatus(
@@ -6696,6 +6723,7 @@ function resolveProviderReleaseRun(
       manifestPath: claim.run_manifest_path,
       pipelineId: null,
       status: null,
+      hasDeadLocalInProgressProof: false,
       proofTerminalStatus: null,
       summary: null,
       issueUpdatedAt: claim.issue_updated_at,
@@ -6977,7 +7005,16 @@ function stripProviderIssueReleasedPrefix(reason: string): string {
 }
 
 function shouldAttemptReleaseCancel(run: ProviderIssueRunRecord | null): boolean {
-  return run?.status === 'in_progress' || run?.status === 'queued' || run?.status === null;
+  if (!run) {
+    return false;
+  }
+  if (run.status === 'in_progress' || run.status === 'queued') {
+    return true;
+  }
+  if (run.status === null) {
+    return !run.hasDeadLocalInProgressProof;
+  }
+  return false;
 }
 
 function canCleanupReleasedProviderWorkspace(run: ProviderIssueRunRecord | null): boolean {
