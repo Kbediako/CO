@@ -77,6 +77,8 @@ const SPARK_POLICY_SCOPE_REQUIRED_PATTERN =
   /\b(?:allow(?:ed|s|ing)?|except(?:ion|ions)?|keep(?:s|ing)?|only|permitted?|permits?|remain(?:s|ing)?|should|use(?:d|s|ing)?|must)\b/i;
 const SPARK_POLICY_FORBIDDEN_USAGE_PATTERN =
   /(?:search\/synthesis|\bbroad exploration\b|\bsynthesis\b|\bplanning\b|\bimplementation\b|\breview\b|\bexploration\b)/gi;
+const SPARK_POLICY_SUFFIX_RESTRICTION_PATTERN =
+  /(?:,\s*)?\b(?:do not|don't|must not|should not|cannot|can't|never)\s+(?:(?:route)\s+(?:to\s+)?|(?:use|run|select|choose|prefer)\s+)(?:it\b|(?:(?:the|a|an)\s+)?[`*_]*(?:spark|spark roles?|explorer_fast|gpt-5\.3-codex-spark)[`*_]*(?=\W|$))/;
 
 const MACHINE_LOCAL_PATH_PATTERNS = [
   /(?:file:\/\/)?\/Users\/[^\s`)>"]+/,
@@ -377,7 +379,7 @@ function checkSparkFileSearchPolicy(input: {
 
     const relevantText = line.slice(findLastClauseBoundary(line, markerIndex));
     const lineNumber = index + 1;
-    if (hasOverbroadSparkUsage(relevantText)) {
+    if (hasOverbroadSparkUsage(relevantText) || hasNegatedSparkFileSearchScope(relevantText)) {
       errors.push({
         file: input.file,
         rule: 'spark-policy-overbroad',
@@ -423,22 +425,70 @@ function hasOverbroadSparkUsage(relevantText: string): boolean {
   return false;
 }
 
+function hasNegatedSparkFileSearchScope(relevantText: string): boolean {
+  return (
+    /\bnot\s+(?:exclusively|just|limited(?:\s+to)?|only|solely)\b/i.test(relevantText) &&
+    SPARK_POLICY_FILE_SEARCH_PATTERN.test(relevantText)
+  );
+}
+
 function isRestrictiveSparkUsageMention(relevantText: string, mentionIndex: number): boolean {
-  const clausePrefix = relevantText.slice(findLastClauseBoundary(relevantText, mentionIndex), mentionIndex).toLowerCase();
+  const clauseStart = findLastClauseBoundary(relevantText, mentionIndex);
+  const clauseEnd = findNextClauseBoundary(relevantText, mentionIndex);
+  const clausePrefix = relevantText.slice(clauseStart, mentionIndex).toLowerCase();
+  const clauseSuffix = relevantText.slice(mentionIndex, clauseEnd).toLowerCase();
+  const localClausePrefix = sliceAfterLastContrast(clausePrefix);
   if (
     /\b(?:use|prefer|choose|select|route|run)\s+(?:a\s+|an\s+)?(?:non-spark|non\s+spark|alternate|alternative|different|other)\s+(?:roles?|agents?|models?)\b/.test(
-      clausePrefix
+      localClausePrefix
     )
   ) {
     return true;
   }
-  if (/\b(?:but|except|unless)\b/.test(clausePrefix)) {
+  if (/\bnot\s+(?:exclusively|just|limited\b|limited\s+to|only|solely)\b/.test(localClausePrefix)) {
     return false;
   }
-  if (/\bnot\s+(?:exclusively|just|limited\b|limited\s+to|only|solely)\b/.test(clausePrefix)) {
+  if (/\b(?:do not|don't|must not|should not|cannot|can't|never|not|no|without)\b/.test(localClausePrefix)) {
+    return true;
+  }
+  return hasSuffixRestrictionForSparkUsage(localClausePrefix, clauseSuffix);
+}
+
+function sliceAfterLastContrast(text: string): string {
+  let lastContrastEnd = 0;
+  for (const match of text.matchAll(/\b(?:but|except|unless)\b/gi)) {
+    lastContrastEnd = (match.index ?? 0) + match[0].length;
+  }
+  return lastContrastEnd === 0 ? text : text.slice(lastContrastEnd);
+}
+
+function hasSuffixRestrictionForSparkUsage(clausePrefix: string, clauseSuffix: string): boolean {
+  const restrictionMatch = SPARK_POLICY_SUFFIX_RESTRICTION_PATTERN.exec(clauseSuffix);
+  if (!restrictionMatch) {
     return false;
   }
-  return /\b(?:do not|don't|must not|should not|cannot|can't|never|not|no|without)\b/.test(clausePrefix);
+  const prefixBeforeRestriction = clauseSuffix.slice(0, restrictionMatch.index);
+  if (/\b(?:but|except|unless)\b/.test(prefixBeforeRestriction)) {
+    return false;
+  }
+  return isFrontedSparkRestrictionScope(`${clausePrefix}${prefixBeforeRestriction}`);
+}
+
+function isFrontedSparkRestrictionScope(prefixBeforeRestriction: string): boolean {
+  const normalized = prefixBeforeRestriction
+    .replace(/[`*_]/g, '')
+    .replace(/^\s*[-+]\s+/, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+  const frontedScope = normalized.replace(/^(?:for|when|while|during)\s+/, '');
+  return isSparkForbiddenScopeList(frontedScope);
+}
+
+function isSparkForbiddenScopeList(scopeText: string): boolean {
+  return /^(?:(?:broad exploration|exploration|implementation|planning|review|search\/synthesis|synthesis)(?:\s+tasks?)?\s*(?:,|\/|and|or)?\s*)+$/.test(
+    scopeText
+  );
 }
 
 function findLastClauseBoundary(text: string, beforeIndex: number): number {
@@ -451,15 +501,50 @@ function findLastClauseBoundary(text: string, beforeIndex: number): number {
   return boundary === -1 ? 0 : boundary + 1;
 }
 
+function findNextClauseBoundary(text: string, afterIndex: number): number {
+  for (let index = afterIndex; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === ';' || char === '!' || char === '?') {
+      return index;
+    }
+    if (char === '.' && !isInternalClausePeriod(text, index)) {
+      return index;
+    }
+  }
+  return text.length;
+}
+
+function isInternalClausePeriod(text: string, index: number): boolean {
+  const previous = text[index - 1] ?? '';
+  const next = text[index + 1] ?? '';
+  return /[A-Za-z0-9]/.test(previous) && /[A-Za-z0-9]/.test(next);
+}
+
 function findSparkPolicyMarkerIndex(line: string): number {
-  const markers = [/explorer_fast/i, /gpt-5\.3-codex-spark/i, /\bspark\b/i];
+  const markers = [/explorer_fast/i, /gpt-5\.3-codex-spark/i];
   const indexes = markers
     .map((marker) => {
       const match = marker.exec(line);
       return match ? match.index : -1;
     })
     .filter((index) => index >= 0);
+  const sparkWordIndex = findSparkWordPolicyMarkerIndex(line);
+  if (sparkWordIndex !== -1) {
+    indexes.push(sparkWordIndex);
+  }
   return indexes.length === 0 ? -1 : Math.min(...indexes);
+}
+
+function findSparkWordPolicyMarkerIndex(line: string): number {
+  for (const match of line.matchAll(/\bspark\b/gi)) {
+    const index = match.index ?? -1;
+    const prefix = line.slice(Math.max(0, index - 4), index).toLowerCase();
+    if (prefix === 'non-' || prefix === 'non ') {
+      continue;
+    }
+    return index;
+  }
+  return -1;
 }
 
 function checkTrackedRuntimeArtifacts(

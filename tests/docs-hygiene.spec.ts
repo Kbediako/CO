@@ -986,6 +986,14 @@ describe('docs hygiene tooling', () => {
         '',
         '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
         '- `explorer_fast` remains the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only; do not use it for planning or review.',
+        '- For planning or review, do not use spark roles.',
+        '- For planning or review, do not use `explorer_fast`.',
+        '- For planning or review, do not use `gpt-5.3-codex-spark`.',
+        '- Planning or review should not use spark roles.',
+        '- For planning, do not route to spark roles.',
+        '- For review, do not choose the spark role.',
+        '- Spark roles are file/codebase search only, but do not use spark for planning.',
+        '- Spark roles are file/codebase search only, but planning should not use spark roles.',
         ''
       ].join('\n'),
       'utf8'
@@ -1030,6 +1038,7 @@ describe('docs hygiene tooling', () => {
         '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
         '- Spark roles are file/codebase search only; use non-spark roles for planning or review.',
         '- Spark roles are file/codebase search only, but use non-spark roles for implementation.',
+        '- For planning or review, use non-spark roles.',
         ''
       ].join('\n'),
       'utf8'
@@ -1117,6 +1126,93 @@ describe('docs hygiene tooling', () => {
         '',
         '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
         '- `explorer_fast` is not limited to file/codebase search and can help with planning.',
+        '- Spark roles can help with planning, but do not use spark for images.',
+        '- Spark roles can help with review, do not use spark for images.',
+        '- For planning, spark roles can help, do not use spark for images.',
+        '- Do not use spark for images, but spark roles can help with planning.',
+        '- Use non-spark roles for images, but spark roles can help with review.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 4: spark role must be file/codebase search only'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 5: spark role must be file/codebase search only'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 6: spark role must be file/codebase search only'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 7: spark role must be file/codebase search only'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 8: spark role must be file/codebase search only'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 9: spark role must be file/codebase search only'
+      })
+    );
+  });
+
+  it('rejects negated file search-only scope for spark roles', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-spark-policy-negated-scope-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['model-posture']
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      [
+        '# Codex Orchestrator',
+        '',
+        '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
+        '- `explorer_fast` is not limited to file/codebase search.',
         ''
       ].join('\n'),
       'utf8'

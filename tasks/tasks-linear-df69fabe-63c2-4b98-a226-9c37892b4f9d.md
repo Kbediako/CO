@@ -32,21 +32,21 @@
 
 ## Validation
 - [x] `node scripts/delegation-guard.mjs`
-- [ ] `node scripts/spec-guard.mjs --dry-run` latest rerun after April 15 date boundary. Evidence: reports stale March 15 task specs beginning at `1196`; follow-up CO-184 owns the out-of-scope baseline.
+- [x] `node scripts/spec-guard.mjs --dry-run` latest rerun after April 15 date boundary. Evidence: final validation after merging CO-184 baseline repair passes.
 - [x] `npm run build`
 - [x] `npm run lint`
 - [x] `npm run test`
 - [x] `npm run docs:check`
-- [ ] `npm run docs:freshness` latest rerun after April 15 date boundary. Evidence: `out/linear-df69fabe-63c2-4b98-a226-9c37892b4f9d/docs-freshness.json` reports `173` blocking stale historical packet docs plus `221` CO-175 rolling entries; follow-up CO-184 / `237c874c-c05f-4947-949a-573043fc575f` owns the out-of-scope baseline.
+- [x] `npm run docs:freshness` latest rerun after April 15 date boundary. Evidence: final validation after merging CO-184 baseline repair passes with only the expected CO-175 rolling advisory.
 - [x] `npm run repo:stewardship`
 - [x] `node scripts/diff-budget.mjs`
 - [x] `npm run pack:smoke` if CLI/package/skills/review-wrapper paths changed
-- [x] Standalone review completed before review handoff. Evidence: `../../.runs/linear-df69fabe-63c2-4b98-a226-9c37892b4f9d/cli/2026-04-14T22-49-28-802Z-039d36f2/review/telemetry.json`.
-- [x] Elegance review completed before review handoff. Evidence: `out/linear-df69fabe-63c2-4b98-a226-9c37892b4f9d/manual/elegance-review.md`.
+- [x] Standalone review completed before review handoff. Evidence: final `bounded-success` with no actionable issues at `../../.runs/linear-df69fabe-63c2-4b98-a226-9c37892b4f9d/cli/2026-04-15T01-22-09-601Z-d01090d3/review/telemetry.json`.
+- [x] Elegance review completed before review handoff. Evidence: final pass at `out/linear-df69fabe-63c2-4b98-a226-9c37892b4f9d/manual/elegance-review.md`.
 - [ ] PR attached and ready-review drain completed before `In Review`
 
-## Current Blocker
+## Handoff Status
 - [x] PR #481 opened and attached to CO-183: `https://github.com/Kbediako/CO/pull/481`.
-- [x] Codex and CodeRabbit PR feedback fixed locally: spark-policy guard no longer fails restrictive `do not use it for planning or review` wording; regression coverage added in `tests/docs-hygiene.spec.ts`; stale shipped-skill Codex CLI `0.105.0` wording updated to `0.118.0`.
-- [x] Out-of-scope docs freshness baseline follow-up created: CO-184 / `237c874c-c05f-4947-949a-573043fc575f`.
-- [ ] Review handoff remains blocked until spec/docs freshness is green or the CO-184 baseline is resolved/waived by policy.
+- [x] Codex and CodeRabbit PR feedback fixed locally: spark-policy guard requires scoped allowance wording, rejects negated search-only scope, accepts restrictive and non-spark redirect wording, and regression coverage lives in `tests/docs-hygiene.spec.ts`; stale shipped-skill Codex CLI `0.105.0` wording updated to `0.118.0`.
+- [x] Out-of-scope docs freshness baseline follow-up CO-184 / `237c874c-c05f-4947-949a-573043fc575f` merged into this branch; spec/docs freshness reruns are green.
+- [ ] Final review handoff pending PR push, direct PR-thread replies/resolution, ready-review drain, and Linear transition to `In Review`.
