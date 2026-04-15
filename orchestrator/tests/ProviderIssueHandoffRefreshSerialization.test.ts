@@ -1183,6 +1183,7 @@ describe('runProviderIssueHandoffRefresh', () => {
       issue_state_type: 'unstarted',
       issue_updated_at: '2026-04-15T01:30:00.000Z'
     });
+    expect(cancelCalls).toHaveLength(0);
 
     state.claims[0].state = 'released';
     state.claims[0].reason = 'provider_issue_released_pending_reopen:provider_issue_released:not_active';
@@ -1191,6 +1192,12 @@ describe('runProviderIssueHandoffRefresh', () => {
     state.claims[0].issue_updated_at = '2026-04-15T01:18:00.000Z';
     await service.refresh();
 
+    expect(cancelCalls).toEqual([
+      expect.objectContaining({
+        action: 'cancel',
+        reason: 'provider_issue_released_pending_reopen:provider_issue_released:not_active'
+      })
+    ]);
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
     expect(state.claims[0]).toMatchObject({

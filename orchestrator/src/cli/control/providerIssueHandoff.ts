@@ -1932,15 +1932,13 @@ export function createProviderIssueHandoffService(
           activeRun?.manifestPath ?? releasedRun?.manifestPath
         );
         const shouldRefreshReleasedActiveRunIssue =
-          activeRun &&
+          activeRun !== undefined &&
           releasedPendingReopen &&
-          input?.refreshTrackedIssueMetadata === true;
+          (input?.refreshTrackedIssueMetadata === true || resolveTrackedIssueWhenNotStuck !== null);
         const freshTrackedIssue =
           shouldRefreshReleasedActiveRunIssue
             ? await resolveFreshTrackedIssueForActiveClaim(claim)
-            : buildActiveClaimFreshTrackedIssueFallback(
-                activeRun === undefined || !releasedPendingReopen || !resolveTrackedIssueWhenNotStuck
-              );
+            : buildActiveClaimFreshTrackedIssueFallback(true);
         const startedWorkerIssue =
           freshTrackedIssue.trackedIssue !== null
             ? isProviderStartedWorkerTrackedIssue(freshTrackedIssue.trackedIssue)
