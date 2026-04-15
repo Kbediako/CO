@@ -43,4 +43,5 @@ CO-183 expands the CO-180 `0.120.0` command-surface audit into a release-note-dr
 - Docs-review: passed via `.runs/linear-df69fabe-63c2-4b98-a226-9c37892b4f9d-co-183-docs-review-r2/cli/2026-04-14T23-00-44-902Z-abb6e4bf/manifest.json`.
 - Standalone review: passed as bounded-success via `../../.runs/linear-df69fabe-63c2-4b98-a226-9c37892b4f9d/cli/2026-04-14T22-49-28-802Z-039d36f2/review/telemetry.json`.
 - Elegance review: passed via `out/linear-df69fabe-63c2-4b98-a226-9c37892b4f9d/manual/elegance-review.md`.
+- Review handoff: blocked by CO-184 spec/docs freshness baseline.
 - Date: 2026-04-14

@@ -72,9 +72,12 @@
   - Mitigation: policy names `0.120.0` as the latest stable candidate and records the blocker rather than leaving an unqualified `0.118.0`.
 - Risk: outputSchema support causes broad MCP churn.
   - Mitigation: adopt only where the delegation tool surface has stable structured output shapes; otherwise document a source-backed no-op.
+- Risk: repo-wide historical spec/docs freshness debt blocks unrelated feature-lane review handoff after the April 15 date boundary.
+  - Mitigation: do not expand CO-183 into baseline repair; preserve the blocker evidence and hand it to CO-184.
 
 ## Approvals
 - Docs-review: passed via `.runs/linear-df69fabe-63c2-4b98-a226-9c37892b4f9d-co-183-docs-review-r2/cli/2026-04-14T23-00-44-902Z-abb6e4bf/manifest.json`.
 - Standalone review: passed as bounded-success via `../../.runs/linear-df69fabe-63c2-4b98-a226-9c37892b4f9d/cli/2026-04-14T22-49-28-802Z-039d36f2/review/telemetry.json`; scoped `--uncommitted` transport canary confirms the saved prompt artifact plus `--title` fallback remains necessary on Codex CLI `0.120.0`.
 - Elegance review: passed with no code changes required via `out/linear-df69fabe-63c2-4b98-a226-9c37892b4f9d/manual/elegance-review.md`.
+- Review handoff: blocked by latest spec/docs freshness failures after April 15 date boundary; CO-184 owns the out-of-scope historical packet baseline repair.
 - Date: 2026-04-14

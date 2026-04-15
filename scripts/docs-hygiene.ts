@@ -73,7 +73,8 @@ const SPARK_POLICY_DOC_CLASSES = new Set([
 
 const SPARK_POLICY_FILE_SEARCH_PATTERN =
   /(?:file[-/ ]search|codebase[-/ ]search|file\/codebase search|file search|codebase search)/i;
-const SPARK_POLICY_FORBIDDEN_USAGE_PATTERN = /(?:search\/synthesis|\bsynthesis\b|\bplanning\b|\bimplementation\b|\breview\b|\bexploration\b|\bbroad exploration\b)/i;
+const SPARK_POLICY_FORBIDDEN_USAGE_PATTERN =
+  /(?:search\/synthesis|\bbroad exploration\b|\bsynthesis\b|\bplanning\b|\bimplementation\b|\breview\b|\bexploration\b)/gi;
 
 const MACHINE_LOCAL_PATH_PATTERNS = [
   /(?:file:\/\/)?\/Users\/[^\s`)>"]+/,
@@ -374,7 +375,7 @@ function checkSparkFileSearchPolicy(input: {
 
     const relevantText = line.slice(markerIndex);
     const lineNumber = index + 1;
-    if (SPARK_POLICY_FORBIDDEN_USAGE_PATTERN.test(relevantText)) {
+    if (hasOverbroadSparkUsage(relevantText)) {
       errors.push({
         file: input.file,
         rule: 'spark-policy-overbroad',
@@ -392,6 +393,33 @@ function checkSparkFileSearchPolicy(input: {
     }
   }
   return errors;
+}
+
+function hasOverbroadSparkUsage(relevantText: string): boolean {
+  for (const match of relevantText.matchAll(SPARK_POLICY_FORBIDDEN_USAGE_PATTERN)) {
+    if (!isRestrictiveSparkUsageMention(relevantText, match.index ?? 0)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function isRestrictiveSparkUsageMention(relevantText: string, mentionIndex: number): boolean {
+  const clausePrefix = relevantText.slice(findLastClauseBoundary(relevantText, mentionIndex), mentionIndex).toLowerCase();
+  if (/\b(?:but|except|unless)\b/.test(clausePrefix)) {
+    return false;
+  }
+  return /\b(?:do not|don't|must not|should not|cannot|can't|never|not|no|without)\b/.test(clausePrefix);
+}
+
+function findLastClauseBoundary(text: string, beforeIndex: number): number {
+  const boundary = Math.max(
+    text.lastIndexOf('.', beforeIndex),
+    text.lastIndexOf(';', beforeIndex),
+    text.lastIndexOf('!', beforeIndex),
+    text.lastIndexOf('?', beforeIndex)
+  );
+  return boundary === -1 ? 0 : boundary + 1;
 }
 
 function findSparkPolicyMarkerIndex(line: string): number {
