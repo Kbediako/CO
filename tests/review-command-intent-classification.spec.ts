@@ -88,6 +88,14 @@ describe('review command intent classification', () => {
       kind: 'validation-suite',
       sample: `pnpm run test -- tests/review-execution-state.spec.ts`
     });
+    expect(
+      classifyCommandIntentCommandLine(`npm run docs:freshness:maintain -- --format json`, {
+        allowValidationCommandIntents: false
+      })
+    ).toEqual({
+      kind: 'validation-suite',
+      sample: `npm run docs:freshness:maintain -- --format json`
+    });
   });
 
   it('resolves launcher variants and nested review-orchestration commands', () => {

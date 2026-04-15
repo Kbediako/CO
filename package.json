@@ -51,6 +51,7 @@
     "docs:archive-implementation": "node scripts/implementation-docs-archive.mjs",
     "docs:archive-tasks": "node scripts/tasks-archive.mjs",
     "docs:freshness": "node scripts/docs-freshness.mjs --check",
+    "docs:freshness:maintain": "node scripts/docs-freshness-maintain.mjs --check",
     "done-closeout:check": "node scripts/done-closeout-provenance-check.mjs --check",
     "repo:stewardship": "node scripts/repo-stewardship-audit.mjs --check",
     "docs:sync": "node --loader ts-node/esm scripts/docs-hygiene.ts --sync",

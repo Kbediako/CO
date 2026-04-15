@@ -222,6 +222,7 @@ codex-orchestrator linear create-follow-up \
 - Treat `review_outcome: failed-boundary` (or older failed telemetry with a non-null `termination_boundary`) as an explicit review-wrapper boundary failure. Treat `failed-other` as a failed review command without a classified boundary, not as proof of wrapper breakage, and keep unrelated validation, CI, or merge blockers labeled separately instead of blaming the review wrapper.
 - Before handing off to `Human Review` or `In Review`, the completion bar is:
   - required validation is green
+  - `docs-review` and `implementation-gate` freshness status comes from the machine-readable `docs:freshness:maintain` decision; cite `pass_with_owned_rolling_debt` only when current diff/task-packet paths are clean and the owner issue/cap/window evidence is present
   - actionable PR feedback is handled or explicitly pushed back
   - the latest `origin/main` is merged into the branch
   - PR checks are green

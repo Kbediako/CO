@@ -17,7 +17,8 @@ export const REVIEW_HEAVY_SCRIPT_TARGETS = new Set([
   'typecheck',
   'check',
   'docs:check',
-  'docs:freshness'
+  'docs:freshness',
+  'docs:freshness:maintain'
 ]);
 
 const REVIEW_PACKAGE_RUN_SUBCOMMAND_ALIASES = new Set(['run', 'run-script', 'rum', 'urn']);
