@@ -47,6 +47,6 @@
 
 ## Current Blocker
 - [x] PR #481 opened and attached to CO-183: `https://github.com/Kbediako/CO/pull/481`.
-- [x] Codex PR feedback fixed locally: spark-policy guard no longer fails restrictive `do not use it for planning or review` wording; regression coverage added in `tests/docs-hygiene.spec.ts`.
+- [x] Codex and CodeRabbit PR feedback fixed locally: spark-policy guard no longer fails restrictive `do not use it for planning or review` wording; regression coverage added in `tests/docs-hygiene.spec.ts`; stale shipped-skill Codex CLI `0.105.0` wording updated to `0.118.0`.
 - [x] Out-of-scope docs freshness baseline follow-up created: CO-184 / `237c874c-c05f-4947-949a-573043fc575f`.
 - [ ] Review handoff remains blocked until spec/docs freshness is green or the CO-184 baseline is resolved/waived by policy.
