@@ -1027,6 +1027,12 @@ describe('docs hygiene tooling', () => {
         '- Spark policy scope lives in docs/search-policy.md.',
         '- Spark policy scope lives in AGENTS.md; docs should stay locked.',
         '- Spark policy scope lives in AGENTS.md. Docs should stay locked.',
+        '- Spark policy review notes were updated.',
+        '- Spark support docs were updated.',
+        '- Spark role support notes live in AGENTS.md.',
+        '- Spark roles support notes live in AGENTS.md.',
+        '- `explorer_fast` support docs were updated.',
+        '- `gpt-5.3-codex-spark` support docs were updated.',
         '- `explorer_fast` remains the only explicit exception, for file/codebase search only.',
         '- _explorer_fast_, limited to file/codebase search, remains the only exception.',
         '- Leave `explorer_fast` unset by default.',
@@ -1110,6 +1116,11 @@ describe('docs hygiene tooling', () => {
         '- Spark roles are off by default and keep search lanes enabled.',
         '- Spark roles are off by default and make search lanes available.',
         '- Spark roles are off by default and leave search lanes enabled.',
+        '- Spark roles support image inputs.',
+        '- Spark roles support documentation generation.',
+        '- Spark roles support image inputs for file/codebase search.',
+        '- Spark roles support image generation.',
+        '- Spark roles support visual analysis.',
         ''
       ].join('\n'),
       'utf8'
@@ -1269,6 +1280,27 @@ describe('docs hygiene tooling', () => {
         file: 'README.md',
         rule: 'spark-policy-overbroad',
         reference: 'line 25: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 26: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 27: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 28: spark role missing file/codebase search-only scope'
       })
     );
   });
@@ -1768,6 +1800,8 @@ describe('docs hygiene tooling', () => {
         '- Spark roles are search-only and file/codebase search only.',
         '- Spark roles are file/codebase search only and may be used for image inputs.',
         '- Spark roles are file/codebase search only and can be selected for visual tasks.',
+        '- Spark roles are file/codebase search only and support image generation.',
+        '- Spark roles are file/codebase search only and support visual analysis.',
         '- Spark roles are file/codebase search only, and they remain only for search lanes.',
         '- Spark roles are file/codebase search only, and they stay only for search lanes.',
         ''
