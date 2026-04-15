@@ -4,7 +4,7 @@ title: Coordinator Symphony-Aligned Orchestrator Resume Pre-Start Failure Persis
 status: draft
 owner: Codex
 created: 2026-03-15
-last_review: 2026-03-15
+last_review: 2026-04-15
 review_cadence_days: 30
 risk_level: medium
 related_prd: docs/PRD-coordinator-symphony-aligned-orchestrator-resume-pre-start-failure-persistence-callback-extraction.md
