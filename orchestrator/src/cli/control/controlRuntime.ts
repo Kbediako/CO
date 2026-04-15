@@ -37,6 +37,7 @@ import {
   type ObservabilityUpdateNotifier
 } from './observabilityUpdateNotifier.js';
 import { resolveProviderPollDispatchLimits } from './providerAgentCapacity.js';
+import { classifyProviderLinearWorkflowState } from './providerLinearWorkflowStates.js';
 import type { QuestionRecord } from './questions.js';
 import {
   createSelectedRunProjectionReader,
@@ -63,6 +64,7 @@ interface ControlRuntimeContext {
 }
 
 const NULL_PROVIDER_RUNNING_FRESHNESS_MS = 10 * 60 * 1000;
+const PROVIDER_RELEASED_PENDING_REOPEN_PREFIX = 'provider_issue_released_pending_reopen:';
 const SYNTHETIC_LINEAR_TASK_ID_PATTERN =
   /^linear-[a-z0-9]+(?:-[a-z0-9]+)*$/i;
 
@@ -927,14 +929,39 @@ function isFreshNullProviderRunningSource(
 }
 
 function isProviderIntakeClaimActiveCurrentActivity(
-  claim: Pick<ProviderIntakeClaimRecord, 'state'>
+  claim: Pick<ProviderIntakeClaimRecord, 'state' | 'reason' | 'issue_state' | 'issue_state_type'>
 ): boolean {
-  return (
+  if (
     claim.state === 'accepted' ||
     claim.state === 'starting' ||
     claim.state === 'running' ||
     claim.state === 'resuming'
-  );
+  ) {
+    return true;
+  }
+  if (
+    claim.state === 'released' &&
+    isProviderIssueReleasedPendingReopen(claim.reason) &&
+    isProviderStartedWorkerIssueState({
+      state: claim.issue_state,
+      state_type: claim.issue_state_type
+    })
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function isProviderIssueReleasedPendingReopen(reason: string | null | undefined): boolean {
+  return typeof reason === 'string' && reason.startsWith(PROVIDER_RELEASED_PENDING_REOPEN_PREFIX);
+}
+
+function isProviderStartedWorkerIssueState(input: {
+  state: string | null | undefined;
+  state_type: string | null | undefined;
+}): boolean {
+  const workflowState = classifyProviderLinearWorkflowState(input);
+  return workflowState.isActive && !workflowState.isTodo;
 }
 
 function buildCompatibilityTelemetrySnapshot(

@@ -18,6 +18,23 @@
       }
     },
     {
+      "id": "20260415-linear-6c2a6f36-7852-4535-9914-e0042b082c95",
+      "title": "CO STATUS: rehydrate live provider workers before releasing active claims",
+      "relates_to": "tasks/tasks-linear-6c2a6f36-7852-4535-9914-e0042b082c95.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-15",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-6c2a6f36-7852-4535-9914-e0042b082c95.md",
+        "task": "tasks/tasks-linear-6c2a6f36-7852-4535-9914-e0042b082c95.md",
+        "agent_task": ".agent/task/linear-6c2a6f36-7852-4535-9914-e0042b082c95.md",
+        "docs": "docs/TECH_SPEC-linear-6c2a6f36-7852-4535-9914-e0042b082c95.md"
+      }
+    },
+    {
       "id": "20260414-linear-ba9a1c35-c8d1-4b76-aa33-4937502d1964",
       "title": "CO: prune terminal released provider rows from CO STATUS JSON active counts",
       "relates_to": "tasks/tasks-linear-ba9a1c35-c8d1-4b76-aa33-4937502d1964.md",

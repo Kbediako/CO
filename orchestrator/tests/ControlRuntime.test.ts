@@ -2468,6 +2468,69 @@ describe('ControlRuntime', () => {
     }
   });
 
+  it('keeps released pending-reopen started provider workers visible while intake rehydrates', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-15T01:27:12.200Z'));
+    try {
+      const providerIntakeState = createProviderIntakeState([
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-185',
+          issue_id: 'lin-issue-185',
+          issue_identifier: 'CO-185',
+          issue_title: 'Provider helper constraints',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-15T01:18:56.003Z',
+          task_id: 'linear-9a54c7d8-518f-4452-95aa-c5852008b38d',
+          mapping_source: 'provider_id_fallback',
+          state: 'released',
+          reason: 'provider_issue_released_pending_reopen:provider_issue_released:not_active',
+          accepted_at: '2026-04-15T01:09:24.461Z',
+          updated_at: '2026-04-15T01:26:48.590Z',
+          last_delivery_id: 'delivery-co-185',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_744_685_936_003,
+          run_id: 'run-1',
+          run_manifest_path: null,
+          launch_source: 'control-host',
+          launch_token: 'launch-co-185'
+        }
+      ]);
+      const fixture = await createFixture({
+        taskId: 'linear-9a54c7d8-518f-4452-95aa-c5852008b38d',
+        providerIntakeState
+      });
+      await seedManifest(fixture.paths, {
+        task_id: 'linear-9a54c7d8-518f-4452-95aa-c5852008b38d',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-185',
+        issue_identifier: 'CO-185',
+        pipeline_id: 'provider-linear-worker',
+        pipeline_title: 'Provider Linear Worker',
+        status: 'in_progress',
+        started_at: '2026-04-15T01:09:24.461Z',
+        updated_at: '2026-04-15T01:26:45.204Z',
+        summary: 'waiting on child lane'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+
+      expect(compatibilityProjection.running.map((entry) => entry.issue_identifier)).toEqual([
+        'CO-185'
+      ]);
+      expect(compatibilityProjection.running[0]).toMatchObject({
+        issue_id: 'lin-issue-185',
+        state: 'In Progress'
+      });
+      expect(compatibilityProjection.codexTotals.seconds_running).toBeGreaterThan(0);
+      expect(compatibilityProjection.issues.map((issue) => issue.issueIdentifier)).toContain('CO-185');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('suppresses null-provider running sources when a matching intake claim is no longer active', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));

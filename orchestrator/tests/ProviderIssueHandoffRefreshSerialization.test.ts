@@ -970,6 +970,191 @@ describe('runProviderIssueHandoffRefresh', () => {
     });
   });
 
+  it('rehydrates released pending-reopen started claims when the retained run is still active', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-9a54c7d8-518f-4452-95aa-c5852008b38d'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-active');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-active',
+        task_id: 'linear-9a54c7d8-518f-4452-95aa-c5852008b38d',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-185',
+        issue_identifier: 'CO-185',
+        issue_updated_at: '2026-04-15T01:18:56.003Z',
+        started_at: '2026-04-15T01:09:24.461Z',
+        updated_at: '2026-04-15T01:26:45.204Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-185',
+      issue_id: 'lin-issue-185',
+      issue_identifier: 'CO-185',
+      issue_title: 'Stale provider helper constraints',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-15T01:18:00.000Z',
+      task_id: 'linear-9a54c7d8-518f-4452-95aa-c5852008b38d',
+      mapping_source: 'provider_id_fallback',
+      state: 'released',
+      reason: 'provider_issue_released_pending_reopen:provider_issue_released:not_active',
+      accepted_at: '2026-04-15T01:09:24.461Z',
+      updated_at: '2026-04-15T01:26:48.590Z',
+      last_delivery_id: 'delivery-co-185',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_744_685_936_003,
+      run_id: 'run-active',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue: vi.fn(async () => ({
+        kind: 'ready' as const,
+        trackedIssue: createTrackedIssue({
+          id: 'lin-issue-185',
+          identifier: 'CO-185',
+          title: 'Provider helper constraints',
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-04-15T01:18:56.003Z'
+        })
+      }))
+    });
+
+    await service.rehydrate();
+
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      issue_title: 'Provider helper constraints',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-15T01:18:56.003Z',
+      run_id: 'run-active',
+      run_manifest_path: childPaths.manifestPath
+    });
+    expect(state.latest_reason).toBe('provider_issue_rehydrated_active_run');
+  });
+
+  it('refreshes released pending-reopen started claims back to running when the retained run is still active', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-9a54c7d8-518f-4452-95aa-c5852008b38d'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-active');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-active',
+        task_id: 'linear-9a54c7d8-518f-4452-95aa-c5852008b38d',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-185',
+        issue_identifier: 'CO-185',
+        issue_updated_at: '2026-04-15T01:18:56.003Z',
+        started_at: '2026-04-15T01:09:24.461Z',
+        updated_at: '2026-04-15T01:26:45.204Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-185',
+      issue_id: 'lin-issue-185',
+      issue_identifier: 'CO-185',
+      issue_title: 'Provider helper constraints',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-15T01:18:56.003Z',
+      task_id: 'linear-9a54c7d8-518f-4452-95aa-c5852008b38d',
+      mapping_source: 'provider_id_fallback',
+      state: 'released',
+      reason: 'provider_issue_released_pending_reopen:provider_issue_released:not_active',
+      accepted_at: '2026-04-15T01:09:24.461Z',
+      updated_at: '2026-04-15T01:26:48.590Z',
+      last_delivery_id: 'delivery-co-185',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_744_685_936_003,
+      run_id: 'run-active',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue: vi.fn(async () => ({
+        kind: 'ready' as const,
+        trackedIssue: createTrackedIssue({
+          id: 'lin-issue-185',
+          identifier: 'CO-185',
+          title: 'Provider helper constraints',
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-04-15T01:18:56.003Z'
+        })
+      }))
+    });
+
+    await service.refresh();
+
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-15T01:18:56.003Z',
+      run_id: 'run-active',
+      run_manifest_path: childPaths.manifestPath
+    });
+    expect(state.latest_reason).toBe('provider_issue_rehydrated_active_run');
+  });
+
   it('retries released queued child cancellation on a later ready refresh after a transient release failure', async () => {
     const { root, paths } = await createHostPaths();
     const queuedEnv = {
