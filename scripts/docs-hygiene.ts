@@ -468,7 +468,15 @@ function buildSparkPolicyLineContext(
   markerIndex: number
 ): { text: string; markerIndex: number } {
   const currentLine = lines[lineIndex] ?? '';
-  const parts = [currentLine.trimEnd()];
+  const startLine = findSparkPolicyContextStartLine(lines, lineIndex);
+  const parts: string[] = [];
+  let adjustedMarkerIndex = markerIndex;
+  for (let index = startLine; index < lineIndex; index += 1) {
+    const previousPart = (lines[index] ?? '').trim();
+    parts.push(previousPart);
+    adjustedMarkerIndex += previousPart.length + 1;
+  }
+  parts.push(currentLine.trimEnd());
   for (let index = lineIndex + 1; index < lines.length; index += 1) {
     const nextLine = lines[index] ?? '';
     if (isSparkPolicyLineContextBoundary(nextLine)) {
@@ -478,13 +486,37 @@ function buildSparkPolicyLineContext(
   }
   return {
     text: parts.join(' '),
-    markerIndex
+    markerIndex: adjustedMarkerIndex
   };
 }
 
 function isSparkPolicyLineContextBoundary(line: string): boolean {
+  return isSparkPolicyHardContextBoundary(line) || isSparkPolicyListItemLine(line);
+}
+
+function findSparkPolicyContextStartLine(lines: string[], lineIndex: number): number {
+  let startLine = lineIndex;
+  while (startLine > 0) {
+    const previousLine = lines[startLine - 1] ?? '';
+    const currentLine = lines[startLine] ?? '';
+    if (isSparkPolicyHardContextBoundary(previousLine) || isSparkPolicyListItemLine(currentLine)) {
+      break;
+    }
+    startLine -= 1;
+    if (isSparkPolicyListItemLine(previousLine)) {
+      break;
+    }
+  }
+  return startLine;
+}
+
+function isSparkPolicyHardContextBoundary(line: string): boolean {
   const trimmed = line.trim();
-  return trimmed.length === 0 || /^(?:#{1,6}\s+|[-*+]\s+|\d+\.\s+|>\s+|```|~~~|\|)/.test(trimmed);
+  return trimmed.length === 0 || /^(?:#{1,6}\s+|>\s+|```|~~~|\|)/.test(trimmed);
+}
+
+function isSparkPolicyListItemLine(line: string): boolean {
+  return /^\s*(?:[-*+]\s+|\d+\.\s+)/.test(line);
 }
 
 function sliceAfterLastContrast(text: string): string {

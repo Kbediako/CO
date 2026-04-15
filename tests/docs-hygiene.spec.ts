@@ -992,6 +992,8 @@ describe('docs hygiene tooling', () => {
         '- Planning or review should not use spark roles.',
         '- For planning, do not route to spark roles.',
         '- For review, do not choose the spark role.',
+        '- For planning or review, do not use',
+        '  `explorer_fast`.',
         '- Spark roles are file/codebase search only, but do not use spark for planning.',
         '- Spark roles are file/codebase search only, but planning should not use spark roles.',
         '- Use `explorer_fast` for file/codebase search without planning or review.',
@@ -1215,6 +1217,8 @@ describe('docs hygiene tooling', () => {
         '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
         '- `explorer_fast` remains the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only,',
         '  but can help with planning.',
+        '- For planning or review, use',
+        '  `explorer_fast` for file/codebase search only.',
         ''
       ].join('\n'),
       'utf8'
@@ -1227,6 +1231,13 @@ describe('docs hygiene tooling', () => {
         file: 'README.md',
         rule: 'spark-policy-overbroad',
         reference: 'line 4: spark role must be file/codebase search only'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 7: spark role must be file/codebase search only'
       })
     );
   });
