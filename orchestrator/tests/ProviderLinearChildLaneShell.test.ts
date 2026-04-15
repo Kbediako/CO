@@ -322,6 +322,285 @@ describe('runProviderLinearChildLaneShell', () => {
     ]);
   });
 
+  it('classifies zero-byte child-lane patches as no-output advisory evidence', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const childRunDir = join(tempRoot ?? '', '.runs', `${TASK_ID}-analysis-a`, 'cli', 'child-run-1');
+    const childProof: ProviderLinearChildLaneProof = {
+      issue_id: ISSUE.issue_id,
+      issue_identifier: ISSUE.issue_identifier,
+      task_id: `${TASK_ID}-analysis-a`,
+      run_id: 'child-run-1',
+      parent_run_id: RUN_ID,
+      stream: 'analysis-a',
+      purpose: 'Read-only advisory check',
+      instructions: null,
+      scope: {
+        files: ['orchestrator/src/cli/providerLinearChildStreamShell.ts'],
+        phases: []
+      },
+      parent_snapshot: {
+        base_sha: 'parent-base-sha',
+        issue_updated_at: '2026-03-30T07:10:00.000Z',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        captured_at: '2026-03-30T07:11:00.000Z'
+      },
+      lane_workspace_path: join(tempRoot ?? '', '.child-lanes', 'analysis-a-child-run-1'),
+      lane_branch: 'child-lane/analysis-a-child-run-1',
+      patch_artifact_path: join(childRunDir, 'provider-linear-child-lane.patch'),
+      patch_bytes: 0,
+      thread_id: 'thread-1',
+      latest_turn_id: 'turn-1',
+      latest_session_id: 'thread-1-turn-1',
+      latest_session_id_source: 'derived_from_thread_and_turn',
+      last_event: 'task_complete',
+      last_message: 'no code changes needed',
+      last_event_at: '2026-03-30T07:12:00.000Z',
+      tokens: {
+        input_tokens: 10,
+        output_tokens: 12,
+        total_tokens: 22
+      },
+      rate_limits: null,
+      status: 'succeeded',
+      updated_at: '2026-03-30T07:12:00.000Z'
+    };
+    const execRunner = vi.fn(async () => {
+      await mkdir(childRunDir, { recursive: true });
+      await writeFile(
+        join(childRunDir, PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME),
+        JSON.stringify(childProof),
+        'utf8'
+      );
+      return {
+        exitCode: 0,
+        stdout: JSON.stringify({
+          run_id: 'child-run-1',
+          status: 'succeeded',
+          artifact_root: `.runs/${TASK_ID}-analysis-a/cli/child-run-1`,
+          manifest: `.runs/${TASK_ID}-analysis-a/cli/child-run-1/manifest.json`,
+          log_path: `.runs/${TASK_ID}-analysis-a/cli/child-run-1/run.log`,
+          summary: 'read-only advisory complete'
+        }),
+        stderr: ''
+      };
+    });
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'launch',
+        streamName: 'analysis-a',
+        purpose: 'Read-only advisory check',
+        files: ['orchestrator/src/cli/providerLinearChildStreamShell.ts'],
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        execRunner,
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: '2026-03-30T07:10:00.000Z',
+          state: 'In Progress',
+          state_type: 'started'
+        })) as never,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
+        readParentHeadSha: vi.fn(async () => 'parent-base-sha'),
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'child-lane',
+      action: 'launched',
+      child_lane: {
+        decision: 'rejected',
+        patch_bytes: 0,
+        decision_reason: expect.stringContaining('No-output advisory')
+      }
+    });
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
+      expect.objectContaining({
+        stream: 'analysis-a',
+        decision: 'rejected',
+        decision_reason: expect.stringContaining('parent owns any implementation patch')
+      })
+    ]);
+  });
+
+  it('keeps failed zero-byte child-lane runs in the failure decision flow', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const childTaskId = `${TASK_ID}-analysis-failed`;
+    const childRunId = 'child-run-failed';
+    const childRunDir = join(tempRoot ?? '', '.runs', childTaskId, 'cli', childRunId);
+    const failedLane = createLaneRecord({
+      stream: 'analysis-failed',
+      task_id: childTaskId,
+      run_id: childRunId,
+      status: 'failed',
+      artifact_root: childRunDir,
+      manifest_path: join(childRunDir, 'manifest.json'),
+      log_path: join(childRunDir, 'run.log'),
+      summary: 'read-only advisory failed',
+      purpose: 'Read-only advisory check',
+      lane_workspace_path: join(tempRoot ?? '', '.child-lanes', 'analysis-failed-child-run-failed'),
+      patch_artifact_path: join(childRunDir, 'provider-linear-child-lane.patch'),
+      patch_bytes: 0
+    });
+    const execRunner = vi.fn(async () => {
+      await writeChildLaneProof(failedLane, {
+        last_event: 'task_failed',
+        last_message: 'child failed before edits'
+      });
+      return {
+        exitCode: 1,
+        stdout: JSON.stringify({
+          run_id: childRunId,
+          status: 'failed',
+          artifact_root: `.runs/${childTaskId}/cli/${childRunId}`,
+          manifest: `.runs/${childTaskId}/cli/${childRunId}/manifest.json`,
+          log_path: `.runs/${childTaskId}/cli/${childRunId}/run.log`,
+          summary: 'read-only advisory failed'
+        }),
+        stderr: 'child failed'
+      };
+    });
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'launch',
+        streamName: 'analysis-failed',
+        purpose: 'Read-only advisory check',
+        files: ['orchestrator/src/cli/providerLinearChildStreamShell.ts'],
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        execRunner,
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: '2026-03-30T07:10:00.000Z',
+          state: 'In Progress',
+          state_type: 'started'
+        })) as never,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
+        readParentHeadSha: vi.fn(async () => 'parent-base-sha'),
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'launch',
+      error: {
+        code: 'provider_worker_child_lane_run_failed'
+      },
+      child_lane: {
+        stream: 'analysis-failed',
+        status: 'failed',
+        patch_bytes: 0,
+        decision: 'pending',
+        decision_reason: null
+      }
+    });
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
+      expect.objectContaining({
+        stream: 'analysis-failed',
+        status: 'failed',
+        patch_bytes: 0,
+        decision: 'pending',
+        decision_reason: null
+      })
+    ]);
+  });
+
+  it('keeps nonzero-exit zero-byte child-lane outputs in the failure decision flow', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const childTaskId = `${TASK_ID}-analysis-nonzero`;
+    const childRunId = 'child-run-nonzero';
+    const childRunDir = join(tempRoot ?? '', '.runs', childTaskId, 'cli', childRunId);
+    const inconsistentLane = createLaneRecord({
+      stream: 'analysis-nonzero',
+      task_id: childTaskId,
+      run_id: childRunId,
+      status: 'succeeded',
+      artifact_root: childRunDir,
+      manifest_path: join(childRunDir, 'manifest.json'),
+      log_path: join(childRunDir, 'run.log'),
+      summary: 'wrapper reported nonzero exit',
+      purpose: 'Read-only advisory check',
+      lane_workspace_path: join(tempRoot ?? '', '.child-lanes', 'analysis-nonzero-child-run-nonzero'),
+      patch_artifact_path: join(childRunDir, 'provider-linear-child-lane.patch'),
+      patch_bytes: 0
+    });
+    const execRunner = vi.fn(async () => {
+      await writeChildLaneProof(inconsistentLane, {
+        last_message: 'child output said succeeded but wrapper exited nonzero'
+      });
+      return {
+        exitCode: 1,
+        stdout: JSON.stringify({
+          run_id: childRunId,
+          status: 'succeeded',
+          artifact_root: `.runs/${childTaskId}/cli/${childRunId}`,
+          manifest: `.runs/${childTaskId}/cli/${childRunId}/manifest.json`,
+          log_path: `.runs/${childTaskId}/cli/${childRunId}/run.log`,
+          summary: 'wrapper reported nonzero exit'
+        }),
+        stderr: 'wrapper failed'
+      };
+    });
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'launch',
+        streamName: 'analysis-nonzero',
+        purpose: 'Read-only advisory check',
+        files: ['orchestrator/src/cli/providerLinearChildStreamShell.ts'],
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        execRunner,
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: '2026-03-30T07:10:00.000Z',
+          state: 'In Progress',
+          state_type: 'started'
+        })) as never,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
+        readParentHeadSha: vi.fn(async () => 'parent-base-sha'),
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'launch',
+      error: {
+        code: 'provider_worker_child_lane_run_failed'
+      },
+      child_lane: {
+        stream: 'analysis-nonzero',
+        status: 'succeeded',
+        patch_bytes: 0,
+        decision: 'pending',
+        decision_reason: null
+      }
+    });
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
+      expect.objectContaining({
+        stream: 'analysis-nonzero',
+        status: 'succeeded',
+        patch_bytes: 0,
+        decision: 'pending',
+        decision_reason: null
+      })
+    ]);
+  });
+
   it('reserves the child lane ledger before spawning the child run', async () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
     const childRunDir = join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-1');
@@ -1272,6 +1551,136 @@ describe('runProviderLinearChildLaneShell', () => {
       action: 'launch',
       error: {
         code: 'provider_worker_child_lane_parent_dirty',
+        status: 409
+      }
+    });
+    if (!result.ok) {
+      expect(result.error?.message).toContain('move scratch workpad/temp artifacts outside the repo');
+    }
+    expect(execRunner).not.toHaveBeenCalled();
+  });
+
+  it('ignores repo-local temp workpad artifacts before phase-scoped launch', async () => {
+    const { manifestPath } = await createProviderWorkerManifest();
+    const childRunDir = join(tempRoot ?? '', '.runs', `${TASK_ID}-docs-a`, 'cli', 'child-run-1');
+    const childProof: ProviderLinearChildLaneProof = {
+      issue_id: ISSUE.issue_id,
+      issue_identifier: ISSUE.issue_identifier,
+      task_id: `${TASK_ID}-docs-a`,
+      run_id: 'child-run-1',
+      parent_run_id: RUN_ID,
+      stream: 'docs-a',
+      purpose: 'Create docs packet',
+      instructions: null,
+      scope: {
+        files: [],
+        phases: ['docs']
+      },
+      parent_snapshot: {
+        base_sha: 'parent-base-sha',
+        issue_updated_at: '2026-03-30T07:10:00.000Z',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        captured_at: '2026-03-30T07:11:00.000Z'
+      },
+      lane_workspace_path: join(tempRoot ?? '', '.child-lanes', 'docs-a-child-run-1'),
+      lane_branch: 'child-lane/docs-a-child-run-1',
+      patch_artifact_path: join(childRunDir, 'provider-linear-child-lane.patch'),
+      patch_bytes: 128,
+      thread_id: 'thread-1',
+      latest_turn_id: 'turn-1',
+      latest_session_id: 'thread-1-turn-1',
+      latest_session_id_source: 'derived_from_thread_and_turn',
+      last_event: 'task_complete',
+      last_message: 'docs lane complete',
+      last_event_at: '2026-03-30T07:12:00.000Z',
+      tokens: {
+        input_tokens: 10,
+        output_tokens: 12,
+        total_tokens: 22
+      },
+      rate_limits: null,
+      status: 'succeeded',
+      updated_at: '2026-03-30T07:12:00.000Z'
+    };
+    const execRunner = vi.fn(async () => {
+      await mkdir(childRunDir, { recursive: true });
+      await writeFile(
+        join(childRunDir, PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME),
+        JSON.stringify(childProof),
+        'utf8'
+      );
+      return {
+        exitCode: 0,
+        stdout: JSON.stringify({
+          run_id: 'child-run-1',
+          status: 'succeeded',
+          artifact_root: `.runs/${TASK_ID}-docs-a/cli/child-run-1`,
+          manifest: `.runs/${TASK_ID}-docs-a/cli/child-run-1/manifest.json`,
+          log_path: `.runs/${TASK_ID}-docs-a/cli/child-run-1/run.log`,
+          summary: 'docs lane complete'
+        }),
+        stderr: ''
+      };
+    });
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'launch',
+        streamName: 'docs-a',
+        purpose: 'Create docs packet',
+        phases: ['docs'],
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        execRunner,
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: '2026-03-30T07:10:00.000Z',
+          state: 'In Progress',
+          state_type: 'started'
+        })) as never,
+        readParentDirtyPaths: vi.fn(async () => ['.tmp/workpad.md']) as never,
+        readParentHeadSha: vi.fn(async () => 'parent-base-sha'),
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'child-lane',
+      action: 'launched',
+      stream: 'docs-a'
+    });
+    expect(execRunner).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps non-workpad temp paths visible to phase-scoped dirty checks', async () => {
+    const { manifestPath } = await createProviderWorkerManifest();
+    const execRunner = vi.fn();
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'launch',
+        streamName: 'docs-a',
+        purpose: 'Create docs packet',
+        phases: ['docs'],
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        execRunner: execRunner as never,
+        readParentDirtyPaths: vi.fn(async () => ['.tmp/notes.md']) as never
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'launch',
+      error: {
+        code: 'provider_worker_child_lane_parent_dirty',
+        message: expect.stringContaining('.tmp/notes.md'),
         status: 409
       }
     });

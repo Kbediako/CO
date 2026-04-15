@@ -51,17 +51,17 @@ describe('provider-linear adoption eval', () => {
     });
     expect(report.summary).toMatchObject({
       ok: true,
-      total_runs: 4,
-      source_0_adopting_runs: 4,
-      prompt_pack_adopting_runs: 4,
-      prior_experience_runs: 3,
+      total_runs: 5,
+      source_0_adopting_runs: 5,
+      prompt_pack_adopting_runs: 5,
+      prior_experience_runs: 4,
       missing_experience_reason_runs: 1,
-      child_lane_launch_count: 1,
+      child_lane_launch_count: 2,
       accepted_child_lane_count: 1,
       traceable_follow_up_runs: 1
     });
     expect(report.summary.parallelization_decision_counts).toEqual({
-      parallelize_now: 1,
+      parallelize_now: 2,
       stay_serial: 3,
       forbid_parallel: 0,
       missing: 0
@@ -69,6 +69,11 @@ describe('provider-linear adoption eval', () => {
     const parallelRun = report.runs.find((run) => run.id === 'parallel-child-lane-accepted');
     expect(parallelRun?.metrics.parallelization.child_lane_acceptance_states).toContain('accepted');
     expect(parallelRun?.metrics.parallelization.successful_same_turn_child_lane_count).toBe(1);
+    const co184Run = report.runs.find((run) => run.id === 'co184-helper-preflight-smooth-path');
+    expect(co184Run?.metrics.helper_constraints.required).toBe(true);
+    expect(co184Run?.metrics.helper_constraints.zero_byte_advisory_evidence).toBe(true);
+    expect(co184Run?.metrics.helper_constraints.zero_byte_advisory_lane_count).toBe(1);
+    expect(co184Run?.metrics.parallelization.child_lane_acceptance_states).toContain('rejected');
   });
 
   it('fails when stay_serial is used while a safe child-lane candidate remains', async () => {
@@ -151,6 +156,66 @@ describe('provider-linear adoption eval', () => {
     );
   });
 
+  it('fails when zero-byte advisory evidence is self-reported without proof-backed lane state', async () => {
+    const { root, fixtureDir } = await copyFixture('co184-helper-preflight-smooth-path');
+    await mutateJson(path.join(fixtureDir, 'provider-linear-worker-proof.json'), (value) => {
+      const [advisoryLane] = value.child_lanes as Array<Record<string, unknown>>;
+      value.child_lanes = [
+        {
+          ...advisoryLane,
+          decision: 'pending',
+          decision_at: null,
+          decision_reason: null
+        }
+      ];
+    });
+
+    const report = await buildProviderLinearAdoptionEvalReport({
+      fixtureRoot: root,
+      generatedAt: '2026-04-14T00:00:00.000Z',
+      taskId: 'linear-co-185-unproven-zero-byte-advisory'
+    });
+
+    expect(report.summary.ok).toBe(false);
+    expect(report.summary.failures).toContain(
+      'co184-helper-preflight-smooth-path: helper constraints do not classify zero-byte child lanes as advisory evidence'
+    );
+  });
+
+  it('fails when zero-byte advisory evidence only exists in historical child-lane state', async () => {
+    const { root, fixtureDir } = await copyFixture('co184-helper-preflight-smooth-path');
+    await mutateJson(path.join(fixtureDir, 'provider-linear-worker-proof.json'), (value) => {
+      const [historicalLane] = value.child_lanes as Array<Record<string, unknown>>;
+      value.child_lanes = [
+        {
+          ...historicalLane,
+          launched_at: '2026-04-15T00:07:30.000Z',
+          decision_at: '2026-04-15T00:07:45.000Z'
+        },
+        {
+          ...historicalLane,
+          stream: 'co184-docs-advisory-current',
+          launched_at: '2026-04-15T00:08:30.000Z',
+          decision: 'pending',
+          decision_at: null,
+          decision_reason: null,
+          summary: 'current turn did not classify zero-byte output'
+        }
+      ];
+    });
+
+    const report = await buildProviderLinearAdoptionEvalReport({
+      fixtureRoot: root,
+      generatedAt: '2026-04-14T00:00:00.000Z',
+      taskId: 'linear-co-185-stale-zero-byte-advisory'
+    });
+
+    expect(report.summary.ok).toBe(false);
+    expect(report.summary.failures).toContain(
+      'co184-helper-preflight-smooth-path: helper constraints do not classify zero-byte child lanes as advisory evidence'
+    );
+  });
+
   it('fails when source-0 prompt adoption artifacts disappear', async () => {
     const { root, fixtureDir } = await copyFixture('memory-adopting-run');
     await mutateJson(path.join(fixtureDir, 'prompt-artifacts.json'), (value) => {
@@ -212,7 +277,7 @@ describe('provider-linear adoption eval', () => {
     const report = JSON.parse(await fs.readFile(outputPath, 'utf8')) as {
       summary: { ok: boolean; total_runs: number };
     };
-    expect(report.summary).toMatchObject({ ok: true, total_runs: 4 });
+    expect(report.summary).toMatchObject({ ok: true, total_runs: 5 });
   });
 
   it('fails when required follow-up shaping and related-link traceability disappear', async () => {

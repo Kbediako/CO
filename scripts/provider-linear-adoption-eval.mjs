@@ -81,6 +81,15 @@ function compareIsoTimestamp(left, right) {
   return leftValue.localeCompare(rightValue);
 }
 
+function selectCurrentTurnChildLanes(proof) {
+  const currentTurnStartedAt =
+    asString(proof.current_turn_started_at) ?? asString(proof.attempt_started_at);
+  const childLanes = asArray(proof.child_lanes).filter(isRecord);
+  return currentTurnStartedAt
+    ? childLanes.filter((lane) => compareIsoTimestamp(lane.launched_at, currentTurnStartedAt) >= 0)
+    : childLanes;
+}
+
 function parseArgs(argv) {
   const args = {};
   for (let index = 0; index < argv.length; index += 1) {
@@ -261,12 +270,8 @@ function extractParallelizationMetrics(proof, promptArtifacts) {
   const evalConfig = asRecord(promptArtifacts.eval);
   const parallelizationConfig = asRecord(evalConfig.parallelization);
   const parallelization = selectParallelization(proof);
-  const currentTurnStartedAt =
-    asString(proof.current_turn_started_at) ?? asString(proof.attempt_started_at);
   const childLanes = asArray(proof.child_lanes).filter(isRecord);
-  const sameTurnChildLanes = currentTurnStartedAt
-    ? childLanes.filter((lane) => compareIsoTimestamp(lane.launched_at, currentTurnStartedAt) >= 0)
-    : childLanes;
+  const sameTurnChildLanes = selectCurrentTurnChildLanes(proof);
   const successfulSameTurnChildLanes = sameTurnChildLanes.filter(
     (lane) => asString(lane.status) === 'succeeded'
   );
@@ -330,6 +335,45 @@ function extractFollowUpMetrics(proof, promptArtifacts) {
     fail_closed_reason: asString(followUpTrace.fail_closed_reason),
     required_issue_shaping_fields_present: missingFields.length === 0,
     missing_issue_shaping_fields: missingFields
+  };
+}
+
+function extractHelperConstraintMetrics(proof, promptArtifacts) {
+  const evalConfig = asRecord(promptArtifacts.eval);
+  const helperConstraints = asRecord(promptArtifacts.helper_constraints);
+  const supportedPhases = asArray(helperConstraints.supported_child_lane_phases)
+    .map(asString)
+    .filter(Boolean)
+    .sort();
+  const childLanes = selectCurrentTurnChildLanes(proof);
+  const zeroByteAdvisoryLanes = childLanes.filter(
+    (lane) =>
+      asNumber(lane.patch_bytes, -1) === 0 &&
+      asString(lane.decision) === 'rejected' &&
+      Boolean(
+        asString(lane.decision_reason) ||
+        asString(lane.summary) ||
+        asString(lane.manifest_path) ||
+        asString(lane.patch_artifact_path)
+      )
+  );
+  const usefulZeroByteAdvisoryLanes = zeroByteAdvisoryLanes.filter(
+    (lane) =>
+      Boolean(asString(lane.manifest_path) || asString(lane.artifact_root) || asString(lane.patch_artifact_path)) &&
+      Boolean(asString(lane.decision_reason) || asString(lane.summary))
+  );
+  return {
+    required: asBoolean(evalConfig.helper_constraints_required),
+    supported_child_lane_phases: supportedPhases,
+    classification_analysis_guidance: asBoolean(helperConstraints.classification_analysis_guidance),
+    parent_dirty_workpad_recovery: asBoolean(helperConstraints.parent_dirty_workpad_recovery),
+    duplicate_parity_retry_suppressed: asBoolean(helperConstraints.duplicate_parity_retry_suppressed),
+    deterministic_failure_retry_count: asNumber(helperConstraints.deterministic_failure_retry_count, 0),
+    zero_byte_advisory_evidence: zeroByteAdvisoryLanes.length > 0,
+    zero_byte_advisory_lane_count: zeroByteAdvisoryLanes.length,
+    useful_parent_evidence_path:
+      asBoolean(helperConstraints.useful_parent_evidence_path) &&
+      usefulZeroByteAdvisoryLanes.length > 0
   };
 }
 
@@ -452,6 +496,31 @@ function validateMetrics(fixtureId, promptArtifacts, metrics) {
     }
   }
 
+  if (metrics.helper_constraints.required) {
+    const expectedPhases = ['docs', 'implementation', 'tests'];
+    if (JSON.stringify(metrics.helper_constraints.supported_child_lane_phases) !== JSON.stringify(expectedPhases)) {
+      failures.push(`${fixtureId}: helper constraints do not expose supported child-lane phases docs, implementation, tests`);
+    }
+    if (!metrics.helper_constraints.classification_analysis_guidance) {
+      failures.push(`${fixtureId}: helper constraints lack classification/analysis fallback guidance`);
+    }
+    if (!metrics.helper_constraints.parent_dirty_workpad_recovery) {
+      failures.push(`${fixtureId}: helper constraints lack parent-dirty workpad recovery`);
+    }
+    if (!metrics.helper_constraints.duplicate_parity_retry_suppressed) {
+      failures.push(`${fixtureId}: helper constraints do not suppress duplicate parity follow-up retries`);
+    }
+    if (metrics.helper_constraints.deterministic_failure_retry_count > 0) {
+      failures.push(`${fixtureId}: helper constraints still show duplicate deterministic mutation retries`);
+    }
+    if (!metrics.helper_constraints.zero_byte_advisory_evidence) {
+      failures.push(`${fixtureId}: helper constraints do not classify zero-byte child lanes as advisory evidence`);
+    }
+    if (!metrics.helper_constraints.useful_parent_evidence_path) {
+      failures.push(`${fixtureId}: helper constraints lack a useful parent-owned evidence path`);
+    }
+  }
+
   return failures;
 }
 
@@ -471,7 +540,8 @@ async function evaluateFixture(fixtureDir) {
       prompt_pack: extractPromptPackMetrics(manifest, promptArtifacts)
     },
     parallelization: extractParallelizationMetrics(proof, promptArtifacts),
-    follow_up: extractFollowUpMetrics(proof, promptArtifacts)
+    follow_up: extractFollowUpMetrics(proof, promptArtifacts),
+    helper_constraints: extractHelperConstraintMetrics(proof, promptArtifacts)
   };
   const failures = validateMetrics(fixtureId, promptArtifacts, metrics);
   return {

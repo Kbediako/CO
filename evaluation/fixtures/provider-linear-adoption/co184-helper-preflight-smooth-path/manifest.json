@@ -1,0 +1,35 @@
+{
+  "task_id": "linear-co184-helper-preflight-smooth-path",
+  "run_id": "2026-04-15T00-07-01-311Z-smooth-path",
+  "memory": {
+    "source_0": {
+      "pointer": "ctx:sha256:f2108c8eef2ced8fd9115b11b7e6ce9808f01f2703faaf8926c8dc6905908177#chunk:c000001",
+      "object_id": "sha256:f2108c8eef2ced8fd9115b11b7e6ce9808f01f2703faaf8926c8dc6905908177",
+      "dir_path": ".runs/linear-co184-helper-preflight-smooth-path/cli/2026-04-15T00-07-01-311Z-smooth-path/memory/source-0",
+      "index_path": ".runs/linear-co184-helper-preflight-smooth-path/cli/2026-04-15T00-07-01-311Z-smooth-path/memory/source-0/index.json",
+      "source_path": ".runs/linear-co184-helper-preflight-smooth-path/cli/2026-04-15T00-07-01-311Z-smooth-path/memory/source-0/source.txt"
+    }
+  },
+  "prompt_packs": [
+    {
+      "id": "provider-helper-preflight",
+      "domain": "implementation",
+      "stamp": "fixture-helper-preflight-stamp",
+      "source_count": 4,
+      "experience_count": 1
+    }
+  ],
+  "plan": {
+    "items": [
+      {
+        "id": "provider-helper-preflight",
+        "metadata": {
+          "selectedMemoryRefs": [
+            "source_0",
+            "prompt_pack:provider-helper-preflight"
+          ]
+        }
+      }
+    ]
+  }
+}

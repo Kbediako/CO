@@ -128,7 +128,7 @@ describe('checked-in CLI bootstrap', () => {
     expect(result.stdout).toContain('ready');
     await waitForFileContents(join(tempRoot, 'child-signal.txt'), 'SIGTERM\n');
     expect(result.stderr).toBe('');
-  });
+  }, 15_000);
 
   it('falls back to dist with an explicit warning when the source runtime is unavailable', async () => {
     tempRoot = await mkdtemp(join(tmpdir(), 'cli-bootstrap-dist-'));

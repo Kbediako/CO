@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   normalizeProviderLinearChildLanePathSelectors,
-  resolveProviderLinearChildLaneScopeContract
+  resolveProviderLinearChildLaneScopeContract,
+  resolveProviderLinearChildLaneSupportedPhases
 } from '../src/cli/providerLinearChildLanePhaseContract.js';
 
 describe('providerLinearChildLanePhaseContract', () => {
@@ -78,5 +79,19 @@ describe('providerLinearChildLanePhaseContract', () => {
         phases: ['constructor']
       })
     ).toThrow(/Unsupported child-lane phases: constructor/);
+  });
+
+  it('exposes the supported provider child-lane phase list for worker preflight guidance', () => {
+    expect(resolveProviderLinearChildLaneSupportedPhases()).toEqual([
+      'docs',
+      'implementation',
+      'tests'
+    ]);
+    expect(() =>
+      resolveProviderLinearChildLaneScopeContract({
+        files: [],
+        phases: ['classification', 'analysis']
+      })
+    ).toThrow(/Unsupported child-lane phases: classification, analysis\. Supported phases: docs, implementation, tests\./);
   });
 });
