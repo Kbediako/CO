@@ -26,6 +26,7 @@ All `173` blocking stale rows are:
 No public guide, repository guide, agent policy, active guide, shipped skill, shipped companion, seeded template, missing, invalid, or uncatalogued row is part of this blocking set.
 
 ## Class Breakdown
+
 | Class | Count | Outcome |
 | --- | ---: | --- |
 | Task Packet | 124 | Refresh after this review |
@@ -33,6 +34,7 @@ No public guide, repository guide, agent policy, active guide, shipped skill, sh
 | Report Only | 24 | Refresh after this review |
 
 ## Path Family Breakdown
+
 | Path family | Count | Outcome |
 | --- | ---: | --- |
 | `.agent/task` | 25 | Refresh |
@@ -44,6 +46,7 @@ No public guide, repository guide, agent policy, active guide, shipped skill, sh
 | `tasks/tasks-*` | 25 | Refresh |
 
 ## Date Cohorts
+
 | Last review / cadence | Count | Notes |
 | --- | ---: | --- |
 | `2026-01-14` / `90` days | 5 | January quick-wins packet surface, including `.agent/task/0951-delegation-rlm-quick-wins.md` and its task mirror |
