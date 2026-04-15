@@ -1326,7 +1326,7 @@ describe('runProviderIssueHandoffRefresh', () => {
     });
   });
 
-  it('refreshes released pending-reopen started claims back to running when the retained run is still active', async () => {
+  it('refreshes released pending-reopen started claims back to running from cached started state', async () => {
     const { root, paths } = await createHostPaths();
     const childPaths = await createCo185ActiveRun(root);
     const state = createProviderIntakeState();
@@ -1341,18 +1341,7 @@ describe('runProviderIssueHandoffRefresh', () => {
       state,
       persist: vi.fn(async () => undefined),
       launcher,
-      startPipelineId: 'provider-linear-worker',
-      resolveTrackedIssue: vi.fn(async () => ({
-        kind: 'ready' as const,
-        trackedIssue: createTrackedIssue({
-          id: 'lin-issue-185',
-          identifier: 'CO-185',
-          title: 'Provider helper constraints',
-          state: 'In Progress',
-          state_type: 'started',
-          updated_at: '2026-04-15T01:18:56.003Z'
-        })
-      }))
+      startPipelineId: 'provider-linear-worker'
     });
 
     await service.refresh();

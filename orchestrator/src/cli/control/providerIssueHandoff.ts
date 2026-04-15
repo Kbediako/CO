@@ -1927,18 +1927,19 @@ export function createProviderIssueHandoffService(
         !claim.run_id;
       if (claim.state === 'released') {
         const activeRun = attachableClaimRuns.find((run) => run.status === 'in_progress');
+        const releasedPendingReopen = isProviderIssueReleasedPendingReopen(claim.reason);
         const activeRunReleaseCancelPending = hasPendingReleaseCancel(
           activeRun?.manifestPath ?? releasedRun?.manifestPath
         );
         const shouldRefreshReleasedActiveRunIssue =
           activeRun &&
-          isProviderIssueReleasedPendingReopen(claim.reason) &&
+          releasedPendingReopen &&
           input?.refreshTrackedIssueMetadata === true;
         const freshTrackedIssue =
           shouldRefreshReleasedActiveRunIssue
             ? await resolveFreshTrackedIssueForActiveClaim(claim)
             : buildActiveClaimFreshTrackedIssueFallback(
-                !(activeRun && isProviderIssueReleasedPendingReopen(claim.reason))
+                activeRun === undefined || !releasedPendingReopen || !resolveTrackedIssueWhenNotStuck
               );
         const startedWorkerIssue =
           freshTrackedIssue.trackedIssue !== null
@@ -1947,7 +1948,7 @@ export function createProviderIssueHandoffService(
         if (
           activeRun &&
           !activeRunReleaseCancelPending &&
-          isProviderIssueReleasedPendingReopen(claim.reason) &&
+          releasedPendingReopen &&
           startedWorkerIssue
         ) {
           const workerHost = resolveRehydratedActiveRunWorkerHost(activeRun, claim);
