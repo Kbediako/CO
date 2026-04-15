@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260415-linear-237c874c-c05f-4947-949a-573043fc575f",
+      "title": "CO: restore Apr 15 docs:freshness historical packet baseline",
+      "relates_to": "tasks/tasks-linear-237c874c-c05f-4947-949a-573043fc575f.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-15",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-237c874c-c05f-4947-949a-573043fc575f.md",
+        "task": "tasks/tasks-linear-237c874c-c05f-4947-949a-573043fc575f.md",
+        "agent_task": ".agent/task/linear-237c874c-c05f-4947-949a-573043fc575f.md",
+        "docs": "docs/TECH_SPEC-linear-237c874c-c05f-4947-949a-573043fc575f.md"
+      }
+    },
+    {
       "id": "20260414-linear-ba9a1c35-c8d1-4b76-aa33-4937502d1964",
       "title": "CO: prune terminal released provider rows from CO STATUS JSON active counts",
       "relates_to": "tasks/tasks-linear-ba9a1c35-c8d1-4b76-aa33-4937502d1964.md",
@@ -4923,7 +4940,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-15",
+      "last_review": "2026-04-15",
       "paths": {
         "spec": "tasks/specs/1219-coordinator-symphony-aligned-standalone-review-remaining-helper-family-freeze-reassessment.md",
         "task": "tasks/tasks-1219-coordinator-symphony-aligned-standalone-review-remaining-helper-family-freeze-reassessment.md",
@@ -4939,7 +4956,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-15",
+      "last_review": "2026-04-15",
       "paths": {
         "spec": "tasks/specs/1218-coordinator-symphony-aligned-standalone-review-shell-command-parser-review-support-classification.md",
         "task": "tasks/tasks-1218-coordinator-symphony-aligned-standalone-review-shell-command-parser-review-support-classification.md",
@@ -4955,7 +4972,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-15",
+      "last_review": "2026-04-15",
       "paths": {
         "spec": "tasks/specs/1217-coordinator-symphony-aligned-standalone-review-execution-telemetry-surface-extraction.md",
         "task": "tasks/tasks-1217-coordinator-symphony-aligned-standalone-review-execution-telemetry-surface-extraction.md",
@@ -4971,7 +4988,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-15",
+      "last_review": "2026-04-15",
       "paths": {
         "spec": "tasks/specs/1216-coordinator-symphony-aligned-standalone-review-meta-surface-boundary-analysis-extraction.md",
         "task": "tasks/tasks-1216-coordinator-symphony-aligned-standalone-review-meta-surface-boundary-analysis-extraction.md",
@@ -4987,7 +5004,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-15",
+      "last_review": "2026-04-15",
       "paths": {
         "spec": "tasks/specs/1215-coordinator-symphony-aligned-standalone-review-command-intent-classification-extraction.md",
         "task": "tasks/tasks-1215-coordinator-symphony-aligned-standalone-review-command-intent-classification-extraction.md",
@@ -5003,7 +5020,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-15",
+      "last_review": "2026-04-15",
       "paths": {
         "spec": "tasks/specs/1214-coordinator-symphony-aligned-standalone-review-command-probe-classification-extraction.md",
         "task": "tasks/tasks-1214-coordinator-symphony-aligned-standalone-review-command-probe-classification-extraction.md",
@@ -5019,7 +5036,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-15",
+      "last_review": "2026-04-15",
       "paths": {
         "spec": "tasks/specs/1213-coordinator-symphony-aligned-standalone-review-inspection-target-parsing-pipeline-extraction.md",
         "task": "tasks/tasks-1213-coordinator-symphony-aligned-standalone-review-inspection-target-parsing-pipeline-extraction.md",
@@ -5035,7 +5052,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-15",
+      "last_review": "2026-04-15",
       "paths": {
         "spec": "tasks/specs/1212-coordinator-symphony-aligned-standalone-review-operand-path-normalization-boundary-extraction.md",
         "task": "tasks/tasks-1212-coordinator-symphony-aligned-standalone-review-operand-path-normalization-boundary-extraction.md",
@@ -5051,7 +5068,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-15",
+      "last_review": "2026-04-15",
       "paths": {
         "spec": "tasks/specs/1211-coordinator-symphony-aligned-standalone-review-shell-command-parser-primitives-extraction.md",
         "task": "tasks/tasks-1211-coordinator-symphony-aligned-standalone-review-shell-command-parser-primitives-extraction.md",
@@ -5067,7 +5084,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-15",
+      "last_review": "2026-04-15",
       "paths": {
         "spec": "tasks/specs/1210-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-review-support-classification.md",
         "task": "tasks/tasks-1210-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-review-support-classification.md",
@@ -5083,7 +5100,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-15",
+      "last_review": "2026-04-15",
       "paths": {
         "spec": "tasks/specs/1209-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-extraction.md",
         "task": "tasks/tasks-1209-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-extraction.md",
@@ -5099,7 +5116,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-15",
+      "last_review": "2026-04-15",
       "paths": {
         "spec": "tasks/specs/1208-coordinator-symphony-aligned-standalone-review-prompt-context-review-support-classification.md",
         "task": "tasks/tasks-1208-coordinator-symphony-aligned-standalone-review-prompt-context-review-support-classification.md",
@@ -5115,7 +5132,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-15",
+      "last_review": "2026-04-15",
       "paths": {
         "spec": "tasks/specs/1207-coordinator-symphony-aligned-standalone-review-prompt-context-builder-extraction.md",
         "task": "tasks/tasks-1207-coordinator-symphony-aligned-standalone-review-prompt-context-builder-extraction.md",
@@ -5131,7 +5148,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-15",
+      "last_review": "2026-04-15",
       "paths": {
         "spec": "tasks/specs/1206-coordinator-symphony-aligned-orchestrator-cloud-interactive-env-default-fallback-contract.md",
         "task": "tasks/tasks-1206-coordinator-symphony-aligned-orchestrator-cloud-interactive-env-default-fallback-contract.md",
@@ -5147,7 +5164,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-15",
+      "last_review": "2026-04-15",
       "paths": {
         "spec": "tasks/specs/1205-coordinator-symphony-aligned-orchestrator-remaining-shared-cloud-request-contract-reassessment.md",
         "task": "tasks/tasks-1205-coordinator-symphony-aligned-orchestrator-remaining-shared-cloud-request-contract-reassessment.md",
@@ -5163,7 +5180,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-15",
+      "last_review": "2026-04-15",
       "paths": {
         "spec": "tasks/specs/1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction.md",
         "task": "tasks/tasks-1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction.md",
@@ -5179,7 +5196,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-15",
+      "last_review": "2026-04-15",
       "paths": {
         "spec": "tasks/specs/1203-coordinator-symphony-aligned-orchestrator-cloud-environment-resolution-boundary-extraction.md",
         "task": "tasks/tasks-1203-coordinator-symphony-aligned-orchestrator-cloud-environment-resolution-boundary-extraction.md",
@@ -5195,7 +5212,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-15",
+      "last_review": "2026-04-15",
       "paths": {
         "spec": "tasks/specs/1202-coordinator-symphony-aligned-orchestrator-cloud-prompt-builder-extraction.md",
         "task": "tasks/tasks-1202-coordinator-symphony-aligned-orchestrator-cloud-prompt-builder-extraction.md",
@@ -5211,7 +5228,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-15",
+      "last_review": "2026-04-15",
       "paths": {
         "spec": "tasks/specs/1201-coordinator-symphony-aligned-orchestrator-remaining-private-wrapper-reassessment.md",
         "task": "tasks/tasks-1201-coordinator-symphony-aligned-orchestrator-remaining-private-wrapper-reassessment.md",
@@ -5227,7 +5244,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-15",
+      "last_review": "2026-04-15",
       "paths": {
         "spec": "tasks/specs/1200-coordinator-symphony-aligned-orchestrator-resume-pre-start-failure-persistence-callback-extraction.md",
         "task": "tasks/tasks-1200-coordinator-symphony-aligned-orchestrator-resume-pre-start-failure-persistence-callback-extraction.md",
@@ -5243,7 +5260,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-15",
+      "last_review": "2026-04-15",
       "paths": {
         "spec": "tasks/specs/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction.md",
         "task": "tasks/tasks-1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction.md",
@@ -5259,7 +5276,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-15",
+      "last_review": "2026-04-15",
       "paths": {
         "spec": "tasks/specs/1198-coordinator-symphony-aligned-orchestrator-runtime-selection-manifest-mutation-extraction.md",
         "task": "tasks/tasks-1198-coordinator-symphony-aligned-orchestrator-runtime-selection-manifest-mutation-extraction.md",
@@ -5275,7 +5292,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-15",
+      "last_review": "2026-04-15",
       "paths": {
         "spec": "tasks/specs/1197-coordinator-symphony-aligned-orchestrator-plan-shell-extraction.md",
         "task": "tasks/tasks-1197-coordinator-symphony-aligned-orchestrator-plan-shell-extraction.md",
@@ -5291,7 +5308,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-15",
+      "last_review": "2026-04-15",
       "paths": {
         "spec": "tasks/specs/1196-coordinator-symphony-aligned-orchestrator-status-shell-extraction.md",
         "task": "tasks/tasks-1196-coordinator-symphony-aligned-orchestrator-status-shell-extraction.md",
@@ -10484,6 +10501,22 @@
     }
   ],
   "specs": [
+    {
+      "id": "20260415-linear-237c874c-c05f-4947-949a-573043fc575f",
+      "title": "CO: restore Apr 15 docs:freshness historical packet baseline",
+      "relates_to": "tasks/tasks-linear-237c874c-c05f-4947-949a-573043fc575f.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-15",
+      "paths": {
+        "spec": "tasks/specs/linear-237c874c-c05f-4947-949a-573043fc575f.md",
+        "task": "tasks/tasks-linear-237c874c-c05f-4947-949a-573043fc575f.md",
+        "agent_task": ".agent/task/linear-237c874c-c05f-4947-949a-573043fc575f.md",
+        "docs": "docs/TECH_SPEC-linear-237c874c-c05f-4947-949a-573043fc575f.md"
+      }
+    },
     {
       "id": "20260414-linear-0022f975-905a-4974-aa8e-d689df90167c",
       "title": "CO: reconcile Done issue mirrors and validation-only closeout provenance",

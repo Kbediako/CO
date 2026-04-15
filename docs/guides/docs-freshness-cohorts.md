@@ -62,3 +62,17 @@ CO-175 reproduced the Apr 14 baseline at `cac56ec89`:
 - declared cohort identity: `co-175-apr-14-march-14-tasks-1164-1195`
 
 The saved baseline report is `out/linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8/manual/baseline-docs-freshness-report.json`, and the cohort classification is `out/linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8/manual/baseline-cohort-classification.json`.
+
+## Apr 15 Reviewed Refresh
+CO-184 reproduced the Apr 15 baseline failure in `out/linear-237c874c-c05f-4947-949a-573043fc575f/pre-fix-docs-freshness.json`:
+
+- `173` blocking stale entries outside the CO-175 rolling cohort
+- `221` CO-175 rolling cohort entries still visible
+- `0` missing registry rows
+- `0` missing-on-disk rows
+- `0` invalid registry entries
+- `0` uncatalogued docs
+- blocking classes: Task Packet `124`, Task Mirror `25`, Report Only `24`
+- blocking path families: `.agent/task` `25`, `tasks/specs` `24`, `tasks/tasks-*` `25`, `docs/findings` `24`, `docs/PRD-*` `25`, `docs/TECH_SPEC-*` `25`, `docs/ACTION_PLAN-*` `25`
+
+The Apr 15 blocking cohort was reviewed in `docs/findings/linear-237c874c-c05f-4947-949a-573043fc575f-docs-freshness-classification.md` and refreshed instead of added to rolling deferral. Adding the `173` rows beside the existing CO-175 `221` rows would exceed `max_entries=300`, so CO-184 keeps the rolling policy unchanged and updates only the reviewed historical packet rows to `last_review=2026-04-15`.
