@@ -994,6 +994,7 @@ describe('docs hygiene tooling', () => {
         '- For review, do not choose the spark role.',
         '- Spark roles are file/codebase search only, but do not use spark for planning.',
         '- Spark roles are file/codebase search only, but planning should not use spark roles.',
+        '- Use `explorer_fast` for file/codebase search without planning or review.',
         ''
       ].join('\n'),
       'utf8'
@@ -1182,6 +1183,54 @@ describe('docs hygiene tooling', () => {
     );
   });
 
+  it('rejects wrapped markdown spark role policy violations', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-spark-policy-wrapped-overbroad-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['model-posture']
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      [
+        '# Codex Orchestrator',
+        '',
+        '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
+        '- `explorer_fast` remains the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only,',
+        '  but can help with planning.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 4: spark role must be file/codebase search only'
+      })
+    );
+  });
+
   it('rejects negated file search-only scope for spark roles', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-spark-policy-negated-scope-'));
     createdDirs.push(repoRoot);
@@ -1260,6 +1309,7 @@ describe('docs hygiene tooling', () => {
         '',
         '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
         '- `explorer_fast` remains the only explicit `gpt-5.3-codex-spark` exception.',
+        '- Keep `explorer_fast` on `gpt-5.3-codex-spark` without changing defaults.',
         ''
       ].join('\n'),
       'utf8'
@@ -1272,6 +1322,13 @@ describe('docs hygiene tooling', () => {
         file: 'README.md',
         rule: 'spark-policy-overbroad',
         reference: 'line 4: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 5: spark role missing file/codebase search-only scope'
       })
     );
   });

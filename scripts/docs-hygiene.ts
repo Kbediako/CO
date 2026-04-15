@@ -79,6 +79,8 @@ const SPARK_POLICY_FORBIDDEN_USAGE_PATTERN =
   /(?:search\/synthesis|\bbroad exploration\b|\bsynthesis\b|\bplanning\b|\bimplementation\b|\breview\b|\bexploration\b)/gi;
 const SPARK_POLICY_SUFFIX_RESTRICTION_PATTERN =
   /(?:,\s*)?\b(?:do not|don't|must not|should not|cannot|can't|never)\s+(?:(?:route)\s+(?:to\s+)?|(?:use|run|select|choose|prefer)\s+)(?:it\b|(?:(?:the|a|an)\s+)?[`*_]*(?:spark|spark roles?|explorer_fast|gpt-5\.3-codex-spark)[`*_]*(?=\W|$))/;
+const SPARK_POLICY_WITHOUT_FORBIDDEN_SCOPE_PATTERN =
+  /\bwithout\s+(?:broad\s+exploration|exploration|implementation|planning|review|search\/synthesis|synthesis)\b/i;
 
 const MACHINE_LOCAL_PATH_PATTERNS = [
   /(?:file:\/\/)?\/Users\/[^\s`)>"]+/,
@@ -377,7 +379,8 @@ function checkSparkFileSearchPolicy(input: {
       continue;
     }
 
-    const relevantText = line.slice(findLastClauseBoundary(line, markerIndex));
+    const lineContext = buildSparkPolicyLineContext(lines, index, markerIndex);
+    const relevantText = lineContext.text.slice(findLastClauseBoundary(lineContext.text, lineContext.markerIndex));
     const lineNumber = index + 1;
     if (hasOverbroadSparkUsage(relevantText) || hasNegatedSparkFileSearchScope(relevantText)) {
       errors.push({
@@ -408,8 +411,9 @@ function requiresSparkFileSearchScope(relevantText: string): boolean {
 
 function isRestrictiveSparkPolicyStatement(relevantText: string): boolean {
   return (
-    /\b(?:do not|don't|must not|should not|cannot|can't|never|without)\b/i.test(relevantText) ||
+    /\b(?:do not|don't|must not|should not|cannot|can't|never)\b/i.test(relevantText) ||
     /\bnot\s+(?:available\s+for|for|intended\s+for|to\s+be\s+used\s+for|used\s+for)\b/i.test(relevantText) ||
+    SPARK_POLICY_WITHOUT_FORBIDDEN_SCOPE_PATTERN.test(relevantText) ||
     /\bno\s+(?:broad\s+exploration|exploration|implementation|planning|review|search\/synthesis|synthesis)\b/i.test(
       relevantText
     )
@@ -438,6 +442,7 @@ function isRestrictiveSparkUsageMention(relevantText: string, mentionIndex: numb
   const clausePrefix = relevantText.slice(clauseStart, mentionIndex).toLowerCase();
   const clauseSuffix = relevantText.slice(mentionIndex, clauseEnd).toLowerCase();
   const localClausePrefix = sliceAfterLastContrast(clausePrefix);
+  const localClause = `${localClausePrefix}${clauseSuffix}`;
   if (
     /\b(?:use|prefer|choose|select|route|run)\s+(?:a\s+|an\s+)?(?:non-spark|non\s+spark|alternate|alternative|different|other)\s+(?:roles?|agents?|models?)\b/.test(
       localClausePrefix
@@ -448,10 +453,38 @@ function isRestrictiveSparkUsageMention(relevantText: string, mentionIndex: numb
   if (/\bnot\s+(?:exclusively|just|limited\b|limited\s+to|only|solely)\b/.test(localClausePrefix)) {
     return false;
   }
-  if (/\b(?:do not|don't|must not|should not|cannot|can't|never|not|no|without)\b/.test(localClausePrefix)) {
+  if (
+    /\b(?:do not|don't|must not|should not|cannot|can't|never|not|no)\b/.test(localClausePrefix) ||
+    SPARK_POLICY_WITHOUT_FORBIDDEN_SCOPE_PATTERN.test(localClause)
+  ) {
     return true;
   }
   return hasSuffixRestrictionForSparkUsage(localClausePrefix, clauseSuffix);
+}
+
+function buildSparkPolicyLineContext(
+  lines: string[],
+  lineIndex: number,
+  markerIndex: number
+): { text: string; markerIndex: number } {
+  const currentLine = lines[lineIndex] ?? '';
+  const parts = [currentLine.trimEnd()];
+  for (let index = lineIndex + 1; index < lines.length; index += 1) {
+    const nextLine = lines[index] ?? '';
+    if (isSparkPolicyLineContextBoundary(nextLine)) {
+      break;
+    }
+    parts.push(nextLine.trim());
+  }
+  return {
+    text: parts.join(' '),
+    markerIndex
+  };
+}
+
+function isSparkPolicyLineContextBoundary(line: string): boolean {
+  const trimmed = line.trim();
+  return trimmed.length === 0 || /^(?:#{1,6}\s+|[-*+]\s+|\d+\.\s+|>\s+|```|~~~|\|)/.test(trimmed);
 }
 
 function sliceAfterLastContrast(text: string): string {

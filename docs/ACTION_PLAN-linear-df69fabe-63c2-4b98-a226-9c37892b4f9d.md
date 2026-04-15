@@ -77,7 +77,7 @@
 
 ## Approvals
 - Docs-review: passed via `.runs/linear-df69fabe-63c2-4b98-a226-9c37892b4f9d-co-183-docs-review-r2/cli/2026-04-14T23-00-44-902Z-abb6e4bf/manifest.json`.
-- Standalone review: final pre-handoff rerun succeeded as `bounded-success` with no actionable issues via `../../.runs/linear-df69fabe-63c2-4b98-a226-9c37892b4f9d/cli/2026-04-15T01-22-09-601Z-d01090d3/review/telemetry.json`.
+- Standalone review: final pre-handoff rerun succeeded as `bounded-success` with no actionable issues via `.runs/linear-df69fabe-63c2-4b98-a226-9c37892b4f9d/cli/2026-04-15T01-22-09-601Z-d01090d3/review/telemetry.json`.
 - Elegance review: final pass recorded via `out/linear-df69fabe-63c2-4b98-a226-9c37892b4f9d/manual/elegance-review.md`.
 - Review handoff: no longer blocked by CO-184 after the current-main merge; pending final PR feedback replies, ready-review drain, and transition to `In Review`.
 - Date: 2026-04-15
