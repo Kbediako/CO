@@ -935,6 +935,11 @@ describe('docs hygiene tooling', () => {
         actualViolations,
         `${fixture.id}: expected=${JSON.stringify(fixture.expected.spark_policy_violations)} title=${fixture.title}`
       ).toEqual(fixture.expected.spark_policy_violations);
+
+      expect(
+        actualViolations.length === 0,
+        `${fixture.id}: expected passes=${fixture.expected.passes} title=${fixture.title}`
+      ).toBe(fixture.expected.passes);
     }
   });
 
@@ -946,7 +951,7 @@ describe('docs hygiene tooling', () => {
 
       const errors = await runDocsCheck(repoRoot);
       const actualErrors = errors
-        .filter((error) => error.file === fixture.document_path && error.rule === 'spark-policy-overbroad')
+        .filter((error) => error.rule === 'spark-policy-overbroad')
         .map((error) => ({ file: error.file, rule: error.rule, reference: error.reference }));
 
       expect(
