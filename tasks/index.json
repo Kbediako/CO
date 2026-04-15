@@ -9,7 +9,27 @@
         "Codex"
       ],
       "last_review": "2026-04-15",
-      "approvals": {},
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-15",
+          "status": "succeeded",
+          "manifest": ".runs/linear-9b1440f0-a3af-4863-8bb5-2f8ea78bd02d-docs-review/cli/2026-04-15T15-33-50-178Z-e7664739/manifest.json",
+          "tech_spec": "tasks/specs/linear-9b1440f0-a3af-4863-8bb5-2f8ea78bd02d.md",
+          "checklists": [
+            "tasks/tasks-linear-9b1440f0-a3af-4863-8bb5-2f8ea78bd02d.md",
+            ".agent/task/linear-9b1440f0-a3af-4863-8bb5-2f8ea78bd02d.md",
+            "docs/TASKS.md"
+          ]
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-15",
+          "status": "succeeded",
+          "telemetry": "../../.runs/linear-9b1440f0-a3af-4863-8bb5-2f8ea78bd02d/cli/2026-04-15T15-14-04-331Z-0bebe30c/review/telemetry.json",
+          "review_outcome": "bounded-success"
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-9b1440f0-a3af-4863-8bb5-2f8ea78bd02d.md",
         "task": "tasks/tasks-linear-9b1440f0-a3af-4863-8bb5-2f8ea78bd02d.md",
