@@ -141,6 +141,7 @@ interface ProviderIssueRunRecord {
   pipelineId: string | null;
   status: string | null;
   proofTerminalStatus: 'failed' | 'succeeded' | null;
+  hasStaleInProgressProof: boolean;
   summary: string | null;
   issueUpdatedAt: string | null;
   startedAt: string | null;
@@ -2790,7 +2791,10 @@ export function createProviderIssueHandoffService(
           nextIssueUpdatedAt: input.trackedIssue.updated_at
         });
         const releaseCancelPending =
-          shouldAttemptReleaseCancel(releasedRun) ||
+          (
+            shouldAttemptReleaseCancel(releasedRun) &&
+            !isInactiveReleasedPendingReopenRun(existing, releasedRun)
+          ) ||
           hasPendingReleaseCancel(releasedRun?.manifestPath ?? existing.run_manifest_path);
         const pendingReleasedReopen = shouldReopenReleasedClaimAtCurrentTimestamp({
           claim: existing,
@@ -3900,17 +3904,28 @@ export function createProviderIssueHandoffService(
             }
             if (resolution.reason === 'provider_issue_poll_deferred_for_fresh_discovery') {
               refreshCounts.issue_by_id_deferred += 1;
-              deferredClaimFreshDiscoveryBlockedProviderKeys.add(claimProviderKey);
+              if (
+                claim.state !== 'released' ||
+                !canFreshDiscoverReleasedPendingReopenClaim(
+                  claim,
+                  releaseRun,
+                  hasPendingReleaseCancel
+                )
+              ) {
+                deferredClaimFreshDiscoveryBlockedProviderKeys.add(claimProviderKey);
+              }
               recordRefreshProgress('refresh:claim_issue_by_id_reconcile');
             }
             if (shouldSuppressFreshDiscoveryForPollFailClosedReason(resolution.reason)) {
               suppressFreshDiscovery = true;
             }
             if (claim.state === 'released') {
-              void retryReleaseCancel({
-                releaseRun,
-                reason: claim.reason ?? 'provider_issue_released'
-              });
+              if (!isInactiveReleasedPendingReopenRun(claim, releaseRun)) {
+                void retryReleaseCancel({
+                  releaseRun,
+                  reason: claim.reason ?? 'provider_issue_released'
+                });
+              }
             }
             continue;
           }
@@ -4020,7 +4035,10 @@ export function createProviderIssueHandoffService(
               refreshedReleasedNonStartedActiveRun = true;
             }
             const releaseRunForCancel = releaseRun ?? activeRun;
-            if (shouldAttemptReleaseCancel(releaseRunForCancel)) {
+            if (
+              shouldAttemptReleaseCancel(releaseRunForCancel) &&
+              !isInactiveReleasedPendingReopenRun(claim, releaseRunForCancel)
+            ) {
               void retryReleaseCancel({
                 releaseRun: releaseRunForCancel,
                 reason: claim.reason ?? 'provider_issue_released'
@@ -4080,7 +4098,15 @@ export function createProviderIssueHandoffService(
                 )
               )
             ) {
-              deferredClaimFreshDiscoveryBlockedProviderKeys.add(claimProviderKey);
+              if (
+                !canFreshDiscoverReleasedPendingReopenClaim(
+                  claim,
+                  releaseRunForCancel,
+                  hasPendingReleaseCancel
+                )
+              ) {
+                deferredClaimFreshDiscoveryBlockedProviderKeys.add(claimProviderKey);
+              }
               continue;
             }
             const handoffResult = await launchStartForTrackedIssue({
@@ -5575,6 +5601,11 @@ async function discoverProviderIssueRunSnapshot(
       const manifestStartedAt = readStringValue(manifest, 'started_at');
       const workerHostProofAttemptStartedAt = readStringValue(proofRecord ?? {}, 'attempt_started_at');
       const workerHostProofUpdatedAt = readStringValue(proofRecord ?? {}, 'updated_at');
+      const hasStaleInProgressProof = hasStaleProviderLinearWorkerInProgressProof(
+        manifest,
+        proof,
+        isProcessAlive
+      );
       const hasFreshWorkerHostContext = Boolean(
         proofRecord
         && isProviderLinearWorkerProofFreshForStage(
@@ -5594,6 +5625,7 @@ async function discoverProviderIssueRunSnapshot(
           manifest,
           proof
         ),
+        hasStaleInProgressProof,
         summary: resolveProviderIssueRunSummary(manifest, proof),
         issueUpdatedAt: readStringValue(manifest, 'issue_updated_at'),
         startedAt: manifestStartedAt,
@@ -6697,6 +6729,7 @@ function resolveProviderReleaseRun(
       pipelineId: null,
       status: null,
       proofTerminalStatus: null,
+      hasStaleInProgressProof: false,
       summary: null,
       issueUpdatedAt: claim.issue_updated_at,
       startedAt: null,
@@ -6978,6 +7011,35 @@ function stripProviderIssueReleasedPrefix(reason: string): string {
 
 function shouldAttemptReleaseCancel(run: ProviderIssueRunRecord | null): boolean {
   return run?.status === 'in_progress' || run?.status === 'queued' || run?.status === null;
+}
+
+function canFreshDiscoverReleasedPendingReopenClaim(
+  claim: Pick<ProviderIntakeClaimRecord, 'reason' | 'run_id' | 'run_manifest_path'>,
+  run: ProviderIssueRunRecord | null,
+  hasPendingReleaseCancel: (manifestPath: string | null | undefined) => boolean
+): boolean {
+  if (!isProviderIssueReleasedPendingReopen(claim.reason ?? null)) {
+    return false;
+  }
+  if (hasPendingReleaseCancel(run?.manifestPath ?? claim.run_manifest_path)) {
+    return false;
+  }
+  if (run === null) {
+    return !claim.run_id && !claim.run_manifest_path;
+  }
+  return !shouldAttemptReleaseCancel(run) || isInactiveReleasedPendingReopenRun(claim, run);
+}
+
+function isInactiveReleasedPendingReopenRun(
+  claim: Pick<ProviderIntakeClaimRecord, 'reason'>,
+  run: ProviderIssueRunRecord | null
+): boolean {
+  return (
+    isProviderIssueReleasedPendingReopen(claim.reason ?? null) &&
+    run?.status === null &&
+    run.proofTerminalStatus === null &&
+    run.hasStaleInProgressProof === true
+  );
 }
 
 function canCleanupReleasedProviderWorkspace(run: ProviderIssueRunRecord | null): boolean {
