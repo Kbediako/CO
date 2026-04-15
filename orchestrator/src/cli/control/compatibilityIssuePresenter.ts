@@ -94,9 +94,10 @@ export function buildCompatibilityProjectionSnapshot(
   });
   const runningByIssue = new Map(running.map((entry) => [entry.issue_identifier, entry] as const));
   const retryingByIssue = new Map(retrying.map((entry) => [entry.issue_identifier, entry] as const));
-  const selectedPayload = snapshot.selected
-    ? buildProjectionSelectedPayload(snapshot.selected, snapshot.providerIntake ?? null)
-    : null;
+  const selectedPayload =
+    snapshot.selected && !shouldSuppressInactiveSelectedPayload(snapshot.selected)
+      ? buildProjectionSelectedPayload(snapshot.selected, snapshot.providerIntake ?? null)
+      : null;
   const issues = index.issues
     .map((issue) => {
       if (shouldPruneTerminalSelectedCompatibilityIssue(issue)) {
@@ -142,27 +143,51 @@ function shouldPruneTerminalSelectedCompatibilityIssue(
   if (issue.runningSource || issue.retrySource || !issue.selectedSource) {
     return false;
   }
-  return isTerminalReleasedCompletedProviderSource(issue.selectedSource);
+  return (
+    isTerminalReleasedCompletedProviderSource(issue.selectedSource) ||
+    isStaleInProgressTerminalReleasedProviderSource(issue.selectedSource)
+  );
 }
 
 function isTerminalReleasedCompletedProviderSource(
   source: ControlCompatibilitySourceContext
 ): boolean {
   const debugSnapshot = source.providerDebugSnapshot ?? null;
-  const claim = debugSnapshot?.claim ?? null;
+  if (!isTerminalReleasedInactiveProviderSource(source)) {
+    return false;
+  }
+  if (!isCompletedCompatibilityRunStatus(source.rawStatus)) {
+    return false;
+  }
+  return hasCompletedMergeCloseout(debugSnapshot);
+}
+
+function shouldSuppressInactiveSelectedPayload(source: ControlCompatibilitySourceContext): boolean {
+  return isStaleInProgressTerminalReleasedProviderSource(source);
+}
+
+function isStaleInProgressTerminalReleasedProviderSource(
+  source: ControlCompatibilitySourceContext
+): boolean {
+  const debugSnapshot = source.providerDebugSnapshot ?? null;
+  return (
+    normalizeProviderLinearWorkflowState(source.rawStatus) === 'in_progress' &&
+    isTerminalReleasedInactiveProviderSource(source) &&
+    hasCompletedMergeCloseout(debugSnapshot)
+  );
+}
+
+function isTerminalReleasedInactiveProviderSource(
+  source: ControlCompatibilitySourceContext
+): boolean {
+  const claim = source.providerDebugSnapshot?.claim ?? null;
   if (normalizeProviderLinearWorkflowState(claim?.state) !== 'released') {
     return false;
   }
   if (normalizeProviderLinearWorkflowState(claim?.reason) !== 'provider_issue_released:not_active') {
     return false;
   }
-  if (!isCompletedCompatibilityRunStatus(source.rawStatus)) {
-    return false;
-  }
-  if (!isTerminalProviderIssueState(source)) {
-    return false;
-  }
-  return hasCompletedMergeCloseout(debugSnapshot);
+  return isTerminalProviderIssueState(source);
 }
 
 function isCompletedCompatibilityRunStatus(status: string | null | undefined): boolean {

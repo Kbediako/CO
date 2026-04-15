@@ -527,12 +527,17 @@ function isAuthoritativeSelectedCurrentRunningSource(
       !isControlHostSelectedFallbackSource(source) && isFreshNullProviderRunningSource(source)
     );
   }
-  if (source.taskId !== 'local-mcp') {
-    return true;
-  }
   const claim = findMatchingProviderIntakeClaim(providerIntakeState, source);
   if (claim !== null) {
-    return isProviderIntakeClaimActiveCurrentActivity(claim);
+    if (isProviderIntakeClaimActiveCurrentActivity(claim)) {
+      return true;
+    }
+    if (isProviderIntakeClaimBoundToCompatibilitySource(claim, source)) {
+      return false;
+    }
+  }
+  if (source.taskId !== 'local-mcp') {
+    return true;
   }
   if (source.taskId === 'local-mcp' && !hasExplicitCompatibilityIssueIdentity(source)) {
     return false;
@@ -591,6 +596,36 @@ function findMatchingProviderIntakeClaim(
     }
   }
   return bestScore > 0 ? bestClaim : null;
+}
+
+function isProviderIntakeClaimBoundToCompatibilitySource(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'issue_id' | 'issue_identifier' | 'run_manifest_path' | 'run_id' | 'task_id'
+  >,
+  source: Pick<
+    ControlCompatibilitySourceContext,
+    | 'issueId'
+    | 'issueIdentifier'
+    | 'issueProvider'
+    | 'manifestPath'
+    | 'pipelineId'
+    | 'pipelineTitle'
+    | 'providerLinearWorkerProof'
+    | 'taskId'
+    | 'runId'
+  >
+): boolean {
+  const comparableBindings = [
+    claim.run_manifest_path && source.manifestPath
+      ? claim.run_manifest_path === source.manifestPath
+      : null,
+    claim.run_id && source.runId ? claim.run_id === source.runId : null
+  ].filter((match): match is boolean => match !== null);
+  if (comparableBindings.length > 0) {
+    return comparableBindings.some(Boolean);
+  }
+  return isAuthoritativeProviderTaskIdMatch(claim, source);
 }
 
 function scoreProviderClaimMatch(

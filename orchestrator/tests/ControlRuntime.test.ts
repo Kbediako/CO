@@ -2411,6 +2411,336 @@ describe('ControlRuntime', () => {
     }
   });
 
+  it('prunes stale in-progress provider rows when terminal released claim has no live worker', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-15T15:13:39.658Z'));
+    try {
+      const providerIntakeState = createProviderIntakeState([
+        {
+          provider: 'linear',
+          provider_key: 'linear:df69fabe-63c2-4b98-a226-9c37892b4f9d',
+          issue_id: 'df69fabe-63c2-4b98-a226-9c37892b4f9d',
+          issue_identifier: 'CO-183',
+          issue_title: 'Expand Codex CLI 0.120 adoption and make spark file-search only',
+          issue_state: 'Done',
+          issue_state_type: 'completed',
+          issue_updated_at: '2026-04-15T14:51:57.000Z',
+          task_id: 'linear-df69fabe-63c2-4b98-a226-9c37892b4f9d',
+          mapping_source: 'provider_id_fallback',
+          state: 'released',
+          reason: 'provider_issue_released:not_active',
+          accepted_at: '2026-04-15T12:00:00.000Z',
+          updated_at: '2026-04-15T14:51:57.000Z',
+          last_delivery_id: 'delivery-co-183',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_744_726_317_000,
+          run_id: 'run-1',
+          run_manifest_path: null,
+          launch_source: 'control-host',
+          launch_token: 'launch-co-183',
+          merge_closeout: {
+            recorded_at: '2026-04-15T14:51:57.000Z',
+            issue_id: 'df69fabe-63c2-4b98-a226-9c37892b4f9d',
+            issue_identifier: 'CO-183',
+            issue_state: 'Done',
+            issue_state_type: 'completed',
+            issue_updated_at: '2026-04-15T14:51:57.000Z',
+            status: 'merged',
+            reason: 'merged_and_transitioned_done',
+            summary: 'Merged attached PR #481 and transitioned the Linear issue to Done.',
+            attached_pr_urls: ['https://github.com/asabeko/CO/pull/481'],
+            ignored_historical_pr_urls: [],
+            conflicting_attached_pr_urls: [],
+            pr: {
+              url: 'https://github.com/asabeko/CO/pull/481',
+              owner: 'asabeko',
+              repo: 'CO',
+              number: 481
+            },
+            snapshot: {
+              state: 'MERGED',
+              review_decision: 'APPROVED',
+              merge_state_status: 'UNKNOWN',
+              ready_to_merge: false,
+              gate_reasons: [],
+              action_required_reasons: [],
+              unresolved_thread_count: 0,
+              checks_pending: 0,
+              checks_failed: 0,
+              required_checks_pending: 0,
+              required_checks_failed: 0,
+              updated_at: '2026-04-15T14:51:57Z',
+              merged_at: '2026-04-15T14:51:57Z',
+              head_oid: 'def456'
+            },
+            branch_recovery: null,
+            merge_attempt: null,
+            shared_root: {
+              status: 'reconciled',
+              reason: 'shared_root_reconciled',
+              before_status: '## main...origin/main',
+              after_status: '## main...origin/main'
+            },
+            linear_transition: {
+              status: 'transitioned',
+              attempted_at: '2026-04-15T14:51:57.000Z',
+              previous_state: 'Merging',
+              target_state: 'Done',
+              issue_state: 'Done',
+              issue_state_type: 'completed',
+              issue_updated_at: '2026-04-15T14:51:57.000Z',
+              error: null
+            },
+            github_rate_limit: null
+          }
+        }
+      ]);
+      const fixture = await createFixture({
+        taskId: 'linear-df69fabe-63c2-4b98-a226-9c37892b4f9d',
+        providerIntakeState,
+        linearAdvisoryState: {
+          tracked_issue: createTrackedIssue({
+            id: 'df69fabe-63c2-4b98-a226-9c37892b4f9d',
+            identifier: 'CO-183',
+            title: 'Expand Codex CLI 0.120 adoption and make spark file-search only',
+            state: 'Done',
+            state_type: 'completed',
+            updated_at: '2026-04-15T14:51:57.000Z'
+          })
+        }
+      });
+      await seedManifest(fixture.paths, {
+        task_id: 'linear-df69fabe-63c2-4b98-a226-9c37892b4f9d',
+        issue_provider: 'linear',
+        issue_id: 'df69fabe-63c2-4b98-a226-9c37892b4f9d',
+        issue_identifier: 'CO-183',
+        pipeline_id: 'provider-linear-worker',
+        pipeline_title: 'Provider Linear Worker',
+        status: 'in_progress',
+        started_at: '2026-04-15T12:00:00.000Z',
+        updated_at: '2026-04-15T14:52:00.000Z',
+        completed_at: null,
+        summary: 'Stale manifest still says the provider worker is running.'
+      });
+      await seedProviderLinearWorkerProof(fixture.paths, {
+        issue_id: 'df69fabe-63c2-4b98-a226-9c37892b4f9d',
+        issue_identifier: 'CO-183',
+        pid: '85191',
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        current_turn_started_at: '2026-04-15T14:40:00.000Z',
+        last_event: 'turn_running',
+        last_message: 'Worker turn still appears to be running from stale proof.',
+        last_event_at: '2026-04-15T14:52:00.000Z',
+        current_turn_activity: {
+          event: 'turn_running',
+          message_or_payload: 'Worker turn still appears to be running from stale proof.',
+          recorded_at: '2026-04-15T14:52:00.000Z',
+          source: 'session_log_hydration',
+          turn_id: 'turn-1',
+          session_id: 'thread-1-turn-1'
+        },
+        rate_limits: {},
+        updated_at: '2026-04-15T14:52:00.000Z'
+      });
+
+      const selectedSnapshot = await fixture.runtime.snapshot().readSelectedRunSnapshot();
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+      const uiDataset = buildUiDataset({
+        projection: compatibilityProjection,
+        generatedAt: '2026-04-15T15:13:39.658Z'
+      });
+
+      expect(selectedSnapshot.selected).toMatchObject({
+        issueIdentifier: 'CO-183',
+        rawStatus: 'in_progress',
+        providerDebugSnapshot: {
+          claim: {
+            state: 'released',
+            reason: 'provider_issue_released:not_active',
+            issue_state: 'Done',
+            issue_state_type: 'completed'
+          },
+          worker: {
+            owner_phase: 'turn_running',
+            owner_status: 'in_progress',
+            pid: '85191'
+          }
+        }
+      });
+      expect(compatibilityProjection.selected).toBeNull();
+      expect(compatibilityProjection.running).toEqual([]);
+      expect(compatibilityProjection.retrying).toEqual([]);
+      expect(compatibilityProjection.issues).toEqual([]);
+      expect(uiDataset.counts.running).toBe(0);
+      expect(uiDataset.counts.issues).toBe(0);
+      expect(uiDataset.selected_issue_identifier).toBeNull();
+      expect(uiDataset.selected).toBeNull();
+      expect(uiDataset.running).toEqual([]);
+      expect(uiDataset.issues).toEqual([]);
+
+      const noCloseoutClaim: ProviderIntakeState['claims'][number] = {
+        ...providerIntakeState.claims[0]!,
+        task_id: 'linear-df69fabe-63c2-4b98-a226-9c37892b4f9d-race',
+        run_id: 'run-1',
+        merge_closeout: null
+      };
+      const noCloseoutFixture = await createFixture({
+        taskId: 'linear-df69fabe-63c2-4b98-a226-9c37892b4f9d-race',
+        providerIntakeState: createProviderIntakeState([noCloseoutClaim]),
+        linearAdvisoryState: {
+          tracked_issue: createTrackedIssue({
+            id: 'df69fabe-63c2-4b98-a226-9c37892b4f9d',
+            identifier: 'CO-183',
+            title: 'Expand Codex CLI 0.120 adoption and make spark file-search only',
+            state: 'Done',
+            state_type: 'completed',
+            updated_at: '2026-04-15T14:51:57.000Z'
+          })
+        }
+      });
+      await seedManifest(noCloseoutFixture.paths, {
+        task_id: 'linear-df69fabe-63c2-4b98-a226-9c37892b4f9d-race',
+        issue_provider: 'linear',
+        issue_id: 'df69fabe-63c2-4b98-a226-9c37892b4f9d',
+        issue_identifier: 'CO-183',
+        pipeline_id: 'provider-linear-worker',
+        pipeline_title: 'Provider Linear Worker',
+        status: 'in_progress',
+        started_at: '2026-04-15T12:00:00.000Z',
+        updated_at: '2026-04-15T14:52:00.000Z',
+        completed_at: null,
+        summary: 'Closeout race manifest still says the provider worker is running.'
+      });
+      await seedProviderLinearWorkerProof(noCloseoutFixture.paths, {
+        issue_id: 'df69fabe-63c2-4b98-a226-9c37892b4f9d',
+        issue_identifier: 'CO-183',
+        pid: '85191',
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        current_turn_started_at: '2026-04-15T14:40:00.000Z',
+        last_event: 'turn_running',
+        last_message: 'Worker proof remains visible until closeout evidence lands.',
+        last_event_at: '2026-04-15T14:52:00.000Z',
+        rate_limits: {},
+        updated_at: '2026-04-15T14:52:00.000Z'
+      });
+
+      const noCloseoutProjection = await noCloseoutFixture.runtime.snapshot().readCompatibilityProjection();
+      const noCloseoutUiDataset = buildUiDataset({
+        projection: noCloseoutProjection,
+        generatedAt: '2026-04-15T15:13:39.658Z'
+      });
+
+      expect(noCloseoutProjection.selected).toMatchObject({
+        issue_identifier: 'CO-183',
+        raw_status: 'in_progress'
+      });
+      expect(noCloseoutProjection.running).toEqual([]);
+      expect(noCloseoutProjection.issues.map((issue) => issue.issueIdentifier)).toEqual(['CO-183']);
+      expect(noCloseoutUiDataset.counts.running).toBe(0);
+      expect(noCloseoutUiDataset.counts.issues).toBe(1);
+      expect(noCloseoutUiDataset.selected_issue_identifier).toBe('CO-183');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps selected in-progress provider runs visible when a same-issue released claim is from another run', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-15T15:13:39.658Z'));
+    try {
+      const providerIntakeState = createProviderIntakeState([
+        {
+          provider: 'linear',
+          provider_key: 'linear:df69fabe-63c2-4b98-a226-9c37892b4f9d',
+          issue_id: 'df69fabe-63c2-4b98-a226-9c37892b4f9d',
+          issue_identifier: 'CO-183',
+          issue_title: 'Expand Codex CLI 0.120 adoption and make spark file-search only',
+          issue_state: 'Done',
+          issue_state_type: 'completed',
+          issue_updated_at: '2026-04-15T14:51:57.000Z',
+          task_id: 'linear-df69fabe-63c2-4b98-a226-9c37892b4f9d-old',
+          mapping_source: 'provider_id_fallback',
+          state: 'released',
+          reason: 'provider_issue_released:not_active',
+          accepted_at: '2026-04-15T12:00:00.000Z',
+          updated_at: '2026-04-15T14:51:57.000Z',
+          last_delivery_id: 'delivery-co-183',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_744_726_317_000,
+          run_id: 'released-run',
+          run_manifest_path: '/tmp/released-co-183/manifest.json',
+          launch_source: 'control-host',
+          launch_token: 'launch-co-183'
+        }
+      ]);
+      const fixture = await createFixture({
+        taskId: 'linear-df69fabe-63c2-4b98-a226-9c37892b4f9d-live',
+        providerIntakeState,
+        linearAdvisoryState: {
+          tracked_issue: createTrackedIssue({
+            id: 'df69fabe-63c2-4b98-a226-9c37892b4f9d',
+            identifier: 'CO-183',
+            title: 'Expand Codex CLI 0.120 adoption and make spark file-search only',
+            state: 'Done',
+            state_type: 'completed',
+            updated_at: '2026-04-15T14:51:57.000Z'
+          })
+        }
+      });
+      await seedManifest(fixture.paths, {
+        run_id: 'live-run',
+        task_id: 'linear-df69fabe-63c2-4b98-a226-9c37892b4f9d-live',
+        issue_provider: 'linear',
+        issue_id: 'df69fabe-63c2-4b98-a226-9c37892b4f9d',
+        issue_identifier: 'CO-183',
+        pipeline_id: 'provider-linear-worker',
+        pipeline_title: 'Provider Linear Worker',
+        status: 'in_progress',
+        started_at: '2026-04-15T15:00:00.000Z',
+        updated_at: '2026-04-15T15:12:00.000Z',
+        summary: 'A newer selected provider run is still live.'
+      });
+      await seedProviderLinearWorkerProof(fixture.paths, {
+        issue_id: 'df69fabe-63c2-4b98-a226-9c37892b4f9d',
+        issue_identifier: 'CO-183',
+        pid: '85192',
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        current_turn_started_at: '2026-04-15T15:00:00.000Z',
+        last_event: 'turn_running',
+        last_message: 'A newer selected provider run is still live.',
+        last_event_at: '2026-04-15T15:12:00.000Z',
+        rate_limits: {},
+        updated_at: '2026-04-15T15:12:00.000Z'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+      const uiDataset = buildUiDataset({
+        projection: compatibilityProjection,
+        generatedAt: '2026-04-15T15:13:39.658Z'
+      });
+
+      expect(compatibilityProjection.selected).toMatchObject({
+        issue_identifier: 'CO-183',
+        raw_status: 'in_progress'
+      });
+      expect(compatibilityProjection.running.map((entry) => entry.issue_identifier)).toEqual([
+        'CO-183'
+      ]);
+      expect(compatibilityProjection.codexTotals.seconds_running).toBeGreaterThan(0);
+      expect(compatibilityProjection.issues.map((issue) => issue.issueIdentifier)).toEqual(['CO-183']);
+      expect(uiDataset.counts.running).toBe(1);
+      expect(uiDataset.counts.issues).toBe(1);
+      expect(uiDataset.selected_issue_identifier).toBe('CO-183');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('ignores unrelated retained local-mcp claims when evaluating the selected run', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
