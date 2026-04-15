@@ -9,6 +9,7 @@ import { runProviderIssueHandoffRefresh } from '../src/cli/control/controlServer
 import { createProviderIssueHandoffService } from '../src/cli/control/providerIssueHandoff.js';
 import type { LiveLinearTrackedIssue } from '../src/cli/control/linearDispatchSource.js';
 import type { ProviderIntakeState } from '../src/cli/control/providerIntakeState.js';
+import { PROVIDER_LINEAR_WORKER_PROOF_FILENAME } from '../src/cli/providerLinearWorkerRunner.js';
 import { resolveRunPaths } from '../src/cli/run/runPaths.js';
 
 const cleanupRoots: string[] = [];
@@ -1133,6 +1134,418 @@ describe('runProviderIssueHandoffRefresh', () => {
       run_manifest_path: childPaths.manifestPath
     });
     expect(state.latest_reason).toBe('provider_issue_released:not_active');
+  });
+
+  it('reconciles a terminal released pending-reopen merging claim without canceling unrelated live workers', async () => {
+    const { root, paths } = await createHostPaths();
+    const staleEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-72286a49-e68b-435a-be72-74d5c28feb09'
+    };
+    const stalePaths = resolveRunPaths(staleEnv, 'run-dead-merging');
+    await mkdir(stalePaths.runDir, { recursive: true });
+    await writeFile(
+      stalePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-dead-merging',
+        task_id: staleEnv.taskId,
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-194',
+        issue_identifier: 'CO-194',
+        issue_updated_at: '2026-04-15T16:30:00.000Z',
+        started_at: '2026-04-15T16:30:00.000Z',
+        updated_at: '2026-04-15T16:32:00.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(stalePaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        issue_id: 'lin-issue-194',
+        issue_identifier: 'CO-194',
+        pid: '424242',
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        attempt_started_at: '2026-04-15T16:30:00.000Z',
+        updated_at: '2026-04-15T16:32:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const liveEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-live-worker'
+    };
+    const livePaths = resolveRunPaths(liveEnv, 'run-live-worker');
+    await mkdir(livePaths.runDir, { recursive: true });
+    await writeFile(
+      livePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-live-worker',
+        task_id: liveEnv.taskId,
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-live',
+        issue_identifier: 'CO-195',
+        issue_updated_at: '2026-04-15T16:31:00.000Z',
+        started_at: '2026-04-15T16:31:00.000Z',
+        updated_at: '2026-04-15T16:34:00.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(livePaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        issue_id: 'lin-issue-live',
+        issue_identifier: 'CO-195',
+        pid: '31337',
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        attempt_started_at: '2026-04-15T16:31:00.000Z',
+        updated_at: '2026-04-15T16:34:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-194',
+      issue_id: 'lin-issue-194',
+      issue_identifier: 'CO-194',
+      issue_title: 'Terminal stale merging claim',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-15T16:30:00.000Z',
+      task_id: staleEnv.taskId,
+      mapping_source: 'provider_id_fallback',
+      state: 'released',
+      reason: 'provider_issue_released_pending_reopen:provider_issue_released:not_active',
+      accepted_at: '2026-04-15T16:30:05.000Z',
+      updated_at: '2026-04-15T16:32:05.000Z',
+      last_delivery_id: 'delivery-co-194-merging',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_744_736_000_000,
+      run_id: 'run-dead-merging',
+      run_manifest_path: stalePaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-live',
+      issue_id: 'lin-issue-live',
+      issue_identifier: 'CO-195',
+      issue_title: 'Unrelated live worker',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-15T16:31:00.000Z',
+      task_id: liveEnv.taskId,
+      mapping_source: 'provider_id_fallback',
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      accepted_at: '2026-04-15T16:31:05.000Z',
+      updated_at: '2026-04-15T16:34:05.000Z',
+      last_delivery_id: 'delivery-live-worker',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_744_736_060_000,
+      run_id: 'run-live-worker',
+      run_manifest_path: livePaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const cancelRequests: Array<{ manifestPath: string; payload: Record<string, unknown> }> = [];
+    vi.spyOn(questionChildResolutionAdapter, 'callChildControlEndpoint').mockImplementation(
+      async ({ manifestPath, payload }) => {
+        cancelRequests.push({ manifestPath, payload });
+      }
+    );
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async ({ issueId }: { issueId: string }) => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue(
+        issueId === 'lin-issue-194'
+          ? {
+              id: 'lin-issue-194',
+              identifier: 'CO-194',
+              title: 'Terminal stale merging claim',
+              state: 'Done',
+              state_type: 'completed',
+              updated_at: '2026-04-15T16:38:07.274Z'
+            }
+          : {
+              id: 'lin-issue-live',
+              identifier: 'CO-195',
+              title: 'Unrelated live worker',
+              state: 'In Progress',
+              state_type: 'started',
+              updated_at: '2026-04-15T16:34:00.000Z'
+            }
+      )
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue,
+      isProcessAlive: (pid) => pid === 31337
+    });
+
+    await service.refresh();
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-194'
+    });
+    expect(cancelRequests).toEqual([]);
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-04-15T16:38:07.274Z',
+      run_id: 'run-dead-merging',
+      run_manifest_path: stalePaths.manifestPath
+    });
+    expect(state.claims[1]).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      run_id: 'run-live-worker',
+      run_manifest_path: livePaths.manifestPath
+    });
+    expect(state.claims.filter((claim) => claim.state === 'running')).toHaveLength(1);
+  });
+
+  it('does not retry release cancellation for a terminal manifest with stale in-progress proof', async () => {
+    const { root, paths } = await createHostPaths();
+    const failedEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-terminal-stale-proof'
+    };
+    const failedPaths = resolveRunPaths(failedEnv, 'run-failed-terminal');
+    await mkdir(failedPaths.runDir, { recursive: true });
+    await writeFile(
+      failedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-failed-terminal',
+        task_id: 'linear-terminal-stale-proof',
+        pipeline_id: 'provider-linear-worker',
+        status: 'failed',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-terminal',
+        issue_identifier: 'CO-TERMINAL',
+        issue_updated_at: '2026-04-15T16:38:07.274Z',
+        started_at: '2026-04-15T16:00:00.000Z',
+        updated_at: '2026-04-15T16:05:00.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(failedPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        issue_id: 'lin-issue-terminal',
+        issue_identifier: 'CO-TERMINAL',
+        attempt_started_at: '2026-04-15T16:00:00.000Z',
+        pid: 424242,
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        updated_at: '2026-04-15T16:04:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-terminal',
+      issue_id: 'lin-issue-terminal',
+      issue_identifier: 'CO-TERMINAL',
+      issue_title: 'Terminal manifest with stale proof',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-04-15T16:38:07.274Z',
+      task_id: 'linear-terminal-stale-proof',
+      mapping_source: 'provider_id_fallback',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      accepted_at: '2026-04-15T16:00:01.000Z',
+      updated_at: '2026-04-15T16:38:07.274Z',
+      last_delivery_id: 'delivery-terminal',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_744_754_287_274,
+      run_id: 'run-failed-terminal',
+      run_manifest_path: failedPaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const cancelRequests: Array<{ manifestPath: string; payload: Record<string, unknown> }> = [];
+    vi.spyOn(questionChildResolutionAdapter, 'callChildControlEndpoint').mockImplementation(
+      async ({ manifestPath, payload }) => {
+        cancelRequests.push({ manifestPath, payload });
+      }
+    );
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue: vi.fn(async () => ({
+        kind: 'ready' as const,
+        trackedIssue: createTrackedIssue({
+          id: 'lin-issue-terminal',
+          identifier: 'CO-TERMINAL',
+          title: 'Terminal manifest with stale proof',
+          state: 'Done',
+          state_type: 'completed',
+          updated_at: '2026-04-15T16:38:07.274Z'
+        })
+      })),
+      isProcessAlive: () => false
+    });
+
+    await service.refresh();
+
+    expect(cancelRequests).toEqual([]);
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      run_id: 'run-failed-terminal',
+      run_manifest_path: failedPaths.manifestPath
+    });
+  });
+
+  it('still cancels null-status released runs when proof lacks fresh dead-local-pid evidence', async () => {
+    const { root, paths } = await createHostPaths();
+    const staleEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-remote-stale-proof'
+    };
+    const stalePaths = resolveRunPaths(staleEnv, 'run-remote-stale-proof');
+    await mkdir(stalePaths.runDir, { recursive: true });
+    await writeFile(
+      stalePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-remote-stale-proof',
+        task_id: 'linear-remote-stale-proof',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-remote-stale',
+        issue_identifier: 'CO-REMOTE',
+        issue_updated_at: '2026-04-15T16:38:07.274Z',
+        started_at: '2026-04-15T16:10:00.000Z',
+        updated_at: '2026-04-15T16:15:00.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(stalePaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        issue_id: 'lin-issue-remote-stale',
+        issue_identifier: 'CO-REMOTE',
+        attempt_started_at: '2026-04-15T16:00:00.000Z',
+        pid: 424242,
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        updated_at: '2026-04-15T16:04:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-remote-stale',
+      issue_id: 'lin-issue-remote-stale',
+      issue_identifier: 'CO-REMOTE',
+      issue_title: 'Remote stale proof',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-04-15T16:38:07.274Z',
+      task_id: 'linear-remote-stale-proof',
+      mapping_source: 'provider_id_fallback',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      accepted_at: '2026-04-15T16:00:01.000Z',
+      updated_at: '2026-04-15T16:38:07.274Z',
+      last_delivery_id: 'delivery-remote-stale',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_744_754_287_274,
+      run_id: 'run-remote-stale-proof',
+      run_manifest_path: stalePaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const cancelRequests: Array<{ manifestPath: string; payload: Record<string, unknown> }> = [];
+    vi.spyOn(questionChildResolutionAdapter, 'callChildControlEndpoint').mockImplementation(
+      async ({ manifestPath, payload }) => {
+        cancelRequests.push({ manifestPath, payload });
+      }
+    );
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue: vi.fn(async () => ({
+        kind: 'skip' as const,
+        reason: 'linear_refresh_unavailable'
+      })),
+      isProcessAlive: () => false
+    });
+
+    await service.refresh();
+
+    await vi.waitFor(() => {
+      expect(cancelRequests).toEqual([
+        {
+          manifestPath: stalePaths.manifestPath,
+          payload: expect.objectContaining({
+            action: 'cancel',
+            reason: 'provider_issue_released:not_active'
+          })
+        }
+      ]);
+    });
   });
 
   it('persists fresh ready metadata before released active-run cancel fallthroughs', async () => {
