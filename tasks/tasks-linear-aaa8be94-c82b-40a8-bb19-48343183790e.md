@@ -1,0 +1,45 @@
+# Task Checklist - linear-aaa8be94-c82b-40a8-bb19-48343183790e
+
+- Linear Issue: `CO-191` / `aaa8be94-c82b-40a8-bb19-48343183790e`
+- MCP Task ID: `linear-aaa8be94-c82b-40a8-bb19-48343183790e`
+- Primary PRD: `docs/PRD-linear-aaa8be94-c82b-40a8-bb19-48343183790e.md`
+- TECH_SPEC: `tasks/specs/linear-aaa8be94-c82b-40a8-bb19-48343183790e.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-linear-aaa8be94-c82b-40a8-bb19-48343183790e.md`
+
+## Docs-First
+- [x] PRD drafted for the CO-191 spark-policy classifier/fixture refactor. Evidence: `docs/PRD-linear-aaa8be94-c82b-40a8-bb19-48343183790e.md`.
+- [x] TECH_SPEC drafted with protected intent, classifier concepts, fixture contract, and validation plan. Evidence: `tasks/specs/linear-aaa8be94-c82b-40a8-bb19-48343183790e.md`, `docs/TECH_SPEC-linear-aaa8be94-c82b-40a8-bb19-48343183790e.md`.
+- [x] ACTION_PLAN drafted for baseline, classifier extraction, fixture wiring, validation, and review handoff. Evidence: `docs/ACTION_PLAN-linear-aaa8be94-c82b-40a8-bb19-48343183790e.md`.
+- [x] `tasks/index.json` updated with the new TECH_SPEC entry, review date, and docs-review recovery waiver. Evidence: `tasks/index.json`.
+- [x] `docs/TASKS.md` updated with the lane snapshot. Evidence: `docs/TASKS.md`.
+- [x] `docs/docs-freshness-registry.json` updated for the new docs and task artifacts. Evidence: `docs/docs-freshness-registry.json`.
+- [x] Checklist mirrored to `.agent/task/linear-aaa8be94-c82b-40a8-bb19-48343183790e.md`. Evidence: `.agent/task/linear-aaa8be94-c82b-40a8-bb19-48343183790e.md`.
+- [x] docs-review approval captured or waived. Evidence: `tasks/index.json` `approvals.docs_review` records the recovery waiver because the stale released-pending-reopen worker left no surviving CO-191 docs-review manifest; local `npm run docs:check`, `npm run docs:freshness`, `node scripts/spec-guard.mjs --dry-run`, and `node scripts/delegation-guard.mjs` were rerun before PR handoff.
+
+## Implementation
+- [x] Baseline focused docs-hygiene behavior checked before implementation internals change. Evidence: `tests/fixtures/docs-hygiene/spark-policy-cases.json` expected outputs were generated from the pre-extraction `runDocsCheck()` path.
+- [x] Spark-policy classification extracted into a focused parser/classifier module. Evidence: `scripts/lib/spark-policy-classifier.js`, `scripts/lib/spark-policy-classifier.d.ts`.
+- [x] Production docs-hygiene/docs-catalog path wired to the classifier. Evidence: `scripts/docs-hygiene.ts`.
+- [x] Structured spark-policy fixture corpus added or accepted from child lane. Evidence: parent-owned `tests/fixtures/docs-hygiene/spark-policy-cases.json`; child lane was treated as reference only.
+- [x] Table-driven fixture evaluator added with fixture id, expected verdict, actual verdict, and reason on failure. Evidence: `tests/docs-hygiene.spec.ts`.
+
+## Validation
+- [x] Child lane `fixture-seed` completed and parent disposition recorded. Evidence: `.runs/linear-aaa8be94-c82b-40a8-bb19-48343183790e-fixture-seed/cli/2026-04-15T09-40-38-221Z-87daea2f/provider-linear-child-lane-proof.json`; parent recreated a richer fixture corpus under `tests/fixtures/docs-hygiene/spark-policy-cases.json`.
+- [x] Focused docs-hygiene tests pass. Evidence: `npx vitest run --config vitest.config.core.ts tests/docs-hygiene.spec.ts` (30 tests passed).
+- [x] `npm run docs:check` passes. Evidence: command exited `0` with `docs:check: OK`.
+- [x] `node scripts/delegation-guard.mjs` passes. Evidence: command exited `0` with `Delegation guard: OK (2 subagent manifest(s) found)`.
+- [x] `node scripts/spec-guard.mjs --dry-run` passes. Evidence: command exited `0` with `Spec guard: OK`.
+- [x] `npm run build` passes. Evidence: command exited `0`.
+- [x] `npm run lint` passes. Evidence: command exited `0`.
+- [x] `npm run test` passes. Evidence: clean committed rerun passed `342` test files and `3921` tests.
+- [x] `node scripts/diff-budget.mjs` passes. Evidence: passed with `DIFF_BUDGET_OVERRIDE_REASON='CO-191 intentionally moves the existing inline spark-policy phrase corpus into a structured fixture file while preserving behavior.'`.
+- [x] Manifest-backed standalone review executed or truthful fallback recorded. Evidence: non-interactive prompt-only `npm run review -- --commit HEAD` succeeded only without the task manifest context; task-scoped rerun failed with `No run manifests found`, so the task records a truthful recovery fallback instead of claiming manifest-backed standalone review completion.
+- [x] Explicit elegance review recorded after review findings are addressed. Evidence: manual pass found no smaller safe split without losing the fixture migration/readability goal after clean-tree validation.
+
+## Handoff
+- [x] Exactly one persistent `## Codex Workpad` comment is kept current on the Linear issue. Evidence: Linear comment `8d24f952-6fd5-4215-9346-72000bfcbc0d`.
+- [x] PR attached to the Linear issue before review-state transition. Evidence: https://github.com/Kbediako/CO/pull/486 and Linear attachment `fae0f3ff-edf9-4ee9-9ea0-019ff4acbd53`.
+- [x] Latest `origin/main` merged into the branch before review-state transition. Evidence: branch fast-forwarded to `b1b4d0c844b29a721c63be45e564771a19ca535a`.
+- [ ] PR checks green and actionable review feedback handled or explicitly pushed back before review-state transition. Evidence: pending.
+- [ ] `codex-orchestrator pr ready-review` drain clean before review-state transition. Evidence: pending.
+- [ ] Issue moved to the actual team review state (`In Review`) only after coding stops. Evidence: pending.
