@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260415-linear-f1d8b29c-b048-4816-96dd-a38f272dabb7",
+      "title": "CO: Canary Codex 0.121 app-server event contracts before replacing provider JSONL/session-log truth",
+      "relates_to": "tasks/tasks-linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-15",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md",
+        "task": "tasks/tasks-linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md",
+        "agent_task": ".agent/task/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md",
+        "docs": "docs/TECH_SPEC-linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md"
+      }
+    },
+    {
       "id": "20260416-linear-c9163fc7-832a-45ac-8961-2d6c213e52af",
       "title": "Control host: safely reclaim plain not_active rows when retained run record disappeared",
       "relates_to": "tasks/tasks-linear-c9163fc7-832a-45ac-8961-2d6c213e52af.md",
