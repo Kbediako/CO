@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260415-linear-4ffb542b-28b2-4530-8630-b79357e306e2",
+      "title": "CO workflow: automate docs:freshness baseline upkeep and diff-local gating",
+      "relates_to": "tasks/tasks-linear-4ffb542b-28b2-4530-8630-b79357e306e2.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-15",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-4ffb542b-28b2-4530-8630-b79357e306e2.md",
+        "task": "tasks/tasks-linear-4ffb542b-28b2-4530-8630-b79357e306e2.md",
+        "agent_task": ".agent/task/linear-4ffb542b-28b2-4530-8630-b79357e306e2.md",
+        "docs": "docs/TECH_SPEC-linear-4ffb542b-28b2-4530-8630-b79357e306e2.md"
+      }
+    },
+    {
       "id": "20260415-linear-237c874c-c05f-4947-949a-573043fc575f",
       "title": "CO: restore Apr 15 docs:freshness historical packet baseline",
       "relates_to": "tasks/tasks-linear-237c874c-c05f-4947-949a-573043fc575f.md",
@@ -10518,6 +10535,23 @@
     }
   ],
   "specs": [
+    {
+      "id": "20260415-linear-4ffb542b-28b2-4530-8630-b79357e306e2",
+      "title": "CO workflow: automate docs:freshness baseline upkeep and diff-local gating",
+      "relates_to": "tasks/tasks-linear-4ffb542b-28b2-4530-8630-b79357e306e2.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-15",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-4ffb542b-28b2-4530-8630-b79357e306e2.md",
+        "task": "tasks/tasks-linear-4ffb542b-28b2-4530-8630-b79357e306e2.md",
+        "agent_task": ".agent/task/linear-4ffb542b-28b2-4530-8630-b79357e306e2.md",
+        "docs": "docs/TECH_SPEC-linear-4ffb542b-28b2-4530-8630-b79357e306e2.md"
+      }
+    },
     {
       "id": "20260415-linear-237c874c-c05f-4947-949a-573043fc575f",
       "title": "CO: restore Apr 15 docs:freshness historical packet baseline",

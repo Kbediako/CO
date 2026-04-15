@@ -1,24 +1,24 @@
-name: Repo Stewardship Weekly
+name: Docs Truthfulness Maintenance
 
 on:
   schedule:
-    - cron: '30 9 * * 1'
+    - cron: '15 0 * * *'
   workflow_dispatch:
 
 concurrency:
-  group: repo-stewardship-weekly
+  group: docs-truthfulness-maintenance
   cancel-in-progress: false
 
 jobs:
-  repo-stewardship-weekly:
-    name: Repo Stewardship Weekly
+  docs-truthfulness-maintenance:
+    name: Docs Truthfulness Maintenance
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
     env:
-      MCP_RUNNER_TASK_ID: docs-truthfulness-weekly
-      REPORT_DIR: out/docs-truthfulness-weekly
+      MCP_RUNNER_TASK_ID: docs-truthfulness-maintenance
+      REPORT_DIR: out/docs-truthfulness-maintenance
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,11 +35,13 @@ jobs:
       - name: Validate front-door docs truth
         run: npm run docs:check
 
-      - name: Generate weekly docs drift and repo stewardship reports
+      - name: Generate docs freshness maintenance and repo stewardship reports
         run: |
-          npm run docs:freshness -- \
+          npm run docs:freshness:maintain -- \
             --warn \
-            --report "$REPORT_DIR/docs-freshness.json" \
+            --format json \
+            --freshness-report "$REPORT_DIR/docs-freshness.json" \
+            --report "$REPORT_DIR/docs-freshness-maintenance.json" \
             --summary-markdown "$REPORT_DIR/docs-freshness-summary.md"
           npm run repo:stewardship -- \
             --warn \
@@ -49,15 +51,17 @@ jobs:
       - name: Publish workflow summary
         run: |
           cat "$REPORT_DIR/docs-freshness-summary.md" >> "$GITHUB_STEP_SUMMARY"
+          node -e "const fs=require('fs'); const report=JSON.parse(fs.readFileSync(process.env.REPORT_DIR + '/docs-freshness-maintenance.json', 'utf8')); fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\n## Docs Freshness Maintenance Decision\n\n' + '- Decision: ' + report.freshness_decision + '\n' + '- Owner issue: ' + (report.owner_issue || 'none') + '\n' + '- Policy capacity: ' + report.policy_capacity_status.status + '\n' + '- Recommended action: ' + report.recommended_action + '\n');"
           printf '\n' >> "$GITHUB_STEP_SUMMARY"
           cat "$REPORT_DIR/repo-stewardship-summary.md" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload repo stewardship artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: repo-stewardship-weekly
+          name: docs-truthfulness-maintenance
           path: |
             ${{ env.REPORT_DIR }}/docs-freshness.json
+            ${{ env.REPORT_DIR }}/docs-freshness-maintenance.json
             ${{ env.REPORT_DIR }}/docs-freshness-summary.md
             ${{ env.REPORT_DIR }}/repo-stewardship.json
             ${{ env.REPORT_DIR }}/repo-stewardship-summary.md
