@@ -1,6 +1,43 @@
 {
   "items": [
     {
+      "id": "20260415-linear-9b1440f0-a3af-4863-8bb5-2f8ea78bd02d",
+      "title": "CO: reclaim Ready released-pending-reopen issues after blockers clear",
+      "relates_to": "tasks/tasks-linear-9b1440f0-a3af-4863-8bb5-2f8ea78bd02d.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-15",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-15",
+          "status": "succeeded",
+          "manifest": ".runs/linear-9b1440f0-a3af-4863-8bb5-2f8ea78bd02d-docs-review/cli/2026-04-15T15-33-50-178Z-e7664739/manifest.json",
+          "tech_spec": "tasks/specs/linear-9b1440f0-a3af-4863-8bb5-2f8ea78bd02d.md",
+          "checklists": [
+            "tasks/tasks-linear-9b1440f0-a3af-4863-8bb5-2f8ea78bd02d.md",
+            ".agent/task/linear-9b1440f0-a3af-4863-8bb5-2f8ea78bd02d.md",
+            "docs/TASKS.md"
+          ]
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-15",
+          "status": "succeeded",
+          "telemetry": ".runs/linear-9b1440f0-a3af-4863-8bb5-2f8ea78bd02d/cli/2026-04-15T15-14-04-331Z-0bebe30c/review/telemetry.json",
+          "review_outcome": "bounded-success"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-9b1440f0-a3af-4863-8bb5-2f8ea78bd02d.md",
+        "task": "tasks/tasks-linear-9b1440f0-a3af-4863-8bb5-2f8ea78bd02d.md",
+        "agent_task": ".agent/task/linear-9b1440f0-a3af-4863-8bb5-2f8ea78bd02d.md",
+        "docs": "docs/TECH_SPEC-linear-9b1440f0-a3af-4863-8bb5-2f8ea78bd02d.md"
+      }
+    },
+    {
       "id": "20260415-linear-aaa8be94-c82b-40a8-bb19-48343183790e",
       "title": "CO: Refactor docs-hygiene spark policy guard into parser-backed fixture harness",
       "relates_to": "tasks/tasks-linear-aaa8be94-c82b-40a8-bb19-48343183790e.md",
