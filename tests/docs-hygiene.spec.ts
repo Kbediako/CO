@@ -893,6 +893,7 @@ describe('docs hygiene tooling', () => {
         '',
         '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
         '- `explorer_fast` remains the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only.',
+        '- `explorer_fast` is limited to file/codebase search only.',
         ''
       ].join('\n'),
       'utf8'
@@ -939,6 +940,7 @@ describe('docs hygiene tooling', () => {
         '',
         '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
         '- `explorer_fast` remains the only explicit `gpt-5.3-codex-spark` exception for fast search/synthesis.',
+        '- The spark policy permits planning.',
         ''
       ].join('\n'),
       'utf8'
@@ -951,6 +953,13 @@ describe('docs hygiene tooling', () => {
         file: 'README.md',
         rule: 'spark-policy-overbroad',
         reference: 'line 4: spark role must be file/codebase search only'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 5: spark role must be file/codebase search only'
       })
     );
   });
@@ -992,11 +1001,51 @@ describe('docs hygiene tooling', () => {
         '- Planning or review should not use spark roles.',
         '- For planning, do not route to spark roles.',
         '- For review, do not choose the spark role.',
+        '- Do not use spark for planning, only use gpt-5.4.',
+        '- Do not use spark for planning and only use gpt-5.4.',
+        '- For planning, do not use spark because non-spark roles are limited.',
+        '- Do not use spark, limit planning to gpt-5.4.',
+        '- The spark policy must not permit planning.',
         '- For planning or review, do not use',
         '  `explorer_fast`.',
         '- Spark roles are file/codebase search only, but do not use spark for planning.',
         '- Spark roles are file/codebase search only, but planning should not use spark roles.',
         '- Use `explorer_fast` for file/codebase search without planning or review.',
+        '- For file/codebase search, `explorer_fast` is limited to search only.',
+        '- For codebase-search, spark roles are search-only.',
+        '1. For file/codebase search, spark roles are search-only.',
+        '- Only for file/codebase search, use explorer_fast.',
+        '- When choosing roles, for file/codebase search, use explorer_fast.',
+        '- Use `explorer_fast` and spark roles for file/codebase search only.',
+        '- Spark roles are file/codebase search only, and the spark policy should stay locked.',
+        '- Spark roles are file/codebase search only, and search-policy docs should stay locked.',
+        '- Spark roles are file/codebase search only and search-policy docs should stay locked.',
+        '- Spark policy scope',
+        '  lives in AGENTS.md.',
+        '- Spark policy scope lives in AGENTS.md.',
+        '- Spark policy scope lives in AGENTS.md, and spark roles remain file/codebase search only.',
+        '- Spark policy scope lives in docs/search-policy.md.',
+        '- Spark policy scope lives in AGENTS.md; docs should stay locked.',
+        '- Spark policy scope lives in AGENTS.md. Docs should stay locked.',
+        '- `explorer_fast` remains the only explicit exception, for file/codebase search only.',
+        '- _explorer_fast_, limited to file/codebase search, remains the only exception.',
+        '- Leave `explorer_fast` unset by default.',
+        '- Keep spark roles disabled unless a file/codebase search lane opts in.',
+        '- Keep spark roles disabled until file/codebase search lanes need them.',
+        '- `gpt-5.3-codex-spark` remains inactive by default.',
+        '- Spark roles are off by default.',
+        '- Spark roles are off by default, and docs should use gpt-5.4 terminology.',
+        '- Spark roles are off by default and not available for search lanes.',
+        '- Spark roles are off by default and are not available for search lanes.',
+        '- Spark roles are off by default and not intended for search lanes.',
+        '- Spark roles are off by default and not used for search lanes.',
+        '- Spark roles are off by default and may be used for file/codebase search.',
+        '- Spark roles are off by default, not globally enabled, but may be used for codebase search.',
+        '- Spark roles are off by default; enabled only for file/codebase search.',
+        '- Spark roles are off by default and may be used for file/codebase search, and `explorer_fast` remains inactive and can be used for file/codebase search.',
+        '- Spark roles are off by default and file/codebase search-only when enabled.',
+        '- Spark roles are file/codebase search only and can be used for file/codebase search lanes.',
+        '- Use `explorer_fast`, spark roles, and `gpt-5.3-codex-spark` for file/codebase search only.',
         ''
       ].join('\n'),
       'utf8'
@@ -1007,6 +1056,365 @@ describe('docs hygiene tooling', () => {
     expect(
       errors.find((error) => error.file === 'README.md' && error.rule === 'spark-policy-overbroad')
     ).toBeUndefined();
+  });
+
+  it('rejects disabled spark wording that resumes active unqualified use', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-spark-policy-disabled-active-use-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['model-posture']
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      [
+        '# Codex Orchestrator',
+        '',
+        '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
+        '- Spark roles are off by default and may be used for search.',
+        '- Keep spark roles disabled by default and use them for search lanes.',
+        '- `explorer_fast` remains inactive by default and can be used for search.',
+        '- Spark roles are off by default and only available for search.',
+        '- Spark roles remain disabled by default but are only for search lanes.',
+        '- Spark roles are off by default and search-only.',
+        '- Spark roles are off by default and search only.',
+        '- Spark roles remain inactive and only-search.',
+        '- Spark roles are disabled by default, search-only when enabled.',
+        '- Spark roles are off by default and may be used for file/codebase search, and `explorer_fast` remains inactive and can be used for search.',
+        '- Keep spark roles disabled unless a search lane opts in.',
+        '- Spark roles are off by default, not globally enabled, but may be used for search.',
+        '- Spark roles are off by default, not globally enabled, and may be used for search.',
+        '- Spark roles are off by default and are not used globally, but may be used for search lanes.',
+        '- Spark roles are off by default and should be selected for search lanes.',
+        '- Spark roles are off by default but may be used for image inputs.',
+        '- Spark roles are off by default and can be selected for visual tasks.',
+        '- Keep spark roles disabled until search lanes need them.',
+        '- Spark roles are off by default; enabled only for search.',
+        '- Spark roles are off by default and keep search lanes enabled.',
+        '- Spark roles are off by default and make search lanes available.',
+        '- Spark roles are off by default and leave search lanes enabled.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 4: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 5: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 6: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 7: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 8: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 9: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 10: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 11: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 12: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 13: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 14: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 15: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 16: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 17: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 18: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 19: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 20: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 21: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 22: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 23: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 24: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 25: spark role missing file/codebase search-only scope'
+      })
+    );
+  });
+
+  it('rejects spark policy noun wording that asserts unqualified scope or other work', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-spark-policy-noun-scope-assertions-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['model-posture']
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      [
+        '# Codex Orchestrator',
+        '',
+        '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
+        '- The spark policy must be search-only.',
+        '- The spark policy permits image inputs.',
+        '- The spark policy remains text-only.',
+        '- The spark policy should stay text-only.',
+        '- The spark policy',
+        '  permits planning.',
+        '- Spark policy scope lives in AGENTS.md, and spark roles should stay enabled.',
+        '- The spark policy should stay enabled.',
+        '- The spark policy must remain only for search lanes.',
+        '- Spark policy scope lives in AGENTS.md, and permits planning.',
+        '- Spark policy scope lives in AGENTS.md, and remains only for search lanes.',
+        '- Spark policy scope lives in AGENTS.md; permits planning.',
+        '- Spark policy scope lives in AGENTS.md; remains only for search lanes.',
+        '- Spark policy scope lives in AGENTS.md. It permits planning.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 4: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 5: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 6: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 7: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 8: spark role must be file/codebase search only'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 10: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 11: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 12: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 13: spark role must be file/codebase search only'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 14: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 15: spark role must be file/codebase search only'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 16: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 17: spark role must be file/codebase search only'
+      })
+    );
   });
 
   it('accepts non-spark redirect wording for planning and review', async () => {
@@ -1042,6 +1450,9 @@ describe('docs hygiene tooling', () => {
         '- Spark roles are file/codebase search only; use non-spark roles for planning or review.',
         '- Spark roles are file/codebase search only, but use non-spark roles for implementation.',
         '- For planning or review, use non-spark roles.',
+        '- Choose a non-spark role instead of `explorer_fast`.',
+        '- Prefer a non-spark role over `explorer_fast`.',
+        '- Select a non-spark model rather than `gpt-5.3-codex-spark`.',
         ''
       ].join('\n'),
       'utf8'
@@ -1321,6 +1732,44 @@ describe('docs hygiene tooling', () => {
         '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
         '- `explorer_fast` remains the only explicit `gpt-5.3-codex-spark` exception.',
         '- Keep `explorer_fast` on `gpt-5.3-codex-spark` without changing defaults.',
+        '- `explorer_fast` is limited to search.',
+        '- `explorer_fast` is limited to search; do not use it for planning.',
+        '- Do not use spark for planning; `explorer_fast` is limited to search.',
+        '- Do not use spark for planning, and `explorer_fast` is limited to search.',
+        '- Do not use spark for planning, and `explorer_fast`, limited to search, remains the only spark exception.',
+        '- Do not use spark for planning, and the `explorer_fast` role, limited to search, remains the only spark exception.',
+        '- Confining `explorer_fast` to search keeps it narrow.',
+        '- Spark roles are file/codebase search only; `explorer_fast` is limited to search.',
+        '- `explorer_fast` is limited to search and spark roles are file/codebase search only.',
+        '- Spark roles are file/codebase search only; `explorer_fast` is search only.',
+        '- Spark roles are file/codebase search only; `explorer_fast` is only search.',
+        '- Spark roles are file/codebase search only and `explorer_fast` is limited to search.',
+        '- Spark roles are file/codebase search only and `explorer_fast` is search-only.',
+        '- Spark roles are file/codebase search only and `explorer_fast` is only-search.',
+        '- Spark roles are file/codebase search only or `explorer_fast` is search-only.',
+        '- Spark roles are file/codebase search only and `explorer_fast` remains the only explicit exception.',
+        '- Do not use spark for planning and keep `explorer_fast` limited to search.',
+        '- Spark roles are file/codebase search only and use `explorer_fast` for search.',
+        '- Spark roles are file/codebase search only and using `explorer_fast` for search.',
+        '- Spark roles are file/codebase search only and may use `explorer_fast` for search.',
+        '- Spark roles are file/codebase search only and allow `explorer_fast` for search.',
+        '- Spark roles are file/codebase search only and permit `explorer_fast` for search.',
+        '- Spark roles are file/codebase search only and limit `explorer_fast` to search.',
+        '- Spark roles are file/codebase search only and restrict `explorer_fast` to search.',
+        '- Spark roles are file/codebase search only and confine `explorer_fast` to search.',
+        '- Spark roles are file/codebase search only and _explorer_fast_, limited to search, remains the exception.',
+        '- Use `explorer_fast`, spark roles, and `gpt-5.3-codex-spark` for search only.',
+        '- Spark roles are file/codebase search only and can be used for search lanes.',
+        '- Spark roles are file/codebase search only and should be used for search lanes.',
+        '- Spark roles are file/codebase search only and may be used for search.',
+        '- Spark roles are file/codebase search only, and may be used for search.',
+        '- Spark roles may be used for search and are file/codebase search only.',
+        '- Spark roles may be used for search lanes and are file/codebase search only.',
+        '- Spark roles are search-only and file/codebase search only.',
+        '- Spark roles are file/codebase search only and may be used for image inputs.',
+        '- Spark roles are file/codebase search only and can be selected for visual tasks.',
+        '- Spark roles are file/codebase search only, and they remain only for search lanes.',
+        '- Spark roles are file/codebase search only, and they stay only for search lanes.',
         ''
       ].join('\n'),
       'utf8'
@@ -1340,6 +1789,272 @@ describe('docs hygiene tooling', () => {
         file: 'README.md',
         rule: 'spark-policy-overbroad',
         reference: 'line 5: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 6: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 7: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 8: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 9: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 10: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 11: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 12: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 13: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 14: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 15: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 16: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 17: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 18: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 19: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 20: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 21: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 22: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 23: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 24: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 25: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 26: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 27: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 28: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 29: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 30: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 31: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 32: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 33: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 34: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 35: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 36: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 37: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 38: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 39: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 40: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 41: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 42: spark role missing file/codebase search-only scope'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'spark-policy-overbroad',
+        reference: 'line 43: spark role missing file/codebase search-only scope'
       })
     );
   });
