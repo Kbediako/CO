@@ -1,0 +1,1356 @@
+{
+  "schema_version": 1,
+  "issue": "CO-191",
+  "purpose": "Table-driven docs-hygiene fixture cases for the explorer_fast spark-policy exception classifier.",
+  "source_context": {
+    "derived_from": [
+      "tests/docs-hygiene.spec.ts",
+      "docs/guides/codex-version-policy.md",
+      "AGENTS.md"
+    ],
+    "parent_recovery_note": "Recreated under parent ownership after stale child-lane claim invalidated the initial fixture patch."
+  },
+  "policy": {
+    "truth_check": "model-posture",
+    "current_model": "gpt-5.4",
+    "spark_exception_role": "explorer_fast",
+    "spark_exception_model": "gpt-5.3-codex-spark",
+    "required_scope": "file/codebase search only"
+  },
+  "cases": [
+    {
+      "id": "current-split-explorer-fast-exception",
+      "title": "Accept a current split explorer_fast exception line alongside the current primary posture line",
+      "category": "allowed_current_exception",
+      "source_test_name": "accepts a current split explorer_fast exception line alongside the current primary posture line",
+      "document_path": "README.md",
+      "doc_class": "front_door",
+      "truth_checks": [
+        "model-posture"
+      ],
+      "content_lines": [
+        "# Codex Orchestrator",
+        "",
+        "- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.",
+        "- `explorer_fast` remains the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only.",
+        "- `explorer_fast` is limited to file/codebase search only.",
+        ""
+      ],
+      "expected": {
+        "passes": true,
+        "spark_policy_violations": [],
+        "docs_check_errors": []
+      }
+    },
+    {
+      "id": "overbroad-search-synthesis-and-planning",
+      "title": "Reject overbroad spark role wording in posture-checked docs",
+      "category": "forbidden_overbroad_usage",
+      "source_test_name": "rejects overbroad spark role wording in posture-checked docs",
+      "document_path": "README.md",
+      "doc_class": "front_door",
+      "truth_checks": [
+        "model-posture"
+      ],
+      "content_lines": [
+        "# Codex Orchestrator",
+        "",
+        "- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.",
+        "- `explorer_fast` remains the only explicit `gpt-5.3-codex-spark` exception for fast search/synthesis.",
+        "- The spark policy permits planning.",
+        ""
+      ],
+      "expected": {
+        "passes": false,
+        "spark_policy_violations": [
+          {
+            "line": 4,
+            "reason": "spark role must be file/codebase search only"
+          },
+          {
+            "line": 5,
+            "reason": "spark role must be file/codebase search only"
+          }
+        ],
+        "docs_check_errors": [
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 4: spark role must be file/codebase search only"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 5: spark role must be file/codebase search only"
+          }
+        ]
+      }
+    },
+    {
+      "id": "restrictive-non-use-wording",
+      "title": "Accept restrictive non-use wording for spark planning and review",
+      "category": "allowed_restrictive_non_use",
+      "source_test_name": "accepts restrictive non-use wording for spark planning and review",
+      "document_path": "README.md",
+      "doc_class": "front_door",
+      "truth_checks": [
+        "model-posture"
+      ],
+      "content_lines": [
+        "# Codex Orchestrator",
+        "",
+        "- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.",
+        "- `explorer_fast` remains the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only; do not use it for planning or review.",
+        "- For planning or review, do not use spark roles.",
+        "- For planning or review, do not use `explorer_fast`.",
+        "- For planning or review, do not use `gpt-5.3-codex-spark`.",
+        "- Planning or review should not use spark roles.",
+        "- For planning, do not route to spark roles.",
+        "- For review, do not choose the spark role.",
+        "- Do not use spark for planning, only use gpt-5.4.",
+        "- Do not use spark for planning and only use gpt-5.4.",
+        "- For planning, do not use spark because non-spark roles are limited.",
+        "- Do not use spark, limit planning to gpt-5.4.",
+        "- The spark policy must not permit planning.",
+        "- For planning or review, do not use",
+        "  `explorer_fast`.",
+        "- Spark roles are file/codebase search only, but do not use spark for planning.",
+        "- Spark roles are file/codebase search only, but planning should not use spark roles.",
+        "- Use `explorer_fast` for file/codebase search without planning or review.",
+        "- For file/codebase search, `explorer_fast` is limited to search only.",
+        "- For codebase-search, spark roles are search-only.",
+        "1. For file/codebase search, spark roles are search-only.",
+        "- Only for file/codebase search, use explorer_fast.",
+        "- When choosing roles, for file/codebase search, use explorer_fast.",
+        "- Use `explorer_fast` and spark roles for file/codebase search only.",
+        "- Spark roles are file/codebase search only, and the spark policy should stay locked.",
+        "- Spark roles are file/codebase search only, and search-policy docs should stay locked.",
+        "- Spark roles are file/codebase search only and search-policy docs should stay locked.",
+        "- Spark policy scope",
+        "  lives in AGENTS.md.",
+        "- Spark policy scope lives in AGENTS.md.",
+        "- Spark policy scope lives in AGENTS.md, and spark roles remain file/codebase search only.",
+        "- Spark policy scope lives in docs/search-policy.md.",
+        "- Spark policy scope lives in AGENTS.md; docs should stay locked.",
+        "- Spark policy scope lives in AGENTS.md. Docs should stay locked.",
+        "- Spark policy review notes were updated.",
+        "- Spark support docs were updated.",
+        "- Spark role support notes live in AGENTS.md.",
+        "- Spark roles support notes live in AGENTS.md.",
+        "- `explorer_fast` support docs were updated.",
+        "- `gpt-5.3-codex-spark` support docs were updated.",
+        "- `explorer_fast` remains the only explicit exception, for file/codebase search only.",
+        "- _explorer_fast_, limited to file/codebase search, remains the only exception.",
+        "- Leave `explorer_fast` unset by default.",
+        "- Keep spark roles disabled unless a file/codebase search lane opts in.",
+        "- Keep spark roles disabled until file/codebase search lanes need them.",
+        "- `gpt-5.3-codex-spark` remains inactive by default.",
+        "- Spark roles are off by default.",
+        "- Spark roles are off by default, and docs should use gpt-5.4 terminology.",
+        "- Spark roles are off by default and not available for search lanes.",
+        "- Spark roles are off by default and are not available for search lanes.",
+        "- Spark roles are off by default and not intended for search lanes.",
+        "- Spark roles are off by default and not used for search lanes.",
+        "- Spark roles are off by default and may be used for file/codebase search.",
+        "- Spark roles are off by default, not globally enabled, but may be used for codebase search.",
+        "- Spark roles are off by default; enabled only for file/codebase search.",
+        "- Spark roles are off by default and may be used for file/codebase search, and `explorer_fast` remains inactive and can be used for file/codebase search.",
+        "- Spark roles are off by default and file/codebase search-only when enabled.",
+        "- Spark roles are file/codebase search only and can be used for file/codebase search lanes.",
+        "- Use `explorer_fast`, spark roles, and `gpt-5.3-codex-spark` for file/codebase search only.",
+        "- `explorer_fast` can help with file/codebase search debugging.",
+        "- For file/codebase search diagnostics, spark roles can assist.",
+        "- `gpt-5.3-codex-spark` is useful for codebase-search troubleshooting.",
+        ""
+      ],
+      "expected": {
+        "passes": true,
+        "spark_policy_violations": [],
+        "docs_check_errors": []
+      }
+    },
+    {
+      "id": "generic-capability-without-file-codebase-scope",
+      "title": "Reject generic spark capability wording without file/codebase search scope",
+      "category": "forbidden_missing_file_codebase_scope",
+      "source_test_name": "rejects generic spark capability wording without file/codebase search scope",
+      "document_path": "README.md",
+      "doc_class": "front_door",
+      "truth_checks": [
+        "model-posture"
+      ],
+      "content_lines": [
+        "# Codex Orchestrator",
+        "",
+        "- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.",
+        "- `explorer_fast` can help with debugging.",
+        "- Spark roles can assist with diagnostics.",
+        "- `gpt-5.3-codex-spark` is helpful for incident triage.",
+        "- Spark roles are useful for repository troubleshooting.",
+        "- For debugging, spark roles can help quickly.",
+        ""
+      ],
+      "expected": {
+        "passes": false,
+        "spark_policy_violations": [
+          {
+            "line": 4,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 5,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 6,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 7,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 8,
+            "reason": "spark role missing file/codebase search-only scope"
+          }
+        ],
+        "docs_check_errors": [
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 4: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 5: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 6: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 7: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 8: spark role missing file/codebase search-only scope"
+          }
+        ]
+      }
+    },
+    {
+      "id": "disabled-wording-resumes-unqualified-use",
+      "title": "Reject disabled spark wording that resumes active unqualified use",
+      "category": "forbidden_disabled_resumed_use",
+      "source_test_name": "rejects disabled spark wording that resumes active unqualified use",
+      "document_path": "README.md",
+      "doc_class": "front_door",
+      "truth_checks": [
+        "model-posture"
+      ],
+      "content_lines": [
+        "# Codex Orchestrator",
+        "",
+        "- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.",
+        "- Spark roles are off by default and may be used for search.",
+        "- Keep spark roles disabled by default and use them for search lanes.",
+        "- `explorer_fast` remains inactive by default and can be used for search.",
+        "- Spark roles are off by default and only available for search.",
+        "- Spark roles remain disabled by default but are only for search lanes.",
+        "- Spark roles are off by default and search-only.",
+        "- Spark roles are off by default and search only.",
+        "- Spark roles remain inactive and only-search.",
+        "- Spark roles are disabled by default, search-only when enabled.",
+        "- Spark roles are off by default and may be used for file/codebase search, and `explorer_fast` remains inactive and can be used for search.",
+        "- Keep spark roles disabled unless a search lane opts in.",
+        "- Spark roles are off by default, not globally enabled, but may be used for search.",
+        "- Spark roles are off by default, not globally enabled, and may be used for search.",
+        "- Spark roles are off by default and are not used globally, but may be used for search lanes.",
+        "- Spark roles are off by default and should be selected for search lanes.",
+        "- Spark roles are off by default but may be used for image inputs.",
+        "- Spark roles are off by default and can be selected for visual tasks.",
+        "- Keep spark roles disabled until search lanes need them.",
+        "- Spark roles are off by default; enabled only for search.",
+        "- Spark roles are off by default and keep search lanes enabled.",
+        "- Spark roles are off by default and make search lanes available.",
+        "- Spark roles are off by default and leave search lanes enabled.",
+        "- Spark roles support image inputs.",
+        "- Spark roles support documentation generation.",
+        "- Spark roles support image inputs for file/codebase search.",
+        "- Spark roles support image generation.",
+        "- Spark roles support visual analysis.",
+        ""
+      ],
+      "expected": {
+        "passes": false,
+        "spark_policy_violations": [
+          {
+            "line": 4,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 5,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 6,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 7,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 8,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 9,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 10,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 11,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 12,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 13,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 14,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 15,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 16,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 17,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 18,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 19,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 20,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 21,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 22,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 23,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 24,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 25,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 26,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 27,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 28,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 29,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 30,
+            "reason": "spark role missing file/codebase search-only scope"
+          }
+        ],
+        "docs_check_errors": [
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 4: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 5: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 6: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 7: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 8: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 9: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 10: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 11: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 12: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 13: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 14: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 15: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 16: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 17: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 18: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 19: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 20: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 21: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 22: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 23: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 24: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 25: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 26: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 27: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 28: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 29: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 30: spark role missing file/codebase search-only scope"
+          }
+        ]
+      }
+    },
+    {
+      "id": "spark-policy-noun-unqualified-scope",
+      "title": "Reject spark policy noun wording that asserts unqualified scope or other work",
+      "category": "forbidden_policy_noun_assertion",
+      "source_test_name": "rejects spark policy noun wording that asserts unqualified scope or other work",
+      "document_path": "README.md",
+      "doc_class": "front_door",
+      "truth_checks": [
+        "model-posture"
+      ],
+      "content_lines": [
+        "# Codex Orchestrator",
+        "",
+        "- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.",
+        "- The spark policy must be search-only.",
+        "- The spark policy permits image inputs.",
+        "- The spark policy remains text-only.",
+        "- The spark policy should stay text-only.",
+        "- The spark policy",
+        "  permits planning.",
+        "- Spark policy scope lives in AGENTS.md, and spark roles should stay enabled.",
+        "- The spark policy should stay enabled.",
+        "- The spark policy must remain only for search lanes.",
+        "- Spark policy scope lives in AGENTS.md, and permits planning.",
+        "- Spark policy scope lives in AGENTS.md, and remains only for search lanes.",
+        "- Spark policy scope lives in AGENTS.md; permits planning.",
+        "- Spark policy scope lives in AGENTS.md; remains only for search lanes.",
+        "- Spark policy scope lives in AGENTS.md. It permits planning.",
+        ""
+      ],
+      "expected": {
+        "passes": false,
+        "spark_policy_violations": [
+          {
+            "line": 4,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 5,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 6,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 7,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 8,
+            "reason": "spark role must be file/codebase search only"
+          },
+          {
+            "line": 10,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 11,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 12,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 13,
+            "reason": "spark role must be file/codebase search only"
+          },
+          {
+            "line": 14,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 15,
+            "reason": "spark role must be file/codebase search only"
+          },
+          {
+            "line": 16,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 17,
+            "reason": "spark role must be file/codebase search only"
+          }
+        ],
+        "docs_check_errors": [
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 4: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 5: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 6: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 7: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 8: spark role must be file/codebase search only"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 10: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 11: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 12: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 13: spark role must be file/codebase search only"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 14: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 15: spark role must be file/codebase search only"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 16: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 17: spark role must be file/codebase search only"
+          }
+        ]
+      }
+    },
+    {
+      "id": "non-spark-redirect-for-planning-review",
+      "title": "Accept non-spark redirect wording for planning and review",
+      "category": "allowed_non_spark_redirect",
+      "source_test_name": "accepts non-spark redirect wording for planning and review",
+      "document_path": "README.md",
+      "doc_class": "front_door",
+      "truth_checks": [
+        "model-posture"
+      ],
+      "content_lines": [
+        "# Codex Orchestrator",
+        "",
+        "- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.",
+        "- Spark roles are file/codebase search only; use non-spark roles for planning or review.",
+        "- Spark roles are file/codebase search only, but use non-spark roles for implementation.",
+        "- For planning or review, use non-spark roles.",
+        "- Choose a non-spark role instead of `explorer_fast`.",
+        "- Prefer a non-spark role over `explorer_fast`.",
+        "- Select a non-spark model rather than `gpt-5.3-codex-spark`.",
+        ""
+      ],
+      "expected": {
+        "passes": true,
+        "spark_policy_violations": [],
+        "docs_check_errors": []
+      }
+    },
+    {
+      "id": "plain-and-restrictive-spark-references",
+      "title": "Accept plain and restrictive spark references without requiring a repeated scope phrase",
+      "category": "allowed_neutral_reference",
+      "source_test_name": "accepts plain and restrictive spark references without requiring a repeated scope phrase",
+      "document_path": "README.md",
+      "doc_class": "front_door",
+      "truth_checks": [
+        "model-posture"
+      ],
+      "content_lines": [
+        "# Codex Orchestrator",
+        "",
+        "- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.",
+        "- Reference note: `gpt-5.3-codex-spark` compatibility can change.",
+        "- Do not use spark for planning or review.",
+        ""
+      ],
+      "expected": {
+        "passes": true,
+        "spark_policy_violations": [],
+        "docs_check_errors": []
+      }
+    },
+    {
+      "id": "non-restrictive-negation-planning-usage",
+      "title": "Reject non-restrictive negation for spark planning usage",
+      "category": "forbidden_non_restrictive_negation",
+      "source_test_name": "rejects non-restrictive negation for spark planning usage",
+      "document_path": "README.md",
+      "doc_class": "front_door",
+      "truth_checks": [
+        "model-posture"
+      ],
+      "content_lines": [
+        "# Codex Orchestrator",
+        "",
+        "- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.",
+        "- `explorer_fast` is not limited to file/codebase search and can help with planning.",
+        "- Spark roles can help with planning, but do not use spark for images.",
+        "- Spark roles can help with review, do not use spark for images.",
+        "- For planning, spark roles can help, do not use spark for images.",
+        "- Do not use spark for images, but spark roles can help with planning.",
+        "- Use non-spark roles for images, but spark roles can help with review.",
+        ""
+      ],
+      "expected": {
+        "passes": false,
+        "spark_policy_violations": [
+          {
+            "line": 4,
+            "reason": "spark role must be file/codebase search only"
+          },
+          {
+            "line": 5,
+            "reason": "spark role must be file/codebase search only"
+          },
+          {
+            "line": 6,
+            "reason": "spark role must be file/codebase search only"
+          },
+          {
+            "line": 7,
+            "reason": "spark role must be file/codebase search only"
+          },
+          {
+            "line": 8,
+            "reason": "spark role must be file/codebase search only"
+          },
+          {
+            "line": 9,
+            "reason": "spark role must be file/codebase search only"
+          }
+        ],
+        "docs_check_errors": [
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 4: spark role must be file/codebase search only"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 5: spark role must be file/codebase search only"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 6: spark role must be file/codebase search only"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 7: spark role must be file/codebase search only"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 8: spark role must be file/codebase search only"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 9: spark role must be file/codebase search only"
+          }
+        ]
+      }
+    },
+    {
+      "id": "wrapped-markdown-policy-violations",
+      "title": "Reject wrapped markdown spark role policy violations",
+      "category": "forbidden_wrapped_markdown",
+      "source_test_name": "rejects wrapped markdown spark role policy violations",
+      "document_path": "README.md",
+      "doc_class": "front_door",
+      "truth_checks": [
+        "model-posture"
+      ],
+      "content_lines": [
+        "# Codex Orchestrator",
+        "",
+        "- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.",
+        "- `explorer_fast` remains the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only,",
+        "  but can help with planning.",
+        "- For planning or review, use",
+        "  `explorer_fast` for file/codebase search only.",
+        ""
+      ],
+      "expected": {
+        "passes": false,
+        "spark_policy_violations": [
+          {
+            "line": 4,
+            "reason": "spark role must be file/codebase search only"
+          },
+          {
+            "line": 7,
+            "reason": "spark role must be file/codebase search only"
+          }
+        ],
+        "docs_check_errors": [
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 4: spark role must be file/codebase search only"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 7: spark role must be file/codebase search only"
+          }
+        ]
+      }
+    },
+    {
+      "id": "negated-file-codebase-search-scope",
+      "title": "Reject negated file search-only scope for spark roles",
+      "category": "forbidden_negated_scope",
+      "source_test_name": "rejects negated file search-only scope for spark roles",
+      "document_path": "README.md",
+      "doc_class": "front_door",
+      "truth_checks": [
+        "model-posture"
+      ],
+      "content_lines": [
+        "# Codex Orchestrator",
+        "",
+        "- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.",
+        "- `explorer_fast` is not limited to file/codebase search.",
+        ""
+      ],
+      "expected": {
+        "passes": false,
+        "spark_policy_violations": [
+          {
+            "line": 4,
+            "reason": "spark role must be file/codebase search only"
+          }
+        ],
+        "docs_check_errors": [
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 4: spark role must be file/codebase search only"
+          }
+        ]
+      }
+    },
+    {
+      "id": "missing-file-codebase-search-scope",
+      "title": "Require spark role lines to name file or codebase search scope",
+      "category": "forbidden_missing_file_codebase_scope",
+      "source_test_name": "requires spark role lines to name file or codebase search scope",
+      "document_path": "README.md",
+      "doc_class": "front_door",
+      "truth_checks": [
+        "model-posture"
+      ],
+      "content_lines": [
+        "# Codex Orchestrator",
+        "",
+        "- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.",
+        "- `explorer_fast` remains the only explicit `gpt-5.3-codex-spark` exception.",
+        "- Keep `explorer_fast` on `gpt-5.3-codex-spark` without changing defaults.",
+        "- `explorer_fast` is limited to search.",
+        "- `explorer_fast` is limited to search; do not use it for planning.",
+        "- Do not use spark for planning; `explorer_fast` is limited to search.",
+        "- Do not use spark for planning, and `explorer_fast` is limited to search.",
+        "- Do not use spark for planning, and `explorer_fast`, limited to search, remains the only spark exception.",
+        "- Do not use spark for planning, and the `explorer_fast` role, limited to search, remains the only spark exception.",
+        "- Confining `explorer_fast` to search keeps it narrow.",
+        "- Spark roles are file/codebase search only; `explorer_fast` is limited to search.",
+        "- `explorer_fast` is limited to search and spark roles are file/codebase search only.",
+        "- Spark roles are file/codebase search only; `explorer_fast` is search only.",
+        "- Spark roles are file/codebase search only; `explorer_fast` is only search.",
+        "- Spark roles are file/codebase search only and `explorer_fast` is limited to search.",
+        "- Spark roles are file/codebase search only and `explorer_fast` is search-only.",
+        "- Spark roles are file/codebase search only and `explorer_fast` is only-search.",
+        "- Spark roles are file/codebase search only or `explorer_fast` is search-only.",
+        "- Spark roles are file/codebase search only and `explorer_fast` remains the only explicit exception.",
+        "- Do not use spark for planning and keep `explorer_fast` limited to search.",
+        "- Spark roles are file/codebase search only and use `explorer_fast` for search.",
+        "- Spark roles are file/codebase search only and using `explorer_fast` for search.",
+        "- Spark roles are file/codebase search only and may use `explorer_fast` for search.",
+        "- Spark roles are file/codebase search only and allow `explorer_fast` for search.",
+        "- Spark roles are file/codebase search only and permit `explorer_fast` for search.",
+        "- Spark roles are file/codebase search only and limit `explorer_fast` to search.",
+        "- Spark roles are file/codebase search only and restrict `explorer_fast` to search.",
+        "- Spark roles are file/codebase search only and confine `explorer_fast` to search.",
+        "- Spark roles are file/codebase search only and _explorer_fast_, limited to search, remains the exception.",
+        "- Use `explorer_fast`, spark roles, and `gpt-5.3-codex-spark` for search only.",
+        "- Spark roles are file/codebase search only and can be used for search lanes.",
+        "- Spark roles are file/codebase search only and should be used for search lanes.",
+        "- Spark roles are file/codebase search only and may be used for search.",
+        "- Spark roles are file/codebase search only, and may be used for search.",
+        "- Spark roles may be used for search and are file/codebase search only.",
+        "- Spark roles may be used for search lanes and are file/codebase search only.",
+        "- Spark roles are search-only and file/codebase search only.",
+        "- Spark roles are file/codebase search only and may be used for image inputs.",
+        "- Spark roles are file/codebase search only and can be selected for visual tasks.",
+        "- Spark roles are file/codebase search only and support image generation.",
+        "- Spark roles are file/codebase search only and support visual analysis.",
+        "- Spark roles are file/codebase search only, and they remain only for search lanes.",
+        "- Spark roles are file/codebase search only, and they stay only for search lanes.",
+        ""
+      ],
+      "expected": {
+        "passes": false,
+        "spark_policy_violations": [
+          {
+            "line": 4,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 5,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 6,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 7,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 8,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 9,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 10,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 11,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 12,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 13,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 14,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 15,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 16,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 17,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 18,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 19,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 20,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 21,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 22,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 23,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 24,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 25,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 26,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 27,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 28,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 29,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 30,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 31,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 32,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 33,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 34,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 35,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 36,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 37,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 38,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 39,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 40,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 41,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 42,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 43,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 44,
+            "reason": "spark role missing file/codebase search-only scope"
+          },
+          {
+            "line": 45,
+            "reason": "spark role missing file/codebase search-only scope"
+          }
+        ],
+        "docs_check_errors": [
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 4: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 5: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 6: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 7: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 8: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 9: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 10: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 11: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 12: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 13: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 14: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 15: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 16: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 17: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 18: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 19: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 20: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 21: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 22: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 23: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 24: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 25: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 26: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 27: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 28: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 29: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 30: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 31: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 32: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 33: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 34: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 35: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 36: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 37: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 38: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 39: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 40: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 41: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 42: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 43: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 44: spark role missing file/codebase search-only scope"
+          },
+          {
+            "file": "README.md",
+            "rule": "spark-policy-overbroad",
+            "reference": "line 45: spark role missing file/codebase search-only scope"
+          }
+        ]
+      }
+    }
+  ]
+}
