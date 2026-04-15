@@ -6,7 +6,7 @@ This guide is the downstream-safe setup path shipped in the npm package.
 
 - Once per machine: install Codex CLI, authenticate, install bundled skills, and register delegation or DevTools wiring.
 - Once per repo: seed the CO templates, review the generated config, and start using task-scoped runs.
-- CO currently targets Codex CLI `0.118.0`.
+- CO currently targets Codex CLI `0.118.0`; newer candidates stay evidence-gated in the version policy.
 
 ## Once per machine
 

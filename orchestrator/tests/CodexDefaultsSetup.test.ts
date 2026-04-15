@@ -132,6 +132,8 @@ describe('runCodexDefaultsSetup', () => {
       expect(parsed.agents?.extra_agent_key).toBe('keep');
 
       const awaiterRole = parsed.agents?.awaiter as Record<string, unknown> | undefined;
+      const explorerFastRole = parsed.agents?.explorer_fast as Record<string, unknown> | undefined;
+      expect(explorerFastRole?.description).toBe('Fast explorer (spark file/codebase search only).');
       expect(awaiterRole?.config_file).toBe('./agents/awaiter-high.toml');
       expect(awaiterRole?.custom).toBe('still-here');
       expect(await readFile(explorerPath, 'utf8')).toBe('MARKER\n');

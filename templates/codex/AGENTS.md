@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp ce3949f764d687016664cf66a2b3e9d65f76f34444be7c177b655b0ab0f1d360 -->
+<!-- codex:instruction-stamp 4690eb4deade8ef1073478ddb7662a24be5f6dce4a1666f6893f62f86b59a7ea -->
 # Agent Instructions (Template)
 
 ## Orchestrator-first workflow
@@ -56,12 +56,12 @@
 - For symbolic collab runs, prefix spawned prompts with `[agent_type:<role>]` on line one so role intent is auditable from JSONL/manifests.
 - Current CO compatibility/adoption target is stable Codex CLI `0.118.0`.
 - Current `0.118.0` posture re-audit confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, and `codex review --help` exposing `[PROMPT]` alongside scoped review flags.
-- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.3-codex-spark`.
+- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
 - Keep top-level defaults on the current CO target by setting `model = "gpt-5.4"` in `~/.codex/config.toml`.
 - Under ChatGPT auth, keep delegated subagent and review surfaces on `gpt-5.4` unless a fresh provider lane explicitly validates `gpt-5.4-codex`.
 - Set `model_reasoning_effort` to at least `high` (CO default: `xhigh`) so spawned agents inherit high reasoning unless role overrides change it.
-- Built-in `explorer` inherits top-level model defaults unless you attach a `config_file`; keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception.
-- Spark caveat: `gpt-5.3-codex-spark` is text-only.
+- Built-in `explorer` inherits top-level model defaults unless you attach a `config_file`; keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only.
+- Spark caveat: `gpt-5.3-codex-spark` is file/codebase search only.
 - Keep RLM/collab built-ins-first by default; add custom specialist roles only when there is measured value, clear ownership, and validation evidence.
 - Use `[agents] max_threads = 12` as the seeded baseline. Keep explicit `max_depth = 4` only when your local Codex parser accepts it, and treat `max_spawn_depth` as a legacy local override rather than current baseline guidance; preserve any intentional constrained caps instead of resetting them.
 - Keep fallback usage explicit and rare: `8/2` for constrained/high-risk lanes, legacy `6/1/1` only as break-glass when an older parser/runtime still consumes spawn-depth caps.

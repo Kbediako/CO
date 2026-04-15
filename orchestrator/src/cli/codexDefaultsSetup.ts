@@ -35,7 +35,7 @@ interface RoleDefinition {
 const ROLE_DEFINITIONS: readonly RoleDefinition[] = [
   {
     key: 'explorer_fast',
-    description: 'Fast explorer (spark text-only).',
+    description: 'Fast explorer (spark file/codebase search only).',
     fileName: 'explorer-fast.toml',
     configFile: './agents/explorer-fast.toml',
     templatePath: join('templates', 'codex', '.codex', 'agents', 'explorer-fast.toml')

@@ -130,7 +130,7 @@ For runner + delegation coordination (short `--task` flow), see `docs/delegation
   - `model_reasoning_effort = "xhigh"`
   - `[agents] max_threads = 12` is the seeded baseline; keep explicit `max_depth = 4` only when your local Codex parser accepts it, and treat `max_spawn_depth` as a legacy local override rather than current baseline guidance
   - Leave `[agents.explorer]` undefined unless you intentionally want to override built-in explorer behavior
-  - Optional `[agents.explorer_fast]` -> `~/.codex/agents/explorer-fast.toml` (`gpt-5.3-codex-spark`, text-only, only explicit exception)
+  - Optional `[agents.explorer_fast]` -> `~/.codex/agents/explorer-fast.toml` (`gpt-5.3-codex-spark`, file/codebase search only)
   - Optional `[agents.awaiter]` override -> `~/.codex/agents/awaiter-high.toml` when you want awaiter at `gpt-5.4` + `high` while preserving awaiter instructions
   - `[agents.worker_complex]` -> `~/.codex/agents/worker-complex.toml` (`gpt-5.4`, `xhigh`)
 - Keep delegated subagent and review surfaces on `gpt-5.4` under ChatGPT auth unless a fresh provider lane explicitly validates `gpt-5.4-codex`.

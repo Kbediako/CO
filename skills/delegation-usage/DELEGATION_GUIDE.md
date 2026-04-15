@@ -162,7 +162,7 @@ Current `0.118.0` local help also confirms that:
   - `model_reasoning_effort = "xhigh"`
   - `[agents] max_threads = 12` is the seeded baseline; keep explicit `max_depth = 4` only when your local Codex parser accepts it, and treat `max_spawn_depth` as a legacy local override rather than current baseline guidance
   - Leave `[agents.explorer]` undefined unless you intentionally want to override built-in explorer behavior.
-  - Add optional `[agents.explorer_fast]` for `gpt-5.3-codex-spark` (text-only; the only explicit exception).
+  - Add optional `[agents.explorer_fast]` for `gpt-5.3-codex-spark` (file/codebase search only).
   - Add optional `[agents.awaiter]` override for `gpt-5.4` + `high` while preserving awaiter instructions.
   - Add `[agents.worker_complex]` for high-risk edits (`gpt-5.4`, `xhigh`).
   - Keep delegated subagent and review surfaces on `gpt-5.4` under ChatGPT auth unless a fresh provider lane explicitly validates `gpt-5.4-codex`.

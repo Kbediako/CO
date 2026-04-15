@@ -35,6 +35,23 @@
       }
     },
     {
+      "id": "20260414-linear-df69fabe-63c2-4b98-a226-9c37892b4f9d",
+      "title": "CO: Expand Codex CLI 0.120 adoption and make spark file-search-only",
+      "relates_to": "tasks/tasks-linear-df69fabe-63c2-4b98-a226-9c37892b4f9d.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-14",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-df69fabe-63c2-4b98-a226-9c37892b4f9d.md",
+        "task": "tasks/tasks-linear-df69fabe-63c2-4b98-a226-9c37892b4f9d.md",
+        "agent_task": ".agent/task/linear-df69fabe-63c2-4b98-a226-9c37892b4f9d.md",
+        "docs": "docs/TECH_SPEC-linear-df69fabe-63c2-4b98-a226-9c37892b4f9d.md"
+      }
+    },
+    {
       "id": "20260415-linear-6c2a6f36-7852-4535-9914-e0042b082c95",
       "title": "CO STATUS: rehydrate live provider workers before releasing active claims",
       "relates_to": "tasks/tasks-linear-6c2a6f36-7852-4535-9914-e0042b082c95.md",

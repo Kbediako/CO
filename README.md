@@ -88,7 +88,7 @@ Bundled skills:
 
 - Current Codex CLI target: `0.118.0`
 - Current model posture: `gpt-5.4`
-- `explorer_fast` remains the explicit `gpt-5.3-codex-spark` exception
+- `explorer_fast` remains the explicit `gpt-5.3-codex-spark` file/codebase search-only exception
 - Local default runtime: `appserver`
 - `executionMode=cloud` with explicit `runtimeMode=appserver` remains unsupported
 
