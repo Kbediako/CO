@@ -1367,33 +1367,48 @@ export function createProviderIssueHandoffService(
     ...buildTrackedIssueMergeCloseoutResetFields(claim, trackedIssue)
   });
 
+  type ActiveClaimFreshTrackedIssueFields = Partial<
+    Pick<
+      ProviderIntakeClaimRecord,
+      | 'issue_identifier'
+      | 'issue_title'
+      | 'issue_state'
+      | 'issue_state_type'
+      | 'issue_updated_at'
+      | 'issue_viewer_id'
+      | 'issue_viewer_auth_fingerprint'
+      | 'issue_assignee_id'
+      | 'issue_assignee_name'
+      | 'issue_blocked_by'
+      | 'merge_closeout'
+      | 'review_promotion'
+    >
+  >;
+  type ActiveClaimFreshTrackedIssueResolution = {
+    trackedIssue: LiveLinearTrackedIssue | null;
+    claimFields: ActiveClaimFreshTrackedIssueFields;
+    releaseClaimFields: ActiveClaimFreshTrackedIssueFields;
+    releaseReason: string | null;
+    useCachedClaimIssueState: boolean;
+  };
+  const buildActiveClaimFreshTrackedIssueFallback = (
+    useCachedClaimIssueState: boolean
+  ): ActiveClaimFreshTrackedIssueResolution => ({
+    trackedIssue: null,
+    claimFields: {},
+    releaseClaimFields: {},
+    releaseReason: null,
+    useCachedClaimIssueState
+  });
+
   const resolveFreshTrackedIssueForActiveClaim = async (
     claim: Pick<
       ProviderIntakeClaimRecord,
       'provider' | 'issue_id' | 'issue_updated_at' | 'merge_closeout' | 'review_promotion'
     >
-  ): Promise<{
-    trackedIssue: LiveLinearTrackedIssue | null;
-    claimFields: Partial<
-      Pick<
-        ProviderIntakeClaimRecord,
-        | 'issue_identifier'
-        | 'issue_title'
-        | 'issue_state'
-        | 'issue_state_type'
-        | 'issue_updated_at'
-        | 'issue_viewer_id'
-        | 'issue_viewer_auth_fingerprint'
-        | 'issue_assignee_id'
-        | 'issue_assignee_name'
-        | 'issue_blocked_by'
-        | 'merge_closeout'
-        | 'review_promotion'
-      >
-    >;
-  }> => {
+  ): Promise<ActiveClaimFreshTrackedIssueResolution> => {
     if (!resolveTrackedIssueWhenNotStuck) {
-      return { trackedIssue: null, claimFields: {} };
+      return buildActiveClaimFreshTrackedIssueFallback(true);
     }
 
     let resolution: Awaited<ReturnType<NonNullable<typeof resolveTrackedIssueWhenNotStuck>>>;
@@ -1409,29 +1424,51 @@ export function createProviderIssueHandoffService(
           claim.issue_id
         )}: ${(error as Error)?.message ?? String(error)}`
       );
-      return { trackedIssue: null, claimFields: {} };
+      return buildActiveClaimFreshTrackedIssueFallback(true);
     }
-    if (resolution.kind !== 'ready') {
-      return { trackedIssue: null, claimFields: {} };
+    if (resolution.kind === 'skip') {
+      return buildActiveClaimFreshTrackedIssueFallback(true);
+    }
+    if (resolution.kind === 'release') {
+      return {
+        trackedIssue: null,
+        claimFields: {},
+        releaseClaimFields: {},
+        releaseReason: `provider_issue_released:${stripProviderIssueReleasedPrefix(resolution.reason)}`,
+        useCachedClaimIssueState: false
+      };
+    }
+
+    if (!isTrackedIssueFreshEnoughForClaim(claim, resolution.trackedIssue)) {
+      return buildActiveClaimFreshTrackedIssueFallback(true);
     }
 
     const eligibility = assessProviderTrackedIssueEligibility(resolution.trackedIssue, {
       hasExistingClaim: true
     });
     if (!eligibility.eligible) {
-      return { trackedIssue: null, claimFields: {} };
+      return {
+        trackedIssue: null,
+        claimFields: {},
+        releaseClaimFields: {
+          ...buildFreshTrackedIssueClaimFields(claim, resolution.trackedIssue),
+          ...buildTrackedIssueMergeCloseoutResetFields(claim, resolution.trackedIssue)
+        },
+        releaseReason: eligibility.releaseReason,
+        useCachedClaimIssueState: false
+      };
     }
 
-    if (!isTrackedIssueFreshEnoughForClaim(claim, resolution.trackedIssue)) {
-      return { trackedIssue: null, claimFields: {} };
-    }
-
+    const freshClaimFields = {
+      ...buildFreshTrackedIssueClaimFields(claim, resolution.trackedIssue),
+      ...buildTrackedIssueMergeCloseoutResetFields(claim, resolution.trackedIssue)
+    };
     return {
       trackedIssue: resolution.trackedIssue,
-      claimFields: {
-        ...buildFreshTrackedIssueClaimFields(claim, resolution.trackedIssue),
-        ...buildTrackedIssueMergeCloseoutResetFields(claim, resolution.trackedIssue)
-      }
+      claimFields: freshClaimFields,
+      releaseClaimFields: freshClaimFields,
+      releaseReason: null,
+      useCachedClaimIssueState: false
     };
   };
 
@@ -1890,18 +1927,26 @@ export function createProviderIssueHandoffService(
         !claim.run_id;
       if (claim.state === 'released') {
         const activeRun = attachableClaimRuns.find((run) => run.status === 'in_progress');
-        const freshTrackedIssue =
+        const activeRunReleaseCancelPending = hasPendingReleaseCancel(
+          activeRun?.manifestPath ?? releasedRun?.manifestPath
+        );
+        const shouldRefreshReleasedActiveRunIssue =
           activeRun &&
           isProviderIssueReleasedPendingReopen(claim.reason) &&
-          input?.refreshTrackedIssueMetadata
+          input?.refreshTrackedIssueMetadata === true;
+        const freshTrackedIssue =
+          shouldRefreshReleasedActiveRunIssue
             ? await resolveFreshTrackedIssueForActiveClaim(claim)
-            : { trackedIssue: null, claimFields: {} };
+            : buildActiveClaimFreshTrackedIssueFallback(
+                !(activeRun && isProviderIssueReleasedPendingReopen(claim.reason))
+              );
         const startedWorkerIssue =
           freshTrackedIssue.trackedIssue !== null
             ? isProviderStartedWorkerTrackedIssue(freshTrackedIssue.trackedIssue)
-            : isProviderStartedWorkerClaim(claim);
+            : freshTrackedIssue.useCachedClaimIssueState && isProviderStartedWorkerClaim(claim);
         if (
           activeRun &&
+          !activeRunReleaseCancelPending &&
           isProviderIssueReleasedPendingReopen(claim.reason) &&
           startedWorkerIssue
         ) {
@@ -1940,23 +1985,32 @@ export function createProviderIssueHandoffService(
           hasPendingClaims = true;
           continue;
         }
+        if (activeRunReleaseCancelPending) {
+          hasPendingClaims = true;
+        }
+        const releaseClaimFields = freshTrackedIssue.releaseClaimFields;
+        const releaseReason =
+          freshTrackedIssue.releaseReason ?? claim.reason ?? 'provider_issue_released';
+        const releasedRunForActiveClaim = releasedRun ?? activeRun;
         const releasedClaimTransitioned = hasProviderClaimTransitioned(claim, {
+          ...releaseClaimFields,
           state: 'released',
-          reason: claim.reason ?? 'provider_issue_released',
-          task_id: releasedRun?.taskId ?? claim.task_id,
-          run_id: releasedRun?.runId ?? claim.run_id,
-          run_manifest_path: releasedRun?.manifestPath ?? claim.run_manifest_path
+          reason: releaseReason,
+          task_id: releasedRunForActiveClaim?.taskId ?? claim.task_id,
+          run_id: releasedRunForActiveClaim?.runId ?? claim.run_id,
+          run_manifest_path: releasedRunForActiveClaim?.manifestPath ?? claim.run_manifest_path
         });
         publishRuntime ||= releasedClaimTransitioned;
         upsertProviderIntakeClaim(options.state, {
           ...claim,
+          ...releaseClaimFields,
           launch_source: undefined,
           launch_token: undefined,
-          task_id: releasedRun?.taskId ?? claim.task_id,
+          task_id: releasedRunForActiveClaim?.taskId ?? claim.task_id,
           state: 'released',
-          reason: claim.reason ?? 'provider_issue_released',
-          run_id: releasedRun?.runId ?? claim.run_id,
-          run_manifest_path: releasedRun?.manifestPath ?? claim.run_manifest_path,
+          reason: releaseReason,
+          run_id: releasedRunForActiveClaim?.runId ?? claim.run_id,
+          run_manifest_path: releasedRunForActiveClaim?.manifestPath ?? claim.run_manifest_path,
           updated_at: releasedClaimTransitioned ? now : claim.updated_at
         });
         if (shouldAttemptReleaseCancel(releasedRun)) {
@@ -1986,7 +2040,7 @@ export function createProviderIssueHandoffService(
           isProviderMergeCloseoutWatchingClaim(claim) || isTerminalProviderMergeCloseoutClaim(claim);
         const freshTrackedIssue = input?.refreshTrackedIssueMetadata
           ? await resolveFreshTrackedIssueForActiveClaim(claim)
-          : { trackedIssue: null, claimFields: {} };
+          : buildActiveClaimFreshTrackedIssueFallback(true);
         const mergeTrackedIssue = freshTrackedIssue.trackedIssue;
         if (preserveMergeCloseoutClaim && !mergeTrackedIssue) {
           hasPendingClaims = true;
@@ -3880,7 +3934,9 @@ export function createProviderIssueHandoffService(
           if (claim.state === 'released') {
             if (
               activeRun &&
+              !hasPendingReleaseCancel(activeRun.manifestPath) &&
               isProviderIssueReleasedPendingReopen(claim.reason) &&
+              isTrackedIssueFreshEnoughForClaim(claim, resolution.trackedIssue) &&
               isProviderStartedWorkerTrackedIssue(resolution.trackedIssue)
             ) {
               const workerHost = resolveRehydratedActiveRunWorkerHost(activeRun, claim);
@@ -3929,14 +3985,53 @@ export function createProviderIssueHandoffService(
               );
               continue;
             }
+            let refreshedReleasedNonStartedActiveRun = false;
             if (
-              shouldAttemptReleaseCancel(releaseRun) &&
-              releaseRun?.status !== null
+              activeRun &&
+              isProviderIssueReleasedPendingReopen(claim.reason) &&
+              !isProviderStartedWorkerTrackedIssue(resolution.trackedIssue) &&
+              isTrackedIssueFreshEnoughForClaim(claim, resolution.trackedIssue)
+            ) {
+              const trackedIssueFields = buildFreshTrackedIssueActiveRunFields(
+                claim,
+                resolution.trackedIssue
+              );
+              const transitioned = hasProviderClaimTransitioned(claim, {
+                ...trackedIssueFields,
+                state: 'released',
+                reason: claim.reason ?? 'provider_issue_released',
+                task_id: (releaseRun ?? activeRun).taskId,
+                run_id: (releaseRun ?? activeRun).runId,
+                run_manifest_path: (releaseRun ?? activeRun).manifestPath
+              });
+              await upsertProviderClaimAndPersist({
+                ...claim,
+                ...trackedIssueFields,
+                launch_source: undefined,
+                launch_token: undefined,
+                task_id: (releaseRun ?? activeRun).taskId,
+                state: 'released',
+                reason: claim.reason ?? 'provider_issue_released',
+                run_id: (releaseRun ?? activeRun).runId,
+                run_manifest_path: (releaseRun ?? activeRun).manifestPath
+              });
+              if (transitioned) {
+                options.publishRuntime?.('provider-intake.refresh');
+              }
+              refreshedReleasedNonStartedActiveRun = true;
+            }
+            const releaseRunForCancel = releaseRun ?? activeRun;
+            if (
+              shouldAttemptReleaseCancel(releaseRunForCancel) &&
+              releaseRunForCancel?.status !== null
             ) {
               void retryReleaseCancel({
-                releaseRun,
+                releaseRun: releaseRunForCancel,
                 reason: claim.reason ?? 'provider_issue_released'
               });
+              continue;
+            }
+            if (refreshedReleasedNonStartedActiveRun) {
               continue;
             }
             if (resolution.kind === 'owned') {
