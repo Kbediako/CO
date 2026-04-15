@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { chmod, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -14,6 +15,10 @@ import {
 import { REPO_CONFIG_PATH_ENV_KEY } from '../src/cli/config/userConfig.js';
 import { sanitizeProviderOverrideEnv } from '../src/cli/utils/providerOverrideEnv.js';
 import * as cloudPreflight from '../src/cli/utils/cloudPreflight.js';
+
+function testFingerprint(value: string): string {
+  return `sha256:${createHash('sha256').update(value).digest('hex').slice(0, 16)}`;
+}
 
 async function writeFakeCodexBinary(dir: string, featureLine: string): Promise<string> {
   const binPath = join(dir, 'codex');
@@ -1136,6 +1141,47 @@ describe('runDoctor', () => {
       expect(result.ok).toBe(true);
       expect(result.issues).toHaveLength(0);
       expect(formatDoctorCloudPreflightSummary(result).join('\n')).toContain('Cloud preflight: ok');
+    } finally {
+      if (previousCodexBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = previousCodexBin;
+      }
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('prints redacted auth provenance in doctor cloud preflight output', async () => {
+    const previousCodexBin = process.env.CODEX_CLI_BIN;
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-auth-'));
+    process.env.CODEX_CLI_BIN = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+    try {
+      const result = await runDoctorCloudPreflight({
+        cwd: process.cwd(),
+        env: buildDoctorCloudEnv({
+          CODEX_CLOUD_ENV_ID: 'env_123',
+          CODEX_CLOUD_BRANCH: 'refs/heads/linear/co-200',
+          CODEX_AUTH_PROFILE: 'operator-profile',
+          OPENAI_ACCOUNT_ID: 'acct_raw_123',
+          OPENAI_API_KEY: 'sk-test-redacted'
+        })
+      });
+      const summary = formatDoctorCloudPreflightSummary(result).join('\n');
+      expect(result.details.auth_provenance).toMatchObject({
+        provider_kind: 'codex_cloud',
+        active_profile_fingerprint: testFingerprint('operator-profile'),
+        active_account_fingerprint: testFingerprint('acct_raw_123'),
+        cloud_env_id: 'env_123',
+        cloud_branch: 'linear/co-200',
+        credential_source: 'env:OPENAI_API_KEY',
+        auth_freshness: 'env_credential_present'
+      });
+      expect(summary).toContain('credential source: env:OPENAI_API_KEY');
+      expect(summary).toContain(`profile fingerprint: ${testFingerprint('operator-profile')}`);
+      expect(summary).toContain(`account fingerprint: ${testFingerprint('acct_raw_123')}`);
+      expect(summary).not.toContain('operator-profile');
+      expect(summary).not.toContain('acct_raw_123');
+      expect(summary).not.toContain('sk-test-redacted');
     } finally {
       if (previousCodexBin === undefined) {
         delete process.env.CODEX_CLI_BIN;

@@ -1,6 +1,6 @@
 import type { ReviewerAgent, ReviewInput, ReviewResult } from '../../types.js';
 import type { PipelineRunExecutionResult } from '../types.js';
-import { diagnoseCloudFailure } from './cloudFailureDiagnostics.js';
+import { diagnoseCloudFailure, formatCloudFailureClass } from './cloudFailureDiagnostics.js';
 
 type ResultProvider = () => PipelineRunExecutionResult | null;
 
@@ -44,14 +44,14 @@ export class CommandReviewer implements ReviewerAgent {
         ...(cloudExecution?.status_url ? [`Cloud status URL: ${cloudExecution.status_url}`] : [])
       ];
       if (!approved) {
-        summaryLines.push(`Failure class: ${diagnosis.category}`);
+        summaryLines.push(`Failure class: ${formatCloudFailureClass(diagnosis)}`);
         summaryLines.push(`Guidance: ${diagnosis.guidance}`);
       }
       const feedbackLines = [cloudExecution?.error ?? (result.notes.join('\n') || undefined)].filter(
         (line): line is string => Boolean(line && line.trim().length > 0)
       );
       if (!approved) {
-        feedbackLines.push(`Failure class: ${diagnosis.category}`);
+        feedbackLines.push(`Failure class: ${formatCloudFailureClass(diagnosis)}`);
         feedbackLines.push(`Guidance: ${diagnosis.guidance}`);
       }
       return {

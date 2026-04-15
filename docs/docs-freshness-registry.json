@@ -3,6 +3,41 @@
   "generated_at": "2026-04-15",
   "entries": [
     {
+      "path": "docs/ACTION_PLAN-codex-0121-diagnostics-auth-provenance.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-16",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-codex-0121-diagnostics-auth-provenance.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-16",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-codex-0121-diagnostics-auth-provenance.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-16",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/linear-4c480fc7-b6c2-48cf-b4a2-73fe057b8aa7.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-16",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-linear-4c480fc7-b6c2-48cf-b4a2-73fe057b8aa7.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-16",
+      "cadence_days": 30
+    },
+    {
       "path": ".agent/task/linear-72286a49-e68b-435a-be72-74d5c28feb09.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",

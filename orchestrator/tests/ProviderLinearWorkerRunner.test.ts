@@ -1,4 +1,5 @@
 import type { ChildProcess } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import http from 'node:http';
 import { mkdtemp, mkdir, readFile, realpath, rm, symlink, utimes, writeFile } from 'node:fs/promises';
@@ -43,6 +44,10 @@ import type { RuntimeCodexCommandContext } from '../src/cli/runtime/index.js';
 let tempRoot: string | null = null;
 const providerLinearWorkerRunnerTestTimeoutMs = 60_000;
 const SOURCE_HELPER_COMMAND = 'node "/tmp/co/bin/codex-orchestrator.js" linear';
+
+function testFingerprint(value: string): string {
+  return `sha256:${createHash('sha256').update(value).digest('hex').slice(0, 16)}`;
+}
 
 afterEach(async () => {
   vi.unstubAllGlobals();
@@ -1367,7 +1372,9 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         output_tokens: null,
         total_tokens: null
       },
-      rateLimits: null
+      rateLimits: null,
+      authProvenance: null,
+      failureDiagnosis: null
     });
   });
 
@@ -1449,7 +1456,9 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         output_tokens: null,
         total_tokens: null
       },
-      rateLimits: null
+      rateLimits: null,
+      authProvenance: null,
+      failureDiagnosis: null
     });
   });
 
@@ -1705,6 +1714,169 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       }
     });
     expect(parsed.finalMessage).toBe('rate limits updated: 5-hour 12.5% / 300m; weekly 48% / 10080m');
+  });
+
+  it('preserves Codex 0.121 account/auth-profile provenance while redacting raw values', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        JSON.stringify({
+          type: 'notification',
+          method: 'account/authProfile/updated',
+          params: {
+            authProfile: 'personal-profile',
+            account: {
+              id: 'acct_raw_123',
+              email: 'operator@example.com'
+            },
+            credentialSource: 'codex_login',
+            authFreshness: 'fresh'
+          },
+          timestamp: '2026-04-15T20:45:18.000Z'
+        }),
+        JSON.stringify({
+          type: 'notification',
+          method: 'account/rateLimits/updated',
+          params: {
+            rateLimits: {
+              primary: {
+                usedPercent: 99,
+                windowDurationMins: 300
+              }
+            },
+            accountPlan: 'prolite',
+            whamPlan: 'unknown_wham_plan'
+          },
+          timestamp: '2026-04-15T20:45:19.000Z'
+        })
+      ].join('\n')
+    );
+
+    expect(parsed.authProvenance).toMatchObject({
+      provider_kind: 'codex',
+      active_profile_fingerprint: testFingerprint('personal-profile'),
+      active_account_fingerprint: testFingerprint('acct_raw_123'),
+      credential_source: 'codex_login',
+      auth_freshness: 'fresh',
+      observed_at: '2026-04-15T20:45:18.000Z',
+      source: 'stdout_jsonl'
+    });
+    expect(JSON.stringify(parsed.authProvenance)).not.toContain('personal-profile');
+    expect(JSON.stringify(parsed.authProvenance)).not.toContain('acct_raw_123');
+    expect(JSON.stringify(parsed.authProvenance)).not.toContain('operator@example.com');
+    expect(parsed.failureDiagnosis).toMatchObject({
+      diagnostic_category: 'quota_rate_limit',
+      source: 'stdout_jsonl'
+    });
+    expect(parsed.failureDiagnosis?.signal).toContain('account_plan=prolite');
+    expect(parsed.failureDiagnosis?.signal).toContain('wham_plan=unknown_wham_plan');
+    expect(parsed.rateLimits).toEqual({
+      primary: {
+        usedPercent: 99,
+        windowDurationMins: 300
+      }
+    });
+  });
+
+  it('redacts unsafe credential-source labels and auth identifiers from provider diagnostics', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      JSON.stringify({
+        type: 'notification',
+        method: 'account/authProfile/mismatch',
+        params: {
+          credentialSource: 'operator@example.com',
+          authFreshness: 'profile=personal-profile',
+          message:
+            'profile mismatch for profile personal-profile {"profile_id":"personal-profile","account_id":"acct_raw_123","org_id":"org_raw_456","refresh_token":"secret-refresh-token"}'
+        },
+        timestamp: '2026-04-15T20:45:21.000Z'
+      })
+    );
+
+    expect(parsed.authProvenance).toMatchObject({
+      provider_kind: 'codex',
+      credential_source: 'redacted',
+      auth_freshness: 'redacted'
+    });
+    expect(JSON.stringify(parsed.authProvenance)).not.toContain('operator@example.com');
+    expect(JSON.stringify(parsed.authProvenance)).not.toContain('personal-profile');
+    expect(parsed.failureDiagnosis).toMatchObject({
+      diagnostic_category: 'auth_mismatch',
+      source: 'stdout_jsonl'
+    });
+    expect(parsed.failureDiagnosis?.signal).not.toContain('personal-profile');
+    expect(parsed.failureDiagnosis?.signal).not.toContain('acct_raw_123');
+    expect(parsed.failureDiagnosis?.signal).not.toContain('org_raw_456');
+    expect(parsed.failureDiagnosis?.signal).not.toContain('secret-refresh-token');
+    expect(parsed.failureDiagnosis?.signal).toContain('"refresh_token":"<redacted>"');
+  });
+
+  it('does not infer auth provenance from generic status-only events', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      JSON.stringify({
+        type: 'event_msg',
+        payload: {
+          status: 'failed',
+          message: 'ordinary provider status update'
+        },
+        timestamp: '2026-04-15T20:45:20.000Z'
+      })
+    );
+
+    expect(parsed.authProvenance).toBeNull();
+  });
+
+  it('classifies Guardian timeouts separately from Guardian policy denials', () => {
+    const timeoutParsed = parseProviderLinearWorkerJsonl(
+      JSON.stringify({
+        type: 'notification',
+        method: 'guardian/review/timeout',
+        params: {
+          message: 'Guardian review timed out; retry with timeout-specific guidance.'
+        },
+        timestamp: '2026-04-15T20:46:00.000Z'
+      })
+    );
+    const denialParsed = parseProviderLinearWorkerJsonl(
+      JSON.stringify({
+        type: 'notification',
+        method: 'guardian/review/denied',
+        params: {
+          message: 'Guardian policy denial blocked this request.'
+        },
+        timestamp: '2026-04-15T20:46:01.000Z'
+      })
+    );
+
+    expect(timeoutParsed.failureDiagnosis).toMatchObject({
+      diagnostic_category: 'guardian_timeout',
+      guidance: expect.stringContaining('timed out')
+    });
+    expect(denialParsed.failureDiagnosis).toMatchObject({
+      diagnostic_category: 'guardian_policy_denial',
+      guidance: expect.stringContaining('policy')
+    });
+  });
+
+  it('preserves Guardian timeout visibility from TUI-history style events', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      JSON.stringify({
+        type: 'event_msg',
+        payload: {
+          type: 'tui_history',
+          message: 'TUI history: Guardian review timed out while waiting for guardian decision.'
+        },
+        timestamp: '2026-04-15T20:46:02.000Z'
+      })
+    );
+
+    expect(parsed.finalMessage).toBe('TUI history: Guardian review timed out while waiting for guardian decision.');
+    expect(parsed.failureDiagnosis).toMatchObject({
+      diagnostic_category: 'guardian_timeout',
+      signal: expect.stringContaining('Guardian review timed out'),
+      guidance: expect.stringContaining('timed out'),
+      source: 'stdout_jsonl',
+      observed_at: '2026-04-15T20:46:02.000Z'
+    });
   });
 
   it('waits for child close before resolving piped stdio capture', async () => {
@@ -2106,6 +2278,13 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         total_tokens: 34
       },
       rate_limits: null,
+      auth_provenance: expect.objectContaining({
+        provider_kind: 'codex',
+        runtime_mode: 'cli',
+        runtime_provider: 'CliRuntimeProvider',
+        credential_source: null,
+        auth_freshness: 'credential_source_unknown'
+      }),
       linear_audit: {
         path: join(runDir, PROVIDER_LINEAR_WORKER_AUDIT_FILENAME),
         attempted_count: 6,
@@ -2161,6 +2340,13 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         output_tokens: 13,
         total_tokens: 34
       },
+      auth_provenance: expect.objectContaining({
+        provider_kind: 'codex',
+        runtime_mode: 'cli',
+        runtime_provider: 'CliRuntimeProvider',
+        credential_source: null,
+        auth_freshness: 'credential_source_unknown'
+      }),
       linear_audit: {
         path: join(runDir, PROVIDER_LINEAR_WORKER_AUDIT_FILENAME),
         attempted_count: 6,
@@ -4451,12 +4637,12 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
             execRunner: vi.fn(async (request) => {
               await appendStaySerialParallelizationDecisionAuditForRequest(request);
               return {
-              exitCode: 2,
-              stdout: [
-                '{"type":"thread.started","thread_id":"thread-1"}',
-                '{"type":"turn_context","payload":{"turn_id":"turn-1"}}'
-              ].join('\n'),
-              stderr: 'boom'
+                exitCode: 2,
+                stdout: [
+                  '{"type":"thread.started","thread_id":"thread-1"}',
+                  '{"type":"turn_context","payload":{"turn_id":"turn-1"}}'
+                ].join('\n'),
+                stderr: 'Rate limit exhausted for prolite account before JSONL failure details emitted.'
               };
             }),
             now: vi
@@ -4476,7 +4662,13 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         latest_turn_id: 'turn-1',
         latest_session_id: 'thread-1-turn-1',
         owner_status: 'failed',
-        end_reason: 'codex_exit_2'
+        end_reason: 'codex_exit_2',
+        failure_diagnosis: {
+          diagnostic_category: 'quota_rate_limit',
+          signal: expect.stringContaining('Rate limit exhausted'),
+          source: 'stderr',
+          observed_at: '2026-03-21T09:00:01.000Z'
+        }
       });
       expect(controlServer.requests).toHaveLength(1);
       expect(controlServer.requests[0]).toMatchObject({
