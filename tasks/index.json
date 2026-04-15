@@ -26,7 +26,7 @@
           "reviewer": "codex-orchestrator review",
           "date": "2026-04-15",
           "status": "succeeded",
-          "telemetry": "../../.runs/linear-9b1440f0-a3af-4863-8bb5-2f8ea78bd02d/cli/2026-04-15T15-14-04-331Z-0bebe30c/review/telemetry.json",
+          "telemetry": ".runs/linear-9b1440f0-a3af-4863-8bb5-2f8ea78bd02d/cli/2026-04-15T15-14-04-331Z-0bebe30c/review/telemetry.json",
           "review_outcome": "bounded-success"
         }
       },
