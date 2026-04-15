@@ -1968,7 +1968,7 @@ async function resolveParentDirtyScopeConflict(
 }
 
 function isIgnoredParentArtifactPath(path: string): boolean {
-  return path === '.child-lanes' || path.startsWith('.child-lanes/') || path === '.tmp' || path.startsWith('.tmp/');
+  return path === '.child-lanes' || path.startsWith('.child-lanes/') || path === '.tmp/workpad.md';
 }
 
 function formatChildLaneScopeLaunchFailureMessage(message: string): string {

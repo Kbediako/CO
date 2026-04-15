@@ -34,6 +34,8 @@
 ## Validation
 - Child lane checks:
   - `git diff --check -- docs/PRD-linear-9a54c7d8-518f-4452-95aa-c5852008b38d.md docs/TECH_SPEC-linear-9a54c7d8-518f-4452-95aa-c5852008b38d.md docs/ACTION_PLAN-linear-9a54c7d8-518f-4452-95aa-c5852008b38d.md tasks/specs/linear-9a54c7d8-518f-4452-95aa-c5852008b38d.md tasks/tasks-linear-9a54c7d8-518f-4452-95aa-c5852008b38d.md .agent/task/linear-9a54c7d8-518f-4452-95aa-c5852008b38d.md`
+  - `npm run docs:check`
+  - `npm run docs:freshness`
 - Parent implementation checks:
   - Focused tests for provider worker guidance/preflight and retry truth.
   - Focused child-lane shell/phase-contract tests.

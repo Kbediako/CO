@@ -182,6 +182,40 @@ describe('provider-linear adoption eval', () => {
     );
   });
 
+  it('fails when zero-byte advisory evidence only exists in historical child-lane state', async () => {
+    const { root, fixtureDir } = await copyFixture('co184-helper-preflight-smooth-path');
+    await mutateJson(path.join(fixtureDir, 'provider-linear-worker-proof.json'), (value) => {
+      const [historicalLane] = value.child_lanes as Array<Record<string, unknown>>;
+      value.child_lanes = [
+        {
+          ...historicalLane,
+          launched_at: '2026-04-15T00:07:30.000Z',
+          decision_at: '2026-04-15T00:07:45.000Z'
+        },
+        {
+          ...historicalLane,
+          stream: 'co184-docs-advisory-current',
+          launched_at: '2026-04-15T00:08:30.000Z',
+          decision: 'pending',
+          decision_at: null,
+          decision_reason: null,
+          summary: 'current turn did not classify zero-byte output'
+        }
+      ];
+    });
+
+    const report = await buildProviderLinearAdoptionEvalReport({
+      fixtureRoot: root,
+      generatedAt: '2026-04-14T00:00:00.000Z',
+      taskId: 'linear-co-185-stale-zero-byte-advisory'
+    });
+
+    expect(report.summary.ok).toBe(false);
+    expect(report.summary.failures).toContain(
+      'co184-helper-preflight-smooth-path: helper constraints do not classify zero-byte child lanes as advisory evidence'
+    );
+  });
+
   it('fails when source-0 prompt adoption artifacts disappear', async () => {
     const { root, fixtureDir } = await copyFixture('memory-adopting-run');
     await mutateJson(path.join(fixtureDir, 'prompt-artifacts.json'), (value) => {

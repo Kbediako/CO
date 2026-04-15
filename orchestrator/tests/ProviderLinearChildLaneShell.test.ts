@@ -1656,6 +1656,37 @@ describe('runProviderLinearChildLaneShell', () => {
     expect(execRunner).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps non-workpad temp paths visible to phase-scoped dirty checks', async () => {
+    const { manifestPath } = await createProviderWorkerManifest();
+    const execRunner = vi.fn();
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'launch',
+        streamName: 'docs-a',
+        purpose: 'Create docs packet',
+        phases: ['docs'],
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        execRunner: execRunner as never,
+        readParentDirtyPaths: vi.fn(async () => ['.tmp/notes.md']) as never
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'launch',
+      error: {
+        code: 'provider_worker_child_lane_parent_dirty',
+        message: expect.stringContaining('.tmp/notes.md'),
+        status: 409
+      }
+    });
+    expect(execRunner).not.toHaveBeenCalled();
+  });
+
   it('normalizes file scopes before comparing them against dirty parent paths', async () => {
     const { manifestPath } = await createProviderWorkerManifest();
     const execRunner = vi.fn();

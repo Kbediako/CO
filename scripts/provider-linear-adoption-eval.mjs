@@ -81,6 +81,15 @@ function compareIsoTimestamp(left, right) {
   return leftValue.localeCompare(rightValue);
 }
 
+function selectCurrentTurnChildLanes(proof) {
+  const currentTurnStartedAt =
+    asString(proof.current_turn_started_at) ?? asString(proof.attempt_started_at);
+  const childLanes = asArray(proof.child_lanes).filter(isRecord);
+  return currentTurnStartedAt
+    ? childLanes.filter((lane) => compareIsoTimestamp(lane.launched_at, currentTurnStartedAt) >= 0)
+    : childLanes;
+}
+
 function parseArgs(argv) {
   const args = {};
   for (let index = 0; index < argv.length; index += 1) {
@@ -261,12 +270,8 @@ function extractParallelizationMetrics(proof, promptArtifacts) {
   const evalConfig = asRecord(promptArtifacts.eval);
   const parallelizationConfig = asRecord(evalConfig.parallelization);
   const parallelization = selectParallelization(proof);
-  const currentTurnStartedAt =
-    asString(proof.current_turn_started_at) ?? asString(proof.attempt_started_at);
   const childLanes = asArray(proof.child_lanes).filter(isRecord);
-  const sameTurnChildLanes = currentTurnStartedAt
-    ? childLanes.filter((lane) => compareIsoTimestamp(lane.launched_at, currentTurnStartedAt) >= 0)
-    : childLanes;
+  const sameTurnChildLanes = selectCurrentTurnChildLanes(proof);
   const successfulSameTurnChildLanes = sameTurnChildLanes.filter(
     (lane) => asString(lane.status) === 'succeeded'
   );
@@ -340,7 +345,7 @@ function extractHelperConstraintMetrics(proof, promptArtifacts) {
     .map(asString)
     .filter(Boolean)
     .sort();
-  const childLanes = asArray(proof.child_lanes).filter(isRecord);
+  const childLanes = selectCurrentTurnChildLanes(proof);
   const zeroByteAdvisoryLanes = childLanes.filter(
     (lane) =>
       asNumber(lane.patch_bytes, -1) === 0 &&
