@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260415-linear-237c874c-c05f-4947-949a-573043fc575f",
+      "title": "CO: restore Apr 15 docs:freshness historical packet baseline",
+      "relates_to": "tasks/tasks-linear-237c874c-c05f-4947-949a-573043fc575f.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-15",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-237c874c-c05f-4947-949a-573043fc575f.md",
+        "task": "tasks/tasks-linear-237c874c-c05f-4947-949a-573043fc575f.md",
+        "agent_task": ".agent/task/linear-237c874c-c05f-4947-949a-573043fc575f.md",
+        "docs": "docs/TECH_SPEC-linear-237c874c-c05f-4947-949a-573043fc575f.md"
+      }
+    },
+    {
       "id": "20260414-linear-ba9a1c35-c8d1-4b76-aa33-4937502d1964",
       "title": "CO: prune terminal released provider rows from CO STATUS JSON active counts",
       "relates_to": "tasks/tasks-linear-ba9a1c35-c8d1-4b76-aa33-4937502d1964.md",
@@ -10484,6 +10501,22 @@
     }
   ],
   "specs": [
+    {
+      "id": "20260415-linear-237c874c-c05f-4947-949a-573043fc575f",
+      "title": "CO: restore Apr 15 docs:freshness historical packet baseline",
+      "relates_to": "tasks/tasks-linear-237c874c-c05f-4947-949a-573043fc575f.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-15",
+      "paths": {
+        "spec": "tasks/specs/linear-237c874c-c05f-4947-949a-573043fc575f.md",
+        "task": "tasks/tasks-linear-237c874c-c05f-4947-949a-573043fc575f.md",
+        "agent_task": ".agent/task/linear-237c874c-c05f-4947-949a-573043fc575f.md",
+        "docs": "docs/TECH_SPEC-linear-237c874c-c05f-4947-949a-573043fc575f.md"
+      }
+    },
     {
       "id": "20260414-linear-0022f975-905a-4974-aa8e-d689df90167c",
       "title": "CO: reconcile Done issue mirrors and validation-only closeout provenance",
