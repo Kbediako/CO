@@ -4020,10 +4020,7 @@ export function createProviderIssueHandoffService(
               refreshedReleasedNonStartedActiveRun = true;
             }
             const releaseRunForCancel = releaseRun ?? activeRun;
-            if (
-              shouldAttemptReleaseCancel(releaseRunForCancel) &&
-              releaseRunForCancel?.status !== null
-            ) {
+            if (shouldAttemptReleaseCancel(releaseRunForCancel)) {
               void retryReleaseCancel({
                 releaseRun: releaseRunForCancel,
                 reason: claim.reason ?? 'provider_issue_released'
