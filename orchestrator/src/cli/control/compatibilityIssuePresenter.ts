@@ -16,6 +16,10 @@ import {
   buildSelectedRunLatestEventPayload
 } from './observabilityReadModel.js';
 import type { LinearBudgetStatus } from './linearBudgetState.js';
+import {
+  classifyProviderLinearWorkflowState,
+  normalizeProviderLinearWorkflowState
+} from './providerLinearWorkflowStates.js';
 
 const PROVIDER_LINEAR_WORKER_PIPELINE_TITLE = 'Provider Linear Worker';
 const PROVIDER_LINEAR_WORKER_PIPELINE_ID = 'provider-linear-worker';
@@ -95,6 +99,9 @@ export function buildCompatibilityProjectionSnapshot(
     : null;
   const issues = index.issues
     .map((issue) => {
+      if (shouldPruneTerminalSelectedCompatibilityIssue(issue)) {
+        return null;
+      }
       const preferredSource = issue.runningSource ?? issue.retrySource ?? issue.selectedSource;
       if (!preferredSource) {
         return null;
@@ -127,6 +134,117 @@ export function buildCompatibilityProjectionSnapshot(
     providerWorkflow: snapshot.providerWorkflow,
     polling: snapshot.polling
   };
+}
+
+function shouldPruneTerminalSelectedCompatibilityIssue(
+  issue: CompatibilityIssueIndexEntry<ControlCompatibilitySourceContext, ControlDispatchPilotPayload>
+): boolean {
+  if (issue.runningSource || issue.retrySource || !issue.selectedSource) {
+    return false;
+  }
+  return isTerminalReleasedCompletedProviderSource(issue.selectedSource);
+}
+
+function isTerminalReleasedCompletedProviderSource(
+  source: ControlCompatibilitySourceContext
+): boolean {
+  const debugSnapshot = source.providerDebugSnapshot ?? null;
+  const claim = debugSnapshot?.claim ?? null;
+  if (normalizeProviderLinearWorkflowState(claim?.state) !== 'released') {
+    return false;
+  }
+  if (normalizeProviderLinearWorkflowState(claim?.reason) !== 'provider_issue_released:not_active') {
+    return false;
+  }
+  if (!isCompletedCompatibilityRunStatus(source.rawStatus)) {
+    return false;
+  }
+  if (!isTerminalProviderIssueState(source)) {
+    return false;
+  }
+  return hasCompletedMergeCloseout(debugSnapshot);
+}
+
+function isCompletedCompatibilityRunStatus(status: string | null | undefined): boolean {
+  const normalized = normalizeProviderLinearWorkflowState(status);
+  return (
+    normalized === 'succeeded' ||
+    normalized === 'success' ||
+    normalized === 'completed' ||
+    normalized === 'done'
+  );
+}
+
+function isTerminalProviderIssueState(source: ControlCompatibilitySourceContext): boolean {
+  const trackedLinear = source.tracked?.linear ?? null;
+  const debugSnapshot = source.providerDebugSnapshot ?? null;
+  const claimEvidence = {
+    state: debugSnapshot?.claim?.issue_state ?? null,
+    state_type: debugSnapshot?.claim?.issue_state_type ?? null,
+    updated_at:
+      debugSnapshot?.claim?.issue_updated_at ??
+      debugSnapshot?.claim?.updated_at ??
+      null
+  };
+  const claimState = classifyProviderLinearWorkflowState(claimEvidence);
+  if (claimState.isTerminal) {
+    return !hasNewerActiveProviderIssueState(source, claimEvidence.updated_at);
+  }
+
+  return [
+    {
+      state: trackedLinear?.state ?? null,
+      state_type: trackedLinear?.state_type ?? null
+    },
+    {
+      state: debugSnapshot?.live_linear_state.state ?? null,
+      state_type: debugSnapshot?.live_linear_state.state_type ?? null
+    },
+    {
+      state: source.compatibilityState ?? null,
+      state_type: null
+    }
+  ].some((evidence) => classifyProviderLinearWorkflowState(evidence).isTerminal);
+}
+
+function hasNewerActiveProviderIssueState(
+  source: ControlCompatibilitySourceContext,
+  claimUpdatedAt: string | null
+): boolean {
+  const trackedLinear = source.tracked?.linear ?? null;
+  const debugSnapshot = source.providerDebugSnapshot ?? null;
+  return [
+    {
+      state: trackedLinear?.state ?? null,
+      state_type: trackedLinear?.state_type ?? null,
+      updated_at: trackedLinear?.updated_at ?? null
+    },
+    {
+      state: debugSnapshot?.live_linear_state.state ?? null,
+      state_type: debugSnapshot?.live_linear_state.state_type ?? null,
+      updated_at: debugSnapshot?.live_linear_state.updated_at ?? null
+    }
+  ].some((evidence) => {
+    const workflowState = classifyProviderLinearWorkflowState(evidence);
+    return workflowState.isActive && compareIsoTimestamp(evidence.updated_at, claimUpdatedAt) > 0;
+  });
+}
+
+function hasCompletedMergeCloseout(
+  debugSnapshot: ControlCompatibilitySourceContext['providerDebugSnapshot'] | null
+): boolean {
+  const progress = debugSnapshot?.progress ?? null;
+  if (progress?.kind === 'merge_closeout' && progress.status === 'completed') {
+    return true;
+  }
+  const pullRequest = debugSnapshot?.pull_request ?? null;
+  const mergeCloseoutStatus = normalizeProviderLinearWorkflowState(
+    pullRequest?.merge_closeout_status
+  );
+  if (mergeCloseoutStatus !== 'merged') {
+    return false;
+  }
+  return Boolean(pullRequest?.merged_at);
 }
 
 export function findCompatibilityProjectionIssueRecord(

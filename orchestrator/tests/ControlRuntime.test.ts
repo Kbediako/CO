@@ -13,6 +13,7 @@ import {
   readProviderPollingHealth
 } from '../src/cli/control/providerPollingHealth.js';
 import { createControlRuntime } from '../src/cli/control/controlRuntime.js';
+import { buildUiDataset } from '../src/cli/control/operatorDashboardPresenter.js';
 import * as liveLinearAdvisoryRuntimeModule from '../src/cli/control/liveLinearAdvisoryRuntime.js';
 import type { LiveLinearTrackedIssue } from '../src/cli/control/linearDispatchSource.js';
 import type { ProviderIntakeState } from '../src/cli/control/providerIntakeState.js';
@@ -2140,6 +2141,271 @@ describe('ControlRuntime', () => {
       expect(compatibilityProjection.running).toEqual([]);
       expect(compatibilityProjection.codexTotals.seconds_running).toBe(0);
       expect(compatibilityProjection.selected?.issue_identifier).toBe('ISSUE-LOCAL-MCP');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('prunes terminal released completed provider rows from active dashboard issues', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-14T22:38:07.171Z'));
+    try {
+      const providerIntakeState = createProviderIntakeState([
+        {
+          provider: 'linear',
+          provider_key: 'linear:issue-co-181',
+          issue_id: 'issue-co-181',
+          issue_identifier: 'CO-181',
+          issue_title: 'Completed provider refresh issue',
+          issue_state: 'Done',
+          issue_state_type: 'completed',
+          issue_updated_at: '2026-04-14T16:02:35.110Z',
+          task_id: 'linear-issue-co-181',
+          mapping_source: 'provider_id_fallback',
+          state: 'released',
+          reason: 'provider_issue_released:not_active',
+          accepted_at: '2026-04-14T15:00:00.000Z',
+          updated_at: '2026-04-14T16:02:35.110Z',
+          last_delivery_id: 'delivery-co-181',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_744_646_555_110,
+          run_id: 'run-1',
+          run_manifest_path: null,
+          launch_source: 'control-host',
+          launch_token: 'launch-co-181',
+          merge_closeout: {
+            recorded_at: '2026-04-14T16:02:35.110Z',
+            issue_id: 'issue-co-181',
+            issue_identifier: 'CO-181',
+            issue_state: 'Done',
+            issue_state_type: 'completed',
+            issue_updated_at: '2026-04-14T16:02:35.110Z',
+            status: 'merged',
+            reason: 'merged_and_transitioned_done',
+            summary: 'Merged attached PR #479, reconciled shared root, and transitioned the Linear issue to Done.',
+            attached_pr_urls: ['https://github.com/asabeko/CO/pull/479'],
+            ignored_historical_pr_urls: [],
+            conflicting_attached_pr_urls: [],
+            pr: {
+              url: 'https://github.com/asabeko/CO/pull/479',
+              owner: 'asabeko',
+              repo: 'CO',
+              number: 479
+            },
+            snapshot: {
+              state: 'MERGED',
+              review_decision: 'APPROVED',
+              merge_state_status: 'UNKNOWN',
+              ready_to_merge: false,
+              gate_reasons: [],
+              action_required_reasons: [],
+              unresolved_thread_count: 0,
+              checks_pending: 0,
+              checks_failed: 0,
+              required_checks_pending: 0,
+              required_checks_failed: 0,
+              updated_at: '2026-04-14T16:02:16Z',
+              merged_at: '2026-04-14T16:02:16Z',
+              head_oid: 'abc123'
+            },
+            branch_recovery: null,
+            merge_attempt: null,
+            shared_root: {
+              status: 'reconciled',
+              reason: 'shared_root_reconciled',
+              before_status: '## main...origin/main',
+              after_status: '## main...origin/main'
+            },
+            linear_transition: {
+              status: 'transitioned',
+              attempted_at: '2026-04-14T16:02:35.110Z',
+              previous_state: 'Merging',
+              target_state: 'Done',
+              issue_state: 'Done',
+              issue_state_type: 'completed',
+              issue_updated_at: '2026-04-14T16:02:35.110Z',
+              error: null
+            },
+            github_rate_limit: null
+          }
+        }
+      ]);
+      const fixture = await createFixture({
+        taskId: 'linear-issue-co-181',
+        providerIntakeState,
+        linearAdvisoryState: {
+          tracked_issue: createTrackedIssue({
+            id: 'issue-co-181',
+            identifier: 'CO-181',
+            title: 'Completed provider refresh issue',
+            state: 'In Progress',
+            state_type: 'started',
+            updated_at: '2026-04-14T15:30:00.000Z'
+          })
+        }
+      });
+      await seedManifest(fixture.paths, {
+        task_id: 'linear-issue-co-181',
+        issue_provider: 'linear',
+        issue_id: 'issue-co-181',
+        issue_identifier: 'CO-181',
+        pipeline_id: 'provider-linear-worker',
+        pipeline_title: 'Provider Linear Worker',
+        status: 'succeeded',
+        started_at: '2026-04-14T15:00:00.000Z',
+        updated_at: '2026-04-14T16:02:35.110Z',
+        completed_at: '2026-04-14T16:02:35.110Z',
+        summary: 'Provider worker completed merge closeout.'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+      const uiDataset = buildUiDataset({
+        projection: compatibilityProjection,
+        generatedAt: '2026-04-14T22:38:07.171Z'
+      });
+
+      expect(compatibilityProjection.selected).toMatchObject({
+        issue_identifier: 'CO-181',
+        raw_status: 'succeeded',
+        provider_debug_snapshot: {
+          claim: {
+            state: 'released',
+            reason: 'provider_issue_released:not_active',
+            issue_state: 'Done',
+            issue_state_type: 'completed',
+            issue_updated_at: '2026-04-14T16:02:35.110Z'
+          },
+          progress: {
+            kind: 'merge_closeout',
+            status: 'completed'
+          }
+        }
+      });
+      expect(compatibilityProjection.running).toEqual([]);
+      expect(compatibilityProjection.retrying).toEqual([]);
+      expect(compatibilityProjection.issues).toEqual([]);
+      expect(uiDataset.counts.issues).toBe(0);
+      expect(uiDataset.issues).toEqual([]);
+
+      const doneClaim = providerIntakeState.claims[0]!;
+      const activeAgainFixture = await createFixture({
+        taskId: 'linear-issue-co-181-active-again',
+        providerIntakeState: createProviderIntakeState([
+          {
+            ...doneClaim,
+            task_id: 'linear-issue-co-181-active-again'
+          }
+        ]),
+        linearAdvisoryState: {
+          tracked_issue: createTrackedIssue({
+            id: 'issue-co-181',
+            identifier: 'CO-181',
+            title: 'Reopened provider refresh issue',
+            state: 'In Progress',
+            state_type: 'started',
+            updated_at: '2026-04-14T16:03:00.000Z'
+          })
+        }
+      });
+      await seedManifest(activeAgainFixture.paths, {
+        task_id: 'linear-issue-co-181-active-again',
+        issue_provider: 'linear',
+        issue_id: 'issue-co-181',
+        issue_identifier: 'CO-181',
+        pipeline_id: 'provider-linear-worker',
+        pipeline_title: 'Provider Linear Worker',
+        status: 'succeeded',
+        started_at: '2026-04-14T15:00:00.000Z',
+        updated_at: '2026-04-14T16:02:35.110Z',
+        completed_at: '2026-04-14T16:02:35.110Z',
+        summary: 'Provider worker completed merge closeout before a later active Linear update.'
+      });
+
+      const activeAgainProjection = await activeAgainFixture.runtime.snapshot().readCompatibilityProjection();
+      const activeAgainUiDataset = buildUiDataset({
+        projection: activeAgainProjection,
+        generatedAt: '2026-04-14T22:38:07.171Z'
+      });
+
+      expect(activeAgainProjection.running).toEqual([]);
+      expect(activeAgainProjection.retrying).toEqual([]);
+      expect(activeAgainProjection.issues.map((issue) => issue.issueIdentifier)).toEqual(['CO-181']);
+      expect(activeAgainUiDataset.counts.issues).toBe(1);
+      expect(activeAgainUiDataset.issues.map((issue) => issue.issue_identifier)).toEqual(['CO-181']);
+
+      const doneMergeCloseout = doneClaim.merge_closeout!;
+      const canceledClaim: ProviderIntakeState['claims'][number] = {
+        ...doneClaim,
+        provider_key: 'linear:issue-co-canceled',
+        issue_id: 'issue-co-canceled',
+        issue_identifier: 'CO-CANCELED',
+        issue_title: 'Canceled terminal provider row',
+        issue_state: 'Duplicate',
+        issue_state_type: 'canceled',
+        task_id: 'linear-issue-co-canceled',
+        merge_closeout: {
+          ...doneMergeCloseout,
+          issue_id: 'issue-co-canceled',
+          issue_identifier: 'CO-CANCELED',
+          issue_state: 'Duplicate',
+          issue_state_type: 'canceled',
+          linear_transition: doneMergeCloseout.linear_transition
+            ? {
+                ...doneMergeCloseout.linear_transition,
+                previous_state: 'In Progress',
+                target_state: 'Duplicate',
+                issue_state: 'Duplicate',
+                issue_state_type: 'canceled'
+              }
+            : null
+        }
+      };
+      const canceledFixture = await createFixture({
+        taskId: 'linear-issue-co-canceled',
+        providerIntakeState: createProviderIntakeState([canceledClaim])
+      });
+      await seedManifest(canceledFixture.paths, {
+        task_id: 'linear-issue-co-canceled',
+        issue_provider: 'linear',
+        issue_id: 'issue-co-canceled',
+        issue_identifier: 'CO-CANCELED',
+        pipeline_id: 'provider-linear-worker',
+        pipeline_title: 'Provider Linear Worker',
+        status: 'succeeded',
+        started_at: '2026-04-14T15:00:00.000Z',
+        updated_at: '2026-04-14T16:02:35.110Z',
+        completed_at: '2026-04-14T16:02:35.110Z',
+        summary: 'Provider worker completed terminal closeout.'
+      });
+
+      const canceledProjection = await canceledFixture.runtime.snapshot().readCompatibilityProjection();
+      const canceledUiDataset = buildUiDataset({
+        projection: canceledProjection,
+        generatedAt: '2026-04-14T22:38:07.171Z'
+      });
+
+      expect(canceledProjection.selected).toMatchObject({
+        issue_identifier: 'CO-CANCELED',
+        raw_status: 'succeeded',
+        provider_debug_snapshot: {
+          claim: {
+            state: 'released',
+            reason: 'provider_issue_released:not_active',
+            issue_state: 'Duplicate',
+            issue_state_type: 'canceled'
+          },
+          progress: {
+            kind: 'merge_closeout',
+            status: 'completed'
+          }
+        }
+      });
+      expect(canceledProjection.running).toEqual([]);
+      expect(canceledProjection.retrying).toEqual([]);
+      expect(canceledProjection.issues).toEqual([]);
+      expect(canceledUiDataset.counts.issues).toBe(0);
+      expect(canceledUiDataset.issues).toEqual([]);
     } finally {
       vi.useRealTimers();
     }
