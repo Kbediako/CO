@@ -156,6 +156,7 @@ function buildChildLanePrompt(context: ProviderLinearChildLaneContext): string {
     '- If the change cannot be completed within that scope, stop and report back to the parent lane so it can relaunch with widened ownership.',
     '- Do not call Linear mutation helpers. Parent-owned integration happens by patch artifact only.',
     '- Do not run full repo validation suites. Keep checks tightly scoped to the touched area when needed.',
+    '- If the lane is advisory/read-only and no file changes are needed, finish with a concise evidence summary. The parent will classify a zero-byte patch as no-output advisory evidence, not as an applicable patch.',
     '',
     `Purpose: ${context.purpose}`,
     ...scopeLines,

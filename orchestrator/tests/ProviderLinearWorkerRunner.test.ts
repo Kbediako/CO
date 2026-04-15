@@ -1134,7 +1134,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       'Same-attempt deterministic provider mutation suppressions are in effect'
     );
     expect(continuationPrompt).toContain(
-      'Do not retry `create-follow-up` in this attempt unless you first add the required parity matrix.'
+      'Do not retry `create-follow-up` in this attempt unless you first add the required parity matrix or explicitly reclassify the follow-up as non-parity/alignment and omit `--parity-lane`.'
     );
   });
 
@@ -1179,7 +1179,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       'Same-attempt deterministic provider mutation suppressions are in effect'
     );
     expect(continuationPrompt).not.toContain(
-      'Do not retry `create-follow-up` in this attempt unless you first add the required parity matrix.'
+      'Do not retry `create-follow-up` in this attempt unless you first add the required parity matrix or explicitly reclassify the follow-up as non-parity/alignment and omit `--parity-lane`.'
     );
   });
 
@@ -1223,7 +1223,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       'Same-attempt deterministic provider mutation suppressions are in effect'
     );
     expect(continuationPrompt).not.toContain(
-      'Do not retry `create-follow-up` in this attempt unless you first add the required parity matrix.'
+      'Do not retry `create-follow-up` in this attempt unless you first add the required parity matrix or explicitly reclassify the follow-up as non-parity/alignment and omit `--parity-lane`.'
     );
   });
 
@@ -2040,6 +2040,8 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(firstTurnPrompt).toContain('manual elegance checklist');
     expect(firstTurnPrompt).toContain('Refresh the workpad with the review goal, findings or fallback, and final clean or justified status before handoff.');
     expect(firstTurnPrompt).toContain('Ordinary eligible same-issue child-lane parallelisation is a runtime contract');
+    expect(firstTurnPrompt).toContain('Supported child-lane phases are `docs`, `implementation`, `tests`');
+    expect(firstTurnPrompt).toContain('Do not request unsupported `classification` or `analysis` phases');
     expect(firstTurnPrompt).toContain('pre-turn decomposition matrix before choosing that decision');
     expect(firstTurnPrompt).toContain('candidate child lanes, file/phase scope, dependencies, overlap risk, expected validation artifact, child-lane owner, and cap-slot use');
     expect(firstTurnPrompt).toContain('Default to `parallelize_now` when the matrix contains at least one safe independent child-lane candidate');
@@ -2066,6 +2068,8 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(continuationPrompt).toContain('manual elegance checklist');
     expect(continuationPrompt).toContain('Refresh the workpad with the review goal, findings or fallback, and final clean or justified status before handoff.');
     expect(continuationPrompt).toContain('Ordinary eligible same-issue child-lane parallelisation is a runtime contract');
+    expect(continuationPrompt).toContain('Supported child-lane phases are `docs`, `implementation`, `tests`');
+    expect(continuationPrompt).toContain('Do not request unsupported `classification` or `analysis` phases');
     expect(continuationPrompt).toContain('pre-turn decomposition matrix before choosing that decision');
     expect(continuationPrompt).toContain('candidate child lanes, file/phase scope, dependencies, overlap risk, expected validation artifact, child-lane owner, and cap-slot use');
     expect(continuationPrompt).toContain('Default to `parallelize_now` when the matrix contains at least one safe independent child-lane candidate');

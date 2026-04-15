@@ -1,0 +1,111 @@
+{
+  "issue_id": "fixture-co184-helper-preflight-smooth-path",
+  "issue_identifier": "CO-FIXTURE-CO184",
+  "attempt_started_at": "2026-04-15T00:07:01.311Z",
+  "current_turn_started_at": "2026-04-15T00:08:00.000Z",
+  "linear_audit": {
+    "path": "provider-linear-worker-linear-audit.jsonl",
+    "attempted_count": 3,
+    "success_count": 3,
+    "failure_count": 0,
+    "latest_recorded_at": "2026-04-15T00:12:00.000Z",
+    "latest_by_operation": {
+      "parallelization": {
+        "recorded_at": "2026-04-15T00:08:05.000Z",
+        "operation": "parallelization",
+        "ok": true,
+        "issue_id": "fixture-co184-helper-preflight-smooth-path",
+        "issue_identifier": "CO-FIXTURE-CO184",
+        "source_setup": null,
+        "action": "parallelize_now",
+        "via": "supported docs advisory lane available after helper preflight; cap 0/2",
+        "state": "independent_scope_available",
+        "follow_up_issue_id": null,
+        "follow_up_issue_identifier": null,
+        "failed_relation_type": null,
+        "comment_id": null,
+        "attachment_id": null,
+        "error_code": null,
+        "error_message": null
+      },
+      "child-lane": {
+        "recorded_at": "2026-04-15T00:09:00.000Z",
+        "operation": "child-lane",
+        "ok": true,
+        "issue_id": "fixture-co184-helper-preflight-smooth-path",
+        "issue_identifier": "CO-FIXTURE-CO184",
+        "source_setup": null,
+        "action": "launched",
+        "via": "no-output advisory child lane recorded with parent-owned evidence path",
+        "state": "docs",
+        "follow_up_issue_id": null,
+        "follow_up_issue_identifier": null,
+        "failed_relation_type": null,
+        "comment_id": null,
+        "attachment_id": null,
+        "error_code": null,
+        "error_message": null
+      },
+      "upsert-workpad": {
+        "recorded_at": "2026-04-15T00:12:00.000Z",
+        "operation": "upsert-workpad",
+        "ok": true,
+        "issue_id": "fixture-co184-helper-preflight-smooth-path",
+        "issue_identifier": "CO-FIXTURE-CO184",
+        "source_setup": null,
+        "action": "updated",
+        "via": null,
+        "state": null,
+        "follow_up_issue_id": null,
+        "follow_up_issue_identifier": null,
+        "failed_relation_type": null,
+        "comment_id": "fixture-workpad-comment",
+        "attachment_id": null,
+        "error_code": null,
+        "error_message": null
+      }
+    },
+    "parallelization_entries": []
+  },
+  "child_lanes": [
+    {
+      "stream": "co184-docs-advisory",
+      "status": "succeeded",
+      "manifest_path": ".runs/linear-co184-helper-preflight-smooth-path-co184-docs-advisory/cli/2026-04-15T00-08-30-000Z/manifest.json",
+      "artifact_root": ".runs/linear-co184-helper-preflight-smooth-path-co184-docs-advisory/cli/2026-04-15T00-08-30-000Z",
+      "log_path": ".runs/linear-co184-helper-preflight-smooth-path-co184-docs-advisory/cli/2026-04-15T00-08-30-000Z/runner.ndjson",
+      "summary": "sanitized advisory lane confirmed classification was parent-owned and no patch was needed",
+      "issue_id": "fixture-co184-helper-preflight-smooth-path",
+      "issue_identifier": "CO-FIXTURE-CO184",
+      "workspace_path": null,
+      "source_setup": null,
+      "launched_at": "2026-04-15T00:08:30.000Z",
+      "purpose": "Advisory docs-scope classification fallback without unsupported phases",
+      "instructions": null,
+      "scope": {
+        "files": [],
+        "phases": [
+          "docs"
+        ]
+      },
+      "parent_snapshot": {
+        "head_sha": "fixture-head"
+      },
+      "lane_workspace_path": null,
+      "patch_artifact_path": ".runs/linear-co184-helper-preflight-smooth-path-co184-docs-advisory/cli/2026-04-15T00-08-30-000Z/provider-linear-child-lane.patch",
+      "patch_bytes": 0,
+      "decision": "rejected",
+      "decision_at": "2026-04-15T00:09:00.000Z",
+      "decision_reason": "No-output advisory: zero-byte patch kept as manifest/proof evidence only; parent owns final evidence path."
+    }
+  ],
+  "parallelization": {
+    "decision": "parallelize_now",
+    "reason": "independent_scope_available",
+    "summary": "supported docs advisory lane available after helper preflight; cap 0/2",
+    "recorded_at": "2026-04-15T00:08:05.000Z",
+    "child_lane_count": 1
+  },
+  "owner_status": "succeeded",
+  "updated_at": "2026-04-15T00:12:00.000Z"
+}

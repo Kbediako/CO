@@ -71,6 +71,7 @@ import { acquireLockWithRetry, type LockRetryOptions } from '../persistence/lock
 import { resolveCodexHome } from './utils/codexPaths.js';
 import {
   normalizeProviderLinearChildLanePathSelectors,
+  resolveProviderLinearChildLaneSupportedPhases,
   type ProviderLinearChildLanePathSelector
 } from './providerLinearChildLanePhaseContract.js';
 import {
@@ -1125,8 +1126,11 @@ function buildParallelizationReasonCodesSummary(): string {
 }
 
 function buildParallelizationGuidance(helperCommand: string, issueId: string): string[] {
+  const supportedPhases = resolveProviderLinearChildLaneSupportedPhases();
+  const supportedPhaseList = supportedPhases.map((phase) => `\`${phase}\``).join(', ');
   return [
     `- Ordinary eligible same-issue child-lane parallelisation is a runtime contract in this lane, not optional prompt advice. During every active turn, record exactly one explicit decision with \`${helperCommand} parallelization --issue-id ${issueId} --decision <parallelize_now|stay_serial|forbid_parallel> --reason <reason-code> --summary <why>\`.`,
+    `- Supported child-lane phases are ${supportedPhaseList}. Do not request unsupported \`classification\` or \`analysis\` phases; handle classification/analysis needs with parent-owned source inspection, a supported file-scoped \`docs\`/\`tests\` lane when it owns concrete files, or an explicit serial/no-go decision when no supported bounded slice exists.`,
     '- Start each ordinary active turn with a pre-turn decomposition matrix before choosing that decision. The matrix must list candidate child lanes, file/phase scope, dependencies, overlap risk, expected validation artifact, child-lane owner, and cap-slot use.',
     '- Default to `parallelize_now` when the matrix contains at least one safe independent child-lane candidate, unless the same-issue cap is already exhausted. Outside that cap-exhausted case, `stay_serial` is rejected while any safe independent candidate remains; `single_bounded_change` must explain why no docs, test, research, or review slice can be separated safely.',
     '- Safe child-lane cap: at most 2 active, pending, or unaccepted same-issue child lanes may exist at once, and that cap never bypasses CO-125 provider admission constraints. If the cap is exhausted, do not launch another lane; record the serial/no-go evidence with `stay_serial` / `existing_child_lane_active` and labeled `cap_exhausted:` evidence in the summary. Stale in-flight accept claims older than 30 minutes, and legacy in-flight claims without timestamps, are recoverable and do not consume cap slots.',

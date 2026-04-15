@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "sanitized": true,
+  "eval": {
+    "description": "CO-184 trace-derived smooth path: helper constraints preflight unsupported child-lane phases, avoid temp workpad parent-dirty retry, suppress duplicate parity follow-up retry, and classify zero-byte child-lane output as advisory evidence.",
+    "memory_required": true,
+    "prompt_pack_required": true,
+    "follow_up_required": false,
+    "helper_constraints_required": true,
+    "parallelization": {
+      "expected_decision": "parallelize_now",
+      "expected_reason": "independent_scope_available",
+      "safe_independent_child_lane_candidates": 1,
+      "require_accepted_child_lane": false
+    }
+  },
+  "source_0": {
+    "pointer": "ctx:sha256:f2108c8eef2ced8fd9115b11b7e6ce9808f01f2703faaf8926c8dc6905908177#chunk:c000001",
+    "object_id": "sha256:f2108c8eef2ced8fd9115b11b7e6ce9808f01f2703faaf8926c8dc6905908177",
+    "source_path": ".runs/linear-co184-helper-preflight-smooth-path/cli/2026-04-15T00-07-01-311Z-smooth-path/memory/source-0/source.txt",
+    "included_in_provider_prompt": true
+  },
+  "prompt_pack": {
+    "selected_id": "provider-helper-preflight",
+    "selected_domain": "implementation",
+    "prior_experience_source_run": "2026-04-15T00-07-01.311Z-co-184",
+    "missing_experience_reason": null,
+    "included_in_provider_prompt": true
+  },
+  "planner": {
+    "selectedMemoryRefs": [
+      "source_0",
+      "prompt_pack:provider-helper-preflight"
+    ]
+  },
+  "helper_constraints": {
+    "supported_child_lane_phases": [
+      "docs",
+      "implementation",
+      "tests"
+    ],
+    "classification_analysis_guidance": true,
+    "parent_dirty_workpad_recovery": true,
+    "duplicate_parity_retry_suppressed": true,
+    "deterministic_failure_retry_count": 0,
+    "zero_byte_advisory_evidence": true,
+    "useful_parent_evidence_path": true
+  },
+  "follow_up_trace": {
+    "workpad_trace_present": true,
+    "related_link_present": false,
+    "blocker_link_present": false,
+    "intent_checksum": false,
+    "non_goals": false,
+    "not_done_if": false,
+    "acceptance_criteria": false,
+    "fail_closed": true,
+    "fail_closed_reason": "same-attempt deterministic parity follow-up retry suppressed until parity matrix or non-parity reclassification exists"
+  }
+}

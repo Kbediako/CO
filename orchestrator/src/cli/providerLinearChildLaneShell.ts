@@ -49,7 +49,8 @@ import {
   providerLinearChildLanePathMatchesSelectors,
   providerLinearChildLanePathSelectorsEqual,
   providerLinearChildLanePathSelectorsOverlap,
-  resolveProviderLinearChildLaneScopeContract
+  resolveProviderLinearChildLaneScopeContract,
+  resolveProviderLinearChildLaneSupportedPhases
 } from './providerLinearChildLanePhaseContract.js';
 import {
   applyResolvedProgramInvocationEnvOverrides,
@@ -366,6 +367,7 @@ async function launchChildLane(
   try {
     scope = normalizeChildLaneScope(params.files ?? [], params.phases ?? [], context.repoRoot);
   } catch (error) {
+    const message = formatChildLaneScopeLaunchFailureMessage(error instanceof Error ? error.message : String(error));
     return failureResult({
       action: 'launch',
       issueId: context.issueId,
@@ -375,7 +377,7 @@ async function launchChildLane(
       childRun: null,
       childLane: null,
       code: 'provider_worker_child_lane_scope_missing',
-      message: error instanceof Error ? error.message : String(error),
+      message,
       status: 422
     });
   }
@@ -389,7 +391,9 @@ async function launchChildLane(
       childRun: null,
       childLane: null,
       code: 'provider_worker_child_lane_scope_missing',
-      message: 'Provider worker child lanes require --purpose and at least one declared file or supported phase scope.',
+      message: formatChildLaneScopeLaunchFailureMessage(
+        'Provider worker child lanes require --purpose and at least one declared file or supported phase scope.'
+      ),
       status: 422
     });
   }
@@ -648,6 +652,7 @@ async function launchChildLane(
     }
   }
 
+  const zeroBytePatch = execResult.exitCode === 0 && childRun.status === 'succeeded' && childProof?.patch_bytes === 0;
   const childLane: ProviderLinearWorkerChildLaneRecord = {
     stream,
     pipeline_id: PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID,
@@ -674,10 +679,12 @@ async function launchChildLane(
     lane_workspace_path: childProof?.lane_workspace_path ?? null,
     patch_artifact_path: childProof?.patch_artifact_path ?? null,
     patch_bytes: childProof?.patch_bytes ?? null,
-    decision: 'pending',
+    decision: zeroBytePatch ? 'rejected' : 'pending',
     in_flight_action: null,
-    decision_at: null,
-    decision_reason: null
+    decision_at: zeroBytePatch ? deps.now() : null,
+    decision_reason: zeroBytePatch
+      ? buildNoOutputAdvisoryChildLaneDecisionReason(childRun)
+      : null
   };
 
   let recordedChildLaneForResult = childLane;
@@ -1951,17 +1958,29 @@ async function resolveParentDirtyScopeConflict(
   }
   const sample = dirtyPaths.slice(0, 5).join(', ');
   if (scope.phases.length > 0) {
-    return `Parent workspace has pending changes (${sample}); phase-scoped child lanes launch from HEAD and therefore require a clean parent workspace baseline.`;
+    return `Parent workspace has pending changes (${sample}); phase-scoped child lanes launch from HEAD and therefore require a clean parent workspace baseline. Move workpad/temp scratch files such as .tmp/workpad.md outside the repo (for example /tmp), remove stale scratch artifacts, or narrow to a file-scoped lane after the parent-owned edits are clean.`;
   }
   const overlapping = scope.files.filter((entry) => dirtyPaths.includes(entry));
   if (overlapping.length === 0) {
     return null;
   }
-  return `Parent workspace already has in-scope pending changes (${overlapping.join(', ')}); child lanes launch from HEAD and would miss those parent edits. Clean, commit, or narrow the lane scope before launching it.`;
+  return `Parent workspace already has in-scope pending changes (${overlapping.join(', ')}); child lanes launch from HEAD and would miss those parent edits. Clean, commit, move scratch workpad/temp artifacts outside the repo (for example /tmp), or narrow the lane scope before launching it.`;
 }
 
 function isIgnoredParentArtifactPath(path: string): boolean {
-  return path === '.child-lanes' || path.startsWith('.child-lanes/');
+  return path === '.child-lanes' || path.startsWith('.child-lanes/') || path === '.tmp/workpad.md';
+}
+
+function formatChildLaneScopeLaunchFailureMessage(message: string): string {
+  const supportedPhases = resolveProviderLinearChildLaneSupportedPhases().join(', ');
+  return `${message} Supported child-lane phases are: ${supportedPhases}. Do not use unsupported classification or analysis phases; use parent-owned source inspection, a supported file-scoped docs/tests lane, or a serial/no-go parallelization decision when no supported bounded slice exists.`;
+}
+
+function buildNoOutputAdvisoryChildLaneDecisionReason(childRun: ProviderLinearChildLaneRunResult): string {
+  const summary = normalizeOptionalString(childRun.summary);
+  return summary
+    ? `No-output advisory: child lane produced a zero-byte patch. Use the child manifest/proof and summary "${summary}" as advisory evidence only; parent owns any implementation patch and final evidence path.`
+    : 'No-output advisory: child lane produced a zero-byte patch. Use the child manifest/proof as advisory evidence only; parent owns any implementation patch and final evidence path.';
 }
 
 function scopesOverlap(
