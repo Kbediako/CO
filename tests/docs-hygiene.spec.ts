@@ -1029,6 +1029,7 @@ describe('docs hygiene tooling', () => {
         '',
         '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
         '- Spark roles are file/codebase search only; use non-spark roles for planning or review.',
+        '- Spark roles are file/codebase search only, but use non-spark roles for implementation.',
         ''
       ].join('\n'),
       'utf8'

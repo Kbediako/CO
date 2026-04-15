@@ -425,18 +425,18 @@ function hasOverbroadSparkUsage(relevantText: string): boolean {
 
 function isRestrictiveSparkUsageMention(relevantText: string, mentionIndex: number): boolean {
   const clausePrefix = relevantText.slice(findLastClauseBoundary(relevantText, mentionIndex), mentionIndex).toLowerCase();
-  if (/\b(?:but|except|unless)\b/.test(clausePrefix)) {
-    return false;
-  }
-  if (/\bnot\s+(?:exclusively|just|limited\b|limited\s+to|only|solely)\b/.test(clausePrefix)) {
-    return false;
-  }
   if (
     /\b(?:use|prefer|choose|select|route|run)\s+(?:a\s+|an\s+)?(?:non-spark|non\s+spark|alternate|alternative|different|other)\s+(?:roles?|agents?|models?)\b/.test(
       clausePrefix
     )
   ) {
     return true;
+  }
+  if (/\b(?:but|except|unless)\b/.test(clausePrefix)) {
+    return false;
+  }
+  if (/\bnot\s+(?:exclusively|just|limited\b|limited\s+to|only|solely)\b/.test(clausePrefix)) {
+    return false;
   }
   return /\b(?:do not|don't|must not|should not|cannot|can't|never|not|no|without)\b/.test(clausePrefix);
 }
