@@ -1052,6 +1052,9 @@ describe('docs hygiene tooling', () => {
         '- Spark roles are off by default and file/codebase search-only when enabled.',
         '- Spark roles are file/codebase search only and can be used for file/codebase search lanes.',
         '- Use `explorer_fast`, spark roles, and `gpt-5.3-codex-spark` for file/codebase search only.',
+        '- `explorer_fast` can help with file/codebase search debugging.',
+        '- For file/codebase search diagnostics, spark roles can assist.',
+        '- `gpt-5.3-codex-spark` is useful for codebase-search troubleshooting.',
         ''
       ].join('\n'),
       'utf8'
@@ -1062,6 +1065,59 @@ describe('docs hygiene tooling', () => {
     expect(
       errors.find((error) => error.file === 'README.md' && error.rule === 'spark-policy-overbroad')
     ).toBeUndefined();
+  });
+
+  it('rejects generic spark capability wording without file/codebase search scope', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-spark-policy-generic-capability-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['model-posture']
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      [
+        '# Codex Orchestrator',
+        '',
+        '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
+        '- `explorer_fast` can help with debugging.',
+        '- Spark roles can assist with diagnostics.',
+        '- `gpt-5.3-codex-spark` is helpful for incident triage.',
+        '- Spark roles are useful for repository troubleshooting.',
+        '- For debugging, spark roles can help quickly.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    for (const lineNumber of [4, 5, 6, 7, 8]) {
+      expect(errors).toContainEqual(
+        expect.objectContaining({
+          file: 'README.md',
+          rule: 'spark-policy-overbroad',
+          reference: `line ${lineNumber}: spark role missing file/codebase search-only scope`
+        })
+      );
+    }
   });
 
   it('rejects disabled spark wording that resumes active unqualified use', async () => {
