@@ -94,9 +94,21 @@ export function buildCompatibilityProjectionSnapshot(
   });
   const runningByIssue = new Map(running.map((entry) => [entry.issue_identifier, entry] as const));
   const retryingByIssue = new Map(retrying.map((entry) => [entry.issue_identifier, entry] as const));
-  const selectedPayload = snapshot.selected
-    ? buildProjectionSelectedPayload(snapshot.selected, snapshot.providerIntake ?? null)
-    : null;
+  const selectedIssue =
+    snapshot.selected ? issuesByIdentifier.get(snapshot.selected.issueIdentifier) ?? null : null;
+  const selectedActiveSource = selectedIssue?.runningSource ?? selectedIssue?.retrySource ?? null;
+  const selectedSnapshotSuppressed =
+    snapshot.selected !== null && shouldSuppressInactiveSelectedPayload(snapshot.selected);
+  const selectedSource = selectedSnapshotSuppressed
+    ? selectedActiveSource ?? selectedIssue?.selectedSource ?? snapshot.selected
+    : snapshot.selected ?? selectedActiveSource ?? selectedIssue?.selectedSource ?? null;
+  const selectedSourceIsPreferredActiveSource =
+    selectedSource !== null && selectedSource === selectedActiveSource;
+  const selectedPayload =
+    selectedSource &&
+    (selectedSourceIsPreferredActiveSource || !shouldSuppressInactiveSelectedPayload(selectedSource))
+      ? buildProjectionSelectedPayload(selectedSource, snapshot.providerIntake ?? null)
+      : null;
   const issues = index.issues
     .map((issue) => {
       if (shouldPruneTerminalSelectedCompatibilityIssue(issue)) {
@@ -142,27 +154,51 @@ function shouldPruneTerminalSelectedCompatibilityIssue(
   if (issue.runningSource || issue.retrySource || !issue.selectedSource) {
     return false;
   }
-  return isTerminalReleasedCompletedProviderSource(issue.selectedSource);
+  return (
+    isTerminalReleasedCompletedProviderSource(issue.selectedSource) ||
+    isStaleInProgressTerminalReleasedProviderSource(issue.selectedSource)
+  );
 }
 
 function isTerminalReleasedCompletedProviderSource(
   source: ControlCompatibilitySourceContext
 ): boolean {
   const debugSnapshot = source.providerDebugSnapshot ?? null;
-  const claim = debugSnapshot?.claim ?? null;
+  if (!isTerminalReleasedInactiveProviderSource(source)) {
+    return false;
+  }
+  if (!isCompletedCompatibilityRunStatus(source.rawStatus)) {
+    return false;
+  }
+  return hasCompletedMergeCloseout(debugSnapshot);
+}
+
+function shouldSuppressInactiveSelectedPayload(source: ControlCompatibilitySourceContext): boolean {
+  return isStaleInProgressTerminalReleasedProviderSource(source);
+}
+
+function isStaleInProgressTerminalReleasedProviderSource(
+  source: ControlCompatibilitySourceContext
+): boolean {
+  const debugSnapshot = source.providerDebugSnapshot ?? null;
+  return (
+    normalizeProviderLinearWorkflowState(source.rawStatus) === 'in_progress' &&
+    isTerminalReleasedInactiveProviderSource(source) &&
+    hasCompletedMergeCloseout(debugSnapshot)
+  );
+}
+
+function isTerminalReleasedInactiveProviderSource(
+  source: ControlCompatibilitySourceContext
+): boolean {
+  const claim = source.providerDebugSnapshot?.claim ?? null;
   if (normalizeProviderLinearWorkflowState(claim?.state) !== 'released') {
     return false;
   }
   if (normalizeProviderLinearWorkflowState(claim?.reason) !== 'provider_issue_released:not_active') {
     return false;
   }
-  if (!isCompletedCompatibilityRunStatus(source.rawStatus)) {
-    return false;
-  }
-  if (!isTerminalProviderIssueState(source)) {
-    return false;
-  }
-  return hasCompletedMergeCloseout(debugSnapshot);
+  return isTerminalProviderIssueState(source);
 }
 
 function isCompletedCompatibilityRunStatus(status: string | null | undefined): boolean {
@@ -194,17 +230,25 @@ function isTerminalProviderIssueState(source: ControlCompatibilitySourceContext)
   return [
     {
       state: trackedLinear?.state ?? null,
-      state_type: trackedLinear?.state_type ?? null
+      state_type: trackedLinear?.state_type ?? null,
+      updated_at: trackedLinear?.updated_at ?? null
     },
     {
       state: debugSnapshot?.live_linear_state.state ?? null,
-      state_type: debugSnapshot?.live_linear_state.state_type ?? null
+      state_type: debugSnapshot?.live_linear_state.state_type ?? null,
+      updated_at: debugSnapshot?.live_linear_state.updated_at ?? null
     },
     {
       state: source.compatibilityState ?? null,
-      state_type: null
+      state_type: null,
+      updated_at: source.updatedAt ?? null
     }
-  ].some((evidence) => classifyProviderLinearWorkflowState(evidence).isTerminal);
+  ].some((evidence) => {
+    const workflowState = classifyProviderLinearWorkflowState(evidence);
+    return (
+      workflowState.isTerminal && !hasNewerActiveProviderIssueState(source, evidence.updated_at)
+    );
+  });
 }
 
 function hasNewerActiveProviderIssueState(
@@ -214,6 +258,14 @@ function hasNewerActiveProviderIssueState(
   const trackedLinear = source.tracked?.linear ?? null;
   const debugSnapshot = source.providerDebugSnapshot ?? null;
   return [
+    {
+      state: debugSnapshot?.claim?.issue_state ?? null,
+      state_type: debugSnapshot?.claim?.issue_state_type ?? null,
+      updated_at:
+        debugSnapshot?.claim?.issue_updated_at ??
+        debugSnapshot?.claim?.updated_at ??
+        null
+    },
     {
       state: trackedLinear?.state ?? null,
       state_type: trackedLinear?.state_type ?? null,

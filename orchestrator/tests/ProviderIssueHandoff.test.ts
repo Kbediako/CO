@@ -19097,6 +19097,437 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.resume).not.toHaveBeenCalled();
   });
 
+  it('keeps queued released pending-reopen drains excluded from fresh discovery', async () => {
+    const { root, paths } = await createHostPaths();
+    const queuedEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const queuedPaths = resolveRunPaths(queuedEnv, 'run-ready-pending-reopen-queued');
+    await mkdir(queuedPaths.runDir, { recursive: true });
+    await writeFile(
+      queuedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-ready-pending-reopen-queued',
+        task_id: 'linear-lin-issue-1',
+        status: 'queued',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-191',
+        issue_updated_at: '2026-04-15T15:00:00.000Z',
+        started_at: '2026-04-15T15:00:00.000Z',
+        updated_at: '2026-04-15T15:02:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-191',
+      issue_title: 'Refactor docs hygiene spark policy guard',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-15T15:00:00.000Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'released',
+      reason: 'provider_issue_released_pending_reopen:provider_issue_released:not_active',
+      accepted_at: '2026-04-15T15:00:05.000Z',
+      updated_at: '2026-04-15T15:02:10.000Z',
+      last_delivery_id: 'delivery-ready-pending-reopen',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_744_730_400_000,
+      run_id: 'run-ready-pending-reopen-queued',
+      run_manifest_path: queuedPaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-should-not-start',
+        manifestPath: '/tmp/provider-run/should-not-start.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue()
+    }));
+    const refetchTrackedIssues = vi.fn(async (input?: { excludedIssueIds?: string[] }) => {
+      expect(input?.excludedIssueIds).toContain('lin-issue-1');
+      return {
+        kind: 'ready' as const,
+        trackedIssues: []
+      };
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
+  it('keeps unknown null-status pending-reopen runs excluded from fresh discovery', async () => {
+    const { root, paths } = await createHostPaths();
+    const unknownEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const unknownPaths = resolveRunPaths(unknownEnv, 'run-ready-pending-reopen-unknown');
+    await mkdir(unknownPaths.runDir, { recursive: true });
+    await writeFile(
+      unknownPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-ready-pending-reopen-unknown',
+        task_id: 'linear-lin-issue-1',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-191',
+        issue_updated_at: '2026-04-15T15:00:00.000Z',
+        started_at: '2026-04-15T15:00:00.000Z',
+        updated_at: '2026-04-15T15:02:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-191',
+      issue_title: 'Refactor docs hygiene spark policy guard',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-15T15:00:00.000Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'released',
+      reason: 'provider_issue_released_pending_reopen:provider_issue_released:not_active',
+      accepted_at: '2026-04-15T15:00:05.000Z',
+      updated_at: '2026-04-15T15:02:10.000Z',
+      last_delivery_id: 'delivery-ready-pending-reopen',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_744_730_400_000,
+      run_id: 'run-ready-pending-reopen-unknown',
+      run_manifest_path: unknownPaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-should-not-start',
+        manifestPath: '/tmp/provider-run/should-not-start.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue()
+    }));
+    const refetchTrackedIssues = vi.fn(async (input?: { excludedIssueIds?: string[] }) => {
+      expect(input?.excludedIssueIds).toContain('lin-issue-1');
+      return {
+        kind: 'ready' as const,
+        trackedIssues: []
+      };
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
+  it('keeps missing retained pending-reopen manifests excluded from fresh discovery', async () => {
+    const { root, paths } = await createHostPaths();
+    const missingManifestPath = join(
+      root,
+      '.runs',
+      'linear-lin-issue-1',
+      'cli',
+      'run-ready-pending-reopen-missing',
+      'manifest.json'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-191',
+      issue_title: 'Refactor docs hygiene spark policy guard',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-15T15:00:00.000Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'released',
+      reason: 'provider_issue_released_pending_reopen:provider_issue_released:not_active',
+      accepted_at: '2026-04-15T15:00:05.000Z',
+      updated_at: '2026-04-15T15:02:10.000Z',
+      last_delivery_id: 'delivery-ready-pending-reopen',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_744_730_400_000,
+      run_id: 'run-ready-pending-reopen-missing',
+      run_manifest_path: missingManifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-should-not-start',
+        manifestPath: '/tmp/provider-run/should-not-start.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue()
+    }));
+    const refetchTrackedIssues = vi.fn(async (input?: { excludedIssueIds?: string[] }) => {
+      expect(input?.excludedIssueIds).toContain('lin-issue-1');
+      return {
+        kind: 'ready' as const,
+        trackedIssues: []
+      };
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
+  it('reclaims a Ready released pending-reopen claim through fresh discovery after blockers clear', async () => {
+    const { root, paths } = await createHostPaths();
+    const staleEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const stalePaths = resolveRunPaths(staleEnv, 'run-ready-pending-reopen-stale');
+    await mkdir(stalePaths.runDir, { recursive: true });
+    await writeFile(
+      stalePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-ready-pending-reopen-stale',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-191',
+        issue_updated_at: '2026-04-15T15:00:00.000Z',
+        started_at: '2026-04-15T15:00:00.000Z',
+        updated_at: '2026-04-15T15:02:00.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(stalePaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-191',
+        pid: '424242',
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        attempt_started_at: '2026-04-15T15:00:00.000Z',
+        updated_at: '2026-04-15T15:02:00.000Z'
+      }),
+      'utf8'
+    );
+    const workspacePath = resolveProviderWorkspacePath(root, 'linear-lin-issue-1');
+    await mkdir(workspacePath, { recursive: true });
+    const dirtyWorkspaceFile = join(workspacePath, 'dirty-workspace.txt');
+    await writeFile(dirtyWorkspaceFile, 'preserve dirty work', 'utf8');
+
+    const terminalBlocker = {
+      id: 'lin-blocker-1',
+      identifier: 'CO-183',
+      state: 'Done',
+      state_type: 'completed'
+    };
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-191',
+      issue_title: 'Refactor docs hygiene spark policy guard',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-15T15:00:00.000Z',
+      issue_blocked_by: [terminalBlocker],
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'released',
+      reason: 'provider_issue_released_pending_reopen:provider_issue_released:not_active',
+      accepted_at: '2026-04-15T15:00:05.000Z',
+      updated_at: '2026-04-15T15:02:10.000Z',
+      last_delivery_id: 'delivery-ready-pending-reopen',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_744_730_400_000,
+      run_id: 'run-ready-pending-reopen-stale',
+      run_manifest_path: stalePaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-ready-reclaimed',
+        manifestPath: '/tmp/provider-run/ready-reclaimed-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue()
+    }));
+    const refetchTrackedIssues = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-issue-1',
+          identifier: 'CO-191',
+          title: 'Refactor docs hygiene spark policy guard',
+          state: 'Ready',
+          state_type: 'unstarted',
+          updated_at: '2026-04-15T15:30:00.000Z',
+          blocked_by: [terminalBlocker]
+        })
+      ]
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue,
+      isProcessAlive: () => false,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(refetchTrackedIssues.mock.calls[0]?.[0]?.excludedIssueIds).not.toContain('lin-issue-1');
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-issue-1',
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-issue-1',
+      issueIdentifier: 'CO-191',
+      issueUpdatedAt: '2026-04-15T15:30:00.000Z',
+      launchToken: expect.any(String)
+    }));
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-15T15:30:00.000Z',
+      issue_blocked_by: [terminalBlocker],
+      task_id: 'linear-lin-issue-1',
+      run_id: 'run-ready-reclaimed',
+      run_manifest_path: '/tmp/provider-run/ready-reclaimed-manifest.json',
+      launch_source: 'control-host',
+      launch_token: expect.any(String)
+    });
+    await expect(readFile(dirtyWorkspaceFile, 'utf8')).resolves.toBe('preserve dirty work');
+  });
+
   it('allows a newer active webhook to relaunch a released claim after the release drain has settled', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {
