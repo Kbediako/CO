@@ -52,6 +52,23 @@
       }
     },
     {
+      "id": "20260415-linear-9a54c7d8-518f-4452-95aa-c5852008b38d",
+      "title": "CO workflow: preflight provider helper constraints before worker retries",
+      "relates_to": "tasks/tasks-linear-9a54c7d8-518f-4452-95aa-c5852008b38d.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-15",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-9a54c7d8-518f-4452-95aa-c5852008b38d.md",
+        "task": "tasks/tasks-linear-9a54c7d8-518f-4452-95aa-c5852008b38d.md",
+        "agent_task": ".agent/task/linear-9a54c7d8-518f-4452-95aa-c5852008b38d.md",
+        "docs": "docs/TECH_SPEC-linear-9a54c7d8-518f-4452-95aa-c5852008b38d.md"
+      }
+    },
+    {
       "id": "20260414-linear-ba9a1c35-c8d1-4b76-aa33-4937502d1964",
       "title": "CO: prune terminal released provider rows from CO STATUS JSON active counts",
       "relates_to": "tasks/tasks-linear-ba9a1c35-c8d1-4b76-aa33-4937502d1964.md",

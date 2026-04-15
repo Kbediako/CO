@@ -182,7 +182,7 @@ function buildDeterministicProviderMutationSuppression(
         error_message: errorMessage,
         instruction:
           errorCode === 'linear_follow_up_parity_matrix_missing'
-            ? 'Do not retry `create-follow-up` in this attempt unless you first add the required parity matrix.'
+            ? 'Do not retry `create-follow-up` in this attempt unless you first add the required parity matrix or explicitly reclassify the follow-up as non-parity/alignment and omit `--parity-lane`.'
             : buildGenericSuppressionInstruction(entry.operation, errorCode, errorMessage),
         summary:
           errorCode === 'linear_follow_up_parity_matrix_missing'
