@@ -30,6 +30,34 @@ Those report fields are not waivers. They are the repo-wide freshness debt ledge
 
 `spec-guard` uses the same catalog policy for stale active specs under the docs catalog. When the only stale specs are eligible, owner-backed, in-window entries from a declared baseline cohort, `spec-guard` prints the rolling spec cohort and exits successfully. It still fails for stale specs when the policy is missing, invalid, over budget, expired, outside the declared baseline, or when the spec class is not eligible.
 
+## Maintenance Decision
+`npm run docs:freshness:maintain` is the provider-gate maintenance entrypoint. It runs `docs:freshness`, runs `spec-guard`, computes the current git diff, and writes `out/<task-id>/docs-freshness-maintenance.json`.
+
+The maintenance report is the machine-readable decision future workers should cite instead of manually reclassifying date-boundary cohorts. It includes:
+
+- `freshness_decision`
+- `owner_issue`
+- `owner_issue_action`
+- `candidate_cohorts`
+- `blocking_changed_paths`
+- `diff_status`
+- `policy_capacity_status`
+- `expires_after`
+- `recommended_action`
+- sample paths for changed blockers, candidate rows, and hard stale rows
+
+Provider-worker gates use this decision in `docs-review` and `implementation-gate`. They may pass with `pass_with_owned_rolling_debt` only when the debt is in an eligible historical class, the policy owner issue is present, the rows are still inside the rolling window and caps, `spec-guard` is clean, and the current diff/task packet has no blocking freshness paths. The underlying `docs:freshness` JSON still preserves the raw stale and rolling row evidence.
+
+Blocking decisions are fail-closed:
+
+- `block_missing_or_invalid_registry`: missing registry rows, registry references to missing files, invalid registry metadata, or uncatalogued docs.
+- `block_diff_local`: current diff/task-packet freshness drift, a hard `spec-guard` failure, or an unavailable git base that prevents proving the current diff is clean.
+- `block_policy_expired`: eligible historical rows are past the rolling window.
+- `block_policy_over_budget`: eligible in-window historical rows exceed `max_entries` or `max_cohorts`.
+- `block_unowned_repo_debt`: stale rows need direct owner action before provider-worker gates may pass.
+
+The scheduled docs truthfulness maintenance workflow runs near UTC date rollover with `--warn`, uploads the maintenance JSON, and records the owner/action evidence in the workflow summary. It does not silently bump `last_review`; it either reports a pass-with-owned-debt decision or a hard blocker that the owner issue must resolve through review, archive, or reclassification.
+
 ## Required Handling
 A rolling cohort must be resolved before the window expires by one of these explicit outcomes:
 

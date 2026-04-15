@@ -50,6 +50,9 @@ describe('review command probe classification', () => {
   it('treats heavy commands and shell payload wrappers as likely review command lines', () => {
     expect(isLikelyReviewCommandLine(`/bin/zsh -lc 'printenv MANIFEST'`)).toBe(true);
     expect(isLikelyReviewCommandLine(`/bin/zsh -lc 'npm run docs:check'`)).toBe(true);
+    expect(isLikelyReviewCommandLine(`/bin/zsh -lc 'npm run docs:freshness:maintain'`)).toBe(
+      true
+    );
     expect(isLikelyReviewCommandLine('not actually a command')).toBe(false);
   });
 
