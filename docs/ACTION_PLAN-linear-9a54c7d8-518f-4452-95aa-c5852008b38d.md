@@ -20,6 +20,7 @@
 - Do not mask `provider_worker_child_lane_scope_missing`, `provider_worker_child_lane_parent_dirty`, `provider_worker_child_lane_scope_conflict`, `linear_follow_up_parity_matrix_missing`, `.tmp/workpad.md`, zero-byte child-lane patch handling, `provider-linear-worker-linear-audit.jsonl`, or `provider-linear-worker-proof.json` as successful hidden outcomes.
 
 ## Parity Matrix
+
 | Criterion | Current | Reference | Target |
 | --- | --- | --- | --- |
 | Child-lane phase contract | Workers can still attempt unsupported `classification,analysis` before helper constraints are surfaced. | Supported phases are `docs`, `implementation`, and `tests`; unsupported phases fail closed. | First-turn/continuation guidance exposes the supported set and routes classification or analysis needs through serial parent evidence or a supported phase. |
@@ -34,7 +35,7 @@
 4. Implement supported child-lane phase preflight in provider guidance, helper output, or both.
 5. Implement deterministic parent-dirty and scope-conflict recovery guidance before child-lane retry.
 6. Implement same-attempt truth to suppress duplicate `create-follow-up` retries after `linear_follow_up_parity_matrix_missing` unless inputs change correctly.
-7. Implement zero-byte read-only child-lane output classification so parent evidence remains useful.
+7. Implement zero-byte, read-only child-lane output classification, so parent evidence remains useful.
 8. Add focused regression/eval coverage based on the `CO-184` trace and run parent validation gates.
 
 ## Dependencies
@@ -61,13 +62,13 @@
 
 ## Risks & Mitigations
 - Risk: preflight guidance hides real helper failures instead of preventing them.
-  - Mitigation: keep failed helper calls visible in audit/proof while suppressing duplicate deterministic retries only after unchanged inputs are proven.
+  - Mitigation: keep failed helper calls visible in audit/proof, while suppressing duplicate deterministic retries only after unchanged inputs are proven.
 - Risk: adding `classification` or `analysis` as phases silently weakens scope semantics.
   - Mitigation: require phase-to-path contract, docs, and tests together before adding phases.
 - Risk: parent-dirty recovery weakens clean-parent checks.
   - Mitigation: preserve clean-parent validation and provide sequencing/recovery guidance rather than broad bypasses.
 - Risk: zero-byte output is reclassified too leniently.
-  - Mitigation: require a usable summary/artifact or explicit no-output advisory plus parent-owned evidence path.
+  - Mitigation: require a usable summary/artifact or explicit no-output advisory plus parent-owned evidence path, while keeping parent evidence useful.
 
 ## Approvals
 - Reviewer: pending parent review and docs-review.
