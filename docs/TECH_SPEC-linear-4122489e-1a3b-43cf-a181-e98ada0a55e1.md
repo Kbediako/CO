@@ -53,7 +53,7 @@ last_review: 2026-04-16
   - `node scripts/spec-guard.mjs --dry-run`
   - `node scripts/runtime-mode-canary.mjs`
   - `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 npm run ci:cloud-canary` or exact blocker
-  - `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 CLOUD_CANARY_EXPECT_FALLBACK=1 npm run ci:cloud-canary` or exact blocker
+  - `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 CLOUD_CANARY_EXPECT_FALLBACK=1 npm run ci:cloud-canary` or exact blocker for the required fallback promotion gate
   - `npm run build`
   - `npm run lint`
   - `npm run test`

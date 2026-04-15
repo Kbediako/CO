@@ -46,6 +46,6 @@
 - [ ] PR attached and ready-review drain completed before `In Review`.
 
 ## Handoff Status
-- [ ] PR opened and attached to CO-195.
+- [x] PR opened (`#490`) and attached to CO-195.
 - [ ] Workpad refreshed with final evidence and review status.
 - [ ] Linear transitioned to `In Review` only after required validation, PR checks, ready-review drain, and latest `origin/main` merge are clean or explicitly waived.
