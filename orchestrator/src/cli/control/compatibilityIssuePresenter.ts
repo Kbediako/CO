@@ -94,9 +94,20 @@ export function buildCompatibilityProjectionSnapshot(
   });
   const runningByIssue = new Map(running.map((entry) => [entry.issue_identifier, entry] as const));
   const retryingByIssue = new Map(retrying.map((entry) => [entry.issue_identifier, entry] as const));
+  const selectedIssue =
+    snapshot.selected ? issuesByIdentifier.get(snapshot.selected.issueIdentifier) ?? null : null;
+  const selectedActiveSource = selectedIssue?.runningSource ?? selectedIssue?.retrySource ?? null;
+  const selectedSnapshotSuppressed =
+    snapshot.selected !== null && shouldSuppressInactiveSelectedPayload(snapshot.selected);
+  const selectedSource = selectedSnapshotSuppressed
+    ? selectedActiveSource ?? selectedIssue?.selectedSource ?? snapshot.selected
+    : snapshot.selected ?? selectedActiveSource ?? selectedIssue?.selectedSource ?? null;
+  const selectedSourceIsPreferredActiveSource =
+    selectedSource !== null && selectedSource === selectedActiveSource;
   const selectedPayload =
-    snapshot.selected && !shouldSuppressInactiveSelectedPayload(snapshot.selected)
-      ? buildProjectionSelectedPayload(snapshot.selected, snapshot.providerIntake ?? null)
+    selectedSource &&
+    (selectedSourceIsPreferredActiveSource || !shouldSuppressInactiveSelectedPayload(selectedSource))
+      ? buildProjectionSelectedPayload(selectedSource, snapshot.providerIntake ?? null)
       : null;
   const issues = index.issues
     .map((issue) => {
@@ -219,17 +230,25 @@ function isTerminalProviderIssueState(source: ControlCompatibilitySourceContext)
   return [
     {
       state: trackedLinear?.state ?? null,
-      state_type: trackedLinear?.state_type ?? null
+      state_type: trackedLinear?.state_type ?? null,
+      updated_at: trackedLinear?.updated_at ?? null
     },
     {
       state: debugSnapshot?.live_linear_state.state ?? null,
-      state_type: debugSnapshot?.live_linear_state.state_type ?? null
+      state_type: debugSnapshot?.live_linear_state.state_type ?? null,
+      updated_at: debugSnapshot?.live_linear_state.updated_at ?? null
     },
     {
       state: source.compatibilityState ?? null,
-      state_type: null
+      state_type: null,
+      updated_at: source.updatedAt ?? null
     }
-  ].some((evidence) => classifyProviderLinearWorkflowState(evidence).isTerminal);
+  ].some((evidence) => {
+    const workflowState = classifyProviderLinearWorkflowState(evidence);
+    return (
+      workflowState.isTerminal && !hasNewerActiveProviderIssueState(source, evidence.updated_at)
+    );
+  });
 }
 
 function hasNewerActiveProviderIssueState(
@@ -239,6 +258,14 @@ function hasNewerActiveProviderIssueState(
   const trackedLinear = source.tracked?.linear ?? null;
   const debugSnapshot = source.providerDebugSnapshot ?? null;
   return [
+    {
+      state: debugSnapshot?.claim?.issue_state ?? null,
+      state_type: debugSnapshot?.claim?.issue_state_type ?? null,
+      updated_at:
+        debugSnapshot?.claim?.issue_updated_at ??
+        debugSnapshot?.claim?.updated_at ??
+        null
+    },
     {
       state: trackedLinear?.state ?? null,
       state_type: trackedLinear?.state_type ?? null,

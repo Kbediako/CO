@@ -36,7 +36,7 @@
 - [x] Parent focused `CO-182` terminal-release pruning regression passes after implementation. Evidence: same focused regression slice passed.
 - [x] Parent focused `CO-189` live same-issue worker regression passes after implementation. Evidence: same focused regression slice passed.
 - [x] `node scripts/spec-guard.mjs --dry-run` after docs packet and implementation. Evidence: guard passed.
-- [x] Parent required validation/review/elegance gates before PR creation. Evidence: delegation/spec/diff guards, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `npm run repo:stewardship`, live `co-status` smoke, manifest-backed review `bounded-success`, and manual elegance pass all completed.
+- [x] Parent required validation/review/elegance gates before PR creation. Evidence: delegation/spec/diff guards, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `npm run repo:stewardship`, live `co-status` smoke, manifest-backed review `bounded-success` at `.runs/linear-34b60caa-258b-4f18-8d67-cdad3f6352cf/cli/2026-04-15T15-13-39-658Z-5e7c3046/review/telemetry.json`, and manual elegance pass all completed.
 
 ## Handoff
 - [x] Parent lane accepts or adjusts this patch, then continues owning Linear workpad, runtime implementation, validation, PR lifecycle, and review-state transition.

@@ -9,7 +9,17 @@
         "Codex"
       ],
       "last_review": "2026-04-15",
-      "approvals": {},
+      "approvals": {
+        "docs_review": {
+          "reviewer": "parent standalone review after docs-packet child lane",
+          "date": "2026-04-15",
+          "status": "succeeded",
+          "manifest": ".runs/linear-34b60caa-258b-4f18-8d67-cdad3f6352cf/cli/2026-04-15T15-13-39-658Z-5e7c3046/manifest.json",
+          "telemetry": ".runs/linear-34b60caa-258b-4f18-8d67-cdad3f6352cf/cli/2026-04-15T15-13-39-658Z-5e7c3046/review/telemetry.json",
+          "review_outcome": "bounded-success",
+          "fallback_note": "No separate docs-review child stream was retained for this packet. Same-issue docs child lane `.runs/linear-34b60caa-258b-4f18-8d67-cdad3f6352cf-docs-packet/cli/2026-04-15T15-17-13-513Z-1f05f920/manifest.json` produced the docs packet, parent accepted it before implementation, and the parent manifest-backed standalone review completed bounded-success."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-34b60caa-258b-4f18-8d67-cdad3f6352cf.md",
         "task": "tasks/tasks-linear-34b60caa-258b-4f18-8d67-cdad3f6352cf.md",

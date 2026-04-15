@@ -616,14 +616,20 @@ function isProviderIntakeClaimBoundToCompatibilitySource(
     | 'runId'
   >
 ): boolean {
-  const comparableBindings = [
+  const manifestBinding =
     claim.run_manifest_path && source.manifestPath
       ? claim.run_manifest_path === source.manifestPath
-      : null,
-    claim.run_id && source.runId ? claim.run_id === source.runId : null
-  ].filter((match): match is boolean => match !== null);
-  if (comparableBindings.length > 0) {
-    return comparableBindings.some(Boolean);
+      : null;
+  if (manifestBinding !== null) {
+    return manifestBinding;
+  }
+
+  const runBinding =
+    claim.run_id && source.runId
+      ? claim.run_id === source.runId && claim.task_id === source.taskId
+      : null;
+  if (runBinding !== null) {
+    return runBinding;
   }
   return isAuthoritativeProviderTaskIdMatch(claim, source);
 }

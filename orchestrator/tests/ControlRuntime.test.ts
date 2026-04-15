@@ -2580,6 +2580,159 @@ describe('ControlRuntime', () => {
       expect(uiDataset.running).toEqual([]);
       expect(uiDataset.issues).toEqual([]);
 
+      const mixedLiveFixture = await createFixture({
+        taskId: 'linear-df69fabe-63c2-4b98-a226-9c37892b4f9d-mixed-live',
+        providerIntakeState: createProviderIntakeState([
+          {
+            ...providerIntakeState.claims[0]!,
+            task_id: 'linear-df69fabe-63c2-4b98-a226-9c37892b4f9d-mixed-live',
+            run_id: 'run-1',
+            run_manifest_path: null
+          },
+          {
+            ...providerIntakeState.claims[0]!,
+            issue_state: 'In Progress',
+            issue_state_type: 'started',
+            issue_updated_at: '2026-04-15T15:12:00.000Z',
+            task_id: 'linear-df69fabe-63c2-4b98-a226-9c37892b4f9d-mixed-live',
+            state: 'running',
+            reason: 'provider_issue_running',
+            updated_at: '2026-04-15T15:12:00.000Z',
+            run_id: 'run-2',
+            run_manifest_path: null,
+            last_delivery_id: 'delivery-co-183-live',
+            launch_token: 'launch-co-183-live',
+            merge_closeout: null
+          }
+        ]),
+        linearAdvisoryState: {
+          tracked_issue: createTrackedIssue({
+            id: 'df69fabe-63c2-4b98-a226-9c37892b4f9d',
+            identifier: 'CO-183',
+            title: 'Expand Codex CLI 0.120 adoption and make spark file-search only',
+            state: 'Done',
+            state_type: 'completed',
+            updated_at: '2026-04-15T14:51:57.000Z'
+          })
+        }
+      });
+      await seedManifest(mixedLiveFixture.paths, {
+        task_id: 'linear-df69fabe-63c2-4b98-a226-9c37892b4f9d-mixed-live',
+        issue_provider: 'linear',
+        issue_id: 'df69fabe-63c2-4b98-a226-9c37892b4f9d',
+        issue_identifier: 'CO-183',
+        pipeline_id: 'provider-linear-worker',
+        pipeline_title: 'Provider Linear Worker',
+        status: 'in_progress',
+        started_at: '2026-04-15T12:00:00.000Z',
+        updated_at: '2026-04-15T14:52:00.000Z',
+        completed_at: null,
+        summary: 'Selected stale manifest is superseded by a live sibling.'
+      });
+      await seedProviderLinearWorkerProof(mixedLiveFixture.paths, {
+        issue_id: 'df69fabe-63c2-4b98-a226-9c37892b4f9d',
+        issue_identifier: 'CO-183',
+        pid: '85191',
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        last_event: 'turn_running',
+        last_message: 'Stale selected proof remains retained for audit.',
+        last_event_at: '2026-04-15T14:52:00.000Z',
+        rate_limits: {},
+        updated_at: '2026-04-15T14:52:00.000Z'
+      });
+      const liveSibling = await createSiblingRun(
+        mixedLiveFixture.root,
+        'linear-df69fabe-63c2-4b98-a226-9c37892b4f9d-mixed-live',
+        'run-2',
+        {
+          manifest: {
+            task_id: 'linear-df69fabe-63c2-4b98-a226-9c37892b4f9d-mixed-live',
+            issue_provider: 'linear',
+            issue_id: 'df69fabe-63c2-4b98-a226-9c37892b4f9d',
+            issue_identifier: 'CO-183',
+            pipeline_id: 'provider-linear-worker',
+            pipeline_title: 'Provider Linear Worker',
+            status: 'in_progress',
+            started_at: '2026-04-15T15:00:00.000Z',
+            updated_at: '2026-04-15T15:12:00.000Z',
+            completed_at: null,
+            summary: 'Live sibling is the preferred same-issue source.'
+          }
+        }
+      );
+      await seedProviderLinearWorkerProof(liveSibling, {
+        issue_id: 'df69fabe-63c2-4b98-a226-9c37892b4f9d',
+        issue_identifier: 'CO-183',
+        pid: '85192',
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        last_event: 'turn_running',
+        last_message: 'Live sibling proof is current.',
+        last_event_at: '2026-04-15T15:12:00.000Z',
+        rate_limits: {},
+        updated_at: '2026-04-15T15:12:00.000Z'
+      });
+      const mixedLiveProjection = await mixedLiveFixture.runtime
+        .snapshot()
+        .readCompatibilityProjection();
+      expect(mixedLiveProjection.selected).toMatchObject({
+        issue_identifier: 'CO-183',
+        run_id: 'run-2',
+        raw_status: 'in_progress'
+      });
+      expect(mixedLiveProjection.running.map((entry) => entry.issue_identifier)).toEqual([
+        'CO-183'
+      ]);
+      expect(mixedLiveProjection.issues.map((issue) => issue.issueIdentifier)).toEqual(['CO-183']);
+
+      const activeClaimFixture = await createFixture({
+        taskId: 'linear-df69fabe-63c2-4b98-a226-9c37892b4f9d-active-claim',
+        providerIntakeState: createProviderIntakeState([
+          {
+            ...providerIntakeState.claims[0]!,
+            issue_state: 'In Progress',
+            issue_state_type: 'started',
+            issue_updated_at: '2026-04-15T15:13:00.000Z',
+            task_id: 'linear-df69fabe-63c2-4b98-a226-9c37892b4f9d-active-claim',
+            updated_at: '2026-04-15T15:13:00.000Z',
+            run_id: 'run-1',
+            run_manifest_path: null
+          }
+        ]),
+        linearAdvisoryState: {
+          tracked_issue: createTrackedIssue({
+            id: 'df69fabe-63c2-4b98-a226-9c37892b4f9d',
+            identifier: 'CO-183',
+            title: 'Expand Codex CLI 0.120 adoption and make spark file-search only',
+            state: 'Done',
+            state_type: 'completed',
+            updated_at: '2026-04-15T14:51:57.000Z'
+          })
+        }
+      });
+      await seedManifest(activeClaimFixture.paths, {
+        task_id: 'linear-df69fabe-63c2-4b98-a226-9c37892b4f9d-active-claim',
+        issue_provider: 'linear',
+        issue_id: 'df69fabe-63c2-4b98-a226-9c37892b4f9d',
+        issue_identifier: 'CO-183',
+        pipeline_id: 'provider-linear-worker',
+        pipeline_title: 'Provider Linear Worker',
+        status: 'in_progress',
+        started_at: '2026-04-15T15:00:00.000Z',
+        updated_at: '2026-04-15T15:12:00.000Z',
+        completed_at: null,
+        summary: 'Provider claim has newer active issue truth than stale terminal tracked state.'
+      });
+      const activeClaimProjection = await activeClaimFixture.runtime
+        .snapshot()
+        .readCompatibilityProjection();
+      expect(activeClaimProjection.selected).toMatchObject({
+        issue_identifier: 'CO-183',
+        raw_status: 'in_progress'
+      });
+      expect(activeClaimProjection.issues.map((issue) => issue.issueIdentifier)).toEqual(['CO-183']);
+
       const noCloseoutClaim: ProviderIntakeState['claims'][number] = {
         ...providerIntakeState.claims[0]!,
         task_id: 'linear-df69fabe-63c2-4b98-a226-9c37892b4f9d-race',
@@ -2647,7 +2800,7 @@ describe('ControlRuntime', () => {
     }
   });
 
-  it('keeps selected in-progress provider runs visible when a same-issue released claim is from another run', async () => {
+  it('keeps selected in-progress provider runs visible when same-issue run ids collide across task lanes', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-15T15:13:39.658Z'));
     try {
@@ -2671,8 +2824,8 @@ describe('ControlRuntime', () => {
           last_event: 'Issue',
           last_action: 'update',
           last_webhook_timestamp: 1_744_726_317_000,
-          run_id: 'released-run',
-          run_manifest_path: '/tmp/released-co-183/manifest.json',
+          run_id: 'run-1',
+          run_manifest_path: null,
           launch_source: 'control-host',
           launch_token: 'launch-co-183'
         }
@@ -2692,7 +2845,6 @@ describe('ControlRuntime', () => {
         }
       });
       await seedManifest(fixture.paths, {
-        run_id: 'live-run',
         task_id: 'linear-df69fabe-63c2-4b98-a226-9c37892b4f9d-live',
         issue_provider: 'linear',
         issue_id: 'df69fabe-63c2-4b98-a226-9c37892b4f9d',
