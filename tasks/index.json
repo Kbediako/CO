@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260415-linear-aaa8be94-c82b-40a8-bb19-48343183790e",
+      "title": "CO: Refactor docs-hygiene spark policy guard into parser-backed fixture harness",
+      "relates_to": "tasks/tasks-linear-aaa8be94-c82b-40a8-bb19-48343183790e.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-15",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-aaa8be94-c82b-40a8-bb19-48343183790e.md",
+        "task": "tasks/tasks-linear-aaa8be94-c82b-40a8-bb19-48343183790e.md",
+        "agent_task": ".agent/task/linear-aaa8be94-c82b-40a8-bb19-48343183790e.md",
+        "docs": "docs/TECH_SPEC-linear-aaa8be94-c82b-40a8-bb19-48343183790e.md"
+      }
+    },
+    {
       "id": "20260415-linear-4ffb542b-28b2-4530-8630-b79357e306e2",
       "title": "CO workflow: automate docs:freshness baseline upkeep and diff-local gating",
       "relates_to": "tasks/tasks-linear-4ffb542b-28b2-4530-8630-b79357e306e2.md",
