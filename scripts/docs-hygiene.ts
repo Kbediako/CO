@@ -73,6 +73,8 @@ const SPARK_POLICY_DOC_CLASSES = new Set([
 
 const SPARK_POLICY_FILE_SEARCH_PATTERN =
   /(?:file[-/ ]search|codebase[-/ ]search|file\/codebase search|file search|codebase search)/i;
+const SPARK_POLICY_SCOPE_REQUIRED_PATTERN =
+  /\b(?:allow(?:ed|s|ing)?|except(?:ion|ions)?|keep(?:s|ing)?|only|permitted?|permits?|remain(?:s|ing)?|should|use(?:d|s|ing)?|must)\b/i;
 const SPARK_POLICY_FORBIDDEN_USAGE_PATTERN =
   /(?:search\/synthesis|\bbroad exploration\b|\bsynthesis\b|\bplanning\b|\bimplementation\b|\breview\b|\bexploration\b)/gi;
 
@@ -373,7 +375,7 @@ function checkSparkFileSearchPolicy(input: {
       continue;
     }
 
-    const relevantText = line.slice(markerIndex);
+    const relevantText = line.slice(findLastClauseBoundary(line, markerIndex));
     const lineNumber = index + 1;
     if (hasOverbroadSparkUsage(relevantText)) {
       errors.push({
@@ -384,7 +386,7 @@ function checkSparkFileSearchPolicy(input: {
       continue;
     }
 
-    if (!SPARK_POLICY_FILE_SEARCH_PATTERN.test(relevantText)) {
+    if (requiresSparkFileSearchScope(relevantText) && !SPARK_POLICY_FILE_SEARCH_PATTERN.test(relevantText)) {
       errors.push({
         file: input.file,
         rule: 'spark-policy-overbroad',
@@ -393,6 +395,23 @@ function checkSparkFileSearchPolicy(input: {
     }
   }
   return errors;
+}
+
+function requiresSparkFileSearchScope(relevantText: string): boolean {
+  if (isRestrictiveSparkPolicyStatement(relevantText)) {
+    return false;
+  }
+  return SPARK_POLICY_SCOPE_REQUIRED_PATTERN.test(relevantText);
+}
+
+function isRestrictiveSparkPolicyStatement(relevantText: string): boolean {
+  return (
+    /\b(?:do not|don't|must not|should not|cannot|can't|never|without)\b/i.test(relevantText) ||
+    /\bnot\s+(?:available\s+for|for|intended\s+for|to\s+be\s+used\s+for|used\s+for)\b/i.test(relevantText) ||
+    /\bno\s+(?:broad\s+exploration|exploration|implementation|planning|review|search\/synthesis|synthesis)\b/i.test(
+      relevantText
+    )
+  );
 }
 
 function hasOverbroadSparkUsage(relevantText: string): boolean {
@@ -407,6 +426,9 @@ function hasOverbroadSparkUsage(relevantText: string): boolean {
 function isRestrictiveSparkUsageMention(relevantText: string, mentionIndex: number): boolean {
   const clausePrefix = relevantText.slice(findLastClauseBoundary(relevantText, mentionIndex), mentionIndex).toLowerCase();
   if (/\b(?:but|except|unless)\b/.test(clausePrefix)) {
+    return false;
+  }
+  if (/\bnot\s+(?:exclusively|just|limited\b|limited\s+to|only|solely)\b/.test(clausePrefix)) {
     return false;
   }
   return /\b(?:do not|don't|must not|should not|cannot|can't|never|not|no|without)\b/.test(clausePrefix);
