@@ -998,6 +998,49 @@ describe('docs hygiene tooling', () => {
     ).toBeUndefined();
   });
 
+  it('accepts non-spark redirect wording for planning and review', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-spark-policy-non-spark-redirect-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['model-posture']
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      [
+        '# Codex Orchestrator',
+        '',
+        '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
+        '- Spark roles are file/codebase search only; use non-spark roles for planning or review.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(
+      errors.find((error) => error.file === 'README.md' && error.rule === 'spark-policy-overbroad')
+    ).toBeUndefined();
+  });
+
   it('accepts plain and restrictive spark references without requiring a repeated scope phrase', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-spark-policy-plain-caveat-'));
     createdDirs.push(repoRoot);

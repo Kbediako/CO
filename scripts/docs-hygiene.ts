@@ -431,6 +431,13 @@ function isRestrictiveSparkUsageMention(relevantText: string, mentionIndex: numb
   if (/\bnot\s+(?:exclusively|just|limited\b|limited\s+to|only|solely)\b/.test(clausePrefix)) {
     return false;
   }
+  if (
+    /\b(?:use|prefer|choose|select|route|run)\s+(?:a\s+|an\s+)?(?:non-spark|non\s+spark|alternate|alternative|different|other)\s+(?:roles?|agents?|models?)\b/.test(
+      clausePrefix
+    )
+  ) {
+    return true;
+  }
   return /\b(?:do not|don't|must not|should not|cannot|can't|never|not|no|without)\b/.test(clausePrefix);
 }
 
