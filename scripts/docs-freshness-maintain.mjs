@@ -14,6 +14,7 @@ import { runDocsFreshness } from './docs-freshness.mjs';
 const execFileAsync = promisify(execFile);
 
 const DEFAULT_REGISTRY_PATH = 'docs/docs-freshness-registry.json';
+const GIT_COMMAND_TIMEOUT_MS = 60_000;
 const PASSING_DECISIONS = new Set(['clean', 'pass_with_owned_rolling_debt']);
 
 function showUsage() {
@@ -420,7 +421,8 @@ export function buildDocsFreshnessMaintenanceDecision(
 
 async function gitOutput(repoRoot, args) {
   const { stdout } = await execFileAsync('git', ['-C', repoRoot, ...args], {
-    maxBuffer: 64 * 1024 * 1024
+    maxBuffer: 64 * 1024 * 1024,
+    timeout: GIT_COMMAND_TIMEOUT_MS
   });
   return stdout
     .split('\n')
@@ -430,7 +432,10 @@ async function gitOutput(repoRoot, args) {
 
 async function gitRefExists(repoRoot, ref) {
   try {
-    await gitOutput(repoRoot, ['rev-parse', '--verify', ref]);
+    await execFileAsync('git', ['-C', repoRoot, 'cat-file', '-e', `${ref}^{commit}`], {
+      maxBuffer: 64 * 1024 * 1024,
+      timeout: GIT_COMMAND_TIMEOUT_MS
+    });
     return true;
   } catch {
     return false;
