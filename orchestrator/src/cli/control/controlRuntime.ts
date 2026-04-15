@@ -1049,10 +1049,10 @@ function hasFreshTerminalSelectedTrackedIssue(
   }
   const trackedUpdatedAt = Date.parse(linear.updated_at ?? '');
   const claimIssueUpdatedAt = Date.parse(claim.issue_updated_at ?? '');
-  if (!Number.isFinite(claimIssueUpdatedAt)) {
-    return true;
+  if (!Number.isFinite(trackedUpdatedAt) || !Number.isFinite(claimIssueUpdatedAt)) {
+    return false;
   }
-  return Number.isFinite(trackedUpdatedAt) && trackedUpdatedAt >= claimIssueUpdatedAt;
+  return trackedUpdatedAt >= claimIssueUpdatedAt;
 }
 
 function hasStaleLocalProviderInProgressProof(

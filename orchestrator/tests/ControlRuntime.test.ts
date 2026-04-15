@@ -3189,6 +3189,102 @@ describe('ControlRuntime', () => {
     }
   });
 
+  it('keeps a selected provider claim running when the retained claim lacks issue freshness', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-15T16:39:00.000Z'));
+    const stalePid = 424245;
+    vi.spyOn(process, 'kill').mockImplementation((pid, signal) => {
+      if (pid === stalePid && signal === 0) {
+        const error = new Error('process not found') as NodeJS.ErrnoException;
+        error.code = 'ESRCH';
+        throw error;
+      }
+      return true;
+    });
+    try {
+      const providerIntakeState = createProviderIntakeState([
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-194',
+          issue_id: 'lin-issue-194',
+          issue_identifier: 'CO-194',
+          issue_title: 'Terminal stale merging claim',
+          issue_state: 'Merging',
+          issue_state_type: 'started',
+          issue_updated_at: null,
+          task_id: 'linear-72286a49-e68b-435a-be72-74d5c28feb09',
+          mapping_source: 'provider_id_fallback',
+          state: 'released',
+          reason: 'provider_issue_released_pending_reopen:provider_issue_released:not_active',
+          accepted_at: '2026-04-15T16:00:01.000Z',
+          updated_at: '2026-04-15T16:38:07.274Z',
+          last_delivery_id: 'delivery-co-194',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_744_754_287_274,
+          run_id: 'run-1',
+          run_manifest_path: null,
+          launch_source: null,
+          launch_token: null
+        }
+      ]);
+      const fixture = await createFixture({
+        taskId: 'linear-72286a49-e68b-435a-be72-74d5c28feb09',
+        providerIntakeState,
+        linearAdvisoryState: {
+          tracked_issue: createTrackedIssue({
+            id: 'lin-issue-194',
+            identifier: 'CO-194',
+            title: 'Terminal stale merging claim',
+            state: 'Done',
+            state_type: 'completed',
+            updated_at: '2026-04-15T16:38:07.274Z'
+          })
+        }
+      });
+      providerIntakeState.claims[0]!.run_manifest_path = fixture.paths.manifestPath;
+      await seedManifest(fixture.paths, {
+        task_id: 'linear-72286a49-e68b-435a-be72-74d5c28feb09',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-194',
+        issue_identifier: 'CO-194',
+        pipeline_id: 'provider-linear-worker',
+        pipeline_title: 'Provider Linear Worker',
+        status: 'in_progress',
+        started_at: '2026-04-15T16:00:00.000Z',
+        updated_at: '2026-04-15T16:04:00.000Z',
+        summary: 'Stale worker still reports in progress.'
+      });
+      await seedProviderLinearWorkerProof(fixture.paths, {
+        issue_id: 'lin-issue-194',
+        issue_identifier: 'CO-194',
+        pid: stalePid,
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        last_event: 'turn_running',
+        last_message: 'stale worker still reports running',
+        updated_at: '2026-04-15T16:04:00.000Z'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+      const uiDataset = buildUiDataset({
+        projection: compatibilityProjection,
+        generatedAt: '2026-04-15T16:39:00.000Z'
+      });
+
+      expect(compatibilityProjection.running).toHaveLength(1);
+      expect(compatibilityProjection.running[0]).toMatchObject({
+        issue_identifier: 'CO-194'
+      });
+      expect(uiDataset.counts.running).toBe(1);
+      expect(uiDataset.running[0]).toMatchObject({
+        issue_identifier: 'CO-194'
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('ignores unrelated retained local-mcp claims when evaluating the selected run', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
