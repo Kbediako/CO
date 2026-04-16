@@ -2033,6 +2033,158 @@ describe('runProviderIssueHandoffRefresh', () => {
     });
   });
 
+  it('keeps missing-manifest ordinary released not-active claims eligible for fresh discovery', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    pushCo185ReleasedPendingClaim(state, '', {
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-04-15T01:10:00.000Z',
+      run_id: 'run-missing-co-185',
+      run_manifest_path: `${paths.runDir}/missing-co-185-manifest.json`
+    });
+
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-co-185-restarted',
+        manifestPath: '/tmp/provider-run/co-185-restarted-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'skip' as const,
+      reason: 'provider_issue_poll_deferred_for_fresh_discovery'
+    }));
+    const refetchTrackedIssues = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-issue-185',
+          identifier: 'CO-185',
+          title: 'Provider helper constraints',
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-04-15T01:18:56.003Z'
+        })
+      ]
+    }));
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue,
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      allowPollFailClosed: true,
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(refetchTrackedIssues).toHaveBeenCalledWith({
+      mode: 'fresh_discovery',
+      eligibleTargetCount: 1,
+      eligibleStateSlotCounts: {},
+      excludedIssueIds: []
+    });
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'lin-issue-185',
+      issueIdentifier: 'CO-185',
+      issueUpdatedAt: '2026-04-15T01:18:56.003Z'
+    }));
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-15T01:18:56.003Z',
+      run_id: 'run-co-185-restarted',
+      run_manifest_path: '/tmp/provider-run/co-185-restarted-manifest.json'
+    });
+  });
+
+  it('keeps synthetic missing-manifest ordinary released not-active claims fail-closed', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    pushCo185ReleasedPendingClaim(state, '', {
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-04-15T01:10:00.000Z',
+      run_id: co185TaskId,
+      run_manifest_path: null
+    });
+
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-co-185-restarted',
+        manifestPath: '/tmp/provider-run/co-185-restarted-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => {
+      throw new Error('synthetic released not-active claim should not use direct issue refresh');
+    });
+    const refetchTrackedIssues = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-issue-185',
+          identifier: 'CO-185',
+          title: 'Provider helper constraints',
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-04-15T01:18:56.003Z'
+        })
+      ]
+    }));
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue,
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      allowPollFailClosed: true,
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(refetchTrackedIssues).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-04-15T01:10:00.000Z',
+      run_id: co185TaskId,
+      run_manifest_path: null
+    });
+  });
+
   it('retries released queued child cancellation on a later ready refresh after a transient release failure', async () => {
     const { root, paths } = await createHostPaths();
     const queuedEnv = {

@@ -3884,6 +3884,14 @@ export function createProviderIssueHandoffService(
           const activeRun = attachableClaimRuns.find((run) => run.status === 'in_progress') ?? null;
           const releaseRun = resolveProviderReleaseRun(claim, attachableClaimRuns);
           const latestRun = resolveLatestKnownProviderRun(attachableClaimRuns);
+          const canFreshDiscoverReleasedLiveWorker =
+            claim.state === 'released' &&
+            canFreshDiscoverReleasedLiveWorkerClaim(
+              claim,
+              releaseRun,
+              activeRun,
+              hasPendingReleaseCancel
+            );
           const allowDirectIssueById =
             !boundPreDiscoveryIssueByIdReads ||
             activeRun !== null ||
@@ -3895,10 +3903,7 @@ export function createProviderIssueHandoffService(
             allowPollFailClosed: pollInput?.deferFreshDiscovery === true,
             allowReleasedPollFailClosed:
               (pollInput?.allowPollFailClosed === true || pollInput?.deferFreshDiscovery === true) &&
-              !(
-                activeRun !== null &&
-                isProviderIssueReleasedLiveWorkerRehydrateCandidate(claim)
-              ),
+              !canFreshDiscoverReleasedLiveWorker,
             allowDirectIssueById,
             onDirectIssueById: () => {
               refreshCounts.issue_by_id_reads += 1;
@@ -3919,12 +3924,7 @@ export function createProviderIssueHandoffService(
               refreshCounts.issue_by_id_deferred += 1;
               if (
                 claim.state !== 'released' ||
-                !canFreshDiscoverReleasedLiveWorkerClaim(
-                  claim,
-                  releaseRun,
-                  activeRun,
-                  hasPendingReleaseCancel
-                )
+                !canFreshDiscoverReleasedLiveWorker
               ) {
                 deferredClaimFreshDiscoveryBlockedProviderKeys.add(claimProviderKey);
               }
@@ -7102,7 +7102,7 @@ function canFreshDiscoverReleasedPendingReopenClaim(
 }
 
 function canFreshDiscoverReleasedLiveWorkerClaim(
-  claim: Pick<ProviderIntakeClaimRecord, 'reason' | 'run_id' | 'run_manifest_path'>,
+  claim: Pick<ProviderIntakeClaimRecord, 'reason' | 'run_id' | 'run_manifest_path' | 'task_id'>,
   releaseRun: ProviderIssueRunRecord | null,
   activeRun: ProviderIssueRunRecord | null,
   hasPendingReleaseCancel: (manifestPath: string | null | undefined) => boolean
@@ -7115,9 +7115,24 @@ function canFreshDiscoverReleasedLiveWorkerClaim(
     return false;
   }
   if (claim.reason === 'provider_issue_released:not_active') {
-    return activeRun !== null;
+    return activeRun !== null || (runForCancel === null && canRecheckPlainReleasedNotActiveClaim(claim));
   }
   return canFreshDiscoverReleasedPendingReopenClaim(claim, releaseRun, hasPendingReleaseCancel);
+}
+
+function canRecheckPlainReleasedNotActiveClaim(
+  claim: Pick<ProviderIntakeClaimRecord, 'reason' | 'run_id' | 'run_manifest_path' | 'task_id'>
+): boolean {
+  if (claim.reason !== 'provider_issue_released:not_active') {
+    return false;
+  }
+  if (claim.run_manifest_path) {
+    return true;
+  }
+  return (
+    Boolean(claim.run_id) &&
+    claim.run_id !== claim.task_id
+  );
 }
 
 function isInactiveReleasedPendingReopenRun(
