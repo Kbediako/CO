@@ -3,9 +3,11 @@
 ## Traceability
 - Linear issue: `CO-198` / `f1d8b29c-b048-4816-96dd-a38f272dabb7`
 - Linear URL: https://linear.app/asabeko/issue/CO-198/co-canary-codex-0121-app-server-event-contracts-before-replacing
-- Parent manifest: `../../.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/cli/2026-04-15T22-57-06-636Z-d82a867f/manifest.json`
-- Child evidence manifest: `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-docs-source-evidence/cli/2026-04-15T23-01-24-245Z-8e91c159/manifest.json`
-- Source anchor: `ctx:sha256:09d3d2c97b6d9dca0677435e51ff33cf9d6615d9033e3c522efc0047af389c28#chunk:c000001`
+- Rework parent manifest: `../../.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/cli/2026-04-16T11-26-54-445Z-ce65b23d/manifest.json`
+- Rework child evidence manifest: `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-docs-source-evidence-rework/cli/2026-04-16T11-30-38-094Z-926472c7/manifest.json`
+- Rework workpad: Linear comment `817c4ebb-b0e9-484f-b4e8-4bc22fdda76c`
+- Fresh app-server smoke artifact: `out/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/manual/appserver-smoke-rework-20260416.json`
+- Source anchor: `ctx:sha256:f4b2acaf1748242cc5aa60b7a330957290d9217f08351fd7123b8b4f834613da#chunk:c000001`
 
 ## Problem
 Codex CLI `0.121.0` exposes experimental app-server and realtime event contracts that overlap with some data CO currently derives from provider stdout JSONL and session-log hydration. CO must not replace, de-prioritize, or weaken provider JSONL/session-log truth until the app-server contract is proven to preserve the provider proof fields used by CO STATUS, runtime diagnostics, worker ownership, and review/merge lifecycle evidence.
@@ -24,6 +26,7 @@ Reject these interpretations:
 - Confirm stable `0.121.0` release evidence, including registry, tag, package, and binary evidence.
 - Capture app-server schema/event/API surfaces for account/rate-limit notifications, Guardian review notifications/statuses, realtime transcript delta/done, MCP/app tool calls, thread/turn injection, and instruction-source fields.
 - Run a local app-server smoke and runtime canary without committing raw prompt-bearing payloads.
+- Preserve the `Rework` reset evidence: old PR `#491` closed, previous workpad deleted, and fresh branch based on current `origin/main`.
 - Produce a parity matrix from app-server surfaces to the CO provider proof fields currently sourced from stdout JSONL and session-log hydration.
 - Make a concrete replacement decision: hold unless provider truth loss is ruled out.
 

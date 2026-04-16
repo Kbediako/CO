@@ -1,22 +1,23 @@
 {
   "items": [
     {
-      "id": "20260415-linear-f1d8b29c-b048-4816-96dd-a38f272dabb7",
+      "id": "20260416-linear-f1d8b29c-b048-4816-96dd-a38f272dabb7",
       "title": "CO: Canary Codex 0.121 app-server event contracts before replacing provider JSONL/session-log truth",
       "relates_to": "tasks/tasks-linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md",
       "risk": "high",
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-15",
+      "last_review": "2026-04-16",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
-          "date": "2026-04-15",
-          "status": "succeeded",
-          "manifest": ".runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-docs-review/cli/2026-04-15T23-19-30-605Z-079b362f/manifest.json",
-          "telemetry": ".runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-docs-review/cli/2026-04-15T23-19-30-605Z-079b362f/review/telemetry.json",
-          "review_outcome": "clean-success"
+          "date": "2026-04-16",
+          "status": "pending",
+          "manifest": null,
+          "telemetry": null,
+          "review_outcome": null,
+          "note": "Rework reset replayed the docs packet on current origin/main; fresh docs-review pending before review handoff."
         }
       },
       "paths": {

@@ -2,36 +2,39 @@
 
 - Linear Issue: `CO-198` / `f1d8b29c-b048-4816-96dd-a38f272dabb7`
 - MCP Task ID: `linear-f1d8b29c-b048-4816-96dd-a38f272dabb7`
+- Canonical Registry ID: `20260416-linear-f1d8b29c-b048-4816-96dd-a38f272dabb7`
 - Primary PRD: `docs/PRD-linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md`
 - TECH_SPEC: `tasks/specs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md`
 - TECH_SPEC mirror: `docs/TECH_SPEC-linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md`
 - ACTION_PLAN: `docs/ACTION_PLAN-linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md`
 - Evidence finding: `docs/findings/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-codex-0121-appserver-canary.md`
-- Parent manifest: `../../.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/cli/2026-04-15T22-57-06-636Z-d82a867f/manifest.json`
+- Rework parent manifest: `../../.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/cli/2026-04-16T11-26-54-445Z-ce65b23d/manifest.json`
+- Rework child lane manifest: `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-docs-source-evidence-rework/cli/2026-04-16T11-30-38-094Z-926472c7/manifest.json`
 
 ## Docs-First
-- [x] PRD drafted with protected app-server and provider proof terms. Evidence: `docs/PRD-linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md`.
-- [x] TECH_SPEC drafted with release proof, schema capture, runtime canary, provider parity, and hold/go requirements. Evidence: `tasks/specs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md`, `docs/TECH_SPEC-linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md`.
-- [x] ACTION_PLAN drafted for evidence capture, validation, review, and handoff. Evidence: `docs/ACTION_PLAN-linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md`.
+- [x] PRD refreshed with protected app-server and provider proof terms. Evidence: `docs/PRD-linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md`.
+- [x] TECH_SPEC refreshed with release proof, schema capture, runtime canary, provider parity, and hold/go requirements. Evidence: `tasks/specs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md`, `docs/TECH_SPEC-linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md`.
+- [x] ACTION_PLAN refreshed for rework reset, evidence capture, validation, review, and handoff. Evidence: `docs/ACTION_PLAN-linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md`.
 - [x] `tasks/index.json` updated under canonical `items[]`. Evidence: `tasks/index.json`.
 - [x] `docs/TASKS.md` snapshot updated. Evidence: `docs/TASKS.md`.
 - [x] Checklist mirrored to `.agent/task/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md`. Evidence: `.agent/task/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md`.
-- [x] `docs/docs-freshness-registry.json` coverage added for packet and evidence files. Evidence: `docs/docs-freshness-registry.json`.
-- [x] Docs-review evidence captured before review handoff. Evidence: `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-docs-review/cli/2026-04-15T23-19-30-605Z-079b362f/manifest.json`, `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-docs-review/cli/2026-04-15T23-19-30-605Z-079b362f/review/telemetry.json`.
+- [x] `docs/docs-freshness-registry.json` coverage refreshed for packet and evidence files. Evidence: `docs/docs-freshness-registry.json`.
+- [ ] Fresh docs-review evidence captured before review handoff.
 
 ## Workflow
-- [x] Live issue context inspected before transition. Evidence: `linear issue-context` showed live workflow states and no PR attachment.
-- [x] Issue moved into the team's started state. Evidence: live state moved to `In Progress`.
-- [x] One active `## Codex Workpad` created and maintained. Evidence: Linear comment `2242584f-27ff-4ae0-ac8c-a2973d401009`.
+- [x] Live issue context inspected before transition/reset. Evidence: `linear issue-context` showed live state `Rework`, previous workpad, and attached PR `#491`.
+- [x] Rework reset performed. Evidence: PR `#491` closed; previous workpad `2242584f-27ff-4ae0-ac8c-a2973d401009` deleted.
+- [x] Fresh branch created from current `origin/main`. Evidence: branch `linear/co-198-codex-0121-appserver-contract-canary-rework` from `origin/main` `b65a12bbd`.
+- [x] One active `## Codex Workpad` created and maintained. Evidence: Linear comment `817c4ebb-b0e9-484f-b4e8-4bc22fdda76c`.
 - [x] Pre-turn decomposition and parallelization decision recorded. Evidence: `parallelize_now` / `independent_scope_available`.
-- [x] Same-issue child lane completed successfully. Evidence: `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-docs-source-evidence/cli/2026-04-15T23-01-24-245Z-8e91c159/manifest.json`.
-- [x] Child lane patch accepted after scope review. Evidence: child lane manifest and parent canary finding.
+- [x] Same-issue child lane launched. Evidence: `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-docs-source-evidence-rework/cli/2026-04-16T11-30-38-094Z-926472c7/manifest.json`.
+- [x] Same-issue child lane completed successfully and parent accepted/rejected/invalidated the patch artifact. Evidence: child run succeeded at `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-docs-source-evidence-rework/cli/2026-04-16T11-30-38-094Z-926472c7/manifest.json`; zero-byte patch was helper-rejected as advisory, so parent retained patch ownership.
 
 ## Acceptance Criteria
 - [x] Confirm stable `0.121.0` release evidence and exact app-server surfaces. Evidence: `docs/findings/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-codex-0121-appserver-canary.md`.
 - [x] Capture schemas or observed payloads for account/rate limits, Guardian review, realtime transcript, MCP app tools, thread/turn injection, and instruction-source fields. Evidence: `docs/findings/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-codex-0121-appserver-canary.md`.
 - [x] Produce parity matrix mapping app-server event classes to CO provider proof fields currently sourced from JSONL/session logs. Evidence: PRD parity matrix and finding provider matrix.
-- [x] Run local app-server smoke plus runtime canary and record artifacts. Evidence: finding runtime canary summary.
+- [x] Run local app-server smoke plus runtime canary and record artifacts. Evidence: `out/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/manual/appserver-smoke-rework-20260416.json`, `out/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/manual/runtime-canary-summary.json`.
 - [x] Prove no provider truth replacement is safe without parity. Evidence: hold decision in finding.
 - [x] If app-server evidence is incomplete, document hold decision and keep JSONL/session logs authoritative. Evidence: finding `Decision` section.
 - [x] Mirror issue validation provenance. Evidence: original draft validation by independent subagent Hegel preserved in workpad and checklist.
@@ -44,28 +47,27 @@
 - [ ] The final workpad omits the hold decision or validation status.
 
 ## Validation
-- [x] `git diff --check`.
-- [x] `node scripts/delegation-guard.mjs`.
-- [x] `node scripts/spec-guard.mjs --dry-run`.
-- [x] `npm run build`.
-- [x] `npm run lint`.
-- [x] `npm run test`.
-- [x] `npm run docs:check`.
-- [x] `npm run docs:freshness`.
-- [x] `npm run repo:stewardship`.
-- [x] `node scripts/diff-budget.mjs`.
-- [x] `node scripts/runtime-mode-canary.mjs`. Evidence: `out/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/manual/runtime-canary-summary.json` recorded `20/20` passing iterations for default app-server mode, app-server success, forced fallback, and unsupported-combo checks.
-- [x] Required cloud canary configuration blocker recorded for `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 npm run ci:cloud-canary`. Evidence: provider-worker execution failed closed with `Missing CODEX_CLOUD_ENV_ID`; hold remains in force until a real cloud environment id is available.
-- [x] Fallback contract blocker recorded for `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 CLOUD_CANARY_EXPECT_FALLBACK=1 npm run ci:cloud-canary`. Evidence: fallback manifest `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/cli/2026-04-15T23-59-13-984Z-8bf4380e/manifest.json` and run summary `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/cli/2026-04-15T23-59-13-984Z-8bf4380e/run-summary.json`; command failed required mode because `CODEX_CLOUD_ENV_ID` is absent.
-- [x] Manifest-backed standalone review. Evidence: `../../.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/cli/2026-04-15T22-57-06-636Z-d82a867f/review/telemetry.json` (`clean-success`).
-- [x] Explicit elegance/minimality pass. Result: docs-only packet stayed minimal; duplicate child-manifest evidence was removed; required `docs/TASKS.md` mirror was added through the existing archive path; no runtime/provider change or new abstraction was introduced.
+- [ ] `git diff --check`.
+- [ ] `node scripts/delegation-guard.mjs`.
+- [ ] `node scripts/spec-guard.mjs --dry-run`.
+- [ ] `npm run build`.
+- [ ] `npm run lint`.
+- [ ] `npm run test`.
+- [ ] `npm run docs:check`.
+- [ ] `npm run docs:freshness`.
+- [ ] `npm run repo:stewardship`.
+- [ ] `node scripts/diff-budget.mjs`.
+- [x] `node scripts/runtime-mode-canary.mjs`. Evidence: `out/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/manual/runtime-canary-summary.json` recorded `20/20` passing iterations for default app-server mode, app-server success, forced fallback, and unsupported-combo checks on `2026-04-16T11:40:44.487Z`.
+- [x] Required cloud canary configuration blocker or pass recorded for `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 npm run ci:cloud-canary`. Evidence: `out/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/manual/cloud-canary-required-rework/step-summary.md` records `Missing CODEX_CLOUD_ENV_ID`.
+- [x] Fallback contract blocker or pass recorded for `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 CLOUD_CANARY_EXPECT_FALLBACK=1 npm run ci:cloud-canary`. Evidence: fallback manifest `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/cli/2026-04-16T11-48-13-664Z-46aaeae4/manifest.json`, run summary `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/cli/2026-04-16T11-48-13-664Z-46aaeae4/run-summary.json`, and wrapper failure summary `out/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/manual/cloud-canary-fallback-rework/step-summary.md` record required-mode `configuration` blocker from missing `CODEX_CLOUD_ENV_ID`.
+- [ ] Manifest-backed standalone review under `FORCE_CODEX_REVIEW=1`.
+- [ ] Explicit elegance/minimality pass.
 - [ ] PR attached and automated feedback drain clean before review handoff.
 
 ## Progress Log
-- 2026-04-15: Issue context read, live state moved to `In Progress`, workpad created, parallelization decision recorded, and docs-only child lane launched.
-- 2026-04-15: Child lane `docs-source-evidence` succeeded and parent summarized accepted evidence in `docs/findings/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-codex-0121-appserver-canary.md`.
-- 2026-04-15: Parent release proof, schema capture, app-server smoke, runtime canary, and provider parity matrix documented. Decision: hold; JSONL/session logs remain authoritative.
-- 2026-04-15: Docs-review, repo validation gates, and manifest-backed standalone review passed. Standalone review outcome: `clean-success`.
-- 2026-04-15: Elegance/minimality pass completed. Result: keep the docs-first packet, required `docs/TASKS.md` mirror, and registry/index updates; no additional artifact document or runtime helper is needed.
-- 2026-04-15: Standalone review P2 fixed by adding the `docs/TASKS.md` snapshot and preserving the line-budget archive path.
-- 2026-04-16: PR review feedback addressed by adding newer-version runtime/cloud/fallback canary gates, docs-review approval evidence, and Markdown table spacing fixes.
+- 2026-04-16: Issue context read; live state was `Rework`. Old PR `#491` was closed, old workpad was deleted, and fresh branch `linear/co-198-codex-0121-appserver-contract-canary-rework` was created from current `origin/main`.
+- 2026-04-16: Fresh workpad `817c4ebb-b0e9-484f-b4e8-4bc22fdda76c` created with required pre-turn decomposition matrix; required parallelization decision recorded as `parallelize_now` / `independent_scope_available`.
+- 2026-04-16: Same-issue child lane `docs-source-evidence-rework` launched with docs-only ownership of `out/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/child-docs-source-evidence-rework.md`.
+- 2026-04-16: Child lane `docs-source-evidence-rework` reached `status=succeeded` and produced a zero-byte patch; helper disposition rejected it as advisory, leaving parent-owned packet changes as the final implementation path.
+- 2026-04-16: Previous reviewed docs packet replayed onto fresh `origin/main`, then refreshed with current `codex-cli 0.121.0`, npm/GitHub release evidence, generated app-server schemas, redacted stdio app-server smoke, and runtime-mode canary evidence. Decision remains HOLD; JSONL/session logs remain authoritative.
+- 2026-04-16: Required cloud canary failed closed before cloud execution because `CODEX_CLOUD_ENV_ID` is absent; fallback contract produced local MCP fallback manifest `2026-04-16T11-48-13-664Z-46aaeae4` but still failed the required wrapper classification as `configuration`. HOLD remains in force.

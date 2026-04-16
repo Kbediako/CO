@@ -2,9 +2,11 @@
 
 ## Traceability
 - Linear issue: `CO-198` / `f1d8b29c-b048-4816-96dd-a38f272dabb7`
-- Parent manifest: `../../.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/cli/2026-04-15T22-57-06-636Z-d82a867f/manifest.json`
-- Child lane manifest: `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-docs-source-evidence/cli/2026-04-15T23-01-24-245Z-8e91c159/manifest.json`
-- Parent canary date: `2026-04-15`
+- Rework parent manifest: `../../.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/cli/2026-04-16T11-26-54-445Z-ce65b23d/manifest.json`
+- Rework child lane manifest: `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-docs-source-evidence-rework/cli/2026-04-16T11-30-38-094Z-926472c7/manifest.json`
+- App-server smoke artifact: `out/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/manual/appserver-smoke-rework-20260416.json`
+- Parent canary date: `2026-04-16`
+- Rework reset evidence: old PR `#491` closed; previous workpad `2242584f-27ff-4ae0-ac8c-a2973d401009` deleted; new workpad `817c4ebb-b0e9-484f-b4e8-4bc22fdda76c` created.
 
 ## Release Evidence
 - `npm view @openai/codex@0.121.0 version ... --json` returned `version: 0.121.0`.
@@ -12,12 +14,12 @@
 - npm tarball: `https://registry.npmjs.org/@openai/codex/-/codex-0.121.0.tgz`.
 - npm integrity: `sha512-kCJ2NeATd4QBQRmqV04ymdN1ZU3MSwnJQDm/KzjpuzGvCuUVEn7no/T2mRyxQ2x77AACqriNOyPPoM/yufyvNg==`.
 - npm shasum: `4916f6a6239339c97d74e42dc6bb034e05a72e7e`.
-- `dist-tags.latest` was `0.121.0` at refresh time.
+- `dist-tags.latest` was `0.121.0` at the 2026-04-16 refresh time; `time.modified` was `2026-04-15T21:54:16.186Z`.
 - GitHub tag lookup found stable tag `refs/tags/rust-v0.121.0` and peeled commit `d65ed92a5e440972626965d0af9a6345179783bc`.
 - Extracted platform binary reported `codex-cli 0.121.0`.
 
 ## App-Server Surface Evidence
-Generated protocol evidence came from `codex app-server generate-ts --experimental --out <tmp>` and `codex app-server generate-json-schema --experimental --out <tmp>` using the `0.121.0` binary. Temporary generated directories were used for inspection and not committed.
+Generated protocol evidence came from fresh 2026-04-16 runs of `codex app-server generate-ts --experimental --out <tmp>` and `codex app-server generate-json-schema --experimental --out <tmp>` using the local `codex-cli 0.121.0` binary. Temporary generated directories were used for inspection and not committed.
 
 | Event class | Methods / schemas | Key fields |
 | --- | --- | --- |
@@ -29,20 +31,20 @@ Generated protocol evidence came from `codex app-server generate-ts --experiment
 | Instruction source | `ThreadStartResponse`, `ThreadResumeResponse`, `ThreadForkResponse`, `Thread` | `instructionSources`, `source`, `model`, `modelProvider`, `serviceTier`, `cwd`, `approvalPolicy`, `sandbox`, `reasoningEffort` |
 
 ## Runtime Canary Summary
-- Stdio initialize smoke with the real user `CODEX_HOME` returned a JSON-RPC result containing `userAgent`, `codexHome`, `platformFamily`, and `platformOs`; stderr was empty and the server exited cleanly after `SIGTERM`.
+- Stdio initialize smoke with a temporary `CODEX_HOME` returned a JSON-RPC result containing `userAgent`, `codexHome`, `platformFamily`, and `platformOs`; stderr was empty and the server exited cleanly after `SIGTERM`.
 - Isolated runtime canary used a temp `CODEX_HOME` so account data was not exposed.
 - `account/rateLimits/read` returned JSON-RPC error `-32600` with message `codex account authentication required to read rate limits`; this proves the method exists but is auth-gated in isolated mode.
-- Ephemeral `thread/start` succeeded and returned a thread id, idle status, model/provider metadata, sandbox/approval settings, and `instructionSources` including the workspace `AGENTS.md`.
+- Ephemeral `thread/start` succeeded and returned a nested thread id, idle status, model/provider metadata, sandbox/approval settings, and `instructionSources` including the workspace `AGENTS.md`.
 - `thread/inject_items` succeeded with an empty result after injecting a synthetic user item.
 - `thread/read` with `includeTurns` failed for the ephemeral thread with `ephemeral threads do not support includeTurns`; this is a canary limitation, not a provider replacement proof.
-- Observed notification method names included `thread/started` and `rawResponseItem/completed`.
+- Observed notification method names included `thread/started`.
 - Raw `rawResponseItem/completed` payloads were not committed because they included prompt/instruction content.
 
 ## Newer-Version Policy Canary Gates
 
-- `MCP_RUNNER_TASK_ID=linear-f1d8b29c-b048-4816-96dd-a38f272dabb7 node scripts/runtime-mode-canary.mjs` passed on `2026-04-15T23:59:03.639Z` with `20/20` iterations passing for default mode, app-server success, forced fallback, and unsupported-combo checks. Summary artifact: `out/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/manual/runtime-canary-summary.json`.
+- `MCP_RUNNER_TASK_ID=linear-f1d8b29c-b048-4816-96dd-a38f272dabb7 node scripts/runtime-mode-canary.mjs` passed on `2026-04-16T11:40:44.487Z` with `20/20` iterations passing for default mode, app-server success, forced fallback, and unsupported-combo checks. Summary artifact: `out/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/manual/runtime-canary-summary.json`.
 - Required cloud contract command remains `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 npm run ci:cloud-canary`. Local provider-worker execution with `CODEX_CLOUD_CANARY_REQUIRED=1` failed closed before cloud execution because `CODEX_CLOUD_ENV_ID` is missing. This is a configuration blocker, not provider parity proof.
-- Fallback contract command remains `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 CLOUD_CANARY_EXPECT_FALLBACK=1 npm run ci:cloud-canary`. Local provider-worker execution with `CLOUD_CANARY_EXPECT_FALLBACK=1` captured fallback manifest `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/cli/2026-04-15T23-59-13-984Z-8bf4380e/manifest.json` and run summary `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/cli/2026-04-15T23-59-13-984Z-8bf4380e/run-summary.json`, then failed required mode because the same `CODEX_CLOUD_ENV_ID` configuration is absent.
+- Fallback contract command remains `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 CLOUD_CANARY_EXPECT_FALLBACK=1 npm run ci:cloud-canary`. Local provider-worker execution with `CLOUD_CANARY_EXPECT_FALLBACK=1` captured fallback manifest `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/cli/2026-04-16T11-48-13-664Z-46aaeae4/manifest.json` and run summary `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/cli/2026-04-16T11-48-13-664Z-46aaeae4/run-summary.json`; the wrapper still exited failed in required mode with failure class `configuration` because `CODEX_CLOUD_ENV_ID` is absent. Step summaries: `out/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/manual/cloud-canary-required-rework/step-summary.md`, `out/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/manual/cloud-canary-fallback-rework/step-summary.md`.
 - Hold: cloud promotion evidence is incomplete in this workspace. JSONL/session logs remain authoritative, and no provider precedence or replacement change is allowed until the required cloud environment is available and the cloud/fallback contract gates pass.
 
 ## Provider Parity Matrix

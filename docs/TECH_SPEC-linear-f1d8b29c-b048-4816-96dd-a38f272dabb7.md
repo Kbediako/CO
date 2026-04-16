@@ -1,11 +1,11 @@
 ---
-id: 20260415-linear-f1d8b29c-b048-4816-96dd-a38f272dabb7
+id: 20260416-linear-f1d8b29c-b048-4816-96dd-a38f272dabb7
 title: CO: Canary Codex 0.121 app-server event contracts before replacing provider JSONL/session-log truth
 relates_to: docs/PRD-linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-15
+last_review: 2026-04-16
 ---
 
 ## References
@@ -64,13 +64,14 @@ last_review: 2026-04-15
   - `codex app-server generate-ts --experimental --out <tmp>`
   - `codex app-server generate-json-schema --experimental --out <tmp>`
   - `codex app-server --listen stdio://`
+  - `out/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/manual/appserver-smoke-rework-20260416.json`
 - Provider files:
   - `orchestrator/src/cli/providerLinearWorkerRunner.ts`
   - `orchestrator/src/cli/control/providerIssueObservability.ts`
   - `packages/shared/manifest/types.ts`
 - Evidence files:
   - `docs/findings/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-codex-0121-appserver-canary.md`
-  - `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-docs-source-evidence/cli/2026-04-15T23-01-24-245Z-8e91c159/manifest.json`
+  - `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-docs-source-evidence-rework/cli/2026-04-16T11-30-38-094Z-926472c7/manifest.json`
 
 ## Acceptance Criteria
 1. Stable release provenance is captured.
