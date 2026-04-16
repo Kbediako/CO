@@ -18,6 +18,21 @@
           "telemetry": ".runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-co-198-docs-review-rework-r2/cli/2026-04-16T11-57-15-726Z-2b6ad40c/review/telemetry.json",
           "review_outcome": "clean-success",
           "note": "Rework docs-review rerun succeeded after current-main merge and TASKS archive-budget trim; delegation guard, spec-guard, docs:check, docs:freshness:maintain, and forced review all passed."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review --base origin/main",
+          "date": "2026-04-16",
+          "status": "bounded-success",
+          "manifest": "../../.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/cli/2026-04-16T11-26-54-445Z-ce65b23d/manifest.json",
+          "telemetry": "../../.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/cli/2026-04-16T11-26-54-445Z-ce65b23d/review/telemetry.json",
+          "summary": "Manifest-backed review ran under FORCE_CODEX_REVIEW=1; wrapper classified review_outcome=bounded-success after command-intent retry, and the read-only retry found no actionable regressions."
+        },
+        "elegance_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-16",
+          "status": "passed",
+          "artifact": "out/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/manual/elegance-review-rework.md",
+          "summary": "Explicit minimality pass kept the docs/artifact-only HOLD packet; no simplification patch was needed."
         }
       },
       "paths": {
