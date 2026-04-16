@@ -48,6 +48,40 @@
       }
     },
     {
+      "id": "20260416-linear-c101cb88-3097-4502-bcd7-723d80da7955",
+      "title": "CO workflow: refresh Apr 16 docs:freshness stale cohort blocking handoffs",
+      "relates_to": "tasks/tasks-linear-c101cb88-3097-4502-bcd7-723d80da7955.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-16",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-16",
+          "status": "succeeded",
+          "manifest": ".runs/linear-c101cb88-3097-4502-bcd7-723d80da7955-docs-review/cli/2026-04-16T00-38-54-753Z-95d59008/manifest.json",
+          "summary": "Docs-review child stream succeeded after the Apr 16 baseline repair; guardrails reported spec-guard succeeded."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-16",
+          "status": "succeeded",
+          "manifest": ".runs/linear-c101cb88-3097-4502-bcd7-723d80da7955/cli/2026-04-16T00-32-45-449Z-66cc6490/manifest.json",
+          "telemetry": ".runs/linear-c101cb88-3097-4502-bcd7-723d80da7955/cli/2026-04-16T00-32-45-449Z-66cc6490/review/telemetry.json",
+          "review_outcome": "clean-success",
+          "elegance_note": "out/linear-c101cb88-3097-4502-bcd7-723d80da7955/manual/elegance-review.md"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-c101cb88-3097-4502-bcd7-723d80da7955.md",
+        "task": "tasks/tasks-linear-c101cb88-3097-4502-bcd7-723d80da7955.md",
+        "agent_task": ".agent/task/linear-c101cb88-3097-4502-bcd7-723d80da7955.md",
+        "docs": "docs/TECH_SPEC-linear-c101cb88-3097-4502-bcd7-723d80da7955.md"
+      }
+    },
+    {
       "id": "20260416-linear-72286a49-e68b-435a-be72-74d5c28feb09",
       "title": "Control host: stop stale released-pending-reopen Merging claims from re-triggering refresh stuck/restart loops",
       "relates_to": "tasks/tasks-linear-72286a49-e68b-435a-be72-74d5c28feb09.md",

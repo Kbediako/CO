@@ -4,7 +4,7 @@ title: Coordinator Symphony-Aligned RLM Runner Symbolic Collab Runtime And Confi
 status: completed
 owner: Codex
 created: 2026-03-16
-last_review: 2026-03-16
+last_review: 2026-04-16
 review_cadence_days: 30
 risk_level: medium
 related_prd: docs/PRD-coordinator-symphony-aligned-rlm-runner-symbolic-collab-runtime-and-config-shell-extraction.md
