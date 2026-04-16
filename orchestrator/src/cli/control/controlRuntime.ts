@@ -553,7 +553,15 @@ function isAuthoritativeSelectedCurrentRunningSource(
     if (isProviderIntakeClaimActiveForSourceCurrentActivity(claim, source)) {
       return true;
     }
-    if (isProviderIntakeClaimBoundToCompatibilitySource(claim, source)) {
+    const claimBoundToSource = isProviderIntakeClaimBoundToCompatibilitySource(claim, source);
+    const claimMatchesSelectedTask = isAuthoritativeProviderTaskIdMatch(claim, source);
+    if (
+      (claimBoundToSource || claimMatchesSelectedTask) &&
+      hasStaleLocalProviderInProgressProof(source.providerLinearWorkerProof, source.startedAt)
+    ) {
+      return false;
+    }
+    if (claimBoundToSource) {
       return false;
     }
   }
@@ -1031,7 +1039,8 @@ function isProviderIntakeClaimActiveForSourceCurrentActivity(
     source.rawStatus === 'in_progress' &&
     claim.state === 'released' &&
     isProviderIssueReleasedLiveWorkerRehydrateReason(claim.reason) &&
-    isProviderStartedWorkerSourceIssueState(claim, source)
+    isProviderStartedWorkerSourceIssueState(claim, source) &&
+    !hasStaleLocalProviderInProgressProof(source.providerLinearWorkerProof, source.startedAt)
   ) {
     return true;
   }

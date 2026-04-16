@@ -3560,6 +3560,96 @@ describe('ControlRuntime', () => {
     }
   });
 
+  it('prunes ordinary released not-active workers when fresh proof has a dead pid', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-15T23:00:00.000Z'));
+    const stalePid = 424247;
+    vi.spyOn(process, 'kill').mockImplementation((pid, signal) => {
+      if (signal === 0) {
+        const error = new Error('process not found') as NodeJS.ErrnoException;
+        error.code = 'ESRCH';
+        throw error;
+      }
+      return true;
+    });
+    try {
+      const providerIntakeState = createProviderIntakeState([
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-198',
+          issue_id: 'lin-issue-198',
+          issue_identifier: 'CO-198',
+          issue_title: 'Ordinary released worker with dead proof',
+          issue_state: 'Done',
+          issue_state_type: 'completed',
+          issue_updated_at: '2026-04-15T22:30:00.000Z',
+          task_id: 'linear-ordinary-released-live-worker-dead-proof',
+          mapping_source: 'provider_id_fallback',
+          state: 'released',
+          reason: 'provider_issue_released:not_active',
+          accepted_at: '2026-04-15T22:45:00.000Z',
+          updated_at: '2026-04-15T22:56:00.000Z',
+          last_delivery_id: 'delivery-co-198',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_744_764_500_000,
+          run_id: 'run-ordinary-live-dead-proof',
+          run_manifest_path: null,
+          launch_source: 'control-host',
+          launch_token: 'launch-co-198'
+        }
+      ]);
+      const fixture = await createFixture({
+        taskId: 'linear-ordinary-released-live-worker-dead-proof',
+        providerIntakeState,
+        linearAdvisoryState: {
+          tracked_issue: createTrackedIssue({
+            id: 'lin-issue-198',
+            identifier: 'CO-198',
+            title: 'Ordinary released worker with dead proof',
+            state: 'In Progress',
+            state_type: 'started',
+            updated_at: '2026-04-15T22:59:00.000Z'
+          })
+        }
+      });
+      await seedManifest(fixture.paths, {
+        task_id: 'linear-ordinary-released-live-worker-dead-proof',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-198',
+        issue_identifier: 'CO-198',
+        pipeline_id: 'provider-linear-worker',
+        pipeline_title: 'Provider Linear Worker',
+        status: 'in_progress',
+        started_at: '2026-04-15T22:45:00.000Z',
+        updated_at: '2026-04-15T22:59:00.000Z',
+        summary: 'ordinary released worker has stale local proof'
+      });
+      await seedProviderLinearWorkerProof(fixture.paths, {
+        issue_id: 'lin-issue-198',
+        issue_identifier: 'CO-198',
+        pid: String(stalePid),
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        last_event: 'turn_running',
+        last_message: 'dead local worker still reports running',
+        updated_at: '2026-04-15T22:59:00.000Z'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+      const uiDataset = buildUiDataset({
+        projection: compatibilityProjection,
+        generatedAt: '2026-04-15T23:00:00.000Z'
+      });
+
+      expect(compatibilityProjection.running).toEqual([]);
+      expect(uiDataset.counts.running).toBe(0);
+      expect(uiDataset.running).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('suppresses null-provider running sources when a matching intake claim is no longer active', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
