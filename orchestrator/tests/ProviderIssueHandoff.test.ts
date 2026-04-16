@@ -19617,6 +19617,265 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('does not launch a Ready plain released not-active webhook replay with unresolved retained run identity', async () => {
+    const { root, paths } = await createHostPaths();
+    const missingManifestPath = join(
+      root,
+      '.runs',
+      'linear-lin-issue-1',
+      'cli',
+      'run-ready-not-active-missing',
+      'manifest.json'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-191',
+      issue_title: 'Refactor docs hygiene spark policy guard',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-15T15:00:00.000Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      accepted_at: '2026-04-15T15:00:05.000Z',
+      updated_at: '2026-04-15T15:02:10.000Z',
+      last_delivery_id: 'delivery-ready-not-active',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_744_730_400_000,
+      run_id: 'run-ready-not-active-missing',
+      run_manifest_path: missingManifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-ready-not-active-reclaimed',
+        manifestPath: '/tmp/provider-run/ready-not-active-reclaimed-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics'
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-1',
+        identifier: 'CO-191',
+        title: 'Refactor docs hygiene spark policy guard',
+        state: 'Ready',
+        state_type: 'unstarted',
+        updated_at: '2026-04-15T15:00:00.000Z',
+        blocked_by: []
+      }),
+      deliveryId: 'delivery-ready-not-active-equal',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_744_730_400_000
+    });
+
+    expect(result.kind).toBe('ignored');
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-15T15:00:00.000Z',
+      run_id: 'run-ready-not-active-missing',
+      run_manifest_path: missingManifestPath
+    });
+  });
+
+  it('lets a non-executable direct webhook clear pending reopen with unresolved retained run identity', async () => {
+    const { root, paths } = await createHostPaths();
+    const missingManifestPath = join(
+      root,
+      '.runs',
+      'linear-lin-issue-1',
+      'cli',
+      'run-ready-pending-reopen-missing',
+      'manifest.json'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-191',
+      issue_title: 'Refactor docs hygiene spark policy guard',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-15T15:00:00.000Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'released',
+      reason: 'provider_issue_released_pending_reopen:provider_issue_released:not_active',
+      accepted_at: '2026-04-15T15:00:05.000Z',
+      updated_at: '2026-04-15T15:02:10.000Z',
+      last_delivery_id: 'delivery-ready-pending-reopen',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_744_730_400_000,
+      run_id: 'run-ready-pending-reopen-missing',
+      run_manifest_path: missingManifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-should-not-start',
+        manifestPath: '/tmp/provider-run/should-not-start.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics'
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-1',
+        identifier: 'CO-191',
+        title: 'Refactor docs hygiene spark policy guard',
+        state: 'Done',
+        state_type: 'completed',
+        updated_at: '2026-04-15T15:05:00.000Z',
+        blocked_by: []
+      }),
+      deliveryId: 'delivery-ready-pending-reopen-done',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_744_730_700_000
+    });
+
+    expect(result.kind).toBe('ignored');
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'ignored',
+      reason: 'provider_issue_state_not_active',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-04-15T15:05:00.000Z',
+      run_id: 'run-ready-pending-reopen-missing',
+      run_manifest_path: missingManifestPath
+    });
+    expect(persist).toHaveBeenCalled();
+  });
+
+  it('lets an assigned-away direct webhook clear pending reopen with unresolved retained run identity', async () => {
+    const { root, paths } = await createHostPaths();
+    const missingManifestPath = join(
+      root,
+      '.runs',
+      'linear-lin-issue-1',
+      'cli',
+      'run-ready-pending-reopen-missing',
+      'manifest.json'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-191',
+      issue_title: 'Refactor docs hygiene spark policy guard',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-15T15:00:00.000Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'released',
+      reason: 'provider_issue_released_pending_reopen:provider_issue_released:not_active',
+      accepted_at: '2026-04-15T15:00:05.000Z',
+      updated_at: '2026-04-15T15:02:10.000Z',
+      last_delivery_id: 'delivery-ready-pending-reopen',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_744_730_400_000,
+      run_id: 'run-ready-pending-reopen-missing',
+      run_manifest_path: missingManifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-should-not-start',
+        manifestPath: '/tmp/provider-run/should-not-start.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics'
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-1',
+        identifier: 'CO-191',
+        title: 'Refactor docs hygiene spark policy guard',
+        state: 'Ready',
+        state_type: 'unstarted',
+        updated_at: '2026-04-15T15:05:00.000Z',
+        blocked_by: [],
+        viewer_id: 'viewer-1',
+        assignee_id: 'viewer-2',
+        assignee_name: 'Other owner'
+      }),
+      deliveryId: 'delivery-ready-pending-reopen-assigned-away',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_744_730_700_000
+    });
+
+    expect(result.kind).toBe('ignored');
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'ignored',
+      reason: 'provider_issue_assignee_changed',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-15T15:05:00.000Z',
+      issue_assignee_id: 'viewer-2',
+      issue_assignee_name: 'Other owner',
+      run_id: 'run-ready-pending-reopen-missing',
+      run_manifest_path: missingManifestPath
+    });
+    expect(persist).toHaveBeenCalled();
+  });
+
   it('reclaims a Ready plain released not-active claim with stale cached Blocked state', async () => {
     const { root, paths } = await createHostPaths();
     const staleEnv = {

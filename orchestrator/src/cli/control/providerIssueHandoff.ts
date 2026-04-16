@@ -2799,16 +2799,31 @@ export function createProviderIssueHandoffService(
           hasPendingReleaseCancel(releasedRun?.manifestPath ?? existing.run_manifest_path);
         const existingReleasedPendingReopen =
           isProviderIssueReleasedPendingReopen(existing.reason ?? null);
+        const existingReleasedReclaimCandidate =
+          existingReleasedPendingReopen || canRecheckPlainReleasedNotActiveClaim(existing);
         const pendingReleasedReopen = shouldReopenReleasedClaimAtCurrentTimestamp({
           claim: existing,
           trackedIssue: input.trackedIssue
         });
+        const currentReleasedReopenLaunchable =
+          isProviderLinearTrackedIssueEligibleForExecution(input.trackedIssue) &&
+          isLiveLinearTrackedIssueOwnedByCurrentViewerOrUnassigned(input.trackedIssue);
+        const reopenBlockedByUnresolvedReleasedRunIdentity =
+          existingReleasedReclaimCandidate &&
+          pendingReleasedReopen &&
+          currentReleasedReopenLaunchable &&
+          !canFreshDiscoverReleasedReclaimClaim(
+            existing,
+            releasedRun,
+            hasPendingReleaseCancel
+          );
         const preservePlainReclaimMetadataDuringDrain =
           releaseCancelPending &&
           releasedWebhookTiming === 'equal' &&
           pendingReleasedReopen &&
           !existingReleasedPendingReopen;
         const replayBlockedByReleasedMetadata =
+          reopenBlockedByUnresolvedReleasedRunIdentity ||
           releasedWebhookTiming === 'older' ||
           (
             releasedWebhookTiming === 'equal' &&
