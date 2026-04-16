@@ -2,7 +2,7 @@
 
 ## Traceability
 - Linear issue: `CO-198` / `f1d8b29c-b048-4816-96dd-a38f272dabb7`
-- Rework parent manifest: `../../.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/cli/2026-04-16T11-26-54-445Z-ce65b23d/manifest.json`
+- Rework parent manifest: `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/cli/2026-04-16T11-26-54-445Z-ce65b23d/manifest.json`
 - Rework child lane manifest: `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-docs-source-evidence-rework/cli/2026-04-16T11-30-38-094Z-926472c7/manifest.json`
 - App-server smoke artifact: `out/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/manual/appserver-smoke-rework-20260416.json`
 - Parent canary date: `2026-04-16`

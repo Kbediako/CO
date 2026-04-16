@@ -23,8 +23,8 @@
           "reviewer": "codex-orchestrator review --base origin/main",
           "date": "2026-04-16",
           "status": "bounded-success",
-          "manifest": "../../.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/cli/2026-04-16T11-26-54-445Z-ce65b23d/manifest.json",
-          "telemetry": "../../.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/cli/2026-04-16T11-26-54-445Z-ce65b23d/review/telemetry.json",
+          "manifest": ".runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/cli/2026-04-16T11-26-54-445Z-ce65b23d/manifest.json",
+          "telemetry": ".runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/cli/2026-04-16T11-26-54-445Z-ce65b23d/review/telemetry.json",
           "summary": "Manifest-backed review ran under FORCE_CODEX_REVIEW=1; wrapper classified review_outcome=bounded-success after command-intent retry, and the read-only retry found no actionable regressions."
         },
         "elegance_review": {
