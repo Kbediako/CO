@@ -7122,10 +7122,7 @@ function canFreshDiscoverReleasedReclaimClaim(
     return false;
   }
   if (run === null) {
-    return (
-      canRecheckPlainReleasedNotActiveClaim(claim) ||
-      (!claim.run_id && !claim.run_manifest_path)
-    );
+    return !claim.run_id && !claim.run_manifest_path;
   }
   return !shouldAttemptReleaseCancel(run) || isInactiveReleasedReclaimRun(claim, run);
 }

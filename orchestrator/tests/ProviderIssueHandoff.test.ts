@@ -19524,7 +19524,7 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.resume).not.toHaveBeenCalled();
   });
 
-  it('reclaims a Ready plain released not-active claim with a missing retained run manifest', async () => {
+  it('keeps a Ready plain released not-active claim with missing retained run identity excluded from fresh discovery', async () => {
     const { root, paths } = await createHostPaths();
     const missingManifestPath = join(
       root,
@@ -19575,20 +19575,10 @@ describe('createProviderIssueHandoffService', () => {
       trackedIssue: createTrackedIssue()
     }));
     const refetchTrackedIssues = vi.fn(async (input?: { excludedIssueIds?: string[] }) => {
-      expect(input?.excludedIssueIds).not.toContain('lin-issue-1');
+      expect(input?.excludedIssueIds).toContain('lin-issue-1');
       return {
         kind: 'ready' as const,
-        trackedIssues: [
-          createTrackedIssue({
-            id: 'lin-issue-1',
-            identifier: 'CO-191',
-            title: 'Refactor docs hygiene spark policy guard',
-            state: 'Ready',
-            state_type: 'unstarted',
-            updated_at: '2026-04-15T15:00:00.000Z',
-            blocked_by: []
-          })
-        ]
+        trackedIssues: []
       };
     });
 
@@ -19615,27 +19605,16 @@ describe('createProviderIssueHandoffService', () => {
     expect(resolveTrackedIssue).not.toHaveBeenCalled();
     expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
     expect(launcher.resume).not.toHaveBeenCalled();
-    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
-      taskId: 'linear-lin-issue-1',
-      pipelineId: 'diagnostics',
-      provider: 'linear',
-      issueId: 'lin-issue-1',
-      issueIdentifier: 'CO-191',
-      issueUpdatedAt: '2026-04-15T15:00:00.000Z',
-      launchToken: expect.any(String)
-    }));
+    expect(launcher.start).not.toHaveBeenCalled();
     expect(state.claims[0]).toMatchObject({
-      state: 'starting',
-      reason: 'provider_issue_start_launched',
-      issue_state: 'Ready',
-      issue_state_type: 'unstarted',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
       issue_updated_at: '2026-04-15T15:00:00.000Z',
-      run_id: 'run-ready-not-active-reclaimed',
-      run_manifest_path: '/tmp/provider-run/ready-not-active-reclaimed-manifest.json',
-      launch_source: 'control-host',
-      launch_token: expect.any(String)
+      run_id: 'run-ready-not-active-missing',
+      run_manifest_path: missingManifestPath
     });
-    expect(persist).toHaveBeenCalled();
   });
 
   it('reclaims a Ready plain released not-active claim with stale cached Blocked state', async () => {
