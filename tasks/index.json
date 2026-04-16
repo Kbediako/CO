@@ -1,6 +1,46 @@
 {
   "items": [
     {
+      "id": "20260416-linear-2886b57d-b844-4803-9e55-6fe3657d516d",
+      "title": "CO: Add Codex 0.121 MCP Apps metadata to delegation tools without authority expansion",
+      "relates_to": "tasks/tasks-linear-2886b57d-b844-4803-9e55-6fe3657d516d.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-16",
+      "approvals": {
+        "docs_child_lane": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-16",
+          "status": "rejected",
+          "manifest": ".runs/linear-2886b57d-b844-4803-9e55-6fe3657d516d-co197-docs-metadata/cli/2026-04-16T02-15-09-423Z-e92d3ec3/manifest.json",
+          "reason": "Patch completed but reframed the issue as docs-only, used the wrong source anchor, and included widget metadata outside the delegation-tool scope."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review --uncommitted",
+          "date": "2026-04-16",
+          "status": "succeeded",
+          "review_outcome": "bounded-success",
+          "telemetry": ".runs/linear-2886b57d-b844-4803-9e55-6fe3657d516d/cli/2026-04-16T02-11-44-691Z-26f7f8c0/review/telemetry.json",
+          "summary": "No actionable findings; first attempt crossed validation command boundary and wrapper completed a read-only command-intent retry."
+        },
+        "elegance_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-16",
+          "status": "succeeded",
+          "evidence": "out/linear-2886b57d-b844-4803-9e55-6fe3657d516d/manual/elegance-review.md",
+          "summary": "No simplification patch applied; explicit metadata table retained as the smallest auditable shape."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-2886b57d-b844-4803-9e55-6fe3657d516d.md",
+        "task": "tasks/tasks-linear-2886b57d-b844-4803-9e55-6fe3657d516d.md",
+        "agent_task": ".agent/task/linear-2886b57d-b844-4803-9e55-6fe3657d516d.md",
+        "docs": "docs/TECH_SPEC-linear-2886b57d-b844-4803-9e55-6fe3657d516d.md"
+      }
+    },
+    {
       "id": "20260416-linear-4122489e-1a3b-43cf-a181-e98ada0a55e1",
       "title": "CO: Re-audit and decide Codex CLI 0.121.0 adoption posture with required cloud canary",
       "relates_to": "tasks/tasks-linear-4122489e-1a3b-43cf-a181-e98ada0a55e1.md",

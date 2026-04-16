@@ -4,8 +4,17 @@ export type DelegationMode = 'full' | 'question_only' | 'status_only';
 
 export interface DelegationServerToolDefinition {
   name: string;
+  title?: string;
   description: string;
   inputSchema: Record<string, unknown>;
+  annotations?: DelegationServerToolAnnotations;
+}
+
+export interface DelegationServerToolAnnotations {
+  readOnlyHint?: boolean;
+  destructiveHint?: boolean;
+  idempotentHint?: boolean;
+  openWorldHint?: boolean;
 }
 
 export interface DelegationServerToolCallContext {
@@ -88,6 +97,112 @@ interface DelegationServerToolDispatchDeps {
     context: DelegationServerToolCallContext
   ): Promise<unknown>;
 }
+
+interface DelegationServerToolMetadata {
+  title: string;
+  annotations: DelegationServerToolAnnotations;
+}
+
+const CLOSED_WORLD_READ_ONLY: DelegationServerToolAnnotations = {
+  readOnlyHint: true,
+  openWorldHint: false
+};
+
+const CLOSED_WORLD_ADDITIVE_WRITE: DelegationServerToolAnnotations = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: false,
+  openWorldHint: false
+};
+
+const CLOSED_WORLD_DESTRUCTIVE_WRITE: DelegationServerToolAnnotations = {
+  readOnlyHint: false,
+  destructiveHint: true,
+  idempotentHint: false,
+  openWorldHint: false
+};
+
+const OPEN_WORLD_READ_ONLY: DelegationServerToolAnnotations = {
+  readOnlyHint: true,
+  openWorldHint: true
+};
+
+const OPEN_WORLD_ADDITIVE_WRITE: DelegationServerToolAnnotations = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: false,
+  openWorldHint: true
+};
+
+const OPEN_WORLD_DESTRUCTIVE_WRITE: DelegationServerToolAnnotations = {
+  readOnlyHint: false,
+  destructiveHint: true,
+  idempotentHint: false,
+  openWorldHint: true
+};
+
+const TOOL_METADATA_BY_NAME: Record<string, DelegationServerToolMetadata> = {
+  'delegate.spawn': {
+    title: 'Spawn Delegated Run',
+    annotations: OPEN_WORLD_ADDITIVE_WRITE
+  },
+  'delegate.pause': {
+    title: 'Pause Or Resume Run',
+    annotations: CLOSED_WORLD_ADDITIVE_WRITE
+  },
+  'delegate.cancel': {
+    title: 'Cancel Run',
+    annotations: CLOSED_WORLD_DESTRUCTIVE_WRITE
+  },
+  'delegate.status': {
+    title: 'Fetch Run Status',
+    annotations: CLOSED_WORLD_READ_ONLY
+  },
+  'delegate.question.enqueue': {
+    title: 'Enqueue Parent Question',
+    annotations: CLOSED_WORLD_ADDITIVE_WRITE
+  },
+  'delegate.question.poll': {
+    title: 'Poll Parent Question',
+    annotations: CLOSED_WORLD_ADDITIVE_WRITE
+  },
+  'coordinator.status': {
+    title: 'Coordinator Status Bridge',
+    annotations: CLOSED_WORLD_READ_ONLY
+  },
+  'coordinator.pause': {
+    title: 'Coordinator Pause Bridge',
+    annotations: CLOSED_WORLD_ADDITIVE_WRITE
+  },
+  'coordinator.resume': {
+    title: 'Coordinator Resume Bridge',
+    annotations: CLOSED_WORLD_ADDITIVE_WRITE
+  },
+  'coordinator.cancel': {
+    title: 'Coordinator Cancel Bridge',
+    annotations: CLOSED_WORLD_DESTRUCTIVE_WRITE
+  },
+  'github.open_pr': {
+    title: 'Open GitHub Pull Request',
+    annotations: OPEN_WORLD_ADDITIVE_WRITE
+  },
+  'github.comment': {
+    title: 'Create GitHub Comment',
+    annotations: OPEN_WORLD_ADDITIVE_WRITE
+  },
+  'github.review': {
+    title: 'Submit GitHub Review',
+    annotations: OPEN_WORLD_ADDITIVE_WRITE
+  },
+  'github.get_checks': {
+    title: 'Fetch GitHub Checks',
+    annotations: OPEN_WORLD_READ_ONLY
+  },
+  'github.merge': {
+    title: 'Merge GitHub Pull Request',
+    annotations: OPEN_WORLD_DESTRUCTIVE_WRITE
+  }
+};
 
 export function createDelegationServerRpcHandler(options: {
   protocolVersion: string;
@@ -441,7 +556,17 @@ function toolDefinition(
   description: string,
   inputSchema: Record<string, unknown>
 ): DelegationServerToolDefinition {
-  return { name, description, inputSchema };
+  const metadata = TOOL_METADATA_BY_NAME[name];
+  if (!metadata) {
+    return { name, description, inputSchema };
+  }
+  return {
+    name,
+    title: metadata.title,
+    description,
+    inputSchema,
+    annotations: metadata.annotations
+  };
 }
 
 function dynamicToolBridgeSourceSchemaProperties(): Record<string, unknown> {
