@@ -973,6 +973,136 @@ describe('provider issue observability', () => {
     expect(progress?.last_semantic_progress_at).toBe('2026-04-05T05:44:30.000Z');
   });
 
+  it('does not rank invalidated rejected or accepted child-lane summaries over current replacement progress', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
+      proof: {
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        current_turn_started_at: '2026-04-16T07:46:00.000Z',
+        last_event: 'turn_started',
+        last_message: 'Provider worker turn is active.',
+        last_event_at: '2026-04-16T07:46:00.000Z',
+        updated_at: '2026-04-16T07:50:00.000Z',
+        child_lanes: [
+          {
+            stream: 'failed-regression-tests',
+            task_id: 'linear-co-204-regression-tests-failed',
+            run_id: 'run-lane-failed',
+            status: 'failed',
+            launched_at: '2026-04-16T07:46:30.000Z',
+            decision: 'invalidated',
+            decision_at: '2026-04-16T07:49:50.000Z',
+            decision_reason: 'parent_relaunched_after_failed_lane',
+            summary: 'failed child lane still reports stale failing regression output'
+          },
+          {
+            stream: 'rejected-regression-tests',
+            task_id: 'linear-co-204-regression-tests-rejected',
+            run_id: 'run-lane-rejected',
+            status: 'completed',
+            launched_at: '2026-04-16T07:46:40.000Z',
+            decision: 'rejected',
+            decision_at: '2026-04-16T07:49:40.000Z',
+            decision_reason: 'parent_rejected_stale_patch',
+            summary: 'rejected child lane should not project as current progress'
+          },
+          {
+            stream: 'accepted-regression-tests',
+            task_id: 'linear-co-204-regression-tests-accepted',
+            run_id: 'run-lane-accepted',
+            status: 'completed',
+            launched_at: '2026-04-16T07:46:50.000Z',
+            decision: 'accepted',
+            decision_at: '2026-04-16T07:49:30.000Z',
+            decision_reason: 'parent_already_imported_patch',
+            summary: 'accepted child lane should not remain selected as current progress'
+          }
+        ],
+        child_streams: [
+          {
+            stream: 'replacement-regression-tests',
+            task_id: 'linear-co-204-regression-tests-replacement',
+            run_id: 'run-child-replacement',
+            status: 'completed',
+            launched_at: '2026-04-16T07:48:30.000Z',
+            recorded_at: '2026-04-16T07:49:00.000Z',
+            summary: 'replacement regression lane reported current focused-test progress'
+          }
+        ],
+        linear_audit: null
+      },
+      now: () => '2026-04-16T07:50:00.000Z'
+    });
+
+    expect(progress).toMatchObject({
+      phase: 'turn_running',
+      status: 'progressing',
+      summary: 'replacement regression lane reported current focused-test progress',
+      summary_recorded_at: '2026-04-16T07:49:00.000Z',
+      event_source: 'child_stream_summary'
+    });
+    expect(progress?.event_candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'child_stream_summary',
+          summary: 'replacement regression lane reported current focused-test progress',
+          accepted: true,
+          rejection_reason: null
+        })
+      ])
+    );
+  });
+
+  it('keeps active pending child-lane summaries as current child-lane progress', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
+      proof: {
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        current_turn_started_at: '2026-04-16T07:46:00.000Z',
+        last_event: 'turn_started',
+        last_message: 'Provider worker turn is active.',
+        last_event_at: '2026-04-16T07:46:00.000Z',
+        updated_at: '2026-04-16T07:50:00.000Z',
+        child_lanes: [
+          {
+            stream: 'failed-regression-tests',
+            task_id: 'linear-co-204-regression-tests-failed',
+            run_id: 'run-lane-failed',
+            status: 'failed',
+            launched_at: '2026-04-16T07:46:30.000Z',
+            decision: 'invalidated',
+            decision_at: '2026-04-16T07:49:50.000Z',
+            decision_reason: 'parent_relaunched_after_failed_lane',
+            summary: 'failed child lane still reports stale failing regression output'
+          },
+          {
+            stream: 'replacement-regression-tests',
+            task_id: 'linear-co-204-regression-tests-replacement',
+            run_id: 'run-lane-replacement',
+            status: 'running',
+            launched_at: '2026-04-16T07:48:30.000Z',
+            decision: 'pending',
+            in_flight_action: 'reserved_child_lane_running',
+            summary: 'replacement child lane is running focused regression tests'
+          }
+        ],
+        linear_audit: null
+      },
+      now: () => '2026-04-16T07:50:00.000Z'
+    });
+
+    expect(progress).toMatchObject({
+      phase: 'child_lane',
+      kind: 'child_lane',
+      status: 'waiting',
+      summary: 'replacement child lane is running focused regression tests',
+      stall_classification: 'waiting_on_child_lane',
+      stall_reason: 'child_lane:replacement-regression-tests',
+      recovery_recommendation: 'inspect_child_lane'
+    });
+    expect(progress?.last_semantic_progress_at).toBe('2026-04-16T07:48:30.000Z');
+  });
+
   it('uses the chosen non-empty child summary timestamp when newer child records have blank summaries', () => {
     const progress = deriveProviderLinearWorkerProgressSnapshot({
       proof: {

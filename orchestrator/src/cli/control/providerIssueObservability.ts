@@ -980,27 +980,24 @@ function collectCurrentTurnChildProgressSummaryCandidates(
   currentTurnStartedAt: string | null
 ): RankedProviderLinearWorkerProgressCandidate[] {
   return [
-    ...selectCurrentTurnChildLanes(proof?.child_lanes ?? null, currentTurnStartedAt).flatMap((childLane) => {
-      const summary = normalizeOptionalString(childLane.summary);
-      return summary
-        ? [
-            {
-              source: 'child_lane_summary',
-              event: null,
-              summary,
-              message_recorded_at: latestIsoTimestamp(
-                normalizeOptionalString(childLane.decision_at),
-                normalizeOptionalString(childLane.launched_at)
-              ),
-              source_updated_at: latestIsoTimestamp(
-                normalizeOptionalString(childLane.decision_at),
-                normalizeOptionalString(childLane.launched_at)
-              ),
-              derived: true
-            } satisfies RankedProviderLinearWorkerProgressCandidate
-          ]
-        : [];
-    }),
+    ...selectCurrentTurnChildLanes(proof?.child_lanes ?? null, currentTurnStartedAt)
+      .filter(isCurrentProgressChildLaneSummaryEligible)
+      .flatMap((childLane) => {
+        const summary = normalizeOptionalString(childLane.summary);
+        const summaryRecordedAt = childLaneSummaryRecordedAt(childLane);
+        return summary
+          ? [
+              {
+                source: 'child_lane_summary',
+                event: null,
+                summary,
+                message_recorded_at: summaryRecordedAt,
+                source_updated_at: summaryRecordedAt,
+                derived: true
+              } satisfies RankedProviderLinearWorkerProgressCandidate
+            ]
+          : [];
+      }),
     ...selectCurrentTurnChildStreams(proof?.child_streams ?? null, currentTurnStartedAt).flatMap((childStream) => {
       const summary = normalizeOptionalString(childStream.summary);
       return summary
@@ -1665,22 +1662,21 @@ function selectLatestChildProgressSummaryCandidate(
   currentTurnStartedAt: string | null = null
 ): ProviderChildProgressSummaryCandidate | null {
   const childSummaries = [
-    ...selectCurrentTurnChildLanes(proof?.child_lanes ?? null, currentTurnStartedAt).flatMap((childLane) => {
-      const summary = normalizeOptionalString(childLane.summary);
-      return summary
-        ? [
-            {
-              source: 'child_lane_summary',
-              event: null,
-              summary,
-              recorded_at: latestIsoTimestamp(
-                normalizeOptionalString(childLane.decision_at),
-                normalizeOptionalString(childLane.launched_at)
-              )
-            } satisfies ProviderChildProgressSummaryCandidate
-          ]
-        : [];
-    }),
+    ...selectCurrentTurnChildLanes(proof?.child_lanes ?? null, currentTurnStartedAt)
+      .filter(isCurrentProgressChildLaneSummaryEligible)
+      .flatMap((childLane) => {
+        const summary = normalizeOptionalString(childLane.summary);
+        return summary
+          ? [
+              {
+                source: 'child_lane_summary',
+                event: null,
+                summary,
+                recorded_at: childLaneSummaryRecordedAt(childLane)
+              } satisfies ProviderChildProgressSummaryCandidate
+            ]
+          : [];
+      }),
     ...selectCurrentTurnChildStreams(proof?.child_streams ?? null, currentTurnStartedAt).flatMap((childStream) => {
       const summary = normalizeOptionalString(childStream.summary);
       return summary
@@ -1759,6 +1755,15 @@ function selectLatestChildLaneProgressAt(
     normalizeOptionalString(latestLane?.decision_at),
     normalizeOptionalString(latestLane?.launched_at)
   );
+}
+
+function isCurrentProgressChildLaneSummaryEligible(childLane: ProviderIssueChildLaneLike): boolean {
+  const decision = normalizeOptionalString(childLane.decision);
+  return decision !== 'accepted' && decision !== 'rejected' && decision !== 'invalidated';
+}
+
+function childLaneSummaryRecordedAt(childLane: ProviderIssueChildLaneLike): string | null {
+  return normalizeOptionalString(childLane.launched_at);
 }
 
 function selectActiveChildLane(
