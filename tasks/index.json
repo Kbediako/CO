@@ -1,6 +1,53 @@
 {
   "items": [
     {
+      "id": "20260416-linear-4122489e-1a3b-43cf-a181-e98ada0a55e1",
+      "title": "CO: Re-audit and decide Codex CLI 0.121.0 adoption posture with required cloud canary",
+      "relates_to": "tasks/tasks-linear-4122489e-1a3b-43cf-a181-e98ada0a55e1.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-16",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (clean-success)",
+          "date": "2026-04-16",
+          "status": "succeeded",
+          "manifest": ".runs/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1-co-195-docs-review-r3/cli/2026-04-15T23-10-57-461Z-e2b822df/manifest.json",
+          "telemetry": ".runs/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1-co-195-docs-review-r3/cli/2026-04-15T23-10-57-461Z-e2b822df/review/telemetry.json"
+        },
+        "codex_0121_audit": {
+          "decision": "hold-0.118.0",
+          "date": "2026-04-16",
+          "summary": "0.121.0 release/npm facts, command surfaces, and runtime canary passed; required cloud canary blocked by missing CODEX_CLOUD_ENV_ID.",
+          "decision_summary": "out/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1/manual/codex-version-canary/compare/decision-go-no-go.md"
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-16",
+          "status": "succeeded",
+          "review_outcome": "bounded-success",
+          "telemetry": ".runs/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1-co-195-docs-review-r3/cli/2026-04-15T23-10-57-461Z-e2b822df/review/telemetry.json",
+          "resolved_findings": [
+            "P2 checklist consistency: P0/P1 no-regression gate now checked in task and agent mirrors with adoption-matrix evidence."
+          ]
+        },
+        "elegance_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-16",
+          "status": "succeeded",
+          "evidence": "out/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1/manual/elegance-review/elegance-review.md"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1.md",
+        "task": "tasks/tasks-linear-4122489e-1a3b-43cf-a181-e98ada0a55e1.md",
+        "agent_task": ".agent/task/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1.md",
+        "docs": "docs/TECH_SPEC-linear-4122489e-1a3b-43cf-a181-e98ada0a55e1.md"
+      }
+    },
+    {
       "id": "20260416-linear-c101cb88-3097-4502-bcd7-723d80da7955",
       "title": "CO workflow: refresh Apr 16 docs:freshness stale cohort blocking handoffs",
       "relates_to": "tasks/tasks-linear-c101cb88-3097-4502-bcd7-723d80da7955.md",
