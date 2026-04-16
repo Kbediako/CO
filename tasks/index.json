@@ -1,6 +1,32 @@
 {
   "items": [
     {
+      "id": "20260416-linear-004edeb8-9641-4a91-8f9b-2d024766c2ac",
+      "title": "CO-208 cloud connector/auth drift classification",
+      "relates_to": "tasks/tasks-linear-004edeb8-9641-4a91-8f9b-2d024766c2ac.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-17",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-17",
+          "status": "produced",
+          "manifest": ".runs/linear-004edeb8-9641-4a91-8f9b-2d024766c2ac-docs-packet/cli/2026-04-16T22-50-39-659Z-cf579188/manifest.json",
+          "source_anchor": "ctx:sha256:7f405408c0778e5b1c89f4493b0bf5fd26674e9b2ceb9a6afaa5c552630b085a#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-208 as diagnostics/reporting for cloud connector/auth drift exposed by CO-207, not live connector repair; parent owns implementation, validation, Linear state, workpad, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-004edeb8-9641-4a91-8f9b-2d024766c2ac.md",
+        "task": "tasks/tasks-linear-004edeb8-9641-4a91-8f9b-2d024766c2ac.md",
+        "agent_task": ".agent/task/linear-004edeb8-9641-4a91-8f9b-2d024766c2ac.md",
+        "docs": "docs/TECH_SPEC-linear-004edeb8-9641-4a91-8f9b-2d024766c2ac.md"
+      }
+    },
+    {
       "id": "20260416-linear-642e622a-b02e-4766-85c2-6f2fc47b1f44",
       "title": "CO-206 operator-autopilot local_rollout lifecycle",
       "relates_to": "tasks/tasks-linear-642e622a-b02e-4766-85c2-6f2fc47b1f44.md",
