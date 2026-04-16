@@ -19558,7 +19558,7 @@ describe('createProviderIssueHandoffService', () => {
       trackedIssue: createTrackedIssue()
     }));
     const refetchTrackedIssues = vi.fn(async (input?: { excludedIssueIds?: string[] }) => {
-      expect(input?.excludedIssueIds).not.toContain('lin-issue-1');
+      expect(input?.excludedIssueIds ?? []).not.toContain('lin-issue-1');
       return {
         kind: 'ready' as const,
         trackedIssues: [
