@@ -18259,6 +18259,155 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('marks equal-timestamp Ready plain released not-active reentry pending-reopen while release drain is active', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-ready-not-active-draining');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-ready-not-active-draining',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-191',
+        issue_updated_at: '2026-04-15T15:00:00.000Z',
+        started_at: '2026-04-15T15:00:00.000Z',
+        updated_at: '2026-04-15T15:02:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-191',
+      issue_title: 'Refactor docs hygiene spark policy guard',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-15T15:00:00.000Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      accepted_at: '2026-04-15T15:00:05.000Z',
+      updated_at: '2026-04-15T15:02:10.000Z',
+      last_delivery_id: 'delivery-ready-not-active',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_744_730_400_000,
+      run_id: 'run-ready-not-active-draining',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-ready-not-active-reclaimed',
+        manifestPath: '/tmp/provider-run/ready-not-active-reclaimed-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'diagnostics'
+    });
+
+    const readyIssue = createTrackedIssue({
+      id: 'lin-issue-1',
+      identifier: 'CO-191',
+      title: 'Refactor docs hygiene spark policy guard',
+      state: 'Ready',
+      state_type: 'unstarted',
+      updated_at: '2026-04-15T15:00:00.000Z',
+      blocked_by: []
+    });
+
+    const drainResult = await service.handleAcceptedTrackedIssue({
+      trackedIssue: readyIssue,
+      deliveryId: 'delivery-ready-not-active-equal',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_744_730_410_000
+    });
+
+    expect(drainResult.kind).toBe('ignored');
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released_pending_reopen:provider_issue_released:not_active',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-15T15:00:00.000Z',
+      run_id: 'run-ready-not-active-draining',
+      run_manifest_path: childPaths.manifestPath
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-ready-not-active-draining',
+        task_id: 'linear-lin-issue-1',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-191',
+        issue_updated_at: '2026-04-15T15:00:00.000Z',
+        started_at: '2026-04-15T15:00:00.000Z',
+        updated_at: '2026-04-15T15:03:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const replayResult = await service.handleAcceptedTrackedIssue({
+      trackedIssue: readyIssue,
+      deliveryId: 'delivery-ready-not-active-equal-replay',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_744_730_420_000
+    });
+
+    expect(replayResult).toMatchObject({
+      kind: 'start',
+      reason: 'provider_issue_start_launched'
+    });
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-issue-1',
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-issue-1',
+      issueIdentifier: 'CO-191',
+      issueUpdatedAt: '2026-04-15T15:00:00.000Z',
+      launchToken: expect.any(String)
+    }));
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-15T15:00:00.000Z',
+      run_id: 'run-ready-not-active-reclaimed',
+      run_manifest_path: '/tmp/provider-run/ready-not-active-reclaimed-manifest.json',
+      launch_source: 'control-host',
+      launch_token: expect.any(String)
+    });
+  });
+
   it('preserves released blocker metadata when an equal-timestamp replay arrives with different blockers', async () => {
     const { paths } = await createHostPaths();
     const existingBlockers = [
@@ -19373,6 +19522,120 @@ describe('createProviderIssueHandoffService', () => {
     expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
+  it('reclaims a Ready plain released not-active claim with a missing retained run manifest', async () => {
+    const { root, paths } = await createHostPaths();
+    const missingManifestPath = join(
+      root,
+      '.runs',
+      'linear-lin-issue-1',
+      'cli',
+      'run-ready-not-active-missing',
+      'manifest.json'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-191',
+      issue_title: 'Refactor docs hygiene spark policy guard',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-15T15:00:00.000Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      accepted_at: '2026-04-15T15:00:05.000Z',
+      updated_at: '2026-04-15T15:02:10.000Z',
+      last_delivery_id: 'delivery-ready-not-active',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_744_730_400_000,
+      run_id: 'run-ready-not-active-missing',
+      run_manifest_path: missingManifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-ready-not-active-reclaimed',
+        manifestPath: '/tmp/provider-run/ready-not-active-reclaimed-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue()
+    }));
+    const refetchTrackedIssues = vi.fn(async (input?: { excludedIssueIds?: string[] }) => {
+      expect(input?.excludedIssueIds).not.toContain('lin-issue-1');
+      return {
+        kind: 'ready' as const,
+        trackedIssues: [
+          createTrackedIssue({
+            id: 'lin-issue-1',
+            identifier: 'CO-191',
+            title: 'Refactor docs hygiene spark policy guard',
+            state: 'Ready',
+            state_type: 'unstarted',
+            updated_at: '2026-04-15T15:00:00.000Z',
+            blocked_by: []
+          })
+        ]
+      };
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-issue-1',
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-issue-1',
+      issueIdentifier: 'CO-191',
+      issueUpdatedAt: '2026-04-15T15:00:00.000Z',
+      launchToken: expect.any(String)
+    }));
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-15T15:00:00.000Z',
+      run_id: 'run-ready-not-active-reclaimed',
+      run_manifest_path: '/tmp/provider-run/ready-not-active-reclaimed-manifest.json',
+      launch_source: 'control-host',
+      launch_token: expect.any(String)
+    });
+    expect(persist).toHaveBeenCalled();
   });
 
   it('reclaims a Ready plain released not-active claim with stale cached Blocked state', async () => {

@@ -2808,14 +2808,18 @@ export function createProviderIssueHandoffService(
             !pendingReleasedReopen
           );
         const preserveReleasedIssueMetadata = replayBlockedByReleasedMetadata;
-        const newerWebhookBlockedByDrain =
+        const reopenBlockedByReleaseDrain =
           releaseCancelPending &&
           (
             releasedWebhookTiming === 'newer' ||
-            releasedWebhookTiming === 'unknown'
+            releasedWebhookTiming === 'unknown' ||
+            (
+              releasedWebhookTiming === 'equal' &&
+              pendingReleasedReopen
+            )
           );
         const releasedMutabilityTruth =
-          newerWebhookBlockedByDrain
+          reopenBlockedByReleaseDrain
             ? {
                 issue_archived_at: claimBase.issue_archived_at,
                 issue_trashed: claimBase.issue_trashed
@@ -2837,31 +2841,31 @@ export function createProviderIssueHandoffService(
           const claim = await upsertProviderClaimAndPersist({
             ...claimBase,
             issue_identifier:
-              newerWebhookBlockedByDrain
+              reopenBlockedByReleaseDrain
                 ? claimBase.issue_identifier
                 : preserveReleasedIssueMetadata
                   ? existing.issue_identifier
                   : claimBase.issue_identifier,
             issue_title:
-              newerWebhookBlockedByDrain
+              reopenBlockedByReleaseDrain
                 ? claimBase.issue_title
                 : preserveReleasedIssueMetadata
                   ? existing.issue_title
                   : claimBase.issue_title,
             issue_state:
-              newerWebhookBlockedByDrain
+              reopenBlockedByReleaseDrain
                 ? claimBase.issue_state
                 : preserveReleasedIssueMetadata
                   ? existing.issue_state
                   : claimBase.issue_state,
             issue_state_type:
-              newerWebhookBlockedByDrain
+              reopenBlockedByReleaseDrain
                 ? claimBase.issue_state_type
                 : preserveReleasedIssueMetadata
                   ? existing.issue_state_type
                   : claimBase.issue_state_type,
             issue_updated_at:
-              newerWebhookBlockedByDrain
+              reopenBlockedByReleaseDrain
                 ? claimBase.issue_updated_at
                 : preserveReleasedIssueMetadata
                   ? existing.issue_updated_at
@@ -2869,31 +2873,31 @@ export function createProviderIssueHandoffService(
             issue_archived_at: releasedMutabilityTruth.issue_archived_at,
             issue_trashed: releasedMutabilityTruth.issue_trashed,
             issue_viewer_id:
-              newerWebhookBlockedByDrain
+              reopenBlockedByReleaseDrain
                 ? claimBase.issue_viewer_id
                 : preserveReleasedIssueMetadata
                   ? existing.issue_viewer_id ?? null
                   : claimBase.issue_viewer_id,
             issue_viewer_auth_fingerprint:
-              newerWebhookBlockedByDrain
+              reopenBlockedByReleaseDrain
                 ? claimBase.issue_viewer_auth_fingerprint
                 : preserveReleasedIssueMetadata
                   ? existing.issue_viewer_auth_fingerprint ?? null
                   : claimBase.issue_viewer_auth_fingerprint,
             issue_assignee_id:
-              newerWebhookBlockedByDrain
+              reopenBlockedByReleaseDrain
                 ? claimBase.issue_assignee_id
                 : preserveReleasedIssueMetadata
                   ? existing.issue_assignee_id ?? null
                   : claimBase.issue_assignee_id,
             issue_assignee_name:
-              newerWebhookBlockedByDrain
+              reopenBlockedByReleaseDrain
                 ? claimBase.issue_assignee_name
                 : preserveReleasedIssueMetadata
                   ? existing.issue_assignee_name ?? null
                   : claimBase.issue_assignee_name,
             issue_blocked_by:
-              newerWebhookBlockedByDrain
+              reopenBlockedByReleaseDrain
                 ? claimBase.issue_blocked_by
                 : preserveReleasedIssueMetadata
                   ? existing.issue_blocked_by
@@ -2902,7 +2906,7 @@ export function createProviderIssueHandoffService(
             mapping_source: existing.mapping_source,
             state: 'released',
             reason:
-              newerWebhookBlockedByDrain
+              reopenBlockedByReleaseDrain
                 ? markProviderIssueReleasedPendingReopen(existing.reason ?? null)
                 : existing.reason ?? 'provider_issue_released',
             run_id: releasedRun?.runId ?? existing.run_id,
@@ -7108,7 +7112,10 @@ function canFreshDiscoverReleasedReclaimClaim(
     return false;
   }
   if (run === null) {
-    return !claim.run_id && !claim.run_manifest_path;
+    return (
+      canRecheckPlainReleasedNotActiveClaim(claim) ||
+      (!claim.run_id && !claim.run_manifest_path)
+    );
   }
   return !shouldAttemptReleaseCancel(run) || isInactiveReleasedReclaimRun(claim, run);
 }
