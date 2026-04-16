@@ -54,6 +54,9 @@
 - [x] `npm run docs:freshness`.
 - [x] `npm run repo:stewardship`.
 - [x] `node scripts/diff-budget.mjs`.
+- [x] `node scripts/runtime-mode-canary.mjs`. Evidence: `out/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/manual/runtime-canary-summary.json` recorded `20/20` passing iterations for default app-server mode, app-server success, forced fallback, and unsupported-combo checks.
+- [x] Required cloud canary configuration blocker recorded for `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 npm run ci:cloud-canary`. Evidence: provider-worker execution failed closed with `Missing CODEX_CLOUD_ENV_ID`; hold remains in force until a real cloud environment id is available.
+- [x] Fallback contract blocker recorded for `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 CLOUD_CANARY_EXPECT_FALLBACK=1 npm run ci:cloud-canary`. Evidence: fallback manifest `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/cli/2026-04-15T23-59-13-984Z-8bf4380e/manifest.json` and run summary `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/cli/2026-04-15T23-59-13-984Z-8bf4380e/run-summary.json`; command failed required mode because `CODEX_CLOUD_ENV_ID` is absent.
 - [x] Manifest-backed standalone review. Evidence: `../../.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/cli/2026-04-15T22-57-06-636Z-d82a867f/review/telemetry.json` (`clean-success`).
 - [x] Explicit elegance/minimality pass. Result: docs-only packet stayed minimal; duplicate child-manifest evidence was removed; required `docs/TASKS.md` mirror was added through the existing archive path; no runtime/provider change or new abstraction was introduced.
 - [ ] PR attached and automated feedback drain clean before review handoff.
@@ -65,3 +68,4 @@
 - 2026-04-15: Docs-review, repo validation gates, and manifest-backed standalone review passed. Standalone review outcome: `clean-success`.
 - 2026-04-15: Elegance/minimality pass completed. Result: keep the docs-first packet, required `docs/TASKS.md` mirror, and registry/index updates; no additional artifact document or runtime helper is needed.
 - 2026-04-15: Standalone review P2 fixed by adding the `docs/TASKS.md` snapshot and preserving the line-budget archive path.
+- 2026-04-16: PR review feedback addressed by adding newer-version runtime/cloud/fallback canary gates, docs-review approval evidence, and markdown table spacing fixes.

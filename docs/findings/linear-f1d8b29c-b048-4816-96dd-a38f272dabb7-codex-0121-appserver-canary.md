@@ -38,7 +38,15 @@ Generated protocol evidence came from `codex app-server generate-ts --experiment
 - Observed notification method names included `thread/started` and `rawResponseItem/completed`.
 - Raw `rawResponseItem/completed` payloads were not committed because they included prompt/instruction content.
 
+## Newer-Version Policy Canary Gates
+
+- `MCP_RUNNER_TASK_ID=linear-f1d8b29c-b048-4816-96dd-a38f272dabb7 node scripts/runtime-mode-canary.mjs` passed on `2026-04-15T23:59:03.639Z` with `20/20` iterations passing for default mode, app-server success, forced fallback, and unsupported-combo checks. Summary artifact: `out/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/manual/runtime-canary-summary.json`.
+- Required cloud contract command remains `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 npm run ci:cloud-canary`. Local provider-worker execution with `CODEX_CLOUD_CANARY_REQUIRED=1` failed closed before cloud execution because `CODEX_CLOUD_ENV_ID` is missing. This is a configuration blocker, not provider parity proof.
+- Fallback contract command remains `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 CLOUD_CANARY_EXPECT_FALLBACK=1 npm run ci:cloud-canary`. Local provider-worker execution with `CLOUD_CANARY_EXPECT_FALLBACK=1` captured fallback manifest `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/cli/2026-04-15T23-59-13-984Z-8bf4380e/manifest.json` and run summary `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/cli/2026-04-15T23-59-13-984Z-8bf4380e/run-summary.json`, then failed required mode because the same `CODEX_CLOUD_ENV_ID` configuration is absent.
+- Hold: cloud promotion evidence is incomplete in this workspace. JSONL/session logs remain authoritative, and no provider precedence or replacement change is allowed until the required cloud environment is available and the cloud/fallback contract gates pass.
+
 ## Provider Parity Matrix
+
 | CO provider proof field / behavior | Current authoritative source | App-server 0.121 evidence | Parity result |
 | --- | --- | --- | --- |
 | `thread_id`, `latest_turn_id`, `latest_session_id`, `turn_count` | stdout JSONL and session-log hydration into `provider-linear-worker-proof.json` | Thread APIs expose `threadId`; turn APIs expose turn state. Runtime smoke proved thread creation only. | Partial. Needs provider run binding and turn/session provenance. |

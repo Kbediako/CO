@@ -30,6 +30,9 @@
   - `npm run docs:freshness`
   - `npm run repo:stewardship`
   - `node scripts/diff-budget.mjs`
+  - `node scripts/runtime-mode-canary.mjs`
+  - `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 npm run ci:cloud-canary`
+  - `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 CLOUD_CANARY_EXPECT_FALLBACK=1 npm run ci:cloud-canary`
   - manifest-backed standalone review
   - explicit elegance/minimality pass
 
