@@ -2918,14 +2918,22 @@ function classifyProviderWorkerStderrFailureDiagnosis(
   if (!message) {
     return null;
   }
-  return classifyProviderWorkerFailureDiagnosis(
-    {
-      type: 'stderr',
-      message,
-      timestamp: observedAt
-    },
-    'stderr'
-  );
+  const diagnosticInput = {
+    type: 'stderr',
+    message,
+    timestamp: observedAt
+  };
+  const classifiedDiagnosis = classifyProviderWorkerFailureDiagnosis(diagnosticInput, 'stderr');
+  if (classifiedDiagnosis) {
+    return classifiedDiagnosis;
+  }
+  return {
+    diagnostic_category: 'provider_runtime',
+    signal: buildProviderWorkerDiagnosticSignal(diagnosticInput, 'stderr'),
+    guidance: providerWorkerDiagnosticGuidance('provider_runtime'),
+    source: 'stderr',
+    observed_at: observedAt
+  };
 }
 
 function humanizeProviderWorkerMethod(method: string, input: Record<string, unknown>): string | null {

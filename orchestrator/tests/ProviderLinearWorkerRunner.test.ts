@@ -5064,7 +5064,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     }
   });
 
-  it('persists the first proof snapshot even when the manifest cannot be reread later', async () => {
+  it('persists the first proof snapshot and runtime diagnosis when the manifest cannot be reread later', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
     const readManifest = vi
       .fn<ProviderLinearWorkerDependencies['readManifest']>()
@@ -5115,7 +5115,13 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     ) as Record<string, unknown>;
     expect(written).toMatchObject({
       owner_status: 'failed',
-      end_reason: 'codex_exit_2'
+      end_reason: 'codex_exit_2',
+      failure_diagnosis: {
+        diagnostic_category: 'provider_runtime',
+        signal: expect.stringContaining('boom'),
+        source: 'stderr',
+        observed_at: '2026-03-21T09:00:01.000Z'
+      }
     });
   });
 
