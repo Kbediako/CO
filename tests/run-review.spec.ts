@@ -18,6 +18,8 @@ const createdSandboxes: string[] = [];
 const shellBinary = 'bash';
 const LONG_WAIT_TEST_TIMEOUT_MS = 20_000;
 const RUN_REVIEW_SUBPROCESS_TIMEOUT_MS = 15_000;
+const RUN_REVIEW_MOCK_REAP_POLL_ATTEMPTS = 10;
+const RUN_REVIEW_MOCK_REAP_POLL_INTERVAL_MS = 50;
 
 interface RunReviewMockProcess {
   pid: number;
@@ -1334,6 +1336,16 @@ async function cleanupRunReviewMockProcesses(codexBin: string): Promise<void> {
   const remainingProcesses = await findRunReviewMockProcesses(codexBin);
   for (const processInfo of remainingProcesses) {
     await terminateRunReviewMockProcess(processInfo, 'SIGKILL');
+  }
+  if (remainingProcesses.length > 0) {
+    for (let attempt = 0; attempt < RUN_REVIEW_MOCK_REAP_POLL_ATTEMPTS; attempt += 1) {
+      await new Promise<void>((resolve) =>
+        setTimeout(resolve, RUN_REVIEW_MOCK_REAP_POLL_INTERVAL_MS)
+      );
+      if ((await findRunReviewMockProcesses(codexBin)).length === 0) {
+        break;
+      }
+    }
   }
 }
 
