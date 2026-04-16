@@ -1739,7 +1739,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
           params: {
             rateLimits: {
               primary: {
-                usedPercent: 99,
+                usedPercent: 42,
                 windowDurationMins: 300
               }
             },
@@ -1763,18 +1763,112 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(JSON.stringify(parsed.authProvenance)).not.toContain('personal-profile');
     expect(JSON.stringify(parsed.authProvenance)).not.toContain('acct_raw_123');
     expect(JSON.stringify(parsed.authProvenance)).not.toContain('operator@example.com');
-    expect(parsed.failureDiagnosis).toMatchObject({
-      diagnostic_category: 'quota_rate_limit',
-      source: 'stdout_jsonl'
-    });
-    expect(parsed.failureDiagnosis?.signal).toContain('account_plan=prolite');
-    expect(parsed.failureDiagnosis?.signal).toContain('wham_plan=unknown_wham_plan');
+    expect(parsed.failureDiagnosis).toBeNull();
     expect(parsed.rateLimits).toEqual({
       primary: {
-        usedPercent: 99,
+        usedPercent: 42,
         windowDurationMins: 300
       }
     });
+  });
+
+  it('extracts auth provenance from every supported auth container', () => {
+    const cases: Array<[Record<string, unknown>, string, string]> = [
+      [{
+        type: 'notification',
+        method: 'account/authProfile/updated',
+        auth: {
+          profileId: 'top-profile',
+          account: { id: 'top-acct-raw', email: 'top@example.com' },
+          credentialSource: 'codex_login',
+          authFreshness: 'fresh'
+        }
+      }, 'top-profile', 'top-acct-raw'],
+      [{
+        type: 'event_msg',
+        payload: {
+          type: 'account/authProfile/updated',
+          auth: {
+            profile_id: 'payload-profile',
+            account_id: 'payload-acct-raw',
+            credential_source: 'device_auth',
+            auth_freshness: 'recent'
+          }
+        }
+      }, 'payload-profile', 'payload-acct-raw']
+    ];
+
+    for (const [event, profile, account] of cases) {
+      const parsed = parseProviderLinearWorkerJsonl(JSON.stringify(event));
+      expect(parsed.authProvenance).toMatchObject({
+        provider_kind: 'codex',
+        active_profile_fingerprint: testFingerprint(profile),
+        active_account_fingerprint: testFingerprint(account),
+        source: 'stdout_jsonl'
+      });
+      expect(JSON.stringify(parsed.authProvenance)).not.toContain(profile);
+      expect(JSON.stringify(parsed.authProvenance)).not.toContain(account);
+    }
+  });
+
+  it('classifies Codex 0.121 quota variants and preserves safe plan context', () => {
+    const cases: Array<[Record<string, unknown>, string[]]> = [
+      [
+        {
+          method: 'account/rateLimits/exhausted',
+          params: {
+            message: 'Rate limit exhausted for prolite account; unknown WHAM plan value was decoded.',
+            accountPlan: 'prolite',
+            whamPlan: 'unknown_wham_plan'
+          }
+        },
+        ['account_plan=prolite', 'wham_plan=unknown_wham_plan']
+      ],
+      [
+        {
+          method: 'account/rateLimits/exhausted',
+          params: {
+            message: `Rate limit exhausted. ${'x'.repeat(600)}`,
+            accountPlan: 'prolite',
+            whamPlan: 'unknown_wham_plan'
+          }
+        },
+        ['account_plan=prolite', 'wham_plan=unknown_wham_plan']
+      ],
+      [{ method: 'account/rateLimits/exhausted' }, []],
+      [
+        {
+          method: 'account/rateLimits/exhausted',
+          params: { msg: { payload: { info: { accountPlan: 'prolite', whamPlan: 'unknown_wham_plan' } } } }
+        },
+        ['account_plan=prolite', 'wham_plan=unknown_wham_plan']
+      ],
+      [
+        {
+          method: 'account/rateLimits/exhausted',
+          params: {
+            message: 'Rate limit exhausted.',
+            accountPlan: 'customer_internal_gold_123',
+            whamPlan: 'acct_raw_123'
+          }
+        },
+        ['account_plan=redacted', 'wham_plan=redacted']
+      ]
+    ];
+
+    for (const [event, expectedSignalParts] of cases) {
+      const parsed = parseProviderLinearWorkerJsonl(
+        JSON.stringify({ type: 'notification', timestamp: '2026-04-15T20:45:19.000Z', ...event })
+      );
+      expect(parsed.failureDiagnosis).toMatchObject({
+        diagnostic_category: 'quota_rate_limit',
+        source: 'stdout_jsonl'
+      });
+      expect(parsed.failureDiagnosis?.signal.length).toBeLessThanOrEqual(500);
+      for (const part of expectedSignalParts) {
+        expect(parsed.failureDiagnosis?.signal).toContain(part);
+      }
+    }
   });
 
   it('redacts unsafe credential-source labels and auth identifiers from provider diagnostics', () => {
@@ -1786,7 +1880,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
           credentialSource: 'operator@example.com',
           authFreshness: 'profile=personal-profile',
           message:
-            'profile mismatch for profile personal-profile {"profile_id":"personal-profile","account_id":"acct_raw_123","org_id":"org_raw_456","refresh_token":"secret-refresh-token"}'
+            'profile mismatch for operator@example.com OPENAI_API_KEY=secret-openai-key "OPENAI_API_KEY":"secret-openai-json" oauth_refresh=secret-oauth-refresh oauth_access=secret-oauth-access {"profile_id":"personal-profile","account_id":"acct_raw_123","org_id":"org_raw_456","refresh_token":"secret-refresh-token"} profile id personal-profile account id acct-raw-123 organization id org-raw-456 user id user-raw-789 session id sess-secret-123 refresh token secret-refresh-token standalone acct-standalone-123 org-standalone-456 user-standalone-789 account id abc123 profile identifier xyz789 account id: acctcolon123 profile id: profilecolon123 organization id: orgcolon123 user id: usercolon123 session id: sesscolon123'
         },
         timestamp: '2026-04-15T20:45:21.000Z'
       })
@@ -1803,26 +1897,243 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       diagnostic_category: 'auth_mismatch',
       source: 'stdout_jsonl'
     });
-    expect(parsed.failureDiagnosis?.signal).not.toContain('personal-profile');
-    expect(parsed.failureDiagnosis?.signal).not.toContain('acct_raw_123');
-    expect(parsed.failureDiagnosis?.signal).not.toContain('org_raw_456');
-    expect(parsed.failureDiagnosis?.signal).not.toContain('secret-refresh-token');
-    expect(parsed.failureDiagnosis?.signal).toContain('"refresh_token":"<redacted>"');
+    const signal = parsed.failureDiagnosis?.signal ?? '';
+    for (const fragment of [
+      'personal-profile', 'acct_raw_123', 'acct-raw-123', 'acct-standalone-123',
+      'org_raw_456', 'org-raw-456', 'org-standalone-456',
+      'user-raw-789', 'user-standalone-789', 'abc123', 'xyz789',
+      'acctcolon123', 'profilecolon123', 'orgcolon123', 'usercolon123', 'sesscolon123',
+      'operator@example.com', 'example.com', 'secret-refresh-token',
+      'secret-oauth-refresh', 'secret-oauth-access', 'secret-openai-key',
+      'secret-openai-json', 'sess-secret-123'
+    ]) {
+      expect(signal).not.toContain(fragment);
+    }
+    for (const fragment of [
+      '<email-redacted>', 'OPENAI_API_KEY=<redacted>', '"OPENAI_API_KEY":"<redacted>"',
+      'oauth_refresh=<redacted>', 'oauth_access=<redacted>', '"refresh_token":"<redacted>"',
+      'session id <redacted>', 'profile id <redacted>',
+      'account id <redacted>', 'organization id <redacted>', 'user id <redacted>'
+    ]) {
+      expect(signal).toContain(fragment);
+    }
   });
 
-  it('does not infer auth provenance from generic status-only events', () => {
+  it('redacts whitespace-separated credential labels from provider diagnostics', () => {
     const parsed = parseProviderLinearWorkerJsonl(
       JSON.stringify({
-        type: 'event_msg',
-        payload: {
-          status: 'failed',
-          message: 'ordinary provider status update'
-        },
-        timestamp: '2026-04-15T20:45:20.000Z'
+        type: 'error',
+        message:
+          'auth mismatch OPENAI_API_KEY secret-openai-space "OPENAI_API_KEY" = "secret-openai-spaced-json" refreshToken secret-refresh-camel sessionId sess-secret-camel authorization Bearer secret-bearer refresh token abc123 api key key123 session token def456 credential plaincred api key: colonkey123 API key = eqkey123 "api key":"quotedkey123" "api key" = "spacedquotedkey123" bearer token: bearerplain123',
+        timestamp: '2026-04-15T20:45:21.250Z'
       })
     );
 
-    expect(parsed.authProvenance).toBeNull();
+    expect(parsed.failureDiagnosis).toMatchObject({
+      diagnostic_category: 'auth_mismatch',
+      source: 'stdout_jsonl'
+    });
+    const signal = parsed.failureDiagnosis?.signal ?? '';
+    for (const fragment of [
+      'secret-openai-space',
+      'secret-openai-spaced-json',
+      'secret-refresh-camel',
+      'sess-secret-camel',
+      'secret-bearer',
+      'abc123',
+      'key123',
+      'def456',
+      'plaincred',
+      'colonkey123',
+      'eqkey123',
+      'quotedkey123',
+      'spacedquotedkey123',
+      'bearerplain123'
+    ]) {
+      expect(signal).not.toContain(fragment);
+    }
+    for (const fragment of [
+      'OPENAI_API_KEY <redacted>',
+      '"OPENAI_API_KEY":"<redacted>"',
+      'refreshToken <redacted>',
+      'sessionId <redacted>',
+      'authorization <redacted>',
+      'refresh token <redacted>',
+      'api key <redacted>',
+      'session token <redacted>',
+      'credential <redacted>',
+      'api key=<redacted>',
+      '"api key":"<redacted>"',
+      'bearer token=<redacted>'
+    ]) {
+      expect(signal).toContain(fragment);
+    }
+  });
+
+  it('redacts unsafe free-form plan and WHAM details from quota diagnostics', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      JSON.stringify({
+        type: 'notification',
+        method: 'account/rateLimits/exhausted',
+        params: {
+          message:
+            'Rate limit exhausted for internal plan customer_internal_gold_123 and WHAM plan enterprise_secret_wham_456. Retry account plan customgold123 and wham plan secretwham456. {"accountPlan":"customer_internal_gold_123","whamPlan":"enterprise_secret_wham_456"}',
+          accountPlan: 'customer_internal_gold_123',
+          whamPlan: 'enterprise_secret_wham_456'
+        }
+      })
+    );
+
+    expect(parsed.failureDiagnosis).toMatchObject({
+      diagnostic_category: 'quota_rate_limit',
+      source: 'stdout_jsonl'
+    });
+    const signal = parsed.failureDiagnosis?.signal ?? '';
+    expect(signal).toContain('account_plan=redacted');
+    expect(signal).toContain('wham_plan=redacted');
+    expect(signal).not.toContain('customer_internal_gold_123');
+    expect(signal).not.toContain('enterprise_secret_wham_456');
+    expect(signal).not.toContain('customgold123');
+    expect(signal).not.toContain('secretwham456');
+  });
+
+  it('classifies auth-profile mismatch events before plan/quota context', () => {
+    for (const event of [
+      { type: 'notification', method: 'account/authProfile/mismatch' },
+      { type: 'error', message: 'Active auth profile forbidden for this prolite account.' }
+    ]) {
+      const parsed = parseProviderLinearWorkerJsonl(
+        JSON.stringify({ timestamp: '2026-04-15T20:45:21.500Z', ...event })
+      );
+      expect(parsed.failureDiagnosis).toMatchObject({
+        diagnostic_category: 'auth_mismatch',
+        source: 'stdout_jsonl'
+      });
+    }
+  });
+
+  it('classifies machine-readable provider diagnostic events before prose', () => {
+    const cases: Array<[Record<string, unknown>, string]> = [
+      [{ type: 'auth_mismatch', status: 'failed' }, 'auth_mismatch'],
+      [{ type: 'cloud_denial', status: 'failed' }, 'cloud_denial'],
+      [{ type: 'env_config', status: 'failed' }, 'env_config'],
+      [
+        {
+          type: 'provider_runtime',
+          status: 'failed',
+          status_detail: 'runtime_parity_command_unavailable'
+        },
+        'provider_runtime'
+      ],
+      [
+        {
+          type: 'auth_mismatch',
+          status: 'failed',
+          message: 'quota exhausted context from a nearby account state'
+        },
+        'auth_mismatch'
+      ],
+      [
+        {
+          type: 'cloud_denial',
+          status: 'failed',
+          message: 'rate limit exhausted in the wrapped cloud prose'
+        },
+        'cloud_denial'
+      ],
+      [
+        {
+          type: 'env_config',
+          status: 'failed',
+          message: 'quota exhausted before cloud env was configured'
+        },
+        'env_config'
+      ],
+      [{ type: 'quota_rate_limit', status: 'failed' }, 'quota_rate_limit'],
+      [{ type: 'account_status', status: 'rate_limited' }, 'quota_rate_limit'],
+      [{ type: 'rate_limit', status: 'failed' }, 'quota_rate_limit'],
+      [{ type: 'diagnostic', diagnostic_category: 'auth_mismatch' }, 'auth_mismatch'],
+      [
+        {
+          type: 'diagnostic',
+          params: { status_detail: 'guardian_timeout', message: 'Guardian review timeout' }
+        },
+        'guardian_timeout'
+      ],
+      [
+        {
+          type: 'diagnostic',
+          diagnostic_category: 'guardian_timeout'
+        },
+        'guardian_timeout'
+      ],
+      [
+        {
+          type: 'diagnostic',
+          failure_diagnosis: { diagnostic_category: 'guardian_policy_denial' }
+        },
+        'guardian_policy_denial'
+      ],
+      [
+        {
+          type: 'diagnostic',
+          params: { failure_diagnosis: { diagnostic_category: 'quota_rate_limit' } }
+        },
+        'quota_rate_limit'
+      ]
+    ];
+
+    for (const [payload, expected] of cases) {
+      const parsed = parseProviderLinearWorkerJsonl(
+        JSON.stringify({ type: 'event_msg', payload, timestamp: '2026-04-15T20:45:21.800Z' })
+      );
+      expect(parsed.failureDiagnosis?.diagnostic_category).toBe(expected);
+    }
+  });
+
+  it('classifies prose rate-limited provider failures', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      JSON.stringify({
+        type: 'error',
+        message: 'Codex provider was rate limited by provider quota.',
+        timestamp: '2026-04-15T20:45:22.250Z'
+      })
+    );
+
+    expect(parsed.failureDiagnosis).toMatchObject({
+      diagnostic_category: 'quota_rate_limit',
+      source: 'stdout_jsonl',
+      observed_at: '2026-04-15T20:45:22.250Z'
+    });
+  });
+
+  it('does not infer auth provenance from generic non-auth payload fields', () => {
+    const events = [
+      {
+        type: 'event_msg',
+        payload: {
+          status: 'failed',
+          message: 'ordinary provider status update',
+          account: 'customer account',
+          profile: 'performance'
+        },
+        timestamp: '2026-04-15T20:45:20.000Z'
+      },
+      {
+        type: 'event_msg',
+        payload: {
+          type: 'tool_result',
+          account: { id: 'acct_raw_123' },
+          profile: 'performance',
+          message: 'ordinary tool result payload'
+        },
+        timestamp: '2026-04-15T20:45:20.125Z'
+      }
+    ];
+
+    for (const event of events) {
+      expect(parseProviderLinearWorkerJsonl(JSON.stringify(event)).authProvenance).toBeNull();
+    }
   });
 
   it('classifies Guardian timeouts separately from Guardian policy denials', () => {
@@ -1831,7 +2142,8 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         type: 'notification',
         method: 'guardian/review/timeout',
         params: {
-          message: 'Guardian review timed out; retry with timeout-specific guidance.'
+          message:
+            'Guardian review timed out; retry with timeout-specific guidance and do not treat this timeout as a policy denial.'
         },
         timestamp: '2026-04-15T20:46:00.000Z'
       })
@@ -1841,10 +2153,16 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         type: 'notification',
         method: 'guardian/review/denied',
         params: {
-          message: 'Guardian policy denial blocked this request.'
+          message: 'Guardian policy denial blocked this request; do not retry as a timeout.'
         },
         timestamp: '2026-04-15T20:46:01.000Z'
       })
+    );
+    const enumTimeoutParsed = parseProviderLinearWorkerJsonl(
+      JSON.stringify({ type: 'event_msg', payload: { type: 'guardian_timeout' } })
+    );
+    const enumDenialParsed = parseProviderLinearWorkerJsonl(
+      JSON.stringify({ type: 'event_msg', payload: { type: 'guardian_policy_denial' } })
     );
 
     expect(timeoutParsed.failureDiagnosis).toMatchObject({
@@ -1855,6 +2173,14 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       diagnostic_category: 'guardian_policy_denial',
       guidance: expect.stringContaining('policy')
     });
+    expect(enumTimeoutParsed.failureDiagnosis).toMatchObject({
+      diagnostic_category: 'guardian_timeout',
+      source: 'stdout_jsonl'
+    });
+    expect(enumDenialParsed.failureDiagnosis).toMatchObject({
+      diagnostic_category: 'guardian_policy_denial',
+      source: 'stdout_jsonl'
+    });
   });
 
   it('preserves Guardian timeout visibility from TUI-history style events', () => {
@@ -1863,13 +2189,26 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         type: 'event_msg',
         payload: {
           type: 'tui_history',
-          message: 'TUI history: Guardian review timed out while waiting for guardian decision.'
+          message:
+            'TUI history: Guardian review timed out while waiting for guardian decision; do not treat this timeout as a policy denial.'
         },
         timestamp: '2026-04-15T20:46:02.000Z'
       })
     );
+    const denialParsed = parseProviderLinearWorkerJsonl(
+      JSON.stringify({
+        type: 'event_msg',
+        payload: {
+          type: 'tui_history',
+          message: 'TUI history: Guardian policy denial blocked this request; do not retry as a timeout.'
+        },
+        timestamp: '2026-04-15T20:46:02.250Z'
+      })
+    );
 
-    expect(parsed.finalMessage).toBe('TUI history: Guardian review timed out while waiting for guardian decision.');
+    expect(parsed.finalMessage).toBe(
+      'TUI history: Guardian review timed out while waiting for guardian decision; do not treat this timeout as a policy denial.'
+    );
     expect(parsed.failureDiagnosis).toMatchObject({
       diagnostic_category: 'guardian_timeout',
       signal: expect.stringContaining('Guardian review timed out'),
@@ -1877,6 +2216,43 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       source: 'stdout_jsonl',
       observed_at: '2026-04-15T20:46:02.000Z'
     });
+    expect(denialParsed.failureDiagnosis).toMatchObject({
+      diagnostic_category: 'guardian_policy_denial',
+      guidance: expect.stringContaining('policy'),
+      source: 'stdout_jsonl',
+      observed_at: '2026-04-15T20:46:02.250Z'
+    });
+  });
+
+  it('does not classify ordinary assistant text as provider failures', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        JSON.stringify({
+          type: 'response_item',
+          payload: {
+            type: 'message',
+            content: [
+              {
+                type: 'output_text',
+                text: 'I checked the rate limit, Guardian timeout, and policy denial diagnostics.'
+              }
+            ]
+          },
+          timestamp: '2026-04-15T20:47:00.000Z'
+        }),
+        JSON.stringify({
+          type: 'event_msg',
+          payload: {
+            type: 'agent_message',
+            message: 'The next step is to preserve quota and Guardian failure distinctions.'
+          },
+          timestamp: '2026-04-15T20:47:01.000Z'
+        })
+      ].join('\n')
+    );
+
+    expect(parsed.finalMessage).toBe('The next step is to preserve quota and Guardian failure distinctions.');
+    expect(parsed.failureDiagnosis).toBeNull();
   });
 
   it('waits for child close before resolving piped stdio capture', async () => {

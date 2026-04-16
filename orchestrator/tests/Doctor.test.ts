@@ -1153,14 +1153,25 @@ describe('runDoctor', () => {
   });
 
   it('prints redacted auth provenance in doctor cloud preflight output', async () => {
-    const previousCodexBin = process.env.CODEX_CLI_BIN;
     const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-auth-'));
-    process.env.CODEX_CLI_BIN = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+    const fakeCodexBin = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+    const runCloudPreflightSpy = vi
+      .spyOn(cloudPreflight, 'runCloudPreflight')
+      .mockImplementation(async (request) => ({
+        ok: true,
+        issues: [],
+        details: {
+          codexBin: request.codexBin,
+          environmentId: request.environmentId,
+          branch: typeof request.branch === 'string' ? request.branch.replace(/^refs\/heads\//u, '') : null
+        }
+      }));
 
     try {
       const result = await runDoctorCloudPreflight({
-        cwd: process.cwd(),
+        cwd: tempDir,
         env: buildDoctorCloudEnv({
+          CODEX_CLI_BIN: fakeCodexBin,
           CODEX_CLOUD_ENV_ID: 'env_123',
           CODEX_CLOUD_BRANCH: 'refs/heads/linear/co-200',
           CODEX_AUTH_PROFILE: 'operator-profile',
@@ -1178,6 +1189,11 @@ describe('runDoctor', () => {
         credential_source: 'env:OPENAI_API_KEY',
         auth_freshness: 'env_credential_present'
       });
+      expect(runCloudPreflightSpy).toHaveBeenCalledOnce();
+      const [request] = runCloudPreflightSpy.mock.calls[0] ?? [];
+      expect(request?.repoRoot).toBe(tempDir);
+      expect(request?.codexBin).toBe(fakeCodexBin);
+      expect(request?.branch).toBe('refs/heads/linear/co-200');
       expect(summary).toContain('credential source: env:OPENAI_API_KEY');
       expect(summary).toContain(`profile fingerprint: ${testFingerprint('operator-profile')}`);
       expect(summary).toContain(`account fingerprint: ${testFingerprint('acct_raw_123')}`);
@@ -1185,11 +1201,7 @@ describe('runDoctor', () => {
       expect(summary).not.toContain('acct_raw_123');
       expect(summary).not.toContain('sk-test-redacted');
     } finally {
-      if (previousCodexBin === undefined) {
-        delete process.env.CODEX_CLI_BIN;
-      } else {
-        process.env.CODEX_CLI_BIN = previousCodexBin;
-      }
+      runCloudPreflightSpy.mockRestore();
       await rm(tempDir, { recursive: true, force: true });
     }
   });

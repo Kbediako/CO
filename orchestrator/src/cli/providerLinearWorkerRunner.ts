@@ -1912,6 +1912,24 @@ const PROVIDER_WORKER_AUTH_FRESHNESS_LABELS = new Set([
   'valid'
 ]);
 
+const PROVIDER_WORKER_ACCOUNT_PLAN_LABELS = new Set([
+  'enterprise',
+  'free',
+  'plus',
+  'pro',
+  'prolite',
+  'team',
+  'unknown',
+  'unknown_plan'
+]);
+
+const PROVIDER_WORKER_WHAM_PLAN_LABELS = new Set([
+  'none',
+  'unknown',
+  'unknown_plan',
+  'unknown_wham_plan'
+]);
+
 function normalizeProviderWorkerSafeLabel(
   value: unknown,
   allowedLabels: Set<string>,
@@ -1942,6 +1960,13 @@ function normalizeProviderWorkerCredentialSource(value: unknown): string | null 
 
 function normalizeProviderWorkerAuthFreshness(value: unknown): string | null {
   return normalizeProviderWorkerSafeLabel(value, PROVIDER_WORKER_AUTH_FRESHNESS_LABELS);
+}
+
+function normalizeProviderWorkerPlanLabel(
+  value: unknown,
+  allowedLabels: Set<string>
+): string | null {
+  return normalizeProviderWorkerSafeLabel(value, allowedLabels);
 }
 
 function fingerprintProviderWorkerAuthValue(value: unknown): string | null {
@@ -1978,35 +2003,169 @@ function readFirstProviderWorkerFingerprintAtPaths(
   return null;
 }
 
+function readProviderWorkerStructuredDiagnosticCategoryValues(input: Record<string, unknown>): string[] {
+  const payload = isRecord(input.payload) ? input.payload : null;
+  const params = isRecord(input.params) ? input.params : null;
+  const payloadParams = isRecord(payload?.params) ? payload.params : null;
+  const failureDiagnosis = isRecord(input.failure_diagnosis) ? input.failure_diagnosis : null;
+  const payloadFailureDiagnosis = isRecord(payload?.failure_diagnosis) ? payload.failure_diagnosis : null;
+  const paramsFailureDiagnosis = isRecord(params?.failure_diagnosis) ? params.failure_diagnosis : null;
+  const payloadParamsFailureDiagnosis =
+    isRecord(payloadParams?.failure_diagnosis) ? payloadParams.failure_diagnosis : null;
+  return [
+    normalizeOptionalString(input.diagnostic_category),
+    normalizeOptionalString(input.diagnosticCategory),
+    normalizeOptionalString(failureDiagnosis?.diagnostic_category),
+    normalizeOptionalString(failureDiagnosis?.diagnosticCategory),
+    normalizeOptionalString(payload?.diagnostic_category),
+    normalizeOptionalString(payload?.diagnosticCategory),
+    normalizeOptionalString(payloadFailureDiagnosis?.diagnostic_category),
+    normalizeOptionalString(payloadFailureDiagnosis?.diagnosticCategory),
+    normalizeOptionalString(params?.diagnostic_category),
+    normalizeOptionalString(params?.diagnosticCategory),
+    normalizeOptionalString(paramsFailureDiagnosis?.diagnostic_category),
+    normalizeOptionalString(paramsFailureDiagnosis?.diagnosticCategory),
+    normalizeOptionalString(payloadParams?.diagnostic_category),
+    normalizeOptionalString(payloadParams?.diagnosticCategory),
+    normalizeOptionalString(payloadParamsFailureDiagnosis?.diagnostic_category),
+    normalizeOptionalString(payloadParamsFailureDiagnosis?.diagnosticCategory)
+  ].filter((value): value is string => Boolean(value));
+}
+
+function readProviderWorkerStructuredDiagnosticValues(input: Record<string, unknown>): string[] {
+  const payload = isRecord(input.payload) ? input.payload : null;
+  const params = isRecord(input.params) ? input.params : null;
+  const payloadParams = isRecord(payload?.params) ? payload.params : null;
+  return [
+    ...readProviderWorkerStructuredDiagnosticCategoryValues(input),
+    normalizeOptionalString(input.method),
+    normalizeOptionalString(input.type),
+    normalizeOptionalString(input.status_detail),
+    normalizeOptionalString(input.statusDetail),
+    normalizeOptionalString(input.status),
+    normalizeOptionalString(payload?.method),
+    normalizeOptionalString(payload?.type),
+    normalizeOptionalString(payload?.status_detail),
+    normalizeOptionalString(payload?.statusDetail),
+    normalizeOptionalString(payload?.status),
+    normalizeOptionalString(params?.method),
+    normalizeOptionalString(params?.type),
+    normalizeOptionalString(params?.status_detail),
+    normalizeOptionalString(params?.statusDetail),
+    normalizeOptionalString(params?.status),
+    normalizeOptionalString(payloadParams?.method),
+    normalizeOptionalString(payloadParams?.type),
+    normalizeOptionalString(payloadParams?.status_detail),
+    normalizeOptionalString(payloadParams?.statusDetail),
+    normalizeOptionalString(payloadParams?.status)
+  ].filter((value): value is string => Boolean(value));
+}
+
+function normalizeProviderWorkerStructuredDiagnosticValue(value: string): string {
+  return value
+    .replace(/([a-z0-9])([A-Z])/gu, '$1_$2')
+    .replace(/[^A-Za-z0-9]+/gu, '_')
+    .replace(/^_+|_+$/gu, '')
+    .replace(/_+/gu, '_')
+    .toLowerCase();
+}
+
+function isProviderWorkerAuthProvenanceCarrier(input: Record<string, unknown>): boolean {
+  if (
+    readFirstProviderWorkerStringAtPaths(input, [
+      ['credential_source'],
+      ['credentialSource'],
+      ['auth_source'],
+      ['authSource'],
+      ['auth_freshness'],
+      ['authFreshness'],
+      ['payload', 'credential_source'],
+      ['payload', 'credentialSource'],
+      ['payload', 'auth_source'],
+      ['payload', 'authSource'],
+      ['payload', 'auth_freshness'],
+      ['payload', 'authFreshness'],
+      ['params', 'credential_source'],
+      ['params', 'credentialSource'],
+      ['params', 'auth_source'],
+      ['params', 'authSource'],
+      ['params', 'auth_freshness'],
+      ['params', 'authFreshness']
+    ])
+  ) {
+    return true;
+  }
+  if (
+    findRecordAtPaths(input, [
+      ['auth'],
+      ['params', 'auth'],
+      ['payload', 'auth'],
+      ['payload', 'params', 'auth']
+    ])
+  ) {
+    return true;
+  }
+  return readProviderWorkerStructuredDiagnosticValues(input)
+    .map(normalizeProviderWorkerStructuredDiagnosticValue)
+    .some((value) =>
+      /\bauth\b/u.test(value.replace(/_/gu, ' ')) ||
+      value.includes('auth_profile') ||
+      value.includes('authprofile') ||
+      value.includes('credential') ||
+      value.includes('login') ||
+      value.includes('oauth') ||
+      value.includes('device_auth')
+    );
+}
+
 function extractProviderWorkerAuthProvenance(
   input: Record<string, unknown>,
   source: ProviderLinearWorkerCurrentTurnActivitySource
 ): ProviderLinearWorkerAuthProvenance | null {
+  if (!isProviderWorkerAuthProvenanceCarrier(input)) {
+    return null;
+  }
   const profileFingerprint = readFirstProviderWorkerFingerprintAtPaths(input, [
     ['auth_profile'],
     ['authProfile'],
     ['profile'],
     ['profile_id'],
     ['profileId'],
+    ['auth', 'auth_profile'],
+    ['auth', 'authProfile'],
+    ['auth', 'profile'],
+    ['auth', 'profile_id'],
+    ['auth', 'profileId'],
     ['params', 'auth_profile'],
     ['params', 'authProfile'],
     ['params', 'profile'],
     ['params', 'profile_id'],
     ['params', 'profileId'],
+    ['params', 'auth', 'auth_profile'],
+    ['params', 'auth', 'authProfile'],
     ['params', 'auth', 'profile'],
     ['params', 'auth', 'profile_id'],
+    ['params', 'auth', 'profileId'],
     ['payload', 'auth_profile'],
     ['payload', 'authProfile'],
     ['payload', 'profile'],
     ['payload', 'profile_id'],
     ['payload', 'profileId'],
+    ['payload', 'auth', 'auth_profile'],
+    ['payload', 'auth', 'authProfile'],
+    ['payload', 'auth', 'profile'],
+    ['payload', 'auth', 'profile_id'],
+    ['payload', 'auth', 'profileId'],
     ['payload', 'params', 'auth_profile'],
     ['payload', 'params', 'authProfile'],
     ['payload', 'params', 'profile'],
     ['payload', 'params', 'profile_id'],
     ['payload', 'params', 'profileId'],
+    ['payload', 'params', 'auth', 'auth_profile'],
+    ['payload', 'params', 'auth', 'authProfile'],
     ['payload', 'params', 'auth', 'profile'],
-    ['payload', 'params', 'auth', 'profile_id']
+    ['payload', 'params', 'auth', 'profile_id'],
+    ['payload', 'params', 'auth', 'profileId']
   ]);
   const accountFingerprint = readFirstProviderWorkerFingerprintAtPaths(input, [
     ['account_id'],
@@ -2017,6 +2176,15 @@ function extractProviderWorkerAuthProvenance(
     ['org_id'],
     ['orgId'],
     ['email'],
+    ['auth', 'account_id'],
+    ['auth', 'accountId'],
+    ['auth', 'account'],
+    ['auth', 'account', 'id'],
+    ['auth', 'account', 'email'],
+    ['auth', 'organization_id'],
+    ['auth', 'organizationId'],
+    ['auth', 'org_id'],
+    ['auth', 'orgId'],
     ['params', 'account_id'],
     ['params', 'accountId'],
     ['params', 'account'],
@@ -2027,8 +2195,14 @@ function extractProviderWorkerAuthProvenance(
     ['params', 'org_id'],
     ['params', 'orgId'],
     ['params', 'auth', 'account'],
+    ['params', 'auth', 'account', 'id'],
+    ['params', 'auth', 'account', 'email'],
     ['params', 'auth', 'account_id'],
     ['params', 'auth', 'accountId'],
+    ['params', 'auth', 'organization_id'],
+    ['params', 'auth', 'organizationId'],
+    ['params', 'auth', 'org_id'],
+    ['params', 'auth', 'orgId'],
     ['payload', 'account_id'],
     ['payload', 'accountId'],
     ['payload', 'account'],
@@ -2038,6 +2212,15 @@ function extractProviderWorkerAuthProvenance(
     ['payload', 'organizationId'],
     ['payload', 'org_id'],
     ['payload', 'orgId'],
+    ['payload', 'auth', 'account_id'],
+    ['payload', 'auth', 'accountId'],
+    ['payload', 'auth', 'account'],
+    ['payload', 'auth', 'account', 'id'],
+    ['payload', 'auth', 'account', 'email'],
+    ['payload', 'auth', 'organization_id'],
+    ['payload', 'auth', 'organizationId'],
+    ['payload', 'auth', 'org_id'],
+    ['payload', 'auth', 'orgId'],
     ['payload', 'params', 'account_id'],
     ['payload', 'params', 'accountId'],
     ['payload', 'params', 'account'],
@@ -2048,8 +2231,14 @@ function extractProviderWorkerAuthProvenance(
     ['payload', 'params', 'org_id'],
     ['payload', 'params', 'orgId'],
     ['payload', 'params', 'auth', 'account'],
+    ['payload', 'params', 'auth', 'account', 'id'],
+    ['payload', 'params', 'auth', 'account', 'email'],
     ['payload', 'params', 'auth', 'account_id'],
-    ['payload', 'params', 'auth', 'accountId']
+    ['payload', 'params', 'auth', 'accountId'],
+    ['payload', 'params', 'auth', 'organization_id'],
+    ['payload', 'params', 'auth', 'organizationId'],
+    ['payload', 'params', 'auth', 'org_id'],
+    ['payload', 'params', 'auth', 'orgId']
   ]);
   const credentialSource =
     normalizeProviderWorkerCredentialSource(
@@ -2058,18 +2247,34 @@ function extractProviderWorkerAuthProvenance(
         ['credentialSource'],
         ['auth_source'],
         ['authSource'],
+        ['auth', 'credential_source'],
+        ['auth', 'credentialSource'],
+        ['auth', 'auth_source'],
+        ['auth', 'authSource'],
         ['params', 'credential_source'],
         ['params', 'credentialSource'],
         ['params', 'auth_source'],
         ['params', 'authSource'],
+        ['params', 'auth', 'credential_source'],
+        ['params', 'auth', 'credentialSource'],
+        ['params', 'auth', 'auth_source'],
+        ['params', 'auth', 'authSource'],
         ['payload', 'credential_source'],
         ['payload', 'credentialSource'],
         ['payload', 'auth_source'],
         ['payload', 'authSource'],
+        ['payload', 'auth', 'credential_source'],
+        ['payload', 'auth', 'credentialSource'],
+        ['payload', 'auth', 'auth_source'],
+        ['payload', 'auth', 'authSource'],
         ['payload', 'params', 'credential_source'],
         ['payload', 'params', 'credentialSource'],
         ['payload', 'params', 'auth_source'],
-        ['payload', 'params', 'authSource']
+        ['payload', 'params', 'authSource'],
+        ['payload', 'params', 'auth', 'credential_source'],
+        ['payload', 'params', 'auth', 'credentialSource'],
+        ['payload', 'params', 'auth', 'auth_source'],
+        ['payload', 'params', 'auth', 'authSource']
       ])
     ) ?? null;
   const authFreshness = normalizeProviderWorkerAuthFreshness(
@@ -2077,15 +2282,27 @@ function extractProviderWorkerAuthProvenance(
       ['auth_freshness'],
       ['authFreshness'],
       ['freshness'],
+      ['auth', 'auth_freshness'],
+      ['auth', 'authFreshness'],
+      ['auth', 'freshness'],
       ['params', 'auth_freshness'],
       ['params', 'authFreshness'],
       ['params', 'freshness'],
+      ['params', 'auth', 'auth_freshness'],
+      ['params', 'auth', 'authFreshness'],
+      ['params', 'auth', 'freshness'],
       ['payload', 'auth_freshness'],
       ['payload', 'authFreshness'],
       ['payload', 'freshness'],
+      ['payload', 'auth', 'auth_freshness'],
+      ['payload', 'auth', 'authFreshness'],
+      ['payload', 'auth', 'freshness'],
       ['payload', 'params', 'auth_freshness'],
       ['payload', 'params', 'authFreshness'],
-      ['payload', 'params', 'freshness']
+      ['payload', 'params', 'freshness'],
+      ['payload', 'params', 'auth', 'auth_freshness'],
+      ['payload', 'params', 'auth', 'authFreshness'],
+      ['payload', 'params', 'auth', 'freshness']
     ])
   );
   if (
@@ -2141,16 +2358,55 @@ function mergeProviderWorkerAuthProvenance(
   };
 }
 
-function redactProviderWorkerDiagnosticText(raw: string): string {
+function formatProviderWorkerRedactedPlanValue(label: string, value: string): string {
+  const allowedLabels = /wham/iu.test(label)
+    ? PROVIDER_WORKER_WHAM_PLAN_LABELS
+    : PROVIDER_WORKER_ACCOUNT_PLAN_LABELS;
+  return normalizeProviderWorkerPlanLabel(value, allowedLabels) ?? 'redacted';
+}
+
+function redactProviderWorkerFreeFormPlanDetails(raw: string): string {
   return raw
-    .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/giu, 'Bearer <redacted>')
+    .replace(
+      /(["'])(accountPlan|account_plan|whamPlan|wham_plan)\1\s*[=:]\s*(?:"([^"]*)"|'([^']*)'|([A-Za-z0-9][A-Za-z0-9_-]*))/giu,
+      (
+        _match,
+        quote: string,
+        label: string,
+        doubleQuotedValue: string | undefined,
+        singleQuotedValue: string | undefined,
+        bareValue: string | undefined
+      ) => {
+        const value = doubleQuotedValue ?? singleQuotedValue ?? bareValue ?? '';
+        return `${quote}${label}${quote}:"${formatProviderWorkerRedactedPlanValue(label, value)}"`;
+      }
+    )
+    .replace(
+      /\b(accountPlan|account_plan|whamPlan|wham_plan)\s*[=:]\s*["']?([A-Za-z0-9][A-Za-z0-9_-]*)["']?/giu,
+      (_match, label: string, value: string) =>
+        `${label}=${formatProviderWorkerRedactedPlanValue(label, value)}`
+    )
+    .replace(
+      /\b((?:account\s+)?plan|wham\s+plan)\s+(?:is\s+|was\s+)?["']?([A-Za-z0-9][A-Za-z0-9_-]*)["']?/giu,
+      (_match, label: string, value: string) =>
+        `${label} ${formatProviderWorkerRedactedPlanValue(label, value)}`
+    );
+}
+
+function redactProviderWorkerDiagnosticText(raw: string): string {
+  return redactProviderWorkerFreeFormPlanDetails(raw)
+    .replace(/\bBearer\s+(?!token\b)[A-Za-z0-9._~+/=-]+/giu, 'Bearer <redacted>')
     .replace(/sk-[A-Za-z0-9_-]+/gu, 'sk-<redacted>')
     .replace(
       /([A-Za-z0-9._%+-])[A-Za-z0-9._%+-]*@([A-Za-z0-9.-]+\.[A-Za-z]{2,})/gu,
-      '$1<email-redacted>@$2'
+      '<email-redacted>'
     )
     .replace(
-      /(["'])([A-Za-z0-9_-]*(?:token|secret|credential)[A-Za-z0-9_-]*|api[_-]?key|authorization|cookie|session(?:[_-]?id)?)\1\s*:\s*(?:"[^"]*"|'[^']*'|[^\s,}]+)/giu,
+      /(["'])([A-Za-z0-9_-]*(?:token|secret|credential|api[_-]?key)[A-Za-z0-9_-]*|oauth[_-]?(?:refresh|access)|authorization|cookie|session(?:[_-]?id)?)\1\s*[=:]\s*(?:"[^"]*"|'[^']*'|[^\s,}]+)/giu,
+      '$1$2$1:"<redacted>"'
+    )
+    .replace(
+      /(["'])((?:(?:refresh|access|auth|session|bearer)\s+token|oauth\s+(?:refresh|access)|api\s+key|authorization|cookie|secret|credential|session\s+(?:id|identifier)))\1\s*[=:]\s*(?:"[^"]*"|'[^']*'|[^\s,}]+)/giu,
       '$1$2$1:"<redacted>"'
     )
     .replace(
@@ -2158,87 +2414,292 @@ function redactProviderWorkerDiagnosticText(raw: string): string {
       '$1$2$1:"<redacted>"'
     )
     .replace(
-      /\b([A-Za-z0-9_-]*(?:token|secret|credential)[A-Za-z0-9_-]*|api[_-]?key|authorization|cookie|session(?:[_-]?id)?)\s*[=:]\s*\S+/giu,
+      /(["'])((?:auth[\s_-]?)?profile\s+(?:id|identifier)|account\s+(?:id|identifier)|org(?:anization)?\s+(?:id|identifier)|user\s+(?:id|identifier))\1\s*[=:]\s*(?:"[^"]*"|'[^']*'|[^\s,}]+)/giu,
+      '$1$2$1:"<redacted>"'
+    )
+    .replace(
+      /\b([A-Za-z0-9_-]*(?:token|secret|credential|api[_-]?key)[A-Za-z0-9_-]*|oauth[_-]?(?:refresh|access)|authorization|cookie|session(?:[_-]?id)?)\s*[=:]\s*\S+/giu,
       '$1=<redacted>'
+    )
+    .replace(
+      /\b((?:refresh|access|auth|session|bearer)\s+token|oauth\s+(?:refresh|access)|api\s+key|authorization|cookie|secret|credential|session\s+(?:id|identifier))\s*[=:]\s*(?:"[^"]*"|'[^']*'|\S+)/giu,
+      '$1=<redacted>'
+    )
+    .replace(
+      /\b([A-Za-z0-9_-]*(?:(?:refresh|access|auth)[A-Za-z0-9_-]*token|api[_-]?key|secret|credential)[A-Za-z0-9_-]*|oauth[_-]?(?:refresh|access)|authorization|cookie|session[_-]?id)\s+["']?[A-Za-z0-9][A-Za-z0-9._~+/=@:-]*["']?/giu,
+      '$1 <redacted>'
+    )
+    .replace(
+      /\b(session\s+(?:id|identifier))\s+["']?[A-Za-z0-9][A-Za-z0-9._~+/=@:-]*["']?/giu,
+      '$1 <redacted>'
+    )
+    .replace(
+      /\b((?:refresh|access|auth|session)\s+token|api\s+key|token|secret|credential)\s+["']?[A-Za-z0-9][A-Za-z0-9._~+/=@:-]*["']?/giu,
+      '$1 <redacted>'
     )
     .replace(
       /\b((?:auth[_-]?)?profile(?:[_-]?id)?|account(?:[_-]?id)?|org(?:anization)?(?:[_-]?id)?|user(?:[_-]?id)?)\s*[=:]\s*(?:"[^"]+"|'[^']+'|\S+)/giu,
       '$1=<redacted>'
     )
-    .replace(/\b(acct|org|user)_[A-Za-z0-9_-]+\b/giu, '$1_<redacted>')
+    .replace(/\b(acct|org|user)([_-])[A-Za-z0-9_-]+\b/giu, '$1$2<redacted>')
+    .replace(
+      /\b((?:auth[\s_-]?)?profile|account|org(?:anization)?|user)\s+(id|identifier)\s*[=:]\s*(?:"[^"]+"|'[^']+'|\S+)/giu,
+      '$1 $2 <redacted>'
+    )
+    .replace(
+      /\b((?:auth[\s_-]?)?profile|account|org(?:anization)?|user)\s+(?:id|identifier)\s+["']?[A-Za-z0-9][A-Za-z0-9._@-]*["']?/giu,
+      '$1 id <redacted>'
+    )
     .replace(
       /\b((?:auth[\s_-]?)?profile|account|org(?:anization)?|user)\s+["']?[A-Za-z0-9][A-Za-z0-9._@-]*(?:[_@.-][A-Za-z0-9._@-]+)["']?/giu,
       '$1 <redacted>'
-    )
-    .slice(0, 500);
+    );
 }
 
-function formatProviderWorkerDiagnosticSignalField(label: string, value: unknown): string | null {
+const PROVIDER_WORKER_DIAGNOSTIC_SIGNAL_MAX_LENGTH = 500;
+
+function truncateProviderWorkerDiagnosticSignal(signal: string, preservedFields: string[]): string {
+  if (signal.length <= PROVIDER_WORKER_DIAGNOSTIC_SIGNAL_MAX_LENGTH) {
+    return signal;
+  }
+  const preservedSuffix = Array.from(new Set(preservedFields))
+    .filter((field) => field.length > 0 && signal.includes(field))
+    .join(' | ');
+  if (!preservedSuffix) {
+    return signal.slice(0, PROVIDER_WORKER_DIAGNOSTIC_SIGNAL_MAX_LENGTH);
+  }
+  if (preservedSuffix.length >= PROVIDER_WORKER_DIAGNOSTIC_SIGNAL_MAX_LENGTH) {
+    return preservedSuffix.slice(0, PROVIDER_WORKER_DIAGNOSTIC_SIGNAL_MAX_LENGTH);
+  }
+  const separator = ' | ';
+  const prefixBudget =
+    PROVIDER_WORKER_DIAGNOSTIC_SIGNAL_MAX_LENGTH - preservedSuffix.length - separator.length;
+  const prefix = signal
+    .slice(0, Math.max(0, prefixBudget))
+    .replace(/\s*\|\s*$/u, '')
+    .trimEnd();
+  return (prefix ? `${prefix}${separator}${preservedSuffix}` : preservedSuffix).slice(
+    0,
+    PROVIDER_WORKER_DIAGNOSTIC_SIGNAL_MAX_LENGTH
+  );
+}
+
+function formatProviderWorkerDiagnosticSignalField(
+  label: string,
+  value: unknown,
+  options: { allowedLabels?: Set<string> } = {}
+): string | null {
   const raw = normalizeOptionalString(value);
   if (!raw) {
     return null;
   }
-  const redacted = redactProviderWorkerDiagnosticText(raw).replace(/\s+/gu, '_').slice(0, 96);
+  const redacted = (
+    options.allowedLabels
+      ? normalizeProviderWorkerPlanLabel(raw, options.allowedLabels)
+      : redactProviderWorkerDiagnosticText(raw).replace(/\s+/gu, '_').slice(0, 96)
+  );
+  if (!redacted) {
+    return null;
+  }
   return `${label}=${redacted}`;
 }
 
-function buildProviderWorkerDiagnosticSignal(input: Record<string, unknown>): string {
+function normalizeProviderWorkerDiagnosticClassificationText(value: string): string {
+  return value
+    .replace(/([a-z0-9])([A-Z])/gu, '$1 $2')
+    .replace(/[_\-/]+/gu, ' ')
+    .toLowerCase();
+}
+
+function isProviderWorkerTrustedDiagnosticMessageCarrier(
+  input: Record<string, unknown>,
+  source: ProviderLinearWorkerCurrentTurnActivitySource
+): boolean {
+  if (source === 'stderr') {
+    return true;
+  }
+  const payload = isRecord(input.payload) ? input.payload : null;
+  const method =
+    normalizeOptionalString(input.method) ??
+    normalizeOptionalString(payload?.method);
+  if (method) {
+    return true;
+  }
+  const eventType = normalizeOptionalString(input.type)?.toLowerCase() ?? '';
+  const payloadType = normalizeOptionalString(payload?.type)?.toLowerCase() ?? '';
+  const payloadStatus = normalizeOptionalString(payload?.status)?.toLowerCase() ?? '';
+  if (['error', 'warning', 'diagnostic', 'notification', 'turn.failed', 'run.failed'].includes(eventType)) {
+    return true;
+  }
+  if (eventType !== 'event_msg') {
+    return false;
+  }
+  return (
+    ['diagnostic', 'error', 'guardian_policy_denial', 'guardian_timeout', 'tui_history', 'warning'].includes(
+      payloadType
+    ) ||
+    ['error', 'failed', 'failure'].includes(payloadStatus)
+  );
+}
+
+function buildProviderWorkerDiagnosticSignal(
+  input: Record<string, unknown>,
+  source: ProviderLinearWorkerCurrentTurnActivitySource
+): string {
+  const includeDiagnosticMessage = isProviderWorkerTrustedDiagnosticMessageCarrier(input, source);
+  const payload = isRecord(input.payload) ? input.payload : null;
+  const params = isRecord(input.params) ? input.params : null;
+  const payloadParams = isRecord(payload?.params) ? payload.params : null;
+  const accountPlanField = formatProviderWorkerDiagnosticSignalField(
+    'account_plan',
+    readFirstProviderWorkerStringAtPaths(input, [
+      ['account_plan'],
+      ['accountPlan'],
+      ['plan'],
+      ['params', 'account_plan'],
+      ['params', 'accountPlan'],
+      ['params', 'plan'],
+      ['payload', 'account_plan'],
+      ['payload', 'accountPlan'],
+      ['payload', 'plan'],
+      ['payload', 'params', 'account_plan'],
+      ['payload', 'params', 'accountPlan'],
+      ['payload', 'params', 'plan'],
+      ['params', 'msg', 'payload', 'info', 'account_plan'],
+      ['params', 'msg', 'payload', 'info', 'accountPlan'],
+      ['params', 'msg', 'payload', 'info', 'plan'],
+      ['params', 'msg', 'info', 'account_plan'],
+      ['params', 'msg', 'info', 'accountPlan'],
+      ['params', 'msg', 'info', 'plan'],
+      ['payload', 'params', 'msg', 'payload', 'info', 'account_plan'],
+      ['payload', 'params', 'msg', 'payload', 'info', 'accountPlan'],
+      ['payload', 'params', 'msg', 'payload', 'info', 'plan'],
+      ['payload', 'params', 'msg', 'info', 'account_plan'],
+      ['payload', 'params', 'msg', 'info', 'accountPlan'],
+      ['payload', 'params', 'msg', 'info', 'plan']
+    ]),
+    { allowedLabels: PROVIDER_WORKER_ACCOUNT_PLAN_LABELS }
+  );
+  const whamPlanField = formatProviderWorkerDiagnosticSignalField(
+    'wham_plan',
+    readFirstProviderWorkerStringAtPaths(input, [
+      ['wham_plan'],
+      ['whamPlan'],
+      ['params', 'wham_plan'],
+      ['params', 'whamPlan'],
+      ['payload', 'wham_plan'],
+      ['payload', 'whamPlan'],
+      ['payload', 'params', 'wham_plan'],
+      ['payload', 'params', 'whamPlan'],
+      ['params', 'msg', 'payload', 'info', 'wham_plan'],
+      ['params', 'msg', 'payload', 'info', 'whamPlan'],
+      ['params', 'msg', 'info', 'wham_plan'],
+      ['params', 'msg', 'info', 'whamPlan'],
+      ['payload', 'params', 'msg', 'payload', 'info', 'wham_plan'],
+      ['payload', 'params', 'msg', 'payload', 'info', 'whamPlan'],
+      ['payload', 'params', 'msg', 'info', 'wham_plan'],
+      ['payload', 'params', 'msg', 'info', 'whamPlan']
+    ]),
+    { allowedLabels: PROVIDER_WORKER_WHAM_PLAN_LABELS }
+  );
+  const preservedFields = [accountPlanField, whamPlanField].filter(
+    (value): value is string => Boolean(value)
+  );
   const candidates = [
+    ...readProviderWorkerStructuredDiagnosticCategoryValues(input),
     normalizeOptionalString(input.method),
     normalizeOptionalString(input.type),
     normalizeOptionalString(input.error),
-    normalizeOptionalString(input.message),
+    includeDiagnosticMessage ? normalizeOptionalString(input.message) : null,
     normalizeOptionalString(input.status),
     normalizeOptionalString(input.status_detail),
     normalizeOptionalString(input.statusDetail),
-    normalizeOptionalString((input.payload as Record<string, unknown> | undefined)?.method),
-    normalizeOptionalString((input.payload as Record<string, unknown> | undefined)?.type),
-    normalizeOptionalString((input.payload as Record<string, unknown> | undefined)?.error),
-    normalizeOptionalString((input.payload as Record<string, unknown> | undefined)?.message),
-    normalizeOptionalString((input.payload as Record<string, unknown> | undefined)?.status),
-    normalizeOptionalString((input.params as Record<string, unknown> | undefined)?.error),
-    normalizeOptionalString((input.params as Record<string, unknown> | undefined)?.message),
-    normalizeOptionalString((input.params as Record<string, unknown> | undefined)?.status),
-    formatProviderWorkerDiagnosticSignalField(
-      'account_plan',
-      readFirstProviderWorkerStringAtPaths(input, [
-        ['account_plan'],
-        ['accountPlan'],
-        ['plan'],
-        ['params', 'account_plan'],
-        ['params', 'accountPlan'],
-        ['params', 'plan'],
-        ['payload', 'account_plan'],
-        ['payload', 'accountPlan'],
-        ['payload', 'plan'],
-        ['payload', 'params', 'account_plan'],
-        ['payload', 'params', 'accountPlan'],
-        ['payload', 'params', 'plan']
-      ])
-    ),
-    formatProviderWorkerDiagnosticSignalField(
-      'wham_plan',
-      readFirstProviderWorkerStringAtPaths(input, [
-        ['wham_plan'],
-        ['whamPlan'],
-        ['params', 'wham_plan'],
-        ['params', 'whamPlan'],
-        ['payload', 'wham_plan'],
-        ['payload', 'whamPlan'],
-        ['payload', 'params', 'wham_plan'],
-        ['payload', 'params', 'whamPlan']
-      ])
-    )
+    normalizeOptionalString(payload?.method),
+    normalizeOptionalString(payload?.type),
+    normalizeOptionalString(payload?.error),
+    includeDiagnosticMessage ? normalizeOptionalString(payload?.message) : null,
+    normalizeOptionalString(payload?.status),
+    normalizeOptionalString(payload?.status_detail),
+    normalizeOptionalString(payload?.statusDetail),
+    normalizeOptionalString(params?.error),
+    includeDiagnosticMessage ? normalizeOptionalString(params?.message) : null,
+    normalizeOptionalString(params?.status),
+    normalizeOptionalString(params?.status_detail),
+    normalizeOptionalString(params?.statusDetail),
+    normalizeOptionalString(payloadParams?.error),
+    includeDiagnosticMessage ? normalizeOptionalString(payloadParams?.message) : null,
+    normalizeOptionalString(payloadParams?.status),
+    normalizeOptionalString(payloadParams?.status_detail),
+    normalizeOptionalString(payloadParams?.statusDetail),
+    ...preservedFields
   ].filter((value): value is string => Boolean(value));
-  return redactProviderWorkerDiagnosticText(candidates.join(' | '));
+  return truncateProviderWorkerDiagnosticSignal(
+    redactProviderWorkerDiagnosticText(candidates.join(' | ')),
+    preservedFields
+  );
+}
+
+function hasProviderWorkerQuotaFailureSignal(
+  input: Record<string, unknown>,
+  normalizedSignal: string
+): boolean {
+  const explicitQuotaFailurePatterns = [
+    /\b429\b/u,
+    /\btoo many requests\b/u,
+    /\bquota (?:exceeded|exhausted|reached)\b/u,
+    /\brate[-\s]?limited\b/u,
+    /\brate[-\s]?limit (?:exceeded|exhausted|reached)\b/u,
+    /\busage limit (?:exceeded|exhausted|reached)\b/u,
+    /\bout of quota\b/u
+  ];
+  if (explicitQuotaFailurePatterns.some((pattern) => pattern.test(normalizedSignal))) {
+    return true;
+  }
+  const payload = isRecord(input.payload) ? input.payload : null;
+  const params = isRecord(input.params) ? input.params : null;
+  const method =
+    normalizeOptionalString(input.method) ??
+    normalizeOptionalString(payload?.method);
+  const normalizedMethod = method ? normalizeProviderWorkerDiagnosticClassificationText(method) : '';
+  if (
+    /\b(rate limits?|quota|usage limit)\b/u.test(normalizedMethod) &&
+    /\b(exceeded|exhausted|failed|failure|limited|blocked|denied)\b/u.test(normalizedMethod)
+  ) {
+    return true;
+  }
+  const statusValues = [
+    normalizeOptionalString(input.type),
+    normalizeOptionalString(input.status),
+    normalizeOptionalString(input.status_detail),
+    normalizeOptionalString(input.statusDetail),
+    normalizeOptionalString(payload?.type),
+    normalizeOptionalString(payload?.status),
+    normalizeOptionalString(payload?.status_detail),
+    normalizeOptionalString(payload?.statusDetail),
+    normalizeOptionalString(params?.status),
+    normalizeOptionalString(params?.status_detail),
+    normalizeOptionalString(params?.statusDetail)
+  ]
+    .filter((value): value is string => Boolean(value))
+    .map((value) => value.replace(/[_\-\s]+/gu, '_').toLowerCase());
+  const quotaFailureStatuses = new Set([
+    'quota_rate_limit',
+    'quota_exhausted',
+    'quota_exceeded',
+    'rate_limit',
+    'rate_limited',
+    'rate_limit_exceeded',
+    'usage_limit_reached'
+  ]);
+  return statusValues.some((value) => quotaFailureStatuses.has(value));
 }
 
 function classifyProviderWorkerFailureDiagnosis(
   input: Record<string, unknown>,
   source: ProviderLinearWorkerCurrentTurnActivitySource
 ): ProviderLinearWorkerFailureDiagnosis | null {
-  const signal = buildProviderWorkerDiagnosticSignal(input);
-  const normalized = `${signal}\n${JSON.stringify(input)}`.toLowerCase();
+  const signal = buildProviderWorkerDiagnosticSignal(input, source);
+  const normalizedClassification = normalizeProviderWorkerDiagnosticClassificationText(signal);
   const timestamp =
     normalizeOptionalString(input.timestamp) ??
     normalizeOptionalString((input.payload as Record<string, unknown> | undefined)?.timestamp);
@@ -2252,50 +2713,199 @@ function classifyProviderWorkerFailureDiagnosis(
     source,
     observed_at: timestamp
   });
-  if (normalized.includes('guardian') && /\b(time(?:d)?\s*out|timeout)\b/u.test(normalized)) {
-    return build(
-      'guardian_timeout',
-      'Guardian review timed out; retry with timeout-specific guidance and do not treat this as policy denial.'
-    );
+  const structuredCategory = classifyProviderWorkerStructuredDiagnosticCategory(input);
+  if (structuredCategory) {
+    return build(structuredCategory, providerWorkerDiagnosticGuidance(structuredCategory));
   }
-  if (normalized.includes('guardian') && /\b(policy|deni(?:al|ed)|blocked|refused)\b/u.test(normalized)) {
+  const guardianTimeoutSignal =
+    normalizedClassification.includes('guardian') &&
+    /\b(time(?:d)?\s*out|timeout)\b/u.test(normalizedClassification);
+  const guardianPolicyDenialSignal =
+    normalizedClassification.includes('guardian') &&
+    /\b(policy|deni(?:al|ed)|blocked|refused)\b/u.test(normalizedClassification);
+  const guardianPolicyDenialContrast =
+    guardianTimeoutSignal &&
+    /\b(?:do not|don't|not|rather than|instead of)\b.{0,96}\bpolicy denial\b/u.test(
+      normalizedClassification
+    );
+  if (guardianPolicyDenialSignal && !guardianPolicyDenialContrast) {
     return build(
       'guardian_policy_denial',
       'Guardian policy denied the request; inspect policy-denial guidance rather than timeout remediation.'
     );
   }
-  if (/\b(rate[-\s]?limit|quota|too many requests|prolite|wham|usage limit)\b/u.test(normalized)) {
+  if (guardianTimeoutSignal) {
+    return build(
+      'guardian_timeout',
+      'Guardian review timed out; retry with timeout-specific guidance and do not treat this as policy denial.'
+    );
+  }
+  if (
+    /\b(rate[-\s]?limits?|rate limited|quota|too many requests|prolite|wham|usage limit)\b/u.test(
+      normalizedClassification
+    ) &&
+    hasProviderWorkerQuotaFailureSignal(input, normalizedClassification)
+  ) {
     return build(
       'quota_rate_limit',
       'Codex account quota/rate-limit or plan decoding is implicated; inspect rate-limit and account-plan evidence.'
     );
   }
-  if (/\b(cloud denial|cloud denied|cloud access denied|cloud execution denied|not allowed in cloud)\b/u.test(normalized)) {
+  if (
+    /\b(cloud denial|cloud denied|cloud access denied|cloud execution denied|not allowed in cloud)\b/u
+      .test(normalizedClassification)
+  ) {
     return build(
       'cloud_denial',
       'Codex Cloud denied the run; verify cloud environment, branch, and account permission.'
     );
   }
-  if (/\b(cloud-env-missing|codex_cloud_env_id|missing environment|no environment id)\b/u.test(normalized)) {
+  if (
+    /\b(env config|cloud env missing|codex cloud env id|missing environment|no environment id)\b/u
+      .test(normalizedClassification)
+  ) {
     return build(
       'env_config',
       'Codex Cloud environment configuration is missing or invalid; set CODEX_CLOUD_ENV_ID or task metadata.'
     );
   }
   if (
-    /\b(auth profile|profile mismatch|account mismatch|active account|active profile|not logged in|login required|unauthorized)\b/u
-      .test(normalized)
+    /\b(auth mismatch|auth profile mismatch|profile mismatch|account mismatch|active account mismatch|active profile mismatch|not logged in|login required|unauthorized|forbidden)\b/u
+      .test(normalizedClassification) ||
+    (
+      /\b(auth profile|active account|active profile)\b/u.test(normalizedClassification) &&
+      /\b(mismatch(?:ed)?|unavailable|denied|forbidden|unauthorized|required)\b/u.test(normalizedClassification)
+    )
   ) {
     return build(
       'auth_mismatch',
       'The active Codex account/auth profile appears mismatched or unavailable; verify the selected profile/account.'
     );
   }
-  if (/\b(appserver|provider runtime|runtime parity|codex exec|enoent|websocket|rpc)\b/u.test(normalized)) {
+  if (
+    /\b(appserver|provider runtime|runtime parity|codex exec|enoent|websocket|rpc)\b/u.test(
+      normalizedClassification
+    )
+  ) {
     return build(
       'provider_runtime',
       'Provider/runtime execution is implicated; inspect runtime selection and provider command logs.'
     );
+  }
+  return null;
+}
+
+function providerWorkerDiagnosticGuidance(
+  diagnosticCategory: ProviderLinearWorkerDiagnosticCategory
+): string {
+  switch (diagnosticCategory) {
+    case 'guardian_timeout':
+      return 'Guardian review timed out; retry with timeout-specific guidance and do not treat this as policy denial.';
+    case 'guardian_policy_denial':
+      return 'Guardian policy denied the request; inspect policy-denial guidance rather than timeout remediation.';
+    case 'quota_rate_limit':
+      return 'Codex account quota/rate-limit or plan decoding is implicated; inspect rate-limit and account-plan evidence.';
+    case 'cloud_denial':
+      return 'Codex Cloud denied the run; verify cloud environment, branch, and account permission.';
+    case 'env_config':
+      return 'Codex Cloud environment configuration is missing or invalid; set CODEX_CLOUD_ENV_ID or task metadata.';
+    case 'auth_mismatch':
+      return 'The active Codex account/auth profile appears mismatched or unavailable; verify the selected profile/account.';
+    case 'provider_runtime':
+      return 'Provider/runtime execution is implicated; inspect runtime selection and provider command logs.';
+    default:
+      return 'Inspect provider runtime logs to classify this failure.';
+  }
+}
+
+function classifyProviderWorkerStructuredDiagnosticValue(
+  value: string
+): ProviderLinearWorkerDiagnosticCategory | null {
+  const normalized = normalizeProviderWorkerStructuredDiagnosticValue(value);
+  if (!normalized || normalized === 'failed' || normalized === 'failure' || normalized === 'error') {
+    return null;
+  }
+  if (normalized.includes('guardian') && /\btimeout\b/u.test(normalized.replace(/_/gu, ' '))) {
+    return 'guardian_timeout';
+  }
+  if (
+    normalized.includes('guardian') &&
+    /\b(policy|denial|denied|blocked|refused)\b/u.test(normalized.replace(/_/gu, ' '))
+  ) {
+    return 'guardian_policy_denial';
+  }
+  if (
+    [
+      'quota_rate_limit',
+      'quota_exhausted',
+      'quota_exceeded',
+      'rate_limit',
+      'rate_limited',
+      'rate_limit_exceeded',
+      'usage_limit_reached',
+      'account_rate_limits_exhausted',
+      'account_rate_limit_exhausted'
+    ].includes(normalized)
+  ) {
+    return 'quota_rate_limit';
+  }
+  if (
+    [
+      'auth_mismatch',
+      'auth_profile_mismatch',
+      'profile_mismatch',
+      'account_mismatch',
+      'active_account_mismatch',
+      'active_profile_mismatch',
+      'account_auth_profile_mismatch',
+      'account_authprofile_mismatch'
+    ].includes(normalized)
+  ) {
+    return 'auth_mismatch';
+  }
+  if (
+    [
+      'cloud_denial',
+      'cloud_denied',
+      'cloud_access_denied',
+      'cloud_execution_denied',
+      'not_allowed_in_cloud'
+    ].includes(normalized)
+  ) {
+    return 'cloud_denial';
+  }
+  if (
+    [
+      'env_config',
+      'env_config_missing',
+      'cloud_env_missing',
+      'codex_cloud_env_id_missing',
+      'no_environment_id'
+    ].includes(normalized)
+  ) {
+    return 'env_config';
+  }
+  if (
+    [
+      'provider_runtime',
+      'runtime_parity_command_unavailable',
+      'appserver_runtime_error',
+      'codex_exec_error'
+    ].includes(normalized)
+  ) {
+    return 'provider_runtime';
+  }
+  return null;
+}
+
+function classifyProviderWorkerStructuredDiagnosticCategory(
+  input: Record<string, unknown>
+): ProviderLinearWorkerDiagnosticCategory | null {
+  for (const value of readProviderWorkerStructuredDiagnosticValues(input)) {
+    const category = classifyProviderWorkerStructuredDiagnosticValue(value);
+    if (category) {
+      return category;
+    }
   }
   return null;
 }

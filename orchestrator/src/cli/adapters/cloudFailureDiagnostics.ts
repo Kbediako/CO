@@ -33,37 +33,81 @@ const CLOUD_FAILURE_RULES: CloudFailureRule[] = [
   {
     category: 'execution',
     diagnostic_category: 'guardian_timeout',
-    patterns: ['guardian timeout', 'guardian timed out', 'guardian review timeout', 'guardian review timed out'],
+    patterns: [
+      'guardian timeout',
+      'guardian-timeout',
+      'guardian_timeout',
+      'guardian timed out',
+      'guardian review timeout',
+      'guardian review timed out'
+    ],
     guidance: 'Guardian review timed out; retry or inspect timeout-specific Guardian guidance before treating it as a policy denial.'
   },
   {
     category: 'execution',
     diagnostic_category: 'guardian_policy_denial',
-    patterns: ['guardian policy denial', 'guardian policy denied', 'guardian denied', 'guardian blocked'],
+    patterns: [
+      'guardian policy denial',
+      'guardian-policy-denial',
+      'guardian_policy_denial',
+      'guardian policy denied',
+      'guardian denied',
+      'guardian blocked'
+    ],
     guidance: 'Guardian policy denied the request; inspect policy-denial guidance instead of retrying as a timeout.'
   },
   {
     category: 'execution',
     diagnostic_category: 'quota_rate_limit',
-    patterns: ['rate limit', 'rate-limit', 'quota', 'too many requests', 'prolite', 'wham', 'usage limit'],
+    patterns: [
+      'quota_rate_limit',
+      'rate limit',
+      'rate-limit',
+      'rate_limited',
+      'rate_limit_exceeded',
+      'quota',
+      'too many requests',
+      'usage limit',
+      'usage_limit_reached'
+    ],
     guidance: 'Codex account quota or rate-limit state is implicated; inspect account plan/rate-limit evidence and retry after limits reset.'
   },
   {
     category: 'credentials',
     diagnostic_category: 'cloud_denial',
-    patterns: ['cloud denial', 'cloud denied', 'not allowed in cloud', 'cloud access denied', 'cloud execution denied'],
+    patterns: [
+      'cloud denial',
+      'cloud-denial',
+      'cloud_denial',
+      'cloud denied',
+      'not allowed in cloud',
+      'cloud access denied',
+      'cloud execution denied'
+    ],
     guidance: 'Codex Cloud rejected this run; verify the configured cloud environment, branch, and account permission for cloud execution.'
   },
   {
     category: 'configuration',
     diagnostic_category: 'env_config',
-    patterns: ['cloud-env-missing', 'codex_cloud_env_id', 'no environment id is configured', '--env'],
+    patterns: [
+      'env config',
+      'env-config',
+      'env_config',
+      'cloud-env-missing',
+      'codex_cloud_env_id',
+      'no_environment_id',
+      'no environment id is configured',
+      '--env'
+    ],
     guidance: 'Set CODEX_CLOUD_ENV_ID (or metadata.cloudEnvId) to a valid cloud environment id before re-running.'
   },
   {
     category: 'credentials',
     diagnostic_category: 'auth_mismatch',
     patterns: [
+      'auth mismatch',
+      'auth-mismatch',
+      'auth_mismatch',
       'auth profile',
       'profile mismatch',
       'account mismatch',
@@ -89,6 +133,59 @@ const CLOUD_FAILURE_RULES: CloudFailureRule[] = [
 ];
 
 const TERMINAL_FAILURE_STATUSES = new Set(['failed', 'error', 'cancelled']);
+const MACHINE_READABLE_CLOUD_DETAILS = new Set([
+  'auth_mismatch',
+  'cloud_access_denied',
+  'cloud_denial',
+  'cloud_denied',
+  'cloud_env_missing',
+  'cloud_execution_denied',
+  'codex_cloud_env_id',
+  'env_config',
+  'guardian_policy_denial',
+  'guardian_timeout',
+  'no_environment_id',
+  'not_allowed_in_cloud',
+  'quota_rate_limit',
+  'rate_limit',
+  'rate_limit_exceeded',
+  'rate_limited',
+  'usage_limit_reached'
+]);
+
+function matchCloudFailureRule(signal: string): CloudFailureRule | null {
+  const lowercase = signal.toLowerCase();
+  const normalized = normalizeCloudFailureSignal(signal);
+  return CLOUD_FAILURE_RULES.find((rule) =>
+    rule.patterns.some((pattern) => {
+      const normalizedPattern = normalizeCloudFailureSignal(pattern);
+      return lowercase.includes(pattern) ||
+        (normalizedPattern.length >= 4 && normalized.includes(normalizedPattern));
+    })
+  ) ?? null;
+}
+
+function normalizeCloudFailureSignal(signal: string): string {
+  return signal
+    .replace(/([a-z0-9])([A-Z])/gu, '$1 $2')
+    .toLowerCase()
+    .replace(/[_-]+/gu, ' ')
+    .replace(/\s+/gu, ' ')
+    .trim();
+}
+
+function isMachineReadableCloudDetail(signal: string): boolean {
+  return MACHINE_READABLE_CLOUD_DETAILS.has(normalizeCloudFailureSignal(signal).replace(/\s+/gu, '_'));
+}
+
+function buildCloudFailureDiagnosis(rule: CloudFailureRule, signal: string): CloudFailureDiagnosis {
+  return {
+    category: rule.category,
+    diagnostic_category: rule.diagnostic_category,
+    guidance: rule.guidance,
+    signal
+  };
+}
 
 export function diagnoseCloudFailure(options: {
   status?: string | null;
@@ -98,17 +195,17 @@ export function diagnoseCloudFailure(options: {
   const signal = [options.status ?? null, options.statusDetail ?? null, options.error ?? null]
     .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
     .join('\n');
-  const normalized = signal.toLowerCase();
 
-  for (const rule of CLOUD_FAILURE_RULES) {
-    if (rule.patterns.some((pattern) => normalized.includes(pattern))) {
-      return {
-        category: rule.category,
-        diagnostic_category: rule.diagnostic_category,
-        guidance: rule.guidance,
-        signal
-      };
+  if (options.statusDetail && isMachineReadableCloudDetail(options.statusDetail)) {
+    const statusDetailRule = matchCloudFailureRule(options.statusDetail);
+    if (statusDetailRule) {
+      return buildCloudFailureDiagnosis(statusDetailRule, signal);
     }
+  }
+
+  const signalRule = matchCloudFailureRule(signal);
+  if (signalRule) {
+    return buildCloudFailureDiagnosis(signalRule, signal);
   }
 
   if (options.status && TERMINAL_FAILURE_STATUSES.has(options.status.toLowerCase())) {
