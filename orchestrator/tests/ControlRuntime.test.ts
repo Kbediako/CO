@@ -2414,6 +2414,15 @@ describe('ControlRuntime', () => {
   it('prunes stale in-progress provider rows when terminal released claim has no live worker', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-15T15:13:39.658Z'));
+    const stalePid = 424241;
+    vi.spyOn(process, 'kill').mockImplementation((pid, signal) => {
+      if (pid === stalePid && signal === 0) {
+        const error = new Error('process not found') as NodeJS.ErrnoException;
+        error.code = 'ESRCH';
+        throw error;
+      }
+      return true;
+    });
     try {
       const providerIntakeState = createProviderIntakeState([
         {
@@ -2526,7 +2535,7 @@ describe('ControlRuntime', () => {
       await seedProviderLinearWorkerProof(fixture.paths, {
         issue_id: 'df69fabe-63c2-4b98-a226-9c37892b4f9d',
         issue_identifier: 'CO-183',
-        pid: '85191',
+        pid: String(stalePid),
         owner_phase: 'turn_running',
         owner_status: 'in_progress',
         current_turn_started_at: '2026-04-15T14:40:00.000Z',
