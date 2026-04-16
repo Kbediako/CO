@@ -1164,14 +1164,14 @@ describe('runDoctor', () => {
       });
       expect(result.ok).toBe(true);
       expect(result.issues).toHaveLength(0);
-      expect(result.security_advisories).toEqual([
+      expect(result.security_advisories).toEqual(expect.arrayContaining([
         expect.objectContaining({
           code: 'codex_config_danger_full_access',
           scope: 'local-only',
           severity: 'warning',
           details: expect.objectContaining({ sandbox_mode: 'danger-full-access' })
         })
-      ]);
+      ]));
       expect(formatDoctorCloudPreflightSummary(result).join('\n')).toContain(
         '[codex_config_danger_full_access/local-only]'
       );

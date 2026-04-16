@@ -45,5 +45,5 @@
 
 ## Handoff Status
 - [x] Child lane leaves docs/register changes in place for patch export. Evidence: dirty working tree in this child workspace.
-- [x] Parent resolves `docs/TASKS.md` line-budget/archive follow-up after applying this packet. Evidence: `npm run docs:archive-tasks` preserved displaced 1048 snapshot in `docs/TASKS-archive-2026.md`; `npm run docs:check` passed.
+- [x] Parent resolves `docs/TASKS.md` line-budget/archive follow-up after applying this packet. Evidence: `npm run docs:archive-tasks` preserved displaced 1048 snapshot entry in `docs/TASKS-archive-2026.md`; `npm run docs:check` passed.
 - [ ] Parent opens PR, attaches it to Linear, runs `pr ready-review`, and transitions to review. Evidence: pending parent lane.

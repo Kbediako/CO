@@ -37,6 +37,7 @@ last_review: 2026-04-16
 - Interfaces / contracts: `docs/guides/codex-version-policy.md`, cloud preflight wrapper, runtime-mode canary, docs catalog/freshness registry, app-server/MCP help surfaces, and parent Linear workpad.
 
 ## Classification Requirements
+
 | Surface | Required class | Parent acceptance condition |
 | --- | --- | --- |
 | Secure devcontainer behavior | local-only | Parent documents this as local development/container posture unless a future cloud image lane records direct dependency evidence. |

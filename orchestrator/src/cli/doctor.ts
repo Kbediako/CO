@@ -634,6 +634,14 @@ export function formatDoctorCloudPreflightSummary(result: DoctorCloudPreflightRe
     for (const advisory of result.security_advisories) {
       lines.push(`    - [${advisory.code}/${advisory.scope}] ${advisory.message}`);
       lines.push(`      guidance: ${advisory.guidance}`);
+      if (advisory.details?.path) {
+        lines.push(`      path: ${advisory.details.path}`);
+      }
+      if (advisory.details?.platform || advisory.details?.os_release) {
+        lines.push(
+          `      platform: ${advisory.details.platform ?? '<unknown>'}, os_release: ${advisory.details.os_release ?? '<unknown>'}`
+        );
+      }
     }
   }
 

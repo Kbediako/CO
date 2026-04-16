@@ -56,6 +56,7 @@
 - Explicitly out-of-scope differences: credential/profile rotation fixes, sandbox default weakening, broad cloud runtime redesign, marketplace packaging, MCP Apps metadata authority expansion, and provider-worker appserver migration.
 
 ## Preliminary Classification Matrix
+
 | Release delta / surface | Final class | Preflight policy implication |
 | --- | --- | --- |
 | Secure devcontainer behavior | local-only | Keep as local development/container posture until a cloud lane records direct cloud image dependence. |
