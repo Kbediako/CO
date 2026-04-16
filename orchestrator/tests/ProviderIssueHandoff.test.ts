@@ -19315,7 +19315,7 @@ describe('createProviderIssueHandoffService', () => {
       trackedIssue: createTrackedIssue()
     }));
     const refetchTrackedIssues = vi.fn(async (input?: { excludedIssueIds?: string[] }) => {
-      expect(input?.excludedIssueIds).toContain('lin-issue-1');
+      expect(input?.excludedIssueIds ?? []).toContain('lin-issue-1');
       return {
         kind: 'ready' as const,
         trackedIssues: []
@@ -19412,7 +19412,7 @@ describe('createProviderIssueHandoffService', () => {
       trackedIssue: createTrackedIssue()
     }));
     const refetchTrackedIssues = vi.fn(async (input?: { excludedIssueIds?: string[] }) => {
-      expect(input?.excludedIssueIds).toContain('lin-issue-1');
+      expect(input?.excludedIssueIds ?? []).toContain('lin-issue-1');
       return {
         kind: 'ready' as const,
         trackedIssues: []
@@ -19495,7 +19495,7 @@ describe('createProviderIssueHandoffService', () => {
       trackedIssue: createTrackedIssue()
     }));
     const refetchTrackedIssues = vi.fn(async (input?: { excludedIssueIds?: string[] }) => {
-      expect(input?.excludedIssueIds).toContain('lin-issue-1');
+      expect(input?.excludedIssueIds ?? []).toContain('lin-issue-1');
       return {
         kind: 'ready' as const,
         trackedIssues: []
@@ -19511,7 +19511,7 @@ describe('createProviderIssueHandoffService', () => {
       startPipelineId: 'diagnostics',
       readFeatureToggles: () => ({
         agent: {
-          max_concurrent_agents: 1
+          max_concurrent_agents: 2
         }
       })
     });
@@ -19636,7 +19636,7 @@ describe('createProviderIssueHandoffService', () => {
       trackedIssue: createTrackedIssue()
     }));
     const refetchTrackedIssues = vi.fn(async (input?: { excludedIssueIds?: string[] }) => {
-      expect(input?.excludedIssueIds).toContain('lin-issue-1');
+      expect(input?.excludedIssueIds ?? []).toContain('lin-issue-1');
       return {
         kind: 'ready' as const,
         trackedIssues: [
@@ -19723,7 +19723,7 @@ describe('createProviderIssueHandoffService', () => {
         trackedIssue: createTrackedIssue()
       }));
       const refetchTrackedIssues = vi.fn(async (input?: { excludedIssueIds?: string[] }) => {
-        expect(input?.excludedIssueIds).toContain('lin-issue-1');
+        expect(input?.excludedIssueIds ?? []).toContain('lin-issue-1');
         return {
           kind: 'ready' as const,
           trackedIssues: [
@@ -19815,7 +19815,7 @@ describe('createProviderIssueHandoffService', () => {
         trackedIssue: createTrackedIssue()
       }));
       const refetchTrackedIssues = vi.fn(async (input?: { excludedIssueIds?: string[] }) => {
-        expect(input?.excludedIssueIds).toContain('lin-issue-1');
+        expect(input?.excludedIssueIds ?? []).toContain('lin-issue-1');
         return {
           kind: 'ready' as const,
           trackedIssues: [
@@ -20145,7 +20145,7 @@ describe('createProviderIssueHandoffService', () => {
       trackedIssue: createTrackedIssue()
     }));
     const refetchTrackedIssues = vi.fn(async (input?: { excludedIssueIds?: string[] }) => {
-      expect(input?.excludedIssueIds).not.toContain('lin-issue-1');
+      expect(input?.excludedIssueIds ?? []).not.toContain('lin-issue-1');
       return {
         kind: 'ready' as const,
         trackedIssues: [
@@ -20329,7 +20329,7 @@ describe('createProviderIssueHandoffService', () => {
 
     expect(resolveTrackedIssue).not.toHaveBeenCalled();
     expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
-    expect(refetchTrackedIssues.mock.calls[0]?.[0]?.excludedIssueIds).not.toContain('lin-issue-1');
+    expect(refetchTrackedIssues.mock.calls[0]?.[0]?.excludedIssueIds ?? []).not.toContain('lin-issue-1');
     expect(launcher.resume).not.toHaveBeenCalled();
     expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
       taskId: 'linear-lin-issue-1',

@@ -3945,10 +3945,24 @@ export function createProviderIssueHandoffService(
               activeRun,
               hasPendingReleaseCancel
             );
+          const shouldBlockPendingReopenFreshDiscovery =
+            claim.state === 'released' &&
+            pollInput?.deferFreshDiscovery === true &&
+            isProviderIssueReleasedPendingReopen(claim.reason ?? null) &&
+            !canFreshDiscoverReleasedReclaimClaim(
+              claim,
+              releaseRun,
+              hasPendingReleaseCancel
+            ) &&
+            !canFreshDiscoverReleasedMissingRetainedRun &&
+            !canFreshDiscoverReleasedLiveWorker;
           const allowDirectIssueById =
-            !boundPreDiscoveryIssueByIdReads ||
-            activeRun !== null ||
-            preDiscoveryNonActiveIssueByIdReads < preDiscoveryIssueByIdReadLimit;
+            (
+              !boundPreDiscoveryIssueByIdReads ||
+              activeRun !== null ||
+              preDiscoveryNonActiveIssueByIdReads < preDiscoveryIssueByIdReadLimit
+            ) &&
+            !shouldBlockPendingReopenFreshDiscovery;
           const resolution = await resolveRefreshTrackedIssueResolution({
             claim,
             trackedIssuesByKey,
@@ -4185,6 +4199,10 @@ export function createProviderIssueHandoffService(
               if (!canFreshDiscoverReleasedMissingRetainedRun) {
                 deferredClaimFreshDiscoveryBlockedProviderKeys.add(claimProviderKey);
               }
+              continue;
+            }
+            if (shouldBlockPendingReopenFreshDiscovery) {
+              deferredClaimFreshDiscoveryBlockedProviderKeys.add(claimProviderKey);
               continue;
             }
             if (
