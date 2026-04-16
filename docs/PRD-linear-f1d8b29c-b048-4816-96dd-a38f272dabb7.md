@@ -35,6 +35,7 @@ Reject these interpretations:
 - Adding app connector behavior tests beyond the protocol surface canary.
 
 ## Parity Matrix
+
 | Event class | App-server reference truth | Current CO provider truth | Target decision |
 | --- | --- | --- | --- |
 | Account and rate limits | `account/updated`, `account/rateLimits/updated`, `account/rateLimits/read`; `RateLimitSnapshot` includes `limitId`, `limitName`, `primary`, `secondary`, `credits`, `planType`. | Provider proof stores `rate_limits` and token metadata hydrated from stdout JSONL/session logs; current provider status surfaces do not rely on app-server account auth. | Partial supplement only. Runtime read is auth-gated in isolated smoke; no precedence change. |

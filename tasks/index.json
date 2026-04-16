@@ -9,7 +9,16 @@
         "Codex"
       ],
       "last_review": "2026-04-15",
-      "approvals": {},
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-15",
+          "status": "succeeded",
+          "manifest": ".runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-docs-review/cli/2026-04-15T23-19-30-605Z-079b362f/manifest.json",
+          "telemetry": ".runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-docs-review/cli/2026-04-15T23-19-30-605Z-079b362f/review/telemetry.json",
+          "review_outcome": "clean-success"
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md",
         "task": "tasks/tasks-linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md",
