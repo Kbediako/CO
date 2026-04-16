@@ -2092,7 +2092,7 @@ describe('runProviderIssueHandoffRefresh', () => {
     });
   });
 
-  it('keeps missing-manifest ordinary released not-active claims eligible for fresh discovery', async () => {
+  it('keeps retained missing-manifest ordinary released not-active claims fail-closed without no-live proof', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
     pushCo185ReleasedPendingClaim(state, '', {
@@ -2150,26 +2150,17 @@ describe('runProviderIssueHandoffRefresh', () => {
     });
 
     expect(resolveTrackedIssue).not.toHaveBeenCalled();
-    expect(refetchTrackedIssues).toHaveBeenCalledWith({
-      mode: 'fresh_discovery',
-      eligibleTargetCount: 1,
-      eligibleStateSlotCounts: {},
-      excludedIssueIds: []
-    });
-    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
-      issueId: 'lin-issue-185',
-      issueIdentifier: 'CO-185',
-      issueUpdatedAt: '2026-04-15T01:18:56.003Z'
-    }));
+    expect(refetchTrackedIssues).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
     expect(state.claims[0]).toMatchObject({
-      state: 'starting',
-      reason: 'provider_issue_start_launched',
-      issue_state: 'In Progress',
-      issue_state_type: 'started',
-      issue_updated_at: '2026-04-15T01:18:56.003Z',
-      run_id: 'run-co-185-restarted',
-      run_manifest_path: '/tmp/provider-run/co-185-restarted-manifest.json'
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-04-15T01:10:00.000Z',
+      run_id: 'run-missing-co-185',
+      run_manifest_path: `${paths.runDir}/missing-co-185-manifest.json`
     });
   });
 

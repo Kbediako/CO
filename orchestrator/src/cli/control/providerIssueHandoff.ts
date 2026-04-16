@@ -7132,24 +7132,9 @@ function canFreshDiscoverReleasedLiveWorkerClaim(
     return false;
   }
   if (claim.reason === 'provider_issue_released:not_active') {
-    return activeRun !== null || (runForCancel === null && canRecheckPlainReleasedNotActiveClaim(claim));
+    return activeRun !== null;
   }
   return canFreshDiscoverReleasedPendingReopenClaim(claim, releaseRun, hasPendingReleaseCancel);
-}
-
-function canRecheckPlainReleasedNotActiveClaim(
-  claim: Pick<ProviderIntakeClaimRecord, 'reason' | 'run_id' | 'run_manifest_path' | 'task_id'>
-): boolean {
-  if (claim.reason !== 'provider_issue_released:not_active') {
-    return false;
-  }
-  if (claim.run_manifest_path) {
-    return true;
-  }
-  return (
-    Boolean(claim.run_id) &&
-    claim.run_id !== claim.task_id
-  );
 }
 
 function isInactiveReleasedPendingReopenRun(
