@@ -1252,12 +1252,15 @@ exit 2
   return binPath;
 }
 
-async function findRunReviewMockProcesses(codexBin: string): Promise<RunReviewMockProcess[]> {
+async function findRunReviewMockProcesses(
+  codexBin: string,
+  options: { strict?: boolean } = {}
+): Promise<RunReviewMockProcess[]> {
   if (process.platform === 'win32') {
     return [];
   }
   try {
-    const { stdout } = await execFileAsync('ps', ['-axo', 'pid=,pgid=,command='], {
+    const { stdout } = await execFileAsync('ps', ['-axww', '-o', 'pid=,pgid=,command='], {
       maxBuffer: 4 * 1024 * 1024,
       timeout: 2000
     });
@@ -1285,13 +1288,19 @@ async function findRunReviewMockProcesses(codexBin: string): Promise<RunReviewMo
           }
         ];
       });
-  } catch {
+  } catch (error) {
+    if (options.strict) {
+      throw error;
+    }
     return [];
   }
 }
 
-async function findRunReviewMockPids(codexBin: string): Promise<number[]> {
-  return (await findRunReviewMockProcesses(codexBin)).map((processInfo) => processInfo.pid);
+async function findRunReviewMockPids(
+  codexBin: string,
+  options: { strict?: boolean } = {}
+): Promise<number[]> {
+  return (await findRunReviewMockProcesses(codexBin, options)).map((processInfo) => processInfo.pid);
 }
 
 async function terminateRunReviewMockProcess(
@@ -2487,7 +2496,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
     const codexBin = await makeFakeCodex(sandbox);
-    const beforePids = await findRunReviewMockPids(codexBin);
+    const beforePids = await findRunReviewMockPids(codexBin, { strict: true });
 
     const result = await runReviewCommandSubprocess(
       manifestPath,
@@ -2503,7 +2512,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     );
 
     expect(result.exitCode).toBeGreaterThan(0);
-    expect(await findRunReviewMockPids(codexBin)).toEqual(beforePids);
+    expect(await findRunReviewMockPids(codexBin, { strict: true })).toEqual(beforePids);
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('persists telemetry when review launch fails after the command probe', async () => {
