@@ -56,6 +56,7 @@ import { runControlHostFreshnessGaugeCliShell } from '../orchestrator/src/cli/co
 import { runControlHostSupervisionCliShell } from '../orchestrator/src/cli/controlHostSupervisionCliShell.js';
 import { runCoStatusAttachCliShell } from '../orchestrator/src/cli/coStatusAttachCliShell.js';
 import { runCoStatusCliShell } from '../orchestrator/src/cli/coStatusCliShell.js';
+import { runCoStatusOperatorAutopilotCliShell } from '../orchestrator/src/cli/coStatusOperatorAutopilotCliShell.js';
 import { REPO_CONFIG_REQUIRED_ENV_KEY } from '../orchestrator/src/cli/config/repoConfigPolicy.js';
 
 type ArgMap = Record<string, string | boolean>;
@@ -807,6 +808,19 @@ async function handleControlHost(rawArgs: string[]): Promise<void> {
 }
 
 async function handleCoStatus(rawArgs: string[]): Promise<void> {
+  if (rawArgs[0] === 'operator-autopilot') {
+    const { positionals, flags } = parseArgs(rawArgs.slice(1));
+    if (isHelpRequest(positionals, flags)) {
+      printCoStatusOperatorAutopilotHelp();
+      return;
+    }
+    await runCoStatusOperatorAutopilotCliShell({
+      positionals,
+      flags,
+      printHelp: printCoStatusOperatorAutopilotHelp
+    });
+    return;
+  }
   if (rawArgs[0] === 'attach') {
     const { positionals, flags } = parseArgs(rawArgs.slice(1));
     if (isHelpRequest(positionals, flags)) {
@@ -1834,6 +1848,7 @@ function printCoStatusHelp(): void {
   console.log(`Usage:
   codex-orchestrator co-status [options]
   codex-orchestrator co-status attach [options]
+  codex-orchestrator co-status operator-autopilot local-rollout <acknowledge|clear|dismiss> [options]
 
 Attach the CO STATUS terminal viewer to an already-running local JSON control-host,
 or emit the current CO STATUS snapshot from that host in JSON mode.
@@ -1851,6 +1866,30 @@ JSON contract:
 Attach subcommand:
   attach                Attach to an already-running local JSON control-host.
                         Run \`codex-orchestrator co-status attach --help\` for attach flags.
+
+Operator autopilot lifecycle:
+  operator-autopilot    Acknowledge, clear, or dismiss a pending local rollout action.
+                        Run \`codex-orchestrator co-status operator-autopilot --help\` for lifecycle flags.
+`);
+}
+
+function printCoStatusOperatorAutopilotHelp(): void {
+  console.log(`Usage: codex-orchestrator co-status operator-autopilot local-rollout <acknowledge|clear|dismiss> [options]
+
+Record durable lifecycle metadata for one pending operator-autopilot local rollout
+action from an already-running local JSON control-host.
+
+Options:
+  --issue <id|identifier>   Pending Linear issue id or identifier to match.
+  --action-id <id>          Stable local rollout action instance id to match.
+  --actor <name>            Operator recording the lifecycle event (default: current user).
+  --reason <text>           Required reason for the lifecycle event.
+  --task <id>               Artifact task id for the host state (default: local-mcp).
+  --run <id>                Host run id for persisted state files (default: control-host).
+  --run-dir <path>          Resolve the host from a specific existing run directory.
+  --manifest-path <path>    Resolve the host from an explicit manifest.json path.
+  --format json             Emit machine-readable lifecycle output.
+  --help                    Show this message.
 `);
 }
 

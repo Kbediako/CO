@@ -17250,6 +17250,335 @@ describe('createProviderIssueHandoffService', () => {
     );
   });
 
+  it('applies lifecycle sidecar records to failed operator autopilot fallback projections', async () => {
+    const { paths } = await createHostPaths();
+    const trackedIssue = createTrackedIssue();
+    const state = createProviderIntakeState();
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-co-118',
+        manifestPath: '/repo/.runs/linear-0af906c6/run-co-118/manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const auditPath = join(paths.runDir, 'provider-operator-autopilot.jsonl');
+    const lifecyclePath = join(paths.runDir, 'provider-operator-autopilot-lifecycle.json');
+    const previousResult = {
+      recorded_at: '2026-04-09T10:11:00.000Z',
+      status: 'acted' as const,
+      summary: 'Surfaced 1 pending local rollout action (CO-118).',
+      error: null,
+      actions: [],
+      holds: [],
+      pending_actions: [
+        {
+          kind: 'local_rollout' as const,
+          action_instance_id: 'local_rollout:fallback-clear',
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-118',
+          summary: 'rollout pending',
+          merge_closeout_recorded_at: '2026-04-09T09:15:00.000Z',
+          merge_closeout_reason: 'merged_and_transitioned_done',
+          shared_root_status: 'clean_main_fast_forwarded',
+          linear_transition_status: 'transitioned',
+          lifecycle_state: 'pending' as const,
+          lifecycle_actor: null,
+          lifecycle_reason: null,
+          lifecycle_recorded_at: null
+        }
+      ],
+      resolved_actions: [],
+      lifecycle_records: []
+    };
+    await writeFile(
+      lifecyclePath,
+      JSON.stringify({
+        version: 1,
+        records: [
+          {
+            action_instance_id: 'local_rollout:fallback-clear',
+            kind: 'local_rollout',
+            issue_id: 'lin-issue-1',
+            issue_identifier: 'CO-118',
+            state: 'cleared',
+            actor: 'operator@example.com',
+            reason: 'local rollout completed before fallback refresh',
+            recorded_at: '2026-04-09T10:20:00.000Z',
+            source: 'co-status'
+          }
+        ]
+      }),
+      'utf8'
+    );
+    const recordOperatorAutopilotResult = vi.fn();
+    const appendOperatorAutopilotAuditResult = vi.fn(async () => undefined);
+    const providerWorkflowState = () => ({
+      status: 'ready' as const,
+      pipeline_id: 'provider-linear-worker',
+      source_path: '/repo/codex.orchestrator.json',
+      snapshot_path: '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+      last_reload_attempt_at: '2026-04-09T10:00:00.000Z',
+      last_success_at: '2026-04-09T10:00:00.000Z',
+      last_error_at: null,
+      last_error: null,
+      terminal_cleanup: null,
+      operator_autopilot: {
+        enabled: true,
+        backlog_promotion: {
+          enabled: true,
+          state_name: 'Backlog',
+          target_state_name: 'Ready'
+        },
+        review_handoff_rework: {
+          enabled: true,
+          target_state_name: 'Rework',
+          excluded_action_required_reasons: [
+            'draft',
+            'label:do-not-merge',
+            'review=REVIEW_REQUIRED',
+            'required_checks_query_failed'
+          ]
+        },
+        post_merge_rollout: {
+          enabled: true,
+          summary: 'Merge closeout completed; local rollout follow-up may still be required.'
+        },
+        audit_path: auditPath,
+        lifecycle_path: lifecyclePath,
+        last_result: previousResult
+      }
+    });
+    const providerWorkflowConfigStore = {
+      bootstrap: vi.fn(async () => providerWorkflowState()),
+      refresh: vi.fn(async () => providerWorkflowState()),
+      snapshot: () => providerWorkflowState(),
+      getLaunchConfigPath: vi.fn(async () => '/repo/.runs/local-mcp/cli/control-host/provider-workflow.json'),
+      recordTerminalCleanupResult: vi.fn(),
+      recordOperatorAutopilotResult
+    };
+    const runOperatorAutopilot = vi.fn(async () => {
+      throw new Error('operator autopilot crashed');
+    });
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      providerWorkflowConfigStore,
+      runOperatorAutopilot,
+      appendOperatorAutopilotAuditResult,
+      launcher,
+      resolveTrackedIssues: async () => ({
+        kind: 'ready',
+        trackedIssues: [trackedIssue]
+      })
+    });
+
+    await expect(service.refresh()).resolves.toBeUndefined();
+
+    expect(recordOperatorAutopilotResult).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'failed',
+        pending_actions: [],
+        resolved_actions: [
+          expect.objectContaining({
+            action_instance_id: 'local_rollout:fallback-clear',
+            lifecycle_state: 'cleared',
+            lifecycle_actor: 'operator@example.com',
+            lifecycle_reason: 'local rollout completed before fallback refresh',
+            lifecycle_recorded_at: '2026-04-09T10:20:00.000Z'
+          })
+        ],
+        lifecycle_records: [
+          expect.objectContaining({
+            action_instance_id: 'local_rollout:fallback-clear',
+            state: 'cleared'
+          })
+        ]
+      })
+    );
+    expect(appendOperatorAutopilotAuditResult).toHaveBeenCalledWith(
+      auditPath,
+      expect.objectContaining({
+        status: 'failed',
+        pending_actions: [],
+        resolved_actions: [
+          expect.objectContaining({
+            action_instance_id: 'local_rollout:fallback-clear',
+            lifecycle_state: 'cleared'
+          })
+        ],
+        lifecycle_records: [
+          expect.objectContaining({
+            action_instance_id: 'local_rollout:fallback-clear',
+            state: 'cleared'
+          })
+        ]
+      })
+    );
+  });
+
+  it('preserves previous lifecycle audit rows when lifecycle sidecar reads fail during fallback projections', async () => {
+    const { paths } = await createHostPaths();
+    const trackedIssue = createTrackedIssue();
+    const state = createProviderIntakeState();
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-co-118',
+        manifestPath: '/repo/.runs/linear-0af906c6/run-co-118/manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const auditPath = join(paths.runDir, 'provider-operator-autopilot.jsonl');
+    const lifecyclePath = join(paths.runDir, 'provider-operator-autopilot-lifecycle.json');
+    const lifecycleRecord = {
+      action_instance_id: 'local_rollout:fallback-clear',
+      kind: 'local_rollout' as const,
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-118',
+      state: 'cleared' as const,
+      actor: 'operator@example.com',
+      reason: 'local rollout completed before unreadable sidecar',
+      recorded_at: '2026-04-09T10:20:00.000Z',
+      source: 'co-status' as const
+    };
+    const previousResult = {
+      recorded_at: '2026-04-09T10:11:00.000Z',
+      status: 'acted' as const,
+      summary: 'Surfaced 1 pending local rollout action (CO-118).',
+      error: null,
+      actions: [],
+      holds: [],
+      pending_actions: [
+        {
+          kind: 'local_rollout' as const,
+          action_instance_id: 'local_rollout:fallback-clear',
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-118',
+          summary: 'rollout pending',
+          merge_closeout_recorded_at: '2026-04-09T09:15:00.000Z',
+          merge_closeout_reason: 'merged_and_transitioned_done',
+          shared_root_status: 'clean_main_fast_forwarded',
+          linear_transition_status: 'transitioned',
+          lifecycle_state: 'pending' as const,
+          lifecycle_actor: null,
+          lifecycle_reason: null,
+          lifecycle_recorded_at: null
+        }
+      ],
+      resolved_actions: [],
+      lifecycle_records: [lifecycleRecord]
+    };
+    await writeFile(lifecyclePath, '{ unreadable lifecycle json', 'utf8');
+    const recordOperatorAutopilotResult = vi.fn();
+    const appendOperatorAutopilotAuditResult = vi.fn(async () => undefined);
+    const providerWorkflowState = () => ({
+      status: 'ready' as const,
+      pipeline_id: 'provider-linear-worker',
+      source_path: '/repo/codex.orchestrator.json',
+      snapshot_path: '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+      last_reload_attempt_at: '2026-04-09T10:00:00.000Z',
+      last_success_at: '2026-04-09T10:00:00.000Z',
+      last_error_at: null,
+      last_error: null,
+      terminal_cleanup: null,
+      operator_autopilot: {
+        enabled: true,
+        backlog_promotion: {
+          enabled: true,
+          state_name: 'Backlog',
+          target_state_name: 'Ready'
+        },
+        review_handoff_rework: {
+          enabled: true,
+          target_state_name: 'Rework',
+          excluded_action_required_reasons: [
+            'draft',
+            'label:do-not-merge',
+            'review=REVIEW_REQUIRED',
+            'required_checks_query_failed'
+          ]
+        },
+        post_merge_rollout: {
+          enabled: true,
+          summary: 'Merge closeout completed; local rollout follow-up may still be required.'
+        },
+        audit_path: auditPath,
+        lifecycle_path: lifecyclePath,
+        last_result: previousResult
+      }
+    });
+    const providerWorkflowConfigStore = {
+      bootstrap: vi.fn(async () => providerWorkflowState()),
+      refresh: vi.fn(async () => providerWorkflowState()),
+      snapshot: () => providerWorkflowState(),
+      getLaunchConfigPath: vi.fn(async () => '/repo/.runs/local-mcp/cli/control-host/provider-workflow.json'),
+      recordTerminalCleanupResult: vi.fn(),
+      recordOperatorAutopilotResult
+    };
+    const runOperatorAutopilot = vi.fn(async () => {
+      throw new Error('operator autopilot crashed');
+    });
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      providerWorkflowConfigStore,
+      runOperatorAutopilot,
+      appendOperatorAutopilotAuditResult,
+      launcher,
+      resolveTrackedIssues: async () => ({
+        kind: 'ready',
+        trackedIssues: [trackedIssue]
+      })
+    });
+
+    await expect(service.refresh()).resolves.toBeUndefined();
+
+    expect(runOperatorAutopilot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lifecycle_records: [
+          expect.objectContaining({
+            action_instance_id: 'local_rollout:fallback-clear',
+            state: 'cleared'
+          })
+        ]
+      })
+    );
+    expect(recordOperatorAutopilotResult).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'failed',
+        pending_actions: [],
+        resolved_actions: [
+          expect.objectContaining({
+            action_instance_id: 'local_rollout:fallback-clear',
+            lifecycle_state: 'cleared',
+            lifecycle_reason: 'local rollout completed before unreadable sidecar'
+          })
+        ],
+        lifecycle_records: [
+          expect.objectContaining({
+            action_instance_id: 'local_rollout:fallback-clear',
+            state: 'cleared'
+          })
+        ]
+      })
+    );
+    expect(appendOperatorAutopilotAuditResult).toHaveBeenCalledWith(
+      auditPath,
+      expect.objectContaining({
+        status: 'failed',
+        lifecycle_records: [
+          expect.objectContaining({
+            action_instance_id: 'local_rollout:fallback-clear',
+            state: 'cleared'
+          })
+        ]
+      })
+    );
+  });
+
   it('clears stale pending rollout actions from failed operator autopilot fallback when rollout is disabled', async () => {
     const { paths } = await createHostPaths();
     const trackedIssue = createTrackedIssue();
