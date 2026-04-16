@@ -5705,12 +5705,8 @@ async function discoverProviderIssueRunSnapshot(
       try {
         manifest = await readJsonFile<Record<string, unknown>>(manifestPath);
       } catch (error) {
-        const proof = await readBestEffortJsonFile<ProviderLinearWorkerProofRecord>(
-          join(cliRoot, runEntry, PROVIDER_LINEAR_WORKER_PROOF_FILENAME)
-        );
-        const occupancyRecord = resolveUnreadableProviderAdmissionOccupancyRecord({
+        const occupancyRecord = await readUnreadableProviderAdmissionOccupancyRecord({
           manifestPath,
-          proof,
           isProcessAlive
         });
         if (occupancyRecord) {
@@ -5724,6 +5720,13 @@ async function discoverProviderIssueRunSnapshot(
         continue;
       }
       if (!manifest) {
+        const occupancyRecord = await readUnreadableProviderAdmissionOccupancyRecord({
+          manifestPath,
+          isProcessAlive
+        });
+        if (occupancyRecord) {
+          unreadableAdmissionOccupancy.push(occupancyRecord);
+        }
         continue;
       }
       const parentRunId = readStringValue(manifest, 'parent_run_id');
@@ -5800,6 +5803,20 @@ async function discoverProviderIssueRunSnapshot(
     }),
     unreadableAdmissionOccupancy
   };
+}
+
+async function readUnreadableProviderAdmissionOccupancyRecord(input: {
+  manifestPath: string;
+  isProcessAlive: (pid: number) => boolean;
+}): Promise<ProviderUnreadableManifestAdmissionOccupancyRecord | null> {
+  const proof = await readBestEffortJsonFile<ProviderLinearWorkerProofRecord>(
+    join(dirname(input.manifestPath), PROVIDER_LINEAR_WORKER_PROOF_FILENAME)
+  );
+  return resolveUnreadableProviderAdmissionOccupancyRecord({
+    manifestPath: input.manifestPath,
+    proof,
+    isProcessAlive: input.isProcessAlive
+  });
 }
 
 function resolveUnreadableProviderAdmissionOccupancyRecord(input: {

@@ -19680,6 +19680,96 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('keeps a Ready plain released not-active claim with missing retained manifest but live proof excluded from fresh discovery', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-04-15T15:05:00.000Z'));
+
+      const { root, paths } = await createHostPaths();
+      const retainedEnv = {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'linear-lin-issue-1'
+      };
+      const retainedPaths = resolveRunPaths(retainedEnv, 'run-ready-not-active-missing-live-proof');
+      await mkdir(retainedPaths.runDir, { recursive: true });
+      await writeFile(
+        join(retainedPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+        JSON.stringify({
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-191',
+          owner_phase: 'turn_running',
+          owner_status: 'in_progress',
+          worker_host: 'worker-host-01',
+          attempt_started_at: '2026-04-15T15:03:00.000Z',
+          updated_at: '2026-04-15T15:04:00.000Z'
+        }),
+        'utf8'
+      );
+
+      const state = createProviderIntakeState();
+      state.claims.push(createCo202ReleasedClaim({
+        run_id: 'run-ready-not-active-missing-live-proof',
+        run_manifest_path: retainedPaths.manifestPath
+      }));
+
+      const launcher = createCo202Launcher(
+        'run-ready-not-active-reclaimed',
+        '/tmp/provider-run/ready-not-active-reclaimed-manifest.json'
+      );
+      const resolveTrackedIssue = vi.fn(async () => ({
+        kind: 'ready' as const,
+        trackedIssue: createTrackedIssue()
+      }));
+      const refetchTrackedIssues = vi.fn(async (input?: { excludedIssueIds?: string[] }) => {
+        expect(input?.excludedIssueIds).toContain('lin-issue-1');
+        return {
+          kind: 'ready' as const,
+          trackedIssues: [
+            createCo202ReadyIssue()
+          ]
+        };
+      });
+
+      const service = createProviderIssueHandoffService({
+        paths,
+        state,
+        persist: vi.fn(async () => undefined),
+        launcher,
+        resolveTrackedIssue,
+        startPipelineId: 'diagnostics',
+        readFeatureToggles: () => ({
+          agent: {
+            max_concurrent_agents: 2
+          }
+        })
+      });
+
+      await service.poll?.({
+        trackedIssues: [],
+        refetchTrackedIssues,
+        deferFreshDiscovery: true
+      });
+
+      expect(resolveTrackedIssue).not.toHaveBeenCalled();
+      expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
+      expect(launcher.resume).not.toHaveBeenCalled();
+      expect(launcher.start).not.toHaveBeenCalled();
+      expect(state.claims[0]).toMatchObject({
+        state: 'released',
+        reason: 'provider_issue_released:not_active',
+        issue_state: 'Blocked',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-15T15:00:00.000Z',
+        run_id: 'run-ready-not-active-missing-live-proof',
+        run_manifest_path: retainedPaths.manifestPath
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps a Ready plain released not-active claim with unreadable same-issue live proof excluded from fresh discovery', async () => {
     vi.useFakeTimers();
     try {
