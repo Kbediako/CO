@@ -19,6 +19,11 @@ const shellBinary = 'bash';
 const LONG_WAIT_TEST_TIMEOUT_MS = 20_000;
 const RUN_REVIEW_SUBPROCESS_TIMEOUT_MS = 15_000;
 
+interface RunReviewMockProcess {
+  pid: number;
+  pgid: number | null;
+}
+
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
@@ -1247,12 +1252,12 @@ exit 2
   return binPath;
 }
 
-async function findRunReviewMockPids(codexBin: string): Promise<number[]> {
+async function findRunReviewMockProcesses(codexBin: string): Promise<RunReviewMockProcess[]> {
   if (process.platform === 'win32') {
     return [];
   }
   try {
-    const { stdout } = await execFileAsync('ps', ['-axo', 'pid=,command='], {
+    const { stdout } = await execFileAsync('ps', ['-axo', 'pid=,pgid=,command='], {
       maxBuffer: 4 * 1024 * 1024,
       timeout: 2000
     });
@@ -1260,48 +1265,66 @@ async function findRunReviewMockPids(codexBin: string): Promise<number[]> {
     return String(stdout ?? '')
       .split('\n')
       .flatMap((line) => {
-        const match = line.trim().match(/^(\d+)\s+(.+)$/u);
+        const match = line.trim().match(/^(\d+)\s+(\d+)\s+(.+)$/u);
         if (!match) {
           return [];
         }
-        const command = match[2] ?? '';
+        const command = match[3] ?? '';
         if (!command.includes(needle)) {
           return [];
         }
         const pid = Number.parseInt(match[1] ?? '', 10);
-        return Number.isFinite(pid) ? [pid] : [];
+        const pgid = Number.parseInt(match[2] ?? '', 10);
+        if (!Number.isFinite(pid)) {
+          return [];
+        }
+        return [
+          {
+            pid,
+            pgid: Number.isFinite(pgid) ? pgid : null
+          }
+        ];
       });
   } catch {
     return [];
   }
 }
 
-async function terminateRunReviewMockProcess(pid: number, signal: NodeJS.Signals): Promise<void> {
-  try {
-    process.kill(-pid, signal);
-    return;
-  } catch {
-    // The fake Codex process is normally a detached process-group leader. If a
-    // local platform disagrees, fall back to the exact matched pid.
+async function findRunReviewMockPids(codexBin: string): Promise<number[]> {
+  return (await findRunReviewMockProcesses(codexBin)).map((processInfo) => processInfo.pid);
+}
+
+async function terminateRunReviewMockProcess(
+  processInfo: RunReviewMockProcess,
+  signal: NodeJS.Signals
+): Promise<void> {
+  if (processInfo.pgid === processInfo.pid) {
+    try {
+      process.kill(-processInfo.pid, signal);
+      return;
+    } catch {
+      // Verified process-group leader still gets an exact-pid fallback below if
+      // local signaling races with process exit.
+    }
   }
   try {
-    process.kill(pid, signal);
+    process.kill(processInfo.pid, signal);
   } catch {
     // Best-effort test cleanup; callers verify by scanning again.
   }
 }
 
 async function cleanupRunReviewMockProcesses(codexBin: string): Promise<void> {
-  const initialPids = await findRunReviewMockPids(codexBin);
-  for (const pid of initialPids) {
-    await terminateRunReviewMockProcess(pid, 'SIGTERM');
+  const initialProcesses = await findRunReviewMockProcesses(codexBin);
+  for (const processInfo of initialProcesses) {
+    await terminateRunReviewMockProcess(processInfo, 'SIGTERM');
   }
-  if (initialPids.length > 0) {
+  if (initialProcesses.length > 0) {
     await new Promise<void>((resolve) => setTimeout(resolve, 250));
   }
-  const remainingPids = await findRunReviewMockPids(codexBin);
-  for (const pid of remainingPids) {
-    await terminateRunReviewMockProcess(pid, 'SIGKILL');
+  const remainingProcesses = await findRunReviewMockProcesses(codexBin);
+  for (const processInfo of remainingProcesses) {
+    await terminateRunReviewMockProcess(processInfo, 'SIGKILL');
   }
 }
 
