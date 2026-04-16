@@ -336,7 +336,9 @@ export async function runProviderOperatorAutopilot(
     (action) => action.transition.status === 'transitioned'
   );
   const status =
-    hasTransitionedAction || effectiveLocalRolloutActions.pending_actions.length > 0
+    hasTransitionedAction ||
+    effectiveLocalRolloutActions.pending_actions.length > 0 ||
+    effectiveLocalRolloutActions.resolved_actions.length > 0
       ? 'acted'
       : 'noop';
   return {
@@ -796,15 +798,16 @@ export function resolveEffectiveLocalRolloutActions(input: {
   const recordsByActionInstanceId = groupLifecycleRecordsByActionInstanceId(
     input.lifecycleRecords
   );
+  const pendingActionInstanceIds = new Set(
+    input.pendingActions.map((action) => action.action_instance_id)
+  );
   const pendingActions: ProviderOperatorAutopilotPendingActionRecord[] = [];
   const resolvedActions: ProviderOperatorAutopilotResolvedActionRecord[] = [];
-  const matchedLifecycleRecords: ProviderOperatorAutopilotLifecycleRecord[] = [];
   for (const action of input.pendingActions) {
     const lifecycleRecords =
       recordsByActionInstanceId.get(action.action_instance_id)?.map(
         cloneProviderOperatorAutopilotLifecycleRecord
       ) ?? [];
-    matchedLifecycleRecords.push(...lifecycleRecords);
     const latestTerminalRecord =
       lifecycleRecords.filter(isTerminalLifecycleRecord).at(-1) ?? null;
     if (latestTerminalRecord) {
@@ -830,6 +833,9 @@ export function resolveEffectiveLocalRolloutActions(input: {
     }
     pendingActions.push(clonePendingActionRecord(action));
   }
+  const matchedLifecycleRecords = input.lifecycleRecords
+    .filter((record) => pendingActionInstanceIds.has(record.action_instance_id))
+    .map(cloneProviderOperatorAutopilotLifecycleRecord);
   return {
     pending_actions: pendingActions,
     resolved_actions: resolvedActions,

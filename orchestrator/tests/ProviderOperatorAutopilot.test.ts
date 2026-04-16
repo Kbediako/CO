@@ -963,7 +963,7 @@ describe('providerOperatorAutopilot', () => {
     });
 
     expect(result).toMatchObject({
-      status: 'noop',
+      status: 'acted',
       pending_actions: [],
       resolved_actions: [
         {
@@ -979,6 +979,67 @@ describe('providerOperatorAutopilot', () => {
         {
           action_instance_id: action.action_instance_id,
           state: 'cleared'
+        }
+      ]
+    });
+  });
+
+  it('suppresses dismissed local rollout actions while preserving resolved audit metadata', async () => {
+    const claim = createClaim({
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-118',
+      merge_closeout: createMergeCloseout({
+        status: 'merged',
+        reason: 'merged_and_transitioned_done'
+      })
+    });
+    const baseline = await runProviderOperatorAutopilot({
+      tracked_issues: [],
+      claims: [claim],
+      config: buildConfig(),
+      previous_result: null
+    });
+    const action = baseline.pending_actions[0]!;
+
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [],
+      claims: [claim],
+      config: buildConfig(),
+      previous_result: baseline,
+      lifecycle_records: [
+        {
+          action_instance_id: action.action_instance_id,
+          kind: 'local_rollout',
+          issue_id: action.issue_id,
+          issue_identifier: action.issue_identifier,
+          state: 'dismissed',
+          actor: 'operator@example.com',
+          reason: 'rollout reminder is not actionable',
+          recorded_at: '2026-04-09T10:26:00.000Z',
+          source: 'co-status'
+        }
+      ]
+    });
+
+    expect(result).toMatchObject({
+      status: 'acted',
+      pending_actions: [],
+      resolved_actions: [
+        {
+          action_instance_id: action.action_instance_id,
+          issue_identifier: 'CO-118',
+          lifecycle_state: 'dismissed',
+          lifecycle_actor: 'operator@example.com',
+          lifecycle_reason: 'rollout reminder is not actionable',
+          lifecycle_recorded_at: '2026-04-09T10:26:00.000Z'
+        }
+      ],
+      lifecycle_records: [
+        {
+          action_instance_id: action.action_instance_id,
+          state: 'dismissed',
+          actor: 'operator@example.com',
+          reason: 'rollout reminder is not actionable'
         }
       ]
     });
@@ -1033,7 +1094,7 @@ describe('providerOperatorAutopilot', () => {
     });
 
     expect(result).toMatchObject({
-      status: 'noop',
+      status: 'acted',
       pending_actions: [],
       resolved_actions: [
         {
@@ -1056,6 +1117,94 @@ describe('providerOperatorAutopilot', () => {
         }
       ]
     });
+  });
+
+  it('preserves lifecycle record append order across local rollout action ids', async () => {
+    const firstClaim = createClaim({
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-118',
+      merge_closeout: createMergeCloseout({
+        status: 'merged',
+        reason: 'merged_and_transitioned_done',
+        recorded_at: '2026-04-09T09:15:00.000Z',
+        head_oid: 'abc123'
+      })
+    });
+    const secondClaim = createClaim({
+      issue_id: 'lin-issue-2',
+      issue_identifier: 'CO-119',
+      merge_closeout: createMergeCloseout({
+        issue_id: 'lin-issue-2',
+        issue_identifier: 'CO-119',
+        pr_number: 119,
+        status: 'merged',
+        reason: 'merged_and_transitioned_done',
+        recorded_at: '2026-04-09T09:16:00.000Z',
+        head_oid: 'def456'
+      })
+    });
+    const baseline = await runProviderOperatorAutopilot({
+      tracked_issues: [],
+      claims: [firstClaim, secondClaim],
+      config: buildConfig(),
+      previous_result: null
+    });
+    const firstAction = baseline.pending_actions.find(
+      (action) => action.issue_identifier === 'CO-118'
+    )!;
+    const secondAction = baseline.pending_actions.find(
+      (action) => action.issue_identifier === 'CO-119'
+    )!;
+    const lifecycleRecords = [
+      {
+        action_instance_id: secondAction.action_instance_id,
+        kind: 'local_rollout' as const,
+        issue_id: secondAction.issue_id,
+        issue_identifier: secondAction.issue_identifier,
+        state: 'acknowledged' as const,
+        actor: 'operator-b',
+        reason: 'second action acknowledged first',
+        recorded_at: '2026-04-09T10:20:00.000Z',
+        source: 'co-status' as const
+      },
+      {
+        action_instance_id: firstAction.action_instance_id,
+        kind: 'local_rollout' as const,
+        issue_id: firstAction.issue_id,
+        issue_identifier: firstAction.issue_identifier,
+        state: 'cleared' as const,
+        actor: 'operator-a',
+        reason: 'first action cleared second',
+        recorded_at: '2026-04-09T10:21:00.000Z',
+        source: 'co-status' as const
+      },
+      {
+        action_instance_id: secondAction.action_instance_id,
+        kind: 'local_rollout' as const,
+        issue_id: secondAction.issue_id,
+        issue_identifier: secondAction.issue_identifier,
+        state: 'cleared' as const,
+        actor: 'operator-b',
+        reason: 'second action cleared third',
+        recorded_at: '2026-04-09T10:22:00.000Z',
+        source: 'co-status' as const
+      }
+    ];
+
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [],
+      claims: [firstClaim, secondClaim],
+      config: buildConfig(),
+      previous_result: baseline,
+      lifecycle_records: lifecycleRecords
+    });
+
+    expect(result.lifecycle_records.map((record) => record.recorded_at)).toEqual([
+      '2026-04-09T10:20:00.000Z',
+      '2026-04-09T10:21:00.000Z',
+      '2026-04-09T10:22:00.000Z'
+    ]);
+    expect(result.resolved_actions).toHaveLength(2);
   });
 
   it('keeps a cleared local rollout suppressed when the same merge closeout is re-probed', async () => {

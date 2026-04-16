@@ -45,9 +45,16 @@ export async function runCoStatusOperatorAutopilotCliShell(
   }
   const actionIdSelector = readStringFlag(params.flags, 'action-id');
   const issueSelector = readStringFlag(params.flags, 'issue');
+  if (actionIdSelector && issueSelector) {
+    throw new Error(
+      'co-status operator-autopilot local-rollout accepts exactly one selector: --issue or --action-id.'
+    );
+  }
   const selector = actionIdSelector ?? issueSelector;
   if (!selector) {
-    throw new Error('co-status operator-autopilot local-rollout requires --issue or --action-id.');
+    throw new Error(
+      'co-status operator-autopilot local-rollout accepts exactly one selector: --issue or --action-id.'
+    );
   }
   const actor =
     readStringFlag(params.flags, 'actor') ??

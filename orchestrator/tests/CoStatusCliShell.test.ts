@@ -149,6 +149,22 @@ describe('runCoStatusCliShell', () => {
     );
   });
 
+  it('rejects local rollout lifecycle commands with both selectors', async () => {
+    await expect(
+      runCoStatusOperatorAutopilotCliShell({
+        positionals: ['local-rollout', 'clear'],
+        flags: {
+          'action-id': 'local_rollout:test-action',
+          issue: 'CO-118',
+          reason: 'operator handled the rollout'
+        },
+        printHelp: vi.fn()
+      })
+    ).rejects.toThrow(
+      'co-status operator-autopilot local-rollout accepts exactly one selector: --issue or --action-id.'
+    );
+  });
+
   it('records local rollout lifecycle metadata through the co-status operator-autopilot surface', async () => {
     const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
     tempDirs.push(root);

@@ -20,10 +20,7 @@
         }
       },
       "paths": {
-        "spec": "tasks/specs/linear-642e622a-b02e-4766-85c2-6f2fc47b1f44.md",
-        "task": "tasks/tasks-linear-642e622a-b02e-4766-85c2-6f2fc47b1f44.md",
-        "prd": "docs/PRD-linear-642e622a-b02e-4766-85c2-6f2fc47b1f44.md",
-        "action_plan": "docs/ACTION_PLAN-linear-642e622a-b02e-4766-85c2-6f2fc47b1f44.md"
+        "docs": "tasks/specs/linear-642e622a-b02e-4766-85c2-6f2fc47b1f44.md"
       }
     },
     {

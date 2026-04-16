@@ -4784,9 +4784,14 @@ export function createProviderIssueHandoffService(
     const previousResult = resolveProviderOperatorAutopilotPreviousResultFromPayload(
       providerWorkflow
     );
-    const lifecycleRecords = await readProviderOperatorAutopilotLifecycleRecordsForCycle(
+    const lifecycleRecordsForCycle = await readProviderOperatorAutopilotLifecycleRecordsForCycle(
       autopilotLifecyclePath
     );
+    const lifecycleRecords =
+      lifecycleRecordsForCycle ??
+      (Array.isArray(previousResult?.lifecycle_records)
+        ? previousResult.lifecycle_records.map((record) => ({ ...record }))
+        : []);
     let nextResult: ProviderOperatorAutopilotResult;
     let loggedAutopilotFailure = false;
     try {
@@ -5651,7 +5656,7 @@ function resolveProviderOperatorAutopilotLifecyclePathFromPayload(
 
 async function readProviderOperatorAutopilotLifecycleRecordsForCycle(
   lifecyclePath: string | null
-): Promise<ProviderOperatorAutopilotLifecycleRecord[]> {
+): Promise<ProviderOperatorAutopilotLifecycleRecord[] | undefined> {
   if (!lifecyclePath) {
     return [];
   }
@@ -5663,7 +5668,7 @@ async function readProviderOperatorAutopilotLifecycleRecordsForCycle(
         (error as Error)?.message ?? String(error)
       }`
     );
-    return [];
+    return undefined;
   }
 }
 
