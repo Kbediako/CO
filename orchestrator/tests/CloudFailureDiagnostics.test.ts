@@ -27,6 +27,9 @@ describe('diagnoseCloudFailure', () => {
       ['env_config', 'env_config'],
       ['no_environment_id', 'env_config'],
       ['auth_mismatch', 'auth_mismatch'],
+      ['cloud_connector_auth_drift', 'cloud_connector_auth_drift'],
+      ['missing_github_connector_link', 'cloud_connector_auth_drift'],
+      ['github_connection_not_found', 'cloud_connector_auth_drift'],
       ['cloud_denial', 'cloud_denial'],
       ['cloud_access_denied', 'cloud_denial'],
       ['cloud_execution_denied', 'cloud_denial'],
@@ -68,6 +71,27 @@ describe('diagnoseCloudFailure', () => {
       error: 'Guardian policy denial blocked the request.',
       statusDetail: 'Guardian review timed out'
     }).diagnostic_category).toBe('guardian_policy_denial');
+  });
+
+  it('classifies GitHub connector admission drift distinctly from provider runtime', () => {
+    const missingLink = diagnoseCloudFailure({
+      status: 'failed',
+      error:
+        'codex cloud exec failed with exit 1: HTTP 400 missing_github_connector_link: GitHub connection not found for user',
+      statusDetail: null
+    });
+    const prose = diagnoseCloudFailure({
+      status: 'failed',
+      error: 'CODEX_CLOUD_ENV_ID was present, but GitHub connection not found for user before task creation.',
+      statusDetail: null
+    });
+
+    for (const diagnosis of [missingLink, prose]) {
+      expect(diagnosis.category).toBe('credentials');
+      expect(diagnosis.diagnostic_category).toBe('cloud_connector_auth_drift');
+      expect(diagnosis.diagnostic_category).not.toBe('provider_runtime');
+      expect(diagnosis.guidance).toContain('Repair or relink the GitHub connector');
+    }
   });
 
   it('preserves Codex 0.121 quota/rate-limit distinctions', () => {

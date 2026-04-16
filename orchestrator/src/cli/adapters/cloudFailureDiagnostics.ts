@@ -3,6 +3,7 @@ export type CloudFailureCategory = 'configuration' | 'credentials' | 'connectivi
 export type CloudFailureDiagnosticCategory =
   | 'env_config'
   | 'auth_mismatch'
+  | 'cloud_connector_auth_drift'
   | 'quota_rate_limit'
   | 'cloud_denial'
   | 'guardian_timeout'
@@ -55,6 +56,25 @@ const CLOUD_FAILURE_RULES: CloudFailureRule[] = [
       'guardian blocked'
     ],
     guidance: 'Guardian policy denied the request; inspect policy-denial guidance instead of retrying as a timeout.'
+  },
+  {
+    category: 'credentials',
+    diagnostic_category: 'cloud_connector_auth_drift',
+    patterns: [
+      'cloud connector auth drift',
+      'cloud-connector-auth-drift',
+      'cloud_connector_auth_drift',
+      'missing_github_connector_link',
+      'missing github connector link',
+      'github connection not found for user',
+      'github connection not found',
+      'github connector not found',
+      'github connector link missing',
+      'missing github connection',
+      'missing github connector'
+    ],
+    guidance:
+      'Repair or relink the GitHub connector for the current ChatGPT/Codex cloud account/environment, or record an explicit waiver before re-running cloud-canary gates.'
   },
   {
     category: 'credentials',
@@ -148,10 +168,14 @@ const MACHINE_READABLE_CLOUD_DETAILS = new Set([
   'cloud_denied',
   'cloud_env_missing',
   'cloud_execution_denied',
+  'cloud_connector_auth_drift',
   'codex_cloud_env_id',
   'env_config',
   'guardian_policy_denial',
   'guardian_timeout',
+  'github_connection_not_found',
+  'github_connector_not_found',
+  'missing_github_connector_link',
   'no_environment_id',
   'not_allowed_in_cloud',
   'quota_rate_limit',

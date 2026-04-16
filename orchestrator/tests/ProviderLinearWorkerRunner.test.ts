@@ -2163,9 +2163,30 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     });
   });
 
+  it('classifies Codex Cloud GitHub connector admission drift in provider proof diagnostics', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      JSON.stringify({
+        type: 'error',
+        message:
+          'HTTP 400 missing_github_connector_link: GitHub connection not found for user while CODEX_CLOUD_ENV_ID was configured.',
+        timestamp: '2026-04-15T20:45:22.125Z'
+      })
+    );
+
+    expect(parsed.failureDiagnosis).toMatchObject({
+      diagnostic_category: 'cloud_connector_auth_drift',
+      source: 'stdout_jsonl',
+      observed_at: '2026-04-15T20:45:22.125Z',
+      guidance: expect.stringContaining('Repair or relink the GitHub connector')
+    });
+    expect(parsed.failureDiagnosis?.diagnostic_category).not.toBe('provider_runtime');
+  });
+
   it('classifies machine-readable provider diagnostic events before prose', () => {
     const cases: Array<[Record<string, unknown>, string]> = [
       [{ type: 'auth_mismatch', status: 'failed' }, 'auth_mismatch'],
+      [{ type: 'cloud_connector_auth_drift', status: 'failed' }, 'cloud_connector_auth_drift'],
+      [{ type: 'missing_github_connector_link', status: 'failed' }, 'cloud_connector_auth_drift'],
       [{ type: 'cloud_denial', status: 'failed' }, 'cloud_denial'],
       [{ type: 'env_config', status: 'failed' }, 'env_config'],
       [

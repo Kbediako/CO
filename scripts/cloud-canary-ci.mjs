@@ -4,6 +4,7 @@ import { appendFile, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { isAbsolute, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
 
 const DEFAULT_TASK_ID = 'ci-cloud-canary';
@@ -24,8 +25,26 @@ function envFlagEnabled(value) {
   return normalized === '1' || normalized === 'true' || normalized === 'yes';
 }
 
-function classifyFailure(signal) {
+export function classifyFailure(signal) {
   const normalized = signal.toLowerCase();
+  const normalizedConnectorSignal = normalized.replace(/[_-]+/g, ' ');
+  if (
+    normalizedConnectorSignal.includes('cloud connector auth drift') ||
+    normalizedConnectorSignal.includes('missing github connector link') ||
+    normalizedConnectorSignal.includes('github connection not found for user') ||
+    normalizedConnectorSignal.includes('github connection not found') ||
+    normalizedConnectorSignal.includes('github connector not found') ||
+    normalizedConnectorSignal.includes('github connector link missing') ||
+    normalizedConnectorSignal.includes('missing github connection') ||
+    normalizedConnectorSignal.includes('missing github connector')
+  ) {
+    return {
+      category: 'credentials',
+      diagnostic_category: 'cloud_connector_auth_drift',
+      guidance:
+        'Repair or relink the GitHub connector for the current ChatGPT/Codex cloud account/environment, or record an explicit waiver before re-running cloud-canary gates.'
+    };
+  }
   if (
     normalized.includes('cloud-env-missing') ||
     normalized.includes('codex_cloud_env_id') ||
@@ -33,6 +52,7 @@ function classifyFailure(signal) {
   ) {
     return {
       category: 'configuration',
+      diagnostic_category: 'env_config',
       guidance: 'Set CODEX_CLOUD_ENV_ID (or metadata.cloudEnvId) for the cloud canary target.'
     };
   }
@@ -47,6 +67,7 @@ function classifyFailure(signal) {
   ) {
     return {
       category: 'credentials',
+      diagnostic_category: 'auth_mismatch',
       guidance: 'Provide Codex Cloud credentials in CI with access to the configured environment.'
     };
   }
@@ -62,19 +83,26 @@ function classifyFailure(signal) {
   ) {
     return {
       category: 'connectivity',
+      diagnostic_category: 'network_connectivity',
       guidance: 'Cloud endpoint connectivity looks unstable; retry and inspect endpoint/network health.'
     };
   }
   if (normalized.includes('failed') || normalized.includes('error') || normalized.includes('cancelled')) {
     return {
       category: 'execution',
+      diagnostic_category: 'provider_runtime',
       guidance: 'Inspect cloud command logs and manifest cloud_execution.error for the terminal failure cause.'
     };
   }
   return {
     category: 'unknown',
+    diagnostic_category: 'unknown',
     guidance: 'Inspect manifest status_detail, runner logs, and cloud command logs to classify this failure.'
   };
+}
+
+export function formatCloudCanaryFailureClass(diagnosis) {
+  return `${diagnosis.category} (${diagnosis.diagnostic_category})`;
 }
 
 function hasCredentialEnv(env) {
@@ -475,7 +503,7 @@ async function main() {
       || (expectFallback && diagnosis.category === 'credentials')
     );
   if (fatalCategory) {
-    assertionFailures.push(`Failure class ${diagnosis.category} indicates infrastructure/credential issues.`);
+    assertionFailures.push(`Failure class ${formatCloudCanaryFailureClass(diagnosis)} indicates infrastructure/credential issues.`);
   }
 
   if (assertionFailures.length === 0) {
@@ -523,7 +551,7 @@ async function main() {
     '',
     ...assertionFailures.map((failure) => `- ${failure}`),
     '',
-    `Failure class: ${diagnosis.category}`,
+    `Failure class: ${formatCloudCanaryFailureClass(diagnosis)}`,
     `Guidance: ${diagnosis.guidance}`,
     `Manifest: ${manifestPath ?? '<unresolved>'}`,
     `Run summary: ${runSummaryPath ?? '<unresolved>'}`,
@@ -537,9 +565,11 @@ async function main() {
   process.exitCode = skipEligible ? 0 : 1;
 }
 
-main().catch(async (error) => {
-  const message = (error instanceof Error ? error.stack ?? error.message : String(error)).trim();
-  console.error(`Cloud canary crashed:\n${message}`);
-  await appendStepSummary(['## Cloud Canary (Failed)', '', 'Unhandled exception:', '```', message, '```']);
-  process.exitCode = 1;
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch(async (error) => {
+    const message = (error instanceof Error ? error.stack ?? error.message : String(error)).trim();
+    console.error(`Cloud canary crashed:\n${message}`);
+    await appendStepSummary(['## Cloud Canary (Failed)', '', 'Unhandled exception:', '```', message, '```']);
+    process.exitCode = 1;
+  });
+}
