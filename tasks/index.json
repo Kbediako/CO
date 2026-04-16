@@ -17,12 +17,19 @@
           "manifest": ".runs/linear-9917183b-824a-48f7-95ee-bcee205d7a02-regression-tests/cli/2026-04-16T07-46-57-204Z-d0960b5a/manifest.json",
           "summary": "Focused provider issue observability regression coverage was launched in same-issue child lane regression-tests and accepted by the parent."
         },
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review child stream",
+          "date": "2026-04-16",
+          "status": "approved",
+          "manifest": ".runs/linear-9917183b-824a-48f7-95ee-bcee205d7a02-docs-review/cli/2026-04-16T07-57-56-440Z-ad51414f/manifest.json",
+          "summary": "Docs-review child stream passed with spec guard, docs check, docs freshness, and forced review evidence."
+        },
         "standalone_review": {
           "reviewer": "codex-orchestrator review",
           "date": "2026-04-16",
           "status": "approved",
-          "manifest": "../../.runs/linear-9917183b-824a-48f7-95ee-bcee205d7a02/cli/2026-04-16T07-44-42-931Z-b12a6085/manifest.json",
-          "telemetry": "../../.runs/linear-9917183b-824a-48f7-95ee-bcee205d7a02/cli/2026-04-16T07-44-42-931Z-b12a6085/review/telemetry.json",
+          "manifest": ".runs/linear-9917183b-824a-48f7-95ee-bcee205d7a02/cli/2026-04-16T07-44-42-931Z-b12a6085/manifest.json",
+          "telemetry": ".runs/linear-9917183b-824a-48f7-95ee-bcee205d7a02/cli/2026-04-16T07-44-42-931Z-b12a6085/review/telemetry.json",
           "summary": "Review telemetry reported status=succeeded and review_outcome=bounded-success; read-only retry found no actionable regressions."
         },
         "elegance_review": {

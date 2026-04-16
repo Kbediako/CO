@@ -32,8 +32,9 @@
 - [x] Focused provider issue observability suite passed. Evidence: `npx vitest run --config vitest.config.core.ts orchestrator/tests/ProviderIssueObservability.test.ts` returned 33/33 passing.
 - [x] `node scripts/delegation-guard.mjs` passed. Evidence: `Delegation guard: OK (2 subagent manifest(s) found)`.
 - [x] `node scripts/spec-guard.mjs --dry-run` passed. Evidence: `Spec guard: OK`.
+- [x] Docs-review child stream passed. Evidence: `.runs/linear-9917183b-824a-48f7-95ee-bcee205d7a02-docs-review/cli/2026-04-16T07-57-56-440Z-ad51414f/manifest.json`.
 - [x] Required validation floor passed: `npm run build`, `npm run lint`, `npm run test` (342 files / 3960 tests), `npm run docs:check`, `npm run docs:freshness`, `npm run repo:stewardship`, `node scripts/diff-budget.mjs`, and `npm run pack:smoke`.
-- [x] Manifest-backed standalone review and explicit elegance review completed before PR handoff. Evidence: `../../.runs/linear-9917183b-824a-48f7-95ee-bcee205d7a02/cli/2026-04-16T07-44-42-931Z-b12a6085/review/telemetry.json` (`status=succeeded`, `review_outcome=bounded-success`, no actionable findings) and `out/linear-9917183b-824a-48f7-95ee-bcee205d7a02/manual/elegance-review.md`.
+- [x] Manifest-backed standalone review and explicit elegance review completed before PR handoff. Evidence: `.runs/linear-9917183b-824a-48f7-95ee-bcee205d7a02/cli/2026-04-16T07-44-42-931Z-b12a6085/review/telemetry.json` (`status=succeeded`, `review_outcome=bounded-success`, no actionable findings) and `out/linear-9917183b-824a-48f7-95ee-bcee205d7a02/manual/elegance-review.md`.
 - [ ] PR created or updated, attached to Linear, checks green, and `pr ready-review` drain clean before review-state transition.
 
 ## Handoff
