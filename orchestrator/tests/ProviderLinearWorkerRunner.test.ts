@@ -1787,6 +1787,37 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     });
   });
 
+  it('uses the worker env fingerprint key when parsing auth provenance from JSONL', () => {
+    delete process.env.CODEX_AUTH_PROVENANCE_FINGERPRINT_KEY;
+
+    const parsed = parseProviderLinearWorkerJsonl(
+      JSON.stringify({
+        type: 'notification',
+        method: 'account/authProfile/updated',
+        params: {
+          authProfile: 'worker-env-profile',
+          account: {
+            id: 'worker-env-account'
+          },
+          credentialSource: 'codex_login',
+          authFreshness: 'fresh'
+        },
+        timestamp: '2026-04-15T20:45:18.000Z'
+      }),
+      {
+        CODEX_AUTH_PROVENANCE_FINGERPRINT_KEY: TEST_AUTH_PROVENANCE_FINGERPRINT_KEY
+      }
+    );
+
+    expect(parsed.authProvenance).toMatchObject({
+      active_profile_fingerprint: testFingerprint('worker-env-profile'),
+      active_account_fingerprint: testFingerprint('worker-env-account'),
+      credential_source: 'codex_login',
+      auth_freshness: 'fresh',
+      source: 'stdout_jsonl'
+    });
+  });
+
   it('extracts auth provenance from every supported auth container', () => {
     const cases: Array<[Record<string, unknown>, string, string]> = [
       [{
@@ -6999,8 +7030,14 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       latest_session_id: null,
       owner_phase: 'ended',
       owner_status: 'failed',
-      end_reason: 'exec_runner_failed'
+      end_reason: 'exec_runner_failed',
+      failure_diagnosis: {
+        diagnostic_category: 'provider_runtime',
+        source: 'exec_runner',
+        observed_at: '2026-03-21T09:00:01.000Z'
+      }
     });
+    expect(JSON.stringify(written.failure_diagnosis)).toContain('spawn failed');
   });
 
   it('classifies ENOENT launches with a valid runtime workspace as explicit runtime parity failures', async () => {
@@ -7043,8 +7080,14 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(written).toMatchObject({
       owner_phase: 'ended',
       owner_status: 'failed',
-      end_reason: 'runtime_parity_command_unavailable'
+      end_reason: 'runtime_parity_command_unavailable',
+      failure_diagnosis: {
+        diagnostic_category: 'provider_runtime',
+        source: 'exec_runner',
+        observed_at: '2026-03-21T09:00:01.000Z'
+      }
     });
+    expect(JSON.stringify(written.failure_diagnosis)).toContain('ENOENT');
   });
 
   it('does not relabel unrelated ENOENT exec failures as runtime parity failures', async () => {

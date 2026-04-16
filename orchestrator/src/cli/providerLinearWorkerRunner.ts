@@ -341,7 +341,8 @@ export interface ProviderLinearWorkerProof {
 export type ProviderLinearWorkerCurrentTurnActivitySource =
   | 'stdout_jsonl'
   | 'session_log_hydration'
-  | 'stderr';
+  | 'stderr'
+  | 'exec_runner';
 
 export interface ProviderLinearWorkerCurrentTurnActivity {
   event: string | null;
@@ -1311,11 +1312,14 @@ export function buildProviderWorkerPrompt(
     .join('\n');
 }
 
-export function parseProviderLinearWorkerJsonl(raw: string): ProviderLinearWorkerJsonlParseResult {
+export function parseProviderLinearWorkerJsonl(
+  raw: string,
+  env: NodeJS.ProcessEnv = process.env
+): ProviderLinearWorkerJsonlParseResult {
   const state = buildEmptyProviderLinearWorkerJsonlParseResult();
 
   for (const line of raw.split(/\r?\n/u)) {
-    applyProviderLinearWorkerJsonlLine(state, line);
+    applyProviderLinearWorkerJsonlLine(state, line, 'stdout_jsonl', env);
   }
 
   return state;
@@ -1339,7 +1343,8 @@ function buildEmptyProviderLinearWorkerJsonlParseResult(): ProviderLinearWorkerJ
 function applyProviderLinearWorkerJsonlLine(
   state: ProviderLinearWorkerJsonlParseResult,
   line: string,
-  activitySource: ProviderLinearWorkerCurrentTurnActivitySource = 'stdout_jsonl'
+  activitySource: ProviderLinearWorkerCurrentTurnActivitySource = 'stdout_jsonl',
+  env: NodeJS.ProcessEnv = process.env
 ): boolean {
   const trimmed = line.trim();
   if (!trimmed.startsWith('{')) {
@@ -1347,7 +1352,7 @@ function applyProviderLinearWorkerJsonlLine(
   }
   try {
     const parsed = JSON.parse(trimmed) as Record<string, unknown>;
-    return applyProviderLinearWorkerJsonlRecord(state, parsed, activitySource);
+    return applyProviderLinearWorkerJsonlRecord(state, parsed, activitySource, env);
   } catch {
     return false;
   }
@@ -1356,7 +1361,8 @@ function applyProviderLinearWorkerJsonlLine(
 function applyProviderLinearWorkerJsonlRecord(
   state: ProviderLinearWorkerJsonlParseResult,
   parsed: Record<string, unknown>,
-  activitySource: ProviderLinearWorkerCurrentTurnActivitySource
+  activitySource: ProviderLinearWorkerCurrentTurnActivitySource,
+  env: NodeJS.ProcessEnv = process.env
 ): boolean {
   let changed = false;
   let threadChanged = false;
@@ -1450,7 +1456,7 @@ function applyProviderLinearWorkerJsonlRecord(
     state.rateLimits = observedRateLimits;
     changed = true;
   }
-  const observedAuthProvenance = extractProviderWorkerAuthProvenance(parsed, activitySource);
+  const observedAuthProvenance = extractProviderWorkerAuthProvenance(parsed, activitySource, env);
   if (observedAuthProvenance) {
     state.authProvenance = mergeProviderWorkerAuthProvenance(
       state.authProvenance,
@@ -1479,20 +1485,22 @@ function applyProviderLinearWorkerJsonlRecord(
 
 function applyProviderLinearWorkerSessionJsonlLine(
   state: ProviderLinearWorkerJsonlParseResult,
-  line: string
+  line: string,
+  env: NodeJS.ProcessEnv = process.env
 ): boolean {
   const parsed = parseProviderWorkerSessionJsonlLine(line);
   if (!parsed) {
     return false;
   }
-  return applyProviderLinearWorkerSessionJsonlRecord(state, parsed);
+  return applyProviderLinearWorkerSessionJsonlRecord(state, parsed, env);
 }
 
 function applyProviderLinearWorkerSessionJsonlRecord(
   state: ProviderLinearWorkerJsonlParseResult,
-  parsed: Record<string, unknown>
+  parsed: Record<string, unknown>,
+  env: NodeJS.ProcessEnv = process.env
 ): boolean {
-  return applyProviderLinearWorkerJsonlRecord(state, parsed, 'session_log_hydration');
+  return applyProviderLinearWorkerJsonlRecord(state, parsed, 'session_log_hydration', env);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -1969,11 +1977,14 @@ function normalizeProviderWorkerPlanLabel(
   return normalizeProviderWorkerSafeLabel(value, allowedLabels);
 }
 
-function fingerprintProviderWorkerAuthValue(value: unknown): string | null {
+function fingerprintProviderWorkerAuthValue(
+  value: unknown,
+  env: NodeJS.ProcessEnv = process.env
+): string | null {
   if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
     return null;
   }
-  return fingerprintAuthProvenanceValue(value);
+  return fingerprintAuthProvenanceValue(value, env);
 }
 
 function fingerprintProviderWorkerEnvAuthValue(
@@ -2001,10 +2012,11 @@ function readFirstProviderWorkerStringAtPaths(
 
 function readFirstProviderWorkerFingerprintAtPaths(
   input: Record<string, unknown>,
-  paths: string[][]
+  paths: string[][],
+  env: NodeJS.ProcessEnv = process.env
 ): string | null {
   for (const path of paths) {
-    const fingerprint = fingerprintProviderWorkerAuthValue(findValueAtPath(input, path));
+    const fingerprint = fingerprintProviderWorkerAuthValue(findValueAtPath(input, path), env);
     if (fingerprint) {
       return fingerprint;
     }
@@ -2129,126 +2141,135 @@ function isProviderWorkerAuthProvenanceCarrier(input: Record<string, unknown>): 
 
 function extractProviderWorkerAuthProvenance(
   input: Record<string, unknown>,
-  source: ProviderLinearWorkerCurrentTurnActivitySource
+  source: ProviderLinearWorkerCurrentTurnActivitySource,
+  env: NodeJS.ProcessEnv = process.env
 ): ProviderLinearWorkerAuthProvenance | null {
   if (!isProviderWorkerAuthProvenanceCarrier(input)) {
     return null;
   }
-  const profileFingerprint = readFirstProviderWorkerFingerprintAtPaths(input, [
-    ['auth_profile'],
-    ['authProfile'],
-    ['profile'],
-    ['profile_id'],
-    ['profileId'],
-    ['auth', 'auth_profile'],
-    ['auth', 'authProfile'],
-    ['auth', 'profile'],
-    ['auth', 'profile_id'],
-    ['auth', 'profileId'],
-    ['params', 'auth_profile'],
-    ['params', 'authProfile'],
-    ['params', 'profile'],
-    ['params', 'profile_id'],
-    ['params', 'profileId'],
-    ['params', 'auth', 'auth_profile'],
-    ['params', 'auth', 'authProfile'],
-    ['params', 'auth', 'profile'],
-    ['params', 'auth', 'profile_id'],
-    ['params', 'auth', 'profileId'],
-    ['payload', 'auth_profile'],
-    ['payload', 'authProfile'],
-    ['payload', 'profile'],
-    ['payload', 'profile_id'],
-    ['payload', 'profileId'],
-    ['payload', 'auth', 'auth_profile'],
-    ['payload', 'auth', 'authProfile'],
-    ['payload', 'auth', 'profile'],
-    ['payload', 'auth', 'profile_id'],
-    ['payload', 'auth', 'profileId'],
-    ['payload', 'params', 'auth_profile'],
-    ['payload', 'params', 'authProfile'],
-    ['payload', 'params', 'profile'],
-    ['payload', 'params', 'profile_id'],
-    ['payload', 'params', 'profileId'],
-    ['payload', 'params', 'auth', 'auth_profile'],
-    ['payload', 'params', 'auth', 'authProfile'],
-    ['payload', 'params', 'auth', 'profile'],
-    ['payload', 'params', 'auth', 'profile_id'],
-    ['payload', 'params', 'auth', 'profileId']
-  ]);
-  const accountFingerprint = readFirstProviderWorkerFingerprintAtPaths(input, [
-    ['account_id'],
-    ['accountId'],
-    ['account'],
-    ['organization_id'],
-    ['organizationId'],
-    ['org_id'],
-    ['orgId'],
-    ['email'],
-    ['auth', 'account_id'],
-    ['auth', 'accountId'],
-    ['auth', 'account'],
-    ['auth', 'account', 'id'],
-    ['auth', 'account', 'email'],
-    ['auth', 'organization_id'],
-    ['auth', 'organizationId'],
-    ['auth', 'org_id'],
-    ['auth', 'orgId'],
-    ['params', 'account_id'],
-    ['params', 'accountId'],
-    ['params', 'account'],
-    ['params', 'account', 'id'],
-    ['params', 'account', 'email'],
-    ['params', 'organization_id'],
-    ['params', 'organizationId'],
-    ['params', 'org_id'],
-    ['params', 'orgId'],
-    ['params', 'auth', 'account'],
-    ['params', 'auth', 'account', 'id'],
-    ['params', 'auth', 'account', 'email'],
-    ['params', 'auth', 'account_id'],
-    ['params', 'auth', 'accountId'],
-    ['params', 'auth', 'organization_id'],
-    ['params', 'auth', 'organizationId'],
-    ['params', 'auth', 'org_id'],
-    ['params', 'auth', 'orgId'],
-    ['payload', 'account_id'],
-    ['payload', 'accountId'],
-    ['payload', 'account'],
-    ['payload', 'account', 'id'],
-    ['payload', 'account', 'email'],
-    ['payload', 'organization_id'],
-    ['payload', 'organizationId'],
-    ['payload', 'org_id'],
-    ['payload', 'orgId'],
-    ['payload', 'auth', 'account_id'],
-    ['payload', 'auth', 'accountId'],
-    ['payload', 'auth', 'account'],
-    ['payload', 'auth', 'account', 'id'],
-    ['payload', 'auth', 'account', 'email'],
-    ['payload', 'auth', 'organization_id'],
-    ['payload', 'auth', 'organizationId'],
-    ['payload', 'auth', 'org_id'],
-    ['payload', 'auth', 'orgId'],
-    ['payload', 'params', 'account_id'],
-    ['payload', 'params', 'accountId'],
-    ['payload', 'params', 'account'],
-    ['payload', 'params', 'account', 'id'],
-    ['payload', 'params', 'account', 'email'],
-    ['payload', 'params', 'organization_id'],
-    ['payload', 'params', 'organizationId'],
-    ['payload', 'params', 'org_id'],
-    ['payload', 'params', 'orgId'],
-    ['payload', 'params', 'auth', 'account'],
-    ['payload', 'params', 'auth', 'account', 'id'],
-    ['payload', 'params', 'auth', 'account', 'email'],
-    ['payload', 'params', 'auth', 'account_id'],
-    ['payload', 'params', 'auth', 'accountId'],
-    ['payload', 'params', 'auth', 'organization_id'],
-    ['payload', 'params', 'auth', 'organizationId'],
-    ['payload', 'params', 'auth', 'org_id'],
-    ['payload', 'params', 'auth', 'orgId']
-  ]);
+  const profileFingerprint = readFirstProviderWorkerFingerprintAtPaths(
+    input,
+    [
+      ['auth_profile'],
+      ['authProfile'],
+      ['profile'],
+      ['profile_id'],
+      ['profileId'],
+      ['auth', 'auth_profile'],
+      ['auth', 'authProfile'],
+      ['auth', 'profile'],
+      ['auth', 'profile_id'],
+      ['auth', 'profileId'],
+      ['params', 'auth_profile'],
+      ['params', 'authProfile'],
+      ['params', 'profile'],
+      ['params', 'profile_id'],
+      ['params', 'profileId'],
+      ['params', 'auth', 'auth_profile'],
+      ['params', 'auth', 'authProfile'],
+      ['params', 'auth', 'profile'],
+      ['params', 'auth', 'profile_id'],
+      ['params', 'auth', 'profileId'],
+      ['payload', 'auth_profile'],
+      ['payload', 'authProfile'],
+      ['payload', 'profile'],
+      ['payload', 'profile_id'],
+      ['payload', 'profileId'],
+      ['payload', 'auth', 'auth_profile'],
+      ['payload', 'auth', 'authProfile'],
+      ['payload', 'auth', 'profile'],
+      ['payload', 'auth', 'profile_id'],
+      ['payload', 'auth', 'profileId'],
+      ['payload', 'params', 'auth_profile'],
+      ['payload', 'params', 'authProfile'],
+      ['payload', 'params', 'profile'],
+      ['payload', 'params', 'profile_id'],
+      ['payload', 'params', 'profileId'],
+      ['payload', 'params', 'auth', 'auth_profile'],
+      ['payload', 'params', 'auth', 'authProfile'],
+      ['payload', 'params', 'auth', 'profile'],
+      ['payload', 'params', 'auth', 'profile_id'],
+      ['payload', 'params', 'auth', 'profileId']
+    ],
+    env
+  );
+  const accountFingerprint = readFirstProviderWorkerFingerprintAtPaths(
+    input,
+    [
+      ['account_id'],
+      ['accountId'],
+      ['account'],
+      ['organization_id'],
+      ['organizationId'],
+      ['org_id'],
+      ['orgId'],
+      ['email'],
+      ['auth', 'account_id'],
+      ['auth', 'accountId'],
+      ['auth', 'account'],
+      ['auth', 'account', 'id'],
+      ['auth', 'account', 'email'],
+      ['auth', 'organization_id'],
+      ['auth', 'organizationId'],
+      ['auth', 'org_id'],
+      ['auth', 'orgId'],
+      ['params', 'account_id'],
+      ['params', 'accountId'],
+      ['params', 'account'],
+      ['params', 'account', 'id'],
+      ['params', 'account', 'email'],
+      ['params', 'organization_id'],
+      ['params', 'organizationId'],
+      ['params', 'org_id'],
+      ['params', 'orgId'],
+      ['params', 'auth', 'account'],
+      ['params', 'auth', 'account', 'id'],
+      ['params', 'auth', 'account', 'email'],
+      ['params', 'auth', 'account_id'],
+      ['params', 'auth', 'accountId'],
+      ['params', 'auth', 'organization_id'],
+      ['params', 'auth', 'organizationId'],
+      ['params', 'auth', 'org_id'],
+      ['params', 'auth', 'orgId'],
+      ['payload', 'account_id'],
+      ['payload', 'accountId'],
+      ['payload', 'account'],
+      ['payload', 'account', 'id'],
+      ['payload', 'account', 'email'],
+      ['payload', 'organization_id'],
+      ['payload', 'organizationId'],
+      ['payload', 'org_id'],
+      ['payload', 'orgId'],
+      ['payload', 'auth', 'account_id'],
+      ['payload', 'auth', 'accountId'],
+      ['payload', 'auth', 'account'],
+      ['payload', 'auth', 'account', 'id'],
+      ['payload', 'auth', 'account', 'email'],
+      ['payload', 'auth', 'organization_id'],
+      ['payload', 'auth', 'organizationId'],
+      ['payload', 'auth', 'org_id'],
+      ['payload', 'auth', 'orgId'],
+      ['payload', 'params', 'account_id'],
+      ['payload', 'params', 'accountId'],
+      ['payload', 'params', 'account'],
+      ['payload', 'params', 'account', 'id'],
+      ['payload', 'params', 'account', 'email'],
+      ['payload', 'params', 'organization_id'],
+      ['payload', 'params', 'organizationId'],
+      ['payload', 'params', 'org_id'],
+      ['payload', 'params', 'orgId'],
+      ['payload', 'params', 'auth', 'account'],
+      ['payload', 'params', 'auth', 'account', 'id'],
+      ['payload', 'params', 'auth', 'account', 'email'],
+      ['payload', 'params', 'auth', 'account_id'],
+      ['payload', 'params', 'auth', 'accountId'],
+      ['payload', 'params', 'auth', 'organization_id'],
+      ['payload', 'params', 'auth', 'organizationId'],
+      ['payload', 'params', 'auth', 'org_id'],
+      ['payload', 'params', 'auth', 'orgId']
+    ],
+    env
+  );
   const credentialSource =
     normalizeProviderWorkerCredentialSource(
       readFirstProviderWorkerStringAtPaths(input, [
@@ -2541,7 +2562,7 @@ function isProviderWorkerTrustedDiagnosticMessageCarrier(
   input: Record<string, unknown>,
   source: ProviderLinearWorkerCurrentTurnActivitySource
 ): boolean {
-  if (source === 'stderr') {
+  if (source === 'stderr' || source === 'exec_runner') {
     return true;
   }
   const payload = isRecord(input.payload) ? input.payload : null;
@@ -2972,6 +2993,33 @@ function classifyProviderWorkerStderrFailureDiagnosis(
     signal: buildProviderWorkerDiagnosticSignal(diagnosticInput, 'stderr'),
     guidance: providerWorkerDiagnosticGuidance('provider_runtime'),
     source: 'stderr',
+    observed_at: observedAt
+  };
+}
+
+function classifyProviderWorkerExecRunnerFailureDiagnosis(
+  error: unknown,
+  observedAt: string,
+  endReason: ProviderLinearWorkerProof['end_reason']
+): ProviderLinearWorkerFailureDiagnosis {
+  const errorMessage = normalizeOptionalString((error as Error)?.message) ?? String(error);
+  const errorCode = normalizeOptionalString((error as NodeJS.ErrnoException)?.code);
+  const diagnosticInput = {
+    type: 'exec_runner_error',
+    status_detail: endReason,
+    error: errorCode ? `${errorCode}: ${errorMessage}` : errorMessage,
+    message: errorMessage,
+    timestamp: observedAt
+  };
+  const classifiedDiagnosis = classifyProviderWorkerFailureDiagnosis(diagnosticInput, 'exec_runner');
+  if (classifiedDiagnosis) {
+    return classifiedDiagnosis;
+  }
+  return {
+    diagnostic_category: 'provider_runtime',
+    signal: buildProviderWorkerDiagnosticSignal(diagnosticInput, 'exec_runner'),
+    guidance: providerWorkerDiagnosticGuidance('provider_runtime'),
+    source: 'exec_runner',
     observed_at: observedAt
   };
 }
@@ -3566,7 +3614,8 @@ function selectProviderWorkerSessionBootstrapLines(
 function applyProviderWorkerSessionLogDelta(
   parseState: ProviderLinearWorkerJsonlParseResult,
   tailState: ProviderWorkerSessionLogTailState,
-  chunk: string
+  chunk: string,
+  env: NodeJS.ProcessEnv = process.env
 ): boolean {
   const combined = `${tailState.trailingText}${chunk}`;
   const lines = combined.split(/\r?\n/u);
@@ -3582,7 +3631,7 @@ function applyProviderWorkerSessionLogDelta(
       : lines;
   let changed = false;
   for (const line of linesToApply) {
-    changed = applyProviderLinearWorkerSessionJsonlLine(parseState, line) || changed;
+    changed = applyProviderLinearWorkerSessionJsonlLine(parseState, line, env) || changed;
   }
   if (tailState.bootstrapPending && lines.length > 0) {
     tailState.bootstrapPending = requireTurnContext && parseState.turnId === null;
@@ -3592,7 +3641,8 @@ function applyProviderWorkerSessionLogDelta(
 
 function flushProviderWorkerSessionLogTail(
   parseState: ProviderLinearWorkerJsonlParseResult,
-  tailState: ProviderWorkerSessionLogTailState
+  tailState: ProviderWorkerSessionLogTailState,
+  env: NodeJS.ProcessEnv = process.env
 ): boolean {
   const trailingLine = tailState.trailingText.trim();
   if (!trailingLine) {
@@ -3610,7 +3660,7 @@ function flushProviderWorkerSessionLogTail(
     : [trailingLine];
   let changed = false;
   for (const line of trailingLines) {
-    changed = applyProviderLinearWorkerSessionJsonlLine(parseState, line) || changed;
+    changed = applyProviderLinearWorkerSessionJsonlLine(parseState, line, env) || changed;
   }
   if (shouldBootstrap) {
     tailState.bootstrapPending = requireTurnContext && parseState.turnId === null;
@@ -3951,9 +4001,9 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
   try {
     const delta = await readProviderWorkerSessionLogDelta(tailState);
     if (delta) {
-      applyProviderWorkerSessionLogDelta(parseState, tailState, delta);
+      applyProviderWorkerSessionLogDelta(parseState, tailState, delta, env);
     }
-    flushProviderWorkerSessionLogTail(parseState, tailState);
+    flushProviderWorkerSessionLogTail(parseState, tailState, env);
   } catch {
     return {
       proof,
@@ -5621,7 +5671,7 @@ export async function runProviderLinearWorker(
         liveStdoutBuffer = lines.pop() ?? '';
         let changed = false;
         for (const line of lines) {
-          changed = applyProviderLinearWorkerJsonlLine(liveParseState, line) || changed;
+          changed = applyProviderLinearWorkerJsonlLine(liveParseState, line, 'stdout_jsonl', childEnv) || changed;
         }
         if (changed) {
           queueLiveProofWrite();
@@ -5633,7 +5683,7 @@ export async function runProviderLinearWorker(
         if (!trailingLine) {
           return;
         }
-        if (applyProviderLinearWorkerJsonlLine(liveParseState, trailingLine)) {
+        if (applyProviderLinearWorkerJsonlLine(liveParseState, trailingLine, 'stdout_jsonl', childEnv)) {
           queueLiveProofWrite();
         }
       };
@@ -5736,7 +5786,7 @@ export async function runProviderLinearWorker(
                 }
                 if (liveSessionTailState.path !== null) {
                   const delta = await readProviderWorkerSessionLogDelta(liveSessionTailState);
-                  if (delta && applyProviderWorkerSessionLogDelta(liveParseState, liveSessionTailState, delta)) {
+                  if (delta && applyProviderWorkerSessionLogDelta(liveParseState, liveSessionTailState, delta, childEnv)) {
                     queueLiveProofWrite();
                   }
                 }
@@ -5748,7 +5798,7 @@ export async function runProviderLinearWorker(
                   stopLiveSessionTailPromise
                 ]);
               }
-              if (liveSessionTailState.path !== null && flushProviderWorkerSessionLogTail(liveParseState, liveSessionTailState)) {
+              if (liveSessionTailState.path !== null && flushProviderWorkerSessionLogTail(liveParseState, liveSessionTailState, childEnv)) {
                 queueLiveProofWrite();
               }
             })().catch((error) => {
@@ -5798,13 +5848,17 @@ export async function runProviderLinearWorker(
                 : previousTurnProof.tokens,
               rate_limits: finalProof.rate_limits ?? previousTurnProof.rate_limits
             };
+        const endReason = classifyExecRunnerFailure(error, {
+          cwd: context.repoRoot
+        });
         finalProof = {
           ...failedProofBase,
+          failure_diagnosis:
+            liveParseState.failureDiagnosis ??
+            classifyProviderWorkerExecRunnerFailureDiagnosis(error, turnStartedAt, endReason),
           owner_phase: 'ended',
           owner_status: 'failed',
-          end_reason: classifyExecRunnerFailure(error, {
-            cwd: context.repoRoot
-          }),
+          end_reason: endReason,
           updated_at: deps.now()
         };
         finalProof = await persistProof(finalProof);
@@ -5815,7 +5869,7 @@ export async function runProviderLinearWorker(
       clearLiveSemanticStallTimer();
       flushLiveStdoutTail();
       await liveProofWrite;
-      const parsed = parseProviderLinearWorkerJsonl(execResult.stdout);
+      const parsed = parseProviderLinearWorkerJsonl(execResult.stdout, childEnv);
       const stderrFailureDiagnosis =
         execResult.exitCode === 0
           ? null
