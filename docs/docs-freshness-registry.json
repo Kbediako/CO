@@ -1,7 +1,56 @@
 {
   "version": 1,
-  "generated_at": "2026-04-15",
+  "generated_at": "2026-04-16",
   "entries": [
+    {
+      "path": "docs/findings/linear-c101cb88-3097-4502-bcd7-723d80da7955-docs-freshness-classification.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-16",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/linear-c101cb88-3097-4502-bcd7-723d80da7955.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-16",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-c101cb88-3097-4502-bcd7-723d80da7955.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-16",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-linear-c101cb88-3097-4502-bcd7-723d80da7955.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-16",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-c101cb88-3097-4502-bcd7-723d80da7955.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-16",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/linear-c101cb88-3097-4502-bcd7-723d80da7955.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-16",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-linear-c101cb88-3097-4502-bcd7-723d80da7955.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-16",
+      "cadence_days": 30
+    },
     {
       "path": ".agent/task/linear-72286a49-e68b-435a-be72-74d5c28feb09.md",
       "owner": "Codex (top-level agent), Review agent",
@@ -7308,7 +7357,7 @@
       "path": ".agent/task/0952-delegation-rlm-quick-wins-followup.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-15",
+      "last_review": "2026-04-16",
       "cadence_days": 90
     },
     {
@@ -9156,154 +9205,154 @@
       "path": ".agent/task/1220-coordinator-symphony-aligned-standalone-review-run-review-orchestration-boundary-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": ".agent/task/1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": ".agent/task/1222-coordinator-symphony-aligned-standalone-review-launch-attempt-orchestration-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": ".agent/task/1223-coordinator-symphony-aligned-standalone-review-run-review-scope-advisory-preflight-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": ".agent/task/1224-coordinator-symphony-aligned-standalone-review-run-review-execution-boundary-preflight-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": ".agent/task/1225-coordinator-symphony-aligned-standalone-review-run-review-non-interactive-handoff-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": ".agent/task/1226-coordinator-symphony-aligned-standalone-review-run-review-telemetry-writer-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": ".agent/task/1227-coordinator-symphony-aligned-standalone-review-run-review-orchestration-adapter-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": ".agent/task/1228-coordinator-symphony-aligned-standalone-review-remaining-wrapper-surface-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": ".agent/task/1230-coordinator-symphony-aligned-delegation-server-rpc-transport-and-tool-dispatch-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": ".agent/task/1231-coordinator-symphony-aligned-delegation-server-question-and-token-flow-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": ".agent/task/1232-coordinator-symphony-aligned-delegation-server-remaining-wrapper-surface-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": ".agent/task/1233-coordinator-symphony-aligned-control-request-and-action-dispatch-boundary-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": ".agent/task/1234-coordinator-symphony-aligned-control-server-lifecycle-orchestration-boundary-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": ".agent/task/1235-coordinator-symphony-aligned-control-server-lifecycle-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": ".agent/task/1236-coordinator-symphony-aligned-control-bootstrap-and-telegram-oversight-contract-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": ".agent/task/1237-coordinator-symphony-aligned-rlm-runner-codex-runtime-and-collab-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": ".agent/task/1238-coordinator-symphony-aligned-rlm-runner-symbolic-collab-runtime-and-config-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": ".agent/task/1239-coordinator-symphony-aligned-rlm-runner-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": ".agent/task/1240-coordinator-symphony-aligned-doctor-readiness-and-advisory-boundary-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": ".agent/task/1241-coordinator-symphony-aligned-shared-mcp-server-entry-detector-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": ".agent/task/1242-coordinator-symphony-aligned-devtools-shared-mcp-entry-detector-adoption.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -9338,28 +9387,28 @@
       "path": ".agent/task/1247-coordinator-symphony-aligned-flow-cli-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": ".agent/task/1248-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": ".agent/task/1249-coordinator-symphony-aligned-setup-bootstrap-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": ".agent/task/1250-coordinator-symphony-aligned-doctor-apply-mutation-and-readiness-boundary-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -10402,7 +10451,7 @@
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-bootstrap-and-telegram-oversight-contract-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -10451,7 +10500,7 @@
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-request-and-action-dispatch-boundary-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -10521,14 +10570,14 @@
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-server-lifecycle-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-server-lifecycle-orchestration-boundary-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -10703,21 +10752,21 @@
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-delegation-server-question-and-token-flow-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-delegation-server-remaining-wrapper-surface-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-delegation-server-rpc-transport-and-tool-dispatch-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -10738,7 +10787,7 @@
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-delegation-setup-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -10766,7 +10815,7 @@
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-devtools-shared-mcp-entry-detector-adoption.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -10780,7 +10829,7 @@
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-doctor-apply-mutation-and-readiness-boundary-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -10815,14 +10864,14 @@
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-doctor-readiness-and-advisory-boundary-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-doctor-readiness-and-advisory-command-family-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -10864,7 +10913,7 @@
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -10878,7 +10927,7 @@
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-flow-cli-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -11473,21 +11522,21 @@
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-rlm-runner-codex-runtime-and-collab-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-rlm-runner-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-rlm-runner-symbolic-collab-runtime-and-config-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -11550,7 +11599,7 @@
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-setup-bootstrap-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -11571,7 +11620,7 @@
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-shared-mcp-server-entry-detector-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -11746,7 +11795,7 @@
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -11781,7 +11830,7 @@
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-launch-attempt-orchestration-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -11844,42 +11893,42 @@
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-remaining-wrapper-surface-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-run-review-execution-boundary-preflight-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-run-review-non-interactive-handoff-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-run-review-orchestration-adapter-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-run-review-orchestration-boundary-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-run-review-scope-advisory-preflight-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -11900,7 +11949,7 @@
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-run-review-telemetry-writer-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -14378,154 +14427,154 @@
       "path": "docs/findings/1220-standalone-review-run-review-orchestration-boundary-reassessment-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/findings/1221-standalone-review-execution-runtime-shell-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/findings/1222-standalone-review-launch-attempt-orchestration-shell-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/findings/1223-standalone-review-run-review-scope-advisory-preflight-shell-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/findings/1224-standalone-review-run-review-execution-boundary-preflight-shell-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/findings/1225-standalone-review-run-review-non-interactive-handoff-shell-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/findings/1226-standalone-review-run-review-telemetry-writer-shell-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/findings/1227-standalone-review-run-review-orchestration-adapter-reassessment-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/findings/1228-standalone-review-remaining-wrapper-surface-freeze-reassessment-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/findings/1230-delegation-server-rpc-transport-and-tool-dispatch-shell-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/findings/1231-delegation-server-question-and-token-flow-shell-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/findings/1232-delegation-server-remaining-wrapper-surface-reassessment-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/findings/1233-control-request-and-action-dispatch-boundary-reassessment-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/findings/1234-control-server-lifecycle-orchestration-boundary-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/findings/1235-control-server-lifecycle-boundary-freeze-reassessment-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/findings/1236-control-bootstrap-and-telegram-oversight-contract-reassessment-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/findings/1237-rlm-runner-codex-runtime-and-collab-lifecycle-shell-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/findings/1238-rlm-runner-symbolic-collab-runtime-and-config-shell-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/findings/1239-rlm-runner-remaining-boundary-freeze-reassessment-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/findings/1240-doctor-readiness-and-advisory-boundary-reassessment-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/findings/1241-shared-mcp-server-entry-detector-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/findings/1242-devtools-shared-mcp-entry-detector-adoption-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -14546,42 +14595,42 @@
       "path": "docs/findings/1245-delegation-setup-remaining-boundary-freeze-reassessment-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/findings/1246-doctor-readiness-and-advisory-command-family-reassessment-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/findings/1247-flow-cli-shell-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/findings/1248-flow-cli-remaining-boundary-freeze-reassessment-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/findings/1249-setup-bootstrap-shell-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/findings/1250-doctor-apply-mutation-and-readiness-boundary-reassessment-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -15617,7 +15666,7 @@
       "path": "docs/PRD-coordinator-symphony-aligned-control-bootstrap-and-telegram-oversight-contract-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -15666,7 +15715,7 @@
       "path": "docs/PRD-coordinator-symphony-aligned-control-request-and-action-dispatch-boundary-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -15736,14 +15785,14 @@
       "path": "docs/PRD-coordinator-symphony-aligned-control-server-lifecycle-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-control-server-lifecycle-orchestration-boundary-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -15918,21 +15967,21 @@
       "path": "docs/PRD-coordinator-symphony-aligned-delegation-server-question-and-token-flow-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-delegation-server-remaining-wrapper-surface-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-delegation-server-rpc-transport-and-tool-dispatch-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -15953,7 +16002,7 @@
       "path": "docs/PRD-coordinator-symphony-aligned-delegation-setup-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -15981,7 +16030,7 @@
       "path": "docs/PRD-coordinator-symphony-aligned-devtools-shared-mcp-entry-detector-adoption.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -15995,7 +16044,7 @@
       "path": "docs/PRD-coordinator-symphony-aligned-doctor-apply-mutation-and-readiness-boundary-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -16030,14 +16079,14 @@
       "path": "docs/PRD-coordinator-symphony-aligned-doctor-readiness-and-advisory-boundary-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-doctor-readiness-and-advisory-command-family-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -16079,7 +16128,7 @@
       "path": "docs/PRD-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -16093,7 +16142,7 @@
       "path": "docs/PRD-coordinator-symphony-aligned-flow-cli-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -16688,21 +16737,21 @@
       "path": "docs/PRD-coordinator-symphony-aligned-rlm-runner-codex-runtime-and-collab-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-rlm-runner-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-rlm-runner-symbolic-collab-runtime-and-config-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -16765,7 +16814,7 @@
       "path": "docs/PRD-coordinator-symphony-aligned-setup-bootstrap-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -16786,7 +16835,7 @@
       "path": "docs/PRD-coordinator-symphony-aligned-shared-mcp-server-entry-detector-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -16961,7 +17010,7 @@
       "path": "docs/PRD-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -16996,7 +17045,7 @@
       "path": "docs/PRD-coordinator-symphony-aligned-standalone-review-launch-attempt-orchestration-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -17059,42 +17108,42 @@
       "path": "docs/PRD-coordinator-symphony-aligned-standalone-review-remaining-wrapper-surface-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-standalone-review-run-review-execution-boundary-preflight-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-standalone-review-run-review-non-interactive-handoff-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-standalone-review-run-review-orchestration-adapter-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-standalone-review-run-review-orchestration-boundary-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-standalone-review-run-review-scope-advisory-preflight-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -17115,7 +17164,7 @@
       "path": "docs/PRD-coordinator-symphony-aligned-standalone-review-run-review-telemetry-writer-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -18599,7 +18648,7 @@
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-bootstrap-and-telegram-oversight-contract-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -18648,7 +18697,7 @@
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-request-and-action-dispatch-boundary-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -18718,14 +18767,14 @@
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-server-lifecycle-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-server-lifecycle-orchestration-boundary-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -18900,21 +18949,21 @@
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-delegation-server-question-and-token-flow-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-delegation-server-remaining-wrapper-surface-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-delegation-server-rpc-transport-and-tool-dispatch-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -18935,7 +18984,7 @@
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-delegation-setup-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -18963,7 +19012,7 @@
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-devtools-shared-mcp-entry-detector-adoption.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -18977,7 +19026,7 @@
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-doctor-apply-mutation-and-readiness-boundary-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -19012,14 +19061,14 @@
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-doctor-readiness-and-advisory-boundary-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-doctor-readiness-and-advisory-command-family-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -19061,7 +19110,7 @@
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -19075,7 +19124,7 @@
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-flow-cli-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -19670,21 +19719,21 @@
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-rlm-runner-codex-runtime-and-collab-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-rlm-runner-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-rlm-runner-symbolic-collab-runtime-and-config-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -19747,7 +19796,7 @@
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-setup-bootstrap-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -19768,7 +19817,7 @@
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-shared-mcp-server-entry-detector-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -19943,7 +19992,7 @@
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -19978,7 +20027,7 @@
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-launch-attempt-orchestration-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -20041,42 +20090,42 @@
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-remaining-wrapper-surface-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-run-review-execution-boundary-preflight-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-run-review-non-interactive-handoff-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-run-review-orchestration-adapter-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-run-review-orchestration-boundary-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-run-review-scope-advisory-preflight-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -20097,7 +20146,7 @@
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-run-review-telemetry-writer-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -23233,154 +23282,154 @@
       "path": "tasks/specs/1220-coordinator-symphony-aligned-standalone-review-run-review-orchestration-boundary-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/specs/1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/specs/1222-coordinator-symphony-aligned-standalone-review-launch-attempt-orchestration-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/specs/1223-coordinator-symphony-aligned-standalone-review-run-review-scope-advisory-preflight-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/specs/1224-coordinator-symphony-aligned-standalone-review-run-review-execution-boundary-preflight-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/specs/1225-coordinator-symphony-aligned-standalone-review-run-review-non-interactive-handoff-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/specs/1226-coordinator-symphony-aligned-standalone-review-run-review-telemetry-writer-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/specs/1227-coordinator-symphony-aligned-standalone-review-run-review-orchestration-adapter-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/specs/1228-coordinator-symphony-aligned-standalone-review-remaining-wrapper-surface-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/specs/1230-coordinator-symphony-aligned-delegation-server-rpc-transport-and-tool-dispatch-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/specs/1231-coordinator-symphony-aligned-delegation-server-question-and-token-flow-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/specs/1232-coordinator-symphony-aligned-delegation-server-remaining-wrapper-surface-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/specs/1233-coordinator-symphony-aligned-control-request-and-action-dispatch-boundary-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/specs/1234-coordinator-symphony-aligned-control-server-lifecycle-orchestration-boundary-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/specs/1235-coordinator-symphony-aligned-control-server-lifecycle-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/specs/1236-coordinator-symphony-aligned-control-bootstrap-and-telegram-oversight-contract-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/specs/1237-coordinator-symphony-aligned-rlm-runner-codex-runtime-and-collab-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/specs/1238-coordinator-symphony-aligned-rlm-runner-symbolic-collab-runtime-and-config-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/specs/1239-coordinator-symphony-aligned-rlm-runner-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/specs/1240-coordinator-symphony-aligned-doctor-readiness-and-advisory-boundary-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/specs/1241-coordinator-symphony-aligned-shared-mcp-server-entry-detector-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/specs/1242-coordinator-symphony-aligned-devtools-shared-mcp-entry-detector-adoption.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -23415,28 +23464,28 @@
       "path": "tasks/specs/1247-coordinator-symphony-aligned-flow-cli-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/specs/1248-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/specs/1249-coordinator-symphony-aligned-setup-bootstrap-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/specs/1250-coordinator-symphony-aligned-doctor-apply-mutation-and-readiness-boundary-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -24339,7 +24388,7 @@
       "path": "tasks/tasks-0952-delegation-rlm-quick-wins-followup.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-15",
+      "last_review": "2026-04-16",
       "cadence_days": 90
     },
     {
@@ -26187,154 +26236,154 @@
       "path": "tasks/tasks-1220-coordinator-symphony-aligned-standalone-review-run-review-orchestration-boundary-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/tasks-1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/tasks-1222-coordinator-symphony-aligned-standalone-review-launch-attempt-orchestration-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/tasks-1223-coordinator-symphony-aligned-standalone-review-run-review-scope-advisory-preflight-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/tasks-1224-coordinator-symphony-aligned-standalone-review-run-review-execution-boundary-preflight-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/tasks-1225-coordinator-symphony-aligned-standalone-review-run-review-non-interactive-handoff-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/tasks-1226-coordinator-symphony-aligned-standalone-review-run-review-telemetry-writer-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/tasks-1227-coordinator-symphony-aligned-standalone-review-run-review-orchestration-adapter-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/tasks-1228-coordinator-symphony-aligned-standalone-review-remaining-wrapper-surface-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/tasks-1230-coordinator-symphony-aligned-delegation-server-rpc-transport-and-tool-dispatch-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/tasks-1231-coordinator-symphony-aligned-delegation-server-question-and-token-flow-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/tasks-1232-coordinator-symphony-aligned-delegation-server-remaining-wrapper-surface-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/tasks-1233-coordinator-symphony-aligned-control-request-and-action-dispatch-boundary-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/tasks-1234-coordinator-symphony-aligned-control-server-lifecycle-orchestration-boundary-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/tasks-1235-coordinator-symphony-aligned-control-server-lifecycle-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/tasks-1236-coordinator-symphony-aligned-control-bootstrap-and-telegram-oversight-contract-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/tasks-1237-coordinator-symphony-aligned-rlm-runner-codex-runtime-and-collab-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/tasks-1238-coordinator-symphony-aligned-rlm-runner-symbolic-collab-runtime-and-config-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/tasks-1239-coordinator-symphony-aligned-rlm-runner-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/tasks-1240-coordinator-symphony-aligned-doctor-readiness-and-advisory-boundary-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/tasks-1241-coordinator-symphony-aligned-shared-mcp-server-entry-detector-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/tasks-1242-coordinator-symphony-aligned-devtools-shared-mcp-entry-detector-adoption.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
@@ -26369,28 +26418,28 @@
       "path": "tasks/tasks-1247-coordinator-symphony-aligned-flow-cli-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/tasks-1248-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/tasks-1249-coordinator-symphony-aligned-setup-bootstrap-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/tasks-1250-coordinator-symphony-aligned-doctor-apply-mutation-and-readiness-boundary-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-16",
+      "last_review": "2026-04-16",
       "cadence_days": 30
     },
     {
