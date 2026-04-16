@@ -2805,6 +2805,18 @@ export function createProviderIssueHandoffService(
             !isInactiveReleasedReclaimRun(existing, releasedRun)
           ) ||
           hasPendingReleaseCancel(releasedRun?.manifestPath ?? existing.run_manifest_path);
+        const canFreshDiscoverReleasedMissingRetainedRun =
+          input.deliveryId === null &&
+          input.event === 'poll_tick' &&
+          input.action === 'reconcile' &&
+          canFreshDiscoverPlainReleasedMissingRetainedRunClaim({
+            claim: existing,
+            releaseRun: releasedRun,
+            sameIssueRuns: discoveredReleasedRuns,
+            unreadableAdmissionOccupancy:
+              await discoverUnreadableProviderAdmissionOccupancyForCurrentOperation(),
+            hasPendingReleaseCancel
+          });
         const existingReleasedPendingReopen =
           isProviderIssueReleasedPendingReopen(existing.reason ?? null);
         const existingReleasedReclaimCandidate =
@@ -2820,10 +2832,13 @@ export function createProviderIssueHandoffService(
           existingReleasedReclaimCandidate &&
           pendingReleasedReopen &&
           currentReleasedReopenLaunchable &&
-          !canFreshDiscoverReleasedReclaimClaim(
-            existing,
-            releasedRun,
-            hasPendingReleaseCancel
+          !(
+            canFreshDiscoverReleasedReclaimClaim(
+              existing,
+              releasedRun,
+              hasPendingReleaseCancel
+            ) ||
+            canFreshDiscoverReleasedMissingRetainedRun
           );
         const preservePlainReclaimMetadataDuringDrain =
           releaseCancelPending &&
@@ -3913,6 +3928,15 @@ export function createProviderIssueHandoffService(
           const activeRun = attachableClaimRuns.find((run) => run.status === 'in_progress') ?? null;
           const releaseRun = resolveProviderReleaseRun(claim, attachableClaimRuns);
           const latestRun = resolveLatestKnownProviderRun(attachableClaimRuns);
+          const canFreshDiscoverReleasedMissingRetainedRun =
+            claim.state === 'released' &&
+            canFreshDiscoverPlainReleasedMissingRetainedRunClaim({
+              claim,
+              releaseRun,
+              sameIssueRuns: claimRuns,
+              unreadableAdmissionOccupancy,
+              hasPendingReleaseCancel
+            });
           const canFreshDiscoverReleasedLiveWorker =
             claim.state === 'released' &&
             canFreshDiscoverReleasedLiveWorkerClaim(
@@ -3959,6 +3983,7 @@ export function createProviderIssueHandoffService(
                     releaseRun,
                     hasPendingReleaseCancel
                   ) &&
+                  !canFreshDiscoverReleasedMissingRetainedRun &&
                   !canFreshDiscoverReleasedLiveWorker
                 )
               ) {
@@ -4173,7 +4198,8 @@ export function createProviderIssueHandoffService(
                   claim,
                   releaseRunForCancel,
                   hasPendingReleaseCancel
-                )
+                ) &&
+                !canFreshDiscoverReleasedMissingRetainedRun
               ) {
                 deferredClaimFreshDiscoveryBlockedProviderKeys.add(claimProviderKey);
               }
@@ -7202,6 +7228,46 @@ function canFreshDiscoverReleasedPendingReopenClaim(
     return !claim.run_id && !claim.run_manifest_path;
   }
   return !shouldAttemptReleaseCancel(run) || isInactiveReleasedPendingReopenRun(claim, run);
+}
+
+function canFreshDiscoverPlainReleasedMissingRetainedRunClaim(input: {
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    | 'provider'
+    | 'issue_id'
+    | 'state'
+    | 'reason'
+    | 'run_id'
+    | 'run_manifest_path'
+    | 'issue_state'
+    | 'issue_state_type'
+  >;
+  releaseRun: ProviderIssueRunRecord | null;
+  sameIssueRuns: ProviderIssueRunRecord[];
+  unreadableAdmissionOccupancy: ProviderUnreadableManifestAdmissionOccupancyRecord[];
+  hasPendingReleaseCancel: (manifestPath: string | null | undefined) => boolean;
+}): boolean {
+  if (!canRecheckPlainReleasedNotActiveClaim(input.claim)) {
+    return false;
+  }
+  if (
+    input.releaseRun !== null ||
+    (!input.claim.run_id && !input.claim.run_manifest_path)
+  ) {
+    return false;
+  }
+  if (input.hasPendingReleaseCancel(input.claim.run_manifest_path)) {
+    return false;
+  }
+  const hasBlockingSameIssueRun = input.sameIssueRuns.some(
+    (run) => shouldAttemptReleaseCancel(run) && !isInactiveReleasedReclaimRun(input.claim, run)
+  );
+  if (hasBlockingSameIssueRun) {
+    return false;
+  }
+  return !input.unreadableAdmissionOccupancy.some(
+    (record) => record.provider === input.claim.provider && record.issueId === input.claim.issue_id
+  );
 }
 
 function canFreshDiscoverReleasedReclaimClaim(
