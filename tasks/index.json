@@ -17,6 +17,164 @@
       }
     },
     {
+      "id": "20260416-linear-ec62eea8-7fcf-44a6-8216-10254c56e64d",
+      "title": "CO: terminate hanging run-review mock children after timeout",
+      "relates_to": "tasks/tasks-linear-ec62eea8-7fcf-44a6-8216-10254c56e64d.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-16",
+      "approvals": {
+        "docs_packet": {
+          "reviewer": "same-issue docs child lane",
+          "date": "2026-04-16",
+          "status": "produced",
+          "manifest": ".runs/linear-ec62eea8-7fcf-44a6-8216-10254c56e64d-docs-packet/cli/2026-04-16T10-20-19-149Z-7914bf20/manifest.json",
+          "source_anchor": "ctx:sha256:3b4ea97b5bcc16b71fdd2942cb023f0d4031067c77a83fb0c0c36ff65ba5d8c4#chunk:c000001",
+          "summary": "Docs-first packet preserves the run-review mock cleanup contract and leaves implementation/review integration to the parent lane."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-ec62eea8-7fcf-44a6-8216-10254c56e64d.md",
+        "task": "tasks/tasks-linear-ec62eea8-7fcf-44a6-8216-10254c56e64d.md",
+        "agent_task": ".agent/task/linear-ec62eea8-7fcf-44a6-8216-10254c56e64d.md",
+        "docs": "docs/TECH_SPEC-linear-ec62eea8-7fcf-44a6-8216-10254c56e64d.md"
+      }
+    },
+    {
+      "id": "20260416-linear-c9163fc7-832a-45ac-8961-2d6c213e52af",
+      "title": "Control host: safely reclaim plain not_active rows when retained run record disappeared",
+      "relates_to": "tasks/tasks-linear-c9163fc7-832a-45ac-8961-2d6c213e52af.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-16",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-16",
+          "status": "succeeded",
+          "manifest": ".runs/linear-c9163fc7-832a-45ac-8961-2d6c213e52af-co203-docs-review/cli/2026-04-16T07-30-40-817Z-0e7a5f4e/manifest.json",
+          "summary": "Docs-review completed before implementation; delegation guard, spec-guard, docs:check, docs:freshness:maintain, and forced review all succeeded."
+        },
+        "child_lane": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-16",
+          "status": "rejected_after_success",
+          "manifest": ".runs/linear-c9163fc7-832a-45ac-8961-2d6c213e52af-missing-run-reclaim-tests/cli/2026-04-16T07-42-15-881Z-a627fd25/manifest.json",
+          "summary": "Same-issue child lane completed successfully; parent rejected the incomplete patch because it missed the safe-reclaim regression and integrated final focused coverage directly."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review --uncommitted",
+          "date": "2026-04-16",
+          "status": "bounded-success",
+          "telemetry": ".runs/linear-c9163fc7-832a-45ac-8961-2d6c213e52af/cli/2026-04-16T07-17-40-071Z-cc603710/review/telemetry.json",
+          "summary": "Manifest-backed standalone review completed with review_outcome=bounded-success; lane policy treats this as successful bounded review completion."
+        },
+        "elegance_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-16",
+          "status": "passed",
+          "artifact": "out/linear-c9163fc7-832a-45ac-8961-2d6c213e52af/manual/elegance-review.md",
+          "summary": "Explicit minimality pass kept the scoped proof helper and fresh-discovery call-site threading; no simplification patch was needed."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-c9163fc7-832a-45ac-8961-2d6c213e52af.md",
+        "task": "tasks/tasks-linear-c9163fc7-832a-45ac-8961-2d6c213e52af.md",
+        "agent_task": ".agent/task/linear-c9163fc7-832a-45ac-8961-2d6c213e52af.md",
+        "docs": "docs/TECH_SPEC-linear-c9163fc7-832a-45ac-8961-2d6c213e52af.md"
+      }
+    },
+    {
+      "id": "20260416-linear-9917183b-824a-48f7-95ee-bcee205d7a02",
+      "title": "CO STATUS: do not project invalidated child-lane failure summaries as current progress",
+      "relates_to": "tasks/tasks-linear-9917183b-824a-48f7-95ee-bcee205d7a02.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-16",
+      "approvals": {
+        "child_lane": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-16",
+          "status": "accepted",
+          "manifest": ".runs/linear-9917183b-824a-48f7-95ee-bcee205d7a02-regression-tests/cli/2026-04-16T07-46-57-204Z-d0960b5a/manifest.json",
+          "summary": "Focused provider issue observability regression coverage was launched in same-issue child lane regression-tests and accepted by the parent."
+        },
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review child stream",
+          "date": "2026-04-16",
+          "status": "approved",
+          "manifest": ".runs/linear-9917183b-824a-48f7-95ee-bcee205d7a02-docs-review/cli/2026-04-16T07-57-56-440Z-ad51414f/manifest.json",
+          "summary": "Docs-review child stream passed with spec guard, docs check, docs freshness, and forced review evidence."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-16",
+          "status": "approved",
+          "manifest": ".runs/linear-9917183b-824a-48f7-95ee-bcee205d7a02/cli/2026-04-16T07-44-42-931Z-b12a6085/manifest.json",
+          "telemetry": ".runs/linear-9917183b-824a-48f7-95ee-bcee205d7a02/cli/2026-04-16T07-44-42-931Z-b12a6085/review/telemetry.json",
+          "summary": "Review telemetry reported status=succeeded and review_outcome=bounded-success; read-only retry found no actionable regressions."
+        },
+        "elegance_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-16",
+          "status": "approved",
+          "artifact": "out/linear-9917183b-824a-48f7-95ee-bcee205d7a02/manual/elegance-review.md",
+          "summary": "No simplification patch applied; helper split is intentionally kept to make the disposed-decision filter and child-output timestamp boundary explicit."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-9917183b-824a-48f7-95ee-bcee205d7a02.md",
+        "task": "tasks/tasks-linear-9917183b-824a-48f7-95ee-bcee205d7a02.md",
+        "agent_task": ".agent/task/linear-9917183b-824a-48f7-95ee-bcee205d7a02.md",
+        "docs": "docs/TECH_SPEC-linear-9917183b-824a-48f7-95ee-bcee205d7a02.md"
+      }
+    },
+    {
+      "id": "20260416-linear-f8281682-ceed-4409-949c-efca2358568a",
+      "title": "Control host: reclaim Ready issues suppressed by plain released/not_active stale Blocked cache",
+      "relates_to": "tasks/tasks-linear-f8281682-ceed-4409-949c-efca2358568a.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-16",
+      "approvals": {
+        "child_lane": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-16",
+          "status": "accepted",
+          "manifest": ".runs/linear-f8281682-ceed-4409-949c-efca2358568a-plain-not-active-regression/cli/2026-04-16T03-24-44-832Z-087d1c47/manifest.json",
+          "summary": "Focused regression coverage for Ready stale plain provider_issue_released:not_active reclaim was launched, completed, and accepted before parent implementation refinement."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review --uncommitted",
+          "date": "2026-04-16",
+          "status": "bounded-success",
+          "telemetry": ".runs/linear-f8281682-ceed-4409-949c-efca2358568a/cli/2026-04-16T03-19-06-013Z-48d74a2f/review/telemetry.json",
+          "summary": "Manifest-backed standalone review completed with review_outcome=bounded-success and no actionable findings."
+        },
+        "elegance_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-16",
+          "status": "passed",
+          "artifact": "out/linear-f8281682-ceed-4409-949c-efca2358568a/manual/elegance-review.md",
+          "summary": "Explicit minimality pass kept the scoped helper and call-site threading; no simplification patch was needed."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-f8281682-ceed-4409-949c-efca2358568a.md",
+        "task": "tasks/tasks-linear-f8281682-ceed-4409-949c-efca2358568a.md",
+        "agent_task": ".agent/task/linear-f8281682-ceed-4409-949c-efca2358568a.md",
+        "docs": "docs/TECH_SPEC-linear-f8281682-ceed-4409-949c-efca2358568a.md"
+      }
+    },
+    {
       "id": "20260416-linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1",
       "title": "CO: Classify Codex CLI 0.121.0 sandbox/security local-cloud preflight policy",
       "relates_to": "tasks/tasks-linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",
