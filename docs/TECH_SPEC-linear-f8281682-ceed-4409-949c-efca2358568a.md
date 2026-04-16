@@ -8,139 +8,48 @@ owners:
 last_review: 2026-04-16
 ---
 
-## Added by Bootstrap 2026-04-16
+# TECH_SPEC - Control host: reclaim Ready issues suppressed by plain released/not_active stale Blocked cache
 
 ## Canonical Reference
-- Canonical TECH_SPEC: `tasks/specs/linear-f8281682-ceed-4409-949c-efca2358568a.md`
+- Canonical implementation spec: `tasks/specs/linear-f8281682-ceed-4409-949c-efca2358568a.md`
 - PRD: `docs/PRD-linear-f8281682-ceed-4409-949c-efca2358568a.md`
 - ACTION_PLAN: `docs/ACTION_PLAN-linear-f8281682-ceed-4409-949c-efca2358568a.md`
 - Task checklist: `tasks/tasks-linear-f8281682-ceed-4409-949c-efca2358568a.md`
-- `.agent` mirror: `.agent/task/linear-f8281682-ceed-4409-949c-efca2358568a.md`
-
-## Traceability
-- Linear issue: `CO-202` / `f8281682-ceed-4409-949c-efca2358568a`
-- Linear URL: https://linear.app/asabeko/issue/CO-202/control-host-reclaim-ready-issues-suppressed-by-plain-releasednot
-- Source anchor: `ctx:sha256:5ae2b3954163beab22ebee308568f297c2efcf2072a75cad4ba54c36fbd94562#chunk:c000001`
-- Origin manifest: `../../.runs/linear-f8281682-ceed-4409-949c-efca2358568a/cli/2026-04-16T03-19-06-013Z-48d74a2f/manifest.json`
 - Accepted child-lane manifest: `.runs/linear-f8281682-ceed-4409-949c-efca2358568a-plain-not-active-regression/cli/2026-04-16T03-24-44-832Z-087d1c47/manifest.json`
 
 ## Summary
-- Objective: make provider handoff reclaim a Ready/unstarted issue when the only suppressing evidence is stale local plain `released` / `provider_issue_released:not_active` cache metadata from an earlier non-active started state such as `Blocked`.
-- Scope:
-  - provider-intake released-claim eligibility
-  - fresh-discovery reclaim for eligible live Ready/unstarted issues
-  - preservation of released-pending-reopen behavior from `CO-193`
-  - preservation of terminal stale-row pruning from `CO-192`
-  - preservation of same-issue live-worker protection from `CO-189`
-- Constraints:
-  - no manual local state deletion as the fix
-  - no broad Linear polling increase
-  - no terminal Done/cancelled projection cleanup changes
+`CO-202` fixes the provider-intake reclaim gap where a live `Ready` / `unstarted` issue can stay suppressed by a stale local plain `released` / `provider_issue_released:not_active` claim that still caches `issue_state=Blocked` and `issue_state_type=started`.
 
-## Issue-Shaping Contract
-- User-request translation carried forward: stale cached `Blocked` metadata in `provider-intake-state.json` must not indefinitely suppress a live Ready/unstarted issue with no same-issue worker and no blockers.
-- Protected terms / exact artifact and surface names: `provider-intake-state.json`, `provider_issue_released:not_active`, plain released/not_active, stale `issue_state=Blocked`, `Ready`, `unstarted`, `fresh_discovery`, `active_claims`, `provider_debug_snapshot.claim`, `co-status --format json`, `counts.running`, `counts.issues`, no live same-issue worker, no retry queued, no retry due.
-- Nearby wrong interpretations to reject: pending-reopen-only recovery, manual claim deletion, terminal cleanup weakening, duplicate worker launch, broad polling increase, or treating cached `Blocked` as authoritative after live Ready confirmation.
-- Explicit non-goals carried forward: no broad scheduler redesign, no extra request burn, no provider-intake evidence deletion, no terminal Done/cancelled projection changes.
+## Scope
+- Recheck stale plain released/not_active claims only when cached workflow state is non-terminal, non-active, and non-handoff.
+- Reclaim only through existing refresh/fresh-discovery seams after live Linear data confirms Ready/unstarted eligibility and no blockers.
+- Preserve `CO-193` released-pending-reopen recovery, `CO-192` terminal stale-row pruning, and `CO-189` same-issue live-worker duplicate protection.
+- Retain `provider-intake-state.json`, run manifests, proofs, and debug evidence; do not delete stale rows as the product fix.
+- Do not broaden Linear polling or request burn.
 
-## Parity / Alignment Matrix
-- Current truth:
-  - `provider-intake-state.json` can retain plain `released` / `provider_issue_released:not_active`.
-  - cached `issue_state=Blocked` and `issue_state_type=started` can remain after blockers clear.
-  - the live issue can be Ready/unstarted with no live same-issue worker and no retry queued.
-  - fresh discovery can skip the issue because the stale local row is treated as still authoritative.
-- Reference truth:
-  - Ready/unstarted Linear issue state is the current pickup signal after blockers clear.
-  - non-terminal stale local cache should be rechecked when it is the only suppressing evidence.
-  - same-issue live worker evidence is authoritative for duplicate prevention.
-  - terminal issue states are authoritative for terminal cleanup/pruning.
-- Target truth / intended delta:
-  - plain released/not_active stale inactive started-state rows become recheckable.
-  - live Ready/unstarted eligible issues are reclaimable through existing fresh-discovery flow.
-  - pending-reopen recovery remains intact.
-  - terminal and live-worker protections remain intact.
-- Explicitly out-of-scope differences:
-  - removing retained intake evidence
-  - changing Linear workflow names or filters
-  - increasing poll cadence or request budget
-  - changing terminal status projection policy
-
-## Readiness Gate
-- Not done if:
-  - stale plain released/not_active `Blocked` cache still suppresses a live Ready issue.
-  - only pending-reopen release reasons are recoverable.
-  - terminal released rows become reclaimable.
-  - same-issue live workers can be duplicated.
-  - recovery requires manual deletion of local state.
-- Pre-implementation issue-quality review evidence:
-  - 2026-04-16: parent worker review confirms this is a provider-intake reclaim eligibility bug, not a Linear filter issue, not a status-only projection bug, and not a local-state cleanup request. The micro-task path is ineligible because correctness depends on protected names and adjacent invariant preservation.
-- Safeguard ownership split:
-  - parent owns source implementation, workpad, Linear state, validation, PR lifecycle, and review handoff.
-  - same-issue child lane `plain-not-active-regression` owns focused test coverage for `orchestrator/tests/ProviderIssueHandoff.test.ts` and was accepted before parent refinement.
-
-## Technical Requirements
-- Functional requirements:
-  - identify plain `released` / `provider_issue_released:not_active` claims whose cached workflow state is non-terminal, non-active, and non-handoff.
-  - allow those stale inactive cache claims to be rechecked instead of fail-closed by poll/fresh-discovery suppression.
-  - reclaim only when current live issue data is eligible for provider execution.
-  - keep terminal cached states non-reclaimable.
-  - keep cached active or review-handoff states non-reclaimable.
-  - keep same-issue live worker evidence as a hard veto for duplicate launch.
-  - preserve released-pending-reopen reclaim behavior.
-- Non-functional requirements:
-  - no new broad Linear or GitHub polling.
-  - no schema migration for `provider-intake-state.json`.
-  - retain audit/debug evidence.
-  - keep behavior localized to existing provider handoff/reclaim seams.
-- Interfaces / contracts:
-  - `provider-intake-state.json`
-  - `provider_issue_released:not_active`
-  - `provider_issue_released_pending_reopen:*`
-  - `fresh_discovery`
-  - `active_claims`
-  - `co-status --format json`
-  - `provider_debug_snapshot.claim`
-
-## Architecture & Data
-- Architecture / design adjustments:
-  - add a small helper for recheckable plain released/not_active claims that classifies cached workflow state using existing workflow-state classification.
-  - thread the additional claim metadata through released-claim reopen, refresh, poll fail-closed, and fresh-discovery eligibility helpers.
-  - preserve existing release-cancel and stale-run checks before reclaim.
-  - reuse current tracked issue eligibility as the final live Ready/unstarted gate.
-- Data model changes / migrations:
-  - no migration.
-  - no provider-intake schema change.
-  - no destructive cleanup of retained rows or manifests.
-- External dependencies / integrations:
-  - existing Linear tracked issue metadata from provider handoff refresh.
-  - existing process/run liveness checks for same-issue worker protection.
+## Protected Surfaces
+- `provider-intake-state.json`
+- `provider_issue_released:not_active`
+- plain released/not_active
+- stale `issue_state=Blocked`
+- `Ready`
+- `unstarted`
+- `fresh_discovery`
+- `active_claims`
+- `provider_debug_snapshot.claim`
+- `co-status --format json`
+- `counts.running`
+- `counts.issues`
+- no live same-issue worker
+- no retry queued
+- no retry due
 
 ## Validation Plan
-- Tests / checks:
-  - focused regression for a stale plain released/not_active claim with cached `Blocked` started state and live Ready/unstarted issue data.
-  - broader provider handoff regressions to preserve blocker, assignee, pending-reopen, and terminal behaviors.
-  - CO STATUS/runtime projection slice to preserve `CO-192`/`CO-189` adjacent invariants.
-  - `node scripts/delegation-guard.mjs`
-  - `node scripts/spec-guard.mjs --dry-run`
-  - `npm run build`
-  - `npm run lint`
-  - `npm run test`
-  - `npm run docs:check`
-  - `npm run docs:freshness`
-  - `npm run repo:stewardship`
-  - `node scripts/diff-budget.mjs`
-  - manifest-backed standalone review plus explicit elegance review before review handoff.
-- Rollout verification:
-  - inspect workpad closeout for child-lane evidence, validation commands, review/elegance status, and PR handoff state.
-  - use the PR review drain before moving the issue to `In Review`.
-- Monitoring / alerts:
-  - `co-status --format json` should no longer leave eligible Ready issues suppressed by stale plain released/not_active cache alone.
-  - future incidents should include `provider_debug_snapshot.claim` and `active_claims` evidence to distinguish stale cache from live worker protection.
-
-## Open Questions
-- Should future status output expose a separate "reclaimable stale released cache" debug marker for operators?
-- Should a follow-up add a compact local reproducer around real `provider-intake-state.json` snapshots if another stale-cache shape appears?
+- Focused provider handoff regressions for stale plain released/not_active Ready reclaim and unresolved retained-run identity.
+- Broader provider handoff regressions for blocker, assignee, pending-reopen, terminal, and live-worker invariants.
+- CO STATUS/runtime projection slice for adjacent `CO-192` and `CO-189` status behavior.
+- Required repo gates: delegation guard, spec guard, build, lint, test, docs checks, docs freshness, repo stewardship, diff budget, manifest-backed review, and elegance pass.
 
 ## Approvals
-- Reviewer: `codex-orchestrator review --uncommitted` completed with `review_outcome=bounded-success`; parent provider worker elegance review passed.
-- Date: 2026-04-16
+- Pre-implementation issue-quality review is recorded in the canonical task spec.
+- Review handoff requires successful validation, bounded automated-feedback drain, and workpad closeout.

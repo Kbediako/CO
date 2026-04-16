@@ -4120,6 +4120,16 @@ export function createProviderIssueHandoffService(
               continue;
             }
             if (
+              canRecheckPlainReleasedNotActiveClaim(claim) &&
+              !canFreshDiscoverReleasedReclaimClaim(
+                claim,
+                releaseRunForCancel,
+                hasPendingReleaseCancel
+              )
+            ) {
+              continue;
+            }
+            if (
               !pollDispatchBudget.canDispatch(resolution.trackedIssue) ||
               (
                 shouldReserveFreshDiscoverySlot &&
