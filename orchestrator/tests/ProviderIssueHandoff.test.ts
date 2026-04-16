@@ -146,6 +146,42 @@ function createProviderClaim(
   };
 }
 
+function createCo202ReleasedClaim(overrides: Partial<ProviderIntakeClaimRecord> = {}): ProviderIntakeClaimRecord {
+  return createProviderClaim({
+    issue_id: 'lin-issue-1',
+    issue_identifier: 'CO-191',
+    issue_state: 'Blocked',
+    issue_state_type: 'started',
+    issue_updated_at: '2026-04-15T15:00:00.000Z',
+    issue_blocked_by: [],
+    task_id: 'linear-lin-issue-1',
+    state: 'released',
+    reason: 'provider_issue_released:not_active',
+    last_webhook_timestamp: 1_744_730_400_000,
+    ...overrides
+  });
+}
+
+function createCo202ReadyIssue(overrides: Partial<LiveLinearTrackedIssue> = {}): LiveLinearTrackedIssue {
+  return createTrackedIssue({
+    id: 'lin-issue-1',
+    identifier: 'CO-191',
+    title: 'Refactor docs hygiene spark policy guard',
+    state: 'Ready',
+    state_type: 'unstarted',
+    updated_at: '2026-04-15T15:00:00.000Z',
+    blocked_by: [],
+    ...overrides
+  });
+}
+
+function createCo202Launcher(runId: string, manifestPath: string) {
+  return {
+    start: vi.fn(async () => ({ runId, manifestPath })),
+    resume: vi.fn(async () => undefined)
+  };
+}
+
 function createTrackedIssue(
   overrides: Partial<LiveLinearTrackedIssue> = {}
 ): LiveLinearTrackedIssue {
@@ -18286,39 +18322,15 @@ describe('createProviderIssueHandoffService', () => {
     );
 
     const state = createProviderIntakeState();
-    state.claims.push({
-      provider: 'linear',
-      provider_key: 'linear:lin-issue-1',
-      issue_id: 'lin-issue-1',
-      issue_identifier: 'CO-191',
-      issue_title: 'Refactor docs hygiene spark policy guard',
-      issue_state: 'Blocked',
-      issue_state_type: 'started',
-      issue_updated_at: '2026-04-15T15:00:00.000Z',
-      issue_blocked_by: [],
-      task_id: 'linear-lin-issue-1',
-      mapping_source: 'provider_id_fallback',
-      state: 'released',
-      reason: 'provider_issue_released:not_active',
-      accepted_at: '2026-04-15T15:00:05.000Z',
-      updated_at: '2026-04-15T15:02:10.000Z',
-      last_delivery_id: 'delivery-ready-not-active',
-      last_event: 'Issue',
-      last_action: 'update',
-      last_webhook_timestamp: 1_744_730_400_000,
+    state.claims.push(createCo202ReleasedClaim({
       run_id: 'run-ready-not-active-draining',
-      run_manifest_path: childPaths.manifestPath,
-      launch_source: null,
-      launch_token: null
-    });
+      run_manifest_path: childPaths.manifestPath
+    }));
 
-    const launcher = {
-      start: vi.fn(async () => ({
-        runId: 'run-ready-not-active-reclaimed',
-        manifestPath: '/tmp/provider-run/ready-not-active-reclaimed-manifest.json'
-      })),
-      resume: vi.fn(async () => undefined)
-    };
+    const launcher = createCo202Launcher(
+      'run-ready-not-active-reclaimed',
+      '/tmp/provider-run/ready-not-active-reclaimed-manifest.json'
+    );
     const service = createProviderIssueHandoffService({
       paths,
       state,
@@ -18327,15 +18339,7 @@ describe('createProviderIssueHandoffService', () => {
       startPipelineId: 'diagnostics'
     });
 
-    const readyIssue = createTrackedIssue({
-      id: 'lin-issue-1',
-      identifier: 'CO-191',
-      title: 'Refactor docs hygiene spark policy guard',
-      state: 'Ready',
-      state_type: 'unstarted',
-      updated_at: '2026-04-15T15:00:00.000Z',
-      blocked_by: []
-    });
+    const readyIssue = createCo202ReadyIssue();
 
     const drainResult = await service.handleAcceptedTrackedIssue({
       trackedIssue: readyIssue,
@@ -19536,40 +19540,16 @@ describe('createProviderIssueHandoffService', () => {
     );
 
     const state = createProviderIntakeState();
-    state.claims.push({
-      provider: 'linear',
-      provider_key: 'linear:lin-issue-1',
-      issue_id: 'lin-issue-1',
-      issue_identifier: 'CO-191',
-      issue_title: 'Refactor docs hygiene spark policy guard',
-      issue_state: 'Blocked',
-      issue_state_type: 'started',
-      issue_updated_at: '2026-04-15T15:00:00.000Z',
-      issue_blocked_by: [],
-      task_id: 'linear-lin-issue-1',
-      mapping_source: 'provider_id_fallback',
-      state: 'released',
-      reason: 'provider_issue_released:not_active',
-      accepted_at: '2026-04-15T15:00:05.000Z',
-      updated_at: '2026-04-15T15:02:10.000Z',
-      last_delivery_id: 'delivery-ready-not-active',
-      last_event: 'Issue',
-      last_action: 'update',
-      last_webhook_timestamp: 1_744_730_400_000,
+    state.claims.push(createCo202ReleasedClaim({
       run_id: 'run-ready-not-active-missing',
-      run_manifest_path: missingManifestPath,
-      launch_source: null,
-      launch_token: null
-    });
+      run_manifest_path: missingManifestPath
+    }));
 
     const persist = vi.fn(async () => undefined);
-    const launcher = {
-      start: vi.fn(async () => ({
-        runId: 'run-ready-not-active-reclaimed',
-        manifestPath: '/tmp/provider-run/ready-not-active-reclaimed-manifest.json'
-      })),
-      resume: vi.fn(async () => undefined)
-    };
+    const launcher = createCo202Launcher(
+      'run-ready-not-active-reclaimed',
+      '/tmp/provider-run/ready-not-active-reclaimed-manifest.json'
+    );
     const resolveTrackedIssue = vi.fn(async () => ({
       kind: 'ready' as const,
       trackedIssue: createTrackedIssue()
@@ -19629,40 +19609,16 @@ describe('createProviderIssueHandoffService', () => {
     );
 
     const state = createProviderIntakeState();
-    state.claims.push({
-      provider: 'linear',
-      provider_key: 'linear:lin-issue-1',
-      issue_id: 'lin-issue-1',
-      issue_identifier: 'CO-191',
-      issue_title: 'Refactor docs hygiene spark policy guard',
-      issue_state: 'Blocked',
-      issue_state_type: 'started',
-      issue_updated_at: '2026-04-15T15:00:00.000Z',
-      issue_blocked_by: [],
-      task_id: 'linear-lin-issue-1',
-      mapping_source: 'provider_id_fallback',
-      state: 'released',
-      reason: 'provider_issue_released:not_active',
-      accepted_at: '2026-04-15T15:00:05.000Z',
-      updated_at: '2026-04-15T15:02:10.000Z',
-      last_delivery_id: 'delivery-ready-not-active',
-      last_event: 'Issue',
-      last_action: 'update',
-      last_webhook_timestamp: 1_744_730_400_000,
+    state.claims.push(createCo202ReleasedClaim({
       run_id: 'run-ready-not-active-missing',
-      run_manifest_path: missingManifestPath,
-      launch_source: null,
-      launch_token: null
-    });
+      run_manifest_path: missingManifestPath
+    }));
 
     const persist = vi.fn(async () => undefined);
-    const launcher = {
-      start: vi.fn(async () => ({
-        runId: 'run-ready-not-active-reclaimed',
-        manifestPath: '/tmp/provider-run/ready-not-active-reclaimed-manifest.json'
-      })),
-      resume: vi.fn(async () => undefined)
-    };
+    const launcher = createCo202Launcher(
+      'run-ready-not-active-reclaimed',
+      '/tmp/provider-run/ready-not-active-reclaimed-manifest.json'
+    );
     const service = createProviderIssueHandoffService({
       paths,
       state,
@@ -19672,15 +19628,7 @@ describe('createProviderIssueHandoffService', () => {
     });
 
     const result = await service.handleAcceptedTrackedIssue({
-      trackedIssue: createTrackedIssue({
-        id: 'lin-issue-1',
-        identifier: 'CO-191',
-        title: 'Refactor docs hygiene spark policy guard',
-        state: 'Ready',
-        state_type: 'unstarted',
-        updated_at: '2026-04-15T15:00:00.000Z',
-        blocked_by: []
-      }),
+      trackedIssue: createCo202ReadyIssue(),
       deliveryId: 'delivery-ready-not-active-equal',
       event: 'Issue',
       action: 'update',
@@ -19713,40 +19661,17 @@ describe('createProviderIssueHandoffService', () => {
     );
 
     const state = createProviderIntakeState();
-    state.claims.push({
-      provider: 'linear',
-      provider_key: 'linear:lin-issue-1',
-      issue_id: 'lin-issue-1',
-      issue_identifier: 'CO-191',
-      issue_title: 'Refactor docs hygiene spark policy guard',
+    state.claims.push(createCo202ReleasedClaim({
       issue_state: 'Ready',
       issue_state_type: 'unstarted',
-      issue_updated_at: '2026-04-15T15:00:00.000Z',
-      issue_blocked_by: [],
-      task_id: 'linear-lin-issue-1',
-      mapping_source: 'provider_id_fallback',
-      state: 'released',
       reason: 'provider_issue_released_pending_reopen:provider_issue_released:not_active',
-      accepted_at: '2026-04-15T15:00:05.000Z',
-      updated_at: '2026-04-15T15:02:10.000Z',
       last_delivery_id: 'delivery-ready-pending-reopen',
-      last_event: 'Issue',
-      last_action: 'update',
-      last_webhook_timestamp: 1_744_730_400_000,
       run_id: 'run-ready-pending-reopen-missing',
-      run_manifest_path: missingManifestPath,
-      launch_source: null,
-      launch_token: null
-    });
+      run_manifest_path: missingManifestPath
+    }));
 
     const persist = vi.fn(async () => undefined);
-    const launcher = {
-      start: vi.fn(async () => ({
-        runId: 'run-should-not-start',
-        manifestPath: '/tmp/provider-run/should-not-start.json'
-      })),
-      resume: vi.fn(async () => undefined)
-    };
+    const launcher = createCo202Launcher('run-should-not-start', '/tmp/provider-run/should-not-start.json');
     const service = createProviderIssueHandoffService({
       paths,
       state,
@@ -19756,14 +19681,10 @@ describe('createProviderIssueHandoffService', () => {
     });
 
     const result = await service.handleAcceptedTrackedIssue({
-      trackedIssue: createTrackedIssue({
-        id: 'lin-issue-1',
-        identifier: 'CO-191',
-        title: 'Refactor docs hygiene spark policy guard',
+      trackedIssue: createCo202ReadyIssue({
         state: 'Done',
         state_type: 'completed',
-        updated_at: '2026-04-15T15:05:00.000Z',
-        blocked_by: []
+        updated_at: '2026-04-15T15:05:00.000Z'
       }),
       deliveryId: 'delivery-ready-pending-reopen-done',
       event: 'Issue',
@@ -19798,40 +19719,17 @@ describe('createProviderIssueHandoffService', () => {
     );
 
     const state = createProviderIntakeState();
-    state.claims.push({
-      provider: 'linear',
-      provider_key: 'linear:lin-issue-1',
-      issue_id: 'lin-issue-1',
-      issue_identifier: 'CO-191',
-      issue_title: 'Refactor docs hygiene spark policy guard',
+    state.claims.push(createCo202ReleasedClaim({
       issue_state: 'Ready',
       issue_state_type: 'unstarted',
-      issue_updated_at: '2026-04-15T15:00:00.000Z',
-      issue_blocked_by: [],
-      task_id: 'linear-lin-issue-1',
-      mapping_source: 'provider_id_fallback',
-      state: 'released',
       reason: 'provider_issue_released_pending_reopen:provider_issue_released:not_active',
-      accepted_at: '2026-04-15T15:00:05.000Z',
-      updated_at: '2026-04-15T15:02:10.000Z',
       last_delivery_id: 'delivery-ready-pending-reopen',
-      last_event: 'Issue',
-      last_action: 'update',
-      last_webhook_timestamp: 1_744_730_400_000,
       run_id: 'run-ready-pending-reopen-missing',
-      run_manifest_path: missingManifestPath,
-      launch_source: null,
-      launch_token: null
-    });
+      run_manifest_path: missingManifestPath
+    }));
 
     const persist = vi.fn(async () => undefined);
-    const launcher = {
-      start: vi.fn(async () => ({
-        runId: 'run-should-not-start',
-        manifestPath: '/tmp/provider-run/should-not-start.json'
-      })),
-      resume: vi.fn(async () => undefined)
-    };
+    const launcher = createCo202Launcher('run-should-not-start', '/tmp/provider-run/should-not-start.json');
     const service = createProviderIssueHandoffService({
       paths,
       state,
@@ -19841,14 +19739,8 @@ describe('createProviderIssueHandoffService', () => {
     });
 
     const result = await service.handleAcceptedTrackedIssue({
-      trackedIssue: createTrackedIssue({
-        id: 'lin-issue-1',
-        identifier: 'CO-191',
-        title: 'Refactor docs hygiene spark policy guard',
-        state: 'Ready',
-        state_type: 'unstarted',
+      trackedIssue: createCo202ReadyIssue({
         updated_at: '2026-04-15T15:05:00.000Z',
-        blocked_by: [],
         viewer_id: 'viewer-1',
         assignee_id: 'viewer-2',
         assignee_name: 'Other owner'
@@ -19916,40 +19808,16 @@ describe('createProviderIssueHandoffService', () => {
     );
 
     const state = createProviderIntakeState();
-    state.claims.push({
-      provider: 'linear',
-      provider_key: 'linear:lin-issue-1',
-      issue_id: 'lin-issue-1',
-      issue_identifier: 'CO-191',
-      issue_title: 'Refactor docs hygiene spark policy guard',
-      issue_state: 'Blocked',
-      issue_state_type: 'started',
-      issue_updated_at: '2026-04-15T15:00:00.000Z',
-      issue_blocked_by: [],
-      task_id: 'linear-lin-issue-1',
-      mapping_source: 'provider_id_fallback',
-      state: 'released',
-      reason: 'provider_issue_released:not_active',
-      accepted_at: '2026-04-15T15:00:05.000Z',
-      updated_at: '2026-04-15T15:02:10.000Z',
-      last_delivery_id: 'delivery-ready-not-active',
-      last_event: 'Issue',
-      last_action: 'update',
-      last_webhook_timestamp: 1_744_730_400_000,
+    state.claims.push(createCo202ReleasedClaim({
       run_id: 'run-ready-not-active-stale',
-      run_manifest_path: stalePaths.manifestPath,
-      launch_source: null,
-      launch_token: null
-    });
+      run_manifest_path: stalePaths.manifestPath
+    }));
 
     const persist = vi.fn(async () => undefined);
-    const launcher = {
-      start: vi.fn(async () => ({
-        runId: 'run-ready-not-active-reclaimed',
-        manifestPath: '/tmp/provider-run/ready-not-active-reclaimed-manifest.json'
-      })),
-      resume: vi.fn(async () => undefined)
-    };
+    const launcher = createCo202Launcher(
+      'run-ready-not-active-reclaimed',
+      '/tmp/provider-run/ready-not-active-reclaimed-manifest.json'
+    );
     const resolveTrackedIssue = vi.fn(async () => ({
       kind: 'ready' as const,
       trackedIssue: createTrackedIssue()
@@ -19959,15 +19827,7 @@ describe('createProviderIssueHandoffService', () => {
       return {
         kind: 'ready' as const,
         trackedIssues: [
-          createTrackedIssue({
-            id: 'lin-issue-1',
-            identifier: 'CO-191',
-            title: 'Refactor docs hygiene spark policy guard',
-            state: 'Ready',
-            state_type: 'unstarted',
-            updated_at: '2026-04-15T15:00:00.000Z',
-            blocked_by: []
-          })
+          createCo202ReadyIssue()
         ]
       };
     });
