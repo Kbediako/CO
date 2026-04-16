@@ -235,6 +235,9 @@ fi
   if [[ "\${1:-}" == "review" ]]; then
     mode="\${RUN_REVIEW_MODE:-ok}"
     if [[ "$mode" == "hang" ]]; then
+      if [[ -n "\${RUN_REVIEW_HANG_MARKER:-}" ]]; then
+        printf 'started\\n' > "$RUN_REVIEW_HANG_MARKER"
+      fi
       while true; do sleep 1; done
     fi
     if [[ "$mode" == "reject-scoped-prompt" ]]; then
@@ -2508,6 +2511,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
     const codexBin = await makeFakeCodex(sandbox);
+    const hangMarker = join(sandbox, 'hang-started.txt');
     const beforePids = await findRunReviewMockPids(codexBin, { strict: true });
 
     const result = await runReviewCommandSubprocess(
@@ -2515,15 +2519,17 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       {
         ...baseEnv(sandbox, codexBin),
         RUN_REVIEW_MODE: 'hang',
+        RUN_REVIEW_HANG_MARKER: hangMarker,
         CODEX_REVIEW_TIMEOUT_SECONDS: '0',
         CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
       },
       [],
       process.cwd(),
-      { timeoutMs: 1000, killSignal: 'SIGKILL' }
+      { timeoutMs: 5000, killSignal: 'SIGKILL' }
     );
 
     expect(result.exitCode).toBeGreaterThan(0);
+    await expect(readFile(hangMarker, 'utf8')).resolves.toBe('started\n');
     expect(await findRunReviewMockPids(codexBin, { strict: true })).toEqual(beforePids);
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
