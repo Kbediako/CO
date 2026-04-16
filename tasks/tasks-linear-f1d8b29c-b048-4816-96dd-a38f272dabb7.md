@@ -68,4 +68,4 @@
 - 2026-04-15: Docs-review, repo validation gates, and manifest-backed standalone review passed. Standalone review outcome: `clean-success`.
 - 2026-04-15: Elegance/minimality pass completed. Result: keep the docs-first packet, required `docs/TASKS.md` mirror, and registry/index updates; no additional artifact document or runtime helper is needed.
 - 2026-04-15: Standalone review P2 fixed by adding the `docs/TASKS.md` snapshot and preserving the line-budget archive path.
-- 2026-04-16: PR review feedback addressed by adding newer-version runtime/cloud/fallback canary gates, docs-review approval evidence, and markdown table spacing fixes.
+- 2026-04-16: PR review feedback addressed by adding newer-version runtime/cloud/fallback canary gates, docs-review approval evidence, and Markdown table spacing fixes.
