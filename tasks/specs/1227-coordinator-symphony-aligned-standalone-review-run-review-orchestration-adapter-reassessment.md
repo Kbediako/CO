@@ -4,7 +4,7 @@ title: Coordinator Symphony-Aligned Standalone Review Run-Review Orchestration A
 status: closed
 owner: Codex
 created: 2026-03-16
-last_review: 2026-03-16
+last_review: 2026-04-16
 review_cadence_days: 30
 risk_level: low
 related_prd: docs/PRD-coordinator-symphony-aligned-standalone-review-run-review-orchestration-adapter-reassessment.md

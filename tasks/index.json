@@ -17,6 +17,187 @@
       }
     },
     {
+      "id": "20260416-linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1",
+      "title": "CO: Classify Codex CLI 0.121.0 sandbox/security local-cloud preflight policy",
+      "relates_to": "tasks/tasks-linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-16",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded child lane",
+          "date": "2026-04-16",
+          "status": "succeeded",
+          "summary": "Docs-first packet drafted for CO-199 sandbox/security preflight classification; parent owns source-0 reconciliation, Linear state, implementation, validation, and PR lifecycle."
+        },
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-16",
+          "status": "succeeded_with_findings_addressed",
+          "manifest": ".runs/linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1-docs-review-r2/cli/2026-04-16T03-25-27-353Z-a6d7d89c/manifest.json",
+          "summary": "Docs-review completed before implementation; parent addressed nested checkout cleanup, 1048 TASKS archive preservation, and missing thread/shellCommand classification."
+        },
+        "source_0_reconciliation": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-04-16",
+          "status": "complete",
+          "summary": "Prompt-provided source-0 payload contained run metadata and prompt-pack provenance only; no additional sandbox/security classification rows."
+        },
+        "implementation_gate": {
+          "reviewer": "codex-orchestrator implementation-gate",
+          "date": "2026-04-16",
+          "status": "succeeded",
+          "review_outcome": "clean-success",
+          "manifest": ".runs/linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1-implementation-gate/cli/2026-04-16T03-50-40-046Z-96d42245/manifest.json",
+          "telemetry": ".runs/linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1-implementation-gate/cli/2026-04-16T03-50-40-046Z-96d42245/review/telemetry.json"
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review --uncommitted",
+          "date": "2026-04-16",
+          "status": "succeeded",
+          "review_outcome": "bounded-success",
+          "telemetry": ".runs/linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1-implementation-gate/cli/2026-04-16T03-50-40-046Z-96d42245/review/telemetry.json",
+          "summary": "No actionable findings; first attempt crossed a validation command boundary and wrapper completed a strict read-only command-intent retry."
+        },
+        "elegance_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-16",
+          "status": "succeeded",
+          "evidence": "out/linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1/manual/elegance-review.md",
+          "summary": "No simplification patch applied; advisory-only doctor diagnostics keep cloud blockers separate from local sandbox/security posture."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",
+        "task": "tasks/tasks-linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",
+        "agent_task": ".agent/task/linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",
+        "docs": "docs/TECH_SPEC-linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md"
+      }
+    },
+    {
+      "id": "20260416-linear-2886b57d-b844-4803-9e55-6fe3657d516d",
+      "title": "CO: Add Codex 0.121 MCP Apps metadata to delegation tools without authority expansion",
+      "relates_to": "tasks/tasks-linear-2886b57d-b844-4803-9e55-6fe3657d516d.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-16",
+      "approvals": {
+        "docs_child_lane": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-16",
+          "status": "rejected",
+          "manifest": ".runs/linear-2886b57d-b844-4803-9e55-6fe3657d516d-co197-docs-metadata/cli/2026-04-16T02-15-09-423Z-e92d3ec3/manifest.json",
+          "reason": "Patch completed but reframed the issue as docs-only, used the wrong source anchor, and included widget metadata outside the delegation-tool scope."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review --uncommitted",
+          "date": "2026-04-16",
+          "status": "succeeded",
+          "review_outcome": "bounded-success",
+          "telemetry": ".runs/linear-2886b57d-b844-4803-9e55-6fe3657d516d/cli/2026-04-16T02-11-44-691Z-26f7f8c0/review/telemetry.json",
+          "summary": "No actionable findings; first attempt crossed validation command boundary and wrapper completed a read-only command-intent retry."
+        },
+        "elegance_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-16",
+          "status": "succeeded",
+          "evidence": "out/linear-2886b57d-b844-4803-9e55-6fe3657d516d/manual/elegance-review.md",
+          "summary": "No simplification patch applied; explicit metadata table retained as the smallest auditable shape."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-2886b57d-b844-4803-9e55-6fe3657d516d.md",
+        "task": "tasks/tasks-linear-2886b57d-b844-4803-9e55-6fe3657d516d.md",
+        "agent_task": ".agent/task/linear-2886b57d-b844-4803-9e55-6fe3657d516d.md",
+        "docs": "docs/TECH_SPEC-linear-2886b57d-b844-4803-9e55-6fe3657d516d.md"
+      }
+    },
+    {
+      "id": "20260416-linear-4122489e-1a3b-43cf-a181-e98ada0a55e1",
+      "title": "CO: Re-audit and decide Codex CLI 0.121.0 adoption posture with required cloud canary",
+      "relates_to": "tasks/tasks-linear-4122489e-1a3b-43cf-a181-e98ada0a55e1.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-16",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (clean-success)",
+          "date": "2026-04-16",
+          "status": "succeeded",
+          "manifest": ".runs/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1-co-195-docs-review-r3/cli/2026-04-15T23-10-57-461Z-e2b822df/manifest.json",
+          "telemetry": ".runs/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1-co-195-docs-review-r3/cli/2026-04-15T23-10-57-461Z-e2b822df/review/telemetry.json"
+        },
+        "codex_0121_audit": {
+          "decision": "hold-0.118.0",
+          "date": "2026-04-16",
+          "summary": "0.121.0 release/npm facts, command surfaces, and runtime canary passed; required cloud canary blocked by missing CODEX_CLOUD_ENV_ID.",
+          "decision_summary": "out/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1/manual/codex-version-canary/compare/decision-go-no-go.md"
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-16",
+          "status": "succeeded",
+          "review_outcome": "bounded-success",
+          "telemetry": ".runs/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1-co-195-docs-review-r3/cli/2026-04-15T23-10-57-461Z-e2b822df/review/telemetry.json",
+          "resolved_findings": [
+            "P2 checklist consistency: P0/P1 no-regression gate now checked in task and agent mirrors with adoption-matrix evidence."
+          ]
+        },
+        "elegance_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-16",
+          "status": "succeeded",
+          "evidence": "out/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1/manual/elegance-review/elegance-review.md"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1.md",
+        "task": "tasks/tasks-linear-4122489e-1a3b-43cf-a181-e98ada0a55e1.md",
+        "agent_task": ".agent/task/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1.md",
+        "docs": "docs/TECH_SPEC-linear-4122489e-1a3b-43cf-a181-e98ada0a55e1.md"
+      }
+    },
+    {
+      "id": "20260416-linear-c101cb88-3097-4502-bcd7-723d80da7955",
+      "title": "CO workflow: refresh Apr 16 docs:freshness stale cohort blocking handoffs",
+      "relates_to": "tasks/tasks-linear-c101cb88-3097-4502-bcd7-723d80da7955.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-16",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-16",
+          "status": "succeeded",
+          "manifest": ".runs/linear-c101cb88-3097-4502-bcd7-723d80da7955-docs-review/cli/2026-04-16T00-38-54-753Z-95d59008/manifest.json",
+          "summary": "Docs-review child stream succeeded after the Apr 16 baseline repair; guardrails reported spec-guard succeeded."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-16",
+          "status": "succeeded",
+          "manifest": ".runs/linear-c101cb88-3097-4502-bcd7-723d80da7955/cli/2026-04-16T00-32-45-449Z-66cc6490/manifest.json",
+          "telemetry": ".runs/linear-c101cb88-3097-4502-bcd7-723d80da7955/cli/2026-04-16T00-32-45-449Z-66cc6490/review/telemetry.json",
+          "review_outcome": "clean-success",
+          "elegance_note": "out/linear-c101cb88-3097-4502-bcd7-723d80da7955/manual/elegance-review.md"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-c101cb88-3097-4502-bcd7-723d80da7955.md",
+        "task": "tasks/tasks-linear-c101cb88-3097-4502-bcd7-723d80da7955.md",
+        "agent_task": ".agent/task/linear-c101cb88-3097-4502-bcd7-723d80da7955.md",
+        "docs": "docs/TECH_SPEC-linear-c101cb88-3097-4502-bcd7-723d80da7955.md"
+      }
+    },
+    {
       "id": "20260416-linear-72286a49-e68b-435a-be72-74d5c28feb09",
       "title": "Control host: stop stale released-pending-reopen Merging claims from re-triggering refresh stuck/restart loops",
       "relates_to": "tasks/tasks-linear-72286a49-e68b-435a-be72-74d5c28feb09.md",
@@ -125,7 +306,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-15",
+      "last_review": "2026-04-16",
       "approvals": {},
       "paths": {
         "spec": "tasks/specs/linear-6c2a6f36-7852-4535-9914-e0042b082c95.md",

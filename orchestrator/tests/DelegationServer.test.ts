@@ -633,6 +633,163 @@ describe('delegation server status behavior', () => {
 });
 
 describe('delegation server mode contracts', () => {
+  it('adds supported MCP Apps metadata without changing tool visibility', () => {
+    const tools = buildToolList({
+      mode: 'full',
+      githubEnabled: true,
+      allowedGithubOps: new Set(['open_pr', 'comment', 'review', 'get_checks', 'merge'])
+    });
+    const toolByName = new Map(tools.map((tool) => [tool.name, tool]));
+
+    expect([...toolByName.keys()]).toEqual([
+      'delegate.spawn',
+      'delegate.pause',
+      'delegate.cancel',
+      'coordinator.status',
+      'coordinator.pause',
+      'coordinator.resume',
+      'coordinator.cancel',
+      'delegate.status',
+      'delegate.question.enqueue',
+      'delegate.question.poll',
+      'github.open_pr',
+      'github.comment',
+      'github.review',
+      'github.get_checks',
+      'github.merge'
+    ]);
+
+    const supportedDescriptorKeys = new Set(['name', 'title', 'description', 'inputSchema', 'annotations']);
+    const supportedAnnotationKeys = new Set([
+      'readOnlyHint',
+      'destructiveHint',
+      'idempotentHint',
+      'openWorldHint'
+    ]);
+
+    for (const tool of tools) {
+      expect(Object.keys(tool).every((key) => supportedDescriptorKeys.has(key))).toBe(true);
+      expect(typeof tool.title).toBe('string');
+      expect(tool.title?.length).toBeGreaterThan(0);
+      expect(tool).not.toHaveProperty('_meta');
+      expect(tool).not.toHaveProperty('execution');
+      expect(tool).not.toHaveProperty('outputSchema');
+      expect(Object.keys(tool.annotations ?? {}).every((key) => supportedAnnotationKeys.has(key))).toBe(true);
+    }
+
+    expect(toolByName.get('delegate.status')?.annotations).toEqual({
+      readOnlyHint: true,
+      openWorldHint: false
+    });
+    expect(toolByName.get('coordinator.status')?.annotations).toEqual({
+      readOnlyHint: true,
+      openWorldHint: false
+    });
+    expect(toolByName.get('github.get_checks')?.annotations).toEqual({
+      readOnlyHint: true,
+      openWorldHint: true
+    });
+    expect(toolByName.get('delegate.cancel')?.annotations).toMatchObject({
+      readOnlyHint: false,
+      destructiveHint: true,
+      openWorldHint: false
+    });
+    expect(toolByName.get('coordinator.cancel')?.annotations).toMatchObject({
+      readOnlyHint: false,
+      destructiveHint: true,
+      openWorldHint: false
+    });
+    expect(toolByName.get('github.merge')?.annotations).toMatchObject({
+      readOnlyHint: false,
+      destructiveHint: true,
+      openWorldHint: true
+    });
+    expect(toolByName.get('delegate.question.poll')?.annotations).toMatchObject({
+      readOnlyHint: false,
+      destructiveHint: false,
+      openWorldHint: false
+    });
+  });
+
+  it('keeps status_only schema stable while adding descriptor metadata', () => {
+    const tools = buildToolList({
+      mode: 'status_only',
+      githubEnabled: true,
+      allowedGithubOps: new Set(['merge', 'comment'])
+    });
+    expect(tools).toEqual([
+      {
+        name: 'delegate.status',
+        title: 'Fetch Run Status',
+        description: 'Fetch run status',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            manifest_path: { type: 'string' },
+            intent_id: { type: 'string' },
+            request_id: { type: 'string' }
+          },
+          required: ['manifest_path']
+        },
+        annotations: {
+          readOnlyHint: true,
+          openWorldHint: false
+        }
+      }
+    ]);
+  });
+
+  it('exposes metadata-bearing tools through the JSON-RPC tools/list app-server smoke', async () => {
+    const tools = buildToolList({
+      mode: 'full',
+      githubEnabled: true,
+      allowedGithubOps: new Set(['get_checks', 'merge'])
+    });
+    const handler = createDelegationServerRpcHandler({
+      protocolVersion: '2024-11-05',
+      tools,
+      handleToolCall: vi.fn()
+    });
+
+    await expect(
+      handler({
+        jsonrpc: '2.0',
+        method: 'initialize'
+      })
+    ).resolves.toEqual({
+      protocolVersion: '2024-11-05',
+      serverInfo: { name: 'codex-delegation', version: '0.1.0' },
+      capabilities: { tools: {} }
+    });
+
+    const result = (await handler({
+      jsonrpc: '2.0',
+      method: 'tools/list'
+    })) as { tools: Array<Record<string, unknown>> };
+
+    const serialized = JSON.parse(JSON.stringify(result)) as { tools: Array<Record<string, unknown>> };
+    expect(serialized.tools).toHaveLength(tools.length);
+    expect(serialized.tools.find((tool) => tool.name === 'delegate.status')).toMatchObject({
+      title: 'Fetch Run Status',
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: false
+      }
+    });
+    expect(serialized.tools.find((tool) => tool.name === 'github.merge')).toMatchObject({
+      title: 'Merge GitHub Pull Request',
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: true
+      }
+    });
+    expect(
+      serialized.tools.some((tool) => Object.prototype.hasOwnProperty.call(tool, 'supports_parallel_tool_calls'))
+    ).toBe(false);
+  });
+
   it('routes initialize, tools/list, and tools/call through the rpc handler shell', async () => {
     const tools = buildToolList({
       mode: 'full',

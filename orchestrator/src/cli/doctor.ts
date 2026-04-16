@@ -2,6 +2,7 @@ import process from 'node:process';
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { release as osRelease } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
 import {
@@ -259,7 +260,22 @@ export interface DoctorCloudPreflightResult {
     };
   };
   issues: CloudPreflightIssue[];
+  security_advisories: DoctorSandboxSecurityAdvisory[];
   guidance: string[];
+}
+
+export interface DoctorSandboxSecurityAdvisory {
+  code: 'codex_config_danger_full_access' | 'wsl1_bubblewrap_unsupported';
+  scope: 'local-only';
+  severity: 'warning';
+  message: string;
+  guidance: string;
+  details?: {
+    path?: string;
+    platform?: string;
+    os_release?: string;
+    sandbox_mode?: string;
+  };
 }
 
 export function runDoctor(cwd: string = process.cwd()): DoctorResult {
@@ -511,6 +527,7 @@ export async function runDoctorCloudPreflight(options: {
       branch: preflight.details.branch
     });
   const issues = planMetadataIssue ? [planMetadataIssue, ...preflight.issues] : preflight.issues;
+  const securityAdvisories = inspectCodexSandboxSecurityAdvisories({ env });
   const guidance = buildCloudPreflightGuidance(issues);
 
   return {
@@ -530,8 +547,72 @@ export async function runDoctorCloudPreflight(options: {
       }
     },
     issues,
+    security_advisories: securityAdvisories,
     guidance
   };
+}
+
+export function inspectCodexSandboxSecurityAdvisories(options: {
+  env?: NodeJS.ProcessEnv;
+  platform?: NodeJS.Platform;
+  osRelease?: string | null;
+} = {}): DoctorSandboxSecurityAdvisory[] {
+  const env = options.env ?? process.env;
+  const advisories: DoctorSandboxSecurityAdvisory[] = [];
+  const configPath = join(resolveCodexHome(env), 'config.toml');
+
+  if (existsSync(configPath)) {
+    try {
+      const raw = readFileSync(configPath, 'utf8');
+      const parsed = toml.parse(raw);
+      if (isRecord(parsed)) {
+        const sandboxMode = normalizeOptionalString(readStringValue(parsed.sandbox_mode));
+        if (sandboxMode === 'danger-full-access') {
+          advisories.push({
+            code: 'codex_config_danger_full_access',
+            scope: 'local-only',
+            severity: 'warning',
+            message: 'Codex config sets top-level sandbox_mode to danger-full-access.',
+            guidance:
+              'Treat this as a local-only advisory; do not use it to satisfy cloud readiness or weaken CO sandbox defaults.',
+            details: {
+              path: configPath,
+              sandbox_mode: sandboxMode
+            }
+          });
+        }
+      }
+    } catch {
+      // Existing Codex defaults checks already report invalid TOML; keep this advisory focused on security posture.
+    }
+  }
+
+  const platform = options.platform ?? process.platform;
+  const releaseText = normalizeOptionalString(options.osRelease ?? osRelease());
+  if (isWsl1Release(platform, releaseText)) {
+    advisories.push({
+      code: 'wsl1_bubblewrap_unsupported',
+      scope: 'local-only',
+      severity: 'warning',
+      message: 'WSL1 detected; Codex bubblewrap sandbox behavior is unsupported for this local platform.',
+      guidance:
+        'Run local Codex sandbox checks on WSL2/Linux/macOS, or keep this as a local-only limitation; it is not cloud canary evidence.',
+      details: {
+        platform,
+        os_release: releaseText ?? undefined
+      }
+    });
+  }
+
+  return advisories;
+}
+
+function isWsl1Release(platform: NodeJS.Platform, releaseText: string | null): boolean {
+  if (platform !== 'linux' || !releaseText) {
+    return false;
+  }
+  const normalized = releaseText.toLowerCase();
+  return normalized.includes('microsoft') && !normalized.includes('microsoft-standard') && !normalized.includes('wsl2');
 }
 
 function resolveDoctorRepoRoot(cwd: string): string {
@@ -587,6 +668,22 @@ export function formatDoctorCloudPreflightSummary(result: DoctorCloudPreflightRe
     lines.push('  - guidance:');
     for (const item of result.guidance) {
       lines.push(`    - ${item}`);
+    }
+  }
+
+  if (result.security_advisories.length > 0) {
+    lines.push('  - sandbox/security advisories:');
+    for (const advisory of result.security_advisories) {
+      lines.push(`    - [${advisory.code}/${advisory.scope}] ${advisory.message}`);
+      lines.push(`      guidance: ${advisory.guidance}`);
+      if (advisory.details?.path) {
+        lines.push(`      path: ${advisory.details.path}`);
+      }
+      if (advisory.details?.platform || advisory.details?.os_release) {
+        lines.push(
+          `      platform: ${advisory.details.platform ?? '<unknown>'}, os_release: ${advisory.details.os_release ?? '<unknown>'}`
+        );
+      }
     }
   }
 
