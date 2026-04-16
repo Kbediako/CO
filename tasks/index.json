@@ -1,6 +1,52 @@
 {
   "items": [
     {
+      "id": "20260416-linear-c9163fc7-832a-45ac-8961-2d6c213e52af",
+      "title": "Control host: safely reclaim plain not_active rows when retained run record disappeared",
+      "relates_to": "tasks/tasks-linear-c9163fc7-832a-45ac-8961-2d6c213e52af.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-16",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-16",
+          "status": "succeeded",
+          "manifest": ".runs/linear-c9163fc7-832a-45ac-8961-2d6c213e52af-co203-docs-review/cli/2026-04-16T07-30-40-817Z-0e7a5f4e/manifest.json",
+          "summary": "Docs-review completed before implementation; delegation guard, spec-guard, docs:check, docs:freshness:maintain, and forced review all succeeded."
+        },
+        "child_lane": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-16",
+          "status": "rejected_after_success",
+          "manifest": ".runs/linear-c9163fc7-832a-45ac-8961-2d6c213e52af-missing-run-reclaim-tests/cli/2026-04-16T07-42-15-881Z-a627fd25/manifest.json",
+          "summary": "Same-issue child lane completed successfully; parent rejected the incomplete patch because it missed the safe-reclaim regression and integrated final focused coverage directly."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review --uncommitted",
+          "date": "2026-04-16",
+          "status": "bounded-success",
+          "telemetry": ".runs/linear-c9163fc7-832a-45ac-8961-2d6c213e52af/cli/2026-04-16T07-17-40-071Z-cc603710/review/telemetry.json",
+          "summary": "Manifest-backed standalone review completed with review_outcome=bounded-success; lane policy treats this as successful bounded review completion."
+        },
+        "elegance_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-16",
+          "status": "passed",
+          "artifact": "out/linear-c9163fc7-832a-45ac-8961-2d6c213e52af/manual/elegance-review.md",
+          "summary": "Explicit minimality pass kept the scoped proof helper and fresh-discovery call-site threading; no simplification patch was needed."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-c9163fc7-832a-45ac-8961-2d6c213e52af.md",
+        "task": "tasks/tasks-linear-c9163fc7-832a-45ac-8961-2d6c213e52af.md",
+        "agent_task": ".agent/task/linear-c9163fc7-832a-45ac-8961-2d6c213e52af.md",
+        "docs": "docs/TECH_SPEC-linear-c9163fc7-832a-45ac-8961-2d6c213e52af.md"
+      }
+    },
+    {
       "id": "20260416-linear-9917183b-824a-48f7-95ee-bcee205d7a02",
       "title": "CO STATUS: do not project invalidated child-lane failure summaries as current progress",
       "relates_to": "tasks/tasks-linear-9917183b-824a-48f7-95ee-bcee205d7a02.md",

@@ -19315,7 +19315,7 @@ describe('createProviderIssueHandoffService', () => {
       trackedIssue: createTrackedIssue()
     }));
     const refetchTrackedIssues = vi.fn(async (input?: { excludedIssueIds?: string[] }) => {
-      expect(input?.excludedIssueIds).toContain('lin-issue-1');
+      expect(input?.excludedIssueIds ?? []).toContain('lin-issue-1');
       return {
         kind: 'ready' as const,
         trackedIssues: []
@@ -19412,7 +19412,7 @@ describe('createProviderIssueHandoffService', () => {
       trackedIssue: createTrackedIssue()
     }));
     const refetchTrackedIssues = vi.fn(async (input?: { excludedIssueIds?: string[] }) => {
-      expect(input?.excludedIssueIds).toContain('lin-issue-1');
+      expect(input?.excludedIssueIds ?? []).toContain('lin-issue-1');
       return {
         kind: 'ready' as const,
         trackedIssues: []
@@ -19495,7 +19495,7 @@ describe('createProviderIssueHandoffService', () => {
       trackedIssue: createTrackedIssue()
     }));
     const refetchTrackedIssues = vi.fn(async (input?: { excludedIssueIds?: string[] }) => {
-      expect(input?.excludedIssueIds).toContain('lin-issue-1');
+      expect(input?.excludedIssueIds ?? []).toContain('lin-issue-1');
       return {
         kind: 'ready' as const,
         trackedIssues: []
@@ -19511,7 +19511,7 @@ describe('createProviderIssueHandoffService', () => {
       startPipelineId: 'diagnostics',
       readFeatureToggles: () => ({
         agent: {
-          max_concurrent_agents: 1
+          max_concurrent_agents: 2
         }
       })
     });
@@ -19528,7 +19528,7 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.resume).not.toHaveBeenCalled();
   });
 
-  it('keeps a Ready plain released not-active claim with missing retained run identity excluded from fresh discovery', async () => {
+  it('reclaims a Ready plain released not-active claim with missing retained run identity through fresh discovery when no live proof remains and no release cancel is pending', async () => {
     const { root, paths } = await createHostPaths();
     const missingManifestPath = join(
       root,
@@ -19550,15 +19550,20 @@ describe('createProviderIssueHandoffService', () => {
       'run-ready-not-active-reclaimed',
       '/tmp/provider-run/ready-not-active-reclaimed-manifest.json'
     );
+    const cancelSpy = vi
+      .spyOn(questionChildResolutionAdapter, 'callChildControlEndpoint')
+      .mockResolvedValue(undefined);
     const resolveTrackedIssue = vi.fn(async () => ({
       kind: 'ready' as const,
       trackedIssue: createTrackedIssue()
     }));
     const refetchTrackedIssues = vi.fn(async (input?: { excludedIssueIds?: string[] }) => {
-      expect(input?.excludedIssueIds).toContain('lin-issue-1');
+      expect(input?.excludedIssueIds ?? []).not.toContain('lin-issue-1');
       return {
         kind: 'ready' as const,
-        trackedIssues: []
+        trackedIssues: [
+          createCo202ReadyIssue()
+        ]
       };
     });
 
@@ -19571,7 +19576,85 @@ describe('createProviderIssueHandoffService', () => {
       startPipelineId: 'diagnostics',
       readFeatureToggles: () => ({
         agent: {
-          max_concurrent_agents: 1
+          max_concurrent_agents: 2
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-1'
+    });
+    expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-issue-1',
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-issue-1',
+      issueIdentifier: 'CO-191',
+      issueUpdatedAt: '2026-04-15T15:00:00.000Z',
+      launchToken: expect.any(String)
+    }));
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-15T15:00:00.000Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-issue-1',
+      run_id: 'run-ready-not-active-reclaimed',
+      run_manifest_path: '/tmp/provider-run/ready-not-active-reclaimed-manifest.json',
+      launch_source: 'control-host',
+      launch_token: expect.any(String)
+    });
+    expect(persist).toHaveBeenCalled();
+    expect(cancelSpy).not.toHaveBeenCalled();
+  });
+
+  it('keeps a Ready plain released not-active synthetic detached run id excluded from fresh discovery', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      run_id: 'linear-lin-issue-1',
+      run_manifest_path: null
+    }));
+
+    const launcher = createCo202Launcher(
+      'run-ready-not-active-reclaimed',
+      '/tmp/provider-run/ready-not-active-reclaimed-manifest.json'
+    );
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue()
+    }));
+    const refetchTrackedIssues = vi.fn(async (input?: { excludedIssueIds?: string[] }) => {
+      expect(input?.excludedIssueIds ?? []).toContain('lin-issue-1');
+      return {
+        kind: 'ready' as const,
+        trackedIssues: [
+          createCo202ReadyIssue()
+        ]
+      };
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 2
         }
       })
     });
@@ -19589,12 +19672,254 @@ describe('createProviderIssueHandoffService', () => {
     expect(state.claims[0]).toMatchObject({
       state: 'released',
       reason: 'provider_issue_released:not_active',
-      issue_state: 'Blocked',
-      issue_state_type: 'started',
-      issue_updated_at: '2026-04-15T15:00:00.000Z',
-      run_id: 'run-ready-not-active-missing',
-      run_manifest_path: missingManifestPath
+      run_id: 'linear-lin-issue-1',
+      run_manifest_path: null
     });
+  });
+
+  it('keeps a Ready plain released not-active anonymous no-run claim excluded from fresh discovery', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      run_id: null,
+      run_manifest_path: null
+    }));
+
+    const launcher = createCo202Launcher(
+      'run-ready-not-active-reclaimed',
+      '/tmp/provider-run/ready-not-active-reclaimed-manifest.json'
+    );
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue()
+    }));
+    const refetchTrackedIssues = vi.fn(async (input?: { excludedIssueIds?: string[] }) => {
+      expect(input?.excludedIssueIds ?? []).toContain('lin-issue-1');
+      return {
+        kind: 'ready' as const,
+        trackedIssues: [
+          createCo202ReadyIssue()
+        ]
+      };
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 2
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      run_id: null,
+      run_manifest_path: null
+    });
+  });
+
+  it('keeps a Ready plain released not-active claim with missing retained manifest but live proof excluded from fresh discovery', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-04-15T15:05:00.000Z'));
+
+      const { root, paths } = await createHostPaths();
+      const retainedEnv = {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'linear-lin-issue-1'
+      };
+      const retainedPaths = resolveRunPaths(retainedEnv, 'run-ready-not-active-missing-live-proof');
+      await mkdir(retainedPaths.runDir, { recursive: true });
+      await writeFile(
+        join(retainedPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+        JSON.stringify({
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-191',
+          owner_phase: 'turn_running',
+          owner_status: 'in_progress',
+          worker_host: 'worker-host-01',
+          attempt_started_at: '2026-04-15T15:03:00.000Z',
+          updated_at: '2026-04-15T15:04:00.000Z'
+        }),
+        'utf8'
+      );
+
+      const state = createProviderIntakeState();
+      state.claims.push(createCo202ReleasedClaim({
+        run_id: 'run-ready-not-active-missing-live-proof',
+        run_manifest_path: retainedPaths.manifestPath
+      }));
+
+      const launcher = createCo202Launcher(
+        'run-ready-not-active-reclaimed',
+        '/tmp/provider-run/ready-not-active-reclaimed-manifest.json'
+      );
+      const resolveTrackedIssue = vi.fn(async () => ({
+        kind: 'ready' as const,
+        trackedIssue: createTrackedIssue()
+      }));
+      const refetchTrackedIssues = vi.fn(async (input?: { excludedIssueIds?: string[] }) => {
+        expect(input?.excludedIssueIds ?? []).toContain('lin-issue-1');
+        return {
+          kind: 'ready' as const,
+          trackedIssues: [
+            createCo202ReadyIssue()
+          ]
+        };
+      });
+
+      const service = createProviderIssueHandoffService({
+        paths,
+        state,
+        persist: vi.fn(async () => undefined),
+        launcher,
+        resolveTrackedIssue,
+        startPipelineId: 'diagnostics',
+        readFeatureToggles: () => ({
+          agent: {
+            max_concurrent_agents: 2
+          }
+        })
+      });
+
+      await service.poll?.({
+        trackedIssues: [],
+        refetchTrackedIssues,
+        deferFreshDiscovery: true
+      });
+
+      expect(resolveTrackedIssue).not.toHaveBeenCalled();
+      expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
+      expect(launcher.resume).not.toHaveBeenCalled();
+      expect(launcher.start).not.toHaveBeenCalled();
+      expect(state.claims[0]).toMatchObject({
+        state: 'released',
+        reason: 'provider_issue_released:not_active',
+        issue_state: 'Blocked',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-15T15:00:00.000Z',
+        run_id: 'run-ready-not-active-missing-live-proof',
+        run_manifest_path: retainedPaths.manifestPath
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps a Ready plain released not-active claim with unreadable same-issue live proof excluded from fresh discovery', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-04-15T15:05:00.000Z'));
+
+      const { root, paths } = await createHostPaths();
+      const brokenEnv = {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'linear-lin-issue-1'
+      };
+      const brokenPaths = resolveRunPaths(brokenEnv, 'run-ready-not-active-unreadable');
+      await mkdir(brokenPaths.runDir, { recursive: true });
+      await writeFile(brokenPaths.manifestPath, '{"run_id":"run-ready-not-active-unreadable"', 'utf8');
+      await writeFile(
+        join(brokenPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+        JSON.stringify({
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-191',
+          owner_phase: 'turn_running',
+          owner_status: 'in_progress',
+          worker_host: 'worker-host-01',
+          attempt_started_at: '2026-04-15T15:03:00.000Z',
+          updated_at: '2026-04-15T15:04:00.000Z'
+        }),
+        'utf8'
+      );
+
+      const state = createProviderIntakeState();
+      state.claims.push(createCo202ReleasedClaim({
+        run_id: 'run-ready-not-active-unreadable',
+        run_manifest_path: brokenPaths.manifestPath
+      }));
+
+      const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      const launcher = createCo202Launcher(
+        'run-ready-not-active-reclaimed',
+        '/tmp/provider-run/ready-not-active-reclaimed-manifest.json'
+      );
+      const resolveTrackedIssue = vi.fn(async () => ({
+        kind: 'ready' as const,
+        trackedIssue: createTrackedIssue()
+      }));
+      const refetchTrackedIssues = vi.fn(async (input?: { excludedIssueIds?: string[] }) => {
+        expect(input?.excludedIssueIds ?? []).toContain('lin-issue-1');
+        return {
+          kind: 'ready' as const,
+          trackedIssues: [
+            createCo202ReadyIssue()
+          ]
+        };
+      });
+
+      const service = createProviderIssueHandoffService({
+        paths,
+        state,
+        persist: vi.fn(async () => undefined),
+        launcher,
+        resolveTrackedIssue,
+        startPipelineId: 'diagnostics',
+        readFeatureToggles: () => ({
+          agent: {
+            max_concurrent_agents: 2
+          }
+        })
+      });
+
+      await service.poll?.({
+        trackedIssues: [],
+        refetchTrackedIssues,
+        deferFreshDiscovery: true
+      });
+
+      expect(resolveTrackedIssue).not.toHaveBeenCalled();
+      expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
+      expect(launcher.resume).not.toHaveBeenCalled();
+      expect(launcher.start).not.toHaveBeenCalled();
+      expect(state.claims[0]).toMatchObject({
+        state: 'released',
+        reason: 'provider_issue_released:not_active',
+        issue_state: 'Blocked',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-15T15:00:00.000Z',
+        run_id: 'run-ready-not-active-unreadable',
+        run_manifest_path: brokenPaths.manifestPath
+      });
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          `[provider-issue-run-discovery] skipping unreadable manifest ${brokenPaths.manifestPath}:`
+        )
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('does not launch a Ready plain released not-active refresh with unresolved retained run identity', async () => {
@@ -19875,7 +20200,7 @@ describe('createProviderIssueHandoffService', () => {
       trackedIssue: createTrackedIssue()
     }));
     const refetchTrackedIssues = vi.fn(async (input?: { excludedIssueIds?: string[] }) => {
-      expect(input?.excludedIssueIds).not.toContain('lin-issue-1');
+      expect(input?.excludedIssueIds ?? []).not.toContain('lin-issue-1');
       return {
         kind: 'ready' as const,
         trackedIssues: [
@@ -20059,7 +20384,7 @@ describe('createProviderIssueHandoffService', () => {
 
     expect(resolveTrackedIssue).not.toHaveBeenCalled();
     expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
-    expect(refetchTrackedIssues.mock.calls[0]?.[0]?.excludedIssueIds).not.toContain('lin-issue-1');
+    expect(refetchTrackedIssues.mock.calls[0]?.[0]?.excludedIssueIds ?? []).not.toContain('lin-issue-1');
     expect(launcher.resume).not.toHaveBeenCalled();
     expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
       taskId: 'linear-lin-issue-1',

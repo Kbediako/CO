@@ -2805,6 +2805,18 @@ export function createProviderIssueHandoffService(
             !isInactiveReleasedReclaimRun(existing, releasedRun)
           ) ||
           hasPendingReleaseCancel(releasedRun?.manifestPath ?? existing.run_manifest_path);
+        const canFreshDiscoverReleasedMissingRetainedRun =
+          input.deliveryId === null &&
+          input.event === 'poll_tick' &&
+          input.action === 'reconcile' &&
+          canFreshDiscoverPlainReleasedMissingRetainedRunClaim({
+            claim: existing,
+            releaseRun: releasedRun,
+            sameIssueRuns: discoveredReleasedRuns,
+            unreadableAdmissionOccupancy:
+              await discoverUnreadableProviderAdmissionOccupancyForCurrentOperation(),
+            hasPendingReleaseCancel
+          });
         const existingReleasedPendingReopen =
           isProviderIssueReleasedPendingReopen(existing.reason ?? null);
         const existingReleasedReclaimCandidate =
@@ -2820,10 +2832,13 @@ export function createProviderIssueHandoffService(
           existingReleasedReclaimCandidate &&
           pendingReleasedReopen &&
           currentReleasedReopenLaunchable &&
-          !canFreshDiscoverReleasedReclaimClaim(
-            existing,
-            releasedRun,
-            hasPendingReleaseCancel
+          !(
+            canFreshDiscoverReleasedReclaimClaim(
+              existing,
+              releasedRun,
+              hasPendingReleaseCancel
+            ) ||
+            canFreshDiscoverReleasedMissingRetainedRun
           );
         const preservePlainReclaimMetadataDuringDrain =
           releaseCancelPending &&
@@ -3913,6 +3928,15 @@ export function createProviderIssueHandoffService(
           const activeRun = attachableClaimRuns.find((run) => run.status === 'in_progress') ?? null;
           const releaseRun = resolveProviderReleaseRun(claim, attachableClaimRuns);
           const latestRun = resolveLatestKnownProviderRun(attachableClaimRuns);
+          const canFreshDiscoverReleasedMissingRetainedRun =
+            claim.state === 'released' &&
+            canFreshDiscoverPlainReleasedMissingRetainedRunClaim({
+              claim,
+              releaseRun,
+              sameIssueRuns: claimRuns,
+              unreadableAdmissionOccupancy,
+              hasPendingReleaseCancel
+            });
           const canFreshDiscoverReleasedLiveWorker =
             claim.state === 'released' &&
             canFreshDiscoverReleasedLiveWorkerClaim(
@@ -3921,10 +3945,28 @@ export function createProviderIssueHandoffService(
               activeRun,
               hasPendingReleaseCancel
             );
+          const shouldBlockPlainReleasedWithoutConcreteRetainedRunFreshDiscovery =
+            pollInput?.deferFreshDiscovery === true &&
+            shouldBlockPlainReleasedWithoutConcreteRetainedRunClaim(claim);
+          const shouldBlockPendingReopenFreshDiscovery =
+            claim.state === 'released' &&
+            pollInput?.deferFreshDiscovery === true &&
+            isProviderIssueReleasedPendingReopen(claim.reason ?? null) &&
+            !canFreshDiscoverReleasedReclaimClaim(
+              claim,
+              releaseRun,
+              hasPendingReleaseCancel
+            ) &&
+            !canFreshDiscoverReleasedMissingRetainedRun &&
+            !canFreshDiscoverReleasedLiveWorker;
           const allowDirectIssueById =
-            !boundPreDiscoveryIssueByIdReads ||
-            activeRun !== null ||
-            preDiscoveryNonActiveIssueByIdReads < preDiscoveryIssueByIdReadLimit;
+            (
+              !boundPreDiscoveryIssueByIdReads ||
+              activeRun !== null ||
+              preDiscoveryNonActiveIssueByIdReads < preDiscoveryIssueByIdReadLimit
+            ) &&
+            !shouldBlockPlainReleasedWithoutConcreteRetainedRunFreshDiscovery &&
+            !shouldBlockPendingReopenFreshDiscovery;
           const resolution = await resolveRefreshTrackedIssueResolution({
             claim,
             trackedIssuesByKey,
@@ -3959,6 +4001,7 @@ export function createProviderIssueHandoffService(
                     releaseRun,
                     hasPendingReleaseCancel
                   ) &&
+                  !canFreshDiscoverReleasedMissingRetainedRun &&
                   !canFreshDiscoverReleasedLiveWorker
                 )
               ) {
@@ -4150,13 +4193,23 @@ export function createProviderIssueHandoffService(
               continue;
             }
             if (
-              canRecheckPlainReleasedNotActiveClaim(claim) &&
-              !canFreshDiscoverReleasedReclaimClaim(
-                claim,
-                releaseRunForCancel,
-                hasPendingReleaseCancel
+              shouldBlockPlainReleasedWithoutConcreteRetainedRunFreshDiscovery ||
+              (
+                canRecheckPlainReleasedNotActiveClaim(claim) &&
+                !canFreshDiscoverReleasedReclaimClaim(
+                  claim,
+                  releaseRunForCancel,
+                  hasPendingReleaseCancel
+                )
               )
             ) {
+              if (!canFreshDiscoverReleasedMissingRetainedRun) {
+                deferredClaimFreshDiscoveryBlockedProviderKeys.add(claimProviderKey);
+              }
+              continue;
+            }
+            if (shouldBlockPendingReopenFreshDiscovery) {
+              deferredClaimFreshDiscoveryBlockedProviderKeys.add(claimProviderKey);
               continue;
             }
             if (
@@ -4173,7 +4226,8 @@ export function createProviderIssueHandoffService(
                   claim,
                   releaseRunForCancel,
                   hasPendingReleaseCancel
-                )
+                ) &&
+                !canFreshDiscoverReleasedMissingRetainedRun
               ) {
                 deferredClaimFreshDiscoveryBlockedProviderKeys.add(claimProviderKey);
               }
@@ -5564,7 +5618,10 @@ function buildFreshDiscoveryBlockedProviderKeys(
       .filter(
         (claim) =>
           claim.state !== 'ignored' &&
-          claim.state !== 'released' &&
+          (
+            claim.state !== 'released' ||
+            shouldBlockPlainReleasedWithoutConcreteRetainedRunClaim(claim)
+          ) &&
           claim.state !== 'completed' &&
           claim.state !== 'handoff_failed'
       )
@@ -5670,12 +5727,8 @@ async function discoverProviderIssueRunSnapshot(
       try {
         manifest = await readJsonFile<Record<string, unknown>>(manifestPath);
       } catch (error) {
-        const proof = await readBestEffortJsonFile<ProviderLinearWorkerProofRecord>(
-          join(cliRoot, runEntry, PROVIDER_LINEAR_WORKER_PROOF_FILENAME)
-        );
-        const occupancyRecord = resolveUnreadableProviderAdmissionOccupancyRecord({
+        const occupancyRecord = await readUnreadableProviderAdmissionOccupancyRecord({
           manifestPath,
-          proof,
           isProcessAlive
         });
         if (occupancyRecord) {
@@ -5689,6 +5742,13 @@ async function discoverProviderIssueRunSnapshot(
         continue;
       }
       if (!manifest) {
+        const occupancyRecord = await readUnreadableProviderAdmissionOccupancyRecord({
+          manifestPath,
+          isProcessAlive
+        });
+        if (occupancyRecord) {
+          unreadableAdmissionOccupancy.push(occupancyRecord);
+        }
         continue;
       }
       const parentRunId = readStringValue(manifest, 'parent_run_id');
@@ -5765,6 +5825,20 @@ async function discoverProviderIssueRunSnapshot(
     }),
     unreadableAdmissionOccupancy
   };
+}
+
+async function readUnreadableProviderAdmissionOccupancyRecord(input: {
+  manifestPath: string;
+  isProcessAlive: (pid: number) => boolean;
+}): Promise<ProviderUnreadableManifestAdmissionOccupancyRecord | null> {
+  const proof = await readBestEffortJsonFile<ProviderLinearWorkerProofRecord>(
+    join(dirname(input.manifestPath), PROVIDER_LINEAR_WORKER_PROOF_FILENAME)
+  );
+  return resolveUnreadableProviderAdmissionOccupancyRecord({
+    manifestPath: input.manifestPath,
+    proof,
+    isProcessAlive: input.isProcessAlive
+  });
 }
 
 function resolveUnreadableProviderAdmissionOccupancyRecord(input: {
@@ -7204,10 +7278,87 @@ function canFreshDiscoverReleasedPendingReopenClaim(
   return !shouldAttemptReleaseCancel(run) || isInactiveReleasedPendingReopenRun(claim, run);
 }
 
+function canFreshDiscoverPlainReleasedMissingRetainedRunClaim(input: {
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    | 'provider'
+    | 'issue_id'
+    | 'state'
+    | 'reason'
+    | 'task_id'
+    | 'run_id'
+    | 'run_manifest_path'
+    | 'issue_state'
+    | 'issue_state_type'
+  >;
+  releaseRun: ProviderIssueRunRecord | null;
+  sameIssueRuns: ProviderIssueRunRecord[];
+  unreadableAdmissionOccupancy: ProviderUnreadableManifestAdmissionOccupancyRecord[];
+  hasPendingReleaseCancel: (manifestPath: string | null | undefined) => boolean;
+}): boolean {
+  if (!canRecheckPlainReleasedNotActiveClaim(input.claim)) {
+    return false;
+  }
+  if (
+    input.releaseRun !== null ||
+    !hasConcreteRetainedRunIdentity(input.claim)
+  ) {
+    return false;
+  }
+  if (input.hasPendingReleaseCancel(input.claim.run_manifest_path)) {
+    return false;
+  }
+  const hasBlockingSameIssueRun = input.sameIssueRuns.some(
+    (run) => shouldAttemptReleaseCancel(run) && !isInactiveReleasedReclaimRun(input.claim, run)
+  );
+  if (hasBlockingSameIssueRun) {
+    return false;
+  }
+  return !input.unreadableAdmissionOccupancy.some(
+    (record) => record.provider === input.claim.provider && record.issueId === input.claim.issue_id
+  );
+}
+
+function hasConcreteRetainedRunIdentity(
+  claim: Pick<ProviderIntakeClaimRecord, 'task_id' | 'run_id' | 'run_manifest_path'>
+): boolean {
+  return Boolean(claim.run_manifest_path) ||
+    (Boolean(claim.run_id) && claim.run_id !== claim.task_id);
+}
+
+function shouldBlockPlainReleasedWithoutConcreteRetainedRunClaim(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    | 'state'
+    | 'reason'
+    | 'task_id'
+    | 'run_id'
+    | 'run_manifest_path'
+    | 'issue_state'
+    | 'issue_state_type'
+  >
+): boolean {
+  const workflowState = classifyProviderLinearWorkflowState({
+    state: claim.issue_state,
+    state_type: claim.issue_state_type
+  });
+  return (
+    canRecheckPlainReleasedNotActiveClaim(claim) &&
+    workflowState.normalizedStateType === 'started' &&
+    !hasConcreteRetainedRunIdentity(claim)
+  );
+}
+
 function canFreshDiscoverReleasedReclaimClaim(
   claim: Pick<
     ProviderIntakeClaimRecord,
-    'state' | 'reason' | 'run_id' | 'run_manifest_path' | 'issue_state' | 'issue_state_type'
+    | 'state'
+    | 'reason'
+    | 'task_id'
+    | 'run_id'
+    | 'run_manifest_path'
+    | 'issue_state'
+    | 'issue_state_type'
   >,
   run: ProviderIssueRunRecord | null,
   hasPendingReleaseCancel: (manifestPath: string | null | undefined) => boolean
@@ -7222,6 +7373,9 @@ function canFreshDiscoverReleasedReclaimClaim(
     return false;
   }
   if (run === null) {
+    if (shouldBlockPlainReleasedWithoutConcreteRetainedRunClaim(claim)) {
+      return false;
+    }
     return !claim.run_id && !claim.run_manifest_path;
   }
   return !shouldAttemptReleaseCancel(run) || isInactiveReleasedReclaimRun(claim, run);
