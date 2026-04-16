@@ -33,4 +33,16 @@ describe('cloud-canary-ci failure classification', () => {
     });
     expect(formatCloudCanaryFailureClass(diagnosis)).toBe('configuration (env_config)');
   });
+
+  it('normalizes human and hyphenated connector drift labels', () => {
+    for (const signal of ['cloud connector auth drift', 'cloud-connector-auth-drift']) {
+      const diagnosis = classifyFailure(signal);
+
+      expect(diagnosis).toMatchObject({
+        category: 'credentials',
+        diagnostic_category: 'cloud_connector_auth_drift'
+      });
+      expect(formatCloudCanaryFailureClass(diagnosis)).toBe('credentials (cloud_connector_auth_drift)');
+    }
+  });
 });

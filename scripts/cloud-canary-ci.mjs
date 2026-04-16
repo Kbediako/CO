@@ -27,16 +27,16 @@ function envFlagEnabled(value) {
 
 export function classifyFailure(signal) {
   const normalized = signal.toLowerCase();
+  const normalizedConnectorSignal = normalized.replace(/[_-]+/g, ' ');
   if (
-    normalized.includes('cloud_connector_auth_drift') ||
-    normalized.includes('missing_github_connector_link') ||
-    normalized.includes('missing github connector link') ||
-    normalized.includes('github connection not found for user') ||
-    normalized.includes('github connection not found') ||
-    normalized.includes('github connector not found') ||
-    normalized.includes('github connector link missing') ||
-    normalized.includes('missing github connection') ||
-    normalized.includes('missing github connector')
+    normalizedConnectorSignal.includes('cloud connector auth drift') ||
+    normalizedConnectorSignal.includes('missing github connector link') ||
+    normalizedConnectorSignal.includes('github connection not found for user') ||
+    normalizedConnectorSignal.includes('github connection not found') ||
+    normalizedConnectorSignal.includes('github connector not found') ||
+    normalizedConnectorSignal.includes('github connector link missing') ||
+    normalizedConnectorSignal.includes('missing github connection') ||
+    normalizedConnectorSignal.includes('missing github connector')
   ) {
     return {
       category: 'credentials',
