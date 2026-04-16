@@ -1,6 +1,66 @@
 {
   "items": [
     {
+      "id": "20260416-linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1",
+      "title": "CO: Classify Codex CLI 0.121.0 sandbox/security local-cloud preflight policy",
+      "relates_to": "tasks/tasks-linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-16",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded child lane",
+          "date": "2026-04-16",
+          "status": "succeeded",
+          "summary": "Docs-first packet drafted for CO-199 sandbox/security preflight classification; parent owns source-0 reconciliation, Linear state, implementation, validation, and PR lifecycle."
+        },
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-16",
+          "status": "succeeded_with_findings_addressed",
+          "manifest": ".runs/linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1-docs-review-r2/cli/2026-04-16T03-25-27-353Z-a6d7d89c/manifest.json",
+          "summary": "Docs-review completed before implementation; parent addressed nested checkout cleanup, 1048 TASKS archive preservation, and missing thread/shellCommand classification."
+        },
+        "source_0_reconciliation": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-04-16",
+          "status": "complete",
+          "summary": "Prompt-provided source-0 payload contained run metadata and prompt-pack provenance only; no additional sandbox/security classification rows."
+        },
+        "implementation_gate": {
+          "reviewer": "codex-orchestrator implementation-gate",
+          "date": "2026-04-16",
+          "status": "succeeded",
+          "review_outcome": "clean-success",
+          "manifest": ".runs/linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1-implementation-gate/cli/2026-04-16T03-50-40-046Z-96d42245/manifest.json",
+          "telemetry": ".runs/linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1-implementation-gate/cli/2026-04-16T03-50-40-046Z-96d42245/review/telemetry.json"
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review --uncommitted",
+          "date": "2026-04-16",
+          "status": "succeeded",
+          "review_outcome": "bounded-success",
+          "telemetry": ".runs/linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1-implementation-gate/cli/2026-04-16T03-50-40-046Z-96d42245/review/telemetry.json",
+          "summary": "No actionable findings; first attempt crossed a validation command boundary and wrapper completed a strict read-only command-intent retry."
+        },
+        "elegance_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-16",
+          "status": "succeeded",
+          "evidence": "out/linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1/manual/elegance-review.md",
+          "summary": "No simplification patch applied; advisory-only doctor diagnostics keep cloud blockers separate from local sandbox/security posture."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",
+        "task": "tasks/tasks-linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",
+        "agent_task": ".agent/task/linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",
+        "docs": "docs/TECH_SPEC-linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md"
+      }
+    },
+    {
       "id": "20260416-linear-2886b57d-b844-4803-9e55-6fe3657d516d",
       "title": "CO: Add Codex 0.121 MCP Apps metadata to delegation tools without authority expansion",
       "relates_to": "tasks/tasks-linear-2886b57d-b844-4803-9e55-6fe3657d516d.md",

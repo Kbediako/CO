@@ -43,6 +43,27 @@ codex-orchestrator doctor --cloud-preflight
 codex-orchestrator doctor --cloud-preflight --format json
 ```
 
+`doctor --cloud-preflight` also reports local-only sandbox/security advisories, currently top-level `sandbox_mode = "danger-full-access"` and WSL1 bubblewrap posture, without converting those advisories into cloud blockers.
+
+## Codex 0.121 Sandbox/Security Classification
+
+CO-199 classifies the `rust-v0.121.0` sandbox/security release deltas before any promotion of `0.121.0` from candidate to active CO target. The classification keeps local platform posture, cloud preflight blockers, and shared metadata surfaces separate.
+
+| Codex 0.121 delta / surface | CO preflight class | Policy outcome |
+| --- | --- | --- |
+| Secure devcontainer behavior | local-only | Treat as local development/container posture. Cloud adoption still requires explicit `CODEX_CLOUD_ENV_ID` canary evidence. |
+| macOS private DNS handling | local-only | Document as local macOS sandbox/proxy behavior; never use it as cloud readiness evidence. |
+| macOS Unix socket handling | local-only | Keep Unix socket allowlist behavior scoped to local macOS/app-server paths. |
+| Windows elevated denial | local-only | Elevated Windows sessions are unsupported local operator posture, not a cloud blocker. |
+| WSL1 bubblewrap behavior | local-only | `doctor --cloud-preflight` reports a local-only WSL1 bubblewrap advisory when detectable; WSL2/Linux remains the local replacement path. |
+| exec-server filesystem sandboxing | local-only | Applies to local app-server/exec-server filesystem handling. Provider workers stay on current `codex exec` / `resume` supervision. |
+| Remote exec environment policy | cloud-only | Cloud lanes must keep remote execution policy behind cloud preflight and canary evidence. |
+| Websocket token hash auth | local-only | Applies to local app-server/control surfaces. `--execution-mode cloud --runtime-mode appserver` remains unsupported and fails fast. |
+| Pinned inputs | not applicable | Treat as release/build hygiene unless a future lane identifies a CO preflight dependency. |
+| `danger-full-access` behavior | local-only | `doctor --cloud-preflight` reports top-level `sandbox_mode = "danger-full-access"` as a local-only advisory; CO must not weaken defaults to restore removed behavior. |
+| `thread/shellCommand` sensitive surface | local-only | Keep out of the default provider-worker authority model unless a future cloud-bridge lane proves otherwise. |
+| MCP sandbox-state metadata | both | Metadata may be documented or consumed on local/cloud MCP surfaces, but it does not expand tool authority or replace cloud canary evidence. |
+
 ## Fallback Behavior (No Cloud Wiring)
 
 If preflight fails, CO:

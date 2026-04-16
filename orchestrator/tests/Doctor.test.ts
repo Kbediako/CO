@@ -8,6 +8,7 @@ import {
   buildDelegationDirectTransportGuidance,
   formatDoctorCloudPreflightSummary,
   formatDoctorSummary,
+  inspectCodexSandboxSecurityAdvisories,
   runDoctor,
   runDoctorCloudPreflight
 } from '../src/cli/doctor.js';
@@ -1144,6 +1145,61 @@ describe('runDoctor', () => {
       }
       await rm(tempDir, { recursive: true, force: true });
     }
+  });
+
+  it('reports danger-full-access as a local-only advisory without failing cloud preflight', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-sandbox-advisory-'));
+    const codexHome = join(tempDir, 'codex-home');
+    await mkdir(codexHome, { recursive: true });
+    await writeFile(join(codexHome, 'config.toml'), 'sandbox_mode = "danger-full-access"\n', 'utf8');
+    const fakeCodexBin = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+    try {
+      const result = await runDoctorCloudPreflight({
+        cwd: process.cwd(),
+        env: buildDoctorCloudEnv({
+          CODEX_CLI_BIN: fakeCodexBin,
+          CODEX_CLOUD_ENV_ID: 'env_123',
+          CODEX_HOME: codexHome
+        })
+      });
+      expect(result.ok).toBe(true);
+      expect(result.issues).toHaveLength(0);
+      expect(result.security_advisories).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          code: 'codex_config_danger_full_access',
+          scope: 'local-only',
+          severity: 'warning',
+          details: expect.objectContaining({ sandbox_mode: 'danger-full-access' })
+        })
+      ]));
+      expect(formatDoctorCloudPreflightSummary(result).join('\n')).toContain(
+        '[codex_config_danger_full_access/local-only]'
+      );
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('classifies WSL1 bubblewrap risk as local-only without warning on WSL2', () => {
+    const wsl1 = inspectCodexSandboxSecurityAdvisories({
+      env: buildDoctorCloudEnv({ CODEX_HOME: join(tmpdir(), 'missing-codex-home') }),
+      platform: 'linux',
+      osRelease: '4.4.0-19041-Microsoft'
+    });
+    expect(wsl1).toEqual([
+      expect.objectContaining({
+        code: 'wsl1_bubblewrap_unsupported',
+        scope: 'local-only',
+        severity: 'warning'
+      })
+    ]);
+
+    const wsl2 = inspectCodexSandboxSecurityAdvisories({
+      env: buildDoctorCloudEnv({ CODEX_HOME: join(tmpdir(), 'missing-codex-home') }),
+      platform: 'linux',
+      osRelease: '5.15.90.1-microsoft-standard-WSL2'
+    });
+    expect(wsl2).toHaveLength(0);
   });
 
   it('uses repo pipeline stage cloudEnvId for doctor cloud preflight when env var is unset', async () => {
