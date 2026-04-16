@@ -1,6 +1,7 @@
 import process from 'node:process';
 import { spawn } from 'node:child_process';
 
+import { fingerprintAuthProvenanceValue } from './authProvenanceFingerprint.js';
 import { resolveCodexCliBin } from './codexCli.js';
 
 export interface CloudPreflightIssue {
@@ -20,7 +21,18 @@ export interface CloudPreflightResult {
     codexBin: string;
     environmentId: string | null;
     branch: string | null;
+    authProvenance?: CloudPreflightAuthProvenance;
   };
+}
+
+export interface CloudPreflightAuthProvenance {
+  providerKind: 'codex_cloud';
+  activeProfileFingerprint: string | null;
+  activeAccountFingerprint: string | null;
+  cloudEnvId: string | null;
+  cloudBranch: string | null;
+  credentialSource: string | null;
+  authFreshness: 'env_credential_present' | 'credential_source_unknown';
 }
 
 interface CommandResult {
@@ -106,6 +118,74 @@ function normalizeCloudPreflightRequestValue(raw: string | null | undefined): st
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function readFirstCloudPreflightEnvValue(
+  env: NodeJS.ProcessEnv | undefined,
+  keys: string[]
+): string | null {
+  if (!env) {
+    return null;
+  }
+  for (const key of keys) {
+    const value = normalizeCloudPreflightRequestValue(env[key]);
+    if (value) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function readFirstCloudPreflightCredentialSource(env: NodeJS.ProcessEnv | undefined): string | null {
+  if (!env) {
+    return null;
+  }
+  for (const key of [
+    'CODEX_API_KEY',
+    'OPENAI_API_KEY',
+    'CODEX_AUTH_TOKEN',
+    'OPENAI_AUTH_TOKEN',
+    'CHATGPT_AUTH_TOKEN'
+  ]) {
+    if (normalizeCloudPreflightRequestValue(env[key])) {
+      return `env:${key}`;
+    }
+  }
+  return null;
+}
+
+export function buildCloudPreflightAuthProvenance(params: {
+  env?: NodeJS.ProcessEnv;
+  environmentId: string | null;
+  branch: string | null;
+}): CloudPreflightAuthProvenance {
+  const credentialSource = readFirstCloudPreflightCredentialSource(params.env);
+  const profile = readFirstCloudPreflightEnvValue(params.env, [
+    'CODEX_AUTH_PROFILE',
+    'CODEX_PROFILE',
+    'OPENAI_PROFILE',
+    'CHATGPT_AUTH_PROFILE',
+    'CHATGPT_PROFILE'
+  ]);
+  const account = readFirstCloudPreflightEnvValue(params.env, [
+    'CODEX_ACCOUNT_ID',
+    'CODEX_ACCOUNT',
+    'CODEX_ACCOUNT_EMAIL',
+    'OPENAI_ACCOUNT_ID',
+    'OPENAI_ORG_ID',
+    'CHATGPT_ACCOUNT_ID',
+    'CHATGPT_ACCOUNT',
+    'CHATGPT_ACCOUNT_EMAIL'
+  ]);
+  return {
+    providerKind: 'codex_cloud',
+    activeProfileFingerprint: fingerprintAuthProvenanceValue(profile, params.env),
+    activeAccountFingerprint: fingerprintAuthProvenanceValue(account, params.env),
+    cloudEnvId: params.environmentId,
+    cloudBranch: params.branch,
+    credentialSource,
+    authFreshness: credentialSource ? 'env_credential_present' : 'credential_source_unknown'
+  };
+}
+
 export function buildCloudPreflightRequest(params: {
   repoRoot: string;
   environmentId: string | null;
@@ -173,7 +253,12 @@ export async function runCloudPreflight(params: CloudPreflightRequest): Promise<
     details: {
       codexBin: params.codexBin,
       environmentId: params.environmentId,
-      branch
+      branch,
+      authProvenance: buildCloudPreflightAuthProvenance({
+        env: params.env,
+        environmentId: params.environmentId,
+        branch
+      })
     }
   };
 }

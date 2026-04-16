@@ -1,7 +1,7 @@
 import type { TesterAgent, TestInput, TestResult, TestReport } from '../../types.js';
 import type { PipelineRunExecutionResult } from '../types.js';
 import { ensureGuardrailStatus } from '../run/manifest.js';
-import { diagnoseCloudFailure } from './cloudFailureDiagnostics.js';
+import { diagnoseCloudFailure, formatCloudFailureClass } from './cloudFailureDiagnostics.js';
 
 type ResultProvider = () => PipelineRunExecutionResult | null;
 
@@ -55,7 +55,7 @@ export class CommandTester implements TesterAgent {
           status: passed ? 'passed' : 'failed',
           details: passed
             ? failureDetails
-            : `${failureDetails}\nFailure class: ${diagnosis.category}. ${diagnosis.guidance}`
+            : `${failureDetails}\nFailure class: ${formatCloudFailureClass(diagnosis)}. ${diagnosis.guidance}`
         }
       ];
 

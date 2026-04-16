@@ -20,8 +20,10 @@ import {
 import { resolveCodexHome } from './utils/codexPaths.js';
 import { resolveOptionalDependency, type OptionalResolutionSource } from './utils/optionalDeps.js';
 import {
+  buildCloudPreflightAuthProvenance,
   buildCloudPreflightRequest,
   runCloudPreflight,
+  type CloudPreflightAuthProvenance,
   type CloudPreflightIssue
 } from './utils/cloudPreflight.js';
 import {
@@ -247,6 +249,15 @@ export interface DoctorCloudPreflightResult {
     codex_bin: string;
     environment_id: string | null;
     branch: string | null;
+    auth_provenance: {
+      provider_kind: CloudPreflightAuthProvenance['providerKind'];
+      active_profile_fingerprint: string | null;
+      active_account_fingerprint: string | null;
+      cloud_env_id: string | null;
+      cloud_branch: string | null;
+      credential_source: string | null;
+      auth_freshness: CloudPreflightAuthProvenance['authFreshness'];
+    };
   };
   issues: CloudPreflightIssue[];
   security_advisories: DoctorSandboxSecurityAdvisory[];
@@ -508,6 +519,13 @@ export async function runDoctorCloudPreflight(options: {
     branch: options.branch,
     env
   }));
+  const authProvenance =
+    preflight.details.authProvenance ??
+    buildCloudPreflightAuthProvenance({
+      env,
+      environmentId: preflight.details.environmentId,
+      branch: preflight.details.branch
+    });
   const issues = planMetadataIssue ? [planMetadataIssue, ...preflight.issues] : preflight.issues;
   const securityAdvisories = inspectCodexSandboxSecurityAdvisories({ env });
   const guidance = buildCloudPreflightGuidance(issues);
@@ -517,7 +535,16 @@ export async function runDoctorCloudPreflight(options: {
     details: {
       codex_bin: preflight.details.codexBin,
       environment_id: preflight.details.environmentId,
-      branch: preflight.details.branch
+      branch: preflight.details.branch,
+      auth_provenance: {
+        provider_kind: authProvenance.providerKind,
+        active_profile_fingerprint: authProvenance.activeProfileFingerprint,
+        active_account_fingerprint: authProvenance.activeAccountFingerprint,
+        cloud_env_id: authProvenance.cloudEnvId,
+        cloud_branch: authProvenance.cloudBranch,
+        credential_source: authProvenance.credentialSource,
+        auth_freshness: authProvenance.authFreshness
+      }
     },
     issues,
     security_advisories: securityAdvisories,
@@ -614,6 +641,21 @@ export function formatDoctorCloudPreflightSummary(result: DoctorCloudPreflightRe
   lines.push(`  - codex bin: ${result.details.codex_bin}`);
   lines.push(`  - environment id: ${result.details.environment_id ?? '<unset>'}`);
   lines.push(`  - branch: ${result.details.branch ?? '<unset>'}`);
+  lines.push(`  - auth provider: ${result.details.auth_provenance.provider_kind}`);
+  lines.push(
+    `  - credential source: ${result.details.auth_provenance.credential_source ?? '<none detected>'}`
+  );
+  lines.push(
+    `  - profile fingerprint: ${
+      result.details.auth_provenance.active_profile_fingerprint ?? '<unset>'
+    }`
+  );
+  lines.push(
+    `  - account fingerprint: ${
+      result.details.auth_provenance.active_account_fingerprint ?? '<unset>'
+    }`
+  );
+  lines.push(`  - auth freshness: ${result.details.auth_provenance.auth_freshness}`);
 
   if (result.issues.length > 0) {
     lines.push('  - issues:');

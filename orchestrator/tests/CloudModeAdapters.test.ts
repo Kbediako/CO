@@ -93,6 +93,19 @@ describe('cloud mode adapters', () => {
     expect(result.reports[0]?.status).toBe('passed');
   });
 
+  it('CommandTester includes fine cloud diagnostic category when cloud task failed', async () => {
+    const tester = new CommandTester(() => makeResult('failed'));
+    const input: TestInput = {
+      task: { id: 'task', title: 'Task' },
+      build: buildInput('cloud'),
+      mode: 'cloud',
+      runId: 'run-1'
+    };
+    const result = await tester.test(input);
+    expect(result.success).toBe(false);
+    expect(result.reports[0]?.details).toContain('Failure class: configuration (env_config)');
+  });
+
   it('CommandTester treats missing cloud_execution as a successful MCP fallback', async () => {
     const tester = new CommandTester(() => makeFallbackResult());
     const input: TestInput = {
@@ -125,8 +138,8 @@ describe('cloud mode adapters', () => {
     expect(result.decision.approved).toBe(false);
     expect(result.summary).toContain('Cloud task');
     expect(result.summary).toContain('Cloud status URL');
-    expect(result.summary).toContain('Failure class: configuration');
-    expect(result.decision.feedback).toContain('Failure class: configuration');
+    expect(result.summary).toContain('Failure class: configuration (env_config)');
+    expect(result.decision.feedback).toContain('Failure class: configuration (env_config)');
   });
 
   it('CommandReviewer reports fallback when cloud_execution is missing', async () => {

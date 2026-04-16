@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { chmod, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -15,6 +16,15 @@ import {
 import { REPO_CONFIG_PATH_ENV_KEY } from '../src/cli/config/userConfig.js';
 import { sanitizeProviderOverrideEnv } from '../src/cli/utils/providerOverrideEnv.js';
 import * as cloudPreflight from '../src/cli/utils/cloudPreflight.js';
+
+const TEST_AUTH_PROVENANCE_FINGERPRINT_KEY = 'doctor-test-fingerprint-key';
+
+function testFingerprint(value: string): string {
+  return `hmac-sha256:${createHmac('sha256', TEST_AUTH_PROVENANCE_FINGERPRINT_KEY)
+    .update(value)
+    .digest('hex')
+    .slice(0, 16)}`;
+}
 
 async function writeFakeCodexBinary(dir: string, featureLine: string): Promise<string> {
   const binPath = join(dir, 'codex');
@@ -1147,12 +1157,68 @@ describe('runDoctor', () => {
     }
   });
 
+  it('prints redacted auth provenance in doctor cloud preflight output', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-auth-'));
+    const fakeCodexBin = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+    const runCloudPreflightSpy = vi
+      .spyOn(cloudPreflight, 'runCloudPreflight')
+      .mockImplementation(async (request) => ({
+        ok: true,
+        issues: [],
+        details: {
+          codexBin: request.codexBin,
+          environmentId: request.environmentId,
+          branch: typeof request.branch === 'string' ? request.branch.replace(/^refs\/heads\//u, '') : null
+        }
+      }));
+
+    try {
+      const result = await runDoctorCloudPreflight({
+        cwd: tempDir,
+        env: buildDoctorCloudEnv({
+          CODEX_CLI_BIN: fakeCodexBin,
+          CODEX_CLOUD_ENV_ID: 'env_123',
+          CODEX_CLOUD_BRANCH: 'refs/heads/linear/co-200',
+          CODEX_AUTH_PROFILE: 'operator-profile',
+          OPENAI_ACCOUNT_ID: 'acct_raw_123',
+          CODEX_AUTH_PROVENANCE_FINGERPRINT_KEY: TEST_AUTH_PROVENANCE_FINGERPRINT_KEY,
+          OPENAI_API_KEY: 'sk-test-redacted'
+        })
+      });
+      const summary = formatDoctorCloudPreflightSummary(result).join('\n');
+      expect(result.details.auth_provenance).toMatchObject({
+        provider_kind: 'codex_cloud',
+        active_profile_fingerprint: testFingerprint('operator-profile'),
+        active_account_fingerprint: testFingerprint('acct_raw_123'),
+        cloud_env_id: 'env_123',
+        cloud_branch: 'linear/co-200',
+        credential_source: 'env:OPENAI_API_KEY',
+        auth_freshness: 'env_credential_present'
+      });
+      expect(runCloudPreflightSpy).toHaveBeenCalledOnce();
+      const [request] = runCloudPreflightSpy.mock.calls[0] ?? [];
+      expect(request?.repoRoot).toBe(tempDir);
+      expect(request?.codexBin).toBe(fakeCodexBin);
+      expect(request?.branch).toBe('refs/heads/linear/co-200');
+      expect(summary).toContain('credential source: env:OPENAI_API_KEY');
+      expect(summary).toContain(`profile fingerprint: ${testFingerprint('operator-profile')}`);
+      expect(summary).toContain(`account fingerprint: ${testFingerprint('acct_raw_123')}`);
+      expect(summary).not.toContain('operator-profile');
+      expect(summary).not.toContain('acct_raw_123');
+      expect(summary).not.toContain('sk-test-redacted');
+    } finally {
+      runCloudPreflightSpy.mockRestore();
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it('reports danger-full-access as a local-only advisory without failing cloud preflight', async () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-sandbox-advisory-'));
     const codexHome = join(tempDir, 'codex-home');
     await mkdir(codexHome, { recursive: true });
     await writeFile(join(codexHome, 'config.toml'), 'sandbox_mode = "danger-full-access"\n', 'utf8');
     const fakeCodexBin = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+
     try {
       const result = await runDoctorCloudPreflight({
         cwd: process.cwd(),

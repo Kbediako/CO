@@ -58,12 +58,14 @@ import {
   selectRunMemoryForRole
 } from './run/runMemoryController.js';
 import { writeJsonAtomic } from './utils/fs.js';
+import { fingerprintAuthProvenanceValue } from './utils/authProvenanceFingerprint.js';
 import {
   createRuntimeCodexCommandContext,
   formatRuntimeSelectionSummary,
   parseRuntimeMode,
   resolveRuntimeCodexCommand,
-  type RuntimeCodexCommandContext
+  type RuntimeCodexCommandContext,
+  type RuntimeSelection
 } from './runtime/index.js';
 import { sanitizeRunId } from '../persistence/sanitizeRunId.js';
 import { sanitizeTaskId } from '../persistence/sanitizeTaskId.js';
@@ -268,6 +270,38 @@ export interface ProviderLinearWorkerChildLaneRecord {
   decision_reason: string | null;
 }
 
+export type ProviderLinearWorkerDiagnosticCategory =
+  | 'env_config'
+  | 'auth_mismatch'
+  | 'quota_rate_limit'
+  | 'cloud_denial'
+  | 'guardian_timeout'
+  | 'guardian_policy_denial'
+  | 'provider_runtime'
+  | 'unknown';
+
+export interface ProviderLinearWorkerAuthProvenance {
+  provider_kind: string | null;
+  runtime_mode: string | null;
+  runtime_provider: string | null;
+  active_profile_fingerprint: string | null;
+  active_account_fingerprint: string | null;
+  cloud_env_id: string | null;
+  cloud_branch: string | null;
+  credential_source: string | null;
+  auth_freshness: string | null;
+  observed_at: string | null;
+  source: string | null;
+}
+
+export interface ProviderLinearWorkerFailureDiagnosis {
+  diagnostic_category: ProviderLinearWorkerDiagnosticCategory;
+  signal: string;
+  guidance: string;
+  source: string;
+  observed_at: string | null;
+}
+
 export interface ProviderLinearWorkerProof {
   issue_id: string;
   issue_identifier: string;
@@ -285,6 +319,8 @@ export interface ProviderLinearWorkerProof {
   current_turn_activity?: ProviderLinearWorkerCurrentTurnActivity | null;
   tokens: ProviderLinearWorkerTokenUsage;
   rate_limits: Record<string, unknown> | null;
+  auth_provenance?: ProviderLinearWorkerAuthProvenance | null;
+  failure_diagnosis?: ProviderLinearWorkerFailureDiagnosis | null;
   owner_phase: string;
   owner_status: 'in_progress' | 'succeeded' | 'failed';
   workspace_path: string | null;
@@ -304,7 +340,9 @@ export interface ProviderLinearWorkerProof {
 
 export type ProviderLinearWorkerCurrentTurnActivitySource =
   | 'stdout_jsonl'
-  | 'session_log_hydration';
+  | 'session_log_hydration'
+  | 'stderr'
+  | 'exec_runner';
 
 export interface ProviderLinearWorkerCurrentTurnActivity {
   event: string | null;
@@ -338,6 +376,8 @@ export interface ProviderLinearWorkerJsonlParseResult {
   currentTurnActivity: ProviderLinearWorkerCurrentTurnActivity | null;
   tokens: ProviderLinearWorkerTokenUsage;
   rateLimits: Record<string, unknown> | null;
+  authProvenance: ProviderLinearWorkerAuthProvenance | null;
+  failureDiagnosis: ProviderLinearWorkerFailureDiagnosis | null;
 }
 
 export interface ProviderLinearWorkerExecRequest {
@@ -1272,11 +1312,14 @@ export function buildProviderWorkerPrompt(
     .join('\n');
 }
 
-export function parseProviderLinearWorkerJsonl(raw: string): ProviderLinearWorkerJsonlParseResult {
+export function parseProviderLinearWorkerJsonl(
+  raw: string,
+  env: NodeJS.ProcessEnv = process.env
+): ProviderLinearWorkerJsonlParseResult {
   const state = buildEmptyProviderLinearWorkerJsonlParseResult();
 
   for (const line of raw.split(/\r?\n/u)) {
-    applyProviderLinearWorkerJsonlLine(state, line);
+    applyProviderLinearWorkerJsonlLine(state, line, 'stdout_jsonl', env);
   }
 
   return state;
@@ -1291,14 +1334,17 @@ function buildEmptyProviderLinearWorkerJsonlParseResult(): ProviderLinearWorkerJ
     lastEventAt: null,
     currentTurnActivity: null,
     tokens: buildEmptyProviderLinearWorkerTokenUsage(),
-    rateLimits: null
+    rateLimits: null,
+    authProvenance: null,
+    failureDiagnosis: null
   };
 }
 
 function applyProviderLinearWorkerJsonlLine(
   state: ProviderLinearWorkerJsonlParseResult,
   line: string,
-  activitySource: ProviderLinearWorkerCurrentTurnActivitySource = 'stdout_jsonl'
+  activitySource: ProviderLinearWorkerCurrentTurnActivitySource = 'stdout_jsonl',
+  env: NodeJS.ProcessEnv = process.env
 ): boolean {
   const trimmed = line.trim();
   if (!trimmed.startsWith('{')) {
@@ -1306,7 +1352,7 @@ function applyProviderLinearWorkerJsonlLine(
   }
   try {
     const parsed = JSON.parse(trimmed) as Record<string, unknown>;
-    return applyProviderLinearWorkerJsonlRecord(state, parsed, activitySource);
+    return applyProviderLinearWorkerJsonlRecord(state, parsed, activitySource, env);
   } catch {
     return false;
   }
@@ -1315,7 +1361,8 @@ function applyProviderLinearWorkerJsonlLine(
 function applyProviderLinearWorkerJsonlRecord(
   state: ProviderLinearWorkerJsonlParseResult,
   parsed: Record<string, unknown>,
-  activitySource: ProviderLinearWorkerCurrentTurnActivitySource
+  activitySource: ProviderLinearWorkerCurrentTurnActivitySource,
+  env: NodeJS.ProcessEnv = process.env
 ): boolean {
   let changed = false;
   let threadChanged = false;
@@ -1409,6 +1456,19 @@ function applyProviderLinearWorkerJsonlRecord(
     state.rateLimits = observedRateLimits;
     changed = true;
   }
+  const observedAuthProvenance = extractProviderWorkerAuthProvenance(parsed, activitySource, env);
+  if (observedAuthProvenance) {
+    state.authProvenance = mergeProviderWorkerAuthProvenance(
+      state.authProvenance,
+      observedAuthProvenance
+    );
+    changed = true;
+  }
+  const observedFailureDiagnosis = classifyProviderWorkerFailureDiagnosis(parsed, activitySource);
+  if (observedFailureDiagnosis) {
+    state.failureDiagnosis = observedFailureDiagnosis;
+    changed = true;
+  }
   const synchronizedCurrentTurnActivity = synchronizeProviderLinearWorkerCurrentTurnActivity(
     state.currentTurnActivity,
     state.threadId,
@@ -1425,20 +1485,22 @@ function applyProviderLinearWorkerJsonlRecord(
 
 function applyProviderLinearWorkerSessionJsonlLine(
   state: ProviderLinearWorkerJsonlParseResult,
-  line: string
+  line: string,
+  env: NodeJS.ProcessEnv = process.env
 ): boolean {
   const parsed = parseProviderWorkerSessionJsonlLine(line);
   if (!parsed) {
     return false;
   }
-  return applyProviderLinearWorkerSessionJsonlRecord(state, parsed);
+  return applyProviderLinearWorkerSessionJsonlRecord(state, parsed, env);
 }
 
 function applyProviderLinearWorkerSessionJsonlRecord(
   state: ProviderLinearWorkerJsonlParseResult,
-  parsed: Record<string, unknown>
+  parsed: Record<string, unknown>,
+  env: NodeJS.ProcessEnv = process.env
 ): boolean {
-  return applyProviderLinearWorkerJsonlRecord(state, parsed, 'session_log_hydration');
+  return applyProviderLinearWorkerJsonlRecord(state, parsed, 'session_log_hydration', env);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -1452,6 +1514,7 @@ function resetProviderLinearWorkerTurnScopedTelemetry(
   state.finalMessage = null;
   state.lastEventAt = null;
   state.currentTurnActivity = null;
+  state.failureDiagnosis = null;
 }
 
 function isProviderLinearWorkerBookkeepingRecord(parsed: Record<string, unknown>): boolean {
@@ -1805,6 +1868,1160 @@ function isProviderWorkerRateLimitsRecord(input: Record<string, unknown>): boole
   const primary = isRecord(input.primary) ? input.primary : null;
   const secondary = isRecord(input.secondary) ? input.secondary : null;
   return hasProviderWorkerRateLimitBucketSummary(primary) || hasProviderWorkerRateLimitBucketSummary(secondary);
+}
+
+function findValueAtPath(input: Record<string, unknown>, path: string[]): unknown {
+  let current: unknown = input;
+  for (const segment of path) {
+    if (!isRecord(current)) {
+      return null;
+    }
+    current = current[segment];
+  }
+  return current;
+}
+
+const PROVIDER_WORKER_CREDENTIAL_SOURCE_LABELS = new Set([
+  'api_key',
+  'browser_login',
+  'chatgpt_login',
+  'cloud_env',
+  'codex_login',
+  'config',
+  'credential_store',
+  'device_auth',
+  'env',
+  'keychain',
+  'oauth',
+  'runtime_env',
+  'unknown'
+]);
+
+const PROVIDER_WORKER_CREDENTIAL_SOURCE_ENV_KEYS = new Set([
+  'CHATGPT_AUTH_TOKEN',
+  'CODEX_API_KEY',
+  'CODEX_AUTH_TOKEN',
+  'OPENAI_API_KEY',
+  'OPENAI_AUTH_TOKEN'
+]);
+
+const PROVIDER_WORKER_AUTH_FRESHNESS_LABELS = new Set([
+  'credential_event_present',
+  'credential_source_unknown',
+  'event_observed',
+  'env_credential_present',
+  'expired',
+  'fresh',
+  'missing',
+  'observed',
+  'recent',
+  'stale',
+  'unknown',
+  'valid'
+]);
+
+const PROVIDER_WORKER_ACCOUNT_PLAN_LABELS = new Set([
+  'enterprise',
+  'free',
+  'plus',
+  'pro',
+  'prolite',
+  'team',
+  'unknown',
+  'unknown_plan'
+]);
+
+const PROVIDER_WORKER_WHAM_PLAN_LABELS = new Set([
+  'none',
+  'unknown',
+  'unknown_plan',
+  'unknown_wham_plan'
+]);
+
+function normalizeProviderWorkerSafeLabel(
+  value: unknown,
+  allowedLabels: Set<string>,
+  fallbackLabel = 'redacted'
+): string | null {
+  const raw = normalizeOptionalString(value);
+  if (!raw) {
+    return null;
+  }
+  if (
+    /(?:bearer\s+|sk-[a-z0-9]|token\s*[:=]|api[_-]?key\s*[:=]|authorization\s*[:=]|cookie\s*[:=])/iu.test(raw)
+    || raw.length > 96
+  ) {
+    return null;
+  }
+  const envMatch = /^env:([A-Za-z0-9_]+)$/u.exec(raw.trim());
+  if (envMatch) {
+    const envKey = envMatch[1].toUpperCase();
+    return PROVIDER_WORKER_CREDENTIAL_SOURCE_ENV_KEYS.has(envKey) ? `env:${envKey}` : fallbackLabel;
+  }
+  const normalized = raw.replace(/[-\s]+/gu, '_').toLowerCase();
+  return allowedLabels.has(normalized) ? normalized : fallbackLabel;
+}
+
+function normalizeProviderWorkerCredentialSource(value: unknown): string | null {
+  return normalizeProviderWorkerSafeLabel(value, PROVIDER_WORKER_CREDENTIAL_SOURCE_LABELS);
+}
+
+function normalizeProviderWorkerAuthFreshness(value: unknown): string | null {
+  return normalizeProviderWorkerSafeLabel(value, PROVIDER_WORKER_AUTH_FRESHNESS_LABELS);
+}
+
+function normalizeProviderWorkerPlanLabel(
+  value: unknown,
+  allowedLabels: Set<string>
+): string | null {
+  return normalizeProviderWorkerSafeLabel(value, allowedLabels);
+}
+
+function fingerprintProviderWorkerAuthValue(
+  value: unknown,
+  env: NodeJS.ProcessEnv = process.env
+): string | null {
+  if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
+    return null;
+  }
+  return fingerprintAuthProvenanceValue(value, env);
+}
+
+function fingerprintProviderWorkerEnvAuthValue(
+  value: unknown,
+  env: NodeJS.ProcessEnv
+): string | null {
+  if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
+    return null;
+  }
+  return fingerprintAuthProvenanceValue(value, env);
+}
+
+function readFirstProviderWorkerStringAtPaths(
+  input: Record<string, unknown>,
+  paths: string[][]
+): string | null {
+  for (const path of paths) {
+    const value = normalizeOptionalString(findValueAtPath(input, path));
+    if (value) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function readFirstProviderWorkerFingerprintAtPaths(
+  input: Record<string, unknown>,
+  paths: string[][],
+  env: NodeJS.ProcessEnv = process.env
+): string | null {
+  for (const path of paths) {
+    const fingerprint = fingerprintProviderWorkerAuthValue(findValueAtPath(input, path), env);
+    if (fingerprint) {
+      return fingerprint;
+    }
+  }
+  return null;
+}
+
+function readProviderWorkerStructuredDiagnosticCategoryValues(input: Record<string, unknown>): string[] {
+  const payload = isRecord(input.payload) ? input.payload : null;
+  const params = isRecord(input.params) ? input.params : null;
+  const payloadParams = isRecord(payload?.params) ? payload.params : null;
+  const failureDiagnosis = isRecord(input.failure_diagnosis) ? input.failure_diagnosis : null;
+  const payloadFailureDiagnosis = isRecord(payload?.failure_diagnosis) ? payload.failure_diagnosis : null;
+  const paramsFailureDiagnosis = isRecord(params?.failure_diagnosis) ? params.failure_diagnosis : null;
+  const payloadParamsFailureDiagnosis =
+    isRecord(payloadParams?.failure_diagnosis) ? payloadParams.failure_diagnosis : null;
+  return [
+    normalizeOptionalString(input.diagnostic_category),
+    normalizeOptionalString(input.diagnosticCategory),
+    normalizeOptionalString(failureDiagnosis?.diagnostic_category),
+    normalizeOptionalString(failureDiagnosis?.diagnosticCategory),
+    normalizeOptionalString(payload?.diagnostic_category),
+    normalizeOptionalString(payload?.diagnosticCategory),
+    normalizeOptionalString(payloadFailureDiagnosis?.diagnostic_category),
+    normalizeOptionalString(payloadFailureDiagnosis?.diagnosticCategory),
+    normalizeOptionalString(params?.diagnostic_category),
+    normalizeOptionalString(params?.diagnosticCategory),
+    normalizeOptionalString(paramsFailureDiagnosis?.diagnostic_category),
+    normalizeOptionalString(paramsFailureDiagnosis?.diagnosticCategory),
+    normalizeOptionalString(payloadParams?.diagnostic_category),
+    normalizeOptionalString(payloadParams?.diagnosticCategory),
+    normalizeOptionalString(payloadParamsFailureDiagnosis?.diagnostic_category),
+    normalizeOptionalString(payloadParamsFailureDiagnosis?.diagnosticCategory)
+  ].filter((value): value is string => Boolean(value));
+}
+
+function readProviderWorkerStructuredDiagnosticValues(input: Record<string, unknown>): string[] {
+  const payload = isRecord(input.payload) ? input.payload : null;
+  const params = isRecord(input.params) ? input.params : null;
+  const payloadParams = isRecord(payload?.params) ? payload.params : null;
+  return [
+    ...readProviderWorkerStructuredDiagnosticCategoryValues(input),
+    normalizeOptionalString(input.method),
+    normalizeOptionalString(input.type),
+    normalizeOptionalString(input.status_detail),
+    normalizeOptionalString(input.statusDetail),
+    normalizeOptionalString(input.status),
+    normalizeOptionalString(payload?.method),
+    normalizeOptionalString(payload?.type),
+    normalizeOptionalString(payload?.status_detail),
+    normalizeOptionalString(payload?.statusDetail),
+    normalizeOptionalString(payload?.status),
+    normalizeOptionalString(params?.method),
+    normalizeOptionalString(params?.type),
+    normalizeOptionalString(params?.status_detail),
+    normalizeOptionalString(params?.statusDetail),
+    normalizeOptionalString(params?.status),
+    normalizeOptionalString(payloadParams?.method),
+    normalizeOptionalString(payloadParams?.type),
+    normalizeOptionalString(payloadParams?.status_detail),
+    normalizeOptionalString(payloadParams?.statusDetail),
+    normalizeOptionalString(payloadParams?.status)
+  ].filter((value): value is string => Boolean(value));
+}
+
+function normalizeProviderWorkerStructuredDiagnosticValue(value: string): string {
+  return value
+    .replace(/([a-z0-9])([A-Z])/gu, '$1_$2')
+    .replace(/[^A-Za-z0-9]+/gu, '_')
+    .replace(/^_+|_+$/gu, '')
+    .replace(/_+/gu, '_')
+    .toLowerCase();
+}
+
+function isProviderWorkerAuthProvenanceCarrier(input: Record<string, unknown>): boolean {
+  if (
+    readFirstProviderWorkerStringAtPaths(input, [
+      ['credential_source'],
+      ['credentialSource'],
+      ['auth_source'],
+      ['authSource'],
+      ['auth_freshness'],
+      ['authFreshness'],
+      ['payload', 'credential_source'],
+      ['payload', 'credentialSource'],
+      ['payload', 'auth_source'],
+      ['payload', 'authSource'],
+      ['payload', 'auth_freshness'],
+      ['payload', 'authFreshness'],
+      ['params', 'credential_source'],
+      ['params', 'credentialSource'],
+      ['params', 'auth_source'],
+      ['params', 'authSource'],
+      ['params', 'auth_freshness'],
+      ['params', 'authFreshness']
+    ])
+  ) {
+    return true;
+  }
+  if (
+    findRecordAtPaths(input, [
+      ['auth'],
+      ['params', 'auth'],
+      ['payload', 'auth'],
+      ['payload', 'params', 'auth']
+    ])
+  ) {
+    return true;
+  }
+  return readProviderWorkerStructuredDiagnosticValues(input)
+    .map(normalizeProviderWorkerStructuredDiagnosticValue)
+    .some((value) =>
+      /\bauth\b/u.test(value.replace(/_/gu, ' ')) ||
+      value.includes('auth_profile') ||
+      value.includes('authprofile') ||
+      value.includes('credential') ||
+      value.includes('login') ||
+      value.includes('oauth') ||
+      value.includes('device_auth')
+    );
+}
+
+function extractProviderWorkerAuthProvenance(
+  input: Record<string, unknown>,
+  source: ProviderLinearWorkerCurrentTurnActivitySource,
+  env: NodeJS.ProcessEnv = process.env
+): ProviderLinearWorkerAuthProvenance | null {
+  if (!isProviderWorkerAuthProvenanceCarrier(input)) {
+    return null;
+  }
+  const profileFingerprint = readFirstProviderWorkerFingerprintAtPaths(
+    input,
+    [
+      ['auth_profile'],
+      ['authProfile'],
+      ['profile'],
+      ['profile_id'],
+      ['profileId'],
+      ['auth', 'auth_profile'],
+      ['auth', 'authProfile'],
+      ['auth', 'profile'],
+      ['auth', 'profile_id'],
+      ['auth', 'profileId'],
+      ['params', 'auth_profile'],
+      ['params', 'authProfile'],
+      ['params', 'profile'],
+      ['params', 'profile_id'],
+      ['params', 'profileId'],
+      ['params', 'auth', 'auth_profile'],
+      ['params', 'auth', 'authProfile'],
+      ['params', 'auth', 'profile'],
+      ['params', 'auth', 'profile_id'],
+      ['params', 'auth', 'profileId'],
+      ['payload', 'auth_profile'],
+      ['payload', 'authProfile'],
+      ['payload', 'profile'],
+      ['payload', 'profile_id'],
+      ['payload', 'profileId'],
+      ['payload', 'auth', 'auth_profile'],
+      ['payload', 'auth', 'authProfile'],
+      ['payload', 'auth', 'profile'],
+      ['payload', 'auth', 'profile_id'],
+      ['payload', 'auth', 'profileId'],
+      ['payload', 'params', 'auth_profile'],
+      ['payload', 'params', 'authProfile'],
+      ['payload', 'params', 'profile'],
+      ['payload', 'params', 'profile_id'],
+      ['payload', 'params', 'profileId'],
+      ['payload', 'params', 'auth', 'auth_profile'],
+      ['payload', 'params', 'auth', 'authProfile'],
+      ['payload', 'params', 'auth', 'profile'],
+      ['payload', 'params', 'auth', 'profile_id'],
+      ['payload', 'params', 'auth', 'profileId']
+    ],
+    env
+  );
+  const accountFingerprint = readFirstProviderWorkerFingerprintAtPaths(
+    input,
+    [
+      ['account_id'],
+      ['accountId'],
+      ['account'],
+      ['organization_id'],
+      ['organizationId'],
+      ['org_id'],
+      ['orgId'],
+      ['email'],
+      ['auth', 'account_id'],
+      ['auth', 'accountId'],
+      ['auth', 'account'],
+      ['auth', 'account', 'id'],
+      ['auth', 'account', 'email'],
+      ['auth', 'organization_id'],
+      ['auth', 'organizationId'],
+      ['auth', 'org_id'],
+      ['auth', 'orgId'],
+      ['params', 'account_id'],
+      ['params', 'accountId'],
+      ['params', 'account'],
+      ['params', 'account', 'id'],
+      ['params', 'account', 'email'],
+      ['params', 'organization_id'],
+      ['params', 'organizationId'],
+      ['params', 'org_id'],
+      ['params', 'orgId'],
+      ['params', 'auth', 'account'],
+      ['params', 'auth', 'account', 'id'],
+      ['params', 'auth', 'account', 'email'],
+      ['params', 'auth', 'account_id'],
+      ['params', 'auth', 'accountId'],
+      ['params', 'auth', 'organization_id'],
+      ['params', 'auth', 'organizationId'],
+      ['params', 'auth', 'org_id'],
+      ['params', 'auth', 'orgId'],
+      ['payload', 'account_id'],
+      ['payload', 'accountId'],
+      ['payload', 'account'],
+      ['payload', 'account', 'id'],
+      ['payload', 'account', 'email'],
+      ['payload', 'organization_id'],
+      ['payload', 'organizationId'],
+      ['payload', 'org_id'],
+      ['payload', 'orgId'],
+      ['payload', 'auth', 'account_id'],
+      ['payload', 'auth', 'accountId'],
+      ['payload', 'auth', 'account'],
+      ['payload', 'auth', 'account', 'id'],
+      ['payload', 'auth', 'account', 'email'],
+      ['payload', 'auth', 'organization_id'],
+      ['payload', 'auth', 'organizationId'],
+      ['payload', 'auth', 'org_id'],
+      ['payload', 'auth', 'orgId'],
+      ['payload', 'params', 'account_id'],
+      ['payload', 'params', 'accountId'],
+      ['payload', 'params', 'account'],
+      ['payload', 'params', 'account', 'id'],
+      ['payload', 'params', 'account', 'email'],
+      ['payload', 'params', 'organization_id'],
+      ['payload', 'params', 'organizationId'],
+      ['payload', 'params', 'org_id'],
+      ['payload', 'params', 'orgId'],
+      ['payload', 'params', 'auth', 'account'],
+      ['payload', 'params', 'auth', 'account', 'id'],
+      ['payload', 'params', 'auth', 'account', 'email'],
+      ['payload', 'params', 'auth', 'account_id'],
+      ['payload', 'params', 'auth', 'accountId'],
+      ['payload', 'params', 'auth', 'organization_id'],
+      ['payload', 'params', 'auth', 'organizationId'],
+      ['payload', 'params', 'auth', 'org_id'],
+      ['payload', 'params', 'auth', 'orgId']
+    ],
+    env
+  );
+  const credentialSource =
+    normalizeProviderWorkerCredentialSource(
+      readFirstProviderWorkerStringAtPaths(input, [
+        ['credential_source'],
+        ['credentialSource'],
+        ['auth_source'],
+        ['authSource'],
+        ['auth', 'credential_source'],
+        ['auth', 'credentialSource'],
+        ['auth', 'auth_source'],
+        ['auth', 'authSource'],
+        ['params', 'credential_source'],
+        ['params', 'credentialSource'],
+        ['params', 'auth_source'],
+        ['params', 'authSource'],
+        ['params', 'auth', 'credential_source'],
+        ['params', 'auth', 'credentialSource'],
+        ['params', 'auth', 'auth_source'],
+        ['params', 'auth', 'authSource'],
+        ['payload', 'credential_source'],
+        ['payload', 'credentialSource'],
+        ['payload', 'auth_source'],
+        ['payload', 'authSource'],
+        ['payload', 'auth', 'credential_source'],
+        ['payload', 'auth', 'credentialSource'],
+        ['payload', 'auth', 'auth_source'],
+        ['payload', 'auth', 'authSource'],
+        ['payload', 'params', 'credential_source'],
+        ['payload', 'params', 'credentialSource'],
+        ['payload', 'params', 'auth_source'],
+        ['payload', 'params', 'authSource'],
+        ['payload', 'params', 'auth', 'credential_source'],
+        ['payload', 'params', 'auth', 'credentialSource'],
+        ['payload', 'params', 'auth', 'auth_source'],
+        ['payload', 'params', 'auth', 'authSource']
+      ])
+    ) ?? null;
+  const authFreshness = normalizeProviderWorkerAuthFreshness(
+    readFirstProviderWorkerStringAtPaths(input, [
+      ['auth_freshness'],
+      ['authFreshness'],
+      ['freshness'],
+      ['auth', 'auth_freshness'],
+      ['auth', 'authFreshness'],
+      ['auth', 'freshness'],
+      ['params', 'auth_freshness'],
+      ['params', 'authFreshness'],
+      ['params', 'freshness'],
+      ['params', 'auth', 'auth_freshness'],
+      ['params', 'auth', 'authFreshness'],
+      ['params', 'auth', 'freshness'],
+      ['payload', 'auth_freshness'],
+      ['payload', 'authFreshness'],
+      ['payload', 'freshness'],
+      ['payload', 'auth', 'auth_freshness'],
+      ['payload', 'auth', 'authFreshness'],
+      ['payload', 'auth', 'freshness'],
+      ['payload', 'params', 'auth_freshness'],
+      ['payload', 'params', 'authFreshness'],
+      ['payload', 'params', 'freshness'],
+      ['payload', 'params', 'auth', 'auth_freshness'],
+      ['payload', 'params', 'auth', 'authFreshness'],
+      ['payload', 'params', 'auth', 'freshness']
+    ])
+  );
+  if (
+    !profileFingerprint &&
+    !accountFingerprint &&
+    !credentialSource &&
+    !authFreshness
+  ) {
+    return null;
+  }
+  const timestamp =
+    normalizeOptionalString(input.timestamp) ??
+    normalizeOptionalString((input.payload as Record<string, unknown> | undefined)?.timestamp);
+  return {
+    provider_kind: 'codex',
+    runtime_mode: null,
+    runtime_provider: null,
+    active_profile_fingerprint: profileFingerprint,
+    active_account_fingerprint: accountFingerprint,
+    cloud_env_id: null,
+    cloud_branch: null,
+    credential_source: credentialSource,
+    auth_freshness: authFreshness ?? (credentialSource ? 'credential_event_present' : 'event_observed'),
+    observed_at: timestamp,
+    source
+  };
+}
+
+function mergeProviderWorkerAuthProvenance(
+  current: ProviderLinearWorkerAuthProvenance | null | undefined,
+  observed: ProviderLinearWorkerAuthProvenance | null | undefined
+): ProviderLinearWorkerAuthProvenance | null {
+  if (!current) {
+    return observed ?? null;
+  }
+  if (!observed) {
+    return current;
+  }
+  const currentObservedAt = Date.parse(current.observed_at ?? '');
+  const observedObservedAt = Date.parse(observed.observed_at ?? '');
+  const observedIsNewer =
+    Number.isFinite(currentObservedAt) && Number.isFinite(observedObservedAt)
+      ? observedObservedAt >= currentObservedAt
+      : true;
+  const preferObserved = <T>(currentValue: T | null, observedValue: T | null): T | null =>
+    observedIsNewer ? (observedValue ?? currentValue) : currentValue;
+  return {
+    provider_kind: preferObserved(current.provider_kind, observed.provider_kind),
+    runtime_mode: preferObserved(current.runtime_mode, observed.runtime_mode),
+    runtime_provider: preferObserved(current.runtime_provider, observed.runtime_provider),
+    active_profile_fingerprint: preferObserved(
+      current.active_profile_fingerprint,
+      observed.active_profile_fingerprint
+    ),
+    active_account_fingerprint: preferObserved(
+      current.active_account_fingerprint,
+      observed.active_account_fingerprint
+    ),
+    cloud_env_id: preferObserved(current.cloud_env_id, observed.cloud_env_id),
+    cloud_branch: preferObserved(current.cloud_branch, observed.cloud_branch),
+    credential_source: preferObserved(current.credential_source, observed.credential_source),
+    auth_freshness: preferObserved(current.auth_freshness, observed.auth_freshness),
+    observed_at: preferObserved(current.observed_at, observed.observed_at),
+    source: preferObserved(current.source, observed.source)
+  };
+}
+
+function formatProviderWorkerRedactedPlanValue(label: string, value: string): string {
+  const allowedLabels = /wham/iu.test(label)
+    ? PROVIDER_WORKER_WHAM_PLAN_LABELS
+    : PROVIDER_WORKER_ACCOUNT_PLAN_LABELS;
+  return normalizeProviderWorkerPlanLabel(value, allowedLabels) ?? 'redacted';
+}
+
+function redactProviderWorkerFreeFormPlanDetails(raw: string): string {
+  return raw
+    .replace(
+      /(["'])(accountPlan|account_plan|whamPlan|wham_plan)\1\s*[=:]\s*(?:"([^"]*)"|'([^']*)'|([A-Za-z0-9][A-Za-z0-9_-]*))/giu,
+      (
+        _match,
+        quote: string,
+        label: string,
+        doubleQuotedValue: string | undefined,
+        singleQuotedValue: string | undefined,
+        bareValue: string | undefined
+      ) => {
+        const value = doubleQuotedValue ?? singleQuotedValue ?? bareValue ?? '';
+        return `${quote}${label}${quote}:"${formatProviderWorkerRedactedPlanValue(label, value)}"`;
+      }
+    )
+    .replace(
+      /\b(accountPlan|account_plan|whamPlan|wham_plan)\s*[=:]\s*["']?([A-Za-z0-9][A-Za-z0-9_-]*)["']?/giu,
+      (_match, label: string, value: string) =>
+        `${label}=${formatProviderWorkerRedactedPlanValue(label, value)}`
+    )
+    .replace(
+      /\b((?:account\s+)?plan|wham\s+plan)\s+(?:is\s+|was\s+)?["']?([A-Za-z0-9][A-Za-z0-9_-]*)["']?/giu,
+      (_match, label: string, value: string) =>
+        `${label} ${formatProviderWorkerRedactedPlanValue(label, value)}`
+    );
+}
+
+function redactProviderWorkerDiagnosticText(raw: string): string {
+  return redactProviderWorkerFreeFormPlanDetails(raw)
+    .replace(/\bBearer\s+(?!token\b)[A-Za-z0-9._~+/=-]+/giu, 'Bearer <redacted>')
+    .replace(/sk-[A-Za-z0-9_-]+/gu, 'sk-<redacted>')
+    .replace(
+      /([A-Za-z0-9._%+-])[A-Za-z0-9._%+-]*@([A-Za-z0-9.-]+\.[A-Za-z]{2,})/gu,
+      '<email-redacted>'
+    )
+    .replace(
+      /(["'])([A-Za-z0-9_-]*(?:token|secret|credential|api[_-]?key)[A-Za-z0-9_-]*|oauth[_-]?(?:refresh|access)|authorization|cookie|session(?:[_-]?id)?)\1\s*[=:]\s*(?:"[^"]*"|'[^']*'|[^\s,}]+)/giu,
+      '$1$2$1:"<redacted>"'
+    )
+    .replace(
+      /(["'])((?:(?:refresh|access|auth|session|bearer)\s+token|oauth\s+(?:refresh|access)|api\s+key|authorization|cookie|secret|credential|session\s+(?:id|identifier)))\1\s*[=:]\s*(?:"[^"]*"|'[^']*'|[^\s,}]+)/giu,
+      '$1$2$1:"<redacted>"'
+    )
+    .replace(
+      /(["'])((?:auth[_-]?)?profile(?:[_-]?id)?|account(?:[_-]?id)?|org(?:anization)?(?:[_-]?id)?|user(?:[_-]?id)?)\1\s*:\s*(?:"[^"]*"|'[^']*'|[^\s,}]+)/giu,
+      '$1$2$1:"<redacted>"'
+    )
+    .replace(
+      /(["'])((?:auth[\s_-]?)?profile\s+(?:id|identifier)|account\s+(?:id|identifier)|org(?:anization)?\s+(?:id|identifier)|user\s+(?:id|identifier))\1\s*[=:]\s*(?:"[^"]*"|'[^']*'|[^\s,}]+)/giu,
+      '$1$2$1:"<redacted>"'
+    )
+    .replace(
+      /\b([A-Za-z0-9_-]*(?:token|secret|credential|api[_-]?key)[A-Za-z0-9_-]*|oauth[_-]?(?:refresh|access)|authorization|cookie|session(?:[_-]?id)?)\s*[=:]\s*\S+/giu,
+      '$1=<redacted>'
+    )
+    .replace(
+      /\b((?:refresh|access|auth|session|bearer)\s+token|oauth\s+(?:refresh|access)|api\s+key|authorization|cookie|secret|credential|session\s+(?:id|identifier))\s*[=:]\s*(?:"[^"]*"|'[^']*'|\S+)/giu,
+      '$1=<redacted>'
+    )
+    .replace(
+      /\b([A-Za-z0-9_-]*(?:(?:refresh|access|auth)[A-Za-z0-9_-]*token|api[_-]?key|secret|credential)[A-Za-z0-9_-]*|oauth[_-]?(?:refresh|access)|authorization|cookie|session[_-]?id)\s+["']?[A-Za-z0-9][A-Za-z0-9._~+/=@:-]*["']?/giu,
+      '$1 <redacted>'
+    )
+    .replace(
+      /\b(session\s+(?:id|identifier))\s+["']?[A-Za-z0-9][A-Za-z0-9._~+/=@:-]*["']?/giu,
+      '$1 <redacted>'
+    )
+    .replace(
+      /\b((?:refresh|access|auth|session)\s+token|api\s+key|token(?!\s+(?:quota|limit|rate(?:\s+limit)?|usage\s+limit)\b)|secret|credential)\s+["']?[A-Za-z0-9][A-Za-z0-9._~+/=@:-]*["']?/giu,
+      '$1 <redacted>'
+    )
+    .replace(
+      /\b((?:auth[_-]?)?profile(?:[_-]?id)?|account(?:[_-]?id)?|org(?:anization)?(?:[_-]?id)?|user(?:[_-]?id)?)\s*[=:]\s*(?:"[^"]+"|'[^']+'|\S+)/giu,
+      '$1=<redacted>'
+    )
+    .replace(/\b(acct|org|user)([_-])[A-Za-z0-9_-]+\b/giu, '$1$2<redacted>')
+    .replace(
+      /\b((?:auth[\s_-]?)?profile|account|org(?:anization)?|user)\s+(id|identifier)\s*[=:]\s*(?:"[^"]+"|'[^']+'|\S+)/giu,
+      '$1 $2 <redacted>'
+    )
+    .replace(
+      /\b((?:auth[\s_-]?)?profile|account|org(?:anization)?|user)\s+(?:id|identifier)\s+["']?[A-Za-z0-9][A-Za-z0-9._@-]*["']?/giu,
+      '$1 id <redacted>'
+    )
+    .replace(
+      /\b((?:auth[\s_-]?)?profile|account|org(?:anization)?|user)\s+["']?[A-Za-z0-9][A-Za-z0-9._@-]*(?:[_@.-][A-Za-z0-9._@-]+)["']?/giu,
+      '$1 <redacted>'
+    );
+}
+
+const PROVIDER_WORKER_DIAGNOSTIC_SIGNAL_MAX_LENGTH = 500;
+
+interface ProviderWorkerDiagnosticSignal {
+  classificationSignal: string;
+  signal: string;
+}
+
+function truncateProviderWorkerDiagnosticSignal(signal: string, preservedFields: string[]): string {
+  if (signal.length <= PROVIDER_WORKER_DIAGNOSTIC_SIGNAL_MAX_LENGTH) {
+    return signal;
+  }
+  const preservedSuffix = Array.from(new Set(preservedFields))
+    .filter((field) => field.length > 0 && signal.includes(field))
+    .join(' | ');
+  if (!preservedSuffix) {
+    return signal.slice(0, PROVIDER_WORKER_DIAGNOSTIC_SIGNAL_MAX_LENGTH);
+  }
+  if (preservedSuffix.length >= PROVIDER_WORKER_DIAGNOSTIC_SIGNAL_MAX_LENGTH) {
+    return preservedSuffix.slice(0, PROVIDER_WORKER_DIAGNOSTIC_SIGNAL_MAX_LENGTH);
+  }
+  const separator = ' | ';
+  const prefixBudget =
+    PROVIDER_WORKER_DIAGNOSTIC_SIGNAL_MAX_LENGTH - preservedSuffix.length - separator.length;
+  const prefix = signal
+    .slice(0, Math.max(0, prefixBudget))
+    .replace(/\s*\|\s*$/u, '')
+    .trimEnd();
+  return (prefix ? `${prefix}${separator}${preservedSuffix}` : preservedSuffix).slice(
+    0,
+    PROVIDER_WORKER_DIAGNOSTIC_SIGNAL_MAX_LENGTH
+  );
+}
+
+function formatProviderWorkerDiagnosticSignalField(
+  label: string,
+  value: unknown,
+  options: { allowedLabels?: Set<string> } = {}
+): string | null {
+  const raw = normalizeOptionalString(value);
+  if (!raw) {
+    return null;
+  }
+  const redacted = (
+    options.allowedLabels
+      ? normalizeProviderWorkerPlanLabel(raw, options.allowedLabels)
+      : redactProviderWorkerDiagnosticText(raw).replace(/\s+/gu, '_').slice(0, 96)
+  );
+  if (!redacted) {
+    return null;
+  }
+  return `${label}=${redacted}`;
+}
+
+function normalizeProviderWorkerDiagnosticClassificationText(value: string): string {
+  return value
+    .replace(/([a-z0-9])([A-Z])/gu, '$1 $2')
+    .replace(/[_\-/]+/gu, ' ')
+    .toLowerCase();
+}
+
+function isProviderWorkerTrustedDiagnosticMessageCarrier(
+  input: Record<string, unknown>,
+  source: ProviderLinearWorkerCurrentTurnActivitySource
+): boolean {
+  if (source === 'stderr' || source === 'exec_runner') {
+    return true;
+  }
+  const payload = isRecord(input.payload) ? input.payload : null;
+  const method =
+    normalizeOptionalString(input.method) ??
+    normalizeOptionalString(payload?.method);
+  if (method) {
+    return true;
+  }
+  const eventType = normalizeOptionalString(input.type)?.toLowerCase() ?? '';
+  const payloadType = normalizeOptionalString(payload?.type)?.toLowerCase() ?? '';
+  const payloadStatus = normalizeOptionalString(payload?.status)?.toLowerCase() ?? '';
+  if (['error', 'warning', 'diagnostic', 'notification', 'turn.failed', 'run.failed'].includes(eventType)) {
+    return true;
+  }
+  if (eventType !== 'event_msg') {
+    return false;
+  }
+  return (
+    ['diagnostic', 'error', 'guardian_policy_denial', 'guardian_timeout', 'tui_history', 'warning'].includes(
+      payloadType
+    ) ||
+    ['error', 'failed', 'failure'].includes(payloadStatus)
+  );
+}
+
+function buildProviderWorkerDiagnosticSignalParts(
+  input: Record<string, unknown>,
+  source: ProviderLinearWorkerCurrentTurnActivitySource
+): ProviderWorkerDiagnosticSignal {
+  const includeDiagnosticMessage = isProviderWorkerTrustedDiagnosticMessageCarrier(input, source);
+  const payload = isRecord(input.payload) ? input.payload : null;
+  const params = isRecord(input.params) ? input.params : null;
+  const payloadParams = isRecord(payload?.params) ? payload.params : null;
+  const accountPlanField = formatProviderWorkerDiagnosticSignalField(
+    'account_plan',
+    readFirstProviderWorkerStringAtPaths(input, [
+      ['account_plan'],
+      ['accountPlan'],
+      ['plan'],
+      ['params', 'account_plan'],
+      ['params', 'accountPlan'],
+      ['params', 'plan'],
+      ['payload', 'account_plan'],
+      ['payload', 'accountPlan'],
+      ['payload', 'plan'],
+      ['payload', 'params', 'account_plan'],
+      ['payload', 'params', 'accountPlan'],
+      ['payload', 'params', 'plan'],
+      ['params', 'msg', 'payload', 'info', 'account_plan'],
+      ['params', 'msg', 'payload', 'info', 'accountPlan'],
+      ['params', 'msg', 'payload', 'info', 'plan'],
+      ['params', 'msg', 'info', 'account_plan'],
+      ['params', 'msg', 'info', 'accountPlan'],
+      ['params', 'msg', 'info', 'plan'],
+      ['payload', 'params', 'msg', 'payload', 'info', 'account_plan'],
+      ['payload', 'params', 'msg', 'payload', 'info', 'accountPlan'],
+      ['payload', 'params', 'msg', 'payload', 'info', 'plan'],
+      ['payload', 'params', 'msg', 'info', 'account_plan'],
+      ['payload', 'params', 'msg', 'info', 'accountPlan'],
+      ['payload', 'params', 'msg', 'info', 'plan']
+    ]),
+    { allowedLabels: PROVIDER_WORKER_ACCOUNT_PLAN_LABELS }
+  );
+  const whamPlanField = formatProviderWorkerDiagnosticSignalField(
+    'wham_plan',
+    readFirstProviderWorkerStringAtPaths(input, [
+      ['wham_plan'],
+      ['whamPlan'],
+      ['params', 'wham_plan'],
+      ['params', 'whamPlan'],
+      ['payload', 'wham_plan'],
+      ['payload', 'whamPlan'],
+      ['payload', 'params', 'wham_plan'],
+      ['payload', 'params', 'whamPlan'],
+      ['params', 'msg', 'payload', 'info', 'wham_plan'],
+      ['params', 'msg', 'payload', 'info', 'whamPlan'],
+      ['params', 'msg', 'info', 'wham_plan'],
+      ['params', 'msg', 'info', 'whamPlan'],
+      ['payload', 'params', 'msg', 'payload', 'info', 'wham_plan'],
+      ['payload', 'params', 'msg', 'payload', 'info', 'whamPlan'],
+      ['payload', 'params', 'msg', 'info', 'wham_plan'],
+      ['payload', 'params', 'msg', 'info', 'whamPlan']
+    ]),
+    { allowedLabels: PROVIDER_WORKER_WHAM_PLAN_LABELS }
+  );
+  const preservedFields = [accountPlanField, whamPlanField].filter(
+    (value): value is string => Boolean(value)
+  );
+  const candidates = [
+    ...readProviderWorkerStructuredDiagnosticCategoryValues(input),
+    normalizeOptionalString(input.method),
+    normalizeOptionalString(input.type),
+    normalizeOptionalString(input.error),
+    includeDiagnosticMessage ? normalizeOptionalString(input.message) : null,
+    normalizeOptionalString(input.status),
+    normalizeOptionalString(input.status_detail),
+    normalizeOptionalString(input.statusDetail),
+    normalizeOptionalString(payload?.method),
+    normalizeOptionalString(payload?.type),
+    normalizeOptionalString(payload?.error),
+    includeDiagnosticMessage ? normalizeOptionalString(payload?.message) : null,
+    normalizeOptionalString(payload?.status),
+    normalizeOptionalString(payload?.status_detail),
+    normalizeOptionalString(payload?.statusDetail),
+    normalizeOptionalString(params?.error),
+    includeDiagnosticMessage ? normalizeOptionalString(params?.message) : null,
+    normalizeOptionalString(params?.status),
+    normalizeOptionalString(params?.status_detail),
+    normalizeOptionalString(params?.statusDetail),
+    normalizeOptionalString(payloadParams?.error),
+    includeDiagnosticMessage ? normalizeOptionalString(payloadParams?.message) : null,
+    normalizeOptionalString(payloadParams?.status),
+    normalizeOptionalString(payloadParams?.status_detail),
+    normalizeOptionalString(payloadParams?.statusDetail),
+    ...preservedFields
+  ].filter((value): value is string => Boolean(value));
+  const classificationSignal = redactProviderWorkerDiagnosticText(candidates.join(' | '));
+  return {
+    classificationSignal,
+    signal: truncateProviderWorkerDiagnosticSignal(classificationSignal, preservedFields)
+  };
+}
+
+function buildProviderWorkerDiagnosticSignal(
+  input: Record<string, unknown>,
+  source: ProviderLinearWorkerCurrentTurnActivitySource
+): string {
+  return buildProviderWorkerDiagnosticSignalParts(input, source).signal;
+}
+
+function hasProviderWorkerQuotaFailureSignal(
+  input: Record<string, unknown>,
+  normalizedSignal: string
+): boolean {
+  const explicitQuotaFailurePatterns = [
+    /\b429\b/u,
+    /\btoo many requests\b/u,
+    /\btokens?\s+(?:quota|limit)\s+(?:exceeded|exhausted|reached)\b/u,
+    /\btoken rate[-\s]?limits? (?:exceeded|exhausted|reached)\b/u,
+    /\bquota (?:exceeded|exhausted|reached)\b/u,
+    /\brate[-\s]?limited\b/u,
+    /\brate[-\s]?limits? (?:exceeded|exhausted|reached)\b/u,
+    /\brate[-\s]?limits?\s+for\s+tokens?\s+(?:exceeded|exhausted|reached)\b/u,
+    /\busage limit (?:exceeded|exhausted|reached)\b/u,
+    /\bout of quota\b/u
+  ];
+  if (explicitQuotaFailurePatterns.some((pattern) => pattern.test(normalizedSignal))) {
+    return true;
+  }
+  const payload = isRecord(input.payload) ? input.payload : null;
+  const params = isRecord(input.params) ? input.params : null;
+  const method =
+    normalizeOptionalString(input.method) ??
+    normalizeOptionalString(payload?.method);
+  const normalizedMethod = method ? normalizeProviderWorkerDiagnosticClassificationText(method) : '';
+  if (
+    /\b(rate limits?|quota|usage limit)\b/u.test(normalizedMethod) &&
+    /\b(exceeded|exhausted|failed|failure|limited|blocked|denied)\b/u.test(normalizedMethod)
+  ) {
+    return true;
+  }
+  const statusValues = [
+    normalizeOptionalString(input.type),
+    normalizeOptionalString(input.status),
+    normalizeOptionalString(input.status_detail),
+    normalizeOptionalString(input.statusDetail),
+    normalizeOptionalString(payload?.type),
+    normalizeOptionalString(payload?.status),
+    normalizeOptionalString(payload?.status_detail),
+    normalizeOptionalString(payload?.statusDetail),
+    normalizeOptionalString(params?.status),
+    normalizeOptionalString(params?.status_detail),
+    normalizeOptionalString(params?.statusDetail)
+  ]
+    .filter((value): value is string => Boolean(value))
+    .map((value) => value.replace(/[_\-\s]+/gu, '_').toLowerCase());
+  const quotaFailureStatuses = new Set([
+    'quota_rate_limit',
+    'quota_exhausted',
+    'quota_exceeded',
+    'rate_limit',
+    'rate_limited',
+    'rate_limit_exceeded',
+    'usage_limit_reached'
+  ]);
+  return statusValues.some((value) => quotaFailureStatuses.has(value));
+}
+
+function classifyProviderWorkerFailureDiagnosis(
+  input: Record<string, unknown>,
+  source: ProviderLinearWorkerCurrentTurnActivitySource
+): ProviderLinearWorkerFailureDiagnosis | null {
+  const signalParts = buildProviderWorkerDiagnosticSignalParts(input, source);
+  const signal = signalParts.signal;
+  const normalizedClassification = normalizeProviderWorkerDiagnosticClassificationText(
+    signalParts.classificationSignal
+  );
+  const timestamp =
+    normalizeOptionalString(input.timestamp) ??
+    normalizeOptionalString((input.payload as Record<string, unknown> | undefined)?.timestamp);
+  const build = (
+    diagnosticCategory: ProviderLinearWorkerDiagnosticCategory,
+    guidance: string
+  ): ProviderLinearWorkerFailureDiagnosis => ({
+    diagnostic_category: diagnosticCategory,
+    signal,
+    guidance,
+    source,
+    observed_at: timestamp
+  });
+  const structuredCategory = classifyProviderWorkerStructuredDiagnosticCategory(input);
+  if (structuredCategory) {
+    return build(structuredCategory, providerWorkerDiagnosticGuidance(structuredCategory));
+  }
+  const guardianTimeoutSignal =
+    normalizedClassification.includes('guardian') &&
+    /\b(time(?:d)?\s*out|timeout)\b/u.test(normalizedClassification);
+  const guardianPolicyDenialSignal =
+    normalizedClassification.includes('guardian') &&
+    /\b(policy|deni(?:al|ed)|blocked|refused)\b/u.test(normalizedClassification);
+  const guardianPolicyDenialContrast =
+    guardianTimeoutSignal &&
+    /\b(?:do not|don't|not|rather than|instead of)\b.{0,96}\bpolicy denial\b/u.test(
+      normalizedClassification
+    );
+  if (guardianPolicyDenialSignal && !guardianPolicyDenialContrast) {
+    return build(
+      'guardian_policy_denial',
+      'Guardian policy denied the request; inspect policy-denial guidance rather than timeout remediation.'
+    );
+  }
+  if (guardianTimeoutSignal) {
+    return build(
+      'guardian_timeout',
+      'Guardian review timed out; retry with timeout-specific guidance and do not treat this as policy denial.'
+    );
+  }
+  if (
+    /\b(cloud denial|cloud denied|cloud access denied|cloud execution denied|not allowed in cloud)\b/u
+      .test(normalizedClassification)
+  ) {
+    return build(
+      'cloud_denial',
+      'Codex Cloud denied the run; verify cloud environment, branch, and account permission.'
+    );
+  }
+  if (
+    /\b(auth mismatch|auth profile mismatch|profile mismatch|account mismatch|active account mismatch|active profile mismatch|not logged in|login required|unauthorized|forbidden)\b/u
+      .test(normalizedClassification) ||
+    (
+      /\b(auth profile|active account|active profile)\b/u.test(normalizedClassification) &&
+      /\b(mismatch(?:ed)?|unavailable|denied|forbidden|unauthorized|required)\b/u.test(normalizedClassification)
+    )
+  ) {
+    return build(
+      'auth_mismatch',
+      'The active Codex account/auth profile appears mismatched or unavailable; verify the selected profile/account.'
+    );
+  }
+  if (
+    /\b(rate[-\s]?limits?|rate limited|quota|too many requests|prolite|wham|usage limit|token limit|tokens limit)\b/u.test(
+      normalizedClassification
+    ) &&
+    hasProviderWorkerQuotaFailureSignal(input, normalizedClassification)
+  ) {
+    return build(
+      'quota_rate_limit',
+      'Codex account quota/rate-limit or plan decoding is implicated; inspect rate-limit and account-plan evidence.'
+    );
+  }
+  if (
+    /\b(env config|cloud env missing|codex cloud env id|missing environment|no environment id)\b/u
+      .test(normalizedClassification)
+  ) {
+    return build(
+      'env_config',
+      'Codex Cloud environment configuration is missing or invalid; set CODEX_CLOUD_ENV_ID or task metadata.'
+    );
+  }
+  if (
+    /\b(appserver|provider runtime|runtime parity|codex exec|enoent|websocket|rpc)\b/u.test(
+      normalizedClassification
+    )
+  ) {
+    return build(
+      'provider_runtime',
+      'Provider/runtime execution is implicated; inspect runtime selection and provider command logs.'
+    );
+  }
+  return null;
+}
+
+function providerWorkerDiagnosticGuidance(
+  diagnosticCategory: ProviderLinearWorkerDiagnosticCategory
+): string {
+  switch (diagnosticCategory) {
+    case 'guardian_timeout':
+      return 'Guardian review timed out; retry with timeout-specific guidance and do not treat this as policy denial.';
+    case 'guardian_policy_denial':
+      return 'Guardian policy denied the request; inspect policy-denial guidance rather than timeout remediation.';
+    case 'quota_rate_limit':
+      return 'Codex account quota/rate-limit or plan decoding is implicated; inspect rate-limit and account-plan evidence.';
+    case 'cloud_denial':
+      return 'Codex Cloud denied the run; verify cloud environment, branch, and account permission.';
+    case 'env_config':
+      return 'Codex Cloud environment configuration is missing or invalid; set CODEX_CLOUD_ENV_ID or task metadata.';
+    case 'auth_mismatch':
+      return 'The active Codex account/auth profile appears mismatched or unavailable; verify the selected profile/account.';
+    case 'provider_runtime':
+      return 'Provider/runtime execution is implicated; inspect runtime selection and provider command logs.';
+    default:
+      return 'Inspect provider runtime logs to classify this failure.';
+  }
+}
+
+function classifyProviderWorkerStructuredDiagnosticValue(
+  value: string
+): ProviderLinearWorkerDiagnosticCategory | null {
+  const normalized = normalizeProviderWorkerStructuredDiagnosticValue(value);
+  if (!normalized || normalized === 'failed' || normalized === 'failure' || normalized === 'error') {
+    return null;
+  }
+  if (normalized.includes('guardian') && /\btimeout\b/u.test(normalized.replace(/_/gu, ' '))) {
+    return 'guardian_timeout';
+  }
+  if (
+    normalized.includes('guardian') &&
+    /\b(policy|denial|denied|blocked|refused)\b/u.test(normalized.replace(/_/gu, ' '))
+  ) {
+    return 'guardian_policy_denial';
+  }
+  if (
+    [
+      'quota_rate_limit',
+      'quota_exhausted',
+      'quota_exceeded',
+      'rate_limit',
+      'rate_limited',
+      'rate_limit_exceeded',
+      'usage_limit_reached',
+      'account_rate_limits_exhausted',
+      'account_rate_limit_exhausted'
+    ].includes(normalized)
+  ) {
+    return 'quota_rate_limit';
+  }
+  if (
+    [
+      'auth_mismatch',
+      'auth_profile_mismatch',
+      'profile_mismatch',
+      'account_mismatch',
+      'active_account_mismatch',
+      'active_profile_mismatch',
+      'account_auth_profile_mismatch',
+      'account_authprofile_mismatch'
+    ].includes(normalized)
+  ) {
+    return 'auth_mismatch';
+  }
+  if (
+    [
+      'cloud_denial',
+      'cloud_denied',
+      'cloud_access_denied',
+      'cloud_execution_denied',
+      'not_allowed_in_cloud'
+    ].includes(normalized)
+  ) {
+    return 'cloud_denial';
+  }
+  if (
+    [
+      'env_config',
+      'env_config_missing',
+      'cloud_env_missing',
+      'codex_cloud_env_id_missing',
+      'no_environment_id'
+    ].includes(normalized)
+  ) {
+    return 'env_config';
+  }
+  if (
+    [
+      'provider_runtime',
+      'runtime_parity_command_unavailable',
+      'appserver_runtime_error',
+      'codex_exec_error'
+    ].includes(normalized)
+  ) {
+    return 'provider_runtime';
+  }
+  return null;
+}
+
+function classifyProviderWorkerStructuredDiagnosticCategory(
+  input: Record<string, unknown>
+): ProviderLinearWorkerDiagnosticCategory | null {
+  for (const value of readProviderWorkerStructuredDiagnosticValues(input)) {
+    const category = classifyProviderWorkerStructuredDiagnosticValue(value);
+    if (category) {
+      return category;
+    }
+  }
+  return null;
+}
+
+function classifyProviderWorkerStderrFailureDiagnosis(
+  stderr: string,
+  observedAt: string
+): ProviderLinearWorkerFailureDiagnosis | null {
+  const message = normalizeOptionalString(stderr);
+  if (!message) {
+    return null;
+  }
+  const diagnosticInput = {
+    type: 'stderr',
+    message,
+    timestamp: observedAt
+  };
+  const classifiedDiagnosis = classifyProviderWorkerFailureDiagnosis(diagnosticInput, 'stderr');
+  if (classifiedDiagnosis) {
+    return classifiedDiagnosis;
+  }
+  return {
+    diagnostic_category: 'provider_runtime',
+    signal: buildProviderWorkerDiagnosticSignal(diagnosticInput, 'stderr'),
+    guidance: providerWorkerDiagnosticGuidance('provider_runtime'),
+    source: 'stderr',
+    observed_at: observedAt
+  };
+}
+
+function classifyProviderWorkerExecRunnerFailureDiagnosis(
+  error: unknown,
+  observedAt: string,
+  endReason: ProviderLinearWorkerProof['end_reason']
+): ProviderLinearWorkerFailureDiagnosis {
+  const errorMessage = normalizeOptionalString((error as Error)?.message) ?? String(error);
+  const errorCode = normalizeOptionalString((error as NodeJS.ErrnoException)?.code);
+  const diagnosticInput = {
+    type: 'exec_runner_error',
+    status_detail: endReason,
+    error: errorCode ? `${errorCode}: ${errorMessage}` : errorMessage,
+    message: errorMessage,
+    timestamp: observedAt
+  };
+  const classifiedDiagnosis = classifyProviderWorkerFailureDiagnosis(diagnosticInput, 'exec_runner');
+  if (classifiedDiagnosis) {
+    return classifiedDiagnosis;
+  }
+  return {
+    diagnostic_category: 'provider_runtime',
+    signal: buildProviderWorkerDiagnosticSignal(diagnosticInput, 'exec_runner'),
+    guidance: providerWorkerDiagnosticGuidance('provider_runtime'),
+    source: 'exec_runner',
+    observed_at: observedAt
+  };
 }
 
 function humanizeProviderWorkerMethod(method: string, input: Record<string, unknown>): string | null {
@@ -2296,7 +3513,9 @@ function buildProviderWorkerSessionLogHydrationProofSignature(
         proof.latest_turn_id ?? null
       ) ?? null,
     tokens: proof.tokens ?? null,
-    rate_limits: proof.rate_limits ?? null
+    rate_limits: proof.rate_limits ?? null,
+    auth_provenance: proof.auth_provenance ?? null,
+    failure_diagnosis: proof.failure_diagnosis ?? null
   });
 }
 
@@ -2395,7 +3614,8 @@ function selectProviderWorkerSessionBootstrapLines(
 function applyProviderWorkerSessionLogDelta(
   parseState: ProviderLinearWorkerJsonlParseResult,
   tailState: ProviderWorkerSessionLogTailState,
-  chunk: string
+  chunk: string,
+  env: NodeJS.ProcessEnv = process.env
 ): boolean {
   const combined = `${tailState.trailingText}${chunk}`;
   const lines = combined.split(/\r?\n/u);
@@ -2411,7 +3631,7 @@ function applyProviderWorkerSessionLogDelta(
       : lines;
   let changed = false;
   for (const line of linesToApply) {
-    changed = applyProviderLinearWorkerSessionJsonlLine(parseState, line) || changed;
+    changed = applyProviderLinearWorkerSessionJsonlLine(parseState, line, env) || changed;
   }
   if (tailState.bootstrapPending && lines.length > 0) {
     tailState.bootstrapPending = requireTurnContext && parseState.turnId === null;
@@ -2421,7 +3641,8 @@ function applyProviderWorkerSessionLogDelta(
 
 function flushProviderWorkerSessionLogTail(
   parseState: ProviderLinearWorkerJsonlParseResult,
-  tailState: ProviderWorkerSessionLogTailState
+  tailState: ProviderWorkerSessionLogTailState,
+  env: NodeJS.ProcessEnv = process.env
 ): boolean {
   const trailingLine = tailState.trailingText.trim();
   if (!trailingLine) {
@@ -2439,7 +3660,7 @@ function flushProviderWorkerSessionLogTail(
     : [trailingLine];
   let changed = false;
   for (const line of trailingLines) {
-    changed = applyProviderLinearWorkerSessionJsonlLine(parseState, line) || changed;
+    changed = applyProviderLinearWorkerSessionJsonlLine(parseState, line, env) || changed;
   }
   if (shouldBootstrap) {
     tailState.bootstrapPending = requireTurnContext && parseState.turnId === null;
@@ -2474,6 +3695,8 @@ function selectProviderLinearWorkerProofTelemetryFields(
     current_turn_activity: selectProviderLinearWorkerCurrentTurnActivity(proof) ?? null,
     tokens: proof.tokens,
     rate_limits: proof.rate_limits ?? null,
+    auth_provenance: proof.auth_provenance ?? null,
+    failure_diagnosis: proof.failure_diagnosis ?? null,
     owner_phase: proof.owner_phase,
     owner_status: proof.owner_status,
     tracked_issue_error: proof.tracked_issue_error ?? null,
@@ -2522,6 +3745,7 @@ function buildProviderLinearWorkerTurnBootstrapProof(
     current_turn_activity: null,
     tokens: buildEmptyProviderLinearWorkerTokenUsage(),
     rate_limits: null,
+    failure_diagnosis: null,
     owner_phase: 'turn_running',
     owner_status: 'in_progress',
     turn_count: turnCount,
@@ -2730,7 +3954,9 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     lastEventAt: proof.last_event_at,
     currentTurnActivity: proofCurrentTurnActivity,
     tokens: proof.tokens ?? buildEmptyProviderLinearWorkerTokenUsage(),
-    rateLimits: proof.rate_limits
+    rateLimits: proof.rate_limits,
+    authProvenance: proof.auth_provenance ?? null,
+    failureDiagnosis: proof.failure_diagnosis ?? null
   };
   const restoreProofTelemetryFloor = () => {
     parseState.threadId = proof.thread_id;
@@ -2739,6 +3965,7 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     parseState.finalMessage = proof.last_message;
     parseState.lastEventAt = proof.last_event_at;
     parseState.currentTurnActivity = proofCurrentTurnActivity;
+    parseState.failureDiagnosis = proof.failure_diagnosis ?? null;
   };
   let tailState = buildProviderWorkerSessionLogTailState(sessionLogPath, hydrationState);
   let preserveProofTelemetryFloor = false;
@@ -2774,9 +4001,9 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
   try {
     const delta = await readProviderWorkerSessionLogDelta(tailState);
     if (delta) {
-      applyProviderWorkerSessionLogDelta(parseState, tailState, delta);
+      applyProviderWorkerSessionLogDelta(parseState, tailState, delta, env);
     }
-    flushProviderWorkerSessionLogTail(parseState, tailState);
+    flushProviderWorkerSessionLogTail(parseState, tailState, env);
   } catch {
     return {
       proof,
@@ -2800,6 +4027,7 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     restoreProofTelemetryFloor();
     parseState.tokens = mergeProviderWorkerTokenUsageFloor(proofTokenFloor, parseState.tokens);
     parseState.rateLimits = proof.rate_limits;
+    parseState.failureDiagnosis = proof.failure_diagnosis ?? null;
   }
 
   const liveThreadId = parseState.threadId ?? proof.thread_id;
@@ -2839,7 +4067,12 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
         : proof.tokens,
     rate_limits: preferProofRateLimits
       ? proof.rate_limits
-      : parseState.rateLimits ?? (liveTurnChanged ? null : proof.rate_limits)
+      : parseState.rateLimits ?? (liveTurnChanged ? null : proof.rate_limits),
+    auth_provenance: mergeProviderWorkerAuthProvenance(
+      proof.auth_provenance ?? null,
+      parseState.authProvenance
+    ),
+    failure_diagnosis: parseState.failureDiagnosis ?? (liveTurnChanged ? null : proof.failure_diagnosis ?? null)
   };
   return {
     proof: hydratedProof,
@@ -2914,6 +4147,72 @@ async function resolveProviderLinearWorkerRuntimeContext(
     env: { ...process.env, ...env },
     runId
   });
+}
+
+function readFirstProviderWorkerEnvValue(env: NodeJS.ProcessEnv, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = normalizeOptionalString(env[key]);
+    if (value) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function readProviderWorkerCredentialSourceFromEnv(env: NodeJS.ProcessEnv): string | null {
+  for (const key of [
+    'CODEX_API_KEY',
+    'OPENAI_API_KEY',
+    'CODEX_AUTH_TOKEN',
+    'OPENAI_AUTH_TOKEN',
+    'CHATGPT_AUTH_TOKEN'
+  ]) {
+    if (normalizeOptionalString(env[key])) {
+      return `env:${key}`;
+    }
+  }
+  return null;
+}
+
+function buildProviderWorkerRuntimeAuthProvenance(params: {
+  env: NodeJS.ProcessEnv;
+  runtime: RuntimeSelection;
+  sourceSetup: DispatchPilotSourceSetup | null;
+  observedAt: string;
+}): ProviderLinearWorkerAuthProvenance {
+  const profile = readFirstProviderWorkerEnvValue(params.env, [
+    'CODEX_AUTH_PROFILE',
+    'CODEX_PROFILE',
+    'OPENAI_PROFILE',
+    'CHATGPT_AUTH_PROFILE',
+    'CHATGPT_PROFILE'
+  ]);
+  const account = readFirstProviderWorkerEnvValue(params.env, [
+    'CODEX_ACCOUNT_ID',
+    'CODEX_ACCOUNT',
+    'CODEX_ACCOUNT_EMAIL',
+    'OPENAI_ACCOUNT_ID',
+    'OPENAI_ORG_ID',
+    'CHATGPT_ACCOUNT_ID',
+    'CHATGPT_ACCOUNT',
+    'CHATGPT_ACCOUNT_EMAIL'
+  ]);
+  const cloudBranchRaw = normalizeOptionalString(params.env.CODEX_CLOUD_BRANCH);
+  const cloudBranch = cloudBranchRaw ? cloudBranchRaw.replace(/^refs\/heads\//u, '') : null;
+  const credentialSource = readProviderWorkerCredentialSourceFromEnv(params.env);
+  return {
+    provider_kind: 'codex',
+    runtime_mode: params.runtime.selected_mode,
+    runtime_provider: params.runtime.provider,
+    active_profile_fingerprint: fingerprintProviderWorkerEnvAuthValue(profile, params.env),
+    active_account_fingerprint: fingerprintProviderWorkerEnvAuthValue(account, params.env),
+    cloud_env_id: normalizeOptionalString(params.env.CODEX_CLOUD_ENV_ID),
+    cloud_branch: cloudBranch,
+    credential_source: credentialSource,
+    auth_freshness: credentialSource ? 'env_credential_present' : 'credential_source_unknown',
+    observed_at: params.observedAt,
+    source: params.sourceSetup?.provider ? `runtime_env:${params.sourceSetup.provider}` : 'runtime_env'
+  };
 }
 
 async function readTrackedIssueOrThrow(input: {
@@ -4010,6 +5309,13 @@ export async function runProviderLinearWorker(
     current_turn_activity: null,
     tokens: buildEmptyProviderLinearWorkerTokenUsage(),
     rate_limits: null,
+    auth_provenance: buildProviderWorkerRuntimeAuthProvenance({
+      env: childEnv,
+      runtime: runtimeContext.runtime,
+      sourceSetup: context.sourceSetup,
+      observedAt: attemptStartedAt
+    }),
+    failure_diagnosis: null,
     owner_phase: 'bootstrapping',
     owner_status: 'in_progress',
     workspace_path: context.workspacePath,
@@ -4307,6 +5613,12 @@ export async function runProviderLinearWorker(
               ? buildEmptyProviderLinearWorkerTokenUsage()
               : finalProof.tokens,
           rate_limits: liveParseState.rateLimits ?? (liveTurnChanged ? null : finalProof.rate_limits),
+          auth_provenance: mergeProviderWorkerAuthProvenance(
+            finalProof.auth_provenance ?? null,
+            liveParseState.authProvenance
+          ),
+          failure_diagnosis:
+            liveParseState.failureDiagnosis ?? (liveTurnChanged ? null : finalProof.failure_diagnosis ?? null),
           owner_phase: 'turn_running',
           owner_status: 'in_progress',
           progress: finalProof.progress ?? null,
@@ -4324,6 +5636,8 @@ export async function runProviderLinearWorker(
           current_turn_activity: nextProof.current_turn_activity ?? null,
           tokens: nextProof.tokens,
           rate_limits: nextProof.rate_limits,
+          auth_provenance: nextProof.auth_provenance ?? null,
+          failure_diagnosis: nextProof.failure_diagnosis ?? null,
           owner_phase: nextProof.owner_phase
         });
         if (signature === liveProofSignature) {
@@ -4357,7 +5671,7 @@ export async function runProviderLinearWorker(
         liveStdoutBuffer = lines.pop() ?? '';
         let changed = false;
         for (const line of lines) {
-          changed = applyProviderLinearWorkerJsonlLine(liveParseState, line) || changed;
+          changed = applyProviderLinearWorkerJsonlLine(liveParseState, line, 'stdout_jsonl', childEnv) || changed;
         }
         if (changed) {
           queueLiveProofWrite();
@@ -4369,7 +5683,7 @@ export async function runProviderLinearWorker(
         if (!trailingLine) {
           return;
         }
-        if (applyProviderLinearWorkerJsonlLine(liveParseState, trailingLine)) {
+        if (applyProviderLinearWorkerJsonlLine(liveParseState, trailingLine, 'stdout_jsonl', childEnv)) {
           queueLiveProofWrite();
         }
       };
@@ -4472,7 +5786,7 @@ export async function runProviderLinearWorker(
                 }
                 if (liveSessionTailState.path !== null) {
                   const delta = await readProviderWorkerSessionLogDelta(liveSessionTailState);
-                  if (delta && applyProviderWorkerSessionLogDelta(liveParseState, liveSessionTailState, delta)) {
+                  if (delta && applyProviderWorkerSessionLogDelta(liveParseState, liveSessionTailState, delta, childEnv)) {
                     queueLiveProofWrite();
                   }
                 }
@@ -4484,7 +5798,7 @@ export async function runProviderLinearWorker(
                   stopLiveSessionTailPromise
                 ]);
               }
-              if (liveSessionTailState.path !== null && flushProviderWorkerSessionLogTail(liveParseState, liveSessionTailState)) {
+              if (liveSessionTailState.path !== null && flushProviderWorkerSessionLogTail(liveParseState, liveSessionTailState, childEnv)) {
                 queueLiveProofWrite();
               }
             })().catch((error) => {
@@ -4534,13 +5848,17 @@ export async function runProviderLinearWorker(
                 : previousTurnProof.tokens,
               rate_limits: finalProof.rate_limits ?? previousTurnProof.rate_limits
             };
+        const endReason = classifyExecRunnerFailure(error, {
+          cwd: context.repoRoot
+        });
         finalProof = {
           ...failedProofBase,
+          failure_diagnosis:
+            liveParseState.failureDiagnosis ??
+            classifyProviderWorkerExecRunnerFailureDiagnosis(error, turnStartedAt, endReason),
           owner_phase: 'ended',
           owner_status: 'failed',
-          end_reason: classifyExecRunnerFailure(error, {
-            cwd: context.repoRoot
-          }),
+          end_reason: endReason,
           updated_at: deps.now()
         };
         finalProof = await persistProof(finalProof);
@@ -4551,7 +5869,11 @@ export async function runProviderLinearWorker(
       clearLiveSemanticStallTimer();
       flushLiveStdoutTail();
       await liveProofWrite;
-      const parsed = parseProviderLinearWorkerJsonl(execResult.stdout);
+      const parsed = parseProviderLinearWorkerJsonl(execResult.stdout, childEnv);
+      const stderrFailureDiagnosis =
+        execResult.exitCode === 0
+          ? null
+          : classifyProviderWorkerStderrFailureDiagnosis(execResult.stderr, turnStartedAt);
       threadId = parsed.threadId ?? finalProof.thread_id ?? threadId;
       const parsedThreadChanged = Boolean(threadId && threadId !== finalProof.thread_id);
       if (
@@ -4601,6 +5923,14 @@ export async function runProviderLinearWorker(
           ) ?? (parsedScopeChanged ? null : selectProviderLinearWorkerCurrentTurnActivity(finalProof)),
         tokens: hasProviderWorkerTokenUsage(parsed.tokens) ? parsed.tokens : finalProof.tokens,
         rate_limits: parsed.rateLimits ?? finalProof.rate_limits,
+        auth_provenance: mergeProviderWorkerAuthProvenance(
+          finalProof.auth_provenance ?? null,
+          parsed.authProvenance
+        ),
+        failure_diagnosis:
+          parsed.failureDiagnosis ??
+          stderrFailureDiagnosis ??
+          (parsedScopeChanged ? null : finalProof.failure_diagnosis ?? null),
         owner_phase: execResult.exitCode === 0 ? 'turn_completed' : 'turn_failed',
         owner_status: execResult.exitCode === 0 ? 'in_progress' : 'failed',
         workspace_path: context.workspacePath,
