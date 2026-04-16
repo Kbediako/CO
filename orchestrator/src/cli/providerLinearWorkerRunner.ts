@@ -2455,7 +2455,7 @@ function redactProviderWorkerDiagnosticText(raw: string): string {
       '$1 <redacted>'
     )
     .replace(
-      /\b((?:refresh|access|auth|session)\s+token|api\s+key|token|secret|credential)\s+["']?[A-Za-z0-9][A-Za-z0-9._~+/=@:-]*["']?/giu,
+      /\b((?:refresh|access|auth|session)\s+token|api\s+key|token(?!\s+(?:quota|limit|rate(?:\s+limit)?|usage\s+limit)\b)|secret|credential)\s+["']?[A-Za-z0-9][A-Za-z0-9._~+/=@:-]*["']?/giu,
       '$1 <redacted>'
     )
     .replace(
@@ -2478,6 +2478,11 @@ function redactProviderWorkerDiagnosticText(raw: string): string {
 }
 
 const PROVIDER_WORKER_DIAGNOSTIC_SIGNAL_MAX_LENGTH = 500;
+
+interface ProviderWorkerDiagnosticSignal {
+  classificationSignal: string;
+  signal: string;
+}
 
 function truncateProviderWorkerDiagnosticSignal(signal: string, preservedFields: string[]): string {
   if (signal.length <= PROVIDER_WORKER_DIAGNOSTIC_SIGNAL_MAX_LENGTH) {
@@ -2563,10 +2568,10 @@ function isProviderWorkerTrustedDiagnosticMessageCarrier(
   );
 }
 
-function buildProviderWorkerDiagnosticSignal(
+function buildProviderWorkerDiagnosticSignalParts(
   input: Record<string, unknown>,
   source: ProviderLinearWorkerCurrentTurnActivitySource
-): string {
+): ProviderWorkerDiagnosticSignal {
   const includeDiagnosticMessage = isProviderWorkerTrustedDiagnosticMessageCarrier(input, source);
   const payload = isRecord(input.payload) ? input.payload : null;
   const params = isRecord(input.params) ? input.params : null;
@@ -2654,10 +2659,18 @@ function buildProviderWorkerDiagnosticSignal(
     normalizeOptionalString(payloadParams?.statusDetail),
     ...preservedFields
   ].filter((value): value is string => Boolean(value));
-  return truncateProviderWorkerDiagnosticSignal(
-    redactProviderWorkerDiagnosticText(candidates.join(' | ')),
-    preservedFields
-  );
+  const classificationSignal = redactProviderWorkerDiagnosticText(candidates.join(' | '));
+  return {
+    classificationSignal,
+    signal: truncateProviderWorkerDiagnosticSignal(classificationSignal, preservedFields)
+  };
+}
+
+function buildProviderWorkerDiagnosticSignal(
+  input: Record<string, unknown>,
+  source: ProviderLinearWorkerCurrentTurnActivitySource
+): string {
+  return buildProviderWorkerDiagnosticSignalParts(input, source).signal;
 }
 
 function hasProviderWorkerQuotaFailureSignal(
@@ -2667,9 +2680,12 @@ function hasProviderWorkerQuotaFailureSignal(
   const explicitQuotaFailurePatterns = [
     /\b429\b/u,
     /\btoo many requests\b/u,
+    /\btokens?\s+(?:quota|limit)\s+(?:exceeded|exhausted|reached)\b/u,
+    /\btoken rate[-\s]?limits? (?:exceeded|exhausted|reached)\b/u,
     /\bquota (?:exceeded|exhausted|reached)\b/u,
     /\brate[-\s]?limited\b/u,
-    /\brate[-\s]?limit (?:exceeded|exhausted|reached)\b/u,
+    /\brate[-\s]?limits? (?:exceeded|exhausted|reached)\b/u,
+    /\brate[-\s]?limits?\s+for\s+tokens?\s+(?:exceeded|exhausted|reached)\b/u,
     /\busage limit (?:exceeded|exhausted|reached)\b/u,
     /\bout of quota\b/u
   ];
@@ -2719,8 +2735,11 @@ function classifyProviderWorkerFailureDiagnosis(
   input: Record<string, unknown>,
   source: ProviderLinearWorkerCurrentTurnActivitySource
 ): ProviderLinearWorkerFailureDiagnosis | null {
-  const signal = buildProviderWorkerDiagnosticSignal(input, source);
-  const normalizedClassification = normalizeProviderWorkerDiagnosticClassificationText(signal);
+  const signalParts = buildProviderWorkerDiagnosticSignalParts(input, source);
+  const signal = signalParts.signal;
+  const normalizedClassification = normalizeProviderWorkerDiagnosticClassificationText(
+    signalParts.classificationSignal
+  );
   const timestamp =
     normalizeOptionalString(input.timestamp) ??
     normalizeOptionalString((input.payload as Record<string, unknown> | undefined)?.timestamp);
@@ -2784,7 +2803,7 @@ function classifyProviderWorkerFailureDiagnosis(
     );
   }
   if (
-    /\b(rate[-\s]?limits?|rate limited|quota|too many requests|prolite|wham|usage limit)\b/u.test(
+    /\b(rate[-\s]?limits?|rate limited|quota|too many requests|prolite|wham|usage limit|token limit|tokens limit)\b/u.test(
       normalizedClassification
     ) &&
     hasProviderWorkerQuotaFailureSignal(input, normalizedClassification)

@@ -57,22 +57,6 @@ const CLOUD_FAILURE_RULES: CloudFailureRule[] = [
     guidance: 'Guardian policy denied the request; inspect policy-denial guidance instead of retrying as a timeout.'
   },
   {
-    category: 'execution',
-    diagnostic_category: 'quota_rate_limit',
-    patterns: [
-      'quota_rate_limit',
-      'rate limit',
-      'rate-limit',
-      'rate_limited',
-      'rate_limit_exceeded',
-      'quota',
-      'too many requests',
-      'usage limit',
-      'usage_limit_reached'
-    ],
-    guidance: 'Codex account quota or rate-limit state is implicated; inspect account plan/rate-limit evidence and retry after limits reset.'
-  },
-  {
     category: 'credentials',
     diagnostic_category: 'cloud_denial',
     patterns: [
@@ -119,10 +103,34 @@ const CLOUD_FAILURE_RULES: CloudFailureRule[] = [
       'login',
       'api key',
       'credential',
-      'token'
+      'auth token',
+      'access token',
+      'refresh token',
+      'bearer token',
+      'invalid token',
+      'expired token',
+      'token expired',
+      'missing token',
+      'token missing'
     ],
     guidance:
       'Ensure the active Codex account/auth profile matches the cloud environment and has access to the configured environment.'
+  },
+  {
+    category: 'execution',
+    diagnostic_category: 'quota_rate_limit',
+    patterns: [
+      'quota_rate_limit',
+      'rate limit',
+      'rate-limit',
+      'rate_limited',
+      'rate_limit_exceeded',
+      'quota',
+      'too many requests',
+      'usage limit',
+      'usage_limit_reached'
+    ],
+    guidance: 'Codex account quota or rate-limit state is implicated; inspect account plan/rate-limit evidence and retry after limits reset.'
   },
   {
     category: 'connectivity',
@@ -200,6 +208,13 @@ export function diagnoseCloudFailure(options: {
     const statusDetailRule = matchCloudFailureRule(options.statusDetail);
     if (statusDetailRule) {
       return buildCloudFailureDiagnosis(statusDetailRule, signal);
+    }
+  }
+
+  if (options.error) {
+    const errorRule = matchCloudFailureRule(options.error);
+    if (errorRule) {
+      return buildCloudFailureDiagnosis(errorRule, signal);
     }
   }
 

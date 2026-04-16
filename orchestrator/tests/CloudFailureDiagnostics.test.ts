@@ -63,6 +63,11 @@ describe('diagnoseCloudFailure', () => {
       error: 'Guardian policy denial blocked the request.',
       statusDetail: 'timed out'
     }).diagnostic_category).toBe('guardian_policy_denial');
+    expect(diagnoseCloudFailure({
+      status: 'failed',
+      error: 'Guardian policy denial blocked the request.',
+      statusDetail: 'Guardian review timed out'
+    }).diagnostic_category).toBe('guardian_policy_denial');
   });
 
   it('preserves Codex 0.121 quota/rate-limit distinctions', () => {
@@ -71,8 +76,26 @@ describe('diagnoseCloudFailure', () => {
       error: 'Rate limit exhausted for prolite account; unknown WHAM plan value was decoded.',
       statusDetail: null
     });
+    const tokenQuota = diagnoseCloudFailure({
+      status: 'failed',
+      error: 'Token quota exceeded for this account.',
+      statusDetail: null
+    });
+    const tokenRateLimit = diagnoseCloudFailure({
+      status: 'failed',
+      error: 'Rate limit for tokens reached.',
+      statusDetail: null
+    });
+    const expiredAuthToken = diagnoseCloudFailure({
+      status: 'failed',
+      error: 'Auth token expired; login required.',
+      statusDetail: null
+    });
     expect(diagnosis.category).toBe('execution');
     expect(diagnosis.diagnostic_category).toBe('quota_rate_limit');
+    expect(tokenQuota.diagnostic_category).toBe('quota_rate_limit');
+    expect(tokenRateLimit.diagnostic_category).toBe('quota_rate_limit');
+    expect(expiredAuthToken.diagnostic_category).toBe('auth_mismatch');
   });
 
   it('separates Guardian timeout and Guardian policy denial diagnostics', () => {
@@ -119,6 +142,11 @@ describe('diagnoseCloudFailure', () => {
       error: 'Active auth profile forbidden for this prolite account.',
       statusDetail: null
     });
+    const mismatchWithQuotaContext = diagnoseCloudFailure({
+      status: 'failed',
+      error: 'Account mismatch while rate limit exhausted for this profile.',
+      statusDetail: null
+    });
     const denial = diagnoseCloudFailure({
       status: 'failed',
       error: 'Codex cloud execution denied for this branch.',
@@ -128,6 +156,8 @@ describe('diagnoseCloudFailure', () => {
     expect(mismatch.diagnostic_category).toBe('auth_mismatch');
     expect(mismatchWithPlanContext.category).toBe('credentials');
     expect(mismatchWithPlanContext.diagnostic_category).toBe('auth_mismatch');
+    expect(mismatchWithQuotaContext.category).toBe('credentials');
+    expect(mismatchWithQuotaContext.diagnostic_category).toBe('auth_mismatch');
     expect(denial.category).toBe('credentials');
     expect(denial.diagnostic_category).toBe('cloud_denial');
   });

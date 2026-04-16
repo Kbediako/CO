@@ -1911,6 +1911,34 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
           }
         },
         ['account_plan=redacted', 'wham_plan=redacted']
+      ],
+      [
+        {
+          type: 'error',
+          message: 'Rate limits exhausted for prolite account.'
+        },
+        []
+      ],
+      [
+        {
+          type: 'error',
+          message: 'Token quota exceeded for this account.'
+        },
+        ['Token quota exceeded']
+      ],
+      [
+        {
+          type: 'error',
+          message: 'Token limit exceeded for this account.'
+        },
+        ['Token limit exceeded']
+      ],
+      [
+        {
+          type: 'error',
+          message: 'Rate limit for tokens reached.'
+        },
+        ['Rate limit for tokens reached']
       ]
     ];
 
@@ -1927,6 +1955,23 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         expect(parsed.failureDiagnosis?.signal).toContain(part);
       }
     }
+  });
+
+  it('classifies provider diagnostics before truncating the persisted signal', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      JSON.stringify({
+        type: 'error',
+        message: `${'provider stack frame '.repeat(60)}Rate limit exhausted for prolite account.`,
+        timestamp: '2026-04-15T20:45:20.000Z'
+      })
+    );
+
+    expect(parsed.failureDiagnosis).toMatchObject({
+      diagnostic_category: 'quota_rate_limit',
+      source: 'stdout_jsonl',
+      observed_at: '2026-04-15T20:45:20.000Z'
+    });
+    expect(parsed.failureDiagnosis?.signal.length).toBeLessThanOrEqual(500);
   });
 
   it('redacts unsafe credential-source labels and auth identifiers from provider diagnostics', () => {
