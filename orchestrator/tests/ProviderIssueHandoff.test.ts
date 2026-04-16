@@ -19665,10 +19665,7 @@ describe('createProviderIssueHandoffService', () => {
       deferFreshDiscovery: true
     });
 
-    expect(resolveTrackedIssue).toHaveBeenCalledWith({
-      provider: 'linear',
-      issueId: 'lin-issue-1'
-    });
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
     expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
     expect(launcher.resume).not.toHaveBeenCalled();
     expect(launcher.start).not.toHaveBeenCalled();
@@ -19676,6 +19673,64 @@ describe('createProviderIssueHandoffService', () => {
       state: 'released',
       reason: 'provider_issue_released:not_active',
       run_id: 'linear-lin-issue-1',
+      run_manifest_path: null
+    });
+  });
+
+  it('keeps a Ready plain released not-active anonymous no-run claim excluded from fresh discovery', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      run_id: null,
+      run_manifest_path: null
+    }));
+
+    const launcher = createCo202Launcher(
+      'run-ready-not-active-reclaimed',
+      '/tmp/provider-run/ready-not-active-reclaimed-manifest.json'
+    );
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue()
+    }));
+    const refetchTrackedIssues = vi.fn(async (input?: { excludedIssueIds?: string[] }) => {
+      expect(input?.excludedIssueIds ?? []).toContain('lin-issue-1');
+      return {
+        kind: 'ready' as const,
+        trackedIssues: [
+          createCo202ReadyIssue()
+        ]
+      };
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 2
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      run_id: null,
       run_manifest_path: null
     });
   });
