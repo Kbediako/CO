@@ -31,12 +31,12 @@ Generated protocol evidence came from fresh 2026-04-16 runs of `codex app-server
 | Instruction source | `ThreadStartResponse`, `ThreadResumeResponse`, `ThreadForkResponse`, `Thread` | `instructionSources`, `source`, `model`, `modelProvider`, `serviceTier`, `cwd`, `approvalPolicy`, `sandbox`, `reasoningEffort` |
 
 ## Runtime Canary Summary
-- Stdio initialize smoke with a temporary `CODEX_HOME` returned a JSON-RPC result containing `userAgent`, `codexHome`, `platformFamily`, and `platformOs`; stderr was empty and the server exited cleanly after `SIGTERM`.
-- Isolated runtime canary used a temp `CODEX_HOME` so account data was not exposed.
+- Stdio initialize smoke with a temporary `CODEX_HOME` returned a JSON-RPC result containing `userAgent`, `codexHome`, `platformFamily`, and `platformOs`; stderr was empty, and the server exited cleanly after `SIGTERM`.
+- Isolated runtime canary used a temp `CODEX_HOME`, so account data was not exposed.
 - `account/rateLimits/read` returned JSON-RPC error `-32600` with message `codex account authentication required to read rate limits`; this proves the method exists but is auth-gated in isolated mode.
-- Ephemeral `thread/start` succeeded and returned a nested thread id, idle status, model/provider metadata, sandbox/approval settings, and `instructionSources` including the workspace `AGENTS.md`.
+- Ephemeral `thread/start` succeeded and returned a nested thread id, idle status, model/provider metadata, sandbox/approval settings, and `instructionSources`, including the workspace `AGENTS.md`.
 - `thread/inject_items` succeeded with an empty result after injecting a synthetic user item.
-- `thread/read` with `includeTurns` failed for the ephemeral thread with `ephemeral threads do not support includeTurns`; this is a canary limitation, not a provider replacement proof.
+- `thread/read` with `includeTurns` failed for the ephemeral thread, with `ephemeral threads do not support includeTurns`; this is a canary limitation, not a provider replacement proof.
 - Observed notification method names included `thread/started`.
 - Raw `rawResponseItem/completed` payloads were not committed because they included prompt/instruction content.
 
