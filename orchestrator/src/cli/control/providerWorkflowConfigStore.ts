@@ -15,6 +15,7 @@ import {
   resolveProviderOperatorAutopilotConfig,
   type ProviderOperatorAutopilotResult
 } from './providerOperatorAutopilot.js';
+import { resolveProviderOperatorAutopilotLifecyclePath } from './providerOperatorAutopilotLifecycle.js';
 import {
   resolveProviderTerminalCleanupConfig,
   type ProviderTerminalCleanupResult
@@ -344,6 +345,7 @@ function buildDefaultOperatorAutopilotPayload(
       summary: config.post_merge_rollout.summary
     },
     audit_path: resolveProviderOperatorAutopilotAuditPath(runDir),
+    lifecycle_path: resolveProviderOperatorAutopilotLifecyclePath(runDir),
     last_result: null
   };
 }
@@ -406,6 +408,7 @@ function buildOperatorAutopilotPayload(
       summary: config.post_merge_rollout.summary
     },
     audit_path: resolveProviderOperatorAutopilotAuditPath(runDir),
+    lifecycle_path: resolveProviderOperatorAutopilotLifecyclePath(runDir),
     last_result: lastResult ? cloneOperatorAutopilotLastResult(lastResult) : null
   };
 }
@@ -486,12 +489,44 @@ function cloneOperatorAutopilotLastResult(
     })),
     pending_actions: result.pending_actions.map((pendingAction) => ({
       kind: pendingAction.kind,
+      action_instance_id: pendingAction.action_instance_id,
       issue_id: pendingAction.issue_id,
       issue_identifier: pendingAction.issue_identifier,
       summary: pendingAction.summary,
+      merge_closeout_recorded_at: pendingAction.merge_closeout_recorded_at,
       merge_closeout_reason: pendingAction.merge_closeout_reason,
       shared_root_status: pendingAction.shared_root_status,
-      linear_transition_status: pendingAction.linear_transition_status
+      linear_transition_status: pendingAction.linear_transition_status,
+      lifecycle_state: pendingAction.lifecycle_state,
+      lifecycle_actor: pendingAction.lifecycle_actor,
+      lifecycle_reason: pendingAction.lifecycle_reason,
+      lifecycle_recorded_at: pendingAction.lifecycle_recorded_at
+    })),
+    resolved_actions: (result.resolved_actions ?? []).map((resolvedAction) => ({
+      kind: resolvedAction.kind,
+      action_instance_id: resolvedAction.action_instance_id,
+      issue_id: resolvedAction.issue_id,
+      issue_identifier: resolvedAction.issue_identifier,
+      summary: resolvedAction.summary,
+      merge_closeout_recorded_at: resolvedAction.merge_closeout_recorded_at,
+      merge_closeout_reason: resolvedAction.merge_closeout_reason,
+      shared_root_status: resolvedAction.shared_root_status,
+      linear_transition_status: resolvedAction.linear_transition_status,
+      lifecycle_state: resolvedAction.lifecycle_state,
+      lifecycle_actor: resolvedAction.lifecycle_actor,
+      lifecycle_reason: resolvedAction.lifecycle_reason,
+      lifecycle_recorded_at: resolvedAction.lifecycle_recorded_at
+    })),
+    lifecycle_records: (result.lifecycle_records ?? []).map((record) => ({
+      action_instance_id: record.action_instance_id,
+      kind: record.kind,
+      issue_id: record.issue_id,
+      issue_identifier: record.issue_identifier,
+      state: record.state,
+      actor: record.actor,
+      reason: record.reason,
+      recorded_at: record.recorded_at,
+      source: record.source
     }))
   };
 }

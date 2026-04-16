@@ -126,12 +126,46 @@ export interface ControlProviderOperatorAutopilotHoldPayload {
 
 export interface ControlProviderOperatorAutopilotPendingActionPayload {
   kind: 'local_rollout';
+  action_instance_id: string;
   issue_id: string;
   issue_identifier: string | null;
   summary: string;
+  merge_closeout_recorded_at: string;
   merge_closeout_reason: string;
   shared_root_status: string | null;
   linear_transition_status: string | null;
+  lifecycle_state: 'pending' | 'acknowledged';
+  lifecycle_actor: string | null;
+  lifecycle_reason: string | null;
+  lifecycle_recorded_at: string | null;
+}
+
+export interface ControlProviderOperatorAutopilotResolvedActionPayload {
+  kind: 'local_rollout';
+  action_instance_id: string;
+  issue_id: string;
+  issue_identifier: string | null;
+  summary: string;
+  merge_closeout_recorded_at: string;
+  merge_closeout_reason: string;
+  shared_root_status: string | null;
+  linear_transition_status: string | null;
+  lifecycle_state: 'cleared' | 'dismissed';
+  lifecycle_actor: string;
+  lifecycle_reason: string;
+  lifecycle_recorded_at: string;
+}
+
+export interface ControlProviderOperatorAutopilotLifecycleRecordPayload {
+  action_instance_id: string;
+  kind: 'local_rollout';
+  issue_id: string;
+  issue_identifier: string | null;
+  state: 'acknowledged' | 'cleared' | 'dismissed';
+  actor: string;
+  reason: string;
+  recorded_at: string;
+  source: 'co-status';
 }
 
 export interface ControlProviderOperatorAutopilotLastResultPayload {
@@ -142,6 +176,8 @@ export interface ControlProviderOperatorAutopilotLastResultPayload {
   actions: ControlProviderOperatorAutopilotActionPayload[];
   holds: ControlProviderOperatorAutopilotHoldPayload[];
   pending_actions: ControlProviderOperatorAutopilotPendingActionPayload[];
+  resolved_actions?: ControlProviderOperatorAutopilotResolvedActionPayload[];
+  lifecycle_records?: ControlProviderOperatorAutopilotLifecycleRecordPayload[];
 }
 
 export interface ControlProviderOperatorAutopilotPayload {
@@ -161,6 +197,7 @@ export interface ControlProviderOperatorAutopilotPayload {
     summary: string;
   };
   audit_path: string;
+  lifecycle_path?: string;
   last_result: ControlProviderOperatorAutopilotLastResultPayload | null;
 }
 
@@ -746,6 +783,7 @@ export function buildSelectedRunRuntimeFingerprintInput(
                   summary: providerWorkflow.operator_autopilot.post_merge_rollout.summary
                 },
                 audit_path: providerWorkflow.operator_autopilot.audit_path,
+                lifecycle_path: providerWorkflow.operator_autopilot.lifecycle_path,
                 last_result: providerWorkflow.operator_autopilot.last_result
                   ? {
                       recorded_at: providerWorkflow.operator_autopilot.last_result.recorded_at,
@@ -782,12 +820,52 @@ export function buildSelectedRunRuntimeFingerprintInput(
                         providerWorkflow.operator_autopilot.last_result.pending_actions.map(
                           (pendingAction) => ({
                             kind: pendingAction.kind,
+                            action_instance_id: pendingAction.action_instance_id,
                             issue_id: pendingAction.issue_id,
                             issue_identifier: pendingAction.issue_identifier,
                             summary: pendingAction.summary,
+                            merge_closeout_recorded_at:
+                              pendingAction.merge_closeout_recorded_at,
                             merge_closeout_reason: pendingAction.merge_closeout_reason,
                             shared_root_status: pendingAction.shared_root_status,
-                            linear_transition_status: pendingAction.linear_transition_status
+                            linear_transition_status: pendingAction.linear_transition_status,
+                            lifecycle_state: pendingAction.lifecycle_state,
+                            lifecycle_actor: pendingAction.lifecycle_actor,
+                            lifecycle_reason: pendingAction.lifecycle_reason,
+                            lifecycle_recorded_at: pendingAction.lifecycle_recorded_at
+                          })
+                        ),
+                      resolved_actions:
+                        (providerWorkflow.operator_autopilot.last_result.resolved_actions ?? []).map(
+                          (resolvedAction) => ({
+                            kind: resolvedAction.kind,
+                            action_instance_id: resolvedAction.action_instance_id,
+                            issue_id: resolvedAction.issue_id,
+                            issue_identifier: resolvedAction.issue_identifier,
+                            summary: resolvedAction.summary,
+                            merge_closeout_recorded_at:
+                              resolvedAction.merge_closeout_recorded_at,
+                            merge_closeout_reason: resolvedAction.merge_closeout_reason,
+                            shared_root_status: resolvedAction.shared_root_status,
+                            linear_transition_status: resolvedAction.linear_transition_status,
+                            lifecycle_state: resolvedAction.lifecycle_state,
+                            lifecycle_actor: resolvedAction.lifecycle_actor,
+                            lifecycle_reason: resolvedAction.lifecycle_reason,
+                            lifecycle_recorded_at: resolvedAction.lifecycle_recorded_at
+                          })
+                        ),
+                      lifecycle_records:
+                        (providerWorkflow.operator_autopilot.last_result.lifecycle_records ?? []).map(
+                          (record) => ({
+                            action_instance_id: record.action_instance_id,
+                            kind: record.kind,
+                            issue_id: record.issue_id,
+                            issue_identifier: record.issue_identifier,
+                            state: record.state,
+                            actor: record.actor,
+                            reason: record.reason,
+                            recorded_at: record.recorded_at,
+                            source: record.source
                           })
                         )
                     }

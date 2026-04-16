@@ -422,6 +422,9 @@ describe('providerWorkflowConfigStore', () => {
     expect(bootstrapped.operator_autopilot?.audit_path).toContain(
       'provider-operator-autopilot.jsonl'
     );
+    expect(bootstrapped.operator_autopilot?.lifecycle_path).toContain(
+      'provider-operator-autopilot-lifecycle.json'
+    );
 
     store.recordOperatorAutopilotResult({
       recorded_at: '2026-04-09T09:30:00.000Z',
@@ -449,7 +452,9 @@ describe('providerWorkflowConfigStore', () => {
         }
       ],
       holds: [],
-      pending_actions: []
+      pending_actions: [],
+      resolved_actions: [],
+      lifecycle_records: []
     });
 
     expect(store.snapshot().operator_autopilot?.last_result).toMatchObject({

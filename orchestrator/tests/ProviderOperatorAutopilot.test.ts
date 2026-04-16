@@ -853,11 +853,407 @@ describe('providerOperatorAutopilot', () => {
       pending_actions: [
         {
           kind: 'local_rollout',
+          action_instance_id: expect.stringMatching(/^local_rollout:/),
           issue_identifier: 'CO-118',
-          merge_closeout_reason: 'merged_and_transitioned_done'
+          merge_closeout_recorded_at: '2026-04-09T09:15:00.000Z',
+          merge_closeout_reason: 'merged_and_transitioned_done',
+          lifecycle_state: 'pending'
+        }
+      ],
+      resolved_actions: [],
+      lifecycle_records: []
+    });
+  });
+
+  it('keeps acknowledged local rollout actions visible with durable lifecycle metadata', async () => {
+    const claim = createClaim({
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-118',
+      merge_closeout: createMergeCloseout({
+        status: 'merged',
+        reason: 'merged_and_transitioned_done'
+      })
+    });
+    const baseline = await runProviderOperatorAutopilot({
+      tracked_issues: [],
+      claims: [claim],
+      config: buildConfig(),
+      previous_result: null
+    });
+
+    const action = baseline.pending_actions[0]!;
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [],
+      claims: [claim],
+      config: buildConfig(),
+      previous_result: baseline,
+      lifecycle_records: [
+        {
+          action_instance_id: action.action_instance_id,
+          kind: 'local_rollout',
+          issue_id: action.issue_id,
+          issue_identifier: action.issue_identifier,
+          state: 'acknowledged',
+          actor: 'operator@example.com',
+          reason: 'rollout is scheduled with the local operator',
+          recorded_at: '2026-04-09T10:20:00.000Z',
+          source: 'co-status'
         }
       ]
     });
+
+    expect(result).toMatchObject({
+      status: 'acted',
+      pending_actions: [
+        {
+          action_instance_id: action.action_instance_id,
+          issue_identifier: 'CO-118',
+          lifecycle_state: 'acknowledged',
+          lifecycle_actor: 'operator@example.com',
+          lifecycle_reason: 'rollout is scheduled with the local operator',
+          lifecycle_recorded_at: '2026-04-09T10:20:00.000Z'
+        }
+      ],
+      resolved_actions: [],
+      lifecycle_records: [
+        {
+          action_instance_id: action.action_instance_id,
+          state: 'acknowledged',
+          actor: 'operator@example.com'
+        }
+      ]
+    });
+  });
+
+  it('suppresses cleared local rollout actions while preserving resolved audit metadata', async () => {
+    const claim = createClaim({
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-118',
+      merge_closeout: createMergeCloseout({
+        status: 'merged',
+        reason: 'merged_and_transitioned_done'
+      })
+    });
+    const baseline = await runProviderOperatorAutopilot({
+      tracked_issues: [],
+      claims: [claim],
+      config: buildConfig(),
+      previous_result: null
+    });
+    const action = baseline.pending_actions[0]!;
+
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [],
+      claims: [claim],
+      config: buildConfig(),
+      previous_result: baseline,
+      lifecycle_records: [
+        {
+          action_instance_id: action.action_instance_id,
+          kind: 'local_rollout',
+          issue_id: action.issue_id,
+          issue_identifier: action.issue_identifier,
+          state: 'cleared',
+          actor: 'operator@example.com',
+          reason: 'local rollout completed out of band',
+          recorded_at: '2026-04-09T10:25:00.000Z',
+          source: 'co-status'
+        }
+      ]
+    });
+
+    expect(result).toMatchObject({
+      status: 'noop',
+      pending_actions: [],
+      resolved_actions: [
+        {
+          action_instance_id: action.action_instance_id,
+          issue_identifier: 'CO-118',
+          lifecycle_state: 'cleared',
+          lifecycle_actor: 'operator@example.com',
+          lifecycle_reason: 'local rollout completed out of band',
+          lifecycle_recorded_at: '2026-04-09T10:25:00.000Z'
+        }
+      ],
+      lifecycle_records: [
+        {
+          action_instance_id: action.action_instance_id,
+          state: 'cleared'
+        }
+      ]
+    });
+  });
+
+  it('keeps terminal local rollout lifecycle records terminal after a stale acknowledge', async () => {
+    const claim = createClaim({
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-118',
+      merge_closeout: createMergeCloseout({
+        status: 'merged',
+        reason: 'merged_and_transitioned_done'
+      })
+    });
+    const baseline = await runProviderOperatorAutopilot({
+      tracked_issues: [],
+      claims: [claim],
+      config: buildConfig(),
+      previous_result: null
+    });
+    const action = baseline.pending_actions[0]!;
+
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [],
+      claims: [claim],
+      config: buildConfig(),
+      previous_result: baseline,
+      lifecycle_records: [
+        {
+          action_instance_id: action.action_instance_id,
+          kind: 'local_rollout',
+          issue_id: action.issue_id,
+          issue_identifier: action.issue_identifier,
+          state: 'cleared',
+          actor: 'operator@example.com',
+          reason: 'local rollout completed out of band',
+          recorded_at: '2026-04-09T10:25:00.000Z',
+          source: 'co-status'
+        },
+        {
+          action_instance_id: action.action_instance_id,
+          kind: 'local_rollout',
+          issue_id: action.issue_id,
+          issue_identifier: action.issue_identifier,
+          state: 'acknowledged',
+          actor: 'operator@example.com',
+          reason: 'stale dashboard command after clear',
+          recorded_at: '2026-04-09T10:26:00.000Z',
+          source: 'co-status'
+        }
+      ]
+    });
+
+    expect(result).toMatchObject({
+      status: 'noop',
+      pending_actions: [],
+      resolved_actions: [
+        {
+          action_instance_id: action.action_instance_id,
+          issue_identifier: 'CO-118',
+          lifecycle_state: 'cleared',
+          lifecycle_actor: 'operator@example.com',
+          lifecycle_reason: 'local rollout completed out of band',
+          lifecycle_recorded_at: '2026-04-09T10:25:00.000Z'
+        }
+      ],
+      lifecycle_records: [
+        {
+          action_instance_id: action.action_instance_id,
+          state: 'cleared'
+        },
+        {
+          action_instance_id: action.action_instance_id,
+          state: 'acknowledged'
+        }
+      ]
+    });
+  });
+
+  it('keeps a cleared local rollout suppressed when the same merge closeout is re-probed', async () => {
+    const mergedAt = '2026-04-09T09:14:30.000Z';
+    const oldClaim = createClaim({
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-118',
+      merge_closeout: createMergeCloseout({
+        status: 'merged',
+        reason: 'merged_and_transitioned_done',
+        recorded_at: '2026-04-09T09:15:00.000Z',
+        merged_at: mergedAt,
+        head_oid: 'abc123'
+      })
+    });
+    const baseline = await runProviderOperatorAutopilot({
+      tracked_issues: [],
+      claims: [oldClaim],
+      config: buildConfig(),
+      previous_result: null
+    });
+    const oldAction = baseline.pending_actions[0]!;
+    const reprobedClaim = createClaim({
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-118',
+      merge_closeout: createMergeCloseout({
+        status: 'merged',
+        reason: 'merged_and_transitioned_done_after_recovery',
+        recorded_at: '2026-04-09T11:15:00.000Z',
+        merged_at: mergedAt,
+        head_oid: 'abc123'
+      })
+    });
+
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [],
+      claims: [reprobedClaim],
+      config: buildConfig(),
+      previous_result: baseline,
+      lifecycle_records: [
+        {
+          action_instance_id: oldAction.action_instance_id,
+          kind: 'local_rollout',
+          issue_id: oldAction.issue_id,
+          issue_identifier: oldAction.issue_identifier,
+          state: 'cleared',
+          actor: 'operator@example.com',
+          reason: 'rollout handled after merge',
+          recorded_at: '2026-04-09T10:25:00.000Z',
+          source: 'co-status'
+        }
+      ]
+    });
+
+    expect(result.pending_actions).toEqual([]);
+    expect(result.resolved_actions).toMatchObject([
+      {
+        action_instance_id: oldAction.action_instance_id,
+        issue_identifier: 'CO-118',
+        lifecycle_state: 'cleared',
+        lifecycle_reason: 'rollout handled after merge'
+      }
+    ]);
+    expect(result.lifecycle_records).toMatchObject([
+      {
+        action_instance_id: oldAction.action_instance_id,
+        state: 'cleared'
+      }
+    ]);
+  });
+
+  it('keeps local rollout action identity stable when display identifiers and attachment lists churn', async () => {
+    const oldClaim = createClaim({
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-118',
+      merge_closeout: createMergeCloseout({
+        status: 'merged',
+        reason: 'merged_and_transitioned_done',
+        recorded_at: '2026-04-09T09:15:00.000Z',
+        merged_at: '2026-04-09T09:15:00.000Z',
+        head_oid: 'abc123'
+      })
+    });
+    const baseline = await runProviderOperatorAutopilot({
+      tracked_issues: [],
+      claims: [oldClaim],
+      config: buildConfig(),
+      previous_result: null
+    });
+    const oldAction = baseline.pending_actions[0]!;
+    const reprobedCloseout = createMergeCloseout({
+      status: 'merged',
+      reason: 'merged_and_transitioned_done_after_recovery',
+      recorded_at: '2026-04-09T11:15:00.000Z',
+      merged_at: '2026-04-09T09:15:00.000Z',
+      head_oid: 'abc123'
+    });
+    reprobedCloseout.attached_pr_urls = [
+      ...reprobedCloseout.attached_pr_urls,
+      'https://github.com/asabeko/CO/pull/999'
+    ];
+
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [],
+      claims: [
+        createClaim({
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-999',
+          merge_closeout: reprobedCloseout
+        })
+      ],
+      config: buildConfig(),
+      previous_result: baseline,
+      lifecycle_records: [
+        {
+          action_instance_id: oldAction.action_instance_id,
+          kind: 'local_rollout',
+          issue_id: oldAction.issue_id,
+          issue_identifier: oldAction.issue_identifier,
+          state: 'cleared',
+          actor: 'operator@example.com',
+          reason: 'rollout handled after merge',
+          recorded_at: '2026-04-09T10:25:00.000Z',
+          source: 'co-status'
+        }
+      ]
+    });
+
+    expect(result.pending_actions).toEqual([]);
+    expect(result.resolved_actions).toMatchObject([
+      {
+        action_instance_id: oldAction.action_instance_id,
+        issue_identifier: 'CO-999',
+        lifecycle_state: 'cleared'
+      }
+    ]);
+  });
+
+  it('does not suppress a new local rollout action instance with newer merge-closeout evidence', async () => {
+    const oldClaim = createClaim({
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-118',
+      merge_closeout: createMergeCloseout({
+        status: 'merged',
+        reason: 'merged_and_transitioned_done',
+        recorded_at: '2026-04-09T09:15:00.000Z',
+        head_oid: 'abc123'
+      })
+    });
+    const baseline = await runProviderOperatorAutopilot({
+      tracked_issues: [],
+      claims: [oldClaim],
+      config: buildConfig(),
+      previous_result: null
+    });
+    const oldAction = baseline.pending_actions[0]!;
+    const newClaim = createClaim({
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-118',
+      merge_closeout: createMergeCloseout({
+        status: 'merged',
+        reason: 'merged_and_transitioned_done',
+        recorded_at: '2026-04-09T11:15:00.000Z',
+        head_oid: 'def456'
+      })
+    });
+
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [],
+      claims: [newClaim],
+      config: buildConfig(),
+      previous_result: baseline,
+      lifecycle_records: [
+        {
+          action_instance_id: oldAction.action_instance_id,
+          kind: 'local_rollout',
+          issue_id: oldAction.issue_id,
+          issue_identifier: oldAction.issue_identifier,
+          state: 'cleared',
+          actor: 'operator@example.com',
+          reason: 'old rollout handled',
+          recorded_at: '2026-04-09T10:25:00.000Z',
+          source: 'co-status'
+        }
+      ]
+    });
+
+    expect(result.pending_actions).toHaveLength(1);
+    expect(result.pending_actions[0]).toMatchObject({
+      issue_identifier: 'CO-118',
+      merge_closeout_recorded_at: '2026-04-09T11:15:00.000Z',
+      lifecycle_state: 'pending'
+    });
+    expect(result.pending_actions[0]?.action_instance_id).not.toBe(
+      oldAction.action_instance_id
+    );
+    expect(result.resolved_actions).toEqual([]);
+    expect(result.lifecycle_records).toEqual([]);
   });
 
   it('clears stale pending rollout actions when post-merge rollout is disabled', async () => {
@@ -882,14 +1278,22 @@ describe('providerOperatorAutopilot', () => {
         pending_actions: [
           {
             kind: 'local_rollout',
+            action_instance_id: 'local_rollout:stale',
             issue_id: 'lin-issue-1',
             issue_identifier: 'CO-118',
             summary: 'stale rollout reminder',
+            merge_closeout_recorded_at: '2026-04-09T09:15:00.000Z',
             merge_closeout_reason: 'merged_and_transitioned_done',
             shared_root_status: 'clean_main_fast_forwarded',
-            linear_transition_status: 'transitioned'
+            linear_transition_status: 'transitioned',
+            lifecycle_state: 'pending',
+            lifecycle_actor: null,
+            lifecycle_reason: null,
+            lifecycle_recorded_at: null
           }
-        ]
+        ],
+        resolved_actions: [],
+        lifecycle_records: []
       }
     });
 
@@ -914,14 +1318,22 @@ describe('providerOperatorAutopilot', () => {
         pending_actions: [
           {
             kind: 'local_rollout',
+            action_instance_id: 'local_rollout:stale',
             issue_id: 'lin-issue-1',
             issue_identifier: 'CO-118',
             summary: 'stale rollout reminder',
+            merge_closeout_recorded_at: '2026-04-09T09:15:00.000Z',
             merge_closeout_reason: 'merged_and_transitioned_done',
             shared_root_status: 'clean_main_fast_forwarded',
-            linear_transition_status: 'transitioned'
+            linear_transition_status: 'transitioned',
+            lifecycle_state: 'pending',
+            lifecycle_actor: null,
+            lifecycle_reason: null,
+            lifecycle_recorded_at: null
           }
-        ]
+        ],
+        resolved_actions: [],
+        lifecycle_records: []
       }
     });
 
@@ -1098,6 +1510,9 @@ function createMergeCloseout(input: {
   pr_owner?: string;
   pr_repo?: string;
   pr_number?: number;
+  recorded_at?: string;
+  merged_at?: string | null;
+  head_oid?: string;
   status: 'watching' | 'action_required' | 'merged' | 'merge_failed' | 'transition_failed';
   reason: string;
 }) {
@@ -1108,13 +1523,14 @@ function createMergeCloseout(input: {
   const prRepo = input.pr_repo ?? 'CO';
   const prNumber = input.pr_number ?? 118;
   const prUrl = `https://github.com/${prOwner}/${prRepo}/pull/${prNumber}`;
+  const recordedAt = input.recorded_at ?? '2026-04-09T09:15:00.000Z';
   return {
-    recorded_at: '2026-04-09T09:15:00.000Z',
+    recorded_at: recordedAt,
     issue_id: issueId,
     issue_identifier: issueIdentifier,
     issue_state: issueState,
     issue_state_type: 'completed',
-    issue_updated_at: '2026-04-09T09:15:00.000Z',
+    issue_updated_at: recordedAt,
     status: input.status,
     reason: input.reason,
     summary: 'merge closeout test fixture',
@@ -1139,9 +1555,9 @@ function createMergeCloseout(input: {
       checks_failed: 0,
       required_checks_pending: 0,
       required_checks_failed: 0,
-      updated_at: '2026-04-09T09:15:00.000Z',
-      merged_at: '2026-04-09T09:15:00.000Z',
-      head_oid: 'abc123'
+      updated_at: recordedAt,
+      merged_at: input.merged_at === undefined ? recordedAt : input.merged_at,
+      head_oid: input.head_oid ?? 'abc123'
     },
     merge_attempt: null,
     shared_root: {
@@ -1158,7 +1574,7 @@ function createMergeCloseout(input: {
       target_state: 'Done',
       issue_state: 'Done',
       issue_state_type: 'completed',
-      issue_updated_at: '2026-04-09T09:15:00.000Z',
+      issue_updated_at: recordedAt,
       error: null
     }
   };

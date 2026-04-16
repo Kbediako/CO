@@ -1,11 +1,13 @@
 import http from 'node:http';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { runCoStatusCliShell } from '../src/cli/coStatusCliShell.js';
+import { runCoStatusOperatorAutopilotCliShell } from '../src/cli/coStatusOperatorAutopilotCliShell.js';
+import { appendProviderOperatorAutopilotLifecycleRecord } from '../src/cli/control/providerOperatorAutopilotLifecycle.js';
 
 const tempDirs: string[] = [];
 const servers = new Set<http.Server>();
@@ -146,15 +148,244 @@ describe('runCoStatusCliShell', () => {
       'co-status attaches to an existing control host and does not accept launch-only flags: --pipeline. Use `control-host` to start a control host with launch settings.'
     );
   });
+
+  it('records local rollout lifecycle metadata through the co-status operator-autopilot surface', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = join(root, '.runs', 'local-mcp', 'cli', 'control-host');
+    await mkdir(runDir, { recursive: true });
+    const lifecyclePath = join(runDir, 'provider-operator-autopilot-lifecycle.json');
+
+    const server = await startUiServer(buildUiPayload({
+      provider_workflow: {
+        status: 'ready',
+        pipeline_id: 'provider-linear-worker',
+        source_path: join(root, 'codex.orchestrator.json'),
+        snapshot_path: null,
+        last_reload_attempt_at: '2026-04-03T08:29:00.000Z',
+        last_success_at: '2026-04-03T08:29:00.000Z',
+        last_error_at: null,
+        last_error: null,
+        terminal_cleanup: null,
+        worker_hosts: [],
+        operator_autopilot: {
+          enabled: true,
+          backlog_promotion: {
+            enabled: true,
+            state_name: 'Backlog',
+            target_state_name: 'Ready'
+          },
+          review_handoff_rework: {
+            enabled: true,
+            target_state_name: 'Rework',
+            excluded_action_required_reasons: []
+          },
+          post_merge_rollout: {
+            enabled: true,
+            summary: 'Merge closeout completed; local rollout follow-up may still be required.'
+          },
+          audit_path: join(runDir, 'provider-operator-autopilot.jsonl'),
+          lifecycle_path: lifecyclePath,
+          last_result: {
+            recorded_at: '2026-04-03T08:30:00.000Z',
+            status: 'acted',
+            summary: 'Surfaced 1 pending local rollout action (CO-118).',
+            error: null,
+            actions: [],
+            holds: [],
+            pending_actions: [
+              {
+                kind: 'local_rollout',
+                action_instance_id: 'local_rollout:test-action',
+                issue_id: 'lin-issue-1',
+                issue_identifier: 'CO-118',
+                summary: 'rollout pending',
+                merge_closeout_recorded_at: '2026-04-03T08:20:00.000Z',
+                merge_closeout_reason: 'merged_and_transitioned_done',
+                shared_root_status: 'reconciled',
+                linear_transition_status: 'transitioned',
+                lifecycle_state: 'pending',
+                lifecycle_actor: null,
+                lifecycle_reason: null,
+                lifecycle_recorded_at: null
+              }
+            ],
+            resolved_actions: [],
+            lifecycle_records: []
+          }
+        }
+      }
+    }));
+    servers.add(server.instance);
+
+    await writeFile(
+      join(runDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: 'control-host',
+        task_id: 'local-mcp',
+        status: 'in_progress'
+      }),
+      'utf8'
+    );
+    await writeFile(join(runDir, 'control_auth.json'), JSON.stringify({ token: 'snapshot-token' }), 'utf8');
+    await writeFile(
+      join(runDir, 'control_endpoint.json'),
+      JSON.stringify({
+        base_url: server.baseUrl,
+        token_path: 'control_auth.json'
+      }),
+      'utf8'
+    );
+
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    const originalUser = process.env.USER;
+    process.env.USER = '   ';
+    try {
+      await runCoStatusOperatorAutopilotCliShell({
+        positionals: ['local-rollout', 'dismiss'],
+        flags: {
+          'action-id': '   ',
+          issue: 'CO-118',
+          reason: 'rollout reminder is not actionable',
+          'run-dir': runDir,
+          format: 'json'
+        },
+        printHelp: vi.fn()
+      });
+    } finally {
+      if (originalUser === undefined) {
+        delete process.env.USER;
+      } else {
+        process.env.USER = originalUser;
+      }
+    }
+
+    expect(server.requests).toEqual([
+      {
+        authorization: 'Bearer snapshot-token',
+        csrfToken: 'snapshot-token'
+      }
+    ]);
+    expect(log).toHaveBeenCalledTimes(1);
+    const payload = JSON.parse(String(log.mock.calls[0]?.[0])) as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      status: 'recorded',
+      state: 'dismissed',
+      action: 'dismiss',
+      lifecycle_path: lifecyclePath
+    });
+    const store = JSON.parse(await readFile(lifecyclePath, 'utf8')) as Record<string, unknown>;
+    expect(store).toMatchObject({
+      version: 1,
+      records: [
+        {
+          action_instance_id: 'local_rollout:test-action',
+          state: 'dismissed',
+          actor: 'operator',
+          reason: 'rollout reminder is not actionable',
+          source: 'co-status'
+        }
+      ]
+    });
+  });
+
+  it('serializes concurrent local rollout lifecycle sidecar appends', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    const lifecyclePath = join(
+      root,
+      '.runs',
+      'local-mcp',
+      'cli',
+      'control-host',
+      'provider-operator-autopilot-lifecycle.json'
+    );
+
+    await Promise.all(
+      ['acknowledged', 'cleared'].map((state, index) =>
+        appendProviderOperatorAutopilotLifecycleRecord(lifecyclePath, {
+          action_instance_id: 'local_rollout:test-action',
+          kind: 'local_rollout',
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-118',
+          state: state as 'acknowledged' | 'cleared',
+          actor: `operator-${index}`,
+          reason: `operator decision ${index}`,
+          recorded_at: `2026-04-09T10:2${index}:00.000Z`,
+          source: 'co-status'
+        })
+      )
+    );
+
+    const store = JSON.parse(await readFile(lifecyclePath, 'utf8')) as {
+      records?: Array<Record<string, unknown>>;
+    };
+    expect(store.records).toHaveLength(2);
+    expect(store.records).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          state: 'acknowledged',
+          actor: 'operator-0'
+        }),
+        expect.objectContaining({
+          state: 'cleared',
+          actor: 'operator-1'
+        })
+      ])
+    );
+  });
+
+  it('recovers stale local rollout lifecycle sidecar locks', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    const lifecyclePath = join(
+      root,
+      '.runs',
+      'local-mcp',
+      'cli',
+      'control-host',
+      'provider-operator-autopilot-lifecycle.json'
+    );
+    const lockPath = `${lifecyclePath}.lock`;
+    await mkdir(dirname(lockPath), { recursive: true });
+    await writeFile(lockPath, 'interrupted-owner', 'utf8');
+    const staleAt = new Date(Date.now() - 60_000);
+    await utimes(lockPath, staleAt, staleAt);
+
+    await appendProviderOperatorAutopilotLifecycleRecord(lifecyclePath, {
+      action_instance_id: 'local_rollout:test-action',
+      kind: 'local_rollout',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-118',
+      state: 'cleared',
+      actor: 'operator',
+      reason: 'local rollout completed',
+      recorded_at: '2026-04-09T10:25:00.000Z',
+      source: 'co-status'
+    });
+
+    const store = JSON.parse(await readFile(lifecyclePath, 'utf8')) as {
+      records?: Array<Record<string, unknown>>;
+    };
+    expect(store.records).toEqual([
+      expect.objectContaining({
+        state: 'cleared',
+        actor: 'operator'
+      })
+    ]);
+    await expect(readFile(lockPath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+  });
 });
 
-async function startUiServer(): Promise<{
+async function startUiServer(payload: Record<string, unknown> = buildUiPayload()): Promise<{
   instance: http.Server;
   baseUrl: string;
   requests: Array<{ authorization: string | null; csrfToken: string | null }>;
 }> {
   const requests: Array<{ authorization: string | null; csrfToken: string | null }> = [];
-  const payload = buildUiPayload();
   const server = http.createServer((req, res) => {
     if (req.url === '/ui/data.json') {
       requests.push({
@@ -195,7 +426,7 @@ async function startUiServer(): Promise<{
   };
 }
 
-function buildUiPayload(): Record<string, unknown> {
+function buildUiPayload(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     generated_at: '2026-04-03T08:30:00.000Z',
     mode: 'operator_dashboard',
@@ -234,6 +465,7 @@ function buildUiPayload(): Record<string, unknown> {
     selected: null,
     running: [],
     retrying: [],
-    issues: []
+    issues: [],
+    ...overrides
   };
 }

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { appendFile, mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import process from 'node:process';
@@ -19,6 +20,10 @@ import {
 } from './providerLinearWorkflowStates.js';
 import type { ProviderIntakeClaimRecord } from './providerIntakeState.js';
 import type { DispatchPilotSourceSetup } from './trackerDispatchPilot.js';
+import {
+  cloneProviderOperatorAutopilotLifecycleRecord,
+  type ProviderOperatorAutopilotLifecycleRecord
+} from './providerOperatorAutopilotLifecycle.js';
 
 export const PROVIDER_OPERATOR_AUTOPILOT_AUDIT_FILENAME = 'provider-operator-autopilot.jsonl';
 export const DEFAULT_PROVIDER_OPERATOR_AUTOPILOT_PENDING_SUMMARY =
@@ -91,12 +96,34 @@ export interface ProviderOperatorAutopilotHoldRecord {
 
 export interface ProviderOperatorAutopilotPendingActionRecord {
   kind: 'local_rollout';
+  action_instance_id: string;
   issue_id: string;
   issue_identifier: string | null;
   summary: string;
+  merge_closeout_recorded_at: string;
   merge_closeout_reason: string;
   shared_root_status: string | null;
   linear_transition_status: string | null;
+  lifecycle_state: 'pending' | 'acknowledged';
+  lifecycle_actor: string | null;
+  lifecycle_reason: string | null;
+  lifecycle_recorded_at: string | null;
+}
+
+export interface ProviderOperatorAutopilotResolvedActionRecord {
+  kind: 'local_rollout';
+  action_instance_id: string;
+  issue_id: string;
+  issue_identifier: string | null;
+  summary: string;
+  merge_closeout_recorded_at: string;
+  merge_closeout_reason: string;
+  shared_root_status: string | null;
+  linear_transition_status: string | null;
+  lifecycle_state: 'cleared' | 'dismissed';
+  lifecycle_actor: string;
+  lifecycle_reason: string;
+  lifecycle_recorded_at: string;
 }
 
 export interface ProviderOperatorAutopilotResult {
@@ -107,6 +134,8 @@ export interface ProviderOperatorAutopilotResult {
   actions: ProviderOperatorAutopilotActionRecord[];
   holds: ProviderOperatorAutopilotHoldRecord[];
   pending_actions: ProviderOperatorAutopilotPendingActionRecord[];
+  resolved_actions?: ProviderOperatorAutopilotResolvedActionRecord[];
+  lifecycle_records?: ProviderOperatorAutopilotLifecycleRecord[];
 }
 
 interface ProviderOperatorAutopilotDependencies {
@@ -190,6 +219,7 @@ export async function runProviderOperatorAutopilot(
     source_setup?: DispatchPilotSourceSetup | null;
     env?: NodeJS.ProcessEnv;
     previous_result?: ProviderOperatorAutopilotResult | null;
+    lifecycle_records?: ProviderOperatorAutopilotLifecycleRecord[];
   },
   deps: ProviderOperatorAutopilotDependencies = {}
 ): Promise<ProviderOperatorAutopilotResult> {
@@ -204,7 +234,9 @@ export async function runProviderOperatorAutopilot(
       error: null,
       actions: [],
       holds: [],
-      pending_actions: []
+      pending_actions: [],
+      resolved_actions: [],
+      lifecycle_records: []
     };
   }
 
@@ -220,6 +252,9 @@ export async function runProviderOperatorAutopilot(
     claims: input.claims,
     config: input.config
   });
+  const lifecycleRecords = (input.lifecycle_records ?? []).map(
+    cloneProviderOperatorAutopilotLifecycleRecord
+  );
 
   const reviewHandoffOutcome = await maybeRunReviewHandoffRework({
     claims: input.claims,
@@ -232,6 +267,11 @@ export async function runProviderOperatorAutopilot(
     transitionIssueState
   });
   if (reviewHandoffOutcome.failed) {
+    const effectiveLocalRolloutActions = resolveEffectiveLocalRolloutActions({
+      pendingActions,
+      postMergeRolloutEnabled: input.config.post_merge_rollout.enabled,
+      lifecycleRecords
+    });
     return {
       recorded_at: recordedAt,
       status: 'failed',
@@ -239,10 +279,9 @@ export async function runProviderOperatorAutopilot(
       error: reviewHandoffOutcome.error,
       actions: [],
       holds,
-      pending_actions: resolveEffectivePendingActions(
-        pendingActions,
-        input.config.post_merge_rollout.enabled
-      )
+      pending_actions: effectiveLocalRolloutActions.pending_actions,
+      resolved_actions: effectiveLocalRolloutActions.resolved_actions,
+      lifecycle_records: effectiveLocalRolloutActions.lifecycle_records
     };
   }
   if (reviewHandoffOutcome.action) {
@@ -263,6 +302,11 @@ export async function runProviderOperatorAutopilot(
       transitionIssueState
     });
     if (backlogOutcome.failed) {
+      const effectiveLocalRolloutActions = resolveEffectiveLocalRolloutActions({
+        pendingActions,
+        postMergeRolloutEnabled: input.config.post_merge_rollout.enabled,
+        lifecycleRecords
+      });
       return {
         recorded_at: recordedAt,
         status: 'failed',
@@ -270,10 +314,9 @@ export async function runProviderOperatorAutopilot(
         error: backlogOutcome.error,
         actions,
         holds,
-        pending_actions: resolveEffectivePendingActions(
-          pendingActions,
-          input.config.post_merge_rollout.enabled
-        )
+        pending_actions: effectiveLocalRolloutActions.pending_actions,
+        resolved_actions: effectiveLocalRolloutActions.resolved_actions,
+        lifecycle_records: effectiveLocalRolloutActions.lifecycle_records
       };
     }
     if (backlogOutcome.action) {
@@ -284,27 +327,33 @@ export async function runProviderOperatorAutopilot(
     }
   }
 
-  const effectivePendingActions = resolveEffectivePendingActions(
+  const effectiveLocalRolloutActions = resolveEffectiveLocalRolloutActions({
     pendingActions,
-    input.config.post_merge_rollout.enabled
-  );
+    postMergeRolloutEnabled: input.config.post_merge_rollout.enabled,
+    lifecycleRecords
+  });
   const hasTransitionedAction = actions.some(
     (action) => action.transition.status === 'transitioned'
   );
   const status =
-    hasTransitionedAction || effectivePendingActions.length > 0 ? 'acted' : 'noop';
+    hasTransitionedAction || effectiveLocalRolloutActions.pending_actions.length > 0
+      ? 'acted'
+      : 'noop';
   return {
     recorded_at: recordedAt,
     status,
     summary: summarizeOperatorAutopilotResult({
       actions,
       holds,
-      pendingActions: effectivePendingActions
+      pendingActions: effectiveLocalRolloutActions.pending_actions,
+      resolvedActions: effectiveLocalRolloutActions.resolved_actions
     }),
     error: null,
     actions,
     holds,
-    pending_actions: effectivePendingActions
+    pending_actions: effectiveLocalRolloutActions.pending_actions,
+    resolved_actions: effectiveLocalRolloutActions.resolved_actions,
+    lifecycle_records: effectiveLocalRolloutActions.lifecycle_records
   };
 }
 
@@ -625,38 +674,185 @@ function collectPendingActions(input: {
     if (!mergeCloseout || mergeCloseout.status !== 'merged') {
       continue;
     }
-    if (pendingByIssueId.has(claim.issue_id)) {
+    const nextAction = buildLocalRolloutPendingAction({
+      claim,
+      summary: input.config.post_merge_rollout.summary
+    });
+    const existingAction = pendingByIssueId.get(claim.issue_id) ?? null;
+    if (
+      existingAction &&
+      compareNullableIsoTimestamp(
+        existingAction.merge_closeout_recorded_at,
+        nextAction.merge_closeout_recorded_at
+      ) >= 0
+    ) {
       continue;
     }
-    pendingByIssueId.set(claim.issue_id, {
-      kind: 'local_rollout',
-      issue_id: claim.issue_id,
-      issue_identifier: claim.issue_identifier ?? mergeCloseout.issue_identifier ?? null,
-      summary: `${input.config.post_merge_rollout.summary} Merge closeout reason=${mergeCloseout.reason}; shared_root=${mergeCloseout.shared_root?.status ?? 'unknown'}; linear_transition=${mergeCloseout.linear_transition?.status ?? 'unknown'}.`,
-      merge_closeout_reason: mergeCloseout.reason,
-      shared_root_status: mergeCloseout.shared_root?.status ?? null,
-      linear_transition_status: mergeCloseout.linear_transition?.status ?? null
-    });
+    pendingByIssueId.set(claim.issue_id, nextAction);
   }
   return [...pendingByIssueId.values()].sort((left, right) =>
     (left.issue_identifier ?? left.issue_id).localeCompare(right.issue_identifier ?? right.issue_id)
   );
 }
 
-function resolveEffectivePendingActions(
-  pendingActions: ProviderOperatorAutopilotPendingActionRecord[],
-  postMergeRolloutEnabled: boolean
-): ProviderOperatorAutopilotPendingActionRecord[] {
-  if (!postMergeRolloutEnabled) {
-    return [];
+function buildLocalRolloutPendingAction(input: {
+  claim: ProviderIntakeClaimRecord;
+  summary: string;
+}): ProviderOperatorAutopilotPendingActionRecord {
+  const mergeCloseout = input.claim.merge_closeout;
+  if (!mergeCloseout || mergeCloseout.status !== 'merged') {
+    throw new Error('Cannot build local rollout pending action without merged closeout truth.');
   }
-  return pendingActions.map(clonePendingActionRecord);
+  const issueIdentifier = input.claim.issue_identifier ?? mergeCloseout.issue_identifier ?? null;
+  return {
+    kind: 'local_rollout',
+    action_instance_id: buildLocalRolloutActionInstanceId({
+      claim: input.claim,
+      mergeCloseout
+    }),
+    issue_id: input.claim.issue_id,
+    issue_identifier: issueIdentifier,
+    summary: `${input.summary} Merge closeout reason=${mergeCloseout.reason}; shared_root=${mergeCloseout.shared_root?.status ?? 'unknown'}; linear_transition=${mergeCloseout.linear_transition?.status ?? 'unknown'}.`,
+    merge_closeout_recorded_at: mergeCloseout.recorded_at,
+    merge_closeout_reason: mergeCloseout.reason,
+    shared_root_status: mergeCloseout.shared_root?.status ?? null,
+    linear_transition_status: mergeCloseout.linear_transition?.status ?? null,
+    lifecycle_state: 'pending',
+    lifecycle_actor: null,
+    lifecycle_reason: null,
+    lifecycle_recorded_at: null
+  };
+}
+
+function buildLocalRolloutActionInstanceId(input: {
+  claim: ProviderIntakeClaimRecord;
+  mergeCloseout: NonNullable<ProviderIntakeClaimRecord['merge_closeout']>;
+}): string {
+  const identity = {
+    kind: 'local_rollout',
+    issue_id: input.claim.issue_id,
+    pr_url: input.mergeCloseout.pr?.url ?? null,
+    pr_number: input.mergeCloseout.pr?.number ?? null,
+    snapshot_merged_at: input.mergeCloseout.snapshot?.merged_at ?? null,
+    snapshot_head_oid: input.mergeCloseout.snapshot?.head_oid ?? null
+  };
+  const digest = createHash('sha256')
+    .update(JSON.stringify(identity))
+    .digest('hex')
+    .slice(0, 24);
+  return `local_rollout:${digest}`;
+}
+
+function groupLifecycleRecordsByActionInstanceId(
+  records: ProviderOperatorAutopilotLifecycleRecord[]
+): Map<string, ProviderOperatorAutopilotLifecycleRecord[]> {
+  const grouped = new Map<string, ProviderOperatorAutopilotLifecycleRecord[]>();
+  for (const record of records) {
+    const current = grouped.get(record.action_instance_id) ?? [];
+    current.push(cloneProviderOperatorAutopilotLifecycleRecord(record));
+    grouped.set(record.action_instance_id, current);
+  }
+  for (const [actionInstanceId, actionRecords] of grouped) {
+    grouped.set(
+      actionInstanceId,
+      actionRecords.sort((left, right) =>
+        compareNullableIsoTimestamp(left.recorded_at, right.recorded_at)
+      )
+    );
+  }
+  return grouped;
+}
+
+function compareNullableIsoTimestamp(left: string | null, right: string | null): number {
+  if (left === right) {
+    return 0;
+  }
+  if (!left) {
+    return -1;
+  }
+  if (!right) {
+    return 1;
+  }
+  const leftTime = Date.parse(left);
+  const rightTime = Date.parse(right);
+  if (Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime !== rightTime) {
+    return leftTime - rightTime;
+  }
+  return left.localeCompare(right);
+}
+
+export function resolveEffectiveLocalRolloutActions(input: {
+  pendingActions: ProviderOperatorAutopilotPendingActionRecord[];
+  postMergeRolloutEnabled: boolean;
+  lifecycleRecords: ProviderOperatorAutopilotLifecycleRecord[];
+}): {
+  pending_actions: ProviderOperatorAutopilotPendingActionRecord[];
+  resolved_actions: ProviderOperatorAutopilotResolvedActionRecord[];
+  lifecycle_records: ProviderOperatorAutopilotLifecycleRecord[];
+} {
+  if (!input.postMergeRolloutEnabled) {
+    return { pending_actions: [], resolved_actions: [], lifecycle_records: [] };
+  }
+  const recordsByActionInstanceId = groupLifecycleRecordsByActionInstanceId(
+    input.lifecycleRecords
+  );
+  const pendingActions: ProviderOperatorAutopilotPendingActionRecord[] = [];
+  const resolvedActions: ProviderOperatorAutopilotResolvedActionRecord[] = [];
+  const matchedLifecycleRecords: ProviderOperatorAutopilotLifecycleRecord[] = [];
+  for (const action of input.pendingActions) {
+    const lifecycleRecords =
+      recordsByActionInstanceId.get(action.action_instance_id)?.map(
+        cloneProviderOperatorAutopilotLifecycleRecord
+      ) ?? [];
+    matchedLifecycleRecords.push(...lifecycleRecords);
+    const latestTerminalRecord =
+      lifecycleRecords.filter(isTerminalLifecycleRecord).at(-1) ?? null;
+    if (latestTerminalRecord) {
+      resolvedActions.push({
+        ...clonePendingActionRecord(action),
+        lifecycle_state: latestTerminalRecord.state,
+        lifecycle_actor: latestTerminalRecord.actor,
+        lifecycle_reason: latestTerminalRecord.reason,
+        lifecycle_recorded_at: latestTerminalRecord.recorded_at
+      });
+      continue;
+    }
+    const latestRecord = lifecycleRecords.at(-1) ?? null;
+    if (latestRecord?.state === 'acknowledged') {
+      pendingActions.push({
+        ...clonePendingActionRecord(action),
+        lifecycle_state: 'acknowledged',
+        lifecycle_actor: latestRecord.actor,
+        lifecycle_reason: latestRecord.reason,
+        lifecycle_recorded_at: latestRecord.recorded_at
+      });
+      continue;
+    }
+    pendingActions.push(clonePendingActionRecord(action));
+  }
+  return {
+    pending_actions: pendingActions,
+    resolved_actions: resolvedActions,
+    lifecycle_records: matchedLifecycleRecords
+  };
+}
+
+type TerminalProviderOperatorAutopilotLifecycleRecord =
+  ProviderOperatorAutopilotLifecycleRecord & {
+    state: 'cleared' | 'dismissed';
+  };
+
+function isTerminalLifecycleRecord(
+  record: ProviderOperatorAutopilotLifecycleRecord
+): record is TerminalProviderOperatorAutopilotLifecycleRecord {
+  return record.state === 'cleared' || record.state === 'dismissed';
 }
 
 function summarizeOperatorAutopilotResult(input: {
   actions: ProviderOperatorAutopilotActionRecord[];
   holds: ProviderOperatorAutopilotHoldRecord[];
   pendingActions: ProviderOperatorAutopilotPendingActionRecord[];
+  resolvedActions: ProviderOperatorAutopilotResolvedActionRecord[];
 }): string {
   const parts: string[] = [];
   if (input.actions.length > 0) {
@@ -666,10 +862,20 @@ function summarizeOperatorAutopilotResult(input: {
     parts.push(input.holds.map((hold) => hold.summary).join(' '));
   }
   if (input.pendingActions.length > 0) {
+    const acknowledgedCount = input.pendingActions.filter(
+      (pendingAction) => pendingAction.lifecycle_state === 'acknowledged'
+    ).length;
     parts.push(
       input.pendingActions.length === 1
-        ? `Surfaced 1 pending local rollout action (${input.pendingActions[0]!.issue_identifier ?? input.pendingActions[0]!.issue_id}).`
+        ? `Surfaced 1 ${acknowledgedCount === 1 ? 'acknowledged ' : ''}pending local rollout action (${input.pendingActions[0]!.issue_identifier ?? input.pendingActions[0]!.issue_id}).`
         : `Surfaced ${input.pendingActions.length} pending local rollout actions.`
+    );
+  }
+  if (input.resolvedActions.length > 0) {
+    parts.push(
+      input.resolvedActions.length === 1
+        ? `Suppressed 1 ${input.resolvedActions[0]!.lifecycle_state} local rollout action (${input.resolvedActions[0]!.issue_identifier ?? input.resolvedActions[0]!.issue_id}).`
+        : `Suppressed ${input.resolvedActions.length} cleared or dismissed local rollout actions.`
     );
   }
   if (parts.length === 0) {
@@ -748,7 +954,9 @@ function normalizeComparableResult(
     error: result.error,
     actions: result.actions,
     holds: result.holds,
-    pending_actions: result.pending_actions
+    pending_actions: result.pending_actions,
+    resolved_actions: result.resolved_actions ?? [],
+    lifecycle_records: result.lifecycle_records ?? []
   };
 }
 
@@ -757,12 +965,18 @@ function clonePendingActionRecord(
 ): ProviderOperatorAutopilotPendingActionRecord {
   return {
     kind: record.kind,
+    action_instance_id: record.action_instance_id,
     issue_id: record.issue_id,
     issue_identifier: record.issue_identifier,
     summary: record.summary,
+    merge_closeout_recorded_at: record.merge_closeout_recorded_at,
     merge_closeout_reason: record.merge_closeout_reason,
     shared_root_status: record.shared_root_status,
-    linear_transition_status: record.linear_transition_status
+    linear_transition_status: record.linear_transition_status,
+    lifecycle_state: record.lifecycle_state,
+    lifecycle_actor: record.lifecycle_actor,
+    lifecycle_reason: record.lifecycle_reason,
+    lifecycle_recorded_at: record.lifecycle_recorded_at
   };
 }
 
