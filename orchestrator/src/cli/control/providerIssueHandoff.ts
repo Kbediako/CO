@@ -4182,6 +4182,9 @@ export function createProviderIssueHandoffService(
                 hasPendingReleaseCancel
               )
             ) {
+              if (!canFreshDiscoverReleasedMissingRetainedRun) {
+                deferredClaimFreshDiscoveryBlockedProviderKeys.add(claimProviderKey);
+              }
               continue;
             }
             if (
@@ -5590,7 +5593,13 @@ function buildFreshDiscoveryBlockedProviderKeys(
       .filter(
         (claim) =>
           claim.state !== 'ignored' &&
-          claim.state !== 'released' &&
+          (
+            claim.state !== 'released' ||
+            (
+              canRecheckPlainReleasedNotActiveClaim(claim) &&
+              hasSyntheticDetachedRetainedRunIdentity(claim)
+            )
+          ) &&
           claim.state !== 'completed' &&
           claim.state !== 'handoff_failed'
       )
@@ -7237,6 +7246,7 @@ function canFreshDiscoverPlainReleasedMissingRetainedRunClaim(input: {
     | 'issue_id'
     | 'state'
     | 'reason'
+    | 'task_id'
     | 'run_id'
     | 'run_manifest_path'
     | 'issue_state'
@@ -7252,7 +7262,7 @@ function canFreshDiscoverPlainReleasedMissingRetainedRunClaim(input: {
   }
   if (
     input.releaseRun !== null ||
-    (!input.claim.run_id && !input.claim.run_manifest_path)
+    !hasConcreteRetainedRunIdentity(input.claim)
   ) {
     return false;
   }
@@ -7268,6 +7278,19 @@ function canFreshDiscoverPlainReleasedMissingRetainedRunClaim(input: {
   return !input.unreadableAdmissionOccupancy.some(
     (record) => record.provider === input.claim.provider && record.issueId === input.claim.issue_id
   );
+}
+
+function hasConcreteRetainedRunIdentity(
+  claim: Pick<ProviderIntakeClaimRecord, 'task_id' | 'run_id' | 'run_manifest_path'>
+): boolean {
+  return Boolean(claim.run_manifest_path) ||
+    (Boolean(claim.run_id) && claim.run_id !== claim.task_id);
+}
+
+function hasSyntheticDetachedRetainedRunIdentity(
+  claim: Pick<ProviderIntakeClaimRecord, 'task_id' | 'run_id' | 'run_manifest_path'>
+): boolean {
+  return Boolean(claim.run_id) && claim.run_id === claim.task_id && !claim.run_manifest_path;
 }
 
 function canFreshDiscoverReleasedReclaimClaim(

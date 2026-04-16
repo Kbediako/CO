@@ -28,8 +28,7 @@ last_review: 2026-04-16
 ## Protected Surfaces
 - `provider-intake-state.json`
 - `provider_issue_released:not_active`
-- retained `run_id`
-- retained `run_manifest_path`
+- retained run identity: `run_id` and `run_manifest_path`
 - missing retained run manifest
 - disappeared run record
 - `fresh_discovery`
