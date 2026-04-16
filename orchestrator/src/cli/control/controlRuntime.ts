@@ -38,6 +38,7 @@ import {
 } from './observabilityUpdateNotifier.js';
 import { resolveProviderPollDispatchLimits } from './providerAgentCapacity.js';
 import { isProviderLinearWorkerProofFreshForStage } from './providerLinearWorkerTruth.js';
+import { buildProviderIssueDebugSnapshot } from './providerIssueObservability.js';
 import { classifyProviderLinearWorkflowState } from './providerLinearWorkflowStates.js';
 import type { QuestionRecord } from './questions.js';
 import {
@@ -483,12 +484,31 @@ function enrichProjectionSourceWithProviderRetryState<
   }
   const claim = findMatchingProviderIntakeClaim(providerIntakeState, source);
   const retryState = buildProviderRetryState(claim);
-  if (!retryState) {
+  const providerProof =
+    source.providerLinearWorkerProof &&
+    isProviderLinearWorkerProofFreshForStage(
+      source.providerLinearWorkerProof as unknown as Record<string, unknown>,
+      source.startedAt
+    ) &&
+    !hasStaleLocalProviderInProgressProof(source.providerLinearWorkerProof, source.startedAt)
+      ? source.providerLinearWorkerProof
+      : null;
+  const providerDebugSnapshot =
+    claim !== null
+      ? buildProviderIssueDebugSnapshot({
+          tracked_issue: source.tracked?.linear ?? null,
+          claim,
+          proof: providerProof,
+          rehydrated_at: providerIntakeState.rehydrated_at ?? null
+        }) ?? source.providerDebugSnapshot ?? null
+      : source.providerDebugSnapshot ?? null;
+  if (!retryState && providerDebugSnapshot === source.providerDebugSnapshot) {
     return source;
   }
   return {
     ...source,
-    providerRetryState: retryState
+    ...(providerDebugSnapshot ? { providerDebugSnapshot } : {}),
+    ...(retryState ? { providerRetryState: retryState } : {})
   };
 }
 
@@ -533,7 +553,23 @@ function isAuthoritativeSelectedCurrentRunningSource(
     if (isProviderIntakeClaimActiveForSourceCurrentActivity(claim, source)) {
       return true;
     }
-    if (isProviderIntakeClaimBoundToCompatibilitySource(claim, source)) {
+    const claimBoundToSource = isProviderIntakeClaimBoundToCompatibilitySource(claim, source);
+    const claimMatchesSelectedTask = isAuthoritativeProviderTaskIdMatch(claim, source);
+    if (
+      (claimBoundToSource || claimMatchesSelectedTask) &&
+      claim.state === 'released' &&
+      isProviderIssueReleasedLiveWorkerRehydrateReason(claim.reason) &&
+      !isProviderStartedWorkerSourceIssueState(claim, source)
+    ) {
+      return false;
+    }
+    if (
+      (claimBoundToSource || claimMatchesSelectedTask) &&
+      hasStaleLocalProviderInProgressProof(source.providerLinearWorkerProof, source.startedAt)
+    ) {
+      return false;
+    }
+    if (claimBoundToSource) {
       return false;
     }
   }
@@ -999,15 +1035,57 @@ function isProviderIntakeClaimActiveForSourceCurrentActivity(
     ProviderIntakeClaimRecord,
     'state' | 'reason' | 'issue_state' | 'issue_state_type' | 'issue_updated_at'
   >,
-  source: Pick<ControlCompatibilitySourceContext, 'tracked' | 'providerLinearWorkerProof' | 'startedAt'>
+  source: Pick<
+    ControlCompatibilitySourceContext,
+    'rawStatus' | 'tracked' | 'providerLinearWorkerProof' | 'startedAt'
+  >
 ): boolean {
-  if (isStaleTerminalPendingReopenProviderSource(claim, source)) {
+  if (isStaleTerminalReleasedProviderSource(claim, source)) {
     return false;
+  }
+  if (
+    source.rawStatus === 'in_progress' &&
+    claim.state === 'released' &&
+    isProviderIssueReleasedLiveWorkerRehydrateReason(claim.reason) &&
+    isProviderStartedWorkerSourceIssueState(claim, source) &&
+    !hasStaleLocalProviderInProgressProof(source.providerLinearWorkerProof, source.startedAt)
+  ) {
+    return true;
   }
   return isProviderIntakeClaimActiveCurrentActivity(claim);
 }
 
-function isStaleTerminalPendingReopenProviderSource(
+function isProviderStartedWorkerSourceIssueState(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'reason' | 'issue_state' | 'issue_state_type' | 'issue_updated_at'
+  >,
+  source: Pick<ControlCompatibilitySourceContext, 'tracked'>
+): boolean {
+  const trackedIssue = source.tracked?.linear ?? null;
+  if (trackedIssue) {
+    const trackedUpdatedAt = Date.parse(trackedIssue.updated_at ?? '');
+    const claimIssueUpdatedAt = Date.parse(claim.issue_updated_at ?? '');
+    const trackedIssueIsCurrent =
+      Number.isFinite(trackedUpdatedAt) &&
+      (!Number.isFinite(claimIssueUpdatedAt) || trackedUpdatedAt >= claimIssueUpdatedAt);
+    if (trackedIssueIsCurrent) {
+      return isProviderStartedWorkerIssueState({
+        state: trackedIssue.state,
+        state_type: trackedIssue.state_type
+      });
+    }
+  }
+  return (
+    isProviderIssueReleasedPendingReopen(claim.reason) &&
+    isProviderStartedWorkerIssueState({
+      state: claim.issue_state,
+      state_type: claim.issue_state_type
+    })
+  );
+}
+
+function isStaleTerminalReleasedProviderSource(
   claim: Pick<
     ProviderIntakeClaimRecord,
     'state' | 'reason' | 'issue_state' | 'issue_state_type' | 'issue_updated_at'
@@ -1016,7 +1094,7 @@ function isStaleTerminalPendingReopenProviderSource(
 ): boolean {
   if (
     claim.state !== 'released' ||
-    !isProviderIssueReleasedPendingReopen(claim.reason) ||
+    !isProviderIssueReleasedLiveWorkerRehydrateReason(claim.reason) ||
     !isProviderStartedWorkerIssueState({
       state: claim.issue_state,
       state_type: claim.issue_state_type
@@ -1104,6 +1182,15 @@ function isLocalProcessAlive(pid: number): boolean {
 
 function isProviderIssueReleasedPendingReopen(reason: string | null | undefined): boolean {
   return typeof reason === 'string' && reason.startsWith(PROVIDER_RELEASED_PENDING_REOPEN_PREFIX);
+}
+
+function isProviderIssueReleasedLiveWorkerRehydrateReason(
+  reason: string | null | undefined
+): boolean {
+  return (
+    isProviderIssueReleasedPendingReopen(reason) ||
+    reason === 'provider_issue_released:not_active'
+  );
 }
 
 function isProviderStartedWorkerIssueState(input: {
