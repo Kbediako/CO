@@ -1,0 +1,51 @@
+# Task Checklist - linear-4122489e-1a3b-43cf-a181-e98ada0a55e1
+
+- Linear Issue: `CO-195` / `4122489e-1a3b-43cf-a181-e98ada0a55e1`
+- MCP Task ID: `linear-4122489e-1a3b-43cf-a181-e98ada0a55e1`
+- Primary PRD: `docs/PRD-linear-4122489e-1a3b-43cf-a181-e98ada0a55e1.md`
+- TECH_SPEC: `docs/TECH_SPEC-linear-4122489e-1a3b-43cf-a181-e98ada0a55e1.md`
+- Task spec: `tasks/specs/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-linear-4122489e-1a3b-43cf-a181-e98ada0a55e1.md`
+
+## Docs-First
+- [x] PRD, TECH_SPEC, ACTION_PLAN, task spec, task checklist, `.agent` mirror, `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` drafted for `CO-195`. Evidence: docs packet paths above.
+- [x] Pre-implementation issue-quality review notes captured before implementation. Evidence: `tasks/specs/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1.md`.
+- [x] Docs-review evidence captured before implementation. Evidence: `.runs/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1-co-195-docs-review-r3/cli/2026-04-15T23-10-57-461Z-e2b822df/manifest.json`.
+
+## Linear / Delegation
+- [x] `linear issue-context` inspected live team states before transition. Evidence: packaged `linear issue-context --issue-id 4122489e-1a3b-43cf-a181-e98ada0a55e1 --format json`.
+- [x] Issue moved from live `Ready` to live started state `In Progress` before active work. Evidence: packaged `linear transition --issue-id 4122489e-1a3b-43cf-a181-e98ada0a55e1 --state "In Progress" --format json`.
+- [x] Workpad created and pre-turn decomposition matrix recorded. Evidence: Linear workpad comment `929ccb1d-1fb1-4096-9764-95ce673d5066`.
+- [x] Parallelization decision recorded as `parallelize_now / independent_scope_available`. Evidence: packaged `linear parallelization` result.
+- [x] Same-issue child lane `release-facts` completed successfully before turn end and parent recorded artifact handling. Evidence: `.runs/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1-release-facts/cli/2026-04-15T23-00-49-078Z-4df3c05c/manifest.json`.
+
+## Evidence / Implementation
+- [x] Official `rust-v0.121.0` release-note and OpenAI changelog facts captured. Evidence: `out/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1/manual/codex-0121-release-audit/`.
+- [x] Local `codex --version` and relevant help surfaces captured. Evidence: `out/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1/manual/codex-0121-command-surface/`.
+- [x] npm `@openai/codex` latest/dist-tag/time metadata captured. Evidence: `out/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1/manual/codex-0121-command-surface/npm-openai-codex.log`.
+- [x] Adoption matrix completed and linked. Evidence: `out/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1/manual/codex-0121-release-audit/adoption-matrix.md`.
+- [x] Final promote/hold decision recorded in policy and task packet. Decision: hold `0.118.0`; evidence: `out/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1/manual/codex-version-canary/compare/decision-go-no-go.md`.
+- [x] Multiple GPT/Codex auth rotation workflow validated or linked Bug created. Evidence: `out/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1/manual/auth-profile-rotation/auth-profile-rotation-summary.md`; no reusable bug reproduced.
+- [x] Provider/review/delegation/appserver/exec-server P0/P1 regression assessment completed. Evidence: `out/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1/manual/codex-0121-release-audit/adoption-matrix.md`; standalone review P2 checklist-consistency finding resolved in this mirror and `.agent/task/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1.md`.
+
+## Validation
+- [x] `node scripts/delegation-guard.mjs`
+- [x] `node scripts/spec-guard.mjs --dry-run`
+- [x] `node scripts/runtime-mode-canary.mjs`. Evidence: `out/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1/manual/runtime-mode-canary/runtime-canary-summary.json`.
+- [x] Required cloud canary result or exact blocker captured. Evidence: `out/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1/manual/cloud-canary-required/cloud-canary-required.log`.
+- [x] Fallback cloud canary result or exact blocker captured. Evidence: `out/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1/manual/cloud-canary-fallback/cloud-canary-fallback.log`.
+- [x] `npm run build`
+- [x] `npm run lint`
+- [x] `npm run test`
+- [x] `npm run docs:check`
+- [x] `npm run docs:freshness`
+- [x] `npm run repo:stewardship`
+- [x] `node scripts/diff-budget.mjs`
+- [x] Manifest-backed standalone review completed before review handoff. Evidence: `.runs/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1-co-195-docs-review-r3/cli/2026-04-15T23-10-57-461Z-e2b822df/review/telemetry.json` (`bounded-success`); P2 checklist-consistency finding resolved.
+- [x] Elegance review completed before review handoff. Evidence: `out/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1/manual/elegance-review/elegance-review.md`.
+- [ ] PR attached and ready-review drain completed before `In Review`.
+
+## Handoff Status
+- [x] PR opened (`#490`) and attached to CO-195.
+- [ ] Workpad refreshed with final evidence and review status.
+- [ ] Linear transitioned to `In Review` only after required validation, PR checks, ready-review drain, and latest `origin/main` merge are clean or explicitly waived.
