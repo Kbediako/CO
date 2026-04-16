@@ -19,7 +19,7 @@
 - [x] `docs/TASKS.md` snapshot updated. Evidence: `docs/TASKS.md`.
 - [x] Checklist mirrored to `.agent/task/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md`. Evidence: `.agent/task/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md`.
 - [x] `docs/docs-freshness-registry.json` coverage refreshed for packet and evidence files. Evidence: `docs/docs-freshness-registry.json`.
-- [ ] Fresh docs-review evidence captured before review handoff.
+- [x] Fresh docs-review evidence captured before review handoff. Evidence: `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-co-198-docs-review-rework-r2/cli/2026-04-16T11-57-15-726Z-2b6ad40c/manifest.json`, `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-co-198-docs-review-rework-r2/cli/2026-04-16T11-57-15-726Z-2b6ad40c/review/telemetry.json` (`review_outcome=clean-success`).
 
 ## Workflow
 - [x] Live issue context inspected before transition/reset. Evidence: `linear issue-context` showed live state `Rework`, previous workpad, and attached PR `#491`.
@@ -71,3 +71,4 @@
 - 2026-04-16: Child lane `docs-source-evidence-rework` reached `status=succeeded` and produced a zero-byte patch; helper disposition rejected it as advisory, leaving parent-owned packet changes as the final implementation path.
 - 2026-04-16: Previous reviewed docs packet replayed onto fresh `origin/main`, then refreshed with current `codex-cli 0.121.0`, npm/GitHub release evidence, generated app-server schemas, redacted stdio app-server smoke, and runtime-mode canary evidence. Decision remains HOLD; JSONL/session logs remain authoritative.
 - 2026-04-16: Required cloud canary failed closed before cloud execution because `CODEX_CLOUD_ENV_ID` is absent; fallback contract produced local MCP fallback manifest `2026-04-16T11-48-13-664Z-46aaeae4` but still failed the required wrapper classification as `configuration`. HOLD remains in force.
+- 2026-04-16: Rework docs-review rerun succeeded after current-main merge and TASKS archive-budget trim. Evidence: `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-co-198-docs-review-rework-r2/cli/2026-04-16T11-57-15-726Z-2b6ad40c/manifest.json`, `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-co-198-docs-review-rework-r2/cli/2026-04-16T11-57-15-726Z-2b6ad40c/review/telemetry.json`.

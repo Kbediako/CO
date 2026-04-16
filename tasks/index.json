@@ -13,11 +13,11 @@
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
           "date": "2026-04-16",
-          "status": "pending",
-          "manifest": null,
-          "telemetry": null,
-          "review_outcome": null,
-          "note": "Rework reset replayed the docs packet on current origin/main; fresh docs-review pending before review handoff."
+          "status": "succeeded",
+          "manifest": ".runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-co-198-docs-review-rework-r2/cli/2026-04-16T11-57-15-726Z-2b6ad40c/manifest.json",
+          "telemetry": ".runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-co-198-docs-review-rework-r2/cli/2026-04-16T11-57-15-726Z-2b6ad40c/review/telemetry.json",
+          "review_outcome": "clean-success",
+          "note": "Rework docs-review rerun succeeded after current-main merge and TASKS archive-budget trim; delegation guard, spec-guard, docs:check, docs:freshness:maintain, and forced review all passed."
         }
       },
       "paths": {
