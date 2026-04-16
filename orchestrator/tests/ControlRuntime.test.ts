@@ -3405,6 +3405,155 @@ describe('ControlRuntime', () => {
     }
   });
 
+  it('keeps ordinary released not-active started provider workers visible while intake rehydrates', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-15T23:00:00.000Z'));
+    try {
+      const providerIntakeState = createProviderIntakeState([
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-195',
+          issue_id: 'lin-issue-195',
+          issue_identifier: 'CO-195',
+          issue_title: 'Ordinary released live worker',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-15T22:55:00.000Z',
+          task_id: 'linear-ordinary-released-live-worker',
+          mapping_source: 'provider_id_fallback',
+          state: 'released',
+          reason: 'provider_issue_released:not_active',
+          accepted_at: '2026-04-15T22:45:00.000Z',
+          updated_at: '2026-04-15T22:56:00.000Z',
+          last_delivery_id: 'delivery-co-195',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_744_764_500_000,
+          run_id: 'run-ordinary-live',
+          run_manifest_path: null,
+          launch_source: 'control-host',
+          launch_token: 'launch-co-195'
+        }
+      ]);
+      const fixture = await createFixture({
+        taskId: 'linear-ordinary-released-live-worker',
+        providerIntakeState
+      });
+      await seedManifest(fixture.paths, {
+        task_id: 'linear-ordinary-released-live-worker',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-195',
+        issue_identifier: 'CO-195',
+        pipeline_id: 'provider-linear-worker',
+        pipeline_title: 'Provider Linear Worker',
+        status: 'in_progress',
+        started_at: '2026-04-15T22:45:00.000Z',
+        updated_at: '2026-04-15T22:59:00.000Z',
+        summary: 'ordinary released worker still running'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+      const uiDataset = buildUiDataset({
+        projection: compatibilityProjection,
+        generatedAt: '2026-04-15T23:00:00.000Z'
+      });
+
+      expect(compatibilityProjection.running.map((entry) => entry.issue_identifier)).toEqual([
+        'CO-195'
+      ]);
+      expect(compatibilityProjection.issues.map((issue) => issue.issueIdentifier)).toContain('CO-195');
+      expect(uiDataset.counts.running).toBe(1);
+      expect(uiDataset.running.map((entry) => entry.issue_identifier)).toEqual(['CO-195']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps ordinary released not-active workers visible when fresh tracked state supersedes stale cached metadata', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-15T23:00:00.000Z'));
+    try {
+      const providerIntakeState = createProviderIntakeState([
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-198',
+          issue_id: 'lin-issue-198',
+          issue_identifier: 'CO-198',
+          issue_title: 'Ordinary released live worker with stale cache',
+          issue_state: 'Done',
+          issue_state_type: 'completed',
+          issue_updated_at: '2026-04-15T22:30:00.000Z',
+          task_id: 'linear-ordinary-released-live-worker-stale-cache',
+          mapping_source: 'provider_id_fallback',
+          state: 'released',
+          reason: 'provider_issue_released:not_active',
+          accepted_at: '2026-04-15T22:45:00.000Z',
+          updated_at: '2026-04-15T22:56:00.000Z',
+          last_delivery_id: 'delivery-co-198',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_744_764_500_000,
+          run_id: 'run-ordinary-live-stale-cache',
+          run_manifest_path: null,
+          launch_source: 'control-host',
+          launch_token: 'launch-co-198'
+        }
+      ]);
+      const fixture = await createFixture({
+        taskId: 'linear-ordinary-released-live-worker-stale-cache',
+        providerIntakeState,
+        linearAdvisoryState: {
+          tracked_issue: createTrackedIssue({
+            id: 'lin-issue-198',
+            identifier: 'CO-198',
+            title: 'Ordinary released live worker with stale cache',
+            state: 'In Progress',
+            state_type: 'started',
+            updated_at: '2026-04-15T22:59:00.000Z'
+          })
+        }
+      });
+      await seedManifest(fixture.paths, {
+        task_id: 'linear-ordinary-released-live-worker-stale-cache',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-198',
+        issue_identifier: 'CO-198',
+        pipeline_id: 'provider-linear-worker',
+        pipeline_title: 'Provider Linear Worker',
+        status: 'in_progress',
+        started_at: '2026-04-15T22:45:00.000Z',
+        updated_at: '2026-04-15T22:59:00.000Z',
+        summary: 'ordinary released worker still running with fresh tracked truth'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+      const uiDataset = buildUiDataset({
+        projection: compatibilityProjection,
+        generatedAt: '2026-04-15T23:00:00.000Z'
+      });
+
+      expect(compatibilityProjection.running.map((entry) => entry.issue_identifier)).toEqual([
+        'CO-198'
+      ]);
+      const issue = compatibilityProjection.issues.find((entry) => entry.issueIdentifier === 'CO-198');
+      expect(issue?.payload.provider_debug_snapshot?.claim).toMatchObject({
+        state: 'released',
+        reason: 'provider_issue_released:not_active',
+        issue_state: 'Done',
+        issue_state_type: 'completed'
+      });
+      expect(issue?.payload.provider_debug_snapshot?.live_linear_state).toMatchObject({
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-04-15T22:59:00.000Z'
+      });
+      expect(uiDataset.counts.running).toBe(1);
+      expect(uiDataset.running.map((entry) => entry.issue_identifier)).toEqual(['CO-198']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('suppresses null-provider running sources when a matching intake claim is no longer active', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));

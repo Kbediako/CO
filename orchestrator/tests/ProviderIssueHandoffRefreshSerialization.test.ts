@@ -929,7 +929,7 @@ describe('runProviderIssueHandoffRefresh', () => {
     });
   });
 
-  it('retries released active child cancellation on a later ready refresh after a transient release failure', async () => {
+  it('rehydrates a released active child on a later ready refresh after a transient release failure', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {
       repoRoot: root,
@@ -1025,12 +1025,12 @@ describe('runProviderIssueHandoffRefresh', () => {
     await service.refresh();
 
     expect(resolveTrackedIssueCallCount).toBe(2);
-    expect(cancelCalls).toHaveLength(2);
+    expect(cancelCalls).toHaveLength(1);
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
     expect(state.claims[0]).toMatchObject({
-      state: 'released',
-      reason: 'provider_issue_released:not_active',
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
       run_id: 'run-active',
       run_manifest_path: childPaths.manifestPath
     });
@@ -1622,6 +1622,56 @@ describe('runProviderIssueHandoffRefresh', () => {
     });
   });
 
+  it('keeps release-cancel retries for pending-reopen active runs with cached non-started state', async () => {
+    const { root, paths } = await createHostPaths();
+    const childPaths = await createCo185ActiveRun(root);
+    const state = createProviderIntakeState();
+    pushCo185ReleasedPendingClaim(state, childPaths.manifestPath, {
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-15T01:30:00.000Z'
+    });
+
+    const cancelCalls: Array<Record<string, unknown>> = [];
+    vi.spyOn(questionChildResolutionAdapter, 'callChildControlEndpoint').mockImplementation(
+      async ({ payload }) => {
+        cancelCalls.push(payload);
+      }
+    );
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue: vi.fn(async () => ({
+        kind: 'skip' as const,
+        reason: 'linear_refresh_unavailable'
+      }))
+    });
+
+    await service.refresh();
+
+    expect(cancelCalls).toEqual([
+      expect.objectContaining({
+        action: 'cancel',
+        reason: 'provider_issue_released_pending_reopen:provider_issue_released:not_active'
+      })
+    ]);
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-15T01:30:00.000Z'
+    });
+  });
+
   it('does not reattach a released active run while cancellation is in flight', async () => {
     const { root, paths } = await createHostPaths();
     const childPaths = await createCo185ActiveRun(root);
@@ -1778,6 +1828,209 @@ describe('runProviderIssueHandoffRefresh', () => {
       run_manifest_path: childPaths.manifestPath
     });
     expect(state.latest_reason).toBe('provider_issue_rehydrated_active_run');
+  });
+
+  it('rehydrates ordinary released not-active claims only with fresh started truth and live runs', async () => {
+    const { root, paths } = await createHostPaths();
+    const childPaths = await createCo185ActiveRun(root);
+    const state = createProviderIntakeState();
+    pushCo185ReleasedPendingClaim(state, childPaths.manifestPath, {
+      reason: 'provider_issue_released:not_active'
+    });
+
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-185',
+        identifier: 'CO-185',
+        title: 'Provider helper constraints',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-04-15T01:18:56.003Z'
+      })
+    }));
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue
+    });
+
+    await service.rehydrate();
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-185'
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-15T01:18:56.003Z',
+      run_id: 'run-active',
+      run_manifest_path: childPaths.manifestPath
+    });
+    expect(state.latest_reason).toBe('provider_issue_rehydrated_active_run');
+  });
+
+  it('rehydrates ordinary released not-active claims when cached issue metadata is stale non-started', async () => {
+    const { root, paths } = await createHostPaths();
+    const childPaths = await createCo185ActiveRun(root);
+    const state = createProviderIntakeState();
+    pushCo185ReleasedPendingClaim(state, childPaths.manifestPath, {
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-04-15T01:10:00.000Z'
+    });
+
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-185',
+        identifier: 'CO-185',
+        title: 'Provider helper constraints',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-04-15T01:18:56.003Z'
+      })
+    }));
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue
+    });
+
+    await service.rehydrate();
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-185'
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-15T01:18:56.003Z',
+      run_id: 'run-active',
+      run_manifest_path: childPaths.manifestPath
+    });
+    expect(state.latest_reason).toBe('provider_issue_rehydrated_active_run');
+  });
+
+  it('does not rehydrate ordinary released not-active claims from cached started metadata alone', async () => {
+    const { root, paths } = await createHostPaths();
+    const childPaths = await createCo185ActiveRun(root);
+    const state = createProviderIntakeState();
+    pushCo185ReleasedPendingClaim(state, childPaths.manifestPath, {
+      reason: 'provider_issue_released:not_active'
+    });
+
+    const cancelCalls: Array<Record<string, unknown>> = [];
+    vi.spyOn(questionChildResolutionAdapter, 'callChildControlEndpoint').mockImplementation(
+      async ({ payload }) => {
+        cancelCalls.push(payload);
+      }
+    );
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'provider-linear-worker'
+    });
+
+    await service.rehydrate();
+
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(cancelCalls).toHaveLength(0);
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      run_id: 'run-active',
+      run_manifest_path: childPaths.manifestPath
+    });
+  });
+
+  it('does not fail closed ordinary released not-active live workers before fresh started resolution', async () => {
+    const { root, paths } = await createHostPaths();
+    const childPaths = await createCo185ActiveRun(root);
+    const state = createProviderIntakeState();
+    pushCo185ReleasedPendingClaim(state, childPaths.manifestPath, {
+      reason: 'provider_issue_released:not_active'
+    });
+
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-185',
+        identifier: 'CO-185',
+        title: 'Provider helper constraints',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-04-15T01:18:56.003Z'
+      })
+    }));
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      allowPollFailClosed: true,
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-185'
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-15T01:18:56.003Z',
+      run_id: 'run-active',
+      run_manifest_path: childPaths.manifestPath
+    });
   });
 
   it('retries released queued child cancellation on a later ready refresh after a transient release failure', async () => {
