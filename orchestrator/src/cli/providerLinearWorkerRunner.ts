@@ -2762,6 +2762,15 @@ function classifyProviderWorkerFailureDiagnosis(
     );
   }
   if (
+    /\b(cloud denial|cloud denied|cloud access denied|cloud execution denied|not allowed in cloud)\b/u
+      .test(normalizedClassification)
+  ) {
+    return build(
+      'cloud_denial',
+      'Codex Cloud denied the run; verify cloud environment, branch, and account permission.'
+    );
+  }
+  if (
     /\b(auth mismatch|auth profile mismatch|profile mismatch|account mismatch|active account mismatch|active profile mismatch|not logged in|login required|unauthorized|forbidden)\b/u
       .test(normalizedClassification) ||
     (
@@ -2783,15 +2792,6 @@ function classifyProviderWorkerFailureDiagnosis(
     return build(
       'quota_rate_limit',
       'Codex account quota/rate-limit or plan decoding is implicated; inspect rate-limit and account-plan evidence.'
-    );
-  }
-  if (
-    /\b(cloud denial|cloud denied|cloud access denied|cloud execution denied|not allowed in cloud)\b/u
-      .test(normalizedClassification)
-  ) {
-    return build(
-      'cloud_denial',
-      'Codex Cloud denied the run; verify cloud environment, branch, and account permission.'
     );
   }
   if (

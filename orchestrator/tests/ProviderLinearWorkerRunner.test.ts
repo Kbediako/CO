@@ -2071,6 +2071,22 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     }
   });
 
+  it('classifies cloud-denied forbidden errors before auth mismatch', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      JSON.stringify({
+        type: 'error',
+        message: 'Cloud execution denied (403 forbidden) for this branch.',
+        timestamp: '2026-04-15T20:45:22.000Z'
+      })
+    );
+
+    expect(parsed.failureDiagnosis).toMatchObject({
+      diagnostic_category: 'cloud_denial',
+      source: 'stdout_jsonl',
+      observed_at: '2026-04-15T20:45:22.000Z'
+    });
+  });
+
   it('classifies machine-readable provider diagnostic events before prose', () => {
     const cases: Array<[Record<string, unknown>, string]> = [
       [{ type: 'auth_mismatch', status: 'failed' }, 'auth_mismatch'],
