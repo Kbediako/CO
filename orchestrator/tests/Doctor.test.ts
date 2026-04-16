@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHmac } from 'node:crypto';
 import { chmod, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -17,8 +17,13 @@ import { REPO_CONFIG_PATH_ENV_KEY } from '../src/cli/config/userConfig.js';
 import { sanitizeProviderOverrideEnv } from '../src/cli/utils/providerOverrideEnv.js';
 import * as cloudPreflight from '../src/cli/utils/cloudPreflight.js';
 
+const TEST_AUTH_PROVENANCE_FINGERPRINT_KEY = 'doctor-test-fingerprint-key';
+
 function testFingerprint(value: string): string {
-  return `sha256:${createHash('sha256').update(value).digest('hex').slice(0, 16)}`;
+  return `hmac-sha256:${createHmac('sha256', TEST_AUTH_PROVENANCE_FINGERPRINT_KEY)
+    .update(value)
+    .digest('hex')
+    .slice(0, 16)}`;
 }
 
 async function writeFakeCodexBinary(dir: string, featureLine: string): Promise<string> {
@@ -1176,6 +1181,7 @@ describe('runDoctor', () => {
           CODEX_CLOUD_BRANCH: 'refs/heads/linear/co-200',
           CODEX_AUTH_PROFILE: 'operator-profile',
           OPENAI_ACCOUNT_ID: 'acct_raw_123',
+          CODEX_AUTH_PROVENANCE_FINGERPRINT_KEY: TEST_AUTH_PROVENANCE_FINGERPRINT_KEY,
           OPENAI_API_KEY: 'sk-test-redacted'
         })
       });

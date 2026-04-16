@@ -12,7 +12,7 @@
 - [x] Canonical TECH_SPEC drafted with diagnostic categories, redacted auth provenance fields, upstream evidence, fixture plan, and validation gates. Evidence: `tasks/specs/linear-4c480fc7-b6c2-48cf-b4a2-73fe057b8aa7.md`.
 - [x] TECH_SPEC mirror drafted inside docs scope. Evidence: `docs/TECH_SPEC-codex-0121-diagnostics-auth-provenance.md`.
 - [x] ACTION_PLAN drafted for parent implementation, focused fixtures, redaction checks, and review gates. Evidence: `docs/ACTION_PLAN-codex-0121-diagnostics-auth-provenance.md`.
-- [x] `tasks/index.json` updated under canonical `items[]` with the `CO-200` TECH_SPEC entry and review date. Evidence: `tasks/index.json` points `paths.spec` to the canonical spec and `paths.docs` to the docs mirror.
+- [x] `tasks/index.json` updated under canonical `items[]` with the `CO-200` TECH_SPEC entry and review date. Evidence: `tasks/index.json` uses the date-prefixed task id and points `paths.docs` to the canonical TECH_SPEC mirror.
 - [x] Official upstream `openai/codex` release evidence verified for `rust-v0.121.0`: title `0.121.0`, published `2026-04-15T20:45:18Z`, account/rate-limit fix, and Guardian timeout fix anchors. Evidence: https://github.com/openai/codex/releases/tag/rust-v0.121.0 and https://api.github.com/repos/openai/codex/releases/tags/rust-v0.121.0.
 
 ## Workflow
@@ -58,7 +58,7 @@
 - [x] Parent diff-budget guard. Evidence: `DIFF_BUDGET_OVERRIDE_REASON="CO-200 combines required docs-first packet, diagnostics implementation, and focused fixtures in one provider issue; split would obscure review provenance" node scripts/diff-budget.mjs` passed.
 - [x] Parent `npm run test` after commit/clean-diff conditions. Evidence: clean post-commit run passed, 342 test files and 3942 tests.
 - [x] Parent `npm run pack:smoke`. Evidence: command passed.
-- [ ] Parent standalone review and elegance/minimality pass before review handoff.
+- [x] Parent standalone review and elegance/minimality pass before review handoff. Evidence: manifest-backed `FORCE_CODEX_REVIEW=1` rerun completed cleanly, and explicit elegance/minimality pass was recorded in the Linear workpad.
 
 ## Progress Log
 - 2026-04-16: Bounded same-issue child lane created the `CO-200` docs-first packet and canonical `tasks/index.json` entry only. Protected terms preserved: Codex `0.121.0`, `rust-v0.121.0`, `openai/codex`, `prolite`, WHAM, Guardian, TUI history, `diagnostic_category`, `auth_provenance`, `rate_limit`, `account_plan`, `guardian_timeout`, and `guardian_policy_denial`.

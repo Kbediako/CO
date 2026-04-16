@@ -1,5 +1,5 @@
 import type { ChildProcess } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHmac } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import http from 'node:http';
 import { mkdtemp, mkdir, readFile, realpath, rm, symlink, utimes, writeFile } from 'node:fs/promises';
@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { PassThrough } from 'node:stream';
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   appendProviderLinearWorkerChildLaneRecord,
@@ -44,13 +44,28 @@ import type { RuntimeCodexCommandContext } from '../src/cli/runtime/index.js';
 let tempRoot: string | null = null;
 const providerLinearWorkerRunnerTestTimeoutMs = 60_000;
 const SOURCE_HELPER_COMMAND = 'node "/tmp/co/bin/codex-orchestrator.js" linear';
+const TEST_AUTH_PROVENANCE_FINGERPRINT_KEY = 'provider-linear-worker-test-fingerprint-key';
+let originalAuthProvenanceFingerprintKey: string | undefined;
 
 function testFingerprint(value: string): string {
-  return `sha256:${createHash('sha256').update(value).digest('hex').slice(0, 16)}`;
+  return `hmac-sha256:${createHmac('sha256', TEST_AUTH_PROVENANCE_FINGERPRINT_KEY)
+    .update(value)
+    .digest('hex')
+    .slice(0, 16)}`;
 }
+
+beforeEach(() => {
+  originalAuthProvenanceFingerprintKey = process.env.CODEX_AUTH_PROVENANCE_FINGERPRINT_KEY;
+  process.env.CODEX_AUTH_PROVENANCE_FINGERPRINT_KEY = TEST_AUTH_PROVENANCE_FINGERPRINT_KEY;
+});
 
 afterEach(async () => {
   vi.unstubAllGlobals();
+  if (originalAuthProvenanceFingerprintKey === undefined) {
+    delete process.env.CODEX_AUTH_PROVENANCE_FINGERPRINT_KEY;
+  } else {
+    process.env.CODEX_AUTH_PROVENANCE_FINGERPRINT_KEY = originalAuthProvenanceFingerprintKey;
+  }
   if (tempRoot) {
     await rm(tempRoot, { recursive: true, force: true });
     tempRoot = null;
@@ -1811,6 +1826,49 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     }
   });
 
+  it('does not let older auth provenance events overwrite newer fingerprints', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        JSON.stringify({
+          type: 'notification',
+          method: 'account/authProfile/updated',
+          params: {
+            auth: {
+              profile_id: 'new-profile',
+              account_id: 'new-account',
+              credential_source: 'codex_login',
+              auth_freshness: 'fresh'
+            }
+          },
+          timestamp: '2026-04-15T20:46:00.000Z'
+        }),
+        JSON.stringify({
+          type: 'notification',
+          method: 'account/authProfile/updated',
+          params: {
+            auth: {
+              profile_id: 'old-profile',
+              account_id: 'old-account',
+              credential_source: 'device_auth',
+              auth_freshness: 'stale'
+            }
+          },
+          timestamp: '2026-04-15T20:45:00.000Z'
+        })
+      ].join('\n')
+    );
+
+    expect(parsed.authProvenance).toMatchObject({
+      active_profile_fingerprint: testFingerprint('new-profile'),
+      active_account_fingerprint: testFingerprint('new-account'),
+      credential_source: 'codex_login',
+      auth_freshness: 'fresh',
+      observed_at: '2026-04-15T20:46:00.000Z'
+    });
+    expect(JSON.stringify(parsed.authProvenance)).not.toContain('old-profile');
+    expect(JSON.stringify(parsed.authProvenance)).not.toContain('old-account');
+  });
+
   it('classifies Codex 0.121 quota variants and preserves safe plan context', () => {
     const cases: Array<[Record<string, unknown>, string[]]> = [
       [
@@ -2000,7 +2058,8 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
   it('classifies auth-profile mismatch events before plan/quota context', () => {
     for (const event of [
       { type: 'notification', method: 'account/authProfile/mismatch' },
-      { type: 'error', message: 'Active auth profile forbidden for this prolite account.' }
+      { type: 'error', message: 'Active auth profile forbidden for this prolite account.' },
+      { type: 'error', message: 'Account mismatch while rate limit exhausted for this profile.' }
     ]) {
       const parsed = parseProviderLinearWorkerJsonl(
         JSON.stringify({ timestamp: '2026-04-15T20:45:21.500Z', ...event })

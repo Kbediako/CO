@@ -1,7 +1,7 @@
 {
   "items": [
     {
-      "id": "linear-4c480fc7-b6c2-48cf-b4a2-73fe057b8aa7",
+      "id": "20260416-linear-4c480fc7-b6c2-48cf-b4a2-73fe057b8aa7",
       "title": "CO-200 Codex 0.121 diagnostics auth provenance and failure distinctions",
       "relates_to": "tasks/tasks-linear-4c480fc7-b6c2-48cf-b4a2-73fe057b8aa7.md",
       "risk": "high",
@@ -11,7 +11,6 @@
       "last_review": "2026-04-16",
       "approvals": {},
       "paths": {
-        "spec": "tasks/specs/linear-4c480fc7-b6c2-48cf-b4a2-73fe057b8aa7.md",
         "task": "tasks/tasks-linear-4c480fc7-b6c2-48cf-b4a2-73fe057b8aa7.md",
         "docs": "docs/TECH_SPEC-codex-0121-diagnostics-auth-provenance.md"
       }

@@ -129,7 +129,7 @@ last_review: 2026-04-16
   - include release evidence in docs/task artifacts rather than runtime diagnostic payloads unless parent implementation chooses a version-evidence field.
 - Redacted auth provenance allowlist:
   - `provider_kind`, `runtime_mode`, `runtime_provider`, `credential_source`, `auth_freshness`, `observed_at`, and `source`: normalized short labels only.
-  - `active_profile_fingerprint` and `active_account_fingerprint`: one-way hashes with the stable `sha256:<16-hex>` format, never raw identifiers.
+  - `active_profile_fingerprint` and `active_account_fingerprint`: keyed opaque HMAC fingerprints with the `hmac-sha256:<16-hex>` format when `CODEX_AUTH_PROVENANCE_FINGERPRINT_KEY` or `CODEX_ORCHESTRATOR_AUTH_PROVENANCE_KEY` is available; never raw identifiers.
   - `cloud_env_id` and `cloud_branch`: cloud run context needed for preflight diagnosis.
   - `failure_diagnosis.signal`: safe redacted source detail and allowlisted plan labels such as `account_plan=prolite` or `wham_plan=unknown_wham_plan`; never raw auth material.
 - Forbidden auth provenance fields:

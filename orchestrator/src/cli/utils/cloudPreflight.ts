@@ -1,7 +1,7 @@
 import process from 'node:process';
 import { spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
 
+import { fingerprintAuthProvenanceValue } from './authProvenanceFingerprint.js';
 import { resolveCodexCliBin } from './codexCli.js';
 
 export interface CloudPreflightIssue {
@@ -118,13 +118,6 @@ function normalizeCloudPreflightRequestValue(raw: string | null | undefined): st
   return trimmed.length > 0 ? trimmed : null;
 }
 
-function fingerprintCloudPreflightValue(value: string | null): string | null {
-  if (!value) {
-    return null;
-  }
-  return `sha256:${createHash('sha256').update(value).digest('hex').slice(0, 16)}`;
-}
-
 function readFirstCloudPreflightEnvValue(
   env: NodeJS.ProcessEnv | undefined,
   keys: string[]
@@ -184,8 +177,8 @@ export function buildCloudPreflightAuthProvenance(params: {
   ]);
   return {
     providerKind: 'codex_cloud',
-    activeProfileFingerprint: fingerprintCloudPreflightValue(profile),
-    activeAccountFingerprint: fingerprintCloudPreflightValue(account),
+    activeProfileFingerprint: fingerprintAuthProvenanceValue(profile, params.env),
+    activeAccountFingerprint: fingerprintAuthProvenanceValue(account, params.env),
     cloudEnvId: params.environmentId,
     cloudBranch: params.branch,
     credentialSource,

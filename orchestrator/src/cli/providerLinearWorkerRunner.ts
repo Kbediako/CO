@@ -1,5 +1,4 @@
 import { spawn, type StdioOptions } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import process from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -59,6 +58,7 @@ import {
   selectRunMemoryForRole
 } from './run/runMemoryController.js';
 import { writeJsonAtomic } from './utils/fs.js';
+import { fingerprintAuthProvenanceValue } from './utils/authProvenanceFingerprint.js';
 import {
   createRuntimeCodexCommandContext,
   formatRuntimeSelectionSummary,
@@ -1970,11 +1970,20 @@ function normalizeProviderWorkerPlanLabel(
 }
 
 function fingerprintProviderWorkerAuthValue(value: unknown): string | null {
-  const raw = normalizeOptionalString(value);
-  if (!raw) {
+  if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
     return null;
   }
-  return `sha256:${createHash('sha256').update(raw).digest('hex').slice(0, 16)}`;
+  return fingerprintAuthProvenanceValue(value);
+}
+
+function fingerprintProviderWorkerEnvAuthValue(
+  value: unknown,
+  env: NodeJS.ProcessEnv
+): string | null {
+  if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
+    return null;
+  }
+  return fingerprintAuthProvenanceValue(value, env);
 }
 
 function readFirstProviderWorkerStringAtPaths(
@@ -2341,20 +2350,32 @@ function mergeProviderWorkerAuthProvenance(
   if (!observed) {
     return current;
   }
+  const currentObservedAt = Date.parse(current.observed_at ?? '');
+  const observedObservedAt = Date.parse(observed.observed_at ?? '');
+  const observedIsNewer =
+    Number.isFinite(currentObservedAt) && Number.isFinite(observedObservedAt)
+      ? observedObservedAt >= currentObservedAt
+      : true;
+  const preferObserved = <T>(currentValue: T | null, observedValue: T | null): T | null =>
+    observedIsNewer ? (observedValue ?? currentValue) : currentValue;
   return {
-    provider_kind: observed.provider_kind ?? current.provider_kind,
-    runtime_mode: observed.runtime_mode ?? current.runtime_mode,
-    runtime_provider: observed.runtime_provider ?? current.runtime_provider,
-    active_profile_fingerprint:
-      observed.active_profile_fingerprint ?? current.active_profile_fingerprint,
-    active_account_fingerprint:
-      observed.active_account_fingerprint ?? current.active_account_fingerprint,
-    cloud_env_id: observed.cloud_env_id ?? current.cloud_env_id,
-    cloud_branch: observed.cloud_branch ?? current.cloud_branch,
-    credential_source: observed.credential_source ?? current.credential_source,
-    auth_freshness: observed.auth_freshness ?? current.auth_freshness,
-    observed_at: observed.observed_at ?? current.observed_at,
-    source: observed.source ?? current.source
+    provider_kind: preferObserved(current.provider_kind, observed.provider_kind),
+    runtime_mode: preferObserved(current.runtime_mode, observed.runtime_mode),
+    runtime_provider: preferObserved(current.runtime_provider, observed.runtime_provider),
+    active_profile_fingerprint: preferObserved(
+      current.active_profile_fingerprint,
+      observed.active_profile_fingerprint
+    ),
+    active_account_fingerprint: preferObserved(
+      current.active_account_fingerprint,
+      observed.active_account_fingerprint
+    ),
+    cloud_env_id: preferObserved(current.cloud_env_id, observed.cloud_env_id),
+    cloud_branch: preferObserved(current.cloud_branch, observed.cloud_branch),
+    credential_source: preferObserved(current.credential_source, observed.credential_source),
+    auth_freshness: preferObserved(current.auth_freshness, observed.auth_freshness),
+    observed_at: preferObserved(current.observed_at, observed.observed_at),
+    source: preferObserved(current.source, observed.source)
   };
 }
 
@@ -2741,6 +2762,19 @@ function classifyProviderWorkerFailureDiagnosis(
     );
   }
   if (
+    /\b(auth mismatch|auth profile mismatch|profile mismatch|account mismatch|active account mismatch|active profile mismatch|not logged in|login required|unauthorized|forbidden)\b/u
+      .test(normalizedClassification) ||
+    (
+      /\b(auth profile|active account|active profile)\b/u.test(normalizedClassification) &&
+      /\b(mismatch(?:ed)?|unavailable|denied|forbidden|unauthorized|required)\b/u.test(normalizedClassification)
+    )
+  ) {
+    return build(
+      'auth_mismatch',
+      'The active Codex account/auth profile appears mismatched or unavailable; verify the selected profile/account.'
+    );
+  }
+  if (
     /\b(rate[-\s]?limits?|rate limited|quota|too many requests|prolite|wham|usage limit)\b/u.test(
       normalizedClassification
     ) &&
@@ -2767,19 +2801,6 @@ function classifyProviderWorkerFailureDiagnosis(
     return build(
       'env_config',
       'Codex Cloud environment configuration is missing or invalid; set CODEX_CLOUD_ENV_ID or task metadata.'
-    );
-  }
-  if (
-    /\b(auth mismatch|auth profile mismatch|profile mismatch|account mismatch|active account mismatch|active profile mismatch|not logged in|login required|unauthorized|forbidden)\b/u
-      .test(normalizedClassification) ||
-    (
-      /\b(auth profile|active account|active profile)\b/u.test(normalizedClassification) &&
-      /\b(mismatch(?:ed)?|unavailable|denied|forbidden|unauthorized|required)\b/u.test(normalizedClassification)
-    )
-  ) {
-    return build(
-      'auth_mismatch',
-      'The active Codex account/auth profile appears mismatched or unavailable; verify the selected profile/account.'
     );
   }
   if (
@@ -4114,8 +4135,8 @@ function buildProviderWorkerRuntimeAuthProvenance(params: {
     provider_kind: 'codex',
     runtime_mode: params.runtime.selected_mode,
     runtime_provider: params.runtime.provider,
-    active_profile_fingerprint: fingerprintProviderWorkerAuthValue(profile),
-    active_account_fingerprint: fingerprintProviderWorkerAuthValue(account),
+    active_profile_fingerprint: fingerprintProviderWorkerEnvAuthValue(profile, params.env),
+    active_account_fingerprint: fingerprintProviderWorkerEnvAuthValue(account, params.env),
     cloud_env_id: normalizeOptionalString(params.env.CODEX_CLOUD_ENV_ID),
     cloud_branch: cloudBranch,
     credential_source: credentialSource,
