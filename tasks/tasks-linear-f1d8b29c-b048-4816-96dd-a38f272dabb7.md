@@ -47,16 +47,16 @@
 - [ ] The final workpad omits the hold decision or validation status.
 
 ## Validation
-- [ ] `git diff --check`.
-- [ ] `node scripts/delegation-guard.mjs`.
-- [ ] `node scripts/spec-guard.mjs --dry-run`.
-- [ ] `npm run build`.
-- [ ] `npm run lint`.
-- [ ] `npm run test`.
-- [ ] `npm run docs:check`.
-- [ ] `npm run docs:freshness`.
-- [ ] `npm run repo:stewardship`.
-- [ ] `node scripts/diff-budget.mjs`.
+- [x] `git diff --check`.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `Delegation guard: OK (6 subagent manifest(s) found)`.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `Spec guard: OK`.
+- [x] `npm run build`. Evidence: `tsc -p tsconfig.build.json` succeeded.
+- [x] `npm run lint`. Evidence: ESLint completed successfully.
+- [x] `npm run test`. Evidence: `342` test files and `3965` tests passed.
+- [x] `npm run docs:check`. Evidence: `docs:check: OK`.
+- [x] `npm run docs:freshness`. Evidence: `docs:freshness OK - 3965 docs, 3968 registry entries`.
+- [x] `npm run repo:stewardship`. Evidence: `repo:stewardship OK - 5053 tracked files, 0 action-required`.
+- [x] `node scripts/diff-budget.mjs`. Evidence: working-tree scope `files=0/25`, `lines=0/1200`; advisory stacked aggregate `files=8/25`, `lines=471/1200`.
 - [x] `node scripts/runtime-mode-canary.mjs`. Evidence: `out/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/manual/runtime-canary-summary.json` recorded `20/20` passing iterations for default app-server mode, app-server success, forced fallback, and unsupported-combo checks on `2026-04-16T11:40:44.487Z`.
 - [x] Required cloud canary configuration blocker or pass recorded for `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 npm run ci:cloud-canary`. Evidence: `out/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/manual/cloud-canary-required-rework/step-summary.md` records `Missing CODEX_CLOUD_ENV_ID`.
 - [x] Fallback contract blocker or pass recorded for `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 CLOUD_CANARY_EXPECT_FALLBACK=1 npm run ci:cloud-canary`. Evidence: fallback manifest `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/cli/2026-04-16T11-48-13-664Z-46aaeae4/manifest.json`, run summary `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/cli/2026-04-16T11-48-13-664Z-46aaeae4/run-summary.json`, and wrapper failure summary `out/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/manual/cloud-canary-fallback-rework/step-summary.md` record required-mode `configuration` blocker from missing `CODEX_CLOUD_ENV_ID`.
@@ -72,3 +72,4 @@
 - 2026-04-16: Previous reviewed docs packet replayed onto fresh `origin/main`, then refreshed with current `codex-cli 0.121.0`, npm/GitHub release evidence, generated app-server schemas, redacted stdio app-server smoke, and runtime-mode canary evidence. Decision remains HOLD; JSONL/session logs remain authoritative.
 - 2026-04-16: Required cloud canary failed closed before cloud execution because `CODEX_CLOUD_ENV_ID` is absent; fallback contract produced local MCP fallback manifest `2026-04-16T11-48-13-664Z-46aaeae4` but still failed the required wrapper classification as `configuration`. HOLD remains in force.
 - 2026-04-16: Rework docs-review rerun succeeded after current-main merge and TASKS archive-budget trim. Evidence: `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-co-198-docs-review-rework-r2/cli/2026-04-16T11-57-15-726Z-2b6ad40c/manifest.json`, `.runs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-co-198-docs-review-rework-r2/cli/2026-04-16T11-57-15-726Z-2b6ad40c/review/telemetry.json`.
+- 2026-04-16: Local validation gates passed: `git diff --check`, delegation guard, spec guard, build, lint, test (`342` files / `3965` tests), docs:check, docs:freshness, repo:stewardship, and diff-budget.
