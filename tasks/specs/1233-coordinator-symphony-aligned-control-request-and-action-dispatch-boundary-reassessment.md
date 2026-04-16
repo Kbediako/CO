@@ -4,7 +4,7 @@ title: Coordinator Symphony-Aligned Control Request and Action Dispatch Boundary
 status: completed
 owner: Codex
 created: 2026-03-16
-last_review: 2026-03-16
+last_review: 2026-04-16
 review_cadence_days: 30
 risk_level: medium
 related_prd: docs/PRD-coordinator-symphony-aligned-control-request-and-action-dispatch-boundary-reassessment.md
