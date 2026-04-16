@@ -1672,6 +1672,65 @@ describe('runProviderIssueHandoffRefresh', () => {
     });
   });
 
+  it('keeps release-cancel retries for ordinary released not-active active runs with cached terminal state', async () => {
+    const { root, paths } = await createHostPaths();
+    const childPaths = await createCo185ActiveRun(root);
+    const state = createProviderIntakeState();
+    pushCo185ReleasedPendingClaim(state, childPaths.manifestPath, {
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-04-15T01:10:00.000Z'
+    });
+
+    const cancelCalls: Array<Record<string, unknown>> = [];
+    vi.spyOn(questionChildResolutionAdapter, 'callChildControlEndpoint').mockImplementation(
+      async ({ payload }) => {
+        cancelCalls.push(payload);
+      }
+    );
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'skip' as const,
+      reason: 'linear_refresh_unavailable'
+    }));
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue
+    });
+
+    await service.refresh();
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-185'
+    });
+    await vi.waitFor(() => {
+      expect(cancelCalls).toEqual([
+        expect.objectContaining({
+          action: 'cancel',
+          reason: 'provider_issue_released:not_active'
+        })
+      ]);
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-04-15T01:10:00.000Z'
+    });
+  });
+
   it('does not reattach a released active run while cancellation is in flight', async () => {
     const { root, paths } = await createHostPaths();
     const childPaths = await createCo185ActiveRun(root);

@@ -3936,7 +3936,14 @@ export function createProviderIssueHandoffService(
             if (claim.state === 'released') {
               if (
                 !isInactiveReleasedPendingReopenRun(claim, releaseRun) &&
-                !(activeRun && shouldDeferReleasedLiveWorkerCancelForFreshTruth(claim))
+                !(
+                  activeRun &&
+                  shouldDeferReleasedLiveWorkerCancelForFreshTruth(claim, {
+                    freshDiscoveryDeferred:
+                      resolution.reason === 'provider_issue_poll_deferred_for_fresh_discovery',
+                    canFreshDiscoverReleasedLiveWorker
+                  })
+                )
               ) {
                 void retryReleaseCancel({
                   releaseRun,
@@ -4850,12 +4857,22 @@ function isProviderIssueReleasedLiveWorkerRehydrateCandidate(
 }
 
 function shouldDeferReleasedLiveWorkerCancelForFreshTruth(
-  claim: Pick<ProviderIntakeClaimRecord, 'reason' | 'issue_state' | 'issue_state_type'>
+  claim: Pick<ProviderIntakeClaimRecord, 'reason' | 'issue_state' | 'issue_state_type'>,
+  options: {
+    freshDiscoveryDeferred: boolean;
+    canFreshDiscoverReleasedLiveWorker: boolean;
+  }
 ): boolean {
   if (isProviderIssueReleasedPendingReopen(claim.reason ?? null)) {
     return isProviderStartedWorkerClaim(claim);
   }
-  return claim.reason === 'provider_issue_released:not_active';
+  if (claim.reason !== 'provider_issue_released:not_active') {
+    return false;
+  }
+  if (isProviderStartedWorkerClaim(claim)) {
+    return true;
+  }
+  return options.freshDiscoveryDeferred && options.canFreshDiscoverReleasedLiveWorker;
 }
 
 function markProviderIssueReleasedPendingReopen(reason: string | null): string {
