@@ -1,6 +1,45 @@
 {
   "items": [
     {
+      "id": "20260416-linear-f8281682-ceed-4409-949c-efca2358568a",
+      "title": "Control host: reclaim Ready issues suppressed by plain released/not_active stale Blocked cache",
+      "relates_to": "tasks/tasks-linear-f8281682-ceed-4409-949c-efca2358568a.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-16",
+      "approvals": {
+        "child_lane": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-16",
+          "status": "accepted",
+          "manifest": ".runs/linear-f8281682-ceed-4409-949c-efca2358568a-plain-not-active-regression/cli/2026-04-16T03-24-44-832Z-087d1c47/manifest.json",
+          "summary": "Focused regression coverage for Ready stale plain provider_issue_released:not_active reclaim was launched, completed, and accepted before parent implementation refinement."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review --uncommitted",
+          "date": "2026-04-16",
+          "status": "bounded-success",
+          "telemetry": ".runs/linear-f8281682-ceed-4409-949c-efca2358568a/cli/2026-04-16T03-19-06-013Z-48d74a2f/review/telemetry.json",
+          "summary": "Manifest-backed standalone review completed with review_outcome=bounded-success and no actionable findings."
+        },
+        "elegance_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-16",
+          "status": "passed",
+          "artifact": "out/linear-f8281682-ceed-4409-949c-efca2358568a/manual/elegance-review.md",
+          "summary": "Explicit minimality pass kept the scoped helper and call-site threading; no simplification patch was needed."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-f8281682-ceed-4409-949c-efca2358568a.md",
+        "task": "tasks/tasks-linear-f8281682-ceed-4409-949c-efca2358568a.md",
+        "agent_task": ".agent/task/linear-f8281682-ceed-4409-949c-efca2358568a.md",
+        "docs": "docs/TECH_SPEC-linear-f8281682-ceed-4409-949c-efca2358568a.md"
+      }
+    },
+    {
       "id": "20260416-linear-2886b57d-b844-4803-9e55-6fe3657d516d",
       "title": "CO: Add Codex 0.121 MCP Apps metadata to delegation tools without authority expansion",
       "relates_to": "tasks/tasks-linear-2886b57d-b844-4803-9e55-6fe3657d516d.md",

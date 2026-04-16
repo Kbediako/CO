@@ -2794,7 +2794,7 @@ export function createProviderIssueHandoffService(
         const releaseCancelPending =
           (
             shouldAttemptReleaseCancel(releasedRun) &&
-            !isInactiveReleasedPendingReopenRun(existing, releasedRun)
+            !isInactiveReleasedReclaimRun(existing, releasedRun)
           ) ||
           hasPendingReleaseCancel(releasedRun?.manifestPath ?? existing.run_manifest_path);
         const pendingReleasedReopen = shouldReopenReleasedClaimAtCurrentTimestamp({
@@ -3907,7 +3907,7 @@ export function createProviderIssueHandoffService(
               refreshCounts.issue_by_id_deferred += 1;
               if (
                 claim.state !== 'released' ||
-                !canFreshDiscoverReleasedPendingReopenClaim(
+                !canFreshDiscoverReleasedReclaimClaim(
                   claim,
                   releaseRun,
                   hasPendingReleaseCancel
@@ -3921,7 +3921,7 @@ export function createProviderIssueHandoffService(
               suppressFreshDiscovery = true;
             }
             if (claim.state === 'released') {
-              if (!isInactiveReleasedPendingReopenRun(claim, releaseRun)) {
+              if (!isInactiveReleasedReclaimRun(claim, releaseRun)) {
                 void retryReleaseCancel({
                   releaseRun,
                   reason: claim.reason ?? 'provider_issue_released'
@@ -4038,7 +4038,7 @@ export function createProviderIssueHandoffService(
             const releaseRunForCancel = releaseRun ?? activeRun;
             if (
               shouldAttemptReleaseCancel(releaseRunForCancel) &&
-              !isInactiveReleasedPendingReopenRun(claim, releaseRunForCancel)
+              !isInactiveReleasedReclaimRun(claim, releaseRunForCancel)
             ) {
               void retryReleaseCancel({
                 releaseRun: releaseRunForCancel,
@@ -4100,7 +4100,7 @@ export function createProviderIssueHandoffService(
               )
             ) {
               if (
-                !canFreshDiscoverReleasedPendingReopenClaim(
+                !canFreshDiscoverReleasedReclaimClaim(
                   claim,
                   releaseRunForCancel,
                   hasPendingReleaseCancel
@@ -4832,7 +4832,10 @@ function markProviderIssueReleasedPendingReopen(reason: string | null): string {
 }
 
 function shouldReopenReleasedClaimAtCurrentTimestamp(input: {
-  claim: Pick<ProviderIntakeClaimRecord, 'reason'>;
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'state' | 'reason' | 'issue_state' | 'issue_state_type'
+  >;
   trackedIssue: Pick<
     LiveLinearTrackedIssue,
     'state' | 'state_type' | 'archived_at' | 'trashed' | 'viewer_id' | 'assignee_id' | 'blocked_by'
@@ -4840,6 +4843,9 @@ function shouldReopenReleasedClaimAtCurrentTimestamp(input: {
 }): boolean {
   if (isProviderIssueReleasedPendingReopen(input.claim.reason ?? null)) {
     return true;
+  }
+  if (canRecheckPlainReleasedNotActiveClaim(input.claim)) {
+    return isProviderLinearTrackedIssueEligibleForExecution(input.trackedIssue);
   }
   if (input.claim.reason === 'provider_issue_released:not_mutable') {
     return isProviderLinearTrackedIssueMutable(input.trackedIssue);
@@ -4851,7 +4857,10 @@ function shouldReopenReleasedClaimAtCurrentTimestamp(input: {
 }
 
 function shouldReopenReleasedClaimOnRefresh(input: {
-  claim: Pick<ProviderIntakeClaimRecord, 'reason' | 'issue_updated_at'>;
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'state' | 'reason' | 'issue_state' | 'issue_state_type' | 'issue_updated_at'
+  >;
   releaseRun: ProviderIssueRunRecord | null;
   trackedIssue: Pick<
     LiveLinearTrackedIssue,
@@ -6294,12 +6303,18 @@ function resolveProviderIssuePollFailClosedReason(
 }
 
 function resolveReleasedProviderIssuePollFailClosedReason(
-  claim: Pick<ProviderIntakeClaimRecord, 'state' | 'reason'>
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'state' | 'reason' | 'issue_state' | 'issue_state_type'
+  >
 ): string | null {
   if (claim.state !== 'released' || isProviderIssueReleasedPendingReopen(claim.reason ?? null)) {
     return null;
   }
   if (claim.reason === 'provider_issue_released:not_active') {
+    if (canRecheckPlainReleasedNotActiveClaim(claim)) {
+      return null;
+    }
     return 'provider_issue_poll_cached_released_not_active';
   }
   if (claim.reason === 'provider_issue_released:not_mutable') {
@@ -6356,6 +6371,31 @@ function isReleasedProviderIssuePollFailClosedReason(
   reason: string | null | undefined
 ): boolean {
   return typeof reason === 'string' && reason.startsWith('provider_issue_poll_cached_released_');
+}
+
+function canRecheckPlainReleasedNotActiveClaim(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'state' | 'reason' | 'issue_state' | 'issue_state_type'
+  >
+): boolean {
+  if (claim.state !== 'released' || claim.reason !== 'provider_issue_released:not_active') {
+    return false;
+  }
+  const workflowState = classifyProviderLinearWorkflowState({
+    state: claim.issue_state,
+    state_type: claim.issue_state_type
+  });
+  const hasCachedWorkflowState =
+    workflowState.normalizedState !== null || workflowState.normalizedStateType !== null;
+  // Terminal, review-handoff, and already-active cached rows stay cached; cached
+  // non-active rows such as Blocked can be stale after the issue returns to Ready.
+  return (
+    hasCachedWorkflowState &&
+    !workflowState.isTerminal &&
+    !workflowState.isHandoff &&
+    !workflowState.isActive
+  );
 }
 
 function resolveProviderMergeCloseoutClaimState(
@@ -7050,12 +7090,18 @@ function shouldAttemptReleaseCancel(run: ProviderIssueRunRecord | null): boolean
   return false;
 }
 
-function canFreshDiscoverReleasedPendingReopenClaim(
-  claim: Pick<ProviderIntakeClaimRecord, 'reason' | 'run_id' | 'run_manifest_path'>,
+function canFreshDiscoverReleasedReclaimClaim(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'state' | 'reason' | 'run_id' | 'run_manifest_path' | 'issue_state' | 'issue_state_type'
+  >,
   run: ProviderIssueRunRecord | null,
   hasPendingReleaseCancel: (manifestPath: string | null | undefined) => boolean
 ): boolean {
-  if (!isProviderIssueReleasedPendingReopen(claim.reason ?? null)) {
+  if (
+    !isProviderIssueReleasedPendingReopen(claim.reason ?? null) &&
+    !canRecheckPlainReleasedNotActiveClaim(claim)
+  ) {
     return false;
   }
   if (hasPendingReleaseCancel(run?.manifestPath ?? claim.run_manifest_path)) {
@@ -7064,15 +7110,21 @@ function canFreshDiscoverReleasedPendingReopenClaim(
   if (run === null) {
     return !claim.run_id && !claim.run_manifest_path;
   }
-  return !shouldAttemptReleaseCancel(run) || isInactiveReleasedPendingReopenRun(claim, run);
+  return !shouldAttemptReleaseCancel(run) || isInactiveReleasedReclaimRun(claim, run);
 }
 
-function isInactiveReleasedPendingReopenRun(
-  claim: Pick<ProviderIntakeClaimRecord, 'reason'>,
+function isInactiveReleasedReclaimRun(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'state' | 'reason' | 'issue_state' | 'issue_state_type'
+  >,
   run: ProviderIssueRunRecord | null
 ): boolean {
   return (
-    isProviderIssueReleasedPendingReopen(claim.reason ?? null) &&
+    (
+      isProviderIssueReleasedPendingReopen(claim.reason ?? null) ||
+      canRecheckPlainReleasedNotActiveClaim(claim)
+    ) &&
     run?.status === null &&
     run.proofTerminalStatus === null &&
     run.hasStaleInProgressProof === true
