@@ -2561,14 +2561,10 @@ describe('ControlRuntime', () => {
             reason: 'provider_issue_released:not_active',
             issue_state: 'Done',
             issue_state_type: 'completed'
-          },
-          worker: {
-            owner_phase: 'turn_running',
-            owner_status: 'in_progress',
-            pid: '85191'
           }
         }
       });
+      expect(selectedSnapshot.selected?.providerDebugSnapshot?.worker).toBeNull();
       expect(compatibilityProjection.selected).toBeNull();
       expect(compatibilityProjection.running).toEqual([]);
       expect(compatibilityProjection.retrying).toEqual([]);
@@ -2988,6 +2984,7 @@ describe('ControlRuntime', () => {
           }
         }
       });
+      expect(compatibilityProjection.selected?.provider_debug_snapshot?.worker).toBeNull();
       expect(compatibilityProjection.running).toEqual([]);
       expect(uiDataset.counts.running).toBe(0);
       expect(uiDataset.running).toEqual([]);

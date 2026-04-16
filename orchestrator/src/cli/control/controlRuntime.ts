@@ -484,12 +484,21 @@ function enrichProjectionSourceWithProviderRetryState<
   }
   const claim = findMatchingProviderIntakeClaim(providerIntakeState, source);
   const retryState = buildProviderRetryState(claim);
+  const providerProof =
+    source.providerLinearWorkerProof &&
+    isProviderLinearWorkerProofFreshForStage(
+      source.providerLinearWorkerProof as unknown as Record<string, unknown>,
+      source.startedAt
+    ) &&
+    !hasStaleLocalProviderInProgressProof(source.providerLinearWorkerProof, source.startedAt)
+      ? source.providerLinearWorkerProof
+      : null;
   const providerDebugSnapshot =
     claim !== null
       ? buildProviderIssueDebugSnapshot({
           tracked_issue: source.tracked?.linear ?? null,
           claim,
-          proof: source.providerLinearWorkerProof ?? null,
+          proof: providerProof,
           rehydrated_at: providerIntakeState.rehydrated_at ?? null
         }) ?? source.providerDebugSnapshot ?? null
       : source.providerDebugSnapshot ?? null;
