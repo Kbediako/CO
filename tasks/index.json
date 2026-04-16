@@ -1,6 +1,32 @@
 {
   "items": [
     {
+      "id": "20260416-linear-ec62eea8-7fcf-44a6-8216-10254c56e64d",
+      "title": "CO: terminate hanging run-review mock children after timeout",
+      "relates_to": "tasks/tasks-linear-ec62eea8-7fcf-44a6-8216-10254c56e64d.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-16",
+      "approvals": {
+        "docs_packet": {
+          "reviewer": "same-issue docs child lane",
+          "date": "2026-04-16",
+          "status": "produced",
+          "manifest": ".runs/linear-ec62eea8-7fcf-44a6-8216-10254c56e64d-docs-packet/cli/2026-04-16T10-20-19-149Z-7914bf20/manifest.json",
+          "source_anchor": "ctx:sha256:3b4ea97b5bcc16b71fdd2942cb023f0d4031067c77a83fb0c0c36ff65ba5d8c4#chunk:c000001",
+          "summary": "Docs-first packet preserves the run-review mock cleanup contract and leaves implementation/review integration to the parent lane."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-ec62eea8-7fcf-44a6-8216-10254c56e64d.md",
+        "task": "tasks/tasks-linear-ec62eea8-7fcf-44a6-8216-10254c56e64d.md",
+        "agent_task": ".agent/task/linear-ec62eea8-7fcf-44a6-8216-10254c56e64d.md",
+        "docs": "docs/TECH_SPEC-linear-ec62eea8-7fcf-44a6-8216-10254c56e64d.md"
+      }
+    },
+    {
       "id": "20260416-linear-9917183b-824a-48f7-95ee-bcee205d7a02",
       "title": "CO STATUS: do not project invalidated child-lane failure summaries as current progress",
       "relates_to": "tasks/tasks-linear-9917183b-824a-48f7-95ee-bcee205d7a02.md",

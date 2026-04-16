@@ -17,6 +17,7 @@ const runReviewScriptDist = join(process.cwd(), 'dist', 'scripts', 'run-review.j
 const createdSandboxes: string[] = [];
 const shellBinary = 'bash';
 const LONG_WAIT_TEST_TIMEOUT_MS = 20_000;
+const RUN_REVIEW_SUBPROCESS_TIMEOUT_MS = 15_000;
 
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
@@ -1246,6 +1247,68 @@ exit 2
   return binPath;
 }
 
+async function findRunReviewMockPids(codexBin: string): Promise<number[]> {
+  if (process.platform === 'win32') {
+    return [];
+  }
+  try {
+    const { stdout } = await execFileAsync('ps', ['-axo', 'pid=,command='], {
+      maxBuffer: 4 * 1024 * 1024,
+      timeout: 2000
+    });
+    const needle = `${codexBin} review`;
+    return String(stdout ?? '')
+      .split('\n')
+      .flatMap((line) => {
+        const match = line.trim().match(/^(\d+)\s+(.+)$/u);
+        if (!match) {
+          return [];
+        }
+        const command = match[2] ?? '';
+        if (!command.includes(needle)) {
+          return [];
+        }
+        const pid = Number.parseInt(match[1] ?? '', 10);
+        return Number.isFinite(pid) ? [pid] : [];
+      });
+  } catch {
+    return [];
+  }
+}
+
+async function terminateRunReviewMockProcess(pid: number, signal: NodeJS.Signals): Promise<void> {
+  try {
+    process.kill(-pid, signal);
+    return;
+  } catch {
+    // The fake Codex process is normally a detached process-group leader. If a
+    // local platform disagrees, fall back to the exact matched pid.
+  }
+  try {
+    process.kill(pid, signal);
+  } catch {
+    // Best-effort test cleanup; callers verify by scanning again.
+  }
+}
+
+async function cleanupRunReviewMockProcesses(codexBin: string): Promise<void> {
+  const initialPids = await findRunReviewMockPids(codexBin);
+  for (const pid of initialPids) {
+    await terminateRunReviewMockProcess(pid, 'SIGTERM');
+  }
+  if (initialPids.length > 0) {
+    await new Promise<void>((resolve) => setTimeout(resolve, 250));
+  }
+  const remainingPids = await findRunReviewMockPids(codexBin);
+  for (const pid of remainingPids) {
+    await terminateRunReviewMockProcess(pid, 'SIGKILL');
+  }
+}
+
+async function cleanupRunReviewMockProcessesForSandbox(sandbox: string): Promise<void> {
+  await cleanupRunReviewMockProcesses(join(sandbox, 'codex-mock.sh'));
+}
+
 async function makeFakeDiffBudgetScript(sandbox: string): Promise<void> {
   await mkdir(join(sandbox, 'scripts'), { recursive: true });
   await writeFile(
@@ -1366,7 +1429,8 @@ async function runReviewCommandSubprocess(
   manifestPath: string | null,
   env: Record<string, string | undefined>,
   extraArgs: string[] = [],
-  cwd = process.cwd()
+  cwd = process.cwd(),
+  options: { timeoutMs?: number; killSignal?: NodeJS.Signals } = {}
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
   const entryArgs = (await shouldUseFreshDist(runReviewScript, runReviewScriptDist))
     ? [runReviewScriptDist, ...extraArgs]
@@ -1376,11 +1440,18 @@ async function runReviewCommandSubprocess(
     args.push('--manifest', manifestPath);
   }
   args.push('--non-interactive');
+  const codexBin = typeof env.CODEX_CLI_BIN === 'string' ? env.CODEX_CLI_BIN : null;
   try {
     const { stdout, stderr } = await execFileAsync(
       process.execPath,
       args,
-      { cwd, env, maxBuffer: 16 * 1024 * 1024, timeout: 30_000 }
+      {
+        cwd,
+        env,
+        maxBuffer: 16 * 1024 * 1024,
+        timeout: options.timeoutMs ?? RUN_REVIEW_SUBPROCESS_TIMEOUT_MS,
+        killSignal: options.killSignal
+      }
     );
     return { exitCode: 0, stdout: String(stdout ?? ''), stderr: String(stderr ?? '') };
   } catch (error) {
@@ -1403,6 +1474,10 @@ async function runReviewCommandSubprocess(
         : '';
     const exitCode = typeof err.code === 'number' && Number.isFinite(err.code) ? err.code : 1;
     return { exitCode, stdout, stderr };
+  } finally {
+    if (codexBin && basename(codexBin) === 'codex-mock.sh') {
+      await cleanupRunReviewMockProcesses(codexBin);
+    }
   }
 }
 
@@ -1815,6 +1890,7 @@ afterEach(async () => {
   while (createdSandboxes.length > 0) {
     const dir = createdSandboxes.pop();
     if (dir) {
+      await cleanupRunReviewMockProcessesForSandbox(dir);
       await rm(dir, { recursive: true, force: true });
     }
   }
@@ -2378,6 +2454,33 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(telemetry.summary.commandStarts.length).toBeGreaterThan(0);
     expect(telemetry.summary.heavyCommandStarts.length).toBeGreaterThan(0);
     expect(telemetry.summary.heavyCommandStarts[0]).toContain('[redacted heavy-command');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('reaps hanging fake Codex subprocesses after a subprocess harness timeout', async () => {
+    if (process.platform === 'win32') {
+      return;
+    }
+
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const beforePids = await findRunReviewMockPids(codexBin);
+
+    const result = await runReviewCommandSubprocess(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'hang',
+        CODEX_REVIEW_TIMEOUT_SECONDS: '0',
+        CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
+      },
+      [],
+      process.cwd(),
+      { timeoutMs: 1000, killSignal: 'SIGKILL' }
+    );
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(await findRunReviewMockPids(codexBin)).toEqual(beforePids);
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('persists telemetry when review launch fails after the command probe', async () => {
