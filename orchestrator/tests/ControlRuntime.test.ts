@@ -3443,7 +3443,17 @@ describe('ControlRuntime', () => {
       ]);
       const fixture = await createFixture({
         taskId: 'linear-ordinary-released-live-worker',
-        providerIntakeState
+        providerIntakeState,
+        linearAdvisoryState: {
+          tracked_issue: createTrackedIssue({
+            id: 'lin-issue-195',
+            identifier: 'CO-195',
+            title: 'Ordinary released live worker',
+            state: 'In Progress',
+            state_type: 'started',
+            updated_at: '2026-04-15T22:59:00.000Z'
+          })
+        }
       });
       await seedManifest(fixture.paths, {
         task_id: 'linear-ordinary-released-live-worker',
@@ -3470,6 +3480,67 @@ describe('ControlRuntime', () => {
       expect(compatibilityProjection.issues.map((issue) => issue.issueIdentifier)).toContain('CO-195');
       expect(uiDataset.counts.running).toBe(1);
       expect(uiDataset.running.map((entry) => entry.issue_identifier)).toEqual(['CO-195']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not count ordinary released not-active workers from cached started metadata alone', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-15T23:00:00.000Z'));
+    try {
+      const providerIntakeState = createProviderIntakeState([
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-195',
+          issue_id: 'lin-issue-195',
+          issue_identifier: 'CO-195',
+          issue_title: 'Ordinary released cached-only worker',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-15T22:55:00.000Z',
+          task_id: 'linear-ordinary-released-cached-only-worker',
+          mapping_source: 'provider_id_fallback',
+          state: 'released',
+          reason: 'provider_issue_released:not_active',
+          accepted_at: '2026-04-15T22:45:00.000Z',
+          updated_at: '2026-04-15T22:56:00.000Z',
+          last_delivery_id: 'delivery-co-195',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_744_764_500_000,
+          run_id: 'run-ordinary-cached-only',
+          run_manifest_path: null,
+          launch_source: 'control-host',
+          launch_token: 'launch-co-195'
+        }
+      ]);
+      const fixture = await createFixture({
+        taskId: 'linear-ordinary-released-cached-only-worker',
+        providerIntakeState
+      });
+      await seedManifest(fixture.paths, {
+        task_id: 'linear-ordinary-released-cached-only-worker',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-195',
+        issue_identifier: 'CO-195',
+        pipeline_id: 'provider-linear-worker',
+        pipeline_title: 'Provider Linear Worker',
+        status: 'in_progress',
+        started_at: '2026-04-15T22:45:00.000Z',
+        updated_at: '2026-04-15T22:59:00.000Z',
+        summary: 'ordinary released cached-only worker'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+      const uiDataset = buildUiDataset({
+        projection: compatibilityProjection,
+        generatedAt: '2026-04-15T23:00:00.000Z'
+      });
+
+      expect(compatibilityProjection.running.map((entry) => entry.issue_identifier)).toEqual([]);
+      expect(uiDataset.counts.running).toBe(0);
+      expect(uiDataset.running.map((entry) => entry.issue_identifier)).toEqual([]);
     } finally {
       vi.useRealTimers();
     }
@@ -3565,7 +3636,7 @@ describe('ControlRuntime', () => {
     vi.setSystemTime(new Date('2026-04-15T23:00:00.000Z'));
     const stalePid = 424247;
     vi.spyOn(process, 'kill').mockImplementation((pid, signal) => {
-      if (signal === 0) {
+      if (pid === stalePid && signal === 0) {
         const error = new Error('process not found') as NodeJS.ErrnoException;
         error.code = 'ESRCH';
         throw error;

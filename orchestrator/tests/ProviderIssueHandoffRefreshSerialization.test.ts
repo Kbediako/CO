@@ -352,7 +352,7 @@ describe('runProviderIssueHandoffRefresh', () => {
       task_id: 'task-1303-active',
       mapping_source: 'provider_id_fallback',
       state: 'released',
-      reason: 'provider_issue_released:not_active',
+      reason: 'provider_issue_released:not_mutable',
       accepted_at: '2026-03-19T04:20:05.000Z',
       updated_at: '2026-03-19T04:20:10.000Z',
       last_delivery_id: 'delivery-active',
@@ -443,7 +443,7 @@ describe('runProviderIssueHandoffRefresh', () => {
       expect(cancelCalls).toEqual([
         expect.objectContaining({
           action: 'cancel',
-          reason: 'provider_issue_released:not_active'
+          reason: 'provider_issue_released:not_mutable'
         })
       ]);
     });
@@ -465,7 +465,7 @@ describe('runProviderIssueHandoffRefresh', () => {
 
     expect(state.claims[0]).toMatchObject({
       state: 'released',
-      reason: 'provider_issue_released:not_active',
+      reason: 'provider_issue_released:not_mutable',
       task_id: 'task-1303-active',
       run_id: 'run-active',
       run_manifest_path: childPaths.manifestPath
@@ -510,7 +510,7 @@ describe('runProviderIssueHandoffRefresh', () => {
       task_id: 'task-1303-active',
       mapping_source: 'provider_id_fallback',
       state: 'released',
-      reason: 'provider_issue_released:not_active',
+      reason: 'provider_issue_released:not_mutable',
       accepted_at: '2026-03-19T04:20:05.000Z',
       updated_at: '2026-03-19T04:20:10.000Z',
       last_delivery_id: 'delivery-active',
@@ -615,11 +615,11 @@ describe('runProviderIssueHandoffRefresh', () => {
       expect(cancelCalls).toEqual([
         expect.objectContaining({
           action: 'cancel',
-          reason: 'provider_issue_released:not_active'
+          reason: 'provider_issue_released:not_mutable'
         }),
         expect.objectContaining({
           action: 'cancel',
-          reason: 'provider_issue_released:not_active'
+          reason: 'provider_issue_released:not_mutable'
         })
       ]);
     });
@@ -633,7 +633,7 @@ describe('runProviderIssueHandoffRefresh', () => {
 
     expect(state.claims[0]).toMatchObject({
       state: 'released',
-      reason: 'provider_issue_released:not_active',
+      reason: 'provider_issue_released:not_mutable',
       task_id: 'task-1303-active',
       run_id: 'run-active',
       run_manifest_path: childPaths.manifestPath
@@ -678,7 +678,7 @@ describe('runProviderIssueHandoffRefresh', () => {
       task_id: 'task-1303-active',
       mapping_source: 'provider_id_fallback',
       state: 'released',
-      reason: 'provider_issue_released:not_active',
+      reason: 'provider_issue_released:not_mutable',
       accepted_at: '2026-03-19T04:20:05.000Z',
       updated_at: '2026-03-19T04:20:10.000Z',
       last_delivery_id: 'delivery-active',
@@ -795,7 +795,7 @@ describe('runProviderIssueHandoffRefresh', () => {
     expect(maxPendingCancels).toBe(1);
     expect(state.claims[0]).toMatchObject({
       state: 'released',
-      reason: 'provider_issue_released:not_active',
+      reason: 'provider_issue_released:not_mutable',
       task_id: 'task-1303-active',
       run_id: 'run-active',
       run_manifest_path: childPaths.manifestPath
@@ -840,7 +840,7 @@ describe('runProviderIssueHandoffRefresh', () => {
       task_id: 'task-1303-active',
       mapping_source: 'provider_id_fallback',
       state: 'released',
-      reason: 'provider_issue_released:not_active',
+      reason: 'provider_issue_released:not_mutable',
       accepted_at: '2026-03-19T04:20:05.000Z',
       updated_at: '2026-03-19T04:20:10.000Z',
       last_delivery_id: 'delivery-active',
@@ -923,7 +923,7 @@ describe('runProviderIssueHandoffRefresh', () => {
 
     expect(state.claims[0]).toMatchObject({
       state: 'released',
-      reason: 'provider_issue_released:not_active',
+      reason: 'provider_issue_released:not_mutable',
       run_id: 'run-active',
       run_manifest_path: childPaths.manifestPath
     });
@@ -1679,7 +1679,7 @@ describe('runProviderIssueHandoffRefresh', () => {
     pushCo185ReleasedPendingClaim(state, childPaths.manifestPath, {
       issue_state: 'Done',
       issue_state_type: 'completed',
-      reason: 'provider_issue_released:not_active'
+      reason: 'provider_issue_released:not_mutable'
     });
 
     const cancelCalls: Array<Record<string, unknown>> = [];

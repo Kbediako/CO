@@ -557,6 +557,14 @@ function isAuthoritativeSelectedCurrentRunningSource(
     const claimMatchesSelectedTask = isAuthoritativeProviderTaskIdMatch(claim, source);
     if (
       (claimBoundToSource || claimMatchesSelectedTask) &&
+      claim.state === 'released' &&
+      isProviderIssueReleasedLiveWorkerRehydrateReason(claim.reason) &&
+      !isProviderStartedWorkerSourceIssueState(claim, source)
+    ) {
+      return false;
+    }
+    if (
+      (claimBoundToSource || claimMatchesSelectedTask) &&
       hasStaleLocalProviderInProgressProof(source.providerLinearWorkerProof, source.startedAt)
     ) {
       return false;
@@ -1048,7 +1056,10 @@ function isProviderIntakeClaimActiveForSourceCurrentActivity(
 }
 
 function isProviderStartedWorkerSourceIssueState(
-  claim: Pick<ProviderIntakeClaimRecord, 'issue_state' | 'issue_state_type' | 'issue_updated_at'>,
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'reason' | 'issue_state' | 'issue_state_type' | 'issue_updated_at'
+  >,
   source: Pick<ControlCompatibilitySourceContext, 'tracked'>
 ): boolean {
   const trackedIssue = source.tracked?.linear ?? null;
@@ -1065,10 +1076,13 @@ function isProviderStartedWorkerSourceIssueState(
       });
     }
   }
-  return isProviderStartedWorkerIssueState({
-    state: claim.issue_state,
-    state_type: claim.issue_state_type
-  });
+  return (
+    isProviderIssueReleasedPendingReopen(claim.reason) &&
+    isProviderStartedWorkerIssueState({
+      state: claim.issue_state,
+      state_type: claim.issue_state_type
+    })
+  );
 }
 
 function isStaleTerminalReleasedProviderSource(
