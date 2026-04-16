@@ -2797,15 +2797,25 @@ export function createProviderIssueHandoffService(
             !isInactiveReleasedReclaimRun(existing, releasedRun)
           ) ||
           hasPendingReleaseCancel(releasedRun?.manifestPath ?? existing.run_manifest_path);
+        const existingReleasedPendingReopen =
+          isProviderIssueReleasedPendingReopen(existing.reason ?? null);
         const pendingReleasedReopen = shouldReopenReleasedClaimAtCurrentTimestamp({
           claim: existing,
           trackedIssue: input.trackedIssue
         });
+        const preservePlainReclaimMetadataDuringDrain =
+          releaseCancelPending &&
+          releasedWebhookTiming === 'equal' &&
+          pendingReleasedReopen &&
+          !existingReleasedPendingReopen;
         const replayBlockedByReleasedMetadata =
           releasedWebhookTiming === 'older' ||
           (
             releasedWebhookTiming === 'equal' &&
-            !pendingReleasedReopen
+            (
+              !pendingReleasedReopen ||
+              preservePlainReclaimMetadataDuringDrain
+            )
           );
         const preserveReleasedIssueMetadata = replayBlockedByReleasedMetadata;
         const reopenBlockedByReleaseDrain =
@@ -2815,7 +2825,7 @@ export function createProviderIssueHandoffService(
             releasedWebhookTiming === 'unknown' ||
             (
               releasedWebhookTiming === 'equal' &&
-              pendingReleasedReopen
+              existingReleasedPendingReopen
             )
           );
         const releasedMutabilityTruth =

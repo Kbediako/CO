@@ -18259,7 +18259,7 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
-  it('marks equal-timestamp Ready plain released not-active reentry pending-reopen while release drain is active', async () => {
+  it('preserves equal-timestamp Ready plain released not-active recheck metadata while release drain is active', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {
       repoRoot: root,
@@ -18342,15 +18342,15 @@ describe('createProviderIssueHandoffService', () => {
       deliveryId: 'delivery-ready-not-active-equal',
       event: 'Issue',
       action: 'update',
-      webhookTimestamp: 1_744_730_410_000
+      webhookTimestamp: 1_744_730_400_000
     });
 
     expect(drainResult.kind).toBe('ignored');
     expect(state.claims[0]).toMatchObject({
       state: 'released',
-      reason: 'provider_issue_released_pending_reopen:provider_issue_released:not_active',
-      issue_state: 'Ready',
-      issue_state_type: 'unstarted',
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
       issue_updated_at: '2026-04-15T15:00:00.000Z',
       run_id: 'run-ready-not-active-draining',
       run_manifest_path: childPaths.manifestPath
