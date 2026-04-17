@@ -968,14 +968,20 @@ function mapIssuePullRequestAttachmentSnapshot(
     return null;
   }
   const record = value as Record<string, unknown>;
+  const state = normalizeOptionalString(record.state as string | null | undefined);
+  const mergedAt = normalizeOptionalString(
+    (record.mergedAt ?? record.merged_at) as string | null | undefined
+  );
+  const updatedAt = normalizeOptionalString(
+    (record.updatedAt ?? record.updated_at) as string | null | undefined
+  );
+  if (state === null && mergedAt === null && updatedAt === null) {
+    return null;
+  }
   return {
-    state: normalizeOptionalString(record.state as string | null | undefined),
-    merged_at: normalizeOptionalString(
-      (record.mergedAt ?? record.merged_at) as string | null | undefined
-    ),
-    updated_at: normalizeOptionalString(
-      (record.updatedAt ?? record.updated_at) as string | null | undefined
-    )
+    state,
+    merged_at: mergedAt,
+    updated_at: updatedAt
   };
 }
 
@@ -3469,6 +3475,10 @@ function shouldReuseCachedIssueContextForRead(
 }
 
 function issueContextCacheRecordCarriesLivePrTruth(issue: ProviderLinearIssueContext): boolean {
+  const workflowState = classifyProviderLinearWorkflowState({
+    state: issue.state?.name ?? null,
+    state_type: issue.state?.type ?? null
+  });
   if (
     issue.pull_request_attachments.current
     || issue.pull_request_attachments.conflicting.length > 0
@@ -3476,16 +3486,19 @@ function issueContextCacheRecordCarriesLivePrTruth(issue: ProviderLinearIssueCon
   ) {
     return true;
   }
+  if (workflowState.normalizedState === 'merging') {
+    return (
+      issue.pull_request_attachments.historical.length > 0
+      || issue.attachments.some((attachment) => parseGitHubPullRequestUrl(attachment.url))
+    );
+  }
   if (issue.pull_request_attachments.historical.length > 0) {
     return false;
   }
   if (issue.attachments.some((attachment) => parseGitHubPullRequestUrl(attachment.url))) {
     return true;
   }
-  return classifyProviderLinearWorkflowState({
-    state: issue.state?.name ?? null,
-    state_type: issue.state?.type ?? null
-  }).normalizedState === 'merging';
+  return false;
 }
 
 async function writeCachedIssueContextRecord(
