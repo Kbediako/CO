@@ -755,6 +755,19 @@ describe('delegationMcpHealth', () => {
     expect(result.stalePids).toEqual([]);
   });
 
+  it('recognizes delegate-server processes when node runtime flags precede the script path', () => {
+    const snapshot = [
+      '101     1 00:20  10240 codex resume 019-parent',
+      '202   101 00:10   4096 /opt/homebrew/bin/node --enable-source-maps /repo/dist/bin/codex-orchestrator.js delegate-server'
+    ].join('\n');
+
+    const result = inspectDelegateServerProcesses({ snapshot });
+    expect(result.activeCount).toBe(1);
+    expect(result.activePids).toEqual([202]);
+    expect(result.staleCount).toBe(0);
+    expect(result.stalePids).toEqual([]);
+  });
+
   it('keeps delegate-server children active when the parent uses a configured non-default codex binary', () => {
     const previousCodexBin = process.env.CODEX_CLI_BIN;
     process.env.CODEX_CLI_BIN = '/tmp/fake-codex';

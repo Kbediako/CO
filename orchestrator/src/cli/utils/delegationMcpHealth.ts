@@ -818,7 +818,7 @@ function isDelegateServerCommand(command: string): boolean {
   }
   const precedingToken = delegateIndex > 0 ? args[delegateIndex - 1] ?? null : null;
   if (precedingToken && (isDistCodexOrchestratorPath(precedingToken) || isCodexOrchestratorWrapperPath(precedingToken))) {
-    return delegateIndex === 1 || isNodeLauncherToken(args[delegateIndex - 2] ?? '');
+    return delegateIndex === 1 || args.slice(0, delegateIndex - 1).some((arg) => isNodeLauncherToken(arg));
   }
   return delegateIndex === 1 && isCodexOrchestratorWrapperPath(args[0] ?? '');
 }
