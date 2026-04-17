@@ -12,6 +12,8 @@ export const DEFAULT_CONTROL_HOST_SUPERVISION_LAUNCHD_THROTTLE_SECONDS = 15;
 export const DEFAULT_CONTROL_HOST_SUPERVISION_KILL_TIMEOUT_SECONDS = 10;
 export const DEFAULT_CONTROL_HOST_SUPERVISION_RESTART_EXIT_CODE = 75;
 export const DEFAULT_CONTROL_HOST_SUPERVISION_SHELL_PATH = '/bin/zsh';
+export const DEFAULT_CONTROL_HOST_SUPERVISION_ACTIVE_WORKER_RESTART_QUARANTINE_MS =
+  10 * 60 * 1000;
 export const CONTROL_HOST_SUPERVISION_MAX_NODE_TIMER_SECONDS = Math.floor(
   2_147_483_647 / 1_000
 );
@@ -85,12 +87,64 @@ export interface ControlHostSupervisionState {
   health_interval_seconds: number;
   last_restart_reason: string | null;
   last_restart_requested_at: string | null;
+  restart_history?: ControlHostSupervisionRestartRecord[];
   message: string | null;
+}
+
+export interface ControlHostSupervisionRunningWorkerSnapshot {
+  issue_id: string | null;
+  issue_identifier: string;
+  state: string | null;
+  display_state: string | null;
+  pid: string | null;
+  worker_host: string | null;
+  session_id: string | null;
+  started_at: string | null;
+  last_event_at: string | null;
+}
+
+export interface ControlHostSupervisionPollingDiagnostic {
+  updated_at: string | null;
+  checking: boolean;
+  queued: boolean;
+  stuck: boolean;
+  restart_required: boolean;
+  reason: string | null;
+  last_error: string | null;
+  refresh_phase: string | null;
+  refresh_request_class: string | null;
+  refresh_provider_keys: string[] | null;
+  operation_elapsed_ms: number | null;
+  stalled_after_ms: number | null;
+  control_host_owner: Record<string, unknown> | null;
+}
+
+export interface ControlHostSupervisionHealthDiagnostic {
+  counts: {
+    running: number | null;
+    retrying: number | null;
+  };
+  polling: ControlHostSupervisionPollingDiagnostic | null;
+  running_workers: ControlHostSupervisionRunningWorkerSnapshot[];
+}
+
+export interface ControlHostSupervisionRestartRecord {
+  requested_at: string;
+  reason: string;
+  message: string;
+  consecutive_unhealthy_samples: number;
+  child_pid: number | null;
+  diagnostic: ControlHostSupervisionHealthDiagnostic | null;
 }
 
 export interface ControlHostSupervisionHealthEvaluation {
   healthy: boolean;
-  reason: 'ok' | 'restart_required' | 'stale_restart_required' | 'invalid_payload';
+  reason:
+    | 'ok'
+    | 'restart_required'
+    | 'stale_restart_required'
+    | 'active_worker_restart_quarantine'
+    | 'invalid_payload';
   message: string;
 }
 
@@ -283,6 +337,7 @@ export function buildInitialControlHostSupervisionState(input: {
   restartCount?: number;
   lastRestartReason?: string | null;
   lastRestartRequestedAt?: string | null;
+  restartHistory?: ControlHostSupervisionRestartRecord[] | null;
 }): ControlHostSupervisionState {
   return {
     version: 1,
@@ -304,7 +359,50 @@ export function buildInitialControlHostSupervisionState(input: {
     health_interval_seconds: input.config.healthIntervalSeconds,
     last_restart_reason: input.lastRestartReason ?? null,
     last_restart_requested_at: input.lastRestartRequestedAt ?? null,
+    restart_history: normalizeControlHostSupervisionRestartHistory(input.restartHistory ?? null),
     message: input.message ?? null
+  };
+}
+
+export function readControlHostSupervisionHealthDiagnostic(
+  payload: unknown
+): ControlHostSupervisionHealthDiagnostic | null {
+  if (!isRecord(payload)) {
+    return null;
+  }
+  const counts = isRecord(payload.counts) ? payload.counts : null;
+  const polling = isRecord(payload.polling) ? payload.polling : null;
+  const running = Array.isArray(payload.running) ? payload.running : [];
+  return {
+    counts: {
+      running: readFiniteNumber(counts?.running),
+      retrying: readFiniteNumber(counts?.retrying)
+    },
+    polling: polling ? buildControlHostSupervisionPollingDiagnostic(polling) : null,
+    running_workers: running
+      .map((entry) => buildControlHostSupervisionRunningWorkerSnapshot(entry))
+      .filter((entry): entry is ControlHostSupervisionRunningWorkerSnapshot => entry !== null)
+  };
+}
+
+function normalizeStoredControlHostSupervisionHealthDiagnostic(
+  value: unknown
+): ControlHostSupervisionHealthDiagnostic | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const counts = isRecord(value.counts) ? value.counts : null;
+  const polling = isRecord(value.polling) ? value.polling : null;
+  const runningWorkers = Array.isArray(value.running_workers) ? value.running_workers : [];
+  return {
+    counts: {
+      running: readFiniteNumber(counts?.running),
+      retrying: readFiniteNumber(counts?.retrying)
+    },
+    polling: polling ? buildControlHostSupervisionPollingDiagnostic(polling) : null,
+    running_workers: runningWorkers
+      .map((entry) => buildControlHostSupervisionRunningWorkerSnapshot(entry))
+      .filter((entry): entry is ControlHostSupervisionRunningWorkerSnapshot => entry !== null)
   };
 }
 
@@ -313,6 +411,8 @@ export function evaluateControlHostSupervisionHealthPayload(
   options: {
     minPollingUpdatedAt?: string | null;
     staleRestartRequiredGraceMs?: number | null;
+    restartHistory?: ControlHostSupervisionRestartRecord[] | null;
+    activeWorkerRestartQuarantineMs?: number | null;
     now?: string | null;
   } = {}
 ): ControlHostSupervisionHealthEvaluation {
@@ -324,6 +424,7 @@ export function evaluateControlHostSupervisionHealthPayload(
     };
   }
   const polling = isRecord(payload.polling) ? payload.polling : null;
+  const diagnostic = readControlHostSupervisionHealthDiagnostic(payload);
   if (!polling) {
     return {
       healthy: true,
@@ -351,6 +452,18 @@ export function evaluateControlHostSupervisionHealthPayload(
           graceSeconds === null ? '' : ` for the bounded ${graceSeconds}s startup grace window`
         } while the current host refreshes.`
       };
+    }
+    const repeatedRestartQuarantine = resolveRepeatedActiveWorkerRestartQuarantine({
+      polling,
+      diagnostic,
+      restartHistory: options.restartHistory ?? null,
+      activeWorkerRestartQuarantineMs:
+        options.activeWorkerRestartQuarantineMs ??
+        DEFAULT_CONTROL_HOST_SUPERVISION_ACTIVE_WORKER_RESTART_QUARANTINE_MS,
+      now: options.now
+    });
+    if (repeatedRestartQuarantine) {
+      return repeatedRestartQuarantine;
     }
     return {
       healthy: false,
@@ -394,6 +507,179 @@ function isStaleRecoverableProviderRestartRequiredPolling(
   return now !== null && now - minimumUpdatedAt <= Math.max(0, options.staleRestartRequiredGraceMs);
 }
 
+function resolveRepeatedActiveWorkerRestartQuarantine(input: {
+  polling: Record<string, unknown>;
+  diagnostic: ControlHostSupervisionHealthDiagnostic | null;
+  restartHistory: ControlHostSupervisionRestartRecord[] | null;
+  activeWorkerRestartQuarantineMs: number | null;
+  now?: string | null;
+}): ControlHostSupervisionHealthEvaluation | null {
+  if (!isProviderRefreshLifecycleRestartRequired(input.polling)) {
+    return null;
+  }
+  const diagnostic = input.diagnostic;
+  if (!diagnostic || diagnostic.running_workers.length === 0) {
+    return null;
+  }
+  const restartHistory = normalizeControlHostSupervisionRestartHistory(input.restartHistory);
+  if (restartHistory.length === 0) {
+    return null;
+  }
+  const currentSignature = buildControlHostSupervisionRestartSignature(diagnostic);
+  if (currentSignature === null) {
+    return null;
+  }
+  const nowMs = parseIsoTimestampToMs(input.now ?? new Date().toISOString());
+  const quarantineMs =
+    typeof input.activeWorkerRestartQuarantineMs === 'number' &&
+    Number.isFinite(input.activeWorkerRestartQuarantineMs)
+      ? Math.max(0, input.activeWorkerRestartQuarantineMs)
+      : null;
+  for (let index = restartHistory.length - 1; index >= 0; index -= 1) {
+    const record = restartHistory[index];
+    const requestedAtMs = parseIsoTimestampToMs(record.requested_at);
+    if (
+      quarantineMs !== null &&
+      nowMs !== null &&
+      requestedAtMs !== null &&
+      nowMs - requestedAtMs > quarantineMs
+    ) {
+      break;
+    }
+    const recordSignature = buildControlHostSupervisionRestartSignature(record.diagnostic);
+    if (recordSignature === null || recordSignature !== currentSignature) {
+      return null;
+    }
+    return {
+      healthy: true,
+      reason: 'active_worker_restart_quarantine',
+      message: `co-status reported restart_required=true for the same provider refresh stuck series already restarted at ${record.requested_at}; ${diagnostic.running_workers.length} active provider worker(s) remain visible, so supervision is quarantining repeated restart churn while retaining restart_required in co-status.`
+    };
+  }
+  return null;
+}
+
+function buildControlHostSupervisionPollingDiagnostic(
+  polling: Record<string, unknown>
+): ControlHostSupervisionPollingDiagnostic {
+  return {
+    updated_at: readIsoString(polling.updated_at),
+    checking: polling.checking === true,
+    queued: polling.queued === true,
+    stuck: polling.stuck === true,
+    restart_required: polling.restart_required === true,
+    reason: readNonEmptyString(polling.reason),
+    last_error: readNonEmptyString(polling.last_error),
+    refresh_phase: readNonEmptyString(polling.refresh_phase),
+    refresh_request_class: readNonEmptyString(polling.refresh_request_class),
+    refresh_provider_keys: readStringArray(polling.refresh_provider_keys),
+    operation_elapsed_ms: readFiniteNumber(polling.operation_elapsed_ms),
+    stalled_after_ms: readFiniteNumber(polling.stalled_after_ms),
+    control_host_owner: isRecord(polling.control_host_owner) ? { ...polling.control_host_owner } : null
+  };
+}
+
+function buildControlHostSupervisionRunningWorkerSnapshot(
+  value: unknown
+): ControlHostSupervisionRunningWorkerSnapshot | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const issueIdentifier = readNonEmptyString(value.issue_identifier);
+  if (!issueIdentifier) {
+    return null;
+  }
+  return {
+    issue_id: readIsoOrPlainString(value.issue_id),
+    issue_identifier: issueIdentifier,
+    state: readNonEmptyString(value.state),
+    display_state: readNonEmptyString(value.display_state),
+    pid: readNonEmptyString(value.pid),
+    worker_host: readNonEmptyString(value.worker_host),
+    session_id: readNonEmptyString(value.session_id),
+    started_at: readIsoString(value.started_at),
+    last_event_at: readIsoString(value.last_event_at)
+  };
+}
+
+function normalizeControlHostSupervisionRestartHistory(
+  value: ControlHostSupervisionRestartRecord[] | null | undefined
+): ControlHostSupervisionRestartRecord[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const normalized = value
+    .map((entry) => normalizeControlHostSupervisionRestartRecord(entry))
+    .filter((entry): entry is ControlHostSupervisionRestartRecord => entry !== null);
+  return normalized.slice(-20);
+}
+
+function normalizeControlHostSupervisionRestartRecord(
+  value: ControlHostSupervisionRestartRecord | null | undefined
+): ControlHostSupervisionRestartRecord | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const requestedAt = readIsoString(value.requested_at);
+  const reason = readNonEmptyString(value.reason);
+  if (!requestedAt || !reason) {
+    return null;
+  }
+  return {
+    requested_at: requestedAt,
+    reason,
+    message: readNonEmptyString(value.message) ?? '',
+    consecutive_unhealthy_samples: readFiniteNumber(value.consecutive_unhealthy_samples) ?? 0,
+    child_pid: readFiniteNumber(value.child_pid),
+    diagnostic: normalizeStoredControlHostSupervisionHealthDiagnostic(value.diagnostic)
+  };
+}
+
+function buildControlHostSupervisionRestartSignature(
+  diagnostic: ControlHostSupervisionHealthDiagnostic | null | undefined
+): string | null {
+  if (!diagnostic?.polling) {
+    return null;
+  }
+  const workerSeries = diagnostic.running_workers
+    .map((worker) => buildControlHostSupervisionWorkerSeriesKey(worker))
+    .filter((value): value is string => value !== null)
+    .sort();
+  if (workerSeries.length === 0) {
+    return null;
+  }
+  // Quarantine repeated restart churn on the stable active-worker series, not on transient
+  // refresh checkpoints that can legitimately drift within one stuck refresh cycle.
+  return JSON.stringify({
+    reason: diagnostic.polling.reason ?? diagnostic.polling.last_error ?? null,
+    worker_series: workerSeries
+  });
+}
+
+function buildControlHostSupervisionWorkerSeriesKey(
+  worker: ControlHostSupervisionRunningWorkerSnapshot
+): string | null {
+  if (worker.issue_identifier.length === 0) {
+    return null;
+  }
+  return JSON.stringify({
+    issue_identifier: worker.issue_identifier,
+    session_id: worker.session_id ?? null,
+    started_at: worker.started_at ?? null,
+    pid: worker.pid ?? null
+  });
+}
+
+function isProviderRefreshLifecycleRestartRequired(polling: Record<string, unknown>): boolean {
+  if (polling.restart_required !== true) {
+    return false;
+  }
+  return (
+    polling.reason === 'provider_refresh_lifecycle_stuck' ||
+    polling.last_error === 'provider_refresh_lifecycle_stuck'
+  );
+}
+
 function parseIsoTimestampToMs(value: unknown): number | null {
   if (typeof value !== 'string' || value.trim().length === 0) {
     return null;
@@ -417,6 +703,37 @@ export function parseControlHostSupervisionCsv(raw: string | null | undefined): 
     .split(',')
     .map((value) => value.trim())
     .filter((value) => value.length > 0);
+}
+
+function readNonEmptyString(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function readIsoString(value: unknown): string | null {
+  const candidate = readNonEmptyString(value);
+  return candidate && Number.isFinite(Date.parse(candidate)) ? candidate : null;
+}
+
+function readIsoOrPlainString(value: unknown): string | null {
+  return readNonEmptyString(value);
+}
+
+function readFiniteNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function readStringArray(value: unknown): string[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  const normalized = value
+    .map((entry) => readNonEmptyString(entry))
+    .filter((entry): entry is string => entry !== null);
+  return normalized.length > 0 ? normalized : null;
 }
 
 export function sanitizeControlHostSupervisionPathSegment(value: string): string {
