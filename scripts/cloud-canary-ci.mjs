@@ -25,10 +25,69 @@ function envFlagEnabled(value) {
   return normalized === '1' || normalized === 'true' || normalized === 'yes';
 }
 
-export function classifyFailure(signal) {
-  const normalized = signal.toLowerCase();
-  const normalizedConnectorSignal = normalized.replace(/[_-]+/g, ' ');
-  if (
+function normalizeFailureSignal(signal) {
+  return String(signal ?? '').toLowerCase();
+}
+
+function joinFailureSignals(...signals) {
+  return signals
+    .map((signal) => String(signal ?? '').trim())
+    .filter((signal) => signal.length > 0)
+    .join('\n');
+}
+
+function cloudConnectorAuthDriftDiagnosis() {
+  return {
+    category: 'credentials',
+    diagnostic_category: 'cloud_connector_auth_drift',
+    guidance:
+      'Repair or relink the GitHub connector for the current ChatGPT/Codex cloud account/environment, or record an explicit waiver before re-running cloud-canary gates.'
+  };
+}
+
+function envConfigDiagnosis() {
+  return {
+    category: 'configuration',
+    diagnostic_category: 'env_config',
+    guidance: 'Set CODEX_CLOUD_ENV_ID (or metadata.cloudEnvId) for the cloud canary target.'
+  };
+}
+
+function authMismatchDiagnosis() {
+  return {
+    category: 'credentials',
+    diagnostic_category: 'auth_mismatch',
+    guidance: 'Provide Codex Cloud credentials in CI with access to the configured environment.'
+  };
+}
+
+function networkConnectivityDiagnosis() {
+  return {
+    category: 'connectivity',
+    diagnostic_category: 'network_connectivity',
+    guidance: 'Cloud endpoint connectivity looks unstable; retry and inspect endpoint/network health.'
+  };
+}
+
+function providerRuntimeDiagnosis() {
+  return {
+    category: 'execution',
+    diagnostic_category: 'provider_runtime',
+    guidance: 'Inspect cloud command logs and manifest cloud_execution.error for the terminal failure cause.'
+  };
+}
+
+function unknownDiagnosis() {
+  return {
+    category: 'unknown',
+    diagnostic_category: 'unknown',
+    guidance: 'Inspect manifest status_detail, runner logs, and cloud command logs to classify this failure.'
+  };
+}
+
+function hasCloudConnectorAuthDriftSignal(normalizedSignal) {
+  const normalizedConnectorSignal = normalizedSignal.replace(/[_-]+/g, ' ');
+  return (
     normalizedConnectorSignal.includes('cloud connector auth drift') ||
     normalizedConnectorSignal.includes('missing github connector link') ||
     normalizedConnectorSignal.includes('github connection not found for user') ||
@@ -37,68 +96,110 @@ export function classifyFailure(signal) {
     normalizedConnectorSignal.includes('github connector link missing') ||
     normalizedConnectorSignal.includes('missing github connection') ||
     normalizedConnectorSignal.includes('missing github connector')
-  ) {
-    return {
-      category: 'credentials',
-      diagnostic_category: 'cloud_connector_auth_drift',
-      guidance:
-        'Repair or relink the GitHub connector for the current ChatGPT/Codex cloud account/environment, or record an explicit waiver before re-running cloud-canary gates.'
-    };
+  );
+}
+
+function hasEnvConfigSignal(normalizedSignal) {
+  return (
+    normalizedSignal.includes('cloud-env-missing') ||
+    normalizedSignal.includes('codex_cloud_env_id') ||
+    normalizedSignal.includes('no environment id is configured')
+  );
+}
+
+function hasAuthMismatchSignal(normalizedSignal) {
+  return (
+    normalizedSignal.includes('unauthorized') ||
+    normalizedSignal.includes('forbidden') ||
+    normalizedSignal.includes('not logged in') ||
+    normalizedSignal.includes('codex login') ||
+    normalizedSignal.includes('login required') ||
+    normalizedSignal.includes('please login') ||
+    normalizedSignal.includes('please log in') ||
+    normalizedSignal.includes('api key') ||
+    normalizedSignal.includes('credential') ||
+    /\b(?:missing|invalid|expired|revoked|unavailable|required|denied)\W{0,8}(?:(?:auth|access|refresh|bearer)[\W_]+)?token\b/u.test(normalizedSignal) ||
+    /\b(?:(?:auth|access|refresh|bearer)[\W_]+)?token\b\W{0,24}(?:missing|mismatch|invalid|expired|revoked|unavailable|required|not found|denied|error|failure)\b/u.test(normalizedSignal)
+  );
+}
+
+function hasOnlyExpectedFallbackIssues(issues) {
+  return (
+    Array.isArray(issues) &&
+    issues.length > 0 &&
+    issues.every((issue) => issue?.code === 'missing_environment')
+  );
+}
+
+function hasConnectivityStatusCodeContext(normalizedSignal) {
+  return (
+    /\b(?:http(?:\s+(?:status|response))?|status|response|upstream|gateway|error|failed|returned)\D{0,16}(?:502|503|504)\b/u.test(normalizedSignal) ||
+    /\b(?:502|503|504)\D{0,16}(?:bad gateway|service unavailable|gateway timeout)\b/u.test(normalizedSignal)
+  );
+}
+
+function hasConnectivitySignal(normalizedSignal, { includeStatusCodes = true, requireStatusContext = false } = {}) {
+  return (
+    normalizedSignal.includes('enotfound') ||
+    normalizedSignal.includes('econn') ||
+    normalizedSignal.includes('network') ||
+    normalizedSignal.includes('timed out') ||
+    normalizedSignal.includes('timeout') ||
+    normalizedSignal.includes('bad gateway') ||
+    normalizedSignal.includes('service unavailable') ||
+    normalizedSignal.includes('gateway timeout') ||
+    (
+      includeStatusCodes &&
+      (
+        requireStatusContext
+          ? hasConnectivityStatusCodeContext(normalizedSignal)
+          : (
+            normalizedSignal.includes('502') ||
+            normalizedSignal.includes('503') ||
+            normalizedSignal.includes('504')
+          )
+      )
+    )
+  );
+}
+
+export function classifyFailure(signal) {
+  const normalized = normalizeFailureSignal(signal);
+  if (hasCloudConnectorAuthDriftSignal(normalized)) {
+    return cloudConnectorAuthDriftDiagnosis();
   }
-  if (
-    normalized.includes('cloud-env-missing') ||
-    normalized.includes('codex_cloud_env_id') ||
-    normalized.includes('no environment id is configured')
-  ) {
-    return {
-      category: 'configuration',
-      diagnostic_category: 'env_config',
-      guidance: 'Set CODEX_CLOUD_ENV_ID (or metadata.cloudEnvId) for the cloud canary target.'
-    };
+  if (hasEnvConfigSignal(normalized)) {
+    return envConfigDiagnosis();
   }
-  if (
-    normalized.includes('unauthorized') ||
-    normalized.includes('forbidden') ||
-    normalized.includes('not logged in') ||
-    normalized.includes('login') ||
-    normalized.includes('api key') ||
-    normalized.includes('credential') ||
-    normalized.includes('token')
-  ) {
-    return {
-      category: 'credentials',
-      diagnostic_category: 'auth_mismatch',
-      guidance: 'Provide Codex Cloud credentials in CI with access to the configured environment.'
-    };
+  if (hasAuthMismatchSignal(normalized)) {
+    return authMismatchDiagnosis();
   }
-  if (
-    normalized.includes('enotfound') ||
-    normalized.includes('econn') ||
-    normalized.includes('network') ||
-    normalized.includes('timed out') ||
-    normalized.includes('timeout') ||
-    normalized.includes('502') ||
-    normalized.includes('503') ||
-    normalized.includes('504')
-  ) {
-    return {
-      category: 'connectivity',
-      diagnostic_category: 'network_connectivity',
-      guidance: 'Cloud endpoint connectivity looks unstable; retry and inspect endpoint/network health.'
-    };
+  if (hasConnectivitySignal(normalized)) {
+    return networkConnectivityDiagnosis();
   }
   if (normalized.includes('failed') || normalized.includes('error') || normalized.includes('cancelled')) {
-    return {
-      category: 'execution',
-      diagnostic_category: 'provider_runtime',
-      guidance: 'Inspect cloud command logs and manifest cloud_execution.error for the terminal failure cause.'
-    };
+    return providerRuntimeDiagnosis();
   }
-  return {
-    category: 'unknown',
-    diagnostic_category: 'unknown',
-    guidance: 'Inspect manifest status_detail, runner logs, and cloud command logs to classify this failure.'
-  };
+  return unknownDiagnosis();
+}
+
+function classifyCredentialFatalSignal(signal) {
+  const normalized = normalizeFailureSignal(signal);
+  if (hasCloudConnectorAuthDriftSignal(normalized)) {
+    return cloudConnectorAuthDriftDiagnosis();
+  }
+  if (hasAuthMismatchSignal(normalized)) {
+    return authMismatchDiagnosis();
+  }
+  return null;
+}
+
+function classifyConnectivityFatalSignal(signal, options) {
+  const normalized = normalizeFailureSignal(signal);
+  if (hasConnectivitySignal(normalized, options)) {
+    return networkConnectivityDiagnosis();
+  }
+  return null;
 }
 
 export function formatCloudCanaryFailureClass(diagnosis) {
@@ -430,8 +531,8 @@ async function main() {
       assert(Array.isArray(cloudFallback.issues) && cloudFallback.issues.length > 0, 'cloud_fallback.issues should include at least one preflight issue.');
       if (Array.isArray(cloudFallback.issues)) {
         assert(
-          cloudFallback.issues.some((issue) => issue?.code === 'missing_environment'),
-          'cloud_fallback.issues should include missing_environment for fallback canary mode.'
+          hasOnlyExpectedFallbackIssues(cloudFallback.issues),
+          'cloud_fallback.issues should contain only missing_environment for fallback canary mode.'
         );
       }
     }
@@ -484,26 +585,33 @@ async function main() {
     }
   }
 
-  const failureSignal = [
+  const primaryFailureSignal = joinFailureSignals(
     expectFallback ? '' : cloudFallback?.reason ?? '',
     cloudExecution?.error ?? '',
     manifest?.status_detail ?? '',
-    execution.stderr ?? '',
-    tail(execution.stdout, 20)
-  ]
-    .filter((value) => value.trim().length > 0)
-    .join('\n');
-  const diagnosis = classifyFailure(failureSignal);
-  const fatalCategory =
-    required &&
-    (diagnosis.category === 'configuration' || diagnosis.category === 'credentials' || diagnosis.category === 'connectivity');
+    execution.stderr ?? ''
+  );
+  const stdoutFailureSignal = tail(execution.stdout, 20);
+  const fatalFailureSignal = joinFailureSignals(primaryFailureSignal, stdoutFailureSignal);
+  const diagnosis = classifyFailure(primaryFailureSignal || stdoutFailureSignal);
+  const expectedFallbackConfigurationFailure =
+    expectFallback &&
+    cloudFallback?.mode_requested === 'cloud' &&
+    cloudFallback?.mode_used === 'mcp' &&
+    hasOnlyExpectedFallbackIssues(cloudFallback?.issues);
+  const fatalDiagnosis = required
+    ? classifyCredentialFatalSignal(fatalFailureSignal)
+      ?? classifyConnectivityFatalSignal(primaryFailureSignal)
+      ?? classifyConnectivityFatalSignal(stdoutFailureSignal, { requireStatusContext: true })
+      ?? (diagnosis.category === 'configuration' && !expectedFallbackConfigurationFailure ? diagnosis : null)
+    : null;
   const skipEligible = !required
     && (
       (!expectFallback && SKIPPABLE_FAILURE_CATEGORIES.has(diagnosis.category))
       || (expectFallback && diagnosis.category === 'credentials')
     );
-  if (fatalCategory) {
-    assertionFailures.push(`Failure class ${formatCloudCanaryFailureClass(diagnosis)} indicates infrastructure/credential issues.`);
+  if (fatalDiagnosis) {
+    assertionFailures.push(`Failure class ${formatCloudCanaryFailureClass(fatalDiagnosis)} indicates infrastructure/credential issues.`);
   }
 
   if (assertionFailures.length === 0) {
@@ -546,13 +654,14 @@ async function main() {
     process.env.OPENAI_API_KEY,
     process.env.GITHUB_TOKEN
   ]);
+  const reportedDiagnosis = fatalDiagnosis ?? diagnosis;
   const details = [
     header,
     '',
     ...assertionFailures.map((failure) => `- ${failure}`),
     '',
-    `Failure class: ${formatCloudCanaryFailureClass(diagnosis)}`,
-    `Guidance: ${diagnosis.guidance}`,
+    `Failure class: ${formatCloudCanaryFailureClass(reportedDiagnosis)}`,
+    `Guidance: ${reportedDiagnosis.guidance}`,
     `Manifest: ${manifestPath ?? '<unresolved>'}`,
     `Run summary: ${runSummaryPath ?? '<unresolved>'}`,
     `Runner stderr (tail):`,
