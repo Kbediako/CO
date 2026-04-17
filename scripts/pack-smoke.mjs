@@ -650,7 +650,15 @@ async function installMarketplacePlugin(codexBin, env, pluginVersion, label) {
   }
 }
 
-async function runMarketplaceInstallScenario({ label, codexBin, tempDir, pluginVersion, addArgs, expectedConfigLines }) {
+async function runMarketplaceInstallScenario({
+  label,
+  codexBin,
+  tempDir,
+  pluginVersion,
+  addArgs,
+  expectedConfigLines,
+  afterInstall
+}) {
   const homeRoot = path.join(tempDir, `.codex-plugin-smoke-home-${label}`);
   const codexHome = path.join(homeRoot, '.codex');
   await mkdir(codexHome, { recursive: true });
@@ -669,10 +677,55 @@ async function runMarketplaceInstallScenario({ label, codexBin, tempDir, pluginV
   for (const expectedLine of expectedConfigLines) {
     await assertFileIncludes(configPath, expectedLine, `${label} marketplace config`);
   }
-  const { cachedPluginRoot } = await installMarketplacePlugin(codexBin, marketplaceEnv, pluginVersion, label);
+  const { cachedPluginRoot, configPath: installedConfigPath } = await installMarketplacePlugin(
+    codexBin,
+    marketplaceEnv,
+    pluginVersion,
+    label
+  );
+  if (typeof afterInstall === 'function') {
+    await afterInstall({
+      cachedPluginRoot,
+      configPath: installedConfigPath,
+      homeRoot,
+      codexHome,
+      marketplaceEnv
+    });
+  }
   const workspaceRoot = path.join(tempDir, `.codex-plugin-smoke-workspace-${label}`);
   await mkdir(workspaceRoot, { recursive: true });
   await runCachedPluginLauncherSmoke(cachedPluginRoot, marketplaceEnv, `${label} cached plugin`, workspaceRoot);
+}
+
+async function rewriteMarketplaceSourceToRelative(configPath, sourceRoot) {
+  const relativeSourceRoot = path.relative(path.dirname(configPath), sourceRoot);
+  const updatedLines = [];
+  let inMarketplaceSection = false;
+  let replaced = false;
+  for (const line of (await readFile(configPath, 'utf8')).split(/\r?\n/u)) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      inMarketplaceSection = trimmed === `[marketplaces.${MARKETPLACE_NAME}]`;
+      updatedLines.push(line);
+      continue;
+    }
+    if (inMarketplaceSection && /^source\s*=/.test(trimmed)) {
+      const indentation = line.slice(0, line.indexOf(trimmed));
+      updatedLines.push(`${indentation}source = ${JSON.stringify(relativeSourceRoot)}`);
+      replaced = true;
+      continue;
+    }
+    updatedLines.push(line);
+  }
+  if (!replaced) {
+    throw new Error(`Unable to rewrite ${configPath} with a relative local marketplace source.`);
+  }
+  await writeFile(configPath, updatedLines.join('\n'));
+  await assertFileIncludes(
+    configPath,
+    `source = ${JSON.stringify(relativeSourceRoot)}`,
+    'relative local marketplace config'
+  );
 }
 
 async function runMarketplacePluginSmoke(packageRoot, tempDir) {
@@ -722,7 +775,10 @@ async function runMarketplacePluginSmoke(packageRoot, tempDir) {
     expectedConfigLines: [
       `[marketplaces.${MARKETPLACE_NAME}]`,
       'source_type = "local"'
-    ]
+    ],
+    afterInstall: async ({ configPath }) => {
+      await rewriteMarketplaceSourceToRelative(configPath, marketplaceRoot);
+    }
   });
 
   const servedGitRoot = path.join(tempDir, 'codex-marketplace-served.git');

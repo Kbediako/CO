@@ -3,7 +3,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync, writeSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { isAbsolute, join } from 'node:path';
+import { dirname, isAbsolute, join } from 'node:path';
 import process from 'node:process';
 
 const FORWARDABLE_SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP'];
@@ -59,15 +59,31 @@ function resolveMarketplaceSourceRoot() {
   }
 
   const raw = readFileSync(configPath, 'utf8');
-  const source = readMarketplaceSource(raw);
+  const marketplaceConfig = readMarketplaceConfig(raw);
+  const source = marketplaceConfig?.source;
+  const sourceType = marketplaceConfig?.sourceType;
   if (!source) {
     throw new Error(
       `Codex config at ${configPath} is missing ${MARKETPLACE_SECTION}. Re-run codex marketplace add for Codex Orchestrator.`
     );
   }
+  if (sourceType === 'local') {
+    return resolveLocalMarketplaceSourceRoot(source, configPath);
+  }
+  if (sourceType === 'git') {
+    return resolveInstalledMarketplaceSourceRoot(codexHome, source);
+  }
   if (isAbsolute(source)) {
     return source;
   }
+  return resolveInstalledMarketplaceSourceRoot(codexHome, source);
+}
+
+function resolveLocalMarketplaceSourceRoot(source, configPath) {
+  return isAbsolute(source) ? source : join(dirname(configPath), source);
+}
+
+function resolveInstalledMarketplaceSourceRoot(codexHome, source) {
   const installedMarketplaceRoot = join(codexHome, '.tmp', 'marketplaces', MARKETPLACE_NAME);
   if (existsSync(installedMarketplaceRoot)) {
     return installedMarketplaceRoot;
@@ -92,8 +108,10 @@ function resolveCodexPaths() {
   };
 }
 
-function readMarketplaceSource(rawConfig) {
+function readMarketplaceConfig(rawConfig) {
   let inMarketplaceSection = false;
+  let source = null;
+  let sourceType = null;
   for (const line of rawConfig.split(/\r?\n/u)) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) {
@@ -106,13 +124,20 @@ function readMarketplaceSource(rawConfig) {
     if (!inMarketplaceSection) {
       continue;
     }
-    const match = trimmed.match(/^source\s*=\s*"((?:[^"\\]|\\.)*)"\s*$/u);
-    if (!match) {
+    const sourceMatch = trimmed.match(/^source\s*=\s*"((?:[^"\\]|\\.)*)"\s*$/u);
+    if (sourceMatch) {
+      source = JSON.parse(`"${sourceMatch[1]}"`);
       continue;
     }
-    return JSON.parse(`"${match[1]}"`);
+    const sourceTypeMatch = trimmed.match(/^source_type\s*=\s*"((?:[^"\\]|\\.)*)"\s*$/u);
+    if (sourceTypeMatch) {
+      sourceType = JSON.parse(`"${sourceTypeMatch[1]}"`);
+    }
   }
-  return null;
+  if (!source && !sourceType) {
+    return null;
+  }
+  return { source, sourceType };
 }
 
 function normalizeOptionalString(value) {
