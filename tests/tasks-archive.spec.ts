@@ -580,6 +580,29 @@ describe('tasks-archive script', () => {
     expect(archiveContent).not.toContain('1002-still-active-task');
   });
 
+  it('does not archive snapshots when index status is still active despite historical completed_at', async () => {
+    const repo = await initRepository({
+      completedTaskIndexEntry: {
+        status: 'in_progress',
+        completed_at: completedAt
+      }
+    });
+
+    await expect(
+      execFileAsync('node', [scriptPath, '--out', 'docs/TASKS-archive-YYYY.md'], {
+        cwd: repo,
+        env: {
+          ...process.env,
+          CODEX_ORCHESTRATOR_ROOT: repo,
+          CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+        }
+      })
+    ).rejects.toThrow(/no eligible tasks can be archived/i);
+
+    const tasksContent = await readFile(join(repo, 'docs', 'TASKS.md'), 'utf8');
+    expect(tasksContent).toContain('linear-6ed6ef11-538e-48f0-936c-8547632bf92e');
+  });
+
   it('does not append duplicate header-only archive sections when the archive already contains the task key', async () => {
     const repo = await initRepository();
     const existingArchivePath = join(repo, 'docs', `TASKS-archive-${archiveYear}.md`);
