@@ -488,23 +488,27 @@ async function checkTasksFileSize(repoRoot: string): Promise<DocsCheckError | nu
   }
 
   const raw = await readFile(policyPath, 'utf8');
-  const policy = JSON.parse(raw) as { max_lines?: number };
+  const policy = JSON.parse(raw) as { max_lines?: number; reserve_lines?: number };
   const maxLines = Number.isFinite(policy?.max_lines) ? Number(policy.max_lines) : NaN;
   if (!Number.isInteger(maxLines) || maxLines <= 0) {
     return null;
   }
+  const reserveLines =
+    Number.isInteger(policy?.reserve_lines) && Number(policy.reserve_lines) >= 0
+      ? Number(policy.reserve_lines)
+      : 0;
 
   const tasksRaw = await readFile(tasksPath, 'utf8');
   const tasksLines = tasksRaw.split('\n');
   const lineCount = tasksLines.at(-1) === '' ? tasksLines.length - 1 : tasksLines.length;
-  if (lineCount <= maxLines) {
+  if (lineCount < maxLines) {
     return null;
   }
 
   return {
     file: 'docs/TASKS.md',
     rule: 'tasks-file-too-large',
-    reference: `lines=${lineCount} max=${maxLines}`
+    reference: `lines=${lineCount} max=${maxLines} reserve=${reserveLines} state=${lineCount === maxLines ? 'zero_headroom' : 'overflow'}`
   };
 }
 
