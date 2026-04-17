@@ -2396,7 +2396,7 @@ describe('ControlRuntime', () => {
             issue_state_type: 'canceled'
           },
           progress: {
-            kind: 'merge_closeout',
+            kind: 'workflow',
             status: 'completed'
           }
         }
