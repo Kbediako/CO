@@ -461,6 +461,9 @@ async function maybeRunBacklogPromotion(input: {
   const transition = await input.transitionIssueState({
     issueId: candidate.id,
     stateName: input.config.backlog_promotion.target_state_name,
+    expectedStateName: candidate.state,
+    expectedStateType: candidate.state_type,
+    expectedUpdatedAt: candidate.updated_at,
     sourceSetup: input.sourceSetup,
     env: input.env
   });
@@ -599,6 +602,9 @@ async function maybeRunReviewHandoffRework(input: {
   const transition = await input.transitionIssueState({
     issueId: candidate.trackedIssue.id,
     stateName: input.config.review_handoff_rework.target_state_name,
+    expectedStateName: candidate.trackedIssue.state,
+    expectedStateType: candidate.trackedIssue.state_type,
+    expectedUpdatedAt: candidate.trackedIssue.updated_at,
     sourceSetup: input.sourceSetup,
     env: input.env
   });

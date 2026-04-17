@@ -21,6 +21,10 @@ import {
 import { mapLinearRateLimitedFailure } from './linearRateLimit.js';
 import { resolveLinearSourceSetup } from './linearDispatchSource.js';
 import { resolveProviderLinearAuditPath } from './providerLinearWorkflowAudit.js';
+import {
+  isProviderLinearTerminalReopenTransition,
+  normalizeProviderLinearWorkflowState
+} from './providerLinearWorkflowStates.js';
 import type { DispatchPilotSourceSetup } from './trackerDispatchPilot.js';
 
 const LINEAR_WORKPAD_MARKER = '## Codex Workpad';
@@ -419,6 +423,7 @@ export type ProviderLinearTransitionResult =
       };
       previous_state: ProviderLinearWorkflowState | null;
       target_state: ProviderLinearWorkflowState;
+      transition_guard?: ProviderLinearTransitionGuardAudit | null;
       source_setup: DispatchPilotSourceSetup | null;
     }
   | {
@@ -426,6 +431,14 @@ export type ProviderLinearTransitionResult =
       operation: 'transition';
       error: ProviderLinearWorkflowError;
     };
+
+export interface ProviderLinearTransitionGuardAudit {
+  expected_state: string | null;
+  expected_state_type: string | null;
+  expected_updated_at: string | null;
+  force: boolean;
+  force_reason: string | null;
+}
 
 export type ProviderLinearAttachPrResult =
   | {
@@ -1389,6 +1402,11 @@ export async function deleteProviderLinearWorkpadComment(input: {
 export async function transitionProviderLinearIssueState(input: {
   issueId: string;
   stateName: string;
+  expectedStateName?: string | null;
+  expectedStateType?: string | null;
+  expectedUpdatedAt?: string | null;
+  force?: boolean;
+  forceReason?: string | null;
   sourceSetup?: DispatchPilotSourceSetup | null;
   env?: NodeJS.ProcessEnv;
   fetchImpl?: typeof fetch;
@@ -1401,6 +1419,13 @@ export async function transitionProviderLinearIssueState(input: {
   if (!stateName) {
     return failure('transition', 'linear_state_name_missing', 'Linear state name is required.', 422);
   }
+  const transitionGuard = resolveTransitionGuardInput(input);
+  if (!transitionGuard.ok) {
+    return transitionGuard;
+  }
+  const transitionGuardAudit = shouldIncludeTransitionGuardAudit(transitionGuard.guard)
+    ? buildTransitionGuardAudit(transitionGuard.guard)
+    : null;
 
   const session = resolveLinearWorkflowSession(input.env, input.fetchImpl, input.sourceSetup);
   if (!session.ok) {
@@ -1482,47 +1507,6 @@ export async function transitionProviderLinearIssueState(input: {
     );
   }
 
-  if (
-    sameWorkflowState(summary.state, targetState) &&
-    cachedContext &&
-    canTrustCachedMutationContext &&
-    !summaryFreshForTransition
-  ) {
-    const liveSummary = await readTransitionIssueSummary();
-    if (!liveSummary.ok) {
-      return failureFromWorkflowError('transition', liveSummary.error);
-    }
-    summary = liveSummary.issue;
-    cacheContext = mergeCachedIssueContextSummary(cachedContext, summary);
-    summaryFreshForTransition = true;
-    targetState = resolveWorkflowStateByName(summary.team?.states ?? [], stateName);
-    if (!targetState) {
-      return failure(
-        'transition',
-        'linear_state_not_found',
-        `Linear team state "${stateName}" was not found for issue ${summary.identifier}.`,
-        422
-      );
-    }
-  }
-
-  if (sameWorkflowState(summary.state, targetState)) {
-    return {
-      ok: true,
-      operation: 'transition',
-      action: 'noop',
-      issue: {
-        id: summary.id,
-        identifier: summary.identifier,
-        state: summary.state,
-        updated_at: summary.updated_at
-      },
-      previous_state: summary.state,
-      target_state: targetState,
-      source_setup: session.session.sourceSetup
-    };
-  }
-
   if (!summaryFreshForTransition) {
     const liveSummary = await readTransitionIssueSummary();
     if (!liveSummary.ok) {
@@ -1540,27 +1524,47 @@ export async function transitionProviderLinearIssueState(input: {
         422
       );
     }
-    if (sameWorkflowState(summary.state, targetState)) {
-      return {
-        ok: true,
-        operation: 'transition',
-        action: 'noop',
-        issue: {
-          id: summary.id,
-          identifier: summary.identifier,
-          state: summary.state,
-          updated_at: summary.updated_at
-        },
-        previous_state: summary.state,
-        target_state: targetState,
-        source_setup: session.session.sourceSetup
-      };
-    }
+  }
+
+  const preconditionConflict = failureIfTransitionPreconditionsMismatch(
+    summary,
+    targetState,
+    transitionGuard.guard
+  );
+  if (preconditionConflict) {
+    return preconditionConflict;
+  }
+
+  if (sameWorkflowState(summary.state, targetState)) {
+    return {
+      ok: true,
+      operation: 'transition',
+      action: 'noop',
+      issue: {
+        id: summary.id,
+        identifier: summary.identifier,
+        state: summary.state,
+        updated_at: summary.updated_at
+      },
+      previous_state: summary.state,
+      target_state: targetState,
+      ...(transitionGuardAudit ? { transition_guard: transitionGuardAudit } : {}),
+      source_setup: session.session.sourceSetup
+    };
   }
 
   const mutabilityFailure = failureIfIssueNotMutable('transition', summary);
   if (mutabilityFailure) {
     return mutabilityFailure;
+  }
+
+  const forceGuardFailure = failureIfTerminalTransitionRequiresForce(
+    summary,
+    targetState,
+    transitionGuard.guard
+  );
+  if (forceGuardFailure) {
+    return forceGuardFailure;
   }
 
   const transitionBudgetError = await preflightProviderLinearBudget({
@@ -1620,6 +1624,7 @@ export async function transitionProviderLinearIssueState(input: {
     },
     previous_state: summary.state,
     target_state: targetState,
+    ...(transitionGuardAudit ? { transition_guard: transitionGuardAudit } : {}),
     source_setup: session.session.sourceSetup
   };
 }
@@ -5647,6 +5652,192 @@ function sameWorkflowState(
     return false;
   }
   return left.id === right.id || normalizeComparableValue(left.name) === normalizeComparableValue(right.name);
+}
+
+interface ProviderLinearTransitionGuardInput {
+  expectedStateName: string | null;
+  expectedStateType: string | null;
+  expectedUpdatedAt: string | null;
+  force: boolean;
+  forceReason: string | null;
+}
+
+function resolveTransitionGuardInput(input: {
+  expectedStateName?: string | null;
+  expectedStateType?: string | null;
+  expectedUpdatedAt?: string | null;
+  force?: boolean;
+  forceReason?: string | null;
+}): ProviderLinearOperationFailure<'transition'> | {
+  ok: true;
+  guard: ProviderLinearTransitionGuardInput;
+} {
+  const force = input.force === true;
+  const forceReason = normalizeOptionalString(input.forceReason);
+  if (force && !forceReason) {
+    return failure(
+      'transition',
+      'linear_force_reason_missing',
+      'Forced Linear transitions require a non-empty force reason.',
+      422
+    );
+  }
+  if (!force && forceReason) {
+    return failure(
+      'transition',
+      'linear_force_reason_without_force',
+      'A force reason requires the explicit --force transition override.',
+      422
+    );
+  }
+  const expectedUpdatedAt = input.expectedUpdatedAt
+    ? normalizeIso(input.expectedUpdatedAt)
+    : null;
+  if (input.expectedUpdatedAt && !expectedUpdatedAt) {
+    return failure(
+      'transition',
+      'linear_expected_updated_at_invalid',
+      'Expected updated_at must be a valid ISO timestamp.',
+      422
+    );
+  }
+  return {
+    ok: true,
+    guard: {
+      expectedStateName: normalizeOptionalString(input.expectedStateName),
+      expectedStateType: normalizeOptionalString(input.expectedStateType),
+      expectedUpdatedAt,
+      force,
+      forceReason
+    }
+  };
+}
+
+function buildTransitionGuardAudit(
+  guard: ProviderLinearTransitionGuardInput
+): ProviderLinearTransitionGuardAudit {
+  return {
+    expected_state: guard.expectedStateName,
+    expected_state_type: guard.expectedStateType,
+    expected_updated_at: guard.expectedUpdatedAt,
+    force: guard.force,
+    force_reason: guard.forceReason
+  };
+}
+
+function shouldIncludeTransitionGuardAudit(guard: ProviderLinearTransitionGuardInput): boolean {
+  return (
+    guard.expectedStateName !== null ||
+    guard.expectedStateType !== null ||
+    guard.expectedUpdatedAt !== null ||
+    guard.force ||
+    guard.forceReason !== null
+  );
+}
+
+function buildTransitionAuditDetails(input: {
+  summary: ProviderLinearIssueSummary;
+  targetState: ProviderLinearWorkflowState;
+  guard: ProviderLinearTransitionGuardInput;
+  extra?: Record<string, unknown>;
+}): Record<string, unknown> {
+  return {
+    issue_id: input.summary.id,
+    issue_identifier: input.summary.identifier,
+    previous_state: input.summary.state?.name ?? null,
+    previous_state_type: input.summary.state?.type ?? null,
+    target_state: input.targetState.name,
+    target_state_type: input.targetState.type ?? null,
+    issue_updated_at: input.summary.updated_at,
+    expected_state: input.guard.expectedStateName,
+    expected_state_type: input.guard.expectedStateType,
+    expected_updated_at: input.guard.expectedUpdatedAt,
+    force: input.guard.force,
+    force_reason: input.guard.forceReason,
+    ...(input.extra ?? {})
+  };
+}
+
+function failureIfTransitionPreconditionsMismatch(
+  summary: ProviderLinearIssueSummary,
+  targetState: ProviderLinearWorkflowState,
+  guard: ProviderLinearTransitionGuardInput
+): ProviderLinearOperationFailure<'transition'> | null {
+  const mismatches: string[] = [];
+  if (guard.expectedStateName !== null) {
+    const actualState = normalizeProviderLinearWorkflowState(summary.state?.name);
+    const expectedState = normalizeProviderLinearWorkflowState(guard.expectedStateName);
+    if (actualState !== expectedState) {
+      mismatches.push('state');
+    }
+  }
+  if (guard.expectedStateType !== null) {
+    const actualStateType = normalizeProviderLinearWorkflowState(summary.state?.type);
+    const expectedStateType = normalizeProviderLinearWorkflowState(guard.expectedStateType);
+    if (actualStateType !== expectedStateType) {
+      mismatches.push('state_type');
+    }
+  }
+  if (guard.expectedUpdatedAt !== null) {
+    if (summary.updated_at !== guard.expectedUpdatedAt) {
+      mismatches.push('updated_at');
+    }
+  }
+  if (mismatches.length === 0) {
+    return null;
+  }
+  return failure(
+    'transition',
+    'linear_transition_conflict',
+    `Linear issue ${summary.identifier} no longer matches the expected transition preconditions (${mismatches.join(', ')}).`,
+    409,
+    buildTransitionAuditDetails({
+      summary,
+      targetState,
+      guard,
+      extra: {
+        mismatch_fields: mismatches
+      }
+    })
+  );
+}
+
+function failureIfTerminalTransitionRequiresForce(
+  summary: ProviderLinearIssueSummary,
+  targetState: ProviderLinearWorkflowState,
+  guard: ProviderLinearTransitionGuardInput
+): ProviderLinearOperationFailure<'transition'> | null {
+  if (
+    !isProviderLinearTerminalReopenTransition({
+      current: {
+        state: summary.state?.name ?? null,
+        state_type: summary.state?.type ?? null
+      },
+      target: {
+        state: targetState.name,
+        state_type: targetState.type
+      }
+    })
+  ) {
+    return null;
+  }
+  if (guard.force) {
+    return null;
+  }
+  return failure(
+    'transition',
+    'linear_terminal_transition_requires_force',
+    `Linear issue ${summary.identifier} is already terminal; transitioning it to ${targetState.name} requires --force and a non-empty --force-reason.`,
+    409,
+    buildTransitionAuditDetails({
+      summary,
+      targetState,
+      guard,
+      extra: {
+        force_required: true
+      }
+    })
+  );
 }
 
 function failure<T extends ProviderLinearOperation>(
