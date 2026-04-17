@@ -1,6 +1,32 @@
 {
   "items": [
     {
+      "id": "20260417-linear-5de4b04b-ec1e-4ab5-b75a-270989af4599",
+      "title": "CO: make linear transition race-safe with expected-state/CAS semantics and expected updated_at",
+      "relates_to": "tasks/tasks-linear-5de4b04b-ec1e-4ab5-b75a-270989af4599.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-17",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-17",
+          "status": "produced",
+          "manifest": ".runs/linear-5de4b04b-ec1e-4ab5-b75a-270989af4599-co215-docs-packet/cli/2026-04-17T09-16-32-281Z-7ee373ad/manifest.json",
+          "source_anchor": "ctx:sha256:2ac878f3d195fac62c08cd13c1747e33d4960f3aa5ec0484caee93b20cb2a167#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-215 as a narrow linear transition race-safety lane: add expected-state/CAS semantics, expected updated_at, terminal/completed workflow type guarding, `--force` plus force reason, and richer audit output around `In Review -> Merging` / `Merging -> Done` so a stale `Done -> Merging race` cannot regress post-CO-212 / PR #507 truth. The expected shared source payload was absent in this child checkout, so the packet is anchored on protected issue wording plus current repo seams in providerLinearWorkflowFacade.ts, linearCliShell.ts, providerLinearWorkflowStates.ts, and providerMergeCloseout.ts; parent owns implementation, validation, Linear state, workpad, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-5de4b04b-ec1e-4ab5-b75a-270989af4599.md",
+        "task": "tasks/tasks-linear-5de4b04b-ec1e-4ab5-b75a-270989af4599.md",
+        "agent_task": ".agent/task/linear-5de4b04b-ec1e-4ab5-b75a-270989af4599.md",
+        "docs": "docs/TECH_SPEC-linear-5de4b04b-ec1e-4ab5-b75a-270989af4599.md"
+      }
+    },
+    {
       "id": "20260417-linear-5561a9a9-39dd-4ed4-99a0-896553327669",
       "title": "CO: Add a Codex 0.121 plugin marketplace distribution path for Codex Orchestrator",
       "relates_to": "tasks/tasks-linear-5561a9a9-39dd-4ed4-99a0-896553327669.md",

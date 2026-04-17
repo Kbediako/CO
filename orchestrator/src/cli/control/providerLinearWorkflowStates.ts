@@ -97,6 +97,21 @@ export function classifyProviderLinearWorkflowState(input: {
   };
 }
 
+export function isProviderLinearTerminalReopenTransition(input: {
+  current: {
+    state: string | null | undefined;
+    state_type: string | null | undefined;
+  };
+  target: {
+    state: string | null | undefined;
+    state_type: string | null | undefined;
+  };
+}): boolean {
+  const current = classifyProviderLinearWorkflowState(input.current);
+  const target = classifyProviderLinearWorkflowState(input.target);
+  return current.isTerminal && !target.isTerminal;
+}
+
 export function providerLinearTodoBlockedByNonTerminal(
   blockers: LiveLinearTrackedIssue['blocked_by'] | null | undefined
 ): boolean {

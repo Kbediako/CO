@@ -612,6 +612,9 @@ export async function runProviderDeterministicMergeCloseout(
       const transitionResult = await transitionIssueState({
         issueId: input.issueId,
         stateName: 'Rework',
+        expectedStateName: currentIssueState,
+        expectedStateType: currentIssueStateType,
+        expectedUpdatedAt: currentIssueUpdatedAt,
         env,
         sourceSetup: input.sourceSetup
       });
@@ -862,6 +865,9 @@ export async function runProviderDeterministicMergeCloseout(
   const transitionResult = await transitionIssueState({
     issueId: input.issueId,
     stateName: 'Done',
+    expectedStateName: currentIssueState,
+    expectedStateType: currentIssueStateType,
+    expectedUpdatedAt: currentIssueUpdatedAt,
     env,
     sourceSetup: input.sourceSetup
   });
@@ -1283,6 +1289,9 @@ export async function runProviderReviewHandoffPromotion(
       const transitionResult = await transitionIssueState({
         issueId: input.issueId,
         stateName: 'Rework',
+        expectedStateName: currentIssueState,
+        expectedStateType: currentIssueStateType,
+        expectedUpdatedAt: currentIssueUpdatedAt,
         env,
         sourceSetup: input.sourceSetup
       });
@@ -1387,6 +1396,9 @@ export async function runProviderReviewHandoffPromotion(
   const transitionResult = await transitionIssueState({
     issueId: input.issueId,
     stateName: 'Merging',
+    expectedStateName: currentIssueState,
+    expectedStateType: currentIssueStateType,
+    expectedUpdatedAt: currentIssueUpdatedAt,
     env,
     sourceSetup: input.sourceSetup
   });

@@ -2842,7 +2842,10 @@ describe('runProviderDeterministicMergeCloseout', () => {
     });
     expect(transitionIssueState).toHaveBeenCalledWith(expect.objectContaining({
       issueId: 'lin-issue-1',
-      stateName: 'Rework'
+      stateName: 'Rework',
+      expectedStateName: 'Merging',
+      expectedStateType: 'started',
+      expectedUpdatedAt: '2026-04-05T00:12:00.000Z'
     }));
   });
 
@@ -3033,7 +3036,10 @@ describe('runProviderReviewHandoffPromotion', () => {
     }));
     expect(transitionIssueState).toHaveBeenCalledWith(expect.objectContaining({
       issueId: 'lin-issue-1',
-      stateName: 'Merging'
+      stateName: 'Merging',
+      expectedStateName: 'In Review',
+      expectedStateType: 'started',
+      expectedUpdatedAt: '2026-04-09T03:04:00.000Z'
     }));
   });
 
@@ -3194,7 +3200,10 @@ describe('runProviderReviewHandoffPromotion', () => {
     expect(result.summary).toContain('https://github.com/asabeko/CO/pull/360');
     expect(transitionIssueState).toHaveBeenCalledWith(expect.objectContaining({
       issueId: 'lin-issue-1',
-      stateName: 'Merging'
+      stateName: 'Merging',
+      expectedStateName: 'In Review',
+      expectedStateType: 'started',
+      expectedUpdatedAt: '2026-04-09T03:06:30.000Z'
     }));
   });
 
@@ -3578,7 +3587,10 @@ describe('runProviderReviewHandoffPromotion', () => {
     expect(fetchSnapshot).toHaveBeenCalledTimes(2);
     expect(transitionIssueState).toHaveBeenCalledWith(expect.objectContaining({
       issueId: 'lin-issue-1',
-      stateName: 'Merging'
+      stateName: 'Merging',
+      expectedStateName: 'In Review',
+      expectedStateType: 'started',
+      expectedUpdatedAt: '2026-04-09T03:11:00.000Z'
     }));
   });
 
