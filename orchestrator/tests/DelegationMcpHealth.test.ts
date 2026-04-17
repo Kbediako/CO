@@ -605,6 +605,43 @@ describe('delegationMcpHealth', () => {
     });
   });
 
+  it('requires a proof-pid ancestry match before falling back from a scoped workspace to shared-root manifests', () => {
+    const workspaceRoot = '/repo/.workspaces/linear-210';
+    const snapshot = [
+      '101     1 20:00  10240 codex resume 019-parent',
+      '202   101 15:00   4096 /opt/homebrew/bin/node /repo/dist/bin/codex-orchestrator.js delegate-server'
+    ].join('\n');
+
+    const result = inspectDelegateServerProcesses({
+      snapshot,
+      staleThresholdSeconds: 600,
+      processCwdLookup: {
+        101: workspaceRoot,
+        202: workspaceRoot
+      },
+      manifestCatalog: [
+        {
+          manifestPath: '/repo/.runs/linear-999/cli/run-1/manifest.json',
+          workspacePath: '/repo',
+          status: 'in_progress',
+          pipelineId: 'provider-linear-worker',
+          taskId: 'linear-999',
+          runId: 'run-1',
+          issueId: 'issue-999',
+          issueIdentifier: 'CO-999',
+          proofPid: null
+        }
+      ]
+    });
+
+    expect(result.activePids).toEqual([]);
+    expect(result.details.find((detail) => detail.pid === 202)).toMatchObject({
+      classification: 'idle-parent-session',
+      manifestAssociation: null,
+      rootCodexParentPid: 101
+    });
+  });
+
   it('falls back to the newest terminal scoped manifest when live scoped candidates are proof-backed but ancestry does not match', () => {
     const workspaceRoot = '/repo/.workspaces/linear-210';
     const snapshot = [

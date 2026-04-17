@@ -1247,6 +1247,27 @@ function resolveManifestCandidatesForWorkspace(
   return manifestCatalogByWorkspace.get(fallbackWorkspaceRoot) ?? [];
 }
 
+function resolveScopedManifestCandidatesForWorkspace(
+  workspacePath: string,
+  manifestCatalogByWorkspace: Map<string, DelegateServerManifestAssociation[]>
+): DelegateServerManifestAssociation[] {
+  const exactCandidates = manifestCatalogByWorkspace.get(workspacePath);
+  if (exactCandidates && exactCandidates.length > 0) {
+    return exactCandidates;
+  }
+  const fallbackWorkspaceRoot = [...manifestCatalogByWorkspace.keys()]
+    .filter((candidateWorkspacePath) =>
+      candidateWorkspacePath !== workspacePath
+      && isScopedWorkspacePath(candidateWorkspacePath)
+      && isPathWithinWorkspaceRoot(candidateWorkspacePath, workspacePath)
+    )
+    .sort((left, right) => right.length - left.length)[0];
+  if (!fallbackWorkspaceRoot) {
+    return [];
+  }
+  return manifestCatalogByWorkspace.get(fallbackWorkspaceRoot) ?? [];
+}
+
 function buildDelegateServerProcessDraft(
   record: DelegateServerProcessRecord,
   processMap: Map<number, DelegateServerProcessRecord>,
@@ -1305,7 +1326,12 @@ function resolveManifestAssociationForProcess(
     if (!workspacePath) {
       continue;
     }
-    const candidates = resolveManifestCandidatesForWorkspace(workspacePath, manifestCatalogByWorkspace);
+    const scopedCandidates = isScopedWorkspacePath(workspacePath)
+      ? resolveScopedManifestCandidatesForWorkspace(workspacePath, manifestCatalogByWorkspace)
+      : [];
+    const candidates = scopedCandidates.length > 0
+      ? scopedCandidates
+      : resolveManifestCandidatesForWorkspace(workspacePath, manifestCatalogByWorkspace);
     if (!candidates || candidates.length === 0) {
       continue;
     }
@@ -1315,8 +1341,8 @@ function resolveManifestAssociationForProcess(
     if (exactAncestryMatch) {
       return exactAncestryMatch;
     }
-    if (isScopedWorkspacePath(workspacePath)) {
-      const scopedFallback = resolveScopedWorkspaceFallbackAssociation(candidates);
+    if (isScopedWorkspacePath(workspacePath) && scopedCandidates.length > 0) {
+      const scopedFallback = resolveScopedWorkspaceFallbackAssociation(scopedCandidates);
       if (scopedFallback) {
         return scopedFallback;
       }
