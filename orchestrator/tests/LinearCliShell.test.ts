@@ -126,6 +126,216 @@ describe('runLinearCliShell', () => {
     });
   });
 
+  it('routes transition guard flags into the facade and records transition audit metadata', async () => {
+    const log = vi.fn();
+    const appendAuditEntry = vi.fn();
+    const transitionProviderLinearIssueStateMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').transitionProviderLinearIssueState>()
+        .mockResolvedValue({
+          ok: true,
+          operation: 'transition',
+          action: 'updated',
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-1',
+            updated_at: '2026-04-17T06:05:00.000Z',
+            state: {
+              id: 'state-merging',
+              name: 'Merging',
+              type: 'started'
+            }
+          },
+          previous_state: {
+            id: 'state-done',
+            name: 'Done',
+            type: 'completed'
+          },
+          target_state: {
+            id: 'state-merging',
+            name: 'Merging',
+            type: 'started'
+          },
+          transition_guard: {
+            expected_state: 'Done',
+            expected_state_type: 'completed',
+            expected_updated_at: '2026-04-17T06:00:27.516Z',
+            force: true,
+            force_reason: 'manual reopen after merge-race correction'
+          },
+          source_setup: null
+        } as never);
+
+    await runLinearCliShell(
+      {
+        positionals: ['transition'],
+        flags: {
+          format: 'json',
+          'issue-id': 'lin-issue-1',
+          state: 'Merging',
+          'expected-state': 'Done',
+          'expected-state-type': 'completed',
+          'expected-updated-at': '2026-04-17T06:00:27.516Z',
+          force: true,
+          'force-reason': 'manual reopen after merge-race correction'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        transitionProviderLinearIssueState: transitionProviderLinearIssueStateMock,
+        getEnv: () => ({
+          CO_LINEAR_API_TOKEN: 'lin-api-token',
+          CODEX_PROVIDER_LINEAR_AUDIT_PATH: '/tmp/provider-linear-audit.jsonl'
+        }),
+        now: () => '2026-04-17T06:05:00.000Z',
+        appendAuditEntry,
+        log
+      }
+    );
+
+    expect(transitionProviderLinearIssueStateMock).toHaveBeenCalledWith({
+      issueId: 'lin-issue-1',
+      stateName: 'Merging',
+      expectedStateName: 'Done',
+      expectedStateType: 'completed',
+      expectedUpdatedAt: '2026-04-17T06:00:27.516Z',
+      force: true,
+      forceReason: 'manual reopen after merge-race correction',
+      sourceSetup: null,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token',
+        CODEX_PROVIDER_LINEAR_AUDIT_PATH: '/tmp/provider-linear-audit.jsonl'
+      }
+    });
+    expect(appendAuditEntry).toHaveBeenCalledWith('/tmp/provider-linear-audit.jsonl', {
+      recorded_at: '2026-04-17T06:05:00.000Z',
+      operation: 'transition',
+      ok: true,
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-1',
+      source_setup: null,
+      action: 'updated',
+      via: null,
+      state: 'Merging',
+      follow_up_issue_id: null,
+      follow_up_issue_identifier: null,
+      failed_relation_type: null,
+      comment_id: null,
+      attachment_id: null,
+      previous_state: 'Done',
+      previous_state_type: 'completed',
+      target_state: 'Merging',
+      target_state_type: 'started',
+      issue_updated_at: '2026-04-17T06:05:00.000Z',
+      expected_state: 'Done',
+      expected_state_type: 'completed',
+      expected_updated_at: '2026-04-17T06:00:27.516Z',
+      force: true,
+      force_reason: 'manual reopen after merge-race correction',
+      error_code: null,
+      error_message: null
+    });
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
+      ok: true,
+      operation: 'transition',
+      transition_guard: {
+        expected_state: 'Done',
+        force: true
+      }
+    });
+  });
+
+  it('records resolved issue identity for transition guard failures in the audit entry', async () => {
+    const log = vi.fn();
+    const appendAuditEntry = vi.fn();
+    const transitionProviderLinearIssueStateMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').transitionProviderLinearIssueState>()
+        .mockResolvedValue({
+          ok: false,
+          operation: 'transition',
+          error: {
+            code: 'linear_transition_conflict',
+            message: 'Linear issue CO-1 no longer matches the expected transition preconditions (state, updated_at).',
+            status: 409,
+            details: {
+              issue_id: 'lin-issue-1',
+              issue_identifier: 'CO-1',
+              previous_state: 'Done',
+              previous_state_type: 'completed',
+              target_state: 'Merging',
+              target_state_type: 'started',
+              issue_updated_at: '2026-04-17T06:00:27.516Z',
+              expected_state: 'In Review',
+              expected_state_type: 'started',
+              expected_updated_at: '2026-04-17T05:53:29.672Z',
+              force: false,
+              force_reason: null
+            }
+          }
+        } as never);
+
+    await runLinearCliShell(
+      {
+        positionals: ['transition'],
+        flags: {
+          format: 'json',
+          'issue-id': 'CO-1',
+          state: 'Merging',
+          'expected-state': 'In Review',
+          'expected-state-type': 'started',
+          'expected-updated-at': '2026-04-17T05:53:29.672Z'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        transitionProviderLinearIssueState: transitionProviderLinearIssueStateMock,
+        getEnv: () => ({
+          CO_LINEAR_API_TOKEN: 'lin-api-token',
+          CODEX_PROVIDER_LINEAR_AUDIT_PATH: '/tmp/provider-linear-audit.jsonl'
+        }),
+        now: () => '2026-04-17T06:05:00.000Z',
+        appendAuditEntry,
+        log
+      }
+    );
+
+    expect(appendAuditEntry).toHaveBeenCalledWith('/tmp/provider-linear-audit.jsonl', {
+      recorded_at: '2026-04-17T06:05:00.000Z',
+      operation: 'transition',
+      ok: false,
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-1',
+      source_setup: null,
+      action: null,
+      via: null,
+      state: null,
+      follow_up_issue_id: null,
+      follow_up_issue_identifier: null,
+      failed_relation_type: null,
+      comment_id: null,
+      attachment_id: null,
+      previous_state: 'Done',
+      previous_state_type: 'completed',
+      target_state: 'Merging',
+      target_state_type: 'started',
+      issue_updated_at: '2026-04-17T06:00:27.516Z',
+      expected_state: 'In Review',
+      expected_state_type: 'started',
+      expected_updated_at: '2026-04-17T05:53:29.672Z',
+      force: false,
+      force_reason: null,
+      error_code: 'linear_transition_conflict',
+      error_message:
+        'Linear issue CO-1 no longer matches the expected transition preconditions (state, updated_at).'
+    });
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
+      ok: false,
+      operation: 'transition',
+      error: {
+        code: 'linear_transition_conflict'
+      }
+    });
+  });
+
   it('reads workpad content from a file before calling the facade', async () => {
     const upsertProviderLinearWorkpadCommentMock =
       vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').upsertProviderLinearWorkpadComment>()

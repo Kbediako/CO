@@ -309,10 +309,27 @@ export async function runLinearCliShell(
         return;
       }
       case 'transition': {
-        assertAllowedFlags(params.flags, ['format', 'issue-id', 'workspace-id', 'team-id', 'project-id', 'state']);
+        assertAllowedFlags(params.flags, [
+          'format',
+          'issue-id',
+          'workspace-id',
+          'team-id',
+          'project-id',
+          'state',
+          'expected-state',
+          'expected-state-type',
+          'expected-updated-at',
+          'force',
+          'force-reason'
+        ]);
         const result = await dependencies.transitionProviderLinearIssueState({
           issueId: requireFlag(params.flags, 'issue-id'),
           stateName: requireFlag(params.flags, 'state'),
+          expectedStateName: readStringFlag(params.flags, 'expected-state') ?? null,
+          expectedStateType: readStringFlag(params.flags, 'expected-state-type') ?? null,
+          expectedUpdatedAt: readStringFlag(params.flags, 'expected-updated-at') ?? null,
+          force: readBooleanFlag(params.flags, 'force'),
+          forceReason: readRawStringFlag(params.flags, 'force-reason'),
           sourceSetup: readSourceSetup(params.flags),
           env
         });
@@ -1105,6 +1122,7 @@ function buildAuditEntry(
       ...followUpAuditFields,
       comment_id: null,
       attachment_id: null,
+      ...resolveTransitionAuditFieldsFromFailure(result),
       error_code: result.error.code,
       error_message: result.error.message
     };
@@ -1181,6 +1199,7 @@ function buildAuditEntry(
         ...followUpAuditFields,
         comment_id: null,
         attachment_id: null,
+        ...resolveTransitionAuditFieldsFromSuccess(result),
         error_code: null,
         error_message: null
       };
@@ -1308,6 +1327,60 @@ function buildAuditEntry(
         error_message: null
       };
   }
+}
+
+function resolveTransitionAuditFieldsFromSuccess(
+  result: Extract<LinearCliResult, { ok: true; operation: 'transition' }>
+): Partial<ProviderLinearAuditEntry> {
+  return {
+    previous_state: result.previous_state?.name ?? null,
+    previous_state_type: result.previous_state?.type ?? null,
+    target_state: result.target_state.name,
+    target_state_type: result.target_state.type ?? null,
+    issue_updated_at: result.issue.updated_at ?? null,
+    expected_state: result.transition_guard?.expected_state ?? null,
+    expected_state_type: result.transition_guard?.expected_state_type ?? null,
+    expected_updated_at: result.transition_guard?.expected_updated_at ?? null,
+    force: result.transition_guard?.force ?? null,
+    force_reason: result.transition_guard?.force_reason ?? null
+  };
+}
+
+function resolveTransitionAuditFieldsFromFailure(
+  result: Extract<LinearCliResult, { ok: false }>
+): Partial<ProviderLinearAuditEntry> {
+  if (result.operation !== 'transition') {
+    return {};
+  }
+  const details =
+    result.error.details && typeof result.error.details === 'object'
+      ? result.error.details as Record<string, unknown>
+      : null;
+  if (!details) {
+    return {};
+  }
+  return {
+    issue_id: normalizeOptionalAuditString(details.issue_id),
+    issue_identifier: normalizeOptionalAuditString(details.issue_identifier),
+    previous_state: normalizeOptionalAuditString(details.previous_state),
+    previous_state_type: normalizeOptionalAuditString(details.previous_state_type),
+    target_state: normalizeOptionalAuditString(details.target_state),
+    target_state_type: normalizeOptionalAuditString(details.target_state_type),
+    issue_updated_at: normalizeOptionalAuditString(details.issue_updated_at),
+    expected_state: normalizeOptionalAuditString(details.expected_state),
+    expected_state_type: normalizeOptionalAuditString(details.expected_state_type),
+    expected_updated_at: normalizeOptionalAuditString(details.expected_updated_at),
+    force: typeof details.force === 'boolean' ? details.force : null,
+    force_reason: normalizeOptionalAuditString(details.force_reason)
+  };
+}
+
+function normalizeOptionalAuditString(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 function resolveFollowUpAuditFields(

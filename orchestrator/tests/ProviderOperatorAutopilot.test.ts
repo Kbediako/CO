@@ -55,6 +55,9 @@ describe('providerOperatorAutopilot', () => {
     expect(transitionIssueState).toHaveBeenCalledWith({
       issueId: 'lin-issue-1',
       stateName: 'Ready',
+      expectedStateName: 'Backlog',
+      expectedStateType: 'backlog',
+      expectedUpdatedAt: '2026-04-09T09:00:00.000Z',
       sourceSetup: null,
       env: expect.any(Object)
     });
@@ -260,6 +263,9 @@ describe('providerOperatorAutopilot', () => {
     expect(transitionIssueState).toHaveBeenCalledWith({
       issueId: 'lin-issue-1',
       stateName: 'Ready',
+      expectedStateName: 'Backlog',
+      expectedStateType: 'backlog',
+      expectedUpdatedAt: '2026-04-09T09:00:00.000Z',
       sourceSetup: null,
       env: expect.any(Object)
     });
@@ -379,6 +385,9 @@ describe('providerOperatorAutopilot', () => {
     expect(transitionIssueState).toHaveBeenCalledWith({
       issueId: 'lin-issue-1',
       stateName: 'Rework',
+      expectedStateName: 'In Review',
+      expectedStateType: 'started',
+      expectedUpdatedAt: '2026-04-09T09:00:00.000Z',
       sourceSetup: null,
       env: expect.any(Object)
     });
@@ -610,6 +619,9 @@ describe('providerOperatorAutopilot', () => {
     expect(transitionIssueState).toHaveBeenCalledWith({
       issueId: 'lin-issue-2',
       stateName: 'Rework',
+      expectedStateName: 'In Review',
+      expectedStateType: 'started',
+      expectedUpdatedAt: '2026-04-09T09:00:00.000Z',
       sourceSetup: null,
       env: expect.any(Object)
     });
@@ -684,6 +696,9 @@ describe('providerOperatorAutopilot', () => {
     expect(transitionIssueState).toHaveBeenCalledWith({
       issueId: 'lin-issue-1',
       stateName: 'Rework',
+      expectedStateName: 'In Review',
+      expectedStateType: 'started',
+      expectedUpdatedAt: '2026-04-09T09:00:00.000Z',
       sourceSetup: null,
       env: expect.any(Object)
     });
@@ -749,6 +764,9 @@ describe('providerOperatorAutopilot', () => {
     expect(transitionIssueState).toHaveBeenCalledWith({
       issueId: 'lin-issue-1',
       stateName: 'Rework',
+      expectedStateName: 'In Review',
+      expectedStateType: 'started',
+      expectedUpdatedAt: '2026-04-09T09:00:00.000Z',
       sourceSetup: null,
       env: expect.any(Object)
     });

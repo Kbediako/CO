@@ -1628,6 +1628,14 @@ Subcommands:
   transition
     --issue-id <id>       Linear issue id/key to update.
     --state <name>        Destination Linear state name (resolved to stateId via team workflow states).
+    --expected-state <name>
+                         Optional expected live state name; conflicts fail closed before mutation.
+    --expected-state-type <type>
+                         Optional expected live workflow type; conflicts fail closed before mutation.
+    --expected-updated-at <iso>
+                         Optional expected live updated_at timestamp; conflicts fail closed before mutation.
+    --force               Allow terminal-to-reopen transitions with an audited force reason.
+    --force-reason <text> Required whenever --force is set.
     --workspace-id <id>   Optional workspace scope check.
     --team-id <id>        Optional team scope check.
     --project-id <id>     Optional project scope check.

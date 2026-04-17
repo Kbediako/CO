@@ -7743,6 +7743,389 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it('fails closed when expected transition preconditions no longer match the live issue summary', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+      };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            updatedAt: '2026-04-17T06:00:27.516Z',
+            state: {
+              id: 'state-done',
+              name: 'Done',
+              type: 'completed'
+            },
+            team: {
+              id: 'lin-team-1',
+              key: 'CO',
+              name: 'Codex Orchestrator',
+              states: {
+                nodes: [
+                  {
+                    id: 'state-in-review',
+                    name: 'In Review',
+                    type: 'started'
+                  },
+                  {
+                    id: 'state-merging',
+                    name: 'Merging',
+                    type: 'started'
+                  },
+                  {
+                    id: 'state-done',
+                    name: 'Done',
+                    type: 'completed'
+                  }
+                ]
+              }
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearMoveIssue')) {
+        throw new Error('Transition mutation must not run after CAS preconditions fail.');
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await transitionProviderLinearIssueState({
+      issueId: 'lin-issue-1',
+      stateName: 'Merging',
+      expectedStateName: 'In Review',
+      expectedStateType: 'started',
+      expectedUpdatedAt: '2026-04-17T05:53:29.672Z',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'transition',
+      error: {
+        code: 'linear_transition_conflict',
+        status: 409,
+        details: {
+          previous_state: 'Done',
+          previous_state_type: 'completed',
+          target_state: 'Merging',
+          target_state_type: 'started',
+          issue_updated_at: '2026-04-17T06:00:27.516Z',
+          expected_state: 'In Review',
+          expected_state_type: 'started',
+          expected_updated_at: '2026-04-17T05:53:29.672Z',
+          mismatch_fields: ['state', 'state_type', 'updated_at']
+        }
+      }
+    });
+  });
+
+  it('requires force plus reason before reopening a terminal issue into an active state', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+      };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            updatedAt: '2026-04-17T06:00:27.516Z',
+            state: {
+              id: 'state-done',
+              name: 'Done',
+              type: 'completed'
+            },
+            team: {
+              id: 'lin-team-1',
+              key: 'CO',
+              name: 'Codex Orchestrator',
+              states: {
+                nodes: [
+                  {
+                    id: 'state-in-progress',
+                    name: 'In Progress',
+                    type: 'started'
+                  },
+                  {
+                    id: 'state-merging',
+                    name: 'Merging',
+                    type: 'started'
+                  },
+                  {
+                    id: 'state-done',
+                    name: 'Done',
+                    type: 'completed'
+                  }
+                ]
+              }
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearMoveIssue')) {
+        throw new Error('Transition mutation must not run without an explicit force override.');
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await transitionProviderLinearIssueState({
+      issueId: 'lin-issue-1',
+      stateName: 'Merging',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'transition',
+      error: {
+        code: 'linear_terminal_transition_requires_force',
+        status: 409,
+        details: {
+          previous_state: 'Done',
+          previous_state_type: 'completed',
+          target_state: 'Merging',
+          target_state_type: 'started',
+          issue_updated_at: '2026-04-17T06:00:27.516Z',
+          force: false,
+          force_reason: null,
+          force_required: true
+        }
+      }
+    });
+  });
+
+  it('allows forced terminal reopen transitions and records the transition guard audit metadata', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            updatedAt: '2026-04-17T06:00:27.516Z',
+            state: {
+              id: 'state-done',
+              name: 'Done',
+              type: 'completed'
+            },
+            team: {
+              id: 'lin-team-1',
+              key: 'CO',
+              name: 'Codex Orchestrator',
+              states: {
+                nodes: [
+                  {
+                    id: 'state-merging',
+                    name: 'Merging',
+                    type: 'started'
+                  },
+                  {
+                    id: 'state-done',
+                    name: 'Done',
+                    type: 'completed'
+                  }
+                ]
+              }
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearMoveIssue')) {
+        expect(body.variables).toEqual({
+          id: 'lin-issue-1',
+          stateId: 'state-merging'
+        });
+        return jsonResponse({
+          data: {
+            issueUpdate: {
+              success: true,
+              issue: {
+                id: 'lin-issue-1',
+                identifier: 'CO-1',
+                updatedAt: '2026-04-17T06:05:00.000Z',
+                state: {
+                  id: 'state-merging',
+                  name: 'Merging',
+                  type: 'started'
+                }
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await transitionProviderLinearIssueState({
+      issueId: 'lin-issue-1',
+      stateName: 'Merging',
+      expectedStateName: 'Done',
+      expectedStateType: 'completed',
+      expectedUpdatedAt: '2026-04-17T06:00:27.516Z',
+      force: true,
+      forceReason: 'manual reopen after merge-race correction',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'transition',
+      action: 'updated',
+      issue: {
+        state: {
+          id: 'state-merging',
+          name: 'Merging',
+          type: 'started'
+        },
+        updated_at: '2026-04-17T06:05:00.000Z'
+      },
+      previous_state: {
+        id: 'state-done',
+        name: 'Done',
+        type: 'completed'
+      },
+      target_state: {
+        id: 'state-merging',
+        name: 'Merging',
+        type: 'started'
+      },
+      transition_guard: {
+        expected_state: 'Done',
+        expected_state_type: 'completed',
+        expected_updated_at: '2026-04-17T06:00:27.516Z',
+        force: true,
+        force_reason: 'manual reopen after merge-race correction'
+      }
+    });
+  });
+
+  it('allows forced terminal reopen transitions to bypass stale CAS expectations while keeping the guard audit', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            updatedAt: '2026-04-17T06:00:27.516Z',
+            state: {
+              id: 'state-done',
+              name: 'Done',
+              type: 'completed'
+            },
+            team: {
+              id: 'lin-team-1',
+              key: 'CO',
+              name: 'Codex Orchestrator',
+              states: {
+                nodes: [
+                  {
+                    id: 'state-in-review',
+                    name: 'In Review',
+                    type: 'started'
+                  },
+                  {
+                    id: 'state-merging',
+                    name: 'Merging',
+                    type: 'started'
+                  },
+                  {
+                    id: 'state-done',
+                    name: 'Done',
+                    type: 'completed'
+                  }
+                ]
+              }
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearMoveIssue')) {
+        expect(body.variables).toEqual({
+          id: 'lin-issue-1',
+          stateId: 'state-merging'
+        });
+        return jsonResponse({
+          data: {
+            issueUpdate: {
+              success: true,
+              issue: {
+                id: 'lin-issue-1',
+                identifier: 'CO-1',
+                updatedAt: '2026-04-17T06:05:00.000Z',
+                state: {
+                  id: 'state-merging',
+                  name: 'Merging',
+                  type: 'started'
+                }
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await transitionProviderLinearIssueState({
+      issueId: 'lin-issue-1',
+      stateName: 'Merging',
+      expectedStateName: 'In Review',
+      expectedStateType: 'started',
+      expectedUpdatedAt: '2026-04-17T05:53:29.672Z',
+      force: true,
+      forceReason: 'manual reopen after merge-race correction',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'transition',
+      action: 'updated',
+      issue: {
+        state: {
+          id: 'state-merging',
+          name: 'Merging',
+          type: 'started'
+        },
+        updated_at: '2026-04-17T06:05:00.000Z'
+      },
+      previous_state: {
+        id: 'state-done',
+        name: 'Done',
+        type: 'completed'
+      },
+      target_state: {
+        id: 'state-merging',
+        name: 'Merging',
+        type: 'started'
+      },
+      transition_guard: {
+        expected_state: 'In Review',
+        expected_state_type: 'started',
+        expected_updated_at: '2026-04-17T05:53:29.672Z',
+        force: true,
+        force_reason: 'manual reopen after merge-race correction'
+      }
+    });
+  });
+
   it('uses a fresh cached issue summary for a direct transition mutation and updates the cached state after success', async () => {
     const env = await createRunScopedEnv();
     await getProviderLinearIssueContext({
@@ -8415,6 +8798,78 @@ describe('providerLinearWorkflowFacade', () => {
       previous_state: {
         id: 'state-human-review',
         name: 'Human Review'
+      }
+    });
+  });
+
+  it('fails cached transition reread noops when expected transition guards are stale', async () => {
+    const env = await createBudgetedRunScopedEnv();
+    const resetAt = String(Date.now() + 60_000);
+
+    await writeCachedIssueContext(env, buildCachedIssueContext(), {
+      recordedAt: new Date().toISOString()
+    });
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'provider-linear:issue-context',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '1',
+        'x-ratelimit-requests-reset': resetAt
+      }
+    });
+
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+      };
+      expect(body.query).toContain('ProviderLinearIssueSummary');
+      return jsonResponse(
+        buildIssueContextBody({
+          updatedAt: '2026-03-22T10:05:00.000Z',
+          state: {
+            id: 'state-human-review',
+            name: 'Human Review',
+            type: 'started'
+          }
+        }),
+        200,
+        {
+          'x-ratelimit-requests-limit': '100',
+          'x-ratelimit-requests-remaining': '0',
+          'x-ratelimit-requests-reset': resetAt
+        }
+      );
+    });
+
+    const result = await transitionProviderLinearIssueState({
+      issueId: 'lin-issue-1',
+      stateName: 'Human Review',
+      expectedStateName: 'In Progress',
+      expectedStateType: 'started',
+      expectedUpdatedAt: '2026-03-22T10:00:00.000Z',
+      env,
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'transition',
+      error: {
+        code: 'linear_transition_conflict',
+        status: 409,
+        details: {
+          previous_state: 'Human Review',
+          previous_state_type: 'started',
+          target_state: 'Human Review',
+          target_state_type: 'started',
+          issue_updated_at: '2026-03-22T10:05:00.000Z',
+          expected_state: 'In Progress',
+          expected_state_type: 'started',
+          expected_updated_at: '2026-03-22T10:00:00.000Z',
+          mismatch_fields: ['state', 'updated_at']
+        }
       }
     });
   });
