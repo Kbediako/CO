@@ -1,6 +1,32 @@
 {
   "items": [
     {
+      "id": "20260417-linear-50e8a891-2b2f-4a67-b4d0-a2706870ddec",
+      "title": "CO: clear stale shared-root merge-closeout residue once CO-211 / PR #506 are merged and live Linear truth is Done",
+      "relates_to": "tasks/tasks-linear-50e8a891-2b2f-4a67-b4d0-a2706870ddec.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-17",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-17",
+          "status": "produced",
+          "manifest": ".runs/linear-50e8a891-2b2f-4a67-b4d0-a2706870ddec-docs-packet/cli/2026-04-17T05-33-52-283Z-922f6714/manifest.json",
+          "source_anchor": "ctx:sha256:b7ad1828659a1c10272a7b9a6baa0ec33f1474751d0357cb894bd66f92c391c0#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-214 as stale merged-closeout residue after CO-211 / PR #506 where merged PR truth plus live Linear Done truth must dominate retained local Merging action-required state; parent owns implementation, validation, Linear state, workpad, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-50e8a891-2b2f-4a67-b4d0-a2706870ddec.md",
+        "task": "tasks/tasks-linear-50e8a891-2b2f-4a67-b4d0-a2706870ddec.md",
+        "agent_task": ".agent/task/linear-50e8a891-2b2f-4a67-b4d0-a2706870ddec.md",
+        "docs": "docs/TECH_SPEC-linear-50e8a891-2b2f-4a67-b4d0-a2706870ddec.md"
+      }
+    },
+    {
       "id": "20260417-linear-5561a9a9-39dd-4ed4-99a0-896553327669",
       "title": "CO: Add a Codex 0.121 plugin marketplace distribution path for Codex Orchestrator",
       "relates_to": "tasks/tasks-linear-5561a9a9-39dd-4ed4-99a0-896553327669.md",

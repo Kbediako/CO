@@ -1316,12 +1316,20 @@ export function createProviderIssueHandoffService(
   const buildTrackedIssueMergeCloseoutResetFields = (
     claim: Pick<
       ProviderIntakeClaimRecord,
-      'merge_closeout' | 'review_promotion' | 'issue_updated_at'
+      'merge_closeout' | 'review_promotion' | 'issue_state' | 'issue_state_type' | 'issue_updated_at'
     >,
     trackedIssue: Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at'>
   ): Partial<Pick<ProviderIntakeClaimRecord, 'merge_closeout' | 'review_promotion'>> => {
     if (!isTrackedIssueFreshEnoughForClaim(claim, trackedIssue)) {
       return {};
+    }
+    if (isSupersededTerminalMergeCloseoutClaim({ claim, trackedIssue })) {
+      return shouldClearStaleReviewPromotionForTrackedIssue({
+        claim,
+        trackedIssue
+      })
+        ? { review_promotion: null }
+        : {};
     }
     const clearMergeCloseout = shouldClearStaleMergeCloseoutForTrackedIssue({
       claim,
@@ -1413,7 +1421,13 @@ export function createProviderIssueHandoffService(
   const resolveFreshTrackedIssueForActiveClaim = async (
     claim: Pick<
       ProviderIntakeClaimRecord,
-      'provider' | 'issue_id' | 'issue_updated_at' | 'merge_closeout' | 'review_promotion'
+      | 'provider'
+      | 'issue_id'
+      | 'issue_state'
+      | 'issue_state_type'
+      | 'issue_updated_at'
+      | 'merge_closeout'
+      | 'review_promotion'
     >
   ): Promise<ActiveClaimFreshTrackedIssueResolution> => {
     if (!resolveTrackedIssueWhenNotStuck) {
@@ -2161,7 +2175,10 @@ export function createProviderIssueHandoffService(
         )
       ) {
         let completedClaim = claim;
-        if (input?.refreshTrackedIssueMetadata) {
+        if (
+          input?.refreshTrackedIssueMetadata ||
+          shouldForceTrackedIssueMetadataRefreshForCompletedClaim(claim)
+        ) {
           const freshTrackedIssue = await resolveFreshTrackedIssueForActiveClaim(claim);
           if (freshTrackedIssue.trackedIssue) {
             completedClaim = {
@@ -2194,6 +2211,19 @@ export function createProviderIssueHandoffService(
                 continue;
               }
             }
+          } else if (
+            shouldApplySupersededTerminalMergeCloseoutReleaseClaim({
+              releaseReason: freshTrackedIssue.releaseReason,
+              claim: {
+                ...completedClaim,
+                ...freshTrackedIssue.releaseClaimFields
+              }
+            })
+          ) {
+            completedClaim = {
+              ...completedClaim,
+              ...freshTrackedIssue.releaseClaimFields
+            };
           }
         }
         const completedState = buildProviderCompletedRunRehydrateState({
@@ -5279,6 +5309,115 @@ function shouldClearStaleMergeCloseoutForTrackedIssue(input: {
   );
 }
 
+function shouldForceTrackedIssueMetadataRefreshForCompletedClaim(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'state' | 'reason' | 'issue_state' | 'merge_closeout'
+  >
+): boolean {
+  if (
+    claim.state !== 'handoff_failed' ||
+    claim.reason !== 'provider_issue_merge_closeout_action_required'
+  ) {
+    return false;
+  }
+  const mergeCloseout = claim.merge_closeout ?? null;
+  if (
+    !mergeCloseout ||
+    mergeCloseout.status !== 'action_required' ||
+    normalizeOptionalString(mergeCloseout.reason) !== 'pending_shared_root_reconciliation'
+  ) {
+    return false;
+  }
+  if (normalizeProviderLinearWorkflowState(claim.issue_state) !== 'merging') {
+    return false;
+  }
+  return mergeCloseoutSnapshotShowsMerged(mergeCloseout);
+}
+
+function shouldApplySupersededTerminalMergeCloseoutReleaseClaim(input: {
+  releaseReason: string | null;
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'issue_state' | 'issue_state_type' | 'issue_updated_at' | 'merge_closeout'
+  >;
+}): boolean {
+  if (
+    input.releaseReason !== 'provider_issue_released:not_active' &&
+    input.releaseReason !== 'provider_issue_released:not_mutable'
+  ) {
+    return false;
+  }
+  return isSupersededTerminalMergeCloseoutClaim({
+    claim: input.claim
+  });
+}
+
+function isSupersededTerminalMergeCloseoutClaim(input: {
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'issue_state' | 'issue_state_type' | 'issue_updated_at' | 'merge_closeout'
+  >;
+  trackedIssue?: Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at'> | null;
+}): boolean {
+  const mergeCloseout = input.claim.merge_closeout ?? null;
+  if (
+    !mergeCloseout ||
+    mergeCloseout.status !== 'action_required' ||
+    normalizeOptionalString(mergeCloseout.reason) !== 'pending_shared_root_reconciliation'
+  ) {
+    return false;
+  }
+  if (!mergeCloseoutSnapshotShowsMerged(mergeCloseout)) {
+    return false;
+  }
+  if (normalizeOptionalString(mergeCloseout.shared_root?.status) !== 'skipped') {
+    return false;
+  }
+  if (normalizeProviderLinearWorkflowState(mergeCloseout.issue_state) !== 'merging') {
+    return false;
+  }
+  const liveWorkflowState = classifyProviderLinearWorkflowState(
+    input.trackedIssue
+      ? {
+          state: input.trackedIssue.state,
+          state_type: input.trackedIssue.state_type
+        }
+      : {
+          state: input.claim.issue_state,
+          state_type: input.claim.issue_state_type
+        }
+  );
+  if (!liveWorkflowState.isTerminal) {
+    return false;
+  }
+  const freshness = compareTrackedIssueUpdatedAt({
+    existingIssueUpdatedAt: mergeCloseout.issue_updated_at ?? null,
+    nextIssueUpdatedAt:
+      input.trackedIssue !== undefined
+        ? input.trackedIssue?.updated_at ?? null
+        : input.claim.issue_updated_at ?? null
+  });
+  return freshness === 'equal' || freshness === 'newer';
+}
+
+function mergeCloseoutSnapshotShowsMerged(
+  mergeCloseout: Pick<ProviderMergeCloseoutRecord, 'status' | 'snapshot'>
+): boolean {
+  if (mergeCloseout.status === 'merged') {
+    return true;
+  }
+  const snapshot = mergeCloseout.snapshot ?? null;
+  return Boolean(
+    normalizeOptionalString(snapshot?.merged_at) ||
+      normalizeOptionalString(snapshot?.state) === 'MERGED'
+  );
+}
+
+function normalizeOptionalString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+}
+
 function shouldClearStaleReviewPromotionForTrackedIssue(input: {
   claim: Pick<ProviderIntakeClaimRecord, 'review_promotion'>;
   trackedIssue: Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at'>;
@@ -6764,7 +6903,8 @@ function buildProviderCompletedRunRehydrateState(input: {
   }
   if (
     input.claim.merge_closeout &&
-    resolveProviderMergeCloseoutClaimState(input.claim.merge_closeout) === 'handoff_failed'
+    resolveProviderMergeCloseoutClaimState(input.claim.merge_closeout) === 'handoff_failed' &&
+    !isSupersededTerminalMergeCloseoutClaim({ claim: input.claim })
   ) {
     return {
       task_id: input.run.taskId,
