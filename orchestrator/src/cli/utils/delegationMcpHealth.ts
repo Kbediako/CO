@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import process from 'node:process';
 
 import { buildCommandPreview } from './commandPreview.js';
@@ -62,6 +62,7 @@ export interface DelegateServerProcessInspection {
   staleRssKb: number;
   thresholdSeconds: number;
   detail: string;
+  details: DelegateServerProcessDetail[];
 }
 
 export interface DelegateServerCleanupResult extends DelegateServerProcessInspection {
@@ -80,13 +81,76 @@ interface DelegateServerProcessRecord {
   command: string;
 }
 
+export type DelegateServerProcessClassification =
+  | 'active-associated'
+  | 'active-unassociated'
+  | 'idle-parent-session'
+  | 'idle-orphan'
+  | 'stale-parent-session'
+  | 'stale-orphan';
+
+export interface DelegateServerManifestAssociation {
+  manifestPath: string;
+  workspacePath: string | null;
+  status: string | null;
+  pipelineId: string | null;
+  taskId: string | null;
+  runId: string | null;
+  issueId: string | null;
+  issueIdentifier: string | null;
+  proofPid: number | null;
+}
+
+export interface DelegateServerProcessDetail {
+  pid: number;
+  ppid: number;
+  elapsedSeconds: number | null;
+  rssKb: number;
+  command: string;
+  cwd: string | null;
+  parentPid: number | null;
+  parentCommand: string | null;
+  parentCwd: string | null;
+  rootCodexParentPid: number | null;
+  rootCodexParentCommand: string | null;
+  rootCodexParentCwd: string | null;
+  manifestAssociation: DelegateServerManifestAssociation | null;
+  classification: DelegateServerProcessClassification;
+  classificationDetail: string;
+}
+
+export function formatDelegateServerProcessSummary(detail: {
+  pid: number;
+  classification: string;
+  cwd: string | null;
+  parentPid: number | null;
+  parentCwd: string | null;
+  rootCodexParentPid: number | null;
+  rootCodexParentCwd: string | null;
+  manifestPath: string | null;
+}): string {
+  return `pid ${detail.pid} (${detail.classification}), parent ${detail.rootCodexParentPid ?? detail.parentPid ?? 'none'}, cwd ${detail.rootCodexParentCwd ?? detail.parentCwd ?? detail.cwd ?? '<unknown>'}, manifest ${detail.manifestPath ?? '<none>'}`;
+}
+
+interface DelegateServerProcessDraft {
+  record: DelegateServerProcessRecord;
+  cwd: string | null;
+  parentRecord: DelegateServerProcessRecord | null;
+  parentCwd: string | null;
+  rootCodexParent: DelegateServerProcessRecord | null;
+  rootCodexParentCwd: string | null;
+  cwdLookupAvailable: boolean;
+  manifestAssociation: DelegateServerManifestAssociation | null;
+  ancestryPids: number[];
+}
+
 interface DelegateServerProcessInspectionBundle {
   inspection: DelegateServerProcessInspection;
   staleRecords: DelegateServerProcessRecord[];
 }
 
 interface DelegateServerCleanupDependencies {
-  inspect: (options: { staleThresholdSeconds?: number }) => DelegateServerProcessInspectionBundle;
+  inspect: (options: { staleThresholdSeconds?: number; repoRoot?: string }) => DelegateServerProcessInspectionBundle;
   readProcessRecord: (pid: number) => DelegateServerProcessRecord | null;
   tryKillProcess: (pid: number, signal: NodeJS.Signals) => KillProcessOutcome;
   isProcessAlive: (pid: number) => boolean;
@@ -314,6 +378,9 @@ export function probeDelegationInitialize(
 export function inspectDelegateServerProcesses(options: {
   snapshot?: string;
   staleThresholdSeconds?: number;
+  repoRoot?: string;
+  processCwdLookup?: Record<number, string | null>;
+  manifestCatalog?: DelegateServerManifestAssociation[];
 } = {}): DelegateServerProcessInspection {
   return inspectDelegateServerProcessBundle(options).inspection;
 }
@@ -321,6 +388,9 @@ export function inspectDelegateServerProcesses(options: {
 function inspectDelegateServerProcessBundle(options: {
   snapshot?: string;
   staleThresholdSeconds?: number;
+  repoRoot?: string;
+  processCwdLookup?: Record<number, string | null>;
+  manifestCatalog?: DelegateServerManifestAssociation[];
 } = {}): DelegateServerProcessInspectionBundle {
   const thresholdSeconds = options.staleThresholdSeconds ?? DEFAULT_STALE_THRESHOLD_SECONDS;
   const snapshotResult: { ok: true; output: string } | { ok: false; detail: string } =
@@ -335,7 +405,8 @@ function inspectDelegateServerProcessBundle(options: {
         stalePids: [],
         staleRssKb: 0,
         thresholdSeconds,
-        detail: snapshotResult.detail
+        detail: snapshotResult.detail,
+        details: []
       },
       staleRecords: []
     };
@@ -344,29 +415,58 @@ function inspectDelegateServerProcessBundle(options: {
   const allProcesses = parseDelegateServerProcessSnapshot(snapshotResult.output);
   const processes = allProcesses.filter((record) => isDelegateServerCommand(record.command));
   const processMap = new Map(allProcesses.map((record) => [record.pid, record]));
-  const activePids: number[] = [];
-  const stalePids: number[] = [];
-  const staleRecords: DelegateServerProcessRecord[] = [];
-  let staleRssKb = 0;
-
-  for (const record of processes) {
-    if (isDelegateServerRootedInCodex(record, processMap)) {
-      activePids.push(record.pid);
-      continue;
-    }
-    if (record.elapsedSeconds !== null && record.elapsedSeconds >= thresholdSeconds) {
-      stalePids.push(record.pid);
-      staleRecords.push(record);
-      staleRssKb += record.rssKb;
-    }
+  const preloadPids = resolveDelegateServerRelatedPids(processes, processMap);
+  const lookupProcessCwd = createProcessCwdReader(
+    options.processCwdLookup,
+    preloadPids
+  );
+  if (processes.length === 0) {
+    return {
+      inspection: {
+        status: 'ok',
+        activeCount: 0,
+        staleCount: 0,
+        activePids: [],
+        stalePids: [],
+        staleRssKb: 0,
+        thresholdSeconds,
+        detail: 'No delegate-server processes detected.',
+        details: []
+      },
+      staleRecords: []
+    };
   }
+  const manifestCatalog =
+    options.manifestCatalog ?? loadDelegateServerManifestCatalog(resolveDelegateServerInspectionRepoRoot(options.repoRoot));
+  const manifestCatalogByWorkspace = buildManifestCatalogByWorkspace(manifestCatalog);
+  const drafts = processes.map((record) =>
+    buildDelegateServerProcessDraft(record, processMap, lookupProcessCwd, manifestCatalogByWorkspace)
+  );
+  const freshestUnassociatedPidByRootParent = resolveFreshestUnassociatedPidByRootParent(drafts);
+  const details = drafts.map((draft) =>
+    finalizeDelegateServerProcessDetail(draft, freshestUnassociatedPidByRootParent, thresholdSeconds)
+  );
+  const activePids = details
+    .filter((detail) => detail.classification === 'active-associated' || detail.classification === 'active-unassociated')
+    .map((detail) => detail.pid);
+  const idleDetails = details.filter(
+    (detail) => detail.classification === 'idle-parent-session' || detail.classification === 'idle-orphan'
+  );
+  const staleDetails = details.filter((detail) =>
+    detail.classification === 'stale-parent-session' || detail.classification === 'stale-orphan'
+  );
+  const stalePids = staleDetails.map((detail) => detail.pid);
+  const staleRecords = processes.filter((record) => stalePids.includes(record.pid));
+  const staleRssKb = staleDetails.reduce((sum, detail) => sum + detail.rssKb, 0);
 
   const detail =
     processes.length === 0
       ? 'No delegate-server processes detected.'
       : stalePids.length > 0
-        ? `Detected ${stalePids.length} stale delegate-server processes not rooted in a live codex client.`
-        : 'No stale delegate-server processes detected.';
+        ? buildDelegateServerInspectionDetail(idleDetails, staleDetails)
+        : idleDetails.length > 0
+          ? buildDelegateServerInspectionDetail(idleDetails, [])
+          : 'No stale delegate-server processes detected.';
 
   return {
     inspection: {
@@ -377,7 +477,8 @@ function inspectDelegateServerProcessBundle(options: {
       stalePids,
       staleRssKb,
       thresholdSeconds,
-      detail
+      detail,
+      details
     },
     staleRecords
   };
@@ -386,10 +487,12 @@ function inspectDelegateServerProcessBundle(options: {
 export async function cleanupStaleDelegateServerProcesses(options: {
   apply?: boolean;
   staleThresholdSeconds?: number;
+  repoRoot?: string;
 } = {}, dependencies: Partial<DelegateServerCleanupDependencies> = {}): Promise<DelegateServerCleanupResult> {
   const cleanupDependencies = { ...DEFAULT_DELEGATE_SERVER_CLEANUP_DEPENDENCIES, ...dependencies };
   const { inspection, staleRecords } = cleanupDependencies.inspect({
-    staleThresholdSeconds: options.staleThresholdSeconds
+    staleThresholdSeconds: options.staleThresholdSeconds,
+    repoRoot: options.repoRoot
   });
   if (!options.apply || inspection.status === 'unavailable' || inspection.stalePids.length === 0) {
     return {
@@ -541,6 +644,21 @@ export function formatDelegateServerCleanupSummary(result: DelegateServerCleanup
     lines.push(`- Remaining pids: ${result.remainingPids.join(', ')}`);
   }
   lines.push(`- Detail: ${result.detail}`);
+  const staleDetails = result.details.filter(
+    (detail) => detail.classification === 'stale-parent-session' || detail.classification === 'stale-orphan'
+  );
+  for (const detail of staleDetails.slice(0, 3)) {
+    lines.push(`- Stale detail: ${formatDelegateServerProcessSummary({
+      pid: detail.pid,
+      classification: detail.classification,
+      cwd: detail.cwd,
+      parentPid: detail.parentPid,
+      parentCwd: detail.parentCwd,
+      rootCodexParentPid: detail.rootCodexParentPid,
+      rootCodexParentCwd: detail.rootCodexParentCwd,
+      manifestPath: detail.manifestAssociation?.manifestPath ?? null
+    })}`);
+  }
   if (result.dryRun && result.status !== 'unavailable') {
     lines.push('Run with --yes to terminate stale delegate-server processes.');
   }
@@ -623,8 +741,12 @@ function isCodexOrchestratorWrapperPath(candidate: string): boolean {
   if (isDistCodexOrchestratorPath(candidate)) {
     return false;
   }
-  const token = basename(candidate);
+  const token = basenameFromCommandToken(candidate);
   return token === 'codex-orchestrator' || token === 'codex-orchestrator.js';
+}
+
+function basenameFromCommandToken(token: string): string {
+  return basename(token.replace(/\\/gu, '/'));
 }
 
 function parseInitializeResponse(stdout: string): { ok: true } | { ok: false; detail: string } {
@@ -711,47 +833,740 @@ function isDelegateServerCommand(command: string): boolean {
   if (args.some((arg) => arg === 'mcp') && args.some((arg) => arg === 'add')) {
     return false;
   }
-  if (delegateIndex === 0) {
-    return isCodexOrchestratorWrapperPath(args[0] ?? '') || isDistCodexOrchestratorPath(args[0] ?? '');
+  const precedingToken = delegateIndex > 0 ? args[delegateIndex - 1] ?? null : null;
+  if (precedingToken && (isDistCodexOrchestratorPath(precedingToken) || isCodexOrchestratorWrapperPath(precedingToken))) {
+    return delegateIndex === 1 || args.slice(0, delegateIndex - 1).some((arg) => isNodeLauncherToken(arg));
   }
-  return args.slice(0, delegateIndex).some((token) => {
-    return isCodexOrchestratorWrapperPath(token) || isDistCodexOrchestratorPath(token);
-  });
+  return delegateIndex === 1 && isCodexOrchestratorWrapperPath(args[0] ?? '');
 }
 
-function isDelegateServerRootedInCodex(
+function resolveDelegateServerRootCodexParent(
   record: DelegateServerProcessRecord,
   processMap: Map<number, DelegateServerProcessRecord>
-): boolean {
+): DelegateServerProcessRecord | null {
   let current: DelegateServerProcessRecord | undefined = record;
   const visited = new Set<number>();
   while (current && !visited.has(current.pid)) {
     visited.add(current.pid);
     if (isCodexClientCommand(current.command)) {
-      return true;
+      return current;
     }
     if (current.ppid <= 1) {
-      return false;
+      return null;
     }
     current = processMap.get(current.ppid);
   }
-  return false;
+  return null;
 }
 
 function isCodexClientCommand(command: string): boolean {
   const args = parseShellStyleArguments(command);
   const recognizedBasenames = buildRecognizedCodexClientBasenames();
-  return args.some((arg) => recognizedBasenames.has(basename(arg).toLowerCase()));
+  return args.some((arg) => recognizedBasenames.has(basenameFromCommandToken(arg).toLowerCase()));
 }
 
 function buildRecognizedCodexClientBasenames(env: NodeJS.ProcessEnv = process.env): Set<string> {
   const basenames = new Set(['codex', 'codex.exe', 'codex.cmd']);
   try {
-    basenames.add(basename(resolveCodexCliBin(env)).toLowerCase());
+    basenames.add(basenameFromCommandToken(resolveCodexCliBin(env)).toLowerCase());
   } catch {
     // Ignore local codex binary resolution failures and keep the default names.
   }
   return basenames;
+}
+
+function isNodeLauncherToken(token: string): boolean {
+  const normalized = basenameFromCommandToken(token).toLowerCase();
+  return normalized === 'node'
+    || normalized === 'node.exe'
+    || normalized === 'nodejs'
+    || normalized === 'nodejs.exe';
+}
+
+function createProcessCwdReader(
+  seed: Record<number, string | null> | undefined,
+  preloadPids: number[] = []
+): (pid: number) => string | null {
+  const cache = new Map<number, string | null>();
+  if (seed) {
+    for (const [key, value] of Object.entries(seed)) {
+      const pid = Number.parseInt(key, 10);
+      if (Number.isInteger(pid)) {
+        cache.set(pid, value);
+      }
+    }
+  }
+  const missingPids = preloadPids.filter((pid, index, values) => {
+    return Number.isInteger(pid) && pid > 0 && !cache.has(pid) && values.indexOf(pid) === index;
+  });
+  if (missingPids.length > 0) {
+    for (const [pid, cwd] of readProcessCwds(missingPids)) {
+      cache.set(pid, cwd);
+    }
+  }
+  return (pid: number): string | null => {
+    if (cache.has(pid)) {
+      return cache.get(pid) ?? null;
+    }
+    const cwd = readProcessCwd(pid);
+    cache.set(pid, cwd);
+    return cwd;
+  };
+}
+
+function resolveDelegateServerRelatedPids(
+  processes: DelegateServerProcessRecord[],
+  processMap: Map<number, DelegateServerProcessRecord>
+): number[] {
+  const related = new Set<number>();
+  for (const record of processes) {
+    let current: DelegateServerProcessRecord | null = record;
+    const seen = new Set<number>();
+    while (current && !seen.has(current.pid)) {
+      seen.add(current.pid);
+      related.add(current.pid);
+      current = processMap.get(current.ppid) ?? null;
+    }
+  }
+  return [...related];
+}
+
+function readProcessCwds(pids: number[]): Map<number, string | null> {
+  const results = new Map<number, string | null>();
+  for (const chunk of chunkProcessIds(pids, 128)) {
+    const result = spawnSync('lsof', ['-a', '-d', 'cwd', '-Fpfn', '-p', chunk.join(',')], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 1000
+    });
+    if (result.error || result.status !== 0) {
+      continue;
+    }
+    let currentPid: number | null = null;
+    for (const rawLine of String(result.stdout ?? '').split(/\r?\n/u)) {
+      const line = rawLine.trim();
+      if (!line) {
+        continue;
+      }
+      if (line.startsWith('p')) {
+        const parsedPid = Number.parseInt(line.slice(1), 10);
+        currentPid = Number.isInteger(parsedPid) ? parsedPid : null;
+        continue;
+      }
+      if (line.startsWith('n') && currentPid !== null) {
+        const cwd = line.slice(1).trim();
+        results.set(currentPid, cwd.length > 0 ? cwd : null);
+      }
+    }
+  }
+  return results;
+}
+
+function chunkProcessIds(pids: number[], chunkSize: number): number[][] {
+  const chunks: number[][] = [];
+  for (let index = 0; index < pids.length; index += chunkSize) {
+    chunks.push(pids.slice(index, index + chunkSize));
+  }
+  return chunks;
+}
+
+function resolveDelegateServerInspectionRepoRoot(repoRoot: string | undefined): string {
+  const configuredRoot = normalizeRepoRootHint(repoRoot);
+  if (configuredRoot) {
+    return collapseWorkspaceRepoRoot(resolveRepoRootFromHint(configuredRoot));
+  }
+  const envRoot = normalizeRepoRootHint(process.env.CODEX_ORCHESTRATOR_ROOT);
+  if (envRoot) {
+    return collapseWorkspaceRepoRoot(resolveRepoRootFromHint(envRoot));
+  }
+  const cwd = normalizeRepoRootHint(process.cwd());
+  if (cwd) {
+    return collapseWorkspaceRepoRoot(resolveRepoRootFromHint(cwd));
+  }
+  try {
+    return collapseWorkspaceRepoRoot(findPackageRoot(import.meta.url));
+  } catch {
+    return collapseWorkspaceRepoRoot(process.cwd());
+  }
+}
+
+function normalizeRepoRootHint(value: string | undefined): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function resolveRepoRootFromHint(rootHint: string): string {
+  const normalizedHint = resolve(rootHint);
+  const gitBoundary = findNearestGitBoundary(normalizedHint);
+  let current: string | null = normalizedHint;
+  while (current) {
+    if (existsSync(join(current, 'tasks', 'index.json'))) {
+      return current;
+    }
+    if (gitBoundary && current === gitBoundary) {
+      break;
+    }
+    const parent = dirname(current);
+    if (parent === current) {
+      break;
+    }
+    current = parent;
+  }
+  return gitBoundary ?? normalizedHint;
+}
+
+function findNearestGitBoundary(start: string): string | null {
+  let current: string | null = resolve(start);
+  while (current) {
+    if (existsSync(join(current, '.git'))) {
+      return current;
+    }
+    const parent = dirname(current);
+    if (parent === current) {
+      break;
+    }
+    current = parent;
+  }
+  return null;
+}
+
+function collapseWorkspaceRepoRoot(candidate: string): string {
+  const resolved = resolve(candidate);
+  const normalized = resolved.replace(/\\/gu, '/');
+  const marker = '/.workspaces/';
+  const markerIndex = normalized.indexOf(marker);
+  if (markerIndex === -1) {
+    return resolved;
+  }
+  return resolved.slice(0, markerIndex) || resolved;
+}
+
+function isPathWithinRoot(root: string, candidate: string): boolean {
+  const relativePath = relative(root, candidate);
+  return relativePath === ''
+    || (!relativePath.startsWith('..') && !relativePath.startsWith(`..${sep}`) && !isAbsolute(relativePath));
+}
+
+function readProcessCwd(pid: number): string | null {
+  const result = spawnSync('lsof', ['-a', '-d', 'cwd', '-Fn', '-p', String(pid)], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: 3000
+  });
+  if (result.error || result.status !== 0) {
+    return null;
+  }
+  const line = String(result.stdout ?? '')
+    .split(/\r?\n/u)
+    .map((value) => value.trim())
+    .find((value) => value.startsWith('n'));
+  if (!line) {
+    return null;
+  }
+  const cwd = line.slice(1).trim();
+  return cwd.length > 0 ? cwd : null;
+}
+
+function loadDelegateServerManifestCatalog(repoRoot: string): DelegateServerManifestAssociation[] {
+  const catalog: DelegateServerManifestAssociation[] = [];
+  for (const runsRoot of resolveDelegateServerManifestCatalogRunsRoots(repoRoot, repoRoot)) {
+    collectManifestCatalogFromRunsRoot(runsRoot, catalog);
+  }
+  const workspacesRoot = join(repoRoot, '.workspaces');
+  if (existsSync(workspacesRoot)) {
+    for (const entry of readDirectoryEntriesSafe(workspacesRoot)) {
+      if (!entry.isDirectory()) {
+        continue;
+      }
+      const workspaceRoot = join(workspacesRoot, entry.name);
+      for (const runsRoot of resolveDelegateServerManifestCatalogRunsRoots(repoRoot, workspaceRoot)) {
+        collectManifestCatalogFromRunsRoot(runsRoot, catalog);
+      }
+      const childLanesRoot = join(workspaceRoot, '.child-lanes');
+      if (!existsSync(childLanesRoot)) {
+        continue;
+      }
+      for (const childLaneEntry of readDirectoryEntriesSafe(childLanesRoot)) {
+        if (!childLaneEntry.isDirectory()) {
+          continue;
+        }
+        const childLaneRoot = join(childLanesRoot, childLaneEntry.name);
+        for (const runsRoot of resolveDelegateServerManifestCatalogRunsRoots(repoRoot, childLaneRoot)) {
+          collectManifestCatalogFromRunsRoot(runsRoot, catalog);
+        }
+      }
+    }
+  }
+  return catalog;
+}
+
+function resolveDelegateServerManifestCatalogRunsRoots(sharedRoot: string, ownerRoot: string): string[] {
+  const runsRoots = new Set<string>([join(ownerRoot, '.runs')]);
+  const configured = normalizeRepoRootHint(process.env.CODEX_ORCHESTRATOR_RUNS_DIR);
+  if (!configured) {
+    return [...runsRoots];
+  }
+  const configuredRunsRoot = isAbsolute(configured) ? resolve(configured) : resolve(sharedRoot, configured);
+  if (ownerRoot === sharedRoot) {
+    runsRoots.add(configuredRunsRoot);
+    return [...runsRoots];
+  }
+  if (isPathWithinRoot(sharedRoot, configuredRunsRoot)) {
+    runsRoots.add(resolve(ownerRoot, relative(sharedRoot, configuredRunsRoot)));
+  }
+  return [...runsRoots];
+}
+
+function collectManifestCatalogFromRunsRoot(root: string, catalog: DelegateServerManifestAssociation[]): void {
+  if (!existsSync(root)) {
+    return;
+  }
+  for (const taskEntry of readDirectoryEntriesSafe(root)) {
+    if (!taskEntry.isDirectory()) {
+      continue;
+    }
+    const taskRoot = join(root, taskEntry.name);
+    const cliRoot = join(taskRoot, 'cli');
+    if (existsSync(cliRoot)) {
+      for (const runEntry of readDirectoryEntriesSafe(cliRoot)) {
+        if (!runEntry.isDirectory()) {
+          continue;
+        }
+        const manifestPath = join(cliRoot, runEntry.name, 'manifest.json');
+        const association = readManifestAssociation(manifestPath);
+        if (association) {
+          catalog.push(association);
+        }
+      }
+      continue;
+    }
+    for (const runEntry of readDirectoryEntriesSafe(taskRoot)) {
+      if (!runEntry.isDirectory()) {
+        continue;
+      }
+      const manifestPath = join(taskRoot, runEntry.name, 'manifest.json');
+      const association = readManifestAssociation(manifestPath);
+      if (association) {
+        catalog.push(association);
+      }
+    }
+  }
+}
+
+function readDirectoryEntriesSafe(root: string) {
+  try {
+    return readdirSync(root, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+}
+
+function readManifestAssociation(manifestPath: string): DelegateServerManifestAssociation | null {
+  if (!existsSync(manifestPath)) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(readFileSync(manifestPath, 'utf8')) as Record<string, unknown>;
+    return {
+      manifestPath,
+      workspacePath: normalizeOptionalString(parsed.workspace_path),
+      status: normalizeOptionalString(parsed.status),
+      pipelineId: normalizeOptionalString(parsed.pipeline_id),
+      taskId: normalizeOptionalString(parsed.task_id),
+      runId: normalizeOptionalString(parsed.run_id),
+      issueId: normalizeOptionalString(parsed.issue_id),
+      issueIdentifier: normalizeOptionalString(parsed.issue_identifier),
+      proofPid: readManifestProofPid(manifestPath)
+    };
+  } catch {
+    return null;
+  }
+}
+
+function readManifestProofPid(manifestPath: string): number | null {
+  const runRoot = dirname(manifestPath);
+  const proofPath = join(runRoot, 'provider-linear-worker-proof.json');
+  if (!existsSync(proofPath)) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(readFileSync(proofPath, 'utf8')) as Record<string, unknown>;
+    return parsePositiveInteger(parsed.pid);
+  } catch {
+    return null;
+  }
+}
+
+function parsePositiveInteger(value: unknown): number | null {
+  if (typeof value === 'number') {
+    return Number.isInteger(value) && value > 0 ? value : null;
+  }
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!/^\d+$/u.test(trimmed)) {
+    return null;
+  }
+  const parsed = Number.parseInt(trimmed, 10);
+  return parsed > 0 ? parsed : null;
+}
+
+function buildManifestCatalogByWorkspace(
+  catalog: DelegateServerManifestAssociation[]
+): Map<string, DelegateServerManifestAssociation[]> {
+  const byWorkspace = new Map<string, DelegateServerManifestAssociation[]>();
+  for (const association of catalog) {
+    if (!association.workspacePath) {
+      continue;
+    }
+    const existing = byWorkspace.get(association.workspacePath) ?? [];
+    existing.push(association);
+    byWorkspace.set(association.workspacePath, existing);
+  }
+  return byWorkspace;
+}
+
+function resolveManifestCandidatesForWorkspace(
+  workspacePath: string,
+  manifestCatalogByWorkspace: Map<string, DelegateServerManifestAssociation[]>
+): DelegateServerManifestAssociation[] {
+  const exactCandidates = manifestCatalogByWorkspace.get(workspacePath);
+  if (exactCandidates && exactCandidates.length > 0) {
+    return exactCandidates;
+  }
+  const fallbackWorkspaceRoot = [...manifestCatalogByWorkspace.keys()]
+    .filter((candidateWorkspacePath) => isPathWithinWorkspaceRoot(candidateWorkspacePath, workspacePath))
+    .sort((left, right) => right.length - left.length)[0];
+  if (!fallbackWorkspaceRoot) {
+    return [];
+  }
+  return manifestCatalogByWorkspace.get(fallbackWorkspaceRoot) ?? [];
+}
+
+function resolveScopedManifestCandidatesForWorkspace(
+  workspacePath: string,
+  manifestCatalogByWorkspace: Map<string, DelegateServerManifestAssociation[]>
+): DelegateServerManifestAssociation[] {
+  const exactCandidates = manifestCatalogByWorkspace.get(workspacePath);
+  if (exactCandidates && exactCandidates.length > 0) {
+    return exactCandidates;
+  }
+  const fallbackWorkspaceRoot = [...manifestCatalogByWorkspace.keys()]
+    .filter((candidateWorkspacePath) =>
+      candidateWorkspacePath !== workspacePath
+      && isScopedWorkspacePath(candidateWorkspacePath)
+      && isPathWithinWorkspaceRoot(candidateWorkspacePath, workspacePath)
+    )
+    .sort((left, right) => right.length - left.length)[0];
+  if (!fallbackWorkspaceRoot) {
+    return [];
+  }
+  return manifestCatalogByWorkspace.get(fallbackWorkspaceRoot) ?? [];
+}
+
+function buildDelegateServerProcessDraft(
+  record: DelegateServerProcessRecord,
+  processMap: Map<number, DelegateServerProcessRecord>,
+  readProcessCwdValue: (pid: number) => string | null,
+  manifestCatalogByWorkspace: Map<string, DelegateServerManifestAssociation[]>
+): DelegateServerProcessDraft {
+  const parentRecord = processMap.get(record.ppid) ?? null;
+  const rootCodexParent = resolveDelegateServerRootCodexParent(record, processMap);
+  const cwd = readProcessCwdValue(record.pid);
+  const parentCwd = parentRecord ? readProcessCwdValue(parentRecord.pid) : null;
+  const rootCodexParentCwd = rootCodexParent ? readProcessCwdValue(rootCodexParent.pid) : null;
+  const ancestryPids = resolveProcessAncestryPids(record, processMap);
+  const candidateWorkspaces = [cwd, parentCwd, rootCodexParentCwd];
+  const cwdLookupAvailable = candidateWorkspaces.some((workspacePath) => workspacePath !== null);
+  return {
+    record,
+    cwd,
+    parentRecord,
+    parentCwd,
+    rootCodexParent,
+    rootCodexParentCwd,
+    cwdLookupAvailable,
+    ancestryPids,
+    manifestAssociation: cwdLookupAvailable
+      ? resolveManifestAssociationForProcess(
+          candidateWorkspaces,
+          ancestryPids,
+          manifestCatalogByWorkspace
+        )
+      : resolveManifestAssociationByAncestry(ancestryPids, manifestCatalogByWorkspace)
+  };
+}
+
+function resolveProcessAncestryPids(
+  record: DelegateServerProcessRecord,
+  processMap: Map<number, DelegateServerProcessRecord>
+): number[] {
+  const ancestry: number[] = [];
+  const seen = new Set<number>();
+  let current: DelegateServerProcessRecord | null = record;
+  while (current && !seen.has(current.pid)) {
+    ancestry.push(current.pid);
+    seen.add(current.pid);
+    current = processMap.get(current.ppid) ?? null;
+  }
+  return ancestry;
+}
+
+function resolveManifestAssociationForProcess(
+  candidateWorkspaces: Array<string | null>,
+  ancestryPids: number[],
+  manifestCatalogByWorkspace: Map<string, DelegateServerManifestAssociation[]>
+): DelegateServerManifestAssociation | null {
+  const ancestryPidSet = new Set(ancestryPids);
+  for (const workspacePath of candidateWorkspaces) {
+    if (!workspacePath) {
+      continue;
+    }
+    const scopedCandidates = isScopedWorkspacePath(workspacePath)
+      ? resolveScopedManifestCandidatesForWorkspace(workspacePath, manifestCatalogByWorkspace)
+      : [];
+    const candidates = scopedCandidates.length > 0
+      ? scopedCandidates
+      : resolveManifestCandidatesForWorkspace(workspacePath, manifestCatalogByWorkspace);
+    if (!candidates || candidates.length === 0) {
+      continue;
+    }
+    const exactAncestryMatch = candidates
+      .filter((candidate) => candidate.proofPid !== null && ancestryPidSet.has(candidate.proofPid))
+      .sort(compareManifestAssociations)[0];
+    if (exactAncestryMatch) {
+      return exactAncestryMatch;
+    }
+    if (isScopedWorkspacePath(workspacePath) && scopedCandidates.length > 0) {
+      const scopedFallback = resolveScopedWorkspaceFallbackAssociation(scopedCandidates);
+      if (scopedFallback) {
+        return scopedFallback;
+      }
+    }
+  }
+  return null;
+}
+
+function resolveManifestAssociationByAncestry(
+  ancestryPids: number[],
+  manifestCatalogByWorkspace: Map<string, DelegateServerManifestAssociation[]>
+): DelegateServerManifestAssociation | null {
+  const ancestryPidSet = new Set(ancestryPids);
+  const matches = [...manifestCatalogByWorkspace.values()]
+    .flat()
+    .filter((candidate) => candidate.proofPid !== null && ancestryPidSet.has(candidate.proofPid))
+    .sort(compareManifestAssociations);
+  if (matches.length === 0) {
+    return null;
+  }
+  const workspaceKeys = new Set(
+    matches.map((candidate) => candidate.workspacePath ?? `manifest:${candidate.manifestPath}`)
+  );
+  if (workspaceKeys.size > 1) {
+    return null;
+  }
+  return matches[0] ?? null;
+}
+
+function isScopedWorkspacePath(workspacePath: string): boolean {
+  const normalized = workspacePath.replace(/\\/gu, '/');
+  return normalized.includes('/.workspaces/') || normalized.includes('/.child-lanes/');
+}
+
+function isPathWithinWorkspaceRoot(root: string, candidate: string): boolean {
+  const normalizedRoot = normalizePathForComparison(root);
+  const normalizedCandidate = normalizePathForComparison(candidate);
+  return normalizedCandidate === normalizedRoot || normalizedCandidate.startsWith(`${normalizedRoot}/`);
+}
+
+function normalizePathForComparison(value: string): string {
+  return value.replace(/\\/gu, '/').replace(/\/+$/u, '');
+}
+
+function resolveScopedWorkspaceFallbackAssociation(
+  candidates: DelegateServerManifestAssociation[]
+): DelegateServerManifestAssociation | null {
+  if (candidates.length === 0) {
+    return null;
+  }
+  const liveCandidates = candidates.filter((candidate) => !isTerminalManifestStatus(candidate.status));
+  const terminalCandidates = candidates.filter((candidate) => isTerminalManifestStatus(candidate.status));
+  if (liveCandidates.length === 0) {
+    return [...terminalCandidates].sort(compareManifestAssociations)[0] ?? null;
+  }
+  if (terminalCandidates.length === 0) {
+    return [...liveCandidates].sort(compareManifestAssociations)[0] ?? null;
+  }
+  if (liveCandidates.every((candidate) => candidate.proofPid !== null)) {
+    return [...terminalCandidates].sort(compareManifestAssociations)[0] ?? null;
+  }
+  return null;
+}
+
+function compareManifestAssociations(
+  left: DelegateServerManifestAssociation,
+  right: DelegateServerManifestAssociation
+): number {
+  const leftTerminal = isTerminalManifestStatus(left.status);
+  const rightTerminal = isTerminalManifestStatus(right.status);
+  if (leftTerminal !== rightTerminal) {
+    return leftTerminal ? 1 : -1;
+  }
+  return (right.runId ?? '').localeCompare(left.runId ?? '');
+}
+
+function isTerminalManifestStatus(status: string | null): boolean {
+  return status === 'succeeded'
+    || status === 'failed'
+    || status === 'cancelled'
+    || status === 'canceled'
+    || status === 'done';
+}
+
+function resolveFreshestUnassociatedPidByRootParent(
+  drafts: DelegateServerProcessDraft[]
+): Map<number, number> {
+  const freshest = new Map<number, number>();
+  for (const draft of drafts) {
+    if (!draft.rootCodexParent || draft.manifestAssociation) {
+      continue;
+    }
+    const rootPid = draft.rootCodexParent.pid;
+    const currentPid = freshest.get(rootPid);
+    if (currentPid === undefined) {
+      freshest.set(rootPid, draft.record.pid);
+      continue;
+    }
+    const currentDraft = drafts.find((candidate) => candidate.record.pid === currentPid) ?? null;
+    if (!currentDraft) {
+      freshest.set(rootPid, draft.record.pid);
+      continue;
+    }
+    const currentAge = currentDraft.record.elapsedSeconds ?? Number.MAX_SAFE_INTEGER;
+    const nextAge = draft.record.elapsedSeconds ?? Number.MAX_SAFE_INTEGER;
+    if (nextAge < currentAge || (nextAge === currentAge && draft.record.pid > currentDraft.record.pid)) {
+      freshest.set(rootPid, draft.record.pid);
+    }
+  }
+  return freshest;
+}
+
+function finalizeDelegateServerProcessDetail(
+  draft: DelegateServerProcessDraft,
+  freshestUnassociatedPidByRootParent: Map<number, number>,
+  thresholdSeconds: number
+): DelegateServerProcessDetail {
+  const association = draft.manifestAssociation;
+  let classification: DelegateServerProcessClassification = 'active-unassociated';
+  let classificationDetail = 'delegate-server is still rooted in a live codex session.';
+
+  if (!draft.rootCodexParent) {
+    if (draft.record.elapsedSeconds !== null && draft.record.elapsedSeconds >= thresholdSeconds) {
+      classification = 'stale-orphan';
+      classificationDetail = 'delegate-server is no longer rooted in a live codex parent and exceeded the stale threshold.';
+    } else {
+      classification = 'idle-orphan';
+      classificationDetail = 'delegate-server is not rooted in a live codex parent and is still within the stale threshold.';
+    }
+  } else if (association && !isTerminalManifestStatus(association.status)) {
+    classification = 'active-associated';
+    classificationDetail = `delegate-server is rooted in codex parent ${draft.rootCodexParent.pid} and matches live manifest ${association.manifestPath}.`;
+  } else if (association && isTerminalManifestStatus(association.status)) {
+    if (draft.record.elapsedSeconds !== null && draft.record.elapsedSeconds >= thresholdSeconds) {
+      classification = 'stale-parent-session';
+      classificationDetail = `delegate-server is still parented by codex pid ${draft.rootCodexParent.pid}, but the matched manifest ${association.manifestPath} is terminal (${association.status ?? 'unknown'}).`;
+    } else {
+      classification = 'idle-parent-session';
+      classificationDetail = `delegate-server matches terminal manifest ${association.manifestPath} but is still below the stale threshold.`;
+    }
+  } else if (!draft.cwdLookupAvailable) {
+    classificationDetail =
+      `delegate-server is rooted in live codex parent ${draft.rootCodexParent.pid}, but cwd lookup was unavailable so manifest association could not be determined.`;
+  } else {
+    const freshestPid = freshestUnassociatedPidByRootParent.get(draft.rootCodexParent.pid) ?? null;
+    if (freshestPid !== null && freshestPid !== draft.record.pid) {
+      if (draft.record.elapsedSeconds !== null && draft.record.elapsedSeconds >= thresholdSeconds) {
+        classification = 'stale-parent-session';
+        classificationDetail =
+          `delegate-server is an older sibling under live codex parent ${draft.rootCodexParent.pid}; pid ${freshestPid} is the freshest unassociated sibling kept active.`;
+      } else {
+        classification = 'idle-parent-session';
+        classificationDetail =
+          `delegate-server is an older sibling under live codex parent ${draft.rootCodexParent.pid} and remains below the stale threshold while pid ${freshestPid} stays active.`;
+      }
+    } else if (draft.record.elapsedSeconds !== null && draft.record.elapsedSeconds >= thresholdSeconds) {
+      classification = 'idle-parent-session';
+      classificationDetail =
+        `delegate-server is the freshest unassociated sibling under live codex parent ${draft.rootCodexParent.pid}; it exceeded the stale threshold without a live manifest association, but no fresher sibling displaced it.`;
+    } else {
+      classificationDetail =
+        `delegate-server is the freshest unassociated sibling under live codex parent ${draft.rootCodexParent.pid} and remains below the stale threshold.`;
+    }
+  }
+
+  return {
+    pid: draft.record.pid,
+    ppid: draft.record.ppid,
+    elapsedSeconds: draft.record.elapsedSeconds,
+    rssKb: draft.record.rssKb,
+    command: draft.record.command,
+    cwd: draft.cwd,
+    parentPid: draft.parentRecord?.pid ?? null,
+    parentCommand: draft.parentRecord?.command ?? null,
+    parentCwd: draft.parentCwd,
+    rootCodexParentPid: draft.rootCodexParent?.pid ?? null,
+    rootCodexParentCommand: draft.rootCodexParent?.command ?? null,
+    rootCodexParentCwd: draft.rootCodexParentCwd,
+    manifestAssociation: draft.manifestAssociation,
+    classification,
+    classificationDetail
+  };
+}
+
+function buildDelegateServerInspectionDetail(
+  idleDetails: DelegateServerProcessDetail[],
+  staleDetails: DelegateServerProcessDetail[]
+): string {
+  const idleParentSessionCount = idleDetails.filter(
+    (detail) => detail.classification === 'idle-parent-session'
+  ).length;
+  const idleOrphanCount = idleDetails.length - idleParentSessionCount;
+  const staleParentSessionCount = staleDetails.filter(
+    (detail) => detail.classification === 'stale-parent-session'
+  ).length;
+  const staleOrphanCount = staleDetails.length - staleParentSessionCount;
+  const parts: string[] = [];
+  if (idleDetails.length > 0) {
+    parts.push(`Detected ${idleDetails.length} idle delegate-server processes`);
+  }
+  if (idleParentSessionCount > 0) {
+    parts.push(`${idleParentSessionCount} idle parent-session`);
+  }
+  if (idleOrphanCount > 0) {
+    parts.push(`${idleOrphanCount} idle orphan`);
+  }
+  if (staleDetails.length > 0) {
+    parts.push(`Detected ${staleDetails.length} stale delegate-server processes`);
+  }
+  if (staleParentSessionCount > 0) {
+    parts.push(`${staleParentSessionCount} stale parent-session`);
+  }
+  if (staleOrphanCount > 0) {
+    parts.push(`${staleOrphanCount} orphaned`);
+  }
+  return `${parts.join(' / ')}.`;
+}
+
+function normalizeOptionalString(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 function parseShellStyleArguments(command: string): string[] {

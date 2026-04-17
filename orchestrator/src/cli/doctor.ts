@@ -28,10 +28,12 @@ import {
 } from './utils/cloudPreflight.js';
 import {
   classifyDelegationTransport,
+  formatDelegateServerProcessSummary,
   inspectDelegateServerProcesses,
   inspectDelegationMcpConfig,
   probeDelegationInitialize,
   resolveDelegationServerInvocation,
+  type DelegateServerProcessClassification,
   type DelegationTransportKind
 } from './utils/delegationMcpHealth.js';
 import { sanitizeProviderOverrideEnv } from './utils/providerOverrideEnv.js';
@@ -189,10 +191,30 @@ export interface DoctorResult {
       status: 'ok' | 'stale' | 'unavailable';
       active_count: number;
       stale_count: number;
+      active_pids: number[];
       stale_pids: number[];
       stale_rss_mb: number;
       threshold_minutes: number;
       detail: string;
+      details: Array<{
+        pid: number;
+        ppid: number;
+        elapsed_seconds: number | null;
+        rss_mb: number;
+        cwd: string | null;
+        parent_pid: number | null;
+        parent_cwd: string | null;
+        root_codex_parent_pid: number | null;
+        root_codex_parent_cwd: string | null;
+        classification: DelegateServerProcessClassification;
+        classification_detail: string;
+        manifest_path: string | null;
+        issue_identifier: string | null;
+        pipeline_id: string | null;
+        task_id: string | null;
+        run_id: string | null;
+        status: string | null;
+      }>;
     };
     enablement: string[];
   };
@@ -372,11 +394,12 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
   const cloudStatus: DoctorResult['cloud']['status'] =
     !cloudCmdAvailable ? 'unavailable' : cloudEnvIdConfigured ? 'ok' : 'not_configured';
   const cloudFallbackPolicy: DoctorResult['cloud']['fallback_policy'] = resolveCloudFallbackPolicy();
+  const repoRoot = resolveDoctorRepoRoot(cwd);
 
   const delegationSnapshot = inspectDelegationMcpConfig(process.env);
   const delegationTransport = classifyDelegationTransport(delegationSnapshot.entry);
   const delegationStartup = probeDelegationInitialize(delegationSnapshot.entry, { env: process.env });
-  const delegationProcesses = inspectDelegateServerProcesses();
+  const delegationProcesses = inspectDelegateServerProcesses({ repoRoot });
   const delegationStatus: DoctorResult['delegation']['status'] =
     delegationSnapshot.status !== 'ok'
       ? 'missing-config'
@@ -389,7 +412,6 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
           ? 'unavailable'
           : 'ok';
   const delegationBlocksOverallStatus = delegationStatus === 'missing-config';
-  const repoRoot = resolveDoctorRepoRoot(cwd);
   const providers = inspectProviderReadiness(repoRoot, process.env);
 
   return {
@@ -455,11 +477,31 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
       processes: {
         status: delegationProcesses.status,
         active_count: delegationProcesses.activeCount,
+        active_pids: delegationProcesses.activePids,
         stale_count: delegationProcesses.staleCount,
         stale_pids: delegationProcesses.stalePids,
         stale_rss_mb: Number((delegationProcesses.staleRssKb / 1024).toFixed(1)),
         threshold_minutes: delegationProcesses.thresholdSeconds / 60,
-        detail: delegationProcesses.detail
+        detail: delegationProcesses.detail,
+        details: delegationProcesses.details.map((detail) => ({
+          pid: detail.pid,
+          ppid: detail.ppid,
+          elapsed_seconds: detail.elapsedSeconds,
+          rss_mb: Number((detail.rssKb / 1024).toFixed(1)),
+          cwd: detail.cwd,
+          parent_pid: detail.parentPid,
+          parent_cwd: detail.parentCwd,
+          root_codex_parent_pid: detail.rootCodexParentPid,
+          root_codex_parent_cwd: detail.rootCodexParentCwd,
+          classification: detail.classification,
+          classification_detail: detail.classificationDetail,
+          manifest_path: detail.manifestAssociation?.manifestPath ?? null,
+          issue_identifier: detail.manifestAssociation?.issueIdentifier ?? null,
+          pipeline_id: detail.manifestAssociation?.pipelineId ?? null,
+          task_id: detail.manifestAssociation?.taskId ?? null,
+          run_id: detail.manifestAssociation?.runId ?? null,
+          status: detail.manifestAssociation?.status ?? null
+        }))
       },
       enablement: buildDelegationEnablementGuidance({
         configStatus: delegationSnapshot.status,
@@ -830,6 +872,20 @@ export function formatDoctorSummary(result: DoctorResult): string[] {
   lines.push(`    detail: ${result.delegation.processes.detail}`);
   if (result.delegation.processes.stale_pids.length > 0) {
     lines.push(`    stale pids: ${result.delegation.processes.stale_pids.join(', ')}`);
+    for (const detail of result.delegation.processes.details
+      .filter((entry) => entry.classification === 'stale-parent-session' || entry.classification === 'stale-orphan')
+      .slice(0, 3)) {
+      lines.push(`    stale detail: ${formatDelegateServerProcessSummary({
+        pid: detail.pid,
+        classification: detail.classification,
+        cwd: detail.cwd,
+        parentPid: detail.parent_pid,
+        parentCwd: detail.parent_cwd,
+        rootCodexParentPid: detail.root_codex_parent_pid,
+        rootCodexParentCwd: detail.root_codex_parent_cwd,
+        manifestPath: detail.manifest_path
+      })}`);
+    }
   }
   for (const line of result.delegation.enablement) {
     lines.push(`  - ${line}`);

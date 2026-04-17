@@ -63,6 +63,7 @@ const DEFAULT_GH_TIMEOUT_MS = 60_000;
 const DEFAULT_DELEGATION_TOKEN_RETRY_MS = 2000;
 const DEFAULT_DELEGATION_TOKEN_RETRY_INTERVAL_MS = 200;
 const DEFAULT_CONTROL_ENDPOINT_TIMEOUT_MS = 15_000;
+const DEFAULT_DELEGATION_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 const DELEGATION_TOKEN_HEADER = 'x-codex-delegation-token';
 const DELEGATION_RUN_HEADER = 'x-codex-delegation-run-id';
 const DELEGATION_TOKEN_FILE = 'delegation_token.json';
@@ -141,7 +142,9 @@ export async function startDelegationServer(options: DelegationServerOptions): P
       })
   });
 
-  await runJsonRpcServer(handler);
+  await runJsonRpcServer(handler, {
+    idleTimeoutMs: resolveDelegationIdleTimeoutMs(process.env)
+  });
 }
 
 async function handleToolCall(
@@ -1307,6 +1310,18 @@ function safeJsonParse(text: string): unknown | null {
 
 function parseSpawnOutput(stdout: string): Record<string, unknown> {
   return parseTrailingJsonObject(stdout, { allowTrailingTextAfterJson: true }) ?? {};
+}
+
+function resolveDelegationIdleTimeoutMs(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env.CODEX_DELEGATION_IDLE_TIMEOUT_MS;
+  if (typeof raw !== 'string' || raw.trim().length === 0) {
+    return DEFAULT_DELEGATION_IDLE_TIMEOUT_MS;
+  }
+  const parsed = Number.parseInt(raw.trim(), 10);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return DEFAULT_DELEGATION_IDLE_TIMEOUT_MS;
+  }
+  return parsed;
 }
 
 export const __test__ = {
