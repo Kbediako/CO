@@ -52,7 +52,36 @@
         "Codex"
       ],
       "last_review": "2026-04-17",
-      "approvals": {},
+      "approvals": {
+        "docs_review_fallback": {
+          "reviewer": "parent provider worker docs packet fallback",
+          "date": "2026-04-17",
+          "status": "accepted",
+          "artifact": "out/linear-5561a9a9-39dd-4ed4-99a0-896553327669/manual/docs-review-fallback.md",
+          "summary": "The required docs-packet child lane failed closed on provider_worker_child_lane_provenance_invalid, so the parent completed the docs-first packet directly and recorded the fallback evidence."
+        },
+        "pack_smoke": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-17",
+          "status": "passed",
+          "artifact": "out/linear-5561a9a9-39dd-4ed4-99a0-896553327669/manual/pack-smoke-proof.md",
+          "summary": "The temp-home pack smoke passed for both the local-root and git-backed marketplace registration paths."
+        },
+        "standalone_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-17",
+          "status": "manual-fallback",
+          "artifact": "out/linear-5561a9a9-39dd-4ed4-99a0-896553327669/manual/standalone-review-fallback.md",
+          "summary": "The manifest-backed rerun stalled without a concrete diff-local finding, so the provider-lane manual fallback review became the authoritative closeout artifact."
+        },
+        "elegance_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-17",
+          "status": "passed",
+          "artifact": "out/linear-5561a9a9-39dd-4ed4-99a0-896553327669/manual/elegance-review.md",
+          "summary": "The explicit minimality pass kept only the suite-level Doctor timeout, the single run-review harness timeout increase, and the small TASKS archive-line restoration."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-5561a9a9-39dd-4ed4-99a0-896553327669.md",
         "task": "tasks/tasks-linear-5561a9a9-39dd-4ed4-99a0-896553327669.md",
