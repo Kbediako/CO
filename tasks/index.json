@@ -18,6 +18,72 @@
       }
     },
     {
+      "id": "20260417-linear-31794e73-bc33-44b7-96d0-41334119a038",
+      "title": "Control host: reclaim Ready issues suppressed by plain released/not_active claims that retain completed blockers",
+      "relates_to": "tasks/tasks-linear-31794e73-bc33-44b7-96d0-41334119a038.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-17",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-17",
+          "status": "produced",
+          "manifest": ".runs/linear-31794e73-bc33-44b7-96d0-41334119a038-co212-docs-packet/cli/2026-04-17T04-02-55-450Z-76be388e/manifest.json",
+          "source_anchor": "ctx:sha256:0273f7bcf74c254d8b96f059f16eff76e5f6c36b6d2de134eee0e6abe85db191#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-212 as reclaim of plain released/not_active claims that retain only completed blockers after live Ready/unstarted truth updates, not a broad blocker-policy or status-only redesign; parent owns implementation in providerIssueHandoff.ts/providerLinearWorkflowStates.ts, validation, Linear state, workpad, PR, and merge."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-17",
+          "status": "bounded_success",
+          "telemetry": ".runs/linear-31794e73-bc33-44b7-96d0-41334119a038/cli/2026-04-17T03-59-51-782Z-dfbe3323/review/telemetry.json",
+          "summary": "Manifest-backed review completed with review_outcome=bounded-success after command-intent retry; the diff-local retry found no actionable correctness issues."
+        },
+        "elegance_review": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-04-17",
+          "status": "passed",
+          "artifact": "out/linear-31794e73-bc33-44b7-96d0-41334119a038/manual/elegance-review.md",
+          "summary": "No extra abstraction was needed; the completed-blocker reclaim fix stays localized to providerIssueHandoff.ts and existing blocker-terminality helpers while preserving synthetic-detached exclusion."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-31794e73-bc33-44b7-96d0-41334119a038.md",
+        "task": "tasks/tasks-linear-31794e73-bc33-44b7-96d0-41334119a038.md",
+        "agent_task": ".agent/task/linear-31794e73-bc33-44b7-96d0-41334119a038.md",
+        "docs": "docs/TECH_SPEC-linear-31794e73-bc33-44b7-96d0-41334119a038.md"
+      }
+    },
+    {
+      "id": "20260417-linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c",
+      "title": "Control host: prevent repeated refresh-stuck restart churn while active provider workers remain healthy",
+      "relates_to": "tasks/tasks-linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-17",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-17",
+          "status": "produced",
+          "manifest": ".runs/linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c-docs-packet/cli/2026-04-17T02-07-55-950Z-cb83673c/manifest.json",
+          "source_anchor": "ctx:sha256:d4239a4784c1cf71c95ab480b4a3821dc2c83dc3648d3b8d4a8c5387ccdfb3f8#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-211 as repeated refresh-stuck restart churn with healthy active workers, machine-checkable restart-series evidence, `stalled_after_ms=45000` diagnostics, worker-preserving recovery, and post-recovery `co-status --format json` truth while keeping CO-210 child-lane manifest hydration semantics out of scope. Parent owns implementation, docs-review, validation, Linear state, workpad, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c.md",
+        "task": "tasks/tasks-linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c.md",
+        "agent_task": ".agent/task/linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c.md",
+        "docs": "docs/TECH_SPEC-linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c.md"
+      }
+    },
+    {
       "id": "20260417-linear-901cd944-fc0c-4372-92ce-65bb8bb411c0",
       "title": "CO workflow: refresh Apr 17 docs:freshness stale cohort blocking handoffs",
       "relates_to": "tasks/tasks-linear-901cd944-fc0c-4372-92ce-65bb8bb411c0.md",

@@ -233,6 +233,383 @@ describe('controlHostSupervision helpers', () => {
     });
   });
 
+  it('quarantines repeated active-worker provider refresh restart churn after one recovery', () => {
+    expect(
+      evaluateControlHostSupervisionHealthPayload(
+        {
+          counts: {
+            running: 1,
+            retrying: 0
+          },
+          running: [
+            {
+              issue_id: 'issue-1',
+              issue_identifier: 'CO-207',
+              state: 'in_progress',
+              display_state: 'In Progress',
+              pid: '555',
+              started_at: '2026-04-14T05:00:00.000Z'
+            }
+          ],
+          polling: {
+            restart_required: true,
+            reason: 'provider_refresh_lifecycle_stuck',
+            updated_at: '2026-04-14T05:07:38.000Z',
+            refresh_phase: 'refresh:fresh_dispatch',
+            refresh_request_class: 'fresh_dispatch:ready',
+            refresh_provider_keys: ['linear:issue-2'],
+            checking: true,
+            queued: true,
+            operation_elapsed_ms: 47_000,
+            stalled_after_ms: 45_000
+          }
+        },
+        {
+          restartHistory: [
+            {
+              requested_at: '2026-04-14T05:06:30.000Z',
+              reason: 'restart_required',
+              message: 'launchd restart requested',
+              consecutive_unhealthy_samples: 3,
+              child_pid: 4321,
+              diagnostic: {
+                counts: {
+                  running: 1,
+                  retrying: 0
+                },
+                polling: {
+                  updated_at: '2026-04-14T05:06:20.000Z',
+                  checking: true,
+                  queued: true,
+                  stuck: true,
+                  restart_required: true,
+                  reason: 'provider_refresh_lifecycle_stuck',
+                  last_error: 'provider_refresh_lifecycle_stuck',
+                  refresh_phase: 'refresh:claim_issue_by_id_reconcile',
+                  refresh_request_class: 'claim_issue_by_id:running',
+                  refresh_provider_keys: ['linear:issue-1'],
+                  operation_elapsed_ms: 46_000,
+                  stalled_after_ms: 45_000,
+                  control_host_owner: null
+                },
+                running_workers: [
+                  {
+                    issue_id: 'issue-1',
+                    issue_identifier: 'CO-207',
+                    state: 'in_progress',
+                    display_state: 'In Progress',
+                    pid: '555',
+                    worker_host: null,
+                    session_id: null,
+                    started_at: '2026-04-14T05:00:00.000Z',
+                    last_event_at: null
+                  }
+                ]
+              }
+            }
+          ],
+          activeWorkerRestartQuarantineMs: 10 * 60 * 1000,
+          now: '2026-04-14T05:07:45.000Z'
+        }
+      )
+    ).toEqual({
+      healthy: true,
+      reason: 'active_worker_restart_quarantine',
+      message:
+        'co-status reported restart_required=true for the same provider refresh stuck series already restarted at 2026-04-14T05:06:30.000Z; 1 active provider worker(s) remain visible, so supervision is quarantining repeated restart churn while retaining restart_required in co-status.'
+    });
+  });
+
+  it('keeps provider refresh restart_required unhealthy after a newer unrelated restart record', () => {
+    expect(
+      evaluateControlHostSupervisionHealthPayload(
+        {
+          counts: {
+            running: 1,
+            retrying: 0
+          },
+          running: [
+            {
+              issue_id: 'issue-1',
+              issue_identifier: 'CO-207',
+              state: 'in_progress',
+              display_state: 'In Progress',
+              pid: '555',
+              started_at: '2026-04-14T05:00:00.000Z'
+            }
+          ],
+          polling: {
+            restart_required: true,
+            reason: 'provider_refresh_lifecycle_stuck',
+            updated_at: '2026-04-14T05:07:38.000Z',
+            refresh_phase: 'refresh:fresh_dispatch',
+            refresh_request_class: 'fresh_dispatch:ready',
+            refresh_provider_keys: ['linear:issue-2'],
+            checking: true,
+            queued: true,
+            operation_elapsed_ms: 47_000,
+            stalled_after_ms: 45_000
+          }
+        },
+        {
+          restartHistory: [
+            {
+              requested_at: '2026-04-14T05:05:30.000Z',
+              reason: 'restart_required',
+              message: 'launchd restart requested',
+              consecutive_unhealthy_samples: 3,
+              child_pid: 4001,
+              diagnostic: {
+                counts: {
+                  running: 1,
+                  retrying: 0
+                },
+                polling: {
+                  updated_at: '2026-04-14T05:05:20.000Z',
+                  checking: true,
+                  queued: true,
+                  stuck: true,
+                  restart_required: true,
+                  reason: 'provider_refresh_lifecycle_stuck',
+                  last_error: 'provider_refresh_lifecycle_stuck',
+                  refresh_phase: 'refresh:claim_issue_by_id_reconcile',
+                  refresh_request_class: 'claim_issue_by_id:running',
+                  refresh_provider_keys: ['linear:issue-1'],
+                  operation_elapsed_ms: 46_000,
+                  stalled_after_ms: 45_000,
+                  control_host_owner: null
+                },
+                running_workers: [
+                  {
+                    issue_id: 'issue-1',
+                    issue_identifier: 'CO-207',
+                    state: 'in_progress',
+                    display_state: 'In Progress',
+                    pid: '555',
+                    worker_host: null,
+                    session_id: null,
+                    started_at: '2026-04-14T05:00:00.000Z',
+                    last_event_at: null
+                  }
+                ]
+              }
+            },
+            {
+              requested_at: '2026-04-14T05:06:30.000Z',
+              reason: 'restart_required',
+              message: 'launchd restart requested',
+              consecutive_unhealthy_samples: 3,
+              child_pid: 4321,
+              diagnostic: {
+                counts: {
+                  running: 1,
+                  retrying: 0
+                },
+                polling: {
+                  updated_at: '2026-04-14T05:06:20.000Z',
+                  checking: true,
+                  queued: true,
+                  stuck: true,
+                  restart_required: true,
+                  reason: 'provider_refresh_lifecycle_stuck',
+                  last_error: 'provider_refresh_lifecycle_stuck',
+                  refresh_phase: 'refresh:fresh_dispatch',
+                  refresh_request_class: 'fresh_dispatch:ready',
+                  refresh_provider_keys: ['linear:issue-2'],
+                  operation_elapsed_ms: 46_000,
+                  stalled_after_ms: 45_000,
+                  control_host_owner: null
+                },
+                running_workers: [
+                  {
+                    issue_id: 'issue-2',
+                    issue_identifier: 'CO-210',
+                    state: 'in_progress',
+                    display_state: 'In Progress',
+                    pid: '777',
+                    worker_host: null,
+                    session_id: null,
+                    started_at: '2026-04-14T05:01:00.000Z',
+                    last_event_at: null
+                  }
+                ]
+              }
+            }
+          ],
+          activeWorkerRestartQuarantineMs: 10 * 60 * 1000,
+          now: '2026-04-14T05:07:45.000Z'
+        }
+      )
+    ).toEqual({
+      healthy: false,
+      reason: 'restart_required',
+      message: 'co-status reported restart_required=true.'
+    });
+  });
+
+  it('keeps provider refresh restart_required unhealthy when the active worker series changes', () => {
+    expect(
+      evaluateControlHostSupervisionHealthPayload(
+        {
+          counts: {
+            running: 1,
+            retrying: 0
+          },
+          running: [
+            {
+              issue_id: 'issue-2',
+              issue_identifier: 'CO-210',
+              state: 'in_progress',
+              display_state: 'In Progress',
+              pid: '888',
+              started_at: '2026-04-14T05:00:00.000Z'
+            }
+          ],
+          polling: {
+            restart_required: true,
+            reason: 'provider_refresh_lifecycle_stuck',
+            updated_at: '2026-04-14T05:07:38.000Z',
+            refresh_phase: 'refresh:fresh_dispatch',
+            refresh_request_class: 'fresh_dispatch:ready',
+            refresh_provider_keys: ['linear:issue-2'],
+            checking: true,
+            queued: true,
+            operation_elapsed_ms: 47_000,
+            stalled_after_ms: 45_000
+          }
+        },
+        {
+          restartHistory: [
+            {
+              requested_at: '2026-04-14T05:06:30.000Z',
+              reason: 'restart_required',
+              message: 'launchd restart requested',
+              consecutive_unhealthy_samples: 3,
+              child_pid: 4321,
+              diagnostic: {
+                counts: {
+                  running: 1,
+                  retrying: 0
+                },
+                polling: {
+                  updated_at: '2026-04-14T05:06:20.000Z',
+                  checking: true,
+                  queued: true,
+                  stuck: true,
+                  restart_required: true,
+                  reason: 'provider_refresh_lifecycle_stuck',
+                  last_error: 'provider_refresh_lifecycle_stuck',
+                  refresh_phase: 'refresh:claim_issue_by_id_reconcile',
+                  refresh_request_class: 'claim_issue_by_id:running',
+                  refresh_provider_keys: ['linear:issue-1'],
+                  operation_elapsed_ms: 46_000,
+                  stalled_after_ms: 45_000,
+                  control_host_owner: null
+                },
+                running_workers: [
+                  {
+                    issue_id: 'issue-1',
+                    issue_identifier: 'CO-207',
+                    state: 'in_progress',
+                    display_state: 'In Progress',
+                    pid: '555',
+                    worker_host: null,
+                    session_id: null,
+                    started_at: '2026-04-14T05:00:00.000Z',
+                    last_event_at: null
+                  }
+                ]
+              }
+            }
+          ],
+          activeWorkerRestartQuarantineMs: 10 * 60 * 1000,
+          now: '2026-04-14T05:07:45.000Z'
+        }
+      )
+    ).toEqual({
+      healthy: false,
+      reason: 'restart_required',
+      message: 'co-status reported restart_required=true.'
+    });
+  });
+
+  it('keeps provider refresh restart_required unhealthy when no active workers remain visible', () => {
+    expect(
+      evaluateControlHostSupervisionHealthPayload(
+        {
+          counts: {
+            running: 0,
+            retrying: 0
+          },
+          running: [],
+          polling: {
+            restart_required: true,
+            reason: 'provider_refresh_lifecycle_stuck',
+            updated_at: '2026-04-14T05:07:38.000Z',
+            refresh_phase: 'refresh:claim_issue_by_id_reconcile',
+            refresh_request_class: 'claim_issue_by_id:running',
+            refresh_provider_keys: ['linear:issue-1'],
+            checking: true,
+            queued: true,
+            operation_elapsed_ms: 47_000,
+            stalled_after_ms: 45_000
+          }
+        },
+        {
+          restartHistory: [
+            {
+              requested_at: '2026-04-14T05:06:30.000Z',
+              reason: 'restart_required',
+              message: 'launchd restart requested',
+              consecutive_unhealthy_samples: 3,
+              child_pid: 4321,
+              diagnostic: {
+                counts: {
+                  running: 1,
+                  retrying: 0
+                },
+                polling: {
+                  updated_at: '2026-04-14T05:06:20.000Z',
+                  checking: true,
+                  queued: true,
+                  stuck: true,
+                  restart_required: true,
+                  reason: 'provider_refresh_lifecycle_stuck',
+                  last_error: 'provider_refresh_lifecycle_stuck',
+                  refresh_phase: 'refresh:claim_issue_by_id_reconcile',
+                  refresh_request_class: 'claim_issue_by_id:running',
+                  refresh_provider_keys: ['linear:issue-1'],
+                  operation_elapsed_ms: 46_000,
+                  stalled_after_ms: 45_000,
+                  control_host_owner: null
+                },
+                running_workers: [
+                  {
+                    issue_id: 'issue-1',
+                    issue_identifier: 'CO-207',
+                    state: 'in_progress',
+                    display_state: 'In Progress',
+                    pid: '555',
+                    worker_host: null,
+                    session_id: null,
+                    started_at: '2026-04-14T05:00:00.000Z',
+                    last_event_at: null
+                  }
+                ]
+              }
+            }
+          ],
+          activeWorkerRestartQuarantineMs: 10 * 60 * 1000,
+          now: '2026-04-14T05:07:45.000Z'
+        }
+      )
+    ).toEqual({
+      healthy: false,
+      reason: 'restart_required',
+      message: 'co-status reported restart_required=true.'
+    });
+  });
+
   it('treats missing polling state as healthy until restart_required is explicit', () => {
     expect(evaluateControlHostSupervisionHealthPayload({})).toEqual({
       healthy: true,
@@ -968,7 +1345,8 @@ describe('controlHostSupervision shell helpers', () => {
     expect(result).toEqual({
       healthy: false,
       reason: 'probe_timeout',
-      message: 'co-status probe timed out after 5s.'
+      message: 'co-status probe timed out after 5s.',
+      diagnostic: null
     });
   });
 
