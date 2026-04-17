@@ -11,6 +11,9 @@ import {
   resolveProviderWorkspacePath
 } from '../run/workspacePath.js';
 import {
+  PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID,
+  PROVIDER_LINEAR_CHILD_LANE_RESERVED_SUMMARY,
+  PROVIDER_LINEAR_WORKER_CHILD_LANES_FILENAME,
   PROVIDER_LINEAR_WORKER_PROOF_FILENAME,
   refreshProviderLinearWorkerProofSnapshot,
   type ProviderLinearWorkerProof
@@ -1198,7 +1201,8 @@ async function readProviderLinearWorkerProofForProjection(
   const proof = await readJsonFile<ProviderLinearWorkerProof>(
     join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME)
   );
-  if (!shouldRefreshProviderLinearWorkerProjectionProof(proof)) {
+  const refreshScope = await resolveProviderLinearWorkerProjectionProofRefreshScope(runDir, proof);
+  if (!refreshScope) {
     return proof;
   }
   return (
@@ -1208,16 +1212,26 @@ async function readProviderLinearWorkerProofForProjection(
       undefined,
       undefined,
       process.env,
-      { updatedAtComparisonScope: 'telemetry' }
+      { updatedAtComparisonScope: refreshScope }
     ).catch(() => proof)) ?? proof
   );
 }
 
-function shouldRefreshProviderLinearWorkerProjectionProof(
+async function resolveProviderLinearWorkerProjectionProofRefreshScope(
+  runDir: string,
   proof: ProviderLinearWorkerProof | null
-): boolean {
-  if (!proof || proof.owner_phase !== 'turn_running' || proof.owner_status !== 'in_progress') {
-    return false;
+): Promise<'full' | 'telemetry' | null> {
+  if (!proof || !isProviderLinearWorkerProjectionRefreshEligible(proof)) {
+    return null;
+  }
+  if (hasProviderLinearWorkerProjectionReservationPlaceholder(proof)) {
+    return 'full';
+  }
+  if (hasProviderLinearWorkerProjectionActivePendingChildLane(proof)) {
+    return 'full';
+  }
+  if (await hasProviderLinearWorkerProjectionActivePendingChildLaneInLedger(runDir)) {
+    return 'full';
   }
   const tokens = proof.tokens ?? null;
   const hasTokens =
@@ -1227,6 +1241,94 @@ function shouldRefreshProviderLinearWorkerProjectionProof(
     !proof.latest_session_id ||
     !hasTokens ||
     proof.rate_limits == null
+  )
+    ? 'telemetry'
+    : null;
+}
+
+function isProviderLinearWorkerProjectionRefreshEligible(
+  proof: ProviderLinearWorkerProof
+): boolean {
+  return (
+    proof.owner_status === 'in_progress' &&
+    (proof.owner_phase === 'turn_running' || proof.owner_phase === 'turn_completed')
+  );
+}
+
+function hasProviderLinearWorkerProjectionReservationPlaceholder(
+  proof: ProviderLinearWorkerProof
+): boolean {
+  return hasProviderLinearWorkerProjectionReservationPlaceholderInRecords(proof.child_lanes);
+}
+
+function hasProviderLinearWorkerProjectionActivePendingChildLane(
+  proof: ProviderLinearWorkerProof
+): boolean {
+  return hasProviderLinearWorkerProjectionActivePendingChildLaneInRecords(proof.child_lanes);
+}
+
+async function hasProviderLinearWorkerProjectionActivePendingChildLaneInLedger(
+  runDir: string
+): Promise<boolean> {
+  const records = await readJsonFile<unknown>(
+    join(runDir, PROVIDER_LINEAR_WORKER_CHILD_LANES_FILENAME)
+  );
+  return hasProviderLinearWorkerProjectionActivePendingChildLaneInRecords(records);
+}
+
+function hasProviderLinearWorkerProjectionReservationPlaceholderInRecords(
+  records: unknown
+): boolean {
+  if (!Array.isArray(records)) {
+    return false;
+  }
+  return records.some((childLane) => {
+    if (!isRecord(childLane)) {
+      return false;
+    }
+    const runId = readStringValue(childLane, 'run_id');
+    const summary = readStringValue(childLane, 'summary');
+    const status = readStringValue(childLane, 'status');
+    const pipelineId = readStringValue(childLane, 'pipeline_id');
+    const decision = readStringValue(childLane, 'decision');
+    return (
+      pipelineId === PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID &&
+      decision === 'pending' &&
+      (
+        status === 'launching' ||
+        Boolean(runId?.startsWith('launching-')) ||
+        summary === PROVIDER_LINEAR_CHILD_LANE_RESERVED_SUMMARY
+      )
+    );
+  });
+}
+
+function hasProviderLinearWorkerProjectionActivePendingChildLaneInRecords(
+  records: unknown
+): boolean {
+  if (!Array.isArray(records)) {
+    return false;
+  }
+  return records.some((childLane) => {
+    if (!isRecord(childLane)) {
+      return false;
+    }
+    const status = readStringValue(childLane, 'status');
+    return (
+      readStringValue(childLane, 'pipeline_id') === PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID &&
+      readStringValue(childLane, 'decision') === 'pending' &&
+      !isProviderLinearWorkerProjectionTerminalChildLaneStatus(status ?? null)
+    );
+  });
+}
+
+function isProviderLinearWorkerProjectionTerminalChildLaneStatus(status: string | null): boolean {
+  return (
+    status === 'succeeded' ||
+    status === 'failed' ||
+    status === 'completed' ||
+    status === 'canceled' ||
+    status === 'cancelled'
   );
 }
 
