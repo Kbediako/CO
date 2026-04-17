@@ -16,7 +16,7 @@ function showUsage() {
   console.log(`Usage: node scripts/tasks-archive.mjs [--policy <path>] [--out <path>] [--dry-run]
 
 Moves completed task snapshots from docs/TASKS.md into a year-based archive payload
-when the line-count threshold is exceeded.
+when the hard line-count limit or the configured reserve target is exceeded.
 
 Options:
   --policy <path>  Path to archive policy JSON (default: ${DEFAULT_POLICY_PATH})
@@ -31,6 +31,11 @@ function parsePolicy(raw, policyPath) {
   const maxLines = Number.isFinite(data?.max_lines) ? Number(data.max_lines) : NaN;
   if (!Number.isInteger(maxLines) || maxLines <= 0) {
     throw new Error(`Policy max_lines is invalid in ${policyPath}`);
+  }
+  const reserveLines =
+    data?.reserve_lines === undefined ? 0 : Number.isFinite(data?.reserve_lines) ? Number(data.reserve_lines) : NaN;
+  if (!Number.isInteger(reserveLines) || reserveLines < 0 || reserveLines >= maxLines) {
+    throw new Error(`Policy reserve_lines is invalid in ${policyPath}`);
   }
   const archiveBranch = typeof data?.archive_branch === 'string' ? data.archive_branch.trim() : '';
   if (!archiveBranch) {
@@ -48,6 +53,7 @@ function parsePolicy(raw, policyPath) {
 
   return {
     maxLines,
+    reserveLines,
     archiveBranch,
     archivePattern,
     repoUrl
@@ -144,6 +150,85 @@ function parseHeaderSections(lines) {
   return sections;
 }
 
+const SNAPSHOT_HEADER_UPDATE_PATTERN =
+  /^# Task List Snapshot(?:\s+—|\s+-).*?\s+-\s+(?:Rework\s+)?Update\s+(\d{4}-\d{2}-\d{2}):\s*(.*)$/i;
+const SNAPSHOT_UPDATE_PATTERNS = [
+  /^(?:[-*]\s+)?\*\*Update\s+[—-]\s*(\d{4}-\d{2}-\d{2}):\*\*\s*(.*)$/i,
+  /^(?:[-*]\s+)?(?:Rework\s+)?Update\s+(\d{4}-\d{2}-\d{2}):\s*(.*)$/i
+];
+const NEGATED_COMPLETED_PATTERN = /\b(?:non|not)(?:[\s-]+yet)?[\s-]+completed\b/i;
+const TERMINAL_UPDATE_BODY_PATTERNS = [
+  /^completed(?:$|[.;]|,\s|\s+\(|\s+(?:after|as|the|with|via|by|under|for|while)\b)/i,
+  /^(?:implementation(?:\s+\+\s+implementation-gate)?|bounded implementation)\s+(?:is\s+)?(?:complete|completed)\b/i,
+  /^(?:this|the)\s+(?:lane|task|issue|snapshot|packet)\s+is\s+(?:closed|complete)\b/i,
+  /^`?(?:CO-\d+|linear-[A-Za-z0-9-]+|\d{4,})`?\s+is\s+(?:closed|complete)\b/i
+];
+
+function parseSnapshotUpdateLine(line) {
+  if (typeof line !== 'string') {
+    return null;
+  }
+
+  const headerMatch = line.match(SNAPSHOT_HEADER_UPDATE_PATTERN);
+  if (headerMatch?.[1]) {
+    return {
+      date: headerMatch[1],
+      body: headerMatch[2] ?? ''
+    };
+  }
+
+  for (const pattern of SNAPSHOT_UPDATE_PATTERNS) {
+    const match = line.match(pattern);
+    if (match?.[1]) {
+      return {
+        date: match[1],
+        body: match[2] ?? ''
+      };
+    }
+  }
+
+  return null;
+}
+
+function isTerminalSnapshotUpdateBody(body) {
+  if (typeof body !== 'string') {
+    return false;
+  }
+
+  const trimmedBody = body.trim();
+  if (NEGATED_COMPLETED_PATTERN.test(trimmedBody)) {
+    return false;
+  }
+
+  return TERMINAL_UPDATE_BODY_PATTERNS.some((pattern) => pattern.test(trimmedBody));
+}
+
+function parseCompletedSnapshotDate(lines, section) {
+  if (!Array.isArray(lines) || !section) {
+    return null;
+  }
+
+  const sectionLines = lines.slice(section.start, section.end + 1);
+  for (let index = sectionLines.length - 1; index >= 0; index -= 1) {
+    const parsedUpdate = parseSnapshotUpdateLine(sectionLines[index]);
+    if (!parsedUpdate) {
+      continue;
+    }
+
+    if (isTerminalSnapshotUpdateBody(parsedUpdate.body)) {
+      const parsed = parseDateString(parsedUpdate.date);
+      if (parsed) {
+        return parsed;
+      }
+      continue;
+    }
+
+    return null;
+  }
+
+  return null;
+}
+
 function parseTaskSections(lines) {
   const sections = [];
   const covered = new Array(lines.length).fill(false);
@@ -228,16 +313,20 @@ function loadTaskIndex(raw) {
     if (!key) {
       continue;
     }
+    const status = typeof item.status === 'string' ? item.status : '';
     const gateStatus = typeof item?.gate?.status === 'string' ? item.gate.status : '';
     const runTimestamp = parseRunIdTimestamp(item?.gate?.run_id);
     const runDate = runTimestamp ? runTimestamp.toISOString().slice(0, 10) : null;
+    const completedAtFromIndex = parseDateString(item.completed_at);
+    const completedByIndex = status === 'succeeded' || status === 'completed';
     const completedAt =
-      parseDateString(item.completed_at) ??
+      completedAtFromIndex ??
       (gateStatus === 'succeeded' ? parseDateString(runDate) : null);
     const entry = {
-      status: typeof item.status === 'string' ? item.status : '',
+      status,
       gateStatus,
-      completedAt
+      completedAt,
+      completedByIndex
     };
     map.set(key, entry);
     if (id) {
@@ -308,11 +397,52 @@ function updateArchiveIndex(content, policy, years) {
 
 function extractArchivedTaskKeys(content) {
   const keys = new Set();
-  const pattern = /<!-- docs-sync:begin ([^ ]+) -->/g;
-  for (const match of content.matchAll(pattern)) {
-    keys.add(match[1]);
+  for (const line of content.split('\n')) {
+    const docsSyncMatch = /^<!-- docs-sync:begin (.+) -->$/.exec(line);
+    if (docsSyncMatch?.[1]) {
+      keys.add(docsSyncMatch[1].trim());
+    }
+    if (lineStartsWithSnapshotHeader(line)) {
+      const headerKey = extractSnapshotKey(line);
+      if (headerKey) {
+        keys.add(headerKey);
+      }
+    }
   }
   return keys;
+}
+
+function extractArchiveSectionKey(section) {
+  if (typeof section !== 'string' || section.length === 0) {
+    return null;
+  }
+  const docsSyncMatch = section.match(/<!-- docs-sync:begin ([^ ]+) -->/);
+  if (docsSyncMatch?.[1]) {
+    return docsSyncMatch[1];
+  }
+  for (const line of section.split('\n')) {
+    if (!lineStartsWithSnapshotHeader(line)) {
+      continue;
+    }
+    const headerKey = extractSnapshotKey(line);
+    if (headerKey) {
+      return headerKey;
+    }
+  }
+  return null;
+}
+
+function cloneArchiveSections(sections) {
+  const cloned = new Map();
+  for (const [year, values] of sections.entries()) {
+    cloned.set(year, [...values]);
+  }
+  return cloned;
+}
+
+function buildUpdatedTasksContent({ lines, removeMask, policy, archivedYears }) {
+  const updatedLines = lines.filter((_, index) => !removeMask[index]);
+  return updateArchiveIndex(updatedLines.join('\n'), policy, archivedYears);
 }
 
 async function main() {
@@ -348,9 +478,15 @@ async function main() {
   const normalizedTasks = normalizeInlineSnapshotHeaders(tasksRaw);
   const lines = normalizedTasks.split('\n');
   const totalLines = countNormalizedLines(normalizedTasks);
+  const targetLines = policy.maxLines - policy.reserveLines;
+  const archiveIndexMissing = !normalizedTasks.includes('<!-- tasks-archive-index:begin -->');
+  const withinArchiveThreshold = (lineCount) =>
+    policy.reserveLines === 0 ? lineCount < targetLines : lineCount <= targetLines;
 
-  if (totalLines <= policy.maxLines) {
-    console.log(`docs/TASKS.md is within limit (${totalLines}/${policy.maxLines}).`);
+  if (withinArchiveThreshold(totalLines)) {
+    console.log(
+      `docs/TASKS.md is within reserve target (${totalLines}/${policy.maxLines}; reserve ${policy.reserveLines}, target ${targetLines}).`
+    );
     return;
   }
 
@@ -360,13 +496,19 @@ async function main() {
   const candidates = [];
   for (const section of sections) {
     const entry = taskIndex.get(section.taskKey);
-    const eligibleStatus = entry?.status === 'succeeded' || entry?.gateStatus === 'succeeded';
-    if (!entry || !eligibleStatus || !entry.completedAt) {
+    const headerCompletedAt = parseCompletedSnapshotDate(lines, section);
+    if (entry?.status && !entry.completedByIndex) {
+      continue;
+    }
+    const completedAt = entry
+      ? entry.completedAt ?? headerCompletedAt
+      : headerCompletedAt;
+    if (!completedAt) {
       continue;
     }
     candidates.push({
       ...section,
-      completedAt: entry.completedAt,
+      completedAt,
       lineCount: section.end - section.start + 1
     });
   }
@@ -380,52 +522,57 @@ async function main() {
 
   if (candidates.length === 0) {
     throw new Error(
-      `docs/TASKS.md exceeds max_lines (${totalLines}/${policy.maxLines}) but no eligible tasks can be archived.`
+      `docs/TASKS.md exceeds the reserve target (${totalLines}/${targetLines}; hard max ${policy.maxLines}) but no eligible tasks can be archived.`
     );
   }
 
   const toArchive = [];
-  let remainingLines = totalLines;
+  let archivedYears = new Set();
+  let archiveSections = new Map();
+  let removeMask = new Array(lines.length).fill(false);
+  let updatedContent = normalizedTasks;
+  let updatedLineCount = totalLines;
   for (const candidate of candidates) {
-    if (remainingLines <= policy.maxLines) {
+    if (withinArchiveThreshold(updatedLineCount)) {
       break;
     }
+
+    const tentativeRemoveMask = removeMask.slice();
+    for (let index = candidate.start; index <= candidate.end; index += 1) {
+      tentativeRemoveMask[index] = true;
+    }
+
+    const year = candidate.completedAt.slice(0, 4);
+    const tentativeArchivedYears = new Set(archivedYears);
+    tentativeArchivedYears.add(year);
+    const tentativeArchiveSections = cloneArchiveSections(archiveSections);
+    const sectionsForYear = tentativeArchiveSections.get(year) ?? [];
+    sectionsForYear.push(lines.slice(candidate.start, candidate.end + 1).join('\n'));
+    tentativeArchiveSections.set(year, sectionsForYear);
+
+    const tentativeUpdatedContent = buildUpdatedTasksContent({
+      lines,
+      removeMask: tentativeRemoveMask,
+      policy,
+      archivedYears: tentativeArchivedYears
+    });
+    const tentativeUpdatedLineCount = countNormalizedLines(tentativeUpdatedContent);
+    const bootstrapArchiveIndex = archiveIndexMissing && archivedYears.size === 0;
+    if (tentativeUpdatedLineCount >= updatedLineCount && !bootstrapArchiveIndex) {
+      continue;
+    }
+
     toArchive.push(candidate);
-    remainingLines -= candidate.lineCount;
+    removeMask = tentativeRemoveMask;
+    archivedYears = tentativeArchivedYears;
+    archiveSections = tentativeArchiveSections;
+    updatedContent = tentativeUpdatedContent;
+    updatedLineCount = tentativeUpdatedLineCount;
   }
 
-  if (remainingLines > policy.maxLines) {
+  if (!withinArchiveThreshold(updatedLineCount)) {
     throw new Error(
-      `Unable to reach max_lines ${policy.maxLines}; ${remainingLines} lines remain after archiving.`
-    );
-  }
-
-  const archivedYears = new Set();
-  const archiveSections = new Map();
-  for (const archived of toArchive) {
-    const year = archived.completedAt.slice(0, 4);
-    archivedYears.add(year);
-    if (!archiveSections.has(year)) {
-      archiveSections.set(year, []);
-    }
-    archiveSections.get(year).push(lines.slice(archived.start, archived.end + 1).join('\n'));
-  }
-
-  const removeMask = new Array(lines.length).fill(false);
-  for (const archived of toArchive) {
-    for (let index = archived.start; index <= archived.end; index += 1) {
-      removeMask[index] = true;
-    }
-  }
-
-  const updatedLines = lines.filter((_, index) => !removeMask[index]);
-  let updatedContent = updatedLines.join('\n');
-  updatedContent = updateArchiveIndex(updatedContent, policy, archivedYears);
-  const updatedLineCount = countNormalizedLines(updatedContent);
-
-  if (updatedLineCount > policy.maxLines) {
-    throw new Error(
-      `Archive output still exceeds max_lines ${policy.maxLines}; ${updatedLineCount} lines remain after archiving.`
+      `Unable to restore reserve target ${targetLines}; ${updatedLineCount} lines remain after archiving (hard max ${policy.maxLines}).`
     );
   }
 
@@ -436,10 +583,6 @@ async function main() {
     : path.join(outRoot, taskId, archiveFileName);
   if (!outPattern.includes('YYYY')) {
     throw new Error('Archive output path must include YYYY.');
-  }
-
-  if (!options.dryRun) {
-    await writeFile(tasksPath, updatedContent);
   }
 
   for (const [year, sectionsForYear] of archiveSections.entries()) {
@@ -461,11 +604,11 @@ async function main() {
         const existing = await readFile(outPath, 'utf8');
         const existingKeys = extractArchivedTaskKeys(existing);
         const filteredSections = sectionsForYear.filter((section) => {
-          const match = section.match(/<!-- docs-sync:begin ([^ ]+) -->/);
-          if (!match) {
+          const sectionKey = extractArchiveSectionKey(section);
+          if (!sectionKey) {
             return true;
           }
-          return !existingKeys.has(match[1]);
+          return !existingKeys.has(sectionKey);
         });
         if (filteredSections.length > 0) {
           const separator = existing.endsWith('\n') ? '\n' : '\n\n';
@@ -479,8 +622,14 @@ async function main() {
     console.log(`Archive payload (${year}): ${outPath}`);
   }
 
+  if (!options.dryRun) {
+    await writeFile(tasksPath, updatedContent);
+  }
+
   console.log(`Archived ${toArchive.length} task(s).`);
-  console.log(`docs/TASKS.md lines: ${totalLines} -> ${updatedLineCount} (limit ${policy.maxLines}).`);
+  console.log(
+    `docs/TASKS.md lines: ${totalLines} -> ${updatedLineCount} (hard limit ${policy.maxLines}; reserve ${policy.reserveLines}; target ${targetLines}).`
+  );
   console.log(`Archive branch: ${policy.archiveBranch}`);
 
   if (options.dryRun) {
