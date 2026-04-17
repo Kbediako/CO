@@ -601,16 +601,19 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
     trackedWorkflowState?.isTerminal ? normalizeOptionalString(trackedIssue?.updated_at) : null;
   const claimTerminalWorkflowIssueUpdatedAt =
     claimWorkflowState?.isTerminal ? normalizeOptionalString(claim?.issue_updated_at) : null;
-  const terminalWorkflowUpdatedAt = latestIsoTimestamp(
+  const terminalWorkflowIssueFreshnessAt = latestIsoTimestamp(
     trackedTerminalWorkflowUpdatedAt,
-    claimTerminalWorkflowIssueUpdatedAt ??
-      (claimWorkflowState?.isTerminal ? normalizeOptionalString(claim?.updated_at) : null)
+    claimTerminalWorkflowIssueUpdatedAt
+  );
+  const terminalWorkflowUpdatedAt = latestIsoTimestamp(
+    terminalWorkflowIssueFreshnessAt,
+    claimWorkflowState?.isTerminal ? normalizeOptionalString(claim?.updated_at) : null
   );
   const mergeCloseoutIssueUpdatedAt = normalizeOptionalString(mergeCloseout?.issue_updated_at);
   const terminalWorkflowSupersedesMergeCloseout = Boolean(
     mergeCloseoutProgress &&
     mergeCloseoutProgress.status !== 'failed' &&
-    terminalWorkflowUpdatedAt &&
+    terminalWorkflowIssueFreshnessAt &&
     (
       (
         !mergeCloseoutIssueUpdatedAt &&
@@ -626,7 +629,7 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
       ) ||
       (
         mergeCloseoutIssueUpdatedAt &&
-        compareIsoTimestamp(terminalWorkflowUpdatedAt, mergeCloseoutIssueUpdatedAt) >= 0
+        compareIsoTimestamp(terminalWorkflowIssueFreshnessAt, mergeCloseoutIssueUpdatedAt) >= 0
       )
     )
   );
