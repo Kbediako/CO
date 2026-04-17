@@ -14,6 +14,7 @@ import {
 } from '../src/cli/control/providerPollingHealth.js';
 import { createControlRuntime } from '../src/cli/control/controlRuntime.js';
 import { buildUiDataset } from '../src/cli/control/operatorDashboardPresenter.js';
+import { readCompatibilityState } from '../src/cli/control/observabilitySurface.js';
 import * as liveLinearAdvisoryRuntimeModule from '../src/cli/control/liveLinearAdvisoryRuntime.js';
 import type { LiveLinearTrackedIssue } from '../src/cli/control/linearDispatchSource.js';
 import type { ProviderIntakeState } from '../src/cli/control/providerIntakeState.js';
@@ -3613,10 +3614,17 @@ describe('ControlRuntime', () => {
         projection: compatibilityProjection,
         generatedAt: '2026-04-15T23:00:00.000Z'
       });
+      const statePayload = await readCompatibilityState({
+        controlStore: fixture.controlStore,
+        paths: fixture.paths,
+        readCompatibilityProjection: async () => compatibilityProjection
+      });
 
       expect(compatibilityProjection.running.map((entry) => entry.issue_identifier)).toEqual([
         'CO-198'
       ]);
+      expect(statePayload.running_ids).toEqual(['CO-198']);
+      expect(statePayload.retrying_ids).toEqual([]);
       const issue = compatibilityProjection.issues.find((entry) => entry.issueIdentifier === 'CO-198');
       expect(issue?.payload.provider_debug_snapshot?.claim).toMatchObject({
         state: 'released',
@@ -3630,7 +3638,17 @@ describe('ControlRuntime', () => {
         updated_at: '2026-04-15T22:59:00.000Z'
       });
       expect(uiDataset.counts.running).toBe(1);
-      expect(uiDataset.running.map((entry) => entry.issue_identifier)).toEqual(['CO-198']);
+      expect(uiDataset.running).toEqual([
+        expect.objectContaining({
+          issue_identifier: 'CO-198',
+          issue_id: 'lin-issue-198',
+          id: 'CO-198',
+          bucket: 'running',
+          state: 'In Progress',
+          reason: null,
+          aliases: expect.arrayContaining(['CO-198', 'lin-issue-198'])
+        })
+      ]);
     } finally {
       vi.useRealTimers();
     }

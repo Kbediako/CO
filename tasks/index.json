@@ -1,6 +1,32 @@
 {
   "items": [
     {
+      "id": "20260418-linear-a0ef4f6c-bf78-4dd6-9d43-244c445b87cb",
+      "title": "CO STATUS / observability: restore compatibility row fields after post-recovery rehydrate",
+      "relates_to": "tasks/tasks-linear-a0ef4f6c-bf78-4dd6-9d43-244c445b87cb.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-a0ef4f6c-bf78-4dd6-9d43-244c445b87cb-docs-packet/cli/2026-04-17T22-12-16-013Z-ad2f7b8b/manifest.json",
+          "source_anchor": "ctx:sha256:94042dd2db264d8821d3e322490b751dc925f36b8ea0692cb03302b6418ec7b0#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-227 as the narrow post-recovery compatibility-hydration gap: after control-host recovery or rehydrate, canonical issue identity and live occupancy recover, but authenticated /api/v1/state still leaves running_ids and retrying_ids null while co-status --format json still leaves compatibility row fields id, bucket, state, reason, and aliases null for live rows. The packet keeps this explicitly distinct from CO-223 top-level tracked truth and from CO-211, CO-146, and CO-189. The expected shared source payload was absent in this child checkout, so the packet is anchored on the live read-only CO-227 issue wording plus current repo seams in selectedRunProjection.ts, compatibilityIssuePresenter.ts, observabilityReadModel.ts, controlRuntime.ts, observabilitySurface.ts, and operatorDashboardPresenter.ts; parent owns implementation, validation, Linear state, workpad, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-a0ef4f6c-bf78-4dd6-9d43-244c445b87cb.md",
+        "task": "tasks/tasks-linear-a0ef4f6c-bf78-4dd6-9d43-244c445b87cb.md",
+        "agent_task": ".agent/task/linear-a0ef4f6c-bf78-4dd6-9d43-244c445b87cb.md",
+        "docs": "docs/TECH_SPEC-linear-a0ef4f6c-bf78-4dd6-9d43-244c445b87cb.md"
+      }
+    },
+    {
       "id": "20260418-linear-7896d3c1-7a62-4b79-97df-a71984fab5b2",
       "title": "CO: stop synthesizing Guardrails spec-guard command not found when no spec-guard stage exists",
       "relates_to": "tasks/tasks-linear-7896d3c1-7a62-4b79-97df-a71984fab5b2.md",

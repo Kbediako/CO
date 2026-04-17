@@ -368,6 +368,8 @@ export interface ControlStatePayload {
     running: number;
     retrying: number;
   };
+  running_ids: string[];
+  retrying_ids: string[];
   running: ControlRunningPayload[];
   retrying: ControlRetryPayload[];
   codex_totals: ControlCodexTotalsPayload;
