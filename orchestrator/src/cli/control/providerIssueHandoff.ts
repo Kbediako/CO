@@ -2219,28 +2219,40 @@ export function createProviderIssueHandoffService(
                 continue;
               }
             }
-          } else if (
-            shouldApplySupersededTerminalMergeCloseoutReleaseClaim({
-              releaseReason: freshTrackedIssue.releaseReason,
-              claim: {
+          } else {
+            const hasFreshReleaseIssueMetadata =
+              freshTrackedIssue.releaseClaimFields.issue_state !== undefined ||
+              freshTrackedIssue.releaseClaimFields.issue_state_type !== undefined ||
+              freshTrackedIssue.releaseClaimFields.issue_updated_at !== undefined;
+            if (
+              hasFreshReleaseIssueMetadata &&
+              (
+                shouldApplySupersededTerminalMergeCloseoutReleaseClaim({
+                  releaseReason: freshTrackedIssue.releaseReason,
+                  claim: {
+                    ...completedClaim,
+                    ...freshTrackedIssue.releaseClaimFields
+                  }
+                }) ||
+                shouldApplySupersededTransitionFailedMergeCloseoutReleaseClaim({
+                  releaseReason: freshTrackedIssue.releaseReason,
+                  claim: completedClaim,
+                  nextIssueState:
+                    freshTrackedIssue.releaseClaimFields.issue_state ?? completedClaim.issue_state,
+                  nextIssueStateType:
+                    freshTrackedIssue.releaseClaimFields.issue_state_type ??
+                    completedClaim.issue_state_type,
+                  nextIssueUpdatedAt:
+                    freshTrackedIssue.releaseClaimFields.issue_updated_at ??
+                    completedClaim.issue_updated_at
+                })
+              )
+            ) {
+              completedClaim = {
                 ...completedClaim,
                 ...freshTrackedIssue.releaseClaimFields
-              }
-            }) ||
-            shouldApplySupersededTransitionFailedMergeCloseoutReleaseClaim({
-              releaseReason: freshTrackedIssue.releaseReason,
-              claim: completedClaim,
-              nextIssueState: freshTrackedIssue.releaseClaimFields.issue_state ?? completedClaim.issue_state,
-              nextIssueStateType:
-                freshTrackedIssue.releaseClaimFields.issue_state_type ?? completedClaim.issue_state_type,
-              nextIssueUpdatedAt:
-                freshTrackedIssue.releaseClaimFields.issue_updated_at ?? completedClaim.issue_updated_at
-            })
-          ) {
-            completedClaim = {
-              ...completedClaim,
-              ...freshTrackedIssue.releaseClaimFields
-            };
+              };
+            }
           }
         }
         const completedState = buildProviderCompletedRunRehydrateState({
@@ -5331,14 +5343,7 @@ function isProviderLinearDoneWorkflowState(input: {
   state_type: string | null | undefined;
 }): boolean {
   const normalizedState = normalizeProviderLinearWorkflowState(input.state);
-  const normalizedStateType = normalizeProviderLinearWorkflowState(input.state_type);
-  if (normalizedState === 'done') {
-    return true;
-  }
-  if (normalizedState !== null) {
-    return false;
-  }
-  return normalizedStateType === 'completed';
+  return normalizedState === 'done';
 }
 
 function shouldForceTrackedIssueMetadataRefreshForCompletedTransitionFailedClaim(
