@@ -215,29 +215,29 @@ export function upsertProviderIntakeClaim(
           )
       : input.launch_started_at;
   const retryStateDefaults =
-    existing?.retry_attempt !== null && existing?.retry_attempt !== undefined
-      ? input.state === 'resumable' || input.state === 'handoff_failed'
-        ? {
+    input.state === 'starting' || input.state === 'resuming' || input.state === 'running'
+      ? {
+          retryQueued: false,
+          retryDueAt: null,
+          retryError: existing?.retry_error ?? null
+        }
+      : existing?.retry_attempt !== null && existing?.retry_attempt !== undefined
+        ? input.state === 'resumable' || input.state === 'handoff_failed'
+          ? {
+              retryQueued: existing?.retry_queued ?? null,
+              retryDueAt: existing?.retry_due_at ?? null,
+              retryError: existing?.retry_error ?? null
+            }
+          : {
+              retryQueued: false,
+              retryDueAt: null,
+              retryError: null
+            }
+        : {
             retryQueued: existing?.retry_queued ?? null,
             retryDueAt: existing?.retry_due_at ?? null,
             retryError: existing?.retry_error ?? null
-          }
-        : input.state === 'starting' || input.state === 'resuming' || input.state === 'running'
-          ? {
-              retryQueued: false,
-              retryDueAt: null,
-              retryError: existing?.retry_error ?? null
-            }
-        : {
-            retryQueued: false,
-            retryDueAt: null,
-            retryError: null
-          }
-      : {
-          retryQueued: existing?.retry_queued ?? null,
-          retryDueAt: existing?.retry_due_at ?? null,
-          retryError: existing?.retry_error ?? null
-        };
+          };
   const next: ProviderIntakeClaimRecord = {
     provider: 'linear',
     provider_key: input.provider_key,
