@@ -3906,6 +3906,89 @@ describe('ControlRuntime', () => {
     }
   });
 
+  it('prunes accepted pending-revalidation workers when the local proof is stale', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-17T06:16:00.000Z'));
+    try {
+      const providerIntakeState = createProviderIntakeState([
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-211',
+          issue_id: 'lin-issue-211',
+          issue_identifier: 'CO-211',
+          issue_title: 'Accepted pending revalidation with stale local proof',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-17T06:15:00.000Z',
+          task_id: 'linear-issue-211-stale-proof',
+          mapping_source: 'provider_id_fallback',
+          state: 'accepted',
+          reason: 'provider_issue_rehydration_pending_revalidation',
+          accepted_at: '2026-04-17T05:45:00.000Z',
+          updated_at: '2026-04-17T06:15:00.000Z',
+          last_delivery_id: 'delivery-co-211',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_744_870_500_000,
+          run_id: 'run-stale-proof',
+          run_manifest_path: null,
+          launch_source: 'control-host',
+          launch_token: 'launch-co-211'
+        }
+      ]);
+      const fixture = await createFixture({
+        taskId: 'linear-issue-211-stale-proof',
+        providerIntakeState,
+        linearAdvisoryState: {
+          tracked_issue: createTrackedIssue({
+            id: 'lin-issue-211',
+            identifier: 'CO-211',
+            title: 'Accepted pending revalidation with stale local proof',
+            state: 'In Progress',
+            state_type: 'started',
+            updated_at: '2026-04-17T06:15:00.000Z'
+          })
+        }
+      });
+      providerIntakeState.claims[0]!.run_manifest_path = fixture.paths.manifestPath;
+      await seedManifest(fixture.paths, {
+        task_id: 'linear-issue-211-stale-proof',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-211',
+        issue_identifier: 'CO-211',
+        pipeline_id: 'provider-linear-worker',
+        pipeline_title: 'Provider Linear Worker',
+        status: 'in_progress',
+        started_at: '2026-04-17T06:00:00.000Z',
+        updated_at: '2026-04-17T06:15:00.000Z',
+        summary: 'accepted pending revalidation still points at an older attempt proof'
+      });
+      await seedProviderLinearWorkerProof(fixture.paths, {
+        issue_id: 'lin-issue-211',
+        issue_identifier: 'CO-211',
+        attempt_started_at: '2026-04-17T05:55:00.000Z',
+        pid: 59516,
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        last_event: 'turn_running',
+        last_message: 'older attempt proof still reports running',
+        updated_at: '2026-04-17T05:55:00.000Z'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+      const uiDataset = buildUiDataset({
+        projection: compatibilityProjection,
+        generatedAt: '2026-04-17T06:16:00.000Z'
+      });
+
+      expect(compatibilityProjection.running).toEqual([]);
+      expect(uiDataset.counts.running).toBe(0);
+      expect(uiDataset.running).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps accepted pending-revalidation workers running when local proof is still live', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-17T06:16:00.000Z'));

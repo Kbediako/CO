@@ -2133,6 +2133,90 @@ describe('ControlServer', () => {
     }
   });
 
+  it('does not surface accepted pending-revalidation claims with stale local proofs in /ui/data.json running output', async () => {
+    const startedAt = '2026-04-16T10:00:00.000Z';
+    const updatedAt = '2026-04-16T10:05:00.000Z';
+    const { root, env, paths } = await createRunRoot('linear-lin-issue-220');
+    await seedManifest(paths, {
+      task_id: 'linear-lin-issue-220',
+      issue_provider: 'linear',
+      issue_id: 'lin-issue-220',
+      issue_identifier: 'CO-220',
+      pipeline_id: 'provider-linear-worker',
+      pipeline_title: 'Provider Linear Worker',
+      status: 'in_progress',
+      started_at: startedAt,
+      updated_at: updatedAt,
+      summary: 'accepted pending revalidation still points at an older attempt proof'
+    });
+    await seedProviderIntakeState(paths, [
+      {
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-220',
+        issue_id: 'lin-issue-220',
+        issue_identifier: 'CO-220',
+        issue_title: 'Pending revalidation issue with stale local proof',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: updatedAt,
+        task_id: 'linear-lin-issue-220',
+        mapping_source: 'provider_id_fallback',
+        state: 'accepted',
+        reason: 'provider_issue_rehydration_pending_revalidation',
+        accepted_at: '2026-04-16T10:00:05.000Z',
+        updated_at: updatedAt,
+        last_delivery_id: 'delivery-co-220',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_744_768_300_000,
+        run_id: 'run-1',
+        run_manifest_path: paths.manifestPath,
+        launch_source: 'control-host',
+        launch_token: 'launch-co-220'
+      }
+    ]);
+    await seedProviderLinearWorkerProof(paths, {
+      issue_id: 'lin-issue-220',
+      issue_identifier: 'CO-220',
+      attempt_started_at: '2026-04-16T09:55:00.000Z',
+      pid: '999999',
+      owner_phase: 'turn_running',
+      owner_status: 'in_progress',
+      last_event: 'turn_running',
+      last_message: 'older attempt proof still reports running',
+      last_event_at: '2026-04-16T09:55:00.000Z',
+      updated_at: '2026-04-16T09:55:00.000Z',
+      workspace_path: root
+    });
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(uiRes.status).toBe(200);
+      const uiPayload = (await uiRes.json()) as {
+        counts?: { running?: number };
+        running?: Array<{ issue_identifier?: string }>;
+      };
+      expect(uiPayload.counts?.running).toBe(0);
+      expect(uiPayload.running).toEqual([]);
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('resolves same-issue multi-run compatibility lookups while leaving ui data on the selected run', async () => {
     const { root, env, paths } = await createRunRoot('task-1035-current');
     await seedManifest(paths, {

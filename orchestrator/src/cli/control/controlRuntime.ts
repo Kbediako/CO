@@ -1055,7 +1055,7 @@ function isProviderIntakeClaimActiveForSourceCurrentActivity(
   if (isStaleTerminalReleasedProviderSource(claim, source)) {
     return false;
   }
-  if (isAcceptedPendingRevalidationSourceWithDeadLocalProof(claim, source)) {
+  if (isAcceptedPendingRevalidationSourceWithInactiveLocalProof(claim, source)) {
     return false;
   }
   if (
@@ -1070,7 +1070,7 @@ function isProviderIntakeClaimActiveForSourceCurrentActivity(
   return isProviderIntakeClaimActiveCurrentActivity(claim);
 }
 
-function isAcceptedPendingRevalidationSourceWithDeadLocalProof(
+function isAcceptedPendingRevalidationSourceWithInactiveLocalProof(
   claim: Pick<ProviderIntakeClaimRecord, 'state' | 'reason'>,
   source: Pick<ControlCompatibilitySourceContext, 'rawStatus' | 'providerLinearWorkerProof' | 'startedAt'>
 ): boolean {
@@ -1078,7 +1078,11 @@ function isAcceptedPendingRevalidationSourceWithDeadLocalProof(
     source.rawStatus === 'in_progress' &&
     claim.state === 'accepted' &&
     claim.reason === 'provider_issue_rehydration_pending_revalidation' &&
-    hasStaleLocalProviderInProgressProof(source.providerLinearWorkerProof, source.startedAt)
+    source.providerLinearWorkerProof !== null &&
+    (!isProviderLinearWorkerProofFreshForStage(
+      source.providerLinearWorkerProof as unknown as Record<string, unknown>,
+      source.startedAt
+    ) || hasStaleLocalProviderInProgressProof(source.providerLinearWorkerProof, source.startedAt))
   );
 }
 
