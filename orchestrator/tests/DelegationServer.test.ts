@@ -4194,12 +4194,15 @@ describe('delegation server MCP framing', () => {
         onIdleTimeout
       });
 
+      await vi.advanceTimersByTimeAsync(900);
       input.write('Content-Length: 42\r\n\r');
       await Promise.resolve();
       await Promise.resolve();
       expect(onIdleTimeout).toHaveBeenCalledTimes(0);
 
-      await vi.advanceTimersByTimeAsync(1_000);
+      await vi.advanceTimersByTimeAsync(900);
+      expect(onIdleTimeout).toHaveBeenCalledTimes(0);
+      await vi.advanceTimersByTimeAsync(100);
       expect(onIdleTimeout).toHaveBeenCalledTimes(1);
 
     } finally {

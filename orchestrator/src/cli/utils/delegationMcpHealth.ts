@@ -139,6 +139,7 @@ interface DelegateServerProcessDraft {
   parentCwd: string | null;
   rootCodexParent: DelegateServerProcessRecord | null;
   rootCodexParentCwd: string | null;
+  cwdLookupAvailable: boolean;
   manifestAssociation: DelegateServerManifestAssociation | null;
   ancestryPids: number[];
 }
@@ -419,6 +420,22 @@ function inspectDelegateServerProcessBundle(options: {
     options.processCwdLookup,
     preloadPids
   );
+  if (processes.length === 0) {
+    return {
+      inspection: {
+        status: 'ok',
+        activeCount: 0,
+        staleCount: 0,
+        activePids: [],
+        stalePids: [],
+        staleRssKb: 0,
+        thresholdSeconds,
+        detail: 'No delegate-server processes detected.',
+        details: []
+      },
+      staleRecords: []
+    };
+  }
   const manifestCatalog =
     options.manifestCatalog ?? loadDelegateServerManifestCatalog(resolveDelegateServerInspectionRepoRoot(options.repoRoot));
   const manifestCatalogByWorkspace = buildManifestCatalogByWorkspace(manifestCatalog);
@@ -1234,6 +1251,8 @@ function buildDelegateServerProcessDraft(
   const parentCwd = parentRecord ? readProcessCwdValue(parentRecord.pid) : null;
   const rootCodexParentCwd = rootCodexParent ? readProcessCwdValue(rootCodexParent.pid) : null;
   const ancestryPids = resolveProcessAncestryPids(record, processMap);
+  const candidateWorkspaces = [cwd, parentCwd, rootCodexParentCwd];
+  const cwdLookupAvailable = candidateWorkspaces.some((workspacePath) => workspacePath !== null);
   return {
     record,
     cwd,
@@ -1241,12 +1260,15 @@ function buildDelegateServerProcessDraft(
     parentCwd,
     rootCodexParent,
     rootCodexParentCwd,
+    cwdLookupAvailable,
     ancestryPids,
-    manifestAssociation: resolveManifestAssociationForProcess(
-      [cwd, parentCwd, rootCodexParentCwd],
-      ancestryPids,
-      manifestCatalogByWorkspace
-    )
+    manifestAssociation: cwdLookupAvailable
+      ? resolveManifestAssociationForProcess(
+          candidateWorkspaces,
+          ancestryPids,
+          manifestCatalogByWorkspace
+        )
+      : null
   };
 }
 
@@ -1406,6 +1428,9 @@ function finalizeDelegateServerProcessDetail(
       classification = 'idle-parent-session';
       classificationDetail = `delegate-server matches terminal manifest ${association.manifestPath} but is still below the stale threshold.`;
     }
+  } else if (!draft.cwdLookupAvailable) {
+    classificationDetail =
+      `delegate-server is rooted in live codex parent ${draft.rootCodexParent.pid}, but cwd lookup was unavailable so manifest association could not be determined.`;
   } else {
     const freshestPid = freshestUnassociatedPidByRootParent.get(draft.rootCodexParent.pid) ?? null;
     if (freshestPid !== null && freshestPid !== draft.record.pid) {
