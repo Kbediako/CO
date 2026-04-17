@@ -735,15 +735,26 @@ async function rewriteMarketplaceSourceToRelative(configPath, sourceRoot) {
 
 async function runMarketplacePluginSmoke(packageRoot, tempDir) {
   const codexBin = process.env.PACK_SMOKE_CODEX_BIN ?? 'codex';
+  const allowMarketplaceSkip = process.env.PACK_SMOKE_ALLOW_MARKETPLACE_SKIP === '1';
   const codexAvailable = await commandSucceeds(codexBin, ['--version']);
   if (!codexAvailable) {
-    console.warn(`Skipping marketplace smoke: ${codexBin} is unavailable in this environment.`);
-    return;
+    if (allowMarketplaceSkip) {
+      console.warn(`Skipping marketplace smoke: ${codexBin} is unavailable in this environment.`);
+      return;
+    }
+    throw new Error(
+      `Marketplace smoke requires ${codexBin} in PATH. Set PACK_SMOKE_ALLOW_MARKETPLACE_SKIP=1 only for local-dev opt-out.`
+    );
   }
   const marketplaceCapable = await codexSupportsMarketplace(codexBin);
   if (!marketplaceCapable) {
-    console.warn(`Skipping marketplace smoke: ${codexBin} does not expose codex marketplace add.`);
-    return;
+    if (allowMarketplaceSkip) {
+      console.warn(`Skipping marketplace smoke: ${codexBin} does not expose codex marketplace add.`);
+      return;
+    }
+    throw new Error(
+      'Marketplace smoke requires a Codex CLI with `marketplace add` support. Set PACK_SMOKE_ALLOW_MARKETPLACE_SKIP=1 only for local-dev opt-out.'
+    );
   }
 
   const marketplaceRoot = path.join(tempDir, 'codex-marketplace-root');
