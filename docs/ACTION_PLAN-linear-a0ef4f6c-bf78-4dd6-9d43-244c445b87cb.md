@@ -59,11 +59,15 @@
   - `rg -n "running_ids|retrying_ids|co-status --format json|id|bucket|state|reason|aliases|CO-223|CO-211|CO-146|CO-189" docs/PRD-linear-a0ef4f6c-bf78-4dd6-9d43-244c445b87cb.md docs/TECH_SPEC-linear-a0ef4f6c-bf78-4dd6-9d43-244c445b87cb.md docs/ACTION_PLAN-linear-a0ef4f6c-bf78-4dd6-9d43-244c445b87cb.md tasks/specs/linear-a0ef4f6c-bf78-4dd6-9d43-244c445b87cb.md tasks/tasks-linear-a0ef4f6c-bf78-4dd6-9d43-244c445b87cb.md .agent/task/linear-a0ef4f6c-bf78-4dd6-9d43-244c445b87cb.md`
   - `git diff --check -- docs/PRD-linear-a0ef4f6c-bf78-4dd6-9d43-244c445b87cb.md docs/TECH_SPEC-linear-a0ef4f6c-bf78-4dd6-9d43-244c445b87cb.md docs/ACTION_PLAN-linear-a0ef4f6c-bf78-4dd6-9d43-244c445b87cb.md tasks/specs/linear-a0ef4f6c-bf78-4dd6-9d43-244c445b87cb.md tasks/tasks-linear-a0ef4f6c-bf78-4dd6-9d43-244c445b87cb.md .agent/task/linear-a0ef4f6c-bf78-4dd6-9d43-244c445b87cb.md tasks/index.json docs/TASKS.md docs/docs-freshness-registry.json`
 - Parent implementation lane:
+  - `node scripts/spec-guard.mjs --dry-run`
   - focused compatibility-hydration regressions for `running_ids` / `retrying_ids`
   - focused `co-status --format json` row-field hydration regressions for `id`, `bucket`, `state`, `reason`, and `aliases`
   - focused regression to prove meaningful event rendering remains intact
   - parent docs-review before implementation
+  - `npm run docs:check`
+  - `npm run docs:freshness`
   - parent-selected scoped validation after source edits
+  - `node scripts/diff-budget.mjs`
 - Rollback plan:
   - revert the bounded compatibility-hydration seam if it regresses canonical mapping or meaningful event rendering
 

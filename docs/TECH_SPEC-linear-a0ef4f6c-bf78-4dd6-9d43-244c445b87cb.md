@@ -114,8 +114,8 @@ last_review: 2026-04-18
 ## Architecture & Data
 - Architecture / design adjustments:
   - reuse the existing post-rehydrate canonical mapping from the selected/compatibility runtime path instead of adding a second identity source
-  - decide one compatibility payload contract that owns `running_ids` and `retrying_ids` for `/api/v1/state`
-  - ensure the same compatibility contract feeds `co-status --format json` row fields `id`, `bucket`, `state`, `reason`, and `aliases`
+  - define one compatibility payload contract that owns `running_ids` and `retrying_ids` for `/api/v1/state`
+  - feed `co-status --format json` row fields `id`, `bucket`, `state`, `reason`, and `aliases` from that same compatibility contract
 - Required artifact/content expectations:
   - `ControlCompatibilityProjectionSnapshot` or an adjacent state-surface wrapper carries populated ids after rehydrate
   - compatibility row hydration carries `aliases` and stable row identity metadata forward after rehydrate
