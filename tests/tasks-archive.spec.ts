@@ -20,9 +20,24 @@ afterEach(async () => {
   }
 });
 
-async function initRepository(): Promise<string> {
+async function initRepository(options?: {
+  maxLines?: number;
+  reserveLines?: number;
+  completedTaskIndexEntry?: Record<string, unknown>;
+}): Promise<string> {
   const repo = await mkdtemp(join(tmpdir(), 'tasks-archive-'));
   createdDirs.push(repo);
+
+  const maxLines = options?.maxLines ?? 11;
+  const reserveLines = options?.reserveLines ?? 2;
+  const completedTaskIndexEntry = {
+    id: '20260413-linear-6ed6ef11-538e-48f0-936c-8547632bf92e',
+    title: 'Completed linear archive candidate',
+    paths: {
+      task: 'tasks/tasks-linear-6ed6ef11-538e-48f0-936c-8547632bf92e.md'
+    },
+    ...options?.completedTaskIndexEntry
+  };
 
   await mkdir(join(repo, 'docs'), { recursive: true });
   await mkdir(join(repo, 'tasks'), { recursive: true });
@@ -32,8 +47,8 @@ async function initRepository(): Promise<string> {
     JSON.stringify(
       {
         version: 1,
-        max_lines: 11,
-        reserve_lines: 2,
+        max_lines: maxLines,
+        reserve_lines: reserveLines,
         archive_branch: 'task-archives',
         archive_file_pattern: 'docs/TASKS-archive-YYYY.md',
         repo_url: 'https://github.com/example/repo'
@@ -48,13 +63,7 @@ async function initRepository(): Promise<string> {
     JSON.stringify(
       {
         items: [
-          {
-            id: '20260413-linear-6ed6ef11-538e-48f0-936c-8547632bf92e',
-            title: 'Completed linear archive candidate',
-            paths: {
-              task: 'tasks/tasks-linear-6ed6ef11-538e-48f0-936c-8547632bf92e.md'
-            }
-          },
+          completedTaskIndexEntry,
           {
             id: '1001',
             title: 'Active numeric task',
@@ -130,5 +139,60 @@ describe('tasks-archive script', () => {
     expect(archiveContent).toContain('<!-- docs-sync:begin linear-6ed6ef11-538e-48f0-936c-8547632bf92e -->');
     expect(archiveContent).not.toContain('1002-still-active-task');
     expect(archiveContent).toContain('Task Archive');
+  });
+
+  it('archives at the hard ceiling when reserve_lines is zero', async () => {
+    const repo = await initRepository({
+      maxLines: 12,
+      reserveLines: 0
+    });
+
+    await execFileAsync('node', [scriptPath, '--out', 'docs/TASKS-archive-YYYY.md'], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const tasksContent = await readFile(join(repo, 'docs', 'TASKS.md'), 'utf8');
+    const archiveContent = await readFile(
+      join(repo, 'docs', `TASKS-archive-${archiveYear}.md`),
+      'utf8'
+    );
+
+    expect(tasksContent).not.toContain('linear-6ed6ef11-538e-48f0-936c-8547632bf92e');
+    expect(archiveContent).toContain('linear-6ed6ef11-538e-48f0-936c-8547632bf92e');
+  });
+
+  it('preserves legacy gate-only completion fallback for status-less index rows', async () => {
+    const repo = await initRepository({
+      completedTaskIndexEntry: {
+        gate: {
+          status: 'succeeded',
+          run_id: '2026-04-13T02-03-04-000Z-completedgate1'
+        }
+      }
+    });
+
+    await execFileAsync('node', [scriptPath, '--out', 'docs/TASKS-archive-YYYY.md'], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const tasksContent = await readFile(join(repo, 'docs', 'TASKS.md'), 'utf8');
+    const archiveContent = await readFile(
+      join(repo, 'docs', `TASKS-archive-${archiveYear}.md`),
+      'utf8'
+    );
+
+    expect(tasksContent).not.toContain('linear-6ed6ef11-538e-48f0-936c-8547632bf92e');
+    expect(archiveContent).toContain('linear-6ed6ef11-538e-48f0-936c-8547632bf92e');
+    expect(archiveContent).not.toContain('1002-still-active-task');
   });
 });

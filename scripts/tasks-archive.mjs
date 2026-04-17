@@ -262,7 +262,7 @@ function loadTaskIndex(raw) {
     const completedByIndex = status === 'succeeded' || status === 'completed' || Boolean(completedAtFromIndex);
     const completedAt =
       completedAtFromIndex ??
-      (completedByIndex && gateStatus === 'succeeded' ? parseDateString(runDate) : null);
+      (gateStatus === 'succeeded' ? parseDateString(runDate) : null);
     const entry = {
       status,
       gateStatus,
@@ -379,8 +379,10 @@ async function main() {
   const lines = normalizedTasks.split('\n');
   const totalLines = countNormalizedLines(normalizedTasks);
   const targetLines = policy.maxLines - policy.reserveLines;
+  const withinArchiveThreshold = (lineCount) =>
+    policy.reserveLines === 0 ? lineCount < targetLines : lineCount <= targetLines;
 
-  if (totalLines <= targetLines) {
+  if (withinArchiveThreshold(totalLines)) {
     console.log(
       `docs/TASKS.md is within reserve target (${totalLines}/${policy.maxLines}; reserve ${policy.reserveLines}, target ${targetLines}).`
     );
@@ -427,14 +429,14 @@ async function main() {
   const toArchive = [];
   let remainingLines = totalLines;
   for (const candidate of candidates) {
-    if (remainingLines <= targetLines) {
+    if (withinArchiveThreshold(remainingLines)) {
       break;
     }
     toArchive.push(candidate);
     remainingLines -= candidate.lineCount;
   }
 
-  if (remainingLines > targetLines) {
+  if (!withinArchiveThreshold(remainingLines)) {
     throw new Error(
       `Unable to restore reserve target ${targetLines}; ${remainingLines} lines remain after archiving (hard max ${policy.maxLines}).`
     );
@@ -463,7 +465,7 @@ async function main() {
   updatedContent = updateArchiveIndex(updatedContent, policy, archivedYears);
   const updatedLineCount = countNormalizedLines(updatedContent);
 
-  if (updatedLineCount > targetLines) {
+  if (!withinArchiveThreshold(updatedLineCount)) {
     throw new Error(
       `Archive output still exceeds reserve target ${targetLines}; ${updatedLineCount} lines remain after archiving (hard max ${policy.maxLines}).`
     );
