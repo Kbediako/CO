@@ -150,24 +150,83 @@ function parseHeaderSections(lines) {
   return sections;
 }
 
-function findSnapshotHeaderLine(lines, section) {
-  for (let index = section.start; index <= section.end; index += 1) {
-    if (lineStartsWithSnapshotHeader(lines[index])) {
-      return lines[index];
+const SNAPSHOT_HEADER_UPDATE_PATTERN =
+  /^# Task List Snapshot(?:\s+—|\s+-).*?\s+-\s+(?:Rework\s+)?Update\s+(\d{4}-\d{2}-\d{2}):\s*(.*)$/i;
+const SNAPSHOT_UPDATE_PATTERNS = [
+  /^(?:[-*]\s+)?\*\*Update\s+[—-]\s*(\d{4}-\d{2}-\d{2}):\*\*\s*(.*)$/i,
+  /^(?:[-*]\s+)?(?:Rework\s+)?Update\s+(\d{4}-\d{2}-\d{2}):\s*(.*)$/i
+];
+const NEGATED_COMPLETED_PATTERN = /\b(?:non|not)(?:[\s-]+yet)?[\s-]+completed\b/i;
+const TERMINAL_UPDATE_BODY_PATTERNS = [
+  /^completed(?:$|[.;]|,\s|\s+\(|\s+(?:after|as|the|with|via|by|under|for|while)\b)/i,
+  /^(?:implementation(?:\s+\+\s+implementation-gate)?|bounded implementation)\s+(?:is\s+)?(?:complete|completed)\b/i,
+  /^(?:this|the)\s+(?:lane|task|issue|snapshot|packet)\s+is\s+(?:closed|complete)\b/i,
+  /^`?(?:CO-\d+|linear-[A-Za-z0-9-]+|\d{4,})`?\s+is\s+(?:closed|complete)\b/i
+];
+
+function parseSnapshotUpdateLine(line) {
+  if (typeof line !== 'string') {
+    return null;
+  }
+
+  const headerMatch = line.match(SNAPSHOT_HEADER_UPDATE_PATTERN);
+  if (headerMatch?.[1]) {
+    return {
+      date: headerMatch[1],
+      body: headerMatch[2] ?? ''
+    };
+  }
+
+  for (const pattern of SNAPSHOT_UPDATE_PATTERNS) {
+    const match = line.match(pattern);
+    if (match?.[1]) {
+      return {
+        date: match[1],
+        body: match[2] ?? ''
+      };
     }
   }
+
   return null;
 }
 
-function parseCompletedSnapshotDate(headerLine) {
-  if (typeof headerLine !== 'string') {
+function isTerminalSnapshotUpdateBody(body) {
+  if (typeof body !== 'string') {
+    return false;
+  }
+
+  const trimmedBody = body.trim();
+  if (NEGATED_COMPLETED_PATTERN.test(trimmedBody)) {
+    return false;
+  }
+
+  return TERMINAL_UPDATE_BODY_PATTERNS.some((pattern) => pattern.test(trimmedBody));
+}
+
+function parseCompletedSnapshotDate(lines, section) {
+  if (!Array.isArray(lines) || !section) {
     return null;
   }
-  const match = headerLine.match(/Update (\d{4}-\d{2}-\d{2}): completed\b/i);
-  if (!match?.[1]) {
+
+  const sectionLines = lines.slice(section.start, section.end + 1);
+  for (let index = sectionLines.length - 1; index >= 0; index -= 1) {
+    const parsedUpdate = parseSnapshotUpdateLine(sectionLines[index]);
+    if (!parsedUpdate) {
+      continue;
+    }
+
+    if (isTerminalSnapshotUpdateBody(parsedUpdate.body)) {
+      const parsed = parseDateString(parsedUpdate.date);
+      if (parsed) {
+        return parsed;
+      }
+      continue;
+    }
+
     return null;
   }
-  return parseDateString(match[1]);
+
+  return null;
 }
 
 function parseTaskSections(lines) {
@@ -437,8 +496,7 @@ async function main() {
   const candidates = [];
   for (const section of sections) {
     const entry = taskIndex.get(section.taskKey);
-    const headerLine = findSnapshotHeaderLine(lines, section);
-    const headerCompletedAt = parseCompletedSnapshotDate(headerLine);
+    const headerCompletedAt = parseCompletedSnapshotDate(lines, section);
     if (entry?.status && !entry.completedByIndex) {
       continue;
     }

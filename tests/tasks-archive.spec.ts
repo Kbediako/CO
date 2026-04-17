@@ -24,6 +24,7 @@ async function initRepository(options?: {
   maxLines?: number;
   reserveLines?: number;
   completedTaskIndexEntry?: Record<string, unknown>;
+  completedSnapshotLines?: string[];
 }): Promise<string> {
   const repo = await mkdtemp(join(tmpdir(), 'tasks-archive-'));
   createdDirs.push(repo);
@@ -94,12 +95,14 @@ async function initRepository(options?: {
   await writeFile(
     join(repo, 'docs', 'TASKS.md'),
     [
-      `# Task List Snapshot - Completed linear archive candidate (linear-6ed6ef11-538e-48f0-936c-8547632bf92e) - Update ${completedAt}: completed`,
-      '',
-      '<!-- docs-sync:begin linear-6ed6ef11-538e-48f0-936c-8547632bf92e -->',
-      '## Checklist Mirror',
-      '- [x] archived by proactive reserve restoration.',
-      '<!-- docs-sync:end linear-6ed6ef11-538e-48f0-936c-8547632bf92e -->',
+      ...(options?.completedSnapshotLines ?? [
+        `# Task List Snapshot - Completed linear archive candidate (linear-6ed6ef11-538e-48f0-936c-8547632bf92e) - Update ${completedAt}: completed`,
+        '',
+        '<!-- docs-sync:begin linear-6ed6ef11-538e-48f0-936c-8547632bf92e -->',
+        '## Checklist Mirror',
+        '- [x] archived by proactive reserve restoration.',
+        '<!-- docs-sync:end linear-6ed6ef11-538e-48f0-936c-8547632bf92e -->'
+      ]),
       '',
       `<!-- tasks-archive-index:begin --> ## Archive index - archived task snapshots live on the task-archives branch. ${archiveYear}: https://github.com/example/repo/blob/task-archives/docs/TASKS-archive-${archiveYear}.md <!-- tasks-archive-index:end -->`,
       '',
@@ -164,6 +167,379 @@ describe('tasks-archive script', () => {
 
     expect(tasksContent).not.toContain('linear-6ed6ef11-538e-48f0-936c-8547632bf92e');
     expect(archiveContent).toContain('linear-6ed6ef11-538e-48f0-936c-8547632bf92e');
+  });
+
+  it('archives completed snapshots when the terminal state is phrased as is closed', async () => {
+    const repo = await initRepository({
+      completedSnapshotLines: [
+        `# Task List Snapshot - Completed linear archive candidate (linear-6ed6ef11-538e-48f0-936c-8547632bf92e) - Update ${completedAt}: \`CO-221\` is closed.`,
+        '',
+        '<!-- docs-sync:begin linear-6ed6ef11-538e-48f0-936c-8547632bf92e -->',
+        '## Checklist Mirror',
+        '- [x] archived after closed phrasing.',
+        '<!-- docs-sync:end linear-6ed6ef11-538e-48f0-936c-8547632bf92e -->'
+      ]
+    });
+
+    await execFileAsync('node', [scriptPath, '--out', 'docs/TASKS-archive-YYYY.md'], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const tasksContent = await readFile(join(repo, 'docs', 'TASKS.md'), 'utf8');
+    const archiveContent = await readFile(
+      join(repo, 'docs', `TASKS-archive-${archiveYear}.md`),
+      'utf8'
+    );
+
+    expect(tasksContent).not.toContain('linear-6ed6ef11-538e-48f0-936c-8547632bf92e');
+    expect(archiveContent).toContain('Update 2026-04-13: `CO-221` is closed.');
+  });
+
+  it('archives completed snapshots when the header uses implementation complete phrasing', async () => {
+    const repo = await initRepository({
+      completedSnapshotLines: [
+        `# Task List Snapshot - Completed linear archive candidate (linear-6ed6ef11-538e-48f0-936c-8547632bf92e) - Update ${completedAt}: implementation complete for \`CO-221\`.`,
+        '',
+        '<!-- docs-sync:begin linear-6ed6ef11-538e-48f0-936c-8547632bf92e -->',
+        '## Checklist Mirror',
+        '- [x] archived after implementation-complete phrasing.',
+        '<!-- docs-sync:end linear-6ed6ef11-538e-48f0-936c-8547632bf92e -->'
+      ]
+    });
+
+    await execFileAsync('node', [scriptPath, '--out', 'docs/TASKS-archive-YYYY.md'], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const tasksContent = await readFile(join(repo, 'docs', 'TASKS.md'), 'utf8');
+    const archiveContent = await readFile(
+      join(repo, 'docs', `TASKS-archive-${archiveYear}.md`),
+      'utf8'
+    );
+
+    expect(tasksContent).not.toContain('linear-6ed6ef11-538e-48f0-936c-8547632bf92e');
+    expect(archiveContent).toContain('implementation complete for `CO-221`.');
+  });
+
+  it('archives completed snapshots when the header uses completed parenthetical closeout phrasing', async () => {
+    const repo = await initRepository({
+      completedSnapshotLines: [
+        `# Task List Snapshot - Completed linear archive candidate (linear-6ed6ef11-538e-48f0-936c-8547632bf92e) - Update ${completedAt}: completed (bounded closeout recorded with final validation evidence).`,
+        '',
+        '<!-- docs-sync:begin linear-6ed6ef11-538e-48f0-936c-8547632bf92e -->',
+        '## Checklist Mirror',
+        '- [x] archived after parenthetical completed phrasing.',
+        '<!-- docs-sync:end linear-6ed6ef11-538e-48f0-936c-8547632bf92e -->'
+      ]
+    });
+
+    await execFileAsync('node', [scriptPath, '--out', 'docs/TASKS-archive-YYYY.md'], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const tasksContent = await readFile(join(repo, 'docs', 'TASKS.md'), 'utf8');
+    const archiveContent = await readFile(
+      join(repo, 'docs', `TASKS-archive-${archiveYear}.md`),
+      'utf8'
+    );
+
+    expect(tasksContent).not.toContain('linear-6ed6ef11-538e-48f0-936c-8547632bf92e');
+    expect(archiveContent).toContain(
+      'Update 2026-04-13: completed (bounded closeout recorded with final validation evidence).'
+    );
+  });
+
+  it('archives completed snapshots when the header uses completed with closeout phrasing', async () => {
+    const repo = await initRepository({
+      completedSnapshotLines: [
+        `# Task List Snapshot - Completed linear archive candidate (linear-6ed6ef11-538e-48f0-936c-8547632bf92e) - Update ${completedAt}: completed with final validation evidence.`,
+        '',
+        '<!-- docs-sync:begin linear-6ed6ef11-538e-48f0-936c-8547632bf92e -->',
+        '## Checklist Mirror',
+        '- [x] archived after completed-with phrasing.',
+        '<!-- docs-sync:end linear-6ed6ef11-538e-48f0-936c-8547632bf92e -->'
+      ]
+    });
+
+    await execFileAsync('node', [scriptPath, '--out', 'docs/TASKS-archive-YYYY.md'], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const tasksContent = await readFile(join(repo, 'docs', 'TASKS.md'), 'utf8');
+    const archiveContent = await readFile(
+      join(repo, 'docs', `TASKS-archive-${archiveYear}.md`),
+      'utf8'
+    );
+
+    expect(tasksContent).not.toContain('linear-6ed6ef11-538e-48f0-936c-8547632bf92e');
+    expect(archiveContent).toContain(
+      'Update 2026-04-13: completed with final validation evidence.'
+    );
+  });
+
+  it('archives completed snapshots when the header uses rework update phrasing', async () => {
+    const repo = await initRepository({
+      completedSnapshotLines: [
+        `# Task List Snapshot - Completed linear archive candidate (linear-6ed6ef11-538e-48f0-936c-8547632bf92e) - Rework Update ${completedAt}: completed with final validation evidence.`,
+        '',
+        '<!-- docs-sync:begin linear-6ed6ef11-538e-48f0-936c-8547632bf92e -->',
+        '## Checklist Mirror',
+        '- [x] archived after rework-update phrasing.',
+        '<!-- docs-sync:end linear-6ed6ef11-538e-48f0-936c-8547632bf92e -->'
+      ]
+    });
+
+    await execFileAsync('node', [scriptPath, '--out', 'docs/TASKS-archive-YYYY.md'], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const tasksContent = await readFile(join(repo, 'docs', 'TASKS.md'), 'utf8');
+    const archiveContent = await readFile(
+      join(repo, 'docs', `TASKS-archive-${archiveYear}.md`),
+      'utf8'
+    );
+
+    expect(tasksContent).not.toContain('linear-6ed6ef11-538e-48f0-936c-8547632bf92e');
+    expect(archiveContent).toContain(
+      'Rework Update 2026-04-13: completed with final validation evidence.'
+    );
+  });
+
+  it('archives completed snapshots when the dated terminal update appears later in the section', async () => {
+    const repo = await initRepository({
+      completedSnapshotLines: [
+        '# Task List Snapshot - Completed linear archive candidate (linear-6ed6ef11-538e-48f0-936c-8547632bf92e)',
+        '',
+        `- **Update — ${completedAt}:** \`CO-221\` is complete.`,
+        '',
+        '<!-- docs-sync:begin linear-6ed6ef11-538e-48f0-936c-8547632bf92e -->',
+        '## Checklist Mirror',
+        '- [x] archived after a later section update line.',
+        '<!-- docs-sync:end linear-6ed6ef11-538e-48f0-936c-8547632bf92e -->'
+      ]
+    });
+
+    await execFileAsync('node', [scriptPath, '--out', 'docs/TASKS-archive-YYYY.md'], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const tasksContent = await readFile(join(repo, 'docs', 'TASKS.md'), 'utf8');
+    const archiveContent = await readFile(
+      join(repo, 'docs', `TASKS-archive-${archiveYear}.md`),
+      'utf8'
+    );
+
+    expect(tasksContent).not.toContain('linear-6ed6ef11-538e-48f0-936c-8547632bf92e');
+    expect(archiveContent).toContain('**Update — 2026-04-13:** `CO-221` is complete.');
+  });
+
+  it('does not archive snapshots when completed only appears inside a non-terminal blocker phrase', async () => {
+    const repo = await initRepository({
+      completedSnapshotLines: [
+        '# Task List Snapshot - Completed linear archive candidate (linear-6ed6ef11-538e-48f0-936c-8547632bf92e)',
+        '',
+        '- Update 2026-04-13: opened to track a non-completed blocker while follow-up validation remains active.',
+        '',
+        '<!-- docs-sync:begin linear-6ed6ef11-538e-48f0-936c-8547632bf92e -->',
+        '## Checklist Mirror',
+        '- [ ] still active',
+        '<!-- docs-sync:end linear-6ed6ef11-538e-48f0-936c-8547632bf92e -->'
+      ]
+    });
+
+    await expect(
+      execFileAsync('node', [scriptPath, '--out', 'docs/TASKS-archive-YYYY.md'], {
+        cwd: repo,
+        env: {
+          ...process.env,
+          CODEX_ORCHESTRATOR_ROOT: repo,
+          CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+        }
+      })
+    ).rejects.toThrow(/no eligible tasks can be archived/i);
+
+    const tasksContent = await readFile(join(repo, 'docs', 'TASKS.md'), 'utf8');
+    expect(tasksContent).toContain('linear-6ed6ef11-538e-48f0-936c-8547632bf92e');
+  });
+
+  it('does not archive snapshots when completed is negated as not completed yet', async () => {
+    const repo = await initRepository({
+      completedSnapshotLines: [
+        '# Task List Snapshot - Completed linear archive candidate (linear-6ed6ef11-538e-48f0-936c-8547632bf92e)',
+        '',
+        '- Update 2026-04-13: not completed yet; QA follow-up remains.',
+        '',
+        '<!-- docs-sync:begin linear-6ed6ef11-538e-48f0-936c-8547632bf92e -->',
+        '## Checklist Mirror',
+        '- [ ] still active',
+        '<!-- docs-sync:end linear-6ed6ef11-538e-48f0-936c-8547632bf92e -->'
+      ]
+    });
+
+    await expect(
+      execFileAsync('node', [scriptPath, '--out', 'docs/TASKS-archive-YYYY.md'], {
+        cwd: repo,
+        env: {
+          ...process.env,
+          CODEX_ORCHESTRATOR_ROOT: repo,
+          CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+        }
+      })
+    ).rejects.toThrow(/no eligible tasks can be archived/i);
+
+    const tasksContent = await readFile(join(repo, 'docs', 'TASKS.md'), 'utf8');
+    expect(tasksContent).toContain('linear-6ed6ef11-538e-48f0-936c-8547632bf92e');
+  });
+
+  it('does not treat checklist notes that mention an old update as the latest terminal update', async () => {
+    const repo = await initRepository({
+      completedSnapshotLines: [
+        '# Task List Snapshot - Completed linear archive candidate (linear-6ed6ef11-538e-48f0-936c-8547632bf92e)',
+        '',
+        '- Update 2026-04-13: reopened for QA follow-up.',
+        '',
+        '<!-- docs-sync:begin linear-6ed6ef11-538e-48f0-936c-8547632bf92e -->',
+        '## Checklist Mirror',
+        '- [x] Historical note: Update 2026-04-10: completed via the earlier dry-run, but the current lane remains active.',
+        '<!-- docs-sync:end linear-6ed6ef11-538e-48f0-936c-8547632bf92e -->'
+      ]
+    });
+
+    await expect(
+      execFileAsync('node', [scriptPath, '--out', 'docs/TASKS-archive-YYYY.md'], {
+        cwd: repo,
+        env: {
+          ...process.env,
+          CODEX_ORCHESTRATOR_ROOT: repo,
+          CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+        }
+      })
+    ).rejects.toThrow(/no eligible tasks can be archived/i);
+
+    const tasksContent = await readFile(join(repo, 'docs', 'TASKS.md'), 'utf8');
+    expect(tasksContent).toContain('Historical note: Update 2026-04-10: completed via the earlier dry-run');
+  });
+
+  it('does not archive status-less snapshots when another task completion is referenced first', async () => {
+    const repo = await initRepository({
+      completedSnapshotLines: [
+        '# Task List Snapshot - Completed linear archive candidate (linear-6ed6ef11-538e-48f0-936c-8547632bf92e)',
+        '',
+        '- Update 2026-04-13: `1224` completed; current task remains the bounded docs-first lane for the non-interactive handoff shell.',
+        '',
+        '<!-- docs-sync:begin linear-6ed6ef11-538e-48f0-936c-8547632bf92e -->',
+        '## Checklist Mirror',
+        '- [x] packet inherited from the prior task while the current lane continues.',
+        '<!-- docs-sync:end linear-6ed6ef11-538e-48f0-936c-8547632bf92e -->'
+      ]
+    });
+
+    await expect(
+      execFileAsync('node', [scriptPath, '--out', 'docs/TASKS-archive-YYYY.md'], {
+        cwd: repo,
+        env: {
+          ...process.env,
+          CODEX_ORCHESTRATOR_ROOT: repo,
+          CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+        }
+      })
+    ).rejects.toThrow(/no eligible tasks can be archived/i);
+
+    const tasksContent = await readFile(join(repo, 'docs', 'TASKS.md'), 'utf8');
+    expect(tasksContent).toContain('`1224` completed; current task remains the bounded docs-first lane');
+  });
+
+  it('does not archive snapshots when the latest dated update is non-terminal', async () => {
+    const repo = await initRepository({
+      completedSnapshotLines: [
+        '# Task List Snapshot - Completed linear archive candidate (linear-6ed6ef11-538e-48f0-936c-8547632bf92e)',
+        '',
+        '- Update 2026-04-10: this lane is complete.',
+        '- Update 2026-04-13: reopened for QA follow-up.',
+        '',
+        '<!-- docs-sync:begin linear-6ed6ef11-538e-48f0-936c-8547632bf92e -->',
+        '## Checklist Mirror',
+        '- [ ] still active',
+        '<!-- docs-sync:end linear-6ed6ef11-538e-48f0-936c-8547632bf92e -->'
+      ]
+    });
+
+    await expect(
+      execFileAsync('node', [scriptPath, '--out', 'docs/TASKS-archive-YYYY.md'], {
+        cwd: repo,
+        env: {
+          ...process.env,
+          CODEX_ORCHESTRATOR_ROOT: repo,
+          CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+        }
+      })
+    ).rejects.toThrow(/no eligible tasks can be archived/i);
+
+    const tasksContent = await readFile(join(repo, 'docs', 'TASKS.md'), 'utf8');
+    expect(tasksContent).toContain('linear-6ed6ef11-538e-48f0-936c-8547632bf92e');
+  });
+
+  it('uses the latest terminal update date when multiple terminal updates exist', async () => {
+    const repo = await initRepository({
+      completedSnapshotLines: [
+        '# Task List Snapshot - Completed linear archive candidate (linear-6ed6ef11-538e-48f0-936c-8547632bf92e)',
+        '',
+        '- Update 2025-12-31: this lane is complete.',
+        '- Update 2026-01-02: `CO-221` is closed.',
+        '',
+        '<!-- docs-sync:begin linear-6ed6ef11-538e-48f0-936c-8547632bf92e -->',
+        '## Checklist Mirror',
+        '- [x] closed in 2026',
+        '<!-- docs-sync:end linear-6ed6ef11-538e-48f0-936c-8547632bf92e -->'
+      ]
+    });
+
+    await execFileAsync('node', [scriptPath, '--out', 'docs/TASKS-archive-YYYY.md'], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const archive2025 = await readFile(join(repo, 'docs', 'TASKS-archive-2025.md'), 'utf8').catch(
+      () => null
+    );
+    const archive2026 = await readFile(join(repo, 'docs', 'TASKS-archive-2026.md'), 'utf8');
+
+    expect(archive2025).toBeNull();
+    expect(archive2026).toContain('Update 2026-01-02: `CO-221` is closed.');
   });
 
   it('preserves legacy gate-only completion fallback for status-less index rows', async () => {
