@@ -51,6 +51,22 @@ async function writeFakeCodexBinary(dir: string, featureLine: string): Promise<s
   return binPath;
 }
 
+async function writeFakeDelegationDistEntrypoint(rootDir: string): Promise<string> {
+  const distDir = join(rootDir, 'dist', 'bin');
+  const entryPath = join(distDir, 'codex-orchestrator.js');
+  await mkdir(distDir, { recursive: true });
+  await writeFile(
+    entryPath,
+    [
+      'process.stdout.write(',
+      "  JSON.stringify({ jsonrpc: '2.0', id: 1, result: { protocolVersion: '2024-11-05' } }) + '\\n'",
+      ');'
+    ].join('\n'),
+    'utf8'
+  );
+  return entryPath;
+}
+
 function buildDoctorCloudEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
   return {
     ...sanitizeProviderOverrideEnv(process.env),
@@ -234,15 +250,17 @@ describe('runDoctor', () => {
     const originalCodexHome = process.env.CODEX_HOME;
     const originalCodexCliBin = process.env.CODEX_CLI_BIN;
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
+    const fakeDistRoot = await mkdtemp(join(tmpdir(), 'codex-dist-'));
     process.env.CODEX_HOME = tempHome;
     process.env.CODEX_CLI_BIN = join(tempHome, 'missing-codex');
     try {
+      const fakeDistEntrypoint = await writeFakeDelegationDistEntrypoint(fakeDistRoot);
       await writeFile(
         join(tempHome, 'config.toml'),
         [
           '[mcp_servers.delegation]',
           `command = "${process.execPath.replace(/\\/g, '\\\\')}"`,
-          `args = ["${join(process.cwd(), 'dist', 'bin', 'codex-orchestrator.js').replace(/\\/g, '\\\\')}", "delegate-server"]`
+          `args = ["${fakeDistEntrypoint.replace(/\\/g, '\\\\')}", "delegate-server"]`
         ].join('\n'),
         'utf8'
       );
@@ -265,6 +283,7 @@ describe('runDoctor', () => {
         process.env.CODEX_CLI_BIN = originalCodexCliBin;
       }
       await rm(tempHome, { recursive: true, force: true });
+      await rm(fakeDistRoot, { recursive: true, force: true });
     }
   }, 15000);
 
