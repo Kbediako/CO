@@ -58,7 +58,7 @@ async function runCommandCapture(command, args, options = {}) {
       stderr += chunk;
     });
     child.once('error', (error) => reject(error));
-    child.once('exit', (code) => {
+    child.once('close', (code) => {
       if (code === 0) {
         resolve({ stdout, stderr });
       } else {
@@ -564,9 +564,14 @@ function startAppServerJsonlClient(command, env) {
   return {
     async request(method, params) {
       const id = nextId++;
-      child.stdin.write(`${JSON.stringify({ method, id, params })}\n`);
       return await new Promise((resolve, reject) => {
         pending.set(id, { resolve, reject });
+        try {
+          child.stdin.write(`${JSON.stringify({ method, id, params })}\n`);
+        } catch (error) {
+          pending.delete(id);
+          reject(error instanceof Error ? error : new Error(String(error)));
+        }
       });
     },
     notify(method, params) {
