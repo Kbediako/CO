@@ -70,6 +70,16 @@ export interface ProviderLinearAuditEntry {
   comment_id: string | null;
   attachment_id: string | null;
   asset_urls?: string[] | null;
+  previous_state?: string | null;
+  previous_state_type?: string | null;
+  target_state?: string | null;
+  target_state_type?: string | null;
+  issue_updated_at?: string | null;
+  expected_state?: string | null;
+  expected_state_type?: string | null;
+  expected_updated_at?: string | null;
+  force?: boolean | null;
+  force_reason?: string | null;
   error_code: string | null;
   error_message: string | null;
 }
@@ -286,6 +296,37 @@ function normalizeProviderLinearAuditEntry(value: unknown): ProviderLinearAuditE
             .map((value) => normalizeOptionalString(value))
             .filter((value): value is string => value !== null)
         }
+      : {}),
+    ...(Object.prototype.hasOwnProperty.call(entry, 'previous_state')
+      ? { previous_state: normalizeOptionalString(entry.previous_state) }
+      : {}),
+    ...(Object.prototype.hasOwnProperty.call(entry, 'previous_state_type')
+      ? { previous_state_type: normalizeOptionalString(entry.previous_state_type) }
+      : {}),
+    ...(Object.prototype.hasOwnProperty.call(entry, 'target_state')
+      ? { target_state: normalizeOptionalString(entry.target_state) }
+      : {}),
+    ...(Object.prototype.hasOwnProperty.call(entry, 'target_state_type')
+      ? { target_state_type: normalizeOptionalString(entry.target_state_type) }
+      : {}),
+    ...(Object.prototype.hasOwnProperty.call(entry, 'issue_updated_at')
+      ? { issue_updated_at: normalizeOptionalString(entry.issue_updated_at) }
+      : {}),
+    ...(Object.prototype.hasOwnProperty.call(entry, 'expected_state')
+      ? { expected_state: normalizeOptionalString(entry.expected_state) }
+      : {}),
+    ...(Object.prototype.hasOwnProperty.call(entry, 'expected_state_type')
+      ? { expected_state_type: normalizeOptionalString(entry.expected_state_type) }
+      : {}),
+    ...(Object.prototype.hasOwnProperty.call(entry, 'expected_updated_at')
+      ? { expected_updated_at: normalizeOptionalString(entry.expected_updated_at) }
+      : {}),
+    ...(Object.prototype.hasOwnProperty.call(entry, 'force')
+      && typeof entry.force === 'boolean'
+      ? { force: entry.force }
+      : {}),
+    ...(Object.prototype.hasOwnProperty.call(entry, 'force_reason')
+      ? { force_reason: normalizeOptionalString(entry.force_reason) }
       : {}),
     error_code: normalizeOptionalString(entry.error_code),
     error_message: normalizeOptionalString(entry.error_message)
