@@ -76,6 +76,11 @@ function resolveMarketplaceSourceRoot() {
   if (sourceType === 'git') {
     return resolveInstalledMarketplaceSourceRoot(codexHome, source);
   }
+  if (sourceType) {
+    throw new Error(
+      `Codex config at ${configPath} has unsupported ${MARKETPLACE_SECTION}.source_type=${JSON.stringify(sourceType)}. Expected "local" or "git".`
+    );
+  }
   if (isAbsolute(source)) {
     return source;
   }
