@@ -22,7 +22,7 @@ last_review: 2026-04-17
 ## Parity / Alignment Matrix
 - Required for parity/alignment lanes; otherwise state `Not applicable`.
 - Current truth: `CLOUD_CANARY_EXPECT_FALLBACK=1` clears `CODEX_CLOUD_ENV_ID`, the orchestrator correctly falls back to local MCP and records `missing_environment`, but the wrapper adds a fatal required-mode configuration failure after the fallback assertions pass.
-- Reference truth: the fallback promotion gate should pass when it proves the fallback branch and should fail when fallback assertions fail or when a real execution problem occurs.
+- Reference truth: the fallback promotion gate should pass when it proves the fallback branch, and should fail when fallback assertions fail or when a real execution problem occurs.
 - Target truth / intended delta: expected fallback `missing_environment` remains required evidence for the fallback contract and is no longer double-counted as fatal after the contract is proven.
 - Explicitly out-of-scope differences: changing cloud environment setup, changing the fallback trigger, or making configuration failures skippable for normal required cloud execution.
 
@@ -41,7 +41,7 @@ last_review: 2026-04-17
   - No secret values written to logs or workpad.
   - Fail closed when fallback evidence is incomplete.
 - Interfaces / contracts:
-  - Required command: `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 npm run ci:cloud-canary`.
+  - Required command: `CODEX_CLOUD_ENV_ID=<env-id> CODEX_ORCHESTRATOR_CLOUD_FALLBACK=deny CODEX_CLOUD_CANARY_REQUIRED=1 npm run ci:cloud-canary`.
   - Fallback command: `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 CLOUD_CANARY_EXPECT_FALLBACK=1 npm run ci:cloud-canary`.
 
 ## Architecture & Data

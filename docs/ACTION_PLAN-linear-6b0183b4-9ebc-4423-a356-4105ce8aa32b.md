@@ -26,7 +26,7 @@
 ## Validation
 - Checks / tests:
   - `npm run test -- --run tests/cloud-canary-ci.spec.ts` or equivalent focused Vitest invocation.
-  - `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 npm run ci:cloud-canary`
+  - `CODEX_CLOUD_ENV_ID=<env-id> CODEX_ORCHESTRATOR_CLOUD_FALLBACK=deny CODEX_CLOUD_CANARY_REQUIRED=1 npm run ci:cloud-canary`
   - `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 CLOUD_CANARY_EXPECT_FALLBACK=1 npm run ci:cloud-canary`
   - Required repo gates from AGENTS.md.
 - Rollback plan: revert the wrapper predicate and test if fallback evidence acceptance masks any genuine failure in review.
