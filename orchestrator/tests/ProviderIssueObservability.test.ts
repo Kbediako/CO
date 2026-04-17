@@ -1780,6 +1780,42 @@ describe('provider issue observability', () => {
     });
   });
 
+  it('keeps real stage failure text in retry truth and projected progress', () => {
+    const failureSummary = "Stage 'fail once' failed with exit code 1.";
+    const snapshot = buildProviderIssueDebugSnapshot({
+      tracked_issue: {
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-04-18T02:00:00.000Z'
+      },
+      claim: {
+        state: 'resumable',
+        reason: 'provider_issue_rehydrated_resumable_run',
+        updated_at: '2026-04-18T02:00:10.000Z',
+        issue_updated_at: '2026-04-18T02:00:00.000Z',
+        run_id: 'run-225',
+        retry_queued: true,
+        retry_attempt: 1,
+        retry_due_at: '2026-04-18T02:05:00.000Z',
+        retry_error: failureSummary
+      },
+      proof: {
+        owner_phase: 'ended',
+        owner_status: 'failed',
+        end_reason: 'stage:fail-once:failed',
+        last_event: 'turn_failed',
+        last_message: failureSummary,
+        last_event_at: '2026-04-18T02:00:08.000Z',
+        updated_at: '2026-04-18T02:00:09.000Z',
+        linear_audit: null
+      }
+    });
+
+    expect(snapshot?.claim?.retry?.error).toBe(failureSummary);
+    expect(snapshot?.progress?.summary).toBe(failureSummary);
+    expect(snapshot?.progress?.summary).not.toContain('Guardrails: spec-guard command not found.');
+  });
+
   it('preserves merge closeout progress after a successful worker exit', () => {
     const snapshot = buildProviderIssueDebugSnapshot({
       tracked_issue: {
