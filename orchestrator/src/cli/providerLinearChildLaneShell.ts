@@ -998,7 +998,6 @@ async function resolveChildLaneDecision(
       });
     }
     const proofViolation = resolveAcceptedChildLaneProofViolation(
-      context.runId,
       target,
       acceptedProof,
       context.repoRoot,
@@ -1355,6 +1354,7 @@ async function resolvePendingChildLaneDecisionTarget(input: {
     target,
     context: input.context,
     childRunsRoot: input.childRunsRoot,
+    action: input.action,
     deps: input.deps,
     now: input.now
   });
@@ -1364,6 +1364,15 @@ async function resolvePendingChildLaneDecisionTarget(input: {
       return { kind: 'blocked', outcome: { kind: 'not_found' }, records };
     }
     resolvedTarget = repaired.target;
+  }
+  const postRepairBlocked = resolveChildLaneDecisionPreRepairBlockedOutcome(
+    input.context,
+    input.stream,
+    resolvedTarget,
+    input.now
+  );
+  if (postRepairBlocked) {
+    return { kind: 'blocked', outcome: postRepairBlocked, records };
   }
   const blocked = resolveChildLaneDecisionReadinessBlockedOutcome(resolvedTarget, input.action);
   if (blocked) {
@@ -1417,6 +1426,7 @@ async function repairPendingLaunchingChildLaneDecisionTarget(input: {
     'issueId' | 'issueIdentifier' | 'taskId' | 'runId' | 'repoRoot'
   >;
   childRunsRoot: string;
+  action: 'accept' | 'reject' | 'invalidate';
   deps: Pick<ProviderLinearChildLaneShellDependencies, 'readChildLaneProof'>;
   now: string;
 }): Promise<{ records: ProviderLinearWorkerChildLaneRecord[]; target: ProviderLinearWorkerChildLaneRecord | null } | null> {
@@ -1427,6 +1437,7 @@ async function repairPendingLaunchingChildLaneDecisionTarget(input: {
     reservation: input.target,
     context: input.context,
     childRunsRoot: input.childRunsRoot,
+    action: input.action,
     deps: input.deps,
     now: input.now
   });
@@ -1533,6 +1544,7 @@ async function findChildLaneReservationRepairCandidate(input: {
     'issueId' | 'issueIdentifier' | 'taskId' | 'runId' | 'repoRoot'
   >;
   childRunsRoot: string;
+  action: 'accept' | 'reject' | 'invalidate';
   deps: Pick<ProviderLinearChildLaneShellDependencies, 'readChildLaneProof'>;
   now: string;
 }): Promise<ProviderLinearWorkerChildLaneRecord | null> {
@@ -1565,6 +1577,7 @@ async function findChildLaneReservationRepairCandidate(input: {
       reservation: input.reservation,
       context: input.context,
       childRunsRoot: input.childRunsRoot,
+      action: input.action,
       deps: input.deps,
       now: input.now,
       runId
@@ -1583,6 +1596,7 @@ async function readChildLaneReservationRepairCandidate(input: {
     'issueId' | 'issueIdentifier' | 'taskId' | 'runId' | 'repoRoot'
   >;
   childRunsRoot: string;
+  action: 'accept' | 'reject' | 'invalidate';
   deps: Pick<ProviderLinearChildLaneShellDependencies, 'readChildLaneProof'>;
   now: string;
   runId: string;
@@ -1626,7 +1640,8 @@ async function readChildLaneReservationRepairCandidate(input: {
     proof,
     context: input.context,
     repoRoot: input.context.repoRoot,
-    childRunsRoot: input.childRunsRoot
+    childRunsRoot: input.childRunsRoot,
+    action: input.action
   });
   return proofViolation ? null : candidate;
 }
@@ -1734,6 +1749,7 @@ function resolveChildLaneReservationRepairProofViolation(input: {
   context: Pick<Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>, 'runId' | 'repoRoot'>;
   repoRoot: string;
   childRunsRoot: string;
+  action: 'accept' | 'reject' | 'invalidate';
 }): string | null {
   if (normalizeOptionalString(input.proof.purpose) !== normalizeOptionalString(input.reservation.purpose)) {
     return 'Child lane proof purpose does not match the pending launching reservation.';
@@ -1758,18 +1774,18 @@ function resolveChildLaneReservationRepairProofViolation(input: {
   if (!artifactRoot) {
     return 'Child lane artifact root must stay anchored to the expected workspace-local child run directory before reservation repair.';
   }
+  const proofLineageViolation = resolveChildLaneProofLineageViolation(input.context.runId, input.candidate, input.proof);
+  if (proofLineageViolation) {
+    return proofLineageViolation;
+  }
+  if (input.action !== 'accept') {
+    return null;
+  }
   const patchArtifactPath = resolveAcceptedPatchArtifactPath(input.repoRoot, input.candidate, artifactRoot);
   if (!patchArtifactPath) {
     return 'Child lane proof patch artifact path must stay within the child lane artifact root before reservation repair.';
   }
-  return resolveAcceptedChildLaneProofViolation(
-    input.context.runId,
-    input.candidate,
-    input.proof,
-    input.repoRoot,
-    artifactRoot,
-    patchArtifactPath
-  );
+  return resolveAcceptedChildLaneProofViolation(input.candidate, input.proof, input.repoRoot, artifactRoot, patchArtifactPath);
 }
 
 function mergeCompletedChildLaneWithParentDecision(
@@ -1777,7 +1793,11 @@ function mergeCompletedChildLaneWithParentDecision(
   completed: ProviderLinearWorkerChildLaneRecord
 ): ProviderLinearWorkerChildLaneRecord {
   if (current.decision === 'pending') {
-    return completed;
+    return {
+      ...completed,
+      in_flight_action: current.in_flight_action,
+      in_flight_started_at: current.in_flight_started_at
+    };
   }
   return {
     ...completed,
@@ -2455,13 +2475,10 @@ function resolvePersistedScopeContractViolation(
   return null;
 }
 
-function resolveAcceptedChildLaneProofViolation(
+function resolveChildLaneProofLineageViolation(
   parentRunId: string,
   childLane: ProviderLinearWorkerChildLaneRecord,
-  proof: ProviderLinearChildLaneProof,
-  repoRoot: string,
-  artifactRoot: string,
-  patchArtifactPath: string
+  proof: ProviderLinearChildLaneProof
 ): string | null {
   if (
     proof.task_id !== childLane.task_id ||
@@ -2472,6 +2489,20 @@ function resolveAcceptedChildLaneProofViolation(
     proof.issue_identifier !== childLane.issue_identifier
   ) {
     return 'Child lane proof lineage does not match the parent ledger record.';
+  }
+  return null;
+}
+
+function resolveAcceptedChildLaneProofViolation(
+  childLane: ProviderLinearWorkerChildLaneRecord,
+  proof: ProviderLinearChildLaneProof,
+  repoRoot: string,
+  artifactRoot: string,
+  patchArtifactPath: string
+): string | null {
+  const lineageViolation = resolveChildLaneProofLineageViolation(proof.parent_run_id, childLane, proof);
+  if (lineageViolation) {
+    return lineageViolation;
   }
   const proofPatchArtifactPath = resolveAcceptedPatchArtifactPath(
     repoRoot,
