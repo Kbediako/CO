@@ -531,8 +531,8 @@ async function main() {
       assert(Array.isArray(cloudFallback.issues) && cloudFallback.issues.length > 0, 'cloud_fallback.issues should include at least one preflight issue.');
       if (Array.isArray(cloudFallback.issues)) {
         assert(
-          cloudFallback.issues.some((issue) => issue?.code === 'missing_environment'),
-          'cloud_fallback.issues should include missing_environment for fallback canary mode.'
+          hasOnlyExpectedFallbackIssues(cloudFallback.issues),
+          'cloud_fallback.issues should contain only missing_environment for fallback canary mode.'
         );
       }
     }
