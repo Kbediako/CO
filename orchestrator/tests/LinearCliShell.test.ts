@@ -336,7 +336,7 @@ describe('runLinearCliShell', () => {
     });
   });
 
-  it('preserves the fallback issue id when transition failure details omit resolved identity', async () => {
+  it('preserves fallback issue identity and requested guard inputs when transition failure details omit them', async () => {
     const log = vi.fn();
     const appendAuditEntry = vi.fn();
     const transitionProviderLinearIssueStateMock =
@@ -361,7 +361,11 @@ describe('runLinearCliShell', () => {
           format: 'json',
           'issue-id': 'lin-issue-1',
           state: 'Merging',
-          'expected-state': 'In Review'
+          'expected-state': 'In Review',
+          'expected-state-type': 'started',
+          'expected-updated-at': '2026-04-17T05:53:29.672Z',
+          force: true,
+          'force-reason': 'manual reopen after merge-race correction'
         },
         printHelp: vi.fn()
       },
@@ -397,11 +401,11 @@ describe('runLinearCliShell', () => {
       target_state: null,
       target_state_type: null,
       issue_updated_at: null,
-      expected_state: null,
-      expected_state_type: null,
-      expected_updated_at: null,
-      force: null,
-      force_reason: null,
+      expected_state: 'In Review',
+      expected_state_type: 'started',
+      expected_updated_at: '2026-04-17T05:53:29.672Z',
+      force: true,
+      force_reason: 'manual reopen after merge-race correction',
       error_code: 'linear_rate_limited',
       error_message: 'Linear API rate limit exceeded.'
     });

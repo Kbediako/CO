@@ -8011,7 +8011,31 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
-  it('allows forced terminal reopen transitions to bypass stale CAS expectations while keeping the guard audit', async () => {
+  it('rejects forced terminal reopen transitions without a non-empty force reason', async () => {
+    const fetchImpl: typeof fetch = vi.fn();
+
+    const result = await transitionProviderLinearIssueState({
+      issueId: 'lin-issue-1',
+      stateName: 'Merging',
+      force: true,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'transition',
+      error: {
+        code: 'linear_force_reason_missing',
+        status: 422
+      }
+    });
+  });
+
+  it('rejects forced terminal reopen transitions when stale CAS expectations no longer match', async () => {
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
         query?: string;
@@ -8093,35 +8117,26 @@ describe('providerLinearWorkflowFacade', () => {
       fetchImpl
     });
 
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(result).toMatchObject({
-      ok: true,
+      ok: false,
       operation: 'transition',
-      action: 'updated',
-      issue: {
-        state: {
-          id: 'state-merging',
-          name: 'Merging',
-          type: 'started'
-        },
-        updated_at: '2026-04-17T06:05:00.000Z'
-      },
-      previous_state: {
-        id: 'state-done',
-        name: 'Done',
-        type: 'completed'
-      },
-      target_state: {
-        id: 'state-merging',
-        name: 'Merging',
-        type: 'started'
-      },
-      transition_guard: {
-        expected_state: 'In Review',
-        expected_state_type: 'started',
-        expected_updated_at: '2026-04-17T05:53:29.672Z',
-        force: true,
-        force_reason: 'manual reopen after merge-race correction'
+      error: {
+        code: 'linear_transition_conflict',
+        status: 409,
+        details: {
+          previous_state: 'Done',
+          previous_state_type: 'completed',
+          target_state: 'Merging',
+          target_state_type: 'started',
+          issue_updated_at: '2026-04-17T06:00:27.516Z',
+          expected_state: 'In Review',
+          expected_state_type: 'started',
+          expected_updated_at: '2026-04-17T05:53:29.672Z',
+          force: true,
+          force_reason: 'manual reopen after merge-race correction',
+          mismatch_fields: ['state', 'state_type', 'updated_at']
+        }
       }
     });
   });

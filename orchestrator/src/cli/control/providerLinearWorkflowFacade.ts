@@ -5763,21 +5763,6 @@ function failureIfTransitionPreconditionsMismatch(
   targetState: ProviderLinearWorkflowState,
   guard: ProviderLinearTransitionGuardInput
 ): ProviderLinearOperationFailure<'transition'> | null {
-  if (
-    guard.force &&
-    isProviderLinearTerminalReopenTransition({
-      current: {
-        state: summary.state?.name ?? null,
-        state_type: summary.state?.type ?? null
-      },
-      target: {
-        state: targetState.name,
-        state_type: targetState.type
-      }
-    })
-  ) {
-    return null;
-  }
   const mismatches: string[] = [];
   if (guard.expectedStateName !== null) {
     const actualState = normalizeProviderLinearWorkflowState(summary.state?.name);

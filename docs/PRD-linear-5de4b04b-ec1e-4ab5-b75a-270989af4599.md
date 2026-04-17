@@ -71,6 +71,7 @@
   - this docs child lane should touch implementation or tests
 
 ## Parity / Alignment Matrix
+
 | Surface | Current Truth | Target Truth |
 | --- | --- | --- |
 | `linear transition` | `linearCliShell.ts` forwards only target `--state`, and `providerLinearWorkflowFacade.ts` transitions after summary reads without expected-state/CAS semantics or expected updated_at. | `linear transition` can carry expected-state/CAS semantics and expected updated_at so stale callers fail closed. |
