@@ -2021,6 +2021,56 @@ describe('provider issue observability', () => {
     });
   });
 
+  it('treats equal terminal and merge-closeout timestamps as terminal-winning', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
+      tracked_issue: {
+        state: 'Done',
+        state_type: 'completed',
+        updated_at: '2026-04-05T06:50:30.000Z'
+      },
+      claim: {
+        state: 'completed',
+        updated_at: '2026-04-05T06:50:30.000Z',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        issue_updated_at: '2026-04-05T06:50:30.000Z',
+        merge_closeout: {
+          recorded_at: '2026-04-05T06:50:30.000Z',
+          status: 'merged',
+          reason: 'pending_shared_root_reconciliation',
+          summary: 'Merged attached PR #82; shared-root reconciliation is pending.',
+          snapshot: {
+            updated_at: '2026-04-05T06:50:30.000Z',
+            merged_at: '2026-04-05T06:50:00.000Z'
+          },
+          shared_root: {
+            status: 'skipped',
+            reason: 'shared_root_dirty'
+          }
+        }
+      },
+      proof: {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_inactive',
+        last_event: 'task_complete',
+        last_message: 'Worker exited after merge closeout.',
+        last_event_at: '2026-04-05T06:50:10.000Z',
+        updated_at: '2026-04-05T06:50:15.000Z',
+        linear_audit: null
+      }
+    });
+
+    expect(progress).toMatchObject({
+      phase: 'completed',
+      kind: 'workflow',
+      status: 'completed',
+      last_semantic_progress_at: '2026-04-05T06:50:30.000Z',
+      stall_classification: 'completed',
+      recovery_recommendation: 'no_action'
+    });
+  });
+
   it('surfaces failed shared-root reconciliation as failed after merge closeout', () => {
     const snapshot = buildProviderIssueDebugSnapshot({
       tracked_issue: {

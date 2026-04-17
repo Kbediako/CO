@@ -609,7 +609,7 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
     compareIsoTimestamp(
       terminalWorkflowUpdatedAt,
       mergeCloseoutProgress.last_semantic_progress_at
-    ) > 0
+    ) >= 0
   );
   const lastSemanticProgressAt = latestIsoTimestamp(
     normalizeOptionalString(proof?.current_turn_activity?.recorded_at),
@@ -630,7 +630,7 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
   const terminalWorkflowIsNewerThanWorkerProgress = Boolean(
     (trackedWorkflowState?.isTerminal || claimWorkflowState?.isTerminal)
     && terminalWorkflowUpdatedAt
-    && compareIsoTimestamp(terminalWorkflowUpdatedAt, lastSemanticProgressAt) > 0
+    && compareIsoTimestamp(terminalWorkflowUpdatedAt, lastSemanticProgressAt) >= 0
   );
 
   if (ownerStatus === 'failed' || ownerPhase === 'turn_failed') {
