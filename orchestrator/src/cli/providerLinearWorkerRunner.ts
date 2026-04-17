@@ -4496,7 +4496,8 @@ interface ProviderLinearWorkerChildLaneManifestHydrationCandidate {
 
 async function hydrateProviderLinearWorkerChildLanesFromActiveManifests(
   runDir: string,
-  childLanes: ProviderLinearWorkerChildLaneRecord[]
+  childLanes: ProviderLinearWorkerChildLaneRecord[],
+  priorProofChildLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined = null
 ): Promise<ProviderLinearWorkerChildLaneRecord[]> {
   if (childLanes.length === 0) {
     return childLanes;
@@ -4507,7 +4508,11 @@ async function hydrateProviderLinearWorkerChildLanesFromActiveManifests(
   }
   return await Promise.all(
     childLanes.map(async (childLane) =>
-      await hydrateProviderLinearWorkerChildLaneFromActiveManifest(parent, childLane)
+      await hydrateProviderLinearWorkerChildLaneFromActiveManifest(
+        parent,
+        childLane,
+        findMatchingPriorHydratedProviderLinearWorkerChildLane(childLane, priorProofChildLanes)
+      )
     )
   );
 }
@@ -4518,10 +4523,11 @@ async function readHydratedProviderLinearWorkerChildLanesAndRepairLedger(
 ): Promise<ProviderLinearWorkerChildLaneRecord[]> {
   return await withProviderLinearWorkerChildLanesLock(runDir, async () => {
     const existing = await readProviderLinearWorkerChildLanes(runDir);
-    const hydrationInputs = existing.map((childLane) =>
-      selectProviderLinearWorkerChildLaneHydrationInput(childLane, priorProofChildLanes)
+    const hydrated = await hydrateProviderLinearWorkerChildLanesFromActiveManifests(
+      runDir,
+      existing,
+      priorProofChildLanes
     );
-    const hydrated = await hydrateProviderLinearWorkerChildLanesFromActiveManifests(runDir, hydrationInputs);
     const ledgerRecords = hydrated.map((childLane, index) =>
       preserveProviderLinearWorkerLaunchReservationLedgerIdentity(existing[index] ?? null, childLane)
     );
@@ -4532,24 +4538,26 @@ async function readHydratedProviderLinearWorkerChildLanesAndRepairLedger(
   });
 }
 
-function selectProviderLinearWorkerChildLaneHydrationInput(
+function findMatchingPriorHydratedProviderLinearWorkerChildLane(
   existing: ProviderLinearWorkerChildLaneRecord,
   priorProofChildLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined
-): ProviderLinearWorkerChildLaneRecord {
+): ProviderLinearWorkerChildLaneRecord | null {
   const existingRunId = normalizeOptionalString(existing.run_id);
   if (!existingRunId?.startsWith('launching-') || !Array.isArray(priorProofChildLanes)) {
-    return existing;
+    return null;
   }
-  return priorProofChildLanes.find((prior) =>
-    prior.pipeline_id === existing.pipeline_id &&
-    prior.decision === existing.decision &&
-    prior.stream === existing.stream &&
-    prior.task_id === existing.task_id &&
-    prior.issue_id === existing.issue_id &&
-    prior.issue_identifier === existing.issue_identifier &&
-    prior.launched_at === existing.launched_at &&
-    normalizeOptionalString(prior.run_id)?.startsWith('launching-') !== true
-  ) ?? existing;
+  return (
+    priorProofChildLanes.find((prior) =>
+      prior.pipeline_id === existing.pipeline_id &&
+      prior.decision === existing.decision &&
+      prior.stream === existing.stream &&
+      prior.task_id === existing.task_id &&
+      prior.issue_id === existing.issue_id &&
+      prior.issue_identifier === existing.issue_identifier &&
+      prior.launched_at === existing.launched_at &&
+      normalizeOptionalString(prior.run_id)?.startsWith('launching-') !== true
+    ) ?? null
+  );
 }
 
 function preserveProviderLinearWorkerLaunchReservationLedgerIdentity(
@@ -4599,7 +4607,8 @@ async function readProviderLinearWorkerParentManifestHydrationMetadata(
 
 async function hydrateProviderLinearWorkerChildLaneFromActiveManifest(
   parent: ProviderLinearWorkerParentManifestHydrationMetadata,
-  childLane: ProviderLinearWorkerChildLaneRecord
+  childLane: ProviderLinearWorkerChildLaneRecord,
+  priorHydratedChildLane: ProviderLinearWorkerChildLaneRecord | null = null
 ): Promise<ProviderLinearWorkerChildLaneRecord> {
   if (!isProviderLinearWorkerPendingChildLaneRecord(childLane)) {
     return childLane;
@@ -4627,10 +4636,20 @@ async function hydrateProviderLinearWorkerChildLaneFromActiveManifest(
     return childLane;
   }
   const summary = buildProviderLinearWorkerHydratedChildLaneSummary(childLane, candidate);
+  const priorSummaryRecordedAt =
+    priorHydratedChildLane && priorHydratedChildLane.summary === summary
+      ? priorHydratedChildLane.summary_recorded_at
+      : null;
   const summaryRecordedAt =
     summary === childLane.summary
-      ? childLane.summary_recorded_at ?? candidate.summaryRecordedAt ?? childLane.launched_at
-      : candidate.summaryRecordedAt ?? childLane.summary_recorded_at ?? childLane.launched_at;
+      ? childLane.summary_recorded_at ??
+        priorSummaryRecordedAt ??
+        candidate.summaryRecordedAt ??
+        childLane.launched_at
+      : priorSummaryRecordedAt ??
+        candidate.summaryRecordedAt ??
+        childLane.summary_recorded_at ??
+        childLane.launched_at;
   return {
     ...childLane,
     run_id: candidate.runId,
