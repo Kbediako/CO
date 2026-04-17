@@ -7749,7 +7749,7 @@ describe('ControlServer', () => {
       expect(expiryClose).toHaveBeenCalledOnce();
       expect(bootstrapClose).toHaveBeenCalledOnce();
       expect(clientEnd).toHaveBeenCalledOnce();
-      expect(order).toEqual(['expiry', 'bootstrap', 'client', 'server']);
+      expect(order).toEqual(['server', 'expiry', 'bootstrap', 'client']);
       expect(runtimeServer.lifecycleState.expiryLifecycle).toBeNull();
       expect(runtimeServer.lifecycleState.bootstrapLifecycle).toBeNull();
     } finally {

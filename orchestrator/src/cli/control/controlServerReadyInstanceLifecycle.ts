@@ -52,6 +52,7 @@ export async function startControlServerReadyInstanceLifecycle(
 }
 
 export {
+  beginControlServerShutdown,
   closeControlServerOwnedRuntime,
   type ControlServerOwnedLifecycleState
 } from './controlServerOwnedRuntimeLifecycle.js';

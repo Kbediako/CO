@@ -36,6 +36,7 @@ import {
   type ControlPollingMode
 } from './providerPollingHealth.js';
 import {
+  beginControlServerShutdown,
   closeControlServerOwnedRuntime,
   startControlServerReadyInstanceLifecycle,
   type ControlServerOwnedLifecycleState
@@ -215,6 +216,7 @@ export async function startControlServerPublicLifecycle(
 export async function closeControlServerPublicLifecycle(
   state: ControlServerPublicLifecycleState
 ): Promise<void> {
+  const serverClosePromise = beginControlServerShutdown(state.server);
   if (state.providerRefreshStartupTrigger) {
     clearTimeout(state.providerRefreshStartupTrigger);
   }
@@ -233,7 +235,8 @@ export async function closeControlServerPublicLifecycle(
     await closeControlServerOwnedRuntime({
       server: state.server,
       requestContextShared: state.requestContextShared,
-      lifecycleState: state.lifecycleState
+      lifecycleState: state.lifecycleState,
+      serverClosePromise
     });
   } catch (error) {
     closeError = error;
