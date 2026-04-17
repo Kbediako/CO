@@ -2027,6 +2027,38 @@ describe('provider issue observability', () => {
     });
   });
 
+  it('does not let claim-only terminal cache override live worker progress when tracked issue data is unavailable', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
+      claim: {
+        state: 'completed',
+        updated_at: '2026-04-05T06:55:00.000Z',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        issue_updated_at: '2026-04-05T06:52:00.000Z'
+      },
+      proof: {
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        last_event: 'turn_started',
+        last_message: 'Turn is still running.',
+        last_event_at: '2026-04-05T06:54:30.000Z',
+        updated_at: '2026-04-05T06:54:45.000Z',
+        linear_audit: null
+      },
+      now: () => '2026-04-05T06:55:00.000Z'
+    });
+
+    expect(progress).toMatchObject({
+      phase: 'turn_running',
+      kind: 'worker',
+      status: 'progressing',
+      summary: 'Turn is still running.',
+      last_semantic_progress_at: '2026-04-05T06:54:30.000Z',
+      stall_classification: 'progressing',
+      recovery_recommendation: 'continue_waiting'
+    });
+  });
+
   it('treats equal terminal and merge-closeout timestamps as terminal-winning', () => {
     const progress = deriveProviderLinearWorkerProgressSnapshot({
       tracked_issue: {

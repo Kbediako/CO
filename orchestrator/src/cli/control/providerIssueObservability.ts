@@ -649,10 +649,25 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
       endReason,
       lastSemanticProgressAt
     });
+  const claimTerminalWorkflowSupersedesWorkerProgress = Boolean(
+    claimWorkflowState?.isTerminal
+    && (
+      !lastSemanticProgressAt
+      || (
+        claimTerminalWorkflowIssueUpdatedAt
+        && compareIsoTimestamp(claimTerminalWorkflowIssueUpdatedAt, lastSemanticProgressAt) >= 0
+      )
+    )
+  );
   const terminalWorkflowIsNewerThanWorkerProgress = Boolean(
-    (trackedWorkflowState?.isTerminal || claimWorkflowState?.isTerminal)
-    && terminalWorkflowUpdatedAt
-    && compareIsoTimestamp(terminalWorkflowUpdatedAt, lastSemanticProgressAt) >= 0
+    (
+      (
+        trackedWorkflowState?.isTerminal
+        && trackedTerminalWorkflowUpdatedAt
+        && compareIsoTimestamp(trackedTerminalWorkflowUpdatedAt, lastSemanticProgressAt) >= 0
+      )
+      || claimTerminalWorkflowSupersedesWorkerProgress
+    )
   );
 
   if (ownerStatus === 'failed' || ownerPhase === 'turn_failed') {
@@ -792,7 +807,7 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
     };
   }
 
-  if (trackedWorkflowState?.isTerminal || claimWorkflowState?.isTerminal) {
+  if (trackedWorkflowState?.isTerminal || claimTerminalWorkflowSupersedesWorkerProgress) {
     return {
       phase: 'completed',
       kind: 'workflow',
