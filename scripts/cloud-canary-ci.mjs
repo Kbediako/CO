@@ -24,19 +24,13 @@ function envFlagEnabled(value) {
   return normalized === '1' || normalized === 'true' || normalized === 'yes';
 }
 
-function classifyFailure(signal) {
-  const normalized = signal.toLowerCase();
-  if (
-    normalized.includes('cloud-env-missing') ||
-    normalized.includes('codex_cloud_env_id') ||
-    normalized.includes('no environment id is configured')
-  ) {
-    return {
-      category: 'configuration',
-      guidance: 'Set CODEX_CLOUD_ENV_ID (or metadata.cloudEnvId) for the cloud canary target.'
-    };
-  }
-  if (
+function normalizeFailureSignal(signal) {
+  return String(signal ?? '').toLowerCase();
+}
+
+function hasCredentialFailureSignal(signal) {
+  const normalized = normalizeFailureSignal(signal);
+  return (
     normalized.includes('unauthorized') ||
     normalized.includes('forbidden') ||
     normalized.includes('not logged in') ||
@@ -44,13 +38,12 @@ function classifyFailure(signal) {
     normalized.includes('api key') ||
     normalized.includes('credential') ||
     normalized.includes('token')
-  ) {
-    return {
-      category: 'credentials',
-      guidance: 'Provide Codex Cloud credentials in CI with access to the configured environment.'
-    };
-  }
-  if (
+  );
+}
+
+function hasConnectivityFailureSignal(signal) {
+  const normalized = normalizeFailureSignal(signal);
+  return (
     normalized.includes('enotfound') ||
     normalized.includes('econn') ||
     normalized.includes('network') ||
@@ -59,13 +52,29 @@ function classifyFailure(signal) {
     normalized.includes('502') ||
     normalized.includes('503') ||
     normalized.includes('504')
-  ) {
+  );
+}
+
+function diagnosisForCategory(category) {
+  if (category === 'configuration') {
+    return {
+      category: 'configuration',
+      guidance: 'Set CODEX_CLOUD_ENV_ID (or metadata.cloudEnvId) for the cloud canary target.'
+    };
+  }
+  if (category === 'credentials') {
+    return {
+      category: 'credentials',
+      guidance: 'Provide Codex Cloud credentials in CI with access to the configured environment.'
+    };
+  }
+  if (category === 'connectivity') {
     return {
       category: 'connectivity',
       guidance: 'Cloud endpoint connectivity looks unstable; retry and inspect endpoint/network health.'
     };
   }
-  if (normalized.includes('failed') || normalized.includes('error') || normalized.includes('cancelled')) {
+  if (category === 'execution') {
     return {
       category: 'execution',
       guidance: 'Inspect cloud command logs and manifest cloud_execution.error for the terminal failure cause.'
@@ -75,6 +84,27 @@ function classifyFailure(signal) {
     category: 'unknown',
     guidance: 'Inspect manifest status_detail, runner logs, and cloud command logs to classify this failure.'
   };
+}
+
+function classifyFailure(signal) {
+  const normalized = normalizeFailureSignal(signal);
+  if (
+    normalized.includes('cloud-env-missing') ||
+    normalized.includes('codex_cloud_env_id') ||
+    normalized.includes('no environment id is configured')
+  ) {
+    return diagnosisForCategory('configuration');
+  }
+  if (hasCredentialFailureSignal(normalized)) {
+    return diagnosisForCategory('credentials');
+  }
+  if (hasConnectivityFailureSignal(normalized)) {
+    return diagnosisForCategory('connectivity');
+  }
+  if (normalized.includes('failed') || normalized.includes('error') || normalized.includes('cancelled')) {
+    return diagnosisForCategory('execution');
+  }
+  return diagnosisForCategory('unknown');
 }
 
 function hasCredentialEnv(env) {
@@ -456,26 +486,39 @@ async function main() {
     }
   }
 
-  const failureSignal = [
+  const primaryFailureSignal = [
     expectFallback ? '' : cloudFallback?.reason ?? '',
     cloudExecution?.error ?? '',
     manifest?.status_detail ?? '',
-    execution.stderr ?? '',
-    tail(execution.stdout, 20)
+    execution.stderr ?? ''
   ]
     .filter((value) => value.trim().length > 0)
     .join('\n');
-  const diagnosis = classifyFailure(failureSignal);
-  const fatalCategory =
-    required &&
-    (diagnosis.category === 'configuration' || diagnosis.category === 'credentials' || diagnosis.category === 'connectivity');
+  const stdoutFailureSignal = tail(execution.stdout, 20);
+  const failureSignal = [primaryFailureSignal, stdoutFailureSignal]
+    .filter((value) => value.trim().length > 0)
+    .join('\n');
+  const diagnosis = classifyFailure(primaryFailureSignal || stdoutFailureSignal);
+  const expectedFallbackConfigurationFailure =
+    expectFallback &&
+    cloudFallback?.mode_requested === 'cloud' &&
+    cloudFallback?.mode_used === 'mcp' &&
+    Array.isArray(cloudFallback?.issues) &&
+    cloudFallback.issues.some((issue) => issue?.code === 'missing_environment');
+  const fatalDiagnosis = required && hasCredentialFailureSignal(primaryFailureSignal)
+    ? diagnosisForCategory('credentials')
+    : required && hasConnectivityFailureSignal(primaryFailureSignal)
+      ? diagnosisForCategory('connectivity')
+      : required && diagnosis.category === 'configuration' && !expectedFallbackConfigurationFailure
+        ? diagnosis
+        : null;
   const skipEligible = !required
     && (
       (!expectFallback && SKIPPABLE_FAILURE_CATEGORIES.has(diagnosis.category))
       || (expectFallback && diagnosis.category === 'credentials')
     );
-  if (fatalCategory) {
-    assertionFailures.push(`Failure class ${diagnosis.category} indicates infrastructure/credential issues.`);
+  if (fatalDiagnosis) {
+    assertionFailures.push(`Failure class ${fatalDiagnosis.category} indicates infrastructure/credential issues.`);
   }
 
   if (assertionFailures.length === 0) {
@@ -518,13 +561,14 @@ async function main() {
     process.env.OPENAI_API_KEY,
     process.env.GITHUB_TOKEN
   ]);
+  const reportedDiagnosis = fatalDiagnosis ?? diagnosis;
   const details = [
     header,
     '',
     ...assertionFailures.map((failure) => `- ${failure}`),
     '',
-    `Failure class: ${diagnosis.category}`,
-    `Guidance: ${diagnosis.guidance}`,
+    `Failure class: ${reportedDiagnosis.category}`,
+    `Guidance: ${reportedDiagnosis.guidance}`,
     `Manifest: ${manifestPath ?? '<unresolved>'}`,
     `Run summary: ${runSummaryPath ?? '<unresolved>'}`,
     `Runner stderr (tail):`,

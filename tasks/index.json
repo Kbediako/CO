@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260417-linear-6b0183b4-9ebc-4423-a356-4105ce8aa32b",
+      "title": "CO: Clear Codex 0.121 cloud-canary promotion gate for marketplace packaging",
+      "relates_to": "tasks/tasks-linear-6b0183b4-9ebc-4423-a356-4105ce8aa32b.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-17",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-6b0183b4-9ebc-4423-a356-4105ce8aa32b.md",
+        "task": "tasks/tasks-linear-6b0183b4-9ebc-4423-a356-4105ce8aa32b.md",
+        "agent_task": ".agent/task/linear-6b0183b4-9ebc-4423-a356-4105ce8aa32b.md",
+        "docs": "docs/TECH_SPEC-linear-6b0183b4-9ebc-4423-a356-4105ce8aa32b.md"
+      }
+    },
+    {
       "id": "20260416-linear-642e622a-b02e-4766-85c2-6f2fc47b1f44",
       "title": "CO-206 operator-autopilot local_rollout lifecycle",
       "relates_to": "tasks/tasks-linear-642e622a-b02e-4766-85c2-6f2fc47b1f44.md",
@@ -11102,6 +11119,23 @@
     }
   ],
   "specs": [
+    {
+      "id": "20260417-linear-6b0183b4-9ebc-4423-a356-4105ce8aa32b",
+      "title": "CO: Clear Codex 0.121 cloud-canary promotion gate for marketplace packaging",
+      "relates_to": "tasks/tasks-linear-6b0183b4-9ebc-4423-a356-4105ce8aa32b.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-17",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-6b0183b4-9ebc-4423-a356-4105ce8aa32b.md",
+        "task": "tasks/tasks-linear-6b0183b4-9ebc-4423-a356-4105ce8aa32b.md",
+        "agent_task": ".agent/task/linear-6b0183b4-9ebc-4423-a356-4105ce8aa32b.md",
+        "docs": "docs/TECH_SPEC-linear-6b0183b4-9ebc-4423-a356-4105ce8aa32b.md"
+      }
+    },
     {
       "id": "20260415-linear-4ffb542b-28b2-4530-8630-b79357e306e2",
       "title": "CO workflow: automate docs:freshness baseline upkeep and diff-local gating",
