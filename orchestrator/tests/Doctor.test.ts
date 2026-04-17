@@ -58,9 +58,29 @@ async function writeFakeDelegationDistEntrypoint(rootDir: string): Promise<strin
   await writeFile(
     entryPath,
     [
-      'process.stdout.write(',
-      "  JSON.stringify({ jsonrpc: '2.0', id: 1, result: { protocolVersion: '2024-11-05' } }) + '\\n'",
-      ');'
+      "let input = '';",
+      "process.stdin.setEncoding('utf8');",
+      "process.stdin.on('data', (chunk) => { input += chunk; });",
+      "process.stdin.on('end', () => {",
+      "  try {",
+      "    const payload = input",
+      "      .split(/\\r?\\n/)",
+      "      .map((line) => line.trim())",
+      "      .find((line) => line.length > 0);",
+      "    const request = payload ? JSON.parse(payload) : null;",
+      "    if (request?.id !== 1 || request?.method !== 'initialize') {",
+      "      process.stderr.write('missing initialize request');",
+      "      process.exitCode = 1;",
+      "      return;",
+      "    }",
+      "    process.stdout.write(",
+      "      JSON.stringify({ jsonrpc: '2.0', id: 1, result: { protocolVersion: '2024-11-05' } }) + '\\n'",
+      "    );",
+      "  } catch (error) {",
+      "    process.stderr.write(error instanceof Error ? error.message : 'invalid initialize request');",
+      "    process.exitCode = 1;",
+      "  }",
+      "});"
     ].join('\n'),
     'utf8'
   );
