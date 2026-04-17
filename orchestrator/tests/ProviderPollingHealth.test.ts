@@ -124,6 +124,8 @@ describe('providerPollingHealth next-refresh projection', () => {
     });
     recordProviderPollingProgress(service, {
       phase: 'refresh:claim_issue_by_id_reconcile',
+      requestClass: 'claim_issue_by_id:running',
+      providerKeys: ['linear:issue-1', 'linear:issue-1', '  ', 'linear:issue-2'],
       counts: {
         claims_scanned: 2,
         issue_by_id_reads: 1,
@@ -139,7 +141,9 @@ describe('providerPollingHealth next-refresh projection', () => {
     expect(activeHealth).toMatchObject({
       checking: true,
       stuck: false,
-      refresh_phase: 'refresh:claim_issue_by_id_reconcile'
+      refresh_phase: 'refresh:claim_issue_by_id_reconcile',
+      refresh_request_class: 'claim_issue_by_id:running',
+      refresh_provider_keys: ['linear:issue-1', 'linear:issue-2']
     });
     expect(activeHealth.refresh_counts).toEqual({
       claims_scanned: 2,
@@ -158,7 +162,9 @@ describe('providerPollingHealth next-refresh projection', () => {
       stuck: true,
       restart_required: true,
       reason: 'provider_refresh_lifecycle_stuck',
-      refresh_phase: 'refresh:claim_issue_by_id_reconcile'
+      refresh_phase: 'refresh:claim_issue_by_id_reconcile',
+      refresh_request_class: 'claim_issue_by_id:running',
+      refresh_provider_keys: ['linear:issue-1', 'linear:issue-2']
     });
     expect(stuckHealth.refresh_counts).toEqual({
       claims_scanned: 2,
@@ -173,6 +179,8 @@ describe('providerPollingHealth next-refresh projection', () => {
       stuck: false,
       restart_required: false,
       refresh_phase: null,
+      refresh_request_class: null,
+      refresh_provider_keys: null,
       refresh_counts: null
     });
   });

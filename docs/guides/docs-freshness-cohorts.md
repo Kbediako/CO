@@ -119,3 +119,17 @@ CO-201 reproduced the Apr 16 baseline failure in `out/linear-c101cb88-3097-4502-
 - date cohorts: `2026-01-15` / `90` days (`2` rows) and `2026-03-16` / `30` days (`190` rows)
 
 The Apr 16 blocking cohort was reviewed in `docs/findings/linear-c101cb88-3097-4502-bcd7-723d80da7955-docs-freshness-classification.md` and refreshed instead of added to rolling deferral. Adding the `192` rows beside the existing CO-175 `221` rows would create `413` candidate rows and `10` candidate cohorts, exceeding both `max_entries=300` and `max_cohorts=2`, so CO-201 keeps the rolling policy unchanged and updates only the reviewed historical packet rows to `last_review=2026-04-16`.
+
+CO-209 reproduced the Apr 17 baseline failure in `out/linear-901cd944-fc0c-4372-92ce-65bb8bb411c0/before/docs-freshness.json`:
+
+- `263` blocking stale entries outside the CO-175 rolling cohort
+- `221` CO-175 rolling cohort entries still visible
+- `0` missing registry rows
+- `0` missing-on-disk rows
+- `0` invalid registry entries
+- `0` uncatalogued docs
+- blocking classes: Task Packet `187`, Task Mirror `38`, Report Only `38`
+- blocking path families: `.agent/task` `38`, `docs/findings` `38`, `tasks/specs` `38`, `tasks/tasks-*` `38`, `docs/PRD-*` `37`, `docs/TECH_SPEC-*` `37`, `docs/ACTION_PLAN-*` `37`
+- date cohort: `2026-03-17` / `30` days (`263` rows)
+
+The Apr 17 blocking cohort was reviewed in `docs/findings/linear-901cd944-fc0c-4372-92ce-65bb8bb411c0-docs-freshness-classification.md` and refreshed instead of added to rolling deferral. Adding the `263` rows beside the existing CO-175 `221` rows would create `484` candidate rows and `8` candidate cohorts, exceeding both `max_entries=300` and `max_cohorts=2`, so CO-209 keeps the rolling policy unchanged and updates only the reviewed historical packet rows to `last_review=2026-04-17`.

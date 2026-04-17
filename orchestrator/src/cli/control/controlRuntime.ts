@@ -374,6 +374,8 @@ function normalizePersistedProviderPollingSnapshot(
         ? polling.stalled_after_ms
         : null,
     refresh_phase: normalizeOptionalPollingString(polling.refresh_phase),
+    refresh_request_class: normalizeOptionalPollingString(polling.refresh_request_class),
+    refresh_provider_keys: normalizePollingStringArray(polling.refresh_provider_keys),
     refresh_counts: normalizePollingRefreshCounts(polling.refresh_counts),
     stuck: polling.stuck === true,
     stuck_since_at: typeof polling.stuck_since_at === 'string' ? polling.stuck_since_at : null,
@@ -397,6 +399,16 @@ function normalizePollingRefreshCounts(value: unknown): Record<string, number> |
     normalized[key] = count;
   }
   return Object.keys(normalized).length > 0 ? normalized : null;
+}
+
+function normalizePollingStringArray(value: unknown): string[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  const normalized = value
+    .map((entry) => normalizeOptionalPollingString(entry))
+    .filter((entry): entry is string => entry !== null);
+  return normalized.length > 0 ? normalized : null;
 }
 
 function normalizeOptionalPollingString(value: unknown): string | null {

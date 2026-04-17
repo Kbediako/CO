@@ -45,4 +45,28 @@ describe('cloud-canary-ci failure classification', () => {
       expect(formatCloudCanaryFailureClass(diagnosis)).toBe('credentials (cloud_connector_auth_drift)');
     }
   });
+
+  it('does not classify benign token identifiers as auth mismatch', () => {
+    const diagnosis = classifyFailure('run_id: canary-token-abc');
+
+    expect(diagnosis).toMatchObject({
+      category: 'unknown',
+      diagnostic_category: 'unknown'
+    });
+  });
+
+  it('classifies qualified token-name auth failures as auth mismatch', () => {
+    for (const signal of [
+      'missing access token',
+      'missing bearer token',
+      'Auth token expired; login required.'
+    ]) {
+      const diagnosis = classifyFailure(signal);
+
+      expect(diagnosis).toMatchObject({
+        category: 'credentials',
+        diagnostic_category: 'auth_mismatch'
+      });
+    }
+  });
 });
