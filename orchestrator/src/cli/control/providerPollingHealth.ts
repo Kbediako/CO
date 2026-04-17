@@ -285,6 +285,15 @@ export function readProviderPollingHealth(
   return buildProviderPollingHealthPayload(state, nowMs);
 }
 
+export async function waitForProviderPollingHealthUpdateDrain(
+  providerIssueHandoff: ProviderIssueHandoffService | null | undefined
+): Promise<void> {
+  if (!providerIssueHandoff) {
+    return;
+  }
+  await providerPollingHealthStates.get(providerIssueHandoff)?.updateChain.catch(() => undefined);
+}
+
 export function resolveControlPollingNextRefreshProjection(input: {
   checking: boolean;
   nextPollAt?: string | null;

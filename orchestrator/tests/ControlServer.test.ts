@@ -2914,6 +2914,89 @@ describe('ControlServer', () => {
     }
   });
 
+  it('waits for accepted provider refresh work to drain before close returns', async () => {
+    const { root, env, paths } = await createRunRoot('task-0940');
+    await seedManifest(paths, { summary: 'task is running' });
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    let blockRefresh = false;
+    let releaseRefresh: (() => void) | null = null;
+    let resolveBlockedRefreshStarted: (() => void) | null = null;
+    const blockedRefreshStarted = new Promise<void>((resolve) => {
+      resolveBlockedRefreshStarted = resolve;
+    });
+    const refreshProviderIssues = vi.fn(async () => {
+      if (!blockRefresh) {
+        return {
+          queued: true,
+          coalesced: false,
+          requested_at: '2026-03-06T03:01:00.000Z',
+          operations: ['poll', 'reconcile']
+        };
+      }
+      resolveBlockedRefreshStarted?.();
+      await new Promise<void>((resolve) => {
+        releaseRefresh = resolve;
+      });
+      return {
+        queued: true,
+        coalesced: false,
+        requested_at: '2026-03-06T03:02:00.000Z',
+        operations: ['poll', 'reconcile']
+      };
+    });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1',
+      createProviderIssueHandoff: () => ({
+        handleAcceptedTrackedIssue: vi.fn(),
+        rehydrate: vi.fn(async () => undefined),
+        refresh: refreshProviderIssues
+      })
+    });
+
+    let closePromise: Promise<void> | null = null;
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+
+      await vi.waitFor(() => expect(refreshProviderIssues).toHaveBeenCalledTimes(1));
+      blockRefresh = true;
+
+      const refreshRes = await fetch(new URL('/api/v1/refresh', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action: 'refresh' })
+      });
+
+      expect(refreshRes.status).toBe(202);
+      await blockedRefreshStarted;
+
+      let closeResolved = false;
+      closePromise = server.close().then(() => {
+        closeResolved = true;
+      });
+
+      await new Promise<void>((resolve) => setTimeout(resolve, 25));
+      expect(closeResolved).toBe(false);
+
+      releaseRefresh?.();
+      await closePromise;
+      expect(closeResolved).toBe(true);
+    } finally {
+      releaseRefresh?.();
+      await closePromise?.catch(() => undefined);
+      await server.close().catch(() => undefined);
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('invalidates the cached runtime after a control action mutates state', async () => {
     const { root, env, paths } = await createRunRoot('task-0940');
     await seedManifest(paths, { summary: 'task is running' });
