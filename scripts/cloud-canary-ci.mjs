@@ -112,10 +112,22 @@ function hasAuthMismatchSignal(normalizedSignal) {
     normalizedSignal.includes('unauthorized') ||
     normalizedSignal.includes('forbidden') ||
     normalizedSignal.includes('not logged in') ||
-    normalizedSignal.includes('login') ||
+    normalizedSignal.includes('codex login') ||
+    normalizedSignal.includes('login required') ||
+    normalizedSignal.includes('please login') ||
+    normalizedSignal.includes('please log in') ||
     normalizedSignal.includes('api key') ||
     normalizedSignal.includes('credential') ||
-    normalizedSignal.includes('token')
+    /\b(?:missing|invalid|expired|revoked|unavailable|required|denied)\W{0,8}(?:(?:auth|access|refresh|bearer)[\W_]+)?token\b/u.test(normalizedSignal) ||
+    /\b(?:(?:auth|access|refresh|bearer)[\W_]+)?token\b\W{0,24}(?:missing|mismatch|invalid|expired|revoked|unavailable|required|not found|denied|error|failure)\b/u.test(normalizedSignal)
+  );
+}
+
+function hasOnlyExpectedFallbackIssues(issues) {
+  return (
+    Array.isArray(issues) &&
+    issues.length > 0 &&
+    issues.every((issue) => issue?.code === 'missing_environment')
   );
 }
 
@@ -586,8 +598,7 @@ async function main() {
     expectFallback &&
     cloudFallback?.mode_requested === 'cloud' &&
     cloudFallback?.mode_used === 'mcp' &&
-    Array.isArray(cloudFallback?.issues) &&
-    cloudFallback.issues.some((issue) => issue?.code === 'missing_environment');
+    hasOnlyExpectedFallbackIssues(cloudFallback?.issues);
   const fatalDiagnosis = required
     ? classifyCredentialFatalSignal(fatalFailureSignal)
       ?? classifyConnectivityFatalSignal(primaryFailureSignal)

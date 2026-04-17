@@ -27,7 +27,13 @@ async function writeExecutable(path: string, content: string): Promise<void> {
 async function initFallbackCanaryRepo(
   runnerStderr: string,
   runId = 'run-fallback',
-  runnerStdout = ''
+  runnerStdout = '',
+  fallbackIssues = [
+    {
+      code: 'missing_environment',
+      message: 'Missing CODEX_CLOUD_ENV_ID.'
+    }
+  ]
 ): Promise<{ repo: string; binDir: string }> {
   const repo = await mkdtemp(join(tmpdir(), 'cloud-canary-ci-'));
   createdDirs.push(repo);
@@ -63,12 +69,7 @@ const fallback = {
   mode_requested: 'cloud',
   mode_used: 'mcp',
   reason: 'Cloud preflight failed; falling back to mcp. Missing CODEX_CLOUD_ENV_ID.',
-  issues: [
-    {
-      code: 'missing_environment',
-      message: 'Missing CODEX_CLOUD_ENV_ID.'
-    }
-  ]
+  issues: ${JSON.stringify(fallbackIssues)}
 };
 const runSummaryPath = join(artifactRoot, 'run-summary.json');
 await writeFile(
@@ -230,6 +231,22 @@ describe('cloud-canary-ci fallback contract', () => {
     });
   });
 
+  it('does not treat benign stdout token identifiers as credential failures', async () => {
+    const { repo, binDir } = await initFallbackCanaryRepo(
+      'Cloud preflight failed; falling back to mcp. Missing CODEX_CLOUD_ENV_ID.',
+      'run-fallback',
+      'run_id: canary-token-abc'
+    );
+
+    const { stdout } = await execFileAsync(process.execPath, [scriptPath], {
+      cwd: repo,
+      env: fallbackEnv(repo, binDir),
+      timeout: 60_000
+    });
+
+    expect(stdout).toContain('## Cloud Canary Fallback Contract (Passed)');
+  });
+
   it('keeps credential failures fatal when fallback stderr also includes missing environment text', async () => {
     const { repo, binDir } = await initFallbackCanaryRepo(
       'Cloud preflight failed; falling back to mcp. Missing CODEX_CLOUD_ENV_ID. Codex token unavailable.'
@@ -244,6 +261,50 @@ describe('cloud-canary-ci fallback contract', () => {
     ).rejects.toMatchObject({
       code: 1,
       stderr: expect.stringContaining('Failure class: credentials (auth_mismatch)')
+    });
+  });
+
+  it('keeps qualified token-name failures fatal in required fallback mode', async () => {
+    const { repo, binDir } = await initFallbackCanaryRepo('Missing access token.');
+
+    await expect(
+      execFileAsync(process.execPath, [scriptPath], {
+        cwd: repo,
+        env: fallbackEnv(repo, binDir),
+        timeout: 60_000
+      })
+    ).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining('Failure class: credentials (auth_mismatch)')
+    });
+  });
+
+  it('keeps fallback manifests with additional issue codes fatal in required fallback mode', async () => {
+    const { repo, binDir } = await initFallbackCanaryRepo(
+      'Cloud preflight failed; falling back to mcp. Missing CODEX_CLOUD_ENV_ID.',
+      'run-fallback',
+      '',
+      [
+        {
+          code: 'missing_environment',
+          message: 'Missing CODEX_CLOUD_ENV_ID.'
+        },
+        {
+          code: 'branch_missing',
+          message: "Cloud branch 'main' was not found on origin."
+        }
+      ]
+    );
+
+    await expect(
+      execFileAsync(process.execPath, [scriptPath], {
+        cwd: repo,
+        env: fallbackEnv(repo, binDir),
+        timeout: 60_000
+      })
+    ).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining('Failure class: configuration (env_config)')
     });
   });
 });
