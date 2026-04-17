@@ -516,6 +516,47 @@ describe('delegationMcpHealth', () => {
     });
   });
 
+  it('still matches proof-pid manifests when cwd lookup is unavailable', () => {
+    const snapshot = [
+      '303     1 20:00  10240 codex resume 019-parent',
+      '404   303 15:00   4096 /opt/homebrew/bin/node /repo/dist/bin/codex-orchestrator.js delegate-server'
+    ].join('\n');
+
+    const result = inspectDelegateServerProcesses({
+      snapshot,
+      staleThresholdSeconds: 600,
+      processCwdLookup: {
+        303: null,
+        404: null
+      },
+      manifestCatalog: [
+        {
+          manifestPath: '/repo/.runs/linear-210/cli/run-terminal/manifest.json',
+          workspacePath: '/repo',
+          status: 'succeeded',
+          pipelineId: 'provider-linear-worker',
+          taskId: 'linear-210',
+          runId: 'run-terminal',
+          issueId: 'issue-210',
+          issueIdentifier: 'CO-210',
+          proofPid: 303
+        }
+      ]
+    });
+
+    expect(result.activePids).toEqual([]);
+    expect(result.stalePids).toEqual([404]);
+    expect(result.details.find((detail) => detail.pid === 404)).toMatchObject({
+      classification: 'stale-parent-session',
+      manifestAssociation: {
+        manifestPath: '/repo/.runs/linear-210/cli/run-terminal/manifest.json',
+        proofPid: 303,
+        status: 'succeeded'
+      },
+      rootCodexParentPid: 303
+    });
+  });
+
   it('falls back to the newest terminal scoped manifest when live scoped candidates are proof-backed but ancestry does not match', () => {
     const workspaceRoot = '/repo/.workspaces/linear-210';
     const snapshot = [

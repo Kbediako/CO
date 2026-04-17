@@ -1268,7 +1268,7 @@ function buildDelegateServerProcessDraft(
           ancestryPids,
           manifestCatalogByWorkspace
         )
-      : null
+      : resolveManifestAssociationByAncestry(ancestryPids, manifestCatalogByWorkspace)
   };
 }
 
@@ -1315,6 +1315,17 @@ function resolveManifestAssociationForProcess(
     }
   }
   return null;
+}
+
+function resolveManifestAssociationByAncestry(
+  ancestryPids: number[],
+  manifestCatalogByWorkspace: Map<string, DelegateServerManifestAssociation[]>
+): DelegateServerManifestAssociation | null {
+  const ancestryPidSet = new Set(ancestryPids);
+  return [...manifestCatalogByWorkspace.values()]
+    .flat()
+    .filter((candidate) => candidate.proofPid !== null && ancestryPidSet.has(candidate.proofPid))
+    .sort(compareManifestAssociations)[0] ?? null;
 }
 
 function isScopedWorkspacePath(workspacePath: string): boolean {
