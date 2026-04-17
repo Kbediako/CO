@@ -19962,6 +19962,8 @@ describe('createProviderIssueHandoffService', () => {
       issue_id: 'lin-issue-196',
       issue_identifier: 'CO-196',
       issue_title: 'Add Codex plugin marketplace distribution path',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
       issue_updated_at: '2026-04-16T22:48:01.000Z',
       issue_blocked_by: [completedBlocker],
       task_id: 'linear-lin-issue-196',
@@ -20050,8 +20052,10 @@ describe('createProviderIssueHandoffService', () => {
       issue_identifier: 'CO-196',
       issue_title: 'Add Codex plugin marketplace distribution path',
       issue_state: 'Blocked',
+      issue_state_type: 'started',
       issue_updated_at: '2026-04-16T22:48:01.000Z',
       issue_blocked_by: [completedBlocker],
+      task_id: 'linear-lin-issue-1',
       run_id: 'linear-lin-issue-1',
       run_manifest_path: null
     }));
@@ -20111,6 +20115,7 @@ describe('createProviderIssueHandoffService', () => {
       issue_state_type: 'started',
       issue_updated_at: '2026-04-16T22:48:01.000Z',
       issue_blocked_by: [completedBlocker],
+      task_id: 'linear-lin-issue-1',
       run_id: 'linear-lin-issue-1',
       run_manifest_path: null
     });
