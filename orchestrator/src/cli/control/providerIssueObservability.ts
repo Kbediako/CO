@@ -600,10 +600,7 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
   const terminalWorkflowUpdatedAt = latestIsoTimestamp(
     trackedWorkflowState?.isTerminal ? normalizeOptionalString(trackedIssue?.updated_at) : null,
     claimWorkflowState?.isTerminal
-      ? latestIsoTimestamp(
-          normalizeOptionalString(claim?.issue_updated_at),
-          normalizeOptionalString(claim?.updated_at)
-        )
+      ? normalizeOptionalString(claim?.issue_updated_at) ?? normalizeOptionalString(claim?.updated_at)
       : null
   );
   const mergeCloseoutIssueUpdatedAt = normalizeOptionalString(mergeCloseout?.issue_updated_at);
@@ -611,10 +608,10 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
     mergeCloseoutProgress &&
     mergeCloseoutProgress.status !== 'failed' &&
     terminalWorkflowUpdatedAt &&
-    compareIsoTimestamp(
-      terminalWorkflowUpdatedAt,
-      mergeCloseoutIssueUpdatedAt ?? mergeCloseoutProgress.last_semantic_progress_at
-    ) >= 0
+    (
+      !mergeCloseoutIssueUpdatedAt ||
+      compareIsoTimestamp(terminalWorkflowUpdatedAt, mergeCloseoutIssueUpdatedAt) >= 0
+    )
   );
   const lastSemanticProgressAt = latestIsoTimestamp(
     normalizeOptionalString(proof?.current_turn_activity?.recorded_at),
