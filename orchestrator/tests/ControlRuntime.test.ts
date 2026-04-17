@@ -3958,6 +3958,201 @@ describe('ControlRuntime', () => {
     }
   });
 
+  it('prunes accepted pending-revalidation workers when fresh local proof has a dead pid', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-17T06:16:00.000Z'));
+    const stalePid = 3391;
+    vi.spyOn(process, 'kill').mockImplementation((pid, signal) => {
+      if (pid === stalePid && signal === 0) {
+        const error = new Error('process not found') as NodeJS.ErrnoException;
+        error.code = 'ESRCH';
+        throw error;
+      }
+      return true;
+    });
+    try {
+      const providerIntakeState = createProviderIntakeState([
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-196',
+          issue_id: 'lin-issue-196',
+          issue_identifier: 'CO-196',
+          issue_title: 'Accepted pending revalidation with dead local proof',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-17T06:15:00.000Z',
+          task_id: 'linear-5561a9a9-39dd-4ed4-99a0-896553327669',
+          mapping_source: 'provider_id_fallback',
+          state: 'accepted',
+          reason: 'provider_issue_rehydration_pending_revalidation',
+          accepted_at: '2026-04-17T03:45:02.315Z',
+          updated_at: '2026-04-17T06:15:00.000Z',
+          last_delivery_id: 'delivery-co-196',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_744_870_500_000,
+          run_id: '2026-04-17T03-45-02-315Z-f469b275',
+          run_manifest_path: null,
+          launch_source: 'control-host',
+          launch_token: 'launch-co-196'
+        }
+      ]);
+      const fixture = await createFixture({
+        taskId: 'linear-5561a9a9-39dd-4ed4-99a0-896553327669',
+        featureToggles: {
+          coordinator: {
+            agent: {
+              max_concurrent_agents: 3
+            }
+          }
+        },
+        providerIntakeState,
+        linearAdvisoryState: {
+          tracked_issue: createTrackedIssue({
+            id: 'lin-issue-196',
+            identifier: 'CO-196',
+            title: 'Accepted pending revalidation with dead local proof',
+            state: 'In Progress',
+            state_type: 'started',
+            updated_at: '2026-04-17T06:15:00.000Z'
+          })
+        }
+      });
+      providerIntakeState.claims[0]!.run_manifest_path = fixture.paths.manifestPath;
+      await seedManifest(fixture.paths, {
+        task_id: 'linear-5561a9a9-39dd-4ed4-99a0-896553327669',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-196',
+        issue_identifier: 'CO-196',
+        pipeline_id: 'provider-linear-worker',
+        pipeline_title: 'Provider Linear Worker',
+        status: 'in_progress',
+        started_at: '2026-04-17T03:45:02.315Z',
+        updated_at: '2026-04-17T06:15:00.000Z',
+        summary: 'stale worker still reports running'
+      });
+      await seedProviderLinearWorkerProof(fixture.paths, {
+        issue_id: 'lin-issue-196',
+        issue_identifier: 'CO-196',
+        pid: stalePid,
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        last_event: 'turn_running',
+        last_message: 'dead local worker still reports running',
+        updated_at: '2026-04-17T06:15:00.000Z'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+      const uiDataset = buildUiDataset({
+        projection: compatibilityProjection,
+        generatedAt: '2026-04-17T06:16:00.000Z'
+      });
+
+      expect(compatibilityProjection.maxConcurrentAgents).toBe(3);
+      expect(compatibilityProjection.running).toEqual([]);
+      expect(uiDataset.counts.max_allowed).toBe(3);
+      expect(uiDataset.counts.running).toBe(0);
+      expect(uiDataset.running).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps accepted pending-revalidation workers running when local proof is still live', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-17T06:16:00.000Z'));
+    const livePid = 59516;
+    vi.spyOn(process, 'kill').mockImplementation((pid, signal) => {
+      if (pid === livePid && signal === 0) {
+        return true;
+      }
+      return true;
+    });
+    try {
+      const providerIntakeState = createProviderIntakeState([
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-210',
+          issue_id: 'lin-issue-210',
+          issue_identifier: 'CO-210',
+          issue_title: 'Accepted pending revalidation with live local proof',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-17T06:15:00.000Z',
+          task_id: 'linear-issue-210-live-proof',
+          mapping_source: 'provider_id_fallback',
+          state: 'accepted',
+          reason: 'provider_issue_rehydration_pending_revalidation',
+          accepted_at: '2026-04-17T05:50:00.000Z',
+          updated_at: '2026-04-17T06:15:00.000Z',
+          last_delivery_id: 'delivery-co-210',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_744_870_500_000,
+          run_id: 'run-live-proof',
+          run_manifest_path: null,
+          launch_source: 'control-host',
+          launch_token: 'launch-co-210'
+        }
+      ]);
+      const fixture = await createFixture({
+        taskId: 'linear-issue-210-live-proof',
+        providerIntakeState,
+        linearAdvisoryState: {
+          tracked_issue: createTrackedIssue({
+            id: 'lin-issue-210',
+            identifier: 'CO-210',
+            title: 'Accepted pending revalidation with live local proof',
+            state: 'In Progress',
+            state_type: 'started',
+            updated_at: '2026-04-17T06:15:00.000Z'
+          })
+        }
+      });
+      providerIntakeState.claims[0]!.run_manifest_path = fixture.paths.manifestPath;
+      await seedManifest(fixture.paths, {
+        task_id: 'linear-issue-210-live-proof',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-210',
+        issue_identifier: 'CO-210',
+        pipeline_id: 'provider-linear-worker',
+        pipeline_title: 'Provider Linear Worker',
+        status: 'in_progress',
+        started_at: '2026-04-17T05:50:00.000Z',
+        updated_at: '2026-04-17T06:15:00.000Z',
+        summary: 'live worker is still running'
+      });
+      await seedProviderLinearWorkerProof(fixture.paths, {
+        issue_id: 'lin-issue-210',
+        issue_identifier: 'CO-210',
+        pid: livePid,
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        last_event: 'turn_running',
+        last_message: 'live local worker still reports running',
+        updated_at: '2026-04-17T06:15:00.000Z'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+      const uiDataset = buildUiDataset({
+        projection: compatibilityProjection,
+        generatedAt: '2026-04-17T06:16:00.000Z'
+      });
+
+      expect(compatibilityProjection.running).toHaveLength(1);
+      expect(compatibilityProjection.running[0]).toMatchObject({
+        issue_identifier: 'CO-210'
+      });
+      expect(uiDataset.counts.running).toBe(1);
+      expect(uiDataset.running[0]).toMatchObject({
+        issue_identifier: 'CO-210',
+        pid: livePid
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('suppresses null-provider running sources when a matching intake claim is no longer active', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));

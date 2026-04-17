@@ -14,6 +14,7 @@ import {
   isLoopbackAddress
 } from '../src/cli/control/controlServer.js';
 import { computeEffectiveDelegationConfig } from '../src/cli/config/delegationConfig.js';
+import { PROVIDER_LINEAR_WORKER_PROOF_FILENAME } from '../src/cli/providerLinearWorkerRunner.js';
 import { resolveRunPaths } from '../src/cli/run/runPaths.js';
 import { RunEventStream } from '../src/cli/events/runEventStream.js';
 
@@ -202,6 +203,43 @@ async function seedProviderIntakeState(
       latest_provider_key: claims.at(-1)?.provider_key ?? null,
       latest_reason: claims.at(-1)?.reason ?? null,
       claims
+    }),
+    'utf8'
+  );
+}
+
+async function seedProviderLinearWorkerProof(
+  paths: Pick<ReturnType<typeof resolveRunPaths>, 'runDir'>,
+  overrides: Record<string, unknown> = {}
+): Promise<void> {
+  await writeFile(
+    join(paths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+    JSON.stringify({
+      issue_id: 'issue-1',
+      issue_identifier: 'ISSUE-1',
+      attempt_started_at: '2026-03-07T00:10:00.000Z',
+      pid: null,
+      thread_id: 'thread-1',
+      latest_turn_id: 'turn-1',
+      latest_session_id: 'thread-1-turn-1',
+      latest_session_id_source: 'derived_from_thread_and_turn',
+      turn_count: 1,
+      last_event: 'turn_running',
+      last_message: 'task is running',
+      last_event_at: '2026-03-07T00:10:00.000Z',
+      tokens: {
+        input_tokens: 1,
+        output_tokens: 1,
+        total_tokens: 2
+      },
+      rate_limits: {},
+      owner_phase: 'turn_running',
+      owner_status: 'in_progress',
+      workspace_path: null,
+      linear_audit: null,
+      end_reason: null,
+      updated_at: '2026-03-07T00:10:00.000Z',
+      ...overrides
     }),
     'utf8'
   );
@@ -2005,6 +2043,90 @@ describe('ControlServer', () => {
         }
       });
       expect(issueRes.status).toBe(200);
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not surface accepted pending-revalidation claims with dead local proofs in /ui/data.json running output', async () => {
+    const startedAt = '2026-04-16T10:00:00.000Z';
+    const updatedAt = '2026-04-16T10:05:00.000Z';
+    const { root, env, paths } = await createRunRoot('linear-lin-issue-219');
+    await seedManifest(paths, {
+      task_id: 'linear-lin-issue-219',
+      issue_provider: 'linear',
+      issue_id: 'lin-issue-219',
+      issue_identifier: 'CO-219',
+      pipeline_id: 'provider-linear-worker',
+      pipeline_title: 'Provider Linear Worker',
+      status: 'in_progress',
+      started_at: startedAt,
+      updated_at: updatedAt,
+      summary: 'stale provider worker still appears to be running'
+    });
+    await seedProviderIntakeState(paths, [
+      {
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-219',
+        issue_id: 'lin-issue-219',
+        issue_identifier: 'CO-219',
+        issue_title: 'Pending revalidation issue with stale local proof',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: updatedAt,
+        task_id: 'linear-lin-issue-219',
+        mapping_source: 'provider_id_fallback',
+        state: 'accepted',
+        reason: 'provider_issue_rehydration_pending_revalidation',
+        accepted_at: '2026-04-16T10:00:05.000Z',
+        updated_at: updatedAt,
+        last_delivery_id: 'delivery-co-219',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_744_768_300_000,
+        run_id: 'run-1',
+        run_manifest_path: paths.manifestPath,
+        launch_source: 'control-host',
+        launch_token: 'launch-co-219'
+      }
+    ]);
+    await seedProviderLinearWorkerProof(paths, {
+      issue_id: 'lin-issue-219',
+      issue_identifier: 'CO-219',
+      attempt_started_at: startedAt,
+      pid: '999999',
+      owner_phase: 'turn_running',
+      owner_status: 'in_progress',
+      last_event: 'turn_running',
+      last_message: 'dead local worker still reports running',
+      last_event_at: updatedAt,
+      updated_at: updatedAt,
+      workspace_path: root
+    });
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(uiRes.status).toBe(200);
+      const uiPayload = (await uiRes.json()) as {
+        counts?: { running?: number };
+        running?: Array<{ issue_identifier?: string }>;
+      };
+      expect(uiPayload.counts?.running).toBe(0);
+      expect(uiPayload.running).toEqual([]);
     } finally {
       await server.close();
       await rm(root, { recursive: true, force: true });
