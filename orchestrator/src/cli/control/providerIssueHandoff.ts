@@ -7452,16 +7452,25 @@ function shouldBlockPlainReleasedWithoutConcreteRetainedRunClaim(
     | 'run_manifest_path'
     | 'issue_state'
     | 'issue_state_type'
+    | 'issue_blocked_by'
   >
 ): boolean {
   const workflowState = classifyProviderLinearWorkflowState({
     state: claim.issue_state,
     state_type: claim.issue_state_type
   });
+  const hasNoRetainedRunIdentity = !claim.run_id && !claim.run_manifest_path;
+  const cachedBlockedByCompletedOnly =
+    workflowState.normalizedState === 'blocked' &&
+    hasNoRetainedRunIdentity &&
+    Array.isArray(claim.issue_blocked_by) &&
+    claim.issue_blocked_by.length > 0 &&
+    !providerLinearTodoBlockedByNonTerminal(claim.issue_blocked_by);
   return (
     canRecheckPlainReleasedNotActiveClaim(claim) &&
     workflowState.normalizedStateType === 'started' &&
-    !hasConcreteRetainedRunIdentity(claim)
+    !hasConcreteRetainedRunIdentity(claim) &&
+    !cachedBlockedByCompletedOnly
   );
 }
 
@@ -7475,6 +7484,7 @@ function canFreshDiscoverReleasedReclaimClaim(
     | 'run_manifest_path'
     | 'issue_state'
     | 'issue_state_type'
+    | 'issue_blocked_by'
   >,
   run: ProviderIssueRunRecord | null,
   hasPendingReleaseCancel: (manifestPath: string | null | undefined) => boolean
