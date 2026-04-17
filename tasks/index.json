@@ -1,6 +1,32 @@
 {
   "items": [
     {
+      "id": "20260417-linear-975669a4-3804-4b5b-9a7b-e1b7c77d3926",
+      "title": "CO classify long-lived parent-session delegate-server children with bounded observability",
+      "relates_to": "tasks/tasks-linear-975669a4-3804-4b5b-9a7b-e1b7c77d3926.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-17",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-17",
+          "status": "accepted",
+          "manifest": ".runs/linear-975669a4-3804-4b5b-9a7b-e1b7c77d3926-co213-docs-packet/cli/2026-04-17T05-22-24-858Z-d77fd0a3/manifest.json",
+          "source_anchor": "ctx:sha256:9365537032610f4c18c808abb19252eb18f9523a66a1087cac046836dfa7662d#chunk:c000001",
+          "summary": "Child lane produced the scoped docs-first packet successfully; parent accepted the patch without file-scope collision and owns registry mirrors, runtime implementation, validation, workpad refreshes, review, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-975669a4-3804-4b5b-9a7b-e1b7c77d3926.md",
+        "task": "tasks/tasks-linear-975669a4-3804-4b5b-9a7b-e1b7c77d3926.md",
+        "agent_task": ".agent/task/linear-975669a4-3804-4b5b-9a7b-e1b7c77d3926.md",
+        "docs": "docs/TECH_SPEC-linear-975669a4-3804-4b5b-9a7b-e1b7c77d3926.md"
+      }
+    },
+    {
       "id": "20260417-linear-901cd944-fc0c-4372-92ce-65bb8bb411c0",
       "title": "CO workflow: refresh Apr 17 docs:freshness stale cohort blocking handoffs",
       "relates_to": "tasks/tasks-linear-901cd944-fc0c-4372-92ce-65bb8bb411c0.md",

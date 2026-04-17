@@ -50,8 +50,12 @@ export async function runDelegationCliShell(
   }
 
   const format = resolveOutputFormat(params.flags);
+  const repoRoot = readStringFlag(params.flags, 'repo') ?? dependencies.getCwd();
   if (subcommand === 'cleanup-stale') {
-    const result = await dependencies.cleanupStaleDelegateServerProcesses({ apply: Boolean(params.flags['yes']) });
+    const result = await dependencies.cleanupStaleDelegateServerProcesses({
+      apply: Boolean(params.flags['yes']),
+      repoRoot
+    });
     if (format === 'json') {
       dependencies.log(JSON.stringify(result, null, 2));
       return;
@@ -67,7 +71,6 @@ export async function runDelegationCliShell(
     throw new Error('delegation setup does not support --format json with --yes.');
   }
 
-  const repoRoot = readStringFlag(params.flags, 'repo') ?? dependencies.getCwd();
   const result = await dependencies.runDelegationSetup({ apply, repoRoot });
 
   if (format === 'json') {

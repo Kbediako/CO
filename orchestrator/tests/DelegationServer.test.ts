@@ -4157,6 +4157,54 @@ describe('delegation server MCP framing', () => {
     input.end();
   });
 
+  it('triggers the idle timeout callback after sustained inactivity', async () => {
+    vi.useFakeTimers();
+    process.exitCode = undefined;
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const onIdleTimeout = vi.fn();
+    await runJsonRpcServer(async () => ({}), {
+      stdin: input,
+      stdout: output,
+      idleTimeoutMs: 1_000,
+      onIdleTimeout
+    });
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(onIdleTimeout).toHaveBeenCalledTimes(1);
+
+    input.end();
+    vi.useRealTimers();
+  });
+
+  it('re-arms the idle timeout when a partial frame stalls before completion', async () => {
+    vi.useFakeTimers();
+    try {
+      process.exitCode = undefined;
+      const input = new PassThrough();
+      const output = new PassThrough();
+      const onIdleTimeout = vi.fn();
+      await runJsonRpcServer(async () => ({}), {
+        stdin: input,
+        stdout: output,
+        idleTimeoutMs: 1_000,
+        onIdleTimeout
+      });
+
+      input.write('Content-Length: 42\r\n\r');
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(onIdleTimeout).toHaveBeenCalledTimes(0);
+
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(onIdleTimeout).toHaveBeenCalledTimes(1);
+
+      input.end();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps non-zero exitCode after oversized payloads', async () => {
     process.exitCode = undefined;
     const input = new PassThrough();

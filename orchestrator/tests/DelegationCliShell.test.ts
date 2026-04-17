@@ -222,11 +222,12 @@ describe('runDelegationCliShell', () => {
       },
       {
         cleanupStaleDelegateServerProcesses: cleanupMock,
+        getCwd: () => '/tmp/repo',
         log
       }
     );
 
-    expect(cleanupMock).toHaveBeenCalledWith({ apply: true });
+    expect(cleanupMock).toHaveBeenCalledWith({ apply: true, repoRoot: '/tmp/repo' });
     expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
       status: 'stale',
       staleCount: 2,

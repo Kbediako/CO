@@ -29,20 +29,61 @@ const MAX_MCP_BUFFER_BYTES =
 
 export async function runJsonRpcServer(
   handler: (request: McpRequest) => Promise<unknown>,
-  options: { stdin?: NodeJS.ReadableStream; stdout?: NodeJS.WritableStream } = {}
+  options: {
+    stdin?: NodeJS.ReadableStream;
+    stdout?: NodeJS.WritableStream;
+    idleTimeoutMs?: number;
+    onIdleTimeout?: () => void;
+  } = {}
 ): Promise<void> {
   let buffer = Buffer.alloc(0);
   let expectedLength: number | null = null;
   let processing = Promise.resolve();
   let halted = false;
+  let inFlightRequests = 0;
   const input = options.stdin ?? process.stdin;
   const output = options.stdout ?? process.stdout;
+  const idleTimeoutMs =
+    typeof options.idleTimeoutMs === 'number' && Number.isFinite(options.idleTimeoutMs)
+      ? Math.max(0, Math.floor(options.idleTimeoutMs))
+      : 0;
+  let idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const clearIdleTimer = () => {
+    if (idleTimer) {
+      clearTimeout(idleTimer);
+      idleTimer = null;
+    }
+  };
+
+  const armIdleTimer = () => {
+    clearIdleTimer();
+    if (halted || idleTimeoutMs <= 0 || inFlightRequests > 0) {
+      return;
+    }
+    idleTimer = setTimeout(() => {
+      if (halted || inFlightRequests > 0) {
+        return;
+      }
+      halted = true;
+      if (typeof (input as { pause?: () => void }).pause === 'function') {
+        input.pause();
+      }
+      if (options.onIdleTimeout) {
+        options.onIdleTimeout();
+        return;
+      }
+      process.exit(0);
+    }, idleTimeoutMs);
+    idleTimer.unref?.();
+  };
 
   const handleProtocolViolation = (message: string) => {
     if (halted) {
       return;
     }
     halted = true;
+    clearIdleTimer();
     logger.warn(message);
     process.exitCode = 1;
     buffer = Buffer.alloc(0);
@@ -56,17 +97,27 @@ export async function runJsonRpcServer(
     if (halted) {
       return;
     }
+    clearIdleTimer();
     buffer = Buffer.concat([buffer, Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)]);
     if (buffer.length > MAX_MCP_BUFFER_BYTES) {
       handleProtocolViolation(`Rejecting MCP buffer larger than ${MAX_MCP_BUFFER_BYTES} bytes`);
       return;
     }
     processing = processing
-      .then(() => processBuffer())
+      .then(async () => {
+        await processBuffer();
+        if (!halted) {
+          armIdleTimer();
+        }
+      })
       .catch((error) => {
         logger.error(`Failed to process MCP buffer: ${(error as Error)?.message ?? error}`);
       });
   });
+  input.on('end', clearIdleTimer);
+  input.on('close', clearIdleTimer);
+  input.on('error', clearIdleTimer);
+  armIdleTimer();
 
   async function processBuffer() {
     while (buffer.length > 0) {
@@ -174,14 +225,20 @@ export async function runJsonRpcServer(
   }
 
   async function handleMessage(raw: string, format: ResponseFormat) {
+    clearIdleTimer();
+    inFlightRequests += 1;
     let request: McpRequest;
     try {
       request = JSON.parse(raw) as McpRequest;
     } catch (error) {
       logger.error(`Failed to parse MCP message: ${(error as Error)?.message ?? error}`);
+      inFlightRequests -= 1;
+      armIdleTimer();
       return;
     }
     if (typeof request.method !== 'string') {
+      inFlightRequests -= 1;
+      armIdleTimer();
       return;
     }
     const id = request.id ?? null;
@@ -202,6 +259,9 @@ export async function runJsonRpcServer(
           format
         );
       }
+    } finally {
+      inFlightRequests = Math.max(0, inFlightRequests - 1);
+      armIdleTimer();
     }
   }
 }
