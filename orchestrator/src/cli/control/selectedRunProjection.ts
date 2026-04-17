@@ -864,24 +864,34 @@ function resolveSelectedRunDisplaySummary(input: {
   if (input.terminalMergeCloseoutProgress?.summary) {
     return input.terminalMergeCloseoutProgress.summary;
   }
+  const acceptedProviderRetryResumeAt = readLatestAcceptedProviderRetryResumeAt(input.manifestRecord);
+  const hasFailedCommandsForAuthoritativeAttempt =
+    acceptedProviderRetryResumeAt === null
+      ? manifestHasFailedCommands(input.manifestRecord)
+      : manifestHasFailedCommandsSince(input.manifestRecord, acceptedProviderRetryResumeAt);
   if (
     input.rawStatus === 'succeeded' &&
     input.summary &&
-    hasStaleFailureSummary(input.summary) &&
-    !manifestHasFailedCommands(input.manifestRecord)
+    hasStaleFailureSummary(input.summary, input.manifestRecord) &&
+    !hasFailedCommandsForAuthoritativeAttempt
   ) {
-    const filteredSummary = filterStaleFailureSummary(input.summary);
+    const filteredSummary = filterStaleFailureSummary(
+      input.summary,
+      input.manifestRecord
+    );
     return filteredSummary ?? 'Completed successfully';
   }
-  const acceptedProviderRetryResumeAt = readLatestAcceptedProviderRetryResumeAt(input.manifestRecord);
   if (
     input.rawStatus === 'in_progress' &&
     input.summary &&
-    hasStaleFailureSummary(input.summary) &&
+    hasStaleFailureSummary(input.summary, input.manifestRecord) &&
     acceptedProviderRetryResumeAt !== null &&
     !manifestHasFailedCommandsSince(input.manifestRecord, acceptedProviderRetryResumeAt)
   ) {
-    const filteredSummary = filterStaleFailureSummary(input.summary);
+    const filteredSummary = filterStaleFailureSummary(
+      input.summary,
+      input.manifestRecord
+    );
     return filteredSummary ?? 'Retry accepted; run resumed after a failed attempt.';
   }
   return input.summary;
@@ -923,27 +933,43 @@ function isTerminalRunStatus(status: string): boolean {
   return status === 'succeeded' || status === 'failed' || status === 'cancelled' || status === 'canceled';
 }
 
-function hasStaleFailureSummary(summary: string): boolean {
-  return summary.split('\n').some((line) => isStaleFailureSummaryLine(line));
+function hasStaleFailureSummary(
+  summary: string,
+  manifestRecord: Record<string, unknown>
+): boolean {
+  return summary.split('\n').some((line) => isStaleFailureSummaryLine(line, manifestRecord));
 }
 
-function filterStaleFailureSummary(summary: string): string | null {
+function filterStaleFailureSummary(
+  summary: string,
+  manifestRecord: Record<string, unknown>
+): string | null {
   const retainedLines = summary
     .split('\n')
     .map((line) => line.trim())
-    .filter((line) => line.length > 0 && !isStaleFailureSummaryLine(line));
+    .filter((line) => line.length > 0 && !isStaleFailureSummaryLine(line, manifestRecord));
   if (retainedLines.length === 0) {
     return null;
   }
   return retainedLines.join('\n');
 }
 
-function isStaleFailureSummaryLine(line: string): boolean {
+function isStaleFailureSummaryLine(
+  line: string,
+  manifestRecord: Record<string, unknown>
+): boolean {
   const trimmed = line.trim();
-  return /^Stage '.*' failed with exit code \d+\.$/u.test(trimmed) ||
+  if (
+    /^Stage '.*' failed with exit code \d+\.$/u.test(trimmed) ||
     /^Sub-pipeline '.*' failed\.$/u.test(trimmed) ||
-    /^Execution error: .+/u.test(trimmed) ||
-    /^Sub-pipeline error: .+/u.test(trimmed);
+    /^Execution error: .+/u.test(trimmed)
+  ) {
+    return true;
+  }
+  if (!/^Sub-pipeline error: .+/u.test(trimmed)) {
+    return false;
+  }
+  return !hasMatchingSkippedSubpipelineErrorSummary(manifestRecord, trimmed);
 }
 
 function manifestHasFailedCommands(manifestRecord: Record<string, unknown>): boolean {
@@ -1003,6 +1029,29 @@ function readLatestAcceptedProviderRetryResumeAt(manifestRecord: Record<string, 
 }
 
 function readLatestCommandFailureTimestampMs(command: Record<string, unknown>): number | null {
+  return readLatestCommandTimestampMs(command);
+}
+
+function hasMatchingSkippedSubpipelineErrorSummary(
+  manifestRecord: Record<string, unknown>,
+  summaryLine: string
+): boolean {
+  const commands = manifestRecord.commands;
+  if (!Array.isArray(commands)) {
+    return false;
+  }
+  return commands.some((command) => {
+    if (!isRecord(command) || readStringValue(command, 'status') !== 'skipped') {
+      return false;
+    }
+    if ((readStringValue(command, 'summary') ?? '').trim() !== summaryLine) {
+      return false;
+    }
+    return true;
+  });
+}
+
+function readLatestCommandTimestampMs(command: Record<string, unknown>): number | null {
   for (const key of ['completed_at', 'completedAt', 'updated_at', 'updatedAt', 'started_at', 'startedAt']) {
     const value = readStringValue(command, key);
     const parsed = Date.parse(value ?? '');

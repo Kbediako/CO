@@ -471,6 +471,272 @@ describe('SelectedRunProjection', () => {
     });
   });
 
+  it('preserves optional sub-pipeline warning summaries for succeeded runs', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:16:28.970Z',
+        summary: 'Sub-pipeline error: optional advisory timed out',
+        commands: [
+          {
+            id: 'docs-advisory',
+            status: 'skipped',
+            summary: 'Sub-pipeline error: optional advisory timed out',
+            completed_at: '2026-03-20T01:16:25.000Z'
+          }
+        ]
+      }),
+      'utf8'
+    );
+
+    const selected = await createProjectionReader(
+      paths,
+      childPaths.manifestPath,
+      createProviderIntakeState(childPaths.manifestPath)
+    ).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      rawStatus: 'succeeded',
+      summary: 'Sub-pipeline error: optional advisory timed out'
+    });
+    expect(selected?.latestEvent).toMatchObject({
+      event: 'succeeded',
+      message: 'Sub-pipeline error: optional advisory timed out'
+    });
+  });
+
+  it('removes stale pre-resume failure summaries after a resumed run later succeeds', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:16:28.970Z',
+        summary: "Stage 'Run provider linear worker' failed with exit code 1.\nRecovered cleanly",
+        commands: [
+          {
+            id: 'provider-linear-worker',
+            status: 'failed',
+            summary: 'previous attempt failed',
+            completed_at: '2026-03-20T01:16:10.000Z'
+          },
+          {
+            id: 'provider-linear-worker',
+            status: 'succeeded',
+            summary: 'recovered cleanly',
+            completed_at: '2026-03-20T01:16:24.000Z'
+          }
+        ],
+        resume_events: [
+          {
+            actor: 'control-host',
+            reason: 'provider-retry',
+            outcome: 'accepted',
+            timestamp: '2026-03-20T01:16:20.000Z'
+          }
+        ]
+      }),
+      'utf8'
+    );
+
+    const selected = await createProjectionReader(
+      paths,
+      childPaths.manifestPath,
+      createProviderIntakeState(childPaths.manifestPath)
+    ).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      rawStatus: 'succeeded',
+      summary: 'Recovered cleanly'
+    });
+    expect(selected?.latestEvent).toMatchObject({
+      event: 'succeeded',
+      message: 'Recovered cleanly'
+    });
+  });
+
+  it('preserves current optional sub-pipeline warnings after retry acceptance while removing stale failure lines', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:16:28.970Z',
+        summary: "Sub-pipeline 'docs-review' failed.\nSub-pipeline error: optional advisory timed out",
+        commands: [
+          {
+            id: 'docs-review',
+            status: 'failed',
+            summary: 'previous attempt failed',
+            completed_at: '2026-03-20T01:16:10.000Z'
+          },
+          {
+            id: 'docs-advisory',
+            status: 'skipped',
+            summary: 'Sub-pipeline error: optional advisory timed out',
+            completed_at: '2026-03-20T01:16:24.000Z'
+          }
+        ],
+        resume_events: [
+          {
+            actor: 'control-host',
+            reason: 'provider-retry',
+            outcome: 'accepted',
+            timestamp: '2026-03-20T01:16:20.000Z'
+          }
+        ]
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(childPaths.manifestPath);
+    providerIntakeState.latest_reason = 'provider_issue_rehydrated_active_run';
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      updated_at: '2026-03-20T01:16:28.970Z',
+      retry_queued: false,
+      retry_attempt: 2,
+      retry_due_at: null,
+      retry_error: 'retryable failure pending rerun'
+    };
+
+    const selected = await createProjectionReader(
+      paths,
+      childPaths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      rawStatus: 'in_progress',
+      summary: 'Sub-pipeline error: optional advisory timed out',
+      lastError: null
+    });
+    expect(selected?.latestEvent).toMatchObject({
+      event: 'in_progress',
+      message: 'Sub-pipeline error: optional advisory timed out'
+    });
+  });
+
+  it('preserves earlier optional sub-pipeline warnings when a later stage fails and the run resumes', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:16:28.970Z',
+        summary: "Stage 'Run provider linear worker' failed with exit code 1.\nSub-pipeline error: optional advisory timed out",
+        commands: [
+          {
+            id: 'docs-advisory',
+            status: 'skipped',
+            summary: 'Sub-pipeline error: optional advisory timed out',
+            completed_at: '2026-03-20T01:16:05.000Z'
+          },
+          {
+            id: 'provider-linear-worker',
+            status: 'failed',
+            summary: 'previous attempt failed',
+            completed_at: '2026-03-20T01:16:10.000Z'
+          }
+        ],
+        resume_events: [
+          {
+            actor: 'control-host',
+            reason: 'provider-retry',
+            outcome: 'accepted',
+            timestamp: '2026-03-20T01:16:20.000Z'
+          }
+        ]
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(childPaths.manifestPath);
+    providerIntakeState.latest_reason = 'provider_issue_rehydrated_active_run';
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      updated_at: '2026-03-20T01:16:28.970Z',
+      retry_queued: false,
+      retry_attempt: 2,
+      retry_due_at: null,
+      retry_error: 'retryable failure pending rerun'
+    };
+
+    const selected = await createProjectionReader(
+      paths,
+      childPaths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      rawStatus: 'in_progress',
+      summary: 'Sub-pipeline error: optional advisory timed out',
+      lastError: null
+    });
+    expect(selected?.latestEvent).toMatchObject({
+      event: 'in_progress',
+      message: 'Sub-pipeline error: optional advisory timed out'
+    });
+  });
+
   it('surfaces the authoritative provider debug snapshot and semantic latest event for merge closeout lanes', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {
