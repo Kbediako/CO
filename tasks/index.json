@@ -43,6 +43,22 @@
           "manifest": ".runs/linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5-docs-packet/cli/2026-04-17T18-52-06-926Z-75ac64a4/manifest.json",
           "source_anchor": "ctx:sha256:b7611a224cd777bffc38c866661c0a8d2cdaf4f31619cac8fd78150f5b46cbea#chunk:c000001",
           "summary": "Docs-first packet preserves CO-224 as the pre-startup appserver child-lane stall seam where runtime selection completed but no real child startup proof exists yet, leaving the parent blocked on a synthetic launching reservation. Parent-owned implementation, validation, Linear/workpad reconciliation, PR, and merge remain out of scope for this child patch."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review --uncommitted",
+          "date": "2026-04-18",
+          "status": "manual-fallback-after-boundary",
+          "manifest": ".runs/linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5/cli/2026-04-17T18-48-42-429Z-40aec176/manifest.json",
+          "telemetry": ".runs/linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5/cli/2026-04-17T18-48-42-429Z-40aec176/review/telemetry.json",
+          "fallback_note": "out/linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5/manual/standalone-review-fallback.md",
+          "summary": "The wrapper first found the real mtime-skew P1 that commit 66014e78e fixed, then later reruns on the skew-fix and abort-after-exit deltas both terminated at the startup-anchor boundary before a startup anchor was observed. The parent lane closed the final delta with manual correctness review plus scoped validation reruns instead of pretending the wrapper verdict was still bounded-success."
+        },
+        "elegance_review": {
+          "reviewer": "provider worker parent lane",
+          "date": "2026-04-18",
+          "status": "completed",
+          "artifact": "out/linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5/manual/elegance-review.md",
+          "summary": "Kept the fix local to providerLinearChildLaneRunner with a bounded startup watchdog, a narrow 1s startup-header mtime skew allowance, and the abort-after-exit recovery helper rather than introducing a broader runtime abstraction."
         }
       },
       "paths": {

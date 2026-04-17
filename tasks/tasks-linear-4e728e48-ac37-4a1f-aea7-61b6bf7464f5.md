@@ -38,8 +38,8 @@
 - [x] `npm run repo:stewardship` passes. Evidence: terminal output `repo:stewardship OK - 5137 tracked files, 0 action-required`.
 - [x] `node scripts/diff-budget.mjs` passes with an explicit justification recorded. Evidence: `Diff budget override accepted: CO-224 requires the docs-first packet, task mirrors, appserver startup recovery, and bounded regression coverage in one auditable change; the branch now exceeds budget because it includes the required post-review watchdog fixes and packet mirrors on top of current origin/main.`
 - [x] `npm run pack:smoke` passes. Evidence: terminal output `Pack smoke passed in temp mock repo`.
-- [x] Manifest-backed standalone review completes. Evidence: `.runs/linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5/cli/2026-04-17T18-48-42-429Z-40aec176/review/telemetry.json` with `status: succeeded` and `review_outcome: bounded-success`.
-- [x] Explicit elegance review completes. Evidence: workpad closeout records the retained minimal shape: local 90s startup watchdog, no broader runtime-provider abstraction, and preserved fail-closed parent semantics.
+- [x] Manifest-backed standalone review attempt is recorded with full evidence. Evidence: `.runs/linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5/cli/2026-04-17T18-48-42-429Z-40aec176/manifest.json` plus `.runs/linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5/cli/2026-04-17T18-48-42-429Z-40aec176/review/telemetry.json`, where the wrapper now reports `status: failed`, `review_outcome: failed-boundary`, and `termination_boundary.kind: startup-anchor`; the final closeout therefore uses the manual fallback captured at `out/linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5/manual/standalone-review-fallback.md`.
+- [x] Explicit elegance review completes. Evidence: `out/linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5/manual/elegance-review.md` records the retained minimal shape: local 90s startup watchdog, no broader runtime-provider abstraction, and preserved fail-closed parent semantics.
 
 ## Progress Log
 - 2026-04-17: moved `CO-224` from `Ready` to `In Progress`, created the required single workpad comment, and recorded the pre-turn decomposition matrix plus `parallelize_now`.
