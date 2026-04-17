@@ -41,6 +41,32 @@
       }
     },
     {
+      "id": "20260417-linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c",
+      "title": "Control host: prevent repeated refresh-stuck restart churn while active provider workers remain healthy",
+      "relates_to": "tasks/tasks-linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-17",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-17",
+          "status": "produced",
+          "manifest": ".runs/linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c-docs-packet/cli/2026-04-17T02-07-55-950Z-cb83673c/manifest.json",
+          "source_anchor": "ctx:sha256:d4239a4784c1cf71c95ab480b4a3821dc2c83dc3648d3b8d4a8c5387ccdfb3f8#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-211 as repeated refresh-stuck restart churn with healthy active workers, machine-checkable restart-series evidence, `stalled_after_ms=45000` diagnostics, worker-preserving recovery, and post-recovery `co-status --format json` truth while keeping CO-210 child-lane manifest hydration semantics out of scope. Parent owns implementation, docs-review, validation, Linear state, workpad, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c.md",
+        "task": "tasks/tasks-linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c.md",
+        "agent_task": ".agent/task/linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c.md",
+        "docs": "docs/TECH_SPEC-linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c.md"
+      }
+    },
+    {
       "id": "20260417-linear-901cd944-fc0c-4372-92ce-65bb8bb411c0",
       "title": "CO workflow: refresh Apr 17 docs:freshness stale cohort blocking handoffs",
       "relates_to": "tasks/tasks-linear-901cd944-fc0c-4372-92ce-65bb8bb411c0.md",

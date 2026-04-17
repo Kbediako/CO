@@ -16,12 +16,15 @@ import {
   buildControlHostSupervisionPlist,
   buildInitialControlHostSupervisionState,
   evaluateControlHostSupervisionHealthPayload,
+  readControlHostSupervisionHealthDiagnostic,
   parseControlHostSupervisionCsv,
   resolveControlHostSupervisionPaths,
   resolveDefaultControlHostSupervisionEntrypoint,
   resolveDefaultControlHostSupervisionEnvFiles,
   type ControlHostSupervisionConfig,
+  type ControlHostSupervisionHealthDiagnostic,
   type ControlHostSupervisionPaths,
+  type ControlHostSupervisionRestartRecord,
   type ControlHostSupervisionState
 } from './control/controlHostSupervision.js';
 import { findPackageRoot } from './utils/packageInfo.js';
@@ -448,7 +451,8 @@ async function runControlHostSupervision(flags: ArgMap): Promise<void> {
 
       if (event.type === 'tick') {
         const probe = await probeControlHostHealth(config, childEnv, {
-          minPollingUpdatedAt: startedAt
+          minPollingUpdatedAt: startedAt,
+          restartHistory: priorState.restart_history ?? null
         });
         const checkedAt = new Date().toISOString();
         if (probe.healthy) {
@@ -479,6 +483,7 @@ async function runControlHostSupervision(flags: ArgMap): Promise<void> {
         }
 
         const restartRequestedAt = new Date().toISOString();
+        const restartMessage = `${probe.message} launchd restart requested after ${consecutiveUnhealthySamples} consecutive unhealthy samples.`;
         await writeRuntimeState({
           status: 'restart_required',
           updated_at: restartRequestedAt,
@@ -488,7 +493,18 @@ async function runControlHostSupervision(flags: ArgMap): Promise<void> {
           restart_count: restartCount + 1,
           last_restart_reason: probe.reason,
           last_restart_requested_at: restartRequestedAt,
-          message: `${probe.message} launchd restart requested after ${consecutiveUnhealthySamples} consecutive unhealthy samples.`
+          restart_history: appendControlHostSupervisionRestartRecord(
+            priorState.restart_history ?? null,
+            buildControlHostSupervisionRestartRecord({
+              requestedAt: restartRequestedAt,
+              reason: probe.reason,
+              message: restartMessage,
+              consecutiveUnhealthySamples,
+              childPid: child.pid ?? null,
+              diagnostic: probe.diagnostic
+            })
+          ),
+          message: restartMessage
         });
         console.error(
           `${restartRequestedAt} control-host unhealthy for ${consecutiveUnhealthySamples} checks; exiting for launchd restart (${probe.reason}).`
@@ -684,9 +700,17 @@ async function loadBootstrapEnvironment(
 async function probeControlHostHealth(
   config: ControlHostSupervisionConfig,
   env: NodeJS.ProcessEnv,
-  options: { minPollingUpdatedAt?: string | null } = {},
+  options: {
+    minPollingUpdatedAt?: string | null;
+    restartHistory?: ControlHostSupervisionRestartRecord[] | null;
+  } = {},
   commandRunner: typeof runCommand = runCommand
-): Promise<{ healthy: boolean; reason: string; message: string }> {
+): Promise<{
+  healthy: boolean;
+  reason: string;
+  message: string;
+  diagnostic: ControlHostSupervisionHealthDiagnostic | null;
+}> {
   const probeTimeoutMs = resolveControlHostSupervisionProbeTimeoutMs(config.healthIntervalSeconds);
   const result = await commandRunner(
     config.nodePath,
@@ -710,7 +734,8 @@ async function probeControlHostHealth(
     return {
       healthy: false,
       reason: 'probe_timeout',
-      message: `co-status probe timed out after ${Math.round(probeTimeoutMs / 1_000)}s.`
+      message: `co-status probe timed out after ${Math.round(probeTimeoutMs / 1_000)}s.`,
+      diagnostic: null
     };
   }
   if (result.exitCode !== 0) {
@@ -718,7 +743,8 @@ async function probeControlHostHealth(
     return {
       healthy: false,
       reason: 'probe_failed',
-      message: `co-status probe failed: ${detail}`
+      message: `co-status probe failed: ${detail}`,
+      diagnostic: null
     };
   }
 
@@ -729,18 +755,22 @@ async function probeControlHostHealth(
     return {
       healthy: false,
       reason: 'invalid_payload',
-      message: `co-status probe returned invalid JSON: ${(error as Error).message}`
+      message: `co-status probe returned invalid JSON: ${(error as Error).message}`,
+      diagnostic: null
     };
   }
 
+  const diagnostic = readControlHostSupervisionHealthDiagnostic(payload);
   const evaluation = evaluateControlHostSupervisionHealthPayload(payload, {
     minPollingUpdatedAt: options.minPollingUpdatedAt ?? null,
-    staleRestartRequiredGraceMs: config.healthIntervalSeconds * config.unhealthyThreshold * 1_000
+    staleRestartRequiredGraceMs: config.healthIntervalSeconds * config.unhealthyThreshold * 1_000,
+    restartHistory: options.restartHistory ?? null
   });
   return {
     healthy: evaluation.healthy,
     reason: evaluation.reason,
-    message: evaluation.message
+    message: evaluation.message,
+    diagnostic
   };
 }
 
@@ -1045,6 +1075,31 @@ function buildNextControlHostSupervisionState(input: {
     unhealthy_threshold: input.config.unhealthyThreshold,
     health_interval_seconds: input.config.healthIntervalSeconds
   };
+}
+
+function buildControlHostSupervisionRestartRecord(input: {
+  requestedAt: string;
+  reason: string;
+  message: string;
+  consecutiveUnhealthySamples: number;
+  childPid: number | null;
+  diagnostic: ControlHostSupervisionHealthDiagnostic | null;
+}): ControlHostSupervisionRestartRecord {
+  return {
+    requested_at: input.requestedAt,
+    reason: input.reason,
+    message: input.message,
+    consecutive_unhealthy_samples: input.consecutiveUnhealthySamples,
+    child_pid: input.childPid,
+    diagnostic: input.diagnostic
+  };
+}
+
+function appendControlHostSupervisionRestartRecord(
+  history: ControlHostSupervisionRestartRecord[] | null | undefined,
+  record: ControlHostSupervisionRestartRecord
+): ControlHostSupervisionRestartRecord[] {
+  return [...(history ?? []), record].slice(-20);
 }
 
 async function bootoutLaunchctlServiceTarget(serviceTarget: string): Promise<void> {
