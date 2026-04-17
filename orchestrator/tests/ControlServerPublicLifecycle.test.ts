@@ -8,6 +8,7 @@ import type { ControlRequestSharedContext } from '../src/cli/control/controlRequ
 import type { LiveLinearTrackedIssue } from '../src/cli/control/linearDispatchSource.js';
 import type { ProviderIssueHandoffPollInput } from '../src/cli/control/providerIssueHandoff.js';
 import {
+  beginControlServerShutdown,
   closeControlServerOwnedRuntime,
   startControlServerReadyInstanceLifecycle,
   type ControlServerOwnedLifecycleState
@@ -53,6 +54,7 @@ vi.mock('../src/cli/control/controlHostOwnership.js', () => ({
 }));
 
 vi.mock('../src/cli/control/controlServerReadyInstanceLifecycle.js', () => ({
+  beginControlServerShutdown: vi.fn(async () => undefined),
   startControlServerReadyInstanceLifecycle: vi.fn(),
   closeControlServerOwnedRuntime: vi.fn()
 }));
@@ -151,6 +153,7 @@ describe('startControlServerPublicLifecycle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useRealTimers();
+    vi.mocked(beginControlServerShutdown).mockResolvedValue(undefined);
     vi.mocked(acquireControlHostOwnership).mockResolvedValue(null as never);
     vi.mocked(resolveLinearWebhookSourceSetup).mockReturnValue({
       sourceSetup: {} as never
@@ -2683,10 +2686,12 @@ describe('closeControlServerPublicLifecycle', () => {
 
     await closeControlServerPublicLifecycle(state);
 
+    expect(beginControlServerShutdown).toHaveBeenCalledWith(state.server);
     expect(closeControlServerOwnedRuntime).toHaveBeenCalledWith({
       server: state.server,
       requestContextShared: state.requestContextShared,
-      lifecycleState: state.lifecycleState
+      lifecycleState: state.lifecycleState,
+      serverClosePromise: expect.any(Promise)
     });
   });
 
@@ -2749,10 +2754,12 @@ describe('closeControlServerPublicLifecycle', () => {
       retry_error: null
     });
     expect(persistProviderIntake).not.toHaveBeenCalled();
+    expect(beginControlServerShutdown).toHaveBeenCalledWith(state.server);
     expect(closeControlServerOwnedRuntime).toHaveBeenCalledWith({
       server: state.server,
       requestContextShared: state.requestContextShared,
-      lifecycleState: state.lifecycleState
+      lifecycleState: state.lifecycleState,
+      serverClosePromise: expect.any(Promise)
     });
   });
 });
