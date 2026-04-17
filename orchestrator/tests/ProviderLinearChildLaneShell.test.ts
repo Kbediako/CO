@@ -216,6 +216,7 @@ describe('runProviderLinearChildLaneShell', () => {
     const env = buildProviderWorkerEnv(manifestPath, {
       CODEX_ORCHESTRATOR_RUNS_DIR: join('/tmp', 'shared-runs'),
       CODEX_ORCHESTRATOR_OUT_DIR: join('/tmp', 'shared-out'),
+      CODEX_THREAD_ID: 'parent-thread-1',
       CODEX_HOME: join(tempRoot ?? '', 'codex-home'),
       CO_LINEAR_API_TOKEN: 'lin-api-token'
     });
@@ -338,6 +339,7 @@ describe('runProviderLinearChildLaneShell', () => {
     const request = execRunner.mock.calls[0]?.[0];
     expect(request?.env.CODEX_ORCHESTRATOR_RUNS_DIR).toBe(join(tempRoot ?? '', '.runs'));
     expect(request?.env.CODEX_ORCHESTRATOR_OUT_DIR).toBe(join(tempRoot ?? '', 'out'));
+    expect(request?.env.CODEX_THREAD_ID).toBeUndefined();
     expect(refreshProofSnapshot).toHaveBeenCalledWith(runDir, null, env);
     expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
       expect.objectContaining({
@@ -2049,6 +2051,123 @@ describe('runProviderLinearChildLaneShell', () => {
       }
     });
     expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([]);
+  });
+
+  it('surfaces failed child-lane proof detail when appserver startup times out', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const childRunDir = join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-timeout');
+    const childProof: ProviderLinearChildLaneProof = {
+      issue_id: ISSUE.issue_id,
+      issue_identifier: ISSUE.issue_identifier,
+      task_id: `${TASK_ID}-impl-a`,
+      run_id: 'child-run-timeout',
+      parent_run_id: RUN_ID,
+      stream: 'impl-a',
+      purpose: 'Implement bounded child lane support',
+      instructions: null,
+      scope: {
+        files: ['docs/PRD-linear-lin-issue-1.md'],
+        phases: ['docs']
+      },
+      parent_snapshot: {
+        base_sha: 'parent-base-sha',
+        issue_updated_at: '2026-03-30T07:10:00.000Z',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        captured_at: '2026-03-30T07:11:00.000Z'
+      },
+      lane_workspace_path: join(tempRoot ?? '', '.child-lanes', 'impl-a-child-run-timeout'),
+      lane_branch: 'child-lane/impl-a-child-run-timeout',
+      patch_artifact_path: join(childRunDir, 'provider-linear-child-lane.patch'),
+      patch_bytes: 0,
+      thread_id: null,
+      latest_turn_id: null,
+      latest_session_id: null,
+      latest_session_id_source: null,
+      last_event: null,
+      last_message:
+        'Appserver child lane startup stalled after runtime selection for 90s without matching session-log startup evidence. Invalidate the lane and relaunch under CLI, or inspect appserver session startup for CO-224.',
+      last_event_at: null,
+      tokens: {
+        input_tokens: null,
+        output_tokens: null,
+        total_tokens: null
+      },
+      rate_limits: null,
+      status: 'failed',
+      updated_at: '2026-03-30T07:12:00.000Z'
+    };
+    const execRunner = vi.fn(async () => {
+      await mkdir(childRunDir, { recursive: true });
+      await writeFile(
+        join(childRunDir, PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME),
+        JSON.stringify(childProof),
+        'utf8'
+      );
+      return {
+        exitCode: 0,
+        stdout: JSON.stringify({
+          run_id: 'child-run-timeout',
+          status: 'failed',
+          artifact_root: `.runs/${TASK_ID}-impl-a/cli/child-run-timeout`,
+          manifest: `.runs/${TASK_ID}-impl-a/cli/child-run-timeout/manifest.json`,
+          summary: null
+        }),
+        stderr: ''
+      };
+    });
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'launch',
+        streamName: 'impl-a',
+        purpose: 'Implement bounded child lane support',
+        files: ['docs/PRD-linear-lin-issue-1.md'],
+        phases: ['docs'],
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        execRunner,
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: '2026-03-30T07:10:00.000Z',
+          state: 'In Progress',
+          state_type: 'started'
+        })) as never,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
+        readParentHeadSha: vi.fn(async () => 'parent-base-sha'),
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'launch',
+      child_run: {
+        run_id: 'child-run-timeout',
+        status: 'failed'
+      },
+      child_lane: {
+        run_id: 'child-run-timeout',
+        status: 'failed',
+        summary: expect.stringContaining('Appserver child lane startup stalled after runtime selection')
+      },
+      error: {
+        code: 'provider_worker_child_lane_run_failed',
+        message: expect.stringContaining('Invalidate the lane and relaunch under CLI'),
+        status: 502
+      }
+    });
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
+      expect.objectContaining({
+        run_id: 'child-run-timeout',
+        status: 'failed',
+        summary: expect.stringContaining('Appserver child lane startup stalled after runtime selection'),
+        decision: 'pending'
+      })
+    ]);
   });
 
   it('returns a failure envelope when launch dependencies throw unexpectedly', async () => {

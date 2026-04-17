@@ -392,6 +392,7 @@ export interface ProviderLinearWorkerExecRequest {
   env: NodeJS.ProcessEnv;
   mirrorOutput: boolean;
   onStdoutChunk?: ((chunk: string) => void) | null;
+  abortSignal?: AbortSignal | null;
 }
 
 export interface ProviderLinearWorkerExecResult {
@@ -462,6 +463,21 @@ export function defaultExecRunner(
   request: ProviderLinearWorkerExecRequest
 ): Promise<ProviderLinearWorkerExecResult> {
   return new Promise((resolvePromise, reject) => {
+    const abortSignal = request.abortSignal ?? null;
+    const buildAbortError = (): Error => {
+      const reason = abortSignal?.reason;
+      if (reason instanceof Error) {
+        return reason;
+      }
+      if (typeof reason === 'string' && reason.trim().length > 0) {
+        return new Error(reason);
+      }
+      return new Error('Command aborted.');
+    };
+    if (abortSignal?.aborted) {
+      reject(buildAbortError());
+      return;
+    }
     const stdio: StdioOptions = request.mirrorOutput ? ['ignore', 'inherit', 'inherit'] : ['ignore', 'pipe', 'pipe'];
     const child = spawn(request.command, request.args, {
       cwd: request.cwd,
@@ -490,11 +506,26 @@ export function defaultExecRunner(
     }
 
     let settled = false;
+    let abortError: Error | null = null;
+    let abortEscalationTimer: ReturnType<typeof setTimeout> | null = null;
+    const clearAbortEscalationTimer = () => {
+      if (abortEscalationTimer !== null) {
+        clearTimeout(abortEscalationTimer);
+        abortEscalationTimer = null;
+      }
+    };
+    const cleanupAbort = () => {
+      if (abortSignal) {
+        abortSignal.removeEventListener('abort', handleAbort);
+      }
+      clearAbortEscalationTimer();
+    };
     const finalizeError = (error: Error) => {
       if (settled) {
         return;
       }
       settled = true;
+      cleanupAbort();
       reject(error);
     };
     const finalizeSuccess = (result: ProviderLinearWorkerExecResult) => {
@@ -502,15 +533,44 @@ export function defaultExecRunner(
         return;
       }
       settled = true;
+      cleanupAbort();
       resolvePromise(result);
     };
-
+    const handleAbort = () => {
+      if (settled) {
+        return;
+      }
+      if (child.exitCode !== null || child.signalCode !== null) {
+        return;
+      }
+      abortError ??= buildAbortError();
+      if (!child.killed) {
+        child.kill();
+      }
+      if (abortEscalationTimer === null) {
+        abortEscalationTimer = setTimeout(() => {
+          if (settled || child.exitCode !== null || child.signalCode !== null) {
+            return;
+          }
+          child.kill('SIGKILL');
+        }, 5_000);
+        abortEscalationTimer.unref?.();
+      }
+    };
     child.once('error', (error) => {
-      finalizeError(error instanceof Error ? error : new Error(String(error)));
+      finalizeError(abortError ?? (error instanceof Error ? error : new Error(String(error))));
     });
     child.once('close', (exitCode) => {
+      if (abortError) {
+        finalizeError(abortError);
+        return;
+      }
       finalizeSuccess({ exitCode, stdout, stderr });
     });
+    abortSignal?.addEventListener('abort', handleAbort, { once: true });
+    if (abortSignal?.aborted) {
+      handleAbort();
+    }
   });
 }
 
