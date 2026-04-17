@@ -4547,15 +4547,17 @@ function findMatchingPriorHydratedProviderLinearWorkerChildLane(
     return null;
   }
   return (
-    priorProofChildLanes.find((prior) =>
-      prior.pipeline_id === existing.pipeline_id &&
-      prior.decision === existing.decision &&
-      prior.stream === existing.stream &&
-      prior.task_id === existing.task_id &&
-      prior.issue_id === existing.issue_id &&
-      prior.issue_identifier === existing.issue_identifier &&
-      prior.launched_at === existing.launched_at &&
-      normalizeOptionalString(prior.run_id)?.startsWith('launching-') !== true
+    priorProofChildLanes.find(
+      (prior): prior is ProviderLinearWorkerChildLaneRecord =>
+        isRecord(prior) &&
+        prior.pipeline_id === existing.pipeline_id &&
+        prior.decision === existing.decision &&
+        prior.stream === existing.stream &&
+        prior.task_id === existing.task_id &&
+        prior.issue_id === existing.issue_id &&
+        prior.issue_identifier === existing.issue_identifier &&
+        prior.launched_at === existing.launched_at &&
+        normalizeOptionalString(prior.run_id)?.startsWith('launching-') !== true
     ) ?? null
   );
 }
@@ -4593,15 +4595,17 @@ async function readProviderLinearWorkerParentManifestHydrationMetadata(
   if (!isRecord(parsed)) {
     return null;
   }
-  const runId = normalizeOptionalString(parsed.run_id);
+  const runId = normalizeOptionalString(parsed.run_id) ?? normalizeOptionalString(parsed.runId);
   if (!runId) {
     return null;
   }
   return {
     runId,
-    issueId: normalizeOptionalString(parsed.issue_id),
-    issueIdentifier: normalizeOptionalString(parsed.issue_identifier),
-    workspacePath: normalizeOptionalString(parsed.workspace_path)
+    issueId: normalizeOptionalString(parsed.issue_id) ?? normalizeOptionalString(parsed.issueId),
+    issueIdentifier:
+      normalizeOptionalString(parsed.issue_identifier) ?? normalizeOptionalString(parsed.issueIdentifier),
+    workspacePath:
+      normalizeOptionalString(parsed.workspace_path) ?? normalizeOptionalString(parsed.workspacePath)
   };
 }
 

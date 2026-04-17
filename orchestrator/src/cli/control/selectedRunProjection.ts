@@ -1283,12 +1283,14 @@ function hasProviderLinearWorkerProjectionReservationPlaceholderInRecords(
     return false;
   }
   return records.some((childLane) => {
-    const record = childLane as unknown as Record<string, unknown>;
-    const runId = readStringValue(record, 'run_id');
-    const summary = readStringValue(record, 'summary');
-    const status = readStringValue(record, 'status');
-    const pipelineId = readStringValue(record, 'pipeline_id');
-    const decision = readStringValue(record, 'decision');
+    if (!isRecord(childLane)) {
+      return false;
+    }
+    const runId = readStringValue(childLane, 'run_id');
+    const summary = readStringValue(childLane, 'summary');
+    const status = readStringValue(childLane, 'status');
+    const pipelineId = readStringValue(childLane, 'pipeline_id');
+    const decision = readStringValue(childLane, 'decision');
     return (
       pipelineId === PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID &&
       decision === 'pending' &&
@@ -1308,11 +1310,13 @@ function hasProviderLinearWorkerProjectionActivePendingChildLaneInRecords(
     return false;
   }
   return records.some((childLane) => {
-    const record = childLane as unknown as Record<string, unknown>;
-    const status = readStringValue(record, 'status');
+    if (!isRecord(childLane)) {
+      return false;
+    }
+    const status = readStringValue(childLane, 'status');
     return (
-      readStringValue(record, 'pipeline_id') === PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID &&
-      readStringValue(record, 'decision') === 'pending' &&
+      readStringValue(childLane, 'pipeline_id') === PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID &&
+      readStringValue(childLane, 'decision') === 'pending' &&
       !isProviderLinearWorkerProjectionTerminalChildLaneStatus(status ?? null)
     );
   });
