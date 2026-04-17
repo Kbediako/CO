@@ -28,6 +28,7 @@ import {
 } from './utils/cloudPreflight.js';
 import {
   classifyDelegationTransport,
+  formatDelegateServerProcessSummary,
   inspectDelegateServerProcesses,
   inspectDelegationMcpConfig,
   probeDelegationInitialize,
@@ -874,9 +875,16 @@ export function formatDoctorSummary(result: DoctorResult): string[] {
     for (const detail of result.delegation.processes.details
       .filter((entry) => entry.classification === 'stale-parent-session' || entry.classification === 'stale-orphan')
       .slice(0, 3)) {
-      lines.push(
-        `    stale detail: pid ${detail.pid} (${detail.classification}), parent ${detail.root_codex_parent_pid ?? detail.parent_pid ?? 'none'}, cwd ${detail.root_codex_parent_cwd ?? detail.parent_cwd ?? detail.cwd ?? '<unknown>'}, manifest ${detail.manifest_path ?? '<none>'}`
-      );
+      lines.push(`    stale detail: ${formatDelegateServerProcessSummary({
+        pid: detail.pid,
+        classification: detail.classification,
+        cwd: detail.cwd,
+        parentPid: detail.parent_pid,
+        parentCwd: detail.parent_cwd,
+        rootCodexParentPid: detail.root_codex_parent_pid,
+        rootCodexParentCwd: detail.root_codex_parent_cwd,
+        manifestPath: detail.manifest_path
+      })}`);
     }
   }
   for (const line of result.delegation.enablement) {

@@ -93,6 +93,22 @@ export async function runJsonRpcServer(
     }
   };
 
+  const handleInputError = (error: unknown) => {
+    if (halted) {
+      return;
+    }
+    halted = true;
+    clearIdleTimer();
+    const detail = error instanceof Error ? error.message : String(error);
+    logger.error(`MCP input stream error: ${detail}`);
+    process.exitCode = 1;
+    buffer = Buffer.alloc(0);
+    expectedLength = null;
+    if (typeof (input as { pause?: () => void }).pause === 'function') {
+      input.pause();
+    }
+  };
+
   input.on('data', (chunk) => {
     if (halted) {
       return;
@@ -116,7 +132,7 @@ export async function runJsonRpcServer(
   });
   input.on('end', clearIdleTimer);
   input.on('close', clearIdleTimer);
-  input.on('error', clearIdleTimer);
+  input.on('error', handleInputError);
   armIdleTimer();
 
   async function processBuffer() {

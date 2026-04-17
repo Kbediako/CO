@@ -15,6 +15,7 @@ import {
   resolveRunManifestPath
 } from '../src/cli/delegationServer.js';
 import { __test__ as delegationServerTest } from '../src/cli/delegationServer.js';
+import { logger } from '../src/logger.js';
 
 const {
   runJsonRpcServer,
@@ -4159,29 +4160,31 @@ describe('delegation server MCP framing', () => {
 
   it('triggers the idle timeout callback after sustained inactivity', async () => {
     vi.useFakeTimers();
-    process.exitCode = undefined;
     const input = new PassThrough();
-    const output = new PassThrough();
-    const onIdleTimeout = vi.fn();
-    await runJsonRpcServer(async () => ({}), {
-      stdin: input,
-      stdout: output,
-      idleTimeoutMs: 1_000,
-      onIdleTimeout
-    });
+    try {
+      process.exitCode = undefined;
+      const output = new PassThrough();
+      const onIdleTimeout = vi.fn();
+      await runJsonRpcServer(async () => ({}), {
+        stdin: input,
+        stdout: output,
+        idleTimeoutMs: 1_000,
+        onIdleTimeout
+      });
 
-    await vi.advanceTimersByTimeAsync(1_000);
-    expect(onIdleTimeout).toHaveBeenCalledTimes(1);
-
-    input.end();
-    vi.useRealTimers();
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(onIdleTimeout).toHaveBeenCalledTimes(1);
+    } finally {
+      input.end();
+      vi.useRealTimers();
+    }
   });
 
   it('re-arms the idle timeout when a partial frame stalls before completion', async () => {
     vi.useFakeTimers();
+    const input = new PassThrough();
     try {
       process.exitCode = undefined;
-      const input = new PassThrough();
       const output = new PassThrough();
       const onIdleTimeout = vi.fn();
       await runJsonRpcServer(async () => ({}), {
@@ -4199,9 +4202,27 @@ describe('delegation server MCP framing', () => {
       await vi.advanceTimersByTimeAsync(1_000);
       expect(onIdleTimeout).toHaveBeenCalledTimes(1);
 
-      input.end();
     } finally {
+      input.end();
       vi.useRealTimers();
+    }
+  });
+
+  it('logs input stream errors and marks the MCP server failed', async () => {
+    process.exitCode = undefined;
+    const input = new PassThrough();
+    const loggerErrorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+    try {
+      await runJsonRpcServer(async () => ({}), { stdin: input, stdout: new PassThrough() });
+
+      input.emit('error', new Error('boom'));
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(process.exitCode).toBe(1);
+      expect(loggerErrorSpy).toHaveBeenCalledWith('MCP input stream error: boom');
+    } finally {
+      input.end();
+      loggerErrorSpy.mockRestore();
     }
   });
 

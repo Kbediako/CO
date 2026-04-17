@@ -1,3 +1,4 @@
+import * as childProcess from 'node:child_process';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -14,6 +15,7 @@ import {
 describe('delegationMcpHealth', () => {
   afterEach(() => {
     vi.resetModules();
+    vi.doUnmock('node:child_process');
     vi.doUnmock('../src/cli/utils/packageInfo.js');
     vi.doUnmock('../src/cli/utils/packageProgramResolver.js');
   });
@@ -685,18 +687,59 @@ describe('delegationMcpHealth', () => {
     }
   });
 
-  it('falls back to per-pid cwd lookup when batched lsof preload misses a live delegate-server pid', () => {
+  it('falls back to per-pid cwd lookup when batched lsof preload misses a live delegate-server pid', async () => {
+    vi.resetModules();
+    const actualChildProcess = await vi.importActual<typeof import('node:child_process')>('node:child_process');
+    const spawnSyncMock = vi.fn((command: string, args?: string[], options?: childProcess.SpawnSyncOptions) => {
+      if (command === 'lsof' && Array.isArray(args) && args[2] === 'cwd' && args[3] === '-Fpfn') {
+        return {
+          stdout: `p${process.ppid}\nn${process.cwd()}\n`,
+          stderr: '',
+          status: 0,
+          signal: null,
+          output: [null, `p${process.ppid}\nn${process.cwd()}\n`, ''],
+          pid: 0
+        } as any;
+      }
+      if (
+        command === 'lsof'
+        && Array.isArray(args)
+        && args[2] === 'cwd'
+        && args[3] === '-Fn'
+        && args[5] === String(process.pid)
+      ) {
+        return {
+          stdout: `p${process.pid}\nn${process.cwd()}\n`,
+          stderr: '',
+          status: 0,
+          signal: null,
+          output: [null, `p${process.pid}\nn${process.cwd()}\n`, ''],
+          pid: 0
+        } as any;
+      }
+      return actualChildProcess.spawnSync(command as never, args as never, options as never) as any;
+    });
+    vi.doMock('node:child_process', () => ({
+      ...actualChildProcess,
+      spawnSync: spawnSyncMock
+    }));
+    const health = await import('../src/cli/utils/delegationMcpHealth.js');
     const snapshot = [
       `${process.ppid}     1 20:00  10240 codex resume 019-parent`,
       `${process.pid}   ${process.ppid} 00:05   4096 /opt/homebrew/bin/node /repo/dist/bin/codex-orchestrator.js delegate-server`,
       '999999     1 00:01   1024 helper'
     ].join('\n');
 
-    const result = inspectDelegateServerProcesses({ snapshot });
+    const result = health.inspectDelegateServerProcesses({ snapshot });
     expect(result.details.find((detail) => detail.pid === process.pid)).toMatchObject({
       cwd: process.cwd(),
       rootCodexParentCwd: process.cwd()
     });
+    expect(spawnSyncMock).toHaveBeenCalledWith(
+      'lsof',
+      ['-a', '-d', 'cwd', '-Fn', '-p', String(process.pid)],
+      expect.objectContaining({ encoding: 'utf8' })
+    );
   });
 
   it('keeps delegate-server children active when the codex parent argv mentions codex-orchestrator text', () => {

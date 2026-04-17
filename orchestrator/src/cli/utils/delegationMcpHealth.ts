@@ -119,6 +119,19 @@ export interface DelegateServerProcessDetail {
   classificationDetail: string;
 }
 
+export function formatDelegateServerProcessSummary(detail: {
+  pid: number;
+  classification: string;
+  cwd: string | null;
+  parentPid: number | null;
+  parentCwd: string | null;
+  rootCodexParentPid: number | null;
+  rootCodexParentCwd: string | null;
+  manifestPath: string | null;
+}): string {
+  return `pid ${detail.pid} (${detail.classification}), parent ${detail.rootCodexParentPid ?? detail.parentPid ?? 'none'}, cwd ${detail.rootCodexParentCwd ?? detail.parentCwd ?? detail.cwd ?? '<unknown>'}, manifest ${detail.manifestPath ?? '<none>'}`;
+}
+
 interface DelegateServerProcessDraft {
   record: DelegateServerProcessRecord;
   cwd: string | null;
@@ -618,9 +631,16 @@ export function formatDelegateServerCleanupSummary(result: DelegateServerCleanup
     (detail) => detail.classification === 'stale-parent-session' || detail.classification === 'stale-orphan'
   );
   for (const detail of staleDetails.slice(0, 3)) {
-    lines.push(
-      `- Stale detail: pid ${detail.pid} (${detail.classification}), parent ${detail.rootCodexParentPid ?? detail.parentPid ?? 'none'}, cwd ${detail.rootCodexParentCwd ?? detail.parentCwd ?? detail.cwd ?? '<unknown>'}, manifest ${detail.manifestAssociation?.manifestPath ?? '<none>'}`
-    );
+    lines.push(`- Stale detail: ${formatDelegateServerProcessSummary({
+      pid: detail.pid,
+      classification: detail.classification,
+      cwd: detail.cwd,
+      parentPid: detail.parentPid,
+      parentCwd: detail.parentCwd,
+      rootCodexParentPid: detail.rootCodexParentPid,
+      rootCodexParentCwd: detail.rootCodexParentCwd,
+      manifestPath: detail.manifestAssociation?.manifestPath ?? null
+    })}`);
   }
   if (result.dryRun && result.status !== 'unavailable') {
     lines.push('Run with --yes to terminate stale delegate-server processes.');
