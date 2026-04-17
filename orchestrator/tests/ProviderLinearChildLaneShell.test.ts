@@ -11,6 +11,7 @@ import {
 import {
   PROVIDER_LINEAR_CHILD_LANE_INSTRUCTIONS_ENV,
   PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_BASE_SHA_ENV,
+  PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_CAPTURED_AT_ENV,
   PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_STATE_ENV,
   PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_STATE_TYPE_ENV,
   PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_UPDATED_AT_ENV,
@@ -183,6 +184,31 @@ async function writeChildLaneProof(
   return proof;
 }
 
+async function writeChildLaneManifest(
+  childLane: ProviderLinearWorkerChildLaneRecord,
+  overrides: Record<string, unknown> = {}
+): Promise<void> {
+  await mkdir(dirname(childLane.manifest_path), { recursive: true });
+  await writeFile(
+    childLane.manifest_path,
+    JSON.stringify({
+      run_id: childLane.run_id,
+      task_id: childLane.task_id,
+      pipeline_id: childLane.pipeline_id,
+      parent_run_id: RUN_ID,
+      issue_id: childLane.issue_id,
+      issue_identifier: childLane.issue_identifier,
+      status: childLane.status,
+      artifact_root: childLane.artifact_root,
+      manifest_path: childLane.manifest_path,
+      log_path: childLane.log_path,
+      summary: childLane.summary,
+      ...overrides
+    }),
+    'utf8'
+  );
+}
+
 describe('runProviderLinearChildLaneShell', () => {
   it('launches a same-issue child lane and records parent-owned lineage', async () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
@@ -190,6 +216,7 @@ describe('runProviderLinearChildLaneShell', () => {
     const env = buildProviderWorkerEnv(manifestPath, {
       CODEX_ORCHESTRATOR_RUNS_DIR: join('/tmp', 'shared-runs'),
       CODEX_ORCHESTRATOR_OUT_DIR: join('/tmp', 'shared-out'),
+      CODEX_THREAD_ID: 'parent-thread-1',
       CODEX_HOME: join(tempRoot ?? '', 'codex-home'),
       CO_LINEAR_API_TOKEN: 'lin-api-token'
     });
@@ -312,6 +339,7 @@ describe('runProviderLinearChildLaneShell', () => {
     const request = execRunner.mock.calls[0]?.[0];
     expect(request?.env.CODEX_ORCHESTRATOR_RUNS_DIR).toBe(join(tempRoot ?? '', '.runs'));
     expect(request?.env.CODEX_ORCHESTRATOR_OUT_DIR).toBe(join(tempRoot ?? '', 'out'));
+    expect(request?.env.CODEX_THREAD_ID).toBeUndefined();
     expect(refreshProofSnapshot).toHaveBeenCalledWith(runDir, null, env);
     expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
       expect.objectContaining({
@@ -2025,6 +2053,123 @@ describe('runProviderLinearChildLaneShell', () => {
     expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([]);
   });
 
+  it('surfaces failed child-lane proof detail when appserver startup times out', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const childRunDir = join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-timeout');
+    const childProof: ProviderLinearChildLaneProof = {
+      issue_id: ISSUE.issue_id,
+      issue_identifier: ISSUE.issue_identifier,
+      task_id: `${TASK_ID}-impl-a`,
+      run_id: 'child-run-timeout',
+      parent_run_id: RUN_ID,
+      stream: 'impl-a',
+      purpose: 'Implement bounded child lane support',
+      instructions: null,
+      scope: {
+        files: ['docs/PRD-linear-lin-issue-1.md'],
+        phases: ['docs']
+      },
+      parent_snapshot: {
+        base_sha: 'parent-base-sha',
+        issue_updated_at: '2026-03-30T07:10:00.000Z',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        captured_at: '2026-03-30T07:11:00.000Z'
+      },
+      lane_workspace_path: join(tempRoot ?? '', '.child-lanes', 'impl-a-child-run-timeout'),
+      lane_branch: 'child-lane/impl-a-child-run-timeout',
+      patch_artifact_path: join(childRunDir, 'provider-linear-child-lane.patch'),
+      patch_bytes: 0,
+      thread_id: null,
+      latest_turn_id: null,
+      latest_session_id: null,
+      latest_session_id_source: null,
+      last_event: null,
+      last_message:
+        'Appserver child lane startup stalled after runtime selection for 90s without matching session-log startup evidence. Invalidate the lane and relaunch under CLI, or inspect appserver session startup for CO-224.',
+      last_event_at: null,
+      tokens: {
+        input_tokens: null,
+        output_tokens: null,
+        total_tokens: null
+      },
+      rate_limits: null,
+      status: 'failed',
+      updated_at: '2026-03-30T07:12:00.000Z'
+    };
+    const execRunner = vi.fn(async () => {
+      await mkdir(childRunDir, { recursive: true });
+      await writeFile(
+        join(childRunDir, PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME),
+        JSON.stringify(childProof),
+        'utf8'
+      );
+      return {
+        exitCode: 0,
+        stdout: JSON.stringify({
+          run_id: 'child-run-timeout',
+          status: 'failed',
+          artifact_root: `.runs/${TASK_ID}-impl-a/cli/child-run-timeout`,
+          manifest: `.runs/${TASK_ID}-impl-a/cli/child-run-timeout/manifest.json`,
+          summary: null
+        }),
+        stderr: ''
+      };
+    });
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'launch',
+        streamName: 'impl-a',
+        purpose: 'Implement bounded child lane support',
+        files: ['docs/PRD-linear-lin-issue-1.md'],
+        phases: ['docs'],
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        execRunner,
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: '2026-03-30T07:10:00.000Z',
+          state: 'In Progress',
+          state_type: 'started'
+        })) as never,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
+        readParentHeadSha: vi.fn(async () => 'parent-base-sha'),
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'launch',
+      child_run: {
+        run_id: 'child-run-timeout',
+        status: 'failed'
+      },
+      child_lane: {
+        run_id: 'child-run-timeout',
+        status: 'failed',
+        summary: expect.stringContaining('Appserver child lane startup stalled after runtime selection')
+      },
+      error: {
+        code: 'provider_worker_child_lane_run_failed',
+        message: expect.stringContaining('Invalidate the lane and relaunch under CLI'),
+        status: 502
+      }
+    });
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
+      expect.objectContaining({
+        run_id: 'child-run-timeout',
+        status: 'failed',
+        summary: expect.stringContaining('Appserver child lane startup stalled after runtime selection'),
+        decision: 'pending'
+      })
+    ]);
+  });
+
   it('returns a failure envelope when launch dependencies throw unexpectedly', async () => {
     const { manifestPath } = await createProviderWorkerManifest();
 
@@ -2283,6 +2428,513 @@ describe('runProviderLinearChildLaneShell', () => {
         in_flight_action: null
       })
     ]);
+  });
+
+  it('repairs a stale launching reservation before accepting the recovered child lane', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const launchingLane = createLaneRecord({
+      run_id: 'launching-stale-1',
+      status: 'launching',
+      manifest_path: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'launching-stale-1', 'manifest.json'),
+      artifact_root: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'launching-stale-1'),
+      log_path: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'launching-stale-1', 'run.log'),
+      summary: 'Child lane reserved before child run startup.',
+      lane_workspace_path: null,
+      patch_artifact_path: null,
+      patch_bytes: null
+    });
+    const childLane = createLaneRecord();
+    await appendProviderLinearWorkerChildLaneRecord(runDir, launchingLane);
+    await writeChildLaneManifest(childLane);
+    await writeChildLaneProof(childLane, {
+      parent_snapshot: {
+        ...childLane.parent_snapshot,
+        captured_at: '2026-03-30T07:12:30.000Z'
+      }
+    });
+    await writePatchArtifact(childLane.patch_artifact_path ?? '', childLane.scope.files[0] ?? '');
+    const applyPatchArtifact = vi.fn(async () => {
+      const claimed = await readProviderLinearWorkerChildLanes(runDir);
+      expect(claimed).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            run_id: launchingLane.run_id,
+            decision: 'invalidated',
+            decision_reason: expect.stringContaining(childLane.run_id)
+          }),
+          expect.objectContaining({
+            run_id: childLane.run_id,
+            decision: 'pending',
+            in_flight_action: 'accept'
+          })
+        ])
+      );
+    });
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'accept',
+        streamName: childLane.stream,
+        reason: 'Parent accepted the repaired child lane patch.',
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        applyPatchArtifact,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
+        readParentHeadSha: vi.fn(async () => childLane.parent_snapshot.base_sha),
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: childLane.parent_snapshot.issue_updated_at,
+          state: childLane.parent_snapshot.issue_state,
+          state_type: childLane.parent_snapshot.issue_state_type
+        })) as never,
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'child-lane',
+      action: 'accepted',
+      child_lane: {
+        run_id: childLane.run_id,
+        decision: 'accepted',
+        decision_reason: 'Parent accepted the repaired child lane patch.'
+      }
+    });
+    expect(applyPatchArtifact).toHaveBeenCalledWith(tempRoot, childLane.patch_artifact_path);
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          run_id: launchingLane.run_id,
+          decision: 'invalidated',
+          decision_reason: expect.stringContaining(childLane.run_id)
+        }),
+        expect.objectContaining({
+          run_id: childLane.run_id,
+          decision: 'accepted',
+          decision_reason: 'Parent accepted the repaired child lane patch.',
+          in_flight_action: null
+        })
+      ])
+    );
+  });
+
+  it('keeps repaired child lanes blocked when the recovered run already has a live in-flight decision', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const childLane = createLaneRecord({
+      run_id: 'child-run-existing-pending',
+      manifest_path: join(
+        tempRoot ?? '',
+        '.runs',
+        `${TASK_ID}-impl-a`,
+        'cli',
+        'child-run-existing-pending',
+        'manifest.json'
+      ),
+      artifact_root: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-existing-pending'),
+      log_path: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-existing-pending', 'run.log'),
+      patch_artifact_path: join(
+        tempRoot ?? '',
+        '.runs',
+        `${TASK_ID}-impl-a`,
+        'cli',
+        'child-run-existing-pending',
+        'provider-linear-child-lane.patch'
+      ),
+      in_flight_action: 'accept',
+      in_flight_started_at: '2026-03-30T07:25:00.000Z'
+    });
+    const launchingLane = createLaneRecord({
+      run_id: 'launching-stale-1b',
+      status: 'launching',
+      manifest_path: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'launching-stale-1b', 'manifest.json'),
+      artifact_root: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'launching-stale-1b'),
+      log_path: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'launching-stale-1b', 'run.log'),
+      summary: 'Child lane reserved before child run startup.',
+      lane_workspace_path: null,
+      patch_artifact_path: null,
+      patch_bytes: null
+    });
+    await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+    await appendProviderLinearWorkerChildLaneRecord(runDir, launchingLane);
+    await writeChildLaneManifest(childLane);
+    await writeChildLaneProof(childLane);
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'reject',
+        streamName: childLane.stream,
+        reason: 'Parent rejected the recovered child lane output.',
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        now: vi.fn(() => '2026-03-30T07:30:00.000Z'),
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'reject',
+      error: {
+        code: 'provider_worker_child_lane_decision_in_flight',
+        status: 409
+      }
+    });
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          run_id: launchingLane.run_id,
+          decision: 'invalidated',
+          decision_reason: expect.stringContaining(childLane.run_id)
+        }),
+        expect.objectContaining({
+          run_id: childLane.run_id,
+          decision: 'pending',
+          in_flight_action: 'accept',
+          in_flight_started_at: '2026-03-30T07:25:00.000Z'
+        })
+      ])
+    );
+  });
+
+  it('repairs a stale launching reservation before rejecting the recovered child lane', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const launchingLane = createLaneRecord({
+      run_id: 'launching-stale-2',
+      status: 'launching',
+      manifest_path: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'launching-stale-2', 'manifest.json'),
+      artifact_root: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'launching-stale-2'),
+      log_path: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'launching-stale-2', 'run.log'),
+      summary: 'Child lane reserved before child run startup.',
+      lane_workspace_path: null,
+      patch_artifact_path: null,
+      patch_bytes: null
+    });
+    const childLane = createLaneRecord();
+    await appendProviderLinearWorkerChildLaneRecord(runDir, launchingLane);
+    await writeChildLaneManifest(childLane);
+    await writeChildLaneProof(childLane);
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'reject',
+        streamName: childLane.stream,
+        reason: 'Parent rejected the repaired child lane output.',
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'child-lane',
+      action: 'rejected',
+      child_lane: {
+        run_id: childLane.run_id,
+        decision: 'rejected',
+        decision_reason: 'Parent rejected the repaired child lane output.'
+      }
+    });
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          run_id: launchingLane.run_id,
+          decision: 'invalidated',
+          decision_reason: expect.stringContaining(childLane.run_id)
+        }),
+        expect.objectContaining({
+          run_id: childLane.run_id,
+          decision: 'rejected',
+          decision_reason: 'Parent rejected the repaired child lane output.'
+        })
+      ])
+    );
+  });
+
+  it('repairs a stale launching reservation before rejecting a recovered child lane without a patch artifact', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const launchingLane = createLaneRecord({
+      run_id: 'launching-stale-2b',
+      status: 'launching',
+      manifest_path: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'launching-stale-2b', 'manifest.json'),
+      artifact_root: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'launching-stale-2b'),
+      log_path: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'launching-stale-2b', 'run.log'),
+      summary: 'Child lane reserved before child run startup.',
+      lane_workspace_path: null,
+      patch_artifact_path: null,
+      patch_bytes: null
+    });
+    const childLane = createLaneRecord({
+      run_id: 'child-run-failed-no-patch',
+      status: 'failed',
+      manifest_path: join(
+        tempRoot ?? '',
+        '.runs',
+        `${TASK_ID}-impl-a`,
+        'cli',
+        'child-run-failed-no-patch',
+        'manifest.json'
+      ),
+      artifact_root: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-failed-no-patch'),
+      log_path: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-failed-no-patch', 'run.log'),
+      patch_artifact_path: null,
+      patch_bytes: null,
+      summary: 'child lane failed before producing a patch'
+    });
+    await appendProviderLinearWorkerChildLaneRecord(runDir, launchingLane);
+    await writeChildLaneManifest(childLane);
+    await writeChildLaneProof(childLane, {
+      patch_artifact_path: null,
+      patch_bytes: null
+    });
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'reject',
+        streamName: childLane.stream,
+        reason: 'Parent rejected the recovered failed child lane output.',
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'child-lane',
+      action: 'rejected',
+      child_lane: {
+        run_id: childLane.run_id,
+        decision: 'rejected',
+        decision_reason: 'Parent rejected the recovered failed child lane output.'
+      }
+    });
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          run_id: launchingLane.run_id,
+          decision: 'invalidated',
+          decision_reason: expect.stringContaining(childLane.run_id)
+        }),
+        expect.objectContaining({
+          run_id: childLane.run_id,
+          status: 'failed',
+          patch_artifact_path: null,
+          decision: 'rejected',
+          decision_reason: 'Parent rejected the recovered failed child lane output.'
+        })
+      ])
+    );
+  });
+
+  it('fails closed when recovered child-lane proof lineage does not match the launching reservation', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const launchingLane = createLaneRecord({
+      run_id: 'launching-stale-3',
+      status: 'launching',
+      manifest_path: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'launching-stale-3', 'manifest.json'),
+      artifact_root: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'launching-stale-3'),
+      log_path: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'launching-stale-3', 'run.log'),
+      summary: 'Child lane reserved before child run startup.',
+      lane_workspace_path: null,
+      patch_artifact_path: null,
+      patch_bytes: null
+    });
+    const childLane = createLaneRecord();
+    await appendProviderLinearWorkerChildLaneRecord(runDir, launchingLane);
+    await writeChildLaneManifest(childLane);
+    await writeChildLaneProof(childLane, {
+      parent_run_id: 'other-parent-run'
+    });
+    const applyPatchArtifact = vi.fn(async () => undefined);
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'accept',
+        streamName: childLane.stream,
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        applyPatchArtifact,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
+        readParentHeadSha: vi.fn(async () => childLane.parent_snapshot.base_sha),
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: childLane.parent_snapshot.issue_updated_at,
+          state: childLane.parent_snapshot.issue_state,
+          state_type: childLane.parent_snapshot.issue_state_type
+        })) as never,
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'accept',
+      error: {
+        code: 'provider_worker_child_lane_not_ready',
+        status: 409
+      }
+    });
+    expect(applyPatchArtifact).not.toHaveBeenCalled();
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
+      expect.objectContaining({
+        run_id: launchingLane.run_id,
+        decision: 'pending',
+        status: 'launching'
+      })
+    ]);
+  });
+
+  it('keeps repaired child lanes non-accepted when the recovered patch artifact is missing', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const launchingLane = createLaneRecord({
+      run_id: 'launching-stale-4',
+      status: 'launching',
+      manifest_path: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'launching-stale-4', 'manifest.json'),
+      artifact_root: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'launching-stale-4'),
+      log_path: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'launching-stale-4', 'run.log'),
+      summary: 'Child lane reserved before child run startup.',
+      lane_workspace_path: null,
+      patch_artifact_path: null,
+      patch_bytes: null
+    });
+    const childLane = createLaneRecord();
+    await appendProviderLinearWorkerChildLaneRecord(runDir, launchingLane);
+    await writeChildLaneManifest(childLane);
+    await writeChildLaneProof(childLane);
+    const applyPatchArtifact = vi.fn(async () => undefined);
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'accept',
+        streamName: childLane.stream,
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        applyPatchArtifact,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
+        readParentHeadSha: vi.fn(async () => childLane.parent_snapshot.base_sha),
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: childLane.parent_snapshot.issue_updated_at,
+          state: childLane.parent_snapshot.issue_state,
+          state_type: childLane.parent_snapshot.issue_state_type
+        })) as never,
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'accept',
+      error: {
+        code: 'provider_worker_child_lane_patch_invalid',
+        status: 409
+      }
+    });
+    expect(applyPatchArtifact).not.toHaveBeenCalled();
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          run_id: launchingLane.run_id,
+          decision: 'invalidated',
+          decision_reason: expect.stringContaining(childLane.run_id)
+        }),
+        expect.objectContaining({
+          run_id: childLane.run_id,
+          decision: 'pending',
+          status: 'succeeded',
+          in_flight_action: null
+        })
+      ])
+    );
+  });
+
+  it('fails closed without retiring the live reservation when the only recovered run is already finalized in the ledger', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const launchingLane = createLaneRecord({
+      run_id: 'launching-stale-5',
+      status: 'launching',
+      manifest_path: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'launching-stale-5', 'manifest.json'),
+      artifact_root: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'launching-stale-5'),
+      log_path: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'launching-stale-5', 'run.log'),
+      summary: 'Child lane reserved before child run startup.',
+      lane_workspace_path: null,
+      patch_artifact_path: null,
+      patch_bytes: null
+    });
+    const finalizedLane = createLaneRecord({
+      run_id: 'child-run-existing',
+      manifest_path: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-existing', 'manifest.json'),
+      artifact_root: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-existing'),
+      log_path: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-existing', 'run.log'),
+      decision: 'rejected',
+      decision_at: '2026-03-30T07:13:00.000Z',
+      decision_reason: 'Older child lane was already rejected.'
+    });
+    await appendProviderLinearWorkerChildLaneRecord(runDir, finalizedLane);
+    await appendProviderLinearWorkerChildLaneRecord(runDir, launchingLane);
+    await writeChildLaneManifest(finalizedLane);
+    await writeChildLaneProof(finalizedLane);
+    const applyPatchArtifact = vi.fn(async () => undefined);
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'accept',
+        streamName: launchingLane.stream,
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        applyPatchArtifact,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
+        readParentHeadSha: vi.fn(async () => launchingLane.parent_snapshot.base_sha),
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: launchingLane.parent_snapshot.issue_updated_at,
+          state: launchingLane.parent_snapshot.issue_state,
+          state_type: launchingLane.parent_snapshot.issue_state_type
+        })) as never,
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'accept',
+      error: {
+        code: 'provider_worker_child_lane_not_ready',
+        status: 409
+      }
+    });
+    expect(applyPatchArtifact).not.toHaveBeenCalled();
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          run_id: launchingLane.run_id,
+          decision: 'pending',
+          status: 'launching'
+        }),
+        expect.objectContaining({
+          run_id: finalizedLane.run_id,
+          decision: 'rejected',
+          decision_reason: 'Older child lane was already rejected.'
+        })
+      ])
+    );
   });
 
   it('accepts a non-stale child lane rooted under an in-repo custom runs directory', async () => {
@@ -3315,6 +3967,8 @@ describe('runProviderLinearChildLaneShell', () => {
       [PROVIDER_LINEAR_CHILD_LANE_INSTRUCTIONS_ENV]: process.env[PROVIDER_LINEAR_CHILD_LANE_INSTRUCTIONS_ENV],
       [PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_BASE_SHA_ENV]:
         process.env[PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_BASE_SHA_ENV],
+      [PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_CAPTURED_AT_ENV]:
+        process.env[PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_CAPTURED_AT_ENV],
       [PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_UPDATED_AT_ENV]:
         process.env[PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_UPDATED_AT_ENV],
       [PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_STATE_ENV]:
@@ -3324,6 +3978,7 @@ describe('runProviderLinearChildLaneShell', () => {
     };
     process.env[PROVIDER_LINEAR_CHILD_LANE_INSTRUCTIONS_ENV] = 'stale instructions';
     process.env[PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_BASE_SHA_ENV] = 'stale-base';
+    process.env[PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_CAPTURED_AT_ENV] = 'stale-captured-at';
     process.env[PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_UPDATED_AT_ENV] = 'stale-updated-at';
     process.env[PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_STATE_ENV] = 'stale-state';
     process.env[PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_STATE_TYPE_ENV] = 'stale-state-type';
@@ -3342,7 +3997,8 @@ describe('runProviderLinearChildLaneShell', () => {
           readTrackedIssue: vi.fn(async () => null) as never,
           readParentDirtyPaths: vi.fn(async () => []) as never,
           readParentHeadSha: vi.fn(async () => 'parent-base-sha'),
-          refreshProofSnapshot: vi.fn(async () => undefined)
+          refreshProofSnapshot: vi.fn(async () => undefined),
+          now: vi.fn(() => '2026-03-30T07:11:00.000Z')
         }
       );
     } finally {
@@ -3358,6 +4014,7 @@ describe('runProviderLinearChildLaneShell', () => {
     const request = execRunner.mock.calls[0]?.[0];
     expect(request?.env[PROVIDER_LINEAR_CHILD_LANE_INSTRUCTIONS_ENV]).toBe('');
     expect(request?.env[PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_BASE_SHA_ENV]).toBe('parent-base-sha');
+    expect(request?.env[PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_CAPTURED_AT_ENV]).toBe('2026-03-30T07:11:00.000Z');
     expect(request?.env[PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_UPDATED_AT_ENV]).toBe('2026-03-30T07:10:00.000Z');
     expect(request?.env[PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_STATE_ENV]).toBe('');
     expect(request?.env[PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_STATE_TYPE_ENV]).toBe('');

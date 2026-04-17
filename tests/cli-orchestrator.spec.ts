@@ -151,7 +151,17 @@ describe('CodexOrchestrator CLI', () => {
     const manifest = JSON.parse(manifestRaw);
     expect(Array.isArray(manifest.commands)).toBe(true);
     expect(manifest.metrics_recorded).toBe(true);
-    expect(manifest.summary).toContain('Guardrails: spec-guard command not found.');
+    expect(manifest.summary ?? '').not.toContain('Guardrails: spec-guard command not found.');
+    expect(manifest.summary ?? '').not.toContain(
+      'Guardrails: spec-guard not configured for this pipeline.'
+    );
+    expect(manifest.guardrail_status).toMatchObject({
+      present: false,
+      summary: 'Guardrails: spec-guard not configured for this pipeline.',
+      counts: {
+        total: 0
+      }
+    });
 
     const metricsPath = path.join(runsDir, '0101', 'metrics.json');
     const metricsContent = await fs.readFile(metricsPath, 'utf8');
@@ -168,6 +178,12 @@ describe('CodexOrchestrator CLI', () => {
 
     const failed = await orchestrator.start({ pipelineId: 'failable' });
     expect(failed.manifest.status).toBe('failed');
+    expect(failed.manifest.summary).toContain("Stage 'fail once' failed with exit code 1.");
+    expect(failed.manifest.summary).not.toContain('Guardrails: spec-guard command not found.');
+    expect(failed.manifest.guardrail_status).toMatchObject({
+      present: false,
+      summary: 'Guardrails: spec-guard not configured for this pipeline.'
+    });
 
     const resumed = await orchestrator.resume({ runId: failed.manifest.run_id });
     expect(resumed.manifest.status).toBe('succeeded');

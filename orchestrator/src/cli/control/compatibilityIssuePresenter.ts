@@ -660,6 +660,9 @@ export function buildCompatibilityIssuePayload(input: {
   dispatchPilotSummary: ControlDispatchPilotPayload | null;
   providerIntake?: ControlCompatibilityRuntimeSnapshot['providerIntake'];
 }): ControlIssuePayload {
+  const retryPayload =
+    input.retry ??
+    (input.source.providerRetryState ? buildCompatibilityRetryEntry(input.source) : null);
   const selectedPayload = buildProjectionSelectedPayload(
     input.source,
     input.providerIntake ?? null
@@ -686,9 +689,9 @@ export function buildCompatibilityIssuePayload(input: {
       path: input.source.workspacePath ?? input.source.providerLinearWorkerProof?.workspace_path ?? null
     },
     ...(workerHost !== null ? { worker_host: workerHost } : {}),
-    attempts: buildCompatibilityIssueAttempts(input.source, input.retry),
+    attempts: buildCompatibilityIssueAttempts(input.source, retryPayload),
     running: input.running,
-    retry: input.retry,
+    retry: retryPayload,
     logs: {
       codex_session_logs: []
     },

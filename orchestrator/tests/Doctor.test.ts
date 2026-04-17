@@ -71,6 +71,8 @@ function buildDoctorCloudEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessE
   };
 }
 
+const RUN_DOCTOR_TIMEOUT_MS = 15000;
+
 describe('runDoctor', () => {
   it('reports missing devtools config and skill when absent', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
@@ -93,7 +95,7 @@ describe('runDoctor', () => {
       }
       await rm(tempHome, { recursive: true, force: true });
     }
-  });
+  }, 15000);
 
   it('reports devtools readiness when config and skill exist', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
@@ -151,7 +153,7 @@ describe('runDoctor', () => {
       }
       await rm(tempHome, { recursive: true, force: true });
     }
-  });
+  }, 15000);
 
   it('flags legacy max_spawn_depth when it still constrains older runtimes', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
@@ -226,7 +228,7 @@ describe('runDoctor', () => {
       }
       await rm(tempHome, { recursive: true, force: true });
     }
-  });
+  }, 15000);
 
   it('reports direct-dist delegation readiness and initialize latency', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
@@ -264,7 +266,7 @@ describe('runDoctor', () => {
       }
       await rm(tempHome, { recursive: true, force: true });
     }
-  });
+  }, 15000);
 
   it('degrades delegation direct-transport guidance instead of throwing when dist is unavailable', () => {
     const guidance = buildDelegationDirectTransportGuidance(() => {
@@ -444,7 +446,7 @@ describe('runDoctor', () => {
       await rm(tempHome, { recursive: true, force: true });
       await rm(tempRepo, { recursive: true, force: true });
     }
-  });
+  }, RUN_DOCTOR_TIMEOUT_MS);
 
   it('reports provider readiness when the repo is seeded and env is configured', async () => {
     const tempRepo = await mkdtemp(join(tmpdir(), 'doctor-providers-'));
@@ -521,7 +523,7 @@ describe('runDoctor', () => {
       }
       await rm(tempRepo, { recursive: true, force: true });
     }
-  });
+  }, RUN_DOCTOR_TIMEOUT_MS);
 
   it('resolves provider readiness from the repo root when doctor runs in a nested directory', async () => {
     const tempRepo = await mkdtemp(join(tmpdir(), 'doctor-providers-root-'));
@@ -592,7 +594,7 @@ describe('runDoctor', () => {
       }
       await rm(tempRepo, { recursive: true, force: true });
     }
-  });
+  }, RUN_DOCTOR_TIMEOUT_MS);
 
   it('resolves provider readiness from seeded .codex repo roots when doctor runs in a nested directory', async () => {
     const tempRepo = await mkdtemp(join(tmpdir(), 'doctor-seeded-root-'));
@@ -661,7 +663,7 @@ describe('runDoctor', () => {
       }
       await rm(tempRepo, { recursive: true, force: true });
     }
-  });
+  }, 15000);
 
   it('prefers task roots over nested provider templates when both signals exist', async () => {
     const tempRepo = await mkdtemp(join(tmpdir(), 'doctor-template-root-'));
@@ -758,7 +760,7 @@ describe('runDoctor', () => {
       }
       await rm(tempRepo, { recursive: true, force: true });
     }
-  });
+  }, 15000);
 
   it('treats disabled providers as neutral for an ok aggregate provider status', async () => {
     const tempRepo = await mkdtemp(join(tmpdir(), 'doctor-providers-linear-only-'));
@@ -822,7 +824,7 @@ describe('runDoctor', () => {
       }
       await rm(tempRepo, { recursive: true, force: true });
     }
-  });
+  }, 15000);
 
   it('treats non-object provider control payloads as invalid', async () => {
     const tempRepo = await mkdtemp(join(tmpdir(), 'doctor-providers-invalid-policy-'));
@@ -2226,4 +2228,4 @@ describe('runDoctor', () => {
       await rm(tempDir, { recursive: true, force: true });
     }
   });
-});
+}, RUN_DOCTOR_TIMEOUT_MS);

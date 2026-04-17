@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 419477f92de3490d49a7597b572f93c061241d9dcc80d6faa3c02e3f1baa911e -->
+<!-- codex:instruction-stamp b7bc5fef16d8e48b617da0f06dd8af0d089ce3e0cbc35f89f7741f6da03778e6 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -163,7 +163,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Before opening/updating a PR, validate in a clean worktree/clone (no untracked files) so local-only directories don’t mask CI failures (e.g., `docs:check` only sees tracked paths). Quick pattern: `git worktree add ../CO-ci HEAD` then run the core lane commands in `../CO-ci/`.
 - When writing PR summaries, avoid literal `\n` sequences; use `gh pr create --body-file` or a here-doc so line breaks render correctly in GitHub.
 - Git workflow details: `.agent/SOPs/git-management.md`.
-- Keep `docs/TASKS.md` under the line threshold in `docs/tasks-archive-policy.json`; the tasks archive automation workflow opens a PR and updates the `task-archives` branch when the limit is exceeded. Use `npm run docs:archive-tasks` for manual fallback.
+- Keep `docs/TASKS.md` under the hard limit and reserve target in `docs/tasks-archive-policy.json`; the tasks archive automation workflow opens a PR and updates the `task-archives` branch once reserve headroom is exhausted on `main`. Use `npm run docs:archive-tasks` for manual fallback.
 - Archive implementation docs (PRD/TECH_SPEC/ACTION_PLAN, task checklists, mirrors) using `docs/implementation-docs-archive-policy.json`; the automation workflow syncs payloads to `doc-archives` and opens a PR with stubs. Use `npm run docs:archive-implementation` for manual fallback.
 - Keep `reference/` lean by storing only the active snapshot plus the automation scripts (loader macros, serve README). Serve-from-archive instructions should point to the canonical timestamped folder so reviewers can reproduce results without keeping every raw asset in the repo.
 - Before new iterations, run the cleanup script (or manually remove stray `.runs`/`archives` folders) so the working tree returns to a clean state while leaving committed improvements intact.

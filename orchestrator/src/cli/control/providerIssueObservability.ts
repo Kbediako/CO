@@ -125,6 +125,10 @@ interface ProviderIssueClaimLike {
   issue_state?: string | null;
   issue_state_type?: string | null;
   issue_updated_at?: string | null;
+  retry_queued?: boolean | null;
+  retry_attempt?: number | null;
+  retry_due_at?: string | null;
+  retry_error?: string | null;
   review_promotion?: ProviderIssueReviewPromotionLike | null;
   merge_closeout?: ProviderIssueMergeCloseoutLike | null;
 }
@@ -216,6 +220,7 @@ interface ProviderIssueChildLaneLike {
   run_id?: string | null;
   status?: string | null;
   launched_at?: string | null;
+  summary_recorded_at?: string | null;
   summary?: string | null;
   decision?: string | null;
   in_flight_action?: string | null;
@@ -273,6 +278,12 @@ export interface ControlProviderDebugSnapshot {
     worker_host?: string | null;
     launch_source: string | null;
     launch_started_at: string | null;
+    retry: {
+      active: boolean;
+      attempt: number | null;
+      due_at: string | null;
+      error: string | null;
+    } | null;
     freshness: ProviderIntakeClaimFreshness | null;
     is_rehydrated: boolean;
     rehydrated_at: string | null;
@@ -419,8 +430,6 @@ export function buildProviderIssueDebugSnapshot(input: {
     proof
   });
   const pullRequest = buildProviderDebugPullRequestSnapshot({
-    trackedIssue,
-    claim,
     reviewPromotion: claim?.review_promotion ?? null,
     mergeCloseout: claim?.merge_closeout ?? null,
     preferReviewPromotion:
@@ -452,6 +461,7 @@ export function buildProviderIssueDebugSnapshot(input: {
           worker_host: normalizeProviderWorkerHostName(claim.worker_host),
           launch_source: normalizeOptionalString(claim.launch_source),
           launch_started_at: normalizeOptionalString(claim.launch_started_at),
+          retry: buildProviderClaimRetrySnapshot(claim),
           freshness: claimFreshness,
           is_rehydrated: claimIsRehydrated,
           rehydrated_at: normalizeOptionalString(input.rehydrated_at)
@@ -519,6 +529,30 @@ export function buildProviderIssueDebugSnapshot(input: {
     stall_classification: progress?.stall_classification ?? null,
     stall_reason: progress?.stall_reason ?? null,
     recovery_recommendation: progress?.recovery_recommendation ?? null
+  };
+}
+
+function buildProviderClaimRetrySnapshot(
+  claim: Pick<
+    ProviderIssueClaimLike,
+    'retry_queued' | 'retry_attempt' | 'retry_due_at' | 'retry_error'
+  > | null
+): NonNullable<ControlProviderDebugSnapshot['claim']>['retry'] {
+  if (!claim) {
+    return null;
+  }
+  const active = claim.retry_queued === true;
+  const attempt = normalizeOptionalInteger(claim.retry_attempt);
+  const dueAt = normalizeOptionalString(claim.retry_due_at);
+  const error = normalizeOptionalString(claim.retry_error);
+  if (!active && attempt === null && dueAt === null && error === null) {
+    return null;
+  }
+  return {
+    active,
+    attempt,
+    due_at: dueAt,
+    error
   };
 }
 
@@ -597,6 +631,43 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
     proof,
     currentTurnStartedAt
   );
+  const mergeCloseoutProgress = mergeCloseout ? deriveMergeCloseoutProgressSnapshot(mergeCloseout) : null;
+  const trackedTerminalWorkflowUpdatedAt =
+    trackedWorkflowState?.isTerminal ? normalizeOptionalString(trackedIssue?.updated_at) : null;
+  const claimTerminalWorkflowIssueUpdatedAt =
+    claimWorkflowState?.isTerminal ? normalizeOptionalString(claim?.issue_updated_at) : null;
+  const terminalWorkflowIssueFreshnessAt = latestIsoTimestamp(
+    trackedTerminalWorkflowUpdatedAt,
+    claimTerminalWorkflowIssueUpdatedAt
+  );
+  const terminalWorkflowUpdatedAt = latestIsoTimestamp(
+    terminalWorkflowIssueFreshnessAt,
+    claimWorkflowState?.isTerminal ? normalizeOptionalString(claim?.updated_at) : null
+  );
+  const mergeCloseoutIssueUpdatedAt = normalizeOptionalString(mergeCloseout?.issue_updated_at);
+  const terminalWorkflowSupersedesMergeCloseout = Boolean(
+    mergeCloseoutProgress &&
+    mergeCloseoutProgress.status !== 'failed' &&
+    terminalWorkflowIssueFreshnessAt &&
+    (
+      (
+        !mergeCloseoutIssueUpdatedAt &&
+        trackedTerminalWorkflowUpdatedAt
+      ) ||
+      (
+        !mergeCloseoutIssueUpdatedAt &&
+        claimTerminalWorkflowIssueUpdatedAt &&
+        compareIsoTimestamp(
+          claimTerminalWorkflowIssueUpdatedAt,
+          mergeCloseoutProgress.last_semantic_progress_at
+        ) >= 0
+      ) ||
+      (
+        mergeCloseoutIssueUpdatedAt &&
+        compareIsoTimestamp(terminalWorkflowIssueFreshnessAt, mergeCloseoutIssueUpdatedAt) >= 0
+      )
+    )
+  );
   const lastSemanticProgressAt = latestIsoTimestamp(
     normalizeOptionalString(proof?.current_turn_activity?.recorded_at),
     normalizeOptionalString(proof?.last_event_at),
@@ -613,6 +684,26 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
       endReason,
       lastSemanticProgressAt
     });
+  const claimTerminalWorkflowSupersedesWorkerProgress = Boolean(
+    claimWorkflowState?.isTerminal
+    && (
+      !lastSemanticProgressAt
+      || (
+        claimTerminalWorkflowIssueUpdatedAt
+        && compareIsoTimestamp(claimTerminalWorkflowIssueUpdatedAt, lastSemanticProgressAt) >= 0
+      )
+    )
+  );
+  const terminalWorkflowIsNewerThanWorkerProgress = Boolean(
+    (
+      (
+        trackedWorkflowState?.isTerminal
+        && trackedTerminalWorkflowUpdatedAt
+        && compareIsoTimestamp(trackedTerminalWorkflowUpdatedAt, lastSemanticProgressAt) >= 0
+      )
+      || claimTerminalWorkflowSupersedesWorkerProgress
+    )
+  );
 
   if (ownerStatus === 'failed' || ownerPhase === 'turn_failed') {
     return {
@@ -647,15 +738,11 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
   }
 
   if (
-    mergeCloseout
+    mergeCloseoutProgress
     && !workerProgressSuppressedByStaleClaim
-    && !isSupersededTerminalMergeCloseoutProgress({
-      trackedIssue,
-      claim,
-      mergeCloseout
-    })
+    && !terminalWorkflowSupersedesMergeCloseout
   ) {
-    return deriveMergeCloseoutProgressSnapshot(mergeCloseout);
+    return mergeCloseoutProgress;
   }
 
   if (ownerPhase === 'ended' && ownerStatus === 'succeeded') {
@@ -675,12 +762,22 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
     }
     return {
       phase: trackedWorkflowState?.isHandoff ? 'review_handoff' : 'completed',
-      kind: trackedWorkflowState?.isHandoff ? 'workflow' : 'worker',
+      kind:
+        trackedWorkflowState?.isHandoff || terminalWorkflowIsNewerThanWorkerProgress
+          ? 'workflow'
+          : 'worker',
       status: 'completed',
       summary:
         selectProofPreferredMessage(proof) ??
-        'Provider worker completed successfully.',
-      last_semantic_progress_at: lastSemanticProgressAt,
+        (
+          terminalWorkflowIsNewerThanWorkerProgress
+            ? 'Issue is complete.'
+            : 'Provider worker completed successfully.'
+        ),
+      last_semantic_progress_at: latestIsoTimestamp(
+        lastSemanticProgressAt,
+        terminalWorkflowIsNewerThanWorkerProgress ? terminalWorkflowUpdatedAt : null
+      ),
       stall_classification: 'completed',
       stall_reason: null,
       recovery_recommendation: 'no_action'
@@ -696,7 +793,9 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
       kind: 'child_lane',
       status: 'waiting',
       summary: childLaneSummary,
+      summary_recorded_at: childLaneSummaryRecordedAt(activeChildLane),
       last_semantic_progress_at: latestIsoTimestamp(
+        childLaneSummaryRecordedAt(activeChildLane),
         normalizeOptionalString(activeChildLane.decision_at),
         normalizeOptionalString(activeChildLane.launched_at),
         latestAudit?.recorded_at ?? null,
@@ -743,13 +842,16 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
     };
   }
 
-  if (trackedWorkflowState?.isTerminal) {
+  if (trackedWorkflowState?.isTerminal || claimTerminalWorkflowSupersedesWorkerProgress) {
     return {
       phase: 'completed',
       kind: 'workflow',
       status: 'completed',
       summary: 'Issue is complete.',
-      last_semantic_progress_at: lastSemanticProgressAt,
+      last_semantic_progress_at: latestIsoTimestamp(
+        lastSemanticProgressAt,
+        terminalWorkflowUpdatedAt
+      ),
       stall_classification: 'completed',
       stall_reason: null,
       recovery_recommendation: 'no_action'
@@ -1351,86 +1453,6 @@ function deriveMergeCloseoutProgressSnapshot(
   };
 }
 
-function isSupersededTerminalMergeCloseoutProgress(input: {
-  trackedIssue:
-    | Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at'>
-    | null
-    | undefined;
-  claim: ProviderIssueClaimLike | null;
-  mergeCloseout: ProviderIssueMergeCloseoutLike;
-}): boolean {
-  const mergeStatus = normalizeOptionalString(input.mergeCloseout.status);
-  if (
-    mergeStatus !== 'action_required' ||
-    normalizeOptionalString(input.mergeCloseout.reason) !== 'pending_shared_root_reconciliation'
-  ) {
-    return false;
-  }
-  if (!mergeCloseoutSnapshotShowsMerged(input.mergeCloseout)) {
-    return false;
-  }
-  if (normalizeOptionalString(input.mergeCloseout.shared_root?.status) !== 'skipped') {
-    return false;
-  }
-  if (
-    normalizeProviderLinearWorkflowState(
-      normalizeOptionalString(input.mergeCloseout.issue_state)
-    ) !== 'merging'
-  ) {
-    return false;
-  }
-  const liveWorkflowState = input.trackedIssue
-    ? classifyProviderLinearWorkflowState(input.trackedIssue)
-    : resolveClaimWorkflowStateClassification(input.claim);
-  if (!liveWorkflowState?.isTerminal) {
-    return false;
-  }
-  const mergeCloseoutIssueUpdatedAt = normalizeOptionalString(input.mergeCloseout.issue_updated_at);
-  const liveIssueUpdatedAt =
-    input.trackedIssue !== null && input.trackedIssue !== undefined
-      ? normalizeOptionalString(input.trackedIssue.updated_at)
-      : normalizeOptionalString(input.claim?.issue_updated_at);
-  const freshness = compareObservedIssueUpdatedAt(mergeCloseoutIssueUpdatedAt, liveIssueUpdatedAt);
-  return freshness === 'equal' || freshness === 'newer';
-}
-
-function mergeCloseoutSnapshotShowsMerged(
-  mergeCloseout: Pick<ProviderIssueMergeCloseoutLike, 'status' | 'snapshot'>
-): boolean {
-  if (normalizeOptionalString(mergeCloseout.status) === 'merged') {
-    return true;
-  }
-  const snapshot = mergeCloseout.snapshot ?? null;
-  return Boolean(
-    normalizeOptionalString(snapshot?.merged_at) ||
-      normalizeOptionalString(snapshot?.state) === 'MERGED'
-  );
-}
-
-function compareObservedIssueUpdatedAt(
-  existingIssueUpdatedAt: string | null,
-  nextIssueUpdatedAt: string | null
-): 'older' | 'equal' | 'newer' | 'unknown' {
-  if (!nextIssueUpdatedAt) {
-    return 'unknown';
-  }
-  if (!existingIssueUpdatedAt) {
-    return 'unknown';
-  }
-  const existingTime = Date.parse(existingIssueUpdatedAt);
-  const nextTime = Date.parse(nextIssueUpdatedAt);
-  if (!Number.isFinite(existingTime) || !Number.isFinite(nextTime)) {
-    return 'unknown';
-  }
-  if (nextTime < existingTime) {
-    return 'older';
-  }
-  if (nextTime === existingTime) {
-    return 'equal';
-  }
-  return 'newer';
-}
-
 function deriveReviewPromotionProgressSnapshot(
   reviewPromotion: ProviderIssueReviewPromotionLike
 ): ProviderLinearWorkerProgressSnapshot {
@@ -1648,11 +1670,6 @@ function isMergeCloseoutChecksFailedReason(reason: string): boolean {
 }
 
 function buildProviderDebugPullRequestSnapshot(input: {
-  trackedIssue:
-    | Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at'>
-    | null
-    | undefined;
-  claim: ProviderIssueClaimLike | null;
   reviewPromotion: ProviderIssueReviewPromotionLike | null;
   mergeCloseout: ProviderIssueMergeCloseoutLike | null;
   preferReviewPromotion: boolean;
@@ -1664,13 +1681,6 @@ function buildProviderDebugPullRequestSnapshot(input: {
   if (!selectedRecord) {
     return null;
   }
-  const supersededTerminalMergeCloseout =
-    input.mergeCloseout !== null &&
-    isSupersededTerminalMergeCloseoutProgress({
-      trackedIssue: input.trackedIssue,
-      claim: input.claim,
-      mergeCloseout: input.mergeCloseout
-    });
   const snapshot = selectedRecord.snapshot ?? null;
   return {
     review_promotion_status: normalizeOptionalString(input.reviewPromotion?.status),
@@ -1681,9 +1691,7 @@ function buildProviderDebugPullRequestSnapshot(input: {
     owner: normalizeOptionalString(selectedRecord.pr?.owner),
     repo: normalizeOptionalString(selectedRecord.pr?.repo),
     number: normalizeOptionalInteger(selectedRecord.pr?.number),
-    merge_closeout_status: supersededTerminalMergeCloseout
-      ? null
-      : normalizeOptionalString(input.mergeCloseout?.status),
+    merge_closeout_status: normalizeOptionalString(input.mergeCloseout?.status),
     reason: normalizeOptionalString(selectedRecord.reason),
     summary: normalizeOptionalString(selectedRecord.summary),
     shared_root_status: normalizeOptionalString(input.mergeCloseout?.shared_root?.status),
@@ -1856,6 +1864,7 @@ function selectLatestChildLaneProgressAt(
     selectCurrentTurnChildLanes(childLanes, currentTurnStartedAt)
   );
   return latestIsoTimestamp(
+    childLaneSummaryRecordedAt(latestLane ?? {}),
     normalizeOptionalString(latestLane?.decision_at),
     normalizeOptionalString(latestLane?.launched_at)
   );
@@ -1867,7 +1876,15 @@ function isCurrentProgressChildLaneSummaryEligible(childLane: ProviderIssueChild
 }
 
 function childLaneSummaryRecordedAt(childLane: ProviderIssueChildLaneLike): string | null {
-  return normalizeOptionalString(childLane.launched_at);
+  return normalizeOptionalString(childLane.summary_recorded_at) ?? normalizeOptionalString(childLane.launched_at);
+}
+
+function childLaneProgressRecordedAt(childLane: ProviderIssueChildLaneLike): string | null {
+  return latestIsoTimestamp(
+    childLaneSummaryRecordedAt(childLane),
+    normalizeOptionalString(childLane.decision_at),
+    normalizeOptionalString(childLane.launched_at)
+  );
 }
 
 function selectActiveChildLane(
@@ -1880,7 +1897,7 @@ function selectActiveChildLane(
     return null;
   }
   return [...active].sort(
-    (left, right) => compareIsoTimestamp(right.launched_at ?? null, left.launched_at ?? null)
+    (left, right) => compareIsoTimestamp(childLaneProgressRecordedAt(right), childLaneProgressRecordedAt(left))
   )[0] ?? null;
 }
 
@@ -1909,14 +1926,8 @@ function selectLatestChildLaneRecord(
   return [...lanes]
     .sort((left, right) =>
       compareIsoTimestamp(
-        latestIsoTimestamp(
-          normalizeOptionalString(right.decision_at),
-          normalizeOptionalString(right.launched_at)
-        ),
-        latestIsoTimestamp(
-          normalizeOptionalString(left.decision_at),
-          normalizeOptionalString(left.launched_at)
-        )
+        childLaneProgressRecordedAt(right),
+        childLaneProgressRecordedAt(left)
       )
     )[0] ?? null;
 }

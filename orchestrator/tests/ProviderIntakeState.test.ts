@@ -317,6 +317,79 @@ describe('upsertProviderIntakeClaim', () => {
     });
   });
 
+  it.each([
+    {
+      nextState: 'starting' as const,
+      nextReason: 'provider_issue_start_launched',
+      nextRunId: null,
+      nextRunManifestPath: null
+    },
+    {
+      nextState: 'resuming' as const,
+      nextReason: 'provider_issue_resume_launched',
+      nextRunId: 'run-1',
+      nextRunManifestPath: '/tmp/run-1/manifest.json'
+    },
+    {
+      nextState: 'running' as const,
+      nextReason: 'provider_issue_rehydrated_active_run',
+      nextRunId: 'run-1',
+      nextRunManifestPath: '/tmp/run-1/manifest.json'
+    }
+  ])(
+    'clears stale queued first-retry state while preserving retry error on $nextState claims',
+    ({ nextState, nextReason, nextRunId, nextRunManifestPath }) => {
+      const state = createProviderIntakeState();
+
+      upsertProviderIntakeClaim(state, {
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-1',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_title: 'Autonomous intake handoff',
+        issue_state: 'Ready',
+        issue_state_type: 'unstarted',
+        issue_updated_at: '2026-03-19T04:00:00.000Z',
+        task_id: 'linear-lin-issue-1',
+        mapping_source: 'provider_id_fallback',
+        state: 'accepted',
+        reason: 'provider_issue_retry_queued',
+        run_id: null,
+        run_manifest_path: null,
+        retry_queued: true,
+        retry_attempt: null,
+        retry_due_at: '2026-03-19T04:30:10.000Z',
+        retry_error: 'stale continuation queue'
+      });
+
+      const claim = upsertProviderIntakeClaim(state, {
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-1',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_title: 'Autonomous intake handoff',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-19T04:00:01.000Z',
+        task_id: 'linear-lin-issue-1',
+        mapping_source: 'provider_id_fallback',
+        state: nextState,
+        reason: nextReason,
+        run_id: nextRunId,
+        run_manifest_path: nextRunManifestPath
+      });
+
+      expect(claim).toMatchObject({
+        state: nextState,
+        reason: nextReason,
+        retry_queued: false,
+        retry_attempt: null,
+        retry_due_at: null,
+        retry_error: 'stale continuation queue'
+      });
+    }
+  );
+
   it('preserves launch provenance when the run id is first discovered during rehydrate', () => {
     const state = createProviderIntakeState();
 

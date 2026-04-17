@@ -417,6 +417,7 @@ describe('metricsAggregator', () => {
     const refreshSummary = 'Linear refresh failed after successful handoff.';
     manifest.pipeline_id = 'provider-linear-worker';
     manifest.pipeline_title = 'Provider Linear Worker';
+    manifest.guardrails_required = false;
     manifest.summary =
       `${refreshSummary}\n` +
       'Guardrail command missing; run "codex-orchestrator start diagnostics --approval-policy never --format json --no-interactive" to capture reviewer diagnostics.';
@@ -441,13 +442,13 @@ describe('metricsAggregator', () => {
     expect(manifest.status).toBe('succeeded');
     expect(summaryLines[0]).toBe(providerSummary);
     expect(summaryLines[1]).toBe(refreshSummary);
-    expect(manifest.summary).toContain(
+    expect(manifest.summary).not.toContain(
       'Guardrail command missing; run "codex-orchestrator start diagnostics --approval-policy never --format json --no-interactive" to capture reviewer diagnostics.'
     );
-    expect(manifest.summary).toContain('Guardrails: spec-guard command not found.');
+    expect(manifest.summary).not.toContain('Guardrails: spec-guard command not found.');
     expect(manifest.guardrail_status).toMatchObject({
       present: false,
-      summary: 'Guardrails: spec-guard command not found.',
+      summary: 'Guardrails: spec-guard not configured for this pipeline.',
       counts: {
         total: 0
       }

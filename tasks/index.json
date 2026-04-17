@@ -1,6 +1,168 @@
 {
   "items": [
     {
+      "id": "20260418-linear-7896d3c1-7a62-4b79-97df-a71984fab5b2",
+      "title": "CO: stop synthesizing Guardrails spec-guard command not found when no spec-guard stage exists",
+      "relates_to": "tasks/tasks-linear-7896d3c1-7a62-4b79-97df-a71984fab5b2.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-18",
+          "status": "succeeded",
+          "manifest": ".runs/linear-7896d3c1-7a62-4b79-97df-a71984fab5b2-co-225-docs-review-rerun/cli/2026-04-17T20-21-33-585Z-1c79ad95/manifest.json",
+          "telemetry": ".runs/linear-7896d3c1-7a62-4b79-97df-a71984fab5b2-co-225-docs-review-rerun/cli/2026-04-17T20-21-33-585Z-1c79ad95/review/telemetry.json",
+          "summary": "Docs-review rerun completed before implementation after adding the packet to docs-freshness registry coverage; docs:freshness:maintain, docs:check, spec-guard, delegation guard, and forced review succeeded."
+        },
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-7896d3c1-7a62-4b79-97df-a71984fab5b2-docs-packet/cli/2026-04-17T20-05-40-785Z-50e95ea9/manifest.json",
+          "source_anchor": "ctx:sha256:55b1fe17233f9cfdd4784c7f69c01c4db4680de408150700c8ab551971417abc#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-225 as a narrow false-runtime-synthesis lane: `Guardrails: spec-guard command not found.` must not be synthesized when no `spec-guard` stage exists, and the same applicability truth must carry across manifest summaries, metrics closeout, provider issue observability, and retry truth without generic guardrail redesign, unrelated scheduler/provider changes, or docs-only reinterpretation. The expected shared source payload was absent in this child checkout, so the packet is anchored on the protected issue wording plus current repo seams in run/manifest.ts, metrics/metricsRecorder.ts, providerIssueObservability.ts, providerIssueHandoff.ts, selectedRunProjection.ts, controlRuntime.ts, and providerLinearWorkerRunner.ts; parent owns implementation, validation, Linear state, workpad, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-7896d3c1-7a62-4b79-97df-a71984fab5b2.md",
+        "task": "tasks/tasks-linear-7896d3c1-7a62-4b79-97df-a71984fab5b2.md",
+        "agent_task": ".agent/task/linear-7896d3c1-7a62-4b79-97df-a71984fab5b2.md",
+        "docs": "docs/TECH_SPEC-linear-7896d3c1-7a62-4b79-97df-a71984fab5b2.md"
+      }
+    },
+    {
+      "id": "20260418-linear-8f8b9b94-41fe-46c3-93fc-0a2c28efc58c",
+      "title": "Control host: reconcile resumed provider-worker retry acceptance and CO STATUS truth after a failed prior attempt",
+      "relates_to": "tasks/tasks-linear-8f8b9b94-41fe-46c3-93fc-0a2c28efc58c.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-8f8b9b94-41fe-46c3-93fc-0a2c28efc58c-co222-docs-packet/cli/2026-04-17T16-32-33-651Z-8f6278d1/manifest.json",
+          "source_anchor": "ctx:sha256:6c2fdaf4cabe0fb0a183c2574b434ee4b063ceab0a04e0e592aad4c44d81b205#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-222 as a narrow resumed provider-worker truth-reconciliation lane: after a failed prior attempt, retry acceptance, control-host refresh failure history, control-host intake, manifest/proof/summary truth reconciliation, and CO STATUS must all prefer the current authoritative resumed run while keeping failed-attempt evidence available for audit. The expected shared source payload was absent in this child checkout, so the packet is anchored on the protected handoff wording plus current repo seams in providerIssueHandoff.ts, providerLinearWorkerRunner.ts, providerIssueObservability.ts, selectedRunProjection.ts, and controlRuntime.ts; parent owns implementation, validation, Linear state, workpad, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-8f8b9b94-41fe-46c3-93fc-0a2c28efc58c.md",
+        "task": "tasks/tasks-linear-8f8b9b94-41fe-46c3-93fc-0a2c28efc58c.md",
+        "agent_task": ".agent/task/linear-8f8b9b94-41fe-46c3-93fc-0a2c28efc58c.md",
+        "docs": "docs/TECH_SPEC-linear-8f8b9b94-41fe-46c3-93fc-0a2c28efc58c.md"
+      }
+    },
+    {
+      "id": "20260418-linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5",
+      "title": "CO appserver child lanes stall after runtime selection and leave the parent blocked on a synthetic launching reservation",
+      "relates_to": "tasks/tasks-linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5-docs-packet/cli/2026-04-17T18-52-06-926Z-75ac64a4/manifest.json",
+          "source_anchor": "ctx:sha256:b7611a224cd777bffc38c866661c0a8d2cdaf4f31619cac8fd78150f5b46cbea#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-224 as the pre-startup appserver child-lane stall seam where runtime selection completed but no real child startup proof exists yet, leaving the parent blocked on a synthetic launching reservation. Parent-owned implementation, validation, Linear/workpad reconciliation, PR, and merge remain out of scope for this child patch."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review --uncommitted",
+          "date": "2026-04-18",
+          "status": "manual-fallback-after-boundary",
+          "manifest": ".runs/linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5/cli/2026-04-17T18-48-42-429Z-40aec176/manifest.json",
+          "telemetry": ".runs/linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5/cli/2026-04-17T18-48-42-429Z-40aec176/review/telemetry.json",
+          "fallback_note": "out/linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5/manual/standalone-review-fallback.md",
+          "summary": "The wrapper first found the real mtime-skew P1 that commit 66014e78e fixed, then later reruns on the skew-fix and abort-after-exit deltas both terminated at the startup-anchor boundary before a startup anchor was observed. The parent lane closed the final delta with manual correctness review plus scoped validation reruns instead of pretending the wrapper verdict was still bounded-success."
+        },
+        "elegance_review": {
+          "reviewer": "provider worker parent lane",
+          "date": "2026-04-18",
+          "status": "completed",
+          "artifact": "out/linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5/manual/elegance-review.md",
+          "summary": "Kept the fix local to providerLinearChildLaneRunner with a bounded startup watchdog, a narrow 1s startup-header mtime skew allowance, and the abort-after-exit recovery helper rather than introducing a broader runtime abstraction."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5.md",
+        "task": "tasks/tasks-linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5.md",
+        "agent_task": ".agent/task/linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5.md",
+        "docs": "docs/TECH_SPEC-linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5.md"
+      }
+    },
+    {
+      "id": "20260417-linear-5f3bf177-0fa7-4378-9438-5dcaf7919394",
+      "title": "CO workflow restore docs/TASKS headroom and make task archiving proactive",
+      "relates_to": "tasks/tasks-linear-5f3bf177-0fa7-4378-9438-5dcaf7919394.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-5f3bf177-0fa7-4378-9438-5dcaf7919394.md",
+        "task": "tasks/tasks-linear-5f3bf177-0fa7-4378-9438-5dcaf7919394.md",
+        "agent_task": ".agent/task/linear-5f3bf177-0fa7-4378-9438-5dcaf7919394.md",
+        "docs": "docs/TECH_SPEC-linear-5f3bf177-0fa7-4378-9438-5dcaf7919394.md"
+      }
+    },
+    {
+      "id": "20260417-linear-5b31889f-233c-4f23-9750-5ff21d737661",
+      "title": "CO child-lane decisions repair stale pending ledger after post-startup launch-shell miss",
+      "relates_to": "tasks/tasks-linear-5b31889f-233c-4f23-9750-5ff21d737661.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-17",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-5b31889f-233c-4f23-9750-5ff21d737661.md",
+        "task": "tasks/tasks-linear-5b31889f-233c-4f23-9750-5ff21d737661.md",
+        "agent_task": ".agent/task/linear-5b31889f-233c-4f23-9750-5ff21d737661.md",
+        "docs": "docs/TECH_SPEC-linear-5b31889f-233c-4f23-9750-5ff21d737661.md"
+      }
+    },
+    {
+      "id": "20260417-linear-5de4b04b-ec1e-4ab5-b75a-270989af4599",
+      "title": "CO: make linear transition race-safe with expected-state/CAS semantics and expected updated_at",
+      "relates_to": "tasks/tasks-linear-5de4b04b-ec1e-4ab5-b75a-270989af4599.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-17",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-17",
+          "status": "produced",
+          "manifest": ".runs/linear-5de4b04b-ec1e-4ab5-b75a-270989af4599-co215-docs-packet/cli/2026-04-17T09-16-32-281Z-7ee373ad/manifest.json",
+          "source_anchor": "ctx:sha256:2ac878f3d195fac62c08cd13c1747e33d4960f3aa5ec0484caee93b20cb2a167#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-215 as a narrow linear transition race-safety lane: add expected-state/CAS semantics, expected updated_at, terminal/completed workflow type guarding, `--force` plus force reason, and richer audit output around `In Review -> Merging` / `Merging -> Done` so a stale `Done -> Merging race` cannot regress post-CO-212 / PR #507 truth. The expected shared source payload was absent in this child checkout, so the packet is anchored on protected issue wording plus current repo seams in providerLinearWorkflowFacade.ts, linearCliShell.ts, providerLinearWorkflowStates.ts, and providerMergeCloseout.ts; parent owns implementation, validation, Linear state, workpad, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-5de4b04b-ec1e-4ab5-b75a-270989af4599.md",
+        "task": "tasks/tasks-linear-5de4b04b-ec1e-4ab5-b75a-270989af4599.md",
+        "agent_task": ".agent/task/linear-5de4b04b-ec1e-4ab5-b75a-270989af4599.md",
+        "docs": "docs/TECH_SPEC-linear-5de4b04b-ec1e-4ab5-b75a-270989af4599.md"
+      }
+    },
+    {
       "id": "20260417-linear-975669a4-3804-4b5b-9a7b-e1b7c77d3926",
       "title": "CO classify long-lived parent-session delegate-server children with bounded observability",
       "relates_to": "tasks/tasks-linear-975669a4-3804-4b5b-9a7b-e1b7c77d3926.md",
@@ -50,6 +212,46 @@
         "task": "tasks/tasks-linear-50e8a891-2b2f-4a67-b4d0-a2706870ddec.md",
         "agent_task": ".agent/task/linear-50e8a891-2b2f-4a67-b4d0-a2706870ddec.md",
         "docs": "docs/TECH_SPEC-linear-50e8a891-2b2f-4a67-b4d0-a2706870ddec.md"
+      }
+    },
+    {
+      "id": "20260417-linear-34c13c4f-5839-4c64-b6c3-c2b30b7d7fe3",
+      "title": "CO STATUS: hydrate active child-lane manifests before showing reserved-before-startup progress",
+      "relates_to": "tasks/tasks-linear-34c13c4f-5839-4c64-b6c3-c2b30b7d7fe3.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-17",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-17",
+          "status": "produced",
+          "manifest": ".runs/linear-34c13c4f-5839-4c64-b6c3-c2b30b7d7fe3-docs-packet/cli/2026-04-17T01-07-48-639Z-27495b47/manifest.json",
+          "source_anchor": "ctx:sha256:530ad0bff819be566bc79e33d5f828c1347470cd404c9615dbda890743938120#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-210 as a child-lane manifest hydration/current-progress truth issue; parent owns implementation, validation, Linear state, workpad, PR, and merge."
+        },
+        "parent_validation": {
+          "reviewer": "provider worker parent lane",
+          "date": "2026-04-17",
+          "status": "completed",
+          "manifest": ".runs/linear-34c13c4f-5839-4c64-b6c3-c2b30b7d7fe3/cli/2026-04-17T01-04-43-224Z-393e7661/manifest.json",
+          "summary": "Implementation landed with an extra fail-closed malformed-child-run-id guard, focused quartet reruns passed after the patch, and the red docs:freshness gate was classified as standing repo-baseline debt with zero CO-210 packet hits."
+        },
+        "parent_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-17",
+          "status": "bounded-success",
+          "manifest": ".runs/linear-34c13c4f-5839-4c64-b6c3-c2b30b7d7fe3/cli/2026-04-17T01-04-43-224Z-393e7661/manifest.json",
+          "summary": "Manifest-backed standalone review telemetry recorded status=succeeded and review_outcome=bounded-success; follow-up CO-218 captures the separate post-startup launch-shell/ledger-repair risk instead of broadening CO-210."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-34c13c4f-5839-4c64-b6c3-c2b30b7d7fe3.md",
+        "task": "tasks/tasks-linear-34c13c4f-5839-4c64-b6c3-c2b30b7d7fe3.md",
+        "agent_task": ".agent/task/linear-34c13c4f-5839-4c64-b6c3-c2b30b7d7fe3.md",
+        "docs": "docs/TECH_SPEC-linear-34c13c4f-5839-4c64-b6c3-c2b30b7d7fe3.md"
       }
     },
     {

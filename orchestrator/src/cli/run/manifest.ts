@@ -513,14 +513,22 @@ export function buildGuardrailSummary(manifest: CliManifest): string {
 }
 
 export function upsertGuardrailSummary(manifest: CliManifest): void {
-  const summary = buildGuardrailSummary(manifest);
+  const guardrailStatus = ensureGuardrailStatus(manifest);
   const existing = manifest.summary ? manifest.summary.split('\n') : [];
-  const filtered = existing.filter((line) => !line.toLowerCase().startsWith('guardrails:'));
-  filtered.push(summary);
-  manifest.summary = filtered.join('\n').trim();
-  if (manifest.summary.length === 0) {
-    manifest.summary = summary;
+  const filtered = existing.filter(
+    (line) =>
+      !line.toLowerCase().startsWith('guardrails:') && !isGuardrailRecommendationLine(line)
+  );
+  if (!shouldEmitGuardrailSummary(manifest, guardrailStatus)) {
+    manifest.summary = filtered.join('\n').trim() || null;
+    return;
   }
+
+  if (guardrailStatus.recommendation) {
+    filtered.push(guardrailStatus.recommendation);
+  }
+  filtered.push(guardrailStatus.summary);
+  manifest.summary = filtered.join('\n').trim() || guardrailStatus.summary;
 }
 
 function computeGuardrailStatus(manifest: CliManifest): GuardrailStatusSnapshot {
@@ -562,7 +570,7 @@ function computeGuardrailStatus(manifest: CliManifest): GuardrailStatusSnapshot 
       'Guardrail command failed; re-run "codex-orchestrator start diagnostics --approval-policy never --format json --no-interactive" to gather failure artifacts.';
   }
 
-  const summary = formatGuardrailSummary(counts);
+  const summary = formatGuardrailSummary(counts, guardrailsRequired);
 
   return {
     present,
@@ -610,9 +618,21 @@ function isExplicitGuardrailSkip(summary: string | null | undefined): boolean {
   );
 }
 
-function formatGuardrailSummary(counts: GuardrailCounts): string {
+function shouldEmitGuardrailSummary(
+  manifest: CliManifest,
+  snapshot: Pick<GuardrailStatusSnapshot, 'counts'>
+): boolean {
+  if (snapshot.counts.total > 0) {
+    return true;
+  }
+  return (manifest.guardrails_required ?? true) !== false;
+}
+
+function formatGuardrailSummary(counts: GuardrailCounts, guardrailsRequired: boolean): string {
   if (counts.total === 0) {
-    return 'Guardrails: spec-guard command not found.';
+    return guardrailsRequired
+      ? 'Guardrails: spec-guard command not found.'
+      : 'Guardrails: spec-guard not configured for this pipeline.';
   }
   if (counts.failed > 0) {
     return `Guardrails: spec-guard failed (${counts.failed}/${counts.total} failed).`;
@@ -636,6 +656,14 @@ function formatGuardrailSummary(counts: GuardrailCounts): string {
   }
 
   return `Guardrails: spec-guard partial (${parts.join(', ')} of ${counts.total}).`;
+}
+
+function isGuardrailRecommendationLine(line: string): boolean {
+  const trimmed = line.trim();
+  return (
+    trimmed.startsWith('Guardrail command missing;') ||
+    trimmed.startsWith('Guardrail command failed;')
+  );
 }
 
 export function appendSummary(manifest: CliManifest, message: string | null | undefined): void {

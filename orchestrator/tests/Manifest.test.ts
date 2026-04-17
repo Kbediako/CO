@@ -8,7 +8,8 @@ import {
   buildGuardrailSummary,
   ensureGuardrailStatus,
   loadManifest,
-  recordResumeEvent
+  recordResumeEvent,
+  upsertGuardrailSummary
 } from '../src/cli/run/manifest.js';
 import { readRunSource0Payload } from '../src/cli/run/source0.js';
 import type { EnvironmentPaths } from '../src/cli/run/environment.js';
@@ -1621,8 +1622,124 @@ describe('loadManifest', () => {
 });
 
 describe('buildGuardrailSummary', () => {
+  it('reports when spec-guard is not configured for the pipeline', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-guardrail-not-configured-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'guardrail-task'
+    };
+    try {
+      const pipeline: PipelineDefinition = {
+        id: 'guardrail-pipeline',
+        title: 'Guardrail Pipeline',
+        guardrailsRequired: false,
+        stages: []
+      };
+
+      const { manifest } = await bootstrapManifest('run-guardrail-not-configured', {
+        env,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      const summary = buildGuardrailSummary(manifest);
+      expect(summary).toBe('Guardrails: spec-guard not configured for this pipeline.');
+
+      const snapshot = ensureGuardrailStatus(manifest);
+      expect(snapshot.recommendation).toBeNull();
+      expect(snapshot.counts.total).toBe(0);
+      expect(snapshot.present).toBe(false);
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
   it('treats explicit spec-guard skip summaries as skipped', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-guardrail-skip-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'guardrail-task'
+    };
+
+    try {
+      const pipeline: PipelineDefinition = {
+        id: 'guardrail-pipeline',
+        title: 'Guardrail Pipeline',
+        stages: [{ kind: 'command', id: 'spec-guard', title: 'Spec guard', command: 'echo skip' }]
+      };
+
+      const { manifest } = await bootstrapManifest('run-guardrail-skip', {
+        env,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      const command = manifest.commands[0];
+      if (!command) {
+        throw new Error('Expected spec-guard command in manifest.');
+      }
+      command.status = 'succeeded';
+      command.summary = '[spec-guard] skipped: no guard script found';
+
+      const summary = buildGuardrailSummary(manifest);
+      expect(summary).toBe('Guardrails: spec-guard skipped (all 1 skipped).');
+
+      const snapshot = ensureGuardrailStatus(manifest);
+      expect(snapshot.counts.skipped).toBe(1);
+      expect(snapshot.counts.succeeded).toBe(0);
+      expect(snapshot.present).toBe(false);
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('preserves real failure summaries when guardrails are not configured', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-guardrail-summary-preserve-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'guardrail-task'
+    };
+
+    try {
+      const pipeline: PipelineDefinition = {
+        id: 'guardrail-pipeline',
+        title: 'Guardrail Pipeline',
+        guardrailsRequired: false,
+        stages: []
+      };
+
+      const { manifest } = await bootstrapManifest('run-guardrail-summary-preserve', {
+        env,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      manifest.summary = "Stage 'fail once' failed with exit code 1.";
+      upsertGuardrailSummary(manifest);
+
+      expect(manifest.summary).toBe("Stage 'fail once' failed with exit code 1.");
+      expect(buildGuardrailSummary(manifest)).toBe(
+        'Guardrails: spec-guard not configured for this pipeline.'
+      );
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('strips stale guardrail recommendations when guardrails are not configured', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-guardrail-recommendation-strip-'));
     const env: EnvironmentPaths = {
       repoRoot,
       runsRoot: join(repoRoot, '.runs'),
@@ -1633,10 +1750,11 @@ describe('buildGuardrailSummary', () => {
     const pipeline: PipelineDefinition = {
       id: 'guardrail-pipeline',
       title: 'Guardrail Pipeline',
-      stages: [{ kind: 'command', id: 'spec-guard', title: 'Spec guard', command: 'echo skip' }]
+      guardrailsRequired: false,
+      stages: []
     };
 
-    const { manifest } = await bootstrapManifest('run-guardrail-skip', {
+    const { manifest } = await bootstrapManifest('run-guardrail-recommendation-strip', {
       env,
       pipeline,
       parentRunId: null,
@@ -1644,19 +1762,63 @@ describe('buildGuardrailSummary', () => {
       approvalPolicy: null
     });
 
-    const command = manifest.commands[0];
-    if (!command) {
-      throw new Error('Expected spec-guard command in manifest.');
+    manifest.summary =
+      "Stage 'fail once' failed with exit code 1.\n" +
+      'Guardrail command missing; run "codex-orchestrator start diagnostics --approval-policy never --format json --no-interactive" to capture reviewer diagnostics.';
+
+    upsertGuardrailSummary(manifest);
+
+    expect(manifest.summary).toBe("Stage 'fail once' failed with exit code 1.");
+  });
+
+  it('replaces stale guardrail recommendations when a resumed guardrail later succeeds', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-guardrail-recommendation-refresh-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'guardrail-task'
+    };
+
+    try {
+      const pipeline: PipelineDefinition = {
+        id: 'guardrail-pipeline',
+        title: 'Guardrail Pipeline',
+        stages: [
+          {
+            kind: 'command',
+            id: 'spec-guard',
+            title: 'Spec guard',
+            command: 'echo ok'
+          }
+        ]
+      };
+
+      const { manifest } = await bootstrapManifest('run-guardrail-recommendation-refresh', {
+        env,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      const command = manifest.commands[0];
+      if (!command) {
+        throw new Error('Expected spec-guard command in manifest.');
+      }
+      command.status = 'succeeded';
+      manifest.summary =
+        "Stage 'fail once' failed with exit code 1.\n" +
+        'Guardrail command failed; re-run "codex-orchestrator start diagnostics --approval-policy never --format json --no-interactive" to gather failure artifacts.';
+
+      upsertGuardrailSummary(manifest);
+
+      expect(manifest.summary).toBe(
+        "Stage 'fail once' failed with exit code 1.\n" +
+          'Guardrails: spec-guard succeeded (1 passed).'
+      );
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
     }
-    command.status = 'succeeded';
-    command.summary = '[spec-guard] skipped: no guard script found';
-
-    const summary = buildGuardrailSummary(manifest);
-    expect(summary).toBe('Guardrails: spec-guard skipped (all 1 skipped).');
-
-    const snapshot = ensureGuardrailStatus(manifest);
-    expect(snapshot.counts.skipped).toBe(1);
-    expect(snapshot.counts.succeeded).toBe(0);
-    expect(snapshot.present).toBe(false);
   });
 });

@@ -11,6 +11,9 @@ import {
   resolveProviderWorkspacePath
 } from '../run/workspacePath.js';
 import {
+  PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID,
+  PROVIDER_LINEAR_CHILD_LANE_RESERVED_SUMMARY,
+  PROVIDER_LINEAR_WORKER_CHILD_LANES_FILENAME,
   PROVIDER_LINEAR_WORKER_PROOF_FILENAME,
   refreshProviderLinearWorkerProofSnapshot,
   type ProviderLinearWorkerProof
@@ -861,14 +864,35 @@ function resolveSelectedRunDisplaySummary(input: {
   if (input.terminalMergeCloseoutProgress?.summary) {
     return input.terminalMergeCloseoutProgress.summary;
   }
+  const acceptedProviderRetryResumeAt = readLatestAcceptedProviderRetryResumeAt(input.manifestRecord);
+  const hasFailedCommandsForAuthoritativeAttempt =
+    acceptedProviderRetryResumeAt === null
+      ? manifestHasFailedCommands(input.manifestRecord)
+      : manifestHasFailedCommandsSince(input.manifestRecord, acceptedProviderRetryResumeAt);
   if (
     input.rawStatus === 'succeeded' &&
     input.summary &&
-    hasStaleSucceededFailureSummary(input.summary) &&
-    !manifestHasFailedCommands(input.manifestRecord)
+    hasStaleFailureSummary(input.summary, input.manifestRecord) &&
+    !hasFailedCommandsForAuthoritativeAttempt
   ) {
-    const filteredSummary = filterStaleSucceededFailureSummary(input.summary);
+    const filteredSummary = filterStaleFailureSummary(
+      input.summary,
+      input.manifestRecord
+    );
     return filteredSummary ?? 'Completed successfully';
+  }
+  if (
+    input.rawStatus === 'in_progress' &&
+    input.summary &&
+    hasStaleFailureSummary(input.summary, input.manifestRecord) &&
+    acceptedProviderRetryResumeAt !== null &&
+    !manifestHasFailedCommandsSince(input.manifestRecord, acceptedProviderRetryResumeAt)
+  ) {
+    const filteredSummary = filterStaleFailureSummary(
+      input.summary,
+      input.manifestRecord
+    );
+    return filteredSummary ?? 'Retry accepted; run resumed after a failed attempt.';
   }
   return input.summary;
 }
@@ -909,23 +933,43 @@ function isTerminalRunStatus(status: string): boolean {
   return status === 'succeeded' || status === 'failed' || status === 'cancelled' || status === 'canceled';
 }
 
-function hasStaleSucceededFailureSummary(summary: string): boolean {
-  return summary.split('\n').some((line) => isStaleSucceededFailureSummaryLine(line));
+function hasStaleFailureSummary(
+  summary: string,
+  manifestRecord: Record<string, unknown>
+): boolean {
+  return summary.split('\n').some((line) => isStaleFailureSummaryLine(line, manifestRecord));
 }
 
-function filterStaleSucceededFailureSummary(summary: string): string | null {
+function filterStaleFailureSummary(
+  summary: string,
+  manifestRecord: Record<string, unknown>
+): string | null {
   const retainedLines = summary
     .split('\n')
     .map((line) => line.trim())
-    .filter((line) => line.length > 0 && !isStaleSucceededFailureSummaryLine(line));
+    .filter((line) => line.length > 0 && !isStaleFailureSummaryLine(line, manifestRecord));
   if (retainedLines.length === 0) {
     return null;
   }
   return retainedLines.join('\n');
 }
 
-function isStaleSucceededFailureSummaryLine(line: string): boolean {
-  return /^Stage '.*' failed with exit code \d+\.$/u.test(line.trim());
+function isStaleFailureSummaryLine(
+  line: string,
+  manifestRecord: Record<string, unknown>
+): boolean {
+  const trimmed = line.trim();
+  if (
+    /^Stage '.*' failed with exit code \d+\.$/u.test(trimmed) ||
+    /^Sub-pipeline '.*' failed\.$/u.test(trimmed) ||
+    /^Execution error: .+/u.test(trimmed)
+  ) {
+    return true;
+  }
+  if (!/^Sub-pipeline error: .+/u.test(trimmed)) {
+    return false;
+  }
+  return !hasMatchingSkippedSubpipelineErrorSummary(manifestRecord, trimmed);
 }
 
 function manifestHasFailedCommands(manifestRecord: Record<string, unknown>): boolean {
@@ -939,6 +983,83 @@ function manifestHasFailedCommands(manifestRecord: Record<string, unknown>): boo
     }
     return readStringValue(command as Record<string, unknown>, 'status') === 'failed';
   });
+}
+
+function manifestHasFailedCommandsSince(
+  manifestRecord: Record<string, unknown>,
+  sinceAtMs: number
+): boolean {
+  const commands = manifestRecord.commands;
+  if (!Array.isArray(commands)) {
+    return false;
+  }
+  return commands.some((command) => {
+    if (!isRecord(command) || readStringValue(command, 'status') !== 'failed') {
+      return false;
+    }
+    const commandFailureAtMs = readLatestCommandFailureTimestampMs(command);
+    if (commandFailureAtMs === null) {
+      return true;
+    }
+    return commandFailureAtMs >= sinceAtMs;
+  });
+}
+
+function readLatestAcceptedProviderRetryResumeAt(manifestRecord: Record<string, unknown>): number | null {
+  const resumeEvents = manifestRecord.resume_events;
+  if (!Array.isArray(resumeEvents)) {
+    return null;
+  }
+  let latestAcceptedAt: number | null = null;
+  for (const event of resumeEvents) {
+    if (
+      !isRecord(event) ||
+      readStringValue(event, 'reason') !== 'provider-retry' ||
+      readStringValue(event, 'outcome') !== 'accepted'
+    ) {
+      continue;
+    }
+    const acceptedAt = Date.parse(readStringValue(event, 'timestamp') ?? '');
+    if (!Number.isFinite(acceptedAt)) {
+      continue;
+    }
+    latestAcceptedAt = latestAcceptedAt === null ? acceptedAt : Math.max(latestAcceptedAt, acceptedAt);
+  }
+  return latestAcceptedAt;
+}
+
+function readLatestCommandFailureTimestampMs(command: Record<string, unknown>): number | null {
+  return readLatestCommandTimestampMs(command);
+}
+
+function hasMatchingSkippedSubpipelineErrorSummary(
+  manifestRecord: Record<string, unknown>,
+  summaryLine: string
+): boolean {
+  const commands = manifestRecord.commands;
+  if (!Array.isArray(commands)) {
+    return false;
+  }
+  return commands.some((command) => {
+    if (!isRecord(command) || readStringValue(command, 'status') !== 'skipped') {
+      return false;
+    }
+    if ((readStringValue(command, 'summary') ?? '').trim() !== summaryLine) {
+      return false;
+    }
+    return true;
+  });
+}
+
+function readLatestCommandTimestampMs(command: Record<string, unknown>): number | null {
+  for (const key of ['completed_at', 'completedAt', 'updated_at', 'updatedAt', 'started_at', 'startedAt']) {
+    const value = readStringValue(command, key);
+    const parsed = Date.parse(value ?? '');
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return null;
 }
 
 function readManifestStageSummaries(manifestRecord: Record<string, unknown>): Array<{
@@ -1198,7 +1319,8 @@ async function readProviderLinearWorkerProofForProjection(
   const proof = await readJsonFile<ProviderLinearWorkerProof>(
     join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME)
   );
-  if (!shouldRefreshProviderLinearWorkerProjectionProof(proof)) {
+  const refreshScope = await resolveProviderLinearWorkerProjectionProofRefreshScope(runDir, proof);
+  if (!refreshScope) {
     return proof;
   }
   return (
@@ -1208,16 +1330,26 @@ async function readProviderLinearWorkerProofForProjection(
       undefined,
       undefined,
       process.env,
-      { updatedAtComparisonScope: 'telemetry' }
+      { updatedAtComparisonScope: refreshScope }
     ).catch(() => proof)) ?? proof
   );
 }
 
-function shouldRefreshProviderLinearWorkerProjectionProof(
+async function resolveProviderLinearWorkerProjectionProofRefreshScope(
+  runDir: string,
   proof: ProviderLinearWorkerProof | null
-): boolean {
-  if (!proof || proof.owner_phase !== 'turn_running' || proof.owner_status !== 'in_progress') {
-    return false;
+): Promise<'full' | 'telemetry' | null> {
+  if (!proof || !isProviderLinearWorkerProjectionRefreshEligible(proof)) {
+    return null;
+  }
+  if (hasProviderLinearWorkerProjectionReservationPlaceholder(proof)) {
+    return 'full';
+  }
+  if (hasProviderLinearWorkerProjectionActivePendingChildLane(proof)) {
+    return 'full';
+  }
+  if (await hasProviderLinearWorkerProjectionActivePendingChildLaneInLedger(runDir)) {
+    return 'full';
   }
   const tokens = proof.tokens ?? null;
   const hasTokens =
@@ -1227,6 +1359,94 @@ function shouldRefreshProviderLinearWorkerProjectionProof(
     !proof.latest_session_id ||
     !hasTokens ||
     proof.rate_limits == null
+  )
+    ? 'telemetry'
+    : null;
+}
+
+function isProviderLinearWorkerProjectionRefreshEligible(
+  proof: ProviderLinearWorkerProof
+): boolean {
+  return (
+    proof.owner_status === 'in_progress' &&
+    (proof.owner_phase === 'turn_running' || proof.owner_phase === 'turn_completed')
+  );
+}
+
+function hasProviderLinearWorkerProjectionReservationPlaceholder(
+  proof: ProviderLinearWorkerProof
+): boolean {
+  return hasProviderLinearWorkerProjectionReservationPlaceholderInRecords(proof.child_lanes);
+}
+
+function hasProviderLinearWorkerProjectionActivePendingChildLane(
+  proof: ProviderLinearWorkerProof
+): boolean {
+  return hasProviderLinearWorkerProjectionActivePendingChildLaneInRecords(proof.child_lanes);
+}
+
+async function hasProviderLinearWorkerProjectionActivePendingChildLaneInLedger(
+  runDir: string
+): Promise<boolean> {
+  const records = await readJsonFile<unknown>(
+    join(runDir, PROVIDER_LINEAR_WORKER_CHILD_LANES_FILENAME)
+  );
+  return hasProviderLinearWorkerProjectionActivePendingChildLaneInRecords(records);
+}
+
+function hasProviderLinearWorkerProjectionReservationPlaceholderInRecords(
+  records: unknown
+): boolean {
+  if (!Array.isArray(records)) {
+    return false;
+  }
+  return records.some((childLane) => {
+    if (!isRecord(childLane)) {
+      return false;
+    }
+    const runId = readStringValue(childLane, 'run_id');
+    const summary = readStringValue(childLane, 'summary');
+    const status = readStringValue(childLane, 'status');
+    const pipelineId = readStringValue(childLane, 'pipeline_id');
+    const decision = readStringValue(childLane, 'decision');
+    return (
+      pipelineId === PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID &&
+      decision === 'pending' &&
+      (
+        status === 'launching' ||
+        Boolean(runId?.startsWith('launching-')) ||
+        summary === PROVIDER_LINEAR_CHILD_LANE_RESERVED_SUMMARY
+      )
+    );
+  });
+}
+
+function hasProviderLinearWorkerProjectionActivePendingChildLaneInRecords(
+  records: unknown
+): boolean {
+  if (!Array.isArray(records)) {
+    return false;
+  }
+  return records.some((childLane) => {
+    if (!isRecord(childLane)) {
+      return false;
+    }
+    const status = readStringValue(childLane, 'status');
+    return (
+      readStringValue(childLane, 'pipeline_id') === PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID &&
+      readStringValue(childLane, 'decision') === 'pending' &&
+      !isProviderLinearWorkerProjectionTerminalChildLaneStatus(status ?? null)
+    );
+  });
+}
+
+function isProviderLinearWorkerProjectionTerminalChildLaneStatus(status: string | null): boolean {
+  return (
+    status === 'succeeded' ||
+    status === 'failed' ||
+    status === 'completed' ||
+    status === 'canceled' ||
+    status === 'cancelled'
   );
 }
 
@@ -1462,14 +1682,16 @@ function buildProviderRetryState(
   }
   const active = claim.retry_queued === true;
   const attempt = claim.retry_attempt ?? null;
-  if (!active && attempt === null) {
+  const dueAt = claim.retry_due_at ?? null;
+  const error = claim.retry_error ?? null;
+  if (!active && attempt === null && dueAt === null && error === null) {
     return null;
   }
   return {
     active,
     attempt,
-    due_at: active ? claim.retry_due_at ?? null : null,
-    error: active ? claim.retry_error ?? null : null
+    due_at: dueAt,
+    error
   };
 }
 

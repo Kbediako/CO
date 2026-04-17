@@ -2269,8 +2269,15 @@ describe('ControlServer', () => {
           issue_identifier?: string;
           status?: string;
           display_status?: string;
+          last_error?: string | null;
           running?: { session_id?: string | null; display_state?: string } | null;
-          retry?: { session_id?: string | null; state?: string } | null;
+          retry?: {
+            session_id?: string | null;
+            state?: string;
+            attempt?: number | null;
+            display_state?: string;
+            error?: string | null;
+          } | null;
           question_summary?: { queued_count?: number };
           attempts?: { restart_count?: number | null; current_retry_attempt?: number | null };
         };
@@ -2278,6 +2285,7 @@ describe('ControlServer', () => {
           issue_identifier: 'ISSUE-1035',
           status: 'running',
           display_status: 'paused',
+          last_error: null,
           question_summary: {
             queued_count: 1
           },
@@ -2289,7 +2297,13 @@ describe('ControlServer', () => {
             session_id: null,
             display_state: 'paused'
           },
-          retry: null
+          retry: {
+            session_id: null,
+            state: 'in_progress',
+            attempt: 2,
+            display_state: 'paused',
+            error: null
+          }
         });
       }
 
