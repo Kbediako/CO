@@ -7887,6 +7887,9 @@ describe('providerLinearWorkflowFacade', () => {
       error: {
         code: 'linear_terminal_transition_requires_force',
         status: 409,
+        message: expect.stringContaining(
+          'requires --force and a non-empty --force-reason.'
+        ),
         details: {
           previous_state: 'Done',
           previous_state_type: 'completed',
@@ -8018,6 +8021,31 @@ describe('providerLinearWorkflowFacade', () => {
       issueId: 'lin-issue-1',
       stateName: 'Merging',
       force: true,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'transition',
+      error: {
+        code: 'linear_force_reason_missing',
+        status: 422
+      }
+    });
+  });
+
+  it('rejects forced terminal reopen transitions when the force reason is only whitespace', async () => {
+    const fetchImpl: typeof fetch = vi.fn();
+
+    const result = await transitionProviderLinearIssueState({
+      issueId: 'lin-issue-1',
+      stateName: 'Merging',
+      force: true,
+      forceReason: '   ',
       env: {
         CO_LINEAR_API_TOKEN: 'lin-api-token'
       },

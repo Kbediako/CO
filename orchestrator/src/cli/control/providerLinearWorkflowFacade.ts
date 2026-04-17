@@ -5827,7 +5827,7 @@ function failureIfTerminalTransitionRequiresForce(
   return failure(
     'transition',
     'linear_terminal_transition_requires_force',
-    `Linear issue ${summary.identifier} is already terminal; transitioning it to ${targetState.name} requires an explicit force reason.`,
+    `Linear issue ${summary.identifier} is already terminal; transitioning it to ${targetState.name} requires --force and a non-empty --force-reason.`,
     409,
     buildTransitionAuditDetails({
       summary,
