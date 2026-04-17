@@ -2185,7 +2185,7 @@ describe('provider issue observability', () => {
     });
   });
 
-  it('falls back to terminal claim issue state when merge-closeout issue freshness is missing', () => {
+  it('preserves merge-closeout progress when claim-only freshness is unknown', () => {
     const progress = deriveProviderLinearWorkerProgressSnapshot({
       claim: {
         state: 'completed',
@@ -2223,12 +2223,13 @@ describe('provider issue observability', () => {
     });
 
     expect(progress).toMatchObject({
-      phase: 'completed',
-      kind: 'workflow',
-      status: 'completed',
-      last_semantic_progress_at: '2026-04-05T06:51:00.000Z',
-      stall_classification: 'completed',
-      recovery_recommendation: 'no_action'
+      phase: 'pending_shared_root_reconciliation',
+      kind: 'merge_closeout',
+      status: 'stalled',
+      last_semantic_progress_at: '2026-04-05T06:52:30.000Z',
+      stall_classification: 'stalled',
+      stall_reason: 'shared_root_dirty',
+      recovery_recommendation: 'inspect_merge_closeout'
     });
   });
 
