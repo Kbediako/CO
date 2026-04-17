@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260417-linear-5b31889f-233c-4f23-9750-5ff21d737661",
+      "title": "CO child-lane decisions repair stale pending ledger after post-startup launch-shell miss",
+      "relates_to": "tasks/tasks-linear-5b31889f-233c-4f23-9750-5ff21d737661.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-17",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-5b31889f-233c-4f23-9750-5ff21d737661.md",
+        "task": "tasks/tasks-linear-5b31889f-233c-4f23-9750-5ff21d737661.md",
+        "agent_task": ".agent/task/linear-5b31889f-233c-4f23-9750-5ff21d737661.md",
+        "docs": "docs/TECH_SPEC-linear-5b31889f-233c-4f23-9750-5ff21d737661.md"
+      }
+    },
+    {
       "id": "20260417-linear-975669a4-3804-4b5b-9a7b-e1b7c77d3926",
       "title": "CO classify long-lived parent-session delegate-server children with bounded observability",
       "relates_to": "tasks/tasks-linear-975669a4-3804-4b5b-9a7b-e1b7c77d3926.md",

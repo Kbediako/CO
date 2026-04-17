@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, posix, relative, resolve, sep } from 'node:path';
 import process from 'node:process';
 import { promisify } from 'node:util';
@@ -34,6 +34,7 @@ import {
   PROVIDER_LINEAR_CHILD_LANE_FILES_ENV,
   PROVIDER_LINEAR_CHILD_LANE_INSTRUCTIONS_ENV,
   PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_BASE_SHA_ENV,
+  PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_CAPTURED_AT_ENV,
   PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_STATE_ENV,
   PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_STATE_TYPE_ENV,
   PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_UPDATED_AT_ENV,
@@ -86,6 +87,7 @@ const PROVIDER_LINEAR_CHILD_LANE_ENV_KEYS_TO_REMOVE = [
 const PROVIDER_LINEAR_CHILD_LANE_OPTIONAL_ENV_KEYS = [
   PROVIDER_LINEAR_CHILD_LANE_INSTRUCTIONS_ENV,
   PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_BASE_SHA_ENV,
+  PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_CAPTURED_AT_ENV,
   PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_UPDATED_AT_ENV,
   PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_STATE_ENV,
   PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_STATE_TYPE_ENV
@@ -801,10 +803,16 @@ async function resolveChildLaneDecision(
       status: 422
     });
   }
+  const childRunsRoot = resolveWorkspaceScopedArtifactDir(
+    context.repoRoot,
+    params.env.CODEX_ORCHESTRATOR_RUNS_DIR,
+    '.runs'
+  );
   if (params.action !== 'accept') {
     const finalized = await finalizePendingChildLaneDecision({
       action: params.action,
       context,
+      childRunsRoot,
       stream,
       deps,
       reason: normalizeOptionalString(params.reason),
@@ -843,6 +851,7 @@ async function resolveChildLaneDecision(
 
   const claimed = await claimPendingChildLaneAcceptance({
     context,
+    childRunsRoot,
     stream,
     deps,
     now: deps.now()
@@ -920,7 +929,7 @@ async function resolveChildLaneDecision(
   }
   const artifactRoot = resolveAcceptedChildLaneArtifactRoot(
     context.repoRoot,
-    resolveWorkspaceScopedArtifactDir(context.repoRoot, params.env.CODEX_ORCHESTRATOR_RUNS_DIR, '.runs'),
+    childRunsRoot,
     target
   );
   if (!artifactRoot) {
@@ -1157,6 +1166,10 @@ type ChildLaneDecisionFailureOutcome =
   | { kind: 'not_found' }
   | ChildLaneDecisionBlockedOutcome;
 
+type ResolvedPendingChildLaneDecisionTarget =
+  | { kind: 'blocked'; outcome: ChildLaneDecisionFailureOutcome; records: ProviderLinearWorkerChildLaneRecord[] }
+  | { kind: 'ready'; records: ProviderLinearWorkerChildLaneRecord[]; target: ProviderLinearWorkerChildLaneRecord };
+
 function childLaneDecisionFailureResult(input: {
   action: 'accept' | 'reject' | 'invalidate';
   context: Pick<Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>, 'issueId' | 'issueIdentifier'>;
@@ -1222,7 +1235,11 @@ function childLaneDecisionFailureResult(input: {
 
 async function finalizePendingChildLaneDecision(input: {
   action: 'reject' | 'invalidate';
-  context: Pick<Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>, 'runDir' | 'issueId' | 'issueIdentifier' | 'taskId'>;
+  context: Pick<
+    Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>,
+    'runDir' | 'issueId' | 'issueIdentifier' | 'taskId' | 'runId' | 'repoRoot'
+  >;
+  childRunsRoot: string;
   stream: string;
   deps: ProviderLinearChildLaneShellDependencies;
   reason: string | null;
@@ -1232,14 +1249,19 @@ async function finalizePendingChildLaneDecision(input: {
   return await input.deps.transactChildLanes<
     ChildLaneDecisionFailureOutcome | { kind: 'updated'; childLane: ProviderLinearWorkerChildLaneRecord; decision: ProviderLinearWorkerChildLaneDecision }
   >(input.context.runDir, async (records) => {
-    const target = findLatestPendingChildLane(records, input.stream);
-    if (!target) {
-      return { records, result: { kind: 'not_found' } };
+    const resolved = await resolvePendingChildLaneDecisionTarget({
+      records,
+      context: input.context,
+      childRunsRoot: input.childRunsRoot,
+      stream: input.stream,
+      action: input.action,
+      deps: input.deps,
+      now: input.now
+    });
+    if (resolved.kind !== 'ready') {
+      return { records: resolved.records, result: resolved.outcome };
     }
-    const blocked = resolveChildLaneDecisionBlockedOutcome(input.context, input.stream, target, input.action, input.now);
-    if (blocked) {
-      return { records, result: blocked };
-    }
+    const target = resolved.target;
     const updated: ProviderLinearWorkerChildLaneRecord = {
       ...target,
       decision,
@@ -1248,9 +1270,9 @@ async function finalizePendingChildLaneDecision(input: {
       decision_at: input.now,
       decision_reason: input.reason ?? defaultDecisionReason(input.action, target)
     };
-    const next = replaceChildLaneRecord(records, target, updated);
+    const next = replaceChildLaneRecord(resolved.records, target, updated);
     if (!next) {
-      return { records, result: { kind: 'not_found' } };
+      return { records: resolved.records, result: { kind: 'not_found' } };
     }
     return {
       records: next,
@@ -1260,7 +1282,11 @@ async function finalizePendingChildLaneDecision(input: {
 }
 
 async function claimPendingChildLaneAcceptance(input: {
-  context: Pick<Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>, 'runDir' | 'issueId' | 'issueIdentifier' | 'taskId'>;
+  context: Pick<
+    Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>,
+    'runDir' | 'issueId' | 'issueIdentifier' | 'taskId' | 'runId' | 'repoRoot'
+  >;
+  childRunsRoot: string;
   stream: string;
   deps: ProviderLinearChildLaneShellDependencies;
   now: string;
@@ -1268,28 +1294,168 @@ async function claimPendingChildLaneAcceptance(input: {
   return await input.deps.transactChildLanes<
     ChildLaneDecisionFailureOutcome | { kind: 'claimed'; childLane: ProviderLinearWorkerChildLaneRecord }
   >(input.context.runDir, async (records) => {
-    const target = findLatestPendingChildLane(records, input.stream);
-    if (!target) {
-      return { records, result: { kind: 'not_found' } };
+    const resolved = await resolvePendingChildLaneDecisionTarget({
+      records,
+      context: input.context,
+      childRunsRoot: input.childRunsRoot,
+      stream: input.stream,
+      action: 'accept',
+      deps: input.deps,
+      now: input.now
+    });
+    if (resolved.kind !== 'ready') {
+      return { records: resolved.records, result: resolved.outcome };
     }
-    const blocked = resolveChildLaneDecisionBlockedOutcome(input.context, input.stream, target, 'accept', input.now);
-    if (blocked) {
-      return { records, result: blocked };
-    }
+    const target = resolved.target;
     const claimed: ProviderLinearWorkerChildLaneRecord = {
       ...target,
       in_flight_action: 'accept',
       in_flight_started_at: input.now
     };
-    const next = replaceChildLaneRecord(records, target, claimed);
+    const next = replaceChildLaneRecord(resolved.records, target, claimed);
     if (!next) {
-      return { records, result: { kind: 'not_found' } };
+      return { records: resolved.records, result: { kind: 'not_found' } };
     }
     return {
       records: next,
       result: { kind: 'claimed', childLane: claimed }
     };
   });
+}
+
+async function resolvePendingChildLaneDecisionTarget(input: {
+  records: ProviderLinearWorkerChildLaneRecord[];
+  context: Pick<
+    Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>,
+    'issueId' | 'issueIdentifier' | 'taskId' | 'runId' | 'repoRoot'
+  >;
+  childRunsRoot: string;
+  stream: string;
+  action: 'accept' | 'reject' | 'invalidate';
+  deps: Pick<ProviderLinearChildLaneShellDependencies, 'readChildLaneProof'>;
+  now: string;
+}): Promise<ResolvedPendingChildLaneDecisionTarget> {
+  const target = findLatestPendingChildLane(input.records, input.stream);
+  if (!target) {
+    return { kind: 'blocked', outcome: { kind: 'not_found' }, records: input.records };
+  }
+  const preRepairBlocked = resolveChildLaneDecisionPreRepairBlockedOutcome(
+    input.context,
+    input.stream,
+    target,
+    input.now
+  );
+  if (preRepairBlocked) {
+    return { kind: 'blocked', outcome: preRepairBlocked, records: input.records };
+  }
+  let records = input.records;
+  let resolvedTarget = target;
+  const repaired = await repairPendingLaunchingChildLaneDecisionTarget({
+    records,
+    target,
+    context: input.context,
+    childRunsRoot: input.childRunsRoot,
+    deps: input.deps,
+    now: input.now
+  });
+  if (repaired) {
+    records = repaired.records;
+    if (!repaired.target) {
+      return { kind: 'blocked', outcome: { kind: 'not_found' }, records };
+    }
+    resolvedTarget = repaired.target;
+  }
+  const blocked = resolveChildLaneDecisionReadinessBlockedOutcome(resolvedTarget, input.action);
+  if (blocked) {
+    return { kind: 'blocked', outcome: blocked, records };
+  }
+  return { kind: 'ready', records, target: resolvedTarget };
+}
+
+function resolveChildLaneDecisionPreRepairBlockedOutcome(
+  context: Pick<Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>, 'issueId' | 'issueIdentifier' | 'taskId'>,
+  stream: string,
+  target: ProviderLinearWorkerChildLaneRecord,
+  now: string
+): Exclude<ChildLaneDecisionBlockedOutcome, { kind: 'not_ready'; childLane: ProviderLinearWorkerChildLaneRecord }> | null {
+  const provenanceViolation = resolveChildLaneDecisionProvenanceViolation(context, stream, target);
+  if (provenanceViolation) {
+    return {
+      kind: 'provenance_invalid',
+      childLane: target,
+      message: provenanceViolation
+    };
+  }
+  if (target.in_flight_action && !isStaleInFlightChildLane(target, now)) {
+    return {
+      kind: 'in_flight',
+      childLane: target,
+      inFlightAction: target.in_flight_action
+    };
+  }
+  return null;
+}
+
+function resolveChildLaneDecisionReadinessBlockedOutcome(
+  target: ProviderLinearWorkerChildLaneRecord,
+  action: 'accept' | 'reject' | 'invalidate'
+): ChildLaneDecisionBlockedOutcome | null {
+  if (action === 'accept' && target.status === 'launching') {
+    return {
+      kind: 'not_ready',
+      childLane: target
+    };
+  }
+  return null;
+}
+
+async function repairPendingLaunchingChildLaneDecisionTarget(input: {
+  records: ProviderLinearWorkerChildLaneRecord[];
+  target: ProviderLinearWorkerChildLaneRecord;
+  context: Pick<
+    Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>,
+    'issueId' | 'issueIdentifier' | 'taskId' | 'runId' | 'repoRoot'
+  >;
+  childRunsRoot: string;
+  deps: Pick<ProviderLinearChildLaneShellDependencies, 'readChildLaneProof'>;
+  now: string;
+}): Promise<{ records: ProviderLinearWorkerChildLaneRecord[]; target: ProviderLinearWorkerChildLaneRecord | null } | null> {
+  if (input.target.status !== 'launching' || !input.target.run_id.startsWith('launching-')) {
+    return null;
+  }
+  const candidate = await findChildLaneReservationRepairCandidate({
+    reservation: input.target,
+    context: input.context,
+    childRunsRoot: input.childRunsRoot,
+    deps: input.deps,
+    now: input.now
+  });
+  if (!candidate) {
+    return null;
+  }
+  const repairedReservation: ProviderLinearWorkerChildLaneRecord = {
+    ...input.target,
+    decision: 'invalidated',
+    in_flight_action: null,
+    in_flight_started_at: null,
+    decision_at: input.now,
+    decision_reason: buildChildLaneReservationRepairDecisionReason(input.target, candidate)
+  };
+  const withRetiredReservation = replaceChildLaneRecord(input.records, input.target, repairedReservation);
+  if (!withRetiredReservation) {
+    return null;
+  }
+  const existingCandidate = withRetiredReservation.find((entry) => matchesChildLaneRecordIdentity(entry, candidate)) ?? null;
+  const repairedTarget = existingCandidate
+    ? mergeCompletedChildLaneWithParentDecision(existingCandidate, candidate)
+    : candidate;
+  const nextRecords = existingCandidate
+    ? (replaceChildLaneRecord(withRetiredReservation, existingCandidate, repairedTarget) ?? withRetiredReservation)
+    : [...withRetiredReservation.filter((entry) => !matchesChildLaneRecordIdentity(entry, repairedTarget)), repairedTarget];
+  return {
+    records: nextRecords,
+    target: repairedTarget.decision === 'pending' ? repairedTarget : null
+  };
 }
 
 async function releaseClaimedChildLaneAcceptance(
@@ -1341,37 +1507,6 @@ async function finalizeClaimedChildLaneDecision(input: {
   });
 }
 
-function resolveChildLaneDecisionBlockedOutcome(
-  context: Pick<Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>, 'issueId' | 'issueIdentifier' | 'taskId'>,
-  stream: string,
-  target: ProviderLinearWorkerChildLaneRecord,
-  action: 'accept' | 'reject' | 'invalidate',
-  now: string
-): ChildLaneDecisionBlockedOutcome | null {
-  const provenanceViolation = resolveChildLaneDecisionProvenanceViolation(context, stream, target);
-  if (provenanceViolation) {
-    return {
-      kind: 'provenance_invalid',
-      childLane: target,
-      message: provenanceViolation
-    };
-  }
-  if (target.in_flight_action && !isStaleInFlightChildLane(target, now)) {
-    return {
-      kind: 'in_flight',
-      childLane: target,
-      inFlightAction: target.in_flight_action
-    };
-  }
-  if (action === 'accept' && target.status === 'launching') {
-    return {
-      kind: 'not_ready',
-      childLane: target
-    };
-  }
-  return null;
-}
-
 function findLatestPendingChildLane(
   records: ProviderLinearWorkerChildLaneRecord[],
   stream: string
@@ -1386,6 +1521,252 @@ function findChildLaneByIdentity(
   target: ProviderLinearWorkerChildLaneRecord
 ): ProviderLinearWorkerChildLaneRecord | null {
   return records.find((entry) => matchesChildLaneRecordIdentity(entry, target)) ?? null;
+}
+
+async function findChildLaneReservationRepairCandidate(input: {
+  reservation: ProviderLinearWorkerChildLaneRecord;
+  context: Pick<
+    Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>,
+    'issueId' | 'issueIdentifier' | 'taskId' | 'runId' | 'repoRoot'
+  >;
+  childRunsRoot: string;
+  deps: Pick<ProviderLinearChildLaneShellDependencies, 'readChildLaneProof'>;
+  now: string;
+}): Promise<ProviderLinearWorkerChildLaneRecord | null> {
+  const childTaskCliRoot = join(input.childRunsRoot, input.reservation.task_id, 'cli');
+  let entries;
+  try {
+    entries = await readdir(childTaskCliRoot, { withFileTypes: true });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
+  const candidates: ProviderLinearWorkerChildLaneRecord[] = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.name === input.reservation.run_id) {
+      continue;
+    }
+    const runId = (() => {
+      try {
+        return sanitizeRunId(entry.name);
+      } catch {
+        return null;
+      }
+    })();
+    if (!runId) {
+      continue;
+    }
+    const candidate = await readChildLaneReservationRepairCandidate({
+      reservation: input.reservation,
+      context: input.context,
+      childRunsRoot: input.childRunsRoot,
+      deps: input.deps,
+      now: input.now,
+      runId
+    });
+    if (candidate) {
+      candidates.push(candidate);
+    }
+  }
+  return candidates.length === 1 ? candidates[0]! : null;
+}
+
+async function readChildLaneReservationRepairCandidate(input: {
+  reservation: ProviderLinearWorkerChildLaneRecord;
+  context: Pick<
+    Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>,
+    'issueId' | 'issueIdentifier' | 'taskId' | 'runId' | 'repoRoot'
+  >;
+  childRunsRoot: string;
+  deps: Pick<ProviderLinearChildLaneShellDependencies, 'readChildLaneProof'>;
+  now: string;
+  runId: string;
+}): Promise<ProviderLinearWorkerChildLaneRecord | null> {
+  const artifactRoot = resolve(input.childRunsRoot, input.reservation.task_id, 'cli', input.runId);
+  const manifestPath = join(artifactRoot, 'manifest.json');
+  let rawManifest: Record<string, unknown>;
+  try {
+    rawManifest = JSON.parse(await readFile(manifestPath, 'utf8')) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  const childRun = parseProviderLinearChildLaneRunManifest({
+    manifest: rawManifest,
+    repoRoot: input.context.repoRoot,
+    artifactRoot,
+    manifestPath,
+    taskId: input.reservation.task_id,
+    runId: input.runId,
+    parentRunId: input.context.runId,
+    issueId: input.context.issueId,
+    issueIdentifier: input.context.issueIdentifier
+  });
+  if (!childRun) {
+    return null;
+  }
+  const proof = await input.deps.readChildLaneProof(join(artifactRoot, PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME)).catch(() => null);
+  if (!proof || !proof.scope || !proof.parent_snapshot) {
+    return null;
+  }
+  const candidate = buildRepairedChildLaneRecord({
+    reservation: input.reservation,
+    childRun,
+    proof,
+    now: input.now
+  });
+  const proofViolation = resolveChildLaneReservationRepairProofViolation({
+    reservation: input.reservation,
+    childRun,
+    candidate,
+    proof,
+    context: input.context,
+    repoRoot: input.context.repoRoot,
+    childRunsRoot: input.childRunsRoot
+  });
+  return proofViolation ? null : candidate;
+}
+
+function parseProviderLinearChildLaneRunManifest(input: {
+  manifest: Record<string, unknown>;
+  repoRoot: string;
+  artifactRoot: string;
+  manifestPath: string;
+  taskId: string;
+  runId: string;
+  parentRunId: string;
+  issueId: string;
+  issueIdentifier: string;
+}): ProviderLinearChildLaneRunResult | null {
+  const manifestRunId = normalizeOptionalString(input.manifest.run_id);
+  const manifestTaskId = normalizeOptionalString(input.manifest.task_id);
+  const manifestPipelineId = normalizeOptionalString(input.manifest.pipeline_id);
+  const manifestParentRunId = normalizeOptionalString(input.manifest.parent_run_id);
+  const manifestIssueId = normalizeOptionalString(input.manifest.issue_id);
+  const manifestIssueIdentifier = normalizeOptionalString(input.manifest.issue_identifier);
+  const status = normalizeOptionalString(input.manifest.status);
+  if (
+    manifestRunId !== input.runId ||
+    manifestTaskId !== input.taskId ||
+    manifestPipelineId !== PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID ||
+    manifestParentRunId !== input.parentRunId ||
+    manifestIssueId !== input.issueId ||
+    manifestIssueIdentifier !== input.issueIdentifier ||
+    !status
+  ) {
+    return null;
+  }
+  const recordedArtifactRoot = normalizeOptionalString(input.manifest.artifact_root);
+  if (recordedArtifactRoot && resolveRunPath(input.repoRoot, recordedArtifactRoot) !== input.artifactRoot) {
+    return null;
+  }
+  const recordedManifestPath =
+    normalizeOptionalString(input.manifest.manifest_path) ?? normalizeOptionalString(input.manifest.manifest);
+  if (recordedManifestPath && resolveRunPath(input.repoRoot, recordedManifestPath) !== input.manifestPath) {
+    return null;
+  }
+  const recordedLogPath = normalizeOptionalString(input.manifest.log_path);
+  const logPath = recordedLogPath ? resolveRunPath(input.repoRoot, recordedLogPath) : join(input.artifactRoot, 'run.log');
+  if (recordedLogPath && !isPathWithinRoot(input.artifactRoot, logPath)) {
+    return null;
+  }
+  return {
+    run_id: input.runId,
+    task_id: input.taskId,
+    pipeline_id: PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID,
+    status,
+    artifact_root: input.artifactRoot,
+    manifest_path: input.manifestPath,
+    log_path: logPath,
+    summary: normalizeOptionalString(input.manifest.summary),
+    runtime_mode_requested: normalizeOptionalString(input.manifest.runtime_mode_requested),
+    runtime_mode: normalizeOptionalString(input.manifest.runtime_mode),
+    runtime_provider: normalizeOptionalString(input.manifest.runtime_provider)
+  };
+}
+
+function buildRepairedChildLaneRecord(input: {
+  reservation: ProviderLinearWorkerChildLaneRecord;
+  childRun: ProviderLinearChildLaneRunResult;
+  proof: ProviderLinearChildLaneProof;
+  now: string;
+}): ProviderLinearWorkerChildLaneRecord {
+  const zeroBytePatch = input.childRun.status === 'succeeded' && input.proof.patch_bytes === 0;
+  return {
+    stream: input.reservation.stream,
+    pipeline_id: PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID,
+    task_id: input.reservation.task_id,
+    run_id: input.childRun.run_id,
+    status: input.childRun.status,
+    manifest_path: input.childRun.manifest_path,
+    artifact_root: input.childRun.artifact_root,
+    log_path: input.childRun.log_path,
+    summary: input.childRun.summary,
+    issue_id: input.reservation.issue_id,
+    issue_identifier: input.reservation.issue_identifier,
+    workspace_path: input.reservation.workspace_path,
+    source_setup: input.reservation.source_setup,
+    launched_at: input.reservation.launched_at,
+    purpose: input.reservation.purpose,
+    instructions: input.reservation.instructions,
+    scope: input.reservation.scope,
+    parent_snapshot: input.reservation.parent_snapshot,
+    lane_workspace_path: normalizeOptionalString(input.proof.lane_workspace_path),
+    patch_artifact_path: normalizeOptionalString(input.proof.patch_artifact_path),
+    patch_bytes: Number.isFinite(input.proof.patch_bytes) ? input.proof.patch_bytes : null,
+    decision: zeroBytePatch ? 'rejected' : 'pending',
+    in_flight_action: null,
+    in_flight_started_at: null,
+    decision_at: zeroBytePatch ? input.now : null,
+    decision_reason: zeroBytePatch ? buildNoOutputAdvisoryChildLaneDecisionReason(input.childRun) : null
+  };
+}
+
+function resolveChildLaneReservationRepairProofViolation(input: {
+  reservation: ProviderLinearWorkerChildLaneRecord;
+  childRun: ProviderLinearChildLaneRunResult;
+  candidate: ProviderLinearWorkerChildLaneRecord;
+  proof: ProviderLinearChildLaneProof;
+  context: Pick<Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>, 'runId' | 'repoRoot'>;
+  repoRoot: string;
+  childRunsRoot: string;
+}): string | null {
+  if (normalizeOptionalString(input.proof.purpose) !== normalizeOptionalString(input.reservation.purpose)) {
+    return 'Child lane proof purpose does not match the pending launching reservation.';
+  }
+  if (normalizeOptionalString(input.proof.instructions) !== normalizeOptionalString(input.reservation.instructions)) {
+    return 'Child lane proof instructions do not match the pending launching reservation.';
+  }
+  if (!areChildLaneScopesEquivalent(input.proof.scope, input.reservation.scope)) {
+    return 'Child lane proof scope does not match the pending launching reservation.';
+  }
+  if (!areChildLaneParentSnapshotsEquivalent(input.proof.parent_snapshot, input.reservation.parent_snapshot)) {
+    return 'Child lane proof parent snapshot does not match the pending launching reservation.';
+  }
+  if (normalizeOptionalString(input.proof.status) !== input.childRun.status) {
+    return 'Child lane proof status does not match the child manifest status.';
+  }
+  const artifactRoot = resolveAcceptedChildLaneArtifactRoot(
+    input.repoRoot,
+    input.childRunsRoot,
+    input.candidate
+  );
+  if (!artifactRoot) {
+    return 'Child lane artifact root must stay anchored to the expected workspace-local child run directory before reservation repair.';
+  }
+  const patchArtifactPath = resolveAcceptedPatchArtifactPath(input.repoRoot, input.candidate, artifactRoot);
+  if (!patchArtifactPath) {
+    return 'Child lane proof patch artifact path must stay within the child lane artifact root before reservation repair.';
+  }
+  return resolveAcceptedChildLaneProofViolation(
+    input.context.runId,
+    input.candidate,
+    input.proof,
+    input.repoRoot,
+    artifactRoot,
+    patchArtifactPath
+  );
 }
 
 function mergeCompletedChildLaneWithParentDecision(
@@ -1426,6 +1807,13 @@ function matchesChildLaneRecordIdentity(
   right: Pick<ProviderLinearWorkerChildLaneRecord, 'stream' | 'task_id' | 'run_id'>
 ): boolean {
   return left.stream === right.stream && left.task_id === right.task_id && left.run_id === right.run_id;
+}
+
+function buildChildLaneReservationRepairDecisionReason(
+  reservation: ProviderLinearWorkerChildLaneRecord,
+  repaired: ProviderLinearWorkerChildLaneRecord
+): string {
+  return `Reconciled stale launching reservation ${reservation.run_id} to recovered child run ${repaired.run_id} after matching manifest/proof recovery.`;
 }
 
 function normalizeAction(value: string): ProviderLinearChildLaneAction | null {
@@ -2027,6 +2415,18 @@ function areChildLaneScopesEquivalent(
   );
 }
 
+function areChildLaneParentSnapshotsEquivalent(
+  left: ProviderLinearWorkerChildLaneRecord['parent_snapshot'],
+  right: ProviderLinearWorkerChildLaneRecord['parent_snapshot']
+): boolean {
+  return (
+    normalizeOptionalString(left.base_sha) === normalizeOptionalString(right.base_sha) &&
+    normalizeOptionalString(left.issue_updated_at) === normalizeOptionalString(right.issue_updated_at) &&
+    normalizeOptionalString(left.issue_state) === normalizeOptionalString(right.issue_state) &&
+    normalizeOptionalString(left.issue_state_type) === normalizeOptionalString(right.issue_state_type)
+  );
+}
+
 function resolvePersistedScopeContractViolation(
   sourceLabel: string,
   persistedScope: ProviderLinearWorkerChildLaneScope,
@@ -2144,6 +2544,7 @@ function buildProviderLinearChildLaneStartEnv(
   sanitized[PROVIDER_LINEAR_CHILD_LANE_PHASES_ENV] = JSON.stringify(input.scope.phases);
   sanitized[PROVIDER_LINEAR_CHILD_LANE_PARENT_WORKSPACE_PATH_ENV] = input.parentWorkspacePath;
   sanitized[PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_BASE_SHA_ENV] = input.parentSnapshot.base_sha ?? '';
+  sanitized[PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_CAPTURED_AT_ENV] = input.parentSnapshot.captured_at ?? '';
   sanitized[PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_UPDATED_AT_ENV] = input.parentSnapshot.issue_updated_at ?? '';
   sanitized[PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_STATE_ENV] = input.parentSnapshot.issue_state ?? '';
   sanitized[PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_STATE_TYPE_ENV] = input.parentSnapshot.issue_state_type ?? '';
