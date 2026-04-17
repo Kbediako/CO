@@ -471,6 +471,48 @@ async function writeCachedIssueContext(
   );
 }
 
+const LINEAR_TOKEN_ENV: NodeJS.ProcessEnv = {
+  CO_LINEAR_API_TOKEN: 'lin-api-token'
+};
+
+function buildGitHubAttachment(id: string, prNumber: number, title = `PR ${prNumber}`): Record<string, unknown> {
+  return {
+    id,
+    title,
+    url: `https://github.com/asabeko/CO/pull/${prNumber}`,
+    sourceType: 'github'
+  };
+}
+
+async function readIssueContextAttachmentTruth(options: {
+  title: string;
+  state: { id: string; name: string; type: 'started' };
+  attachments: Record<string, unknown>[];
+  snapshotForPr: (prNumber: number) => { state: string; mergedAt: string | null; updatedAt: string };
+}) {
+  const fetchImpl: typeof fetch = vi.fn(async () =>
+    jsonResponse(
+      buildIssueContextBody({
+        identifier: 'CO-220',
+        title: options.title,
+        updatedAt: '2026-04-17T13:12:00.000Z',
+        state: options.state,
+        attachments: { nodes: options.attachments }
+      })
+    )
+  );
+  const resolvePullRequestSnapshot = vi.fn(async ({ prNumber }: { prNumber: number }) =>
+    options.snapshotForPr(prNumber)
+  );
+  const result = await getProviderLinearIssueContext({
+    issueId: 'lin-issue-1',
+    env: LINEAR_TOKEN_ENV,
+    fetchImpl,
+    resolvePullRequestSnapshot
+  });
+  return { result, resolvePullRequestSnapshot };
+}
+
 describe('providerLinearWorkflowFacade', () => {
   it('fails issue-context reads fast when shared cooldown is already active', async () => {
     const codexHome = await mkdtemp(join(tmpdir(), 'provider-linear-workflow-facade-'));
@@ -572,13 +614,7 @@ describe('providerLinearWorkflowFacade', () => {
   });
 
   it('bypasses stale read-only cache reuse when cached Merging attachment truth conflicts with a live Rework reset', async () => {
-    const codexHome = await mkdtemp(join(tmpdir(), 'provider-linear-workflow-facade-'));
-    tempDirs.push(codexHome);
-    const env = {
-      CODEX_HOME: codexHome,
-      CO_LINEAR_API_TOKEN: 'lin-api-token',
-      CODEX_PROVIDER_LINEAR_AUDIT_PATH: join(codexHome, 'provider-linear-worker-linear-audit.jsonl')
-    };
+    const env = await createBudgetedRunScopedEnv();
     const resetAt = String(Date.now() + 60_000);
 
     await writeCachedIssueContext(
@@ -662,13 +698,7 @@ describe('providerLinearWorkflowFacade', () => {
   });
 
   it('reuses degraded-headroom cache when cached PR truth is historical only', async () => {
-    const codexHome = await mkdtemp(join(tmpdir(), 'provider-linear-workflow-facade-'));
-    tempDirs.push(codexHome);
-    const env = {
-      CODEX_HOME: codexHome,
-      CO_LINEAR_API_TOKEN: 'lin-api-token',
-      CODEX_PROVIDER_LINEAR_AUDIT_PATH: join(codexHome, 'provider-linear-worker-linear-audit.jsonl')
-    };
+    const env = await createBudgetedRunScopedEnv();
     const resetAt = String(Date.now() + 60_000);
 
     await writeCachedIssueContext(
@@ -1088,43 +1118,19 @@ describe('providerLinearWorkflowFacade', () => {
   });
 
   it('classifies a closed stale PR attachment as historical when the live issue has reset to Rework', async () => {
-    const fetchImpl: typeof fetch = vi.fn(async () =>
-      jsonResponse(
-        buildIssueContextBody({
-          identifier: 'CO-220',
-          title: 'Reset Rework truth',
-          updatedAt: '2026-04-17T13:12:00.000Z',
-          state: {
-            id: 'state-rework',
-            name: 'Rework',
-            type: 'started'
-          },
-          attachments: {
-            nodes: [
-              {
-                id: 'attachment-pr-509',
-                title: 'PR 509',
-                url: 'https://github.com/asabeko/CO/pull/509',
-                sourceType: 'github'
-              }
-            ]
-          }
-        })
-      )
-    );
-    const resolvePullRequestSnapshot = vi.fn(async () => ({
-      state: 'CLOSED',
-      mergedAt: null,
-      updatedAt: '2026-04-17T13:10:30.000Z'
-    }));
-
-    const result = await getProviderLinearIssueContext({
-      issueId: 'lin-issue-1',
-      env: {
-        CO_LINEAR_API_TOKEN: 'lin-api-token'
+    const { result, resolvePullRequestSnapshot } = await readIssueContextAttachmentTruth({
+      title: 'Reset Rework truth',
+      state: {
+        id: 'state-rework',
+        name: 'Rework',
+        type: 'started'
       },
-      fetchImpl,
-      resolvePullRequestSnapshot
+      attachments: [buildGitHubAttachment('attachment-pr-509', 509)],
+      snapshotForPr: () => ({
+        state: 'CLOSED',
+        mergedAt: null,
+        updatedAt: '2026-04-17T13:10:30.000Z'
+      })
     });
 
     expect(resolvePullRequestSnapshot).toHaveBeenCalledWith({
@@ -1156,123 +1162,30 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
-  it('keeps a real merged PR attachment current while the live issue is still in Merging', async () => {
-    const fetchImpl: typeof fetch = vi.fn(async () =>
-      jsonResponse(
-        buildIssueContextBody({
-          identifier: 'CO-220',
-          title: 'Merge closeout is live',
-          updatedAt: '2026-04-17T13:12:00.000Z',
-          state: {
-            id: 'state-merging',
-            name: 'Merging',
-            type: 'started'
-          },
-          attachments: {
-            nodes: [
-              {
-                id: 'attachment-pr-510',
-                title: 'PR 510',
-                url: 'https://github.com/asabeko/CO/pull/510',
-                sourceType: 'github'
-              }
-            ]
-          }
-        })
-      )
-    );
-    const resolvePullRequestSnapshot = vi.fn(async () => ({
-      state: 'MERGED',
-      mergedAt: '2026-04-17T13:11:30.000Z',
-      updatedAt: '2026-04-17T13:11:30.000Z'
-    }));
-
-    const result = await getProviderLinearIssueContext({
-      issueId: 'lin-issue-1',
-      env: {
-        CO_LINEAR_API_TOKEN: 'lin-api-token'
-      },
-      fetchImpl,
-      resolvePullRequestSnapshot
-    });
-
-    expect(result).toMatchObject({
-      ok: true,
-      operation: 'issue-context',
-      issue: {
-        identifier: 'CO-220',
-        state: {
-          name: 'Merging',
-          type: 'started'
-        },
-        pull_request_attachments: {
-          current: {
-            id: 'attachment-pr-510'
-          },
-          historical: [],
-          conflicting: [],
-          unknown: []
-        }
-      }
-    });
-  });
-
   it('keeps merge-state PR truth unresolved when candidates cannot be deterministically disambiguated', async () => {
-    const fetchImpl: typeof fetch = vi.fn(async () =>
-      jsonResponse(
-        buildIssueContextBody({
-          identifier: 'CO-220',
-          title: 'Ambiguous merge-state PR truth',
-          updatedAt: '2026-04-17T13:12:00.000Z',
-          state: {
-            id: 'state-merging',
-            name: 'Merging',
-            type: 'started'
-          },
-          attachments: {
-            nodes: [
-              {
-                id: 'attachment-pr-360',
-                title: 'PR 360',
-                url: 'https://github.com/asabeko/CO/pull/360',
-                sourceType: 'github'
-              },
-              {
-                id: 'attachment-pr-372',
-                title: 'PR 372',
-                url: 'https://github.com/asabeko/CO/pull/372',
-                sourceType: 'github'
-              }
-            ]
-          }
-        })
-      )
-    );
-    const resolvePullRequestSnapshot = vi.fn(async ({ prNumber }: { prNumber: number }) => {
-      if (prNumber === 360) {
-        return {
-          state: 'OPEN',
-          mergedAt: null,
-          updatedAt: '2026-04-17T13:11:30.000Z'
-        };
-      }
-      if (prNumber === 372) {
-        return {
-          state: 'MERGED',
-          mergedAt: '2026-04-17T13:11:30.000Z',
-          updatedAt: '2026-04-17T13:11:30.000Z'
-        };
-      }
-      throw new Error(`Unexpected PR ${String(prNumber)}`);
-    });
-
-    const result = await getProviderLinearIssueContext({
-      issueId: 'lin-issue-1',
-      env: {
-        CO_LINEAR_API_TOKEN: 'lin-api-token'
+    const { result } = await readIssueContextAttachmentTruth({
+      title: 'Ambiguous merge-state PR truth',
+      state: {
+        id: 'state-merging',
+        name: 'Merging',
+        type: 'started'
       },
-      fetchImpl,
-      resolvePullRequestSnapshot
+      attachments: [
+        buildGitHubAttachment('attachment-pr-360', 360),
+        buildGitHubAttachment('attachment-pr-372', 372)
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 360
+          ? {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-17T13:11:30.000Z'
+            }
+          : {
+              state: 'MERGED',
+              mergedAt: '2026-04-17T13:11:30.000Z',
+              updatedAt: '2026-04-17T13:11:30.000Z'
+            }
     });
 
     expect(result).toMatchObject({
@@ -1302,122 +1215,66 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
-  it('keeps a single merged PR attachment current while the live issue is in Human Review', async () => {
-    const fetchImpl: typeof fetch = vi.fn(async () =>
-      jsonResponse(
-        buildIssueContextBody({
-          identifier: 'CO-220',
-          title: 'Review handoff still points at the merged PR',
-          updatedAt: '2026-04-17T13:12:00.000Z',
-          state: {
-            id: 'state-human-review',
-            name: 'Human Review',
-            type: 'started'
-          },
-          attachments: {
-            nodes: [
-              {
-                id: 'attachment-pr-510',
-                title: 'PR 510',
-                url: 'https://github.com/asabeko/CO/pull/510',
-                sourceType: 'github'
-              }
-            ]
-          }
-        })
-      )
-    );
-    const resolvePullRequestSnapshot = vi.fn(async () => ({
-      state: 'MERGED',
-      mergedAt: '2026-04-17T13:11:30.000Z',
-      updatedAt: '2026-04-17T13:11:30.000Z'
-    }));
-
-    const result = await getProviderLinearIssueContext({
-      issueId: 'lin-issue-1',
-      env: {
-        CO_LINEAR_API_TOKEN: 'lin-api-token'
-      },
-      fetchImpl,
-      resolvePullRequestSnapshot
+  it.each([
+    {
+      title: 'Merge closeout is live',
+      state: { id: 'state-merging', name: 'Merging', type: 'started' as const },
+      attachments: [buildGitHubAttachment('attachment-pr-510', 510)],
+      expectedCurrentId: 'attachment-pr-510',
+      expectedStateName: 'Merging'
+    },
+    {
+      title: 'Review handoff still points at the merged PR',
+      state: { id: 'state-human-review', name: 'Human Review', type: 'started' as const },
+      attachments: [buildGitHubAttachment('attachment-pr-510', 510)],
+      expectedCurrentId: 'attachment-pr-510',
+      expectedStateName: 'Human Review'
+    },
+    {
+      title: 'Duplicate attachment rows',
+      state: { id: 'state-human-review', name: 'Human Review', type: 'started' as const },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-510-a', 510, 'PR 510 A'),
+        buildGitHubAttachment('attachment-pr-510-b', 510, 'PR 510 B')
+      ],
+      expectedCurrentId: 'attachment-pr-510-a',
+      expectedStateName: 'Human Review',
+      expectedSnapshotCalls: 1
+    }
+  ])('keeps merged attachment truth current: $title', async ({
+    title,
+    state,
+    attachments,
+    expectedCurrentId,
+    expectedStateName,
+    expectedSnapshotCalls
+  }) => {
+    const { result, resolvePullRequestSnapshot } = await readIssueContextAttachmentTruth({
+      title,
+      state,
+      attachments,
+      snapshotForPr: () => ({
+        state: 'MERGED',
+        mergedAt: '2026-04-17T13:11:30.000Z',
+        updatedAt: '2026-04-17T13:11:30.000Z'
+      })
     });
 
+    if (expectedSnapshotCalls !== undefined) {
+      expect(resolvePullRequestSnapshot).toHaveBeenCalledTimes(expectedSnapshotCalls);
+    }
     expect(result).toMatchObject({
       ok: true,
       operation: 'issue-context',
       issue: {
         identifier: 'CO-220',
         state: {
-          name: 'Human Review',
+          name: expectedStateName,
           type: 'started'
         },
         pull_request_attachments: {
           current: {
-            id: 'attachment-pr-510'
-          },
-          historical: [],
-          conflicting: [],
-          unknown: []
-        }
-      }
-    });
-  });
-
-  it('deduplicates identical attached PR URLs before classifying current truth', async () => {
-    const fetchImpl: typeof fetch = vi.fn(async () =>
-      jsonResponse(
-        buildIssueContextBody({
-          identifier: 'CO-220',
-          title: 'Duplicate attachment rows',
-          updatedAt: '2026-04-17T13:12:00.000Z',
-          state: {
-            id: 'state-human-review',
-            name: 'Human Review',
-            type: 'started'
-          },
-          attachments: {
-            nodes: [
-              {
-                id: 'attachment-pr-510-a',
-                title: 'PR 510 A',
-                url: 'https://github.com/asabeko/CO/pull/510',
-                sourceType: 'github'
-              },
-              {
-                id: 'attachment-pr-510-b',
-                title: 'PR 510 B',
-                url: 'https://github.com/asabeko/CO/pull/510',
-                sourceType: 'github'
-              }
-            ]
-          }
-        })
-      )
-    );
-    const resolvePullRequestSnapshot = vi.fn(async () => ({
-      state: 'MERGED',
-      mergedAt: '2026-04-17T13:11:30.000Z',
-      updatedAt: '2026-04-17T13:11:30.000Z'
-    }));
-
-    const result = await getProviderLinearIssueContext({
-      issueId: 'lin-issue-1',
-      env: {
-        CO_LINEAR_API_TOKEN: 'lin-api-token'
-      },
-      fetchImpl,
-      resolvePullRequestSnapshot
-    });
-
-    expect(resolvePullRequestSnapshot).toHaveBeenCalledTimes(1);
-    expect(result).toMatchObject({
-      ok: true,
-      operation: 'issue-context',
-      issue: {
-        identifier: 'CO-220',
-        pull_request_attachments: {
-          current: {
-            id: 'attachment-pr-510-a'
+            id: expectedCurrentId
           },
           historical: [],
           conflicting: [],
