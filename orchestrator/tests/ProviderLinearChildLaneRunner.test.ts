@@ -150,7 +150,7 @@ describe('provider linear child lane runner', () => {
     await writeFile(staleSessionLogPath, matchingHeader, 'utf8');
     await writeFile(freshSessionLogPath, matchingHeader, 'utf8');
 
-    const staleTimestamp = new Date('2026-04-17T18:52:06.000Z');
+    const staleTimestamp = new Date('2026-04-17T18:52:02.000Z');
     const freshTimestamp = new Date('2026-04-17T18:52:08.000Z');
     await utimes(staleSessionLogPath, staleTimestamp, staleTimestamp);
     await utimes(freshSessionLogPath, freshTimestamp, freshTimestamp);
@@ -163,6 +163,63 @@ describe('provider linear child lane runner', () => {
     });
 
     expect(sessionLogPath).toBe(freshSessionLogPath);
+  });
+
+  it('accepts matching startup evidence when coarse mtime precision rounds below launch time', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-runner-'));
+    const codexHome = join(tempRoot, '.codex');
+    const sessionDir = join(codexHome, 'sessions', '2026', '04', '17');
+    await mkdir(sessionDir, { recursive: true });
+
+    const workspacePath = join(tempRoot, 'workspace');
+    const promptNeedles = ['You are a bounded same-issue child lane for Linear issue CO-224.'];
+    const sessionLogPath = join(sessionDir, 'rollout-second-resolution.jsonl');
+    const matchingHeader = [
+      `{"timestamp":"2026-04-17T18:52:07.950Z","type":"session_meta","payload":{"cwd":"${workspacePath}"}}`,
+      `{"timestamp":"2026-04-17T18:52:08.000Z","type":"turn_context","payload":{"user_instructions":"${promptNeedles[0]}"}}`
+    ].join('\n');
+    await writeFile(sessionLogPath, matchingHeader, 'utf8');
+
+    const roundedTimestamp = new Date('2026-04-17T18:52:07.000Z');
+    await utimes(sessionLogPath, roundedTimestamp, roundedTimestamp);
+
+    const discoveredPath = await childLaneRunnerTest.discoverProviderLinearChildLaneSessionLogPath({
+      env: { CODEX_HOME: codexHome },
+      workspacePath,
+      promptNeedles,
+      startedAt: '2026-04-17T18:52:07.900Z'
+    });
+
+    expect(discoveredPath).toBe(sessionLogPath);
+  });
+
+  it('ignores within-skew logs when only later non-header events land after launch', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-runner-'));
+    const codexHome = join(tempRoot, '.codex');
+    const sessionDir = join(codexHome, 'sessions', '2026', '04', '17');
+    await mkdir(sessionDir, { recursive: true });
+
+    const workspacePath = join(tempRoot, 'workspace');
+    const promptNeedles = ['You are a bounded same-issue child lane for Linear issue CO-224.'];
+    const sessionLogPath = join(sessionDir, 'rollout-stale-with-late-event.jsonl');
+    const matchingHeader = [
+      `{"timestamp":"2026-04-17T18:52:07.000Z","type":"session_meta","payload":{"cwd":"${workspacePath}"}}`,
+      `{"timestamp":"2026-04-17T18:52:07.050Z","type":"turn_context","payload":{"user_instructions":"${promptNeedles[0]}"}}`,
+      `{"timestamp":"2026-04-17T18:52:08.000Z","type":"event_msg","payload":{"message":"late append from stale log"}}`
+    ].join('\n');
+    await writeFile(sessionLogPath, matchingHeader, 'utf8');
+
+    const roundedTimestamp = new Date('2026-04-17T18:52:07.000Z');
+    await utimes(sessionLogPath, roundedTimestamp, roundedTimestamp);
+
+    const discoveredPath = await childLaneRunnerTest.discoverProviderLinearChildLaneSessionLogPath({
+      env: { CODEX_HOME: codexHome },
+      workspacePath,
+      promptNeedles,
+      startedAt: '2026-04-17T18:52:07.900Z'
+    });
+
+    expect(discoveredPath).toBeNull();
   });
 
   it('discovers matching startup evidence when turn context lands beyond 16KB', async () => {

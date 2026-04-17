@@ -34,12 +34,12 @@
 - [x] `node scripts/spec-guard.mjs --dry-run` passes. Evidence: terminal output `Spec guard: OK`.
 - [x] Focused provider-child-lane tests pass. Evidence: `npm test -- ProviderLinearChildLaneRunner.test.ts ProviderLinearChildLaneShell.test.ts`.
 - [x] `npm run build`, `npm run lint`, `npm run test`, and `npm run docs:check` pass. Evidence: terminal output from the current workspace validation run (`344` files / `4107` tests passed).
-- [ ] `npm run docs:freshness` passes after the packet registry/mirror repair. Evidence: pending rerun.
+- [x] `npm run docs:freshness` passes after the packet registry/mirror repair. Evidence: `docs:freshness OK` with refreshed output at `out/linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5/docs-freshness.json`.
 - [x] `npm run repo:stewardship` passes. Evidence: terminal output `repo:stewardship OK - 5137 tracked files, 0 action-required`.
-- [ ] `node scripts/diff-budget.mjs` passes or an explicit justification is recorded. Evidence: pending rerun after removing `.child-lanes/...`.
-- [ ] `npm run pack:smoke` passes. Evidence: pending.
-- [ ] Manifest-backed standalone review completes. Evidence: pending.
-- [ ] Explicit elegance review completes. Evidence: pending.
+- [x] `node scripts/diff-budget.mjs` passes with an explicit justification recorded. Evidence: `Diff budget override accepted: CO-224 requires the docs-first packet, task mirrors, appserver startup recovery, and bounded regression coverage in one auditable change; the branch now exceeds budget because it includes the required post-review watchdog fixes and packet mirrors on top of current origin/main.`
+- [x] `npm run pack:smoke` passes. Evidence: terminal output `Pack smoke passed in temp mock repo`.
+- [x] Manifest-backed standalone review completes. Evidence: `.runs/linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5/cli/2026-04-17T18-48-42-429Z-40aec176/review/telemetry.json` with `status: succeeded` and `review_outcome: bounded-success`.
+- [x] Explicit elegance review completes. Evidence: workpad closeout records the retained minimal shape: local 90s startup watchdog, no broader runtime-provider abstraction, and preserved fail-closed parent semantics.
 
 ## Progress Log
 - 2026-04-17: moved `CO-224` from `Ready` to `In Progress`, created the required single workpad comment, and recorded the pre-turn decomposition matrix plus `parallelize_now`.

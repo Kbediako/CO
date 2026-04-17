@@ -33,6 +33,7 @@ const PROVIDER_LINEAR_CHILD_LANE_APPSERVER_STARTUP_TIMEOUT_MS = 90 * 1000;
 const PROVIDER_LINEAR_CHILD_LANE_APPSERVER_STARTUP_POLL_INTERVAL_MS = 250;
 const PROVIDER_LINEAR_CHILD_LANE_SESSION_LOG_DISCOVERY_WINDOW_MS = 10 * 60 * 1000;
 const PROVIDER_LINEAR_CHILD_LANE_SESSION_LOG_HEADER_BYTES = 256 * 1024;
+const PROVIDER_LINEAR_CHILD_LANE_SESSION_LOG_MTIME_SKEW_MS = 1000;
 
 export const PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME = 'provider-linear-child-lane-proof.json';
 export const PROVIDER_LINEAR_CHILD_LANE_STREAM_ENV = 'CODEX_PROVIDER_LINEAR_CHILD_LANE_STREAM';
@@ -312,6 +313,27 @@ function prefixContainsProviderLinearChildLaneSessionHeader(
   return false;
 }
 
+function prefixHasProviderLinearChildLaneSessionTimestampAtOrAfter(
+  prefix: string,
+  startedAtMs: number
+): boolean {
+  if (!Number.isFinite(startedAtMs)) {
+    return false;
+  }
+  for (const line of prefix.split(/\r?\n/u)) {
+    const parsed = parseProviderLinearChildLaneSessionJsonlLine(line);
+    if (parsed?.type !== 'session_meta' && parsed?.type !== 'turn_context') {
+      continue;
+    }
+    const timestamp =
+      typeof parsed?.timestamp === 'string' ? Date.parse(parsed.timestamp) : Number.NaN;
+    if (Number.isFinite(timestamp) && timestamp >= startedAtMs) {
+      return true;
+    }
+  }
+  return false;
+}
+
 async function discoverProviderLinearChildLaneSessionLogPath(input: {
   env: NodeJS.ProcessEnv;
   workspacePath: string;
@@ -360,9 +382,6 @@ async function discoverProviderLinearChildLaneSessionLogPath(input: {
   candidates.sort((left, right) => right.mtimeMs - left.mtimeMs);
   for (const requireThreadHint of threadIdHint ? [true, false] : [false]) {
     for (const candidate of candidates) {
-      if (!requireThreadHint && Number.isFinite(startedAtMs) && candidate.mtimeMs < startedAtMs) {
-        continue;
-      }
       let prefix: string;
       try {
         prefix = await readProviderLinearChildLaneFilePrefix(
@@ -378,6 +397,16 @@ async function discoverProviderLinearChildLaneSessionLogPath(input: {
         (sessionMetaNeedle !== null && prefix.includes(sessionMetaNeedle));
       if (requireThreadHint && !matchesThreadHint) {
         continue;
+      }
+      if (!requireThreadHint && Number.isFinite(startedAtMs) && candidate.mtimeMs < startedAtMs) {
+        const mtimeWithinSkewWindow =
+          candidate.mtimeMs + PROVIDER_LINEAR_CHILD_LANE_SESSION_LOG_MTIME_SKEW_MS >= startedAtMs;
+        if (
+          !mtimeWithinSkewWindow ||
+          !prefixHasProviderLinearChildLaneSessionTimestampAtOrAfter(prefix, startedAtMs)
+        ) {
+          continue;
+        }
       }
       if (
         prefixContainsProviderLinearChildLaneSessionHeader(
