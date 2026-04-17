@@ -336,6 +336,84 @@ describe('runLinearCliShell', () => {
     });
   });
 
+  it('preserves the fallback issue id when transition failure details omit resolved identity', async () => {
+    const log = vi.fn();
+    const appendAuditEntry = vi.fn();
+    const transitionProviderLinearIssueStateMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').transitionProviderLinearIssueState>()
+        .mockResolvedValue({
+          ok: false,
+          operation: 'transition',
+          error: {
+            code: 'linear_rate_limited',
+            message: 'Linear API rate limit exceeded.',
+            status: 429,
+            details: {
+              retry_after_ms: 1200
+            }
+          }
+        } as never);
+
+    await runLinearCliShell(
+      {
+        positionals: ['transition'],
+        flags: {
+          format: 'json',
+          'issue-id': 'lin-issue-1',
+          state: 'Merging',
+          'expected-state': 'In Review'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        transitionProviderLinearIssueState: transitionProviderLinearIssueStateMock,
+        getEnv: () => ({
+          CO_LINEAR_API_TOKEN: 'lin-api-token',
+          CODEX_PROVIDER_LINEAR_AUDIT_PATH: '/tmp/provider-linear-audit.jsonl'
+        }),
+        now: () => '2026-04-17T10:55:00.000Z',
+        appendAuditEntry,
+        log
+      }
+    );
+
+    expect(appendAuditEntry).toHaveBeenCalledWith('/tmp/provider-linear-audit.jsonl', {
+      recorded_at: '2026-04-17T10:55:00.000Z',
+      operation: 'transition',
+      ok: false,
+      issue_id: 'lin-issue-1',
+      issue_identifier: null,
+      source_setup: null,
+      action: null,
+      via: null,
+      state: null,
+      follow_up_issue_id: null,
+      follow_up_issue_identifier: null,
+      failed_relation_type: null,
+      comment_id: null,
+      attachment_id: null,
+      previous_state: null,
+      previous_state_type: null,
+      target_state: null,
+      target_state_type: null,
+      issue_updated_at: null,
+      expected_state: null,
+      expected_state_type: null,
+      expected_updated_at: null,
+      force: null,
+      force_reason: null,
+      error_code: 'linear_rate_limited',
+      error_message: 'Linear API rate limit exceeded.'
+    });
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
+      ok: false,
+      operation: 'transition',
+      error: {
+        code: 'linear_rate_limited'
+      }
+    });
+  });
+
   it('reads workpad content from a file before calling the facade', async () => {
     const upsertProviderLinearWorkpadCommentMock =
       vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').upsertProviderLinearWorkpadComment>()

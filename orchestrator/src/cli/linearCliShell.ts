@@ -1359,9 +1359,11 @@ function resolveTransitionAuditFieldsFromFailure(
   if (!details) {
     return {};
   }
+  const issueId = normalizeOptionalAuditString(details.issue_id);
+  const issueIdentifier = normalizeOptionalAuditString(details.issue_identifier);
   return {
-    issue_id: normalizeOptionalAuditString(details.issue_id),
-    issue_identifier: normalizeOptionalAuditString(details.issue_identifier),
+    ...(issueId ? { issue_id: issueId } : {}),
+    ...(issueIdentifier ? { issue_identifier: issueIdentifier } : {}),
     previous_state: normalizeOptionalAuditString(details.previous_state),
     previous_state_type: normalizeOptionalAuditString(details.previous_state_type),
     target_state: normalizeOptionalAuditString(details.target_state),
