@@ -309,10 +309,27 @@ export async function runLinearCliShell(
         return;
       }
       case 'transition': {
-        assertAllowedFlags(params.flags, ['format', 'issue-id', 'workspace-id', 'team-id', 'project-id', 'state']);
+        assertAllowedFlags(params.flags, [
+          'format',
+          'issue-id',
+          'workspace-id',
+          'team-id',
+          'project-id',
+          'state',
+          'expected-state',
+          'expected-state-type',
+          'expected-updated-at',
+          'force',
+          'force-reason'
+        ]);
         const result = await dependencies.transitionProviderLinearIssueState({
           issueId: requireFlag(params.flags, 'issue-id'),
           stateName: requireFlag(params.flags, 'state'),
+          expectedStateName: readStringFlag(params.flags, 'expected-state') ?? null,
+          expectedStateType: readStringFlag(params.flags, 'expected-state-type') ?? null,
+          expectedUpdatedAt: readStringFlag(params.flags, 'expected-updated-at') ?? null,
+          force: readBooleanFlag(params.flags, 'force'),
+          forceReason: readRawStringFlag(params.flags, 'force-reason'),
           sourceSetup: readSourceSetup(params.flags),
           env
         });
@@ -1105,6 +1122,7 @@ function buildAuditEntry(
       ...followUpAuditFields,
       comment_id: null,
       attachment_id: null,
+      ...resolveTransitionAuditFieldsFromFailure(result, resolveRequestedTransitionAuditFields(flags)),
       error_code: result.error.code,
       error_message: result.error.message
     };
@@ -1181,6 +1199,7 @@ function buildAuditEntry(
         ...followUpAuditFields,
         comment_id: null,
         attachment_id: null,
+        ...resolveTransitionAuditFieldsFromSuccess(result),
         error_code: null,
         error_message: null
       };
@@ -1308,6 +1327,92 @@ function buildAuditEntry(
         error_message: null
       };
   }
+}
+
+function resolveTransitionAuditFieldsFromSuccess(
+  result: Extract<LinearCliResult, { ok: true; operation: 'transition' }>
+): Partial<ProviderLinearAuditEntry> {
+  return {
+    previous_state: result.previous_state?.name ?? null,
+    previous_state_type: result.previous_state?.type ?? null,
+    target_state: result.target_state.name,
+    target_state_type: result.target_state.type ?? null,
+    issue_updated_at: result.issue.updated_at ?? null,
+    expected_state: result.transition_guard?.expected_state ?? null,
+    expected_state_type: result.transition_guard?.expected_state_type ?? null,
+    expected_updated_at: result.transition_guard?.expected_updated_at ?? null,
+    force: result.transition_guard?.force ?? null,
+    force_reason: result.transition_guard?.force_reason ?? null
+  };
+}
+
+function resolveRequestedTransitionAuditFields(flags: ArgMap): Partial<ProviderLinearAuditEntry> {
+  const hasForce = Object.prototype.hasOwnProperty.call(flags, 'force');
+  return {
+    expected_state: readStringFlag(flags, 'expected-state') ?? null,
+    expected_state_type: readStringFlag(flags, 'expected-state-type') ?? null,
+    expected_updated_at: readStringFlag(flags, 'expected-updated-at') ?? null,
+    force: hasForce ? readBooleanFlag(flags, 'force') : null,
+    force_reason: normalizeOptionalAuditString(readRawStringFlag(flags, 'force-reason'))
+  };
+}
+
+function resolveTransitionAuditFieldsFromFailure(
+  result: Extract<LinearCliResult, { ok: false }>,
+  fallbackGuardFields: Partial<
+    Pick<
+      ProviderLinearAuditEntry,
+      'expected_state' | 'expected_state_type' | 'expected_updated_at' | 'force' | 'force_reason'
+    >
+  > = {}
+): Partial<ProviderLinearAuditEntry> {
+  if (result.operation !== 'transition') {
+    return {};
+  }
+  const details =
+    result.error.details && typeof result.error.details === 'object'
+      ? result.error.details as Record<string, unknown>
+      : null;
+  const issueId = details ? normalizeOptionalAuditString(details.issue_id) : null;
+  const issueIdentifier = details ? normalizeOptionalAuditString(details.issue_identifier) : null;
+  const expectedState = details
+    ? normalizeOptionalAuditString(details.expected_state)
+    : null;
+  const expectedStateType = details
+    ? normalizeOptionalAuditString(details.expected_state_type)
+    : null;
+  const expectedUpdatedAt = details
+    ? normalizeOptionalAuditString(details.expected_updated_at)
+    : null;
+  const force = details && typeof details.force === 'boolean'
+    ? details.force
+    : (fallbackGuardFields.force ?? null);
+  const forceReason = details
+    ? normalizeOptionalAuditString(details.force_reason)
+    : null;
+  return {
+    ...(issueId ? { issue_id: issueId } : {}),
+    ...(issueIdentifier ? { issue_identifier: issueIdentifier } : {}),
+    previous_state: details ? normalizeOptionalAuditString(details.previous_state) : null,
+    previous_state_type: details ? normalizeOptionalAuditString(details.previous_state_type) : null,
+    target_state: details ? normalizeOptionalAuditString(details.target_state) : null,
+    target_state_type: details ? normalizeOptionalAuditString(details.target_state_type) : null,
+    issue_updated_at: details ? normalizeOptionalAuditString(details.issue_updated_at) : null,
+    expected_state: expectedState ?? fallbackGuardFields.expected_state ?? null,
+    expected_state_type: expectedStateType ?? fallbackGuardFields.expected_state_type ?? null,
+    expected_updated_at:
+      expectedUpdatedAt ?? fallbackGuardFields.expected_updated_at ?? null,
+    force,
+    force_reason: forceReason ?? fallbackGuardFields.force_reason ?? null
+  };
+}
+
+function normalizeOptionalAuditString(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 function resolveFollowUpAuditFields(
