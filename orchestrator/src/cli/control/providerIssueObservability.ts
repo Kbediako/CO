@@ -559,7 +559,7 @@ function resolveProviderParallelizationSnapshot(
 
 export function deriveProviderLinearWorkerProgressSnapshot(input: {
   tracked_issue?:
-    | Pick<LiveLinearTrackedIssue, 'state' | 'state_type'>
+    | Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at'>
     | null
     | undefined;
   claim?: ProviderIssueClaimLike | null | undefined;
@@ -593,6 +593,24 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
     proof,
     currentTurnStartedAt
   );
+  const mergeCloseoutProgress = mergeCloseout ? deriveMergeCloseoutProgressSnapshot(mergeCloseout) : null;
+  const terminalWorkflowUpdatedAt = latestIsoTimestamp(
+    trackedWorkflowState?.isTerminal ? normalizeOptionalString(trackedIssue?.updated_at) : null,
+    claimWorkflowState?.isTerminal
+      ? latestIsoTimestamp(
+          normalizeOptionalString(claim?.issue_updated_at),
+          normalizeOptionalString(claim?.updated_at)
+        )
+      : null
+  );
+  const terminalWorkflowSupersedesMergeCloseout = Boolean(
+    mergeCloseoutProgress &&
+    terminalWorkflowUpdatedAt &&
+    compareIsoTimestamp(
+      terminalWorkflowUpdatedAt,
+      mergeCloseoutProgress.last_semantic_progress_at
+    ) > 0
+  );
   const lastSemanticProgressAt = latestIsoTimestamp(
     normalizeOptionalString(proof?.current_turn_activity?.recorded_at),
     normalizeOptionalString(proof?.last_event_at),
@@ -609,6 +627,11 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
       endReason,
       lastSemanticProgressAt
     });
+  const terminalWorkflowIsNewerThanWorkerProgress = Boolean(
+    (trackedWorkflowState?.isTerminal || claimWorkflowState?.isTerminal)
+    && terminalWorkflowUpdatedAt
+    && compareIsoTimestamp(terminalWorkflowUpdatedAt, lastSemanticProgressAt) > 0
+  );
 
   if (ownerStatus === 'failed' || ownerPhase === 'turn_failed') {
     return {
@@ -643,10 +666,11 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
   }
 
   if (
-    mergeCloseout
+    mergeCloseoutProgress
     && !workerProgressSuppressedByStaleClaim
+    && !terminalWorkflowSupersedesMergeCloseout
   ) {
-    return deriveMergeCloseoutProgressSnapshot(mergeCloseout);
+    return mergeCloseoutProgress;
   }
 
   if (ownerPhase === 'ended' && ownerStatus === 'succeeded') {
@@ -666,12 +690,22 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
     }
     return {
       phase: trackedWorkflowState?.isHandoff ? 'review_handoff' : 'completed',
-      kind: trackedWorkflowState?.isHandoff ? 'workflow' : 'worker',
+      kind:
+        trackedWorkflowState?.isHandoff || terminalWorkflowIsNewerThanWorkerProgress
+          ? 'workflow'
+          : 'worker',
       status: 'completed',
       summary:
         selectProofPreferredMessage(proof) ??
-        'Provider worker completed successfully.',
-      last_semantic_progress_at: lastSemanticProgressAt,
+        (
+          terminalWorkflowIsNewerThanWorkerProgress
+            ? 'Issue is complete.'
+            : 'Provider worker completed successfully.'
+        ),
+      last_semantic_progress_at: latestIsoTimestamp(
+        lastSemanticProgressAt,
+        terminalWorkflowIsNewerThanWorkerProgress ? terminalWorkflowUpdatedAt : null
+      ),
       stall_classification: 'completed',
       stall_reason: null,
       recovery_recommendation: 'no_action'
@@ -736,13 +770,16 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
     };
   }
 
-  if (trackedWorkflowState?.isTerminal) {
+  if (trackedWorkflowState?.isTerminal || claimWorkflowState?.isTerminal) {
     return {
       phase: 'completed',
       kind: 'workflow',
       status: 'completed',
       summary: 'Issue is complete.',
-      last_semantic_progress_at: lastSemanticProgressAt,
+      last_semantic_progress_at: latestIsoTimestamp(
+        lastSemanticProgressAt,
+        terminalWorkflowUpdatedAt
+      ),
       stall_classification: 'completed',
       stall_reason: null,
       recovery_recommendation: 'no_action'
