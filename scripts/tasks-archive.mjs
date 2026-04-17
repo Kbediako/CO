@@ -16,7 +16,7 @@ function showUsage() {
   console.log(`Usage: node scripts/tasks-archive.mjs [--policy <path>] [--out <path>] [--dry-run]
 
 Moves completed task snapshots from docs/TASKS.md into a year-based archive payload
-when the line-count threshold is exceeded.
+when the hard line-count limit or the configured reserve target is exceeded.
 
 Options:
   --policy <path>  Path to archive policy JSON (default: ${DEFAULT_POLICY_PATH})
@@ -31,6 +31,11 @@ function parsePolicy(raw, policyPath) {
   const maxLines = Number.isFinite(data?.max_lines) ? Number(data.max_lines) : NaN;
   if (!Number.isInteger(maxLines) || maxLines <= 0) {
     throw new Error(`Policy max_lines is invalid in ${policyPath}`);
+  }
+  const reserveLines =
+    data?.reserve_lines === undefined ? 0 : Number.isFinite(data?.reserve_lines) ? Number(data.reserve_lines) : NaN;
+  if (!Number.isInteger(reserveLines) || reserveLines < 0 || reserveLines >= maxLines) {
+    throw new Error(`Policy reserve_lines is invalid in ${policyPath}`);
   }
   const archiveBranch = typeof data?.archive_branch === 'string' ? data.archive_branch.trim() : '';
   if (!archiveBranch) {
@@ -48,6 +53,7 @@ function parsePolicy(raw, policyPath) {
 
   return {
     maxLines,
+    reserveLines,
     archiveBranch,
     archivePattern,
     repoUrl
@@ -144,6 +150,26 @@ function parseHeaderSections(lines) {
   return sections;
 }
 
+function findSnapshotHeaderLine(lines, section) {
+  for (let index = section.start; index <= section.end; index += 1) {
+    if (lineStartsWithSnapshotHeader(lines[index])) {
+      return lines[index];
+    }
+  }
+  return null;
+}
+
+function parseCompletedSnapshotDate(headerLine) {
+  if (typeof headerLine !== 'string') {
+    return null;
+  }
+  const match = headerLine.match(/Update (\d{4}-\d{2}-\d{2}): completed\b/i);
+  if (!match?.[1]) {
+    return null;
+  }
+  return parseDateString(match[1]);
+}
+
 function parseTaskSections(lines) {
   const sections = [];
   const covered = new Array(lines.length).fill(false);
@@ -228,16 +254,20 @@ function loadTaskIndex(raw) {
     if (!key) {
       continue;
     }
+    const status = typeof item.status === 'string' ? item.status : '';
     const gateStatus = typeof item?.gate?.status === 'string' ? item.gate.status : '';
     const runTimestamp = parseRunIdTimestamp(item?.gate?.run_id);
     const runDate = runTimestamp ? runTimestamp.toISOString().slice(0, 10) : null;
+    const completedAtFromIndex = parseDateString(item.completed_at);
+    const completedByIndex = status === 'succeeded' || status === 'completed' || Boolean(completedAtFromIndex);
     const completedAt =
-      parseDateString(item.completed_at) ??
-      (gateStatus === 'succeeded' ? parseDateString(runDate) : null);
+      completedAtFromIndex ??
+      (completedByIndex && gateStatus === 'succeeded' ? parseDateString(runDate) : null);
     const entry = {
-      status: typeof item.status === 'string' ? item.status : '',
+      status,
       gateStatus,
-      completedAt
+      completedAt,
+      completedByIndex
     };
     map.set(key, entry);
     if (id) {
@@ -348,9 +378,12 @@ async function main() {
   const normalizedTasks = normalizeInlineSnapshotHeaders(tasksRaw);
   const lines = normalizedTasks.split('\n');
   const totalLines = countNormalizedLines(normalizedTasks);
+  const targetLines = policy.maxLines - policy.reserveLines;
 
-  if (totalLines <= policy.maxLines) {
-    console.log(`docs/TASKS.md is within limit (${totalLines}/${policy.maxLines}).`);
+  if (totalLines <= targetLines) {
+    console.log(
+      `docs/TASKS.md is within reserve target (${totalLines}/${policy.maxLines}; reserve ${policy.reserveLines}, target ${targetLines}).`
+    );
     return;
   }
 
@@ -360,13 +393,20 @@ async function main() {
   const candidates = [];
   for (const section of sections) {
     const entry = taskIndex.get(section.taskKey);
-    const eligibleStatus = entry?.status === 'succeeded' || entry?.gateStatus === 'succeeded';
-    if (!entry || !eligibleStatus || !entry.completedAt) {
+    const headerLine = findSnapshotHeaderLine(lines, section);
+    const headerCompletedAt = parseCompletedSnapshotDate(headerLine);
+    if (entry?.status && !entry.completedByIndex) {
+      continue;
+    }
+    const completedAt = entry
+      ? entry.completedAt ?? headerCompletedAt
+      : headerCompletedAt;
+    if (!completedAt) {
       continue;
     }
     candidates.push({
       ...section,
-      completedAt: entry.completedAt,
+      completedAt,
       lineCount: section.end - section.start + 1
     });
   }
@@ -380,23 +420,23 @@ async function main() {
 
   if (candidates.length === 0) {
     throw new Error(
-      `docs/TASKS.md exceeds max_lines (${totalLines}/${policy.maxLines}) but no eligible tasks can be archived.`
+      `docs/TASKS.md exceeds the reserve target (${totalLines}/${targetLines}; hard max ${policy.maxLines}) but no eligible tasks can be archived.`
     );
   }
 
   const toArchive = [];
   let remainingLines = totalLines;
   for (const candidate of candidates) {
-    if (remainingLines <= policy.maxLines) {
+    if (remainingLines <= targetLines) {
       break;
     }
     toArchive.push(candidate);
     remainingLines -= candidate.lineCount;
   }
 
-  if (remainingLines > policy.maxLines) {
+  if (remainingLines > targetLines) {
     throw new Error(
-      `Unable to reach max_lines ${policy.maxLines}; ${remainingLines} lines remain after archiving.`
+      `Unable to restore reserve target ${targetLines}; ${remainingLines} lines remain after archiving (hard max ${policy.maxLines}).`
     );
   }
 
@@ -423,9 +463,9 @@ async function main() {
   updatedContent = updateArchiveIndex(updatedContent, policy, archivedYears);
   const updatedLineCount = countNormalizedLines(updatedContent);
 
-  if (updatedLineCount > policy.maxLines) {
+  if (updatedLineCount > targetLines) {
     throw new Error(
-      `Archive output still exceeds max_lines ${policy.maxLines}; ${updatedLineCount} lines remain after archiving.`
+      `Archive output still exceeds reserve target ${targetLines}; ${updatedLineCount} lines remain after archiving (hard max ${policy.maxLines}).`
     );
   }
 
@@ -480,7 +520,9 @@ async function main() {
   }
 
   console.log(`Archived ${toArchive.length} task(s).`);
-  console.log(`docs/TASKS.md lines: ${totalLines} -> ${updatedLineCount} (limit ${policy.maxLines}).`);
+  console.log(
+    `docs/TASKS.md lines: ${totalLines} -> ${updatedLineCount} (hard limit ${policy.maxLines}; reserve ${policy.reserveLines}; target ${targetLines}).`
+  );
   console.log(`Archive branch: ${policy.archiveBranch}`);
 
   if (options.dryRun) {

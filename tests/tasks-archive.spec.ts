@@ -32,7 +32,8 @@ async function initRepository(): Promise<string> {
     JSON.stringify(
       {
         version: 1,
-        max_lines: 4,
+        max_lines: 11,
+        reserve_lines: 2,
         archive_branch: 'task-archives',
         archive_file_pattern: 'docs/TASKS-archive-YYYY.md',
         repo_url: 'https://github.com/example/repo'
@@ -50,11 +51,6 @@ async function initRepository(): Promise<string> {
           {
             id: '20260413-linear-6ed6ef11-538e-48f0-936c-8547632bf92e',
             title: 'Completed linear archive candidate',
-            status: 'completed',
-            completed_at: completedAt,
-            gate: {
-              status: 'succeeded'
-            },
             paths: {
               task: 'tasks/tasks-linear-6ed6ef11-538e-48f0-936c-8547632bf92e.md'
             }
@@ -65,6 +61,18 @@ async function initRepository(): Promise<string> {
             status: 'in_progress',
             paths: {
               task: 'tasks/tasks-1001-active-task.md'
+            }
+          },
+          {
+            id: '1002',
+            title: 'Still active task with a succeeded gate',
+            status: 'in_progress',
+            gate: {
+              status: 'succeeded',
+              run_id: '2026-04-10T02-03-04-000Z-activegate1'
+            },
+            paths: {
+              task: 'tasks/tasks-1002-still-active-task.md'
             }
           }
         ]
@@ -77,11 +85,18 @@ async function initRepository(): Promise<string> {
   await writeFile(
     join(repo, 'docs', 'TASKS.md'),
     [
-      '# Task List Snapshot - Completed linear archive candidate (linear-6ed6ef11-538e-48f0-936c-8547632bf92e)',
+      `# Task List Snapshot - Completed linear archive candidate (linear-6ed6ef11-538e-48f0-936c-8547632bf92e) - Update ${completedAt}: completed`,
+      '',
+      '<!-- docs-sync:begin linear-6ed6ef11-538e-48f0-936c-8547632bf92e -->',
+      '## Checklist Mirror',
+      '- [x] archived by proactive reserve restoration.',
+      '<!-- docs-sync:end linear-6ed6ef11-538e-48f0-936c-8547632bf92e -->',
       '',
       `<!-- tasks-archive-index:begin --> ## Archive index - archived task snapshots live on the task-archives branch. ${archiveYear}: https://github.com/example/repo/blob/task-archives/docs/TASKS-archive-${archiveYear}.md <!-- tasks-archive-index:end -->`,
       '',
       '# Task List Snapshot - Active numeric task (1001-active-task)',
+      '',
+      '# Task List Snapshot - Still active task with a succeeded gate (1002-still-active-task)',
       ''
     ].join('\n')
   );
@@ -90,7 +105,7 @@ async function initRepository(): Promise<string> {
 }
 
 describe('tasks-archive script', () => {
-  it('archives completed linear snapshots and keeps the active snapshot in docs/TASKS.md', async () => {
+  it('archives completed linear snapshots proactively once reserve headroom is exhausted', async () => {
     const repo = await initRepository();
 
     await execFileAsync('node', [scriptPath, '--out', 'docs/TASKS-archive-YYYY.md'], {
@@ -109,8 +124,11 @@ describe('tasks-archive script', () => {
     );
 
     expect(tasksContent).toContain('1001-active-task');
+    expect(tasksContent).toContain('1002-still-active-task');
     expect(tasksContent).not.toContain('linear-6ed6ef11-538e-48f0-936c-8547632bf92e');
     expect(archiveContent).toContain('linear-6ed6ef11-538e-48f0-936c-8547632bf92e');
+    expect(archiveContent).toContain('<!-- docs-sync:begin linear-6ed6ef11-538e-48f0-936c-8547632bf92e -->');
+    expect(archiveContent).not.toContain('1002-still-active-task');
     expect(archiveContent).toContain('Task Archive');
   });
 });
