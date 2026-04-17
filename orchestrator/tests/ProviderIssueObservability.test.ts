@@ -1849,6 +1849,62 @@ describe('provider issue observability', () => {
     });
   });
 
+  it('does not let fallback-only claim rewrites suppress live merge closeout truth after Rework', () => {
+    const snapshot = buildProviderIssueDebugSnapshot({
+      claim: {
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        updated_at: '2026-04-05T07:05:00.000Z',
+        issue_state: 'Rework',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-05T07:00:00.000Z',
+        run_id: 'run-82-fallback-rework',
+        merge_closeout: {
+          recorded_at: '2026-04-05T07:02:00.000Z',
+          issue_updated_at: '2026-04-05T07:02:00.000Z',
+          status: 'watching',
+          reason: 'checks_pending',
+          summary: 'Waiting for required checks before merge.',
+          attached_pr_urls: ['https://github.com/asabeko/CO/pull/82'],
+          pr: {
+            url: 'https://github.com/asabeko/CO/pull/82',
+            owner: 'asabeko',
+            repo: 'CO',
+            number: 82
+          },
+          snapshot: {
+            review_decision: 'APPROVED',
+            merge_state_status: 'BLOCKED',
+            ready_to_merge: false,
+            gate_reasons: ['required_checks_pending'],
+            action_required_reasons: [],
+            unresolved_thread_count: 0,
+            checks_pending: 2,
+            checks_failed: 0,
+            required_checks_pending: 2,
+            required_checks_failed: 0,
+            updated_at: '2026-04-05T07:02:00.000Z',
+            merged_at: null
+          }
+        }
+      },
+      proof: null
+    });
+
+    expect(snapshot).toMatchObject({
+      pull_request: {
+        number: 82,
+        required_checks_pending: 2
+      },
+      progress: {
+        kind: 'merge_closeout',
+        status: 'waiting',
+        stall_classification: 'waiting_on_checks',
+        recovery_recommendation: 'wait_for_checks'
+      }
+    });
+  });
+
   it('surfaces skipped shared-root reconciliation as pending after merge closeout', () => {
     const snapshot = buildProviderIssueDebugSnapshot({
       tracked_issue: {

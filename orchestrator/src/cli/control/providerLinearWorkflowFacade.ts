@@ -2,6 +2,7 @@ import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, join, resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { fetchPrStatusSnapshot } from '../../../../scripts/lib/pr-watch-merge.js';
 import {
   executeLinearGraphql,
   resolveLinearApiToken,
@@ -22,6 +23,7 @@ import { mapLinearRateLimitedFailure } from './linearRateLimit.js';
 import { resolveLinearSourceSetup } from './linearDispatchSource.js';
 import { resolveProviderLinearAuditPath } from './providerLinearWorkflowAudit.js';
 import {
+  classifyProviderLinearWorkflowState,
   isProviderLinearTerminalReopenTransition,
   normalizeProviderLinearWorkflowState
 } from './providerLinearWorkflowStates.js';
@@ -292,6 +294,13 @@ export interface ProviderLinearWorkflowAttachment {
   source_type: string | null;
 }
 
+export interface ProviderLinearIssuePullRequestAttachments {
+  current: ProviderLinearWorkflowAttachment | null;
+  historical: ProviderLinearWorkflowAttachment[];
+  conflicting: ProviderLinearWorkflowAttachment[];
+  unknown: ProviderLinearWorkflowAttachment[];
+}
+
 export interface ProviderLinearEmbeddedAsset {
   original_reference: string;
   resolved_path: string;
@@ -357,6 +366,7 @@ export interface ProviderLinearIssueContext {
   } | null;
   comments: ProviderLinearWorkflowComment[];
   attachments: ProviderLinearWorkflowAttachment[];
+  pull_request_attachments: ProviderLinearIssuePullRequestAttachments;
   workpad_comment: ProviderLinearWorkflowComment | null;
 }
 
@@ -774,6 +784,12 @@ export async function getProviderLinearIssueContext(input: {
   sourceSetup?: DispatchPilotSourceSetup | null;
   fallbackToCacheOnFailure?: boolean;
   allowReadOnlyCacheReuse?: boolean;
+  resolvePullRequestSnapshot?: (input: {
+    owner: string;
+    repo: string;
+    prNumber: number;
+    readinessMode?: 'merge' | 'review';
+  }) => Promise<unknown>;
   env?: NodeJS.ProcessEnv;
   fetchImpl?: typeof fetch;
 }): Promise<ProviderLinearIssueContextResult> {
@@ -846,11 +862,15 @@ export async function getProviderLinearIssueContext(input: {
     return failureFromWorkflowError('issue-context', context.error);
   }
 
-  await writeCachedIssueContextRecord(input.env, context.issue, session.session.sourceSetup);
+  const issue = await hydrateIssuePullRequestAttachments(
+    context.issue,
+    input.resolvePullRequestSnapshot ?? fetchPrStatusSnapshot
+  );
+  await writeCachedIssueContextRecord(input.env, issue, session.session.sourceSetup);
   return {
     ok: true,
     operation: 'issue-context',
-    issue: context.issue,
+    issue,
     source_setup: session.session.sourceSetup
   };
 }
@@ -859,6 +879,255 @@ function shouldFallbackToCachedIssueContextFromWorkflowError(
   error: ProviderLinearWorkflowError
 ): boolean {
   return error.code === 'linear_rate_limited';
+}
+
+function buildEmptyIssuePullRequestAttachments(): ProviderLinearIssuePullRequestAttachments {
+  return {
+    current: null,
+    historical: [],
+    conflicting: [],
+    unknown: []
+  };
+}
+
+interface ProviderLinearIssuePullRequestCandidate {
+  attachment: ProviderLinearWorkflowAttachment;
+  snapshot: {
+    state: string | null;
+    merged_at: string | null;
+    updated_at: string | null;
+  };
+}
+
+async function hydrateIssuePullRequestAttachments(
+  issue: ProviderLinearIssueContext,
+  resolvePullRequestSnapshot: (input: {
+    owner: string;
+    repo: string;
+    prNumber: number;
+    readinessMode?: 'merge' | 'review';
+  }) => Promise<unknown>
+): Promise<ProviderLinearIssueContext> {
+  const seenComparisonKeys = new Set<string>();
+  const pullRequestAttachments = issue.attachments.flatMap((attachment) => {
+    const parsed = parseGitHubPullRequestUrl(attachment.url);
+    if (!parsed || seenComparisonKeys.has(parsed.comparisonKey)) {
+      return [];
+    }
+    seenComparisonKeys.add(parsed.comparisonKey);
+    return parsed
+      ? [{
+          attachment,
+          owner: parsed.owner,
+          repo: parsed.repo,
+          prNumber: parsed.number
+        }]
+      : [];
+  });
+  if (pullRequestAttachments.length === 0) {
+    return {
+      ...issue,
+      pull_request_attachments: buildEmptyIssuePullRequestAttachments()
+    };
+  }
+
+  const resolved: ProviderLinearIssuePullRequestCandidate[] = [];
+  const unknown: ProviderLinearWorkflowAttachment[] = [];
+  for (const candidate of pullRequestAttachments) {
+    try {
+      const rawSnapshot = await resolvePullRequestSnapshot({
+        owner: candidate.owner,
+        repo: candidate.repo,
+        prNumber: candidate.prNumber,
+        readinessMode: 'merge'
+      });
+      const snapshot = mapIssuePullRequestAttachmentSnapshot(rawSnapshot);
+      if (!snapshot) {
+        unknown.push(candidate.attachment);
+        continue;
+      }
+      resolved.push({
+        attachment: candidate.attachment,
+        snapshot
+      });
+    } catch {
+      unknown.push(candidate.attachment);
+    }
+  }
+
+  return {
+    ...issue,
+    pull_request_attachments: classifyIssuePullRequestAttachments(issue, resolved, unknown)
+  };
+}
+
+function mapIssuePullRequestAttachmentSnapshot(
+  value: unknown
+): ProviderLinearIssuePullRequestCandidate['snapshot'] | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  return {
+    state: normalizeOptionalString(record.state as string | null | undefined),
+    merged_at: normalizeOptionalString(
+      (record.mergedAt ?? record.merged_at) as string | null | undefined
+    ),
+    updated_at: normalizeOptionalString(
+      (record.updatedAt ?? record.updated_at) as string | null | undefined
+    )
+  };
+}
+
+function classifyIssuePullRequestAttachments(
+  issue: ProviderLinearIssueContext,
+  resolved: ProviderLinearIssuePullRequestCandidate[],
+  unknown: ProviderLinearWorkflowAttachment[]
+): ProviderLinearIssuePullRequestAttachments {
+  if (resolved.length === 0) {
+    return {
+      ...buildEmptyIssuePullRequestAttachments(),
+      unknown: [...unknown]
+    };
+  }
+  const workflowState = classifyProviderLinearWorkflowState({
+    state: issue.state?.name ?? null,
+    state_type: issue.state?.type ?? null
+  });
+  const terminal = resolved.filter((candidate) => isIssuePullRequestSnapshotTerminal(candidate.snapshot));
+  const active = resolved.filter((candidate) => !isIssuePullRequestSnapshotTerminal(candidate.snapshot));
+  if (workflowState.normalizedState === 'merging') {
+    const mergingSelection = selectCurrentMergingPullRequestAttachment(resolved);
+    if (mergingSelection) {
+      return {
+        current: mergingSelection.current.attachment,
+        historical: mergingSelection.historical.map((candidate) => candidate.attachment),
+        conflicting: mergingSelection.conflicting.map((candidate) => candidate.attachment),
+        unknown: [...unknown]
+      };
+    }
+  }
+  if (workflowState.normalizedState !== 'merging' && active.length === 1) {
+    return {
+      current: active[0]!.attachment,
+      historical: terminal.map((candidate) => candidate.attachment),
+      conflicting: [],
+      unknown: [...unknown]
+    };
+  }
+  if (active.length === 0) {
+    if (workflowState.normalizedState !== 'rework') {
+      const terminalSelection = selectCurrentMergingPullRequestAttachment(resolved);
+      if (terminalSelection) {
+        return {
+          current: terminalSelection.current.attachment,
+          historical: terminalSelection.historical.map((candidate) => candidate.attachment),
+          conflicting: terminalSelection.conflicting.map((candidate) => candidate.attachment),
+          unknown: [...unknown]
+        };
+      }
+    }
+    return {
+      current: null,
+      historical: terminal.map((candidate) => candidate.attachment),
+      conflicting: [],
+      unknown: [...unknown]
+    };
+  }
+  return {
+    current: null,
+    historical: terminal.map((candidate) => candidate.attachment),
+    conflicting: active.map((candidate) => candidate.attachment),
+    unknown: [...unknown]
+  };
+}
+
+function selectCurrentMergingPullRequestAttachment(
+  candidates: ProviderLinearIssuePullRequestCandidate[]
+): {
+  current: ProviderLinearIssuePullRequestCandidate;
+  historical: ProviderLinearIssuePullRequestCandidate[];
+  conflicting: ProviderLinearIssuePullRequestCandidate[];
+} | null {
+  const terminal = candidates.filter((candidate) => isIssuePullRequestSnapshotTerminal(candidate.snapshot));
+  const active = candidates.filter((candidate) => !isIssuePullRequestSnapshotTerminal(candidate.snapshot));
+  if (active.length === 1) {
+    const current = active[0]!;
+    const historical = terminal.filter((candidate) =>
+      isIssuePullRequestSnapshotStrictlyOlderThanSelection(candidate.snapshot, current.snapshot)
+    );
+    const conflicting = candidates.filter(
+      (candidate) => candidate.attachment.id !== current.attachment.id && !historical.includes(candidate)
+    );
+    if (conflicting.length === 0) {
+      return {
+        current,
+        historical,
+        conflicting: []
+      };
+    }
+  }
+  const newestTerminal = terminal.reduce<ProviderLinearIssuePullRequestCandidate | null>(
+    (currentNewest, candidate) =>
+      !currentNewest ||
+      isIssuePullRequestSnapshotStrictlyOlderThanSelection(currentNewest.snapshot, candidate.snapshot)
+        ? candidate
+        : currentNewest,
+    null
+  );
+  if (!newestTerminal) {
+    return null;
+  }
+  const historical = candidates.filter(
+    (candidate) =>
+      candidate.attachment.id !== newestTerminal.attachment.id &&
+      isIssuePullRequestSnapshotStrictlyOlderThanSelection(candidate.snapshot, newestTerminal.snapshot)
+  );
+  const conflicting = candidates.filter(
+    (candidate) => candidate.attachment.id !== newestTerminal.attachment.id && !historical.includes(candidate)
+  );
+  if (conflicting.length > 0) {
+    return null;
+  }
+  return {
+    current: newestTerminal,
+    historical,
+    conflicting: []
+  };
+}
+
+function isIssuePullRequestSnapshotTerminal(snapshot: {
+  state: string | null;
+  merged_at: string | null;
+}): boolean {
+  return snapshot.merged_at !== null || snapshot.state === 'MERGED' || snapshot.state === 'CLOSED';
+}
+
+function isIssuePullRequestSnapshotStrictlyOlderThanSelection(
+  candidate: {
+    merged_at: string | null;
+    updated_at: string | null;
+  },
+  selected: {
+    merged_at: string | null;
+    updated_at: string | null;
+  }
+): boolean {
+  const candidateTimestamp = resolveIssuePullRequestSnapshotTimestamp(candidate);
+  const selectedTimestamp = resolveIssuePullRequestSnapshotTimestamp(selected);
+  if (candidateTimestamp === null || selectedTimestamp === null) {
+    return false;
+  }
+  return candidateTimestamp < selectedTimestamp;
+}
+
+function resolveIssuePullRequestSnapshotTimestamp(snapshot: {
+  merged_at: string | null;
+  updated_at: string | null;
+}): number | null {
+  const preferredTimestamp = snapshot.merged_at ?? snapshot.updated_at;
+  const parsed = Date.parse(preferredTimestamp ?? '');
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 export async function upsertProviderLinearWorkpadComment(input: {
@@ -3180,6 +3449,9 @@ function shouldReuseCachedIssueContextForRead(
   record: ProviderLinearIssueContextCacheRecord,
   budget: LinearBudgetStatus | null
 ): boolean {
+  if (issueContextCacheRecordCarriesLivePrTruth(record.issue)) {
+    return false;
+  }
   if (!budget || budget.cooldown_active) {
     return false;
   }
@@ -3194,6 +3466,26 @@ function shouldReuseCachedIssueContextForRead(
     return false;
   }
   return isIssueContextCacheRecordFresh(record, PROVIDER_LINEAR_LOW_HEADROOM_READ_CACHE_MAX_AGE_MS);
+}
+
+function issueContextCacheRecordCarriesLivePrTruth(issue: ProviderLinearIssueContext): boolean {
+  if (
+    issue.pull_request_attachments.current
+    || issue.pull_request_attachments.conflicting.length > 0
+    || issue.pull_request_attachments.unknown.length > 0
+  ) {
+    return true;
+  }
+  if (issue.pull_request_attachments.historical.length > 0) {
+    return false;
+  }
+  if (issue.attachments.some((attachment) => parseGitHubPullRequestUrl(attachment.url))) {
+    return true;
+  }
+  return classifyProviderLinearWorkflowState({
+    state: issue.state?.name ?? null,
+    state_type: issue.state?.type ?? null
+  }).normalizedState === 'merging';
 }
 
 async function writeCachedIssueContextRecord(
@@ -3344,6 +3636,9 @@ function parseCachedIssueContext(value: unknown): ProviderLinearIssueContext | n
   const project = parseCachedIssueProject(issue.project);
   const comments = parseCachedIssueComments(issue.comments);
   const attachments = parseCachedIssueAttachments(issue.attachments);
+  const pullRequestAttachments = parseCachedIssuePullRequestAttachments(
+    issue.pull_request_attachments
+  );
   if (!id || !identifier || !title || comments === null || attachments === null) {
     return null;
   }
@@ -3354,6 +3649,13 @@ function parseCachedIssueContext(value: unknown): ProviderLinearIssueContext | n
     return null;
   }
   if (issue.project !== undefined && issue.project !== null && project === null) {
+    return null;
+  }
+  if (
+    issue.pull_request_attachments !== undefined &&
+    issue.pull_request_attachments !== null &&
+    pullRequestAttachments === null
+  ) {
     return null;
   }
 
@@ -3377,6 +3679,7 @@ function parseCachedIssueContext(value: unknown): ProviderLinearIssueContext | n
     project,
     comments,
     attachments,
+    pull_request_attachments: pullRequestAttachments ?? buildEmptyIssuePullRequestAttachments(),
     workpad_comment: workpadComment
   };
 }
@@ -3486,6 +3789,47 @@ function parseCachedAttachment(value: unknown): ProviderLinearWorkflowAttachment
     url: normalizeOptionalString(record.url as string | null | undefined),
     source_type: normalizeOptionalString(record.source_type as string | null | undefined)
   };
+}
+
+function parseCachedIssuePullRequestAttachments(
+  value: unknown
+): ProviderLinearIssuePullRequestAttachments | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const current =
+    record.current === null
+      ? null
+      : record.current === undefined
+        ? null
+        : parseCachedAttachment(record.current);
+  const historical = parseOptionalCachedAttachmentArray(record.historical);
+  const conflicting = parseOptionalCachedAttachmentArray(record.conflicting);
+  const unknown = parseOptionalCachedAttachmentArray(record.unknown);
+  if (
+    (record.current !== undefined && record.current !== null && current === null) ||
+    historical === null ||
+    conflicting === null ||
+    unknown === null
+  ) {
+    return null;
+  }
+  return {
+    current,
+    historical,
+    conflicting,
+    unknown
+  };
+}
+
+function parseOptionalCachedAttachmentArray(
+  value: unknown
+): ProviderLinearWorkflowAttachment[] | null {
+  if (value === undefined || value === null) {
+    return [];
+  }
+  return parseCachedIssueAttachments(value);
 }
 
 function parseCachedIssueWorkpadComment(
@@ -3962,6 +4306,7 @@ function parseIssueContext(
                 .map((entry) => parseAttachment(entry))
                 .filter((entry): entry is ProviderLinearWorkflowAttachment => entry !== null)
             : [],
+      pull_request_attachments: buildEmptyIssuePullRequestAttachments(),
       workpad_comment: workpadComment
     }
   };
@@ -6132,6 +6477,9 @@ function parseGitHubPullRequestUrl(
 ): {
   canonicalUrl: string;
   comparisonKey: string;
+  owner: string;
+  repo: string;
+  number: number;
 } | null {
   const normalized = normalizeOptionalString(value);
   if (!normalized) {
@@ -6159,7 +6507,10 @@ function parseGitHubPullRequestUrl(
 
   return {
     canonicalUrl: `https://github.com/${owner}/${repo}/pull/${pullNumber}`,
-    comparisonKey: `https://github.com/${owner.toLowerCase()}/${repo.toLowerCase()}/pull/${pullNumber}`
+    comparisonKey: `https://github.com/${owner.toLowerCase()}/${repo.toLowerCase()}/pull/${pullNumber}`,
+    owner,
+    repo,
+    number: Number(pullNumber)
   };
 }
 
