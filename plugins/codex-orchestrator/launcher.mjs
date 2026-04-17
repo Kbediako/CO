@@ -2,6 +2,7 @@
 
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync, writeSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join } from 'node:path';
 import process from 'node:process';
@@ -9,6 +10,8 @@ import process from 'node:process';
 const FORWARDABLE_SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP'];
 const MARKETPLACE_NAME = 'codex-orchestrator';
 const MARKETPLACE_SECTION = `[marketplaces.${MARKETPLACE_NAME}]`;
+const require = createRequire(import.meta.url);
+const toml = require('@iarna/toml');
 
 function main() {
   const sourceRoot = resolveMarketplaceSourceRoot();
@@ -59,7 +62,7 @@ function resolveMarketplaceSourceRoot() {
   }
 
   const raw = readFileSync(configPath, 'utf8');
-  const marketplaceConfig = readMarketplaceConfig(raw);
+  const marketplaceConfig = readMarketplaceConfig(raw, configPath);
   const source = marketplaceConfig?.source;
   const sourceType = marketplaceConfig?.sourceType;
   if (!source) {
@@ -108,32 +111,20 @@ function resolveCodexPaths() {
   };
 }
 
-function readMarketplaceConfig(rawConfig) {
-  let inMarketplaceSection = false;
-  let source = null;
-  let sourceType = null;
-  for (const line of rawConfig.split(/\r?\n/u)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) {
-      continue;
-    }
-    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-      inMarketplaceSection = trimmed === MARKETPLACE_SECTION;
-      continue;
-    }
-    if (!inMarketplaceSection) {
-      continue;
-    }
-    const sourceMatch = trimmed.match(/^source\s*=\s*"((?:[^"\\]|\\.)*)"\s*$/u);
-    if (sourceMatch) {
-      source = JSON.parse(`"${sourceMatch[1]}"`);
-      continue;
-    }
-    const sourceTypeMatch = trimmed.match(/^source_type\s*=\s*"((?:[^"\\]|\\.)*)"\s*$/u);
-    if (sourceTypeMatch) {
-      sourceType = JSON.parse(`"${sourceTypeMatch[1]}"`);
-    }
+function readMarketplaceConfig(rawConfig, configPath) {
+  let parsedConfig;
+  try {
+    parsedConfig = toml.parse(rawConfig);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`Unable to parse Codex config at ${configPath}: ${detail}`);
   }
+  const marketplaceConfig = parsedConfig?.marketplaces?.[MARKETPLACE_NAME];
+  if (!marketplaceConfig || typeof marketplaceConfig !== 'object') {
+    return null;
+  }
+  const source = normalizeOptionalString(marketplaceConfig.source);
+  const sourceType = normalizeOptionalString(marketplaceConfig.source_type ?? marketplaceConfig.sourceType);
   if (!source && !sourceType) {
     return null;
   }
