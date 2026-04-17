@@ -2586,6 +2586,81 @@ describe('runProviderLinearChildLaneShell', () => {
     );
   });
 
+  it('fails closed without retiring the live reservation when the only recovered run is already finalized in the ledger', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const launchingLane = createLaneRecord({
+      run_id: 'launching-stale-5',
+      status: 'launching',
+      manifest_path: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'launching-stale-5', 'manifest.json'),
+      artifact_root: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'launching-stale-5'),
+      log_path: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'launching-stale-5', 'run.log'),
+      summary: 'Child lane reserved before child run startup.',
+      lane_workspace_path: null,
+      patch_artifact_path: null,
+      patch_bytes: null
+    });
+    const finalizedLane = createLaneRecord({
+      run_id: 'child-run-existing',
+      manifest_path: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-existing', 'manifest.json'),
+      artifact_root: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-existing'),
+      log_path: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-existing', 'run.log'),
+      decision: 'rejected',
+      decision_at: '2026-03-30T07:13:00.000Z',
+      decision_reason: 'Older child lane was already rejected.'
+    });
+    await appendProviderLinearWorkerChildLaneRecord(runDir, finalizedLane);
+    await appendProviderLinearWorkerChildLaneRecord(runDir, launchingLane);
+    await writeChildLaneManifest(finalizedLane);
+    await writeChildLaneProof(finalizedLane);
+    const applyPatchArtifact = vi.fn(async () => undefined);
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'accept',
+        streamName: launchingLane.stream,
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        applyPatchArtifact,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
+        readParentHeadSha: vi.fn(async () => launchingLane.parent_snapshot.base_sha),
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: launchingLane.parent_snapshot.issue_updated_at,
+          state: launchingLane.parent_snapshot.issue_state,
+          state_type: launchingLane.parent_snapshot.issue_state_type
+        })) as never,
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'accept',
+      error: {
+        code: 'provider_worker_child_lane_not_ready',
+        status: 409
+      }
+    });
+    expect(applyPatchArtifact).not.toHaveBeenCalled();
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          run_id: launchingLane.run_id,
+          decision: 'pending',
+          status: 'launching'
+        }),
+        expect.objectContaining({
+          run_id: finalizedLane.run_id,
+          decision: 'rejected',
+          decision_reason: 'Older child lane was already rejected.'
+        })
+      ])
+    );
+  });
+
   it('accepts a non-stale child lane rooted under an in-repo custom runs directory', async () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
     const childLane = createLaneRecord({

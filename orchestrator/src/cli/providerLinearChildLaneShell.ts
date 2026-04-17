@@ -1446,6 +1446,9 @@ async function repairPendingLaunchingChildLaneDecisionTarget(input: {
     return null;
   }
   const existingCandidate = withRetiredReservation.find((entry) => matchesChildLaneRecordIdentity(entry, candidate)) ?? null;
+  if (existingCandidate && existingCandidate.decision !== 'pending') {
+    return null;
+  }
   const repairedTarget = existingCandidate
     ? mergeCompletedChildLaneWithParentDecision(existingCandidate, candidate)
     : candidate;
