@@ -27,6 +27,32 @@
       }
     },
     {
+      "id": "20260418-linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5",
+      "title": "CO appserver child lanes stall after runtime selection and leave the parent blocked on a synthetic launching reservation",
+      "relates_to": "tasks/tasks-linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5-docs-packet/cli/2026-04-17T18-52-06-926Z-75ac64a4/manifest.json",
+          "source_anchor": "ctx:sha256:b7611a224cd777bffc38c866661c0a8d2cdaf4f31619cac8fd78150f5b46cbea#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-224 as the pre-startup appserver child-lane stall seam where runtime selection completed but no real child startup proof exists yet, leaving the parent blocked on a synthetic launching reservation. Parent-owned implementation, validation, Linear/workpad reconciliation, PR, and merge remain out of scope for this child patch."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5.md",
+        "task": "tasks/tasks-linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5.md",
+        "agent_task": ".agent/task/linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5.md",
+        "docs": "docs/TECH_SPEC-linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5.md"
+      }
+    },
+    {
       "id": "20260417-linear-5f3bf177-0fa7-4378-9438-5dcaf7919394",
       "title": "CO workflow restore docs/TASKS headroom and make task archiving proactive",
       "relates_to": "tasks/tasks-linear-5f3bf177-0fa7-4378-9438-5dcaf7919394.md",

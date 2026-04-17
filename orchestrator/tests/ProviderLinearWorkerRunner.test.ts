@@ -2519,6 +2519,113 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     }
   });
 
+  it('waits for close instead of timing out when abort fires after child exit', async () => {
+    vi.resetModules();
+    const stdout = new PassThrough();
+    const stderr = new PassThrough();
+    const kill = vi.fn(() => true);
+    const fakeChild = Object.assign(new EventEmitter(), {
+      stdout,
+      stderr,
+      kill,
+      killed: false,
+      exitCode: null,
+      signalCode: null
+    }) as unknown as ChildProcess;
+    const actualChildProcess = await vi.importActual<typeof import('node:child_process')>('node:child_process');
+    vi.doMock('node:child_process', () => ({
+      ...actualChildProcess,
+      spawn: vi.fn(() => fakeChild)
+    }));
+
+    try {
+      const { defaultExecRunner } = await import('../src/cli/providerLinearWorkerRunner.js');
+      const controller = new AbortController();
+      const resultPromise = defaultExecRunner({
+        command: 'codex',
+        args: ['exec'],
+        cwd: tempRoot ?? process.cwd(),
+        env: {},
+        mirrorOutput: false,
+        abortSignal: controller.signal
+      });
+
+      stdout.end('stdout-before-close');
+      stderr.end('stderr-before-close');
+      fakeChild.exitCode = 0;
+      fakeChild.emit('exit', 0);
+      controller.abort(new Error('startup timeout'));
+
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(kill).not.toHaveBeenCalled();
+
+      fakeChild.emit('close', 0);
+      await expect(resultPromise).resolves.toEqual({
+        exitCode: 0,
+        stdout: 'stdout-before-close',
+        stderr: 'stderr-before-close'
+      });
+    } finally {
+      vi.doUnmock('node:child_process');
+      vi.resetModules();
+    }
+  });
+
+  it('waits for close before rejecting when abort kills a still-running child', async () => {
+    vi.resetModules();
+    const stdout = new PassThrough();
+    const stderr = new PassThrough();
+    const kill = vi.fn(() => true);
+    const fakeChild = Object.assign(new EventEmitter(), {
+      stdout,
+      stderr,
+      kill,
+      killed: false,
+      exitCode: null,
+      signalCode: null
+    }) as unknown as ChildProcess;
+    const actualChildProcess = await vi.importActual<typeof import('node:child_process')>('node:child_process');
+    vi.doMock('node:child_process', () => ({
+      ...actualChildProcess,
+      spawn: vi.fn(() => fakeChild)
+    }));
+
+    try {
+      const { defaultExecRunner } = await import('../src/cli/providerLinearWorkerRunner.js');
+      const controller = new AbortController();
+      let settled = false;
+      const resultPromise = defaultExecRunner({
+        command: 'codex',
+        args: ['exec'],
+        cwd: tempRoot ?? process.cwd(),
+        env: {},
+        mirrorOutput: false,
+        abortSignal: controller.signal
+      });
+      void resultPromise.then(
+        () => {
+          settled = true;
+        },
+        () => {
+          settled = true;
+        }
+      );
+
+      controller.abort(new Error('startup timeout'));
+
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(kill).toHaveBeenCalledTimes(1);
+      expect(settled).toBe(false);
+
+      fakeChild.signalCode = 'SIGTERM';
+      fakeChild.emit('close', null);
+      await expect(resultPromise).rejects.toThrow('startup timeout');
+    } finally {
+      vi.doUnmock('node:child_process');
+      vi.resetModules();
+    }
+  });
+
   it('continues on the same thread across turns and writes a proof sidecar', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
     const readTrackedIssue = vi
