@@ -1,6 +1,32 @@
 {
   "items": [
     {
+      "id": "20260418-linear-7896d3c1-7a62-4b79-97df-a71984fab5b2",
+      "title": "CO: stop synthesizing Guardrails spec-guard command not found when no spec-guard stage exists",
+      "relates_to": "tasks/tasks-linear-7896d3c1-7a62-4b79-97df-a71984fab5b2.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-7896d3c1-7a62-4b79-97df-a71984fab5b2-docs-packet/cli/2026-04-17T20-05-40-785Z-50e95ea9/manifest.json",
+          "source_anchor": "ctx:sha256:55b1fe17233f9cfdd4784c7f69c01c4db4680de408150700c8ab551971417abc#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-225 as a narrow false-runtime-synthesis lane: `Guardrails: spec-guard command not found.` must not be synthesized when no `spec-guard` stage exists, and the same applicability truth must carry across manifest summaries, metrics closeout, provider issue observability, and retry truth without generic guardrail redesign, unrelated scheduler/provider changes, or docs-only reinterpretation. The expected shared source payload was absent in this child checkout, so the packet is anchored on the protected issue wording plus current repo seams in run/manifest.ts, metrics/metricsRecorder.ts, providerIssueObservability.ts, providerIssueHandoff.ts, selectedRunProjection.ts, controlRuntime.ts, and providerLinearWorkerRunner.ts; parent owns implementation, validation, Linear state, workpad, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-7896d3c1-7a62-4b79-97df-a71984fab5b2.md",
+        "task": "tasks/tasks-linear-7896d3c1-7a62-4b79-97df-a71984fab5b2.md",
+        "agent_task": ".agent/task/linear-7896d3c1-7a62-4b79-97df-a71984fab5b2.md",
+        "docs": "docs/TECH_SPEC-linear-7896d3c1-7a62-4b79-97df-a71984fab5b2.md"
+      }
+    },
+    {
       "id": "20260418-linear-8f8b9b94-41fe-46c3-93fc-0a2c28efc58c",
       "title": "Control host: reconcile resumed provider-worker retry acceptance and CO STATUS truth after a failed prior attempt",
       "relates_to": "tasks/tasks-linear-8f8b9b94-41fe-46c3-93fc-0a2c28efc58c.md",

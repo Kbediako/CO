@@ -8,7 +8,8 @@ import {
   buildGuardrailSummary,
   ensureGuardrailStatus,
   loadManifest,
-  recordResumeEvent
+  recordResumeEvent,
+  upsertGuardrailSummary
 } from '../src/cli/run/manifest.js';
 import { readRunSource0Payload } from '../src/cli/run/source0.js';
 import type { EnvironmentPaths } from '../src/cli/run/environment.js';
@@ -1621,6 +1622,39 @@ describe('loadManifest', () => {
 });
 
 describe('buildGuardrailSummary', () => {
+  it('reports when spec-guard is not configured for the pipeline', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-guardrail-not-configured-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'guardrail-task'
+    };
+
+    const pipeline: PipelineDefinition = {
+      id: 'guardrail-pipeline',
+      title: 'Guardrail Pipeline',
+      guardrailsRequired: false,
+      stages: []
+    };
+
+    const { manifest } = await bootstrapManifest('run-guardrail-not-configured', {
+      env,
+      pipeline,
+      parentRunId: null,
+      taskSlug: null,
+      approvalPolicy: null
+    });
+
+    const summary = buildGuardrailSummary(manifest);
+    expect(summary).toBe('Guardrails: spec-guard not configured for this pipeline.');
+
+    const snapshot = ensureGuardrailStatus(manifest);
+    expect(snapshot.recommendation).toBeNull();
+    expect(snapshot.counts.total).toBe(0);
+    expect(snapshot.present).toBe(false);
+  });
+
   it('treats explicit spec-guard skip summaries as skipped', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-guardrail-skip-'));
     const env: EnvironmentPaths = {
@@ -1658,5 +1692,71 @@ describe('buildGuardrailSummary', () => {
     expect(snapshot.counts.skipped).toBe(1);
     expect(snapshot.counts.succeeded).toBe(0);
     expect(snapshot.present).toBe(false);
+  });
+
+  it('preserves real failure summaries when guardrails are not configured', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-guardrail-summary-preserve-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'guardrail-task'
+    };
+
+    const pipeline: PipelineDefinition = {
+      id: 'guardrail-pipeline',
+      title: 'Guardrail Pipeline',
+      guardrailsRequired: false,
+      stages: []
+    };
+
+    const { manifest } = await bootstrapManifest('run-guardrail-summary-preserve', {
+      env,
+      pipeline,
+      parentRunId: null,
+      taskSlug: null,
+      approvalPolicy: null
+    });
+
+    manifest.summary = "Stage 'fail once' failed with exit code 1.";
+    upsertGuardrailSummary(manifest);
+
+    expect(manifest.summary).toBe("Stage 'fail once' failed with exit code 1.");
+    expect(buildGuardrailSummary(manifest)).toBe(
+      'Guardrails: spec-guard not configured for this pipeline.'
+    );
+  });
+
+  it('strips stale guardrail recommendations when guardrails are not configured', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-guardrail-recommendation-strip-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'guardrail-task'
+    };
+
+    const pipeline: PipelineDefinition = {
+      id: 'guardrail-pipeline',
+      title: 'Guardrail Pipeline',
+      guardrailsRequired: false,
+      stages: []
+    };
+
+    const { manifest } = await bootstrapManifest('run-guardrail-recommendation-strip', {
+      env,
+      pipeline,
+      parentRunId: null,
+      taskSlug: null,
+      approvalPolicy: null
+    });
+
+    manifest.summary =
+      "Stage 'fail once' failed with exit code 1.\n" +
+      'Guardrail command missing; run "codex-orchestrator start diagnostics --approval-policy never --format json --no-interactive" to capture reviewer diagnostics.';
+
+    upsertGuardrailSummary(manifest);
+
+    expect(manifest.summary).toBe("Stage 'fail once' failed with exit code 1.");
   });
 });
