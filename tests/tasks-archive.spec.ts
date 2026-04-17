@@ -118,7 +118,15 @@ async function initRepository(options?: {
 
 describe('tasks-archive script', () => {
   it('archives completed linear snapshots proactively once reserve headroom is exhausted', async () => {
-    const repo = await initRepository();
+    const repo = await initRepository({
+      maxLines: 13,
+      reserveLines: 2
+    });
+
+    const preArchiveTasksContent = await readFile(join(repo, 'docs', 'TASKS.md'), 'utf8');
+    const preArchiveLineCount = preArchiveTasksContent.trimEnd().split('\n').length;
+    expect(preArchiveLineCount).toBeGreaterThan(11);
+    expect(preArchiveLineCount).toBeLessThanOrEqual(13);
 
     await execFileAsync('node', [scriptPath, '--out', 'docs/TASKS-archive-YYYY.md'], {
       cwd: repo,
@@ -596,10 +604,12 @@ describe('tasks-archive script', () => {
       }
     });
 
+    const tasksContent = await readFile(join(repo, 'docs', 'TASKS.md'), 'utf8');
     const archiveContent = await readFile(existingArchivePath, 'utf8');
     const archiveMatches =
       archiveContent.match(/linear-6ed6ef11-538e-48f0-936c-8547632bf92e/g)?.length ?? 0;
 
+    expect(tasksContent).not.toContain('linear-6ed6ef11-538e-48f0-936c-8547632bf92e');
     expect(archiveMatches).toBe(1);
   });
 
