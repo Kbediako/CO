@@ -1294,18 +1294,31 @@ function resolveProviderLinearWorkerRateLimitsRecordedAt(
   proof: NonNullable<ControlCompatibilitySourceContext['providerLinearWorkerProof']>,
   source: NonNullable<ControlCompatibilityRuntimeSnapshot['selected']>
 ): number {
+  let semanticLatest = Number.NEGATIVE_INFINITY;
   for (const candidate of [
     proof.last_event_at,
-    proof.current_turn_activity?.recorded_at,
+    proof.current_turn_activity?.recorded_at
+  ]) {
+    const parsed = Date.parse(candidate ?? '');
+    if (Number.isFinite(parsed)) {
+      semanticLatest = Math.max(semanticLatest, parsed);
+    }
+  }
+  if (Number.isFinite(semanticLatest)) {
+    return semanticLatest;
+  }
+
+  let fallbackLatest = Number.NEGATIVE_INFINITY;
+  for (const candidate of [
     source.updatedAt,
     proof.updated_at
   ]) {
     const parsed = Date.parse(candidate ?? '');
     if (Number.isFinite(parsed)) {
-      return parsed;
+      fallbackLatest = Math.max(fallbackLatest, parsed);
     }
   }
-  return Number.NEGATIVE_INFINITY;
+  return fallbackLatest;
 }
 
 function combineCompatibilityRateLimits(input: {

@@ -4110,6 +4110,78 @@ describe('ControlRuntime', () => {
     }
   });
 
+  it('prefers the freshest current-turn activity timestamp when selecting compatibility Codex rate limits', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
+    try {
+      const fixture = await createFixture({
+        taskId: 'task-rate-limit-current-turn'
+      });
+
+      await seedManifest(fixture.paths, {
+        task_id: 'task-rate-limit-current-turn',
+        issue_id: 'issue-rate-limit-current-turn',
+        issue_identifier: 'ISSUE-RATE-LIMIT-CURRENT-TURN',
+        started_at: '2026-03-07T00:20:00.000Z',
+        updated_at: '2026-03-07T00:29:00.000Z'
+      });
+      await seedProviderLinearWorkerProof(fixture.paths, {
+        issue_id: 'issue-rate-limit-current-turn',
+        issue_identifier: 'ISSUE-RATE-LIMIT-CURRENT-TURN',
+        last_event_at: '2026-03-07T00:28:00.000Z',
+        current_turn_activity: {
+          event: 'token_count',
+          message_or_payload: 'Refreshed Codex budgets.',
+          recorded_at: '2026-03-07T00:29:30.000Z',
+          source: 'session_log_hydration',
+          turn_id: 'turn-2',
+          session_id: 'thread-current-turn-2'
+        },
+        rate_limits: {
+          source: 'current-turn-activity',
+          primary: {
+            remaining: 3
+          }
+        },
+        updated_at: '2026-03-07T00:29:30.000Z'
+      });
+
+      const sibling = await createSiblingRun(fixture.root, 'task-rate-limit-sibling', 'run-2', {
+        manifest: {
+          task_id: 'task-rate-limit-sibling',
+          issue_id: 'issue-rate-limit-sibling',
+          issue_identifier: 'ISSUE-RATE-LIMIT-SIBLING',
+          status: 'in_progress',
+          started_at: '2026-03-07T00:21:00.000Z',
+          updated_at: '2026-03-07T00:29:00.000Z'
+        }
+      });
+      await seedProviderLinearWorkerProof(sibling, {
+        issue_id: 'issue-rate-limit-sibling',
+        issue_identifier: 'ISSUE-RATE-LIMIT-SIBLING',
+        last_event_at: '2026-03-07T00:29:00.000Z',
+        rate_limits: {
+          source: 'last-event-only',
+          primary: {
+            remaining: 17
+          }
+        },
+        updated_at: '2026-03-07T00:29:00.000Z'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+
+      expect(compatibilityProjection.rateLimits).toEqual({
+        source: 'current-turn-activity',
+        primary: {
+          remaining: 3
+        }
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('prefers semantic provider progress over the generic in_progress fallback in running rows', async () => {
     const fixture = await createFixture({
       taskId: 'task-1037-event-current'
