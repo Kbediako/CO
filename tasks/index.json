@@ -37,7 +37,7 @@
           "reviewer": "codex-orchestrator review",
           "date": "2026-04-17",
           "status": "bounded_success",
-          "telemetry": "../../.runs/linear-901cd944-fc0c-4372-92ce-65bb8bb411c0/cli/2026-04-17T00-30-34-564Z-3788b7dc/review/telemetry.json",
+          "telemetry": ".runs/linear-901cd944-fc0c-4372-92ce-65bb8bb411c0/cli/2026-04-17T00-30-34-564Z-3788b7dc/review/telemetry.json",
           "summary": "Manifest-backed review completed with review_outcome=bounded-success after command-intent retry; read-only retry found no actionable correctness issues."
         },
         "elegance_review": {
