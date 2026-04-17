@@ -9,7 +9,39 @@
         "Codex"
       ],
       "last_review": "2026-04-18",
-      "approvals": {},
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-18",
+          "status": "succeeded",
+          "manifest": ".runs/linear-56395d00-0da1-447e-8d2d-68b195e8a3dc-co226-docs-review/cli/2026-04-17T21-47-30-660Z-b185d824/manifest.json",
+          "summary": "Docs-review completed before implementation and preserved the exact Doctor full-suite-versus-targeted contract for CO-226."
+        },
+        "child_lane": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-18",
+          "status": "accepted",
+          "manifest": ".runs/linear-56395d00-0da1-447e-8d2d-68b195e8a3dc-doctor-targeted-tests/cli/2026-04-17T21-40-57-908Z-850bb2ea/manifest.json",
+          "summary": "Accepted bounded same-issue child lane patch in Doctor.test.ts: replace one real direct-dist startup with a fake direct-dist entrypoint that still waits for the initialize request before returning the expected probe payload."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review --uncommitted plus manual fallback",
+          "date": "2026-04-18",
+          "status": "failed-boundary",
+          "telemetry": ".runs/linear-56395d00-0da1-447e-8d2d-68b195e8a3dc/cli/2026-04-17T21-59-26-233Z-1b0fdbf2/review/telemetry.json",
+          "review_outcome": "failed-boundary",
+          "termination_boundary": "startup-anchor",
+          "override_reason": "Forced standalone review executed under FORCE_CODEX_REVIEW=1 and failed closed before any verdict. The lane recorded the telemetry, completed the documented manual fallback review with no actionable regressions, and split the later unrelated full-suite-only SelectedRunProjection timeout into CO-233 instead of widening CO-226.",
+          "artifact": "out/linear-56395d00-0da1-447e-8d2d-68b195e8a3dc/manual/20260417T221004Z-review-elegance-fallback.md"
+        },
+        "elegance_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-18",
+          "status": "passed",
+          "artifact": "out/linear-56395d00-0da1-447e-8d2d-68b195e8a3dc/manual/20260417T221004Z-review-elegance-fallback.md",
+          "summary": "Explicit minimality pass kept the local direct-dist handshake stub and refused to broaden CO-226 into the later SelectedRunProjection blocker."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-56395d00-0da1-447e-8d2d-68b195e8a3dc.md",
         "task": "tasks/tasks-linear-56395d00-0da1-447e-8d2d-68b195e8a3dc.md",

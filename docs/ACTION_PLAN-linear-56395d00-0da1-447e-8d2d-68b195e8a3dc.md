@@ -7,7 +7,7 @@
   - the issue body is authoritative for the failing command surfaces and protected wording
   - the active child lane can collect tests-phase evidence inside `Doctor.test.ts` while the parent stays off that file
   - the smallest correct fix may live in Doctor tests, shared test harness, or the repo’s Vitest execution contract, depending on evidence
-- Latest status (2026-04-18): milestones 1 through 6 are complete. The remaining work is review/elegance closeout, PR creation, and review handoff.
+- Latest status (2026-04-18): milestones 1 through 7 are complete for the original Doctor timeout cluster, PR `#522` is attached, and the latest exact full-suite rerun proves Doctor is no longer the live failing surface. CO-226 now stops at blocked-dependency handoff because follow-up `CO-233` owns the new unrelated `SelectedRunProjection.test.ts` full-suite-only timeout.
 
 ## Issue Readiness Gate
 - Intent checksum / protected terms carried forward:

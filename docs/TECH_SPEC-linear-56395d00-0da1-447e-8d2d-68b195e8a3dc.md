@@ -18,7 +18,7 @@ last_review: 2026-04-18
 ## Traceability
 - Linear issue: `CO-226` / `56395d00-0da1-447e-8d2d-68b195e8a3dc`
 - Source issue: `CO-219` / `9f101328-ca10-47b3-9dc9-b0984d339794`
-- Prompt handoff referenced upstream origin manifest id `2026-04-17T21-37-49-533Z-7f05b822`, but that file is not materialized under this workspace `.runs/`; local evidence for this attempt comes from the manifests created during the active docs-review, child-lane, and review wrapper runs.
+- Prompt handoff referenced upstream origin manifest id `2026-04-17T21-37-49-533Z-7f05b822`, but that file is not materialized under this workspace `.runs/`; local evidence for this attempt comes from the manifests created during the active docs-review, child-lane, review wrapper, and PR handoff runs.
 - Source anchor: `ctx:sha256:dc802d183aad52d63c661a623eea2dfb1a6331c8142f57e36c744ffe0706b069#chunk:c000001`
 - Shared source note: the shared source payload in this workspace provides provider-worker run metadata only; the Linear issue body remains the authoritative problem statement and checksum source.
 
@@ -122,9 +122,12 @@ last_review: 2026-04-18
 - The issue documents one standalone Doctor pass and one targeted-trio pass after the CO-219 changes landed, proving the Doctor surface is not failing deterministically in isolation.
 - The same issue documents three repo-wide reruns with non-deterministic timeout outcomes in `Doctor.test.ts`: one with `11` timeouts, one with a single timeout in `prefers task roots over nested provider templates when both signals exist`, and one with a single timeout in `resolves provider readiness from the repo root when doctor runs in a nested directory`.
 - The rest of the required CO-219 non-test validation gates already passed, so the remaining blocker is specifically the repo-wide test gate.
-- The child lane `doctor-targeted-tests` completed and the parent accepted its bounded `Doctor.test.ts` patch: replace one real direct-dist delegation startup with a local fake `dist/bin/codex-orchestrator.js` entrypoint that still returns the initialize probe payload the Doctor check expects.
+- The child lane `doctor-targeted-tests` completed and the parent accepted its bounded `Doctor.test.ts` patch: replace one real direct-dist delegation startup with a local fake `dist/bin/codex-orchestrator.js` entrypoint that still waits for the `initialize` request before returning the expected probe payload.
 - The first current-lane full-suite rerun after accepting that patch got past `Doctor.test.ts` and failed only because this fresh workspace did not yet have `dist/bin/codex-orchestrator.js`; after `npm run build`, the previously failing `tests/cli-command-surface.spec.ts` and `tests/run-review.spec.ts` surfaces passed in isolation.
 - The next exact `npm run test` rerun finished green with `344` files and `4119` tests, and `Doctor.test.ts` completed inside the full suite in `74023ms`.
+- PR `#522` now carries the Doctor stabilization diff, and the follow-up Codex review fix commit `91df91ef4` tightened the fake direct-dist entrypoint so it responds only after seeing the real `initialize` request instead of unconditionally writing a success payload.
+- A later exact `npm run test` rerun no longer failed in `Doctor.test.ts`; it failed only in `orchestrator/tests/SelectedRunProjection.test.ts > refreshes projection proofs when child-lane reservation ledger placeholders exist` with `Error: Test timed out in 5000ms`, while the isolated repro for that exact case passed in about `1.92s`.
+- Because that remaining full-suite-only timeout is outside the original Doctor scope, follow-up issue `CO-233` / `2594bf7f-12f3-4e59-8b9f-62c551fe58a0` now tracks the new blocker so CO-226 can stop at a blocked dependency handoff instead of widening into a second unrelated timeout lane.
 
 ## Proposed Design
 - Record the docs-first packet first, then run an audited `docs-review` child stream before source edits.
@@ -155,5 +158,8 @@ last_review: 2026-04-18
   - manifest-backed standalone review followed by an explicit elegance pass before review handoff
 
 ## Approvals
-- Reviewer: pending `docs-review`, then parent implementation/review
-- Date: 2026-04-18
+- Docs-review: succeeded under `.runs/linear-56395d00-0da1-447e-8d2d-68b195e8a3dc-co226-docs-review/cli/2026-04-17T21-47-30-660Z-b185d824/manifest.json`.
+- Child lane: accepted under `.runs/linear-56395d00-0da1-447e-8d2d-68b195e8a3dc-doctor-targeted-tests/cli/2026-04-17T21-40-57-908Z-850bb2ea/manifest.json`.
+- Standalone review: forced wrapper run recorded `review_outcome=failed-boundary` with `termination_boundary.kind=startup-anchor`; the lane completed the documented manual fallback in `out/linear-56395d00-0da1-447e-8d2d-68b195e8a3dc/manual/20260417T221004Z-review-elegance-fallback.md`.
+- Elegance review: explicit minimality pass recorded in `out/linear-56395d00-0da1-447e-8d2d-68b195e8a3dc/manual/20260417T221004Z-review-elegance-fallback.md`.
+- Closeout state: PR `#522` is attached to CO-226, and the issue is blocked on follow-up `CO-233` rather than ready for `In Review`.
