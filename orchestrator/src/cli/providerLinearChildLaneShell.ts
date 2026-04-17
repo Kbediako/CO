@@ -187,7 +187,9 @@ const DEFAULT_DEPENDENCIES: ProviderLinearChildLaneShellDependencies = {
     return normalizeScopeEntries([...modified.stdout.split(/\r?\n/u), ...untracked.stdout.split(/\r?\n/u)]);
   },
   refreshProofSnapshot: async (runDir, auditPath, env) => {
-    await refreshProviderLinearWorkerProofSnapshot(runDir, auditPath, undefined, undefined, env);
+    await refreshProviderLinearWorkerProofSnapshot(runDir, auditPath, undefined, undefined, env, {
+      emitProgressEvent: (message) => logger.warn(message)
+    });
   },
   readTrackedIssue: async ({ issueId, sourceSetup, env }) => {
     const resolution = await resolveLiveLinearTrackedIssueById({
