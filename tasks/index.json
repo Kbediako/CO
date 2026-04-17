@@ -10,6 +10,14 @@
       ],
       "last_review": "2026-04-18",
       "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-18",
+          "status": "succeeded",
+          "manifest": ".runs/linear-7896d3c1-7a62-4b79-97df-a71984fab5b2-co-225-docs-review-rerun/cli/2026-04-17T20-21-33-585Z-1c79ad95/manifest.json",
+          "telemetry": ".runs/linear-7896d3c1-7a62-4b79-97df-a71984fab5b2-co-225-docs-review-rerun/cli/2026-04-17T20-21-33-585Z-1c79ad95/review/telemetry.json",
+          "summary": "Docs-review rerun completed before implementation after adding the packet to docs-freshness registry coverage; docs:freshness:maintain, docs:check, spec-guard, delegation guard, and forced review succeeded."
+        },
         "docs_packet_child_lane": {
           "reviewer": "bounded same-issue docs child lane",
           "date": "2026-04-18",

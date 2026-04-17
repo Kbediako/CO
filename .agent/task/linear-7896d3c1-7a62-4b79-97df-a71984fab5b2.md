@@ -38,7 +38,7 @@
 - [x] Child scoped whitespace / diff check on touched files. Evidence: `git diff --check -- docs/PRD-linear-7896d3c1-7a62-4b79-97df-a71984fab5b2.md docs/TECH_SPEC-linear-7896d3c1-7a62-4b79-97df-a71984fab5b2.md docs/ACTION_PLAN-linear-7896d3c1-7a62-4b79-97df-a71984fab5b2.md tasks/specs/linear-7896d3c1-7a62-4b79-97df-a71984fab5b2.md tasks/tasks-linear-7896d3c1-7a62-4b79-97df-a71984fab5b2.md .agent/task/linear-7896d3c1-7a62-4b79-97df-a71984fab5b2.md tasks/index.json docs/TASKS.md`.
 - [ ] Parent focused guardrail-status and metrics-closeout regressions.
 - [ ] Parent focused provider issue observability and retry-truth regressions.
-- [ ] Parent docs-review before implementation.
+- [x] Parent docs-review before implementation. Evidence: `.runs/linear-7896d3c1-7a62-4b79-97df-a71984fab5b2-co-225-docs-review-rerun/cli/2026-04-17T20-21-33-585Z-1c79ad95/manifest.json`, `.runs/linear-7896d3c1-7a62-4b79-97df-a71984fab5b2-co-225-docs-review-rerun/cli/2026-04-17T20-21-33-585Z-1c79ad95/review/telemetry.json`.
 - [ ] Parent-selected scoped validation after source edits.
 
 ## Progress Log

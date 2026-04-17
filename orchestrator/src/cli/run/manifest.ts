@@ -515,15 +515,18 @@ export function buildGuardrailSummary(manifest: CliManifest): string {
 export function upsertGuardrailSummary(manifest: CliManifest): void {
   const guardrailStatus = ensureGuardrailStatus(manifest);
   const existing = manifest.summary ? manifest.summary.split('\n') : [];
-  const filtered = existing.filter((line) => !line.toLowerCase().startsWith('guardrails:'));
+  const filtered = existing.filter(
+    (line) =>
+      !line.toLowerCase().startsWith('guardrails:') && !isGuardrailRecommendationLine(line)
+  );
   if (!shouldEmitGuardrailSummary(manifest, guardrailStatus)) {
-    manifest.summary = filtered
-      .filter((line) => !isGuardrailRecommendationLine(line))
-      .join('\n')
-      .trim() || null;
+    manifest.summary = filtered.join('\n').trim() || null;
     return;
   }
 
+  if (guardrailStatus.recommendation) {
+    filtered.push(guardrailStatus.recommendation);
+  }
   filtered.push(guardrailStatus.summary);
   manifest.summary = filtered.join('\n').trim() || guardrailStatus.summary;
 }
