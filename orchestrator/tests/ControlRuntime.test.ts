@@ -3788,6 +3788,86 @@ describe('ControlRuntime', () => {
     }
   });
 
+  it('surfaces live Ready truth when stale released not-active Blocked cache retains only completed blockers', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-17T04:00:00.000Z'));
+    try {
+      const completedBlocker = {
+        id: 'lin-blocker-207',
+        identifier: 'CO-207',
+        state: 'Done',
+        state_type: 'completed'
+      };
+      const providerIntakeState = createProviderIntakeState([
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-196',
+          issue_id: 'lin-issue-196',
+          issue_identifier: 'CO-196',
+          issue_title: 'Add Codex plugin marketplace distribution path',
+          issue_state: 'Blocked',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-16T22:48:01.000Z',
+          issue_blocked_by: [completedBlocker],
+          task_id: 'linear-co-196-ready-reclaim',
+          mapping_source: 'provider_id_fallback',
+          state: 'released',
+          reason: 'provider_issue_released:not_active',
+          accepted_at: '2026-04-16T22:48:05.000Z',
+          updated_at: '2026-04-16T22:48:10.000Z',
+          last_delivery_id: 'delivery-co-196',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_744_828_881_000,
+          run_id: null,
+          run_manifest_path: null,
+          launch_source: 'control-host',
+          launch_token: 'launch-co-196'
+        }
+      ]);
+      const fixture = await createFixture({
+        taskId: 'linear-co-196-ready-reclaim',
+        providerIntakeState,
+        linearAdvisoryState: {
+          tracked_issue: createTrackedIssue({
+            id: 'lin-issue-196',
+            identifier: 'CO-196',
+            title: 'Add Codex plugin marketplace distribution path',
+            state: 'Ready',
+            state_type: 'unstarted',
+            updated_at: '2026-04-17T03:33:27.936Z',
+            blocked_by: [completedBlocker]
+          })
+        }
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+      const uiDataset = buildUiDataset({
+        projection: compatibilityProjection,
+        generatedAt: '2026-04-17T04:00:00.000Z'
+      });
+
+      expect(compatibilityProjection.issues).toHaveLength(1);
+      const issue = compatibilityProjection.issues[0];
+      expect(issue?.payload.provider_debug_snapshot?.claim).toMatchObject({
+        state: 'released',
+        reason: 'provider_issue_released:not_active',
+        issue_state: 'Blocked',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-16T22:48:01.000Z'
+      });
+      expect(issue?.payload.provider_debug_snapshot?.live_linear_state).toMatchObject({
+        state: 'Ready',
+        state_type: 'unstarted',
+        updated_at: '2026-04-17T03:33:27.936Z'
+      });
+      expect(uiDataset.counts.issues).toBe(1);
+      expect(uiDataset.issues).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('prunes ordinary released not-active workers when fresh proof has a dead pid', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-15T23:00:00.000Z'));
@@ -6043,6 +6123,9 @@ describe('ControlRuntime', () => {
           operation_started_at: '2026-03-07T00:00:00.000Z',
           operation_elapsed_ms: 45000,
           stalled_after_ms: 45000,
+          refresh_phase: 'refresh:claim_issue_by_id_reconcile',
+          refresh_request_class: 'claim_issue_by_id:running',
+          refresh_provider_keys: ['linear:issue-1'],
           stuck: true,
           stuck_since_at: '2026-03-07T00:00:45.000Z',
           restart_required: true,
@@ -6057,6 +6140,9 @@ describe('ControlRuntime', () => {
     expect(compatibilityProjection.polling).toMatchObject({
       interval_ms: 15000,
       checking: true,
+      refresh_phase: 'refresh:claim_issue_by_id_reconcile',
+      refresh_request_class: 'claim_issue_by_id:running',
+      refresh_provider_keys: ['linear:issue-1'],
       stuck: true,
       restart_required: true,
       reason: 'provider_refresh_lifecycle_stuck',

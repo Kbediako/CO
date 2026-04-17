@@ -3759,22 +3759,34 @@ export function createProviderIssueHandoffService(
       fresh_discovery_candidates: 0,
       fresh_discovery_started: 0
     };
-    const recordRefreshProgress = (phase: string): void => {
+    const recordRefreshProgress = (
+      phase: string,
+      input: {
+        requestClass?: string | null;
+        providerKeys?: string[] | null;
+      } = {}
+    ): void => {
       if (!providerIssueHandoffService) {
         return;
       }
       recordProviderPollingProgress(providerIssueHandoffService, {
         phase,
+        requestClass: input.requestClass ?? null,
+        providerKeys: input.providerKeys ?? null,
         counts: refreshCounts
       });
     };
       await runWithProviderIssueRunDiscoveryCache(async () => {
         await runWithRefreshLifecycleLock(async () => {
-          recordRefreshProgress('refresh:rehydrate');
+          recordRefreshProgress('refresh:rehydrate', {
+            requestClass: 'rehydrate'
+          });
           assertRefreshCycleNotStuck();
           const result = await rehydrateNow();
           refreshCounts.claims_total = options.state.claims.length;
-          recordRefreshProgress('refresh:rehydrated');
+          recordRefreshProgress('refresh:rehydrated', {
+            requestClass: 'rehydrate'
+          });
           assertRefreshCycleNotStuck();
           if (result.hasPendingClaims) {
             scheduleBestEffortRehydrateWithRefreshLock();
@@ -3925,7 +3937,9 @@ export function createProviderIssueHandoffService(
             trackedIssuesByKey?.get(providerKey) ?? { state: claimStateByProviderKey.get(providerKey) ?? null }
           );
         }
-        recordRefreshProgress('refresh:claim_reconcile');
+        recordRefreshProgress('refresh:claim_reconcile', {
+          requestClass: 'claim_reconcile'
+        });
         const hasFreshDiscoveryCandidates =
           pollInput !== undefined &&
           (trackedIssueRefetch !== null || pollInput.trackedIssues.length > 0);
@@ -3954,7 +3968,10 @@ export function createProviderIssueHandoffService(
             releasedFailClosedDisqualifyingRetainedCount += 1;
           }
           refreshCounts.claims_scanned += 1;
-          recordRefreshProgress('refresh:claim_reconcile');
+          recordRefreshProgress('refresh:claim_reconcile', {
+            requestClass: `claim_reconcile:${claim.state ?? 'unknown'}`,
+            providerKeys: [claimProviderKey]
+          });
           try {
           const claimRuns =
             runsByProviderIssue.get(claimProviderKey) ?? [];
@@ -4018,7 +4035,10 @@ export function createProviderIssueHandoffService(
               if (boundPreDiscoveryIssueByIdReads && activeRun === null) {
                 preDiscoveryNonActiveIssueByIdReads += 1;
               }
-              recordRefreshProgress('refresh:claim_issue_by_id_reconcile');
+              recordRefreshProgress('refresh:claim_issue_by_id_reconcile', {
+                requestClass: `claim_issue_by_id:${claim.state ?? 'unknown'}`,
+                providerKeys: [claimProviderKey]
+              });
             }
           });
           assertRefreshCycleNotStuck();
@@ -4044,7 +4064,10 @@ export function createProviderIssueHandoffService(
               ) {
                 deferredClaimFreshDiscoveryBlockedProviderKeys.add(claimProviderKey);
               }
-              recordRefreshProgress('refresh:claim_issue_by_id_reconcile');
+              recordRefreshProgress('refresh:claim_issue_by_id_reconcile', {
+                requestClass: `claim_issue_by_id:${claim.state ?? 'unknown'}`,
+                providerKeys: [claimProviderKey]
+              });
             }
             if (shouldSuppressFreshDiscoveryForPollFailClosedReason(resolution.reason)) {
               suppressFreshDiscovery = true;
@@ -4697,7 +4720,9 @@ export function createProviderIssueHandoffService(
           trackedIssues: LiveLinearTrackedIssue[]
         ): Promise<void> => {
           refreshCounts.fresh_discovery_candidates += trackedIssues.length;
-          recordRefreshProgress('refresh:fresh_dispatch');
+          recordRefreshProgress('refresh:fresh_dispatch', {
+            requestClass: 'fresh_dispatch'
+          });
           for (const trackedIssue of sortLiveLinearTrackedIssuesForDispatch(trackedIssues)) {
             assertRefreshCycleNotStuck();
             const providerKey = buildProviderIssueKey(trackedIssue.provider, trackedIssue.id);
@@ -4715,6 +4740,10 @@ export function createProviderIssueHandoffService(
               }
               continue;
             }
+            recordRefreshProgress('refresh:fresh_dispatch', {
+              requestClass: `fresh_dispatch:${trackedIssue.state ?? 'unknown'}`,
+              providerKeys: [providerKey]
+            });
             consumedTrackedIssueKeys.add(providerKey);
             try {
               const handoffResult = await processTrackedIssueCandidate({
@@ -4731,7 +4760,10 @@ export function createProviderIssueHandoffService(
                   providerKey,
                   trackedIssue
                 );
-                recordRefreshProgress('refresh:fresh_dispatch');
+                recordRefreshProgress('refresh:fresh_dispatch', {
+                  requestClass: `fresh_dispatch:${trackedIssue.state ?? 'unknown'}`,
+                  providerKeys: [providerKey]
+                });
               }
             } catch (error) {
               logger.warn(
@@ -4757,7 +4789,9 @@ export function createProviderIssueHandoffService(
             options.state.claims
           );
           refreshCounts.fresh_discovery_runs += 1;
-          recordRefreshProgress('refresh:fresh_discovery');
+          recordRefreshProgress('refresh:fresh_discovery', {
+            requestClass: 'fresh_discovery_query'
+          });
           const freshDiscoveryResolution = await trackedIssueRefetch({
             mode: 'fresh_discovery',
             eligibleTargetCount: pollDispatchBudget.remainingGlobalSlots(),
@@ -7558,16 +7592,25 @@ function shouldBlockPlainReleasedWithoutConcreteRetainedRunClaim(
     | 'run_manifest_path'
     | 'issue_state'
     | 'issue_state_type'
+    | 'issue_blocked_by'
   >
 ): boolean {
   const workflowState = classifyProviderLinearWorkflowState({
     state: claim.issue_state,
     state_type: claim.issue_state_type
   });
+  const hasNoRetainedRunIdentity = !claim.run_id && !claim.run_manifest_path;
+  const cachedBlockedByCompletedOnly =
+    workflowState.normalizedState === 'blocked' &&
+    hasNoRetainedRunIdentity &&
+    Array.isArray(claim.issue_blocked_by) &&
+    claim.issue_blocked_by.length > 0 &&
+    !providerLinearTodoBlockedByNonTerminal(claim.issue_blocked_by);
   return (
     canRecheckPlainReleasedNotActiveClaim(claim) &&
     workflowState.normalizedStateType === 'started' &&
-    !hasConcreteRetainedRunIdentity(claim)
+    !hasConcreteRetainedRunIdentity(claim) &&
+    !cachedBlockedByCompletedOnly
   );
 }
 
@@ -7581,6 +7624,7 @@ function canFreshDiscoverReleasedReclaimClaim(
     | 'run_manifest_path'
     | 'issue_state'
     | 'issue_state_type'
+    | 'issue_blocked_by'
   >,
   run: ProviderIssueRunRecord | null,
   hasPendingReleaseCancel: (manifestPath: string | null | undefined) => boolean
