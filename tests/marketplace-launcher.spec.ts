@@ -71,4 +71,37 @@ describe('marketplace launcher', () => {
       packageRoot: sourceRoot
     });
   });
+
+  it('fails closed on unsupported explicit marketplace source_type values', async () => {
+    const sandbox = await makeSandbox();
+    const homeRoot = join(sandbox, 'home');
+    const codexHome = join(homeRoot, '.codex');
+    await mkdir(codexHome, { recursive: true });
+
+    await writeFile(
+      join(codexHome, 'config.toml'),
+      [
+        '[marketplaces.codex-orchestrator]',
+        "source = 'owner/repo'",
+        "source_type = 'weird'"
+      ].join('\n'),
+      'utf8'
+    );
+
+    await expect(
+      execFileAsync(process.execPath, [launcherPath], {
+        env: {
+          ...process.env,
+          HOME: homeRoot,
+          CODEX_HOME: codexHome
+        }
+      })
+    ).rejects.toMatchObject({
+      code: 1,
+      stdout: '',
+      stderr: expect.stringContaining(
+        'unsupported [marketplaces.codex-orchestrator].source_type="weird"'
+      )
+    });
+  });
 });
