@@ -599,11 +599,12 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
   const mergeCloseoutProgress = mergeCloseout ? deriveMergeCloseoutProgressSnapshot(mergeCloseout) : null;
   const trackedTerminalWorkflowUpdatedAt =
     trackedWorkflowState?.isTerminal ? normalizeOptionalString(trackedIssue?.updated_at) : null;
+  const claimTerminalWorkflowIssueUpdatedAt =
+    claimWorkflowState?.isTerminal ? normalizeOptionalString(claim?.issue_updated_at) : null;
   const terminalWorkflowUpdatedAt = latestIsoTimestamp(
     trackedTerminalWorkflowUpdatedAt,
-    claimWorkflowState?.isTerminal
-      ? normalizeOptionalString(claim?.issue_updated_at) ?? normalizeOptionalString(claim?.updated_at)
-      : null
+    claimTerminalWorkflowIssueUpdatedAt ??
+      (claimWorkflowState?.isTerminal ? normalizeOptionalString(claim?.updated_at) : null)
   );
   const mergeCloseoutIssueUpdatedAt = normalizeOptionalString(mergeCloseout?.issue_updated_at);
   const terminalWorkflowSupersedesMergeCloseout = Boolean(
@@ -614,6 +615,14 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
       (
         !mergeCloseoutIssueUpdatedAt &&
         trackedTerminalWorkflowUpdatedAt
+      ) ||
+      (
+        !mergeCloseoutIssueUpdatedAt &&
+        claimTerminalWorkflowIssueUpdatedAt &&
+        compareIsoTimestamp(
+          claimTerminalWorkflowIssueUpdatedAt,
+          mergeCloseoutProgress.last_semantic_progress_at
+        ) >= 0
       ) ||
       (
         mergeCloseoutIssueUpdatedAt &&
