@@ -189,6 +189,9 @@ interface ProviderIssueReviewPromotionLike extends ProviderIssuePullRequestLifec
 }
 
 interface ProviderIssueMergeCloseoutLike extends ProviderIssuePullRequestLifecycleLike {
+  issue_state?: string | null;
+  issue_state_type?: string | null;
+  issue_updated_at?: string | null;
   shared_root?: {
     status?: string | null;
     reason?: string | null;
@@ -416,6 +419,8 @@ export function buildProviderIssueDebugSnapshot(input: {
     proof
   });
   const pullRequest = buildProviderDebugPullRequestSnapshot({
+    trackedIssue,
+    claim,
     reviewPromotion: claim?.review_promotion ?? null,
     mergeCloseout: claim?.merge_closeout ?? null,
     preferReviewPromotion:
@@ -558,7 +563,7 @@ function resolveProviderParallelizationSnapshot(
 
 export function deriveProviderLinearWorkerProgressSnapshot(input: {
   tracked_issue?:
-    | Pick<LiveLinearTrackedIssue, 'state' | 'state_type'>
+    | Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at'>
     | null
     | undefined;
   claim?: ProviderIssueClaimLike | null | undefined;
@@ -644,6 +649,11 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
   if (
     mergeCloseout
     && !workerProgressSuppressedByStaleClaim
+    && !isSupersededTerminalMergeCloseoutProgress({
+      trackedIssue,
+      claim,
+      mergeCloseout
+    })
   ) {
     return deriveMergeCloseoutProgressSnapshot(mergeCloseout);
   }
@@ -1341,6 +1351,86 @@ function deriveMergeCloseoutProgressSnapshot(
   };
 }
 
+function isSupersededTerminalMergeCloseoutProgress(input: {
+  trackedIssue:
+    | Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at'>
+    | null
+    | undefined;
+  claim: ProviderIssueClaimLike | null;
+  mergeCloseout: ProviderIssueMergeCloseoutLike;
+}): boolean {
+  const mergeStatus = normalizeOptionalString(input.mergeCloseout.status);
+  if (
+    mergeStatus !== 'action_required' ||
+    normalizeOptionalString(input.mergeCloseout.reason) !== 'pending_shared_root_reconciliation'
+  ) {
+    return false;
+  }
+  if (!mergeCloseoutSnapshotShowsMerged(input.mergeCloseout)) {
+    return false;
+  }
+  if (normalizeOptionalString(input.mergeCloseout.shared_root?.status) !== 'skipped') {
+    return false;
+  }
+  if (
+    normalizeProviderLinearWorkflowState(
+      normalizeOptionalString(input.mergeCloseout.issue_state)
+    ) !== 'merging'
+  ) {
+    return false;
+  }
+  const liveWorkflowState = input.trackedIssue
+    ? classifyProviderLinearWorkflowState(input.trackedIssue)
+    : resolveClaimWorkflowStateClassification(input.claim);
+  if (!liveWorkflowState?.isTerminal) {
+    return false;
+  }
+  const mergeCloseoutIssueUpdatedAt = normalizeOptionalString(input.mergeCloseout.issue_updated_at);
+  const liveIssueUpdatedAt =
+    input.trackedIssue !== null && input.trackedIssue !== undefined
+      ? normalizeOptionalString(input.trackedIssue.updated_at)
+      : normalizeOptionalString(input.claim?.issue_updated_at);
+  const freshness = compareObservedIssueUpdatedAt(mergeCloseoutIssueUpdatedAt, liveIssueUpdatedAt);
+  return freshness === 'equal' || freshness === 'newer';
+}
+
+function mergeCloseoutSnapshotShowsMerged(
+  mergeCloseout: Pick<ProviderIssueMergeCloseoutLike, 'status' | 'snapshot'>
+): boolean {
+  if (normalizeOptionalString(mergeCloseout.status) === 'merged') {
+    return true;
+  }
+  const snapshot = mergeCloseout.snapshot ?? null;
+  return Boolean(
+    normalizeOptionalString(snapshot?.merged_at) ||
+      normalizeOptionalString(snapshot?.state) === 'MERGED'
+  );
+}
+
+function compareObservedIssueUpdatedAt(
+  existingIssueUpdatedAt: string | null,
+  nextIssueUpdatedAt: string | null
+): 'older' | 'equal' | 'newer' | 'unknown' {
+  if (!nextIssueUpdatedAt) {
+    return 'unknown';
+  }
+  if (!existingIssueUpdatedAt) {
+    return 'unknown';
+  }
+  const existingTime = Date.parse(existingIssueUpdatedAt);
+  const nextTime = Date.parse(nextIssueUpdatedAt);
+  if (!Number.isFinite(existingTime) || !Number.isFinite(nextTime)) {
+    return 'unknown';
+  }
+  if (nextTime < existingTime) {
+    return 'older';
+  }
+  if (nextTime === existingTime) {
+    return 'equal';
+  }
+  return 'newer';
+}
+
 function deriveReviewPromotionProgressSnapshot(
   reviewPromotion: ProviderIssueReviewPromotionLike
 ): ProviderLinearWorkerProgressSnapshot {
@@ -1558,6 +1648,11 @@ function isMergeCloseoutChecksFailedReason(reason: string): boolean {
 }
 
 function buildProviderDebugPullRequestSnapshot(input: {
+  trackedIssue:
+    | Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at'>
+    | null
+    | undefined;
+  claim: ProviderIssueClaimLike | null;
   reviewPromotion: ProviderIssueReviewPromotionLike | null;
   mergeCloseout: ProviderIssueMergeCloseoutLike | null;
   preferReviewPromotion: boolean;
@@ -1569,6 +1664,13 @@ function buildProviderDebugPullRequestSnapshot(input: {
   if (!selectedRecord) {
     return null;
   }
+  const supersededTerminalMergeCloseout =
+    input.mergeCloseout !== null &&
+    isSupersededTerminalMergeCloseoutProgress({
+      trackedIssue: input.trackedIssue,
+      claim: input.claim,
+      mergeCloseout: input.mergeCloseout
+    });
   const snapshot = selectedRecord.snapshot ?? null;
   return {
     review_promotion_status: normalizeOptionalString(input.reviewPromotion?.status),
@@ -1579,7 +1681,9 @@ function buildProviderDebugPullRequestSnapshot(input: {
     owner: normalizeOptionalString(selectedRecord.pr?.owner),
     repo: normalizeOptionalString(selectedRecord.pr?.repo),
     number: normalizeOptionalInteger(selectedRecord.pr?.number),
-    merge_closeout_status: normalizeOptionalString(input.mergeCloseout?.status),
+    merge_closeout_status: supersededTerminalMergeCloseout
+      ? null
+      : normalizeOptionalString(input.mergeCloseout?.status),
     reason: normalizeOptionalString(selectedRecord.reason),
     summary: normalizeOptionalString(selectedRecord.summary),
     shared_root_status: normalizeOptionalString(input.mergeCloseout?.shared_root?.status),

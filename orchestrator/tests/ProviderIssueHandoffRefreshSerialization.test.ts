@@ -2410,4 +2410,553 @@ describe('runProviderIssueHandoffRefresh', () => {
       expect(pendingCancels).toBe(0);
     });
   });
+
+  it('reconciles a stale merge-closeout action-required claim after live terminal truth is reread', async () => {
+    const { root, paths } = await createHostPaths();
+    const taskId = 'linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c';
+    const runId = '2026-04-17T02-04-33-897Z-d18707f4';
+    const completedPaths = resolveRunPaths(
+      {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId
+      },
+      runId
+    );
+    await mkdir(completedPaths.runDir, { recursive: true });
+    await writeFile(
+      completedPaths.manifestPath,
+      JSON.stringify({
+        run_id: runId,
+        task_id: taskId,
+        pipeline_id: 'provider-linear-worker',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: '59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c',
+        issue_identifier: 'CO-211',
+        issue_updated_at: '2026-04-17T02:04:28.234Z',
+        started_at: '2026-04-17T02:04:34.014Z',
+        updated_at: '2026-04-17T03:50:45.850Z',
+        completed_at: '2026-04-17T03:50:45.820Z',
+        summary: 'Provider linear worker reached review handoff.'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c',
+      issue_id: '59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c',
+      issue_identifier: 'CO-211',
+      issue_title: 'Control host: prevent repeated refresh-stuck restart churn while active provider workers remain healthy',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-17T03:51:02.741Z',
+      task_id: taskId,
+      mapping_source: 'provider_id_fallback',
+      state: 'handoff_failed',
+      reason: 'provider_issue_merge_closeout_action_required',
+      accepted_at: '2026-04-17T02:04:29.689Z',
+      updated_at: '2026-04-17T05:35:08.264Z',
+      last_delivery_id: null,
+      last_event: 'poll_tick',
+      last_action: 'reconcile',
+      last_webhook_timestamp: null,
+      run_id: runId,
+      run_manifest_path: completedPaths.manifestPath,
+      worker_host: null,
+      launch_source: 'control-host',
+      launch_token: 'f730c7d679b5b13ff935d92097a7aa00',
+      launch_started_at: '2026-04-17T02:04:29.689Z',
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null,
+      review_promotion: null,
+      merge_closeout: {
+        recorded_at: '2026-04-17T03:51:34.035Z',
+        issue_id: '59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c',
+        issue_identifier: 'CO-211',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-17T03:51:02.741Z',
+        status: 'action_required',
+        reason: 'pending_shared_root_reconciliation',
+        summary:
+          'Merged attached PR #506; shared-root reconciliation is pending (shared_root_not_on_main) before the Linear issue can transition to Done.',
+        attached_pr_urls: ['https://github.com/Kbediako/CO/pull/506'],
+        ignored_historical_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: {
+          url: 'https://github.com/Kbediako/CO/pull/506',
+          owner: 'Kbediako',
+          repo: 'CO',
+          number: 506
+        },
+        snapshot: {
+          state: 'MERGED',
+          review_decision: 'NONE',
+          merge_state_status: 'UNKNOWN',
+          ready_to_merge: false,
+          gate_reasons: ['state=MERGED', 'merge_state=UNKNOWN'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 0,
+          checks_failed: 0,
+          required_checks_pending: 0,
+          required_checks_failed: 0,
+          updated_at: '2026-04-17T03:51:37Z',
+          merged_at: '2026-04-17T03:51:37Z',
+          head_oid: 'b154340a90bb7fb46b5f5af5074b8e94f8a19853',
+          github_rate_limit: null
+        },
+        branch_recovery: null,
+        merge_attempt: {
+          attempted_at: '2026-04-17T03:51:36.081Z',
+          command: 'gh',
+          args: [
+            'pr',
+            'merge',
+            '506',
+            '--squash',
+            '--repo',
+            'Kbediako/CO',
+            '--match-head-commit',
+            'b154340a90bb7fb46b5f5af5074b8e94f8a19853'
+          ],
+          exit_code: 0,
+          ok: true,
+          stdout: null,
+          stderr: null
+        },
+        shared_root: {
+          status: 'skipped',
+          attempted_at: '2026-04-17T03:51:40.227Z',
+          before_status: '## linear/co-196-codex-0121-plugin-marketplace',
+          after_status: '## linear/co-196-codex-0121-plugin-marketplace',
+          reason: 'shared_root_not_on_main'
+        },
+        linear_transition: null,
+        github_rate_limit: null
+      }
+    });
+
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async ({ issueId }: { issueId: string }) => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: issueId,
+        identifier: 'CO-211',
+        title:
+          'Control host: prevent repeated refresh-stuck restart churn while active provider workers remain healthy',
+        state: 'Done',
+        state_type: 'completed',
+        updated_at: '2026-04-17T03:51:37.100Z'
+      })
+    }));
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue
+    });
+
+    await service.refresh();
+
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-04-17T03:51:37.100Z',
+      run_id: runId,
+      run_manifest_path: completedPaths.manifestPath,
+      merge_closeout: {
+        status: 'action_required',
+        reason: 'pending_shared_root_reconciliation',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        shared_root: {
+          status: 'skipped',
+          reason: 'shared_root_not_on_main'
+        },
+        linear_transition: null
+      }
+    });
+  });
+
+  it('rehydrates an archived terminal merge-closeout claim without preserving stale merging authority', async () => {
+    const { root, paths } = await createHostPaths();
+    const taskId = 'linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c';
+    const runId = '2026-04-17T02-04-33-897Z-d18707f4';
+    const completedPaths = resolveRunPaths(
+      {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId
+      },
+      runId
+    );
+    await mkdir(completedPaths.runDir, { recursive: true });
+    await writeFile(
+      completedPaths.manifestPath,
+      JSON.stringify({
+        run_id: runId,
+        task_id: taskId,
+        pipeline_id: 'provider-linear-worker',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: '59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c',
+        issue_identifier: 'CO-211',
+        issue_updated_at: '2026-04-17T02:04:28.234Z',
+        started_at: '2026-04-17T02:04:34.014Z',
+        updated_at: '2026-04-17T03:50:45.850Z',
+        completed_at: '2026-04-17T03:50:45.820Z',
+        summary: 'Provider linear worker reached review handoff.'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c',
+      issue_id: '59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c',
+      issue_identifier: 'CO-211',
+      issue_title:
+        'Control host: prevent repeated refresh-stuck restart churn while active provider workers remain healthy',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-17T03:51:02.741Z',
+      task_id: taskId,
+      mapping_source: 'provider_id_fallback',
+      state: 'handoff_failed',
+      reason: 'provider_issue_merge_closeout_action_required',
+      accepted_at: '2026-04-17T02:04:29.689Z',
+      updated_at: '2026-04-17T05:35:08.264Z',
+      last_delivery_id: null,
+      last_event: 'poll_tick',
+      last_action: 'reconcile',
+      last_webhook_timestamp: null,
+      run_id: runId,
+      run_manifest_path: completedPaths.manifestPath,
+      worker_host: null,
+      launch_source: 'control-host',
+      launch_token: 'f730c7d679b5b13ff935d92097a7aa00',
+      launch_started_at: '2026-04-17T02:04:29.689Z',
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null,
+      review_promotion: null,
+      merge_closeout: {
+        recorded_at: '2026-04-17T03:51:34.035Z',
+        issue_id: '59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c',
+        issue_identifier: 'CO-211',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-17T03:51:02.741Z',
+        status: 'action_required',
+        reason: 'pending_shared_root_reconciliation',
+        summary:
+          'Merged attached PR #506; shared-root reconciliation is pending (shared_root_not_on_main) before the Linear issue can transition to Done.',
+        attached_pr_urls: ['https://github.com/Kbediako/CO/pull/506'],
+        ignored_historical_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: {
+          url: 'https://github.com/Kbediako/CO/pull/506',
+          owner: 'Kbediako',
+          repo: 'CO',
+          number: 506
+        },
+        snapshot: {
+          state: 'MERGED',
+          review_decision: 'NONE',
+          merge_state_status: 'UNKNOWN',
+          ready_to_merge: false,
+          gate_reasons: ['state=MERGED', 'merge_state=UNKNOWN'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 0,
+          checks_failed: 0,
+          required_checks_pending: 0,
+          required_checks_failed: 0,
+          updated_at: '2026-04-17T03:51:37Z',
+          merged_at: '2026-04-17T03:51:37Z',
+          head_oid: 'b154340a90bb7fb46b5f5af5074b8e94f8a19853',
+          github_rate_limit: null
+        },
+        branch_recovery: null,
+        merge_attempt: {
+          attempted_at: '2026-04-17T03:51:36.081Z',
+          command: 'gh',
+          args: [
+            'pr',
+            'merge',
+            '506',
+            '--squash',
+            '--repo',
+            'Kbediako/CO',
+            '--match-head-commit',
+            'b154340a90bb7fb46b5f5af5074b8e94f8a19853'
+          ],
+          exit_code: 0,
+          ok: true,
+          stdout: null,
+          stderr: null
+        },
+        shared_root: {
+          status: 'skipped',
+          attempted_at: '2026-04-17T03:51:40.227Z',
+          before_status: '## linear/co-196-codex-0121-plugin-marketplace',
+          after_status: '## linear/co-196-codex-0121-plugin-marketplace',
+          reason: 'shared_root_not_on_main'
+        },
+        linear_transition: null,
+        github_rate_limit: null
+      }
+    });
+
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async ({ issueId }: { issueId: string }) => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: issueId,
+        identifier: 'CO-211',
+        title:
+          'Control host: prevent repeated refresh-stuck restart churn while active provider workers remain healthy',
+        state: 'Done',
+        state_type: 'completed',
+        updated_at: '2026-04-17T03:51:37.100Z',
+        archived_at: '2026-04-17T04:00:00.000Z'
+      })
+    }));
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue
+    });
+
+    await service.rehydrate();
+
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-04-17T03:51:37.100Z',
+      issue_archived_at: '2026-04-17T04:00:00.000Z',
+      run_id: runId,
+      run_manifest_path: completedPaths.manifestPath,
+      merge_closeout: {
+        status: 'action_required',
+        reason: 'pending_shared_root_reconciliation',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        shared_root: {
+          status: 'skipped',
+          reason: 'shared_root_not_on_main'
+        },
+        linear_transition: null
+      },
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
+    });
+  });
+
+  it('keeps merge-closeout authority when cached terminal truth lacks updated_at freshness proof', async () => {
+    const { root, paths } = await createHostPaths();
+    const taskId = 'linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c';
+    const runId = '2026-04-17T02-04-33-897Z-d18707f4';
+    const completedPaths = resolveRunPaths(
+      {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId
+      },
+      runId
+    );
+    await mkdir(completedPaths.runDir, { recursive: true });
+    await writeFile(
+      completedPaths.manifestPath,
+      JSON.stringify({
+        run_id: runId,
+        task_id: taskId,
+        issue_provider: 'linear',
+        issue_id: '59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c',
+        issue_identifier: 'CO-211',
+        pipeline_id: 'diagnostics',
+        pipeline_title: 'Diagnostics',
+        status: 'succeeded',
+        started_at: '2026-04-17T02:04:34.014Z',
+        updated_at: '2026-04-17T03:50:45.850Z',
+        completed_at: '2026-04-17T03:50:45.820Z',
+        summary: 'Provider linear worker reached review handoff.'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c',
+      issue_id: '59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c',
+      issue_identifier: 'CO-211',
+      issue_title:
+        'Control host: prevent repeated refresh-stuck restart churn while active provider workers remain healthy',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: null,
+      task_id: taskId,
+      mapping_source: 'provider_id_fallback',
+      state: 'handoff_failed',
+      reason: 'provider_issue_merge_closeout_action_required',
+      accepted_at: '2026-04-17T02:04:29.689Z',
+      updated_at: '2026-04-17T05:35:08.264Z',
+      last_delivery_id: null,
+      last_event: 'poll_tick',
+      last_action: 'reconcile',
+      last_webhook_timestamp: null,
+      run_id: runId,
+      run_manifest_path: completedPaths.manifestPath,
+      worker_host: null,
+      launch_source: 'control-host',
+      launch_token: 'f730c7d679b5b13ff935d92097a7aa00',
+      launch_started_at: '2026-04-17T02:04:29.689Z',
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null,
+      review_promotion: null,
+      merge_closeout: {
+        recorded_at: '2026-04-17T03:51:34.035Z',
+        issue_id: '59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c',
+        issue_identifier: 'CO-211',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-17T03:51:02.741Z',
+        status: 'action_required',
+        reason: 'pending_shared_root_reconciliation',
+        summary:
+          'Merged attached PR #506; shared-root reconciliation is pending (shared_root_not_on_main) before the Linear issue can transition to Done.',
+        attached_pr_urls: ['https://github.com/Kbediako/CO/pull/506'],
+        ignored_historical_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: {
+          url: 'https://github.com/Kbediako/CO/pull/506',
+          owner: 'Kbediako',
+          repo: 'CO',
+          number: 506
+        },
+        snapshot: {
+          state: 'MERGED',
+          review_decision: 'NONE',
+          merge_state_status: 'UNKNOWN',
+          ready_to_merge: false,
+          gate_reasons: ['state=MERGED', 'merge_state=UNKNOWN'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 0,
+          checks_failed: 0,
+          required_checks_pending: 0,
+          required_checks_failed: 0,
+          updated_at: '2026-04-17T03:51:37Z',
+          merged_at: '2026-04-17T03:51:37Z',
+          head_oid: 'b154340a90bb7fb46b5f5af5074b8e94f8a19853',
+          github_rate_limit: null
+        },
+        branch_recovery: null,
+        merge_attempt: {
+          attempted_at: '2026-04-17T03:51:36.081Z',
+          command: 'gh',
+          args: [
+            'pr',
+            'merge',
+            '506',
+            '--squash',
+            '--repo',
+            'Kbediako/CO',
+            '--match-head-commit',
+            'b154340a90bb7fb46b5f5af5074b8e94f8a19853'
+          ],
+          exit_code: 0,
+          ok: true,
+          stdout: null,
+          stderr: null
+        },
+        shared_root: {
+          status: 'skipped',
+          attempted_at: '2026-04-17T03:51:40.227Z',
+          before_status: '## linear/co-196-codex-0121-plugin-marketplace',
+          after_status: '## linear/co-196-codex-0121-plugin-marketplace',
+          reason: 'shared_root_not_on_main'
+        },
+        linear_transition: null,
+        github_rate_limit: null
+      }
+    });
+
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'skip' as const,
+      reason: 'dispatch_source_unavailable'
+    }));
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      resolveTrackedIssue
+    });
+
+    await service.refresh();
+
+    expect(resolveTrackedIssue).toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'handoff_failed',
+      reason: 'provider_issue_merge_closeout_action_required',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: null,
+      run_id: runId,
+      run_manifest_path: completedPaths.manifestPath,
+      merge_closeout: {
+        status: 'action_required',
+        reason: 'pending_shared_root_reconciliation',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        shared_root: {
+          status: 'skipped',
+          reason: 'shared_root_not_on_main'
+        },
+        linear_transition: null
+      }
+    });
+  });
 });
