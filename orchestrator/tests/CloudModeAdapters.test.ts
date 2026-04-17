@@ -46,6 +46,17 @@ function makeResult(status: 'ready' | 'failed'): PipelineRunExecutionResult {
   };
 }
 
+function makeConnectorDriftResult(): PipelineRunExecutionResult {
+  const result = makeResult('failed');
+  if (result.manifest.cloud_execution) {
+    result.manifest.status_detail = null;
+    result.manifest.cloud_execution.task_id = null;
+    result.manifest.cloud_execution.error =
+      'codex cloud exec failed with exit 1: HTTP 400 missing_github_connector_link: GitHub connection not found for user';
+  }
+  return result;
+}
+
 function makeFallbackResult(): PipelineRunExecutionResult {
   return {
     success: true,
@@ -106,6 +117,19 @@ describe('cloud mode adapters', () => {
     expect(result.reports[0]?.details).toContain('Failure class: configuration (env_config)');
   });
 
+  it('CommandTester reports cloud connector auth drift for GitHub connector admission failures', async () => {
+    const tester = new CommandTester(() => makeConnectorDriftResult());
+    const input: TestInput = {
+      task: { id: 'task', title: 'Task' },
+      build: buildInput('cloud'),
+      mode: 'cloud',
+      runId: 'run-1'
+    };
+    const result = await tester.test(input);
+    expect(result.success).toBe(false);
+    expect(result.reports[0]?.details).toContain('Failure class: credentials (cloud_connector_auth_drift)');
+  });
+
   it('CommandTester treats missing cloud_execution as a successful MCP fallback', async () => {
     const tester = new CommandTester(() => makeFallbackResult());
     const input: TestInput = {
@@ -140,6 +164,27 @@ describe('cloud mode adapters', () => {
     expect(result.summary).toContain('Cloud status URL');
     expect(result.summary).toContain('Failure class: configuration (env_config)');
     expect(result.decision.feedback).toContain('Failure class: configuration (env_config)');
+  });
+
+  it('CommandReviewer reports cloud connector auth drift for GitHub connector admission failures', async () => {
+    const reviewer = new CommandReviewer(() => makeConnectorDriftResult());
+    const input: ReviewInput = {
+      task: { id: 'task', title: 'Task' },
+      plan: { items: [{ id: 'pipeline:stage', description: 'Stage' }] },
+      build: buildInput('cloud'),
+      test: {
+        subtaskId: 'pipeline:stage',
+        success: false,
+        reports: [{ name: 'cloud-task', status: 'failed' }],
+        runId: 'run-1'
+      },
+      mode: 'cloud',
+      runId: 'run-1'
+    };
+    const result = await reviewer.review(input);
+    expect(result.decision.approved).toBe(false);
+    expect(result.summary).toContain('Failure class: credentials (cloud_connector_auth_drift)');
+    expect(result.decision.feedback).toContain('Repair or relink the GitHub connector');
   });
 
   it('CommandReviewer reports fallback when cloud_execution is missing', async () => {

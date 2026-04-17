@@ -273,6 +273,7 @@ export interface ProviderLinearWorkerChildLaneRecord {
 export type ProviderLinearWorkerDiagnosticCategory =
   | 'env_config'
   | 'auth_mismatch'
+  | 'cloud_connector_auth_drift'
   | 'quota_rate_limit'
   | 'cloud_denial'
   | 'guardian_timeout'
@@ -2802,6 +2803,15 @@ function classifyProviderWorkerFailureDiagnosis(
     );
   }
   if (
+    /\b(cloud connector auth drift|missing github connector link|github connection not found(?: for user)?|github connector not found|github connector link missing|missing github connection|missing github connector)\b/u
+      .test(normalizedClassification)
+  ) {
+    return build(
+      'cloud_connector_auth_drift',
+      'Repair or relink the GitHub connector for the current ChatGPT/Codex cloud account/environment, or record an explicit waiver before re-running cloud-canary gates.'
+    );
+  }
+  if (
     /\b(cloud denial|cloud denied|cloud access denied|cloud execution denied|not allowed in cloud)\b/u
       .test(normalizedClassification)
   ) {
@@ -2866,6 +2876,8 @@ function providerWorkerDiagnosticGuidance(
       return 'Guardian policy denied the request; inspect policy-denial guidance rather than timeout remediation.';
     case 'quota_rate_limit':
       return 'Codex account quota/rate-limit or plan decoding is implicated; inspect rate-limit and account-plan evidence.';
+    case 'cloud_connector_auth_drift':
+      return 'Repair or relink the GitHub connector for the current ChatGPT/Codex cloud account/environment, or record an explicit waiver before re-running cloud-canary gates.';
     case 'cloud_denial':
       return 'Codex Cloud denied the run; verify cloud environment, branch, and account permission.';
     case 'env_config':
@@ -2909,6 +2921,16 @@ function classifyProviderWorkerStructuredDiagnosticValue(
     ].includes(normalized)
   ) {
     return 'quota_rate_limit';
+  }
+  if (
+    [
+      'cloud_connector_auth_drift',
+      'missing_github_connector_link',
+      'github_connection_not_found',
+      'github_connector_not_found'
+    ].includes(normalized)
+  ) {
+    return 'cloud_connector_auth_drift';
   }
   if (
     [

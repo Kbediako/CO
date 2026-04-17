@@ -145,7 +145,7 @@ describe('cloud-canary-ci fallback contract', () => {
       })
     ).rejects.toMatchObject({
       code: 1,
-      stderr: expect.stringContaining('Failure class: credentials')
+      stderr: expect.stringContaining('Failure class: credentials (auth_mismatch)')
     });
   });
 
@@ -178,7 +178,7 @@ describe('cloud-canary-ci fallback contract', () => {
       })
     ).rejects.toMatchObject({
       code: 1,
-      stderr: expect.stringContaining('Failure class: credentials')
+      stderr: expect.stringContaining('Failure class: credentials (auth_mismatch)')
     });
   });
 });

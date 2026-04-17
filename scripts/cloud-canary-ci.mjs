@@ -4,6 +4,7 @@ import { appendFile, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { isAbsolute, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
 
 const DEFAULT_TASK_ID = 'ci-cloud-canary';
@@ -28,83 +29,143 @@ function normalizeFailureSignal(signal) {
   return String(signal ?? '').toLowerCase();
 }
 
-function hasCredentialFailureSignal(signal) {
-  const normalized = normalizeFailureSignal(signal);
-  return (
-    normalized.includes('unauthorized') ||
-    normalized.includes('forbidden') ||
-    normalized.includes('not logged in') ||
-    normalized.includes('login') ||
-    normalized.includes('api key') ||
-    normalized.includes('credential') ||
-    normalized.includes('token')
-  );
+function cloudConnectorAuthDriftDiagnosis() {
+  return {
+    category: 'credentials',
+    diagnostic_category: 'cloud_connector_auth_drift',
+    guidance:
+      'Repair or relink the GitHub connector for the current ChatGPT/Codex cloud account/environment, or record an explicit waiver before re-running cloud-canary gates.'
+  };
 }
 
-function hasConnectivityFailureSignal(signal) {
-  const normalized = normalizeFailureSignal(signal);
-  return (
-    normalized.includes('enotfound') ||
-    normalized.includes('econn') ||
-    normalized.includes('network') ||
-    normalized.includes('timed out') ||
-    normalized.includes('timeout') ||
-    normalized.includes('502') ||
-    normalized.includes('503') ||
-    normalized.includes('504')
-  );
+function envConfigDiagnosis() {
+  return {
+    category: 'configuration',
+    diagnostic_category: 'env_config',
+    guidance: 'Set CODEX_CLOUD_ENV_ID (or metadata.cloudEnvId) for the cloud canary target.'
+  };
 }
 
-function diagnosisForCategory(category) {
-  if (category === 'configuration') {
-    return {
-      category: 'configuration',
-      guidance: 'Set CODEX_CLOUD_ENV_ID (or metadata.cloudEnvId) for the cloud canary target.'
-    };
-  }
-  if (category === 'credentials') {
-    return {
-      category: 'credentials',
-      guidance: 'Provide Codex Cloud credentials in CI with access to the configured environment.'
-    };
-  }
-  if (category === 'connectivity') {
-    return {
-      category: 'connectivity',
-      guidance: 'Cloud endpoint connectivity looks unstable; retry and inspect endpoint/network health.'
-    };
-  }
-  if (category === 'execution') {
-    return {
-      category: 'execution',
-      guidance: 'Inspect cloud command logs and manifest cloud_execution.error for the terminal failure cause.'
-    };
-  }
+function authMismatchDiagnosis() {
+  return {
+    category: 'credentials',
+    diagnostic_category: 'auth_mismatch',
+    guidance: 'Provide Codex Cloud credentials in CI with access to the configured environment.'
+  };
+}
+
+function networkConnectivityDiagnosis() {
+  return {
+    category: 'connectivity',
+    diagnostic_category: 'network_connectivity',
+    guidance: 'Cloud endpoint connectivity looks unstable; retry and inspect endpoint/network health.'
+  };
+}
+
+function providerRuntimeDiagnosis() {
+  return {
+    category: 'execution',
+    diagnostic_category: 'provider_runtime',
+    guidance: 'Inspect cloud command logs and manifest cloud_execution.error for the terminal failure cause.'
+  };
+}
+
+function unknownDiagnosis() {
   return {
     category: 'unknown',
+    diagnostic_category: 'unknown',
     guidance: 'Inspect manifest status_detail, runner logs, and cloud command logs to classify this failure.'
   };
 }
 
-function classifyFailure(signal) {
+function hasCloudConnectorAuthDriftSignal(normalizedSignal) {
+  const normalizedConnectorSignal = normalizedSignal.replace(/[_-]+/g, ' ');
+  return (
+    normalizedConnectorSignal.includes('cloud connector auth drift') ||
+    normalizedConnectorSignal.includes('missing github connector link') ||
+    normalizedConnectorSignal.includes('github connection not found for user') ||
+    normalizedConnectorSignal.includes('github connection not found') ||
+    normalizedConnectorSignal.includes('github connector not found') ||
+    normalizedConnectorSignal.includes('github connector link missing') ||
+    normalizedConnectorSignal.includes('missing github connection') ||
+    normalizedConnectorSignal.includes('missing github connector')
+  );
+}
+
+function hasEnvConfigSignal(normalizedSignal) {
+  return (
+    normalizedSignal.includes('cloud-env-missing') ||
+    normalizedSignal.includes('codex_cloud_env_id') ||
+    normalizedSignal.includes('no environment id is configured')
+  );
+}
+
+function hasAuthMismatchSignal(normalizedSignal) {
+  return (
+    normalizedSignal.includes('unauthorized') ||
+    normalizedSignal.includes('forbidden') ||
+    normalizedSignal.includes('not logged in') ||
+    normalizedSignal.includes('login') ||
+    normalizedSignal.includes('api key') ||
+    normalizedSignal.includes('credential') ||
+    normalizedSignal.includes('token')
+  );
+}
+
+function hasConnectivitySignal(normalizedSignal) {
+  return (
+    normalizedSignal.includes('enotfound') ||
+    normalizedSignal.includes('econn') ||
+    normalizedSignal.includes('network') ||
+    normalizedSignal.includes('timed out') ||
+    normalizedSignal.includes('timeout') ||
+    normalizedSignal.includes('502') ||
+    normalizedSignal.includes('503') ||
+    normalizedSignal.includes('504')
+  );
+}
+
+export function classifyFailure(signal) {
   const normalized = normalizeFailureSignal(signal);
-  if (
-    normalized.includes('cloud-env-missing') ||
-    normalized.includes('codex_cloud_env_id') ||
-    normalized.includes('no environment id is configured')
-  ) {
-    return diagnosisForCategory('configuration');
+  if (hasCloudConnectorAuthDriftSignal(normalized)) {
+    return cloudConnectorAuthDriftDiagnosis();
   }
-  if (hasCredentialFailureSignal(normalized)) {
-    return diagnosisForCategory('credentials');
+  if (hasEnvConfigSignal(normalized)) {
+    return envConfigDiagnosis();
   }
-  if (hasConnectivityFailureSignal(normalized)) {
-    return diagnosisForCategory('connectivity');
+  if (hasAuthMismatchSignal(normalized)) {
+    return authMismatchDiagnosis();
+  }
+  if (hasConnectivitySignal(normalized)) {
+    return networkConnectivityDiagnosis();
   }
   if (normalized.includes('failed') || normalized.includes('error') || normalized.includes('cancelled')) {
-    return diagnosisForCategory('execution');
+    return providerRuntimeDiagnosis();
   }
-  return diagnosisForCategory('unknown');
+  return unknownDiagnosis();
+}
+
+function classifyCredentialFatalSignal(signal) {
+  const normalized = normalizeFailureSignal(signal);
+  if (hasCloudConnectorAuthDriftSignal(normalized)) {
+    return cloudConnectorAuthDriftDiagnosis();
+  }
+  if (hasAuthMismatchSignal(normalized)) {
+    return authMismatchDiagnosis();
+  }
+  return null;
+}
+
+function classifyConnectivityFatalSignal(signal) {
+  const normalized = normalizeFailureSignal(signal);
+  if (hasConnectivitySignal(normalized)) {
+    return networkConnectivityDiagnosis();
+  }
+  return null;
+}
+
+export function formatCloudCanaryFailureClass(diagnosis) {
+  return `${diagnosis.category} (${diagnosis.diagnostic_category})`;
 }
 
 function hasCredentialEnv(env) {
@@ -495,9 +556,6 @@ async function main() {
     .filter((value) => value.trim().length > 0)
     .join('\n');
   const stdoutFailureSignal = tail(execution.stdout, 20);
-  const failureSignal = [primaryFailureSignal, stdoutFailureSignal]
-    .filter((value) => value.trim().length > 0)
-    .join('\n');
   const diagnosis = classifyFailure(primaryFailureSignal || stdoutFailureSignal);
   const expectedFallbackConfigurationFailure =
     expectFallback &&
@@ -505,20 +563,18 @@ async function main() {
     cloudFallback?.mode_used === 'mcp' &&
     Array.isArray(cloudFallback?.issues) &&
     cloudFallback.issues.some((issue) => issue?.code === 'missing_environment');
-  const fatalDiagnosis = required && hasCredentialFailureSignal(primaryFailureSignal)
-    ? diagnosisForCategory('credentials')
-    : required && hasConnectivityFailureSignal(primaryFailureSignal)
-      ? diagnosisForCategory('connectivity')
-      : required && diagnosis.category === 'configuration' && !expectedFallbackConfigurationFailure
-        ? diagnosis
-        : null;
+  const fatalDiagnosis = required
+    ? classifyCredentialFatalSignal(primaryFailureSignal)
+      ?? classifyConnectivityFatalSignal(primaryFailureSignal)
+      ?? (diagnosis.category === 'configuration' && !expectedFallbackConfigurationFailure ? diagnosis : null)
+    : null;
   const skipEligible = !required
     && (
       (!expectFallback && SKIPPABLE_FAILURE_CATEGORIES.has(diagnosis.category))
       || (expectFallback && diagnosis.category === 'credentials')
     );
   if (fatalDiagnosis) {
-    assertionFailures.push(`Failure class ${fatalDiagnosis.category} indicates infrastructure/credential issues.`);
+    assertionFailures.push(`Failure class ${formatCloudCanaryFailureClass(fatalDiagnosis)} indicates infrastructure/credential issues.`);
   }
 
   if (assertionFailures.length === 0) {
@@ -567,7 +623,7 @@ async function main() {
     '',
     ...assertionFailures.map((failure) => `- ${failure}`),
     '',
-    `Failure class: ${reportedDiagnosis.category}`,
+    `Failure class: ${formatCloudCanaryFailureClass(reportedDiagnosis)}`,
     `Guidance: ${reportedDiagnosis.guidance}`,
     `Manifest: ${manifestPath ?? '<unresolved>'}`,
     `Run summary: ${runSummaryPath ?? '<unresolved>'}`,
@@ -581,9 +637,11 @@ async function main() {
   process.exitCode = skipEligible ? 0 : 1;
 }
 
-main().catch(async (error) => {
-  const message = (error instanceof Error ? error.stack ?? error.message : String(error)).trim();
-  console.error(`Cloud canary crashed:\n${message}`);
-  await appendStepSummary(['## Cloud Canary (Failed)', '', 'Unhandled exception:', '```', message, '```']);
-  process.exitCode = 1;
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch(async (error) => {
+    const message = (error instanceof Error ? error.stack ?? error.message : String(error)).trim();
+    console.error(`Cloud canary crashed:\n${message}`);
+    await appendStepSummary(['## Cloud Canary (Failed)', '', 'Unhandled exception:', '```', message, '```']);
+    process.exitCode = 1;
+  });
+}
