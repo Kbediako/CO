@@ -446,7 +446,7 @@ describe('runDoctor', () => {
       await rm(tempHome, { recursive: true, force: true });
       await rm(tempRepo, { recursive: true, force: true });
     }
-  }, 15000);
+  }, RUN_DOCTOR_TIMEOUT_MS);
 
   it('reports provider readiness when the repo is seeded and env is configured', async () => {
     const tempRepo = await mkdtemp(join(tmpdir(), 'doctor-providers-'));
@@ -523,7 +523,7 @@ describe('runDoctor', () => {
       }
       await rm(tempRepo, { recursive: true, force: true });
     }
-  }, 15000);
+  }, RUN_DOCTOR_TIMEOUT_MS);
 
   it('resolves provider readiness from the repo root when doctor runs in a nested directory', async () => {
     const tempRepo = await mkdtemp(join(tmpdir(), 'doctor-providers-root-'));
@@ -594,7 +594,7 @@ describe('runDoctor', () => {
       }
       await rm(tempRepo, { recursive: true, force: true });
     }
-  }, 15000);
+  }, RUN_DOCTOR_TIMEOUT_MS);
 
   it('resolves provider readiness from seeded .codex repo roots when doctor runs in a nested directory', async () => {
     const tempRepo = await mkdtemp(join(tmpdir(), 'doctor-seeded-root-'));

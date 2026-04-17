@@ -195,4 +195,95 @@ describe('tasks-archive script', () => {
     expect(archiveContent).toContain('linear-6ed6ef11-538e-48f0-936c-8547632bf92e');
     expect(archiveContent).not.toContain('1002-still-active-task');
   });
+
+  it('does not append duplicate header-only archive sections when the archive already contains the task key', async () => {
+    const repo = await initRepository();
+    const existingArchivePath = join(repo, 'docs', `TASKS-archive-${archiveYear}.md`);
+
+    await writeFile(
+      existingArchivePath,
+      [
+        `# Task Archive — ${archiveYear}`,
+        '',
+        `# Task List Snapshot - Completed linear archive candidate (linear-6ed6ef11-538e-48f0-936c-8547632bf92e) - Update ${completedAt}: completed`,
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    await execFileAsync('node', [scriptPath, '--out', 'docs/TASKS-archive-YYYY.md'], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const archiveContent = await readFile(existingArchivePath, 'utf8');
+    const archiveMatches =
+      archiveContent.match(/linear-6ed6ef11-538e-48f0-936c-8547632bf92e/g)?.length ?? 0;
+
+    expect(archiveMatches).toBe(1);
+  });
+
+  it('archives enough sections when inserting the archive index consumes extra lines', async () => {
+    const repo = await mkdtemp(join(tmpdir(), 'tasks-archive-index-growth-'));
+    createdDirs.push(repo);
+
+    await mkdir(join(repo, 'docs'), { recursive: true });
+    await mkdir(join(repo, 'tasks'), { recursive: true });
+
+    await writeFile(
+      join(repo, 'docs', 'tasks-archive-policy.json'),
+      JSON.stringify(
+        {
+          version: 1,
+          max_lines: 8,
+          reserve_lines: 2,
+          archive_branch: 'task-archives',
+          archive_file_pattern: 'docs/TASKS-archive-YYYY.md',
+          repo_url: 'https://github.com/example/repo'
+        },
+        null,
+        2
+      )
+    );
+    await writeFile(join(repo, 'tasks', 'index.json'), JSON.stringify({ items: [] }, null, 2), 'utf8');
+    await writeFile(
+      join(repo, 'docs', 'TASKS.md'),
+      [
+        '# Task List Snapshot - Completed candidate one (1001-candidate-one) - Update 2026-04-10: completed',
+        '',
+        '# Task List Snapshot - Completed candidate two (1002-candidate-two) - Update 2026-04-11: completed',
+        '',
+        '# Task List Snapshot - Completed candidate three (1003-candidate-three) - Update 2026-04-12: completed',
+        '',
+        '# Task List Snapshot - Active task (1004-active-task)',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    await execFileAsync('node', [scriptPath, '--out', 'docs/TASKS-archive-YYYY.md'], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const tasksContent = await readFile(join(repo, 'docs', 'TASKS.md'), 'utf8');
+    const normalizedLineCount = tasksContent.trimEnd().split('\n').length;
+    const remainingCompletedCandidates = [
+      '1001-candidate-one',
+      '1002-candidate-two',
+      '1003-candidate-three'
+    ].filter((taskKey) => tasksContent.includes(taskKey));
+
+    expect(tasksContent).toContain('1004-active-task');
+    expect(remainingCompletedCandidates).toHaveLength(1);
+    expect(normalizedLineCount).toBeLessThanOrEqual(6);
+  });
 });

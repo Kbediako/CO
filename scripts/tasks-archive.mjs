@@ -338,11 +338,52 @@ function updateArchiveIndex(content, policy, years) {
 
 function extractArchivedTaskKeys(content) {
   const keys = new Set();
-  const pattern = /<!-- docs-sync:begin ([^ ]+) -->/g;
-  for (const match of content.matchAll(pattern)) {
-    keys.add(match[1]);
+  for (const line of content.split('\n')) {
+    const docsSyncMatch = /^<!-- docs-sync:begin (.+) -->$/.exec(line);
+    if (docsSyncMatch?.[1]) {
+      keys.add(docsSyncMatch[1].trim());
+    }
+    if (lineStartsWithSnapshotHeader(line)) {
+      const headerKey = extractSnapshotKey(line);
+      if (headerKey) {
+        keys.add(headerKey);
+      }
+    }
   }
   return keys;
+}
+
+function extractArchiveSectionKey(section) {
+  if (typeof section !== 'string' || section.length === 0) {
+    return null;
+  }
+  const docsSyncMatch = section.match(/<!-- docs-sync:begin ([^ ]+) -->/);
+  if (docsSyncMatch?.[1]) {
+    return docsSyncMatch[1];
+  }
+  for (const line of section.split('\n')) {
+    if (!lineStartsWithSnapshotHeader(line)) {
+      continue;
+    }
+    const headerKey = extractSnapshotKey(line);
+    if (headerKey) {
+      return headerKey;
+    }
+  }
+  return null;
+}
+
+function cloneArchiveSections(sections) {
+  const cloned = new Map();
+  for (const [year, values] of sections.entries()) {
+    cloned.set(year, [...values]);
+  }
+  return cloned;
+}
+
+function buildUpdatedTasksContent({ lines, removeMask, policy, archivedYears }) {
+  const updatedLines = lines.filter((_, index) => !removeMask[index]);
+  return updateArchiveIndex(updatedLines.join('\n'), policy, archivedYears);
 }
 
 async function main() {
@@ -379,6 +420,7 @@ async function main() {
   const lines = normalizedTasks.split('\n');
   const totalLines = countNormalizedLines(normalizedTasks);
   const targetLines = policy.maxLines - policy.reserveLines;
+  const archiveIndexMissing = !normalizedTasks.includes('<!-- tasks-archive-index:begin -->');
   const withinArchiveThreshold = (lineCount) =>
     policy.reserveLines === 0 ? lineCount < targetLines : lineCount <= targetLines;
 
@@ -427,47 +469,52 @@ async function main() {
   }
 
   const toArchive = [];
-  let remainingLines = totalLines;
+  let archivedYears = new Set();
+  let archiveSections = new Map();
+  let removeMask = new Array(lines.length).fill(false);
+  let updatedContent = normalizedTasks;
+  let updatedLineCount = totalLines;
   for (const candidate of candidates) {
-    if (withinArchiveThreshold(remainingLines)) {
+    if (withinArchiveThreshold(updatedLineCount)) {
       break;
     }
+
+    const tentativeRemoveMask = removeMask.slice();
+    for (let index = candidate.start; index <= candidate.end; index += 1) {
+      tentativeRemoveMask[index] = true;
+    }
+
+    const year = candidate.completedAt.slice(0, 4);
+    const tentativeArchivedYears = new Set(archivedYears);
+    tentativeArchivedYears.add(year);
+    const tentativeArchiveSections = cloneArchiveSections(archiveSections);
+    const sectionsForYear = tentativeArchiveSections.get(year) ?? [];
+    sectionsForYear.push(lines.slice(candidate.start, candidate.end + 1).join('\n'));
+    tentativeArchiveSections.set(year, sectionsForYear);
+
+    const tentativeUpdatedContent = buildUpdatedTasksContent({
+      lines,
+      removeMask: tentativeRemoveMask,
+      policy,
+      archivedYears: tentativeArchivedYears
+    });
+    const tentativeUpdatedLineCount = countNormalizedLines(tentativeUpdatedContent);
+    const bootstrapArchiveIndex = archiveIndexMissing && archivedYears.size === 0;
+    if (tentativeUpdatedLineCount >= updatedLineCount && !bootstrapArchiveIndex) {
+      continue;
+    }
+
     toArchive.push(candidate);
-    remainingLines -= candidate.lineCount;
+    removeMask = tentativeRemoveMask;
+    archivedYears = tentativeArchivedYears;
+    archiveSections = tentativeArchiveSections;
+    updatedContent = tentativeUpdatedContent;
+    updatedLineCount = tentativeUpdatedLineCount;
   }
-
-  if (!withinArchiveThreshold(remainingLines)) {
-    throw new Error(
-      `Unable to restore reserve target ${targetLines}; ${remainingLines} lines remain after archiving (hard max ${policy.maxLines}).`
-    );
-  }
-
-  const archivedYears = new Set();
-  const archiveSections = new Map();
-  for (const archived of toArchive) {
-    const year = archived.completedAt.slice(0, 4);
-    archivedYears.add(year);
-    if (!archiveSections.has(year)) {
-      archiveSections.set(year, []);
-    }
-    archiveSections.get(year).push(lines.slice(archived.start, archived.end + 1).join('\n'));
-  }
-
-  const removeMask = new Array(lines.length).fill(false);
-  for (const archived of toArchive) {
-    for (let index = archived.start; index <= archived.end; index += 1) {
-      removeMask[index] = true;
-    }
-  }
-
-  const updatedLines = lines.filter((_, index) => !removeMask[index]);
-  let updatedContent = updatedLines.join('\n');
-  updatedContent = updateArchiveIndex(updatedContent, policy, archivedYears);
-  const updatedLineCount = countNormalizedLines(updatedContent);
 
   if (!withinArchiveThreshold(updatedLineCount)) {
     throw new Error(
-      `Archive output still exceeds reserve target ${targetLines}; ${updatedLineCount} lines remain after archiving (hard max ${policy.maxLines}).`
+      `Unable to restore reserve target ${targetLines}; ${updatedLineCount} lines remain after archiving (hard max ${policy.maxLines}).`
     );
   }
 
@@ -478,10 +525,6 @@ async function main() {
     : path.join(outRoot, taskId, archiveFileName);
   if (!outPattern.includes('YYYY')) {
     throw new Error('Archive output path must include YYYY.');
-  }
-
-  if (!options.dryRun) {
-    await writeFile(tasksPath, updatedContent);
   }
 
   for (const [year, sectionsForYear] of archiveSections.entries()) {
@@ -503,11 +546,11 @@ async function main() {
         const existing = await readFile(outPath, 'utf8');
         const existingKeys = extractArchivedTaskKeys(existing);
         const filteredSections = sectionsForYear.filter((section) => {
-          const match = section.match(/<!-- docs-sync:begin ([^ ]+) -->/);
-          if (!match) {
+          const sectionKey = extractArchiveSectionKey(section);
+          if (!sectionKey) {
             return true;
           }
-          return !existingKeys.has(match[1]);
+          return !existingKeys.has(sectionKey);
         });
         if (filteredSections.length > 0) {
           const separator = existing.endsWith('\n') ? '\n' : '\n\n';
@@ -519,6 +562,10 @@ async function main() {
       }
     }
     console.log(`Archive payload (${year}): ${outPath}`);
+  }
+
+  if (!options.dryRun) {
+    await writeFile(tasksPath, updatedContent);
   }
 
   console.log(`Archived ${toArchive.length} task(s).`);
