@@ -43,7 +43,7 @@
 - [x] Elegance review completed before review handoff. Evidence: `out/linear-6b0183b4-9ebc-4423-a356-4105ce8aa32b/manual/elegance-review.md`.
 
 ## Handoff Status
-- [ ] PR opened and attached to CO-207.
-- [ ] Workpad refreshed with final evidence and review status.
+- [x] PR opened and attached to CO-207. Evidence: `https://github.com/Kbediako/CO/pull/505`; Linear attachment `c957be0e-44c2-477f-9a60-d81275e1a087`.
+- [x] Workpad refreshed with current validation, review, and PR status. Evidence: Linear workpad comment `3f679c93-c549-4628-a0e1-49035a428fc4`.
 - [ ] PR ready-review drain completed.
 - [ ] Linear transitioned to `In Review` only after required validation, PR checks, ready-review drain, and latest `origin/main` merge are clean or explicitly waived.
