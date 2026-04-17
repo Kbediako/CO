@@ -1,6 +1,61 @@
 {
   "items": [
     {
+      "id": "20260417-linear-901cd944-fc0c-4372-92ce-65bb8bb411c0",
+      "title": "CO workflow: refresh Apr 17 docs:freshness stale cohort blocking handoffs",
+      "relates_to": "tasks/tasks-linear-901cd944-fc0c-4372-92ce-65bb8bb411c0.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-17",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-17",
+          "status": "succeeded_then_stale_snapshot_invalidated_parent_applied",
+          "manifest": ".runs/linear-901cd944-fc0c-4372-92ce-65bb8bb411c0-docs-packet/cli/2026-04-17T00-34-04-191Z-44a13a0d/manifest.json",
+          "source_anchor": "ctx:sha256:c985cc4a17a960ff77ecc05c01c47f3154a8cbf57629da5645f50ad8108cfeb9#chunk:c000001",
+          "summary": "Child lane produced the scoped docs-first packet successfully; helper invalidated acceptance because Linear updated_at changed after launch, so the parent reviewed and applied the saved patch artifact without file-scope collision. Parent owns registry mirrors, reports, cohort disposition, validation, Linear workpad, PR, and merge."
+        },
+        "pre_fix_docs_review": {
+          "reviewer": "codex-orchestrator docs-review child stream",
+          "date": "2026-04-17",
+          "status": "failed_known_baseline_before_fix",
+          "manifest": ".runs/linear-901cd944-fc0c-4372-92ce-65bb8bb411c0-docs-review/cli/2026-04-17T00-48-00-977Z-d429f7b5/manifest.json",
+          "summary": "Pre-fix docs-review reached spec guard, then reproduced the known docs:freshness:maintain block_policy_over_budget baseline blocker that CO-209 owns."
+        },
+        "freshness_owner_action": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-04-17",
+          "status": "reviewed_refreshed",
+          "before": "out/linear-901cd944-fc0c-4372-92ce-65bb8bb411c0/before/docs-freshness-maintenance.json",
+          "after": "out/linear-901cd944-fc0c-4372-92ce-65bb8bb411c0/after/docs-freshness-maintenance.json",
+          "summary": "Classified the Apr 17 last_review=2026-03-17 cohort, refreshed 263 reviewed rows under CO-209 ownership, preserved CO-175 rolling policy, and restored maintenance capacity to 221/300 rows and 1/2 cohorts with blocking_changed_paths empty."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-17",
+          "status": "bounded_success",
+          "telemetry": "../../.runs/linear-901cd944-fc0c-4372-92ce-65bb8bb411c0/cli/2026-04-17T00-30-34-564Z-3788b7dc/review/telemetry.json",
+          "summary": "Manifest-backed review completed with review_outcome=bounded-success after command-intent retry; read-only retry found no actionable correctness issues."
+        },
+        "elegance_review": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-04-17",
+          "status": "passed",
+          "artifact": "out/linear-901cd944-fc0c-4372-92ce-65bb8bb411c0/manual/elegance-review.md",
+          "summary": "No simplification patch needed; solution remains data-only registry refresh plus classification, guide, and task mirror updates."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-901cd944-fc0c-4372-92ce-65bb8bb411c0.md",
+        "task": "tasks/tasks-linear-901cd944-fc0c-4372-92ce-65bb8bb411c0.md",
+        "agent_task": ".agent/task/linear-901cd944-fc0c-4372-92ce-65bb8bb411c0.md",
+        "docs": "docs/TECH_SPEC-linear-901cd944-fc0c-4372-92ce-65bb8bb411c0.md"
+      }
+    },
+    {
       "id": "20260416-linear-004edeb8-9641-4a91-8f9b-2d024766c2ac",
       "title": "CO-208 cloud connector/auth drift classification",
       "relates_to": "tasks/tasks-linear-004edeb8-9641-4a91-8f9b-2d024766c2ac.md",
