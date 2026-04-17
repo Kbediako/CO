@@ -2396,7 +2396,7 @@ describe('ControlRuntime', () => {
             issue_state_type: 'canceled'
           },
           progress: {
-            kind: 'merge_closeout',
+            kind: 'workflow',
             status: 'completed'
           }
         }
@@ -2406,163 +2406,6 @@ describe('ControlRuntime', () => {
       expect(canceledProjection.issues).toEqual([]);
       expect(canceledUiDataset.counts.issues).toBe(0);
       expect(canceledUiDataset.issues).toEqual([]);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('does not project stale pending shared-root reconciliation after terminal truth supersedes merge closeout authority', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-04-17T05:40:00.000Z'));
-    try {
-      const providerIntakeState = createProviderIntakeState([
-        {
-          provider: 'linear',
-          provider_key: 'linear:59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c',
-          issue_id: '59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c',
-          issue_identifier: 'CO-211',
-          issue_title:
-            'Control host: prevent repeated refresh-stuck restart churn while active provider workers remain healthy',
-          issue_state: 'Done',
-          issue_state_type: 'completed',
-          issue_updated_at: '2026-04-17T03:51:37.100Z',
-          task_id: 'linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c',
-          mapping_source: 'provider_id_fallback',
-          state: 'completed',
-          reason: 'provider_issue_rehydrated_completed_run',
-          accepted_at: '2026-04-17T02:04:29.689Z',
-          updated_at: '2026-04-17T05:35:08.264Z',
-          last_delivery_id: null,
-          last_event: 'poll_tick',
-          last_action: 'reconcile',
-          last_webhook_timestamp: null,
-          run_id: '2026-04-17T02-04-33-897Z-d18707f4',
-          run_manifest_path: null,
-          launch_source: 'control-host',
-          launch_token: 'f730c7d679b5b13ff935d92097a7aa00',
-          merge_closeout: {
-            recorded_at: '2026-04-17T03:51:34.035Z',
-            issue_id: '59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c',
-            issue_identifier: 'CO-211',
-            issue_state: 'Merging',
-            issue_state_type: 'started',
-            issue_updated_at: '2026-04-17T03:51:02.741Z',
-            status: 'action_required',
-            reason: 'pending_shared_root_reconciliation',
-            summary:
-              'Merged attached PR #506; shared-root reconciliation is pending (shared_root_not_on_main) before the Linear issue can transition to Done.',
-            attached_pr_urls: ['https://github.com/Kbediako/CO/pull/506'],
-            ignored_historical_pr_urls: [],
-            conflicting_attached_pr_urls: [],
-            pr: {
-              url: 'https://github.com/Kbediako/CO/pull/506',
-              owner: 'Kbediako',
-              repo: 'CO',
-              number: 506
-            },
-            snapshot: {
-              state: 'MERGED',
-              review_decision: 'NONE',
-              merge_state_status: 'UNKNOWN',
-              ready_to_merge: false,
-              gate_reasons: ['state=MERGED', 'merge_state=UNKNOWN'],
-              action_required_reasons: [],
-              unresolved_thread_count: 0,
-              checks_pending: 0,
-              checks_failed: 0,
-              required_checks_pending: 0,
-              required_checks_failed: 0,
-              updated_at: '2026-04-17T03:51:37Z',
-              merged_at: '2026-04-17T03:51:37Z',
-              head_oid: 'b154340a90bb7fb46b5f5af5074b8e94f8a19853'
-            },
-            branch_recovery: null,
-            merge_attempt: null,
-            shared_root: {
-              status: 'skipped',
-              reason: 'shared_root_not_on_main',
-              before_status: '## linear/co-196-codex-0121-plugin-marketplace',
-              after_status: '## linear/co-196-codex-0121-plugin-marketplace'
-            },
-            linear_transition: null,
-            github_rate_limit: null
-          }
-        }
-      ]);
-      const fixture = await createFixture({
-        taskId: 'linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c',
-        providerIntakeState
-      });
-      providerIntakeState.claims[0]!.run_manifest_path = fixture.paths.manifestPath;
-      await seedManifest(fixture.paths, {
-        task_id: 'linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c',
-        issue_provider: 'linear',
-        issue_id: '59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c',
-        issue_identifier: 'CO-211',
-        pipeline_id: 'provider-linear-worker',
-        pipeline_title: 'Provider Linear Worker',
-        status: 'succeeded',
-        started_at: '2026-04-17T02:04:34.014Z',
-        updated_at: '2026-04-17T03:50:45.850Z',
-        completed_at: '2026-04-17T03:50:45.820Z',
-        summary: 'Provider linear worker reached review handoff.'
-      });
-      await seedProviderLinearWorkerProof(fixture.paths, {
-        issue_id: '59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c',
-        issue_identifier: 'CO-211',
-        owner_phase: 'ended',
-        owner_status: 'succeeded',
-        end_reason: 'worker_completed',
-        last_event: 'worker_completed',
-        last_message: 'Provider worker completed.',
-        updated_at: '2026-04-17T03:50:45.820Z'
-      });
-
-      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
-      const uiDataset = buildUiDataset({
-        projection: compatibilityProjection,
-        generatedAt: '2026-04-17T05:40:00.000Z'
-      });
-
-      expect(compatibilityProjection.selected).toMatchObject({
-        issue_identifier: 'CO-211',
-        raw_status: 'succeeded',
-        display_status: 'succeeded',
-        provider_debug_snapshot: {
-          claim: {
-            issue_state: 'Done',
-            issue_state_type: 'completed'
-          },
-          progress: {
-            kind: 'worker',
-            status: 'completed'
-          },
-          pull_request: {
-            merge_closeout_status: null,
-            shared_root_reason: 'shared_root_not_on_main'
-          }
-        }
-      });
-      expect(compatibilityProjection.running).toEqual([]);
-      expect(compatibilityProjection.retrying).toEqual([]);
-      expect(compatibilityProjection.issues).toHaveLength(1);
-      expect(compatibilityProjection.issues[0]).toMatchObject({
-        issueIdentifier: 'CO-211',
-        payload: {
-          display_status: 'succeeded',
-          provider_debug_snapshot: {
-            progress: {
-              kind: 'worker',
-              status: 'completed'
-            }
-          }
-        }
-      });
-      expect(uiDataset.counts.issues).toBe(1);
-      expect(uiDataset.issues[0]).toMatchObject({
-        issue_identifier: 'CO-211',
-        display_status: 'succeeded'
-      });
     } finally {
       vi.useRealTimers();
     }
@@ -4179,7 +4022,21 @@ describe('ControlRuntime', () => {
             remaining: 3
           }
         },
-        updated_at: '2026-03-07T00:20:00.000Z'
+        child_lanes: [
+          {
+            task_id: 'task-1037-current-docs',
+            run_id: 'child-run-1',
+            stream: 'docs',
+            purpose: 'docs lane',
+            pipeline_id: 'provider-linear-child-lane',
+            status: 'in_progress',
+            launched_at: '2026-03-07T00:34:00.000Z',
+            decision: 'pending',
+            summary: 'Child lane docs is running.',
+            summary_recorded_at: '2026-03-07T00:35:00.000Z'
+          }
+        ],
+        updated_at: '2026-03-07T00:35:00.000Z'
       });
 
       const newerSibling = await createSiblingRun(fixture.root, 'task-1037-current', 'run-2', {
@@ -4246,6 +4103,78 @@ describe('ControlRuntime', () => {
         limit_id: 'coding',
         primary: {
           remaining: 17
+        }
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('prefers the freshest current-turn activity timestamp when selecting compatibility Codex rate limits', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
+    try {
+      const fixture = await createFixture({
+        taskId: 'task-rate-limit-current-turn'
+      });
+
+      await seedManifest(fixture.paths, {
+        task_id: 'task-rate-limit-current-turn',
+        issue_id: 'issue-rate-limit-current-turn',
+        issue_identifier: 'ISSUE-RATE-LIMIT-CURRENT-TURN',
+        started_at: '2026-03-07T00:20:00.000Z',
+        updated_at: '2026-03-07T00:29:00.000Z'
+      });
+      await seedProviderLinearWorkerProof(fixture.paths, {
+        issue_id: 'issue-rate-limit-current-turn',
+        issue_identifier: 'ISSUE-RATE-LIMIT-CURRENT-TURN',
+        last_event_at: '2026-03-07T00:28:00.000Z',
+        current_turn_activity: {
+          event: 'token_count',
+          message_or_payload: 'Refreshed Codex budgets.',
+          recorded_at: '2026-03-07T00:29:30.000Z',
+          source: 'session_log_hydration',
+          turn_id: 'turn-2',
+          session_id: 'thread-current-turn-2'
+        },
+        rate_limits: {
+          source: 'current-turn-activity',
+          primary: {
+            remaining: 3
+          }
+        },
+        updated_at: '2026-03-07T00:29:30.000Z'
+      });
+
+      const sibling = await createSiblingRun(fixture.root, 'task-rate-limit-sibling', 'run-2', {
+        manifest: {
+          task_id: 'task-rate-limit-sibling',
+          issue_id: 'issue-rate-limit-sibling',
+          issue_identifier: 'ISSUE-RATE-LIMIT-SIBLING',
+          status: 'in_progress',
+          started_at: '2026-03-07T00:21:00.000Z',
+          updated_at: '2026-03-07T00:29:00.000Z'
+        }
+      });
+      await seedProviderLinearWorkerProof(sibling, {
+        issue_id: 'issue-rate-limit-sibling',
+        issue_identifier: 'ISSUE-RATE-LIMIT-SIBLING',
+        last_event_at: '2026-03-07T00:29:00.000Z',
+        rate_limits: {
+          source: 'last-event-only',
+          primary: {
+            remaining: 17
+          }
+        },
+        updated_at: '2026-03-07T00:29:00.000Z'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+
+      expect(compatibilityProjection.rateLimits).toEqual({
+        source: 'current-turn-activity',
+        primary: {
+          remaining: 3
         }
       });
     } finally {

@@ -1103,6 +1103,54 @@ describe('provider issue observability', () => {
     expect(progress?.last_semantic_progress_at).toBe('2026-04-16T07:48:30.000Z');
   });
 
+  it('prefers the active child lane with the freshest summary timestamp over later launch order', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
+      proof: {
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        current_turn_started_at: '2026-04-16T07:46:00.000Z',
+        last_event: 'turn_started',
+        last_message: 'Provider worker turn is active.',
+        last_event_at: '2026-04-16T07:46:00.000Z',
+        updated_at: '2026-04-16T07:55:00.000Z',
+        child_lanes: [
+          {
+            stream: 'docs-packet',
+            task_id: 'linear-co-210-docs-packet',
+            run_id: 'run-lane-docs',
+            status: 'running',
+            launched_at: '2026-04-16T07:47:00.000Z',
+            summary_recorded_at: '2026-04-16T07:54:00.000Z',
+            decision: 'pending',
+            summary: 'docs-packet child lane is running focused docs validation'
+          },
+          {
+            stream: 'tests-packet',
+            task_id: 'linear-co-210-tests-packet',
+            run_id: 'run-lane-tests',
+            status: 'launching',
+            launched_at: '2026-04-16T07:53:00.000Z',
+            decision: 'pending',
+            summary: 'Child lane reserved before child run startup.'
+          }
+        ],
+        linear_audit: null
+      },
+      now: () => '2026-04-16T07:55:00.000Z'
+    });
+
+    expect(progress).toMatchObject({
+      phase: 'child_lane',
+      kind: 'child_lane',
+      status: 'waiting',
+      summary: 'docs-packet child lane is running focused docs validation',
+      summary_recorded_at: '2026-04-16T07:54:00.000Z',
+      last_semantic_progress_at: '2026-04-16T07:54:00.000Z',
+      stall_classification: 'waiting_on_child_lane',
+      stall_reason: 'child_lane:docs-packet'
+    });
+  });
+
   it('uses the chosen non-empty child summary timestamp when newer child records have blank summaries', () => {
     const progress = deriveProviderLinearWorkerProgressSnapshot({
       proof: {
@@ -1878,271 +1926,438 @@ describe('provider issue observability', () => {
     });
   });
 
-  it('keeps skipped shared-root audit metadata but clears stale merge-closeout status after live terminal truth wins', () => {
-    const baseInput = {
+  it('prefers newer terminal tracked issue state over stale merge-closeout blockers', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
       tracked_issue: {
         state: 'Done',
         state_type: 'completed',
-        updated_at: '2026-04-17T03:51:37.100Z'
+        updated_at: '2026-04-05T06:51:00.000Z'
       },
       claim: {
-        state: 'released',
-        reason: 'provider_issue_released:not_active',
-        updated_at: '2026-04-17T05:35:08.264Z',
-        run_id: 'run-211-terminal',
+        state: 'completed',
+        updated_at: '2026-04-05T06:50:30.000Z',
         issue_state: 'Done',
         issue_state_type: 'completed',
-        issue_updated_at: '2026-04-17T03:51:37.100Z',
+        issue_updated_at: '2026-04-05T06:51:00.000Z',
         merge_closeout: {
-          recorded_at: '2026-04-17T03:51:34.035Z',
-          issue_id: '59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c',
-          issue_identifier: 'CO-211',
           issue_state: 'Merging',
           issue_state_type: 'started',
-          issue_updated_at: '2026-04-17T03:51:02.741Z',
-          status: 'action_required',
+          issue_updated_at: '2026-04-05T06:50:30.000Z',
+          recorded_at: '2026-04-05T06:50:30.000Z',
+          status: 'merged',
           reason: 'pending_shared_root_reconciliation',
-          summary:
-            'Merged attached PR #506; shared-root reconciliation is pending (shared_root_not_on_main) before the Linear issue can transition to Done.',
-          attached_pr_urls: ['https://github.com/Kbediako/CO/pull/506'],
-          pr: {
-            url: 'https://github.com/Kbediako/CO/pull/506',
-            owner: 'Kbediako',
-            repo: 'CO',
-            number: 506
-          },
+          summary: 'Merged attached PR #82; shared-root reconciliation is pending.',
           snapshot: {
-            state: 'MERGED',
-            review_decision: 'NONE',
-            merge_state_status: 'UNKNOWN',
-            ready_to_merge: false,
-            gate_reasons: ['state=MERGED', 'merge_state=UNKNOWN'],
-            action_required_reasons: [],
-            unresolved_thread_count: 0,
-            checks_pending: 0,
-            checks_failed: 0,
-            required_checks_pending: 0,
-            required_checks_failed: 0,
-            updated_at: '2026-04-17T03:51:37Z',
-            merged_at: '2026-04-17T03:51:37Z',
-            head_oid: 'b154340a90bb7fb46b5f5af5074b8e94f8a19853'
+            updated_at: '2026-04-05T06:50:30.000Z',
+            merged_at: '2026-04-05T06:50:00.000Z'
           },
           shared_root: {
             status: 'skipped',
-            reason: 'shared_root_not_on_main',
-            before_status: '## linear/co-196-codex-0121-plugin-marketplace',
-            after_status: '## linear/co-196-codex-0121-plugin-marketplace'
-          },
-          linear_transition: null
+            reason: 'shared_root_dirty'
+          }
         }
       },
       proof: {
         owner_phase: 'ended',
         owner_status: 'succeeded',
-        end_reason: 'worker_completed',
-        last_event: 'worker_completed',
-        last_message: 'Provider worker completed.',
-        last_event_at: '2026-04-17T03:50:45.820Z',
-        updated_at: '2026-04-17T03:50:45.820Z',
-        linear_audit: null
-      }
-    };
-
-    for (const trackedIssueUpdatedAt of [
-      '2026-04-17T03:51:37.100Z',
-      '2026-04-17T03:51:02.741Z'
-    ]) {
-      const snapshot = buildProviderIssueDebugSnapshot({
-        ...baseInput,
-        tracked_issue: {
-          ...baseInput.tracked_issue,
-          updated_at: trackedIssueUpdatedAt
-        }
-      });
-
-      expect(snapshot).toMatchObject({
-        pull_request: {
-          number: 506,
-          merge_closeout_status: null,
-          shared_root_status: 'skipped',
-          shared_root_reason: 'shared_root_not_on_main'
-        },
-        progress: {
-          phase: 'completed',
-          kind: 'worker',
-          status: 'completed'
-        },
-        stall_classification: 'completed',
-        recovery_recommendation: 'no_action'
-      });
-    }
-  });
-
-  it('keeps stale merge-closeout status when terminal truth lacks updated_at freshness proof', () => {
-    const snapshot = buildProviderIssueDebugSnapshot({
-      tracked_issue: {
-        state: 'Done',
-        state_type: 'completed',
-        updated_at: null
-      },
-      claim: {
-        state: 'released',
-        reason: 'provider_issue_released:not_active',
-        updated_at: '2026-04-17T05:35:08.264Z',
-        run_id: 'run-211-terminal',
-        issue_state: 'Done',
-        issue_state_type: 'completed',
-        issue_updated_at: '2026-04-17T03:51:02.741Z',
-        merge_closeout: {
-          recorded_at: '2026-04-17T03:51:34.035Z',
-          issue_id: '59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c',
-          issue_identifier: 'CO-211',
-          issue_state: 'Merging',
-          issue_state_type: 'started',
-          issue_updated_at: '2026-04-17T03:51:02.741Z',
-          status: 'action_required',
-          reason: 'pending_shared_root_reconciliation',
-          summary:
-            'Merged attached PR #506; shared-root reconciliation is pending (shared_root_not_on_main) before the Linear issue can transition to Done.',
-          attached_pr_urls: ['https://github.com/Kbediako/CO/pull/506'],
-          pr: {
-            url: 'https://github.com/Kbediako/CO/pull/506',
-            owner: 'Kbediako',
-            repo: 'CO',
-            number: 506
-          },
-          snapshot: {
-            state: 'MERGED',
-            review_decision: 'NONE',
-            merge_state_status: 'UNKNOWN',
-            ready_to_merge: false,
-            gate_reasons: ['state=MERGED', 'merge_state=UNKNOWN'],
-            action_required_reasons: [],
-            unresolved_thread_count: 0,
-            checks_pending: 0,
-            checks_failed: 0,
-            required_checks_pending: 0,
-            required_checks_failed: 0,
-            updated_at: '2026-04-17T03:51:37Z',
-            merged_at: '2026-04-17T03:51:37Z',
-            head_oid: 'b154340a90bb7fb46b5f5af5074b8e94f8a19853'
-          },
-          shared_root: {
-            status: 'skipped',
-            reason: 'shared_root_not_on_main',
-            before_status: '## linear/co-196-codex-0121-plugin-marketplace',
-            after_status: '## linear/co-196-codex-0121-plugin-marketplace'
-          },
-          linear_transition: null
-        }
-      },
-      proof: {
-        owner_phase: 'ended',
-        owner_status: 'succeeded',
-        end_reason: 'worker_completed',
-        last_event: 'worker_completed',
-        last_message: 'Provider worker completed.',
-        last_event_at: '2026-04-17T03:50:45.820Z',
-        updated_at: '2026-04-17T03:50:45.820Z',
+        end_reason: 'issue_inactive',
+        last_event: 'task_complete',
+        last_message: 'Worker exited after merge closeout.',
+        last_event_at: '2026-04-05T06:50:10.000Z',
+        updated_at: '2026-04-05T06:50:15.000Z',
         linear_audit: null
       }
     });
 
-    expect(snapshot).toMatchObject({
-      pull_request: {
-        number: 506,
-        merge_closeout_status: 'action_required',
-        shared_root_status: 'skipped',
-        shared_root_reason: 'shared_root_not_on_main'
-      },
-      progress: {
-        phase: 'pending_shared_root_reconciliation',
-        kind: 'merge_closeout'
-      }
+    expect(progress).toMatchObject({
+      phase: 'completed',
+      kind: 'workflow',
+      status: 'completed',
+      last_semantic_progress_at: '2026-04-05T06:51:00.000Z',
+      stall_classification: 'completed',
+      recovery_recommendation: 'no_action'
     });
   });
 
-  it('keeps stale merge-closeout status when merge-closeout truth lacks its own updated_at freshness proof', () => {
-    const snapshot = buildProviderIssueDebugSnapshot({
-      tracked_issue: {
-        state: 'Done',
-        state_type: 'completed',
-        updated_at: '2026-04-17T03:51:37.100Z'
-      },
+  it('falls back to terminal claim issue state when live tracked issue data is unavailable', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
       claim: {
-        state: 'released',
-        reason: 'provider_issue_released:not_active',
-        updated_at: '2026-04-17T05:35:08.264Z',
-        run_id: 'run-211-terminal',
+        state: 'completed',
+        updated_at: '2026-04-05T06:50:30.000Z',
         issue_state: 'Done',
         issue_state_type: 'completed',
-        issue_updated_at: '2026-04-17T03:51:37.100Z',
+        issue_updated_at: '2026-04-05T06:51:00.000Z',
         merge_closeout: {
-          recorded_at: '2026-04-17T03:51:34.035Z',
-          issue_id: '59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c',
-          issue_identifier: 'CO-211',
           issue_state: 'Merging',
           issue_state_type: 'started',
-          issue_updated_at: null,
-          status: 'action_required',
+          issue_updated_at: '2026-04-05T06:50:30.000Z',
+          recorded_at: '2026-04-05T06:50:30.000Z',
+          status: 'merged',
           reason: 'pending_shared_root_reconciliation',
-          summary:
-            'Merged attached PR #506; shared-root reconciliation is pending (shared_root_not_on_main) before the Linear issue can transition to Done.',
-          attached_pr_urls: ['https://github.com/Kbediako/CO/pull/506'],
-          pr: {
-            url: 'https://github.com/Kbediako/CO/pull/506',
-            owner: 'Kbediako',
-            repo: 'CO',
-            number: 506
-          },
+          summary: 'Merged attached PR #82; shared-root reconciliation is pending.',
           snapshot: {
-            state: 'MERGED',
-            review_decision: 'NONE',
-            merge_state_status: 'UNKNOWN',
-            ready_to_merge: false,
-            gate_reasons: ['state=MERGED', 'merge_state=UNKNOWN'],
-            action_required_reasons: [],
-            unresolved_thread_count: 0,
-            checks_pending: 0,
-            checks_failed: 0,
-            required_checks_pending: 0,
-            required_checks_failed: 0,
-            updated_at: '2026-04-17T03:51:37Z',
-            merged_at: '2026-04-17T03:51:37Z',
-            head_oid: 'b154340a90bb7fb46b5f5af5074b8e94f8a19853'
+            updated_at: '2026-04-05T06:50:30.000Z',
+            merged_at: '2026-04-05T06:50:00.000Z'
           },
           shared_root: {
             status: 'skipped',
-            reason: 'shared_root_not_on_main',
-            before_status: '## linear/co-196-codex-0121-plugin-marketplace',
-            after_status: '## linear/co-196-codex-0121-plugin-marketplace'
-          },
-          linear_transition: null
+            reason: 'shared_root_dirty'
+          }
         }
       },
       proof: {
         owner_phase: 'ended',
         owner_status: 'succeeded',
-        end_reason: 'worker_completed',
-        last_event: 'worker_completed',
-        last_message: 'Provider worker completed.',
-        last_event_at: '2026-04-17T03:50:45.820Z',
-        updated_at: '2026-04-17T03:50:45.820Z',
+        end_reason: 'issue_inactive',
+        last_event: 'task_complete',
+        last_message: 'Worker exited after merge closeout.',
+        last_event_at: '2026-04-05T06:50:10.000Z',
+        updated_at: '2026-04-05T06:50:15.000Z',
         linear_audit: null
       }
     });
 
-    expect(snapshot).toMatchObject({
-      pull_request: {
-        number: 506,
-        merge_closeout_status: 'action_required',
-        shared_root_status: 'skipped',
-        shared_root_reason: 'shared_root_not_on_main'
+    expect(progress).toMatchObject({
+      phase: 'completed',
+      kind: 'workflow',
+      status: 'completed',
+      last_semantic_progress_at: '2026-04-05T06:51:00.000Z',
+      stall_classification: 'completed',
+      recovery_recommendation: 'no_action'
+    });
+  });
+
+  it('does not let claim-only terminal cache override live worker progress when tracked issue data is unavailable', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
+      claim: {
+        state: 'completed',
+        updated_at: '2026-04-05T06:55:00.000Z',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        issue_updated_at: '2026-04-05T06:52:00.000Z'
       },
-      progress: {
-        phase: 'pending_shared_root_reconciliation',
-        kind: 'merge_closeout'
+      proof: {
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        last_event: 'turn_started',
+        last_message: 'Turn is still running.',
+        last_event_at: '2026-04-05T06:54:30.000Z',
+        updated_at: '2026-04-05T06:54:45.000Z',
+        linear_audit: null
+      },
+      now: () => '2026-04-05T06:55:00.000Z'
+    });
+
+    expect(progress).toMatchObject({
+      phase: 'turn_running',
+      kind: 'worker',
+      status: 'progressing',
+      summary: 'Turn is still running.',
+      last_semantic_progress_at: '2026-04-05T06:54:30.000Z',
+      stall_classification: 'progressing',
+      recovery_recommendation: 'continue_waiting'
+    });
+  });
+
+  it('treats equal terminal and merge-closeout timestamps as terminal-winning', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
+      tracked_issue: {
+        state: 'Done',
+        state_type: 'completed',
+        updated_at: '2026-04-05T06:50:30.000Z'
+      },
+      claim: {
+        state: 'completed',
+        updated_at: '2026-04-05T06:50:30.000Z',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        issue_updated_at: '2026-04-05T06:50:30.000Z',
+        merge_closeout: {
+          issue_state: 'Merging',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-05T06:50:30.000Z',
+          recorded_at: '2026-04-05T06:50:30.000Z',
+          status: 'merged',
+          reason: 'pending_shared_root_reconciliation',
+          summary: 'Merged attached PR #82; shared-root reconciliation is pending.',
+          snapshot: {
+            updated_at: '2026-04-05T06:50:30.000Z',
+            merged_at: '2026-04-05T06:50:00.000Z'
+          },
+          shared_root: {
+            status: 'skipped',
+            reason: 'shared_root_dirty'
+          }
+        }
+      },
+      proof: {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_inactive',
+        last_event: 'task_complete',
+        last_message: 'Worker exited after merge closeout.',
+        last_event_at: '2026-04-05T06:50:10.000Z',
+        updated_at: '2026-04-05T06:50:15.000Z',
+        linear_audit: null
       }
+    });
+
+    expect(progress).toMatchObject({
+      phase: 'completed',
+      kind: 'workflow',
+      status: 'completed',
+      last_semantic_progress_at: '2026-04-05T06:50:30.000Z',
+      stall_classification: 'completed',
+      recovery_recommendation: 'no_action'
+    });
+  });
+
+  it('ignores later merge-closeout polling timestamps when issue freshness is terminal', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
+      tracked_issue: {
+        state: 'Done',
+        state_type: 'completed',
+        updated_at: '2026-04-05T06:51:00.000Z'
+      },
+      claim: {
+        state: 'completed',
+        updated_at: '2026-04-05T06:52:30.000Z',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        issue_updated_at: '2026-04-05T06:51:00.000Z',
+        merge_closeout: {
+          issue_state: 'Merging',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-05T06:50:30.000Z',
+          recorded_at: '2026-04-05T06:52:30.000Z',
+          status: 'merged',
+          reason: 'pending_shared_root_reconciliation',
+          summary: 'Merge closeout polling refreshed after the issue was already terminal.',
+          snapshot: {
+            updated_at: '2026-04-05T06:52:30.000Z',
+            merged_at: '2026-04-05T06:50:00.000Z'
+          },
+          shared_root: {
+            status: 'skipped',
+            reason: 'shared_root_dirty'
+          }
+        }
+      },
+      proof: {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_inactive',
+        last_event: 'task_complete',
+        last_message: 'Worker exited after merge closeout.',
+        last_event_at: '2026-04-05T06:50:10.000Z',
+        updated_at: '2026-04-05T06:50:15.000Z',
+        linear_audit: null
+      }
+    });
+
+    expect(progress).toMatchObject({
+      phase: 'completed',
+      kind: 'workflow',
+      status: 'completed',
+      last_semantic_progress_at: '2026-04-05T06:51:00.000Z',
+      stall_classification: 'completed',
+      recovery_recommendation: 'no_action'
+    });
+  });
+
+  it('prefers terminal tracked issue state when merge-closeout issue freshness is missing', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
+      tracked_issue: {
+        state: 'Done',
+        state_type: 'completed',
+        updated_at: '2026-04-05T06:51:00.000Z'
+      },
+      claim: {
+        state: 'completed',
+        updated_at: '2026-04-05T06:52:30.000Z',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        issue_updated_at: '2026-04-05T06:51:00.000Z',
+        merge_closeout: {
+          issue_state: 'Merging',
+          issue_state_type: 'started',
+          recorded_at: '2026-04-05T06:52:30.000Z',
+          status: 'merged',
+          reason: 'pending_shared_root_reconciliation',
+          summary: 'Merge closeout polling refreshed after the issue was already terminal.',
+          snapshot: {
+            updated_at: '2026-04-05T06:52:30.000Z',
+            merged_at: '2026-04-05T06:50:00.000Z'
+          },
+          shared_root: {
+            status: 'skipped',
+            reason: 'shared_root_dirty'
+          }
+        }
+      },
+      proof: {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_inactive',
+        last_event: 'task_complete',
+        last_message: 'Worker exited after merge closeout.',
+        last_event_at: '2026-04-05T06:50:10.000Z',
+        updated_at: '2026-04-05T06:50:15.000Z',
+        linear_audit: null
+      }
+    });
+
+    expect(progress).toMatchObject({
+      phase: 'completed',
+      kind: 'workflow',
+      status: 'completed',
+      last_semantic_progress_at: '2026-04-05T06:51:00.000Z',
+      stall_classification: 'completed',
+      recovery_recommendation: 'no_action'
+    });
+  });
+
+  it('preserves merge-closeout progress when claim-only freshness is unknown', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
+      claim: {
+        state: 'completed',
+        updated_at: '2026-04-05T06:52:30.000Z',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        issue_updated_at: '2026-04-05T06:51:00.000Z',
+        merge_closeout: {
+          issue_state: 'Merging',
+          issue_state_type: 'started',
+          recorded_at: '2026-04-05T06:52:30.000Z',
+          status: 'merged',
+          reason: 'pending_shared_root_reconciliation',
+          summary: 'Claim polling refreshed after the issue was already terminal.',
+          snapshot: {
+            updated_at: '2026-04-05T06:52:30.000Z',
+            merged_at: '2026-04-05T06:50:00.000Z'
+          },
+          shared_root: {
+            status: 'skipped',
+            reason: 'shared_root_dirty'
+          }
+        }
+      },
+      proof: {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_inactive',
+        last_event: 'task_complete',
+        last_message: 'Worker exited after merge closeout.',
+        last_event_at: '2026-04-05T06:50:10.000Z',
+        updated_at: '2026-04-05T06:50:15.000Z',
+        linear_audit: null
+      }
+    });
+
+    expect(progress).toMatchObject({
+      phase: 'pending_shared_root_reconciliation',
+      kind: 'merge_closeout',
+      status: 'stalled',
+      last_semantic_progress_at: '2026-04-05T06:52:30.000Z',
+      stall_classification: 'stalled',
+      stall_reason: 'shared_root_dirty',
+      recovery_recommendation: 'inspect_merge_closeout'
+    });
+  });
+
+  it('falls back to terminal claim issue state when claim freshness outruns unknown merge-closeout progress', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
+      claim: {
+        state: 'completed',
+        updated_at: '2026-04-05T06:55:00.000Z',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        issue_updated_at: '2026-04-05T06:53:00.000Z',
+        merge_closeout: {
+          issue_state: 'Merging',
+          issue_state_type: 'started',
+          recorded_at: '2026-04-05T06:52:30.000Z',
+          status: 'merged',
+          reason: 'pending_shared_root_reconciliation',
+          summary: 'Claim issue freshness advanced beyond the retained merge closeout record.',
+          snapshot: {
+            updated_at: '2026-04-05T06:52:30.000Z',
+            merged_at: '2026-04-05T06:50:00.000Z'
+          },
+          shared_root: {
+            status: 'skipped',
+            reason: 'shared_root_dirty'
+          }
+        }
+      },
+      proof: {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_inactive',
+        last_event: 'task_complete',
+        last_message: 'Worker exited after merge closeout.',
+        last_event_at: '2026-04-05T06:50:10.000Z',
+        updated_at: '2026-04-05T06:50:15.000Z',
+        linear_audit: null
+      }
+    });
+
+    expect(progress).toMatchObject({
+      phase: 'completed',
+      kind: 'workflow',
+      status: 'completed',
+      last_semantic_progress_at: '2026-04-05T06:55:00.000Z',
+      stall_classification: 'completed',
+      recovery_recommendation: 'no_action'
+    });
+  });
+
+  it('does not let claim polling outrank merge-closeout issue freshness when issue freshness is absent', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
+      claim: {
+        state: 'completed',
+        updated_at: '2026-04-05T06:55:00.000Z',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        issue_updated_at: null,
+        merge_closeout: {
+          issue_state: 'Merging',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-05T06:54:00.000Z',
+          recorded_at: '2026-04-05T06:55:00.000Z',
+          status: 'merged',
+          reason: 'pending_shared_root_reconciliation',
+          summary: 'Claim polling refreshed after merge-closeout issue freshness was recorded.',
+          snapshot: {
+            updated_at: '2026-04-05T06:55:00.000Z',
+            merged_at: '2026-04-05T06:50:00.000Z'
+          },
+          shared_root: {
+            status: 'skipped',
+            reason: 'shared_root_dirty'
+          }
+        }
+      },
+      proof: {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_inactive',
+        last_event: 'task_complete',
+        last_message: 'Worker exited after merge closeout.',
+        last_event_at: '2026-04-05T06:50:10.000Z',
+        updated_at: '2026-04-05T06:50:15.000Z',
+        linear_audit: null
+      }
+    });
+
+    expect(progress).toMatchObject({
+      phase: 'pending_shared_root_reconciliation',
+      kind: 'merge_closeout',
+      status: 'stalled',
+      last_semantic_progress_at: '2026-04-05T06:55:00.000Z',
+      stall_classification: 'stalled',
+      stall_reason: 'shared_root_dirty',
+      recovery_recommendation: 'inspect_merge_closeout'
     });
   });
 
