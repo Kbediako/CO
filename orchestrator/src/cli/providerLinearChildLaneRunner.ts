@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { mkdir, open, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import process from 'node:process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
@@ -26,8 +26,14 @@ import {
   selectRunMemoryForRole
 } from './run/runMemoryController.js';
 import { resolveProviderLinearChildLaneScopeContract } from './providerLinearChildLanePhaseContract.js';
+import { resolveCodexHome } from './utils/codexPaths.js';
 
 const execFileAsync = promisify(execFile);
+const PROVIDER_LINEAR_CHILD_LANE_APPSERVER_STARTUP_TIMEOUT_MS = 90 * 1000;
+const PROVIDER_LINEAR_CHILD_LANE_APPSERVER_STARTUP_POLL_INTERVAL_MS = 250;
+const PROVIDER_LINEAR_CHILD_LANE_SESSION_LOG_DISCOVERY_WINDOW_MS = 10 * 60 * 1000;
+const PROVIDER_LINEAR_CHILD_LANE_SESSION_LOG_HEADER_BYTES = 256 * 1024;
+const PROVIDER_LINEAR_CHILD_LANE_SESSION_LOG_MTIME_SKEW_MS = 1000;
 
 export const PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME = 'provider-linear-child-lane-proof.json';
 export const PROVIDER_LINEAR_CHILD_LANE_STREAM_ENV = 'CODEX_PROVIDER_LINEAR_CHILD_LANE_STREAM';
@@ -89,6 +95,20 @@ interface ProviderLinearChildLaneContext {
   parentSnapshot: ProviderLinearWorkerChildLaneParentSnapshot;
 }
 
+interface ProviderLinearChildLaneRunnerDependencies {
+  now: () => string;
+  sleep: (ms: number) => Promise<void>;
+  execRunner: typeof defaultExecRunner;
+  discoverStartupSessionLogPath: (input: {
+    env: NodeJS.ProcessEnv;
+    workspacePath: string;
+    promptNeedles: readonly string[];
+    startedAt: string;
+  }) => Promise<string | null>;
+}
+
+type ProviderLinearChildLaneExecResult = Awaited<ReturnType<typeof defaultExecRunner>>;
+
 function normalizeOptionalString(value: unknown): string | null {
   if (typeof value !== 'string') {
     return null;
@@ -140,6 +160,10 @@ function deriveLatestTurnSessionId(input: {
   };
 }
 
+function buildChildLanePromptHeader(issueIdentifier: string): string {
+  return `You are a bounded same-issue child lane for Linear issue ${issueIdentifier}.`;
+}
+
 function buildChildLanePrompt(context: ProviderLinearChildLaneContext): string {
   const scopeLines = [
     context.scope.files.length > 0
@@ -150,7 +174,7 @@ function buildChildLanePrompt(context: ProviderLinearChildLaneContext): string {
       : '- Phase scope: none declared'
   ];
   return [
-    `You are a bounded same-issue child lane for Linear issue ${context.issueIdentifier}.`,
+    buildChildLanePromptHeader(context.issueIdentifier),
     '',
     'Constraints:',
     '- Work only inside this lane workspace. The parent lane owns the authoritative issue workspace, Linear state, workpad, and PR lifecycle.',
@@ -168,6 +192,314 @@ function buildChildLanePrompt(context: ProviderLinearChildLaneContext): string {
     '',
     'Finish by leaving the lane workspace changes in place for patch export. Do not commit.'
   ].join('\n');
+}
+
+function buildProviderLinearChildLaneSessionPromptNeedles(
+  context: ProviderLinearChildLaneContext
+): string[] {
+  return [buildChildLanePromptHeader(context.issueIdentifier)];
+}
+
+function buildProviderLinearChildLaneRecentSessionDayDirs(
+  sessionRoot: string,
+  referenceDates: readonly Date[]
+): string[] {
+  const results: string[] = [];
+  const seen = new Set<string>();
+  for (const referenceDate of referenceDates) {
+    for (const dayOffset of [0, -1]) {
+      const current = new Date(referenceDate.getTime());
+      current.setDate(current.getDate() + dayOffset);
+      const dir = join(
+        sessionRoot,
+        String(current.getFullYear()),
+        String(current.getMonth() + 1).padStart(2, '0'),
+        String(current.getDate()).padStart(2, '0')
+      );
+      if (!seen.has(dir)) {
+        seen.add(dir);
+        results.push(dir);
+      }
+    }
+  }
+  return results;
+}
+
+function providerLinearChildLaneSessionLogPathMatchesThreadId(path: string, threadId: string): boolean {
+  return basename(path, '.jsonl').endsWith(`-${threadId}`);
+}
+
+async function readProviderLinearChildLaneFilePrefix(path: string, maxBytes: number): Promise<string> {
+  const handle = await open(path, 'r');
+  try {
+    const buffer = Buffer.alloc(maxBytes);
+    const { bytesRead } = await handle.read(buffer, 0, maxBytes, 0);
+    return buffer.toString('utf8', 0, bytesRead);
+  } finally {
+    await handle.close();
+  }
+}
+
+function parseProviderLinearChildLaneSessionJsonlLine(line: string): Record<string, unknown> | null {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith('{')) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    return typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+function valueContainsProviderLinearChildLaneSessionNeedle(value: unknown, needle: string): boolean {
+  if (typeof value === 'string') {
+    return value.includes(needle);
+  }
+  if (Array.isArray(value)) {
+    return value.some((item) => valueContainsProviderLinearChildLaneSessionNeedle(item, needle));
+  }
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  return Object.values(value).some((item) =>
+    valueContainsProviderLinearChildLaneSessionNeedle(item, needle)
+  );
+}
+
+function valueEqualsProviderLinearChildLaneSessionNeedle(value: unknown, needle: string): boolean {
+  if (typeof value === 'string') {
+    return value === needle;
+  }
+  if (Array.isArray(value)) {
+    return value.some((item) => valueEqualsProviderLinearChildLaneSessionNeedle(item, needle));
+  }
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  return Object.values(value).some((item) =>
+    valueEqualsProviderLinearChildLaneSessionNeedle(item, needle)
+  );
+}
+
+function prefixContainsProviderLinearChildLaneSessionHeader(
+  prefix: string,
+  workspacePath: string,
+  promptNeedles: readonly string[]
+): boolean {
+  let hasExactWorkspacePath = false;
+  let hasPromptNeedle = promptNeedles.some((needle) => prefix.includes(needle));
+  for (const line of prefix.split(/\r?\n/u)) {
+    const parsed = parseProviderLinearChildLaneSessionJsonlLine(line);
+    const payload =
+      parsed?.type === 'session_meta' && parsed.payload && typeof parsed.payload === 'object'
+        ? (parsed.payload as Record<string, unknown>)
+        : parsed?.payload && typeof parsed.payload === 'object'
+          ? (parsed.payload as Record<string, unknown>)
+          : null;
+    if (!payload) {
+      continue;
+    }
+    hasExactWorkspacePath =
+      hasExactWorkspacePath || valueEqualsProviderLinearChildLaneSessionNeedle(payload, workspacePath);
+    if (!hasPromptNeedle) {
+      hasPromptNeedle = promptNeedles.some((needle) =>
+        valueContainsProviderLinearChildLaneSessionNeedle(payload, needle)
+      );
+    }
+    if (hasExactWorkspacePath && hasPromptNeedle) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function prefixHasProviderLinearChildLaneSessionTimestampAtOrAfter(
+  prefix: string,
+  startedAtMs: number
+): boolean {
+  if (!Number.isFinite(startedAtMs)) {
+    return false;
+  }
+  for (const line of prefix.split(/\r?\n/u)) {
+    const parsed = parseProviderLinearChildLaneSessionJsonlLine(line);
+    if (parsed?.type !== 'session_meta' && parsed?.type !== 'turn_context') {
+      continue;
+    }
+    const timestamp =
+      typeof parsed?.timestamp === 'string' ? Date.parse(parsed.timestamp) : Number.NaN;
+    if (Number.isFinite(timestamp) && timestamp >= startedAtMs) {
+      return true;
+    }
+  }
+  return false;
+}
+
+async function discoverProviderLinearChildLaneSessionLogPath(input: {
+  env: NodeJS.ProcessEnv;
+  workspacePath: string;
+  promptNeedles: readonly string[];
+  startedAt: string;
+}): Promise<string | null> {
+  const sessionRoot = join(resolveCodexHome(input.env), 'sessions');
+  const startedAtMs = Date.parse(input.startedAt);
+  const referenceDate = Number.isFinite(startedAtMs) ? new Date(startedAtMs) : new Date();
+  const currentDate = new Date();
+  const cutoffMs = Number.isFinite(startedAtMs)
+    ? startedAtMs - PROVIDER_LINEAR_CHILD_LANE_SESSION_LOG_DISCOVERY_WINDOW_MS
+    : Date.now() - PROVIDER_LINEAR_CHILD_LANE_SESSION_LOG_DISCOVERY_WINDOW_MS;
+  const threadIdHint = normalizeOptionalString(input.env.CODEX_THREAD_ID);
+  const sessionMetaNeedle = threadIdHint ? `"id":"${threadIdHint}"` : null;
+  const candidates: Array<{ path: string; mtimeMs: number }> = [];
+
+  for (const dayDir of buildProviderLinearChildLaneRecentSessionDayDirs(sessionRoot, [
+    currentDate,
+    referenceDate
+  ])) {
+    let entries: string[];
+    try {
+      entries = await readdir(dayDir);
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      if (!entry.startsWith('rollout-') || !entry.endsWith('.jsonl')) {
+        continue;
+      }
+      const candidatePath = join(dayDir, entry);
+      let fileStat;
+      try {
+        fileStat = await stat(candidatePath);
+      } catch {
+        continue;
+      }
+      if (!fileStat.isFile() || fileStat.mtimeMs < cutoffMs) {
+        continue;
+      }
+      candidates.push({ path: candidatePath, mtimeMs: fileStat.mtimeMs });
+    }
+  }
+
+  candidates.sort((left, right) => right.mtimeMs - left.mtimeMs);
+  for (const requireThreadHint of threadIdHint ? [true, false] : [false]) {
+    for (const candidate of candidates) {
+      let prefix: string;
+      try {
+        prefix = await readProviderLinearChildLaneFilePrefix(
+          candidate.path,
+          PROVIDER_LINEAR_CHILD_LANE_SESSION_LOG_HEADER_BYTES
+        );
+      } catch {
+        continue;
+      }
+      const matchesThreadHint =
+        !threadIdHint ||
+        providerLinearChildLaneSessionLogPathMatchesThreadId(candidate.path, threadIdHint) ||
+        (sessionMetaNeedle !== null && prefix.includes(sessionMetaNeedle));
+      if (requireThreadHint && !matchesThreadHint) {
+        continue;
+      }
+      if (!requireThreadHint && Number.isFinite(startedAtMs) && candidate.mtimeMs < startedAtMs) {
+        const mtimeWithinSkewWindow =
+          candidate.mtimeMs + PROVIDER_LINEAR_CHILD_LANE_SESSION_LOG_MTIME_SKEW_MS >= startedAtMs;
+        if (
+          !mtimeWithinSkewWindow ||
+          !prefixHasProviderLinearChildLaneSessionTimestampAtOrAfter(prefix, startedAtMs)
+        ) {
+          continue;
+        }
+      }
+      if (
+        prefixContainsProviderLinearChildLaneSessionHeader(
+          prefix,
+          input.workspacePath,
+          input.promptNeedles
+        )
+      ) {
+        return candidate.path;
+      }
+    }
+  }
+  return null;
+}
+
+function buildProviderLinearChildLaneAppserverStartupTimeoutMessage(
+  context: ProviderLinearChildLaneContext,
+  timeoutMs: number
+): string {
+  const timeoutSeconds = Math.max(1, Math.floor(timeoutMs / 1000));
+  return `Appserver child lane startup stalled after runtime selection for ${timeoutSeconds}s without matching session-log startup evidence. Invalidate the lane and relaunch under CLI, or inspect appserver session startup for ${context.issueIdentifier}.`;
+}
+
+async function waitForProviderLinearChildLaneAppserverStartup(input: {
+  context: ProviderLinearChildLaneContext;
+  laneWorkspacePath: string;
+  env: NodeJS.ProcessEnv;
+  startedAt: string;
+  isExecSettled: () => boolean;
+  deps: ProviderLinearChildLaneRunnerDependencies;
+}): Promise<string | null> {
+  const promptNeedles = buildProviderLinearChildLaneSessionPromptNeedles(input.context);
+  const currentClockMs = (): number => {
+    const parsed = Date.parse(input.deps.now());
+    return Number.isFinite(parsed) ? parsed : Date.now();
+  };
+  const startClockMs = currentClockMs();
+  const startupDeadlineMs =
+    startClockMs + PROVIDER_LINEAR_CHILD_LANE_APPSERVER_STARTUP_TIMEOUT_MS;
+  for (;;) {
+    if (input.isExecSettled()) {
+      return null;
+    }
+    const remainingBeforeDiscoveryMs = startupDeadlineMs - currentClockMs();
+    if (remainingBeforeDiscoveryMs < 0) {
+      break;
+    }
+    const sessionLogPath = await input.deps.discoverStartupSessionLogPath({
+      env: input.env,
+      workspacePath: input.laneWorkspacePath,
+      promptNeedles,
+      startedAt: input.startedAt
+    });
+    if (sessionLogPath) {
+      return sessionLogPath;
+    }
+    const remainingAfterDiscoveryMs = startupDeadlineMs - currentClockMs();
+    if (remainingAfterDiscoveryMs <= 0) {
+      break;
+    }
+    const nextSleepMs = Math.min(
+      PROVIDER_LINEAR_CHILD_LANE_APPSERVER_STARTUP_POLL_INTERVAL_MS,
+      remainingAfterDiscoveryMs
+    );
+    await input.deps.sleep(nextSleepMs);
+  }
+  throw new Error(
+    buildProviderLinearChildLaneAppserverStartupTimeoutMessage(
+      input.context,
+      PROVIDER_LINEAR_CHILD_LANE_APPSERVER_STARTUP_TIMEOUT_MS
+    )
+  );
+}
+
+async function recoverProviderLinearChildLaneExecResultAfterAbort(input: {
+  abortController: AbortController;
+  error: Error;
+  execPromise: Promise<ProviderLinearChildLaneExecResult> | null;
+  execSettled: boolean;
+}): Promise<ProviderLinearChildLaneExecResult | null> {
+  if (!input.execSettled) {
+    input.abortController.abort(input.error);
+  }
+  if (!input.execPromise) {
+    return null;
+  }
+  try {
+    return await input.execPromise;
+  } catch {
+    return null;
+  }
 }
 
 async function resolveChildLaneRuntimeContext(
@@ -316,8 +648,20 @@ async function writeChildLaneProof(
 }
 
 export async function runProviderLinearChildLane(
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  dependencyOverrides: Partial<ProviderLinearChildLaneRunnerDependencies> = {}
 ): Promise<ProviderLinearChildLaneProof> {
+  const deps: ProviderLinearChildLaneRunnerDependencies = {
+    now: () => new Date().toISOString(),
+    sleep: async (ms) => {
+      await new Promise((resolvePromise) => {
+        setTimeout(resolvePromise, ms);
+      });
+    },
+    execRunner: defaultExecRunner,
+    discoverStartupSessionLogPath: discoverProviderLinearChildLaneSessionLogPath,
+    ...dependencyOverrides
+  };
   const context = await loadProviderLinearChildLaneContext(env);
   const { laneWorkspacePath, laneBranch } = await prepareLaneWorkspace(context);
   const runtimeContext = await resolveChildLaneRuntimeContext(env, laneWorkspacePath, context.runId);
@@ -326,50 +670,103 @@ export async function runProviderLinearChildLane(
   childEnv.CODEX_NON_INTERACTIVE = '1';
   childEnv.CODEX_NO_INTERACTIVE = '1';
   childEnv.CODEX_INTERACTIVE = '0';
+  delete childEnv.CODEX_THREAD_ID;
   const prompt = buildChildLanePrompt(context);
   const { command, args } = resolveRuntimeCodexCommand(['exec', '--json', prompt], runtimeContext);
+  const startedAt = deps.now();
+  const execAbortController = new AbortController();
+  let execSettled = false;
+  let execPromise: ReturnType<typeof deps.execRunner> | null = null;
 
-  let execResult;
+  let execResult: ProviderLinearChildLaneExecResult | null = null;
   try {
-    execResult = await defaultExecRunner({
+    execPromise = deps.execRunner({
       command,
       args,
       cwd: laneWorkspacePath,
       env: childEnv,
-      mirrorOutput: false
+      mirrorOutput: false,
+      abortSignal: execAbortController.signal
     });
+    void execPromise.then(
+      () => {
+        execSettled = true;
+      },
+      () => {
+        execSettled = true;
+      }
+    );
+    if (runtimeContext.runtime.selected_mode === 'appserver') {
+      const startupRace = await Promise.race([
+        execPromise.then((result) => ({ kind: 'exec' as const, result })),
+        waitForProviderLinearChildLaneAppserverStartup({
+          context,
+          laneWorkspacePath,
+          env: childEnv,
+          startedAt,
+          isExecSettled: () => execSettled,
+          deps
+        }).then((sessionLogPath) => ({ kind: 'startup' as const, sessionLogPath }))
+      ]);
+      if (startupRace.kind === 'exec') {
+        execResult = startupRace.result;
+      } else {
+        if (startupRace.sessionLogPath) {
+          logger.info(
+            `[provider-linear-child-lane-runtime] appserver startup observed via session log ${basename(startupRace.sessionLogPath)}`
+          );
+        }
+        execResult = await execPromise;
+      }
+    } else {
+      execResult = await execPromise;
+    }
   } catch (error) {
-    const failedProof: ProviderLinearChildLaneProof = {
-      issue_id: context.issueId,
-      issue_identifier: context.issueIdentifier,
-      task_id: context.taskId,
-      run_id: context.runId,
-      parent_run_id: context.parentRunId,
-      stream: context.stream,
-      purpose: context.purpose,
-      instructions: context.instructions,
-      scope: context.scope,
-      parent_snapshot: context.parentSnapshot,
-      lane_workspace_path: laneWorkspacePath,
-      lane_branch: laneBranch,
-      patch_artifact_path: join(context.runDir, 'provider-linear-child-lane.patch'),
-      patch_bytes: 0,
-      thread_id: null,
-      latest_turn_id: null,
-      latest_session_id: null,
-      latest_session_id_source: null,
-      last_event: null,
-      last_message: error instanceof Error ? error.message : String(error),
-      last_event_at: null,
-      tokens: buildEmptyProviderLinearWorkerTokenUsage(),
-      rate_limits: null,
-      status: 'failed',
-      updated_at: new Date().toISOString()
-    };
-    await writeChildLaneProof(context.runDir, failedProof);
-    throw error;
+    const normalizedError = error instanceof Error ? error : new Error(String(error));
+    execResult = await recoverProviderLinearChildLaneExecResultAfterAbort({
+      abortController: execAbortController,
+      error: normalizedError,
+      execPromise,
+      execSettled
+    });
+    if (execResult) {
+      execSettled = true;
+    } else {
+      const failedProof: ProviderLinearChildLaneProof = {
+        issue_id: context.issueId,
+        issue_identifier: context.issueIdentifier,
+        task_id: context.taskId,
+        run_id: context.runId,
+        parent_run_id: context.parentRunId,
+        stream: context.stream,
+        purpose: context.purpose,
+        instructions: context.instructions,
+        scope: context.scope,
+        parent_snapshot: context.parentSnapshot,
+        lane_workspace_path: laneWorkspacePath,
+        lane_branch: laneBranch,
+        patch_artifact_path: join(context.runDir, 'provider-linear-child-lane.patch'),
+        patch_bytes: 0,
+        thread_id: null,
+        latest_turn_id: null,
+        latest_session_id: null,
+        latest_session_id_source: null,
+        last_event: null,
+        last_message: normalizedError.message,
+        last_event_at: null,
+        tokens: buildEmptyProviderLinearWorkerTokenUsage(),
+        rate_limits: null,
+        status: 'failed',
+        updated_at: deps.now()
+      };
+      await writeChildLaneProof(context.runDir, failedProof);
+      throw normalizedError;
+    }
   }
 
+  if (!execResult) {
+    throw new Error('provider-linear-child-lane completed without an exec result');
+  }
   const parsed = parseProviderLinearWorkerJsonl(execResult.stdout);
   const session = deriveLatestTurnSessionId({
     threadId: parsed.threadId,
@@ -401,7 +798,7 @@ export async function runProviderLinearChildLane(
     tokens: parsed.tokens,
     rate_limits: parsed.rateLimits,
     status: execResult.exitCode === 0 ? 'succeeded' : 'failed',
-    updated_at: new Date().toISOString()
+    updated_at: deps.now()
   };
   await writeChildLaneProof(context.runDir, proof);
   if (execResult.exitCode !== 0) {
@@ -424,5 +821,9 @@ if (entry && entry === self) {
 }
 
 export const __test__ = {
-  buildChildLanePrompt
+  buildChildLanePrompt,
+  buildProviderLinearChildLaneAppserverStartupTimeoutMessage,
+  discoverProviderLinearChildLaneSessionLogPath,
+  recoverProviderLinearChildLaneExecResultAfterAbort,
+  waitForProviderLinearChildLaneAppserverStartup
 };
