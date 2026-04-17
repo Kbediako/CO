@@ -27892,7 +27892,21 @@
       "cadence_days": 30
     },
     {
+      "path": ".agent/task/linear-6b0183b4-9ebc-4423-a356-4105ce8aa32b.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-17",
+      "cadence_days": 30
+    },
+    {
       "path": "docs/ACTION_PLAN-linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-17",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-6b0183b4-9ebc-4423-a356-4105ce8aa32b.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-04-17",
@@ -27906,7 +27920,21 @@
       "cadence_days": 30
     },
     {
+      "path": "docs/PRD-linear-6b0183b4-9ebc-4423-a356-4105ce8aa32b.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-17",
+      "cadence_days": 30
+    },
+    {
       "path": "docs/TECH_SPEC-linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-17",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-6b0183b4-9ebc-4423-a356-4105ce8aa32b.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-04-17",
@@ -27920,7 +27948,21 @@
       "cadence_days": 30
     },
     {
+      "path": "tasks/specs/linear-6b0183b4-9ebc-4423-a356-4105ce8aa32b.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-17",
+      "cadence_days": 30
+    },
+    {
       "path": "tasks/tasks-linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-17",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-linear-6b0183b4-9ebc-4423-a356-4105ce8aa32b.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-04-17",
