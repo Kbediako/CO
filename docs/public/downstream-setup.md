@@ -32,7 +32,7 @@ This guide is the downstream-safe setup path shipped in the npm package.
 
 ## Codex marketplace install
 
-Use this when you want Codex to discover and enable CO from the plugin browser while keeping npm available as the baseline CLI install path.
+Use this when you want Codex to discover and enable CO from the plugin browser, while keeping npm available as the baseline CLI install path.
 
 1. Add the packaged marketplace root:
    ```bash
@@ -49,7 +49,10 @@ The shipped marketplace files are:
 - `plugins/codex-orchestrator/.mcp.json`
 - `plugins/codex-orchestrator/launcher.mjs`
 
-The plugin entry points at `plugins/codex-orchestrator`, and its launcher reads the `codex-orchestrator` marketplace entry in `~/.codex/config.toml` to locate the recorded source checkout before it execs the packaged CO CLI there via `node`. Local-directory sources run from the recorded source path. Git-backed sources run from Codex's installed checkout under `~/.codex/.tmp/marketplaces/codex-orchestrator`, so the MCP registration path stays independent of a second `codex-orchestrator` path entry after install. For a local-directory source, run `codex marketplace add <repository-root>` against the repository root that contains those files instead of the npm install directory. For a Git-backed install, pass a Git identifier or URL such as `owner/repo[@ref]`, an HTTPS Git URL, or an SSH Git URL rather than a local path. Re-run `codex marketplace add ...` if you move or replace a local-directory source, or if you remove Codex's installed marketplace checkout and want to restore the Git-backed install. `codex marketplace add --help` currently documents local directories plus Git-backed sources such as `owner/repo[@ref]`, HTTPS Git URLs, and SSH Git URLs.
+- Launcher behaviour: The plugin entry points at `plugins/codex-orchestrator`, and its launcher reads the `codex-orchestrator` marketplace entry in `~/.codex/config.toml` to locate the recorded source checkout before it execs the packaged CO CLI there via `node`. Local-directory sources run from the recorded source path. Git-backed sources run from Codex's installed checkout under `~/.codex/.tmp/marketplaces/codex-orchestrator`, so the MCP registration path stays independent of a second `codex-orchestrator` path entry after install.
+- Local-directory add: Run `codex marketplace add <repository-root>` against the repository root that contains those files instead of the npm install directory.
+- Git-backed add: Pass a Git identifier or URL such as `owner/repo[@ref]`, an HTTPS Git URL, or an SSH Git URL rather than a local path.
+- When to re-run add: Re-run `codex marketplace add ...` if you move or replace a local-directory source, or if you remove Codex's installed marketplace checkout and want to restore the Git-backed install. `codex marketplace add --help` currently documents local directories plus Git-backed sources such as `owner/repo[@ref]`, HTTPS Git URLs, and SSH Git URLs.
 
 ## Rollback and removal
 
