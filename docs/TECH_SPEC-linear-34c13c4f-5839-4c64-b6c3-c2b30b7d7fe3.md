@@ -23,6 +23,7 @@ last_review: 2026-04-17
 ## Required Behavior
 - Treat `Child lane reserved before child run startup.` as a fallback for true pre-startup state only.
 - Prefer a metadata-matching child-lane manifest once the child run has started.
+- Current-progress selection must use child-lane `summary_recorded_at` freshness, not `launched_at` alone; for status-only child-manifest progress that timestamp advances from `latest(updated_at, heartbeat_at)`.
 - Fail closed on missing, malformed, unreadable, or lineage-mismatched child manifests.
 - Preserve historical child-lane ledger/proof records.
 - Do not change stale Linear `updated_at` accept invalidation, child-lane ownership/acceptance, scheduler behavior, or historical retention.
@@ -43,6 +44,7 @@ The manifest `task_id` must match the reservation record in `provider-linear-wor
 
 ## Validation
 - Focused parent-owned regression for reserved child lane plus matching started manifest.
+- Focused parent-owned regression that current-progress selection prefers the freshest child-lane by `summary_recorded_at` rather than `launched_at`, including status-only manifest freshness from `latest(updated_at, heartbeat_at)` in both timestamp orders.
 - Focused parent-owned regression for mismatched manifest lineage.
 - Focused parent-owned regression for no manifest / pre-startup fallback.
 - Existing or focused regression preserving disposed child-lane behavior.

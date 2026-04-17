@@ -53,11 +53,12 @@ This lane is only the docs-first packet and registry mirror. Parent owns impleme
 ## Acceptance Criteria
 1. A child-lane record with summary `Child lane reserved before child run startup.` no longer renders as current `provider-linear-worker-progress` when its metadata-matching child-lane manifest exists and shows startup or later lifecycle truth.
 2. `CO STATUS` and `co-status --format json` show child-lane manifest-backed progress, status, or inspection guidance for active child lanes instead of the reserved-before-startup placeholder.
-3. Hydration accepts only child-lane manifests matching the parent worker lineage by `parent_run_id`, `issue_id`, `issue_identifier`, and `pipeline_id=provider-linear-child-lane`.
-4. Unmatched, missing, or not-yet-started child-lane manifests do not fabricate progress from unrelated runs; the reservation placeholder remains allowed only for true pre-startup state.
-5. `provider-linear-worker-child-lanes.json` and `provider-linear-worker-proof.json` keep historical child-lane records; the fix changes current-progress selection, not audit retention.
-6. Existing disposed child-lane behavior from prior projection fixes remains intact: accepted, rejected, or invalidated child lanes do not become current active progress.
-7. Focused parent-owned tests cover a reserved child lane with a matching started manifest, an unmatched manifest that must not hydrate, and the no-manifest pre-startup fallback.
+3. When multiple candidate child signals exist, current-progress projection across `CO STATUS`, `co-status --format json`, and `provider-linear-worker-progress` picks the freshest child by `summary_recorded_at`, including status-only child-manifest progress that derives freshness from `latest(updated_at, heartbeat_at)`.
+4. Hydration accepts only child-lane manifests matching the parent worker lineage by `parent_run_id`, `issue_id`, `issue_identifier`, and `pipeline_id=provider-linear-child-lane`.
+5. Unmatched, missing, or not-yet-started child-lane manifests do not fabricate progress from unrelated runs; the reservation placeholder remains allowed only for true pre-startup state.
+6. `provider-linear-worker-child-lanes.json` and `provider-linear-worker-proof.json` keep historical child-lane records; the fix changes current-progress selection, not audit retention.
+7. Existing disposed child-lane behavior from prior projection fixes remains intact: accepted, rejected, or invalidated child lanes do not become current active progress.
+8. Focused parent-owned tests cover a reserved child lane with a matching started manifest, unmatched manifests that must not hydrate or outrank fresher child evidence, and the no-manifest pre-startup fallback.
 
 ## Non-Goals
 - No Linear mutation or workpad mutation from this docs child lane.
