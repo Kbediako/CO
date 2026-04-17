@@ -107,6 +107,8 @@ interface ProviderLinearChildLaneRunnerDependencies {
   }) => Promise<string | null>;
 }
 
+type ProviderLinearChildLaneExecResult = Awaited<ReturnType<typeof defaultExecRunner>>;
+
 function normalizeOptionalString(value: unknown): string | null {
   if (typeof value !== 'string') {
     return null;
@@ -481,6 +483,25 @@ async function waitForProviderLinearChildLaneAppserverStartup(input: {
   );
 }
 
+async function recoverProviderLinearChildLaneExecResultAfterAbort(input: {
+  abortController: AbortController;
+  error: Error;
+  execPromise: Promise<ProviderLinearChildLaneExecResult> | null;
+  execSettled: boolean;
+}): Promise<ProviderLinearChildLaneExecResult | null> {
+  if (!input.execSettled) {
+    input.abortController.abort(input.error);
+  }
+  if (!input.execPromise) {
+    return null;
+  }
+  try {
+    return await input.execPromise;
+  } catch {
+    return null;
+  }
+}
+
 async function resolveChildLaneRuntimeContext(
   env: NodeJS.ProcessEnv,
   repoRoot: string,
@@ -657,7 +678,7 @@ export async function runProviderLinearChildLane(
   let execSettled = false;
   let execPromise: ReturnType<typeof deps.execRunner> | null = null;
 
-  let execResult;
+  let execResult: ProviderLinearChildLaneExecResult | null = null;
   try {
     execPromise = deps.execRunner({
       command,
@@ -701,43 +722,51 @@ export async function runProviderLinearChildLane(
       execResult = await execPromise;
     }
   } catch (error) {
-    if (!execSettled) {
-      execAbortController.abort(error instanceof Error ? error : new Error(String(error)));
+    const normalizedError = error instanceof Error ? error : new Error(String(error));
+    execResult = await recoverProviderLinearChildLaneExecResultAfterAbort({
+      abortController: execAbortController,
+      error: normalizedError,
+      execPromise,
+      execSettled
+    });
+    if (execResult) {
+      execSettled = true;
+    } else {
+      const failedProof: ProviderLinearChildLaneProof = {
+        issue_id: context.issueId,
+        issue_identifier: context.issueIdentifier,
+        task_id: context.taskId,
+        run_id: context.runId,
+        parent_run_id: context.parentRunId,
+        stream: context.stream,
+        purpose: context.purpose,
+        instructions: context.instructions,
+        scope: context.scope,
+        parent_snapshot: context.parentSnapshot,
+        lane_workspace_path: laneWorkspacePath,
+        lane_branch: laneBranch,
+        patch_artifact_path: join(context.runDir, 'provider-linear-child-lane.patch'),
+        patch_bytes: 0,
+        thread_id: null,
+        latest_turn_id: null,
+        latest_session_id: null,
+        latest_session_id_source: null,
+        last_event: null,
+        last_message: normalizedError.message,
+        last_event_at: null,
+        tokens: buildEmptyProviderLinearWorkerTokenUsage(),
+        rate_limits: null,
+        status: 'failed',
+        updated_at: deps.now()
+      };
+      await writeChildLaneProof(context.runDir, failedProof);
+      throw normalizedError;
     }
-    if (execPromise) {
-      await execPromise.catch(() => undefined);
-    }
-    const failedProof: ProviderLinearChildLaneProof = {
-      issue_id: context.issueId,
-      issue_identifier: context.issueIdentifier,
-      task_id: context.taskId,
-      run_id: context.runId,
-      parent_run_id: context.parentRunId,
-      stream: context.stream,
-      purpose: context.purpose,
-      instructions: context.instructions,
-      scope: context.scope,
-      parent_snapshot: context.parentSnapshot,
-      lane_workspace_path: laneWorkspacePath,
-      lane_branch: laneBranch,
-      patch_artifact_path: join(context.runDir, 'provider-linear-child-lane.patch'),
-      patch_bytes: 0,
-      thread_id: null,
-      latest_turn_id: null,
-      latest_session_id: null,
-      latest_session_id_source: null,
-      last_event: null,
-      last_message: error instanceof Error ? error.message : String(error),
-      last_event_at: null,
-      tokens: buildEmptyProviderLinearWorkerTokenUsage(),
-      rate_limits: null,
-      status: 'failed',
-      updated_at: deps.now()
-    };
-    await writeChildLaneProof(context.runDir, failedProof);
-    throw error;
   }
 
+  if (!execResult) {
+    throw new Error('provider-linear-child-lane completed without an exec result');
+  }
   const parsed = parseProviderLinearWorkerJsonl(execResult.stdout);
   const session = deriveLatestTurnSessionId({
     threadId: parsed.threadId,
@@ -795,5 +824,6 @@ export const __test__ = {
   buildChildLanePrompt,
   buildProviderLinearChildLaneAppserverStartupTimeoutMessage,
   discoverProviderLinearChildLaneSessionLogPath,
+  recoverProviderLinearChildLaneExecResultAfterAbort,
   waitForProviderLinearChildLaneAppserverStartup
 };

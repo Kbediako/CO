@@ -311,4 +311,41 @@ describe('provider linear child lane runner', () => {
     expect(attempts).toBe(3);
     expect(sleepCalls).toEqual([250, 250]);
   });
+
+  it('preserves a successful exec result when abort fires after exit but before close settles', async () => {
+    const abortController = new AbortController();
+    let resolveExec: ((value: { exitCode: number; stdout: string; stderr: string }) => void) | null = null;
+    const execPromise = new Promise<{ exitCode: number; stdout: string; stderr: string }>((resolve) => {
+      resolveExec = resolve;
+    });
+
+    const recoveryPromise = childLaneRunnerTest.recoverProviderLinearChildLaneExecResultAfterAbort({
+      abortController,
+      error: new Error('startup timeout'),
+      execPromise,
+      execSettled: false
+    });
+
+    expect(abortController.signal.aborted).toBe(true);
+    resolveExec?.({ exitCode: 0, stdout: '{"status":"ok"}', stderr: '' });
+
+    await expect(recoveryPromise).resolves.toEqual({
+      exitCode: 0,
+      stdout: '{"status":"ok"}',
+      stderr: ''
+    });
+  });
+
+  it('returns null when the exec promise still rejects after abort', async () => {
+    const abortController = new AbortController();
+    const recoveryPromise = childLaneRunnerTest.recoverProviderLinearChildLaneExecResultAfterAbort({
+      abortController,
+      error: new Error('startup timeout'),
+      execPromise: Promise.reject(new Error('exec failed')),
+      execSettled: false
+    });
+
+    expect(abortController.signal.aborted).toBe(true);
+    await expect(recoveryPromise).resolves.toBeNull();
+  });
 });
