@@ -60,6 +60,8 @@ That stale residue can keep `fresh discovery suppression` active, pollute `CO ST
 - That stale residue no longer keeps `fresh discovery suppression` active.
 - `CO STATUS active/backoff projection` no longer treats the stale merged/Done issue as live work.
 - Truly current `pending_shared_root_reconciliation` behavior remains visible when the issue is actually still `Merging`.
+- Archived or trashed terminal issues that refresh as `provider_issue_released:not_mutable` follow the same stale-claim supersession rule without weakening truly current `pending_shared_root_reconciliation` behavior.
+- Missing or unknown timestamp freshness stays conservative: stale merge-closeout authority is only cleared when live terminal truth is explicitly `equal` or `newer`, and otherwise remains action-required.
 - Genuine `provider_refresh_lifecycle_stuck` / `restart_required` truth remains visible for actual unhealthy refresh lifecycles.
 - The repair does not drift into `CO-212 Ready reclaim`, shared-root policy redesign, or spec-guard-only cleanup.
 

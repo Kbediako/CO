@@ -1879,7 +1879,7 @@ describe('provider issue observability', () => {
   });
 
   it('keeps skipped shared-root audit metadata but clears stale merge-closeout status after live terminal truth wins', () => {
-    const snapshot = buildProviderIssueDebugSnapshot({
+    const baseInput = {
       tracked_issue: {
         state: 'Done',
         state_type: 'completed',
@@ -1946,23 +1946,36 @@ describe('provider issue observability', () => {
         updated_at: '2026-04-17T03:50:45.820Z',
         linear_audit: null
       }
-    });
+    };
 
-    expect(snapshot).toMatchObject({
-      pull_request: {
-        number: 506,
-        merge_closeout_status: null,
-        shared_root_status: 'skipped',
-        shared_root_reason: 'shared_root_not_on_main'
-      },
-      progress: {
-        phase: 'completed',
-        kind: 'worker',
-        status: 'completed'
-      },
-      stall_classification: 'completed',
-      recovery_recommendation: 'no_action'
-    });
+    for (const trackedIssueUpdatedAt of [
+      '2026-04-17T03:51:37.100Z',
+      '2026-04-17T03:51:02.741Z'
+    ]) {
+      const snapshot = buildProviderIssueDebugSnapshot({
+        ...baseInput,
+        tracked_issue: {
+          ...baseInput.tracked_issue,
+          updated_at: trackedIssueUpdatedAt
+        }
+      });
+
+      expect(snapshot).toMatchObject({
+        pull_request: {
+          number: 506,
+          merge_closeout_status: null,
+          shared_root_status: 'skipped',
+          shared_root_reason: 'shared_root_not_on_main'
+        },
+        progress: {
+          phase: 'completed',
+          kind: 'worker',
+          status: 'completed'
+        },
+        stall_classification: 'completed',
+        recovery_recommendation: 'no_action'
+      });
+    }
   });
 
   it('keeps stale merge-closeout status when terminal truth lacks updated_at freshness proof', () => {
