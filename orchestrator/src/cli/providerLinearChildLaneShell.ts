@@ -998,6 +998,7 @@ async function resolveChildLaneDecision(
       });
     }
     const proofViolation = resolveAcceptedChildLaneProofViolation(
+      context.runId,
       target,
       acceptedProof,
       context.repoRoot,
@@ -1785,7 +1786,14 @@ function resolveChildLaneReservationRepairProofViolation(input: {
   if (!patchArtifactPath) {
     return 'Child lane proof patch artifact path must stay within the child lane artifact root before reservation repair.';
   }
-  return resolveAcceptedChildLaneProofViolation(input.candidate, input.proof, input.repoRoot, artifactRoot, patchArtifactPath);
+  return resolveAcceptedChildLaneProofViolation(
+    input.context.runId,
+    input.candidate,
+    input.proof,
+    input.repoRoot,
+    artifactRoot,
+    patchArtifactPath
+  );
 }
 
 function mergeCompletedChildLaneWithParentDecision(
@@ -2494,13 +2502,14 @@ function resolveChildLaneProofLineageViolation(
 }
 
 function resolveAcceptedChildLaneProofViolation(
+  parentRunId: string,
   childLane: ProviderLinearWorkerChildLaneRecord,
   proof: ProviderLinearChildLaneProof,
   repoRoot: string,
   artifactRoot: string,
   patchArtifactPath: string
 ): string | null {
-  const lineageViolation = resolveChildLaneProofLineageViolation(proof.parent_run_id, childLane, proof);
+  const lineageViolation = resolveChildLaneProofLineageViolation(parentRunId, childLane, proof);
   if (lineageViolation) {
     return lineageViolation;
   }
