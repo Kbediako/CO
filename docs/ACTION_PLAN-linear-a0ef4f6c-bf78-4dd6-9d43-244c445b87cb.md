@@ -61,14 +61,19 @@
 - Parent implementation lane:
   - `node scripts/delegation-guard.mjs`
   - `node scripts/spec-guard.mjs --dry-run`
+  - `npm run build`
+  - `npm run lint`
+  - `npm run test`
   - focused compatibility-hydration regressions for `running_ids` / `retrying_ids`
   - focused `co-status --format json` row-field hydration regressions for `id`, `bucket`, `state`, `reason`, and `aliases`
   - focused regression to prove meaningful event rendering remains intact
   - parent docs-review before implementation
   - `npm run docs:check`
   - `npm run docs:freshness`
+  - `npm run repo:stewardship`
   - parent-selected scoped validation after source edits
   - `node scripts/diff-budget.mjs`
+  - `codex-orchestrator review` (or `npm run review`)
 - Rollback plan:
   - revert the bounded compatibility-hydration seam if it regresses canonical mapping or meaningful event rendering
 
