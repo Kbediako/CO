@@ -557,6 +557,54 @@ describe('delegationMcpHealth', () => {
     });
   });
 
+  it('keeps cwd-unavailable processes unassociated when proof-pid matches span multiple workspaces', () => {
+    const snapshot = [
+      '303     1 20:00  10240 codex resume 019-parent',
+      '404   303 15:00   4096 /opt/homebrew/bin/node /repo/dist/bin/codex-orchestrator.js delegate-server'
+    ].join('\n');
+
+    const result = inspectDelegateServerProcesses({
+      snapshot,
+      staleThresholdSeconds: 600,
+      processCwdLookup: {
+        303: null,
+        404: null
+      },
+      manifestCatalog: [
+        {
+          manifestPath: '/repo/.workspaces/linear-210/.runs/linear-210/cli/run-terminal/manifest.json',
+          workspacePath: '/repo/.workspaces/linear-210',
+          status: 'succeeded',
+          pipelineId: 'provider-linear-worker',
+          taskId: 'linear-210',
+          runId: 'run-terminal',
+          issueId: 'issue-210',
+          issueIdentifier: 'CO-210',
+          proofPid: 303
+        },
+        {
+          manifestPath: '/repo/.workspaces/linear-211/.runs/linear-211/cli/run-terminal/manifest.json',
+          workspacePath: '/repo/.workspaces/linear-211',
+          status: 'succeeded',
+          pipelineId: 'provider-linear-worker',
+          taskId: 'linear-211',
+          runId: 'run-terminal',
+          issueId: 'issue-211',
+          issueIdentifier: 'CO-211',
+          proofPid: 303
+        }
+      ]
+    });
+
+    expect(result.activePids).toEqual([404]);
+    expect(result.stalePids).toEqual([]);
+    expect(result.details.find((detail) => detail.pid === 404)).toMatchObject({
+      classification: 'active-unassociated',
+      manifestAssociation: null,
+      rootCodexParentPid: 303
+    });
+  });
+
   it('falls back to the newest terminal scoped manifest when live scoped candidates are proof-backed but ancestry does not match', () => {
     const workspaceRoot = '/repo/.workspaces/linear-210';
     const snapshot = [
@@ -755,6 +803,40 @@ describe('delegationMcpHealth', () => {
       } else {
         process.env.CODEX_ORCHESTRATOR_ROOT = previousRepoRootEnv;
       }
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('skips unreadable runs roots while cataloging manifests', () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), 'delegation-mcp-health-'));
+    try {
+      const repoRoot = join(tempRoot, 'repo');
+      mkdirSync(join(repoRoot, 'tasks'), { recursive: true });
+      writeFileSync(join(repoRoot, 'tasks', 'index.json'), JSON.stringify({ items: [] }));
+      writeFileSync(join(repoRoot, '.runs'), 'not-a-directory');
+
+      const snapshot = [
+        '303     1 20:00  10240 codex resume 019-parent',
+        `404   303 00:20   4096 /opt/homebrew/bin/node ${repoRoot}/dist/bin/codex-orchestrator.js delegate-server`
+      ].join('\n');
+
+      const result = inspectDelegateServerProcesses({
+        snapshot,
+        repoRoot,
+        processCwdLookup: {
+          303: repoRoot,
+          404: repoRoot
+        }
+      });
+
+      expect(result.status).toBe('ok');
+      expect(result.activePids).toEqual([404]);
+      expect(result.details.find((detail) => detail.pid === 404)).toMatchObject({
+        classification: 'active-unassociated',
+        manifestAssociation: null,
+        rootCodexParentPid: 303
+      });
+    } finally {
       rmSync(tempRoot, { recursive: true, force: true });
     }
   });

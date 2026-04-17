@@ -1077,7 +1077,7 @@ function loadDelegateServerManifestCatalog(repoRoot: string): DelegateServerMani
   }
   const workspacesRoot = join(repoRoot, '.workspaces');
   if (existsSync(workspacesRoot)) {
-    for (const entry of readdirSync(workspacesRoot, { withFileTypes: true })) {
+    for (const entry of readDirectoryEntriesSafe(workspacesRoot)) {
       if (!entry.isDirectory()) {
         continue;
       }
@@ -1089,7 +1089,7 @@ function loadDelegateServerManifestCatalog(repoRoot: string): DelegateServerMani
       if (!existsSync(childLanesRoot)) {
         continue;
       }
-      for (const childLaneEntry of readdirSync(childLanesRoot, { withFileTypes: true })) {
+      for (const childLaneEntry of readDirectoryEntriesSafe(childLanesRoot)) {
         if (!childLaneEntry.isDirectory()) {
           continue;
         }
@@ -1124,14 +1124,14 @@ function collectManifestCatalogFromRunsRoot(root: string, catalog: DelegateServe
   if (!existsSync(root)) {
     return;
   }
-  for (const taskEntry of readdirSync(root, { withFileTypes: true })) {
+  for (const taskEntry of readDirectoryEntriesSafe(root)) {
     if (!taskEntry.isDirectory()) {
       continue;
     }
     const taskRoot = join(root, taskEntry.name);
     const cliRoot = join(taskRoot, 'cli');
     if (existsSync(cliRoot)) {
-      for (const runEntry of readdirSync(cliRoot, { withFileTypes: true })) {
+      for (const runEntry of readDirectoryEntriesSafe(cliRoot)) {
         if (!runEntry.isDirectory()) {
           continue;
         }
@@ -1143,7 +1143,7 @@ function collectManifestCatalogFromRunsRoot(root: string, catalog: DelegateServe
       }
       continue;
     }
-    for (const runEntry of readdirSync(taskRoot, { withFileTypes: true })) {
+    for (const runEntry of readDirectoryEntriesSafe(taskRoot)) {
       if (!runEntry.isDirectory()) {
         continue;
       }
@@ -1153,6 +1153,14 @@ function collectManifestCatalogFromRunsRoot(root: string, catalog: DelegateServe
         catalog.push(association);
       }
     }
+  }
+}
+
+function readDirectoryEntriesSafe(root: string) {
+  try {
+    return readdirSync(root, { withFileTypes: true });
+  } catch {
+    return [];
   }
 }
 
@@ -1322,10 +1330,20 @@ function resolveManifestAssociationByAncestry(
   manifestCatalogByWorkspace: Map<string, DelegateServerManifestAssociation[]>
 ): DelegateServerManifestAssociation | null {
   const ancestryPidSet = new Set(ancestryPids);
-  return [...manifestCatalogByWorkspace.values()]
+  const matches = [...manifestCatalogByWorkspace.values()]
     .flat()
     .filter((candidate) => candidate.proofPid !== null && ancestryPidSet.has(candidate.proofPid))
-    .sort(compareManifestAssociations)[0] ?? null;
+    .sort(compareManifestAssociations);
+  if (matches.length === 0) {
+    return null;
+  }
+  const workspaceKeys = new Set(
+    matches.map((candidate) => candidate.workspacePath ?? `manifest:${candidate.manifestPath}`)
+  );
+  if (workspaceKeys.size > 1) {
+    return null;
+  }
+  return matches[0] ?? null;
 }
 
 function isScopedWorkspacePath(workspacePath: string): boolean {
