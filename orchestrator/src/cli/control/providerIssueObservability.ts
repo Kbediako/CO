@@ -189,6 +189,9 @@ interface ProviderIssueReviewPromotionLike extends ProviderIssuePullRequestLifec
 }
 
 interface ProviderIssueMergeCloseoutLike extends ProviderIssuePullRequestLifecycleLike {
+  issue_state?: string | null;
+  issue_state_type?: string | null;
+  issue_updated_at?: string | null;
   shared_root?: {
     status?: string | null;
     reason?: string | null;
@@ -603,12 +606,14 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
         )
       : null
   );
+  const mergeCloseoutIssueUpdatedAt = normalizeOptionalString(mergeCloseout?.issue_updated_at);
   const terminalWorkflowSupersedesMergeCloseout = Boolean(
     mergeCloseoutProgress &&
+    mergeCloseoutProgress.status !== 'failed' &&
     terminalWorkflowUpdatedAt &&
     compareIsoTimestamp(
       terminalWorkflowUpdatedAt,
-      mergeCloseoutProgress.last_semantic_progress_at
+      mergeCloseoutIssueUpdatedAt ?? mergeCloseoutProgress.last_semantic_progress_at
     ) >= 0
   );
   const lastSemanticProgressAt = latestIsoTimestamp(

@@ -1940,6 +1940,9 @@ describe('provider issue observability', () => {
         issue_state_type: 'completed',
         issue_updated_at: '2026-04-05T06:51:00.000Z',
         merge_closeout: {
+          issue_state: 'Merging',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-05T06:50:30.000Z',
           recorded_at: '2026-04-05T06:50:30.000Z',
           status: 'merged',
           reason: 'pending_shared_root_reconciliation',
@@ -1985,6 +1988,9 @@ describe('provider issue observability', () => {
         issue_state_type: 'completed',
         issue_updated_at: '2026-04-05T06:51:00.000Z',
         merge_closeout: {
+          issue_state: 'Merging',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-05T06:50:30.000Z',
           recorded_at: '2026-04-05T06:50:30.000Z',
           status: 'merged',
           reason: 'pending_shared_root_reconciliation',
@@ -2035,6 +2041,9 @@ describe('provider issue observability', () => {
         issue_state_type: 'completed',
         issue_updated_at: '2026-04-05T06:50:30.000Z',
         merge_closeout: {
+          issue_state: 'Merging',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-05T06:50:30.000Z',
           recorded_at: '2026-04-05T06:50:30.000Z',
           status: 'merged',
           reason: 'pending_shared_root_reconciliation',
@@ -2066,6 +2075,59 @@ describe('provider issue observability', () => {
       kind: 'workflow',
       status: 'completed',
       last_semantic_progress_at: '2026-04-05T06:50:30.000Z',
+      stall_classification: 'completed',
+      recovery_recommendation: 'no_action'
+    });
+  });
+
+  it('ignores later merge-closeout polling timestamps when issue freshness is terminal', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
+      tracked_issue: {
+        state: 'Done',
+        state_type: 'completed',
+        updated_at: '2026-04-05T06:51:00.000Z'
+      },
+      claim: {
+        state: 'completed',
+        updated_at: '2026-04-05T06:52:30.000Z',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        issue_updated_at: '2026-04-05T06:51:00.000Z',
+        merge_closeout: {
+          issue_state: 'Merging',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-05T06:50:30.000Z',
+          recorded_at: '2026-04-05T06:52:30.000Z',
+          status: 'merged',
+          reason: 'pending_shared_root_reconciliation',
+          summary: 'Merge closeout polling refreshed after the issue was already terminal.',
+          snapshot: {
+            updated_at: '2026-04-05T06:52:30.000Z',
+            merged_at: '2026-04-05T06:50:00.000Z'
+          },
+          shared_root: {
+            status: 'skipped',
+            reason: 'shared_root_dirty'
+          }
+        }
+      },
+      proof: {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_inactive',
+        last_event: 'task_complete',
+        last_message: 'Worker exited after merge closeout.',
+        last_event_at: '2026-04-05T06:50:10.000Z',
+        updated_at: '2026-04-05T06:50:15.000Z',
+        linear_audit: null
+      }
+    });
+
+    expect(progress).toMatchObject({
+      phase: 'completed',
+      kind: 'workflow',
+      status: 'completed',
+      last_semantic_progress_at: '2026-04-05T06:51:00.000Z',
       stall_classification: 'completed',
       recovery_recommendation: 'no_action'
     });
