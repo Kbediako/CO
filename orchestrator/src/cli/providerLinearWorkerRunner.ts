@@ -4984,8 +4984,13 @@ function providerLinearWorkerChildLaneSummaryRecordedAt(
   startedAt: string
 ): string | null {
   const manifestSummaryUpdatedAt =
-    normalizeOptionalString(manifest.summary) || normalizeOptionalString(manifest.status_detail)
-      ? normalizeOptionalString(manifest.updated_at)
+    normalizeOptionalString(manifest.status) ||
+    normalizeOptionalString(manifest.summary) ||
+    normalizeOptionalString(manifest.status_detail)
+      ? latestProviderLinearWorkerIsoTimestamp(
+          normalizeOptionalString(manifest.updated_at),
+          normalizeOptionalString(manifest.heartbeat_at)
+        )
       : null;
   return latestProviderLinearWorkerIsoTimestamp(
     proofUpdatedAt,
