@@ -6475,7 +6475,9 @@ function groupProviderIssueRuns(records: ProviderIssueRunRecord[]): Map<string, 
   return grouped;
 }
 
-function buildActiveRunRetryFields(input: Pick<ProviderIntakeClaimRecord, 'retry_attempt'>): Pick<
+function buildActiveRunRetryFields(
+  input: Pick<ProviderIntakeClaimRecord, 'retry_attempt' | 'retry_error'>
+): Pick<
   ProviderIntakeClaimRecord,
   'retry_queued' | 'retry_attempt' | 'retry_due_at' | 'retry_error'
 > {
@@ -6490,12 +6492,12 @@ function buildActiveRunRetryFields(input: Pick<ProviderIntakeClaimRecord, 'retry
     retry_queued: false,
     retry_attempt: retryAttempt,
     retry_due_at: null,
-    retry_error: null
+    retry_error: input.retry_error ?? null
   };
 }
 
 function buildProviderRetryLaunchFields(input: {
-  claim: Pick<ProviderIntakeClaimRecord, 'retry_queued' | 'retry_attempt'>;
+  claim: Pick<ProviderIntakeClaimRecord, 'retry_queued' | 'retry_attempt' | 'retry_error'>;
   previousRun: ProviderIssueRunRecord | null;
   preserveCurrentAttempt?: boolean;
   seedFromPreviousRun?: boolean;
@@ -6517,7 +6519,7 @@ function buildProviderRetryLaunchFields(input: {
     retry_queued: false,
     retry_attempt: retryAttempt,
     retry_due_at: null,
-    retry_error: null
+    retry_error: input.claim.retry_error ?? null
   };
 }
 

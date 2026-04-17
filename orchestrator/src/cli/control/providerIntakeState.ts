@@ -83,6 +83,13 @@ export interface ProviderIntakeState {
   claims: ProviderIntakeClaimRecord[];
 }
 
+export interface ProviderIntakeRetrySummaryPayload {
+  active: boolean;
+  attempt: number | null;
+  due_at: string | null;
+  error: string | null;
+}
+
 export interface ProviderIntakeSummaryPayload {
   provider: 'linear';
   issue_id: string;
@@ -103,6 +110,7 @@ export interface ProviderIntakeSummaryPayload {
   run_id: string | null;
   worker_host?: string | null;
   freshness: ProviderIntakeClaimFreshness | null;
+  retry: ProviderIntakeRetrySummaryPayload | null;
   rehydrated_at: string | null;
   is_rehydrated: boolean;
   updated_at: string;
@@ -214,6 +222,12 @@ export function upsertProviderIntakeClaim(
             retryDueAt: existing?.retry_due_at ?? null,
             retryError: existing?.retry_error ?? null
           }
+        : input.state === 'starting' || input.state === 'resuming' || input.state === 'running'
+          ? {
+              retryQueued: false,
+              retryDueAt: null,
+              retryError: existing?.retry_error ?? null
+            }
         : {
             retryQueued: false,
             retryDueAt: null,
@@ -399,6 +413,7 @@ export function buildProviderIntakeSummary(
     run_id: claim.run_id,
     worker_host: claim.worker_host ?? null,
     freshness,
+    retry: buildProviderIntakeRetrySummary(claim),
     rehydrated_at: normalizedState.rehydrated_at,
     is_rehydrated: freshness === 'rehydrated',
     updated_at: claim.updated_at
@@ -409,6 +424,30 @@ export function hasQueuedProviderIntakeRetry(
   claim: Pick<ProviderIntakeClaimRecord, 'retry_queued' | 'retry_attempt'> | null | undefined
 ): boolean {
   return claim?.retry_queued === true;
+}
+
+function buildProviderIntakeRetrySummary(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'retry_queued' | 'retry_attempt' | 'retry_due_at' | 'retry_error'
+  > | null
+): ProviderIntakeRetrySummaryPayload | null {
+  if (!claim) {
+    return null;
+  }
+  const active = claim.retry_queued === true;
+  const attempt = claim.retry_attempt ?? null;
+  const dueAt = claim.retry_due_at ?? null;
+  const error = claim.retry_error ?? null;
+  if (!active && attempt === null && dueAt === null && error === null) {
+    return null;
+  }
+  return {
+    active,
+    attempt,
+    due_at: dueAt,
+    error
+  };
 }
 
 function normalizeProviderIntakeClaim(

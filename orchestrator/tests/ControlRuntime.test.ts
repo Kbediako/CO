@@ -807,7 +807,7 @@ describe('ControlRuntime', () => {
         retry_queued: false,
         retry_attempt: 2,
         retry_due_at: null,
-        retry_error: null
+        retry_error: 'retryable failure pending rerun'
       }
     ]);
     const fixture = await createFixture({
@@ -905,6 +905,7 @@ describe('ControlRuntime', () => {
         restart_count: 1,
         current_retry_attempt: 2
       },
+      last_error: null,
       question_summary: {
         queued_count: 1
       },
@@ -913,7 +914,11 @@ describe('ControlRuntime', () => {
         session_id: null,
         display_state: 'paused'
       },
-      retry: null
+      retry: {
+        attempt: 2,
+        due_at: null,
+        error: 'retryable failure pending rerun'
+      }
     });
   });
 

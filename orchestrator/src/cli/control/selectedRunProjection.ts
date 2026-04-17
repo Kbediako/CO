@@ -867,11 +867,22 @@ function resolveSelectedRunDisplaySummary(input: {
   if (
     input.rawStatus === 'succeeded' &&
     input.summary &&
-    hasStaleSucceededFailureSummary(input.summary) &&
+    hasStaleFailureSummary(input.summary) &&
     !manifestHasFailedCommands(input.manifestRecord)
   ) {
-    const filteredSummary = filterStaleSucceededFailureSummary(input.summary);
+    const filteredSummary = filterStaleFailureSummary(input.summary);
     return filteredSummary ?? 'Completed successfully';
+  }
+  const acceptedProviderRetryResumeAt = readLatestAcceptedProviderRetryResumeAt(input.manifestRecord);
+  if (
+    input.rawStatus === 'in_progress' &&
+    input.summary &&
+    hasStaleFailureSummary(input.summary) &&
+    acceptedProviderRetryResumeAt !== null &&
+    !manifestHasFailedCommandsSince(input.manifestRecord, acceptedProviderRetryResumeAt)
+  ) {
+    const filteredSummary = filterStaleFailureSummary(input.summary);
+    return filteredSummary ?? 'Retry accepted; run resumed after a failed attempt.';
   }
   return input.summary;
 }
@@ -912,23 +923,27 @@ function isTerminalRunStatus(status: string): boolean {
   return status === 'succeeded' || status === 'failed' || status === 'cancelled' || status === 'canceled';
 }
 
-function hasStaleSucceededFailureSummary(summary: string): boolean {
-  return summary.split('\n').some((line) => isStaleSucceededFailureSummaryLine(line));
+function hasStaleFailureSummary(summary: string): boolean {
+  return summary.split('\n').some((line) => isStaleFailureSummaryLine(line));
 }
 
-function filterStaleSucceededFailureSummary(summary: string): string | null {
+function filterStaleFailureSummary(summary: string): string | null {
   const retainedLines = summary
     .split('\n')
     .map((line) => line.trim())
-    .filter((line) => line.length > 0 && !isStaleSucceededFailureSummaryLine(line));
+    .filter((line) => line.length > 0 && !isStaleFailureSummaryLine(line));
   if (retainedLines.length === 0) {
     return null;
   }
   return retainedLines.join('\n');
 }
 
-function isStaleSucceededFailureSummaryLine(line: string): boolean {
-  return /^Stage '.*' failed with exit code \d+\.$/u.test(line.trim());
+function isStaleFailureSummaryLine(line: string): boolean {
+  const trimmed = line.trim();
+  return /^Stage '.*' failed with exit code \d+\.$/u.test(trimmed) ||
+    /^Sub-pipeline '.*' failed\.$/u.test(trimmed) ||
+    /^Execution error: .+/u.test(trimmed) ||
+    /^Sub-pipeline error: .+/u.test(trimmed);
 }
 
 function manifestHasFailedCommands(manifestRecord: Record<string, unknown>): boolean {
@@ -942,6 +957,60 @@ function manifestHasFailedCommands(manifestRecord: Record<string, unknown>): boo
     }
     return readStringValue(command as Record<string, unknown>, 'status') === 'failed';
   });
+}
+
+function manifestHasFailedCommandsSince(
+  manifestRecord: Record<string, unknown>,
+  sinceAtMs: number
+): boolean {
+  const commands = manifestRecord.commands;
+  if (!Array.isArray(commands)) {
+    return false;
+  }
+  return commands.some((command) => {
+    if (!isRecord(command) || readStringValue(command, 'status') !== 'failed') {
+      return false;
+    }
+    const commandFailureAtMs = readLatestCommandFailureTimestampMs(command);
+    if (commandFailureAtMs === null) {
+      return true;
+    }
+    return commandFailureAtMs >= sinceAtMs;
+  });
+}
+
+function readLatestAcceptedProviderRetryResumeAt(manifestRecord: Record<string, unknown>): number | null {
+  const resumeEvents = manifestRecord.resume_events;
+  if (!Array.isArray(resumeEvents)) {
+    return null;
+  }
+  let latestAcceptedAt: number | null = null;
+  for (const event of resumeEvents) {
+    if (
+      !isRecord(event) ||
+      readStringValue(event, 'reason') !== 'provider-retry' ||
+      readStringValue(event, 'outcome') !== 'accepted'
+    ) {
+      continue;
+    }
+    const acceptedAt = Date.parse(readStringValue(event, 'timestamp') ?? '');
+    if (!Number.isFinite(acceptedAt)) {
+      continue;
+    }
+    latestAcceptedAt = latestAcceptedAt === null ? acceptedAt : Math.max(latestAcceptedAt, acceptedAt);
+  }
+  return latestAcceptedAt;
+}
+
+function readLatestCommandFailureTimestampMs(command: Record<string, unknown>): number | null {
+  for (const key of ['completed_at', 'completedAt', 'updated_at', 'updatedAt', 'started_at', 'startedAt']) {
+    const value = readStringValue(command, key);
+    const parsed = Date.parse(value ?? '');
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return null;
 }
 
 function readManifestStageSummaries(manifestRecord: Record<string, unknown>): Array<{
@@ -1564,14 +1633,16 @@ function buildProviderRetryState(
   }
   const active = claim.retry_queued === true;
   const attempt = claim.retry_attempt ?? null;
-  if (!active && attempt === null) {
+  const dueAt = claim.retry_due_at ?? null;
+  const error = claim.retry_error ?? null;
+  if (!active && attempt === null && dueAt === null && error === null) {
     return null;
   }
   return {
     active,
     attempt,
-    due_at: active ? claim.retry_due_at ?? null : null,
-    error: active ? claim.retry_error ?? null : null
+    due_at: dueAt,
+    error
   };
 }
 

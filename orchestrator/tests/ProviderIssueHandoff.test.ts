@@ -10195,7 +10195,7 @@ describe('createProviderIssueHandoffService', () => {
       retry_queued: false,
       retry_attempt: 2,
       retry_due_at: null,
-      retry_error: null
+      retry_error: 'worker owner continuation unavailable'
     });
   });
 
@@ -12967,7 +12967,7 @@ describe('createProviderIssueHandoffService', () => {
         retry_queued: false,
         retry_attempt: 2,
         retry_due_at: null,
-        retry_error: null
+        retry_error: 'stale continuation queue'
       });
       expect(persist).toHaveBeenCalledTimes(1);
       expect(launcher.start).not.toHaveBeenCalled();
@@ -22538,6 +22538,7 @@ describe('createProviderIssueHandoffService', () => {
         run_id: 'run-failed',
         task_id: 'task-1303-failed',
         status: 'failed',
+        summary: 'retryable failure pending rerun',
         issue_provider: 'linear',
         issue_id: 'lin-issue-1',
         issue_identifier: 'CO-2',
@@ -22607,7 +22608,7 @@ describe('createProviderIssueHandoffService', () => {
       retry_queued: true,
       retry_attempt: 1,
       retry_due_at: '2026-03-19T04:30:10.000Z',
-      retry_error: null
+      retry_error: 'retryable failure pending rerun'
     });
 
     await vi.advanceTimersByTimeAsync(10_001);
@@ -22633,7 +22634,7 @@ describe('createProviderIssueHandoffService', () => {
       retry_queued: false,
       retry_attempt: 1,
       retry_due_at: null,
-      retry_error: null
+      retry_error: 'retryable failure pending rerun'
     });
   });
 

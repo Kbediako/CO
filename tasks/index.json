@@ -1,6 +1,32 @@
 {
   "items": [
     {
+      "id": "20260418-linear-8f8b9b94-41fe-46c3-93fc-0a2c28efc58c",
+      "title": "Control host: reconcile resumed provider-worker retry acceptance and CO STATUS truth after a failed prior attempt",
+      "relates_to": "tasks/tasks-linear-8f8b9b94-41fe-46c3-93fc-0a2c28efc58c.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-8f8b9b94-41fe-46c3-93fc-0a2c28efc58c-co222-docs-packet/cli/2026-04-17T16-32-33-651Z-8f6278d1/manifest.json",
+          "source_anchor": "ctx:sha256:6c2fdaf4cabe0fb0a183c2574b434ee4b063ceab0a04e0e592aad4c44d81b205#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-222 as a narrow resumed provider-worker truth-reconciliation lane: after a failed prior attempt, retry acceptance, control-host refresh failure history, control-host intake, manifest/proof/summary truth reconciliation, and CO STATUS must all prefer the current authoritative resumed run while keeping failed-attempt evidence available for audit. The expected shared source payload was absent in this child checkout, so the packet is anchored on the protected handoff wording plus current repo seams in providerIssueHandoff.ts, providerLinearWorkerRunner.ts, providerIssueObservability.ts, selectedRunProjection.ts, and controlRuntime.ts; parent owns implementation, validation, Linear state, workpad, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-8f8b9b94-41fe-46c3-93fc-0a2c28efc58c.md",
+        "task": "tasks/tasks-linear-8f8b9b94-41fe-46c3-93fc-0a2c28efc58c.md",
+        "agent_task": ".agent/task/linear-8f8b9b94-41fe-46c3-93fc-0a2c28efc58c.md",
+        "docs": "docs/TECH_SPEC-linear-8f8b9b94-41fe-46c3-93fc-0a2c28efc58c.md"
+      }
+    },
+    {
       "id": "20260417-linear-5b31889f-233c-4f23-9750-5ff21d737661",
       "title": "CO child-lane decisions repair stale pending ledger after post-startup launch-shell miss",
       "relates_to": "tasks/tasks-linear-5b31889f-233c-4f23-9750-5ff21d737661.md",
