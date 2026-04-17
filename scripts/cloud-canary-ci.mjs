@@ -29,6 +29,13 @@ function normalizeFailureSignal(signal) {
   return String(signal ?? '').toLowerCase();
 }
 
+function joinFailureSignals(...signals) {
+  return signals
+    .map((signal) => String(signal ?? '').trim())
+    .filter((signal) => signal.length > 0)
+    .join('\n');
+}
+
 function cloudConnectorAuthDriftDiagnosis() {
   return {
     category: 'credentials',
@@ -112,16 +119,35 @@ function hasAuthMismatchSignal(normalizedSignal) {
   );
 }
 
-function hasConnectivitySignal(normalizedSignal) {
+function hasConnectivityStatusCodeContext(normalizedSignal) {
+  return (
+    /\b(?:http(?:\s+(?:status|response))?|status|response|upstream|gateway|error|failed|returned)\D{0,16}(?:502|503|504)\b/u.test(normalizedSignal) ||
+    /\b(?:502|503|504)\D{0,16}(?:bad gateway|service unavailable|gateway timeout)\b/u.test(normalizedSignal)
+  );
+}
+
+function hasConnectivitySignal(normalizedSignal, { includeStatusCodes = true, requireStatusContext = false } = {}) {
   return (
     normalizedSignal.includes('enotfound') ||
     normalizedSignal.includes('econn') ||
     normalizedSignal.includes('network') ||
     normalizedSignal.includes('timed out') ||
     normalizedSignal.includes('timeout') ||
-    normalizedSignal.includes('502') ||
-    normalizedSignal.includes('503') ||
-    normalizedSignal.includes('504')
+    normalizedSignal.includes('bad gateway') ||
+    normalizedSignal.includes('service unavailable') ||
+    normalizedSignal.includes('gateway timeout') ||
+    (
+      includeStatusCodes &&
+      (
+        requireStatusContext
+          ? hasConnectivityStatusCodeContext(normalizedSignal)
+          : (
+            normalizedSignal.includes('502') ||
+            normalizedSignal.includes('503') ||
+            normalizedSignal.includes('504')
+          )
+      )
+    )
   );
 }
 
@@ -156,9 +182,9 @@ function classifyCredentialFatalSignal(signal) {
   return null;
 }
 
-function classifyConnectivityFatalSignal(signal) {
+function classifyConnectivityFatalSignal(signal, options) {
   const normalized = normalizeFailureSignal(signal);
-  if (hasConnectivitySignal(normalized)) {
+  if (hasConnectivitySignal(normalized, options)) {
     return networkConnectivityDiagnosis();
   }
   return null;
@@ -547,15 +573,14 @@ async function main() {
     }
   }
 
-  const primaryFailureSignal = [
+  const primaryFailureSignal = joinFailureSignals(
     expectFallback ? '' : cloudFallback?.reason ?? '',
     cloudExecution?.error ?? '',
     manifest?.status_detail ?? '',
     execution.stderr ?? ''
-  ]
-    .filter((value) => value.trim().length > 0)
-    .join('\n');
+  );
   const stdoutFailureSignal = tail(execution.stdout, 20);
+  const fatalFailureSignal = joinFailureSignals(primaryFailureSignal, stdoutFailureSignal);
   const diagnosis = classifyFailure(primaryFailureSignal || stdoutFailureSignal);
   const expectedFallbackConfigurationFailure =
     expectFallback &&
@@ -564,8 +589,9 @@ async function main() {
     Array.isArray(cloudFallback?.issues) &&
     cloudFallback.issues.some((issue) => issue?.code === 'missing_environment');
   const fatalDiagnosis = required
-    ? classifyCredentialFatalSignal(primaryFailureSignal)
+    ? classifyCredentialFatalSignal(fatalFailureSignal)
       ?? classifyConnectivityFatalSignal(primaryFailureSignal)
+      ?? classifyConnectivityFatalSignal(stdoutFailureSignal, { requireStatusContext: true })
       ?? (diagnosis.category === 'configuration' && !expectedFallbackConfigurationFailure ? diagnosis : null)
     : null;
   const skipEligible = !required

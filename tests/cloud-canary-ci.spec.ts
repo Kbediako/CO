@@ -24,7 +24,11 @@ async function writeExecutable(path: string, content: string): Promise<void> {
   await chmod(path, 0o755);
 }
 
-async function initFallbackCanaryRepo(runnerStderr: string, runId = 'run-fallback'): Promise<{ repo: string; binDir: string }> {
+async function initFallbackCanaryRepo(
+  runnerStderr: string,
+  runId = 'run-fallback',
+  runnerStdout = ''
+): Promise<{ repo: string; binDir: string }> {
   const repo = await mkdtemp(join(tmpdir(), 'cloud-canary-ci-'));
   createdDirs.push(repo);
 
@@ -94,6 +98,10 @@ await writeFile(
   )
 );
 console.error(${JSON.stringify(runnerStderr)});
+const extraStdout = ${JSON.stringify(runnerStdout)};
+if (extraStdout) {
+  console.log(extraStdout);
+}
 console.log(JSON.stringify({ run_id: runId }));
 `
   );
@@ -163,6 +171,63 @@ describe('cloud-canary-ci fallback contract', () => {
 
     expect(stdout).toContain('## Cloud Canary Fallback Contract (Passed)');
     expect(stdout).toContain('run-503-benign');
+  });
+
+  it('keeps stdout credential failures fatal in required fallback mode', async () => {
+    const { repo, binDir } = await initFallbackCanaryRepo(
+      'Cloud preflight failed; falling back to mcp. Missing CODEX_CLOUD_ENV_ID.',
+      'run-fallback',
+      'Codex token unavailable.'
+    );
+
+    await expect(
+      execFileAsync(process.execPath, [scriptPath], {
+        cwd: repo,
+        env: fallbackEnv(repo, binDir),
+        timeout: 60_000
+      })
+    ).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining('Failure class: credentials (auth_mismatch)')
+    });
+  });
+
+  it('keeps explicit stdout connectivity failures fatal in required fallback mode', async () => {
+    const { repo, binDir } = await initFallbackCanaryRepo(
+      'Cloud preflight failed; falling back to mcp. Missing CODEX_CLOUD_ENV_ID.',
+      'run-fallback',
+      'Network timeout while contacting the cloud endpoint.'
+    );
+
+    await expect(
+      execFileAsync(process.execPath, [scriptPath], {
+        cwd: repo,
+        env: fallbackEnv(repo, binDir),
+        timeout: 60_000
+      })
+    ).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining('Failure class: connectivity (network_connectivity)')
+    });
+  });
+
+  it('keeps stdout HTTP 503 failures fatal in required fallback mode', async () => {
+    const { repo, binDir } = await initFallbackCanaryRepo(
+      'Cloud preflight failed; falling back to mcp. Missing CODEX_CLOUD_ENV_ID.',
+      'run-fallback',
+      'codex cloud exec failed with exit 1: HTTP 503'
+    );
+
+    await expect(
+      execFileAsync(process.execPath, [scriptPath], {
+        cwd: repo,
+        env: fallbackEnv(repo, binDir),
+        timeout: 60_000
+      })
+    ).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining('Failure class: connectivity (network_connectivity)')
+    });
   });
 
   it('keeps credential failures fatal when fallback stderr also includes missing environment text', async () => {
