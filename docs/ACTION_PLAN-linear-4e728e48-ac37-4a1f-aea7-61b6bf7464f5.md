@@ -53,6 +53,10 @@
   - `git diff --check -- docs/PRD-linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5.md tasks/specs/linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5.md docs/ACTION_PLAN-linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5.md tasks/index.json docs/TASKS.md`
   - boundary grep over the touched packet files for `CO-210`, `CO-211`, `CO-218`, `synthetic launching reservation`, `runtime selection`, and `Child lane reserved before child run startup.`
 - Parent implementation lane:
+  - `**/*.{ts,tsx,js,jsx,json,md,yml,yaml,toml,ini,conf,config}` -> `node scripts/spec-guard.mjs --dry-run`
+  - `**/{docs/**,skills/**,README.md}` -> `npm run docs:check`
+  - `**/{docs/**,*.md}` -> `npm run docs:freshness`
+  - `**/*` -> `node scripts/diff-budget.mjs`
   - focused startup-stall regression coverage
   - focused no-regression coverage for `CO-210`, `CO-211`, and `CO-218`
   - parent-owned docs-review before implementation

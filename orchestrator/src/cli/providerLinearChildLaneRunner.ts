@@ -157,6 +157,10 @@ function deriveLatestTurnSessionId(input: {
   };
 }
 
+function buildChildLanePromptHeader(issueIdentifier: string): string {
+  return `You are a bounded same-issue child lane for Linear issue ${issueIdentifier}.`;
+}
+
 function buildChildLanePrompt(context: ProviderLinearChildLaneContext): string {
   const scopeLines = [
     context.scope.files.length > 0
@@ -167,7 +171,7 @@ function buildChildLanePrompt(context: ProviderLinearChildLaneContext): string {
       : '- Phase scope: none declared'
   ];
   return [
-    `You are a bounded same-issue child lane for Linear issue ${context.issueIdentifier}.`,
+    buildChildLanePromptHeader(context.issueIdentifier),
     '',
     'Constraints:',
     '- Work only inside this lane workspace. The parent lane owns the authoritative issue workspace, Linear state, workpad, and PR lifecycle.',
@@ -190,7 +194,7 @@ function buildChildLanePrompt(context: ProviderLinearChildLaneContext): string {
 function buildProviderLinearChildLaneSessionPromptNeedles(
   context: ProviderLinearChildLaneContext
 ): string[] {
-  return [`You are a bounded same-issue child lane for Linear issue ${context.issueIdentifier}.`];
+  return [buildChildLanePromptHeader(context.issueIdentifier)];
 }
 
 function buildProviderLinearChildLaneRecentSessionDayDirs(
@@ -616,6 +620,7 @@ export async function runProviderLinearChildLane(
   childEnv.CODEX_NON_INTERACTIVE = '1';
   childEnv.CODEX_NO_INTERACTIVE = '1';
   childEnv.CODEX_INTERACTIVE = '0';
+  delete childEnv.CODEX_THREAD_ID;
   const prompt = buildChildLanePrompt(context);
   const { command, args } = resolveRuntimeCodexCommand(['exec', '--json', prompt], runtimeContext);
   const startedAt = deps.now();

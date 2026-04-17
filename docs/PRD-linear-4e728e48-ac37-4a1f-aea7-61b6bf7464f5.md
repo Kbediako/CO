@@ -4,11 +4,13 @@
 
 ## Traceability
 - Linear issue: `CO-224` / `4e728e48-ac37-4a1f-aea7-61b6bf7464f5`
-- Task id: `linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5`
+- Packet prefix: `linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5`
+- Task id: `20260418-linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5`
 - Source anchor: `ctx:sha256:b7611a224cd777bffc38c866661c0a8d2cdaf4f31619cac8fd78150f5b46cbea#chunk:c000001`
 - Parent-provided source payload reference: `.runs/linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5-docs-packet/cli/2026-04-17T18-52-06-926Z-75ac64a4/memory/source-0/source.txt`
 - Shared source-0 availability note: the referenced payload was not materialized inside this bounded child checkout; this packet relies on the exact issue statement carried in the lane prompt together with current repo seams.
 - Docs packet child lane manifest: `.runs/linear-4e728e48-ac37-4a1f-aea7-61b6bf7464f5-docs-packet/cli/2026-04-17T18-52-06-926Z-75ac64a4/manifest.json`
+- Traceability note: do not refer to the packet prefix itself as the task id; the canonical task id is the date-prefixed form above.
 
 ## Summary
 - Problem Statement: `provider-linear-child-lane` can reserve a child lane for the parent and then resolve runtime mode to `appserver`, but the child run can stall after runtime selection and before a real child-run startup record, proof artifact, or usable decision target exists. In that shape, the parent remains blocked on the synthetic launching reservation instead of moving to a truthful stalled-startup classification or bounded recovery path.

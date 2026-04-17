@@ -2519,6 +2519,37 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     }
   });
 
+  it('rejects already-aborted requests before spawning the child process', async () => {
+    vi.resetModules();
+    const spawn = vi.fn();
+    const actualChildProcess = await vi.importActual<typeof import('node:child_process')>('node:child_process');
+    vi.doMock('node:child_process', () => ({
+      ...actualChildProcess,
+      spawn
+    }));
+
+    try {
+      const { defaultExecRunner } = await import('../src/cli/providerLinearWorkerRunner.js');
+      const controller = new AbortController();
+      controller.abort(new Error('startup timeout'));
+
+      await expect(
+        defaultExecRunner({
+          command: 'codex',
+          args: ['exec'],
+          cwd: tempRoot ?? process.cwd(),
+          env: {},
+          mirrorOutput: false,
+          abortSignal: controller.signal
+        })
+      ).rejects.toThrow('startup timeout');
+      expect(spawn).not.toHaveBeenCalled();
+    } finally {
+      vi.doUnmock('node:child_process');
+      vi.resetModules();
+    }
+  });
+
   it('waits for close instead of timing out when abort fires after child exit', async () => {
     vi.resetModules();
     const stdout = new PassThrough();

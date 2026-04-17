@@ -463,6 +463,21 @@ export function defaultExecRunner(
   request: ProviderLinearWorkerExecRequest
 ): Promise<ProviderLinearWorkerExecResult> {
   return new Promise((resolvePromise, reject) => {
+    const abortSignal = request.abortSignal ?? null;
+    const buildAbortError = (): Error => {
+      const reason = abortSignal?.reason;
+      if (reason instanceof Error) {
+        return reason;
+      }
+      if (typeof reason === 'string' && reason.trim().length > 0) {
+        return new Error(reason);
+      }
+      return new Error('Command aborted.');
+    };
+    if (abortSignal?.aborted) {
+      reject(buildAbortError());
+      return;
+    }
     const stdio: StdioOptions = request.mirrorOutput ? ['ignore', 'inherit', 'inherit'] : ['ignore', 'pipe', 'pipe'];
     const child = spawn(request.command, request.args, {
       cwd: request.cwd,
@@ -491,19 +506,8 @@ export function defaultExecRunner(
     }
 
     let settled = false;
-    const abortSignal = request.abortSignal ?? null;
     let abortError: Error | null = null;
     let abortEscalationTimer: ReturnType<typeof setTimeout> | null = null;
-    const buildAbortError = (): Error => {
-      const reason = abortSignal?.reason;
-      if (reason instanceof Error) {
-        return reason;
-      }
-      if (typeof reason === 'string' && reason.trim().length > 0) {
-        return new Error(reason);
-      }
-      return new Error('Command aborted.');
-    };
     const clearAbortEscalationTimer = () => {
       if (abortEscalationTimer !== null) {
         clearTimeout(abortEscalationTimer);

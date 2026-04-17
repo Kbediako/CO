@@ -42,9 +42,9 @@
 - [ ] Explicit elegance review completes. Evidence: pending.
 
 ## Progress Log
-- 2026-04-18: moved `CO-224` from `Ready` to `In Progress`, created the required single workpad comment, and recorded the pre-turn decomposition matrix plus `parallelize_now`.
-- 2026-04-18: launched the docs-only `docs-packet` child lane, observed the live runtime-selection-only stall shape during its early appserver startup window, then accepted the completed docs patch once the lane eventually produced a patch artifact.
-- 2026-04-18: parent added the appserver startup watchdog, abort path, actionable parent failure detail, focused regressions, and the missing docs mirrors/registry entries.
+- 2026-04-17: moved `CO-224` from `Ready` to `In Progress`, created the required single workpad comment, and recorded the pre-turn decomposition matrix plus `parallelize_now`.
+- 2026-04-17: launched the docs-only `docs-packet` child lane, observed the live runtime-selection-only stall shape during its early appserver startup window, then accepted the completed docs patch once the lane eventually produced a patch artifact.
+- 2026-04-17: parent added the appserver startup watchdog, abort path, actionable parent failure detail, focused regressions, and the missing docs mirrors/registry entries.
 
 ## Notes
 - Keep the fix local to the child-lane startup seam; do not reopen generic runtime redesign.
