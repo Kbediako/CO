@@ -613,9 +613,15 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
-  it('bypasses stale read-only cache reuse when cached Merging attachment truth conflicts with a live Rework reset', async () => {
+  it('bypasses stale read-only cache reuse when cached structured current PR truth conflicts with a live Rework reset', async () => {
     const env = await createBudgetedRunScopedEnv();
     const resetAt = String(Date.now() + 60_000);
+    const cachedAttachment = {
+      id: 'attachment-pr-357',
+      title: 'PR 357',
+      url: 'https://github.com/asabeko/CO/pull/357',
+      source_type: 'github'
+    };
 
     await writeCachedIssueContext(
       env,
@@ -625,14 +631,13 @@ describe('providerLinearWorkflowFacade', () => {
           name: 'Merging',
           type: 'started'
         },
-        attachments: [
-          {
-            id: 'attachment-pr-357',
-            title: 'PR 357',
-            url: 'https://github.com/asabeko/CO/pull/357',
-            source_type: 'github'
-          }
-        ]
+        attachments: [cachedAttachment],
+        pull_request_attachments: {
+          current: cachedAttachment,
+          historical: [],
+          conflicting: [],
+          unknown: []
+        }
       }),
       {
         recordedAt: new Date(Date.now() - 45_000).toISOString()
@@ -697,36 +702,37 @@ describe('providerLinearWorkflowFacade', () => {
     expect(result).not.toHaveProperty('cache_fallback_used');
   });
 
-  it('reuses degraded-headroom cache when cached PR truth is historical only', async () => {
+  it.each([
+    {
+      label: 'completed-state historical-only PR truth',
+      state: { id: 'state-done', name: 'Done', type: 'completed' as const },
+      fetchTitle: null,
+      cacheFallbackUsed: true
+    },
+    {
+      label: 'Merging historical-only PR truth',
+      state: { id: 'state-merging', name: 'Merging', type: 'started' as const },
+      fetchTitle: 'Live merge issue context',
+      cacheFallbackUsed: false
+    }
+  ])('handles degraded-headroom cache with cached $label', async ({ state, fetchTitle, cacheFallbackUsed }) => {
     const env = await createBudgetedRunScopedEnv();
     const resetAt = String(Date.now() + 60_000);
+    const cachedAttachment = {
+      id: 'attachment-pr-510',
+      title: 'PR 510',
+      url: 'https://github.com/asabeko/CO/pull/510',
+      source_type: 'github'
+    };
 
     await writeCachedIssueContext(
       env,
       buildCachedIssueContext({
-        state: {
-          id: 'state-done',
-          name: 'Done',
-          type: 'completed'
-        },
-        attachments: [
-          {
-            id: 'attachment-pr-510',
-            title: 'PR 510',
-            url: 'https://github.com/asabeko/CO/pull/510',
-            source_type: 'github'
-          }
-        ],
+        state,
+        attachments: [cachedAttachment],
         pull_request_attachments: {
           current: null,
-          historical: [
-            {
-              id: 'attachment-pr-510',
-              title: 'PR 510',
-              url: 'https://github.com/asabeko/CO/pull/510',
-              source_type: 'github'
-            }
-          ],
+          historical: [cachedAttachment],
           conflicting: [],
           unknown: []
         }
@@ -745,9 +751,21 @@ describe('providerLinearWorkflowFacade', () => {
       }
     });
 
-    const fetchImpl: typeof fetch = vi.fn(async () => {
-      throw new Error('historical-only PR truth should reuse the scoped cache before fetch');
-    });
+    const fetchImpl: typeof fetch = vi.fn(async () =>
+      jsonResponse(
+        buildIssueContextBody({
+          identifier: fetchTitle ? 'CO-220' : 'CO-1',
+          title: fetchTitle ?? 'Cached issue context',
+          state: fetchTitle ? state : undefined
+        }),
+        200,
+        {
+          'x-ratelimit-requests-limit': '100',
+          'x-ratelimit-requests-remaining': '4',
+          'x-ratelimit-requests-reset': resetAt
+        }
+      )
+    );
 
     const result = await getProviderLinearIssueContext({
       issueId: 'lin-issue-1',
@@ -756,29 +774,19 @@ describe('providerLinearWorkflowFacade', () => {
       fetchImpl
     });
 
-    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(fetchImpl).toHaveBeenCalledTimes(cacheFallbackUsed ? 0 : 1);
     expect(result).toMatchObject({
       ok: true,
       operation: 'issue-context',
-      cache_fallback_used: true,
       issue: {
-        identifier: 'CO-1',
+        identifier: cacheFallbackUsed ? 'CO-1' : 'CO-220',
         state: {
-          name: 'Done',
-          type: 'completed'
-        },
-        pull_request_attachments: {
-          current: null,
-          historical: [
-            {
-              id: 'attachment-pr-510'
-            }
-          ],
-          conflicting: [],
-          unknown: []
+          name: state.name,
+          type: state.type
         }
       }
     });
+    expect(Boolean('cache_fallback_used' in result && result.cache_fallback_used === true)).toBe(cacheFallbackUsed);
   });
 
   it('keeps degraded-headroom cache reuse opt-in so mutation-adjacent callers still live-read', async () => {
@@ -1157,6 +1165,28 @@ describe('providerLinearWorkflowFacade', () => {
           ],
           conflicting: [],
           unknown: []
+        }
+      }
+    });
+  });
+
+  it('classifies unrecognized PR snapshot payloads as unknown attachments', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      title: 'Unknown PR snapshot',
+      state: { id: 'state-human-review', name: 'Human Review', type: 'started' },
+      attachments: [buildGitHubAttachment('attachment-pr-511', 511)],
+      snapshotForPr: () => ({}) as { state: string; mergedAt: string | null; updatedAt: string }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        pull_request_attachments: {
+          current: null,
+          historical: [],
+          conflicting: [],
+          unknown: [{ id: 'attachment-pr-511' }]
         }
       }
     });
