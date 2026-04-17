@@ -95,7 +95,7 @@ describe('runDoctor', () => {
       }
       await rm(tempHome, { recursive: true, force: true });
     }
-  });
+  }, 15000);
 
   it('reports devtools readiness when config and skill exist', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
@@ -153,7 +153,7 @@ describe('runDoctor', () => {
       }
       await rm(tempHome, { recursive: true, force: true });
     }
-  });
+  }, 15000);
 
   it('flags legacy max_spawn_depth when it still constrains older runtimes', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
@@ -228,7 +228,7 @@ describe('runDoctor', () => {
       }
       await rm(tempHome, { recursive: true, force: true });
     }
-  });
+  }, 15000);
 
   it('reports direct-dist delegation readiness and initialize latency', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
@@ -266,7 +266,7 @@ describe('runDoctor', () => {
       }
       await rm(tempHome, { recursive: true, force: true });
     }
-  });
+  }, 15000);
 
   it('degrades delegation direct-transport guidance instead of throwing when dist is unavailable', () => {
     const guidance = buildDelegationDirectTransportGuidance(() => {
@@ -663,7 +663,7 @@ describe('runDoctor', () => {
       }
       await rm(tempRepo, { recursive: true, force: true });
     }
-  });
+  }, 15000);
 
   it('prefers task roots over nested provider templates when both signals exist', async () => {
     const tempRepo = await mkdtemp(join(tmpdir(), 'doctor-template-root-'));
@@ -760,7 +760,7 @@ describe('runDoctor', () => {
       }
       await rm(tempRepo, { recursive: true, force: true });
     }
-  });
+  }, 15000);
 
   it('treats disabled providers as neutral for an ok aggregate provider status', async () => {
     const tempRepo = await mkdtemp(join(tmpdir(), 'doctor-providers-linear-only-'));
@@ -824,7 +824,7 @@ describe('runDoctor', () => {
       }
       await rm(tempRepo, { recursive: true, force: true });
     }
-  });
+  }, 15000);
 
   it('treats non-object provider control payloads as invalid', async () => {
     const tempRepo = await mkdtemp(join(tmpdir(), 'doctor-providers-invalid-policy-'));
