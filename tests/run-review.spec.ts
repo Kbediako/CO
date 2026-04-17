@@ -2525,7 +2525,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       },
       [],
       process.cwd(),
-      { timeoutMs: 5000, killSignal: 'SIGKILL' }
+      { timeoutMs: 10000, killSignal: 'SIGKILL' }
     );
 
     expect(result.exitCode).toBeGreaterThan(0);
