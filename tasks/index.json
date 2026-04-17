@@ -215,6 +215,23 @@
       }
     },
     {
+      "id": "20260417-linear-5561a9a9-39dd-4ed4-99a0-896553327669",
+      "title": "CO: Add a Codex 0.121 plugin marketplace distribution path for Codex Orchestrator",
+      "relates_to": "tasks/tasks-linear-5561a9a9-39dd-4ed4-99a0-896553327669.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-17",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-5561a9a9-39dd-4ed4-99a0-896553327669.md",
+        "task": "tasks/tasks-linear-5561a9a9-39dd-4ed4-99a0-896553327669.md",
+        "agent_task": ".agent/task/linear-5561a9a9-39dd-4ed4-99a0-896553327669.md",
+        "docs": "docs/TECH_SPEC-linear-5561a9a9-39dd-4ed4-99a0-896553327669.md"
+      }
+    },
+    {
       "id": "20260417-linear-975669a4-3804-4b5b-9a7b-e1b7c77d3926",
       "title": "CO classify long-lived parent-session delegate-server children with bounded observability",
       "relates_to": "tasks/tasks-linear-975669a4-3804-4b5b-9a7b-e1b7c77d3926.md",
