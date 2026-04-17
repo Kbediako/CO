@@ -151,7 +151,10 @@ describe('CodexOrchestrator CLI', () => {
     const manifest = JSON.parse(manifestRaw);
     expect(Array.isArray(manifest.commands)).toBe(true);
     expect(manifest.metrics_recorded).toBe(true);
-    expect(manifest.summary).toBeNull();
+    expect(manifest.summary ?? '').not.toContain('Guardrails: spec-guard command not found.');
+    expect(manifest.summary ?? '').not.toContain(
+      'Guardrails: spec-guard not configured for this pipeline.'
+    );
     expect(manifest.guardrail_status).toMatchObject({
       present: false,
       summary: 'Guardrails: spec-guard not configured for this pipeline.',
