@@ -1256,7 +1256,7 @@ function buildCompatibilityTelemetrySnapshot(
 
     if (proof?.rate_limits) {
       const candidateTimestamp =
-        Date.parse(proof.updated_at ?? source.updatedAt ?? '') || Number.NEGATIVE_INFINITY;
+        resolveProviderLinearWorkerRateLimitsRecordedAt(proof, source);
       if (candidateTimestamp >= latestCodexRateLimitsAt) {
         latestCodexRateLimits = proof.rate_limits;
         latestCodexRateLimitsAt = candidateTimestamp;
@@ -1276,6 +1276,24 @@ function buildCompatibilityTelemetrySnapshot(
       linearBudget: latestAuthoritativeRateLimits
     })
   };
+}
+
+function resolveProviderLinearWorkerRateLimitsRecordedAt(
+  proof: NonNullable<ControlCompatibilitySourceContext['providerLinearWorkerProof']>,
+  source: NonNullable<ControlCompatibilityRuntimeSnapshot['selected']>
+): number {
+  for (const candidate of [
+    proof.last_event_at,
+    proof.current_turn_activity?.recorded_at,
+    source.updatedAt,
+    proof.updated_at
+  ]) {
+    const parsed = Date.parse(candidate ?? '');
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return Number.NEGATIVE_INFINITY;
 }
 
 function combineCompatibilityRateLimits(input: {

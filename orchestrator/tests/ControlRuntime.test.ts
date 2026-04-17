@@ -3942,7 +3942,21 @@ describe('ControlRuntime', () => {
             remaining: 3
           }
         },
-        updated_at: '2026-03-07T00:20:00.000Z'
+        child_lanes: [
+          {
+            task_id: 'task-1037-current-docs',
+            run_id: 'child-run-1',
+            stream: 'docs',
+            purpose: 'docs lane',
+            pipeline_id: 'provider-linear-child-lane',
+            status: 'in_progress',
+            launched_at: '2026-03-07T00:34:00.000Z',
+            decision: 'pending',
+            summary: 'Child lane docs is running.',
+            summary_recorded_at: '2026-03-07T00:35:00.000Z'
+          }
+        ],
+        updated_at: '2026-03-07T00:35:00.000Z'
       });
 
       const newerSibling = await createSiblingRun(fixture.root, 'task-1037-current', 'run-2', {

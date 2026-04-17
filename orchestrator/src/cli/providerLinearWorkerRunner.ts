@@ -88,6 +88,9 @@ export const PROVIDER_LINEAR_WORKER_CHILD_STREAMS_FILENAME = 'provider-linear-wo
 export const PROVIDER_LINEAR_WORKER_CHILD_LANES_FILENAME = 'provider-linear-worker-child-lanes.json';
 export const PROVIDER_LINEAR_RESIDENT_SESSION_SEED_ENV =
   'CODEX_ORCHESTRATOR_PROVIDER_RESIDENT_SESSION_SEED';
+export const PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID = 'provider-linear-child-lane';
+export const PROVIDER_LINEAR_CHILD_LANE_RESERVED_SUMMARY = 'Child lane reserved before child run startup.';
+const PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME = 'provider-linear-child-lane-proof.json';
 const PROVIDER_LINEAR_WORKER_SESSION_LOG_HYDRATION_FILENAME =
   'provider-linear-worker-session-log-hydration.json';
 const PROVIDER_LINEAR_WORKER_PROOF_LOCK_FILENAME = `${PROVIDER_LINEAR_WORKER_PROOF_FILENAME}.lock`;
@@ -256,6 +259,7 @@ export interface ProviderLinearWorkerChildLaneRecord {
   workspace_path: string | null;
   source_setup: DispatchPilotSourceSetup | null;
   launched_at: string;
+  summary_recorded_at?: string | null;
   purpose: string;
   instructions: string | null;
   scope: ProviderLinearWorkerChildLaneScope;
@@ -4468,6 +4472,540 @@ export async function readProviderLinearWorkerChildLanes(
   return normalized as ProviderLinearWorkerChildLaneRecord[];
 }
 
+interface ProviderLinearWorkerParentManifestHydrationMetadata {
+  runId: string;
+  issueId: string | null;
+  issueIdentifier: string | null;
+  workspacePath: string | null;
+}
+
+interface ProviderLinearWorkerChildLaneManifestHydrationCandidate {
+  runId: string;
+  status: string;
+  manifestPath: string;
+  artifactRoot: string;
+  logPath: string | null;
+  summary: string | null;
+  startedAt: string;
+  updatedAt: string | null;
+  laneWorkspacePath: string | null;
+  patchArtifactPath: string | null;
+  patchBytes: number | null;
+  summaryRecordedAt: string | null;
+}
+
+async function hydrateProviderLinearWorkerChildLanesFromActiveManifests(
+  runDir: string,
+  childLanes: ProviderLinearWorkerChildLaneRecord[]
+): Promise<ProviderLinearWorkerChildLaneRecord[]> {
+  if (childLanes.length === 0) {
+    return childLanes;
+  }
+  const parent = await readProviderLinearWorkerParentManifestHydrationMetadata(runDir);
+  if (!parent) {
+    return childLanes;
+  }
+  return await Promise.all(
+    childLanes.map(async (childLane) =>
+      await hydrateProviderLinearWorkerChildLaneFromActiveManifest(parent, childLane)
+    )
+  );
+}
+
+async function readHydratedProviderLinearWorkerChildLanesAndRepairLedger(
+  runDir: string,
+  priorProofChildLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined = null
+): Promise<ProviderLinearWorkerChildLaneRecord[]> {
+  return await withProviderLinearWorkerChildLanesLock(runDir, async () => {
+    const existing = await readProviderLinearWorkerChildLanes(runDir);
+    const hydrationInputs = existing.map((childLane) =>
+      selectProviderLinearWorkerChildLaneHydrationInput(childLane, priorProofChildLanes)
+    );
+    const hydrated = await hydrateProviderLinearWorkerChildLanesFromActiveManifests(runDir, hydrationInputs);
+    const ledgerRecords = hydrated.map((childLane, index) =>
+      preserveProviderLinearWorkerLaunchReservationLedgerIdentity(existing[index] ?? null, childLane)
+    );
+    if (JSON.stringify(existing) !== JSON.stringify(ledgerRecords)) {
+      await writeJsonAtomic(buildChildLanesPath(runDir), ledgerRecords);
+    }
+    return hydrated;
+  });
+}
+
+function selectProviderLinearWorkerChildLaneHydrationInput(
+  existing: ProviderLinearWorkerChildLaneRecord,
+  priorProofChildLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined
+): ProviderLinearWorkerChildLaneRecord {
+  const existingRunId = normalizeOptionalString(existing.run_id);
+  if (!existingRunId?.startsWith('launching-') || !Array.isArray(priorProofChildLanes)) {
+    return existing;
+  }
+  return priorProofChildLanes.find((prior) =>
+    prior.pipeline_id === existing.pipeline_id &&
+    prior.decision === existing.decision &&
+    prior.stream === existing.stream &&
+    prior.task_id === existing.task_id &&
+    prior.issue_id === existing.issue_id &&
+    prior.issue_identifier === existing.issue_identifier &&
+    prior.launched_at === existing.launched_at &&
+    normalizeOptionalString(prior.run_id)?.startsWith('launching-') !== true
+  ) ?? existing;
+}
+
+function preserveProviderLinearWorkerLaunchReservationLedgerIdentity(
+  existing: ProviderLinearWorkerChildLaneRecord | null,
+  hydrated: ProviderLinearWorkerChildLaneRecord
+): ProviderLinearWorkerChildLaneRecord {
+  if (!existing) {
+    return hydrated;
+  }
+  const existingRunId = normalizeOptionalString(existing.run_id);
+  if (
+    existing.pipeline_id !== PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID ||
+    existing.decision !== 'pending' ||
+    !existingRunId?.startsWith('launching-') ||
+    existingRunId === hydrated.run_id ||
+    existing.stream !== hydrated.stream ||
+    existing.task_id !== hydrated.task_id
+  ) {
+    return hydrated;
+  }
+  return existing;
+}
+
+async function readProviderLinearWorkerParentManifestHydrationMetadata(
+  runDir: string
+): Promise<ProviderLinearWorkerParentManifestHydrationMetadata | null> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(await readFile(join(runDir, 'manifest.json'), 'utf8')) as unknown;
+  } catch {
+    return null;
+  }
+  if (!isRecord(parsed)) {
+    return null;
+  }
+  const runId = normalizeOptionalString(parsed.run_id);
+  if (!runId) {
+    return null;
+  }
+  return {
+    runId,
+    issueId: normalizeOptionalString(parsed.issue_id),
+    issueIdentifier: normalizeOptionalString(parsed.issue_identifier),
+    workspacePath: normalizeOptionalString(parsed.workspace_path)
+  };
+}
+
+async function hydrateProviderLinearWorkerChildLaneFromActiveManifest(
+  parent: ProviderLinearWorkerParentManifestHydrationMetadata,
+  childLane: ProviderLinearWorkerChildLaneRecord
+): Promise<ProviderLinearWorkerChildLaneRecord> {
+  if (!isProviderLinearWorkerPendingChildLaneRecord(childLane)) {
+    return childLane;
+  }
+  const childCliDir = resolveProviderLinearWorkerChildLaneCliDir(parent, childLane);
+  if (!childCliDir) {
+    return childLane;
+  }
+  const reservationPlaceholder = isProviderLinearWorkerChildLaneReservationPlaceholder(childLane);
+  const candidate = reservationPlaceholder
+    ? await findMatchingProviderLinearWorkerChildLaneManifest(parent, childLane, childCliDir)
+    : await readProviderLinearWorkerChildLaneManifestCandidate(
+      parent,
+      childLane,
+      childCliDir,
+      resolveProviderLinearWorkerChildLanePath(
+        childLane.manifest_path,
+        childLane.workspace_path ?? parent.workspacePath
+      ) ?? join(childCliDir, childLane.run_id, 'manifest.json')
+    );
+  if (!candidate) {
+    return childLane;
+  }
+  if (!reservationPlaceholder && candidate.runId !== childLane.run_id) {
+    return childLane;
+  }
+  const summary = buildProviderLinearWorkerHydratedChildLaneSummary(childLane, candidate);
+  const summaryRecordedAt =
+    summary === childLane.summary
+      ? childLane.summary_recorded_at ?? candidate.summaryRecordedAt ?? childLane.launched_at
+      : candidate.summaryRecordedAt ?? childLane.summary_recorded_at ?? childLane.launched_at;
+  return {
+    ...childLane,
+    run_id: candidate.runId,
+    status: candidate.status,
+    manifest_path: candidate.manifestPath,
+    artifact_root: candidate.artifactRoot,
+    log_path: candidate.logPath,
+    summary,
+    summary_recorded_at: summaryRecordedAt,
+    lane_workspace_path: candidate.laneWorkspacePath ?? childLane.lane_workspace_path,
+    patch_artifact_path: candidate.patchArtifactPath ?? childLane.patch_artifact_path,
+    patch_bytes: candidate.patchBytes ?? childLane.patch_bytes
+  };
+}
+
+function isProviderLinearWorkerPendingChildLaneRecord(
+  childLane: ProviderLinearWorkerChildLaneRecord
+): boolean {
+  return (
+    childLane.pipeline_id === PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID &&
+    childLane.decision === 'pending'
+  );
+}
+
+function isProviderLinearWorkerChildLaneReservationPlaceholder(
+  childLane: ProviderLinearWorkerChildLaneRecord
+): boolean {
+  const runId = normalizeOptionalString(childLane.run_id);
+  const summary = normalizeOptionalString(childLane.summary);
+  return (
+    childLane.pipeline_id === PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID &&
+    childLane.decision === 'pending' &&
+    (
+      childLane.status === 'launching' ||
+      Boolean(runId?.startsWith('launching-')) ||
+      summary === PROVIDER_LINEAR_CHILD_LANE_RESERVED_SUMMARY
+    )
+  );
+}
+
+function resolveProviderLinearWorkerChildLaneCliDir(
+  parent: ProviderLinearWorkerParentManifestHydrationMetadata,
+  childLane: ProviderLinearWorkerChildLaneRecord
+): string | null {
+  const workspacePath = childLane.workspace_path ?? parent.workspacePath;
+  const fallbackCliDir = workspacePath
+    ? resolve(workspacePath, '.runs', childLane.task_id, 'cli')
+    : null;
+  const artifactRoot = resolveProviderLinearWorkerChildLanePath(
+    childLane.artifact_root,
+    workspacePath
+  );
+  const manifestPath = resolveProviderLinearWorkerChildLanePath(
+    childLane.manifest_path,
+    workspacePath
+  );
+  const placeholderRunDir = artifactRoot ?? (manifestPath ? dirname(manifestPath) : null);
+  if (!placeholderRunDir) {
+    return fallbackCliDir;
+  }
+  const candidateCliDir = dirname(placeholderRunDir);
+  const runDirName = basename(placeholderRunDir);
+  const recordedRunIdMatchesRunDir = (() => {
+    const runId = normalizeOptionalString(childLane.run_id);
+    if (!runId || runId.startsWith('launching-')) {
+      return false;
+    }
+    try {
+      return sanitizeRunId(runId) === runId && runDirName === runId;
+    } catch {
+      return false;
+    }
+  })();
+  if (
+    (!runDirName.startsWith('launching-') && !recordedRunIdMatchesRunDir) ||
+    basename(candidateCliDir) !== 'cli' ||
+    basename(dirname(candidateCliDir)) !== childLane.task_id
+  ) {
+    return null;
+  }
+  return candidateCliDir;
+}
+
+function resolveProviderLinearWorkerChildLanePath(
+  value: string | null | undefined,
+  workspacePath: string | null | undefined
+): string | null {
+  const normalized = normalizeOptionalString(value);
+  if (!normalized) {
+    return null;
+  }
+  if (isAbsolute(normalized)) {
+    return resolve(normalized);
+  }
+  const normalizedWorkspacePath = normalizeOptionalString(workspacePath);
+  return normalizedWorkspacePath ? resolve(normalizedWorkspacePath, normalized) : resolve(normalized);
+}
+
+async function findMatchingProviderLinearWorkerChildLaneManifest(
+  parent: ProviderLinearWorkerParentManifestHydrationMetadata,
+  childLane: ProviderLinearWorkerChildLaneRecord,
+  childCliDir: string
+): Promise<ProviderLinearWorkerChildLaneManifestHydrationCandidate | null> {
+  let entries: Array<{ isDirectory(): boolean; name: string }>;
+  try {
+    entries = await readdir(childCliDir, { withFileTypes: true });
+  } catch {
+    return null;
+  }
+  const candidates = await Promise.all(
+    entries
+      .filter((entry) => entry.isDirectory())
+      .map(async (entry) =>
+        await readProviderLinearWorkerChildLaneManifestCandidate(
+          parent,
+          childLane,
+          childCliDir,
+          join(childCliDir, entry.name, 'manifest.json')
+        )
+      )
+  );
+  return candidates
+    .filter((candidate): candidate is ProviderLinearWorkerChildLaneManifestHydrationCandidate => candidate !== null)
+    .sort((left, right) => {
+      const timestampComparison = compareIsoTimestamp(right.updatedAt, left.updatedAt);
+      return timestampComparison !== 0 ? timestampComparison : right.runId.localeCompare(left.runId);
+    })[0] ?? null;
+}
+
+async function readProviderLinearWorkerChildLaneManifestCandidate(
+  parent: ProviderLinearWorkerParentManifestHydrationMetadata,
+  childLane: ProviderLinearWorkerChildLaneRecord,
+  childCliDir: string,
+  manifestPath: string
+): Promise<ProviderLinearWorkerChildLaneManifestHydrationCandidate | null> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(await readFile(manifestPath, 'utf8')) as unknown;
+  } catch {
+    return null;
+  }
+  if (!isRecord(parsed)) {
+    return null;
+  }
+  const pipelineId = normalizeOptionalString(parsed.pipeline_id);
+  const parentRunId = normalizeOptionalString(parsed.parent_run_id);
+  const issueId = normalizeOptionalString(parsed.issue_id);
+  const issueIdentifier = normalizeOptionalString(parsed.issue_identifier);
+  const taskId = normalizeOptionalString(parsed.task_id);
+  const runId = normalizeOptionalString(parsed.run_id);
+  const status = normalizeOptionalString(parsed.status);
+  const startedAt = normalizeOptionalString(parsed.started_at);
+  if (
+    pipelineId !== PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID ||
+    parentRunId !== parent.runId ||
+    issueId !== childLane.issue_id ||
+    issueIdentifier !== childLane.issue_identifier ||
+    taskId !== childLane.task_id ||
+    !runId ||
+    runId.startsWith('launching-') ||
+    !status ||
+    !startedAt ||
+    compareIsoTimestamp(startedAt, childLane.launched_at) < 0
+  ) {
+    return null;
+  }
+  if (parent.issueId && issueId !== parent.issueId) {
+    return null;
+  }
+  if (parent.issueIdentifier && issueIdentifier !== parent.issueIdentifier) {
+    return null;
+  }
+  let sanitizedRunId: string;
+  try {
+    sanitizedRunId = sanitizeRunId(runId);
+  } catch {
+    return null;
+  }
+  if (!sanitizedRunId || sanitizedRunId !== runId) {
+    return null;
+  }
+  const workspacePath =
+    normalizeOptionalString(parsed.workspace_path) ??
+    childLane.workspace_path ??
+    parent.workspacePath;
+  const manifestArtifactRoot = resolveProviderLinearWorkerChildLanePath(
+    normalizeOptionalString(parsed.artifact_root),
+    workspacePath
+  ) ?? dirname(manifestPath);
+  const expectedArtifactRoot = join(childCliDir, sanitizedRunId);
+  if (
+    manifestArtifactRoot !== expectedArtifactRoot ||
+    manifestPath !== join(expectedArtifactRoot, 'manifest.json')
+  ) {
+    return null;
+  }
+  if (!isPathWithinRoot(manifestArtifactRoot, childCliDir)) {
+    return null;
+  }
+  if (!isPathWithinRoot(manifestPath, manifestArtifactRoot)) {
+    return null;
+  }
+  const logPath = resolveProviderLinearWorkerChildLanePath(
+    normalizeOptionalString(parsed.log_path),
+    workspacePath
+  );
+  if (logPath && !isPathWithinRoot(logPath, manifestArtifactRoot)) {
+    return null;
+  }
+  const proofMetadata = await readProviderLinearWorkerChildLaneProofHydrationMetadata(
+    parent,
+    childLane,
+    runId,
+    manifestArtifactRoot,
+    workspacePath
+  );
+  const successfulStatus = isSuccessfulProviderLinearWorkerChildLaneStatus(status);
+  const patchBytes = proofMetadata?.patchBytes ?? null;
+  const patchReady = Boolean(proofMetadata?.patchArtifactPath && patchBytes !== null && patchBytes > 0);
+  const hydratedStatus = successfulStatus && !patchReady ? 'in_progress' : status;
+  const manifestTimestamp = latestProviderLinearWorkerChildLaneManifestTimestamp(parsed);
+  const summaryRecordedAt = providerLinearWorkerChildLaneSummaryRecordedAt(
+    parsed,
+    proofMetadata?.updatedAt ?? null,
+    startedAt
+  );
+  return {
+    runId,
+    status: hydratedStatus,
+    manifestPath,
+    artifactRoot: manifestArtifactRoot,
+    logPath,
+    summary: successfulStatus && !patchReady
+      ? patchBytes === 0
+        ? 'Child lane completed without patch output; waiting for parent ledger decision.'
+        : 'Child lane completed; waiting for patch proof metadata.'
+      : normalizeOptionalString(parsed.summary) ?? normalizeOptionalString(parsed.status_detail),
+    startedAt,
+    updatedAt: manifestTimestamp,
+    laneWorkspacePath: proofMetadata?.laneWorkspacePath ?? null,
+    patchArtifactPath: proofMetadata?.patchArtifactPath ?? null,
+    patchBytes: proofMetadata?.patchBytes ?? null,
+    summaryRecordedAt
+  };
+}
+
+interface ProviderLinearWorkerChildLaneProofHydrationMetadata {
+  laneWorkspacePath: string | null;
+  patchArtifactPath: string | null;
+  patchBytes: number | null;
+  updatedAt: string | null;
+}
+
+async function readProviderLinearWorkerChildLaneProofHydrationMetadata(
+  parent: ProviderLinearWorkerParentManifestHydrationMetadata,
+  childLane: ProviderLinearWorkerChildLaneRecord,
+  runId: string,
+  artifactRoot: string,
+  workspacePath: string | null | undefined
+): Promise<ProviderLinearWorkerChildLaneProofHydrationMetadata | null> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(
+      await readFile(join(artifactRoot, PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME), 'utf8')
+    ) as unknown;
+  } catch {
+    return null;
+  }
+  if (!isRecord(parsed)) {
+    return null;
+  }
+  if (
+    normalizeOptionalString(parsed.parent_run_id) !== parent.runId ||
+    normalizeOptionalString(parsed.issue_id) !== childLane.issue_id ||
+    normalizeOptionalString(parsed.issue_identifier) !== childLane.issue_identifier ||
+    normalizeOptionalString(parsed.task_id) !== childLane.task_id ||
+    normalizeOptionalString(parsed.run_id) !== runId
+  ) {
+    return null;
+  }
+  if (parent.issueId && normalizeOptionalString(parsed.issue_id) !== parent.issueId) {
+    return null;
+  }
+  if (parent.issueIdentifier && normalizeOptionalString(parsed.issue_identifier) !== parent.issueIdentifier) {
+    return null;
+  }
+  const proofWorkspacePath =
+    normalizeOptionalString(parsed.lane_workspace_path) ??
+    normalizeOptionalString(parsed.workspace_path) ??
+    workspacePath;
+  const laneWorkspacePath = resolveProviderLinearWorkerChildLanePath(
+    normalizeOptionalString(parsed.lane_workspace_path),
+    workspacePath
+  );
+  const patchArtifactPath = resolveProviderLinearWorkerChildLanePath(
+    normalizeOptionalString(parsed.patch_artifact_path),
+    proofWorkspacePath
+  );
+  if (patchArtifactPath && !isPathWithinRoot(patchArtifactPath, artifactRoot)) {
+    return null;
+  }
+  return {
+    laneWorkspacePath,
+    patchArtifactPath,
+    patchBytes: normalizeNonNegativeInteger(parsed.patch_bytes),
+    updatedAt: normalizeOptionalString(parsed.updated_at)
+  };
+}
+
+function isSuccessfulProviderLinearWorkerChildLaneStatus(status: string): boolean {
+  return status === 'succeeded' || status === 'completed';
+}
+
+function latestProviderLinearWorkerChildLaneManifestTimestamp(
+  manifest: Record<string, unknown>
+): string | null {
+  return latestProviderLinearWorkerIsoTimestamp(
+    normalizeOptionalString(manifest.updated_at),
+    normalizeOptionalString(manifest.heartbeat_at),
+    normalizeOptionalString(manifest.completed_at),
+    normalizeOptionalString(manifest.started_at)
+  );
+}
+
+function providerLinearWorkerChildLaneSummaryRecordedAt(
+  manifest: Record<string, unknown>,
+  proofUpdatedAt: string | null,
+  startedAt: string
+): string | null {
+  const manifestSummaryUpdatedAt =
+    normalizeOptionalString(manifest.summary) || normalizeOptionalString(manifest.status_detail)
+      ? normalizeOptionalString(manifest.updated_at)
+      : null;
+  return latestProviderLinearWorkerIsoTimestamp(
+    proofUpdatedAt,
+    normalizeOptionalString(manifest.completed_at),
+    manifestSummaryUpdatedAt,
+    startedAt
+  );
+}
+
+function latestProviderLinearWorkerIsoTimestamp(...values: Array<string | null | undefined>): string | null {
+  const normalized = values
+    .map((value) => normalizeOptionalString(value))
+    .filter((value): value is string => value !== null)
+    .sort(compareIsoTimestamp);
+  return normalized[normalized.length - 1] ?? null;
+}
+
+function buildProviderLinearWorkerHydratedChildLaneSummary(
+  childLane: ProviderLinearWorkerChildLaneRecord,
+  candidate: ProviderLinearWorkerChildLaneManifestHydrationCandidate
+): string {
+  if (candidate.summary?.startsWith('Child lane completed')) {
+    return candidate.summary;
+  }
+  const label = childLane.stream || childLane.task_id || candidate.runId;
+  const status = candidate.status.toLowerCase();
+  const statusSummary =
+    status === 'succeeded' || status === 'completed'
+      ? `Child lane ${label} succeeded.`
+      : status === 'failed'
+        ? `Child lane ${label} failed.`
+        : status === 'canceled' || status === 'cancelled'
+          ? `Child lane ${label} was canceled.`
+          : status === 'running' || status === 'in_progress'
+            ? `Child lane ${label} is running.`
+            : status === 'queued'
+              ? `Child lane ${label} is queued.`
+              : `Child lane ${label} status is ${candidate.status}.`;
+  return candidate.summary && candidate.summary !== statusSummary
+    ? `${statusSummary} ${candidate.summary}`
+    : statusSummary;
+}
+
 export async function appendProviderLinearWorkerChildLaneRecord(
   runDir: string,
   record: ProviderLinearWorkerChildLaneRecord,
@@ -4706,6 +5244,7 @@ function normalizeProviderLinearWorkerChildLaneRecord(
         }
       : null,
     launched_at: launchedAt,
+    summary_recorded_at: normalizeOptionalString(value.summary_recorded_at),
     purpose,
     instructions: normalizeOptionalString(value.instructions),
     scope,
@@ -5174,7 +5713,10 @@ async function writeProofSnapshot(
     const linearBudget = await readSharedLinearBudgetStatus(env).catch(() => null);
     const linearAudit = await summarizeProviderLinearAuditPath(auditPath);
     const childStreams = await readProviderLinearWorkerChildStreams(runDir);
-    const childLanes = await readProviderLinearWorkerChildLanes(runDir);
+    const childLanes = await readHydratedProviderLinearWorkerChildLanesAndRepairLedger(
+      runDir,
+      proof.child_lanes
+    );
     const proofWithHydratedSources = {
       ...proof,
       linear_audit: linearAudit,
@@ -5210,6 +5752,7 @@ export async function refreshProviderLinearWorkerProofSnapshot(
   env: NodeJS.ProcessEnv = process.env,
   options: {
     updatedAtComparisonScope?: 'full' | 'telemetry';
+    emitProgressEvent?: (message: string) => void;
   } = {}
 ): Promise<ProviderLinearWorkerProof | null> {
   return await withProviderLinearWorkerProofLock(runDir, async () => {
@@ -5228,7 +5771,10 @@ export async function refreshProviderLinearWorkerProofSnapshot(
     const linearBudget = await readSharedLinearBudgetStatus(env).catch(() => null);
     const linearAudit = auditPath ? await summarizeProviderLinearAuditPath(auditPath) : parsed.linear_audit ?? null;
     const childStreams = await readProviderLinearWorkerChildStreams(runDir);
-    const childLanes = await readProviderLinearWorkerChildLanes(runDir);
+    const childLanes = await readHydratedProviderLinearWorkerChildLanesAndRepairLedger(
+      runDir,
+      parsed.child_lanes
+    );
     const proofWithHydratedSources: ProviderLinearWorkerProof = {
       ...parsed,
       linear_audit: linearAudit,
@@ -5269,8 +5815,22 @@ export async function refreshProviderLinearWorkerProofSnapshot(
     };
     await writeProof(proofPath, hydrated);
     await writeProviderWorkerSessionLogHydrationState(runDir, proofWithSessionTelemetryResult.hydrationState);
+    if (
+      options.emitProgressEvent &&
+      JSON.stringify(parsed.progress ?? null) !== JSON.stringify(hydrated.progress ?? null)
+    ) {
+      options.emitProgressEvent(formatProviderLinearWorkerProgressEvent(hydrated));
+    }
     return hydrated;
   });
+}
+
+function formatProviderLinearWorkerProgressEvent(proof: ProviderLinearWorkerProof): string {
+  return `[provider-linear-worker-progress] ${JSON.stringify({
+    issue_id: proof.issue_id,
+    issue_identifier: proof.issue_identifier,
+    progress: proof.progress ?? null
+  })}`;
 }
 
 export async function runProviderLinearWorker(
@@ -5367,11 +5927,7 @@ export async function runProviderLinearWorker(
     }
     lastProgressSignature = signature;
     deps.log.info(
-      `[provider-linear-worker-progress] ${JSON.stringify({
-        issue_id: proof.issue_id,
-        issue_identifier: proof.issue_identifier,
-        progress
-      })}`
+      formatProviderLinearWorkerProgressEvent(proof)
     );
   };
 

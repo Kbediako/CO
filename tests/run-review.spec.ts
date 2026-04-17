@@ -4352,6 +4352,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
         CODEX_ORCHESTRATOR_RUNS_DIR: join(sharedRoot, '.runs'),
         CODEX_ORCHESTRATOR_OUT_DIR: join(sharedRoot, 'out'),
         CODEX_ORCHESTRATOR_PRESERVE_PROVIDER_ARTIFACT_ROOTS: '1',
+        CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON: 'provider artifact-root fixture; large-scope gate is tested separately',
         RUN_REVIEW_ENV_LOG: envLogPath
       },
       ['--manifest', relative(sharedRoot, sharedManifestPath), '--surface', 'audit'],
@@ -4548,6 +4549,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
         CODEX_ORCHESTRATOR_RUN_DIR: dirname(sharedManifestPath),
         CODEX_ORCHESTRATOR_RUNS_DIR: join(sharedRoot, '.runs'),
         CODEX_ORCHESTRATOR_OUT_DIR: join(sharedRoot, 'out'),
+        CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON: 'provider artifact-root fixture; large-scope gate is tested separately',
         RUN_REVIEW_ENV_LOG: envLogPath
       },
       ['--surface', 'audit'],
@@ -4599,6 +4601,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
         CODEX_ORCHESTRATOR_PIPELINE_ID: 'provider-linear-worker',
         CODEX_ORCHESTRATOR_RUNS_DIR: '.runs',
         CODEX_ORCHESTRATOR_OUT_DIR: 'out',
+        CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON: 'provider artifact-root fixture; large-scope gate is tested separately',
         RUN_REVIEW_ENV_LOG: envLogPath
       },
       ['--runs-dir', '.runs', '--surface', 'audit'],

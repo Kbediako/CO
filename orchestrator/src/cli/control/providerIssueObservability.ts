@@ -213,6 +213,7 @@ interface ProviderIssueChildLaneLike {
   run_id?: string | null;
   status?: string | null;
   launched_at?: string | null;
+  summary_recorded_at?: string | null;
   summary?: string | null;
   decision?: string | null;
   in_flight_action?: string | null;
@@ -686,7 +687,9 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
       kind: 'child_lane',
       status: 'waiting',
       summary: childLaneSummary,
+      summary_recorded_at: childLaneSummaryRecordedAt(activeChildLane),
       last_semantic_progress_at: latestIsoTimestamp(
+        childLaneSummaryRecordedAt(activeChildLane),
         normalizeOptionalString(activeChildLane.decision_at),
         normalizeOptionalString(activeChildLane.launched_at),
         latestAudit?.recorded_at ?? null,
@@ -1752,6 +1755,7 @@ function selectLatestChildLaneProgressAt(
     selectCurrentTurnChildLanes(childLanes, currentTurnStartedAt)
   );
   return latestIsoTimestamp(
+    childLaneSummaryRecordedAt(latestLane ?? {}),
     normalizeOptionalString(latestLane?.decision_at),
     normalizeOptionalString(latestLane?.launched_at)
   );
@@ -1763,7 +1767,15 @@ function isCurrentProgressChildLaneSummaryEligible(childLane: ProviderIssueChild
 }
 
 function childLaneSummaryRecordedAt(childLane: ProviderIssueChildLaneLike): string | null {
-  return normalizeOptionalString(childLane.launched_at);
+  return normalizeOptionalString(childLane.summary_recorded_at) ?? normalizeOptionalString(childLane.launched_at);
+}
+
+function childLaneProgressRecordedAt(childLane: ProviderIssueChildLaneLike): string | null {
+  return latestIsoTimestamp(
+    childLaneSummaryRecordedAt(childLane),
+    normalizeOptionalString(childLane.decision_at),
+    normalizeOptionalString(childLane.launched_at)
+  );
 }
 
 function selectActiveChildLane(
@@ -1776,7 +1788,7 @@ function selectActiveChildLane(
     return null;
   }
   return [...active].sort(
-    (left, right) => compareIsoTimestamp(right.launched_at ?? null, left.launched_at ?? null)
+    (left, right) => compareIsoTimestamp(childLaneProgressRecordedAt(right), childLaneProgressRecordedAt(left))
   )[0] ?? null;
 }
 
@@ -1805,14 +1817,8 @@ function selectLatestChildLaneRecord(
   return [...lanes]
     .sort((left, right) =>
       compareIsoTimestamp(
-        latestIsoTimestamp(
-          normalizeOptionalString(right.decision_at),
-          normalizeOptionalString(right.launched_at)
-        ),
-        latestIsoTimestamp(
-          normalizeOptionalString(left.decision_at),
-          normalizeOptionalString(left.launched_at)
-        )
+        childLaneProgressRecordedAt(right),
+        childLaneProgressRecordedAt(left)
       )
     )[0] ?? null;
 }

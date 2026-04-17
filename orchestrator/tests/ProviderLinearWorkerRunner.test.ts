@@ -24,6 +24,7 @@ import {
   runProviderLinearWorker,
   transactProviderLinearWorkerChildLanes,
   PROVIDER_LINEAR_WORKER_AUDIT_FILENAME,
+  PROVIDER_LINEAR_WORKER_CHILD_LANES_FILENAME,
   PROVIDER_LINEAR_WORKER_PROOF_FILENAME,
   type ProviderLinearWorkerDependencies,
   type ProviderLinearWorkerProof
@@ -3468,6 +3469,661 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         status: 'progressing'
       }
     });
+  });
+
+  it('hydrates active child-lane manifests before reserved placeholder progress', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    await writeFile(
+      proofPath,
+      JSON.stringify({
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        attempt_started_at: '2026-04-17T00:30:00.000Z',
+        current_turn_started_at: '2026-04-17T00:30:01.000Z',
+        thread_id: 'thread-1',
+        latest_turn_id: 'turn-1',
+        latest_session_id: 'thread-1-turn-1',
+        latest_session_id_source: 'derived_from_thread_and_turn',
+        turn_count: 1,
+        last_event: 'item.completed',
+        last_message: null,
+        last_event_at: '2026-04-17T00:33:00.000Z',
+        tokens: {
+          input_tokens: null,
+          output_tokens: null,
+          total_tokens: null
+        },
+        rate_limits: null,
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        workspace_path: tempRoot,
+        linear_audit: null,
+        end_reason: null,
+        updated_at: '2026-04-17T00:33:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const childTaskId = 'linear-lin-issue-1-docs-packet';
+    const childCliDir = join(tempRoot!, '.runs', childTaskId, 'cli');
+    const matchingChildRunDir = join(childCliDir, '2026-04-17T00-34-04-191Z-44a13a0d');
+    const unrelatedChildRunDir = join(childCliDir, '2026-04-17T00-35-04-191Z-unrelated');
+    const historicalChildRunDir = join(childCliDir, '2026-04-17T00-20-00-000Z-historical');
+    await mkdir(matchingChildRunDir, { recursive: true });
+    await mkdir(unrelatedChildRunDir, { recursive: true });
+    await mkdir(historicalChildRunDir, { recursive: true });
+    await appendProviderLinearWorkerChildLaneRecord(runDir, {
+      stream: 'docs-packet',
+      pipeline_id: 'provider-linear-child-lane',
+      task_id: childTaskId,
+      run_id: 'launching-docs-packet',
+      status: 'launching',
+      manifest_path: join(childCliDir, 'launching-docs-packet', 'manifest.json'),
+      artifact_root: join(childCliDir, 'launching-docs-packet'),
+      log_path: null,
+      summary: 'Child lane reserved before child run startup.',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      workspace_path: tempRoot,
+      source_setup: null,
+      launched_at: '2026-04-17T00:34:02.078Z',
+      purpose: 'Build docs packet.',
+      instructions: null,
+      scope: resolveProviderLinearChildLaneScopeContract({
+        files: ['docs/PRD-linear-lin-issue-1.md'],
+        phases: ['docs']
+      }),
+      parent_snapshot: {
+        base_sha: null,
+        issue_updated_at: null,
+        issue_state: null,
+        issue_state_type: null,
+        captured_at: '2026-04-17T00:34:02.078Z'
+      },
+      lane_workspace_path: null,
+      patch_artifact_path: null,
+      patch_bytes: null,
+      decision: 'pending',
+      in_flight_action: null,
+      in_flight_started_at: null,
+      decision_at: null,
+      decision_reason: null
+    });
+    await writeFile(
+      join(unrelatedChildRunDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: '2026-04-17T00-35-04-191Z-unrelated',
+        task_id: childTaskId,
+        parent_run_id: 'other-parent-run',
+        pipeline_id: 'provider-linear-child-lane',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        status: 'in_progress',
+        started_at: '2026-04-17T00:35:04.192Z',
+        updated_at: '2026-04-17T00:40:00.000Z',
+        artifact_root: unrelatedChildRunDir,
+        log_path: join(unrelatedChildRunDir, 'runner.ndjson'),
+        workspace_path: tempRoot
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(historicalChildRunDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: '2026-04-17T00-20-00-000Z-historical',
+        task_id: childTaskId,
+        parent_run_id: 'run-child',
+        pipeline_id: 'provider-linear-child-lane',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        status: 'succeeded',
+        started_at: '2026-04-17T00:20:00.000Z',
+        updated_at: '2026-04-17T00:50:00.000Z',
+        completed_at: '2026-04-17T00:50:00.000Z',
+        artifact_root: historicalChildRunDir,
+        log_path: join(historicalChildRunDir, 'runner.ndjson'),
+        workspace_path: tempRoot
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(matchingChildRunDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: '2026-04-17T00-34-04-191Z-44a13a0d',
+        task_id: childTaskId,
+        parent_run_id: 'run-child',
+        pipeline_id: 'provider-linear-child-lane',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        status: 'in_progress',
+        started_at: '2026-04-17T00:34:04.192Z',
+        updated_at: '2026-04-17T00:34:30.000Z',
+        heartbeat_at: '2026-04-17T00:34:45.000Z',
+        artifact_root: matchingChildRunDir,
+        log_path: join(matchingChildRunDir, 'runner.ndjson'),
+        workspace_path: tempRoot
+      }),
+      'utf8'
+    );
+
+    const progressEvents: string[] = [];
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-04-17T00:35:00.000Z',
+      async (path, proof) => await writeFile(path, JSON.stringify(proof, null, 2), 'utf8'),
+      { CODEX_HOME: tempRoot! },
+      { emitProgressEvent: (message) => progressEvents.push(message) }
+    );
+
+    expect(refreshed?.child_lanes?.[0]).toMatchObject({
+      stream: 'docs-packet',
+      run_id: '2026-04-17T00-34-04-191Z-44a13a0d',
+      status: 'in_progress',
+      manifest_path: join(matchingChildRunDir, 'manifest.json'),
+      artifact_root: matchingChildRunDir,
+      log_path: join(matchingChildRunDir, 'runner.ndjson'),
+      summary: 'Child lane docs-packet is running.',
+      summary_recorded_at: '2026-04-17T00:34:04.192Z',
+      decision: 'pending'
+    });
+    expect(refreshed?.progress).toMatchObject({
+      phase: 'child_lane',
+      kind: 'child_lane',
+      status: 'waiting',
+      summary: 'Child lane docs-packet is running.',
+      summary_recorded_at: '2026-04-17T00:34:04.192Z',
+      last_semantic_progress_at: '2026-04-17T00:34:04.192Z',
+      stall_classification: 'waiting_on_child_lane',
+      stall_reason: 'child_lane:docs-packet',
+      recovery_recommendation: 'inspect_child_lane'
+    });
+    expect(progressEvents).toEqual([
+      expect.stringContaining('"summary":"Child lane docs-packet is running."')
+    ]);
+    const ledger = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_CHILD_LANES_FILENAME), 'utf8')
+    ) as Array<Record<string, unknown>>;
+    expect(ledger[0]).toMatchObject({
+      run_id: 'launching-docs-packet',
+      status: 'launching',
+      manifest_path: join(childCliDir, 'launching-docs-packet', 'manifest.json'),
+      artifact_root: join(childCliDir, 'launching-docs-packet'),
+      summary: 'Child lane reserved before child run startup.'
+    });
+
+    await writeFile(
+      join(matchingChildRunDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: '2026-04-17T00-34-04-191Z-44a13a0d',
+        task_id: childTaskId,
+        parent_run_id: 'run-child',
+        pipeline_id: 'provider-linear-child-lane',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        status: 'in_progress',
+        summary: 'Installing dependencies',
+        started_at: '2026-04-17T00:34:04.192Z',
+        updated_at: '2026-04-17T00:36:00.000Z',
+        heartbeat_at: '2026-04-17T00:36:20.000Z',
+        artifact_root: matchingChildRunDir,
+        log_path: join(matchingChildRunDir, 'runner.ndjson'),
+        workspace_path: tempRoot
+      }),
+      'utf8'
+    );
+
+    const semanticSummaryRefreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-04-17T00:36:30.000Z',
+      async (path, proof) => await writeFile(path, JSON.stringify(proof, null, 2), 'utf8'),
+      { CODEX_HOME: tempRoot! }
+    );
+    expect(semanticSummaryRefreshed?.child_lanes?.[0]).toMatchObject({
+      summary: 'Child lane docs-packet is running. Installing dependencies',
+      summary_recorded_at: '2026-04-17T00:36:00.000Z'
+    });
+    expect(semanticSummaryRefreshed?.progress).toMatchObject({
+      summary: 'Child lane docs-packet is running. Installing dependencies',
+      summary_recorded_at: '2026-04-17T00:36:00.000Z',
+      last_semantic_progress_at: '2026-04-17T00:36:00.000Z'
+    });
+
+    await writeFile(
+      join(matchingChildRunDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: '2026-04-17T00-34-04-191Z-44a13a0d',
+        task_id: childTaskId,
+        parent_run_id: 'run-child',
+        pipeline_id: 'provider-linear-child-lane',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        status: 'in_progress',
+        summary: 'Installing dependencies',
+        started_at: '2026-04-17T00:34:04.192Z',
+        updated_at: '2026-04-17T00:37:00.000Z',
+        heartbeat_at: '2026-04-17T00:37:30.000Z',
+        artifact_root: matchingChildRunDir,
+        log_path: join(matchingChildRunDir, 'runner.ndjson'),
+        workspace_path: tempRoot
+      }),
+      'utf8'
+    );
+
+    const heartbeatOnlyRefreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-04-17T00:37:40.000Z',
+      async (path, proof) => await writeFile(path, JSON.stringify(proof, null, 2), 'utf8'),
+      { CODEX_HOME: tempRoot! }
+    );
+    expect(heartbeatOnlyRefreshed?.child_lanes?.[0]).toMatchObject({
+      summary: 'Child lane docs-packet is running. Installing dependencies',
+      summary_recorded_at: '2026-04-17T00:36:00.000Z'
+    });
+
+    await writeFile(
+      join(matchingChildRunDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: '2026-04-17T00-34-04-191Z-44a13a0d',
+        task_id: childTaskId,
+        parent_run_id: 'run-child',
+        pipeline_id: 'provider-linear-child-lane',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        status: 'succeeded',
+        started_at: '2026-04-17T00:34:04.192Z',
+        completed_at: '2026-04-17T00:43:59.552Z',
+        updated_at: '2026-04-17T00:43:59.552Z',
+        artifact_root: matchingChildRunDir,
+        log_path: join(matchingChildRunDir, 'runner.ndjson'),
+        workspace_path: tempRoot
+      }),
+      'utf8'
+    );
+    const zeroBytePatchPath = join(matchingChildRunDir, 'provider-linear-child-lane.patch');
+    await writeFile(zeroBytePatchPath, '', 'utf8');
+    await writeFile(
+      join(matchingChildRunDir, 'provider-linear-child-lane-proof.json'),
+      JSON.stringify({
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        task_id: childTaskId,
+        run_id: '2026-04-17T00-34-04-191Z-44a13a0d',
+        parent_run_id: 'run-child',
+        stream: 'docs-packet',
+        lane_workspace_path: join(tempRoot!, '.child-lanes', 'docs-packet-child'),
+        patch_artifact_path: zeroBytePatchPath,
+        patch_bytes: 0,
+        status: 'succeeded',
+        updated_at: '2026-04-17T00:43:59.552Z'
+      }),
+      'utf8'
+    );
+
+    const zeroByteRefreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-04-17T00:44:00.000Z',
+      async (path, proof) => await writeFile(path, JSON.stringify(proof, null, 2), 'utf8'),
+      { CODEX_HOME: tempRoot! }
+    );
+
+    expect(zeroByteRefreshed?.child_lanes?.[0]).toMatchObject({
+      run_id: '2026-04-17T00-34-04-191Z-44a13a0d',
+      status: 'in_progress',
+      summary: 'Child lane completed without patch output; waiting for parent ledger decision.',
+      patch_artifact_path: zeroBytePatchPath,
+      patch_bytes: 0,
+      decision: 'pending'
+    });
+  });
+
+  it('keeps reserved child-lane placeholder progress when manifest lineage mismatches', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    await writeFile(
+      proofPath,
+      JSON.stringify({
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        attempt_started_at: '2026-04-17T00:30:00.000Z',
+        current_turn_started_at: '2026-04-17T00:30:01.000Z',
+        thread_id: 'thread-1',
+        latest_turn_id: 'turn-1',
+        latest_session_id: 'thread-1-turn-1',
+        latest_session_id_source: 'derived_from_thread_and_turn',
+        turn_count: 1,
+        last_event: 'item.completed',
+        last_message: null,
+        last_event_at: '2026-04-17T00:33:00.000Z',
+        tokens: {
+          input_tokens: null,
+          output_tokens: null,
+          total_tokens: null
+        },
+        rate_limits: null,
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        workspace_path: tempRoot,
+        linear_audit: null,
+        end_reason: null,
+        updated_at: '2026-04-17T00:33:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const childTaskId = 'linear-lin-issue-1-docs-packet';
+    const childCliDir = join(tempRoot!, '.runs', childTaskId, 'cli');
+    const mismatchedChildRunDir = join(childCliDir, '2026-04-17T00-34-04-191Z-44a13a0d');
+    await mkdir(mismatchedChildRunDir, { recursive: true });
+    await appendProviderLinearWorkerChildLaneRecord(runDir, {
+      stream: 'docs-packet',
+      pipeline_id: 'provider-linear-child-lane',
+      task_id: childTaskId,
+      run_id: 'launching-docs-packet',
+      status: 'launching',
+      manifest_path: join(childCliDir, 'launching-docs-packet', 'manifest.json'),
+      artifact_root: join(childCliDir, 'launching-docs-packet'),
+      log_path: null,
+      summary: 'Child lane reserved before child run startup.',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      workspace_path: tempRoot,
+      source_setup: null,
+      launched_at: '2026-04-17T00:34:02.078Z',
+      purpose: 'Build docs packet.',
+      instructions: null,
+      scope: resolveProviderLinearChildLaneScopeContract({
+        files: ['docs/PRD-linear-lin-issue-1.md'],
+        phases: ['docs']
+      }),
+      parent_snapshot: {
+        base_sha: null,
+        issue_updated_at: null,
+        issue_state: null,
+        issue_state_type: null,
+        captured_at: '2026-04-17T00:34:02.078Z'
+      },
+      lane_workspace_path: null,
+      patch_artifact_path: null,
+      patch_bytes: null,
+      decision: 'pending',
+      in_flight_action: null,
+      in_flight_started_at: null,
+      decision_at: null,
+      decision_reason: null
+    });
+    await writeFile(
+      join(mismatchedChildRunDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: '2026-04-17T00-34-04-191Z-44a13a0d',
+        task_id: childTaskId,
+        parent_run_id: 'other-parent-run',
+        pipeline_id: 'provider-linear-child-lane',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        status: 'in_progress',
+        started_at: '2026-04-17T00:34:04.192Z',
+        updated_at: '2026-04-17T00:34:30.000Z',
+        artifact_root: mismatchedChildRunDir,
+        log_path: join(mismatchedChildRunDir, 'runner.ndjson'),
+        workspace_path: tempRoot
+      }),
+      'utf8'
+    );
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-04-17T00:35:00.000Z',
+      async (path, proof) => await writeFile(path, JSON.stringify(proof, null, 2), 'utf8'),
+      { CODEX_HOME: tempRoot! }
+    );
+
+    expect(refreshed?.child_lanes?.[0]).toMatchObject({
+      run_id: 'launching-docs-packet',
+      status: 'launching',
+      summary: 'Child lane reserved before child run startup.'
+    });
+    expect(refreshed?.progress).toMatchObject({
+      phase: 'child_lane',
+      kind: 'child_lane',
+      status: 'waiting',
+      summary: 'Child lane reserved before child run startup.',
+      stall_classification: 'waiting_on_child_lane',
+      stall_reason: 'child_lane:docs-packet'
+    });
+  });
+
+  it('fails closed for malformed child manifest run ids', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    await writeFile(
+      proofPath,
+      JSON.stringify({
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        attempt_started_at: '2026-04-17T00:30:00.000Z',
+        current_turn_started_at: '2026-04-17T00:30:01.000Z',
+        thread_id: 'thread-1',
+        latest_turn_id: 'turn-1',
+        latest_session_id: 'thread-1-turn-1',
+        latest_session_id_source: 'derived_from_thread_and_turn',
+        turn_count: 1,
+        last_event: 'item.completed',
+        last_message: null,
+        last_event_at: '2026-04-17T00:33:00.000Z',
+        tokens: {
+          input_tokens: null,
+          output_tokens: null,
+          total_tokens: null
+        },
+        rate_limits: null,
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        workspace_path: tempRoot,
+        linear_audit: null,
+        end_reason: null,
+        updated_at: '2026-04-17T00:33:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const childTaskId = 'linear-lin-issue-1-docs-packet';
+    const childCliDir = join(tempRoot!, '.runs', childTaskId, 'cli');
+    const malformedChildRunDir = join(childCliDir, '2026-04-17T00-34-04-191Z-44a13a0d');
+    await mkdir(malformedChildRunDir, { recursive: true });
+    await appendProviderLinearWorkerChildLaneRecord(runDir, {
+      stream: 'docs-packet',
+      pipeline_id: 'provider-linear-child-lane',
+      task_id: childTaskId,
+      run_id: 'launching-docs-packet',
+      status: 'launching',
+      manifest_path: join(childCliDir, 'launching-docs-packet', 'manifest.json'),
+      artifact_root: join(childCliDir, 'launching-docs-packet'),
+      log_path: null,
+      summary: 'Child lane reserved before child run startup.',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      workspace_path: tempRoot,
+      source_setup: null,
+      launched_at: '2026-04-17T00:34:02.078Z',
+      purpose: 'Build docs packet.',
+      instructions: null,
+      scope: resolveProviderLinearChildLaneScopeContract({
+        files: ['docs/PRD-linear-lin-issue-1.md'],
+        phases: ['docs']
+      }),
+      parent_snapshot: {
+        base_sha: null,
+        issue_updated_at: null,
+        issue_state: null,
+        issue_state_type: null,
+        captured_at: '2026-04-17T00:34:02.078Z'
+      },
+      lane_workspace_path: null,
+      patch_artifact_path: null,
+      patch_bytes: null,
+      decision: 'pending',
+      in_flight_action: null,
+      in_flight_started_at: null,
+      decision_at: null,
+      decision_reason: null
+    });
+    await writeFile(
+      join(malformedChildRunDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: '../escape',
+        task_id: childTaskId,
+        parent_run_id: 'run-child',
+        pipeline_id: 'provider-linear-child-lane',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        status: 'in_progress',
+        started_at: '2026-04-17T00:34:04.192Z',
+        updated_at: '2026-04-17T00:34:30.000Z',
+        artifact_root: malformedChildRunDir,
+        log_path: join(malformedChildRunDir, 'runner.ndjson'),
+        workspace_path: tempRoot
+      }),
+      'utf8'
+    );
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-04-17T00:35:00.000Z',
+      async (path, proof) => await writeFile(path, JSON.stringify(proof, null, 2), 'utf8'),
+      { CODEX_HOME: tempRoot! }
+    );
+
+    expect(refreshed?.child_lanes?.[0]).toMatchObject({
+      run_id: 'launching-docs-packet',
+      status: 'launching',
+      summary: 'Child lane reserved before child run startup.'
+    });
+    expect(refreshed?.progress).toMatchObject({
+      phase: 'child_lane',
+      kind: 'child_lane',
+      status: 'waiting',
+      summary: 'Child lane reserved before child run startup.',
+      stall_classification: 'waiting_on_child_lane',
+      stall_reason: 'child_lane:docs-packet'
+    });
+  });
+
+  it('hydrates active child-lane manifests from configured runs roots', async () => {
+    const { runDir } = await createManifestRoot();
+    await writeFile(
+      join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        attempt_started_at: '2026-04-17T00:30:00.000Z',
+        current_turn_started_at: '2026-04-17T00:30:01.000Z',
+        thread_id: 'thread-1',
+        latest_turn_id: 'turn-1',
+        latest_session_id: 'thread-1-turn-1',
+        latest_session_id_source: 'derived_from_thread_and_turn',
+        turn_count: 1,
+        last_event: 'item.completed',
+        last_message: null,
+        last_event_at: '2026-04-17T00:33:00.000Z',
+        tokens: {
+          input_tokens: null,
+          output_tokens: null,
+          total_tokens: null
+        },
+        rate_limits: null,
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        workspace_path: tempRoot,
+        linear_audit: null,
+        end_reason: null,
+        updated_at: '2026-04-17T00:33:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const childTaskId = 'linear-lin-issue-1-docs-packet';
+    const childCliDir = join(tempRoot!, 'artifacts', 'runs', childTaskId, 'cli');
+    const matchingChildRunDir = join(childCliDir, '2026-04-17T00-34-04-191Z-44a13a0d');
+    await mkdir(matchingChildRunDir, { recursive: true });
+    await appendProviderLinearWorkerChildLaneRecord(runDir, {
+      stream: 'docs-packet',
+      pipeline_id: 'provider-linear-child-lane',
+      task_id: childTaskId,
+      run_id: 'launching-docs-packet',
+      status: 'launching',
+      manifest_path: join(childCliDir, 'launching-docs-packet', 'manifest.json'),
+      artifact_root: join(childCliDir, 'launching-docs-packet'),
+      log_path: null,
+      summary: 'Child lane reserved before child run startup.',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      workspace_path: tempRoot,
+      source_setup: null,
+      launched_at: '2026-04-17T00:34:02.078Z',
+      purpose: 'Build docs packet.',
+      instructions: null,
+      scope: resolveProviderLinearChildLaneScopeContract({
+        files: ['docs/PRD-linear-lin-issue-1.md'],
+        phases: ['docs']
+      }),
+      parent_snapshot: {
+        base_sha: null,
+        issue_updated_at: null,
+        issue_state: null,
+        issue_state_type: null,
+        captured_at: '2026-04-17T00:34:02.078Z'
+      },
+      lane_workspace_path: null,
+      patch_artifact_path: null,
+      patch_bytes: null,
+      decision: 'pending',
+      in_flight_action: null,
+      in_flight_started_at: null,
+      decision_at: null,
+      decision_reason: null
+    });
+    await writeFile(
+      join(matchingChildRunDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: '2026-04-17T00-34-04-191Z-44a13a0d',
+        task_id: childTaskId,
+        parent_run_id: 'run-child',
+        pipeline_id: 'provider-linear-child-lane',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        status: 'in_progress',
+        started_at: '2026-04-17T00:34:04.192Z',
+        updated_at: '2026-04-17T00:34:30.000Z',
+        artifact_root: matchingChildRunDir,
+        log_path: join(matchingChildRunDir, 'runner.ndjson'),
+        workspace_path: tempRoot
+      }),
+      'utf8'
+    );
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-04-17T00:35:00.000Z',
+      async (path, proof) => await writeFile(path, JSON.stringify(proof, null, 2), 'utf8'),
+      { CODEX_HOME: tempRoot! }
+    );
+
+    expect(refreshed?.child_lanes?.[0]).toMatchObject({
+      run_id: '2026-04-17T00-34-04-191Z-44a13a0d',
+      status: 'in_progress',
+      manifest_path: join(matchingChildRunDir, 'manifest.json'),
+      artifact_root: matchingChildRunDir,
+      summary: 'Child lane docs-packet is running.'
+    });
+    expect(refreshed?.progress?.summary).toBe('Child lane docs-packet is running.');
   });
 
   it('backfills appserver session telemetry into refreshed provider proofs', async () => {

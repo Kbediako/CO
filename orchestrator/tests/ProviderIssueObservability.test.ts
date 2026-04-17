@@ -1103,6 +1103,54 @@ describe('provider issue observability', () => {
     expect(progress?.last_semantic_progress_at).toBe('2026-04-16T07:48:30.000Z');
   });
 
+  it('prefers the active child lane with the freshest summary timestamp over later launch order', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
+      proof: {
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        current_turn_started_at: '2026-04-16T07:46:00.000Z',
+        last_event: 'turn_started',
+        last_message: 'Provider worker turn is active.',
+        last_event_at: '2026-04-16T07:46:00.000Z',
+        updated_at: '2026-04-16T07:55:00.000Z',
+        child_lanes: [
+          {
+            stream: 'docs-packet',
+            task_id: 'linear-co-210-docs-packet',
+            run_id: 'run-lane-docs',
+            status: 'running',
+            launched_at: '2026-04-16T07:47:00.000Z',
+            summary_recorded_at: '2026-04-16T07:54:00.000Z',
+            decision: 'pending',
+            summary: 'docs-packet child lane is running focused docs validation'
+          },
+          {
+            stream: 'tests-packet',
+            task_id: 'linear-co-210-tests-packet',
+            run_id: 'run-lane-tests',
+            status: 'launching',
+            launched_at: '2026-04-16T07:53:00.000Z',
+            decision: 'pending',
+            summary: 'Child lane reserved before child run startup.'
+          }
+        ],
+        linear_audit: null
+      },
+      now: () => '2026-04-16T07:55:00.000Z'
+    });
+
+    expect(progress).toMatchObject({
+      phase: 'child_lane',
+      kind: 'child_lane',
+      status: 'waiting',
+      summary: 'docs-packet child lane is running focused docs validation',
+      summary_recorded_at: '2026-04-16T07:54:00.000Z',
+      last_semantic_progress_at: '2026-04-16T07:54:00.000Z',
+      stall_classification: 'waiting_on_child_lane',
+      stall_reason: 'child_lane:docs-packet'
+    });
+  });
+
   it('uses the chosen non-empty child summary timestamp when newer child records have blank summaries', () => {
     const progress = deriveProviderLinearWorkerProgressSnapshot({
       proof: {
