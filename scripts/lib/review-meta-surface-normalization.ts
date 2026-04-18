@@ -4,6 +4,8 @@ import { normalizeCommandToken } from './review-shell-command-parser.js';
 
 const REVIEW_ACTIVE_CLOSEOUT_BUNDLE_KIND = 'review-closeout-bundle';
 export const ARCHITECTURE_CONTEXT_META_SURFACE_KIND = 'architecture-context';
+const REVIEW_SUPPORT_CODEX_SKILL_PATH_RE =
+  /(?:^|\/)\.codex\/skills\/(?:standalone-review|delegation-usage)\/SKILL\.md$/u;
 
 export type ReviewMetaSurfaceSample = {
   kind: string;
@@ -759,6 +761,9 @@ function classifyMetaSurfaceOperand(
   }
   if (normalized.includes('.codex/memories/')) {
     return 'codex-memories';
+  }
+  if (REVIEW_SUPPORT_CODEX_SKILL_PATH_RE.test(normalized)) {
+    return 'review-support';
   }
   if (normalized.includes('.codex/skills/')) {
     return 'codex-skills';

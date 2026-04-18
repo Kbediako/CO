@@ -1511,7 +1511,7 @@ describe('ReviewExecutionState', () => {
     );
     state.observeChunk('thinking\nexec\n', 'stdout', 200);
     state.observeChunk(
-      `/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/skills/delegation-usage/SKILL.md'\n`,
+      `/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/skills/collab-subagents-first/SKILL.md'\n`,
       'stdout',
       210
     );
@@ -1539,6 +1539,38 @@ describe('ReviewExecutionState', () => {
     expect(boundary.preAnchorMetaSurfaceKinds).toEqual(['codex-memories', 'codex-skills']);
     expect(summary.startupAnchorObserved).toBe(false);
     expect(summary.preAnchorMetaSurfaceSignals).toBe(2);
+  });
+
+  it('does not count standalone-review and delegation-usage skill reads against the startup-anchor budget', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      enforceStartupAnchorBoundary: true,
+      scopeMode: 'uncommitted',
+      touchedPaths: ['scripts/run-review.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc "pwd && git status --short && sed -n '1,220p' /Users/kbediako/.codex/skills/standalone-review/SKILL.md"\n`,
+      'stdout',
+      110
+    );
+    state.observeChunk('thinking\nexec\n', 'stdout', 200);
+    state.observeChunk(
+      `/bin/zsh -lc "sed -n '1,220p' /Users/kbediako/.codex/skills/delegation-usage/SKILL.md && git diff --stat && sed -n '1,220p' scripts/run-review.ts"\n`,
+      'stdout',
+      210
+    );
+
+    const boundary = state.getStartupAnchorBoundaryState(220);
+    const summary = state.buildOutputSummary();
+    expect(boundary.triggered).toBe(false);
+    expect(boundary.anchorObserved).toBe(true);
+    expect(summary.startupAnchorObserved).toBe(true);
+    expect(summary.preAnchorCommandStarts).toBe(1);
+    expect(summary.preAnchorMetaSurfaceSignals).toBe(0);
+    expect(summary.preAnchorMetaSurfaceKinds).toEqual([]);
   });
 
   it('triggers the audit startup-anchor boundary when repeated off-surface reads happen before manifest or runner-log evidence', () => {
@@ -2818,7 +2850,7 @@ describe('ReviewExecutionState', () => {
 
     state.observeChunk('thinking\nexec\n', 'stdout', 100);
     state.observeChunk(
-      `/bin/zsh -lc 'sed -n 1,120p tests/run-review.spec.ts && sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md && sed -n 1,120p /Users/kbediako/.codex/skills/delegation-usage/SKILL.md && sed -n 1,120p scripts/run-review.ts'\n`,
+      `/bin/zsh -lc 'sed -n 1,120p tests/run-review.spec.ts && sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md && sed -n 1,120p /Users/kbediako/.codex/skills/collab-subagents-first/SKILL.md && sed -n 1,120p scripts/run-review.ts'\n`,
       'stdout',
       110
     );
@@ -3685,7 +3717,7 @@ describe('ReviewExecutionState', () => {
     let nowMs = 100;
     for (const command of [
       "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md'",
-      "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/skills/delegation-usage/SKILL.md'",
+      "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/skills/collab-subagents-first/SKILL.md'",
       "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'",
       "/bin/zsh -lc 'sed -n 1,120p scripts/lib/review-execution-state.ts'",
       "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'",

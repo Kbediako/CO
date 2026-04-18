@@ -1,6 +1,30 @@
 {
   "items": [
     {
+      "id": "20260418-linear-4b6dd62c-dd51-4edc-89e3-24c773d93124",
+      "title": "CO: eliminate residual startup-anchor standalone-review failures that still force manual fallback after CO-173",
+      "relates_to": "tasks/tasks-linear-4b6dd62c-dd51-4edc-89e3-24c773d93124.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (direct fallback after child-stream provenance failure; repo freshness policy owner CO-175)",
+          "date": "2026-04-18",
+          "manifest": ".runs/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124/cli/2026-04-18T05-48-25-732Z-f5e259ca/manifest.json",
+          "override_reason": "Packaged same-issue child-stream and child-lane helper launches failed closed because the parent provider-worker manifest lacks provider_control_host provenance. Direct docs-review rerun then passed delegation-guard override, spec-guard, and docs:check for the CO-242 packet, and stopped only on docs:freshness:maintain block_policy_over_budget owned by CO-175 after the missing .agent/task registry row was fixed."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124.md",
+        "task": "tasks/tasks-linear-4b6dd62c-dd51-4edc-89e3-24c773d93124.md",
+        "agent_task": ".agent/task/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124.md",
+        "docs": "docs/TECH_SPEC-linear-4b6dd62c-dd51-4edc-89e3-24c773d93124.md"
+      }
+    },
+    {
       "id": "20260418-linear-9fc9fe23-bd44-4b72-9459-b5b809970bce",
       "title": "CO: stop review-handoff promotion from parking In Review issues on multiple attached PRs",
       "relates_to": "tasks/tasks-linear-9fc9fe23-bd44-4b72-9459-b5b809970bce.md",

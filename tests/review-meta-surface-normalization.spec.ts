@@ -253,6 +253,57 @@ describe('review meta-surface normalization', () => {
     ]);
   });
 
+  it('classifies the standalone-review skill as review-support when it is inspected directly', () => {
+    expect(
+      classifyMetaSurfaceDirectDetailed(
+        'sed',
+        ['-n', '1,80p', '/Users/kbediako/.codex/skills/standalone-review/SKILL.md'],
+        new Set(),
+        '/repo'
+      )
+    ).toEqual([
+      {
+        kind: 'review-support',
+        candidate: '/Users/kbediako/.codex/skills/standalone-review/SKILL.md',
+        operand: '/Users/kbediako/.codex/skills/standalone-review/SKILL.md'
+      }
+    ]);
+  });
+
+  it('classifies the delegation-usage skill as review-support when it is inspected directly', () => {
+    expect(
+      classifyMetaSurfaceDirectDetailed(
+        'sed',
+        ['-n', '1,80p', '/Users/kbediako/.codex/skills/delegation-usage/SKILL.md'],
+        new Set(),
+        '/repo'
+      )
+    ).toEqual([
+      {
+        kind: 'review-support',
+        candidate: '/Users/kbediako/.codex/skills/delegation-usage/SKILL.md',
+        operand: '/Users/kbediako/.codex/skills/delegation-usage/SKILL.md'
+      }
+    ]);
+  });
+
+  it('keeps unrelated codex skills classified as codex-skills', () => {
+    expect(
+      classifyMetaSurfaceDirectDetailed(
+        'sed',
+        ['-n', '1,80p', '/Users/kbediako/.codex/skills/collab-subagents-first/SKILL.md'],
+        new Set(),
+        '/repo'
+      )
+    ).toEqual([
+      {
+        kind: 'codex-skills',
+        candidate: '/Users/kbediako/.codex/skills/collab-subagents-first/SKILL.md',
+        operand: '/Users/kbediako/.codex/skills/collab-subagents-first/SKILL.md'
+      }
+    ]);
+  });
+
   it('treats the extracted command-intent helper family as touched when review-execution-state is the touched sibling', () => {
     expect(
       isTouchedReviewScopePathFamilyOperand(
