@@ -10,6 +10,14 @@
       ],
       "last_review": "2026-04-18",
       "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-18",
+          "status": "succeeded",
+          "manifest": ".runs/linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26-co-248-docs-review/cli/2026-04-18T13-59-17-756Z-d73e637e/manifest.json",
+          "telemetry": ".runs/linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26-co-248-docs-review/cli/2026-04-18T13-59-17-756Z-d73e637e/review/telemetry.json",
+          "summary": "Docs-review child stream completed before implementation handoff; spec-guard passed and review telemetry reported clean-success for the CO-248 packet."
+        },
         "docs_packet_child_lane": {
           "reviewer": "bounded same-issue docs child lane",
           "date": "2026-04-18",
@@ -11827,6 +11835,32 @@
         "task": "tasks/tasks-linear-ddb81c93-87b2-4dff-b69b-33d7ae3c91cd.md",
         "agent_task": ".agent/task/linear-ddb81c93-87b2-4dff-b69b-33d7ae3c91cd.md",
         "docs": "docs/TECH_SPEC-linear-ddb81c93-87b2-4dff-b69b-33d7ae3c91cd.md"
+      }
+    },
+    {
+      "id": "20260418-linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26",
+      "title": "Control host: stale plain released/not_active Blocked claim can still strand refresh at refresh:rehydrated and starve Ready admission",
+      "relates_to": "tasks/tasks-linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26-docs-packet/cli/2026-04-18T13-17-17-407Z-341c0733/manifest.json",
+          "source_anchor": "ctx:sha256:90f181707d191588a350b88e2378b3a174ef9814ccc956d90dd6d782f7c437a9#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-248 as control-host refresh lifecycle starvation at `refresh:rehydrated` with `provider_refresh_lifecycle_stuck`, `claims_scanned=0`, `fresh_discovery_runs=0`, and stale plain `released/not_active` cached `Blocked` claim state while live dispatch already wants `CO-233`; it explicitly rejects reclaim-only, `CO-212`, `CO-238`, `manual-launch`, and broad-restart reinterpretations. Parent owns implementation, validation, Linear/workpad state, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26.md",
+        "task": "tasks/tasks-linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26.md",
+        "agent_task": ".agent/task/linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26.md",
+        "docs": "docs/TECH_SPEC-linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26.md"
       }
     }
   ]
