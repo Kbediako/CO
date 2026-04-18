@@ -1,6 +1,47 @@
 {
   "items": [
     {
+      "id": "20260418-linear-9ce7811e-45ca-4d04-b759-bc5e7da77511",
+      "title": "Validation floor: restore handoff readiness after SelectedRunProjection timeout and docs/TASKS zero-headroom",
+      "relates_to": "tasks/tasks-linear-9ce7811e-45ca-4d04-b759-bc5e7da77511.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-9ce7811e-45ca-4d04-b759-bc5e7da77511-docs-packet/cli/2026-04-18T09-50-19-200Z-c62c14f9/manifest.json",
+          "source_anchor": "ctx:sha256:435270084f0b1ce52333855ba3d994b5a40a6a98549a81c2fd69d7f806ba3dd0#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-247 as the current-head validation-floor reclassification lane for blocked CO-231: the inherited docs/TASKS zero-headroom story and the exact SelectedRunProjection timeout must each be rerun on the current head before either is treated as still live, while current workpad evidence already shows the docs line count below the historical 450/450 state. Parent owns registry integration, implementation, validation, Linear/workpad reconciliation, PR, and merge."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review --uncommitted",
+          "date": "2026-04-18",
+          "status": "manual-fallback-after-stall",
+          "manifest": ".runs/linear-9ce7811e-45ca-4d04-b759-bc5e7da77511/cli/2026-04-18T09-46-23-035Z-046b6811/manifest.json",
+          "fallback_note": "out/linear-9ce7811e-45ca-4d04-b759-bc5e7da77511/manual/validation/10-review-fallback.md",
+          "summary": "The wrapper executed with FORCE_CODEX_REVIEW=1, but after more than 4 minutes it still had not produced telemetry or a verdict and had drifted into temp-script exploration. The lane closed with manual correctness review and no findings instead of claiming bounded-success."
+        },
+        "elegance_review": {
+          "reviewer": "provider worker parent lane",
+          "date": "2026-04-18",
+          "status": "completed",
+          "artifact": "out/linear-9ce7811e-45ca-4d04-b759-bc5e7da77511/manual/validation/11-elegance-review.md",
+          "summary": "Kept the fix local to the projection refresh plan and proof refresh helper, avoided timeout inflation or broader session discovery changes, and added only one focused regression test for the new fast path."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-9ce7811e-45ca-4d04-b759-bc5e7da77511.md",
+        "task": "tasks/tasks-linear-9ce7811e-45ca-4d04-b759-bc5e7da77511.md",
+        "agent_task": ".agent/task/linear-9ce7811e-45ca-4d04-b759-bc5e7da77511.md",
+        "docs": "docs/TECH_SPEC-linear-9ce7811e-45ca-4d04-b759-bc5e7da77511.md"
+      }
+    },
+    {
       "id": "20260418-linear-4a34011b-104b-4334-871b-a0a014883548",
       "title": "CO STATUS / observability: stop direct co-status --format json fetch refusals on healthy control-hosts",
       "relates_to": "tasks/tasks-linear-4a34011b-104b-4334-871b-a0a014883548.md",
