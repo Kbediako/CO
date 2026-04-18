@@ -1,6 +1,46 @@
 {
   "items": [
     {
+      "id": "20260418-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0",
+      "title": "CO: restore unrelated full-suite SelectedRunProjection reservation-ledger placeholder timeout blocking CO-226 / CO-219",
+      "relates_to": "tasks/tasks-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0-docs-packet-current-main-audit/cli/2026-04-18T13-48-58-782Z-e41ffc06/manifest.json",
+          "source_anchor": "ctx:sha256:3f6604004897f02bc794db8336db014b25eac836f27afb671f1ef946761d47ee#chunk:c000001",
+          "summary": "Docs-first packet now preserves CO-233 as a historical full-suite-only SelectedRunProjection blocker that the current branch clears with a bounded Vitest worker-cap fix. Historical issue truth remains that `npm run test` timed out or stalled around `orchestrator/tests/SelectedRunProjection.test.ts` case `refreshes projection proofs when child-lane reservation ledger placeholders exist`, while the isolated repro already passed and `orchestrator/tests/Doctor.test.ts` was no longer the live blocker in the same rerun. Current branch truth is that the worker-cap change in `vitest.config.core.ts` plus alias coverage in `tests/vitest-progress-config.spec.ts` keeps both the isolated repro and full `npm run test` green, while CO-226 / CO-219 linkage stays explicit and the deeper SelectedRunProjection proof-refresh seam remains documented only as historical context if the issue recurs. Parent owns implementation, validation, Linear state, workpad, PR, and merge."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review --base origin/main plus explicit manual fallback",
+          "date": "2026-04-18",
+          "status": "manual-fallback-after-drift",
+          "fallback_note": "out/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0/manual/20260418T143124Z-standalone-review-fallback.md",
+          "summary": "Repeated forced standalone-review reruns produced bounded-success telemetry but kept drifting into disallowed validation attempts after the concrete stale-packet findings were fixed, so the lane closed the final review step with explicit manual correctness/regression review instead of claiming another wrapper verdict."
+        },
+        "elegance_review": {
+          "reviewer": "provider worker parent lane",
+          "date": "2026-04-18",
+          "status": "completed",
+          "artifact": "out/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0/manual/20260418T143124Z-elegance-review.md",
+          "summary": "Kept the closeout at the smallest truthful seam: the worker-cap config plus explicit alias coverage stayed in place, no proof-refresh runtime rewrite was added, and the packet refresh only corrected stale blocker wording."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md",
+        "task": "tasks/tasks-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md",
+        "agent_task": ".agent/task/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md",
+        "docs": "docs/TECH_SPEC-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md"
+      }
+    },
+    {
       "id": "20260418-linear-9ce7811e-45ca-4d04-b759-bc5e7da77511",
       "title": "Validation floor: restore handoff readiness after SelectedRunProjection timeout and docs/TASKS zero-headroom",
       "relates_to": "tasks/tasks-linear-9ce7811e-45ca-4d04-b759-bc5e7da77511.md",
