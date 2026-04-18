@@ -5924,6 +5924,86 @@ describe('SelectedRunProjection', () => {
     });
   });
 
+  it('reconciles todo-blocked released claims as stale provider artifacts', async () => {
+    const { root, paths } = await createHostPaths();
+    const providerEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-co-todo'
+    };
+    const orphanPaths = resolveRunPaths(providerEnv, 'run-todo-blocked-active');
+    await mkdir(orphanPaths.runDir, { recursive: true });
+    await writeFile(
+      orphanPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-todo-blocked-active',
+        task_id: 'linear-co-todo',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'co-todo-id',
+        issue_identifier: 'CO-TODO',
+        started_at: '2026-04-09T08:36:05.089Z',
+        updated_at: '2026-04-09T08:40:00.000Z',
+        summary: 'todo-blocked provider run still active-looking',
+        commands: []
+      }),
+      'utf8'
+    );
+    const baseClaim = createProviderIntakeState(orphanPaths.manifestPath).claims[0]!;
+    const providerIntakeState: ProviderIntakeState = {
+      schema_version: 1,
+      updated_at: '2026-04-18T12:10:00.000Z',
+      rehydrated_at: '2026-04-18T12:10:00.000Z',
+      latest_provider_key: 'linear:co-todo-id',
+      latest_reason: 'provider_issue_released:todo_blocked_by_non_terminal',
+      claims: [
+        {
+          ...baseClaim,
+          provider_key: 'linear:co-todo-id',
+          issue_id: 'co-todo-id',
+          issue_identifier: 'CO-TODO',
+          issue_state: 'Todo',
+          issue_state_type: 'unstarted',
+          task_id: 'linear-co-todo',
+          state: 'released',
+          reason: 'provider_issue_released:todo_blocked_by_non_terminal',
+          updated_at: '2026-04-18T12:09:00.000Z',
+          run_id: 'run-todo-blocked-active',
+          run_manifest_path: orphanPaths.manifestPath
+        }
+      ]
+    };
+
+    const discovery = await discoverCompatibilityCollectionContexts(
+      createProjectionContext(paths, providerIntakeState)
+    );
+
+    expect(discovery.running).toEqual([]);
+    expect(discovery.all.find((entry) => entry.runId === 'run-todo-blocked-active')).toMatchObject({
+      rawStatus: 'cancelled',
+      statusReason: 'provider_claim_released',
+      summary: expect.stringContaining(
+        'provider claim is released (provider_issue_released:todo_blocked_by_non_terminal)'
+      )
+    });
+    const reconciliation = JSON.parse(
+      await readFile(join(orphanPaths.runDir, 'provider-linear-worker-reconciliation.json'), 'utf8')
+    ) as Record<string, unknown>;
+    expect(reconciliation).toMatchObject({
+      reason: 'provider_claim_released',
+      reconciled_status: 'cancelled',
+      recorded_at: '2026-04-18T12:09:00.000Z',
+      provider_claim: {
+        state: 'released',
+        reason: 'provider_issue_released:todo_blocked_by_non_terminal',
+        issue_state: 'Todo',
+        issue_state_type: 'unstarted'
+      }
+    });
+  });
+
   it('sets lastError when reconciliation applies newer failed terminal run truth', async () => {
     const { root, paths } = await createHostPaths();
     const providerEnv = {
@@ -6784,6 +6864,87 @@ describe('SelectedRunProjection', () => {
         run_id: terminalRunId,
         status: 'succeeded',
         manifest_path: terminalPaths.manifestPath
+      }
+    });
+  });
+
+  it('reconciles chronology-only terminal replacements when updated_at is missing', async () => {
+    const { root, paths } = await createHostPaths();
+    const providerEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-co-241'
+    };
+    const orphanRunId = 'linear-co-241-2026-04-09T08-36-05-089Z';
+    const terminalRunId = 'linear-co-241-2026-04-13T02-26-01-632Z';
+    const orphanPaths = resolveRunPaths(providerEnv, orphanRunId);
+    const terminalPaths = resolveRunPaths(providerEnv, terminalRunId);
+    await Promise.all([
+      mkdir(orphanPaths.runDir, { recursive: true }),
+      mkdir(terminalPaths.runDir, { recursive: true })
+    ]);
+    await writeFile(
+      orphanPaths.manifestPath,
+      JSON.stringify({
+        run_id: orphanRunId,
+        task_id: 'linear-co-241',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'co-241-id',
+        issue_identifier: 'CO-241',
+        updated_at: '2026-04-09T08:40:00.000Z',
+        summary: 'legacy provider run has only updated_at',
+        commands: []
+      }),
+      'utf8'
+    );
+    await writeFile(
+      terminalPaths.manifestPath,
+      JSON.stringify({
+        run_id: terminalRunId,
+        task_id: 'linear-co-241',
+        pipeline_id: 'provider-linear-worker',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'co-241-id',
+        issue_identifier: 'CO-241',
+        summary: 'terminal run relies on run-id chronology',
+        commands: []
+      }),
+      'utf8'
+    );
+    const providerIntakeState: ProviderIntakeState = {
+      schema_version: 1,
+      updated_at: '2026-04-18T12:10:00.000Z',
+      rehydrated_at: '2026-04-18T12:10:00.000Z',
+      latest_provider_key: null,
+      latest_reason: null,
+      claims: []
+    };
+
+    const discovery = await discoverCompatibilityCollectionContexts(
+      createProjectionContext(paths, providerIntakeState)
+    );
+
+    expect(discovery.running).toEqual([]);
+    expect(discovery.all.find((entry) => entry.runId === orphanRunId)).toMatchObject({
+      rawStatus: 'succeeded',
+      statusReason: 'provider_claim_absent_newer_terminal_run',
+      summary: expect.stringContaining(`newer terminal run ${terminalRunId} supersedes`)
+    });
+    const reconciliation = JSON.parse(
+      await readFile(join(orphanPaths.runDir, 'provider-linear-worker-reconciliation.json'), 'utf8')
+    ) as Record<string, unknown>;
+    expect(reconciliation).toMatchObject({
+      reason: 'provider_claim_absent_newer_terminal_run',
+      recorded_at: '2026-04-13T02:26:01.632Z',
+      replacement_run: {
+        run_id: terminalRunId,
+        status: 'succeeded',
+        manifest_path: terminalPaths.manifestPath,
+        updated_at: null
       }
     });
   });

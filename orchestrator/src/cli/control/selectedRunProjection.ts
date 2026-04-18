@@ -1644,6 +1644,7 @@ function resolveProviderLinearWorkerClaimReconciliationReason(
       reason.includes('not_active') ||
       reason.includes('not_mutable') ||
       reason.includes('assignee_changed') ||
+      reason.includes('todo_blocked_by_non_terminal') ||
       isTerminalProviderLinearIssueState(claim.issue_state, claim.issue_state_type)
     ) {
       return 'provider_claim_released';
@@ -1735,13 +1736,25 @@ function selectProviderLinearWorkerReconciliationEvidenceUpdatedAt(
   replacementRun: ControlCompatibilitySourceContext | null,
   providerIntakeState: ProviderIntakeState
 ): string | null {
+  const replacementRunEvidenceAt = replacementRun
+    ? selectProviderLinearWorkerReconciliationRunEvidenceTimestamp(replacementRun)
+    : null;
   if (reason === 'provider_claim_absent_newer_terminal_run') {
-    return replacementRun?.updatedAt ?? null;
+    return replacementRunEvidenceAt;
   }
   if (reason === 'provider_issue_removed') {
     return providerIntakeState.updated_at;
   }
-  return selectLatestIsoTimestamp(claim?.updated_at ?? null, replacementRun?.updatedAt ?? null);
+  return selectLatestIsoTimestamp(claim?.updated_at ?? null, replacementRunEvidenceAt);
+}
+
+function selectProviderLinearWorkerReconciliationRunEvidenceTimestamp(
+  context: ControlCompatibilitySourceContext
+): string | null {
+  return selectLatestIsoTimestamp(
+    context.updatedAt,
+    selectProviderLinearWorkerContextChronologyTimestamp(context)
+  );
 }
 
 function isProviderLinearWorkerReconciliationEvidenceNewerThanContext(
@@ -1775,8 +1788,7 @@ function findNewerTerminalProviderLinearWorkerContext(
       isProviderLinearWorkerReconciliationSource(candidate) &&
       isTerminalRunStatus(candidate.rawStatus) &&
       providerLinearWorkerContextsShareIssueIdentity(candidate, context) &&
-      isProviderLinearWorkerContextChronologicallyNewer(candidate, context) &&
-      compareIsoTimestamp(candidate.updatedAt, context.updatedAt) > 0
+      isProviderLinearWorkerContextChronologicallyNewer(candidate, context)
     )
     .sort(compareProviderLinearWorkerContextChronologyDesc)[0] ?? null;
 }
