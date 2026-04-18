@@ -186,7 +186,8 @@ describe('ControlAuthenticatedRouteHandoff', () => {
     });
     expect(runProviderIssueHandoffRefresh).toHaveBeenCalledWith(context.providerIssueHandoff, {
       queueIfBusy: true,
-      acknowledgeAccepted: true
+      acknowledgeAccepted: true,
+      allowIdleRestartRequiredRetry: true
     });
   });
 
