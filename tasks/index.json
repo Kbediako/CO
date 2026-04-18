@@ -1,6 +1,32 @@
 {
   "items": [
     {
+      "id": "20260418-linear-a883b037-8167-4011-8bd4-889a1a160db8",
+      "title": "CO: clear stale merge-closeout transition_failed residue once CO-210 / PR #512 are merged and live Linear truth is Done",
+      "relates_to": "tasks/tasks-linear-a883b037-8167-4011-8bd4-889a1a160db8.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-a883b037-8167-4011-8bd4-889a1a160db8-docs-packet/cli/2026-04-17T22-41-33-103Z-08808e6e/manifest.json",
+          "source_anchor": "ctx:sha256:9aebacf8637c2460a3ea3590e492f1426b765f792d70d3b700563c1591d7ef39#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-228 as the stale merged-terminal transition_failed residue seam after CO-210 / PR #512 where live Linear Done truth has already advanced beyond retained local closeout failure state. The packet keeps the exact residue checksum `provider_issue_merge_closeout_transition_failed`, `merge_closeout.status=transition_failed`, `reason=linear_done_transition_failed`, `linear_transition.status=failed`, and `error=linear_transition_conflict`, while staying explicitly separate from shared-root reconciliation redesign, new attachment-selector regressions, CO-104, CO-138, CO-214, and broader CO-210 current-progress hydration scope. The expected shared source payload was absent in this child checkout, so the packet is anchored on the protected issue wording plus current repo seams in providerMergeCloseout.ts, providerIssueHandoff.ts, providerLinearWorkflowFacade.ts, providerIssueObservability.ts, controlRuntime.ts, and compatibilityIssuePresenter.ts; parent owns implementation, validation, Linear state, workpad, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-a883b037-8167-4011-8bd4-889a1a160db8.md",
+        "task": "tasks/tasks-linear-a883b037-8167-4011-8bd4-889a1a160db8.md",
+        "agent_task": ".agent/task/linear-a883b037-8167-4011-8bd4-889a1a160db8.md",
+        "docs": "docs/TECH_SPEC-linear-a883b037-8167-4011-8bd4-889a1a160db8.md"
+      }
+    },
+    {
       "id": "20260418-linear-a0ef4f6c-bf78-4dd6-9d43-244c445b87cb",
       "title": "CO STATUS / observability: restore compatibility row fields after post-recovery rehydrate",
       "relates_to": "tasks/tasks-linear-a0ef4f6c-bf78-4dd6-9d43-244c445b87cb.md",
