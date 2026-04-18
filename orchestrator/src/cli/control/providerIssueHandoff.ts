@@ -588,17 +588,22 @@ export function createProviderIssueHandoffService(
     if (pollingUpdatedAtMs === null || pollingUpdatedAtMs < serviceCreatedAtMs) {
       return false;
     }
+    const liveNowMs = Date.now();
+    const effectivePollingUpdatedAtMs = Math.min(pollingUpdatedAtMs, liveNowMs);
     const liveHealth = providerIssueHandoffService
-      ? readProviderPollingHealth(providerIssueHandoffService, pollingUpdatedAtMs)
+      ? readProviderPollingHealth(providerIssueHandoffService, liveNowMs)
       : null;
     const liveOperationStartedAtMs =
       liveHealth?.checking && typeof liveHealth.operation_started_at === 'string'
         ? Date.parse(liveHealth.operation_started_at)
         : Number.NaN;
     // A fresh retry may start before the persisted polling snapshot catches up.
-    // Once a newer operation is active, do not let the older restart_required
-    // snapshot fail-close that attempt before it can make progress.
-    if (Number.isFinite(liveOperationStartedAtMs) && liveOperationStartedAtMs > pollingUpdatedAtMs) {
+    // Clamp future-skewed persisted timestamps to live time and once a newer (or same-tick)
+    // operation is active, do not let the older restart_required snapshot fail-close it.
+    if (
+      Number.isFinite(liveOperationStartedAtMs) &&
+      liveOperationStartedAtMs >= effectivePollingUpdatedAtMs
+    ) {
       return false;
     }
     return true;

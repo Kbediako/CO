@@ -10,6 +10,14 @@
       ],
       "last_review": "2026-04-18",
       "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-18",
+          "status": "succeeded",
+          "manifest": ".runs/linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26-co-248-docs-review/cli/2026-04-18T13-59-17-756Z-d73e637e/manifest.json",
+          "telemetry": ".runs/linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26-co-248-docs-review/cli/2026-04-18T13-59-17-756Z-d73e637e/review/telemetry.json",
+          "summary": "Docs-review child stream completed before implementation handoff; spec-guard passed and review telemetry reported clean-success for the CO-248 packet."
+        },
         "docs_packet_child_lane": {
           "reviewer": "bounded same-issue docs child lane",
           "date": "2026-04-18",

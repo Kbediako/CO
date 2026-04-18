@@ -2030,6 +2030,93 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('does not treat a future-skewed persisted restart_required snapshot as newer than a live retry', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:00:00.000Z'));
+
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      }
+    });
+    const stuckError = new Error('provider_refresh_lifecycle_stuck');
+    stuckError.name = 'ProviderRefreshLifecycleStuckError';
+
+    markProviderPollingStarted(service, {
+      mode: 'refresh',
+      atMs: Date.parse('2026-03-19T04:00:05.000Z')
+    });
+    await markProviderPollingStuck(service, {
+      atMs: Date.parse('2026-03-19T04:00:50.000Z')
+    });
+    markProviderPollingCompleted(service, {
+      error: stuckError,
+      atMs: Date.parse('2026-03-19T04:00:50.000Z')
+    });
+    state.polling = {
+      checking: false,
+      queued: false,
+      last_mode: 'refresh',
+      last_requested_at: '2026-03-19T04:00:05.000Z',
+      last_completed_at: '2026-03-19T04:00:50.000Z',
+      last_success_at: null,
+      last_error_at: '2026-03-19T04:00:50.000Z',
+      last_error: 'provider_refresh_lifecycle_stuck',
+      next_poll_at: null,
+      next_poll_in_ms: null,
+      next_refresh_state: 'unknown',
+      next_refresh_at: null,
+      next_refresh_in_ms: null,
+      source_updated_at: '2026-03-19T04:02:00.000Z',
+      updated_at: '2026-03-19T04:02:00.000Z',
+      operation_started_at: null,
+      operation_elapsed_ms: null,
+      stalled_after_ms: 45000,
+      refresh_phase: 'refresh:rehydrated',
+      refresh_request_class: 'rehydrate',
+      refresh_provider_keys: null,
+      refresh_counts: {
+        claims_total: 1,
+        claims_scanned: 0,
+        issue_by_id_reads: 0,
+        issue_by_id_deferred: 0,
+        occupied_slots: 0,
+        fresh_discovery_runs: 0,
+        fresh_discovery_candidates: 0,
+        fresh_discovery_started: 0
+      },
+      stuck: true,
+      stuck_since_at: '2026-03-19T04:00:50.000Z',
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck',
+      linear_budget: null
+    };
+    state.updated_at = '2026-03-19T04:02:00.000Z';
+
+    vi.setSystemTime(new Date('2026-03-19T04:01:00.000Z'));
+
+    await expect(
+      runProviderIssueHandoffRefresh(service, {
+        allowIdleRestartRequiredRetry: true
+      })
+    ).resolves.toMatchObject({
+      queued: true,
+      coalesced: false
+    });
+    expect(readProviderPollingHealth(service)).toMatchObject({
+      checking: false,
+      stuck: false,
+      restart_required: false,
+      last_error: null
+    });
+  });
+
   it('fails closed once polling becomes stuck during later direct issue-by-id refresh work', async () => {
     const { paths } = await createHostPaths();
     const state = normalizeProviderIntakeState({
