@@ -78,8 +78,8 @@ last_review: 2026-04-18
   - rely on local `.runs/**/review/telemetry.json` samples, focused tests, and workpad evidence
 
 ## Open Questions
-- Does the smallest truthful fix live entirely in startup-anchor classification / allowlist parity, or does the residual recurrence require a bounded startup-anchor promotion adjustment once nearby support reads occur before touched-path inspection?
+- Resolved: the smallest truthful fix lives in pre-anchor meta-surface classification parity for the two review-workflow support skills, not startup-anchor promotion timing.
 
 ## Approvals
-- Reviewer: pending docs-review
-- Date: 2026-04-18
+- Reviewer: docs-review child stream succeeded; parent standalone review pending final handoff.
+- Date: 2026-04-19

@@ -34,9 +34,9 @@
 - [x] Isolate the lane in `.workspaces/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124`, move the issue into `In Progress`, create the single workpad source, and publish the initial workpad comment with the pre-turn decomposition matrix. Proof: `out/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124/manual/workpad.md`.
 - [x] Register the docs-first packet and registry mirrors for `linear-4b6dd62c-dd51-4edc-89e3-24c773d93124`, keeping the issue wording and current telemetry seam explicit. Proof: `docs/PRD-linear-4b6dd62c-dd51-4edc-89e3-24c773d93124.md`, `docs/TECH_SPEC-linear-4b6dd62c-dd51-4edc-89e3-24c773d93124.md`, `docs/ACTION_PLAN-linear-4b6dd62c-dd51-4edc-89e3-24c773d93124.md`, `tasks/specs/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124.md`, `tasks/tasks-linear-4b6dd62c-dd51-4edc-89e3-24c773d93124.md`, `.agent/task/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124.md`, `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
 - [x] Run docs-review evidence before implementation and record the truthful fallback when same-issue child helpers are unavailable in the parent run. Proof: `out/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124/manual/20260418T0548Z-docs-review-fallback.md`, `.runs/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124/cli/2026-04-18T05-48-25-732Z-f5e259ca/manifest.json`, `out/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124/docs-freshness-maintenance.json`.
-- [ ] Reproduce the fresh startup-anchor / pre-anchor-meta-surface evidence and narrow the exact wrapper seam before code changes. Proof: pending targeted notes and telemetry references.
-- [ ] Implement the smallest truthful fix plus focused regressions, then collect before/after telemetry evidence. Proof: pending touched sources and tests.
-- [ ] Run the final validation floor, standalone review, elegance review, PR attachment, and review drain before any review-state transition. Proof: pending.
+- [x] Reproduce the fresh startup-anchor / pre-anchor-meta-surface evidence and narrow the exact wrapper seam before code changes. Proof: `out/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124/manual/20260418T1616Z-startup-anchor-audit.json`, `.runs/linear-5570250a-1361-4af0-857c-119649b902ab/cli/2026-04-18T02-46-06-691Z-d566012b/review/telemetry.json`.
+- [x] Implement the smallest truthful fix plus focused regressions, then collect before/after telemetry evidence. Proof: `scripts/lib/review-meta-surface-normalization.ts`, `tests/review-meta-surface-normalization.spec.ts`, `tests/review-execution-state.spec.ts`, `tests/run-review.spec.ts`, `.runs/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124-docs-review/cli/2026-04-18T15-54-42-548Z-b8fdf93e/review/telemetry.json`.
+- [ ] Run the final standalone review, elegance review, PR attachment, and review drain before any review-state transition. Proof: parent validation floor green on current `origin/main`; review/handoff pending.
 
 ## Dependencies
 - `scripts/lib/review-execution-state.ts`
@@ -49,10 +49,10 @@
 
 ## Validation
 - [x] docs-review evidence runs before implementation or records a truthful repo-baseline fallback.
-- [ ] fresh pre-fix evidence is captured and cited.
-- [ ] focused startup-anchor regressions pass for the bounded seam.
-- [ ] post-fix evidence shows reduced `startup-anchor` / `pre-anchor-meta-surface` recurrence on the bounded sample.
-- [ ] full repo validation floor runs for the non-trivial diff.
+- [x] fresh pre-fix evidence is captured and cited.
+- [x] focused startup-anchor regressions pass for the bounded seam.
+- [x] post-fix evidence shows reduced `startup-anchor` / `pre-anchor-meta-surface` recurrence on the bounded sample.
+- [x] full repo validation floor runs for the non-trivial diff on current `origin/main`, including `docs:freshness` now passing with `CO-175` retained as in-policy rolling debt.
 - [ ] standalone review plus explicit elegance review complete before handoff.
 - [ ] Rollback plan: revert the bounded startup-anchor change and focused tests together if the fix weakens truthful boundary accounting or regresses adjacent boundary families, then file a bounded follow-up instead of masking the regression.
 
@@ -67,5 +67,5 @@
   - Mitigation: keep the blocked child-lane attempt explicit in the workpad and use the audited docs-review child-stream for this run rather than faking child-lane success.
 
 ## Approvals
-- Reviewer: pending docs-review
-- Date: 2026-04-18
+- Reviewer: docs-review child stream succeeded; parent standalone review pending final handoff.
+- Date: 2026-04-19
