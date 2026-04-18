@@ -1,6 +1,32 @@
 {
   "items": [
     {
+      "id": "20260418-linear-9fc9fe23-bd44-4b72-9459-b5b809970bce",
+      "title": "CO: stop review-handoff promotion from parking In Review issues on multiple attached PRs",
+      "relates_to": "tasks/tasks-linear-9fc9fe23-bd44-4b72-9459-b5b809970bce.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-9fc9fe23-bd44-4b72-9459-b5b809970bce-co237-docs-packet/cli/2026-04-18T01-48-20-327Z-dbdc245e/manifest.json",
+          "source_anchor": "ctx:sha256:8391bf9a067e2de9c1d2651dbe67acb9d3c43cf6bde71c5639ee057b9ca37dfc#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-237 as the bounded review-handoff multiple-attachment seam: provider-owned issues can still stay parked in In Review with `provider_issue_review_promotion_action_required` / `multiple_attached_prs` when same-repo attachments include non-primary PRs. The packet carries the exact incident checksum `CO-196`, closed `#508`, `#515`, `CO-219`, `#523`, and `#522`, rejects framing this as just CO-104 again, only a Merging bug, only CO-154, only CO-226, or manual attachment cleanup as the intended steady state, and anchors on the fallback source anchor plus current repo seams in providerMergeCloseout.ts and providerIssueHandoff.ts; parent owns implementation, validation, Linear state, workpad, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-9fc9fe23-bd44-4b72-9459-b5b809970bce.md",
+        "task": "tasks/tasks-linear-9fc9fe23-bd44-4b72-9459-b5b809970bce.md",
+        "agent_task": ".agent/task/linear-9fc9fe23-bd44-4b72-9459-b5b809970bce.md",
+        "docs": "docs/TECH_SPEC-linear-9fc9fe23-bd44-4b72-9459-b5b809970bce.md"
+      }
+    },
+    {
       "id": "20260418-linear-a883b037-8167-4011-8bd4-889a1a160db8",
       "title": "CO: clear stale merge-closeout transition_failed residue once CO-210 / PR #512 are merged and live Linear truth is Done",
       "relates_to": "tasks/tasks-linear-a883b037-8167-4011-8bd4-889a1a160db8.md",

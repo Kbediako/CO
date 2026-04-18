@@ -22,6 +22,7 @@ import {
 import {
   isLiveLinearTrackedIssueOwnedByCurrentViewerOrUnassigned,
   sortLiveLinearTrackedIssuesForDispatch,
+  type LiveLinearTrackedBlocker,
   type LiveLinearTrackedIssue,
   type LiveLinearTrackedIssuesQueryMode
 } from './linearDispatchSource.js';
@@ -268,6 +269,7 @@ export interface CreateProviderIssueHandoffServiceOptions {
     issueState?: string | null;
     issueStateType?: string | null;
     issueUpdatedAt?: string | null;
+    blockedBy?: readonly LiveLinearTrackedBlocker[] | null;
     previousBranchRecovery?: ProviderReviewHandoffPromotionRecord['branch_recovery'] | null;
     sourceSetup?: DispatchPilotSourceSetup | null;
     repoRoot: string;
@@ -716,6 +718,7 @@ export function createProviderIssueHandoffService(
       issueState: input.trackedIssue.state,
       issueStateType: input.trackedIssue.state_type,
       issueUpdatedAt: input.trackedIssue.updated_at,
+      blockedBy: input.trackedIssue.blocked_by ?? null,
       previousBranchRecovery: input.claim.review_promotion?.branch_recovery ?? null,
       sourceSetup: resolveMergeCloseoutSourceSetup(),
       env: buildMergeCloseoutEnv(input.latestRun?.manifestPath ?? input.claim.run_manifest_path),
