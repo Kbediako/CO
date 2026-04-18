@@ -28,8 +28,8 @@ const codexInstallCommand = 'npm install --global @openai/codex@0.121.0';
 const packSmokeCommand = 'npm run pack:smoke';
 const shellAssignmentPattern = String.raw`[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S+)`;
 const packSmokeInvocationPattern = new RegExp(
-  String.raw`^(?:${shellAssignmentPattern}\s+)*npm\s+run\s+pack:smoke(?:$|[\s;|&])`,
-  'u'
+  String.raw`(?:^|[;&|()]\s*|\b(?:if|then|do|while|until)\s+)(?:!\s+)?(?:${shellAssignmentPattern}\s+)*npm\s+run\s+pack:smoke(?=$|[\s;|&)])`,
+  'gu'
 );
 const nonBlockingPackSmokePattern = /(?:^|[ \t])\|\|[ \t]|;[ \t]*(?:true|exit[ \t]+0)\b/u;
 
@@ -123,13 +123,26 @@ function hasCommandText(run: string, command: string): boolean {
   return normalizeShellContinuations(run).includes(command);
 }
 
+function getPackSmokeCommandOccurrences(run: string): { line: string; endIndex: number }[] {
+  const occurrences: { line: string; endIndex: number }[] = [];
+  for (const line of getRunCommandLines(run)) {
+    for (const match of line.matchAll(packSmokeInvocationPattern)) {
+      occurrences.push({
+        line,
+        endIndex: (match.index ?? 0) + match[0].length
+      });
+    }
+  }
+  return occurrences;
+}
+
 function hasPackSmokeCommand(run: string): boolean {
-  return getRunCommandLines(run).some((line) => packSmokeInvocationPattern.test(line));
+  return getPackSmokeCommandOccurrences(run).length > 0;
 }
 
 function hasNonBlockingPackSmokeCommand(run: string): boolean {
-  return getRunCommandLines(run).some(
-    (line) => packSmokeInvocationPattern.test(line) && nonBlockingPackSmokePattern.test(line)
+  return getPackSmokeCommandOccurrences(run).some(({ line, endIndex }) =>
+    nonBlockingPackSmokePattern.test(line.slice(endIndex))
   );
 }
 
@@ -342,10 +355,15 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(hasPackSmokeCommand(packSmokeCommand)).toBe(true);
     expect(hasPackSmokeCommand(`FOO=1 BAR="two words" ${packSmokeCommand}`)).toBe(true);
     expect(hasPackSmokeCommand(`${packSmokeCommand} -- --flag`)).toBe(true);
+    expect(hasPackSmokeCommand(`npm run lint && ${packSmokeCommand}`)).toBe(true);
+    expect(hasPackSmokeCommand(`if ${packSmokeCommand}; then echo ok; fi`)).toBe(true);
+    expect(hasPackSmokeCommand(`if FOO=1 ${packSmokeCommand} -- --flag; then echo ok; fi`)).toBe(true);
     expect(hasPackSmokeCommand(`echo ${packSmokeCommand}`)).toBe(false);
     expect(hasPackSmokeCommand(`${packSmokeCommand}:other`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} || true`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand}; exit 0`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} -- --flag || true`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`npm run lint || true && ${packSmokeCommand}`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} -- --flag`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`echo ${packSmokeCommand} || true`)).toBe(false);
     expect(isContinueOnErrorEnabled(true)).toBe(true);
