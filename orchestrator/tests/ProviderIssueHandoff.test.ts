@@ -31151,4 +31151,136 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
   });
+
+  it('persists structured review-promotion multi-pr truth and forwards blocker context', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-237',
+      issue_title: 'Review handoff promotion',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-12T03:10:00.000Z',
+      issue_assignee_id: 'viewer-1',
+      issue_assignee_name: 'Codex',
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      accepted_at: '2026-04-12T03:10:05.000Z',
+      updated_at: '2026-04-12T03:10:10.000Z',
+      last_delivery_id: 'delivery-review-multi-pr-refresh',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_744_427_000_000,
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: null,
+      launch_token: null
+    });
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const blockers = [
+      {
+        id: 'lin-issue-2',
+        identifier: 'CO-226',
+        state: 'In Progress',
+        state_type: 'started'
+      }
+    ] as const;
+    const runReviewHandoffPromotion = vi.fn(async () => ({
+      recorded_at: '2026-04-12T03:15:00.000Z',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-237',
+      issue_state: 'In Review',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-12T03:15:00.000Z',
+      status: 'action_required' as const,
+      reason: 'multiple_attached_prs',
+      summary:
+        'Multiple attached GitHub pull requests match asabeko/co; conflicting current-candidate PR URLs still require deterministic disambiguation before review-handoff promotion can continue: https://github.com/asabeko/CO/pull/416, https://github.com/asabeko/CO/pull/419. Ignored historical merged PR URLs: https://github.com/asabeko/CO/pull/401. Ignored closed prior-attempt PR URLs: https://github.com/asabeko/CO/pull/412. Ignored cross-issue PR URLs: https://github.com/asabeko/CO/pull/418.',
+      attached_pr_urls: [
+        'https://github.com/asabeko/CO/pull/401',
+        'https://github.com/asabeko/CO/pull/412',
+        'https://github.com/asabeko/CO/pull/416',
+        'https://github.com/asabeko/CO/pull/418',
+        'https://github.com/asabeko/CO/pull/419'
+      ],
+      ignored_historical_pr_urls: ['https://github.com/asabeko/CO/pull/401'],
+      ignored_closed_unmerged_pr_urls: ['https://github.com/asabeko/CO/pull/412'],
+      ignored_cross_issue_pr_urls: ['https://github.com/asabeko/CO/pull/418'],
+      conflicting_attached_pr_urls: [
+        'https://github.com/asabeko/CO/pull/416',
+        'https://github.com/asabeko/CO/pull/419'
+      ],
+      pr: null,
+      snapshot: null,
+      linear_transition: null
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      runReviewHandoffPromotion,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          identifier: 'CO-237',
+          title: 'Review handoff promotion',
+          state: 'In Review',
+          state_type: 'started',
+          updated_at: '2026-04-12T03:15:00.000Z',
+          blocked_by: [...blockers]
+        })
+      })
+    });
+
+    await service.refresh();
+
+    expect(runReviewHandoffPromotion).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'lin-issue-1',
+      issueIdentifier: 'CO-237',
+      issueState: 'In Review',
+      blockedBy: [...blockers],
+      repoRoot: paths.repoRoot
+    }));
+    expect(state.claims[0]).toMatchObject({
+      state: 'handoff_failed',
+      reason: 'provider_issue_review_promotion_action_required',
+      issue_state: 'In Review',
+      review_promotion: {
+        status: 'action_required',
+        reason: 'multiple_attached_prs',
+        ignored_historical_pr_urls: ['https://github.com/asabeko/CO/pull/401'],
+        ignored_closed_unmerged_pr_urls: ['https://github.com/asabeko/CO/pull/412'],
+        ignored_cross_issue_pr_urls: ['https://github.com/asabeko/CO/pull/418'],
+        conflicting_attached_pr_urls: [
+          'https://github.com/asabeko/CO/pull/416',
+          'https://github.com/asabeko/CO/pull/419'
+        ]
+      },
+      merge_closeout: null
+    });
+    expect(getPersistedState().claims[0]?.review_promotion).toMatchObject({
+      status: 'action_required',
+      reason: 'multiple_attached_prs',
+      ignored_historical_pr_urls: ['https://github.com/asabeko/CO/pull/401'],
+      ignored_closed_unmerged_pr_urls: ['https://github.com/asabeko/CO/pull/412'],
+      ignored_cross_issue_pr_urls: ['https://github.com/asabeko/CO/pull/418'],
+      conflicting_attached_pr_urls: [
+        'https://github.com/asabeko/CO/pull/416',
+        'https://github.com/asabeko/CO/pull/419'
+      ]
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
 });
