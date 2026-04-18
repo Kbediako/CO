@@ -353,6 +353,12 @@ async function reconcileSelectedProviderLinearWorkerContext<T extends ControlCom
   if (!selected || !context.providerIntakeState) {
     return selected;
   }
+  if (
+    !isProviderLinearWorkerReconciliationSource(selected) ||
+    !isActiveLookingProviderLinearWorkerManifestStatus(selected.rawStatus)
+  ) {
+    return selected;
+  }
   const runsRoot = resolveRunsRootFromRunDir(context.paths.runDir);
   const currentTaskId = resolveTaskIdFromManifestPath(context.paths.manifestPath);
   const currentRunId = resolveRunIdFromManifestPath(context.paths.manifestPath);
