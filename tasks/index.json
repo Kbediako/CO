@@ -4117,13 +4117,21 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-30",
+      "last_review": "2026-04-18",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
           "date": "2026-03-30",
           "manifest": ".runs/linear-af97d673-43a4-4a36-8738-b7f61e5b71a1-docs-review/cli/2026-03-30T01-25-36-879Z-17cd2f7d/manifest.json",
           "override_reason": "child-stream wrapper returned output-invalid after prepended logs, but the underlying docs-review manifest succeeded and is recorded directly"
+        },
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-af97d673-43a4-4a36-8738-b7f61e5b71a1-docs-refresh/cli/2026-04-18T21-09-55-260Z-b69a5e6c/manifest.json",
+          "source_anchor": "ctx:sha256:32d01f29a223917c3e47b5f30f7753d44d23e7cfafd3dc6fb8977eb8a2d0c633#chunk:c000001",
+          "summary": "Docs refresh preserves the Apr 18 reopened CO-41 recurrence after March PR #324 landed the original stuck polling / refresh watchdog fix: provider-intake-state.json reported stuck=true, restart_required=true, last_error=provider_refresh_lifecycle_stuck, refresh_phase=refresh:claim_reconcile, and free capacity running=2/max_allowed=3 while a Ready issue (CO-252) was not admitted until restart. Implementation identified the current seam as repeated active-worker restart quarantine ignoring free provider capacity and carries counts.max_allowed through supervision diagnostics; packet preserves boundaries for CO-217, CO-211, CO-214, and CO-248."
         }
       },
       "paths": {

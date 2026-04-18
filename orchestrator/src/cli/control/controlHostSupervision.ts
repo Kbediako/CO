@@ -124,6 +124,7 @@ export interface ControlHostSupervisionHealthDiagnostic {
   counts: {
     running: number | null;
     retrying: number | null;
+    max_allowed?: number | null;
   };
   polling: ControlHostSupervisionPollingDiagnostic | null;
   running_workers: ControlHostSupervisionRunningWorkerSnapshot[];
@@ -377,7 +378,8 @@ export function readControlHostSupervisionHealthDiagnostic(
   return {
     counts: {
       running: readFiniteNumber(counts?.running),
-      retrying: readFiniteNumber(counts?.retrying)
+      retrying: readFiniteNumber(counts?.retrying),
+      max_allowed: readFiniteNumber(counts?.max_allowed)
     },
     polling: polling ? buildControlHostSupervisionPollingDiagnostic(polling) : null,
     running_workers: running
@@ -398,7 +400,8 @@ function normalizeStoredControlHostSupervisionHealthDiagnostic(
   return {
     counts: {
       running: readFiniteNumber(counts?.running),
-      retrying: readFiniteNumber(counts?.retrying)
+      retrying: readFiniteNumber(counts?.retrying),
+      max_allowed: readFiniteNumber(counts?.max_allowed)
     },
     polling: polling ? buildControlHostSupervisionPollingDiagnostic(polling) : null,
     running_workers: runningWorkers
@@ -522,6 +525,9 @@ function resolveRepeatedActiveWorkerRestartQuarantine(input: {
   if (!diagnostic || diagnostic.running_workers.length === 0) {
     return null;
   }
+  if (hasAvailableProviderWorkerCapacity(diagnostic)) {
+    return null;
+  }
   const restartHistory = normalizeControlHostSupervisionRestartHistory(input.restartHistory);
   if (restartHistory.length === 0) {
     return null;
@@ -558,6 +564,18 @@ function resolveRepeatedActiveWorkerRestartQuarantine(input: {
     };
   }
   return null;
+}
+
+function hasAvailableProviderWorkerCapacity(
+  diagnostic: ControlHostSupervisionHealthDiagnostic
+): boolean {
+  const running = diagnostic.counts.running;
+  const retrying = diagnostic.counts.retrying;
+  const maxAllowed = diagnostic.counts.max_allowed ?? null;
+  if (running === null || retrying === null || maxAllowed === null) {
+    return false;
+  }
+  return running + retrying < maxAllowed;
 }
 
 function buildControlHostSupervisionPollingDiagnostic(
