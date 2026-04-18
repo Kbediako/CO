@@ -1705,10 +1705,24 @@ function providerLinearWorkerRemovedIntakeReasonMatchesContext(
   providerIntakeState: ProviderIntakeState,
   context: ControlCompatibilitySourceContext
 ): boolean {
+  if (providerIntakeState.latest_reason !== 'provider_issue_removed') {
+    return false;
+  }
+  const providerIssueKeys = buildProviderLinearWorkerContextProviderIssueKeys(context);
   return Boolean(
-    providerIntakeState.latest_reason === 'provider_issue_removed' &&
-    context.issueId &&
-    providerIntakeState.latest_provider_key === buildProviderIssueKey('linear', context.issueId)
+    providerIntakeState.latest_provider_key &&
+    providerIssueKeys.includes(providerIntakeState.latest_provider_key)
+  );
+}
+
+function buildProviderLinearWorkerContextProviderIssueKeys(
+  context: ControlCompatibilitySourceContext
+): string[] {
+  const identities = [context.issueId, context.issueIdentifier].filter((value): value is string =>
+    Boolean(value && !isProjectionFallbackIdentityValue(value, context))
+  );
+  return Array.from(
+    new Set(identities.map((identity) => buildProviderIssueKey('linear', identity)))
   );
 }
 
@@ -1761,7 +1775,20 @@ function findNewerTerminalProviderLinearWorkerContext(
       isProviderLinearWorkerContextChronologicallyNewer(candidate, context) &&
       compareIsoTimestamp(candidate.updatedAt, context.updatedAt) > 0
     )
-    .sort((left, right) => compareIsoTimestamp(right.updatedAt, left.updatedAt))[0] ?? null;
+    .sort(compareProviderLinearWorkerContextChronologyDesc)[0] ?? null;
+}
+
+function compareProviderLinearWorkerContextChronologyDesc(
+  left: ControlCompatibilitySourceContext,
+  right: ControlCompatibilitySourceContext
+): number {
+  const chronologyComparison = compareIsoTimestamp(
+    selectProviderLinearWorkerContextChronologyTimestamp(right),
+    selectProviderLinearWorkerContextChronologyTimestamp(left)
+  );
+  return chronologyComparison !== 0
+    ? chronologyComparison
+    : compareIsoTimestamp(right.updatedAt, left.updatedAt);
 }
 
 function isProviderLinearWorkerContextChronologicallyNewer(
