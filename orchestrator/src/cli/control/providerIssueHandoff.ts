@@ -396,6 +396,12 @@ export function createProviderIssueHandoffService(
   }>();
   const serviceCreatedAtMs = Date.now();
   let providerIssueHandoffService: ProviderIssueHandoffService | null = null;
+  let concurrentRestartRequiredSnapshotCutoff:
+    | {
+        pollingUpdatedAtMs: number;
+        effectiveUpdatedAtMs: number;
+      }
+    | null = null;
 
   const shouldAbortRefreshCycle = (): boolean =>
     hasConcurrentRestartRequiredPollingSnapshot() ||
@@ -580,16 +586,48 @@ export function createProviderIssueHandoffService(
         )
     );
 
+  const readConcurrentRestartRequiredSnapshotCutoffMs = (liveNowMs: number): number | null => {
+    const pollingUpdatedAtMs = readProviderPollingSnapshotUpdatedAtMs(options.state.polling);
+    if (pollingUpdatedAtMs === null) {
+      concurrentRestartRequiredSnapshotCutoff = null;
+      return null;
+    }
+    if (
+      concurrentRestartRequiredSnapshotCutoff &&
+      concurrentRestartRequiredSnapshotCutoff.pollingUpdatedAtMs === pollingUpdatedAtMs
+    ) {
+      return concurrentRestartRequiredSnapshotCutoff.effectiveUpdatedAtMs;
+    }
+    if (pollingUpdatedAtMs <= liveNowMs) {
+      concurrentRestartRequiredSnapshotCutoff = {
+        pollingUpdatedAtMs,
+        effectiveUpdatedAtMs: pollingUpdatedAtMs
+      };
+      return pollingUpdatedAtMs;
+    }
+    const effectiveUpdatedAtMs = liveNowMs;
+    concurrentRestartRequiredSnapshotCutoff = {
+      pollingUpdatedAtMs,
+      effectiveUpdatedAtMs
+    };
+    return effectiveUpdatedAtMs;
+  };
+
   const hasConcurrentRestartRequiredPollingSnapshot = (): boolean => {
     if (!isRestartRequiredPollingSnapshot(options.state.polling)) {
+      concurrentRestartRequiredSnapshotCutoff = null;
       return false;
     }
     const pollingUpdatedAtMs = readProviderPollingSnapshotUpdatedAtMs(options.state.polling);
     if (pollingUpdatedAtMs === null || pollingUpdatedAtMs < serviceCreatedAtMs) {
+      concurrentRestartRequiredSnapshotCutoff = null;
       return false;
     }
     const liveNowMs = Date.now();
-    const effectivePollingUpdatedAtMs = Math.min(pollingUpdatedAtMs, liveNowMs);
+    const effectivePollingUpdatedAtMs = readConcurrentRestartRequiredSnapshotCutoffMs(liveNowMs);
+    if (effectivePollingUpdatedAtMs === null) {
+      return false;
+    }
     const liveHealth = providerIssueHandoffService
       ? readProviderPollingHealth(providerIssueHandoffService, liveNowMs)
       : null;
@@ -598,8 +636,9 @@ export function createProviderIssueHandoffService(
         ? Date.parse(liveHealth.operation_started_at)
         : Number.NaN;
     // A fresh retry may start before the persisted polling snapshot catches up.
-    // Clamp future-skewed persisted timestamps to live time and once a newer (or same-tick)
-    // operation is active, do not let the older restart_required snapshot fail-close it.
+    // Clamp future-skewed persisted timestamps to the first live-time observation and once a
+    // newer (or same-tick) operation is active, do not let the older restart_required snapshot
+    // fail-close it again while the stale persisted snapshot is still in flight.
     if (
       Number.isFinite(liveOperationStartedAtMs) &&
       liveOperationStartedAtMs >= effectivePollingUpdatedAtMs
