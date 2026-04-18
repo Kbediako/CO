@@ -3862,12 +3862,22 @@ export function createProviderIssueHandoffService(
       if (!providerIssueHandoffService) {
         return;
       }
-      recordProviderPollingProgress(providerIssueHandoffService, {
+      const progress: {
+        phase: string;
+        requestClass?: string | null;
+        providerKeys?: string[] | null;
+        counts: Record<string, number>;
+      } = {
         phase,
-        requestClass: input.requestClass ?? null,
-        providerKeys: input.providerKeys ?? null,
         counts: refreshCounts
-      });
+      };
+      if (input.requestClass !== undefined) {
+        progress.requestClass = input.requestClass;
+      }
+      if (input.providerKeys !== undefined) {
+        progress.providerKeys = input.providerKeys;
+      }
+      recordProviderPollingProgress(providerIssueHandoffService, progress);
     };
       await runWithProviderIssueRunDiscoveryCache(async () => {
         await runWithRefreshLifecycleLock(async () => {
