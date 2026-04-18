@@ -30,7 +30,7 @@
 - [x] Capture a reproducible `npm run test` timeout story for the affected `Doctor.test.ts` cases, including observed variability across reruns. Evidence: issue body attempt history plus current lane reruns recorded in the workpad and validation log.
 - [x] Determine whether the instability is primarily host load, Vitest scheduling, shared test state, or Doctor-specific performance. Evidence: accepted `Doctor.test.ts` patch plus green post-build full-suite rerun shows the live seam was Doctor-specific direct-dist readiness overhead under full-suite load, not a deterministic assertion failure.
 - [x] Land the smallest fix or validated runner/config adjustment that makes repo-wide `npm run test` green again without weakening coverage. Evidence: `orchestrator/tests/Doctor.test.ts`, `npm run build`, `npm run test`.
-- [x] Link the validation outcome back to CO-219 so its dead-proof projection lane can resume normal review handoff. Evidence: post-merge `npm run test` passed with `345` files and `4244` tests after the CO-233 fix reached `origin/main`; CO-226 PR `#522` carries the Doctor-specific stabilization.
+- [x] Link the validation outcome back to CO-219 so its dead-proof projection lane can resume normal review handoff. Evidence: post-merge `npm run test` passed with `345` files and `4246` tests after the CO-233 fix reached `origin/main`; CO-226 PR `#522` carries the Doctor-specific stabilization.
 
 ## Validation
 - [x] Scoped docs syntax check for registry mirrors. Evidence: `jq empty tasks/index.json docs/docs-freshness-registry.json`.
@@ -41,7 +41,7 @@
 - [x] `node scripts/spec-guard.mjs --dry-run`
 - [x] `npm run build`
 - [x] `npm run lint`
-- [x] Latest exact `npm run test` rerun remains green end-to-end. Evidence: post-merge run passed `345` files / `4244` tests; `Doctor.test.ts` passed in-suite in `70390ms`.
+- [x] Latest exact `npm run test` rerun remains green end-to-end. Evidence: post-merge run passed `345` files / `4246` tests; `Doctor.test.ts` passed in-suite in `65455ms`.
 - [x] `npm run docs:check`
 - [x] `npm run docs:freshness`
 - [x] `npm run repo:stewardship`
@@ -59,5 +59,5 @@
 - 2026-04-18: the first current-lane full-suite rerun cleared `Doctor.test.ts` but exposed missing-build noise in `tests/cli-command-surface.spec.ts` and `tests/run-review.spec.ts`; after `npm run build`, both suites passed in isolation and the next exact `npm run test` rerun finished green with `344` files and `4119` tests.
 - 2026-04-18: manifest-backed standalone review completed with `review_outcome=bounded-success` after command-intent retry; read-only retry found no actionable regressions, and the explicit elegance pass found no simplification patch needed.
 - 2026-04-18: opened PR `#522` (`https://github.com/Kbediako/CO/pull/522`), attached it to CO-226, and addressed Codex review feedback by tightening the fake direct-dist entrypoint so it waits for the actual `initialize` request before responding.
-- 2026-04-18: merged current `origin/main`, including the CO-233 SelectedRunProjection fix, into `linear/co-226-doctor-full-suite-timeouts`; the latest exact repo-wide `npm run test` rerun passed with `345` files and `4244` tests, with `Doctor.test.ts` passing in-suite in `70390ms`.
+- 2026-04-18: merged current `origin/main`, including the CO-233 SelectedRunProjection fix, into `linear/co-226-doctor-full-suite-timeouts`; the latest exact repo-wide `npm run test` rerun passed with `345` files and `4246` tests, with `Doctor.test.ts` passing in-suite in `65455ms`.
 - 2026-04-18: CO-226 is ready for PR check/drain handoff rather than blocked; remaining work is push, clean remote checks, clean `pr ready-review` drain, workpad refresh, and transition to `In Review`.

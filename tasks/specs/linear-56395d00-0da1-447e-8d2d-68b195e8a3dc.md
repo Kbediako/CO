@@ -126,7 +126,7 @@ last_review: 2026-04-18
 - The first current-lane full-suite rerun after accepting that patch got past `Doctor.test.ts` and failed only because this fresh workspace did not yet have `dist/bin/codex-orchestrator.js`; after `npm run build`, the previously failing `tests/cli-command-surface.spec.ts` and `tests/run-review.spec.ts` surfaces passed in isolation.
 - The next exact `npm run test` rerun finished green with `344` files and `4119` tests, and `Doctor.test.ts` completed inside the full suite in `74023ms`.
 - PR `#522` now carries the Doctor stabilization diff, and the follow-up Codex review fix commit `651e17b4a` tightened the fake direct-dist entrypoint so it responds only after seeing the real `initialize` request and verifies the `delegate-server` argv instead of unconditionally writing a success payload.
-- After merging current `origin/main`, including the CO-233 SelectedRunProjection fix, the latest exact `npm run test` rerun finished green with `345` files and `4244` tests; `Doctor.test.ts` passed inside the full suite in `70390ms`.
+- After merging current `origin/main`, including the CO-233 SelectedRunProjection fix, the latest exact `npm run test` rerun finished green with `345` files and `4246` tests; `Doctor.test.ts` passed inside the full suite in `65455ms`.
 - CO-226 can proceed to review handoff once remote PR checks and the `pr ready-review` drain are clean; CO-219 can resume normal handoff using this green repo-wide gate evidence.
 
 ## Proposed Design

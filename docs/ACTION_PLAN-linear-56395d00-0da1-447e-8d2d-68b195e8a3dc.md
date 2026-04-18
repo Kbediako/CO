@@ -7,7 +7,7 @@
   - the issue body is authoritative for the failing command surfaces and protected wording
   - the active child lane can collect tests-phase evidence inside `Doctor.test.ts` while the parent stays off that file
   - the smallest correct fix may live in Doctor tests, shared test harness, or the repo’s Vitest execution contract, depending on evidence
-- Latest status (2026-04-18): milestones 1 through 7 are complete for the Doctor timeout cluster, PR `#522` is attached, current `origin/main` is merged, and the latest exact full-suite rerun is green with `345` files and `4244` tests. CO-226 is no longer blocked by the historical CO-233 SelectedRunProjection timeout because that fix is now on the merged base.
+- Latest status (2026-04-18): milestones 1 through 7 are complete for the Doctor timeout cluster, PR `#522` is attached, current `origin/main` is merged, and the latest exact full-suite rerun is green with `345` files and `4246` tests. CO-226 is no longer blocked by the historical CO-233 SelectedRunProjection timeout because that fix is now on the merged base.
 
 ## Issue Readiness Gate
 - Intent checksum / protected terms carried forward:
