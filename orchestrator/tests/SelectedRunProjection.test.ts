@@ -4289,7 +4289,7 @@ describe('SelectedRunProjection', () => {
       manifest_path: join(root, '.runs', 'linear-lin-issue-1-docs-recovery', 'cli', 'docs-recovery-terminal-run', 'manifest.json'),
       artifact_root: join(root, '.runs', 'linear-lin-issue-1-docs-recovery', 'cli', 'docs-recovery-terminal-run'),
       log_path: null,
-      summary: 'Child lane docs-recovery is running.',
+      summary: 'Child lane docs-recovery reserved before child run startup.',
       summary_recorded_at: '2026-04-18T00:30:00.000Z',
       issue_id: 'lin-issue-1',
       issue_identifier: 'CO-231',

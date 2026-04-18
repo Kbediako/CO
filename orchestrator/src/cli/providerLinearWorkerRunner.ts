@@ -5383,7 +5383,8 @@ function isActiveLookingProviderLinearWorkerChildLaneSummary(summary: string | n
     normalized.includes(' status is in_progress') ||
     normalized.includes(' status is running') ||
     normalized.includes(' status is queued') ||
-    normalized.includes(' status is launching')
+    normalized.includes(' status is launching') ||
+    normalized.includes('reserved before child run startup')
   );
 }
 
