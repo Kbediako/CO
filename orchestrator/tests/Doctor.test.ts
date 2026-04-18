@@ -52,6 +52,29 @@ async function writeFakeCodexBinary(dir: string, featureLine: string): Promise<s
   return binPath;
 }
 
+async function withMissingCodexHome(run: (tempHome: string) => Promise<void>): Promise<void> {
+  const originalCodexHome = process.env.CODEX_HOME;
+  const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+  const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
+  process.env.CODEX_HOME = tempHome;
+  process.env.CODEX_CLI_BIN = join(tempHome, 'missing-codex');
+  try {
+    await run(tempHome);
+  } finally {
+    if (originalCodexHome === undefined) {
+      delete process.env.CODEX_HOME;
+    } else {
+      process.env.CODEX_HOME = originalCodexHome;
+    }
+    if (originalCodexCliBin === undefined) {
+      delete process.env.CODEX_CLI_BIN;
+    } else {
+      process.env.CODEX_CLI_BIN = originalCodexCliBin;
+    }
+    await rm(tempHome, { recursive: true, force: true });
+  }
+}
+
 async function writeFakeDelegationDistEntrypoint(rootDir: string): Promise<string> {
   const distDir = join(rootDir, 'dist', 'bin');
   const entryPath = join(distDir, 'codex-orchestrator.js');
@@ -451,42 +474,35 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
   });
 
   it('keeps overall doctor status at warning when providers are incomplete', async () => {
-    const originalCodexHome = process.env.CODEX_HOME;
-    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
     const tempRepo = await mkdtemp(join(tmpdir(), 'doctor-providers-incomplete-'));
-    process.env.CODEX_HOME = tempHome;
     try {
-      const skillDir = join(tempHome, 'skills', 'chrome-devtools');
-      await mkdir(skillDir, { recursive: true });
-      await writeFile(join(skillDir, 'SKILL.md'), '# devtools skill', 'utf8');
-      await writeFile(
-        join(tempHome, 'config.toml'),
-        [
-          'model = "gpt-5.4"',
-          'review_model = "gpt-5.4"',
-          'model_reasoning_effort = "xhigh"',
-          '',
-          '[agents]',
-          'max_threads = 12',
-          '',
-          '[mcp_servers.chrome-devtools]',
-          'command = "npx"',
-          'args = ["-y", "chrome-devtools-mcp@latest"]'
-        ].join('\n'),
-        'utf8'
-      );
+      await withMissingCodexHome(async (tempHome) => {
+        const skillDir = join(tempHome, 'skills', 'chrome-devtools');
+        await mkdir(skillDir, { recursive: true });
+        await writeFile(join(skillDir, 'SKILL.md'), '# devtools skill', 'utf8');
+        await writeFile(
+          join(tempHome, 'config.toml'),
+          [
+            'model = "gpt-5.4"',
+            'review_model = "gpt-5.4"',
+            'model_reasoning_effort = "xhigh"',
+            '',
+            '[agents]',
+            'max_threads = 12',
+            '',
+            '[mcp_servers.chrome-devtools]',
+            'command = "npx"',
+            'args = ["-y", "chrome-devtools-mcp@latest"]'
+          ].join('\n'),
+          'utf8'
+        );
 
-      const result = runDoctor(tempRepo);
-      expect(result.providers.status).toBe('advisory');
-      expect(result.status).toBe('warning');
-      expect(formatDoctorSummary(result).join('\n')).toContain('Providers: advisory');
+        const result = runDoctor(tempRepo);
+        expect(result.providers.status).toBe('advisory');
+        expect(result.status).toBe('warning');
+        expect(formatDoctorSummary(result).join('\n')).toContain('Providers: advisory');
+      });
     } finally {
-      if (originalCodexHome === undefined) {
-        delete process.env.CODEX_HOME;
-      } else {
-        process.env.CODEX_HOME = originalCodexHome;
-      }
-      await rm(tempHome, { recursive: true, force: true });
       await rm(tempRepo, { recursive: true, force: true });
     }
   });
@@ -543,7 +559,10 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
       process.env.CO_TELEGRAM_ENABLE_MUTATIONS = 'true';
       process.env.CO_TELEGRAM_PUSH_ENABLED = 'true';
 
-      const result = runDoctor(tempRepo);
+      let result!: ReturnType<typeof runDoctor>;
+      await withMissingCodexHome(async () => {
+        result = runDoctor(tempRepo);
+      });
       expect(result.providers.status).toBe('ok');
       expect(result.providers.repo_examples.status).toBe('ok');
       expect(result.providers.control_policy.status).toBe('ok');
@@ -623,7 +642,10 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
       process.env.CO_TELEGRAM_ENABLE_MUTATIONS = 'true';
       process.env.CO_TELEGRAM_PUSH_ENABLED = 'true';
 
-      const result = runDoctor(nestedDir);
+      let result!: ReturnType<typeof runDoctor>;
+      await withMissingCodexHome(async () => {
+        result = runDoctor(nestedDir);
+      });
       expect(result.providers.status).toBe('ok');
       expect(result.providers.repo_examples.root).toBe(join(tempRepo, '.codex', 'providers'));
       expect(result.providers.linear.status).toBe('ready');
@@ -692,7 +714,10 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
       process.env.CO_TELEGRAM_ENABLE_MUTATIONS = 'true';
       process.env.CO_TELEGRAM_PUSH_ENABLED = 'true';
 
-      const result = runDoctor(nestedDir);
+      let result!: ReturnType<typeof runDoctor>;
+      await withMissingCodexHome(async () => {
+        result = runDoctor(nestedDir);
+      });
       expect(result.providers.status).toBe('ok');
       expect(result.providers.repo_examples.root).toBe(join(tempRepo, '.codex', 'providers'));
       expect(result.providers.linear.status).toBe('ready');

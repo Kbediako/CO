@@ -1,6 +1,47 @@
 {
   "items": [
     {
+      "id": "20260418-linear-f29c2953-192f-455c-aa67-5418d2607a3a",
+      "title": "Control host: stabilize Doctor.test.ts full-suite timeout cluster under suite load",
+      "relates_to": "tasks/tasks-linear-f29c2953-192f-455c-aa67-5418d2607a3a.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-f29c2953-192f-455c-aa67-5418d2607a3a-docs-packet/cli/2026-04-18T00-31-50-715Z-81077b6b/manifest.json",
+          "source_anchor": "ctx:sha256:ce8d79c8861c039782f62f47ed8c1e50aaa5e0c89390d66072caab9ae13d8df4#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-229 as the bounded Doctor.test.ts suite-load timeout follow-up: full-suite `npm run test` had failed with 5 `Doctor.test.ts` timeouts under suite load while `npx vitest run --config vitest.config.core.ts orchestrator/tests/Doctor.test.ts` passed in isolation with `47 passed` in about `39s`. The packet keeps the exact checksum `Doctor.test.ts`, `full-suite`, `suite load`, `passes in isolation`, `timeouts`, the five named readiness cases, and the explicit rejection of reopening `CO-216` backlog-promotion/manual-demotion logic or broad doctor/docs work."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review --base origin/main",
+          "date": "2026-04-19",
+          "status": "bounded-success",
+          "review_outcome": "bounded-success",
+          "telemetry": ".runs/linear-f29c2953-192f-455c-aa67-5418d2607a3a/cli/2026-04-18T22-54-50-270Z-057eac84/review/telemetry.json",
+          "summary": "Post-merge manifest-backed standalone review ran under FORCE_CODEX_REVIEW=1 against origin/main and reported no actionable regressions; telemetry status=succeeded with review_outcome=bounded-success via command-intent boundary."
+        },
+        "elegance_review": {
+          "reviewer": "provider worker parent lane",
+          "date": "2026-04-19",
+          "status": "passed",
+          "artifact": "out/linear-f29c2953-192f-455c-aa67-5418d2607a3a/manual/20260418T2320Z-elegance-review.md",
+          "summary": "Collapsed the provider-incomplete case onto the new missing Codex-home/bin helper, kept the helper local to Doctor.test.ts, and avoided production doctor changes or global timeout increases."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-f29c2953-192f-455c-aa67-5418d2607a3a.md",
+        "task": "tasks/tasks-linear-f29c2953-192f-455c-aa67-5418d2607a3a.md",
+        "agent_task": ".agent/task/linear-f29c2953-192f-455c-aa67-5418d2607a3a.md",
+        "docs": "docs/TECH_SPEC-linear-f29c2953-192f-455c-aa67-5418d2607a3a.md"
+      }
+    },
+    {
       "id": "20260418-linear-56395d00-0da1-447e-8d2d-68b195e8a3dc",
       "title": "CO: Stabilize unrelated orchestrator/tests/Doctor.test.ts full-suite timeouts blocking CO-219 handoff",
       "relates_to": "tasks/tasks-linear-56395d00-0da1-447e-8d2d-68b195e8a3dc.md",
