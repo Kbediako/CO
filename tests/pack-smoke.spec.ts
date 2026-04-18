@@ -22,6 +22,8 @@ type WorkflowFile = {
 };
 
 const marketplaceSkipToken = 'PACK_SMOKE_ALLOW_MARKETPLACE_SKIP';
+const codexInstallCommand = 'npm install --global @openai/codex@0.121.0';
+const packSmokeCommand = 'npm run pack:smoke';
 
 async function readWorkflow(path: string): Promise<WorkflowFile> {
   const parsed = load(await readText(path));
@@ -206,15 +208,17 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
           expect(run, `${workflow} job ${jobName} must not opt out of marketplace smoke`).not.toContain(
             marketplaceSkipToken
           );
-          if (run.includes('npm install --global @openai/codex@0.121.0')) {
-            codexInstallSeen = true;
-          }
-          if (run.includes('npm run pack:smoke')) {
+          const installIndex = run.indexOf(codexInstallCommand);
+          const smokeIndices = [...run.matchAll(new RegExp(packSmokeCommand, 'gu'))].map((match) => match.index ?? -1);
+          for (const smokeIndex of smokeIndices) {
             smokeStepCount += 1;
             expect(
-              codexInstallSeen,
+              codexInstallSeen || (installIndex >= 0 && installIndex < smokeIndex),
               `${workflow} job ${jobName} step ${stepIndex + 1} must install Codex 0.121.0 before pack:smoke`
             ).toBe(true);
+          }
+          if (installIndex >= 0) {
+            codexInstallSeen = true;
           }
         }
       }
