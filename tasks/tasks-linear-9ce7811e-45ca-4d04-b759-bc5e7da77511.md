@@ -26,7 +26,7 @@
 - [x] Fresh current-head `docs/TASKS.md` evidence is captured and classified. Evidence: `out/linear-9ce7811e-45ca-4d04-b759-bc5e7da77511/manual/repro/docs-check-current-head.log`, `out/linear-9ce7811e-45ca-4d04-b759-bc5e7da77511/manual/repro/docs-check-after-packet.log`.
 - [x] Fresh isolated rerun artifact for `refreshes projection proofs when child-lane reservation ledger placeholders exist` is captured. Evidence: `out/linear-9ce7811e-45ca-4d04-b759-bc5e7da77511/manual/repro/selected-run-projection-isolated.log`.
 - [x] Full-suite vs isolated classification is recorded for the `SelectedRunProjection` surface if the exact rerun is not sufficient. Evidence: `out/linear-9ce7811e-45ca-4d04-b759-bc5e7da77511/manual/repro/npm-run-test-post-build.log`, `out/linear-9ce7811e-45ca-4d04-b759-bc5e7da77511/manual/repro/npm-run-test-post-fix.log`, `out/linear-9ce7811e-45ca-4d04-b759-bc5e7da77511/manual/validation/05-test.log`.
-- [ ] Blocked `CO-231` handoff is updated to name the real remaining blocker, if any, or to record an explicit non-repro / dependency contract. Evidence: pending parent workpad and handoff artifact.
+- [x] Blocked `CO-231` handoff is updated to name the real remaining blocker, if any, or to record an explicit non-repro / dependency contract. Evidence: `out/linear-9ce7811e-45ca-4d04-b759-bc5e7da77511/manual/post-merge-validation/16-co-231-handoff-status.md`.
 
 ## Parent Implementation Boundaries
 - [x] If the docs surface is still red, parent-owned edits stay inside the supported docs headroom/archive surfaces. Evidence: current-head docs surface was a non-repro, so no docs-headroom remediation landed beyond the required packet and mirrors.
@@ -45,6 +45,7 @@
 - 2026-04-18: fresh current-head repro proved the docs blocker was stale (`docs:check` green before and after the packet) while the exact `SelectedRunProjection` case remained a post-build full-suite-only timeout until the bounded projection refresh fix landed.
 - 2026-04-18: ordered validation completed through `delegation-guard`, `spec-guard`, `build`, `lint` (warnings only), `test`, `docs:check`, `docs:freshness`, `repo:stewardship`, `diff-budget` override, and `pack:smoke`.
 - 2026-04-18: wrapper-led standalone review stalled without telemetry or verdict after low-signal temp-script exploration, so the lane closed with manual review fallback plus an explicit elegance pass.
+- 2026-04-18: post-merge PR review feedback tightened the child-lane refresh shortcut so only `turn_completed` proofs with a complete session-log floor can skip hydration; merged-head reruns stayed green on the targeted `SelectedRunProjection` suite and full `npm run test`, and the CO-231 handoff artifact now records that the remaining dependency is PR `#536` review/drain rather than a validation-floor blocker.
 
 ## Notes
 - Do not assume either inherited blocker outcome before fresh current-head evidence.

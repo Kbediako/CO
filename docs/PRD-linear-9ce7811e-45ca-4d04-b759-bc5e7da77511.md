@@ -4,7 +4,8 @@
 
 ## Traceability
 - Linear issue: `CO-247` / `9ce7811e-45ca-4d04-b759-bc5e7da77511`
-- Task id: `linear-9ce7811e-45ca-4d04-b759-bc5e7da77511`
+- Follow-up packet prefix: `linear-9ce7811e-45ca-4d04-b759-bc5e7da77511`
+- Canonical task id: `20260418-linear-9ce7811e-45ca-4d04-b759-bc5e7da77511` (`tasks/index.json` lookup key)
 - Canonical task spec: `tasks/specs/linear-9ce7811e-45ca-4d04-b759-bc5e7da77511.md`
 - TECH_SPEC mirror: `docs/TECH_SPEC-linear-9ce7811e-45ca-4d04-b759-bc5e7da77511.md`
 - ACTION_PLAN: `docs/ACTION_PLAN-linear-9ce7811e-45ca-4d04-b759-bc5e7da77511.md`

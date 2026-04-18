@@ -1352,22 +1352,26 @@ async function resolveProviderLinearWorkerProjectionProofRefreshPlan(
     return null;
   }
   const telemetryGap = hasProviderLinearWorkerProjectionTelemetryGap(proof);
+  const canSkipSessionLogHydration = canSkipProviderLinearWorkerProjectionSessionLogHydration(
+    proof,
+    telemetryGap
+  );
   if (hasProviderLinearWorkerProjectionReservationPlaceholder(proof)) {
     return {
       updatedAtComparisonScope: 'full',
-      skipSessionLogHydration: !telemetryGap
+      skipSessionLogHydration: canSkipSessionLogHydration
     };
   }
   if (hasProviderLinearWorkerProjectionActivePendingChildLane(proof)) {
     return {
       updatedAtComparisonScope: 'full',
-      skipSessionLogHydration: !telemetryGap
+      skipSessionLogHydration: canSkipSessionLogHydration
     };
   }
   if (await hasProviderLinearWorkerProjectionActivePendingChildLaneInLedger(runDir)) {
     return {
       updatedAtComparisonScope: 'full',
-      skipSessionLogHydration: !telemetryGap
+      skipSessionLogHydration: canSkipSessionLogHydration
     };
   }
   return telemetryGap
@@ -1410,6 +1414,26 @@ function hasProviderLinearWorkerProjectionTelemetryGap(
     !proof.latest_session_id ||
     !hasTokens ||
     proof.rate_limits == null
+  );
+}
+
+function canSkipProviderLinearWorkerProjectionSessionLogHydration(
+  proof: ProviderLinearWorkerProof,
+  telemetryGap: boolean
+): boolean {
+  if (proof.owner_phase !== 'turn_completed') {
+    return false;
+  }
+  const currentTurnActivity = proof.current_turn_activity ?? null;
+  return !(
+    telemetryGap ||
+    !proof.last_event_at ||
+    (!proof.last_event && !proof.last_message) ||
+    currentTurnActivity == null ||
+    currentTurnActivity.recorded_at == null ||
+    currentTurnActivity.turn_id !== proof.latest_turn_id ||
+    currentTurnActivity.session_id !== proof.latest_session_id ||
+    proof.auth_provenance == null
   );
 }
 
