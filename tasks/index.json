@@ -1,6 +1,48 @@
 {
   "items": [
     {
+      "id": "20260418-linear-ddb81c93-87b2-4dff-b69b-33d7ae3c91cd",
+      "title": "CO: reclaim / reclassify / re-admit plain released/not_active issues across Backlog -> Ready with a free slot",
+      "relates_to": "tasks/tasks-linear-ddb81c93-87b2-4dff-b69b-33d7ae3c91cd.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-ddb81c93-87b2-4dff-b69b-33d7ae3c91cd-co-240-docs-packet/cli/2026-04-18T05-23-04-716Z-7f3aae66/manifest.json",
+          "source_anchor": "ctx:sha256:80949939d67126c2c2bb65ec2935ce53a96a87f8e4e7e3b5fd8ff2ecf48992d4#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-240 as the stale plain `Backlog` released/not_active reclaim seam: a live issue can return to `Ready` while `provider-intake-state.json` still retains `provider_issue_released:not_active` residue and a free slot / `max_allowed=3` remains idle. The packet preserves the protected `CO-236`, `Ready`, `Backlog`, reclaim / reclassify / re-admit framing, rejects generic `max-concurrency`, `manual-launch`, `stale-Blocked-only`, and generic `refresh-loop` interpretations, and leaves implementation, validation, workpad, PR, and merge to the parent lane."
+        },
+        "standalone_review": {
+          "reviewer": "npm run review -- --uncommitted",
+          "date": "2026-04-18",
+          "status": "manual-fallback-after-rerun-stall",
+          "manifest": ".runs/linear-ddb81c93-87b2-4dff-b69b-33d7ae3c91cd/cli/2026-04-18T05-18-28-716Z-2ed043eb/manifest.json",
+          "telemetry": ".runs/linear-ddb81c93-87b2-4dff-b69b-33d7ae3c91cd/cli/2026-04-18T05-18-28-716Z-2ed043eb/review/telemetry.json",
+          "fallback_note": "out/linear-ddb81c93-87b2-4dff-b69b-33d7ae3c91cd/manual/20260418T060151Z-standalone-review-fallback.md",
+          "summary": "The first wrapper run preserved `status=succeeded` and `review_outcome=bounded-success`, but after the parent tightened the regression to the real one-free-slot incident shape, the follow-up rerun did not converge to a fresh reviewer verdict promptly. The final diff is therefore closed with explicit manual correctness review plus focused validation reruns instead of claiming a new wrapper verdict."
+        },
+        "elegance_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-18",
+          "status": "completed",
+          "artifact": "out/linear-ddb81c93-87b2-4dff-b69b-33d7ae3c91cd/manual/20260418T060151Z-elegance-review.md",
+          "summary": "The minimal truthful outcome is docs/task packet registration plus the focused free-slot regression because current production reclaim logic already rechecks stale non-active released claims; no simplification patch was needed."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-ddb81c93-87b2-4dff-b69b-33d7ae3c91cd.md",
+        "task": "tasks/tasks-linear-ddb81c93-87b2-4dff-b69b-33d7ae3c91cd.md",
+        "agent_task": ".agent/task/linear-ddb81c93-87b2-4dff-b69b-33d7ae3c91cd.md",
+        "docs": "docs/TECH_SPEC-linear-ddb81c93-87b2-4dff-b69b-33d7ae3c91cd.md"
+      }
+    },
+    {
       "id": "20260418-linear-9fc9fe23-bd44-4b72-9459-b5b809970bce",
       "title": "CO: stop review-handoff promotion from parking In Review issues on multiple attached PRs",
       "relates_to": "tasks/tasks-linear-9fc9fe23-bd44-4b72-9459-b5b809970bce.md",
