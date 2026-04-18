@@ -74,6 +74,7 @@ import { sanitizeRunId } from '../persistence/sanitizeRunId.js';
 import { sanitizeTaskId } from '../persistence/sanitizeTaskId.js';
 import { acquireLockWithRetry, type LockRetryOptions } from '../persistence/lockFile.js';
 import { resolveCodexHome } from './utils/codexPaths.js';
+import { REPO_CONFIG_REQUIRED_ENV_KEY } from './config/repoConfigPolicy.js';
 import { REPO_CONFIG_PATH_ENV_KEY } from './config/userConfig.js';
 import {
   normalizeProviderLinearChildLanePathSelectors,
@@ -1171,6 +1172,14 @@ function applyProviderLinearWorkerContextEnv(
       context.repoRoot,
       env
     );
+    const currentPackageRoot = resolveProviderLinearWorkerEnvPath(
+      context.repoRoot,
+      env.CODEX_ORCHESTRATOR_PACKAGE_ROOT
+    );
+    const providerPackageRoot = resolveProviderLinearWorkerEnvPath(
+      context.repoRoot,
+      env[PROVIDER_PACKAGE_ROOT_ENV_KEY]
+    );
     delete env[PROVIDER_CONTROL_HOST_TASK_ID_ENV];
     delete env[PROVIDER_CONTROL_HOST_RUN_ID_ENV];
     delete env[PROVIDER_LAUNCH_SOURCE_ENV];
@@ -1179,8 +1188,12 @@ function applyProviderLinearWorkerContextEnv(
       env[REPO_CONFIG_PATH_ENV_KEY] = preservedRepoConfigPath;
     } else {
       delete env[REPO_CONFIG_PATH_ENV_KEY];
+      delete env[REPO_CONFIG_REQUIRED_ENV_KEY];
     }
     delete env[PROVIDER_REPO_CONFIG_PATH_ENV_KEY];
+    if (currentPackageRoot && providerPackageRoot && currentPackageRoot === providerPackageRoot) {
+      delete env.CODEX_ORCHESTRATOR_PACKAGE_ROOT;
+    }
     delete env[PROVIDER_PACKAGE_ROOT_ENV_KEY];
   }
 }
@@ -1200,11 +1213,11 @@ function resolveProviderLinearWorkerArtifactDir(
     return isProviderWorkspaceScopedArtifactPath(repoRoot, candidate) ? fallback : candidate;
   }
   if (basename(dirname(repoRoot)) !== PROVIDER_WORKSPACE_ROOT_DIRNAME) {
-    return fallback;
+    return isAbsolute(normalized) ? candidate : fallback;
   }
   const sharedRoot = dirname(dirname(repoRoot));
   if (!isPathWithinRoot(candidate, sharedRoot)) {
-    return fallback;
+    return isAbsolute(normalized) ? candidate : fallback;
   }
   if (isProviderWorkspaceScopedArtifactPath(sharedRoot, candidate)) {
     return fallback;
@@ -1240,6 +1253,17 @@ function resolveProviderLinearWorkerRepoConfigPath(
     return null;
   }
   return repoConfigPath;
+}
+
+function resolveProviderLinearWorkerEnvPath(
+  repoRoot: string,
+  value: string | undefined
+): string | null {
+  const normalized = normalizeOptionalString(value);
+  if (!normalized) {
+    return null;
+  }
+  return isAbsolute(normalized) ? resolve(normalized) : resolve(repoRoot, normalized);
 }
 
 function isProviderWorkflowSnapshotPath(candidate: string): boolean {

@@ -5817,7 +5817,9 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       'CODEX_ORCHESTRATOR_PROVIDER_REPO_CONFIG_PATH',
       join(olderRunDir, 'provider-workflow.last-known-good.json')
     );
+    vi.stubEnv('CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED', '1');
     vi.stubEnv('CODEX_ORCHESTRATOR_PROVIDER_PACKAGE_ROOT', olderIssueWorkspacePath);
+    vi.stubEnv('CODEX_ORCHESTRATOR_PACKAGE_ROOT', olderIssueWorkspacePath);
     vi.stubEnv('CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE', 'control-host');
     vi.stubEnv('CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_TOKEN', 'stale-launch-token');
 
@@ -5870,7 +5872,9 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(turnEnv.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE).toBeUndefined();
     expect(turnEnv.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_TOKEN).toBeUndefined();
     expect(turnEnv.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH).toBeUndefined();
+    expect(turnEnv.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED).toBeUndefined();
     expect(turnEnv.CODEX_ORCHESTRATOR_PROVIDER_REPO_CONFIG_PATH).toBeUndefined();
+    expect(turnEnv.CODEX_ORCHESTRATOR_PACKAGE_ROOT).toBeUndefined();
     expect(turnEnv.CODEX_ORCHESTRATOR_PROVIDER_PACKAGE_ROOT).toBeUndefined();
   });
 
@@ -5936,6 +5940,70 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(turnEnv.CODEX_ORCHESTRATOR_RUNS_DIR).toBe(customRunsDir);
     expect(turnEnv.CODEX_ORCHESTRATOR_OUT_DIR).toBe(customOutDir);
     expect(turnEnv.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH).toBe(customRepoConfigPath);
+  });
+
+  it('preserves explicit external absolute artifact-root overrides for provider workspaces', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-worker-external-artifact-env-'));
+    const workspaceRoot = join(tempRoot, '.workspaces', 'linear-lin-issue-1');
+    const manualTaskId = 'test-manual-dispatch';
+    const manualRunId = 'manual-run-1';
+    const manualRunDir = join(workspaceRoot, '.runs', manualTaskId, 'cli', manualRunId);
+    const manualManifestPath = join(manualRunDir, 'manifest.json');
+    const externalRunsDir = await mkdtemp(
+      join(tmpdir(), 'provider-linear-worker-shared-runs-')
+    );
+    const externalOutDir = await mkdtemp(join(tmpdir(), 'provider-linear-worker-shared-out-'));
+    await mkdir(manualRunDir, { recursive: true });
+    await writeFile(
+      manualManifestPath,
+      JSON.stringify({
+        run_id: manualRunId,
+        task_id: manualTaskId,
+        pipeline_id: 'provider-linear-worker',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: workspaceRoot
+      }),
+      'utf8'
+    );
+
+    const execRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
+      return {
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-1"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+          '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}'
+        ].join('\n'),
+        stderr: ''
+      };
+    });
+
+    await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manualManifestPath,
+        CODEX_ORCHESTRATOR_ROOT: workspaceRoot,
+        CODEX_ORCHESTRATOR_RUNS_DIR: externalRunsDir,
+        CODEX_ORCHESTRATOR_OUT_DIR: externalOutDir,
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+      },
+      {
+        readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+        execRunner,
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(execRunner).toHaveBeenCalledTimes(1);
+    const turnEnv = execRunner.mock.calls[0]?.[0].env;
+    expect(turnEnv.CODEX_ORCHESTRATOR_RUNS_DIR).toBe(externalRunsDir);
+    expect(turnEnv.CODEX_ORCHESTRATOR_OUT_DIR).toBe(externalOutDir);
   });
 
   it('fails closed when a codex turn exits non-zero and writes a failed proof sidecar', async () => {
