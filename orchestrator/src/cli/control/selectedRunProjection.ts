@@ -1470,7 +1470,13 @@ function resolveProviderLinearWorkerRunArtifactReconciliation(
     replacementRun,
     providerIntakeState
   );
-  if (!isProviderLinearWorkerReconciliationEvidenceNewerThanContext(evidenceUpdatedAt, context)) {
+  if (
+    !isProviderLinearWorkerReconciliationEvidenceNewerThanContext(
+      evidenceUpdatedAt,
+      context,
+      Boolean(replacementRun)
+    )
+  ) {
     return null;
   }
   const reconciledStatus =
@@ -1759,13 +1765,16 @@ function selectProviderLinearWorkerReconciliationRunEvidenceTimestamp(
 
 function isProviderLinearWorkerReconciliationEvidenceNewerThanContext(
   evidenceUpdatedAt: string | null,
-  context: ControlCompatibilitySourceContext
+  context: ControlCompatibilitySourceContext,
+  useRunChronologyBoundary = false
 ): boolean {
   if (!evidenceUpdatedAt) {
     return false;
   }
-  const contextUpdatedAt = selectLatestIsoTimestamp(context.updatedAt, context.startedAt);
-  return !contextUpdatedAt || compareIsoTimestamp(evidenceUpdatedAt, contextUpdatedAt) > 0;
+  const contextEvidenceBoundary = useRunChronologyBoundary
+    ? selectProviderLinearWorkerContextChronologyTimestamp(context) ?? context.updatedAt
+    : selectLatestIsoTimestamp(context.updatedAt, context.startedAt);
+  return !contextEvidenceBoundary || compareIsoTimestamp(evidenceUpdatedAt, contextEvidenceBoundary) > 0;
 }
 
 function isTerminalProviderLinearIssueState(
