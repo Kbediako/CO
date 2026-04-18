@@ -46,15 +46,15 @@
 - [x] Parent `npm run docs:check` passed. Evidence: command rerun on 2026-04-18 in the issue workspace.
 - [x] Parent `npm run docs:freshness` passed. Evidence: `out/linear-a710d9a7-5187-414d-8a8b-beab7853e446/after/docs-freshness.json`, `out/linear-a710d9a7-5187-414d-8a8b-beab7853e446/after/docs-freshness.md`.
 - [x] Parent `npm run docs:freshness:maintain` passed with owned rolling debt only. Evidence: `out/linear-a710d9a7-5187-414d-8a8b-beab7853e446/after/docs-freshness-maintain-input.json`, `out/linear-a710d9a7-5187-414d-8a8b-beab7853e446/after/docs-freshness-maintenance.json`.
-- [x] Parent standalone review fallback recorded after the forced wrapper stalled without a verdict. Evidence: `out/linear-a710d9a7-5187-414d-8a8b-beab7853e446/manual/manual-review.md`.
-- [x] Parent elegance or minimality pass recorded. Evidence: `out/linear-a710d9a7-5187-414d-8a8b-beab7853e446/manual/elegance-review.md`.
+- [x] Parent standalone review completed as bounded success via command-intent retry. Evidence: `.runs/linear-a710d9a7-5187-414d-8a8b-beab7853e446/cli/2026-04-18T19-45-01-387Z-d47cc337/review/telemetry.json`, `.runs/linear-a710d9a7-5187-414d-8a8b-beab7853e446/cli/2026-04-18T19-45-01-387Z-d47cc337/review/output.log`.
+- [x] Parent elegance or minimality pass recorded. Evidence: `out/linear-a710d9a7-5187-414d-8a8b-beab7853e446/manual/20260418T195521Z-elegance-review.md`.
 
 ## Progress Log
 - 2026-04-18: bounded same-issue child lane created the CO-239 docs-first packet against source anchor `ctx:sha256:0d82ad4fdf8297fae69d0937a0588fb2976cb0c927eb468ec132a5ff9c789318#chunk:c000001`. The shared source payload is metadata-only, so the packet preserves the live issue checksum from the parent-owned issue cache: clean current `main` fails `docs:freshness` with `70` blocking Mar 18 stale rows, `221` visible CO-175 rolling rows, class split `Task Packet=50`, `Task Mirror=10`, `Report Only=10`, and lineage `1289-1298`.
 - 2026-04-18: packet wording keeps the Apr 18 baseline-repair contract explicit and rejects blind `last_review` bumps, policy-cap changes, or reopening `CO-175`.
 - 2026-04-18: parent refreshed exactly the `70` reviewed Mar 18 cohort rows, added the seven CO-239 packet/classification registry entries, refreshed the edited active-doc registry rows for `docs/TASKS.md` and `docs/guides/docs-freshness-cohorts.md`, and left the CO-175 rolling cohort untouched.
 - 2026-04-18: after-state validation is truthful: `docs:freshness` passes with `0` blocking stale rows and `221` visible CO-175 rolling rows, and `docs:freshness:maintain` passes with `freshness_decision=pass_with_owned_rolling_debt`, `current_entries=221`, `current_cohorts=1`, and `blocking_changed_paths=[]`.
-- 2026-04-18: full `npm run test` still hit the unrelated `SelectedRunProjection` suite timeout already present in the repo baseline, while the isolated rerun of the timed-out test passed; the lane is docs-only and does not touch those codepaths.
+- 2026-04-18: after merging current `origin/main`, the prior unrelated full-suite blocker no longer reproduces; full `npm run test` passed with `345` files and `4212` tests.
 
 ## Relevant Files
 - `docs/PRD-linear-a710d9a7-5187-414d-8a8b-beab7853e446.md`
@@ -70,4 +70,4 @@
 - Do not hide the `221` CO-175 rolling rows.
 - Do not widen caps or windows.
 - Do not solve the Apr 18 blocker with a blind `last_review` bump.
-- Standalone review fallback was used because the forced wrapper stalled on repeated doc/registry rereads without emitting review telemetry or a terminal verdict. The manual fallback fixed the only plausible documentation-truth gap it surfaced and then accepted the remaining diff with no blocking findings.
+- Standalone review completed with `status=succeeded`, `review_outcome=bounded-success`, `startupAnchorObserved=true`, and `termination_boundary.kind=command-intent` / `provenance=validation-suite`; per provider policy this is successful bounded review completion, not a wrapper failure.

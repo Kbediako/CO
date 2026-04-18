@@ -448,20 +448,20 @@
           "summary": "Classified the Apr 18 last_review=2026-03-18 Mar 18 packet cohort, refreshed exactly 70 reviewed rows, refreshed the edited active-doc registry rows for docs/TASKS.md and docs/guides/docs-freshness-cohorts.md, preserved CO-175 rolling policy, and restored maintenance truth to 221/300 rows and 1/2 cohorts with blocking_changed_paths empty."
         },
         "standalone_review": {
-          "reviewer": "codex-orchestrator review (stalled, manual fallback accepted)",
+          "reviewer": "codex-orchestrator review --base origin/main",
           "date": "2026-04-18",
-          "status": "manual_fallback_accepted",
-          "manifest": ".runs/linear-a710d9a7-5187-414d-8a8b-beab7853e446/cli/2026-04-18T04-35-39-294Z-290af894/manifest.json",
-          "summary": "Forced review never emitted telemetry or a verdict; the parent fixed the only plausible docs-truth gap it surfaced and accepted the remaining docs-only diff after explicit manual correctness/regression review.",
-          "override_reason": "Forced standalone review ran under FORCE_CODEX_REVIEW=1 and spent multiple bounded wait windows rereading docs/task/registry surfaces without emitting review telemetry or a terminal verdict. The exploratory pass surfaced one plausible documentation-truth gap around edited active-doc registry freshness and checklist truthfulness; the parent fixed those rows and mirrors, then accepted the remaining docs-only diff after explicit manual correctness/regression review.",
-          "fallback_note": "out/linear-a710d9a7-5187-414d-8a8b-beab7853e446/manual/manual-review.md"
+          "status": "bounded_success_command_intent_retry",
+          "manifest": ".runs/linear-a710d9a7-5187-414d-8a8b-beab7853e446/cli/2026-04-18T19-45-01-387Z-d47cc337/manifest.json",
+          "telemetry": ".runs/linear-a710d9a7-5187-414d-8a8b-beab7853e446/cli/2026-04-18T19-45-01-387Z-d47cc337/review/telemetry.json",
+          "summary": "Manifest-backed standalone review completed with status=succeeded and review_outcome=bounded-success after command-intent retry. The reviewer reported no actionable diff-local regressions: the Apr 18 temporary rolling cohort removal is paired with the intended 70-row registry refresh and new CO-239 registry entries, with JSON structure intact.",
+          "termination_boundary": "command-intent / validation-suite"
         },
         "elegance_review": {
           "reviewer": "Codex parent lane",
           "date": "2026-04-18",
           "status": "passed",
-          "artifact": "out/linear-a710d9a7-5187-414d-8a8b-beab7853e446/manual/elegance-review.md",
-          "summary": "No simplification patch needed; the smallest truthful fix remains the reviewed 70-row registry refresh plus the packet/classification registrations, guidance refresh, and mirror truth updates."
+          "artifact": "out/linear-a710d9a7-5187-414d-8a8b-beab7853e446/manual/20260418T195521Z-elegance-review.md",
+          "summary": "No simplification patch needed; the smallest truthful fix remains the reviewed 70-row registry refresh, removal of the temporary Apr 18 CO-175 rolling catalog entry, packet/classification registrations, guidance refresh, and mirror truth updates."
         }
       },
       "paths": {
