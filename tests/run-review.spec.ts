@@ -5023,7 +5023,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     );
     expect(telemetry.summary.metaSurfaceSignals).toBeGreaterThanOrEqual(4);
     expect(telemetry.summary.metaSurfaceKinds).toEqual(
-      expect.arrayContaining(['codex-memories', 'codex-skills'])
+      expect.arrayContaining(['codex-memories', 'review-support'])
     );
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
@@ -5577,10 +5577,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     );
     expect(telemetry.summary.startupAnchorObserved).toBe(false);
     expect(telemetry.summary.preAnchorMetaSurfaceSignals).toBeGreaterThanOrEqual(2);
-    expect(telemetry.summary.preAnchorMetaSurfaceKinds).toEqual([
-      'codex-memories',
-      'codex-skills'
-    ]);
+    expect(telemetry.summary.preAnchorMetaSurfaceKinds).toEqual(['codex-memories']);
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('fails bounded diff review when adjacent review-system surfaces persist', async () => {
@@ -5930,7 +5927,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(telemetry.summary.metaSurfaceSignals).toBeGreaterThanOrEqual(4);
     expect(telemetry.summary.distinctMetaSurfaces).toBeGreaterThanOrEqual(3);
     expect(telemetry.summary.metaSurfaceKinds).toContain('codex-memories');
-    expect(telemetry.summary.metaSurfaceKinds).toContain('codex-skills');
+    expect(telemetry.summary.metaSurfaceKinds).toContain('review-support');
     expect(telemetry.summary.metaSurfaceKinds).toContain('review-docs');
     expect(telemetry.summary.metaSurfaceKinds).not.toContain('run-manifest');
     expect(telemetry.summary.metaSurfaceKinds).not.toContain('run-runner-log');

@@ -42,6 +42,54 @@
       }
     },
     {
+      "id": "20260418-linear-4b6dd62c-dd51-4edc-89e3-24c773d93124",
+      "title": "CO: eliminate residual startup-anchor standalone-review failures that still force manual fallback after CO-173",
+      "relates_to": "tasks/tasks-linear-4b6dd62c-dd51-4edc-89e3-24c773d93124.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (direct fallback after child-stream provenance failure; repo freshness policy owner CO-175)",
+          "date": "2026-04-18",
+          "manifest": ".runs/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124/cli/2026-04-18T05-48-25-732Z-f5e259ca/manifest.json",
+          "override_reason": "Packaged same-issue child-stream and child-lane helper launches failed closed because the parent provider-worker manifest lacks provider_control_host provenance. Direct docs-review rerun then passed delegation-guard override, spec-guard, and docs:check for the CO-242 packet, and stopped only on docs:freshness:maintain block_policy_over_budget owned by CO-175 after the missing .agent/task registry row was fixed."
+        },
+        "docs_review_continuation": {
+          "reviewer": "codex-orchestrator docs-review child stream",
+          "date": "2026-04-18",
+          "status": "succeeded",
+          "manifest": ".runs/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124-docs-review/cli/2026-04-18T15-54-42-548Z-b8fdf93e/manifest.json",
+          "telemetry": ".runs/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124-docs-review/cli/2026-04-18T15-54-42-548Z-b8fdf93e/review/telemetry.json",
+          "summary": "Continuation docs-review child stream succeeded on the workspace-scoped artifact root with clean-success telemetry; freshness maintenance passed with CO-175 retained as owned rolling debt and no blocking changed paths."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review --base origin/main",
+          "date": "2026-04-18",
+          "status": "succeeded",
+          "review_outcome": "bounded-success",
+          "manifest": ".runs/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124/cli/2026-04-18T05-35-22-749Z-3e368e6f/manifest.json",
+          "telemetry": ".runs/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124/cli/2026-04-18T05-35-22-749Z-3e368e6f/review/telemetry.json",
+          "summary": "Parent review completed with startupAnchorObserved=true, preAnchorMetaSurfaceSignals=0, and bounded-success via command-intent; this was successful bounded review completion, not a failed-boundary wrapper blocker."
+        },
+        "elegance_review": {
+          "reviewer": "provider worker parent lane",
+          "date": "2026-04-18",
+          "status": "completed",
+          "artifact": "out/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124/manual/20260418T1621Z-final-elegance-review.md",
+          "summary": "The final pass kept the implementation limited to the two review-support skill entrypoints, preserved unrelated codex-skills boundary accounting, and found no need for broader abstraction or timeout changes."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124.md",
+        "task": "tasks/tasks-linear-4b6dd62c-dd51-4edc-89e3-24c773d93124.md",
+        "agent_task": ".agent/task/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124.md",
+        "docs": "docs/TECH_SPEC-linear-4b6dd62c-dd51-4edc-89e3-24c773d93124.md"
+      }
+    },
+    {
       "id": "20260418-linear-9ce7811e-45ca-4d04-b759-bc5e7da77511",
       "title": "Validation floor: restore handoff readiness after SelectedRunProjection timeout and docs/TASKS zero-headroom",
       "relates_to": "tasks/tasks-linear-9ce7811e-45ca-4d04-b759-bc5e7da77511.md",
