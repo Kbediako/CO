@@ -1,6 +1,32 @@
 {
   "items": [
     {
+      "id": "20260418-linear-850b66b4-6a56-426a-947e-ce45d7f12a96",
+      "title": "CO STATUS / observability: reconcile top-level provider_intake with concurrent running claims and retry/error history",
+      "relates_to": "tasks/tasks-linear-850b66b4-6a56-426a-947e-ce45d7f12a96.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-850b66b4-6a56-426a-947e-ce45d7f12a96-docs-packet/cli/2026-04-18T06-37-07-244Z-a8194450/manifest.json",
+          "source_anchor": "ctx:sha256:e406003646faf7e5ea017cd7f91b297ac8e25a900b7ecb2a26dc8d3eeab09575#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-243 as the bounded top-level provider_intake versus concurrent-running truth gap: .runs/local-mcp/cli/control-host/provider-intake-state.json can retain multiple concurrent running claims, but buildProviderIntakeSummary()/selectProviderIntakeClaim() still collapse top-level provider_intake to one claim by state-rank plus updated_at sort, which can diverge from CO STATUS / co-status --format json and hide retry/error history on non-selected claims. The expected shared source payload is absent in this child checkout, so the packet is anchored on the protected lane wording plus current repo seams in providerIntakeState.ts, controlRuntime.ts, selectedRunProjection.ts, observabilityReadModel.ts, observabilitySurface.ts, and operatorDashboardPresenter.ts; parent owns implementation, validation, Linear state, workpad, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-850b66b4-6a56-426a-947e-ce45d7f12a96.md",
+        "task": "tasks/tasks-linear-850b66b4-6a56-426a-947e-ce45d7f12a96.md",
+        "agent_task": ".agent/task/linear-850b66b4-6a56-426a-947e-ce45d7f12a96.md",
+        "docs": "docs/TECH_SPEC-linear-850b66b4-6a56-426a-947e-ce45d7f12a96.md"
+      }
+    },
+    {
       "id": "20260418-linear-9fc9fe23-bd44-4b72-9459-b5b809970bce",
       "title": "CO: stop review-handoff promotion from parking In Review issues on multiple attached PRs",
       "relates_to": "tasks/tasks-linear-9fc9fe23-bd44-4b72-9459-b5b809970bce.md",
