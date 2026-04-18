@@ -3,7 +3,6 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:pat
 import process from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
-import { createRequire } from 'node:module';
 import { existsSync } from 'node:fs';
 import { mkdir, open, readFile, readdir, realpath, stat } from 'node:fs/promises';
 
@@ -155,10 +154,6 @@ export const PROVIDER_SEMANTIC_STALL_RECHECK_DELAY_MS = 15 * 60 * 1000 + 1_000;
 const PROVIDER_WORKER_SESSION_LOG_POLL_INTERVAL_MS = 250;
 const PROVIDER_WORKER_SESSION_LOG_DISCOVERY_WINDOW_MS = 15 * 60 * 1000;
 const PROVIDER_WORKER_SESSION_LOG_HEADER_BYTES = 256 * 1024;
-const require = createRequire(import.meta.url);
-const toml = require('@iarna/toml') as {
-  parse: (source: string) => unknown;
-};
 
 export interface ProviderLinearWorkerContext {
   manifest: Record<string, unknown>;
@@ -747,27 +742,127 @@ async function resolveProviderWorkerMaxTurns(
   }
 
   if (rawConfig) {
-    let parsedConfig: unknown;
-    try {
-      parsedConfig = toml.parse(rawConfig);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to parse Codex config TOML at ${configPath}: ${message}`);
-    }
-    if (isRecord(parsedConfig)) {
-      const agentConfig = isRecord(parsedConfig.agent)
-        ? parsedConfig.agent
-        : parsedConfig['agent.max_turns'];
-      const configuredTurns = isRecord(agentConfig)
-        ? parsePositiveInteger(agentConfig.max_turns, `${configPath} [agent].max_turns`)
-        : parsePositiveInteger(agentConfig, `${configPath} agent.max_turns`);
-      if (configuredTurns !== null) {
-        return configuredTurns;
-      }
+    const configuredTurns = readAgentMaxTurnsFromToml(rawConfig, configPath);
+    if (configuredTurns !== null) {
+      return configuredTurns;
     }
   }
 
   return PROVIDER_WORKER_DEFAULT_MAX_TURNS;
+}
+
+function readAgentMaxTurnsFromToml(rawConfig: string, configPath: string): number | null {
+  let inAgentSection = false;
+  for (const line of rawConfig.split(/\r?\n/u)) {
+    const trimmed = stripTomlComment(line).trim();
+    if (!trimmed) {
+      continue;
+    }
+    const tableMatch = trimmed.match(/^\[(.+)\]$/u);
+    if (tableMatch) {
+      inAgentSection = normalizeTomlKey(tableMatch[1] ?? '') === 'agent';
+      continue;
+    }
+    if (inAgentSection) {
+      const sectionValue = readTomlPositiveIntegerAssignment(trimmed, 'max_turns', `${configPath} [agent].max_turns`);
+      if (sectionValue !== null) {
+        return sectionValue;
+      }
+    }
+    const dottedValue = readTomlPositiveIntegerAssignment(
+      trimmed,
+      'agent.max_turns',
+      `${configPath} agent.max_turns`
+    );
+    if (dottedValue !== null) {
+      return dottedValue;
+    }
+  }
+  return null;
+}
+
+function readTomlPositiveIntegerAssignment(
+  trimmedLine: string,
+  key: string,
+  sourceLabel: string
+): number | null {
+  const separatorIndex = findTomlAssignmentSeparator(trimmedLine);
+  if (separatorIndex === -1) {
+    return null;
+  }
+  const rawKey = normalizeTomlKey(trimmedLine.slice(0, separatorIndex));
+  if (rawKey !== key) {
+    return null;
+  }
+  return parsePositiveInteger(trimmedLine.slice(separatorIndex + 1).trim(), sourceLabel);
+}
+
+function normalizeTomlKey(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return null;
+  }
+  return trimmed
+    .split('.')
+    .map((segment) => segment.trim().replace(/^["']|["']$/gu, ''))
+    .filter((segment) => segment.length > 0)
+    .join('.');
+}
+
+function findTomlAssignmentSeparator(raw: string): number {
+  let quote: '"' | '\'' | null = null;
+  let escaping = false;
+  for (let index = 0; index < raw.length; index += 1) {
+    const character = raw[index];
+    if (escaping) {
+      escaping = false;
+      continue;
+    }
+    if (quote && character === '\\') {
+      escaping = true;
+      continue;
+    }
+    if (character === '"' || character === '\'') {
+      if (quote === character) {
+        quote = null;
+      } else if (!quote) {
+        quote = character;
+      }
+      continue;
+    }
+    if (!quote && character === '=') {
+      return index;
+    }
+  }
+  return -1;
+}
+
+function stripTomlComment(line: string): string {
+  let quote: '"' | '\'' | null = null;
+  let escaping = false;
+  for (let index = 0; index < line.length; index += 1) {
+    const character = line[index];
+    if (escaping) {
+      escaping = false;
+      continue;
+    }
+    if (quote && character === '\\') {
+      escaping = true;
+      continue;
+    }
+    if (character === '"' || character === '\'') {
+      if (quote === character) {
+        quote = null;
+      } else if (!quote) {
+        quote = character;
+      }
+      continue;
+    }
+    if (!quote && character === '#') {
+      return line.slice(0, index);
+    }
+  }
+  return line;
 }
 
 function resolveProviderLinearWorkerSourceSetup(

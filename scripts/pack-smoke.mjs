@@ -664,42 +664,48 @@ async function runMarketplaceInstallScenario({
   expectedConfigLines,
   afterInstall
 }) {
-  const homeRoot = path.join(tempDir, `.codex-plugin-smoke-home-${label}`);
+  // Keep CODEX_HOME outside the temp package tree so cached plugin launches
+  // cannot resolve undeclared modules from tempDir/node_modules ancestors.
+  const homeRoot = await mkdtemp(path.join(os.tmpdir(), `codex-plugin-smoke-home-${label}-`));
   const codexHome = path.join(homeRoot, '.codex');
   await mkdir(codexHome, { recursive: true });
 
-  const marketplaceEnv = {
-    ...process.env,
-    HOME: homeRoot,
-    CODEX_HOME: codexHome
-  };
+  try {
+    const marketplaceEnv = {
+      ...process.env,
+      HOME: homeRoot,
+      CODEX_HOME: codexHome
+    };
 
-  await runCommand(codexBin, ['marketplace', 'add', ...addArgs], {
-    cwd: tempDir,
-    env: marketplaceEnv
-  });
-  const configPath = path.join(codexHome, 'config.toml');
-  for (const expectedLine of expectedConfigLines) {
-    await assertFileIncludes(configPath, expectedLine, `${label} marketplace config`);
-  }
-  const { cachedPluginRoot, configPath: installedConfigPath } = await installMarketplacePlugin(
-    codexBin,
-    marketplaceEnv,
-    pluginVersion,
-    label
-  );
-  if (typeof afterInstall === 'function') {
-    await afterInstall({
-      cachedPluginRoot,
-      configPath: installedConfigPath,
-      homeRoot,
-      codexHome,
-      marketplaceEnv
+    await runCommand(codexBin, ['marketplace', 'add', ...addArgs], {
+      cwd: tempDir,
+      env: marketplaceEnv
     });
+    const configPath = path.join(codexHome, 'config.toml');
+    for (const expectedLine of expectedConfigLines) {
+      await assertFileIncludes(configPath, expectedLine, `${label} marketplace config`);
+    }
+    const { cachedPluginRoot, configPath: installedConfigPath } = await installMarketplacePlugin(
+      codexBin,
+      marketplaceEnv,
+      pluginVersion,
+      label
+    );
+    if (typeof afterInstall === 'function') {
+      await afterInstall({
+        cachedPluginRoot,
+        configPath: installedConfigPath,
+        homeRoot,
+        codexHome,
+        marketplaceEnv
+      });
+    }
+    const workspaceRoot = path.join(tempDir, `.codex-plugin-smoke-workspace-${label}`);
+    await mkdir(workspaceRoot, { recursive: true });
+    await runCachedPluginLauncherSmoke(cachedPluginRoot, marketplaceEnv, `${label} cached plugin`, workspaceRoot);
+  } finally {
+    await rm(homeRoot, { recursive: true, force: true });
   }
-  const workspaceRoot = path.join(tempDir, `.codex-plugin-smoke-workspace-${label}`);
-  await mkdir(workspaceRoot, { recursive: true });
-  await runCachedPluginLauncherSmoke(cachedPluginRoot, marketplaceEnv, `${label} cached plugin`, workspaceRoot);
 }
 
 async function rewriteMarketplaceSourceToRelative(configPath, sourceRoot) {
