@@ -69,8 +69,8 @@
           "date": "2026-04-18",
           "status": "succeeded",
           "review_outcome": "bounded-success",
-          "manifest": "/Users/kbediako/Code/CO/.runs/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124/cli/2026-04-18T05-35-22-749Z-3e368e6f/manifest.json",
-          "telemetry": "/Users/kbediako/Code/CO/.runs/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124/cli/2026-04-18T05-35-22-749Z-3e368e6f/review/telemetry.json",
+          "manifest": ".runs/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124/cli/2026-04-18T05-35-22-749Z-3e368e6f/manifest.json",
+          "telemetry": ".runs/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124/cli/2026-04-18T05-35-22-749Z-3e368e6f/review/telemetry.json",
           "summary": "Parent review completed with startupAnchorObserved=true, preAnchorMetaSurfaceSignals=0, and bounded-success via command-intent; this was successful bounded review completion, not a failed-boundary wrapper blocker."
         },
         "elegance_review": {

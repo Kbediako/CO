@@ -762,7 +762,7 @@ function classifyMetaSurfaceOperand(
   if (normalized.includes('.codex/memories/')) {
     return 'codex-memories';
   }
-  if (REVIEW_SUPPORT_CODEX_SKILL_PATH_RE.test(normalized)) {
+  if (isReviewSupportCodexSkillPath(normalized, repoRoot)) {
     return 'review-support';
   }
   if (normalized.includes('.codex/skills/')) {
@@ -860,6 +860,32 @@ function classifyMetaSurfaceOperand(
     return 'review-docs';
   }
   return null;
+}
+
+function isReviewSupportCodexSkillPath(normalized: string, repoRoot: string | null): boolean {
+  if (!REVIEW_SUPPORT_CODEX_SKILL_PATH_RE.test(normalized)) {
+    return false;
+  }
+  const normalizedRepoRoot = normalizeScopeRoot(repoRoot ?? undefined);
+  if (normalizedRepoRoot) {
+    if (relativizeOperandToRepoRoot(normalized, normalizedRepoRoot) !== normalized) {
+      return false;
+    }
+    if (
+      /^[A-Za-z]:\//u.test(normalized) &&
+      /^[A-Za-z]:\//u.test(normalizedRepoRoot) &&
+      normalized.toLowerCase().startsWith(`${normalizedRepoRoot.toLowerCase()}/`)
+    ) {
+      return false;
+    }
+  }
+  return (
+    normalized.startsWith('/') ||
+    /^[A-Za-z]:\//u.test(normalized) ||
+    normalized.startsWith('~/.codex/') ||
+    normalized.startsWith('$HOME/.codex/') ||
+    normalized.startsWith('${HOME}/.codex/')
+  );
 }
 
 function matchesPathSuffix(value: string, relativePath: string): boolean {
