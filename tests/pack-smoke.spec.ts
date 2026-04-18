@@ -14,6 +14,7 @@ type WorkflowStep = {
 };
 
 type WorkflowJob = {
+  'continue-on-error'?: unknown;
   env?: unknown;
   steps?: unknown;
 };
@@ -31,7 +32,7 @@ const packSmokeInvocationPattern = new RegExp(
   String.raw`(?:^|[;&|()]\s*|\b(?:if|then|do|while|until)\s+)(?:!\s+)?(?:${shellAssignmentPattern}\s+)*npm\s+run\s+pack:smoke(?=$|[\s;|&)])`,
   'gu'
 );
-const nonBlockingPackSmokePattern = /(?:^|[ \t])(?:\|\|[ \t]|\|&?[ \t])|;[ \t]*(?:true|exit[ \t]+0)\b/u;
+const nonBlockingPackSmokePattern = /\|\||\|&?|;[ \t]*(?:true|exit[ \t]+0)\b/u;
 
 async function readWorkflow(path: string): Promise<WorkflowFile> {
   const parsed = load(await readText(path));
@@ -92,7 +93,10 @@ function installConditionCoversSmokeStep(installCondition: string, smokeConditio
 }
 
 function normalizeShellContinuations(run: string): string {
-  return run.replace(/\\\r?\n[ \t]*/gu, ' ');
+  return run
+    .replace(/\\\r?\n[ \t]*/gu, ' ')
+    .replace(/(\|\||\|&?)[ \t]*\r?\n[ \t]*/gu, '$1 ')
+    .replace(/\r?\n[ \t]*(?=(?:\|\||\|&?)(?:\s|$))/gu, ' ');
 }
 
 function getHeredocDelimiter(line: string): string | null {
@@ -155,18 +159,13 @@ function hasPackSmokeCommand(run: string): boolean {
 }
 
 function hasActiveShellCondition(beforeOccurrence: string): boolean {
-  const controlTokens = [...beforeOccurrence.matchAll(/\b(if|while|until|then|do)\b/gu)];
-  const lastControlToken = controlTokens.at(-1)?.[1];
-  return lastControlToken === 'if' || lastControlToken === 'while' || lastControlToken === 'until';
+  return /\b(if|while|until|then|do)\b/u.test(beforeOccurrence);
 }
 
 function isConditionPackSmokeOccurrence(occurrence: PackSmokeCommandOccurrence): boolean {
   const matchText = occurrence.matchText.trimStart();
-  if (/^(?:then|do)\s+/u.test(matchText)) {
-    return false;
-  }
   return (
-    /^(?:if|while|until)\s+/u.test(matchText) ||
+    /^(?:if|while|until|then|do)\s+/u.test(matchText) ||
     hasActiveShellCondition(occurrence.line.slice(0, occurrence.startIndex))
   );
 }
@@ -366,6 +365,10 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
           if (hasPackSmokeCommand(run)) {
             smokeStepCount += 1;
             expect(
+              isContinueOnErrorEnabled(job['continue-on-error']),
+              `${workflow} job ${jobName} must not continue-on-error when it runs pack:smoke`
+            ).toBe(false);
+            expect(
               isContinueOnErrorEnabled(step['continue-on-error']),
               `${workflow} job ${jobName} step ${stepIndex + 1} must not continue-on-error pack:smoke`
             ).toBe(false);
@@ -404,16 +407,21 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(hasPackSmokeCommand(`cat <<'EOF-MARK'\n${packSmokeCommand}\nEOF-MARK`)).toBe(false);
     expect(hasPackSmokeCommand(`${packSmokeCommand}:other`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} || true`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand}||true`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand}\n|| true`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} | tee smoke.log`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} |& tee smoke.log`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} |\n tee smoke.log`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand}; exit 0`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand};true`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} -- --flag || true`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`if ${packSmokeCommand}; then echo ok; fi`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`if FOO=1 ${packSmokeCommand} -- --flag; then echo ok; fi`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`if npm run lint && ${packSmokeCommand}; then echo ok; fi`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`if test -f marker; then ${packSmokeCommand}; fi`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`while false; do ${packSmokeCommand}; done`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`! ${packSmokeCommand}`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`npm run lint || true && ${packSmokeCommand}`)).toBe(false);
-    expect(hasNonBlockingPackSmokeCommand(`if test -f marker; then ${packSmokeCommand}; fi`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} -- --flag`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`echo ${packSmokeCommand} || true`)).toBe(false);
     expect(isContinueOnErrorEnabled(true)).toBe(true);
