@@ -62,6 +62,7 @@
 - The two owned rolling cohorts now expire on `2026-04-20` (Apr 14 cohort) and `2026-04-24` (Apr 18 cohort) unless refreshed, archived, or reclassified earlier.
 
 ## Parity / Alignment Matrix
+
 | Dimension | Current Truth | Reference Truth | Target Truth / Intended Delta | Explicitly Out Of Scope |
 | --- | --- | --- | --- | --- |
 | Rolling policy | CO-175 policy is already merged and still owns the Apr 14 March 14 cohort. | Rolling debt stays visible and fail-closed for undeclared or expired cohorts. | Keep the existing rolling cohort unchanged. | Reverting or weakening the policy. |
