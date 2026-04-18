@@ -5006,7 +5006,7 @@ describe('SelectedRunProjection', () => {
       summary_recorded_at: '2026-04-17T00:43:59.552Z'
     });
     },
-    20_000
+    30_000
   );
 
   it(

@@ -1,0 +1,30 @@
+{
+  "name": "codex-orchestrator",
+  "version": "0.1.38",
+  "description": "Codex Orchestrator plugin metadata for the packaged CO runtime.",
+  "author": {
+    "name": "Kbediako",
+    "url": "https://github.com/Kbediako"
+  },
+  "homepage": "https://github.com/Kbediako/CO#readme",
+  "repository": "https://github.com/Kbediako/CO",
+  "license": "MIT",
+  "keywords": [
+    "codex",
+    "mcp",
+    "orchestrator"
+  ],
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Codex Orchestrator",
+    "shortDescription": "Register CO's MCP orchestration server in Codex.",
+    "longDescription": "Connect Codex to Codex Orchestrator's MCP server for auditable task flows, manifests, and delegation workflows.",
+    "developerName": "Kbediako",
+    "category": "Productivity",
+    "capabilities": [
+      "MCP",
+      "Automation"
+    ],
+    "screenshots": []
+  }
+}

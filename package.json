@@ -16,6 +16,8 @@
     "codex-orch": "bin/codex-orchestrator.js"
   },
   "files": [
+    ".agents/plugins/marketplace.json",
+    "plugins/**",
     "bin/codex-orchestrator.js",
     "dist/bin/**",
     "dist/orchestrator/**",
