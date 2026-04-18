@@ -145,6 +145,56 @@
             "start": "1164",
             "end": "1195"
           }
+        },
+        {
+          "id": "co-175-apr-18-march-18-cli-1289-1298",
+          "last_review": "2026-03-18",
+          "cadence_days": 30,
+          "path_families": [
+            ".agent/task",
+            "tasks/specs",
+            "tasks/tasks-*",
+            "docs/findings",
+            "docs/PRD-*",
+            "docs/TECH_SPEC-*",
+            "docs/ACTION_PLAN-*"
+          ],
+          "path_prefixes": [
+            "docs/ACTION_PLAN-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md",
+            "docs/ACTION_PLAN-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment-revisit.md",
+            "docs/ACTION_PLAN-coordinator-symphony-aligned-flow-cli-request-shell-extraction.md",
+            "docs/ACTION_PLAN-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit.md",
+            "docs/ACTION_PLAN-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction.md",
+            "docs/ACTION_PLAN-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md",
+            "docs/ACTION_PLAN-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit.md",
+            "docs/ACTION_PLAN-coordinator-symphony-aligned-rlm-cli-request-shell-extraction.md",
+            "docs/ACTION_PLAN-coordinator-symphony-aligned-start-cli-remaining-boundary-freeze-reassessment.md",
+            "docs/ACTION_PLAN-coordinator-symphony-aligned-start-cli-request-shell-extraction.md",
+            "docs/PRD-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md",
+            "docs/PRD-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment-revisit.md",
+            "docs/PRD-coordinator-symphony-aligned-flow-cli-request-shell-extraction.md",
+            "docs/PRD-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit.md",
+            "docs/PRD-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction.md",
+            "docs/PRD-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md",
+            "docs/PRD-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit.md",
+            "docs/PRD-coordinator-symphony-aligned-rlm-cli-request-shell-extraction.md",
+            "docs/PRD-coordinator-symphony-aligned-start-cli-remaining-boundary-freeze-reassessment.md",
+            "docs/PRD-coordinator-symphony-aligned-start-cli-request-shell-extraction.md",
+            "docs/TECH_SPEC-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md",
+            "docs/TECH_SPEC-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment-revisit.md",
+            "docs/TECH_SPEC-coordinator-symphony-aligned-flow-cli-request-shell-extraction.md",
+            "docs/TECH_SPEC-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit.md",
+            "docs/TECH_SPEC-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction.md",
+            "docs/TECH_SPEC-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md",
+            "docs/TECH_SPEC-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit.md",
+            "docs/TECH_SPEC-coordinator-symphony-aligned-rlm-cli-request-shell-extraction.md",
+            "docs/TECH_SPEC-coordinator-symphony-aligned-start-cli-remaining-boundary-freeze-reassessment.md",
+            "docs/TECH_SPEC-coordinator-symphony-aligned-start-cli-request-shell-extraction.md"
+          ],
+          "task_number_range": {
+            "start": "1289",
+            "end": "1298"
+          }
         }
       ],
       "action_after_window": "refresh, archive, reclassify, or file a new same-project baseline owner before feature-lane review handoff"

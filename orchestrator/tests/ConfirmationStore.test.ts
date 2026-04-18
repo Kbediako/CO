@@ -24,6 +24,31 @@ describe('ConfirmationStore', () => {
     expect(digestWithNonce).toBe(digestBase);
   });
 
+  it('normalizes object key order in action digests', () => {
+    const digestA = buildActionParamsDigest({
+      tool: 'delegate.cancel',
+      params: {
+        outer: {
+          b: 2,
+          a: 1
+        },
+        run_id: 'run-1'
+      }
+    });
+    const digestB = buildActionParamsDigest({
+      tool: 'delegate.cancel',
+      params: {
+        run_id: 'run-1',
+        outer: {
+          a: 1,
+          b: 2
+        }
+      }
+    });
+
+    expect(digestA).toBe(digestB);
+  });
+
   it('dedupes confirmation requests with identical digests', () => {
     const store = new ConfirmationStore({ runId: 'run-1', now, expiresInMs: 1000, maxPending: 3 });
     const first = store.create({

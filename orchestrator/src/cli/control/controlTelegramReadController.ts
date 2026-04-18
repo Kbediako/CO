@@ -212,9 +212,13 @@ function formatProviderIntakeSummary(
   if (!providerIntake) {
     return null;
   }
-  const runId = providerIntake.run_id ? ` -> ${providerIntake.run_id}` : '';
-  const reason = providerIntake.reason ? ` (${providerIntake.reason})` : '';
-  return `Intake: ${providerIntake.state} ${providerIntake.issue_identifier} -> ${providerIntake.task_id}${runId}${reason}`;
+  const claim = providerIntake.selected_claim;
+  const runId = claim.run_id ? ` -> ${claim.run_id}` : '';
+  const reason = claim.reason ? ` (${claim.reason})` : '';
+  if (providerIntake.summary_scope === 'selected_claim') {
+    return `Intake: selected claim ${claim.issue_identifier} of ${providerIntake.active_claim_count} active / ${providerIntake.running_claim_count} running -> ${claim.task_id}${runId}${reason}`;
+  }
+  return `Intake: ${claim.state} ${claim.issue_identifier} -> ${claim.task_id}${runId}${reason}`;
 }
 
 function formatStateLine(
