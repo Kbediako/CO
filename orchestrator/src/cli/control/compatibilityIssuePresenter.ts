@@ -673,6 +673,8 @@ export function buildCompatibilityIssuePayload(input: {
     providerLinearWorkerProof: input.source.providerLinearWorkerProof,
     providerDebugSnapshot: input.source.providerDebugSnapshot,
     providerIntake: input.providerIntake ?? null,
+    issueIdentifier: input.source.issueIdentifier,
+    issueId: input.source.issueId,
     stageStartedAt: input.source.startedAt
   });
 

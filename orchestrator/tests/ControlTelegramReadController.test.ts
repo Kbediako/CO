@@ -8,6 +8,7 @@ function buildSnapshot(input: {
   prompt: string;
   urgency: 'low' | 'medium' | 'high';
   proof?: Partial<ProviderLinearWorkerProof>;
+  providerIntake?: ControlSelectedRunRuntimeSnapshot['providerIntake'];
 }): ControlSelectedRunRuntimeSnapshot {
   return {
     selected: {
@@ -96,7 +97,50 @@ function buildSnapshot(input: {
         project_id: 'lin-project'
       }
     },
-    tracked: null
+    tracked: null,
+    providerIntake: input.providerIntake ?? null
+  };
+}
+
+function buildProviderIntake(
+  overrides: Partial<NonNullable<ControlSelectedRunRuntimeSnapshot['providerIntake']>> = {}
+): NonNullable<ControlSelectedRunRuntimeSnapshot['providerIntake']> {
+  return {
+    provider: 'linear',
+    summary_scope: 'single_claim',
+    selection_strategy: null,
+    claim_count: 1,
+    active_claim_count: 1,
+    running_claim_count: 1,
+    active_issue_identifiers: ['CO-175'],
+    running_issue_identifiers: ['CO-175'],
+    selected_claim: {
+      provider: 'linear',
+      issue_id: 'lin-issue-175',
+      issue_identifier: 'CO-175',
+      issue_title: 'Provider intake issue',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-18T06:09:00.000Z',
+      issue_archived_at: null,
+      issue_trashed: null,
+      issue_viewer_id: null,
+      issue_assignee_id: null,
+      issue_assignee_name: null,
+      task_id: 'linear-co-175',
+      mapping_source: 'provider_id_fallback',
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: 'run-175',
+      worker_host: null,
+      freshness: 'current',
+      retry: null,
+      updated_at: '2026-04-18T06:09:30.000Z'
+    },
+    rehydrated_at: null,
+    is_rehydrated: false,
+    updated_at: '2026-04-18T06:09:30.000Z',
+    ...overrides
   };
 }
 
@@ -309,5 +353,53 @@ describe('ControlTelegramReadController', () => {
     });
 
     await expect(controller.dispatchReadCommand('/questions')).resolves.toContain('q-1 [high]: Approve the sync?');
+  });
+
+  it('renders single-claim provider intake status', async () => {
+    const controller = createControlTelegramReadController({
+      readAdapter: {
+        readSelectedRun: async () =>
+          buildSnapshot({
+            prompt: 'Approve?',
+            urgency: 'high',
+            providerIntake: buildProviderIntake()
+          }),
+        readDispatch: async () => ({}),
+        readQuestions: async () => ({ questions: [] })
+      },
+      mutationsEnabled: true
+    });
+
+    await expect(controller.dispatchReadCommand('/status')).resolves.toContain(
+      'Intake: running CO-175 -> linear-co-175 -> run-175 (provider_issue_rehydrated_active_run)'
+    );
+  });
+
+  it('renders concurrent provider intake as an explicitly selected claim summary', async () => {
+    const controller = createControlTelegramReadController({
+      readAdapter: {
+        readSelectedRun: async () =>
+          buildSnapshot({
+            prompt: 'Approve?',
+            urgency: 'high',
+            providerIntake: buildProviderIntake({
+              summary_scope: 'selected_claim',
+              selection_strategy: 'state_rank_updated_at',
+              claim_count: 3,
+              active_claim_count: 3,
+              running_claim_count: 3,
+              active_issue_identifiers: ['CO-175', 'CO-240', 'CO-242'],
+              running_issue_identifiers: ['CO-175', 'CO-240', 'CO-242']
+            })
+          }),
+        readDispatch: async () => ({}),
+        readQuestions: async () => ({ questions: [] })
+      },
+      mutationsEnabled: true
+    });
+
+    await expect(controller.dispatchReadCommand('/status')).resolves.toContain(
+      'Intake: selected claim CO-175 of 3 active / 3 running -> linear-co-175 -> run-175 (provider_issue_rehydrated_active_run)'
+    );
   });
 });
