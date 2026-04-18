@@ -65,7 +65,8 @@
   - focused `ProviderLinearChildLaneShell.test.ts` / `ProviderIssueHandoffRefreshSerialization.test.ts` coverage only if a follow-on proof-refresh fix becomes necessary
   - parent docs-review before implementation
 - Rollback plan:
-  - revert the narrow proof-refresh / placeholder hardening if it hides the suite-context mismatch without actually fixing it
+  - revert the Vitest worker-cap change in `vitest.config.core.ts` if it fails to resolve the suite-context mismatch or introduces regressions
+  - if a follow-on proof-refresh hardening change is introduced later, revert that separately so rollback attribution stays explicit
 
 ## Risks & Mitigations
 - Risk: the parent treats the isolated repro pass as sufficient and skips full-suite validation.
