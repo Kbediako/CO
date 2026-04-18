@@ -7574,6 +7574,106 @@ describe('SelectedRunProjection', () => {
     });
   });
 
+  it('uses run-bound claim chronology when stale manifests are metadata-touched after the claim', async () => {
+    const { root, paths } = await createHostPaths();
+    const providerEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-co-241'
+    };
+    const staleRunId = 'linear-co-241-2026-04-09T08-36-05-089Z';
+    const liveRunId = 'linear-co-241-2026-04-13T02-26-01-632Z';
+    const stalePaths = resolveRunPaths(providerEnv, staleRunId);
+    const livePaths = resolveRunPaths(providerEnv, liveRunId);
+    await Promise.all([
+      mkdir(stalePaths.runDir, { recursive: true }),
+      mkdir(livePaths.runDir, { recursive: true })
+    ]);
+    await writeFile(
+      stalePaths.manifestPath,
+      JSON.stringify({
+        run_id: staleRunId,
+        task_id: 'linear-co-241',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'co-241-id',
+        issue_identifier: 'CO-241',
+        started_at: '2026-04-09T08:36:05.089Z',
+        updated_at: '2026-04-18T12:00:00.000Z',
+        summary: 'older provider run was metadata-touched after retry',
+        commands: []
+      }),
+      'utf8'
+    );
+    await writeFile(
+      livePaths.manifestPath,
+      JSON.stringify({
+        run_id: liveRunId,
+        task_id: 'linear-co-241',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'co-241-id',
+        issue_identifier: 'CO-241',
+        summary: 'newer active provider run relies on run-id chronology',
+        commands: []
+      }),
+      'utf8'
+    );
+    const baseClaim = createProviderIntakeState(livePaths.manifestPath).claims[0]!;
+    const providerIntakeState: ProviderIntakeState = {
+      schema_version: 1,
+      updated_at: '2026-04-18T12:10:00.000Z',
+      rehydrated_at: '2026-04-18T12:10:00.000Z',
+      latest_provider_key: 'linear:co-241-id',
+      latest_reason: 'provider_issue_rehydrated_active_run',
+      claims: [
+        {
+          ...baseClaim,
+          provider_key: 'linear:co-241-id',
+          issue_id: 'co-241-id',
+          issue_identifier: 'CO-241',
+          issue_title: 'Retry active issue',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          task_id: 'linear-co-241',
+          state: 'running',
+          reason: 'provider_issue_rehydrated_active_run',
+          updated_at: '2026-04-13T02:30:00.000Z',
+          run_id: liveRunId,
+          run_manifest_path: livePaths.manifestPath
+        }
+      ]
+    };
+
+    const discovery = await discoverCompatibilityCollectionContexts(
+      createProjectionContext(paths, providerIntakeState)
+    );
+
+    expect(discovery.running.map((entry) => entry.runId)).toEqual([liveRunId]);
+    expect(discovery.all.find((entry) => entry.runId === staleRunId)).toMatchObject({
+      rawStatus: 'cancelled',
+      statusReason: 'provider_claim_active_newer_run',
+      summary: expect.stringContaining(`newer active claim run ${liveRunId} supersedes`)
+    });
+    const reconciliation = JSON.parse(
+      await readFile(join(stalePaths.runDir, 'provider-linear-worker-reconciliation.json'), 'utf8')
+    ) as Record<string, unknown>;
+    expect(reconciliation).toMatchObject({
+      reason: 'provider_claim_active_newer_run',
+      reconciled_status: 'cancelled',
+      recorded_at: '2026-04-13T02:30:00.000Z',
+      provider_claim: {
+        state: 'running',
+        run_id: liveRunId,
+        run_manifest_path: livePaths.manifestPath
+      },
+      replacement_run: null
+    });
+  });
+
   it('treats canceled manifests as retry fallback candidates when provider intake state is absent', async () => {
     const { root, paths } = await createHostPaths();
     const retryEnv = {

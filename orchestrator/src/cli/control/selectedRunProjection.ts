@@ -1474,7 +1474,7 @@ function resolveProviderLinearWorkerRunArtifactReconciliation(
     !isProviderLinearWorkerReconciliationEvidenceNewerThanContext(
       evidenceUpdatedAt,
       context,
-      Boolean(replacementRun)
+      Boolean(replacementRun) || reason === 'provider_claim_active_newer_run'
     )
   ) {
     return null;
@@ -1745,13 +1745,16 @@ function selectProviderLinearWorkerReconciliationEvidenceUpdatedAt(
   const replacementRunEvidenceAt = replacementRun
     ? selectProviderLinearWorkerReconciliationRunEvidenceTimestamp(replacementRun)
     : null;
+  const claimRunEvidenceAt = claim
+    ? selectProviderLinearWorkerClaimRunEvidenceTimestamp(claim)
+    : null;
   if (reason === 'provider_claim_absent_newer_terminal_run') {
     return replacementRunEvidenceAt;
   }
   if (reason === 'provider_issue_removed') {
     return providerIntakeState.updated_at;
   }
-  return selectLatestIsoTimestamp(claim?.updated_at ?? null, replacementRunEvidenceAt);
+  return selectLatestIsoTimestamp(claim?.updated_at ?? null, claimRunEvidenceAt, replacementRunEvidenceAt);
 }
 
 function selectProviderLinearWorkerReconciliationRunEvidenceTimestamp(
@@ -1877,9 +1880,46 @@ function findNewerRunBoundProviderLinearWorkerClaimForContext(
       providerLinearWorkerClaimHasRunIdentity(claim) &&
       !providerLinearWorkerClaimRunIdentityMatchesContext(claim, context) &&
       providerLinearWorkerClaimIssueIdentityMatchesContext(claim, context) &&
-      compareIsoTimestamp(claim.updated_at, context.updatedAt) > 0
+      isProviderLinearWorkerRunBoundClaimNewerThanContext(claim, context)
     )
-    .sort((left, right) => compareIsoTimestamp(right.updated_at, left.updated_at))[0] ?? null;
+    .sort(compareProviderLinearWorkerRunBoundClaimDesc)[0] ?? null;
+}
+
+function isProviderLinearWorkerRunBoundClaimNewerThanContext(
+  claim: ProviderIntakeClaimRecord,
+  context: ControlCompatibilitySourceContext
+): boolean {
+  const claimRunEvidenceAt = selectProviderLinearWorkerClaimRunEvidenceTimestamp(claim);
+  const contextRunEvidenceAt = selectProviderLinearWorkerContextChronologyTimestamp(context);
+  if (claimRunEvidenceAt && contextRunEvidenceAt) {
+    return compareIsoTimestamp(claimRunEvidenceAt, contextRunEvidenceAt) > 0;
+  }
+  if (claimRunEvidenceAt && !contextRunEvidenceAt) {
+    return true;
+  }
+  return compareIsoTimestamp(claim.updated_at, context.updatedAt) > 0;
+}
+
+function compareProviderLinearWorkerRunBoundClaimDesc(
+  left: ProviderIntakeClaimRecord,
+  right: ProviderIntakeClaimRecord
+): number {
+  const chronologyComparison = compareIsoTimestamp(
+    selectProviderLinearWorkerClaimRunEvidenceTimestamp(right),
+    selectProviderLinearWorkerClaimRunEvidenceTimestamp(left)
+  );
+  return chronologyComparison !== 0
+    ? chronologyComparison
+    : compareIsoTimestamp(right.updated_at, left.updated_at);
+}
+
+function selectProviderLinearWorkerClaimRunEvidenceTimestamp(
+  claim: Pick<ProviderIntakeClaimRecord, 'run_id' | 'run_manifest_path'>
+): string | null {
+  return selectLatestIsoTimestamp(
+    parseProviderLinearWorkerRunIdTimestamp(claim.run_id),
+    parseProviderLinearWorkerRunPathTimestamp(claim.run_manifest_path)
+  );
 }
 
 function isProviderLinearWorkerRunBoundClaimAuthoritative(
