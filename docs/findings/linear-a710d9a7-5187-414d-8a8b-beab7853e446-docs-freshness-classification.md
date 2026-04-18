@@ -30,6 +30,7 @@ All `70` Apr 18 blocking stale rows are:
 No Front Door, Public Guide, Repository Guide, Agent Policy, Active Guide, shipped skill, shipped companion, seeded template, missing registry, missing-on-disk, invalid registry, or uncatalogued row is part of the blocking set.
 
 ## Class Breakdown
+
 | Class | Count | Outcome |
 | --- | ---: | --- |
 | Task Packet | 50 | Refresh after this review |
@@ -37,6 +38,7 @@ No Front Door, Public Guide, Repository Guide, Agent Policy, Active Guide, shipp
 | Report Only | 10 | Refresh after this review |
 
 ## Path Family Breakdown
+
 | Path family | Count | Outcome |
 | --- | ---: | --- |
 | `.agent/task` | 10 | Refresh |
@@ -48,9 +50,14 @@ No Front Door, Public Guide, Repository Guide, Agent Policy, Active Guide, shipp
 | `tasks/tasks-*` | 10 | Refresh |
 
 ## Date Cohorts
+
 | Last review / cadence | Count | Notes |
 | --- | ---: | --- |
 | `2026-03-18` / `30` days | 70 | March 18 coordinator-symphony start/flow/rlm/frontend-test task packet, mirror, and deliberation/report rows |
+
+## Exact Refresh Verification
+- The exact before-stale path set from `out/linear-a710d9a7-5187-414d-8a8b-beab7853e446/before/docs-freshness.json` contains `70` rows; all `70` are present in `docs/docs-freshness-registry.json` with `last_review=2026-04-18` and `cadence_days=30`.
+- Numeric task-id path matching only finds `40` rows because the `docs/ACTION_PLAN-*`, `docs/PRD-*`, and `docs/TECH_SPEC-*` packet rows are slug-only paths; exact-path verification is the authoritative cohort count for this repair.
 
 ## Lineage
 - Numbered stale task surfaces: `1289` through `1298`.
