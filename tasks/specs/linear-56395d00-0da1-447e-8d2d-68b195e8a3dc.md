@@ -125,9 +125,9 @@ last_review: 2026-04-18
 - The child lane `doctor-targeted-tests` completed and the parent accepted its bounded `Doctor.test.ts` patch: replace one real direct-dist delegation startup with a local fake `dist/bin/codex-orchestrator.js` entrypoint that still waits for the `initialize` request before returning the expected probe payload.
 - The first current-lane full-suite rerun after accepting that patch got past `Doctor.test.ts` and failed only because this fresh workspace did not yet have `dist/bin/codex-orchestrator.js`; after `npm run build`, the previously failing `tests/cli-command-surface.spec.ts` and `tests/run-review.spec.ts` surfaces passed in isolation.
 - The next exact `npm run test` rerun finished green with `344` files and `4119` tests, and `Doctor.test.ts` completed inside the full suite in `74023ms`.
-- PR `#522` now carries the Doctor stabilization diff, and the follow-up Codex review fix commit `91df91ef4` tightened the fake direct-dist entrypoint so it responds only after seeing the real `initialize` request instead of unconditionally writing a success payload.
-- A later exact `npm run test` rerun no longer failed in `Doctor.test.ts`; it failed only in `orchestrator/tests/SelectedRunProjection.test.ts > refreshes projection proofs when child-lane reservation ledger placeholders exist` with `Error: Test timed out in 5000ms`, while the isolated repro for that exact case passed in about `1.92s`.
-- Because that remaining full-suite-only timeout is outside the original Doctor scope, follow-up issue `CO-233` / `2594bf7f-12f3-4e59-8b9f-62c551fe58a0` now tracks the new blocker so CO-226 can stop at a blocked dependency handoff instead of widening into a second unrelated timeout lane.
+- PR `#522` now carries the Doctor stabilization diff, and the follow-up Codex review fix commit `651e17b4a` tightened the fake direct-dist entrypoint so it responds only after seeing the real `initialize` request and verifies the `delegate-server` argv instead of unconditionally writing a success payload.
+- After merging current `origin/main`, including the CO-233 SelectedRunProjection fix, the latest exact `npm run test` rerun finished green with `345` files and `4244` tests; `Doctor.test.ts` passed inside the full suite in `70390ms`.
+- CO-226 can proceed to review handoff once remote PR checks and the `pr ready-review` drain are clean; CO-219 can resume normal handoff using this green repo-wide gate evidence.
 
 ## Proposed Design
 - Record the docs-first packet first, then run an audited `docs-review` child stream before source edits.
@@ -160,6 +160,6 @@ last_review: 2026-04-18
 ## Approvals
 - Docs-review: succeeded under `.runs/linear-56395d00-0da1-447e-8d2d-68b195e8a3dc-co226-docs-review/cli/2026-04-17T21-47-30-660Z-b185d824/manifest.json`.
 - Child lane: accepted under `.runs/linear-56395d00-0da1-447e-8d2d-68b195e8a3dc-doctor-targeted-tests/cli/2026-04-17T21-40-57-908Z-850bb2ea/manifest.json`.
-- Standalone review: forced wrapper run recorded `review_outcome=failed-boundary` with `termination_boundary.kind=startup-anchor`; the lane completed the documented manual fallback in `out/linear-56395d00-0da1-447e-8d2d-68b195e8a3dc/manual/20260417T221004Z-review-elegance-fallback.md`.
-- Elegance review: explicit minimality pass recorded in `out/linear-56395d00-0da1-447e-8d2d-68b195e8a3dc/manual/20260417T221004Z-review-elegance-fallback.md`.
-- Closeout state: PR `#522` is attached to CO-226, and the issue is blocked on follow-up `CO-233` rather than ready for `In Review`.
+- Standalone review: forced wrapper run completed with `status=succeeded` and `review_outcome=bounded-success` under `.runs/linear-56395d00-0da1-447e-8d2d-68b195e8a3dc/cli/2026-04-18T22-36-13-247Z-90cb1362/review/telemetry.json`; the command-intent boundary retry produced a read-only no-findings verdict and is successful bounded review completion.
+- Elegance review: explicit minimality pass after standalone review kept the local fake direct-dist helper and argv/initialize assertions as the smallest coverage-preserving fix; no simplification patch was needed.
+- Closeout state: PR `#522` is attached to CO-226 and current validation is green; remaining handoff work is push, clean remote checks, clean `pr ready-review` drain, workpad refresh, and transition to `In Review`.

@@ -25,21 +25,19 @@
           "summary": "Accepted bounded same-issue child lane patch in Doctor.test.ts: replace one real direct-dist startup with a fake direct-dist entrypoint that still waits for the initialize request before returning the expected probe payload."
         },
         "standalone_review": {
-          "reviewer": "codex-orchestrator review --uncommitted plus manual fallback",
+          "reviewer": "codex-orchestrator review --base origin/main",
           "date": "2026-04-18",
-          "status": "failed-boundary",
-          "telemetry": ".runs/linear-56395d00-0da1-447e-8d2d-68b195e8a3dc/cli/2026-04-17T21-59-26-233Z-1b0fdbf2/review/telemetry.json",
-          "review_outcome": "failed-boundary",
-          "termination_boundary": "startup-anchor",
-          "override_reason": "Forced standalone review executed under FORCE_CODEX_REVIEW=1 and failed closed before any verdict. The lane recorded the telemetry, completed the documented manual fallback review with no actionable regressions, and split the later unrelated full-suite-only SelectedRunProjection timeout into CO-233 instead of widening CO-226.",
-          "artifact": "out/linear-56395d00-0da1-447e-8d2d-68b195e8a3dc/manual/20260417T221004Z-review-elegance-fallback.md"
+          "status": "bounded-success",
+          "telemetry": ".runs/linear-56395d00-0da1-447e-8d2d-68b195e8a3dc/cli/2026-04-18T22-36-13-247Z-90cb1362/review/telemetry.json",
+          "review_outcome": "bounded-success",
+          "termination_boundary": "command-intent",
+          "summary": "Forced standalone review executed under FORCE_CODEX_REVIEW=1 and completed as bounded-success after command-intent retry; read-only retry found no actionable regressions in the Doctor test helper or adjacent docs/task registry changes."
         },
         "elegance_review": {
           "reviewer": "parent provider worker",
           "date": "2026-04-18",
           "status": "passed",
-          "artifact": "out/linear-56395d00-0da1-447e-8d2d-68b195e8a3dc/manual/20260417T221004Z-review-elegance-fallback.md",
-          "summary": "Explicit minimality pass kept the local direct-dist handshake stub and refused to broaden CO-226 into the later SelectedRunProjection blocker."
+          "summary": "Explicit minimality pass kept the local fake direct-dist helper plus initialize and delegate-server argv assertions as the smallest coverage-preserving Doctor fix; no simplification patch was needed."
         }
       },
       "paths": {

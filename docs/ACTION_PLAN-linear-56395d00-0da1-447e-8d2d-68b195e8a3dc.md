@@ -7,7 +7,7 @@
   - the issue body is authoritative for the failing command surfaces and protected wording
   - the active child lane can collect tests-phase evidence inside `Doctor.test.ts` while the parent stays off that file
   - the smallest correct fix may live in Doctor tests, shared test harness, or the repo’s Vitest execution contract, depending on evidence
-- Latest status (2026-04-18): milestones 1 through 7 are complete for the original Doctor timeout cluster, PR `#522` is attached, and the latest exact full-suite rerun proves Doctor is no longer the live failing surface. CO-226 now stops at blocked-dependency handoff because follow-up `CO-233` owns the new unrelated `SelectedRunProjection.test.ts` full-suite-only timeout.
+- Latest status (2026-04-18): milestones 1 through 7 are complete for the Doctor timeout cluster, PR `#522` is attached, current `origin/main` is merged, and the latest exact full-suite rerun is green with `345` files and `4244` tests. CO-226 is no longer blocked by the historical CO-233 SelectedRunProjection timeout because that fix is now on the merged base.
 
 ## Issue Readiness Gate
 - Intent checksum / protected terms carried forward:
@@ -60,7 +60,7 @@
     - `npm run docs:freshness`
     - `npm run repo:stewardship`
     - `node scripts/diff-budget.mjs`
-    - `npm run pack:smoke`
+    - `npm run pack:smoke` only when touching CLI/package/skills/review-wrapper downstream surfaces
   - manifest-backed standalone review
   - explicit elegance review
 - Rollback plan:
@@ -75,5 +75,5 @@
   - Mitigation: treat timeout-only changes as insufficient unless the evidence shows runner scheduling is the true seam and the adjustment is the smallest honest fix.
 
 ## Approvals
-- Docs-review: pending
-- Parent implementation/review: pending
+- Docs-review: succeeded under `.runs/linear-56395d00-0da1-447e-8d2d-68b195e8a3dc-co226-docs-review/cli/2026-04-17T21-47-30-660Z-b185d824/manifest.json`.
+- Parent implementation/review: current validation floor is green through `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `npm run repo:stewardship`, and `node scripts/diff-budget.mjs`; manifest-backed standalone review completed with `review_outcome=bounded-success`, and the explicit elegance pass found no simplification patch needed.
