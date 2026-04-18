@@ -411,6 +411,61 @@
       }
     },
     {
+      "id": "20260417-linear-5561a9a9-39dd-4ed4-99a0-896553327669",
+      "title": "CO: Add a Codex 0.121 plugin marketplace distribution path for Codex Orchestrator",
+      "relates_to": "tasks/tasks-linear-5561a9a9-39dd-4ed4-99a0-896553327669.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_review_fallback": {
+          "reviewer": "provider worker manual docs review",
+          "date": "2026-04-18",
+          "status": "accepted",
+          "artifact": "out/linear-5561a9a9-39dd-4ed4-99a0-896553327669/manual/20260418T014254Z-rework-r2/13-docs-review-fallback.md",
+          "summary": "The current Rework lane rechecked the existing packet directly after replaying the implementation onto a fresh origin/main branch."
+        },
+        "pack_smoke": {
+          "reviewer": "provider worker",
+          "date": "2026-04-18",
+          "status": "passed",
+          "artifact": "out/linear-5561a9a9-39dd-4ed4-99a0-896553327669/manual/20260418T014254Z-rework-r2/10-pack-smoke.log",
+          "summary": "Pack smoke passed for the packaged marketplace/plugin path, including local-directory and Git-backed marketplace registration."
+        },
+        "standalone_review": {
+          "reviewer": "provider worker manual fallback after review-wrapper boundary",
+          "date": "2026-04-18",
+          "status": "manual-fallback-after-boundary",
+          "telemetry": ".runs/linear-5561a9a9-39dd-4ed4-99a0-896553327669/cli/2026-04-18T01-28-09-196Z-c8f11c3d/review/telemetry.json",
+          "artifact": "out/linear-5561a9a9-39dd-4ed4-99a0-896553327669/manual/20260418T014254Z-rework-r2/14-manual-review-fallback.md",
+          "summary": "The forced wrapper run terminated on the startup-anchor boundary before diff-local analysis, so the parent lane completed a manual diff-local review and fixed the one README wording mismatch it found."
+        },
+        "elegance_review": {
+          "reviewer": "provider worker",
+          "date": "2026-04-18",
+          "status": "passed",
+          "artifact": "out/linear-5561a9a9-39dd-4ed4-99a0-896553327669/manual/20260418T014254Z-rework-r2/15-elegance-review.md",
+          "summary": "The final tree keeps the marketplace path additive and thin: packaged metadata, a small launcher, real Codex smoke coverage, and no authority or packaging refactor beyond the requested path."
+        },
+        "packet_refresh_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-5561a9a9-39dd-4ed4-99a0-896553327669-packet-refresh/cli/2026-04-18T12-38-14-882Z-e4ea1f4b/manifest.json",
+          "source_anchor": "ctx:sha256:cb6a64ba6e2f8fc849e39804635bfddb2d7e402bd0058a63ad175132d50f2146#chunk:c000001",
+          "summary": "Refreshed the CO-196 packet/status mirrors after the merged-head unblock: branch `linear/co-196-codex-0121-plugin-marketplace-rework-r2` already includes merged `origin/main` at `57d3c5e88`, `docs:freshness` passed on that merged head, the issue is back in `In Progress`, stale PR `#515` remains closed, no open replacement PR exists yet, and parent-owned next steps are validation, review, workpad refresh, and replacement PR handoff."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-5561a9a9-39dd-4ed4-99a0-896553327669.md",
+        "task": "tasks/tasks-linear-5561a9a9-39dd-4ed4-99a0-896553327669.md",
+        "agent_task": ".agent/task/linear-5561a9a9-39dd-4ed4-99a0-896553327669.md",
+        "docs": "docs/TECH_SPEC-linear-5561a9a9-39dd-4ed4-99a0-896553327669.md"
+      }
+    },
+    {
       "id": "20260417-linear-975669a4-3804-4b5b-9a7b-e1b7c77d3926",
       "title": "CO classify long-lived parent-session delegate-server children with bounded observability",
       "relates_to": "tasks/tasks-linear-975669a4-3804-4b5b-9a7b-e1b7c77d3926.md",

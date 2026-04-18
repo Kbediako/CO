@@ -155,14 +155,18 @@ async function createControlEndpointServer(bindHost = '127.0.0.1'): Promise<{
   };
 }
 
-async function writeCodexConfig(maxTurns: number): Promise<string> {
+async function writeCodexConfigContent(content: string): Promise<string> {
   if (!tempRoot) {
     throw new Error('temp root not initialized');
   }
   const codexHome = join(tempRoot, '.codex');
   await mkdir(codexHome, { recursive: true });
-  await writeFile(join(codexHome, 'config.toml'), `[agent]\nmax_turns = ${maxTurns}\n`, 'utf8');
+  await writeFile(join(codexHome, 'config.toml'), content, 'utf8');
   return codexHome;
+}
+
+async function writeCodexConfig(maxTurns: number): Promise<string> {
+  return await writeCodexConfigContent(`[agent]\nmax_turns = ${maxTurns}\n`);
 }
 
 type ReadTrackedIssueInput = Parameters<ProviderLinearWorkerDependencies['readTrackedIssue']>[0];
@@ -729,6 +733,97 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
   it('loads provider worker max turns from CODEX_HOME config when env overrides are absent', async () => {
     const { manifestPath } = await createManifestRoot();
     const codexHome = await writeCodexConfig(9);
+
+    const context = await loadProviderLinearWorkerContext({
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+      CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+      CODEX_HOME: codexHome
+    });
+
+    expect(context.maxTurns).toBe(9);
+  });
+
+  it('does not let nested table dotted keys override root agent max_turns', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const codexHome = await writeCodexConfigContent(
+      [
+        '[profile.worker]',
+        'agent.max_turns = 2',
+        '',
+        '[agent]',
+        'max_turns = 9',
+        ''
+      ].join('\n')
+    );
+
+    const context = await loadProviderLinearWorkerContext({
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+      CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+      CODEX_HOME: codexHome
+    });
+
+    expect(context.maxTurns).toBe(9);
+  });
+
+  it.each([
+    ['leading plus', '+12', 12],
+    ['underscore separator', '1_000', 1000],
+    ['hexadecimal', '0x14', 20],
+    ['octal', '0o24', 20],
+    ['binary', '0b10100', 20]
+  ])('accepts valid TOML integer spelling with %s for root agent max_turns', async (_label, value, expected) => {
+    const { manifestPath } = await createManifestRoot();
+    const codexHome = await writeCodexConfigContent(`[agent]\nmax_turns = ${value}\n`);
+
+    const context = await loadProviderLinearWorkerContext({
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+      CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+      CODEX_HOME: codexHome
+    });
+
+    expect(context.maxTurns).toBe(expected);
+  });
+
+  it('does not parse max_turns assignments embedded in multiline basic strings', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const codexHome = await writeCodexConfigContent(
+      [
+        'status_message = """',
+        'agent.max_turns = 2',
+        '[agent]',
+        'max_turns = 3',
+        '"""',
+        '',
+        '[agent]',
+        'max_turns = 9',
+        ''
+      ].join('\n')
+    );
+
+    const context = await loadProviderLinearWorkerContext({
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+      CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+      CODEX_HOME: codexHome
+    });
+
+    expect(context.maxTurns).toBe(9);
+  });
+
+  it('does not parse max_turns assignments embedded in multiline literal strings', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const codexHome = await writeCodexConfigContent(
+      [
+        "status_message = '''",
+        'agent.max_turns = 2',
+        '[agent]',
+        'max_turns = 3',
+        "'''",
+        '',
+        '[agent]',
+        'max_turns = 9',
+        ''
+      ].join('\n')
+    );
 
     const context = await loadProviderLinearWorkerContext({
       CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,

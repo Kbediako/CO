@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { mkdtemp, mkdir, rm, symlink } from 'node:fs/promises';
+import { describe, expect, it, vi } from 'vitest';
+import { mkdtemp, mkdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -14,6 +14,31 @@ type DelegationConfigLayer = Parameters<typeof computeEffectiveDelegationConfig>
 
 function makeLayer(input: DelegationConfigLayer) {
   return input;
+}
+
+type DelegationConfigModule = typeof import('../src/cli/config/delegationConfig.js');
+
+async function importDelegationConfigWithoutTomlParser(): Promise<DelegationConfigModule> {
+  vi.resetModules();
+  vi.doMock('node:module', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('node:module')>();
+    const fallbackRequire = actual.createRequire(import.meta.url);
+    return {
+      ...actual,
+      createRequire: () => (id: string) => {
+        if (id === '@iarna/toml') {
+          throw new Error('simulate missing TOML dependency');
+        }
+        return fallbackRequire(id);
+      }
+    };
+  });
+
+  try {
+    return (await import('../src/cli/config/delegationConfig.js')) as DelegationConfigModule;
+  } finally {
+    vi.doUnmock('node:module');
+  }
 }
 
 describe('delegation config layering', () => {
@@ -251,5 +276,96 @@ describe('delegation config layering', () => {
     });
 
     expect(result.rlm.maxIterations).toBe(9);
+  });
+
+  it('keeps fallback TOML parsing scoped to delegation config roots', async () => {
+    const fallbackConfig = await importDelegationConfigWithoutTomlParser();
+    const tempRoot = await mkdtemp(join(tmpdir(), 'delegation-config-fallback-'));
+    const codexHome = join(tempRoot, 'codex-home');
+    const tempRepo = join(tempRoot, 'repo');
+    const outsideRoot = join(tempRoot, 'outside');
+
+    await mkdir(join(tempRepo, '.codex'), { recursive: true });
+    await mkdir(codexHome, { recursive: true });
+    await mkdir(outsideRoot, { recursive: true });
+
+    try {
+      await writeFile(
+        join(codexHome, 'config.toml'),
+        [
+          '[agents]',
+          'max_threads = 12',
+          'max_depth = 4',
+          'legacy = {',
+          '',
+          '[mcp_servers.delegation]',
+          'command = "node"',
+          '',
+          '[paths]',
+          `allowed_roots = ["${tempRepo}", "${outsideRoot}"]`,
+          '',
+          '[ui]',
+          `allowed_run_roots = ["${tempRepo}", "${outsideRoot}"]`
+        ].join('\n'),
+        'utf8'
+      );
+      await writeFile(
+        join(tempRepo, '.codex', 'orchestrator.toml'),
+        [
+          '[paths]',
+          `allowed_roots = ["${tempRepo}"]`,
+          '',
+          '[ui]',
+          `allowed_run_roots = ["${tempRepo}"]`
+        ].join('\n'),
+        'utf8'
+      );
+
+      const resolvedRepo = await realpath(tempRepo);
+      const configFiles = await fallbackConfig.loadDelegationConfigFiles({
+        repoRoot: tempRepo,
+        codexHome
+      });
+      const effective = fallbackConfig.computeEffectiveDelegationConfig({
+        repoRoot: tempRepo,
+        layers: [configFiles.global!, configFiles.repo!]
+      });
+
+      expect(configFiles.global).not.toHaveProperty('agents');
+      expect(configFiles.global).not.toHaveProperty('mcp_servers');
+      expect(configFiles.global?.paths?.allowedRoots).toEqual([tempRepo, outsideRoot]);
+      expect(configFiles.global?.ui?.allowedRunRoots).toEqual([tempRepo, outsideRoot]);
+      expect(effective.paths.allowedRoots).toEqual([resolvedRepo]);
+      expect(effective.ui.allowedRunRoots).toEqual([resolvedRepo]);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('parses integer budget fields when the TOML dependency is unavailable', async () => {
+    const fallbackConfig = await importDelegationConfigWithoutTomlParser();
+    const layer = fallbackConfig.parseDelegationConfigOverride(
+      [
+        '[rlm]',
+        'max_iterations = 7',
+        'max_subcalls = 11',
+        'max_subcall_depth = 2',
+        'wall_clock_timeout_ms = 1234',
+        'budget_tokens = 4321',
+        '',
+        '[confirm]',
+        'max_pending = 4',
+        'expires_in_ms = 9000'
+      ].join('\n'),
+      'env'
+    );
+
+    expect(layer?.rlm?.maxIterations).toBe(7);
+    expect(layer?.rlm?.maxSubcalls).toBe(11);
+    expect(layer?.rlm?.maxSubcallDepth).toBe(2);
+    expect(layer?.rlm?.wallClockTimeoutMs).toBe(1234);
+    expect(layer?.rlm?.budgetTokens).toBe(4321);
+    expect(layer?.confirm?.maxPending).toBe(4);
+    expect(layer?.confirm?.expiresInMs).toBe(9000);
   });
 });

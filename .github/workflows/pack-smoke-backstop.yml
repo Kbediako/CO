@@ -28,5 +28,8 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Install Codex CLI for marketplace smoke
+        run: npm install --global @openai/codex@0.121.0
+
       - name: Downstream simulation smoke
         run: npm run pack:smoke
