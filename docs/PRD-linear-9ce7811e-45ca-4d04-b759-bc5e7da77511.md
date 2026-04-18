@@ -17,8 +17,8 @@
 - Current workpad source: `out/linear-9ce7811e-45ca-4d04-b759-bc5e7da77511/workpad.md`
 
 ## Summary
-- Problem Statement: the blocked `CO-231` packet carried two validation-floor blockers into follow-up work: a `docs/TASKS.md` `tasks-file-too-large` / `zero_headroom` docs gate tied to `450/450`, and a full-suite timeout story around `orchestrator/tests/SelectedRunProjection.test.ts`, especially `refreshes projection proofs when child-lane reservation ledger placeholders exist`. On the current detached head `3d3d56959`, the live workpad already shows `docs/TASKS.md` at `446` lines, so at least one inherited blocker may now be a stale description instead of a live current-head failure.
-- Desired Outcome: keep the packet truthful while the parent reruns current-head evidence for both inherited surfaces, fix only the surfaces that remain live blockers, and either restore a review-handoff validation floor for blocked `CO-231` or leave an explicit blocked dependency / evidence contract.
+- Problem Statement: the blocked `CO-231` packet carried two validation-floor blockers into follow-up work: a `docs/TASKS.md` `tasks-file-too-large` / `zero_headroom` docs gate tied to `450/450`, and a full-suite timeout story around `orchestrator/tests/SelectedRunProjection.test.ts`, especially `refreshes projection proofs when child-lane reservation ledger placeholders exist`. This lane had to reclassify both inherited surfaces on the current branch head instead of copying the source packet forward unchanged.
+- Desired Outcome: keep the packet truthful, classify each inherited surface on the current branch head, fix only the surfaces that remain live blockers, and either restore a review-handoff validation floor for blocked `CO-231` or leave an explicit blocked dependency / evidence contract.
 
 ## User Request Translation (Context Anchor)
 - User intent / needs (in your own words): create the required docs-first packet for `CO-247`, preserve the source packet anchors from blocked `CO-231`, and keep both inherited blocker surfaces explicitly unresolved until fresh current-head repro shows whether each one is still live or is now a non-repro.
@@ -28,9 +28,9 @@
   - the parent can use the packet to run fresh current-head docs and test classification steps without widening scope
   - the final handoff for `CO-231` records which surface is still blocking, if any, with machine-checkable artifacts
 - Constraints / non-goals:
-  - this child lane edits only the six packet files
-  - no `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`, code, or test edits in this lane
-  - no Linear mutation, workpad mutation, or PR lifecycle work in this lane
+  - this issue lane stays bounded to the docs packet, required registry mirrors, the exact `SelectedRunProjection` production/test seam, and the audit artifacts needed for truthful handoff
+  - no broad docs archive redesign, generic `SelectedRunProjection` rewrite, or unrelated code/test/registry edits beyond the exact blocker surfaces
+  - no reopening Doctor readiness semantics or widening back into `CO-220`
 
 ## Intent Checksum
 - Exact user wording / phrases to preserve:
@@ -60,11 +60,13 @@
   - treat `CO-247` as replacing the `CO-231` source anchors instead of reclassifying them truthfully on the new head
 
 ## Parity / Alignment Matrix
+
 | Surface | Source / Inherited Truth | Current-Head Status To Verify | Target Truth |
 | --- | --- | --- | --- |
-| `docs/TASKS.md` docs gate | Source packet treated `450/450` as `tasks-file-too-large` / `zero_headroom`. | Workpad now records `446` lines on `3d3d56959`, but the actual `docs:check` gate has not yet been rerun. | Parent records a machine-checkable current-head verdict and fixes docs headroom only if the gate is still red. |
-| `SelectedRunProjection` exact case | Source packet carried a full-suite timeout story for `orchestrator/tests/SelectedRunProjection.test.ts`, especially `refreshes projection proofs when child-lane reservation ledger placeholders exist`. | Isolated and full-suite behavior on the current head is not yet refreshed in this lane. | Parent classifies the surface as live blocker, shared baseline interaction, branch interaction, or current-head non-repro using fresh artifacts. |
-| `CO-231` review-handoff floor | Blocked branch `linear/co-231-doctor-readiness-stability-r2` remained unable to claim a truthful validation floor. | Whether the remaining blocker is docs, tests, both, or neither is not yet refreshed on the current head. | Handoff names the remaining blocker exactly, or closes the stale blocker story as non-repro with evidence. |
+| `docs/TASKS.md` docs gate | Source packet treated `450/450` as `tasks-file-too-large` / `zero_headroom`. | Fresh `docs:check` reruns on the current branch head are green, so the inherited docs blocker is now classified as a current-head non-repro rather than a live failure. | Keep the docs headroom contract green and record the blocker as stale-on-current-head instead of preserving the old `450/450` story. |
+| `SelectedRunProjection` exact case | Source packet carried a full-suite timeout story for `orchestrator/tests/SelectedRunProjection.test.ts`, especially `refreshes projection proofs when child-lane reservation ledger placeholders exist`. | The lane reproduced the interaction, then fixed it by allowing the child-lane refresh fast path to skip session-log hydration only for `turn_completed` proofs that already have a complete session-log-backed floor; targeted regression coverage now pins the reservation-placeholder + `turn_running` path. | Preserve the bounded seam fix and its regression coverage so the full-suite timeout no longer blocks truthful handoff. |
+| `CO-231` review-handoff floor | Blocked branch `linear/co-231-doctor-readiness-stability-r2` remained unable to claim a truthful validation floor. | Current-head validation now shows no remaining validation-floor blocker; the only residual dependency is PR `#536` review/check drain. | Handoff names PR review/check drain as the remaining dependency and does not continue to describe the docs or projection surfaces as live blockers. |
+
 
 ## Acceptance Criteria
 1. The packet preserves the `CO-231` source anchors, blocked branch, and both inherited blocker surfaces without silently narrowing scope.
@@ -73,7 +75,7 @@
 4. If the docs gate is still red, the parent-owned fix stays bounded to the supported docs headroom surfaces rather than generic docs cleanup.
 5. If the `SelectedRunProjection` surface is still red, the parent-owned fix stays bounded to the exact projection/test seam needed to explain or repair current-head behavior.
 6. If either inherited surface is a non-repro, the packet, workpad, and handoff record that truth directly instead of preserving stale blocker language.
-7. This child lane creates only the six packet files and does not touch registry mirrors, `docs/TASKS.md`, code, or tests.
+7. The shipped diff stays bounded to the docs packet, required registry mirrors, the exact `SelectedRunProjection` production/test seam, and audit artifacts needed for truthful handoff.
 
 ## Goals
 - Preserve the issue-shaping contract from the blocked `CO-231` source packet.
@@ -82,17 +84,17 @@
 - Keep the eventual review-handoff floor truthful for `CO-231`.
 
 ## Non-Goals
-- Direct docs headroom fixes in this child lane.
-- Direct `SelectedRunProjection` test or production changes in this child lane.
-- Registry updates, `docs/TASKS.md` snapshots, or docs-freshness mirror work in this child lane.
-- Linear state changes, workpad updates, PR creation, PR review, or merge work in this child lane.
+- Broad docs archive redesign or generic docs debt cleanup beyond the supported headroom surfaces needed to keep `docs:check` truthful.
+- Broad `SelectedRunProjection` production or test refactors beyond the exact refresh / hydration seam required to classify and fix the inherited timeout.
+- Unrelated registry, workpad, or PR workflow changes beyond the evidence and handoff updates required for `CO-247`.
+- Reopening Doctor readiness semantics or `CO-220` stale-projection scope while resolving the inherited validation-floor blockers.
 - Reframing the issue as generic docs debt or a generic `SelectedRunProjection` rewrite.
 
 ## Not done if
 - either inherited blocker surface is marked resolved without fresh current-head evidence artifacts
 - the packet drops the `CO-231` / `91749283-6dc8-4df8-aee3-5c9127c1200c` source anchors, blocked branch anchor, or parity/alignment matrix
 - the lane lacks an explicit docs packet, acceptance criteria, or a bounded rerun path for the `SelectedRunProjection` snapshots
-- this lane edits code, tests, registry mirrors, or docs surfaces outside the six packet files
+- the lane edits code, tests, registry mirrors, or docs surfaces outside the bounded packet + headroom + `SelectedRunProjection` contract required for this fix
 
 ## Stakeholders
 - Product: CO maintainers who need a truthful follow-up path for blocked `CO-231`
@@ -121,7 +123,7 @@
 
 ## Technical Considerations
 - Architectural Notes:
-  - the child lane is docs-only; the parent owns all actual reproduction, implementation, and review decisions
+  - the initial docs packet came from a bounded child lane, but the shipped issue lane also owns the required registry updates, current-head repro, bounded `SelectedRunProjection` repair, and review/handoff closeout
   - the workpad already proves that line-count signal alone is not enough to inherit the old docs blocker blindly
   - the exact `SelectedRunProjection` case exists on this head and is the minimum acceptable reproduction surface before any wider test diagnosis
 - Dependencies / Integrations:
@@ -131,10 +133,10 @@
   - `npm run test`
   - `out/linear-9ce7811e-45ca-4d04-b759-bc5e7da77511/workpad.md`
 
-## Open Questions
-- Does the current `446` line count still translate into a real `docs:check` failure because of reserve semantics, or was the source packet's `450/450 zero_headroom` state already stale?
-- Does `refreshes projection proofs when child-lane reservation ledger placeholders exist` fail in isolation on `3d3d56959`, only under a broader validation path, or not at all?
-- Which remaining surface, if any, is still the truthful blocker for blocked `CO-231` after current-head reruns?
+## Resolved Questions
+- The inherited `docs/TASKS.md` `450/450 zero_headroom` blocker was stale on the current branch head; fresh `docs:check` reruns are green.
+- `refreshes projection proofs when child-lane reservation ledger placeholders exist` required a bounded current-head fix in the `SelectedRunProjection` refresh/hydration seam rather than blanket retries or a widened refactor.
+- After current-head reruns, the remaining dependency for blocked `CO-231` is PR `#536` review/check drain, not a live validation-floor blocker on the docs or projection surfaces.
 
 ## Approvals
 - Product: pending
