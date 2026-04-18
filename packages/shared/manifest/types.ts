@@ -29,6 +29,7 @@ export interface CodexOrchestratorCLIManifest {
   issue_identifier?: string | null;
   issue_updated_at?: string | null;
   workspace_path?: string | null;
+  provider_launch_source?: string | null;
   provider_control_host_task_id?: string | null;
   provider_control_host_run_id?: string | null;
   summary: string | null;

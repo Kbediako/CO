@@ -72,6 +72,41 @@ function buildCompatibilityRuntime(
   };
 }
 
+function buildProviderIntakeSummary(overrides: Record<string, unknown> = {}) {
+  return {
+    provider: 'linear',
+    summary_scope: 'single_claim',
+    selection_strategy: null,
+    claim_count: 1,
+    active_claim_count: 1,
+    running_claim_count: 1,
+    active_issue_identifiers: ['CO-100'],
+    running_issue_identifiers: ['CO-100'],
+    selected_claim: {
+      provider: 'linear',
+      issue_id: 'issue-100',
+      issue_identifier: 'CO-100',
+      issue_title: 'CO-100',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-06T02:35:00.000Z',
+      task_id: 'linear-co-100',
+      mapping_source: 'provider_id_fallback',
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: 'run-co-100',
+      worker_host: 'worker-host-intake',
+      freshness: 'current',
+      retry: null,
+      updated_at: '2026-04-06T02:35:00.000Z'
+    },
+    rehydrated_at: '2026-04-06T02:35:00.000Z',
+    is_rehydrated: false,
+    updated_at: '2026-04-06T02:35:00.000Z',
+    ...overrides
+  };
+}
+
 function buildExhaustedLinearPolling() {
   return {
     next_poll_in_ms: 43_000,
@@ -184,25 +219,12 @@ describe('CompatibilityIssuePresenter', () => {
           updated_at: '2026-04-06T02:35:00.000Z',
           worker_host: 'worker-host-proof'
         },
-        providerIntake: {
-          provider: 'linear',
-          issue_id: 'issue-100',
-          issue_identifier: 'CO-100',
-          issue_title: 'CO-100',
-          issue_state: 'In Progress',
-          issue_state_type: 'started',
-          issue_updated_at: '2026-04-06T02:35:00.000Z',
-          task_id: 'linear-co-100',
-          mapping_source: 'provider_id_fallback',
-          state: 'running',
-          reason: 'provider_issue_rehydrated_active_run',
-          run_id: 'run-co-100',
-          worker_host: 'worker-host-stale',
-          freshness: 'current',
-          rehydrated_at: '2026-04-06T02:35:00.000Z',
-          is_rehydrated: false,
-          updated_at: '2026-04-06T02:35:00.000Z'
-        },
+        providerIntake: buildProviderIntakeSummary({
+          selected_claim: {
+            ...buildProviderIntakeSummary().selected_claim,
+            worker_host: 'worker-host-stale'
+          }
+        }),
         stageStartedAt: '2026-04-06T02:30:00.000Z'
       })
     ).toBe('worker-host-proof');
@@ -239,25 +261,12 @@ describe('CompatibilityIssuePresenter', () => {
           stall_reason: null,
           recovery_recommendation: null
         },
-        providerIntake: {
-          provider: 'linear',
-          issue_id: 'issue-100',
-          issue_identifier: 'CO-100',
-          issue_title: 'CO-100',
-          issue_state: 'In Progress',
-          issue_state_type: 'started',
-          issue_updated_at: '2026-04-06T02:35:00.000Z',
-          task_id: 'linear-co-100',
-          mapping_source: 'provider_id_fallback',
-          state: 'running',
-          reason: 'provider_issue_rehydrated_active_run',
-          run_id: 'run-co-100',
-          worker_host: 'worker-host-stale',
-          freshness: 'current',
-          rehydrated_at: '2026-04-06T02:35:00.000Z',
-          is_rehydrated: false,
-          updated_at: '2026-04-06T02:35:00.000Z'
-        }
+        providerIntake: buildProviderIntakeSummary({
+          selected_claim: {
+            ...buildProviderIntakeSummary().selected_claim,
+            worker_host: 'worker-host-stale'
+          }
+        })
       })
     ).toBeNull();
   });
@@ -272,25 +281,12 @@ describe('CompatibilityIssuePresenter', () => {
           updated_at: '2026-04-06T02:35:00.000Z',
           worker_host: null
         },
-        providerIntake: {
-          provider: 'linear',
-          issue_id: 'issue-100',
-          issue_identifier: 'CO-100',
-          issue_title: 'CO-100',
-          issue_state: 'In Progress',
-          issue_state_type: 'started',
-          issue_updated_at: '2026-04-06T02:35:00.000Z',
-          task_id: 'linear-co-100',
-          mapping_source: 'provider_id_fallback',
-          state: 'running',
-          reason: 'provider_issue_rehydrated_active_run',
-          run_id: 'run-co-100',
-          worker_host: 'worker-host-stale',
-          freshness: 'current',
-          rehydrated_at: '2026-04-06T02:35:00.000Z',
-          is_rehydrated: false,
-          updated_at: '2026-04-06T02:35:00.000Z'
-        },
+        providerIntake: buildProviderIntakeSummary({
+          selected_claim: {
+            ...buildProviderIntakeSummary().selected_claim,
+            worker_host: 'worker-host-stale'
+          }
+        }),
         stageStartedAt: '2026-04-06T02:30:00.000Z'
       })
     ).toBeNull();
@@ -315,31 +311,46 @@ describe('CompatibilityIssuePresenter', () => {
       rateLimits: null,
       dispatchPilot: null,
       tracked: null,
-      providerIntake: {
-        provider: 'linear',
-        issue_id: 'issue-100',
-        issue_identifier: 'CO-100',
-        issue_title: 'CO-100',
-        issue_state: 'In Progress',
-        issue_state_type: 'started',
-        issue_updated_at: '2026-04-06T02:35:00.000Z',
-        task_id: 'linear-co-100',
-        mapping_source: 'provider_id_fallback',
-        state: 'running',
-        reason: 'provider_issue_rehydrated_active_run',
-        run_id: 'run-co-100',
-        worker_host: 'worker-host-intake',
-        freshness: 'current',
-        rehydrated_at: '2026-04-06T02:35:00.000Z',
-        is_rehydrated: false,
-        updated_at: '2026-04-06T02:35:00.000Z'
-      },
+      providerIntake: buildProviderIntakeSummary(),
       providerWorkflow: null,
       polling: null
     });
 
     expect(projection.selected?.worker_host).toBe('worker-host-intake');
     expect(projection.issues[0]?.payload.worker_host).toBe('worker-host-intake');
+  });
+
+  it('does not leak a selected intake worker_host into a different issue payload', () => {
+    const source = buildCompatibilitySource({
+      issueIdentifier: 'CO-240',
+      issueId: 'issue-240',
+      taskId: 'linear-co-240',
+      runId: 'run-co-240',
+      lookupAliases: ['CO-240', 'issue-240'],
+      rawStatus: 'in_progress',
+      displayStatus: 'In Progress'
+    });
+
+    const projection = buildCompatibilityProjectionSnapshot({
+      selected: source,
+      running: [],
+      retrying: [],
+      codexTotals: {
+        input_tokens: 0,
+        output_tokens: 0,
+        total_tokens: 0,
+        seconds_running: 0
+      },
+      rateLimits: null,
+      dispatchPilot: null,
+      tracked: null,
+      providerIntake: buildProviderIntakeSummary(),
+      providerWorkflow: null,
+      polling: null
+    });
+
+    expect(projection.selected?.worker_host).toBeUndefined();
+    expect(projection.issues[0]?.payload.worker_host).toBeUndefined();
   });
 
   it('surfaces worker_host through selected, running, retrying, and issue payloads', () => {
