@@ -1688,11 +1688,9 @@ async function resolveAttachedSameRepoPullRequestCandidate(input: {
     });
   }
 
-  const filteredCandidates = inspectedCandidates;
-
   const openUnmergedCandidates =
     input.mode === 'review_promotion'
-      ? filteredCandidates.filter(
+      ? inspectedCandidates.filter(
           (candidate) =>
             !isMergedPullRequestSnapshot(candidate.snapshot) && candidate.snapshot.state !== 'CLOSED'
         )
@@ -1700,7 +1698,7 @@ async function resolveAttachedSameRepoPullRequestCandidate(input: {
 
   const ignoredClosedUnmergedCandidates =
     input.mode === 'review_promotion'
-      ? filteredCandidates.filter(
+      ? inspectedCandidates.filter(
           (candidate) =>
             isClosedUnmergedPullRequestSnapshot(candidate.snapshot) &&
             openUnmergedCandidates.some((openCandidate) =>
@@ -1712,7 +1710,7 @@ async function resolveAttachedSameRepoPullRequestCandidate(input: {
     (candidate) => candidate.pr.url
   );
   const ignoredClosedUnmergedUrlSet = new Set(ignoredClosedUnmergedPrUrls);
-  const resolutionCandidates = filteredCandidates.filter(
+  const resolutionCandidates = inspectedCandidates.filter(
     (candidate) => !ignoredClosedUnmergedUrlSet.has(candidate.pr.url)
   );
 
