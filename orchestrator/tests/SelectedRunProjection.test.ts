@@ -6109,6 +6109,106 @@ describe('SelectedRunProjection', () => {
     });
   });
 
+  it('reconciles claim-selected provider manifests using the selected manifest runs root', async () => {
+    const { root, paths } = await createHostPaths();
+    const providerEnv = {
+      repoRoot: root,
+      runsRoot: join(root, 'provider-artifacts', '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-co-241'
+    };
+    const stalePaths = resolveRunPaths(providerEnv, 'run-co-241-selected-stale');
+    const terminalPaths = resolveRunPaths(providerEnv, 'run-co-241-selected-terminal');
+    await Promise.all([
+      mkdir(stalePaths.runDir, { recursive: true }),
+      mkdir(terminalPaths.runDir, { recursive: true })
+    ]);
+    await writeFile(
+      stalePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-co-241-selected-stale',
+        task_id: 'linear-co-241',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'co-241-id',
+        issue_identifier: 'CO-241',
+        started_at: '2026-04-09T08:36:05.089Z',
+        updated_at: '2026-04-09T08:40:00.000Z',
+        summary: 'selected provider manifest is still active-looking',
+        commands: []
+      }),
+      'utf8'
+    );
+    await writeFile(
+      terminalPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-co-241-selected-terminal',
+        task_id: 'linear-co-241',
+        pipeline_id: 'provider-linear-worker',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'co-241-id',
+        issue_identifier: 'CO-241',
+        started_at: '2026-04-13T02:26:01.632Z',
+        updated_at: '2026-04-13T02:30:00.000Z',
+        summary: 'newer terminal selected sibling outside the control-host runs root',
+        commands: []
+      }),
+      'utf8'
+    );
+    const baseClaim = createProviderIntakeState(stalePaths.manifestPath).claims[0]!;
+    const providerIntakeState: ProviderIntakeState = {
+      schema_version: 1,
+      updated_at: '2026-04-18T12:10:00.000Z',
+      rehydrated_at: '2026-04-18T12:10:00.000Z',
+      latest_provider_key: 'linear:co-241-id',
+      latest_reason: 'provider_issue_released:not_active',
+      claims: [
+        {
+          ...baseClaim,
+          provider_key: 'linear:co-241-id',
+          issue_id: 'co-241-id',
+          issue_identifier: 'CO-241',
+          issue_state: 'Done',
+          issue_state_type: 'completed',
+          task_id: 'linear-co-241',
+          state: 'released',
+          reason: 'provider_issue_released:not_active',
+          updated_at: '2026-04-18T12:09:00.000Z',
+          run_id: 'run-co-241-selected-stale',
+          run_manifest_path: stalePaths.manifestPath
+        }
+      ]
+    };
+
+    const selected = await createSelectedRunProjectionReader(
+      createProjectionContext(paths, providerIntakeState)
+    ).buildCompatibilitySourceContext();
+
+    expect(selected).toMatchObject({
+      runId: 'run-co-241-selected-stale',
+      rawStatus: 'succeeded',
+      statusReason: 'provider_claim_released',
+      summary: expect.stringContaining('newer terminal run run-co-241-selected-terminal supersedes')
+    });
+    const reconciliation = JSON.parse(
+      await readFile(join(stalePaths.runDir, 'provider-linear-worker-reconciliation.json'), 'utf8')
+    ) as Record<string, unknown>;
+    expect(reconciliation).toMatchObject({
+      reason: 'provider_claim_released',
+      manifest: {
+        run_id: 'run-co-241-selected-stale',
+        status: 'in_progress'
+      },
+      replacement_run: {
+        run_id: 'run-co-241-selected-terminal',
+        status: 'succeeded',
+        manifest_path: terminalPaths.manifestPath
+      }
+    });
+  });
+
   it('does not reconcile newer active manifests from older terminal claim evidence', async () => {
     const { root, paths } = await createHostPaths();
     const providerEnv = {

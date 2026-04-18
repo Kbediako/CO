@@ -359,9 +359,12 @@ async function reconcileSelectedProviderLinearWorkerContext<T extends ControlCom
   ) {
     return selected;
   }
-  const runsRoot = resolveRunsRootFromRunDir(context.paths.runDir);
-  const currentTaskId = resolveTaskIdFromManifestPath(context.paths.manifestPath);
-  const currentRunId = resolveRunIdFromManifestPath(context.paths.manifestPath);
+  const selectedRunDir =
+    selected.runDir ?? (selected.manifestPath ? dirname(selected.manifestPath) : context.paths.runDir);
+  const selectedManifestPath = selected.manifestPath ?? context.paths.manifestPath;
+  const runsRoot = resolveRunsRootFromRunDir(selectedRunDir);
+  const currentTaskId = resolveTaskIdFromManifestPath(selectedManifestPath) ?? selected.taskId;
+  const currentRunId = resolveRunIdFromManifestPath(selectedManifestPath) ?? selected.runId;
   if (!runsRoot) {
     return selected;
   }
