@@ -1,6 +1,39 @@
 {
   "items": [
     {
+      "id": "20260418-linear-42debc45-fa05-4a0a-a7bb-35a48153aea9",
+      "title": "Run artifact truth: reconcile orphaned active manifests and child-lane placeholders after release/invalidation",
+      "relates_to": "tasks/tasks-linear-42debc45-fa05-4a0a-a7bb-35a48153aea9.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-42debc45-fa05-4a0a-a7bb-35a48153aea9-docs-packet/cli/2026-04-18T15-12-30-748Z-ea3efd2f/manifest.json",
+          "source_anchor": "ctx:sha256:63b0749832e8a186a955a92d8fd3c5f60eb8d06d28e3a02f3006b2838e802175#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-241 as the run artifact truth reconciliation lane for orphaned active-looking `.runs/**/manifest.json` records with `status=in_progress` or `status=launching` after provider `released` / `removed` and child-lane `invalidated` / `rejected` truth. The packet keeps `provider-intake-state.json`, file-based audit truth, and child-lane ledger truth distinct, rejects artifact deletion or destructive state cleanup, and leaves implementation, validation, Linear state, workpad, PR, and merge to the parent lane. The expected shared source payload path is absent in this child checkout."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-18",
+          "status": "bounded-success",
+          "telemetry": ".runs/linear-42debc45-fa05-4a0a-a7bb-35a48153aea9/cli/2026-04-18T15-09-04-142Z-ed00e88d/review/telemetry.json",
+          "summary": "Manifest-backed standalone review completed with review_outcome=bounded-success; concrete findings from earlier passes were addressed before PR handoff."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-42debc45-fa05-4a0a-a7bb-35a48153aea9-run-artifact-truth.md",
+        "task": "tasks/tasks-linear-42debc45-fa05-4a0a-a7bb-35a48153aea9.md",
+        "agent_task": ".agent/task/linear-42debc45-fa05-4a0a-a7bb-35a48153aea9.md",
+        "docs": "docs/TECH_SPEC-linear-42debc45-fa05-4a0a-a7bb-35a48153aea9.md"
+      }
+    },
+    {
       "id": "20260418-linear-0ae7288b-cc5f-493d-896f-713990e51808",
       "title": "CO: stabilize run-review fake Codex subprocess timeout flake under full npm run test",
       "relates_to": "tasks/tasks-linear-0ae7288b-cc5f-493d-896f-713990e51808.md",
