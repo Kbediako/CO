@@ -2,7 +2,6 @@
 
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync, writeSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join } from 'node:path';
 import process from 'node:process';
@@ -10,8 +9,10 @@ import process from 'node:process';
 const FORWARDABLE_SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP'];
 const MARKETPLACE_NAME = 'codex-orchestrator';
 const MARKETPLACE_SECTION = `[marketplaces.${MARKETPLACE_NAME}]`;
-const require = createRequire(import.meta.url);
-const toml = require('@iarna/toml');
+const MARKETPLACE_SECTION_PATTERN = new RegExp(
+  `^marketplaces\\s*\\.\\s*(?:"${escapeRegExp(MARKETPLACE_NAME)}"|'${escapeRegExp(MARKETPLACE_NAME)}'|${escapeRegExp(MARKETPLACE_NAME)})$`,
+  'u'
+);
 
 function main() {
   const sourceRoot = resolveMarketplaceSourceRoot();
@@ -117,23 +118,179 @@ function resolveCodexPaths() {
 }
 
 function readMarketplaceConfig(rawConfig, configPath) {
-  let parsedConfig;
-  try {
-    parsedConfig = toml.parse(rawConfig);
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    throw new Error(`Unable to parse Codex config at ${configPath}: ${detail}`);
-  }
-  const marketplaceConfig = parsedConfig?.marketplaces?.[MARKETPLACE_NAME];
-  if (!marketplaceConfig || typeof marketplaceConfig !== 'object') {
+  const marketplaceSectionLines = findMarketplaceSectionLines(rawConfig);
+  if (!marketplaceSectionLines) {
     return null;
   }
-  const source = normalizeOptionalString(marketplaceConfig.source);
-  const sourceType = normalizeOptionalString(marketplaceConfig.source_type ?? marketplaceConfig.sourceType);
+  const source = normalizeOptionalString(readMarketplaceAssignment(marketplaceSectionLines, 'source', configPath));
+  const sourceType = normalizeOptionalString(
+    readMarketplaceAssignment(marketplaceSectionLines, 'source_type', configPath) ??
+      readMarketplaceAssignment(marketplaceSectionLines, 'sourceType', configPath)
+  );
   if (!source && !sourceType) {
     return null;
   }
   return { source, sourceType };
+}
+
+function findMarketplaceSectionLines(rawConfig) {
+  const lines = rawConfig.split(/\r?\n/u);
+  const sectionLines = [];
+  let inMarketplaceSection = false;
+  for (const line of lines) {
+    const trimmed = stripTomlInlineComment(line).trim();
+    const tableMatch = trimmed.match(/^\[(.+)\]$/u);
+    if (tableMatch) {
+      const tableName = tableMatch[1]?.trim() ?? '';
+      if (MARKETPLACE_SECTION_PATTERN.test(tableName)) {
+        inMarketplaceSection = true;
+        continue;
+      }
+      if (inMarketplaceSection) {
+        break;
+      }
+      continue;
+    }
+    if (inMarketplaceSection) {
+      sectionLines.push(line);
+    }
+  }
+  return inMarketplaceSection ? sectionLines : null;
+}
+
+function readMarketplaceAssignment(sectionLines, key, configPath) {
+  const keyPattern = new RegExp(`^(?:"${escapeRegExp(key)}"|'${escapeRegExp(key)}'|${escapeRegExp(key)})\\s*=`, 'u');
+  for (const line of sectionLines) {
+    const withoutComment = stripTomlInlineComment(line).trim();
+    if (!keyPattern.test(withoutComment)) {
+      continue;
+    }
+    const separatorIndex = withoutComment.indexOf('=');
+    if (separatorIndex === -1) {
+      continue;
+    }
+    const rawKey = withoutComment.slice(0, separatorIndex).trim();
+    const parsedKey = rawKey.startsWith('"') || rawKey.startsWith("'")
+      ? parseTomlStringValue(rawKey, configPath, `key:${key}`)
+      : rawKey;
+    if (parsedKey !== key) {
+      continue;
+    }
+    const rawValue = withoutComment.slice(separatorIndex + 1).trim();
+    if (rawValue.length === 0) {
+      throw new Error(`Unable to parse Codex config at ${configPath}: ${MARKETPLACE_SECTION}.${key} is empty.`);
+    }
+    return parseTomlStringValue(rawValue, configPath, key);
+  }
+  return null;
+}
+
+function stripTomlInlineComment(line) {
+  let result = '';
+  let inBasicString = false;
+  let inLiteralString = false;
+  let escaping = false;
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    if (escaping) {
+      result += char;
+      escaping = false;
+      continue;
+    }
+    if (inBasicString) {
+      result += char;
+      if (char === '\\') {
+        escaping = true;
+      } else if (char === '"') {
+        inBasicString = false;
+      }
+      continue;
+    }
+    if (inLiteralString) {
+      result += char;
+      if (char === "'") {
+        if (line[index + 1] === "'") {
+          result += "'";
+          index += 1;
+        } else {
+          inLiteralString = false;
+        }
+      }
+      continue;
+    }
+    if (char === '#') {
+      break;
+    }
+    result += char;
+    if (char === '"') {
+      inBasicString = true;
+    } else if (char === "'") {
+      inLiteralString = true;
+    }
+  }
+  return result;
+}
+
+function parseTomlStringValue(rawValue, configPath, key) {
+  if (rawValue.startsWith("'")) {
+    return parseTomlLiteralString(rawValue, configPath, key);
+  }
+  if (rawValue.startsWith('"')) {
+    return parseTomlBasicString(rawValue, configPath, key);
+  }
+  return rawValue;
+}
+
+function parseTomlBasicString(rawValue, configPath, key) {
+  let escaping = false;
+  for (let index = 1; index < rawValue.length; index += 1) {
+    const char = rawValue[index];
+    if (escaping) {
+      escaping = false;
+      continue;
+    }
+    if (char === '\\') {
+      escaping = true;
+      continue;
+    }
+    if (char === '"') {
+      try {
+        return JSON.parse(rawValue.slice(0, index + 1));
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        throw new Error(
+          `Unable to parse Codex config at ${configPath}: ${MARKETPLACE_SECTION}.${key} has an invalid basic string (${detail}).`
+        );
+      }
+    }
+  }
+  throw new Error(
+    `Unable to parse Codex config at ${configPath}: ${MARKETPLACE_SECTION}.${key} has an unterminated basic string.`
+  );
+}
+
+function parseTomlLiteralString(rawValue, configPath, key) {
+  let parsed = '';
+  for (let index = 1; index < rawValue.length; index += 1) {
+    const char = rawValue[index];
+    if (char !== "'") {
+      parsed += char;
+      continue;
+    }
+    if (rawValue[index + 1] === "'") {
+      parsed += "'";
+      index += 1;
+      continue;
+    }
+    return parsed;
+  }
+  throw new Error(
+    `Unable to parse Codex config at ${configPath}: ${MARKETPLACE_SECTION}.${key} has an unterminated literal string.`
+  );
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 }
 
 function normalizeOptionalString(value) {
