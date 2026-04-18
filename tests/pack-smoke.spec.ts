@@ -123,12 +123,21 @@ function hasCommandText(run: string, command: string): boolean {
   return normalizeShellContinuations(run).includes(command);
 }
 
-function getPackSmokeCommandOccurrences(run: string): { line: string; endIndex: number }[] {
-  const occurrences: { line: string; endIndex: number }[] = [];
+type PackSmokeCommandOccurrence = {
+  endIndex: number;
+  line: string;
+  matchText: string;
+  startIndex: number;
+};
+
+function getPackSmokeCommandOccurrences(run: string): PackSmokeCommandOccurrence[] {
+  const occurrences: PackSmokeCommandOccurrence[] = [];
   for (const line of getRunCommandLines(run)) {
     for (const match of line.matchAll(packSmokeInvocationPattern)) {
       occurrences.push({
+        startIndex: match.index ?? 0,
         line,
+        matchText: match[0],
         endIndex: (match.index ?? 0) + match[0].length
       });
     }
@@ -140,9 +149,36 @@ function hasPackSmokeCommand(run: string): boolean {
   return getPackSmokeCommandOccurrences(run).length > 0;
 }
 
+function hasActiveShellCondition(beforeOccurrence: string): boolean {
+  const controlTokens = [...beforeOccurrence.matchAll(/\b(if|while|until|then|do)\b/gu)];
+  const lastControlToken = controlTokens.at(-1)?.[1];
+  return lastControlToken === 'if' || lastControlToken === 'while' || lastControlToken === 'until';
+}
+
+function isConditionPackSmokeOccurrence(occurrence: PackSmokeCommandOccurrence): boolean {
+  const matchText = occurrence.matchText.trimStart();
+  if (/^(?:then|do)\s+/u.test(matchText)) {
+    return false;
+  }
+  return (
+    /^(?:if|while|until)\s+/u.test(matchText) ||
+    hasActiveShellCondition(occurrence.line.slice(0, occurrence.startIndex))
+  );
+}
+
+function isNegatedPackSmokeOccurrence(occurrence: PackSmokeCommandOccurrence): boolean {
+  return /!\s+(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S+)\s+)*npm\s+run\s+pack:smoke/u.test(
+    occurrence.matchText
+  );
+}
+
 function hasNonBlockingPackSmokeCommand(run: string): boolean {
-  return getPackSmokeCommandOccurrences(run).some(({ line, endIndex }) =>
-    nonBlockingPackSmokePattern.test(line.slice(endIndex))
+  return getPackSmokeCommandOccurrences(run).some((occurrence) =>
+    (
+      isConditionPackSmokeOccurrence(occurrence) ||
+      isNegatedPackSmokeOccurrence(occurrence) ||
+      nonBlockingPackSmokePattern.test(occurrence.line.slice(occurrence.endIndex))
+    )
   );
 }
 
@@ -363,7 +399,12 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} || true`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand}; exit 0`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} -- --flag || true`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`if ${packSmokeCommand}; then echo ok; fi`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`if FOO=1 ${packSmokeCommand} -- --flag; then echo ok; fi`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`if npm run lint && ${packSmokeCommand}; then echo ok; fi`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`! ${packSmokeCommand}`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`npm run lint || true && ${packSmokeCommand}`)).toBe(false);
+    expect(hasNonBlockingPackSmokeCommand(`if test -f marker; then ${packSmokeCommand}; fi`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} -- --flag`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`echo ${packSmokeCommand} || true`)).toBe(false);
     expect(isContinueOnErrorEnabled(true)).toBe(true);
