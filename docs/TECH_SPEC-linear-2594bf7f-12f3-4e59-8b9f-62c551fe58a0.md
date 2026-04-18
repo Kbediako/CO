@@ -29,15 +29,16 @@ last_review: 2026-04-18
 - Scope:
   - existing docs-first packet and bounded issue-local checklist mirrors for `CO-233`
   - parent-owned reproduction of full-suite `npm run test` truth versus isolated repro truth
-  - parent-owned implementation and focused validation in the narrow proof-refresh / placeholder-resolution seam
+  - current branch runtime/test implementation in `vitest.config.core.ts` and `tests/vitest-progress-config.spec.ts` that stabilizes unattended broad-lane Vitest worker saturation without changing interactive local runs
+  - parent-owned focused validation and review handoff for the narrow fix
   - explicit linkage to `CO-226` and `CO-219` as adjacent lanes that should not absorb this blocker
 - Constraints:
-  - child lane remains docs-only
-  - no runtime/test/Linear/workpad/PR mutations in this patch
-  - parent owns implementation, validation, review, and integration
+  - the historical docs child lane remained docs-only across the six owned issue-doc files
+  - the parent branch runtime/test mutation stays bounded to the Vitest worker-cap config and matching config-test coverage
+  - parent owns Linear/workpad/PR integration plus final validation/review handoff
 
 ## Issue-Shaping Contract
-- User-request translation carried forward: this issue is about a suite-context mismatch, not a failing isolated test. The authoritative blocker is that full `npm run test` still times out or stalls around `orchestrator/tests/SelectedRunProjection.test.ts` case `refreshes projection proofs when child-lane reservation ledger placeholders exist`, while `npx vitest run orchestrator/tests/SelectedRunProjection.test.ts -t "refreshes projection proofs when child-lane reservation ledger placeholders exist"` already passes. `orchestrator/tests/Doctor.test.ts` is no longer the live blocker in the same rerun. `CO-226` and `CO-219` must remain explicit linked lanes rather than silent scope sprawl.
+- User-request translation carried forward: this issue started as a suite-context mismatch, not a failing isolated test. The historical blocker was that full `npm run test` timed out or stalled around `orchestrator/tests/SelectedRunProjection.test.ts` case `refreshes projection proofs when child-lane reservation ledger placeholders exist`, while `npx vitest run orchestrator/tests/SelectedRunProjection.test.ts -t "refreshes projection proofs when child-lane reservation ledger placeholders exist"` already passed. The current branch now records the bounded Vitest worker-cap fix plus green full-suite and isolated-repro evidence, and `orchestrator/tests/Doctor.test.ts` remains a non-blocker in the same rerun contrast. `CO-226` and `CO-219` must remain explicit linked lanes rather than silent scope sprawl.
 - Protected terms / exact artifact and surface names:
   - `npm run test`
   - `orchestrator/tests/SelectedRunProjection.test.ts`
@@ -60,7 +61,7 @@ last_review: 2026-04-18
   - the fix is "increase Vitest timeout" without proving the narrow proof-refresh / placeholder seam
   - broad control-runtime or observability redesign is required before reproducing the exact suite-only mismatch
 - Explicit non-goals carried forward:
-  - no code or test edits in this child lane
+  - no unrelated runtime or test edits beyond the worker-cap config/test stabilization on this branch
   - no Linear or workpad mutation from this lane
   - no full repo validation from this lane
   - no reopening `Doctor.test.ts` without fresh evidence
@@ -68,10 +69,10 @@ last_review: 2026-04-18
 
 ## Parity / Alignment Matrix
 - Current truth:
-  - full `npm run test` surfaces the unrelated suite-only timeout around `orchestrator/tests/SelectedRunProjection.test.ts`
-  - the exact case is `refreshes projection proofs when child-lane reservation ledger placeholders exist`
-  - the isolated repro command for that case passes
-  - `orchestrator/tests/Doctor.test.ts` is no longer the live blocker in the same rerun
+  - the historical blocker was the unrelated suite-only timeout around `orchestrator/tests/SelectedRunProjection.test.ts`
+  - the exact case remains `refreshes projection proofs when child-lane reservation ledger placeholders exist`
+  - the current branch now has green full-suite and isolated-repro evidence after the bounded Vitest worker-cap fix
+  - `orchestrator/tests/Doctor.test.ts` remains a non-blocker in the same rerun contrast
 - Reference truth:
   - full-suite and isolated-repro truth should agree, or the mismatch must be explicitly owned as a suite-context defect
   - unrelated branch-baseline blockers should remain separate from adjacent issue lanes
@@ -87,7 +88,7 @@ last_review: 2026-04-18
 
 ## Readiness Gate
 - Not done if:
-  - full `npm run test` still times out or stalls around `refreshes projection proofs when child-lane reservation ledger placeholders exist` without explicit owner
+  - full `npm run test` regresses back into a timeout or stall around `refreshes projection proofs when child-lane reservation ledger placeholders exist` before handoff without explicit owner
   - the packet implies the isolated repro pass is enough to close the issue
   - the packet treats `orchestrator/tests/Doctor.test.ts` as the active blocker despite current rerun truth
   - `CO-226` or `CO-219` are left as implicit background context rather than explicit linked issues
@@ -104,7 +105,8 @@ last_review: 2026-04-18
   3. Preserve the fact that `orchestrator/tests/Doctor.test.ts` is no longer the live blocker in the same rerun.
   4. Keep `CO-226` and `CO-219` explicit as linked adjacent issues so parent closeout can reference them without scope drift.
   5. Point the parent at the smallest likely source seam where SelectedRunProjection refreshes proof data while child-lane reservation ledger placeholders still exist.
-  6. Keep parent ownership explicit for implementation, tests, workpad, Linear state, PR lifecycle, and full validation.
+  6. Record the implemented worker-cap seam truthfully: unattended broad-lane runs cap Vitest workers through config, while interactive local runs stay uncapped.
+  7. Keep parent ownership explicit for tests, workpad, Linear state, PR lifecycle, and full validation.
 - Non-functional requirements:
   - deterministic documentation of the suite-only mismatch
   - bounded implementation seam with no unnecessary redesign pressure
@@ -118,9 +120,11 @@ last_review: 2026-04-18
 
 ## Architecture & Data
 - Architecture / design adjustments:
-  - keep the eventual repair bounded to how SelectedRunProjection refreshes provider proof data when a reserved child-lane placeholder ledger entry and a matching real child manifest coexist
+  - the current branch repair is implemented as a Vitest worker-cap adjustment for unattended broad-lane runs in `vitest.config.core.ts`, keyed off `CI`, `CODEX_VITEST_PROGRESS`, `CODEX_NON_INTERACTIVE`, `CODEX_NO_INTERACTIVE`, and `CODEX_NONINTERACTIVE`
+  - matching config tests in `tests/vitest-progress-config.spec.ts` cover the non-interactive aliases explicitly and preserve uncapped interactive local runs
+  - keep the repair bounded; do not widen from this runner/config seam into unrelated runtime redesign
   - preserve the distinction between the proof snapshot (`provider-linear-worker-proof.json`) and the reservation ledger (`provider-linear-worker-child-lanes.json`)
-  - avoid broad runtime changes unless the parent later proves the narrow SelectedRunProjection seam cannot explain the suite-only timeout
+  - avoid broad runtime changes unless new evidence proves the narrow runner/config stabilization is insufficient
 - Required artifact/content expectations:
   - `provider-linear-worker-proof.json` refreshes accurately when a placeholder reservation and a matching real child run both exist
   - `provider-linear-worker-child-lanes.json` placeholder records remain truthful rather than being silently rewritten into unrelated states
@@ -135,22 +139,22 @@ last_review: 2026-04-18
 ## Current Truth
 - `orchestrator/tests/SelectedRunProjection.test.ts` includes a dedicated case that seeds a reserved child-lane ledger placeholder with `run_id: 'launching-docs-packet'`, `status: 'launching'`, and summary `Child lane reserved before child run startup.`
 - The same case also writes a matching real child manifest at `.runs/<child-task>/cli/<real-run-id>/manifest.json` and expects SelectedRunProjection to refresh `provider-linear-worker-proof.json` from that real child run while leaving the child-lane ledger placeholder record unchanged.
-- The isolated repro for that exact case passes, which means the currently reported failure is the full-suite-only timeout or drift in `npm run test`, not the narrow assertion set when run alone.
+- The historical blocker was a full-suite-only timeout or drift in `npm run test`, not a failure of the narrow assertion set when run alone.
 - `orchestrator/tests/Doctor.test.ts` is no longer the blocker in the same rerun, so reopening doctor-only repair would be issue drift.
+- The current branch implementation fixes that suite-context failure by capping Vitest workers for unattended broad-lane runs and covering the non-interactive env aliases in config tests, while leaving interactive local runs uncapped.
 
 ## Proposed Design
-- Parent implementation should harden the proof-refresh / placeholder-resolution seam so SelectedRunProjection behaves identically in isolated and full-suite contexts.
-- The smallest likely implementation surface is:
-  - `selectedRunProjection.ts` for placeholder-ledger discovery and refreshed proof projection
-  - `providerLinearWorkerRunner.ts` for proof and child-lane ledger contract definitions / refresh helpers
-  - `providerLinearChildLaneShell.ts` if proof-refresh hardening is required when child-lane state is reserved, accepted, invalidated, or finalized
-- Parent should avoid closing the issue with timeout-only tuning unless the suite-only mismatch remains after the narrow proof-refresh seam is proven correct.
+- Current branch implementation:
+  - `vitest.config.core.ts` caps workers for unattended broad-lane runs that set `CI`, `CODEX_VITEST_PROGRESS`, `CODEX_NON_INTERACTIVE`, `CODEX_NO_INTERACTIVE`, or `CODEX_NONINTERACTIVE`
+  - `tests/vitest-progress-config.spec.ts` covers those env aliases explicitly and preserves uncapped interactive local runs
+- This keeps the fix at the smallest truthful seam that explains the suite-only timeout, instead of weakening assertions or raising generic timeouts.
+- If the suite-only mismatch returns after this runner/config stabilization, the next seam to inspect remains the proof-refresh / placeholder-resolution path in `selectedRunProjection.ts`, `providerLinearWorkerRunner.ts`, and `providerLinearChildLaneShell.ts`.
 
 ## Protected Expectations
 - Preserve the exact strings `npm run test`, `orchestrator/tests/SelectedRunProjection.test.ts`, `refreshes projection proofs when child-lane reservation ledger placeholders exist`, and the isolated repro command.
 - Preserve `orchestrator/tests/Doctor.test.ts` as no longer the live blocker in the same rerun.
 - Preserve `CO-226` / `CO-219` as explicit linked issues.
-- Preserve docs-only scope for this child lane and parent ownership for everything else.
+- Preserve the historical docs-only child-lane audit fact, while truthfully recording the parent branch's Vitest worker-cap implementation and validation.
 
 ## Reject These Wrong Interpretations
 - `This issue is already fixed because the isolated repro passes.`
