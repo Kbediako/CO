@@ -17,6 +17,21 @@
           "manifest": ".runs/linear-0ae7288b-cc5f-493d-896f-713990e51808-docs-packet/cli/2026-04-18T16-47-04-916Z-1d67c18a/manifest.json",
           "source_anchor": "ctx:sha256:7bc40b569a41bfbaead86699849abdfea03d40ad923c988770e2bfb98ef981bc#chunk:c000001",
           "summary": "Docs-first packet preserves CO-251 as the full-suite run-review fake Codex subprocess timeout flake lane: tests/run-review.spec.ts, scripts/run-review, fake Codex subprocess, hang-started.txt, findRunReviewMockPids, and full npm run test remain protected. The expected shared source payload is absent in this child checkout, so the packet is anchored on the protected issue wording plus the provided source anchor. Parent owns root cause, implementation, validation, Linear state, workpad, PR, and merge; this packet rejects CO-234 LockFile work, generic review-wrapper redesign without evidence, and any skipping or weakening of subprocess cleanup coverage."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review --base origin/main",
+          "date": "2026-04-18",
+          "status": "bounded-success",
+          "manifest": ".runs/linear-0ae7288b-cc5f-493d-896f-713990e51808/cli/2026-04-18T16-44-05-565Z-29a8403b/manifest.json",
+          "telemetry": ".runs/linear-0ae7288b-cc5f-493d-896f-713990e51808/cli/2026-04-18T16-44-05-565Z-29a8403b/review/telemetry.json",
+          "summary": "Final standalone review completed with review_outcome=bounded-success after command-intent retry and reported no actionable findings."
+        },
+        "elegance_review": {
+          "reviewer": "provider worker parent lane",
+          "date": "2026-04-18",
+          "status": "completed",
+          "artifact": "out/linear-0ae7288b-cc5f-493d-896f-713990e51808/manual/20260418T180715Z-elegance-review.md",
+          "summary": "Kept the fix to the hanging fake-Codex subprocess timeout and per-test headroom only; no scripts/run-review.ts or cleanup helper behavior changed."
         }
       },
       "paths": {
@@ -36,6 +51,14 @@
       ],
       "last_review": "2026-04-18",
       "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-18",
+          "status": "succeeded",
+          "manifest": ".runs/linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26-co-248-docs-review/cli/2026-04-18T13-59-17-756Z-d73e637e/manifest.json",
+          "telemetry": ".runs/linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26-co-248-docs-review/cli/2026-04-18T13-59-17-756Z-d73e637e/review/telemetry.json",
+          "summary": "Docs-review child stream completed before implementation handoff; spec-guard passed and review telemetry reported clean-success for the CO-248 packet."
+        },
         "docs_packet_child_lane": {
           "reviewer": "bounded same-issue docs child lane",
           "date": "2026-04-18",

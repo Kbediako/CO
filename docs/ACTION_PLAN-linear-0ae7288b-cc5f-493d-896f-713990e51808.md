@@ -22,9 +22,9 @@
 ## Milestones & Sequencing
 1. Completed in this child lane: create the PRD, TECH_SPEC mirror, canonical task spec, ACTION_PLAN, task checklist, `.agent` mirror, `tasks/index.json` registration, `docs/TASKS.md` snapshot, and docs-freshness registry rows.
 2. Completed in the parent lane: classify the focused fake Codex subprocess timeout case in `tests/run-review.spec.ts` as an outer harness startup-marker race under full-suite load.
-3. Completed in the parent lane: explain the full `npm run test` flake as `scripts/run-review.ts` startup plus fake Codex marker creation taking longer than the previous 5s subprocess harness timeout before the wrapper was killed.
-4. Completed in the parent lane: implement the smallest fix in the proven owner by naming the hanging fake-Codex harness timeout and increasing only that timeout to 10s, preserving fake subprocess cleanup and real-process safety assertions.
-5. Parent-owned closeout: rerun focused `run-review` validation, full `npm run test`, docs/spec guards, standalone review, and elegance review before PR handoff.
+3. Completed in the parent lane: explain the full `npm run test` flake as `scripts/run-review.ts` startup plus fake Codex marker creation racing the outer subprocess harness timeout before the wrapper was killed.
+4. Completed in the parent lane: implement the smallest fix in the proven owner by naming the hanging fake-Codex harness timeout, increasing only that subprocess kill budget to 15s, and giving that slow-path case a 30s Vitest timeout so cleanup assertions have headroom.
+5. Completed in the parent lane: rerun focused `run-review` validation, full `npm run test`, docs/spec guards, standalone review, and elegance review before PR handoff.
 
 ## Dependencies
 - `tests/run-review.spec.ts`
@@ -42,6 +42,7 @@
   - parent lane: relevant `run-review` timeout/stall coverage when needed
   - parent lane: full `npm run test`
   - parent lane: process-health check when needed to prove no new fake Codex subprocess remains
+  - parent lane: final standalone review completed as `bounded-success` after command-intent retry, followed by explicit elegance review
 - Rollback plan:
   - if parent evidence shows the issue cannot be fixed inside the declared `run-review` subprocess-timeout surface, stop and relaunch with widened ownership rather than expanding this packet silently
 
