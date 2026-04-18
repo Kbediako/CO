@@ -68,6 +68,23 @@
       }
     },
     {
+      "id": "20260418-linear-f2c25700-a367-4e69-923f-cdf3e7f726be",
+      "title": "CO CLI test surface remove clean-tree dependency on prebuilt dist entrypoint",
+      "relates_to": "tasks/tasks-linear-f2c25700-a367-4e69-923f-cdf3e7f726be.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-f2c25700-a367-4e69-923f-cdf3e7f726be.md",
+        "task": "tasks/tasks-linear-f2c25700-a367-4e69-923f-cdf3e7f726be.md",
+        "agent_task": ".agent/task/linear-f2c25700-a367-4e69-923f-cdf3e7f726be.md",
+        "docs": "docs/TECH_SPEC-linear-f2c25700-a367-4e69-923f-cdf3e7f726be.md"
+      }
+    },
+    {
       "id": "20260418-linear-4a34011b-104b-4334-871b-a0a014883548",
       "title": "CO STATUS / observability: stop direct co-status --format json fetch refusals on healthy control-hosts",
       "relates_to": "tasks/tasks-linear-4a34011b-104b-4334-871b-a0a014883548.md",

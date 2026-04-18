@@ -5,9 +5,10 @@ import { isAbsolute, join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { isDirectExecution, runCodexOrchestratorCli } from '../bin/codex-orchestrator.ts';
 import { REPO_CONFIG_PATH_ENV_KEY } from '../orchestrator/src/cli/config/userConfig.js';
+import * as delegationMcpHealth from '../orchestrator/src/cli/utils/delegationMcpHealth.js';
 import {
   PROVIDER_OVERRIDE_ENV_KEYS,
   sanitizeProviderOverrideEnv
@@ -46,8 +47,8 @@ const DEFAULT_REPO_CONFIG_TEST_ENV = {
 } satisfies NodeJS.ProcessEnv;
 
 let tempDir: string | null = null;
-
 afterEach(async () => {
+  vi.restoreAllMocks();
   if (!tempDir) {
     return;
   }
@@ -93,6 +94,15 @@ async function runCliSourceSubprocess(
   return await execFileAsync(process.execPath, ['--loader', 'ts-node/esm', CLI_ENTRY, ...args], {
     env: buildCliEnv(env, explicitProviderOverrideKeys),
     timeout: timeoutMs
+  });
+}
+
+function mockDelegationServerInvocation(distPath: string): void {
+  vi.spyOn(delegationMcpHealth, 'resolveDelegationServerInvocation').mockReturnValue({
+    command: process.execPath,
+    args: [distPath, 'delegate-server'],
+    distPath,
+    commandLine: `${process.execPath} ${distPath} delegate-server`
   });
 }
 
@@ -2602,6 +2612,7 @@ describe('codex-orchestrator command surface', () => {
       CODEX_HOME: tempDir,
       CODEX_CLI_BIN: fakeCodex
     };
+    mockDelegationServerInvocation(join(tempDir, 'dist', 'bin', 'codex-orchestrator.js'));
     await runCli(['setup', '--yes'], env, FLOW_TARGET_TEST_TIMEOUT);
     expect(await readFile(skillPath, 'utf8')).toBe('MARKER\n');
   }, FLOW_TARGET_TEST_TIMEOUT);
@@ -2618,6 +2629,7 @@ describe('codex-orchestrator command surface', () => {
       CODEX_HOME: tempDir,
       CODEX_CLI_BIN: fakeCodex
     };
+    mockDelegationServerInvocation(join(tempDir, 'dist', 'bin', 'codex-orchestrator.js'));
     await runCli(['setup', '--yes', '--refresh-skills'], env, FLOW_TARGET_TEST_TIMEOUT);
     const content = await readFile(skillPath, 'utf8');
     expect(content).not.toBe('MARKER\n');
@@ -2639,6 +2651,7 @@ describe('codex-orchestrator command surface', () => {
       CODEX_TEST_MCP_ADD_LOG: addLog
     };
 
+    mockDelegationServerInvocation(join(tempDir, 'dist', 'bin', 'codex-orchestrator.js'));
     await runCli(['delegation', 'setup', '--yes', '--repo', repoRoot], env, FLOW_TARGET_TEST_TIMEOUT);
     const log = await readFile(addLog, 'utf8');
     expect(log).toContain('mcp add delegation');
@@ -2674,6 +2687,7 @@ describe('codex-orchestrator command surface', () => {
       CODEX_TEST_MCP_ADD_LOG: addLog
     };
 
+    mockDelegationServerInvocation(join(tempDir, 'dist', 'bin', 'codex-orchestrator.js'));
     await runCli(['delegation', 'setup', '--yes', '--repo', repoRoot], env, FLOW_TARGET_TEST_TIMEOUT);
     const log = await readFile(addLog, 'utf8');
     expect(log).toContain('mcp add delegation');
