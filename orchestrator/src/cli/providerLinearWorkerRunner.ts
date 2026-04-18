@@ -75,6 +75,7 @@ import { sanitizeRunId } from '../persistence/sanitizeRunId.js';
 import { sanitizeTaskId } from '../persistence/sanitizeTaskId.js';
 import { acquireLockWithRetry, type LockRetryOptions } from '../persistence/lockFile.js';
 import { resolveCodexHome } from './utils/codexPaths.js';
+import { REPO_CONFIG_REQUIRED_ENV_KEY } from './config/repoConfigPolicy.js';
 import { REPO_CONFIG_PATH_ENV_KEY } from './config/userConfig.js';
 import {
   normalizeProviderLinearChildLanePathSelectors,
@@ -1196,6 +1197,7 @@ function applyProviderLinearWorkerContextEnv(
     env[PROVIDER_CONTROL_HOST_RUN_ID_ENV] = context.providerControlHostRunId;
     env[PROVIDER_LAUNCH_SOURCE_ENV] = PROVIDER_LAUNCH_SOURCE_CONTROL_HOST;
   } else {
+    const inheritedRepoConfigPath = normalizeOptionalString(env[REPO_CONFIG_PATH_ENV_KEY]);
     const preservedRepoConfigPath = resolveProviderLinearWorkerRepoConfigPath(
       inheritedEnvPaths.repoRoot,
       env
@@ -1216,6 +1218,9 @@ function applyProviderLinearWorkerContextEnv(
       env[REPO_CONFIG_PATH_ENV_KEY] = preservedRepoConfigPath;
     } else {
       delete env[REPO_CONFIG_PATH_ENV_KEY];
+      if (inheritedRepoConfigPath) {
+        delete env[REPO_CONFIG_REQUIRED_ENV_KEY];
+      }
     }
     delete env[PROVIDER_REPO_CONFIG_PATH_ENV_KEY];
     if (currentPackageRoot && providerPackageRoot && currentPackageRoot === providerPackageRoot) {
@@ -6120,6 +6125,7 @@ export async function refreshProviderLinearWorkerProofSnapshot(
   env: NodeJS.ProcessEnv = process.env,
   options: {
     updatedAtComparisonScope?: 'full' | 'telemetry';
+    skipSessionLogHydration?: boolean;
     emitProgressEvent?: (message: string) => void;
   } = {}
 ): Promise<ProviderLinearWorkerProof | null> {
@@ -6158,11 +6164,16 @@ export async function refreshProviderLinearWorkerProofSnapshot(
       linear_budget: linearBudget,
       updated_at: parsed.updated_at ?? null
     };
-    const proofWithSessionTelemetryResult = await hydrateProviderLinearWorkerProofFromSessionLog(
-      proofWithHydratedSources,
-      env,
-      priorHydrationState
-    );
+    const proofWithSessionTelemetryResult = options.skipSessionLogHydration
+      ? {
+          proof: proofWithHydratedSources,
+          hydrationState: priorHydrationState
+        }
+      : await hydrateProviderLinearWorkerProofFromSessionLog(
+          proofWithHydratedSources,
+          env,
+          priorHydrationState
+        );
     const proofWithSessionTelemetry = proofWithSessionTelemetryResult.proof;
     const hydratedWithoutUpdatedAt: ProviderLinearWorkerProof = {
       ...proofWithSessionTelemetry,

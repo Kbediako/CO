@@ -1319,8 +1319,8 @@ async function readProviderLinearWorkerProofForProjection(
   const proof = await readJsonFile<ProviderLinearWorkerProof>(
     join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME)
   );
-  const refreshScope = await resolveProviderLinearWorkerProjectionProofRefreshScope(runDir, proof);
-  if (!refreshScope) {
+  const refreshPlan = await resolveProviderLinearWorkerProjectionProofRefreshPlan(runDir, proof);
+  if (!refreshPlan) {
     return proof;
   }
   return (
@@ -1330,37 +1330,55 @@ async function readProviderLinearWorkerProofForProjection(
       undefined,
       undefined,
       process.env,
-      { updatedAtComparisonScope: refreshScope }
+      {
+        updatedAtComparisonScope: refreshPlan.updatedAtComparisonScope,
+        skipSessionLogHydration: refreshPlan.skipSessionLogHydration
+      }
     ).catch(() => proof)) ?? proof
   );
 }
 
-async function resolveProviderLinearWorkerProjectionProofRefreshScope(
+async function resolveProviderLinearWorkerProjectionProofRefreshPlan(
   runDir: string,
   proof: ProviderLinearWorkerProof | null
-): Promise<'full' | 'telemetry' | null> {
+): Promise<
+  | {
+      updatedAtComparisonScope: 'full' | 'telemetry';
+      skipSessionLogHydration: boolean;
+    }
+  | null
+> {
   if (!proof || !isProviderLinearWorkerProjectionRefreshEligible(proof)) {
     return null;
   }
+  const telemetryGap = hasProviderLinearWorkerProjectionTelemetryGap(proof);
+  const canSkipSessionLogHydration = canSkipProviderLinearWorkerProjectionSessionLogHydration(
+    proof,
+    telemetryGap
+  );
   if (hasProviderLinearWorkerProjectionReservationPlaceholder(proof)) {
-    return 'full';
+    return {
+      updatedAtComparisonScope: 'full',
+      skipSessionLogHydration: canSkipSessionLogHydration
+    };
   }
   if (hasProviderLinearWorkerProjectionActivePendingChildLane(proof)) {
-    return 'full';
+    return {
+      updatedAtComparisonScope: 'full',
+      skipSessionLogHydration: canSkipSessionLogHydration
+    };
   }
   if (await hasProviderLinearWorkerProjectionActivePendingChildLaneInLedger(runDir)) {
-    return 'full';
+    return {
+      updatedAtComparisonScope: 'full',
+      skipSessionLogHydration: canSkipSessionLogHydration
+    };
   }
-  const tokens = proof.tokens ?? null;
-  const hasTokens =
-    tokens?.input_tokens != null || tokens?.output_tokens != null || tokens?.total_tokens != null;
-  return (
-    !proof.latest_turn_id ||
-    !proof.latest_session_id ||
-    !hasTokens ||
-    proof.rate_limits == null
-  )
-    ? 'telemetry'
+  return telemetryGap
+    ? {
+        updatedAtComparisonScope: 'telemetry',
+        skipSessionLogHydration: false
+      }
     : null;
 }
 
@@ -1383,6 +1401,40 @@ function hasProviderLinearWorkerProjectionActivePendingChildLane(
   proof: ProviderLinearWorkerProof
 ): boolean {
   return hasProviderLinearWorkerProjectionActivePendingChildLaneInRecords(proof.child_lanes);
+}
+
+function hasProviderLinearWorkerProjectionTelemetryGap(
+  proof: ProviderLinearWorkerProof
+): boolean {
+  const tokens = proof.tokens ?? null;
+  const hasTokens =
+    tokens?.input_tokens != null || tokens?.output_tokens != null || tokens?.total_tokens != null;
+  return (
+    !proof.latest_turn_id ||
+    !proof.latest_session_id ||
+    !hasTokens ||
+    proof.rate_limits == null
+  );
+}
+
+function canSkipProviderLinearWorkerProjectionSessionLogHydration(
+  proof: ProviderLinearWorkerProof,
+  telemetryGap: boolean
+): boolean {
+  if (proof.owner_phase !== 'turn_completed') {
+    return false;
+  }
+  const currentTurnActivity = proof.current_turn_activity ?? null;
+  return !(
+    telemetryGap ||
+    !proof.last_event_at ||
+    (!proof.last_event && !proof.last_message) ||
+    currentTurnActivity == null ||
+    currentTurnActivity.recorded_at == null ||
+    currentTurnActivity.turn_id !== proof.latest_turn_id ||
+    currentTurnActivity.session_id !== proof.latest_session_id ||
+    proof.auth_provenance == null
+  );
 }
 
 async function hasProviderLinearWorkerProjectionActivePendingChildLaneInLedger(
