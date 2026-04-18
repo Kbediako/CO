@@ -1602,7 +1602,20 @@ function findProviderLinearWorkerClaimForContext(
   const candidates = providerIntakeState.claims.filter((claim) =>
     providerLinearWorkerClaimMatchesContext(claim, context)
   );
-  return candidates.sort((left, right) => compareIsoTimestamp(right.updated_at, left.updated_at))[0] ?? null;
+  return candidates.sort((left, right) => compareProviderLinearWorkerClaimForContext(left, right, context))[0] ?? null;
+}
+
+function compareProviderLinearWorkerClaimForContext(
+  left: ProviderIntakeClaimRecord,
+  right: ProviderIntakeClaimRecord,
+  context: ControlCompatibilitySourceContext
+): number {
+  const leftRunIdentityMatch = providerLinearWorkerClaimRunIdentityMatchesContext(left, context);
+  const rightRunIdentityMatch = providerLinearWorkerClaimRunIdentityMatchesContext(right, context);
+  if (leftRunIdentityMatch !== rightRunIdentityMatch) {
+    return leftRunIdentityMatch ? -1 : 1;
+  }
+  return compareIsoTimestamp(right.updated_at, left.updated_at);
 }
 
 function providerLinearWorkerClaimMatchesContext(
@@ -1824,11 +1837,14 @@ function isProviderLinearWorkerContextChronologicallyNewer(
 ): boolean {
   const candidateStartedAt = selectProviderLinearWorkerContextChronologyTimestamp(candidate);
   const contextStartedAt = selectProviderLinearWorkerContextChronologyTimestamp(context);
-  return Boolean(
-    candidateStartedAt &&
-    contextStartedAt &&
-    compareIsoTimestamp(candidateStartedAt, contextStartedAt) > 0
-  );
+  if (!candidateStartedAt) {
+    return false;
+  }
+  if (!contextStartedAt) {
+    const contextUpdatedAt = selectLatestIsoTimestamp(context.updatedAt, context.startedAt);
+    return !contextUpdatedAt || compareIsoTimestamp(candidateStartedAt, contextUpdatedAt) > 0;
+  }
+  return compareIsoTimestamp(candidateStartedAt, contextStartedAt) > 0;
 }
 
 function selectProviderLinearWorkerContextChronologyTimestamp(

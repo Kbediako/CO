@@ -6004,6 +6004,88 @@ describe('SelectedRunProjection', () => {
     });
   });
 
+  it('keeps exact run-bound active claims ahead of newer issue-only aliases', async () => {
+    const { root, paths } = await createHostPaths();
+    const providerEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-co-241'
+    };
+    const activeRunId = 'run-co-241-active';
+    const activePaths = resolveRunPaths(providerEnv, activeRunId);
+    await mkdir(activePaths.runDir, { recursive: true });
+    await writeFile(
+      activePaths.manifestPath,
+      JSON.stringify({
+        run_id: activeRunId,
+        task_id: 'linear-co-241',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'co-241-id',
+        issue_identifier: 'CO-241',
+        started_at: '2026-04-11T08:36:05.089Z',
+        updated_at: '2026-04-11T08:40:00.000Z',
+        summary: 'active provider run with exact run-bound claim',
+        commands: []
+      }),
+      'utf8'
+    );
+    const baseClaim = createProviderIntakeState(activePaths.manifestPath).claims[0]!;
+    const providerIntakeState: ProviderIntakeState = {
+      schema_version: 1,
+      updated_at: '2026-04-18T12:10:00.000Z',
+      rehydrated_at: '2026-04-18T12:10:00.000Z',
+      latest_provider_key: 'linear:co-241-id',
+      latest_reason: 'provider_issue_released:not_active',
+      claims: [
+        {
+          ...baseClaim,
+          provider_key: 'linear:co-241-id',
+          issue_id: 'co-241-id',
+          issue_identifier: 'CO-241',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          task_id: 'linear-co-241',
+          state: 'running',
+          reason: 'provider_issue_rehydrated_active_run',
+          updated_at: '2026-04-11T08:45:00.000Z',
+          run_id: activeRunId,
+          run_manifest_path: activePaths.manifestPath
+        },
+        {
+          ...baseClaim,
+          provider_key: 'linear:co-241-id',
+          issue_id: 'co-241-id',
+          issue_identifier: 'CO-241',
+          issue_state: 'Done',
+          issue_state_type: 'completed',
+          task_id: 'linear-co-241',
+          state: 'released',
+          reason: 'provider_issue_released:not_active',
+          updated_at: '2026-04-18T12:09:00.000Z',
+          run_id: null,
+          run_manifest_path: null
+        }
+      ]
+    };
+
+    const discovery = await discoverCompatibilityCollectionContexts(
+      createProjectionContext(paths, providerIntakeState)
+    );
+
+    expect(discovery.running.map((entry) => entry.runId)).toEqual([activeRunId]);
+    expect(discovery.all.find((entry) => entry.runId === activeRunId)).toMatchObject({
+      rawStatus: 'in_progress',
+      statusReason: null,
+      summary: 'active provider run with exact run-bound claim'
+    });
+    await expect(
+      readFile(join(activePaths.runDir, 'provider-linear-worker-reconciliation.json'), 'utf8')
+    ).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
   it('sets lastError when reconciliation applies newer failed terminal run truth', async () => {
     const { root, paths } = await createHostPaths();
     const providerEnv = {
@@ -6860,6 +6942,90 @@ describe('SelectedRunProjection', () => {
     ) as Record<string, unknown>;
     expect(reconciliation).toMatchObject({
       reason: 'provider_claim_absent_newer_terminal_run',
+      replacement_run: {
+        run_id: terminalRunId,
+        status: 'succeeded',
+        manifest_path: terminalPaths.manifestPath
+      }
+    });
+  });
+
+  it('reconciles terminal replacements when stale manifests have no parseable chronology', async () => {
+    const { root, paths } = await createHostPaths();
+    const providerEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-co-241'
+    };
+    const orphanRunId = 'legacy-active-without-chronology';
+    const terminalRunId = 'linear-co-241-2026-04-13T02-26-01-632Z';
+    const orphanPaths = resolveRunPaths(providerEnv, orphanRunId);
+    const terminalPaths = resolveRunPaths(providerEnv, terminalRunId);
+    await Promise.all([
+      mkdir(orphanPaths.runDir, { recursive: true }),
+      mkdir(terminalPaths.runDir, { recursive: true })
+    ]);
+    await writeFile(
+      orphanPaths.manifestPath,
+      JSON.stringify({
+        run_id: orphanRunId,
+        task_id: 'linear-co-241',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'co-241-id',
+        issue_identifier: 'CO-241',
+        updated_at: '2026-04-09T08:40:00.000Z',
+        summary: 'legacy active-looking manifest has no parseable chronology',
+        commands: []
+      }),
+      'utf8'
+    );
+    await writeFile(
+      terminalPaths.manifestPath,
+      JSON.stringify({
+        run_id: terminalRunId,
+        task_id: 'linear-co-241',
+        pipeline_id: 'provider-linear-worker',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'co-241-id',
+        issue_identifier: 'CO-241',
+        summary: 'terminal replacement has parseable run chronology',
+        commands: []
+      }),
+      'utf8'
+    );
+    const providerIntakeState: ProviderIntakeState = {
+      schema_version: 1,
+      updated_at: '2026-04-18T12:10:00.000Z',
+      rehydrated_at: '2026-04-18T12:10:00.000Z',
+      latest_provider_key: null,
+      latest_reason: null,
+      claims: []
+    };
+
+    const discovery = await discoverCompatibilityCollectionContexts(
+      createProjectionContext(paths, providerIntakeState)
+    );
+
+    expect(discovery.running).toEqual([]);
+    expect(discovery.all.find((entry) => entry.runId === orphanRunId)).toMatchObject({
+      rawStatus: 'succeeded',
+      statusReason: 'provider_claim_absent_newer_terminal_run',
+      summary: expect.stringContaining(`newer terminal run ${terminalRunId} supersedes`)
+    });
+    const reconciliation = JSON.parse(
+      await readFile(join(orphanPaths.runDir, 'provider-linear-worker-reconciliation.json'), 'utf8')
+    ) as Record<string, unknown>;
+    expect(reconciliation).toMatchObject({
+      reason: 'provider_claim_absent_newer_terminal_run',
+      recorded_at: '2026-04-13T02:26:01.632Z',
+      manifest: {
+        run_id: orphanRunId,
+        status: 'in_progress'
+      },
       replacement_run: {
         run_id: terminalRunId,
         status: 'succeeded',
