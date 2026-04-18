@@ -7,6 +7,7 @@ async function readText(path: string): Promise<string> {
 }
 
 type WorkflowStep = {
+  'continue-on-error'?: unknown;
   env?: unknown;
   if?: unknown;
   run?: unknown;
@@ -25,15 +26,6 @@ type WorkflowFile = {
 const marketplaceSkipToken = 'PACK_SMOKE_ALLOW_MARKETPLACE_SKIP';
 const codexInstallCommand = 'npm install --global @openai/codex@0.121.0';
 const packSmokeCommand = 'npm run pack:smoke';
-
-type CommandOccurrence = {
-  index: number;
-  line: string;
-};
-
-type CommandOccurrenceOptions = {
-  allowAndPrefix?: boolean;
-};
 
 async function readWorkflow(path: string): Promise<WorkflowFile> {
   const parsed = load(await readText(path));
@@ -70,51 +62,57 @@ function getStepCondition(step: WorkflowStep): string {
   return typeof step.if === 'string' ? step.if.trim() : '';
 }
 
-function isExecutableCommandOccurrence(line: string, index: number, options: CommandOccurrenceOptions = {}): boolean {
-  const trimmed = line.trimStart();
-  if (trimmed.startsWith('#')) {
-    return false;
-  }
-  const { allowAndPrefix = true } = options;
-  const prefix = line.slice(0, index).trimEnd();
-  return prefix === '' || prefix.endsWith(';') || (allowAndPrefix && prefix.endsWith('&&'));
-}
-
 function normalizeShellContinuations(run: string): string {
   return run.replace(/\\\r?\n[ \t]*/gu, ' ');
 }
 
-function getExecutableCommandOccurrences(
-  run: string,
-  command: string,
-  options: CommandOccurrenceOptions = {}
-): CommandOccurrence[] {
-  const occurrences: CommandOccurrence[] = [];
-  const normalizedRun = normalizeShellContinuations(run);
-  let offset = 0;
-  for (const line of normalizedRun.split(/\r?\n/u)) {
-    let searchFrom = 0;
-    let index = line.indexOf(command, searchFrom);
-    while (index >= 0) {
-      if (isExecutableCommandOccurrence(line, index, options)) {
-        occurrences.push({ index: offset + index, line });
+function getHeredocDelimiter(line: string): string | null {
+  const match = line.match(/<<-?\s*['"]?([A-Za-z_][A-Za-z0-9_]*)['"]?/u);
+  return match?.[1] ?? null;
+}
+
+function getRunCommandLines(run: string): string[] {
+  const commandLines: string[] = [];
+  let heredocDelimiter: string | null = null;
+  for (const rawLine of normalizeShellContinuations(run).split(/\r?\n/u)) {
+    const line = rawLine.trim();
+    if (heredocDelimiter) {
+      if (line === heredocDelimiter) {
+        heredocDelimiter = null;
       }
-      searchFrom = index + command.length;
-      index = line.indexOf(command, searchFrom);
+      continue;
     }
-    offset += line.length + 1;
+    if (!line || line.startsWith('#')) {
+      continue;
+    }
+    const nextHeredocDelimiter = getHeredocDelimiter(line);
+    if (nextHeredocDelimiter) {
+      heredocDelimiter = nextHeredocDelimiter;
+      continue;
+    }
+    commandLines.push(line);
   }
-  return occurrences;
+  return commandLines;
 }
 
-function isSoftFailedCodexInstall(occurrence: CommandOccurrence): boolean {
-  const commandIndex = occurrence.line.indexOf(codexInstallCommand);
-  const afterCommand = commandIndex >= 0 ? occurrence.line.slice(commandIndex + codexInstallCommand.length) : '';
-  return afterCommand.includes('||');
+function hasCommandText(run: string, command: string): boolean {
+  return normalizeShellContinuations(run).includes(command);
 }
 
-function getCodexInstallOccurrences(run: string): CommandOccurrence[] {
-  return getExecutableCommandOccurrences(run, codexInstallCommand, { allowAndPrefix: false });
+function hasExactCommand(run: string, command: string): boolean {
+  return getRunCommandLines(run).includes(command);
+}
+
+function isDedicatedCodexInstallRun(run: string): boolean {
+  const commandLines = getRunCommandLines(run);
+  return commandLines.length === 1 && commandLines[0] === codexInstallCommand;
+}
+
+function isContinueOnErrorEnabled(value: unknown): boolean {
+  if (value === true) {
+    return true;
+  }
+  return typeof value === 'string' && value.trim().length > 0 && value.trim() !== 'false';
 }
 
 describe('scripts/pack-smoke env isolation', () => {
@@ -262,7 +260,8 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
       let smokeStepCount = 0;
       for (const [jobName, job] of Object.entries(workflowFile.jobs ?? {})) {
         expectNoMarketplaceSkipEnv(job.env, `${workflow} job ${jobName}`);
-        const codexInstallConditions = new Set<string>();
+        let hasUnconditionalCodexInstall = false;
+        const conditionalCodexInstallConditions = new Set<string>();
         for (const [stepIndex, step] of getWorkflowSteps(job).entries()) {
           expectNoMarketplaceSkipEnv(step.env, `${workflow} job ${jobName} step ${stepIndex + 1}`);
           const stepCondition = getStepCondition(step);
@@ -270,29 +269,27 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
           expect(run, `${workflow} job ${jobName} must not opt out of marketplace smoke`).not.toContain(
             marketplaceSkipToken
           );
-          const installOccurrences = getCodexInstallOccurrences(run);
-          for (const installOccurrence of installOccurrences) {
+          if (hasCommandText(run, codexInstallCommand)) {
             expect(
-              isSoftFailedCodexInstall(installOccurrence),
-              `${workflow} job ${jobName} step ${stepIndex + 1} must not soft-fail Codex install`
+              isContinueOnErrorEnabled(step['continue-on-error']),
+              `${workflow} job ${jobName} step ${stepIndex + 1} must not continue-on-error Codex install`
             ).toBe(false);
-          }
-          const validInstallOccurrences = installOccurrences.filter(
-            (installOccurrence) => !isSoftFailedCodexInstall(installOccurrence)
-          );
-          const smokeOccurrences = getExecutableCommandOccurrences(run, packSmokeCommand);
-          for (const smokeOccurrence of smokeOccurrences) {
-            smokeStepCount += 1;
-            const installBeforeInSameStep = validInstallOccurrences.some(
-              (installOccurrence) => installOccurrence.index < smokeOccurrence.index
-            );
             expect(
-              codexInstallConditions.has(stepCondition) || installBeforeInSameStep,
+              isDedicatedCodexInstallRun(run),
+              `${workflow} job ${jobName} step ${stepIndex + 1} must use a dedicated Codex 0.121.0 install step`
+            ).toBe(true);
+            if (stepCondition) {
+              conditionalCodexInstallConditions.add(stepCondition);
+            } else {
+              hasUnconditionalCodexInstall = true;
+            }
+          }
+          if (hasExactCommand(run, packSmokeCommand)) {
+            smokeStepCount += 1;
+            expect(
+              hasUnconditionalCodexInstall || conditionalCodexInstallConditions.has(stepCondition),
               `${workflow} job ${jobName} step ${stepIndex + 1} must install Codex 0.121.0 before pack:smoke with matching if condition`
             ).toBe(true);
-          }
-          if (validInstallOccurrences.length > 0) {
-            codexInstallConditions.add(stepCondition);
           }
         }
       }
@@ -300,12 +297,15 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     }
   });
 
-  it('does not treat conditionally chained Codex installs as workflow proof', () => {
-    expect(getCodexInstallOccurrences(`[[ "$NEEDS_CODEX" == 1 ]] && ${codexInstallCommand}`)).toHaveLength(0);
-    expect(getCodexInstallOccurrences(`echo setup; ${codexInstallCommand}`)).toHaveLength(1);
-
-    const chainedRun = `${codexInstallCommand} && ${packSmokeCommand}`;
-    expect(getCodexInstallOccurrences(chainedRun)).toHaveLength(1);
-    expect(getExecutableCommandOccurrences(chainedRun, packSmokeCommand)).toHaveLength(1);
+  it('only treats dedicated Codex install steps as workflow proof', () => {
+    expect(isDedicatedCodexInstallRun(codexInstallCommand)).toBe(true);
+    expect(isDedicatedCodexInstallRun(`${codexInstallCommand} || true`)).toBe(false);
+    expect(isDedicatedCodexInstallRun(`${codexInstallCommand} \\\n  || true`)).toBe(false);
+    expect(isDedicatedCodexInstallRun(`[[ "$NEEDS_CODEX" == 1 ]] && ${codexInstallCommand}`)).toBe(false);
+    expect(isDedicatedCodexInstallRun(`exit 0; ${codexInstallCommand}`)).toBe(false);
+    expect(isDedicatedCodexInstallRun(`cat <<EOF\n${codexInstallCommand}\nEOF`)).toBe(false);
+    expect(isContinueOnErrorEnabled(true)).toBe(true);
+    expect(isContinueOnErrorEnabled('true')).toBe(true);
+    expect(isContinueOnErrorEnabled('false')).toBe(false);
   });
 });
