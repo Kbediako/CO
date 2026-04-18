@@ -5,7 +5,7 @@
 - Scope: docs-first packet, `tasks/index.json` registration, parent-owned run artifact truth reconciliation, parent-owned focused validation.
 - Assumptions:
   - the shared source payload itself is absent in this child checkout
-  - the protected parent prompt wording is the authoritative checksum for this docs phase
+  - the protected parent prompt wording is the authoritative checksum for this documentation phase
   - the smallest correct fix is a reconciliation/classification contract, not artifact deletion
 
 ## Issue Readiness Gate
@@ -24,7 +24,7 @@
   - stale `status=launching` placeholders still block capacity after reconciliation
   - the fix deletes historical artifacts instead of preserving file-based audit truth
 - Pre-implementation issue-quality review:
-  - 2026-04-19: the lane prompt makes this a run artifact truth and child-lane ledger truth reconciliation lane. The packet rejects widening into Linear mutation, scheduler redesign, destructive state cleanup, or artifact deletion.
+  - 2026-04-18: the lane prompt makes this a run artifact truth and child-lane ledger truth reconciliation lane. The packet rejects widening into Linear mutation, scheduler redesign, destructive state cleanup, or artifact deletion.
 
 ## Milestones & Sequencing
 1. Completed in this child lane: create the PRD, TECH_SPEC mirror, canonical task spec, ACTION_PLAN, task checklist, and `tasks/index.json` entry for `CO-241`.
@@ -56,6 +56,10 @@
   - `rg -n "\\.runs/\\*\\*/manifest\\.json|status=in_progress|status=launching|provider-intake-state\\.json|orphaned|released|removed|invalidated|rejected|file-based audit truth|child-lane ledger truth" docs/PRD-linear-42debc45-fa05-4a0a-a7bb-35a48153aea9.md docs/TECH_SPEC-linear-42debc45-fa05-4a0a-a7bb-35a48153aea9.md docs/ACTION_PLAN-linear-42debc45-fa05-4a0a-a7bb-35a48153aea9.md tasks/specs/linear-42debc45-fa05-4a0a-a7bb-35a48153aea9-run-artifact-truth.md tasks/tasks-linear-42debc45-fa05-4a0a-a7bb-35a48153aea9.md`
   - `git diff --check -- docs/PRD-linear-42debc45-fa05-4a0a-a7bb-35a48153aea9.md docs/TECH_SPEC-linear-42debc45-fa05-4a0a-a7bb-35a48153aea9.md docs/ACTION_PLAN-linear-42debc45-fa05-4a0a-a7bb-35a48153aea9.md tasks/specs/linear-42debc45-fa05-4a0a-a7bb-35a48153aea9-run-artifact-truth.md tasks/tasks-linear-42debc45-fa05-4a0a-a7bb-35a48153aea9.md tasks/index.json`
   - `for f in docs/PRD-linear-42debc45-fa05-4a0a-a7bb-35a48153aea9.md docs/TECH_SPEC-linear-42debc45-fa05-4a0a-a7bb-35a48153aea9.md docs/ACTION_PLAN-linear-42debc45-fa05-4a0a-a7bb-35a48153aea9.md tasks/specs/linear-42debc45-fa05-4a0a-a7bb-35a48153aea9-run-artifact-truth.md tasks/tasks-linear-42debc45-fa05-4a0a-a7bb-35a48153aea9.md; do git diff --check --no-index -- /dev/null "$f" >/tmp/co-241-diff-check-one.log 2>&1; code=$?; if [ "$code" -gt 1 ]; then cat /tmp/co-241-diff-check-one.log; exit "$code"; fi; done`
+  - `node scripts/spec-guard.mjs --dry-run`
+  - `npm run docs:check`
+  - `npm run docs:freshness`
+  - `node scripts/diff-budget.mjs`
 - Parent implementation lane:
   - focused child-lane placeholder and invalidation/rejection tests
   - focused provider-run manifest orphan classification tests

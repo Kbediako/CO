@@ -5135,9 +5135,13 @@ async function readHydratedProviderLinearWorkerChildLanesAndRepairLedger(
   return await withProviderLinearWorkerChildLanesLock(runDir, async () => {
     const { records: existing, ledgerExists } = await readProviderLinearWorkerChildLanesWithPresence(runDir);
     if (!ledgerExists && existing.length === 0 && Array.isArray(priorProofChildLanes)) {
-      return priorProofChildLanes
+      const recovered = priorProofChildLanes
         .filter(isProviderLinearWorkerRetiredChildLaneRecord)
         .map((childLane) => normalizeProviderLinearWorkerRetiredChildLane(childLane));
+      if (recovered.length > 0) {
+        await writeJsonAtomic(buildChildLanesPath(runDir), recovered);
+      }
+      return recovered;
     }
     const hydrated = await hydrateProviderLinearWorkerChildLanesFromActiveManifests(
       runDir,

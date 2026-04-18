@@ -1936,19 +1936,19 @@ async function resolveProviderLinearWorkerProjectionProofRefreshPlan(
   const hasRetiredResidue =
     hasProviderLinearWorkerProjectionRetiredChildLaneResidue(proof) ||
     (await hasProviderLinearWorkerProjectionRetiredChildLaneResidueInLedger(runDir));
-  if (!isProviderLinearWorkerProjectionRefreshEligible(proof)) {
-    return hasRetiredResidue
-      ? {
-          updatedAtComparisonScope: 'full',
-          skipSessionLogHydration: true
-        }
-      : null;
-  }
   const telemetryGap = hasProviderLinearWorkerProjectionTelemetryGap(proof);
   const canSkipSessionLogHydration = canSkipProviderLinearWorkerProjectionSessionLogHydration(
     proof,
     telemetryGap
   );
+  if (!isProviderLinearWorkerProjectionRefreshEligible(proof)) {
+    return hasRetiredResidue
+      ? {
+          updatedAtComparisonScope: 'full',
+          skipSessionLogHydration: canSkipSessionLogHydration
+        }
+      : null;
+  }
   if (hasRetiredResidue) {
     return {
       updatedAtComparisonScope: 'full',

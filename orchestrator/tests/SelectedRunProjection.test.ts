@@ -4557,9 +4557,16 @@ describe('SelectedRunProjection', () => {
       summary: 'Child lane docs-recovery was invalidated: Parent invalidated stale terminal summary.',
       summary_recorded_at: '2026-04-18T00:31:00.000Z'
     });
-    await expect(
-      readFile(join(childPaths.runDir, PROVIDER_LINEAR_WORKER_CHILD_LANES_FILENAME), 'utf8')
-    ).rejects.toHaveProperty('code', 'ENOENT');
+    const recoveredLedger = JSON.parse(
+      await readFile(join(childPaths.runDir, PROVIDER_LINEAR_WORKER_CHILD_LANES_FILENAME), 'utf8')
+    ) as Array<Record<string, unknown>>;
+    expect(recoveredLedger[0]).toMatchObject({
+      stream: 'docs-recovery',
+      status: 'invalidated',
+      decision: 'invalidated',
+      summary: 'Child lane docs-recovery was invalidated: Parent invalidated stale terminal summary.',
+      summary_recorded_at: '2026-04-18T00:31:00.000Z'
+    });
 
     const selectedAgain = await createProjectionReader(paths, childPaths.manifestPath).buildSelectedRunContext();
 
