@@ -62,6 +62,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   if (originalAuthProvenanceFingerprintKey === undefined) {
     delete process.env.CODEX_AUTH_PROVENANCE_FINGERPRINT_KEY;
   } else {
@@ -5676,6 +5677,191 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(execRunner.mock.calls[0]?.[0].env.CODEX_NON_INTERACTIVE).toBe('1');
     expect(execRunner.mock.calls[0]?.[0].env.CODEX_NO_INTERACTIVE).toBe('1');
     expect(execRunner.mock.calls[0]?.[0].env.CODEX_INTERACTIVE).toBe('0');
+  });
+
+  it('pins the live worker lineage into turn env and clears stale control-host locator env', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-worker-lineage-env-'));
+    const manualTaskId = 'test-manual-dispatch';
+    const manualRunId = 'manual-run-1';
+    const manualRunDir = join(tempRoot, '.runs', manualTaskId, 'cli', manualRunId);
+    const manualManifestPath = join(manualRunDir, 'manifest.json');
+    const olderIssueWorkspacePath = join(tempRoot, '.workspaces', 'linear-lin-issue-1');
+    const olderRunDir = join(
+      olderIssueWorkspacePath,
+      '.runs',
+      'linear-lin-issue-1',
+      'cli',
+      'older-parent-run'
+    );
+    const olderManifestPath = join(olderRunDir, 'manifest.json');
+    await mkdir(manualRunDir, { recursive: true });
+    await mkdir(olderRunDir, { recursive: true });
+    await writeFile(
+      manualManifestPath,
+      JSON.stringify({
+        run_id: manualRunId,
+        task_id: manualTaskId,
+        pipeline_id: 'provider-linear-worker',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: tempRoot
+      }),
+      'utf8'
+    );
+    await writeFile(
+      olderManifestPath,
+      JSON.stringify({
+        run_id: 'older-parent-run',
+        task_id: 'linear-lin-issue-1',
+        pipeline_id: 'provider-linear-worker',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: olderIssueWorkspacePath,
+        provider_control_host_task_id: 'local-mcp',
+        provider_control_host_run_id: 'control-host'
+      }),
+      'utf8'
+    );
+    vi.stubEnv('CODEX_ORCHESTRATOR_MANIFEST_PATH', olderManifestPath);
+    vi.stubEnv('CODEX_ORCHESTRATOR_ROOT', olderIssueWorkspacePath);
+    vi.stubEnv('CODEX_ORCHESTRATOR_TASK_ID', 'linear-lin-issue-1');
+    vi.stubEnv('MCP_RUNNER_TASK_ID', 'linear-lin-issue-1');
+    vi.stubEnv('TASK', 'linear-lin-issue-1');
+    vi.stubEnv('CODEX_ORCHESTRATOR_RUN_ID', 'older-parent-run');
+    vi.stubEnv('CODEX_ORCHESTRATOR_RUNS_DIR', join(olderIssueWorkspacePath, '.runs'));
+    vi.stubEnv('CODEX_ORCHESTRATOR_OUT_DIR', join(olderIssueWorkspacePath, 'out'));
+    vi.stubEnv('CODEX_ORCHESTRATOR_PIPELINE_ID', 'provider-linear-worker');
+    vi.stubEnv('CODEX_ORCHESTRATOR_ISSUE_ID', 'lin-issue-1');
+    vi.stubEnv('CODEX_ORCHESTRATOR_ISSUE_IDENTIFIER', 'CO-2');
+    vi.stubEnv('CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID', 'local-mcp');
+    vi.stubEnv('CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID', 'control-host');
+    vi.stubEnv(
+      'CODEX_ORCHESTRATOR_REPO_CONFIG_PATH',
+      join(olderRunDir, 'provider-workflow.last-known-good.json')
+    );
+    vi.stubEnv(
+      'CODEX_ORCHESTRATOR_PROVIDER_REPO_CONFIG_PATH',
+      join(olderRunDir, 'provider-workflow.last-known-good.json')
+    );
+    vi.stubEnv('CODEX_ORCHESTRATOR_PROVIDER_PACKAGE_ROOT', olderIssueWorkspacePath);
+    vi.stubEnv('CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE', 'control-host');
+    vi.stubEnv('CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_TOKEN', 'stale-launch-token');
+
+    const execRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
+      return {
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-1"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+          '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}'
+        ].join('\n'),
+        stderr: ''
+      };
+    });
+
+    await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manualManifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot,
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+      },
+      {
+        readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+        execRunner,
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(execRunner).toHaveBeenCalledTimes(1);
+    const turnEnv = execRunner.mock.calls[0]?.[0].env;
+    expect(turnEnv.CODEX_ORCHESTRATOR_MANIFEST_PATH).toBe(manualManifestPath);
+    expect(turnEnv.CODEX_ORCHESTRATOR_RUN_DIR).toBe(manualRunDir);
+    expect(turnEnv.CODEX_ORCHESTRATOR_ROOT).toBe(tempRoot);
+    expect(turnEnv.CODEX_ORCHESTRATOR_RUNS_DIR).toBe(join(tempRoot, '.runs'));
+    expect(turnEnv.CODEX_ORCHESTRATOR_OUT_DIR).toBe(join(tempRoot, 'out'));
+    expect(turnEnv.CODEX_ORCHESTRATOR_RUN_ID).toBe(manualRunId);
+    expect(turnEnv.CODEX_ORCHESTRATOR_TASK_ID).toBe(manualTaskId);
+    expect(turnEnv.MCP_RUNNER_TASK_ID).toBe(manualTaskId);
+    expect(turnEnv.TASK).toBe(manualTaskId);
+    expect(turnEnv.CODEX_ORCHESTRATOR_ISSUE_ID).toBe('lin-issue-1');
+    expect(turnEnv.CODEX_ORCHESTRATOR_ISSUE_IDENTIFIER).toBe('CO-2');
+    expect(turnEnv.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID).toBeUndefined();
+    expect(turnEnv.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID).toBeUndefined();
+    expect(turnEnv.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE).toBeUndefined();
+    expect(turnEnv.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_TOKEN).toBeUndefined();
+    expect(turnEnv.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH).toBeUndefined();
+    expect(turnEnv.CODEX_ORCHESTRATOR_PROVIDER_REPO_CONFIG_PATH).toBeUndefined();
+    expect(turnEnv.CODEX_ORCHESTRATOR_PROVIDER_PACKAGE_ROOT).toBeUndefined();
+  });
+
+  it('preserves manual custom repo-config and artifact-root overrides when they are not provider-owned', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-worker-custom-env-'));
+    const manualTaskId = 'test-manual-dispatch';
+    const manualRunId = 'manual-run-1';
+    const manualRunDir = join(tempRoot, '.runs', manualTaskId, 'cli', manualRunId);
+    const manualManifestPath = join(manualRunDir, 'manifest.json');
+    const customRunsDir = join(tempRoot, 'artifacts', 'runs');
+    const customOutDir = join(tempRoot, 'artifacts', 'out');
+    const customRepoConfigPath = join(tempRoot, 'custom', 'codex.orchestrator.json');
+    await mkdir(manualRunDir, { recursive: true });
+    await writeFile(
+      manualManifestPath,
+      JSON.stringify({
+        run_id: manualRunId,
+        task_id: manualTaskId,
+        pipeline_id: 'provider-linear-worker',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: tempRoot
+      }),
+      'utf8'
+    );
+
+    const execRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
+      return {
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-1"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+          '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}'
+        ].join('\n'),
+        stderr: ''
+      };
+    });
+
+    await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manualManifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot,
+        CODEX_ORCHESTRATOR_RUNS_DIR: customRunsDir,
+        CODEX_ORCHESTRATOR_OUT_DIR: customOutDir,
+        CODEX_ORCHESTRATOR_REPO_CONFIG_PATH: customRepoConfigPath,
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+      },
+      {
+        readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+        execRunner,
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(execRunner).toHaveBeenCalledTimes(1);
+    const turnEnv = execRunner.mock.calls[0]?.[0].env;
+    expect(turnEnv.CODEX_ORCHESTRATOR_RUNS_DIR).toBe(customRunsDir);
+    expect(turnEnv.CODEX_ORCHESTRATOR_OUT_DIR).toBe(customOutDir);
+    expect(turnEnv.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH).toBe(customRepoConfigPath);
   });
 
   it('fails closed when a codex turn exits non-zero and writes a failed proof sidecar', async () => {
