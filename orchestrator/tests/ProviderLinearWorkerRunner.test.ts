@@ -43,6 +43,7 @@ import { resolveProviderLinearChildLaneScopeContract } from '../src/cli/provider
 import type { RuntimeCodexCommandContext } from '../src/cli/runtime/index.js';
 
 let tempRoot: string | null = null;
+let extraTempRoots: string[] = [];
 const providerLinearWorkerRunnerTestTimeoutMs = 60_000;
 const SOURCE_HELPER_COMMAND = 'node "/tmp/co/bin/codex-orchestrator.js" linear';
 const TEST_AUTH_PROVENANCE_FINGERPRINT_KEY = 'provider-linear-worker-test-fingerprint-key';
@@ -58,10 +59,12 @@ function testFingerprint(value: string): string {
 beforeEach(() => {
   originalAuthProvenanceFingerprintKey = process.env.CODEX_AUTH_PROVENANCE_FINGERPRINT_KEY;
   process.env.CODEX_AUTH_PROVENANCE_FINGERPRINT_KEY = TEST_AUTH_PROVENANCE_FINGERPRINT_KEY;
+  extraTempRoots = [];
 });
 
 afterEach(async () => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   if (originalAuthProvenanceFingerprintKey === undefined) {
     delete process.env.CODEX_AUTH_PROVENANCE_FINGERPRINT_KEY;
   } else {
@@ -71,6 +74,10 @@ afterEach(async () => {
     await rm(tempRoot, { recursive: true, force: true });
     tempRoot = null;
   }
+  for (const path of extraTempRoots) {
+    await rm(path, { recursive: true, force: true });
+  }
+  extraTempRoots = [];
 });
 
 async function createManifestRoot() {
@@ -148,14 +155,18 @@ async function createControlEndpointServer(bindHost = '127.0.0.1'): Promise<{
   };
 }
 
-async function writeCodexConfig(maxTurns: number): Promise<string> {
+async function writeCodexConfigContent(content: string): Promise<string> {
   if (!tempRoot) {
     throw new Error('temp root not initialized');
   }
   const codexHome = join(tempRoot, '.codex');
   await mkdir(codexHome, { recursive: true });
-  await writeFile(join(codexHome, 'config.toml'), `[agent]\nmax_turns = ${maxTurns}\n`, 'utf8');
+  await writeFile(join(codexHome, 'config.toml'), content, 'utf8');
   return codexHome;
+}
+
+async function writeCodexConfig(maxTurns: number): Promise<string> {
+  return await writeCodexConfigContent(`[agent]\nmax_turns = ${maxTurns}\n`);
 }
 
 type ReadTrackedIssueInput = Parameters<ProviderLinearWorkerDependencies['readTrackedIssue']>[0];
@@ -732,6 +743,97 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(context.maxTurns).toBe(9);
   });
 
+  it('does not let nested table dotted keys override root agent max_turns', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const codexHome = await writeCodexConfigContent(
+      [
+        '[profile.worker]',
+        'agent.max_turns = 2',
+        '',
+        '[agent]',
+        'max_turns = 9',
+        ''
+      ].join('\n')
+    );
+
+    const context = await loadProviderLinearWorkerContext({
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+      CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+      CODEX_HOME: codexHome
+    });
+
+    expect(context.maxTurns).toBe(9);
+  });
+
+  it.each([
+    ['leading plus', '+12', 12],
+    ['underscore separator', '1_000', 1000],
+    ['hexadecimal', '0x14', 20],
+    ['octal', '0o24', 20],
+    ['binary', '0b10100', 20]
+  ])('accepts valid TOML integer spelling with %s for root agent max_turns', async (_label, value, expected) => {
+    const { manifestPath } = await createManifestRoot();
+    const codexHome = await writeCodexConfigContent(`[agent]\nmax_turns = ${value}\n`);
+
+    const context = await loadProviderLinearWorkerContext({
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+      CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+      CODEX_HOME: codexHome
+    });
+
+    expect(context.maxTurns).toBe(expected);
+  });
+
+  it('does not parse max_turns assignments embedded in multiline basic strings', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const codexHome = await writeCodexConfigContent(
+      [
+        'status_message = """',
+        'agent.max_turns = 2',
+        '[agent]',
+        'max_turns = 3',
+        '"""',
+        '',
+        '[agent]',
+        'max_turns = 9',
+        ''
+      ].join('\n')
+    );
+
+    const context = await loadProviderLinearWorkerContext({
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+      CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+      CODEX_HOME: codexHome
+    });
+
+    expect(context.maxTurns).toBe(9);
+  });
+
+  it('does not parse max_turns assignments embedded in multiline literal strings', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const codexHome = await writeCodexConfigContent(
+      [
+        "status_message = '''",
+        'agent.max_turns = 2',
+        '[agent]',
+        'max_turns = 3',
+        "'''",
+        '',
+        '[agent]',
+        'max_turns = 9',
+        ''
+      ].join('\n')
+    );
+
+    const context = await loadProviderLinearWorkerContext({
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+      CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+      CODEX_HOME: codexHome
+    });
+
+    expect(context.maxTurns).toBe(9);
+  });
+
   it('falls back to the Symphony default max turns when env and CODEX_HOME are unset', async () => {
     const { manifestPath } = await createManifestRoot();
 
@@ -848,7 +950,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
   });
   it('requires matching live control-host env values and accepts manifest.pipelineId', async () => {
     const { manifestPath } = await createManifestRoot();
-    await writeFile(manifestPath, JSON.stringify({ run_id: 'run-child', task_id: 'linear-lin-issue-1', issue_id: 'lin-issue-1', issue_identifier: 'CO-2', pipelineId: 'provider-linear-worker', provider_control_host_task_id: 'local-mcp', provider_control_host_run_id: 'control-host', workspace_path: tempRoot }), 'utf8');
+    await writeFile(manifestPath, JSON.stringify({ run_id: 'run-child', task_id: 'linear-lin-issue-1', issue_id: 'lin-issue-1', issue_identifier: 'CO-2', pipelineId: 'provider-linear-worker', provider_launch_source: 'control-host', provider_control_host_task_id: 'local-mcp', provider_control_host_run_id: 'control-host', workspace_path: tempRoot }), 'utf8');
     expect(await loadProviderLinearWorkerContext({ CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath, CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined })).toMatchObject({
       pipelineId: 'provider-linear-worker',
       providerControlHostTaskId: null,
@@ -858,6 +960,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect((await loadProviderLinearWorkerContext({
       CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
       CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+      CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: 'control-host',
       CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: 'local-mcp',
       CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID: 'control-host'
     }))).toMatchObject({
@@ -875,6 +978,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       issue_id: 'lin-issue-1',
       issue_identifier: 'CO-2',
       pipelineId: 'provider-linear-worker',
+      provider_launch_source: 'control-host',
       provider_control_host_task_id: 'local-mcp',
       provider_control_host_run_id: 'control-host',
       workspace_path: tempRoot
@@ -883,6 +987,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     await expect(loadProviderLinearWorkerContext({
       CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
       CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+      CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: 'control-host',
       CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: 'other-task',
       CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID: 'other-run'
     })).resolves.toMatchObject({
@@ -890,6 +995,77 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       providerControlHostRunId: null,
       providerControlHostMatchesManifest: false
     });
+  });
+
+  it('persists missing control-host provenance onto the provider-worker manifest when the live env matches', async () => {
+    const { manifestPath } = await createManifestRoot();
+
+    const context = await loadProviderLinearWorkerContext({
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+      CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+      CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: 'control-host',
+      CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: 'local-mcp',
+      CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID: 'control-host'
+    });
+
+    expect(context).toMatchObject({
+      providerControlHostTaskId: 'local-mcp',
+      providerControlHostRunId: 'control-host',
+      providerControlHostRecordedInManifest: true,
+      providerControlHostMatchesManifest: true
+    });
+
+    const persistedManifest = JSON.parse(await readFile(manifestPath, 'utf8')) as Record<string, unknown>;
+    expect(persistedManifest).toMatchObject({
+      provider_launch_source: 'control-host',
+      provider_control_host_task_id: 'local-mcp',
+      provider_control_host_run_id: 'control-host'
+    });
+  });
+
+  it('does not persist backfilled provenance when context validation fails', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const issueWorkspacePath = join(tempRoot ?? '', '.workspaces', 'linear-lin-issue-1');
+    const workspaceRunDir = join(issueWorkspacePath, '.runs', 'linear-lin-issue-1', 'cli', 'run-child');
+    const workspaceManifestPath = join(workspaceRunDir, 'manifest.json');
+    await mkdir(workspaceRunDir, { recursive: true });
+    await writeFile(
+      workspaceManifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: issueWorkspacePath
+      }),
+      'utf8'
+    );
+
+    await expect(
+      loadProviderLinearWorkerContext(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_TASK_ID: 'linear-lin-issue-1',
+          CODEX_ORCHESTRATOR_ISSUE_ID: 'lin-issue-2',
+          CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: 'control-host',
+          CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: 'local-mcp',
+          CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID: 'control-host'
+        },
+        undefined,
+        issueWorkspacePath
+      )
+    ).rejects.toThrow('Provider worker issue id mismatch');
+
+    const sharedManifest = JSON.parse(await readFile(manifestPath, 'utf8')) as Record<string, unknown>;
+    const workspaceManifest = JSON.parse(
+      await readFile(workspaceManifestPath, 'utf8')
+    ) as Record<string, unknown>;
+    for (const persistedManifest of [sharedManifest, workspaceManifest]) {
+      expect(persistedManifest.provider_launch_source).toBeUndefined();
+      expect(persistedManifest.provider_control_host_task_id).toBeUndefined();
+      expect(persistedManifest.provider_control_host_run_id).toBeUndefined();
+    }
   });
 
   it('builds a full first-turn prompt and a continuation prompt', () => {
@@ -2519,6 +2695,144 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     }
   });
 
+  it('rejects already-aborted requests before spawning the child process', async () => {
+    vi.resetModules();
+    const spawn = vi.fn();
+    const actualChildProcess = await vi.importActual<typeof import('node:child_process')>('node:child_process');
+    vi.doMock('node:child_process', () => ({
+      ...actualChildProcess,
+      spawn
+    }));
+
+    try {
+      const { defaultExecRunner } = await import('../src/cli/providerLinearWorkerRunner.js');
+      const controller = new AbortController();
+      controller.abort(new Error('startup timeout'));
+
+      await expect(
+        defaultExecRunner({
+          command: 'codex',
+          args: ['exec'],
+          cwd: tempRoot ?? process.cwd(),
+          env: {},
+          mirrorOutput: false,
+          abortSignal: controller.signal
+        })
+      ).rejects.toThrow('startup timeout');
+      expect(spawn).not.toHaveBeenCalled();
+    } finally {
+      vi.doUnmock('node:child_process');
+      vi.resetModules();
+    }
+  });
+
+  it('waits for close instead of timing out when abort fires after child exit', async () => {
+    vi.resetModules();
+    const stdout = new PassThrough();
+    const stderr = new PassThrough();
+    const kill = vi.fn(() => true);
+    const fakeChild = Object.assign(new EventEmitter(), {
+      stdout,
+      stderr,
+      kill,
+      killed: false,
+      exitCode: null,
+      signalCode: null
+    }) as unknown as ChildProcess;
+    const actualChildProcess = await vi.importActual<typeof import('node:child_process')>('node:child_process');
+    vi.doMock('node:child_process', () => ({
+      ...actualChildProcess,
+      spawn: vi.fn(() => fakeChild)
+    }));
+
+    try {
+      const { defaultExecRunner } = await import('../src/cli/providerLinearWorkerRunner.js');
+      const controller = new AbortController();
+      const resultPromise = defaultExecRunner({
+        command: 'codex',
+        args: ['exec'],
+        cwd: tempRoot ?? process.cwd(),
+        env: {},
+        mirrorOutput: false,
+        abortSignal: controller.signal
+      });
+
+      stdout.end('stdout-before-close');
+      stderr.end('stderr-before-close');
+      fakeChild.exitCode = 0;
+      fakeChild.emit('exit', 0);
+      controller.abort(new Error('startup timeout'));
+
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(kill).not.toHaveBeenCalled();
+
+      fakeChild.emit('close', 0);
+      await expect(resultPromise).resolves.toEqual({
+        exitCode: 0,
+        stdout: 'stdout-before-close',
+        stderr: 'stderr-before-close'
+      });
+    } finally {
+      vi.doUnmock('node:child_process');
+      vi.resetModules();
+    }
+  });
+
+  it('waits for close before rejecting when abort kills a still-running child', async () => {
+    vi.resetModules();
+    const stdout = new PassThrough();
+    const stderr = new PassThrough();
+    const kill = vi.fn(() => true);
+    const fakeChild = Object.assign(new EventEmitter(), {
+      stdout,
+      stderr,
+      kill,
+      killed: false,
+      exitCode: null,
+      signalCode: null
+    }) as unknown as ChildProcess;
+    const actualChildProcess = await vi.importActual<typeof import('node:child_process')>('node:child_process');
+    vi.doMock('node:child_process', () => ({
+      ...actualChildProcess,
+      spawn: vi.fn(() => fakeChild)
+    }));
+
+    try {
+      const { defaultExecRunner } = await import('../src/cli/providerLinearWorkerRunner.js');
+      const controller = new AbortController();
+      let settled = false;
+      const resultPromise = defaultExecRunner({
+        command: 'codex',
+        args: ['exec'],
+        cwd: tempRoot ?? process.cwd(),
+        env: {},
+        mirrorOutput: false,
+        abortSignal: controller.signal
+      });
+      void resultPromise.then(
+        () => {
+          settled = true;
+        },
+        () => {
+          settled = true;
+        }
+      );
+
+      controller.abort(new Error('startup timeout'));
+
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(kill).toHaveBeenCalledTimes(1);
+      expect(settled).toBe(false);
+
+      fakeChild.signalCode = 'SIGTERM';
+      fakeChild.emit('close', null);
+      await expect(resultPromise).rejects.toThrow('startup timeout');
+    } finally {
+      vi.doUnmock('node:child_process');
+      vi.resetModules();
+    }
+  });
+
   it('continues on the same thread across turns and writes a proof sidecar', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
     const readTrackedIssue = vi
@@ -3652,6 +3966,201 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       run_id: 'launching-docs-packet',
       status: 'launching',
       summary: 'Child lane reserved before child run startup.'
+    });
+  });
+
+  it('can skip session-log hydration while refreshing child-lane state for projection reads', async () => {
+    const { runDir } = await createManifestRoot();
+    const issue = createTrackedIssue();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const codexHome = join(tempRoot ?? '', '.codex');
+    const sessionDir = join(codexHome, 'sessions', '2030', '03', '21');
+    const sessionLogPath = join(sessionDir, 'rollout-2030-03-21T09-00-06-000Z-thread-2.jsonl');
+    await mkdir(sessionDir, { recursive: true });
+    await writeFile(
+      sessionLogPath,
+      [
+        `{"timestamp":"2030-03-21T09:00:06.000Z","type":"session_meta","payload":{"id":"thread-2","cwd":"${tempRoot}","source":"exec"}}`,
+        `{"timestamp":"2030-03-21T09:00:06.050Z","type":"turn_context","payload":{"turn_id":"turn-3","user_instructions":"You are the provider worker for Linear issue ${issue.identifier}: ${issue.title}"}}`,
+        '{"timestamp":"2030-03-21T09:00:06.100Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":99,"output_tokens":55,"total_tokens":154}},"rate_limits":{"primary":{"used_percent":90,"window_minutes":300},"secondary":{"used_percent":75,"window_minutes":10080}}}}'
+      ].join('\n'),
+      'utf8'
+    );
+    const sessionLogMtime = new Date('2030-03-21T09:00:06.000Z');
+    await utimes(sessionLogPath, sessionLogMtime, sessionLogMtime);
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        {
+          issue_id: 'lin-issue-1',
+          issue_identifier: issue.identifier,
+          attempt_started_at: '2030-03-21T09:00:05.000Z',
+          current_turn_started_at: '2030-03-21T09:00:05.500Z',
+          pid: '12345',
+          thread_id: 'thread-2',
+          latest_turn_id: 'turn-2',
+          latest_session_id: 'thread-2-turn-2',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          turn_count: 1,
+          last_event: 'item.completed',
+          last_message: null,
+          last_event_at: '2030-03-21T09:00:05.900Z',
+          tokens: {
+            input_tokens: 12,
+            output_tokens: 8,
+            total_tokens: 20
+          },
+          rate_limits: {
+            primary: {
+              used_percent: 12.5,
+              window_minutes: 300
+            },
+            secondary: {
+              used_percent: 48,
+              window_minutes: 10080
+            }
+          },
+          owner_phase: 'turn_completed',
+          owner_status: 'in_progress',
+          workspace_path: tempRoot,
+          source_setup: null,
+          linear_audit: null,
+          child_streams: [],
+          child_lanes: [],
+          progress: null,
+          tracked_issue_error: null,
+          linear_budget: null,
+          end_reason: null,
+          updated_at: '2030-03-21T09:00:05.000Z'
+        } satisfies ProviderLinearWorkerProof,
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const childTaskId = 'linear-lin-issue-1-docs-packet';
+    const childCliDir = join(tempRoot!, '.runs', childTaskId, 'cli');
+    const matchingChildRunDir = join(childCliDir, '2030-03-21T09-00-07-000Z-childlane');
+    await mkdir(matchingChildRunDir, { recursive: true });
+    await appendProviderLinearWorkerChildLaneRecord(runDir, {
+      stream: 'docs-packet',
+      pipeline_id: 'provider-linear-child-lane',
+      task_id: childTaskId,
+      run_id: 'launching-docs-packet',
+      status: 'launching',
+      manifest_path: join(childCliDir, 'launching-docs-packet', 'manifest.json'),
+      artifact_root: join(childCliDir, 'launching-docs-packet'),
+      log_path: null,
+      summary: 'Child lane reserved before child run startup.',
+      issue_id: 'lin-issue-1',
+      issue_identifier: issue.identifier,
+      workspace_path: tempRoot,
+      source_setup: null,
+      launched_at: '2030-03-21T09:00:06.500Z',
+      purpose: 'Build docs packet.',
+      instructions: null,
+      scope: resolveProviderLinearChildLaneScopeContract({
+        files: ['docs/PRD-linear-lin-issue-1.md'],
+        phases: ['docs']
+      }),
+      parent_snapshot: {
+        base_sha: null,
+        issue_updated_at: null,
+        issue_state: null,
+        issue_state_type: null,
+        captured_at: '2030-03-21T09:00:06.500Z'
+      },
+      lane_workspace_path: null,
+      patch_artifact_path: null,
+      patch_bytes: null,
+      decision: 'pending',
+      in_flight_action: null,
+      in_flight_started_at: null,
+      decision_at: null,
+      decision_reason: null
+    });
+    await writeFile(
+      join(matchingChildRunDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: '2030-03-21T09-00-07-000Z-childlane',
+        task_id: childTaskId,
+        parent_run_id: 'run-child',
+        pipeline_id: 'provider-linear-child-lane',
+        issue_id: 'lin-issue-1',
+        issue_identifier: issue.identifier,
+        status: 'in_progress',
+        summary: 'Installing dependencies',
+        started_at: '2030-03-21T09:00:07.000Z',
+        updated_at: '2030-03-21T09:00:08.000Z',
+        artifact_root: matchingChildRunDir,
+        log_path: join(matchingChildRunDir, 'runner.ndjson'),
+        workspace_path: tempRoot
+      }),
+      'utf8'
+    );
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2030-03-21T09:00:09.000Z',
+      async (path, proof) => await writeFile(path, JSON.stringify(proof, null, 2), 'utf8'),
+      { ...process.env, CODEX_HOME: codexHome },
+      {
+        updatedAtComparisonScope: 'full',
+        skipSessionLogHydration: true
+      }
+    );
+    const onDisk = JSON.parse(await readFile(proofPath, 'utf8')) as ProviderLinearWorkerProof;
+
+    expect(refreshed).toMatchObject({
+      thread_id: 'thread-2',
+      latest_turn_id: 'turn-2',
+      latest_session_id: 'thread-2-turn-2',
+      tokens: {
+        input_tokens: 12,
+        output_tokens: 8,
+        total_tokens: 20
+      },
+      rate_limits: {
+        primary: {
+          used_percent: 12.5,
+          window_minutes: 300
+        },
+        secondary: {
+          used_percent: 48,
+          window_minutes: 10080
+        }
+      },
+      updated_at: '2030-03-21T09:00:09.000Z'
+    });
+    expect(refreshed?.child_lanes?.[0]).toMatchObject({
+      run_id: '2030-03-21T09-00-07-000Z-childlane',
+      status: 'in_progress',
+      summary: 'Child lane docs-packet is running. Installing dependencies',
+      manifest_path: join(matchingChildRunDir, 'manifest.json'),
+      artifact_root: matchingChildRunDir
+    });
+    expect(onDisk).toMatchObject({
+      thread_id: 'thread-2',
+      latest_turn_id: 'turn-2',
+      latest_session_id: 'thread-2-turn-2',
+      tokens: {
+        input_tokens: 12,
+        output_tokens: 8,
+        total_tokens: 20
+      },
+      rate_limits: {
+        primary: {
+          used_percent: 12.5,
+          window_minutes: 300
+        },
+        secondary: {
+          used_percent: 48,
+          window_minutes: 10080
+        }
+      },
+      updated_at: '2030-03-21T09:00:09.000Z'
     });
   });
 
@@ -5538,6 +6047,631 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(execRunner.mock.calls[0]?.[0].env.CODEX_NON_INTERACTIVE).toBe('1');
     expect(execRunner.mock.calls[0]?.[0].env.CODEX_NO_INTERACTIVE).toBe('1');
     expect(execRunner.mock.calls[0]?.[0].env.CODEX_INTERACTIVE).toBe('0');
+  });
+
+  it('pins the live worker lineage into turn env and clears stale control-host locator env', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-worker-lineage-env-'));
+    const manualTaskId = 'test-manual-dispatch';
+    const manualRunId = 'manual-run-1';
+    const manualRunDir = join(tempRoot, '.runs', manualTaskId, 'cli', manualRunId);
+    const manualManifestPath = join(manualRunDir, 'manifest.json');
+    const olderIssueWorkspacePath = join(tempRoot, '.workspaces', 'linear-lin-issue-1');
+    const olderRunDir = join(
+      olderIssueWorkspacePath,
+      '.runs',
+      'linear-lin-issue-1',
+      'cli',
+      'older-parent-run'
+    );
+    const olderManifestPath = join(olderRunDir, 'manifest.json');
+    await mkdir(manualRunDir, { recursive: true });
+    await mkdir(olderRunDir, { recursive: true });
+    await writeFile(
+      manualManifestPath,
+      JSON.stringify({
+        run_id: manualRunId,
+        task_id: manualTaskId,
+        pipeline_id: 'provider-linear-worker',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: tempRoot
+      }),
+      'utf8'
+    );
+    await writeFile(
+      olderManifestPath,
+      JSON.stringify({
+        run_id: 'older-parent-run',
+        task_id: 'linear-lin-issue-1',
+        pipeline_id: 'provider-linear-worker',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: olderIssueWorkspacePath,
+        provider_control_host_task_id: 'local-mcp',
+        provider_control_host_run_id: 'control-host'
+      }),
+      'utf8'
+    );
+    vi.stubEnv('CODEX_ORCHESTRATOR_MANIFEST_PATH', olderManifestPath);
+    vi.stubEnv('CODEX_ORCHESTRATOR_ROOT', olderIssueWorkspacePath);
+    vi.stubEnv('CODEX_ORCHESTRATOR_TASK_ID', 'linear-lin-issue-1');
+    vi.stubEnv('MCP_RUNNER_TASK_ID', 'linear-lin-issue-1');
+    vi.stubEnv('TASK', 'linear-lin-issue-1');
+    vi.stubEnv('CODEX_ORCHESTRATOR_RUN_ID', 'older-parent-run');
+    vi.stubEnv('CODEX_ORCHESTRATOR_RUNS_DIR', join(olderIssueWorkspacePath, '.runs'));
+    vi.stubEnv('CODEX_ORCHESTRATOR_OUT_DIR', join(olderIssueWorkspacePath, 'out'));
+    vi.stubEnv('CODEX_ORCHESTRATOR_PIPELINE_ID', 'provider-linear-worker');
+    vi.stubEnv('CODEX_ORCHESTRATOR_ISSUE_ID', 'lin-issue-1');
+    vi.stubEnv('CODEX_ORCHESTRATOR_ISSUE_IDENTIFIER', 'CO-2');
+    vi.stubEnv('CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID', 'local-mcp');
+    vi.stubEnv('CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID', 'control-host');
+    vi.stubEnv(
+      'CODEX_ORCHESTRATOR_REPO_CONFIG_PATH',
+      join(olderRunDir, 'provider-workflow.last-known-good.json')
+    );
+    vi.stubEnv(
+      'CODEX_ORCHESTRATOR_PROVIDER_REPO_CONFIG_PATH',
+      join(olderRunDir, 'provider-workflow.last-known-good.json')
+    );
+    vi.stubEnv('CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED', '1');
+    vi.stubEnv('CODEX_ORCHESTRATOR_PROVIDER_PACKAGE_ROOT', olderIssueWorkspacePath);
+    vi.stubEnv('CODEX_ORCHESTRATOR_PACKAGE_ROOT', olderIssueWorkspacePath);
+    vi.stubEnv('CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE', 'control-host');
+    vi.stubEnv('CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_TOKEN', 'stale-launch-token');
+
+    const execRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
+      return {
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-1"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+          '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}'
+        ].join('\n'),
+        stderr: ''
+      };
+    });
+
+    await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manualManifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot,
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+      },
+      {
+        readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+        execRunner,
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(execRunner).toHaveBeenCalledTimes(1);
+    const turnEnv = execRunner.mock.calls[0]?.[0].env;
+    expect(turnEnv.CODEX_ORCHESTRATOR_MANIFEST_PATH).toBe(manualManifestPath);
+    expect(turnEnv.CODEX_ORCHESTRATOR_RUN_DIR).toBe(manualRunDir);
+    expect(turnEnv.CODEX_ORCHESTRATOR_ROOT).toBe(tempRoot);
+    expect(turnEnv.CODEX_ORCHESTRATOR_RUNS_DIR).toBe(join(tempRoot, '.runs'));
+    expect(turnEnv.CODEX_ORCHESTRATOR_OUT_DIR).toBe(join(tempRoot, 'out'));
+    expect(turnEnv.CODEX_ORCHESTRATOR_RUN_ID).toBe(manualRunId);
+    expect(turnEnv.CODEX_ORCHESTRATOR_TASK_ID).toBe(manualTaskId);
+    expect(turnEnv.MCP_RUNNER_TASK_ID).toBe(manualTaskId);
+    expect(turnEnv.TASK).toBe(manualTaskId);
+    expect(turnEnv.CODEX_ORCHESTRATOR_ISSUE_ID).toBe('lin-issue-1');
+    expect(turnEnv.CODEX_ORCHESTRATOR_ISSUE_IDENTIFIER).toBe('CO-2');
+    expect(turnEnv.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID).toBeUndefined();
+    expect(turnEnv.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID).toBeUndefined();
+    expect(turnEnv.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE).toBeUndefined();
+    expect(turnEnv.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_TOKEN).toBeUndefined();
+    expect(turnEnv.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH).toBeUndefined();
+    expect(turnEnv.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED).toBeUndefined();
+    expect(turnEnv.CODEX_ORCHESTRATOR_PROVIDER_REPO_CONFIG_PATH).toBeUndefined();
+    expect(turnEnv.CODEX_ORCHESTRATOR_PACKAGE_ROOT).toBeUndefined();
+    expect(turnEnv.CODEX_ORCHESTRATOR_PROVIDER_PACKAGE_ROOT).toBeUndefined();
+  });
+
+  it('preserves manual custom repo-config and artifact-root overrides when they are not provider-owned', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-worker-custom-env-'));
+    const manualTaskId = 'test-manual-dispatch';
+    const manualRunId = 'manual-run-1';
+    const manualRunDir = join(tempRoot, '.runs', manualTaskId, 'cli', manualRunId);
+    const manualManifestPath = join(manualRunDir, 'manifest.json');
+    const customRunsDir = join(tempRoot, 'artifacts', 'runs');
+    const customOutDir = join(tempRoot, 'artifacts', 'out');
+    const customRepoConfigPath = join(tempRoot, 'custom', 'codex.orchestrator.json');
+    await mkdir(manualRunDir, { recursive: true });
+    await writeFile(
+      manualManifestPath,
+      JSON.stringify({
+        run_id: manualRunId,
+        task_id: manualTaskId,
+        pipeline_id: 'provider-linear-worker',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: tempRoot
+      }),
+      'utf8'
+    );
+
+    const execRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
+      return {
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-1"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+          '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}'
+        ].join('\n'),
+        stderr: ''
+      };
+    });
+
+    await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manualManifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot,
+        CODEX_ORCHESTRATOR_RUNS_DIR: customRunsDir,
+        CODEX_ORCHESTRATOR_OUT_DIR: customOutDir,
+        CODEX_ORCHESTRATOR_REPO_CONFIG_PATH: customRepoConfigPath,
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+      },
+      {
+        readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+        execRunner,
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(execRunner).toHaveBeenCalledTimes(1);
+    const turnEnv = execRunner.mock.calls[0]?.[0].env;
+    expect(turnEnv.CODEX_ORCHESTRATOR_RUNS_DIR).toBe(customRunsDir);
+    expect(turnEnv.CODEX_ORCHESTRATOR_OUT_DIR).toBe(customOutDir);
+    expect(turnEnv.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH).toBe(customRepoConfigPath);
+  });
+
+  it('preserves strict repo-config mode when helper turns fall back to the workspace default config path', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-worker-required-repo-config-env-'));
+    const workspaceRoot = join(tempRoot, '.workspaces', 'linear-lin-issue-1');
+    const manualTaskId = 'test-manual-dispatch';
+    const manualRunId = 'manual-run-1';
+    const manualRunDir = join(workspaceRoot, '.runs', manualTaskId, 'cli', manualRunId);
+    const manualManifestPath = join(manualRunDir, 'manifest.json');
+    await mkdir(manualRunDir, { recursive: true });
+    await writeFile(
+      manualManifestPath,
+      JSON.stringify({
+        run_id: manualRunId,
+        task_id: manualTaskId,
+        pipeline_id: 'provider-linear-worker',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: workspaceRoot
+      }),
+      'utf8'
+    );
+
+    const execRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
+      return {
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-1"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+          '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}'
+        ].join('\n'),
+        stderr: ''
+      };
+    });
+
+    await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manualManifestPath,
+        CODEX_ORCHESTRATOR_ROOT: workspaceRoot,
+        CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: '1',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+      },
+      {
+        readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+        execRunner,
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(execRunner).toHaveBeenCalledTimes(1);
+    const turnEnv = execRunner.mock.calls[0]?.[0].env;
+    expect(turnEnv.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH).toBeUndefined();
+    expect(turnEnv.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED).toBe('1');
+  });
+
+  it('absolutizes preserved relative repo-config overrides before rebinding the helper root', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-worker-relative-repo-config-env-'));
+    const workspaceRoot = join(tempRoot, '.workspaces', 'linear-lin-issue-1');
+    const manualTaskId = 'test-manual-dispatch';
+    const manualRunId = 'manual-run-1';
+    const manualRunDir = join(workspaceRoot, '.runs', manualTaskId, 'cli', manualRunId);
+    const manualManifestPath = join(manualRunDir, 'manifest.json');
+    const relativeRepoConfigPath = join('custom', 'codex.orchestrator.json');
+    await mkdir(manualRunDir, { recursive: true });
+    await writeFile(
+      manualManifestPath,
+      JSON.stringify({
+        run_id: manualRunId,
+        task_id: manualTaskId,
+        pipeline_id: 'provider-linear-worker',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: workspaceRoot
+      }),
+      'utf8'
+    );
+
+    const execRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
+      return {
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-1"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+          '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}'
+        ].join('\n'),
+        stderr: ''
+      };
+    });
+
+    await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manualManifestPath,
+        CODEX_ORCHESTRATOR_ROOT: workspaceRoot,
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+      },
+      {
+        readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+        resolveRuntimeContext: vi.fn(async () =>
+          createRuntimeContext({}, {
+            CODEX_ORCHESTRATOR_ROOT: tempRoot,
+            CODEX_ORCHESTRATOR_REPO_CONFIG_PATH: relativeRepoConfigPath
+          })
+        ),
+        execRunner,
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(execRunner).toHaveBeenCalledTimes(1);
+    const turnEnv = execRunner.mock.calls[0]?.[0].env;
+    expect(turnEnv.CODEX_ORCHESTRATOR_ROOT).toBe(workspaceRoot);
+    expect(turnEnv.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH).toBe(
+      join(tempRoot, relativeRepoConfigPath)
+    );
+  });
+
+  it('preserves explicit external absolute artifact-root overrides for provider workspaces', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-worker-external-artifact-env-'));
+    const workspaceRoot = join(tempRoot, '.workspaces', 'linear-lin-issue-1');
+    const manualTaskId = 'test-manual-dispatch';
+    const manualRunId = 'manual-run-1';
+    const manualRunDir = join(workspaceRoot, '.runs', manualTaskId, 'cli', manualRunId);
+    const manualManifestPath = join(manualRunDir, 'manifest.json');
+    const externalRunsDir = await mkdtemp(
+      join(tmpdir(), 'provider-linear-worker-shared-runs-')
+    );
+    const externalOutDir = await mkdtemp(join(tmpdir(), 'provider-linear-worker-shared-out-'));
+    extraTempRoots.push(externalRunsDir, externalOutDir);
+    await mkdir(manualRunDir, { recursive: true });
+    await writeFile(
+      manualManifestPath,
+      JSON.stringify({
+        run_id: manualRunId,
+        task_id: manualTaskId,
+        pipeline_id: 'provider-linear-worker',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: workspaceRoot
+      }),
+      'utf8'
+    );
+
+    const execRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
+      return {
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-1"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+          '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}'
+        ].join('\n'),
+        stderr: ''
+      };
+    });
+
+    await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manualManifestPath,
+        CODEX_ORCHESTRATOR_ROOT: workspaceRoot,
+        CODEX_ORCHESTRATOR_RUNS_DIR: externalRunsDir,
+        CODEX_ORCHESTRATOR_OUT_DIR: externalOutDir,
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+      },
+      {
+        readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+        execRunner,
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(execRunner).toHaveBeenCalledTimes(1);
+    const turnEnv = execRunner.mock.calls[0]?.[0].env;
+    expect(turnEnv.CODEX_ORCHESTRATOR_RUNS_DIR).toBe(externalRunsDir);
+    expect(turnEnv.CODEX_ORCHESTRATOR_OUT_DIR).toBe(externalOutDir);
+  });
+
+  it('drops stale inherited provider-workspace absolute artifact roots when pinning the live run', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-worker-shared-artifact-env-'));
+    const workspaceRoot = join(tempRoot, '.workspaces', 'linear-lin-issue-1');
+    const staleWorkspaceRoot = join(tempRoot, '.workspaces', 'linear-lin-issue-stale');
+    const manualTaskId = 'test-manual-dispatch';
+    const manualRunId = 'manual-run-1';
+    const manualRunDir = join(workspaceRoot, '.runs', manualTaskId, 'cli', manualRunId);
+    const manualManifestPath = join(manualRunDir, 'manifest.json');
+    await mkdir(manualRunDir, { recursive: true });
+    await writeFile(
+      manualManifestPath,
+      JSON.stringify({
+        run_id: manualRunId,
+        task_id: manualTaskId,
+        pipeline_id: 'provider-linear-worker',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: workspaceRoot
+      }),
+      'utf8'
+    );
+    vi.stubEnv('CODEX_ORCHESTRATOR_RUNS_DIR', join(staleWorkspaceRoot, '.runs'));
+    vi.stubEnv('CODEX_ORCHESTRATOR_OUT_DIR', join(staleWorkspaceRoot, 'out'));
+
+    const execRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
+      return {
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-1"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+          '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}'
+        ].join('\n'),
+        stderr: ''
+      };
+    });
+
+    await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manualManifestPath,
+        CODEX_ORCHESTRATOR_ROOT: workspaceRoot,
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+      },
+      {
+        readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+        execRunner,
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(execRunner).toHaveBeenCalledTimes(1);
+    const turnEnv = execRunner.mock.calls[0]?.[0].env;
+    expect(turnEnv.CODEX_ORCHESTRATOR_RUNS_DIR).toBe(join(workspaceRoot, '.runs'));
+    expect(turnEnv.CODEX_ORCHESTRATOR_OUT_DIR).toBe(join(workspaceRoot, 'out'));
+  });
+
+  it('preserves shared default artifact roots when no workspace counterpart exists yet', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-worker-preserve-shared-artifact-env-'));
+    const workspaceRoot = join(tempRoot, '.workspaces', 'linear-lin-issue-1');
+    const manualTaskId = 'test-manual-dispatch';
+    const manualRunId = 'manual-run-1';
+    const sharedRunDir = join(tempRoot, '.runs', manualTaskId, 'cli', manualRunId);
+    const sharedManifestPath = join(sharedRunDir, 'manifest.json');
+    await mkdir(sharedRunDir, { recursive: true });
+    await mkdir(workspaceRoot, { recursive: true });
+    await writeFile(
+      sharedManifestPath,
+      JSON.stringify({
+        run_id: manualRunId,
+        task_id: manualTaskId,
+        pipeline_id: 'provider-linear-worker',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: workspaceRoot
+      }),
+      'utf8'
+    );
+
+    const execRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
+      return {
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-1"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+          '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}'
+        ].join('\n'),
+        stderr: ''
+      };
+    });
+
+    await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: sharedManifestPath,
+        CODEX_ORCHESTRATOR_ROOT: workspaceRoot,
+        CODEX_ORCHESTRATOR_RUNS_DIR: '.runs',
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out',
+        CODEX_ORCHESTRATOR_PRESERVE_PROVIDER_ARTIFACT_ROOTS: '1',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+      },
+      {
+        readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+        execRunner,
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(execRunner).toHaveBeenCalledTimes(1);
+    const turnEnv = execRunner.mock.calls[0]?.[0].env;
+    expect(turnEnv.CODEX_ORCHESTRATOR_ROOT).toBe(workspaceRoot);
+    expect(turnEnv.CODEX_ORCHESTRATOR_RUNS_DIR).toBe(join(tempRoot, '.runs'));
+    expect(turnEnv.CODEX_ORCHESTRATOR_OUT_DIR).toBe(join(tempRoot, 'out'));
+  });
+
+  it('rebases shared absolute artifact-root overrides to the workspace counterpart when one exists', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-worker-rebased-shared-artifact-env-'));
+    const workspaceRoot = join(tempRoot, '.workspaces', 'linear-lin-issue-1');
+    const manualTaskId = 'test-manual-dispatch';
+    const manualRunId = 'manual-run-1';
+    const manualRunDir = join(workspaceRoot, '.runs', manualTaskId, 'cli', manualRunId);
+    const manualManifestPath = join(manualRunDir, 'manifest.json');
+    const sharedRunsDir = join(tempRoot, 'artifacts', 'runs');
+    const sharedOutDir = join(tempRoot, 'artifacts', 'out');
+    await mkdir(manualRunDir, { recursive: true });
+    await writeFile(
+      manualManifestPath,
+      JSON.stringify({
+        run_id: manualRunId,
+        task_id: manualTaskId,
+        pipeline_id: 'provider-linear-worker',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: workspaceRoot
+      }),
+      'utf8'
+    );
+
+    const execRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
+      return {
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-1"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+          '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}'
+        ].join('\n'),
+        stderr: ''
+      };
+    });
+
+    await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manualManifestPath,
+        CODEX_ORCHESTRATOR_ROOT: workspaceRoot,
+        CODEX_ORCHESTRATOR_RUNS_DIR: sharedRunsDir,
+        CODEX_ORCHESTRATOR_OUT_DIR: sharedOutDir,
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+      },
+      {
+        readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+        execRunner,
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(execRunner).toHaveBeenCalledTimes(1);
+    const turnEnv = execRunner.mock.calls[0]?.[0].env;
+    expect(turnEnv.CODEX_ORCHESTRATOR_RUNS_DIR).toBe(join(workspaceRoot, 'artifacts', 'runs'));
+    expect(turnEnv.CODEX_ORCHESTRATOR_OUT_DIR).toBe(join(workspaceRoot, 'artifacts', 'out'));
+  });
+
+  it('keeps verified control-host launch source pinned in helper turn env', async () => {
+    const { manifestPath } = await createManifestRoot();
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        pipeline_id: 'provider-linear-worker',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: tempRoot,
+        provider_launch_source: 'control-host',
+        provider_control_host_task_id: 'local-mcp',
+        provider_control_host_run_id: 'control-host'
+      }),
+      'utf8'
+    );
+
+    const execRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
+      return {
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-1"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+          '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}'
+        ].join('\n'),
+        stderr: ''
+      };
+    });
+
+    await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+        CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: 'control-host',
+        CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: 'local-mcp',
+        CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID: 'control-host'
+      },
+      {
+        readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+        execRunner,
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(execRunner).toHaveBeenCalledTimes(1);
+    const turnEnv = execRunner.mock.calls[0]?.[0].env;
+    expect(turnEnv.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID).toBe('local-mcp');
+    expect(turnEnv.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID).toBe('control-host');
+    expect(turnEnv.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE).toBe('control-host');
   });
 
   it('fails closed when a codex turn exits non-zero and writes a failed proof sidecar', async () => {

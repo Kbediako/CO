@@ -22,6 +22,7 @@ import {
 import {
   isLiveLinearTrackedIssueOwnedByCurrentViewerOrUnassigned,
   sortLiveLinearTrackedIssuesForDispatch,
+  type LiveLinearTrackedBlocker,
   type LiveLinearTrackedIssue,
   type LiveLinearTrackedIssuesQueryMode
 } from './linearDispatchSource.js';
@@ -53,6 +54,7 @@ import {
 import { createProviderIssueRetryQueue } from './providerIssueRetryQueue.js';
 import {
   isProviderPollingStuck,
+  readProviderPollingHealth,
   recordProviderPollingProgress
 } from './providerPollingHealth.js';
 import type { ProviderWorkflowConfigStore } from './providerWorkflowConfigStore.js';
@@ -268,6 +270,7 @@ export interface CreateProviderIssueHandoffServiceOptions {
     issueState?: string | null;
     issueStateType?: string | null;
     issueUpdatedAt?: string | null;
+    blockedBy?: readonly LiveLinearTrackedBlocker[] | null;
     previousBranchRecovery?: ProviderReviewHandoffPromotionRecord['branch_recovery'] | null;
     sourceSetup?: DispatchPilotSourceSetup | null;
     repoRoot: string;
@@ -393,6 +396,12 @@ export function createProviderIssueHandoffService(
   }>();
   const serviceCreatedAtMs = Date.now();
   let providerIssueHandoffService: ProviderIssueHandoffService | null = null;
+  let concurrentRestartRequiredSnapshotCutoff:
+    | {
+        pollingUpdatedAtMs: number;
+        effectiveUpdatedAtMs: number;
+      }
+    | null = null;
 
   const shouldAbortRefreshCycle = (): boolean =>
     hasConcurrentRestartRequiredPollingSnapshot() ||
@@ -577,12 +586,66 @@ export function createProviderIssueHandoffService(
         )
     );
 
+  const readConcurrentRestartRequiredSnapshotCutoffMs = (liveNowMs: number): number | null => {
+    const pollingUpdatedAtMs = readProviderPollingSnapshotUpdatedAtMs(options.state.polling);
+    if (pollingUpdatedAtMs === null) {
+      concurrentRestartRequiredSnapshotCutoff = null;
+      return null;
+    }
+    if (
+      concurrentRestartRequiredSnapshotCutoff &&
+      concurrentRestartRequiredSnapshotCutoff.pollingUpdatedAtMs === pollingUpdatedAtMs
+    ) {
+      return concurrentRestartRequiredSnapshotCutoff.effectiveUpdatedAtMs;
+    }
+    if (pollingUpdatedAtMs <= liveNowMs) {
+      concurrentRestartRequiredSnapshotCutoff = {
+        pollingUpdatedAtMs,
+        effectiveUpdatedAtMs: pollingUpdatedAtMs
+      };
+      return pollingUpdatedAtMs;
+    }
+    const effectiveUpdatedAtMs = liveNowMs;
+    concurrentRestartRequiredSnapshotCutoff = {
+      pollingUpdatedAtMs,
+      effectiveUpdatedAtMs
+    };
+    return effectiveUpdatedAtMs;
+  };
+
   const hasConcurrentRestartRequiredPollingSnapshot = (): boolean => {
     if (!isRestartRequiredPollingSnapshot(options.state.polling)) {
+      concurrentRestartRequiredSnapshotCutoff = null;
       return false;
     }
     const pollingUpdatedAtMs = readProviderPollingSnapshotUpdatedAtMs(options.state.polling);
-    return pollingUpdatedAtMs !== null && pollingUpdatedAtMs >= serviceCreatedAtMs;
+    if (pollingUpdatedAtMs === null || pollingUpdatedAtMs < serviceCreatedAtMs) {
+      concurrentRestartRequiredSnapshotCutoff = null;
+      return false;
+    }
+    const liveNowMs = Date.now();
+    const effectivePollingUpdatedAtMs = readConcurrentRestartRequiredSnapshotCutoffMs(liveNowMs);
+    if (effectivePollingUpdatedAtMs === null) {
+      return false;
+    }
+    const liveHealth = providerIssueHandoffService
+      ? readProviderPollingHealth(providerIssueHandoffService, liveNowMs)
+      : null;
+    const liveOperationStartedAtMs =
+      liveHealth?.checking && typeof liveHealth.operation_started_at === 'string'
+        ? Date.parse(liveHealth.operation_started_at)
+        : Number.NaN;
+    // A fresh retry may start before the persisted polling snapshot catches up.
+    // Clamp future-skewed persisted timestamps to the first live-time observation and once a
+    // newer (or same-tick) operation is active, do not let the older restart_required snapshot
+    // fail-close it again while the stale persisted snapshot is still in flight.
+    if (
+      Number.isFinite(liveOperationStartedAtMs) &&
+      liveOperationStartedAtMs >= effectivePollingUpdatedAtMs
+    ) {
+      return false;
+    }
+    return true;
   };
 
   const pickRestoredProviderStateUpdatedAt = (
@@ -716,6 +779,7 @@ export function createProviderIssueHandoffService(
       issueState: input.trackedIssue.state,
       issueStateType: input.trackedIssue.state_type,
       issueUpdatedAt: input.trackedIssue.updated_at,
+      blockedBy: input.trackedIssue.blocked_by ?? null,
       previousBranchRecovery: input.claim.review_promotion?.branch_recovery ?? null,
       sourceSetup: resolveMergeCloseoutSourceSetup(),
       env: buildMergeCloseoutEnv(input.latestRun?.manifestPath ?? input.claim.run_manifest_path),
@@ -1322,6 +1386,14 @@ export function createProviderIssueHandoffService(
   ): Partial<Pick<ProviderIntakeClaimRecord, 'merge_closeout' | 'review_promotion'>> => {
     if (!isTrackedIssueFreshEnoughForClaim(claim, trackedIssue)) {
       return {};
+    }
+    if (isSupersededDoneTransitionFailedMergeCloseoutClaim({ claim, trackedIssue })) {
+      return shouldClearStaleReviewPromotionForTrackedIssue({
+        claim,
+        trackedIssue
+      })
+        ? { merge_closeout: null, review_promotion: null }
+        : { merge_closeout: null };
     }
     if (isSupersededTerminalMergeCloseoutClaim({ claim, trackedIssue })) {
       return shouldClearStaleReviewPromotionForTrackedIssue({
@@ -2211,19 +2283,40 @@ export function createProviderIssueHandoffService(
                 continue;
               }
             }
-          } else if (
-            shouldApplySupersededTerminalMergeCloseoutReleaseClaim({
-              releaseReason: freshTrackedIssue.releaseReason,
-              claim: {
+          } else {
+            const hasFreshReleaseIssueMetadata =
+              freshTrackedIssue.releaseClaimFields.issue_state !== undefined ||
+              freshTrackedIssue.releaseClaimFields.issue_state_type !== undefined ||
+              freshTrackedIssue.releaseClaimFields.issue_updated_at !== undefined;
+            if (
+              hasFreshReleaseIssueMetadata &&
+              (
+                shouldApplySupersededTerminalMergeCloseoutReleaseClaim({
+                  releaseReason: freshTrackedIssue.releaseReason,
+                  claim: {
+                    ...completedClaim,
+                    ...freshTrackedIssue.releaseClaimFields
+                  }
+                }) ||
+                shouldApplySupersededTransitionFailedMergeCloseoutReleaseClaim({
+                  releaseReason: freshTrackedIssue.releaseReason,
+                  claim: completedClaim,
+                  nextIssueState:
+                    freshTrackedIssue.releaseClaimFields.issue_state ?? completedClaim.issue_state,
+                  nextIssueStateType:
+                    freshTrackedIssue.releaseClaimFields.issue_state_type ??
+                    completedClaim.issue_state_type,
+                  nextIssueUpdatedAt:
+                    freshTrackedIssue.releaseClaimFields.issue_updated_at ??
+                    completedClaim.issue_updated_at
+                })
+              )
+            ) {
+              completedClaim = {
                 ...completedClaim,
                 ...freshTrackedIssue.releaseClaimFields
-              }
-            })
-          ) {
-            completedClaim = {
-              ...completedClaim,
-              ...freshTrackedIssue.releaseClaimFields
-            };
+              };
+            }
           }
         }
         const completedState = buildProviderCompletedRunRehydrateState({
@@ -3769,12 +3862,22 @@ export function createProviderIssueHandoffService(
       if (!providerIssueHandoffService) {
         return;
       }
-      recordProviderPollingProgress(providerIssueHandoffService, {
+      const progress: {
+        phase: string;
+        requestClass?: string | null;
+        providerKeys?: string[] | null;
+        counts: Record<string, number>;
+      } = {
         phase,
-        requestClass: input.requestClass ?? null,
-        providerKeys: input.providerKeys ?? null,
         counts: refreshCounts
-      });
+      };
+      if (input.requestClass !== undefined) {
+        progress.requestClass = input.requestClass;
+      }
+      if (input.providerKeys !== undefined) {
+        progress.providerKeys = input.providerKeys;
+      }
+      recordProviderPollingProgress(providerIssueHandoffService, progress);
     };
       await runWithProviderIssueRunDiscoveryCache(async () => {
         await runWithRefreshLifecycleLock(async () => {
@@ -5309,12 +5412,55 @@ function shouldClearStaleMergeCloseoutForTrackedIssue(input: {
   );
 }
 
+function isProviderLinearDoneWorkflowState(input: {
+  state: string | null | undefined;
+  state_type: string | null | undefined;
+}): boolean {
+  const normalizedState = normalizeProviderLinearWorkflowState(input.state);
+  return normalizedState === 'done';
+}
+
+function shouldForceTrackedIssueMetadataRefreshForCompletedTransitionFailedClaim(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'state' | 'reason' | 'issue_state' | 'merge_closeout'
+  >
+): boolean {
+  if (
+    claim.state !== 'handoff_failed' ||
+    claim.reason !== 'provider_issue_merge_closeout_transition_failed'
+  ) {
+    return false;
+  }
+  const mergeCloseout = claim.merge_closeout ?? null;
+  if (
+    !mergeCloseout ||
+    mergeCloseout.status !== 'transition_failed' ||
+    normalizeOptionalString(mergeCloseout.reason) !== 'linear_done_transition_failed'
+  ) {
+    return false;
+  }
+  if (normalizeProviderLinearWorkflowState(claim.issue_state) !== 'merging') {
+    return false;
+  }
+  if (normalizeProviderLinearWorkflowState(mergeCloseout.issue_state) !== 'merging') {
+    return false;
+  }
+  if (!mergeCloseoutSnapshotShowsMerged(mergeCloseout)) {
+    return false;
+  }
+  return normalizeOptionalString(mergeCloseout.shared_root?.status) === 'reconciled';
+}
+
 function shouldForceTrackedIssueMetadataRefreshForCompletedClaim(
   claim: Pick<
     ProviderIntakeClaimRecord,
     'state' | 'reason' | 'issue_state' | 'merge_closeout'
   >
 ): boolean {
+  if (shouldForceTrackedIssueMetadataRefreshForCompletedTransitionFailedClaim(claim)) {
+    return true;
+  }
   if (
     claim.state !== 'handoff_failed' ||
     claim.reason !== 'provider_issue_merge_closeout_action_required'
@@ -5350,6 +5496,32 @@ function shouldApplySupersededTerminalMergeCloseoutReleaseClaim(input: {
   }
   return isSupersededTerminalMergeCloseoutClaim({
     claim: input.claim
+  });
+}
+
+function shouldApplySupersededTransitionFailedMergeCloseoutReleaseClaim(input: {
+  releaseReason: string | null;
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'issue_state' | 'issue_state_type' | 'issue_updated_at' | 'merge_closeout'
+  >;
+  nextIssueState: string | null;
+  nextIssueStateType: string | null;
+  nextIssueUpdatedAt: string | null;
+}): boolean {
+  if (
+    input.releaseReason !== 'provider_issue_released:not_active' &&
+    input.releaseReason !== 'provider_issue_released:not_mutable'
+  ) {
+    return false;
+  }
+  return isSupersededDoneTransitionFailedMergeCloseoutClaim({
+    claim: input.claim,
+    trackedIssue: {
+      state: input.nextIssueState,
+      state_type: input.nextIssueStateType,
+      updated_at: input.nextIssueUpdatedAt
+    }
   });
 }
 
@@ -5389,6 +5561,52 @@ function isSupersededTerminalMergeCloseoutClaim(input: {
         }
   );
   if (!liveWorkflowState.isTerminal) {
+    return false;
+  }
+  const freshness = compareTrackedIssueUpdatedAt({
+    existingIssueUpdatedAt: mergeCloseout.issue_updated_at ?? null,
+    nextIssueUpdatedAt:
+      input.trackedIssue !== undefined
+        ? input.trackedIssue?.updated_at ?? null
+        : input.claim.issue_updated_at ?? null
+  });
+  return freshness === 'equal' || freshness === 'newer';
+}
+
+function isSupersededDoneTransitionFailedMergeCloseoutClaim(input: {
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'issue_state' | 'issue_state_type' | 'issue_updated_at' | 'merge_closeout'
+  >;
+  trackedIssue?: Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at'> | null;
+}): boolean {
+  const mergeCloseout = input.claim.merge_closeout ?? null;
+  if (
+    !mergeCloseout ||
+    mergeCloseout.status !== 'transition_failed' ||
+    normalizeOptionalString(mergeCloseout.reason) !== 'linear_done_transition_failed'
+  ) {
+    return false;
+  }
+  if (!mergeCloseoutSnapshotShowsMerged(mergeCloseout)) {
+    return false;
+  }
+  if (normalizeOptionalString(mergeCloseout.shared_root?.status) !== 'reconciled') {
+    return false;
+  }
+  if (normalizeProviderLinearWorkflowState(mergeCloseout.issue_state) !== 'merging') {
+    return false;
+  }
+  const nextIssue = input.trackedIssue
+    ? {
+        state: input.trackedIssue.state,
+        state_type: input.trackedIssue.state_type
+      }
+    : {
+        state: input.claim.issue_state,
+        state_type: input.claim.issue_state_type
+      };
+  if (!isProviderLinearDoneWorkflowState(nextIssue)) {
     return false;
   }
   const freshness = compareTrackedIssueUpdatedAt({

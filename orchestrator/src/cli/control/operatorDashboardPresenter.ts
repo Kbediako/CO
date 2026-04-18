@@ -4,6 +4,7 @@ import type { ProviderIntakeSummaryPayload } from './providerIntakeState.js';
 import type { LiveLinearTrackedActivity } from './linearDispatchSource.js';
 import type {
   ControlCodexTotalsPayload,
+  CompatibilityProjectionIssueRecord,
   ControlCompatibilityProjectionSnapshot,
   ControlDispatchPilotPayload,
   ControlIssuePayload,
@@ -26,6 +27,11 @@ export interface OperatorDashboardPresenterContext {
 export interface OperatorDashboardSessionPayload {
   issue_identifier: string;
   issue_id: string | null;
+  id?: string | null;
+  bucket?: 'running';
+  state?: string;
+  reason?: string | null;
+  aliases?: string[];
   task_id: string | null;
   run_id: string | null;
   summary: string | null;
@@ -49,6 +55,11 @@ export interface OperatorDashboardSessionPayload {
 export interface OperatorDashboardRetryPayload {
   issue_identifier: string;
   issue_id: string | null;
+  id?: string | null;
+  bucket?: 'retrying';
+  state?: string;
+  reason?: string | null;
+  aliases?: string[];
   task_id: string | null;
   run_id: string | null;
   summary: string | null;
@@ -135,20 +146,21 @@ export interface OperatorDashboardDataset {
   tracked?: ControlTrackedPayload | null;
 }
 
+export interface CompatibilityIssueRecordLookups {
+  byId: ReadonlyMap<string, CompatibilityProjectionIssueRecord>;
+  byRunId: ReadonlyMap<string, CompatibilityProjectionIssueRecord>;
+  byIdentifier: ReadonlyMap<string, CompatibilityProjectionIssueRecord>;
+}
+
 export function buildUiDataset(input: {
   projection: ControlCompatibilityProjectionSnapshot;
   generatedAt?: string;
 }): OperatorDashboardDataset {
   const generatedAt = input.generatedAt ?? isoTimestamp();
   const selectedIssueIdentifier = input.projection.selected?.issue_identifier ?? null;
-  const issuePayloads = input.projection.issues.map((record) => record.payload);
-  const issuesById = new Map(
-    issuePayloads.flatMap((issue) => (issue.issue_id === null ? [] : [[issue.issue_id, issue] as const]))
-  );
-  const issuesByRunId = new Map(
-    issuePayloads.flatMap((issue) => (issue.run_id === null ? [] : [[issue.run_id, issue] as const]))
-  );
-  const issuesByIdentifier = new Map(issuePayloads.map((issue) => [issue.issue_identifier, issue] as const));
+  const issueRecords = input.projection.issues;
+  const issuePayloads = issueRecords.map((record) => record.payload);
+  const issueRecordLookups = buildCompatibilityIssueRecordLookups(issueRecords);
 
   return {
     generated_at: generatedAt,
@@ -167,16 +179,37 @@ export function buildUiDataset(input: {
     selected_issue_identifier: selectedIssueIdentifier,
     selected: input.projection.selected,
     running: input.projection.running.map((entry) =>
-      buildRunningSessionPayload(entry, resolveRunningIssuePayload(entry, issuesById, issuesByIdentifier))
+      buildRunningSessionPayload(entry, resolveRunningIssueRecord(entry, issueRecordLookups))
     ),
     retrying: input.projection.retrying.map((entry) =>
-      buildRetryQueuePayload(entry, resolveRetryIssuePayload(entry, issuesByRunId, issuesById, issuesByIdentifier))
+      buildRetryQueuePayload(entry, resolveRetryIssueRecord(entry, issueRecordLookups))
     ),
     issues: issuePayloads.map((issue) => buildIssuePayload(issue, issue.issue_identifier === selectedIssueIdentifier)),
     ...(input.projection.providerWorkflow ? { provider_workflow: input.projection.providerWorkflow } : {}),
     ...(input.projection.providerIntake ? { provider_intake: input.projection.providerIntake } : {}),
     ...(input.projection.dispatchPilot ? { dispatch_pilot: input.projection.dispatchPilot } : {}),
     ...(input.projection.tracked ? { tracked: input.projection.tracked } : {})
+  };
+}
+
+export function buildCompatibilityIssueRecordLookups(
+  issueRecords: CompatibilityProjectionIssueRecord[]
+): CompatibilityIssueRecordLookups {
+  const records = issueRecords ?? [];
+  return {
+    byId: new Map(
+      records.flatMap((issue) =>
+        issue.payload.issue_id === null ? [] : [[issue.payload.issue_id, issue] as const]
+      )
+    ),
+    byRunId: new Map(
+      records.flatMap((issue) =>
+        issue.payload.run_id === null ? [] : [[issue.payload.run_id, issue] as const]
+      )
+    ),
+    byIdentifier: new Map(
+      records.map((issue) => [issue.payload.issue_identifier, issue] as const)
+    )
   };
 }
 
@@ -253,8 +286,9 @@ function buildIssuePayload(
 
 function buildRunningSessionPayload(
   entry: ControlRunningPayload,
-  issue: ControlIssuePayload | null
+  issueRecord: CompatibilityProjectionIssueRecord | null
 ): OperatorDashboardSessionPayload {
+  const issue = issueRecord?.payload ?? null;
   const proof = issue?.provider_linear_worker_proof ?? null;
   const workerHost =
     entry.worker_host ??
@@ -271,6 +305,17 @@ function buildRunningSessionPayload(
   return {
     issue_identifier: entry.issue_identifier,
     issue_id: entry.issue_id,
+    id: issueRecord?.issueIdentifier ?? entry.issue_identifier,
+    bucket: 'running',
+    state: entry.state,
+    reason: entry.status_reason,
+    aliases: resolveCompatibilityAliases({
+      issueRecord,
+      issueIdentifier: entry.issue_identifier,
+      issueId: entry.issue_id,
+      taskId: issue?.task_id ?? null,
+      runId: issue?.run_id ?? null
+    }),
     task_id: issue?.task_id ?? null,
     run_id: issue?.run_id ?? null,
     summary: issue?.summary ?? null,
@@ -294,8 +339,9 @@ function buildRunningSessionPayload(
 
 function buildRetryQueuePayload(
   entry: ControlRetryPayload,
-  issue: ControlIssuePayload | null
+  issueRecord: CompatibilityProjectionIssueRecord | null
 ): OperatorDashboardRetryPayload {
+  const issue = issueRecord?.payload ?? null;
   const proof = issue?.provider_linear_worker_proof ?? null;
   const workerHost =
     entry.worker_host ??
@@ -312,6 +358,17 @@ function buildRetryQueuePayload(
   return {
     issue_identifier: entry.issue_identifier,
     issue_id: entry.issue_id,
+    id: issueRecord?.issueIdentifier ?? entry.issue_identifier,
+    bucket: 'retrying',
+    state: entry.state,
+    reason: entry.status_reason,
+    aliases: resolveCompatibilityAliases({
+      issueRecord,
+      issueIdentifier: entry.issue_identifier,
+      issueId: entry.issue_id,
+      taskId: entry.task_id ?? issue?.task_id ?? null,
+      runId: entry.run_id ?? issue?.run_id ?? null
+    }),
     task_id: entry.task_id ?? issue?.task_id ?? null,
     run_id: entry.run_id ?? issue?.run_id ?? null,
     summary: issue?.summary ?? null,
@@ -333,39 +390,55 @@ function buildRetryQueuePayload(
   };
 }
 
-function resolveRunningIssuePayload(
+export function resolveRunningIssueRecord(
   entry: ControlRunningPayload,
-  issuesById: ReadonlyMap<string, ControlIssuePayload>,
-  issuesByIdentifier: ReadonlyMap<string, ControlIssuePayload>
-): ControlIssuePayload | null {
+  issueRecordLookups: CompatibilityIssueRecordLookups
+): CompatibilityProjectionIssueRecord | null {
   if (entry.issue_id !== null) {
-    const issueById = issuesById.get(entry.issue_id);
+    const issueById = issueRecordLookups.byId.get(entry.issue_id);
     if (issueById) {
       return issueById;
     }
   }
-  return issuesByIdentifier.get(entry.issue_identifier) ?? null;
+  return issueRecordLookups.byIdentifier.get(entry.issue_identifier) ?? null;
 }
 
-function resolveRetryIssuePayload(
+export function resolveRetryIssueRecord(
   entry: ControlRetryPayload,
-  issuesByRunId: ReadonlyMap<string, ControlIssuePayload>,
-  issuesById: ReadonlyMap<string, ControlIssuePayload>,
-  issuesByIdentifier: ReadonlyMap<string, ControlIssuePayload>
-): ControlIssuePayload | null {
+  issueRecordLookups: CompatibilityIssueRecordLookups
+): CompatibilityProjectionIssueRecord | null {
   if (entry.run_id) {
-    const issueByRunId = issuesByRunId.get(entry.run_id);
+    const issueByRunId = issueRecordLookups.byRunId.get(entry.run_id);
     if (issueByRunId) {
       return issueByRunId;
     }
   }
   if (entry.issue_id !== null) {
-    const issueById = issuesById.get(entry.issue_id);
+    const issueById = issueRecordLookups.byId.get(entry.issue_id);
     if (issueById) {
       return issueById;
     }
   }
-  return issuesByIdentifier.get(entry.issue_identifier) ?? null;
+  return issueRecordLookups.byIdentifier.get(entry.issue_identifier) ?? null;
+}
+
+function resolveCompatibilityAliases(input: {
+  issueRecord: CompatibilityProjectionIssueRecord | null;
+  issueIdentifier: string;
+  issueId: string | null;
+  taskId: string | null;
+  runId: string | null;
+}): string[] {
+  const aliases = [
+    ...(input.issueRecord?.aliases ?? []),
+    input.issueIdentifier,
+    input.issueId,
+    input.taskId,
+    input.runId
+  ];
+  return Array.from(
+    new Set(aliases.filter((alias): alias is string => typeof alias === 'string' && alias.length > 0))
+  );
 }
 
 function normalizeRecentAgentActivity(

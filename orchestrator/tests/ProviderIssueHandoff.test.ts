@@ -11,6 +11,7 @@ import {
   createProviderIssueHandoffService,
   discoverProviderIssueRuns
 } from '../src/cli/control/providerIssueHandoff.js';
+import { runProviderIssueHandoffRefresh } from '../src/cli/control/controlServerPublicLifecycle.js';
 import { PROVIDER_LINEAR_AUDIT_ENV_VAR } from '../src/cli/control/providerLinearWorkflowAudit.js';
 import type { LiveLinearTrackedIssue } from '../src/cli/control/linearDispatchSource.js';
 import { logger } from '../src/logger.js';
@@ -28,6 +29,7 @@ import {
   type ProviderIntakeState
 } from '../src/cli/control/providerIntakeState.js';
 import {
+  markProviderPollingCompleted,
   readProviderPollingHealth,
   markProviderPollingStarted,
   markProviderPollingStuck
@@ -1938,6 +1940,286 @@ describe('createProviderIssueHandoffService', () => {
       restart_required: true,
       reason: 'provider_refresh_lifecycle_stuck',
       updated_at: '2026-03-19T04:00:10.000Z'
+    });
+  });
+
+  it('lets an explicit idle refresh retry bypass an older persisted restart_required snapshot once a newer attempt starts', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:00:00.000Z'));
+
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      }
+    });
+    const stuckError = new Error('provider_refresh_lifecycle_stuck');
+    stuckError.name = 'ProviderRefreshLifecycleStuckError';
+
+    markProviderPollingStarted(service, {
+      mode: 'refresh',
+      atMs: Date.parse('2026-03-19T04:00:05.000Z')
+    });
+    await markProviderPollingStuck(service, {
+      atMs: Date.parse('2026-03-19T04:00:50.000Z')
+    });
+    markProviderPollingCompleted(service, {
+      error: stuckError,
+      atMs: Date.parse('2026-03-19T04:00:50.000Z')
+    });
+    state.polling = {
+      checking: false,
+      queued: false,
+      last_mode: 'refresh',
+      last_requested_at: '2026-03-19T04:00:05.000Z',
+      last_completed_at: '2026-03-19T04:00:50.000Z',
+      last_success_at: null,
+      last_error_at: '2026-03-19T04:00:50.000Z',
+      last_error: 'provider_refresh_lifecycle_stuck',
+      next_poll_at: null,
+      next_poll_in_ms: null,
+      next_refresh_state: 'unknown',
+      next_refresh_at: null,
+      next_refresh_in_ms: null,
+      source_updated_at: '2026-03-19T04:00:50.000Z',
+      updated_at: '2026-03-19T04:00:50.000Z',
+      operation_started_at: null,
+      operation_elapsed_ms: null,
+      stalled_after_ms: 45000,
+      refresh_phase: 'refresh:rehydrated',
+      refresh_request_class: 'rehydrate',
+      refresh_provider_keys: null,
+      refresh_counts: {
+        claims_total: 1,
+        claims_scanned: 0,
+        issue_by_id_reads: 0,
+        issue_by_id_deferred: 0,
+        occupied_slots: 0,
+        fresh_discovery_runs: 0,
+        fresh_discovery_candidates: 0,
+        fresh_discovery_started: 0
+      },
+      stuck: true,
+      stuck_since_at: '2026-03-19T04:00:50.000Z',
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck',
+      linear_budget: null
+    };
+    state.updated_at = '2026-03-19T04:00:50.000Z';
+
+    vi.setSystemTime(new Date('2026-03-19T04:01:00.000Z'));
+
+    await expect(
+      runProviderIssueHandoffRefresh(service, {
+        allowIdleRestartRequiredRetry: true
+      })
+    ).resolves.toMatchObject({
+      queued: true,
+      coalesced: false
+    });
+    expect(readProviderPollingHealth(service)).toMatchObject({
+      checking: false,
+      stuck: false,
+      restart_required: false,
+      last_error: null
+    });
+  });
+
+  it('does not treat a future-skewed persisted restart_required snapshot as newer than a live retry', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:00:00.000Z'));
+
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      }
+    });
+    const stuckError = new Error('provider_refresh_lifecycle_stuck');
+    stuckError.name = 'ProviderRefreshLifecycleStuckError';
+
+    markProviderPollingStarted(service, {
+      mode: 'refresh',
+      atMs: Date.parse('2026-03-19T04:00:05.000Z')
+    });
+    await markProviderPollingStuck(service, {
+      atMs: Date.parse('2026-03-19T04:00:50.000Z')
+    });
+    markProviderPollingCompleted(service, {
+      error: stuckError,
+      atMs: Date.parse('2026-03-19T04:00:50.000Z')
+    });
+    state.polling = {
+      checking: false,
+      queued: false,
+      last_mode: 'refresh',
+      last_requested_at: '2026-03-19T04:00:05.000Z',
+      last_completed_at: '2026-03-19T04:00:50.000Z',
+      last_success_at: null,
+      last_error_at: '2026-03-19T04:00:50.000Z',
+      last_error: 'provider_refresh_lifecycle_stuck',
+      next_poll_at: null,
+      next_poll_in_ms: null,
+      next_refresh_state: 'unknown',
+      next_refresh_at: null,
+      next_refresh_in_ms: null,
+      source_updated_at: '2026-03-19T04:02:00.000Z',
+      updated_at: '2026-03-19T04:02:00.000Z',
+      operation_started_at: null,
+      operation_elapsed_ms: null,
+      stalled_after_ms: 45000,
+      refresh_phase: 'refresh:rehydrated',
+      refresh_request_class: 'rehydrate',
+      refresh_provider_keys: null,
+      refresh_counts: {
+        claims_total: 1,
+        claims_scanned: 0,
+        issue_by_id_reads: 0,
+        issue_by_id_deferred: 0,
+        occupied_slots: 0,
+        fresh_discovery_runs: 0,
+        fresh_discovery_candidates: 0,
+        fresh_discovery_started: 0
+      },
+      stuck: true,
+      stuck_since_at: '2026-03-19T04:00:50.000Z',
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck',
+      linear_budget: null
+    };
+    state.updated_at = '2026-03-19T04:02:00.000Z';
+
+    vi.setSystemTime(new Date('2026-03-19T04:01:00.000Z'));
+
+    await expect(
+      runProviderIssueHandoffRefresh(service, {
+        allowIdleRestartRequiredRetry: true
+      })
+    ).resolves.toMatchObject({
+      queued: true,
+      coalesced: false
+    });
+    expect(readProviderPollingHealth(service)).toMatchObject({
+      checking: false,
+      stuck: false,
+      restart_required: false,
+      last_error: null
+    });
+  });
+
+  it('keeps the future-skew restart cutoff stable while a live retry is still reconciling', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:00:00.000Z'));
+
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(
+      createProviderClaim({
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        state: 'accepted',
+        reason: 'provider_issue_handoff_owned'
+      })
+    );
+    const resolveTrackedIssue = vi.fn(async () => {
+      vi.setSystemTime(new Date('2026-03-19T04:02:10.000Z'));
+      return {
+        kind: 'owned' as const,
+        trackedIssue: createTrackedIssue({
+          updated_at: '2026-03-19T04:02:10.000Z'
+        })
+      };
+    });
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      resolveTrackedIssue
+    });
+    const stuckError = new Error('provider_refresh_lifecycle_stuck');
+    stuckError.name = 'ProviderRefreshLifecycleStuckError';
+
+    markProviderPollingStarted(service, {
+      mode: 'refresh',
+      atMs: Date.parse('2026-03-19T04:00:05.000Z')
+    });
+    await markProviderPollingStuck(service, {
+      atMs: Date.parse('2026-03-19T04:00:50.000Z')
+    });
+    markProviderPollingCompleted(service, {
+      error: stuckError,
+      atMs: Date.parse('2026-03-19T04:00:50.000Z')
+    });
+    state.polling = {
+      checking: false,
+      queued: false,
+      last_mode: 'refresh',
+      last_requested_at: '2026-03-19T04:00:05.000Z',
+      last_completed_at: '2026-03-19T04:00:50.000Z',
+      last_success_at: null,
+      last_error_at: '2026-03-19T04:00:50.000Z',
+      last_error: 'provider_refresh_lifecycle_stuck',
+      next_poll_at: null,
+      next_poll_in_ms: null,
+      next_refresh_state: 'unknown',
+      next_refresh_at: null,
+      next_refresh_in_ms: null,
+      source_updated_at: '2026-03-19T04:02:00.000Z',
+      updated_at: '2026-03-19T04:02:00.000Z',
+      operation_started_at: null,
+      operation_elapsed_ms: null,
+      stalled_after_ms: 45000,
+      refresh_phase: 'refresh:rehydrated',
+      refresh_request_class: 'rehydrate',
+      refresh_provider_keys: null,
+      refresh_counts: {
+        claims_total: 1,
+        claims_scanned: 0,
+        issue_by_id_reads: 0,
+        issue_by_id_deferred: 0,
+        occupied_slots: 0,
+        fresh_discovery_runs: 0,
+        fresh_discovery_candidates: 0,
+        fresh_discovery_started: 0
+      },
+      stuck: true,
+      stuck_since_at: '2026-03-19T04:00:50.000Z',
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck',
+      linear_budget: null
+    };
+    state.updated_at = '2026-03-19T04:02:00.000Z';
+
+    vi.setSystemTime(new Date('2026-03-19T04:01:00.000Z'));
+
+    await expect(
+      runProviderIssueHandoffRefresh(service, {
+        allowIdleRestartRequiredRetry: true
+      })
+    ).resolves.toMatchObject({
+      queued: true,
+      coalesced: false
+    });
+    expect(resolveTrackedIssue).toHaveBeenCalledTimes(1);
+    expect(readProviderPollingHealth(service)).toMatchObject({
+      checking: false,
+      stuck: false,
+      restart_required: false,
+      last_error: null
     });
   });
 
@@ -19823,7 +20105,10 @@ describe('createProviderIssueHandoffService', () => {
       kind: 'ready' as const,
       trackedIssue: createTrackedIssue()
     }));
-    const refetchTrackedIssues = vi.fn(async (input?: { excludedIssueIds?: string[] }) => {
+    const refetchTrackedIssues = vi.fn(async (input?: {
+      eligibleTargetCount?: number;
+      excludedIssueIds?: string[];
+    }) => {
       expect(input?.excludedIssueIds ?? []).toContain('lin-issue-1');
       return {
         kind: 'ready' as const,
@@ -20032,6 +20317,162 @@ describe('createProviderIssueHandoffService', () => {
       task_id: 'linear-lin-issue-196',
       run_id: 'run-co-196-ready-reclaimed',
       run_manifest_path: '/tmp/provider-run/co-196-ready-reclaimed-manifest.json',
+      launch_source: 'control-host',
+      launch_token: expect.any(String)
+    });
+    expect(persist).toHaveBeenCalled();
+  });
+
+  it('reclaims a stale Backlog plain released not-active claim through fresh discovery', async () => {
+    const { root, paths } = await createHostPaths();
+    const firstActivePaths = resolveRunPaths(
+      {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'task-co-237-active'
+      },
+      'run-co-237-active'
+    );
+    const secondActivePaths = resolveRunPaths(
+      {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'task-co-238-active'
+      },
+      'run-co-238-active'
+    );
+    await mkdir(firstActivePaths.runDir, { recursive: true });
+    await mkdir(secondActivePaths.runDir, { recursive: true });
+    await writeFile(
+      firstActivePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-co-237-active',
+        task_id: 'task-co-237-active',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-237',
+        issue_identifier: 'CO-237',
+        issue_updated_at: '2026-04-18T03:05:00.000Z',
+        updated_at: '2026-04-18T03:20:00.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      secondActivePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-co-238-active',
+        task_id: 'task-co-238-active',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-238',
+        issue_identifier: 'CO-238',
+        issue_updated_at: '2026-04-18T03:12:00.000Z',
+        updated_at: '2026-04-18T03:21:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: 'lin-issue-236',
+      issue_identifier: 'CO-236',
+      issue_title: 'CLI test surface: remove clean-tree dependency on prebuilt dist entrypoint',
+      issue_state: 'Backlog',
+      issue_state_type: 'backlog',
+      issue_updated_at: '2026-04-18T02:47:05.995Z',
+      task_id: 'linear-lin-issue-236',
+      run_id: null,
+      run_manifest_path: null
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = createCo202Launcher(
+      'run-co-236-ready-reclaimed',
+      '/tmp/provider-run/co-236-ready-reclaimed-manifest.json'
+    );
+    const activeTrackedIssues = [
+      createTrackedIssue({
+        id: 'lin-issue-237',
+        identifier: 'CO-237',
+        title: 'Control host: close merge-closeout residue on CO-175',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-04-18T03:05:00.000Z'
+      }),
+      createTrackedIssue({
+        id: 'lin-issue-238',
+        identifier: 'CO-238',
+        title: 'Provider worker: retain reopened merge-closeout residue on CO-175',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-04-18T03:12:00.000Z'
+      })
+    ];
+    const refetchTrackedIssues = vi.fn(async (input?: {
+      eligibleTargetCount?: number;
+      excludedIssueIds?: string[];
+    }) => {
+      expect(input?.eligibleTargetCount).toBe(1);
+      expect(input?.excludedIssueIds ?? []).toEqual(expect.arrayContaining([
+        'lin-issue-237',
+        'lin-issue-238'
+      ]));
+      expect(input?.excludedIssueIds ?? []).not.toContain('lin-issue-236');
+      return {
+        kind: 'ready' as const,
+        trackedIssues: [
+          createCo202ReadyIssue({
+            id: 'lin-issue-236',
+            identifier: 'CO-236',
+            title: 'CLI test surface: remove clean-tree dependency on prebuilt dist entrypoint',
+            updated_at: '2026-04-18T03:24:07.567Z'
+          })
+        ]
+      };
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 3
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: activeTrackedIssues,
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-issue-236',
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-issue-236',
+      issueIdentifier: 'CO-236',
+      issueUpdatedAt: '2026-04-18T03:24:07.567Z',
+      launchToken: expect.any(String)
+    }));
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-18T03:24:07.567Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-issue-236',
+      run_id: 'run-co-236-ready-reclaimed',
+      run_manifest_path: '/tmp/provider-run/co-236-ready-reclaimed-manifest.json',
       launch_source: 'control-host',
       launch_token: expect.any(String)
     });
@@ -25765,6 +26206,648 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.resume).not.toHaveBeenCalled();
   });
 
+  it('clears stale transition_failed merge_closeout residue during completed-run rehydrate when newer tracked issue truth is Done', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-228-stale-transition-failed-rehydrate'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-228-stale-transition-failed-rehydrate');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-228-stale-transition-failed-rehydrate',
+        task_id: 'task-228-stale-transition-failed-rehydrate',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-228',
+        issue_updated_at: '2026-03-19T04:25:00.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-228',
+      issue_title: 'Stale merge closeout transition failure',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:25:00.000Z',
+      issue_assignee_id: null,
+      issue_assignee_name: null,
+      task_id: 'task-228-stale-transition-failed-rehydrate',
+      mapping_source: 'provider_id_fallback',
+      state: 'handoff_failed',
+      reason: 'provider_issue_merge_closeout_transition_failed',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-228-stale-transition-failed-rehydrate',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-228-stale-transition-failed-rehydrate',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null,
+      merge_closeout: {
+        recorded_at: '2026-03-19T04:30:30.000Z',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-228',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-19T04:30:30.000Z',
+        status: 'transition_failed',
+        reason: 'linear_done_transition_failed',
+        summary: 'The pull request merged, but the Linear issue could not transition to Done.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/512'],
+        ignored_historical_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/512',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 512
+        },
+        snapshot: {
+          state: 'MERGED',
+          review_decision: 'APPROVED',
+          merge_state_status: 'UNKNOWN',
+          ready_to_merge: false,
+          gate_reasons: ['state=MERGED'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 0,
+          checks_failed: 0,
+          required_checks_pending: 0,
+          required_checks_failed: 0,
+          updated_at: '2026-03-19T04:30:30.000Z',
+          merged_at: '2026-03-19T04:30:00.000Z',
+          head_oid: 'abc123'
+        },
+        merge_attempt: null,
+        shared_root: {
+          status: 'reconciled',
+          attempted_at: '2026-03-19T04:30:20.000Z',
+          before_status: '## main...origin/main',
+          after_status: '## main...origin/main',
+          reason: 'shared_root_reconciled'
+        },
+        linear_transition: {
+          status: 'failed',
+          attempted_at: '2026-03-19T04:30:25.000Z',
+          previous_state: 'Merging',
+          target_state: 'Done',
+          issue_state: 'Merging',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-03-19T04:30:30.000Z',
+          error: 'linear_transition_conflict: Issue was already updated'
+        }
+      }
+    });
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          identifier: 'CO-228',
+          title: 'Stale merge closeout transition failure',
+          state: 'Done',
+          state_type: 'completed',
+          updated_at: '2026-03-19T04:40:00.000Z',
+          assignee_id: null,
+          assignee_name: null
+        })
+      })
+    });
+
+    await service.rehydrate();
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-03-19T04:40:00.000Z',
+      run_id: 'run-228-stale-transition-failed-rehydrate',
+      run_manifest_path: childPaths.manifestPath,
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
+    });
+    expect(state.claims[0]?.merge_closeout ?? null).toBeNull();
+    expect(getPersistedState().claims[0]).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      issue_state: 'Done',
+      issue_state_type: 'completed'
+    });
+    expect(getPersistedState().claims[0]?.merge_closeout ?? null).toBeNull();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
+  it('keeps transition_failed merge_closeout authority during completed-run rehydrate when live Done truth lacks freshness proof', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-228-transition-failed-rehydrate-no-freshness'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-228-transition-failed-rehydrate-no-freshness');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-228-transition-failed-rehydrate-no-freshness',
+        task_id: 'task-228-transition-failed-rehydrate-no-freshness',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-228',
+        issue_updated_at: '2026-03-19T04:25:00.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-228',
+      issue_title: 'Stale merge closeout transition failure',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:25:00.000Z',
+      issue_assignee_id: null,
+      issue_assignee_name: null,
+      task_id: 'task-228-transition-failed-rehydrate-no-freshness',
+      mapping_source: 'provider_id_fallback',
+      state: 'handoff_failed',
+      reason: 'provider_issue_merge_closeout_transition_failed',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-228-transition-failed-rehydrate-no-freshness',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-228-transition-failed-rehydrate-no-freshness',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null,
+      merge_closeout: {
+        recorded_at: '2026-03-19T04:30:30.000Z',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-228',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-19T04:30:30.000Z',
+        status: 'transition_failed',
+        reason: 'linear_done_transition_failed',
+        summary: 'The pull request merged, but the Linear issue could not transition to Done.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/512'],
+        ignored_historical_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/512',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 512
+        },
+        snapshot: {
+          state: 'MERGED',
+          review_decision: 'APPROVED',
+          merge_state_status: 'UNKNOWN',
+          ready_to_merge: false,
+          gate_reasons: ['state=MERGED'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 0,
+          checks_failed: 0,
+          required_checks_pending: 0,
+          required_checks_failed: 0,
+          updated_at: '2026-03-19T04:30:30.000Z',
+          merged_at: '2026-03-19T04:30:00.000Z',
+          head_oid: 'abc123'
+        },
+        merge_attempt: null,
+        shared_root: {
+          status: 'reconciled',
+          attempted_at: '2026-03-19T04:30:20.000Z',
+          before_status: '## main...origin/main',
+          after_status: '## main...origin/main',
+          reason: 'shared_root_reconciled'
+        },
+        linear_transition: {
+          status: 'failed',
+          attempted_at: '2026-03-19T04:30:25.000Z',
+          previous_state: 'Merging',
+          target_state: 'Done',
+          issue_state: 'Merging',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-03-19T04:30:30.000Z',
+          error: 'linear_transition_conflict: Issue was already updated'
+        }
+      }
+    });
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          identifier: 'CO-228',
+          title: 'Stale merge closeout transition failure',
+          state: 'Done',
+          state_type: 'completed',
+          updated_at: 'not-a-date',
+          assignee_id: null,
+          assignee_name: null
+        })
+      })
+    });
+
+    await service.rehydrate();
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'handoff_failed',
+      reason: 'provider_issue_merge_closeout_transition_failed',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:25:00.000Z',
+      run_id: 'run-228-transition-failed-rehydrate-no-freshness',
+      run_manifest_path: childPaths.manifestPath
+    });
+    expect(state.claims[0]?.merge_closeout).toMatchObject({
+      status: 'transition_failed',
+      reason: 'linear_done_transition_failed'
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      state: 'handoff_failed',
+      reason: 'provider_issue_merge_closeout_transition_failed'
+    });
+    expect(getPersistedState().claims[0]?.merge_closeout).toMatchObject({
+      status: 'transition_failed',
+      reason: 'linear_done_transition_failed'
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
+  it('keeps transition_failed merge_closeout authority during completed-run rehydrate when live completed type lacks an explicit Done state name', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-228-transition-failed-rehydrate-missing-done-state'
+    };
+    const childPaths = resolveRunPaths(
+      childEnv,
+      'run-228-transition-failed-rehydrate-missing-done-state'
+    );
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-228-transition-failed-rehydrate-missing-done-state',
+        task_id: 'task-228-transition-failed-rehydrate-missing-done-state',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-228',
+        issue_updated_at: '2026-03-19T04:25:00.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-228',
+      issue_title: 'Stale merge closeout transition failure',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:25:00.000Z',
+      issue_assignee_id: null,
+      issue_assignee_name: null,
+      task_id: 'task-228-transition-failed-rehydrate-missing-done-state',
+      mapping_source: 'provider_id_fallback',
+      state: 'handoff_failed',
+      reason: 'provider_issue_merge_closeout_transition_failed',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-228-transition-failed-rehydrate-missing-done-state',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-228-transition-failed-rehydrate-missing-done-state',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null,
+      merge_closeout: {
+        recorded_at: '2026-03-19T04:30:30.000Z',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-228',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-19T04:30:30.000Z',
+        status: 'transition_failed',
+        reason: 'linear_done_transition_failed',
+        summary: 'The pull request merged, but the Linear issue could not transition to Done.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/512'],
+        ignored_historical_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/512',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 512
+        },
+        snapshot: {
+          state: 'MERGED',
+          review_decision: 'APPROVED',
+          merge_state_status: 'UNKNOWN',
+          ready_to_merge: false,
+          gate_reasons: ['state=MERGED'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 0,
+          checks_failed: 0,
+          required_checks_pending: 0,
+          required_checks_failed: 0,
+          updated_at: '2026-03-19T04:30:30.000Z',
+          merged_at: '2026-03-19T04:30:00.000Z',
+          head_oid: 'abc123'
+        },
+        merge_attempt: null,
+        shared_root: {
+          status: 'reconciled',
+          attempted_at: '2026-03-19T04:30:20.000Z',
+          before_status: '## main...origin/main',
+          after_status: '## main...origin/main',
+          reason: 'shared_root_reconciled'
+        },
+        linear_transition: {
+          status: 'failed',
+          attempted_at: '2026-03-19T04:30:25.000Z',
+          previous_state: 'Merging',
+          target_state: 'Done',
+          issue_state: 'Merging',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-03-19T04:30:30.000Z',
+          error: 'linear_transition_conflict: Issue was already updated'
+        }
+      }
+    });
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          identifier: 'CO-228',
+          title: 'Stale merge closeout transition failure',
+          state: null,
+          state_type: 'completed',
+          updated_at: '2026-03-19T04:40:00.000Z',
+          assignee_id: null,
+          assignee_name: null
+        })
+      })
+    });
+
+    await service.rehydrate();
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'handoff_failed',
+      reason: 'provider_issue_merge_closeout_transition_failed',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:25:00.000Z',
+      run_id: 'run-228-transition-failed-rehydrate-missing-done-state',
+      run_manifest_path: childPaths.manifestPath
+    });
+    expect(state.claims[0]?.merge_closeout).toMatchObject({
+      status: 'transition_failed',
+      reason: 'linear_done_transition_failed'
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      state: 'handoff_failed',
+      reason: 'provider_issue_merge_closeout_transition_failed'
+    });
+    expect(getPersistedState().claims[0]?.merge_closeout).toMatchObject({
+      status: 'transition_failed',
+      reason: 'linear_done_transition_failed'
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
+  it('keeps transition_failed merge_closeout authority during completed-run rehydrate when live terminal truth is not Done', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-228-transition-failed-rehydrate-not-done-terminal'
+    };
+    const childPaths = resolveRunPaths(
+      childEnv,
+      'run-228-transition-failed-rehydrate-not-done-terminal'
+    );
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-228-transition-failed-rehydrate-not-done-terminal',
+        task_id: 'task-228-transition-failed-rehydrate-not-done-terminal',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-228',
+        issue_updated_at: '2026-03-19T04:25:00.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-228',
+      issue_title: 'Stale merge closeout transition failure',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:25:00.000Z',
+      issue_assignee_id: null,
+      issue_assignee_name: null,
+      task_id: 'task-228-transition-failed-rehydrate-not-done-terminal',
+      mapping_source: 'provider_id_fallback',
+      state: 'handoff_failed',
+      reason: 'provider_issue_merge_closeout_transition_failed',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-228-transition-failed-rehydrate-not-done-terminal',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-228-transition-failed-rehydrate-not-done-terminal',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null,
+      merge_closeout: {
+        recorded_at: '2026-03-19T04:30:30.000Z',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-228',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-19T04:30:30.000Z',
+        status: 'transition_failed',
+        reason: 'linear_done_transition_failed',
+        summary: 'The pull request merged, but the Linear issue could not transition to Done.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/512'],
+        ignored_historical_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/512',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 512
+        },
+        snapshot: {
+          state: 'MERGED',
+          review_decision: 'APPROVED',
+          merge_state_status: 'UNKNOWN',
+          ready_to_merge: false,
+          gate_reasons: ['state=MERGED'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 0,
+          checks_failed: 0,
+          required_checks_pending: 0,
+          required_checks_failed: 0,
+          updated_at: '2026-03-19T04:30:30.000Z',
+          merged_at: '2026-03-19T04:30:00.000Z',
+          head_oid: 'abc123'
+        },
+        merge_attempt: null,
+        shared_root: {
+          status: 'reconciled',
+          attempted_at: '2026-03-19T04:30:20.000Z',
+          before_status: '## main...origin/main',
+          after_status: '## main...origin/main',
+          reason: 'shared_root_reconciled'
+        },
+        linear_transition: {
+          status: 'failed',
+          attempted_at: '2026-03-19T04:30:25.000Z',
+          previous_state: 'Merging',
+          target_state: 'Done',
+          issue_state: 'Merging',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-03-19T04:30:30.000Z',
+          error: 'linear_transition_conflict: Issue was already updated'
+        }
+      }
+    });
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          identifier: 'CO-228',
+          title: 'Stale merge closeout transition failure',
+          state: 'Closed',
+          state_type: 'completed',
+          updated_at: '2026-03-19T04:40:00.000Z',
+          assignee_id: null,
+          assignee_name: null
+        })
+      })
+    });
+
+    await service.rehydrate();
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'handoff_failed',
+      reason: 'provider_issue_merge_closeout_transition_failed',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:25:00.000Z',
+      run_id: 'run-228-transition-failed-rehydrate-not-done-terminal',
+      run_manifest_path: childPaths.manifestPath
+    });
+    expect(state.claims[0]?.merge_closeout).toMatchObject({
+      status: 'transition_failed',
+      reason: 'linear_done_transition_failed'
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      state: 'handoff_failed',
+      reason: 'provider_issue_merge_closeout_transition_failed'
+    });
+    expect(getPersistedState().claims[0]?.merge_closeout).toMatchObject({
+      status: 'transition_failed',
+      reason: 'linear_done_transition_failed'
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
   it('does not run deterministic merge closeout on refresh while an owned Merging issue only has a queued run', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {
@@ -30505,6 +31588,138 @@ describe('createProviderIssueHandoffService', () => {
     expect(getPersistedState().claims[0]?.review_promotion).toMatchObject({
       status: 'action_required',
       reason: 'review=REVIEW_REQUIRED'
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
+  it('persists structured review-promotion multi-pr truth and forwards blocker context', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-237',
+      issue_title: 'Review handoff promotion',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-12T03:10:00.000Z',
+      issue_assignee_id: 'viewer-1',
+      issue_assignee_name: 'Codex',
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      accepted_at: '2026-04-12T03:10:05.000Z',
+      updated_at: '2026-04-12T03:10:10.000Z',
+      last_delivery_id: 'delivery-review-multi-pr-refresh',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_744_427_000_000,
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: null,
+      launch_token: null
+    });
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const blockers = [
+      {
+        id: 'lin-issue-2',
+        identifier: 'CO-226',
+        state: 'In Progress',
+        state_type: 'started'
+      }
+    ] as const;
+    const runReviewHandoffPromotion = vi.fn(async () => ({
+      recorded_at: '2026-04-12T03:15:00.000Z',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-237',
+      issue_state: 'In Review',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-12T03:15:00.000Z',
+      status: 'action_required' as const,
+      reason: 'multiple_attached_prs',
+      summary:
+        'Multiple attached GitHub pull requests match asabeko/co; conflicting current-candidate PR URLs still require deterministic disambiguation before review-handoff promotion can continue: https://github.com/asabeko/CO/pull/416, https://github.com/asabeko/CO/pull/419. Ignored historical merged PR URLs: https://github.com/asabeko/CO/pull/401. Ignored closed prior-attempt PR URLs: https://github.com/asabeko/CO/pull/412. Ignored cross-issue PR URLs: https://github.com/asabeko/CO/pull/418.',
+      attached_pr_urls: [
+        'https://github.com/asabeko/CO/pull/401',
+        'https://github.com/asabeko/CO/pull/412',
+        'https://github.com/asabeko/CO/pull/416',
+        'https://github.com/asabeko/CO/pull/418',
+        'https://github.com/asabeko/CO/pull/419'
+      ],
+      ignored_historical_pr_urls: ['https://github.com/asabeko/CO/pull/401'],
+      ignored_closed_unmerged_pr_urls: ['https://github.com/asabeko/CO/pull/412'],
+      ignored_cross_issue_pr_urls: ['https://github.com/asabeko/CO/pull/418'],
+      conflicting_attached_pr_urls: [
+        'https://github.com/asabeko/CO/pull/416',
+        'https://github.com/asabeko/CO/pull/419'
+      ],
+      pr: null,
+      snapshot: null,
+      linear_transition: null
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      runReviewHandoffPromotion,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          identifier: 'CO-237',
+          title: 'Review handoff promotion',
+          state: 'In Review',
+          state_type: 'started',
+          updated_at: '2026-04-12T03:15:00.000Z',
+          blocked_by: [...blockers]
+        })
+      })
+    });
+
+    await service.refresh();
+
+    expect(runReviewHandoffPromotion).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'lin-issue-1',
+      issueIdentifier: 'CO-237',
+      issueState: 'In Review',
+      blockedBy: [...blockers],
+      repoRoot: paths.repoRoot
+    }));
+    expect(state.claims[0]).toMatchObject({
+      state: 'handoff_failed',
+      reason: 'provider_issue_review_promotion_action_required',
+      issue_state: 'In Review',
+      review_promotion: {
+        status: 'action_required',
+        reason: 'multiple_attached_prs',
+        ignored_historical_pr_urls: ['https://github.com/asabeko/CO/pull/401'],
+        ignored_closed_unmerged_pr_urls: ['https://github.com/asabeko/CO/pull/412'],
+        ignored_cross_issue_pr_urls: ['https://github.com/asabeko/CO/pull/418'],
+        conflicting_attached_pr_urls: [
+          'https://github.com/asabeko/CO/pull/416',
+          'https://github.com/asabeko/CO/pull/419'
+        ]
+      },
+      merge_closeout: null
+    });
+    expect(getPersistedState().claims[0]?.review_promotion).toMatchObject({
+      status: 'action_required',
+      reason: 'multiple_attached_prs',
+      ignored_historical_pr_urls: ['https://github.com/asabeko/CO/pull/401'],
+      ignored_closed_unmerged_pr_urls: ['https://github.com/asabeko/CO/pull/412'],
+      ignored_cross_issue_pr_urls: ['https://github.com/asabeko/CO/pull/418'],
+      conflicting_attached_pr_urls: [
+        'https://github.com/asabeko/CO/pull/416',
+        'https://github.com/asabeko/CO/pull/419'
+      ]
     });
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();

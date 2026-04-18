@@ -14,6 +14,7 @@ export const DEFAULT_CONTROL_HOST_SUPERVISION_RESTART_EXIT_CODE = 75;
 export const DEFAULT_CONTROL_HOST_SUPERVISION_SHELL_PATH = '/bin/zsh';
 export const DEFAULT_CONTROL_HOST_SUPERVISION_ACTIVE_WORKER_RESTART_QUARANTINE_MS =
   10 * 60 * 1000;
+export const CONTROL_HOST_SUPERVISION_RESTART_HISTORY_LIMIT = 20;
 export const CONTROL_HOST_SUPERVISION_MAX_NODE_TIMER_SECONDS = Math.floor(
   2_147_483_647 / 1_000
 );
@@ -611,7 +612,7 @@ function normalizeControlHostSupervisionRestartHistory(
   const normalized = value
     .map((entry) => normalizeControlHostSupervisionRestartRecord(entry))
     .filter((entry): entry is ControlHostSupervisionRestartRecord => entry !== null);
-  return normalized.slice(-20);
+  return normalized.slice(-CONTROL_HOST_SUPERVISION_RESTART_HISTORY_LIMIT);
 }
 
 function normalizeControlHostSupervisionRestartRecord(

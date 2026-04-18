@@ -18,6 +18,7 @@ import { sanitizeProviderOverrideEnv } from '../src/cli/utils/providerOverrideEn
 import * as cloudPreflight from '../src/cli/utils/cloudPreflight.js';
 
 const TEST_AUTH_PROVENANCE_FINGERPRINT_KEY = 'doctor-test-fingerprint-key';
+const RUN_DOCTOR_TEST_TIMEOUT_MS = 15_000;
 
 function testFingerprint(value: string): string {
   return `hmac-sha256:${createHmac('sha256', TEST_AUTH_PROVENANCE_FINGERPRINT_KEY)
@@ -112,9 +113,7 @@ function buildDoctorCloudEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessE
   };
 }
 
-const RUN_DOCTOR_TIMEOUT_MS = 15000;
-
-describe('runDoctor', () => {
+describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
   it('reports missing devtools config and skill when absent', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
@@ -310,7 +309,7 @@ describe('runDoctor', () => {
       await rm(tempHome, { recursive: true, force: true });
       await rm(fakeDistRoot, { recursive: true, force: true });
     }
-  }, 15000);
+  });
 
   it('degrades delegation direct-transport guidance instead of throwing when dist is unavailable', () => {
     const guidance = buildDelegationDirectTransportGuidance(() => {
@@ -490,7 +489,7 @@ describe('runDoctor', () => {
       await rm(tempHome, { recursive: true, force: true });
       await rm(tempRepo, { recursive: true, force: true });
     }
-  }, RUN_DOCTOR_TIMEOUT_MS);
+  });
 
   it('reports provider readiness when the repo is seeded and env is configured', async () => {
     const tempRepo = await mkdtemp(join(tmpdir(), 'doctor-providers-'));
@@ -567,7 +566,7 @@ describe('runDoctor', () => {
       }
       await rm(tempRepo, { recursive: true, force: true });
     }
-  }, RUN_DOCTOR_TIMEOUT_MS);
+  });
 
   it('resolves provider readiness from the repo root when doctor runs in a nested directory', async () => {
     const tempRepo = await mkdtemp(join(tmpdir(), 'doctor-providers-root-'));
@@ -638,7 +637,7 @@ describe('runDoctor', () => {
       }
       await rm(tempRepo, { recursive: true, force: true });
     }
-  }, RUN_DOCTOR_TIMEOUT_MS);
+  });
 
   it('resolves provider readiness from seeded .codex repo roots when doctor runs in a nested directory', async () => {
     const tempRepo = await mkdtemp(join(tmpdir(), 'doctor-seeded-root-'));
@@ -2272,4 +2271,4 @@ describe('runDoctor', () => {
       await rm(tempDir, { recursive: true, force: true });
     }
   });
-}, RUN_DOCTOR_TIMEOUT_MS);
+});

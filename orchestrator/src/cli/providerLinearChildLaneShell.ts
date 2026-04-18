@@ -78,6 +78,7 @@ const PROVIDER_LINEAR_CHILD_LANE_ENV_KEYS_TO_REMOVE = [
   'CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE',
   'CODEX_RUNTIME_MODE',
   'CODEX_ORCHESTRATOR_APPSERVER_SESSION_ID',
+  'CODEX_THREAD_ID',
   PROVIDER_CONTROL_HOST_TASK_ID_ENV,
   PROVIDER_CONTROL_HOST_RUN_ID_ENV,
   PROVIDER_LAUNCH_SOURCE_ENV,
@@ -666,7 +667,7 @@ async function launchChildLane(
     manifest_path: childRun.manifest_path,
     artifact_root: childRun.artifact_root,
     log_path: childRun.log_path,
-    summary: childRun.summary,
+    summary: childRun.summary ?? normalizeOptionalString(childProof?.last_message),
     issue_id: context.issueId,
     issue_identifier: context.issueIdentifier,
     workspace_path: context.repoRoot,
@@ -753,6 +754,10 @@ async function launchChildLane(
     warningContext: `after recording child lane ${stream}`
   });
   if (execResult.exitCode !== 0 || childRun.status !== 'succeeded') {
+    const childFailureDetail =
+      normalizeOptionalString(childProof?.last_message) ??
+      normalizeOptionalString(recordedChildLaneForResult.summary) ??
+      normalizeOptionalString(childRun.summary);
     return failureResult({
       action: 'launch',
       issueId: context.issueId,
@@ -762,7 +767,7 @@ async function launchChildLane(
       childRun,
       childLane: recordedChildLaneForResult,
       code: 'provider_worker_child_lane_run_failed',
-      message: `Child lane ${stream} completed with status ${childRun.status}. ${PROVIDER_LINEAR_CHILD_LANE_MUTATION_REASON}`,
+      message: `Child lane ${stream} completed with status ${childRun.status}.${childFailureDetail ? ` ${childFailureDetail}` : ''} ${PROVIDER_LINEAR_CHILD_LANE_MUTATION_REASON}`,
       status: 502
     });
   }
