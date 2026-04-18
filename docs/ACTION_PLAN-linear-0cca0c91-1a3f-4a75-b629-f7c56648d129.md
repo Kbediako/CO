@@ -5,7 +5,7 @@
 ## Summary
 - Goal: ensure `npm run pack:smoke` and relevant CI/release workflows cannot silently miss Codex marketplace install/register coverage after `CO-196`.
 - Decision: marketplace smoke is mandatory by default; any skip requires an explicit env/flag opt-out with documented allowed use and reason evidence.
-- Scope: docs-first packet and registry mirrors in this child lane; parent-owned implementation, focused validation, workflow edits, Linear state, workpad, PR, and merge.
+- Scope: accepted docs-first packet and registry mirrors, pack-smoke prerequisite hardening, focused validation, workflow posture tests, release-guide documentation, Linear state, workpad, PR, and merge.
 
 ## Issue Readiness Gate
 - Intent checksum / protected terms carried forward:
@@ -25,10 +25,10 @@
 
 ## Milestones & Sequencing
 1. Create the docs-first packet and registry mirrors for `CO-217`.
-2. Parent imports the patch, confirms the packet in the authoritative workspace, and runs docs-review/spec-guard.
-3. Parent identifies the smallest pack-smoke change that exercises marketplace install/register coverage from the packaged downstream simulation.
-4. Parent decides the exact opt-out interface and documents allowed uses.
-5. Parent updates relevant CI/release workflow posture so marketplace smoke cannot be silently absent.
+2. Parent imports the patch, confirms the packet in the authoritative workspace, and merges current `origin/main` containing `CO-196`.
+3. Parent preserves the existing marketplace install/register scenario and hardens only the prerequisite/skip contract.
+4. Parent selects `PACK_SMOKE_ALLOW_MARKETPLACE_SKIP=1` plus required `PACK_SMOKE_MARKETPLACE_SKIP_REASON=<reason>` as the local-dev opt-out interface and documents allowed uses.
+5. Parent pins relevant CI/release workflow posture in focused tests so marketplace smoke cannot be silently absent.
 6. Parent validates focused behavior plus `npm run pack:smoke`, then runs review/elegance and PR lifecycle steps.
 
 ## Dependencies
@@ -44,7 +44,7 @@
   - JSON parse/registry presence check
 - Parent lane checks:
   - docs-review / `node scripts/spec-guard.mjs --dry-run`
-  - focused pack-smoke mandatory/opt-out coverage
+  - focused pack-smoke mandatory/opt-out coverage (`npm run test:orchestrator -- tests/pack-smoke.spec.ts`)
   - `npm run pack:smoke` on the final tree
   - relevant CI/release workflow posture review
   - standalone review and elegance/minimality pass
@@ -63,5 +63,5 @@
   - Mitigation: document Codex `0.121+` as the support boundary and make unsupported-version skips explicit non-coverage evidence.
 
 ## Approvals
-- Reviewer: pending parent lane acceptance, docs-review, and implementation validation
+- Reviewer: ready for PR handoff after docs/spec gates, focused tests, full suite, clean standalone review/elegance, and `npm run pack:smoke`
 - Date: 2026-04-18

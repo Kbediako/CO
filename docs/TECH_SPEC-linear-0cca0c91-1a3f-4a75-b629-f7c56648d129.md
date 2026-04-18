@@ -27,10 +27,11 @@ last_review: 2026-04-18
 - Objective: make marketplace install/register coverage part of `npm run pack:smoke` by default and make any CI/release skip explicit after `CO-196`.
 - Decision: marketplace smoke is mandatory by default. Skipping is allowed only through an explicit env/flag opt-out with documented allowed use and reason evidence.
 - Scope:
-  - parent-owned pack-smoke marketplace install/register assertion
-  - parent-owned CI/release workflow posture updates for mandatory marketplace smoke or explicit opt-out
-  - parent-owned validation that preserves `CO-196` local proof
-  - this child lane docs packet and registry mirrors only
+  - pack-smoke marketplace prerequisite handling and reasoned opt-out enforcement
+  - focused workflow posture regression coverage for mandatory marketplace smoke
+  - release-guide documentation of the non-coverage skip contract
+  - validation that preserves `CO-196` local proof
+  - docs packet and registry mirrors from the accepted child lane
 - Constraints:
   - do not replace the `CO-196` local validation proof
   - do not broaden into release-pipeline refactors
@@ -56,17 +57,17 @@ last_review: 2026-04-18
   - keep logs/artifacts reviewer-readable
   - avoid network or credential assumptions beyond what the marketplace smoke contract explicitly documents
   - avoid broad release-pipeline, guardrail, delegation, or runtime refactors
-- Parent likely touched surfaces:
+- Touched surfaces:
   - `scripts/pack-smoke.mjs`
-  - `package.json` scripts only if pack-smoke command shape changes
+  - `tests/pack-smoke.spec.ts`
   - `.github/workflows/core-lane.yml`
   - `.github/workflows/release.yml`
   - `.github/workflows/pack-smoke-backstop.yml`
-  - docs/runbook surfaces that describe allowed marketplace smoke opt-outs
+  - `docs/skills-release.md`
 
 ## Opt-Out Policy
 - Default: marketplace smoke runs as part of `npm run pack:smoke`.
-- Allowed skips must use an explicit env/flag selected by the parent implementation and include reason text.
+- Allowed skips must use `PACK_SMOKE_ALLOW_MARKETPLACE_SKIP=1` and `PACK_SMOKE_MARKETPLACE_SKIP_REASON=<reason>`.
 - Allowed-use examples to document:
   - local docs-only validation where no package/workflow marketplace coverage is being claimed
   - an explicit compatibility lane for Codex versions before marketplace support
@@ -96,10 +97,10 @@ last_review: 2026-04-18
   - standalone review and explicit elegance/minimality pass before PR handoff
 
 ## Open Questions
-- Which exact workflows must consume the mandatory marketplace smoke contract in the first implementation slice?
-- Should opt-out reason text be a required companion env var, a CLI flag value, or both?
-- Should the parent add a machine-readable field to pack-smoke output for `marketplace_smoke=ran|skipped|failed`?
+- Answered 2026-04-18: core-lane, pack-smoke backstop, and release publish consume the mandatory marketplace smoke contract in this slice.
+- Answered 2026-04-18: opt-out reason text is required through `PACK_SMOKE_MARKETPLACE_SKIP_REASON=<reason>` whenever `PACK_SMOKE_ALLOW_MARKETPLACE_SKIP=1` suppresses marketplace coverage.
+- Answered 2026-04-18: the focused helper exposes `run|skip|fail` decisions; no separate persisted summary field is required for this slice.
 
 ## Approvals
 - Pre-implementation issue-quality review is recorded in the canonical task spec.
-- Parent lane owns docs-review, implementation validation, and PR lifecycle after patch import.
+- Parent lane completed final validation, standalone review/elegance, and pack-smoke proof before PR handoff.
