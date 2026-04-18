@@ -645,7 +645,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-17",
+      "last_review": "2026-04-18",
       "approvals": {
         "docs_packet_child_lane": {
           "reviewer": "bounded same-issue docs child lane",
@@ -654,6 +654,14 @@
           "manifest": ".runs/linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c-docs-packet/cli/2026-04-17T02-07-55-950Z-cb83673c/manifest.json",
           "source_anchor": "ctx:sha256:d4239a4784c1cf71c95ab480b4a3821dc2c83dc3648d3b8d4a8c5387ccdfb3f8#chunk:c000001",
           "summary": "Docs-first packet preserves CO-211 as repeated refresh-stuck restart churn with healthy active workers, machine-checkable restart-series evidence, `stalled_after_ms=45000` diagnostics, worker-preserving recovery, and post-recovery `co-status --format json` truth while keeping CO-210 child-lane manifest hydration semantics out of scope. Parent owns implementation, docs-review, validation, Linear state, workpad, PR, and merge."
+        },
+        "docs_apr18_refresh_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c-docs-apr18-refresh/cli/2026-04-18T18-35-19-649Z-1ede381a/manifest.json",
+          "source_anchor": "ctx:sha256:6a9427aa000f73b2f7d86bab415ae29c6ebbeb9172e159c03bc6d29ae012ff52#chunk:c000001",
+          "summary": "Apr 18 docs refresh records recurrence evidence after merged PR #506 (`e98d459f4dfdb47a22d981fedbf5ba11053d3a95`) while preserving the original CO-211 lifecycle contract: `provider_refresh_lifecycle_stuck`, `restart_required`, `owner rotations`, `refresh phases`, `surviving provider workers`, `stalled_after_ms=45000`, and CO-210 out-of-scope semantics remain protected. The supplied source-0 payload is metadata/provenance only; parent owns the source fix for quarantined samples preserving fail-closed unhealthy streaks and diagnostic retention."
         }
       },
       "paths": {

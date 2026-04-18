@@ -38,6 +38,7 @@ const {
   probeControlHostHealth,
   readFormatFlag,
   readStringFlag,
+  resolveControlHostSupervisionQuarantineUnhealthySamples,
   readIntegerFlag,
   removeInstalledControlHostSupervisionArtifacts,
   resolveReportedSupervisedChildPid,
@@ -318,6 +319,47 @@ describe('controlHostSupervision helpers', () => {
       message:
         'co-status reported restart_required=true for the same provider refresh stuck series already restarted at 2026-04-14T05:06:30.000Z; 1 active provider worker(s) remain visible, so supervision is quarantining repeated restart churn while retaining restart_required in co-status.'
     });
+  });
+
+  it('preserves the unhealthy streak while active-worker restart churn is quarantined', () => {
+    const config = buildControlHostSupervisionConfig({
+      homeDir: '/Users/tester',
+      cwd: '/repo/workspace',
+      repoRoot: '/repo/CO',
+      nodePath: '/custom/node',
+      cliEntrypoint: '/opt/codex-orchestrator.js',
+      unhealthyThreshold: 3
+    });
+    const priorState = buildInitialControlHostSupervisionState({
+      config,
+      updatedAt: '2026-04-14T05:06:30.000Z',
+      status: 'restart_required',
+      restartHistory: [
+        {
+          requested_at: '2026-04-14T05:06:30.000Z',
+          reason: 'restart_required',
+          message: 'launchd restart requested.',
+          consecutive_unhealthy_samples: 3,
+          child_pid: 1234,
+          diagnostic: null
+        }
+      ]
+    });
+
+    expect(
+      resolveControlHostSupervisionQuarantineUnhealthySamples({
+        currentConsecutiveUnhealthySamples: 0,
+        priorState,
+        config
+      })
+    ).toBe(3);
+    expect(
+      resolveControlHostSupervisionQuarantineUnhealthySamples({
+        currentConsecutiveUnhealthySamples: 4,
+        priorState,
+        config
+      })
+    ).toBe(4);
   });
 
   it('keeps provider refresh restart_required unhealthy after a newer unrelated restart record', () => {

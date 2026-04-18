@@ -165,8 +165,12 @@ export function recordProviderPollingProgress(
   }
   const atMs = input.atMs ?? Date.now();
   state.refreshPhase = normalizeOptionalString(input.phase) ?? null;
-  state.refreshRequestClass = normalizeOptionalString(input.requestClass) ?? null;
-  state.refreshProviderKeys = normalizePollingProviderKeys(input.providerKeys ?? null);
+  if (input.requestClass !== undefined) {
+    state.refreshRequestClass = normalizeOptionalString(input.requestClass) ?? null;
+  }
+  if (input.providerKeys !== undefined) {
+    state.refreshProviderKeys = normalizePollingProviderKeys(input.providerKeys);
+  }
   state.refreshCounts = copyFiniteRefreshCounts(input.counts ?? null);
   state.updatedAtMs = atMs;
   queueProviderPollingHealthUpdate(providerIssueHandoff, state, atMs);

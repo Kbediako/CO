@@ -8,6 +8,7 @@ import process from 'node:process';
 import { promisify } from 'node:util';
 
 import {
+  CONTROL_HOST_SUPERVISION_RESTART_HISTORY_LIMIT,
   CONTROL_HOST_SUPERVISION_MAX_NODE_TIMER_SECONDS,
   DEFAULT_CONTROL_HOST_SUPERVISION_LABEL,
   DEFAULT_CONTROL_HOST_SUPERVISION_KILL_TIMEOUT_SECONDS,
@@ -456,6 +457,23 @@ async function runControlHostSupervision(flags: ArgMap): Promise<void> {
         });
         const checkedAt = new Date().toISOString();
         if (probe.healthy) {
+          if (isControlHostSupervisionQuarantineProbe(probe)) {
+            consecutiveUnhealthySamples =
+              resolveControlHostSupervisionQuarantineUnhealthySamples({
+                currentConsecutiveUnhealthySamples: consecutiveUnhealthySamples,
+                priorState,
+                config
+              });
+            await writeRuntimeState({
+              status: 'quarantined',
+              updated_at: checkedAt,
+              last_health_check_at: checkedAt,
+              last_health_status: probe.reason,
+              consecutive_unhealthy_samples: consecutiveUnhealthySamples,
+              message: probe.message
+            });
+            continue;
+          }
           consecutiveUnhealthySamples = 0;
           await writeRuntimeState({
             status: 'healthy',
@@ -1099,7 +1117,30 @@ function appendControlHostSupervisionRestartRecord(
   history: ControlHostSupervisionRestartRecord[] | null | undefined,
   record: ControlHostSupervisionRestartRecord
 ): ControlHostSupervisionRestartRecord[] {
-  return [...(history ?? []), record].slice(-20);
+  return [...(history ?? []), record].slice(-CONTROL_HOST_SUPERVISION_RESTART_HISTORY_LIMIT);
+}
+
+function isControlHostSupervisionQuarantineProbe(probe: { reason: string }): boolean {
+  return probe.reason === 'active_worker_restart_quarantine';
+}
+
+function resolveControlHostSupervisionQuarantineUnhealthySamples(input: {
+  currentConsecutiveUnhealthySamples: number;
+  priorState: ControlHostSupervisionState;
+  config: ControlHostSupervisionConfig;
+}): number {
+  const candidates = [
+    input.currentConsecutiveUnhealthySamples,
+    input.priorState.consecutive_unhealthy_samples,
+    ...(input.priorState.restart_history ?? []).map(
+      (record) => record.consecutive_unhealthy_samples
+    )
+  ].filter((value) => Number.isFinite(value) && value > 0);
+  const priorMaximum = candidates.length > 0 ? Math.max(...candidates) : 0;
+  if (priorMaximum > 0) {
+    return priorMaximum;
+  }
+  return Math.max(1, input.config.unhealthyThreshold);
 }
 
 async function bootoutLaunchctlServiceTarget(serviceTarget: string): Promise<void> {
@@ -2438,6 +2479,7 @@ export const __test__ = {
   probeControlHostHealth,
   readFormatFlag,
   readStringFlag,
+  resolveControlHostSupervisionQuarantineUnhealthySamples,
   readIntegerFlag,
   removeInstalledControlHostSupervisionArtifacts,
   restoreExistingControlHostSupervisionInstall,

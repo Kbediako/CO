@@ -184,4 +184,59 @@ describe('providerPollingHealth next-refresh projection', () => {
       refresh_counts: null
     });
   });
+
+  it('retains request class and provider keys when progress omits optional diagnostics', () => {
+    const service = {} as ProviderIssueHandoffService;
+
+    markProviderPollingStarted(service, {
+      mode: 'refresh',
+      atMs: Date.parse('2026-04-18T18:00:00.000Z')
+    });
+    recordProviderPollingProgress(service, {
+      phase: 'refresh:claim_reconcile',
+      requestClass: 'claim_reconcile:running',
+      providerKeys: ['linear:CO-207', 'linear:CO-210'],
+      counts: {
+        claims_scanned: 2
+      },
+      atMs: Date.parse('2026-04-18T18:00:01.000Z')
+    });
+    recordProviderPollingProgress(service, {
+      phase: 'refresh:rehydrated',
+      counts: {
+        claims_scanned: 2,
+        fresh_discovery_runs: 0
+      },
+      atMs: Date.parse('2026-04-18T18:00:02.000Z')
+    });
+
+    expect(
+      readProviderPollingHealth(service, Date.parse('2026-04-18T18:00:03.000Z'))
+    ).toMatchObject({
+      refresh_phase: 'refresh:rehydrated',
+      refresh_request_class: 'claim_reconcile:running',
+      refresh_provider_keys: ['linear:CO-207', 'linear:CO-210'],
+      refresh_counts: {
+        claims_scanned: 2,
+        fresh_discovery_runs: 0
+      }
+    });
+
+    recordProviderPollingProgress(service, {
+      phase: 'refresh:complete',
+      requestClass: null,
+      providerKeys: null,
+      counts: null,
+      atMs: Date.parse('2026-04-18T18:00:04.000Z')
+    });
+
+    expect(
+      readProviderPollingHealth(service, Date.parse('2026-04-18T18:00:05.000Z'))
+    ).toMatchObject({
+      refresh_phase: 'refresh:complete',
+      refresh_request_class: null,
+      refresh_provider_keys: null,
+      refresh_counts: null
+    });
+  });
 });
