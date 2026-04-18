@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import process from 'node:process';
 import { promisify } from 'node:util';
 
+import type { LiveLinearTrackedBlocker } from './linearDispatchSource.js';
 import type { DispatchPilotSourceSetup } from './trackerDispatchPilot.js';
 import { classifyProviderLinearWorkflowState } from './providerLinearWorkflowStates.js';
 import {
@@ -135,6 +136,8 @@ export interface ProviderReviewHandoffPromotionRecord {
   summary: string;
   attached_pr_urls: string[];
   ignored_historical_pr_urls: string[];
+  ignored_closed_unmerged_pr_urls?: string[];
+  ignored_cross_issue_pr_urls?: string[];
   conflicting_attached_pr_urls: string[];
   pr: ProviderMergeCloseoutPullRequestRecord | null;
   snapshot: ProviderMergeCloseoutSnapshotRecord | null;
@@ -199,10 +202,17 @@ interface ProviderMergeCloseoutDependencies {
   ) => string[];
 }
 
+interface ProviderAttachedSameRepoPullRequestCandidate {
+  pr: ProviderMergeCloseoutPullRequestRecord;
+  attachment_title: string | null;
+}
+
 interface ProviderMergeCloseoutAttachedPrResolution {
   selected_pr: ProviderMergeCloseoutPullRequestRecord | null;
   selected_snapshot: ProviderMergeCloseoutSnapshotRecord | null;
   ignored_historical_pr_urls: string[];
+  ignored_closed_unmerged_pr_urls: string[];
+  ignored_cross_issue_pr_urls: string[];
   conflicting_attached_pr_urls: string[];
   selection_note: string | null;
 }
@@ -313,7 +323,8 @@ export async function runProviderDeterministicMergeCloseout(
     };
   }
 
-  const attachedPrUrls = collectAttachedGitHubPrUrls(issueContext.issue.attachments);
+  const attachedPrCandidates = collectAttachedGitHubPrCandidates(issueContext.issue.attachments);
+  const attachedPrUrls = attachedPrCandidates.map((candidate) => candidate.pr.url);
   const usedCachedIssueContext = issueContext.cache_fallback_used === true;
   if (
     mode === 'probe-merged-recovery' &&
@@ -340,10 +351,9 @@ export async function runProviderDeterministicMergeCloseout(
     };
   }
 
-  const sameRepoPrs = attachedPrUrls
-    .map((url) => parseGitHubPullRequestUrl(url))
-    .filter((value): value is ProviderMergeCloseoutPullRequestRecord => Boolean(value))
-    .filter((value) => `${value.owner.toLowerCase()}/${value.repo.toLowerCase()}` === repoKey);
+  const sameRepoPrs = attachedPrCandidates.filter(
+    (candidate) => `${candidate.pr.owner.toLowerCase()}/${candidate.pr.repo.toLowerCase()}` === repoKey
+  );
   const currentIssueState = issueContext.issue.state?.name ?? base.issue_state;
   const currentIssueStateType = issueContext.issue.state?.type ?? base.issue_state_type;
   const currentIssueUpdatedAt = issueContext.issue.updated_at ?? base.issue_updated_at;
@@ -388,7 +398,7 @@ export async function runProviderDeterministicMergeCloseout(
   let ignoredHistoricalPrUrls: string[] = [];
   let conflictingAttachedPrUrls: string[] = [];
   let selectionNote: string | null = null;
-  let pr = sameRepoPrs[0]!;
+  let pr = sameRepoPrs[0]!.pr;
   let snapshot: ProviderMergeCloseoutSnapshotRecord | null = null;
 
   if (sameRepoPrs.length > 1) {
@@ -954,6 +964,7 @@ export async function runProviderReviewHandoffPromotion(
     issueState?: string | null;
     issueStateType?: string | null;
     issueUpdatedAt?: string | null;
+    blockedBy?: readonly LiveLinearTrackedBlocker[] | null;
     previousBranchRecovery?: ProviderBranchRecoveryAttemptRecord | null;
     repoRoot: string;
     sourceSetup?: DispatchPilotSourceSetup | null;
@@ -982,6 +993,8 @@ export async function runProviderReviewHandoffPromotion(
     issue_updated_at: normalizeOptionalString(input.issueUpdatedAt),
     attached_pr_urls: [] as string[],
     ignored_historical_pr_urls: [] as string[],
+    ignored_closed_unmerged_pr_urls: [] as string[],
+    ignored_cross_issue_pr_urls: [] as string[],
     conflicting_attached_pr_urls: [] as string[],
     pr: null as ProviderMergeCloseoutPullRequestRecord | null,
     snapshot: null as ProviderMergeCloseoutSnapshotRecord | null,
@@ -1031,11 +1044,11 @@ export async function runProviderReviewHandoffPromotion(
     };
   }
 
-  const attachedPrUrls = collectAttachedGitHubPrUrls(issueContext.issue.attachments);
-  const sameRepoPrs = attachedPrUrls
-    .map((url) => parseGitHubPullRequestUrl(url))
-    .filter((value): value is ProviderMergeCloseoutPullRequestRecord => Boolean(value))
-    .filter((value) => `${value.owner.toLowerCase()}/${value.repo.toLowerCase()}` === repoKey);
+  const attachedPrCandidates = collectAttachedGitHubPrCandidates(issueContext.issue.attachments);
+  const attachedPrUrls = attachedPrCandidates.map((candidate) => candidate.pr.url);
+  const sameRepoPrs = attachedPrCandidates.filter(
+    (candidate) => `${candidate.pr.owner.toLowerCase()}/${candidate.pr.repo.toLowerCase()}` === repoKey
+  );
   const currentIssueState = issueContext.issue.state?.name ?? base.issue_state;
   const currentIssueStateType = issueContext.issue.state?.type ?? base.issue_state_type;
   const currentIssueUpdatedAt = issueContext.issue.updated_at ?? base.issue_updated_at;
@@ -1076,9 +1089,11 @@ export async function runProviderReviewHandoffPromotion(
   }
 
   let ignoredHistoricalPrUrls: string[] = [];
+  let ignoredClosedUnmergedPrUrls: string[] = [];
+  let ignoredCrossIssuePrUrls: string[] = [];
   let conflictingAttachedPrUrls: string[] = [];
   let selectionNote: string | null = null;
-  let pr = sameRepoPrs[0]!;
+  let pr = sameRepoPrs[0]!.pr;
   let snapshot: ProviderMergeCloseoutSnapshotRecord | null = null;
 
   if (sameRepoPrs.length > 1) {
@@ -1086,6 +1101,9 @@ export async function runProviderReviewHandoffPromotion(
     try {
       resolution = await resolveAttachedSameRepoPullRequestCandidate({
         candidates: sameRepoPrs,
+        mode: 'review_promotion',
+        issueIdentifier: issueContext.issue.identifier,
+        blockedBy: input.blockedBy ?? null,
         resolveSnapshot,
         resolveSnapshotActionRequiredReasons
       });
@@ -1109,18 +1127,24 @@ export async function runProviderReviewHandoffPromotion(
     }
 
     ignoredHistoricalPrUrls = resolution.ignored_historical_pr_urls;
+    ignoredClosedUnmergedPrUrls = resolution.ignored_closed_unmerged_pr_urls;
+    ignoredCrossIssuePrUrls = resolution.ignored_cross_issue_pr_urls;
     conflictingAttachedPrUrls = resolution.conflicting_attached_pr_urls;
     selectionNote = resolution.selection_note;
     if (!resolution.selected_pr) {
       return {
         ...baseWithContext,
         ignored_historical_pr_urls: [...ignoredHistoricalPrUrls],
+        ignored_closed_unmerged_pr_urls: [...ignoredClosedUnmergedPrUrls],
+        ignored_cross_issue_pr_urls: [...ignoredCrossIssuePrUrls],
         conflicting_attached_pr_urls: [...conflictingAttachedPrUrls],
         status: 'action_required',
         reason: 'multiple_attached_prs',
         summary: buildMultipleAttachedPrsPromotionSummary({
           repoKey,
           ignoredHistoricalPrUrls,
+          ignoredClosedUnmergedPrUrls,
+          ignoredCrossIssuePrUrls,
           conflictingAttachedPrUrls
         })
       };
@@ -1133,6 +1157,8 @@ export async function runProviderReviewHandoffPromotion(
   const baseWithResolution = {
     ...baseWithContext,
     ignored_historical_pr_urls: [...ignoredHistoricalPrUrls],
+    ignored_closed_unmerged_pr_urls: [...ignoredClosedUnmergedPrUrls],
+    ignored_cross_issue_pr_urls: [...ignoredCrossIssuePrUrls],
     conflicting_attached_pr_urls: [...conflictingAttachedPrUrls]
   };
   const summarizeSelection = (summary: string): string =>
@@ -1578,27 +1604,37 @@ async function runProviderMergeCloseoutCommand(input: {
   }
 }
 
-function collectAttachedGitHubPrUrls(
-  attachments: Array<{ url?: string | null }>
-): string[] {
-  const seen = new Set<string>();
-  const urls: string[] = [];
+function collectAttachedGitHubPrCandidates(
+  attachments: Array<{ title?: string | null; url?: string | null }>
+): ProviderAttachedSameRepoPullRequestCandidate[] {
+  const candidatesByUrl = new Map<string, ProviderAttachedSameRepoPullRequestCandidate>();
   for (const attachment of attachments) {
     const parsed = parseGitHubPullRequestUrl(attachment?.url);
     const comparisonKey = parsed
       ? `${parsed.owner.toLowerCase()}/${parsed.repo.toLowerCase()}#${parsed.number}`
       : null;
-    if (!parsed || !comparisonKey || seen.has(comparisonKey)) {
+    if (!parsed || !comparisonKey) {
       continue;
     }
-    seen.add(comparisonKey);
-    urls.push(parsed.url);
+    const title = normalizeOptionalString(attachment?.title);
+    const existingCandidate = candidatesByUrl.get(comparisonKey);
+    if (existingCandidate) {
+      existingCandidate.attachment_title = title;
+      continue;
+    }
+    candidatesByUrl.set(comparisonKey, {
+      pr: parsed,
+      attachment_title: title
+    });
   }
-  return urls;
+  return [...candidatesByUrl.values()];
 }
 
 async function resolveAttachedSameRepoPullRequestCandidate(input: {
-  candidates: ProviderMergeCloseoutPullRequestRecord[];
+  candidates: ProviderAttachedSameRepoPullRequestCandidate[];
+  mode?: 'merge_closeout' | 'review_promotion';
+  issueIdentifier?: string | null;
+  blockedBy?: readonly LiveLinearTrackedBlocker[] | null;
   resolveSnapshot: (
     input: ProviderPrSnapshotReaderInput
   ) => Promise<ProviderPrSnapshotRecord>;
@@ -1607,16 +1643,33 @@ async function resolveAttachedSameRepoPullRequestCandidate(input: {
     options?: { readinessMode?: 'merge' | 'review' }
   ) => string[];
 }): Promise<ProviderMergeCloseoutAttachedPrResolution> {
+  const ignoredCrossIssueCandidates =
+    input.mode === 'review_promotion'
+      ? input.candidates.filter((candidate) =>
+          isReviewPromotionCrossIssueCandidate({
+            attachmentTitle: candidate.attachment_title,
+            issueIdentifier: input.issueIdentifier ?? null,
+            blockedBy: input.blockedBy ?? null
+          })
+        )
+      : [];
+  const ignoredCrossIssuePrUrls = ignoredCrossIssueCandidates.map((candidate) => candidate.pr.url);
+  const ignoredCrossIssueUrlSet = new Set(ignoredCrossIssuePrUrls);
+
   const inspectedCandidates: Array<{
     pr: ProviderMergeCloseoutPullRequestRecord;
     snapshot: ProviderMergeCloseoutSnapshotRecord;
+    attachment_title: string | null;
   }> = [];
 
-  for (const pr of input.candidates) {
+  for (const candidate of input.candidates) {
+    if (ignoredCrossIssueUrlSet.has(candidate.pr.url)) {
+      continue;
+    }
     const rawSnapshot = await input.resolveSnapshot({
-      owner: pr.owner,
-      repo: pr.repo,
-      prNumber: pr.number,
+      owner: candidate.pr.owner,
+      repo: candidate.pr.repo,
+      prNumber: candidate.pr.number,
       readinessMode: 'merge'
     });
     const snapshot = mapSnapshotRecord(
@@ -1629,15 +1682,58 @@ async function resolveAttachedSameRepoPullRequestCandidate(input: {
       throw buildProviderGitHubRateLimitError(snapshot.github_rate_limit);
     }
     inspectedCandidates.push({
-      pr,
-      snapshot
+      pr: candidate.pr,
+      snapshot,
+      attachment_title: candidate.attachment_title
     });
   }
 
-  const mergedCandidates = inspectedCandidates.filter((candidate) =>
+  const openUnmergedCandidates =
+    input.mode === 'review_promotion'
+      ? inspectedCandidates.filter(
+          (candidate) =>
+            !isMergedPullRequestSnapshot(candidate.snapshot) && candidate.snapshot.state !== 'CLOSED'
+        )
+      : [];
+
+  const ignoredClosedUnmergedCandidates =
+    input.mode === 'review_promotion'
+      ? inspectedCandidates.filter(
+          (candidate) =>
+            isClosedUnmergedPullRequestSnapshot(candidate.snapshot) &&
+            openUnmergedCandidates.some((openCandidate) =>
+              isSnapshotStrictlyOlderThanSelection(candidate.snapshot, openCandidate.snapshot)
+            )
+        )
+      : [];
+  const ignoredClosedUnmergedPrUrls = ignoredClosedUnmergedCandidates.map(
+    (candidate) => candidate.pr.url
+  );
+  const ignoredClosedUnmergedUrlSet = new Set(ignoredClosedUnmergedPrUrls);
+  const resolutionCandidates = inspectedCandidates.filter(
+    (candidate) => !ignoredClosedUnmergedUrlSet.has(candidate.pr.url)
+  );
+
+  if (resolutionCandidates.length === 1) {
+    const selectedCandidate = resolutionCandidates[0]!;
+    return {
+      selected_pr: selectedCandidate.pr,
+      selected_snapshot: selectedCandidate.snapshot,
+      ignored_historical_pr_urls: [],
+      ignored_closed_unmerged_pr_urls: ignoredClosedUnmergedPrUrls,
+      ignored_cross_issue_pr_urls: ignoredCrossIssuePrUrls,
+      conflicting_attached_pr_urls: [],
+      selection_note: buildReviewPromotionIgnoredSelectionNote({
+        ignoredClosedUnmergedPrUrls,
+        ignoredCrossIssuePrUrls
+      })
+    };
+  }
+
+  const mergedCandidates = resolutionCandidates.filter((candidate) =>
     isMergedPullRequestSnapshot(candidate.snapshot)
   );
-  const nonMergedCandidates = inspectedCandidates.filter(
+  const nonMergedCandidates = resolutionCandidates.filter(
     (candidate) => !isMergedPullRequestSnapshot(candidate.snapshot)
   );
 
@@ -1652,11 +1748,18 @@ async function resolveAttachedSameRepoPullRequestCandidate(input: {
         selected_pr: selectedCandidate.pr,
         selected_snapshot: selectedCandidate.snapshot,
         ignored_historical_pr_urls: ignoredHistoricalPrUrls,
+        ignored_closed_unmerged_pr_urls: ignoredClosedUnmergedPrUrls,
+        ignored_cross_issue_pr_urls: ignoredCrossIssuePrUrls,
         conflicting_attached_pr_urls: [],
-        selection_note:
+        selection_note: appendReviewPromotionIgnoredSelectionNote(
           ignoredHistoricalPrUrls.length > 0
             ? `Ignored historical merged PR URLs: ${ignoredHistoricalPrUrls.join(', ')}.`
-            : null
+            : null,
+          {
+            ignoredClosedUnmergedPrUrls,
+            ignoredCrossIssuePrUrls
+          }
+        )
       };
     }
   }
@@ -1700,8 +1803,16 @@ async function resolveAttachedSameRepoPullRequestCandidate(input: {
         selected_pr: selectedMergedCandidate.pr,
         selected_snapshot: selectedMergedCandidate.snapshot,
         ignored_historical_pr_urls: ignoredHistoricalPrUrls,
+        ignored_closed_unmerged_pr_urls: ignoredClosedUnmergedPrUrls,
+        ignored_cross_issue_pr_urls: ignoredCrossIssuePrUrls,
         conflicting_attached_pr_urls: [],
-        selection_note: `Selected already-merged PR ${selectedMergedCandidate.pr.url} because all remaining attached same-repo PR URLs are older.${ignoredHistoricalMergedPrUrls.length > 0 ? ` Ignored older merged PR URLs: ${ignoredHistoricalMergedPrUrls.join(', ')}.` : ''}${staleUnmergedPrUrls.length > 0 ? ` Older unmerged PR URLs: ${staleUnmergedPrUrls.join(', ')}.` : ''}`
+        selection_note: appendReviewPromotionIgnoredSelectionNote(
+          `Selected already-merged PR ${selectedMergedCandidate.pr.url} because all remaining attached same-repo PR URLs are older.${ignoredHistoricalMergedPrUrls.length > 0 ? ` Ignored older merged PR URLs: ${ignoredHistoricalMergedPrUrls.join(', ')}.` : ''}${staleUnmergedPrUrls.length > 0 ? ` Older unmerged PR URLs: ${staleUnmergedPrUrls.join(', ')}.` : ''}`,
+          {
+            ignoredClosedUnmergedPrUrls,
+            ignoredCrossIssuePrUrls
+          }
+        )
       };
     }
   }
@@ -1721,7 +1832,9 @@ async function resolveAttachedSameRepoPullRequestCandidate(input: {
     selected_pr: null,
     selected_snapshot: null,
     ignored_historical_pr_urls: ignoredHistoricalPrUrls,
-    conflicting_attached_pr_urls: inspectedCandidates
+    ignored_closed_unmerged_pr_urls: ignoredClosedUnmergedPrUrls,
+    ignored_cross_issue_pr_urls: ignoredCrossIssuePrUrls,
+    conflicting_attached_pr_urls: resolutionCandidates
       .filter((candidate) => !ignoredHistoricalUrlSet.has(candidate.pr.url))
       .map((candidate) => candidate.pr.url),
     selection_note: null
@@ -1746,16 +1859,19 @@ function buildMultipleAttachedPrsSummary(input: {
 function buildMultipleAttachedPrsPromotionSummary(input: {
   repoKey: string;
   ignoredHistoricalPrUrls: string[];
+  ignoredClosedUnmergedPrUrls: string[];
+  ignoredCrossIssuePrUrls: string[];
   conflictingAttachedPrUrls: string[];
 }): string {
-  const ignoredHistoricalSummary =
-    input.ignoredHistoricalPrUrls.length > 0
-      ? ` Ignored historical merged PR URLs: ${input.ignoredHistoricalPrUrls.join(', ')}.`
-      : '';
+  const ignoredSummary = buildReviewPromotionIgnoredSummary({
+    ignoredHistoricalPrUrls: input.ignoredHistoricalPrUrls,
+    ignoredClosedUnmergedPrUrls: input.ignoredClosedUnmergedPrUrls,
+    ignoredCrossIssuePrUrls: input.ignoredCrossIssuePrUrls
+  });
   if (input.conflictingAttachedPrUrls.length === 0) {
-    return `Attached GitHub pull requests match ${input.repoKey}, but no current review-handoff promotion candidate remains after historical filtering.${ignoredHistoricalSummary}`;
+    return `Attached GitHub pull requests match ${input.repoKey}, but no current review-handoff promotion candidate remains after bounded filtering.${ignoredSummary}`;
   }
-  return `Multiple attached GitHub pull requests match ${input.repoKey}; conflicting attached PR URLs still require deterministic disambiguation before review-handoff promotion can continue: ${input.conflictingAttachedPrUrls.join(', ')}.${ignoredHistoricalSummary}`;
+  return `Multiple attached GitHub pull requests match ${input.repoKey}; conflicting current-candidate PR URLs still require deterministic disambiguation before review-handoff promotion can continue: ${input.conflictingAttachedPrUrls.join(', ')}.${ignoredSummary}`;
 }
 
 async function loadProviderSnapshotRecord(input: {
@@ -2059,6 +2175,12 @@ function isMergedPullRequestSnapshot(
   return snapshot.merged_at !== null || snapshot.state === 'MERGED';
 }
 
+function isClosedUnmergedPullRequestSnapshot(
+  snapshot: ProviderMergeCloseoutSnapshotRecord
+): boolean {
+  return snapshot.state === 'CLOSED' && !isMergedPullRequestSnapshot(snapshot);
+}
+
 function isTerminalPullRequestSnapshot(
   snapshot: ProviderMergeCloseoutSnapshotRecord
 ): boolean {
@@ -2075,6 +2197,99 @@ function isSnapshotStrictlyOlderThanSelection(
     return false;
   }
   return candidateTimestamp < selectedTimestamp;
+}
+
+function buildReviewPromotionIgnoredSummary(input: {
+  ignoredHistoricalPrUrls: string[];
+  ignoredClosedUnmergedPrUrls: string[];
+  ignoredCrossIssuePrUrls: string[];
+}): string {
+  const parts: string[] = [];
+  if (input.ignoredHistoricalPrUrls.length > 0) {
+    parts.push(`Ignored historical merged PR URLs: ${input.ignoredHistoricalPrUrls.join(', ')}.`);
+  }
+  if (input.ignoredClosedUnmergedPrUrls.length > 0) {
+    parts.push(
+      `Ignored closed prior-attempt PR URLs: ${input.ignoredClosedUnmergedPrUrls.join(', ')}.`
+    );
+  }
+  if (input.ignoredCrossIssuePrUrls.length > 0) {
+    parts.push(`Ignored cross-issue PR URLs: ${input.ignoredCrossIssuePrUrls.join(', ')}.`);
+  }
+  return parts.length > 0 ? ` ${parts.join(' ')}` : '';
+}
+
+function buildReviewPromotionIgnoredSelectionNote(input: {
+  ignoredClosedUnmergedPrUrls: string[];
+  ignoredCrossIssuePrUrls: string[];
+}): string | null {
+  return appendReviewPromotionIgnoredSelectionNote(null, input);
+}
+
+function appendReviewPromotionIgnoredSelectionNote(
+  baseNote: string | null,
+  input: {
+    ignoredClosedUnmergedPrUrls: string[];
+    ignoredCrossIssuePrUrls: string[];
+  }
+): string | null {
+  const parts: string[] = [];
+  if (typeof baseNote === 'string' && baseNote.trim().length > 0) {
+    parts.push(baseNote.trim());
+  }
+  if (input.ignoredClosedUnmergedPrUrls.length > 0) {
+    parts.push(
+      `Ignored closed prior-attempt PR URLs: ${input.ignoredClosedUnmergedPrUrls.join(', ')}.`
+    );
+  }
+  if (input.ignoredCrossIssuePrUrls.length > 0) {
+    parts.push(`Ignored cross-issue PR URLs: ${input.ignoredCrossIssuePrUrls.join(', ')}.`);
+  }
+  return parts.length > 0 ? parts.join(' ') : null;
+}
+
+function isReviewPromotionCrossIssueCandidate(input: {
+  attachmentTitle: string | null;
+  issueIdentifier: string | null;
+  blockedBy?: readonly LiveLinearTrackedBlocker[] | null;
+}): boolean {
+  const currentIssueIdentifier = normalizeIssueIdentifierToken(input.issueIdentifier);
+  if (!currentIssueIdentifier) {
+    return false;
+  }
+  const leadingIssueIdentifier = extractLeadingIssueIdentifier(input.attachmentTitle);
+  if (!leadingIssueIdentifier || leadingIssueIdentifier === currentIssueIdentifier) {
+    return false;
+  }
+  const title = normalizeOptionalString(input.attachmentTitle) ?? '';
+  const blockedIssueIdentifiers = new Set(
+    (input.blockedBy ?? [])
+      .map((blocker) => normalizeIssueIdentifierToken(blocker.identifier))
+      .filter((value): value is string => value !== null)
+  );
+  if (
+    blockedIssueIdentifiers.has(leadingIssueIdentifier) &&
+    /\bblocker\b/i.test(title)
+  ) {
+    return true;
+  }
+  return /\bfollow(?:-| )up\b/i.test(title);
+}
+
+function extractLeadingIssueIdentifier(value: string | null | undefined): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const match = /^\s*[[(]?([A-Z][A-Z0-9]+-\d+)\b/i.exec(value);
+  return normalizeIssueIdentifierToken(match?.[1] ?? null);
+}
+
+function normalizeIssueIdentifierToken(value: string | null | undefined): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim().toUpperCase();
+  return /^[A-Z][A-Z0-9]+-\d+$/.test(trimmed) ? trimmed : null;
 }
 
 function resolveSnapshotDisambiguationTimestamp(

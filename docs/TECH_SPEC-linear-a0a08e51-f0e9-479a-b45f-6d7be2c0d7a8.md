@@ -1,11 +1,11 @@
 ---
 id: 20260414-linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8
-title: CO workflow: add rolling docs:freshness cohort policy for Apr 14 stale baseline
+title: CO workflow: reopen CO-175 for Apr 18 docs:freshness over-budget historical packet cohort
 relates_to: docs/PRD-linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-14
+last_review: 2026-04-18
 ---
 
 ## Canonical Reference
@@ -13,25 +13,47 @@ last_review: 2026-04-14
 - PRD: `docs/PRD-linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8.md`
 - ACTION_PLAN: `docs/ACTION_PLAN-linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8.md`
 - Task checklist: `tasks/tasks-linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8.md`
+- Shared source anchor: `ctx:sha256:c4f24ab84edb50fdc98e76b64014ea589485230f2da0aba7746189ae723a9798#chunk:c000001`
 
 ## Summary
-CO-175 owns the Apr 14 `docs:freshness` baseline: `221` stale rows, all `2026-03-14`, with no registry or catalog drift. The implementation adds a catalog-backed rolling cohort policy so eligible owned task/report rows remain visible but no longer block unrelated feature-lane validation during the configured window.
+`origin/main` `b678ce4` reopened CO-175 because Apr 18 docs maintenance hit a new March 18 historical packet cohort outside the declared rolling baseline. This branch resolves that with the second explicit baseline cohort `co-175-apr-18-march-18-cli-1289-1298`, so current branch truth is `0` blocking stale docs, `291` rolling CO-175 rows, and `docs:freshness:maintain = pass_with_owned_rolling_debt` with `current_cohorts=2`, `max_cohorts=2`, and `blocking_changed_paths=[]`.
 
 ## Requirements
-- `docs:freshness` separates blocking stale rows from policy-covered `rolling_cohort_entries`.
-- JSON, markdown, and console output include owner issue, expiry, counts, class/path breakdowns, and representative paths.
-- Rolling deferral requires explicit `owner_issue`, `policy_doc`, valid window/budget fields, and non-empty eligible classes.
-- `spec-guard` uses the same owner-backed policy for eligible stale active specs.
-- Missing files, missing registry rows, invalid registry entries, uncatalogued docs, malformed policy config, expired cohorts, over-budget cohorts, and non-eligible stale specs/docs remain blocking.
+- Preserve the existing rolling cohort `co-175-apr-14-march-14-tasks-1164-1195` and the fail-closed policy.
+- Resolve the March 18 `1289-1298` historical packet cohort through reviewed owner action under reopened CO-175.
+- Do not widen rolling caps or windows.
+- Keep the March 18 cohort explicit in packet docs as:
+  - Task Packet: `50`
+  - Task Mirror: `10`
+  - Report Only: `10`
+- Preserve the before-state maintenance checksum and the after-state decision evidence:
+  - `block_policy_over_budget`
+  - `candidate_entries=291`
+  - `current_cohorts=8`
+  - `current_cohorts=2`
+  - `max_cohorts=2`
+  - `blocking_changed_paths=[]`
+  - `pass_with_owned_rolling_debt`
 
 ## Evidence
-- Baseline: `out/linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8/manual/baseline-docs-freshness-report.json`.
-- Classification: `out/linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8/manual/baseline-cohort-classification.json`.
-- Policy guide: `docs/guides/docs-freshness-cohorts.md`.
+- Shared source payload: `/Users/kbediako/Code/CO/.workspaces/linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8/.runs/linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8-co175-docs-reopen/cli/2026-04-18T04-42-20-811Z-4332c1c3/memory/source-0/source.txt`
+- Shared source note: metadata/provenance only; reopen scope comes from the parent prompt plus repo-local March 18 packet lineage.
+- Historical packet cohort:
+  - `last_review=2026-03-18`
+  - lineage `1289-1298`
+  - path families `.agent/task`, `docs/findings`, `tasks/specs`, `tasks/tasks-*`, `docs/PRD-*`, `docs/TECH_SPEC-*`, `docs/ACTION_PLAN-*`
 
 ## Validation Plan
-Run focused tests for `docs:freshness` and `spec-guard`, then the required lane gates: delegation guard, spec guard, build, lint, test, docs check, docs freshness, repo stewardship, diff budget, manifest-backed review, and ready-review.
+- Child lane:
+  - JSON parse of `tasks/index.json`
+  - protected-term grep over the refreshed packet and mirrors
+  - `git diff --check` on touched scoped files
+- Parent lane:
+  - before/after `npm run docs:freshness`
+  - before/after `npm run docs:freshness:maintain`
+  - `node scripts/spec-guard.mjs --dry-run`
+  - focused guide/registry updates proving the resolved Apr 18 state
 
 ## Approvals
-- Reviewer: docs-review / standalone-review evidence in workpad.
-- Date: 2026-04-14
+- Reviewer: pending parent docs-review / implementation.
+- Date: 2026-04-18
