@@ -24,7 +24,7 @@
           "status": "bounded-success",
           "review_outcome": "bounded-success",
           "telemetry": ".runs/linear-f29c2953-192f-455c-aa67-5418d2607a3a/cli/2026-04-18T22-54-50-270Z-057eac84/review/telemetry.json",
-          "summary": "Manifest-backed standalone review ran under FORCE_CODEX_REVIEW=1 and reported no actionable findings; telemetry status=succeeded with review_outcome=bounded-success via command-intent boundary."
+          "summary": "Post-merge manifest-backed standalone review ran under FORCE_CODEX_REVIEW=1 against origin/main and reported no actionable regressions; telemetry status=succeeded with review_outcome=bounded-success via command-intent boundary."
         },
         "elegance_review": {
           "reviewer": "provider worker parent lane",
