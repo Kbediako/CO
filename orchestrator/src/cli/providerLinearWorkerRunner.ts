@@ -983,15 +983,13 @@ export async function loadProviderLinearWorkerContext(
     manifestPath = selectedManifestPath;
     manifest = await readManifest(manifestPath);
   }
-  if (backfillProviderWorkerManifestControlHostProvenance(controlHostManifest, env)) {
-    await writeJsonAtomic(controlHostManifestPath, controlHostManifest);
-  }
-  if (
+  const controlHostManifestBackfilled = backfillProviderWorkerManifestControlHostProvenance(
+    controlHostManifest,
+    env
+  );
+  const selectedManifestBackfilled =
     manifestPath !== controlHostManifestPath &&
-    backfillProviderWorkerManifestControlHostProvenance(manifest, env)
-  ) {
-    await writeJsonAtomic(manifestPath, manifest);
-  }
+    backfillProviderWorkerManifestControlHostProvenance(manifest, env);
   const manifestTaskId =
     normalizeOptionalString(manifest.task_id) ??
     normalizeOptionalString(manifest.taskId);
@@ -1068,6 +1066,13 @@ export async function loadProviderLinearWorkerContext(
   const envWorkerHost = hasExplicitWorkerHostOverride
     ? normalizeProviderWorkerHostName(env[PROVIDER_WORKER_HOST_ENV_KEY])
     : undefined;
+  const maxTurns = await resolveProviderWorkerMaxTurns(env);
+  if (controlHostManifestBackfilled) {
+    await writeJsonAtomic(controlHostManifestPath, controlHostManifest);
+  }
+  if (selectedManifestBackfilled) {
+    await writeJsonAtomic(manifestPath, manifest);
+  }
   return {
     manifest,
     manifestPath,
@@ -1105,7 +1110,7 @@ export async function loadProviderLinearWorkerContext(
       normalizeOptionalString(env.CODEX_ORCHESTRATOR_ISSUE_UPDATED_AT) ??
       normalizeOptionalString(manifest.issue_updated_at) ??
       normalizeOptionalString(manifest.issueUpdatedAt),
-    maxTurns: await resolveProviderWorkerMaxTurns(env),
+    maxTurns,
     residentSessionSeed
   };
 }

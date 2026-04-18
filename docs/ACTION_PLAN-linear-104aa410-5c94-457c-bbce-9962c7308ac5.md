@@ -45,6 +45,8 @@
   - `npm run generate:manifest-types`
   - `npx vitest run orchestrator/tests/Manifest.test.ts orchestrator/tests/ProviderLinearWorkerRunner.test.ts orchestrator/tests/ProviderLinearChildLaneShell.test.ts orchestrator/tests/ProviderLinearChildStreamShell.test.ts`
   - `npm run build`
+  - `npm run docs:check`
+  - `npm run docs:freshness`
   - live `linear child-stream --pipeline docs-review|implementation-gate|docs-relevance-advisory`
   - `node scripts/spec-guard.mjs --dry-run`
   - remaining repo review/handoff gates before `In Review`

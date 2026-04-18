@@ -89,7 +89,7 @@ last_review: 2026-04-18
 - Functional requirements:
   1. Manifest schema/types include `provider_launch_source`.
   2. Manifest bootstrap writes `provider_launch_source`, `provider_control_host_task_id`, and `provider_control_host_run_id` for control-host launches.
-  3. Provider-worker context load backfills missing tuple values only when the live env matches and the manifest has no conflicting non-null provenance.
+  3. Provider-worker context load backfills missing tuple values only when the live env matches and the manifest has no conflicting non-null provenance; the resume-preparation path remains the only explicit overwrite carve-out for reseeding stale provider-worker manifests.
   4. Provider-worker context treats provenance as recorded/valid only when `provider_launch_source=control-host` and task/run match the live env.
   5. Child-lane and child-stream shells keep failing closed when the tuple is missing or mismatched.
 - Non-functional requirements:
@@ -101,13 +101,15 @@ last_review: 2026-04-18
   - `packages/shared/manifest/types.ts`
   - `orchestrator/src/cli/run/manifest.ts`
   - `orchestrator/src/cli/providerLinearWorkerRunner.ts`
+  - `orchestrator/src/cli/services/orchestratorResumePreparationShell.ts`
   - `orchestrator/src/cli/providerLinearChildLaneShell.ts`
   - `orchestrator/src/cli/providerLinearChildStreamShell.ts`
 
 ## Architecture & Data
 - Architecture / design adjustments:
   - extend the manifest tuple to include launch source
-  - keep backfill conflict-aware and same-run only
+  - keep ordinary load/save backfill conflict-aware and same-run only
+  - preserve the explicit resume-preparation overwrite carve-out for reseeding stale provider-worker manifests before resume
   - make provider-worker context own the authoritative manifest repair/write-through step
 - Data model changes / migrations:
   - optional `provider_launch_source` field on manifests
@@ -118,6 +120,7 @@ last_review: 2026-04-18
   - `orchestrator/tests/ProviderLinearWorkerRunner.test.ts`
   - `orchestrator/tests/ProviderLinearChildLaneShell.test.ts`
   - `orchestrator/tests/ProviderLinearChildStreamShell.test.ts`
+  - `orchestrator/src/cli/services/orchestratorResumePreparationShell.ts`
 
 ## Validation Plan
 - Tests / checks:

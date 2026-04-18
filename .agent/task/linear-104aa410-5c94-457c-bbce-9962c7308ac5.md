@@ -24,19 +24,19 @@
 
 ## Implementation Acceptance
 - [x] Manifest schema/types include `provider_launch_source`. Evidence: `schemas/manifest.json`, `packages/shared/manifest/types.ts`.
-- [x] Bootstrap/backfill code writes the full control-host provenance tuple without overriding conflicting non-null provenance. Evidence: `orchestrator/src/cli/run/manifest.ts`, `orchestrator/src/cli/providerLinearWorkerRunner.ts`.
+- [x] Ordinary bootstrap/backfill code writes the full control-host provenance tuple without overriding conflicting non-null provenance; resume preparation keeps the explicit overwrite carve-out. Evidence: `orchestrator/src/cli/run/manifest.ts`, `orchestrator/src/cli/providerLinearWorkerRunner.ts`, `orchestrator/src/cli/services/orchestratorResumePreparationShell.ts`.
 - [x] Focused regressions cover bootstrap/backfill plus child-lane and child-stream happy paths and mismatch behavior. Evidence: `orchestrator/tests/Manifest.test.ts`, `orchestrator/tests/ProviderLinearWorkerRunner.test.ts`, `orchestrator/tests/ProviderLinearChildLaneShell.test.ts`, `orchestrator/tests/ProviderLinearChildStreamShell.test.ts`.
 - [ ] The parent provider-worker manifest persists non-null `provider_launch_source`, `provider_control_host_task_id`, and `provider_control_host_run_id` after a repaired live load path.
 - [x] Same-issue `linear child-lane --action launch ...` succeeds with matching live provenance. Evidence: `.runs/linear-104aa410-5c94-457c-bbce-9962c7308ac5-docs-packet/cli/2026-04-18T06-47-21-165Z-f43e496c/manifest.json`.
-- [ ] Same-issue `linear child-stream --pipeline docs-review|implementation-gate|docs-relevance-advisory` succeeds under the same valid provenance.
+- [x] Same-issue `linear child-stream --pipeline docs-review|implementation-gate|docs-relevance-advisory` succeeds under the same valid provenance. Evidence: `.runs/linear-104aa410-5c94-457c-bbce-9962c7308ac5-provenance-proof/cli/2026-04-18T07-09-14-811Z-a4cecd59/manifest.json`.
 
 ## Validation
 - [x] `npm run generate:manifest-types`.
 - [x] `npx vitest run orchestrator/tests/Manifest.test.ts orchestrator/tests/ProviderLinearWorkerRunner.test.ts orchestrator/tests/ProviderLinearChildLaneShell.test.ts orchestrator/tests/ProviderLinearChildStreamShell.test.ts`.
 - [x] `npm run build`.
 - [ ] Live parent-manifest provenance check shows non-null persisted tuple.
-- [ ] Live same-issue child-stream proof completed cleanly.
-- [ ] `node scripts/spec-guard.mjs --dry-run`.
+- [x] Live same-issue child-stream proof completed cleanly.
+- [x] `node scripts/spec-guard.mjs --dry-run`.
 - [ ] Remaining repo review/handoff gates completed before `In Review`.
 
 ## Progress Log
