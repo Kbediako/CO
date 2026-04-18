@@ -164,12 +164,18 @@ export function recordProviderPollingProgress(
     return;
   }
   const atMs = input.atMs ?? Date.now();
+  const previousRequestClass = state.refreshRequestClass;
   state.refreshPhase = normalizeOptionalString(input.phase) ?? null;
   if (input.requestClass !== undefined) {
     state.refreshRequestClass = normalizeOptionalString(input.requestClass) ?? null;
   }
   if (input.providerKeys !== undefined) {
     state.refreshProviderKeys = normalizePollingProviderKeys(input.providerKeys);
+  } else if (
+    input.requestClass !== undefined &&
+    state.refreshRequestClass !== previousRequestClass
+  ) {
+    state.refreshProviderKeys = null;
   }
   state.refreshCounts = copyFiniteRefreshCounts(input.counts ?? null);
   state.updatedAtMs = atMs;

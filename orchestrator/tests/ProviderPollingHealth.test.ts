@@ -239,4 +239,43 @@ describe('providerPollingHealth next-refresh projection', () => {
       refresh_counts: null
     });
   });
+
+  it('clears stale provider keys when a new request class omits provider diagnostics', () => {
+    const service = {} as ProviderIssueHandoffService;
+
+    markProviderPollingStarted(service, {
+      mode: 'refresh',
+      atMs: Date.parse('2026-04-18T18:10:00.000Z')
+    });
+    recordProviderPollingProgress(service, {
+      phase: 'refresh:claim_reconcile',
+      requestClass: 'claim_reconcile:running',
+      providerKeys: ['linear:CO-207'],
+      counts: {
+        claims_scanned: 1
+      },
+      atMs: Date.parse('2026-04-18T18:10:01.000Z')
+    });
+    recordProviderPollingProgress(service, {
+      phase: 'refresh:fresh_dispatch',
+      requestClass: 'fresh_dispatch',
+      counts: {
+        claims_scanned: 1,
+        fresh_discovery_candidates: 1
+      },
+      atMs: Date.parse('2026-04-18T18:10:02.000Z')
+    });
+
+    expect(
+      readProviderPollingHealth(service, Date.parse('2026-04-18T18:10:03.000Z'))
+    ).toMatchObject({
+      refresh_phase: 'refresh:fresh_dispatch',
+      refresh_request_class: 'fresh_dispatch',
+      refresh_provider_keys: null,
+      refresh_counts: {
+        claims_scanned: 1,
+        fresh_discovery_candidates: 1
+      }
+    });
+  });
 });
