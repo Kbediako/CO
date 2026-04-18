@@ -51,6 +51,33 @@ async function writeFakeCodexBinary(dir: string, featureLine: string): Promise<s
   return binPath;
 }
 
+async function writeFakeDirectDistDelegateServer(repoRoot: string): Promise<string> {
+  const distDir = join(repoRoot, 'dist', 'bin');
+  await mkdir(distDir, { recursive: true });
+  const scriptPath = join(distDir, 'codex-orchestrator.js');
+  await writeFile(
+    scriptPath,
+    [
+      "let buffer = '';",
+      "process.stdin.setEncoding('utf8');",
+      "process.stdin.on('data', (chunk) => {",
+      '  buffer += chunk;',
+      '});',
+      "process.stdin.on('end', () => {",
+      "  const line = buffer.split(/\\r?\\n/).map((part) => part.trim()).filter(Boolean).pop();",
+      '  if (!line) {',
+      '    process.exitCode = 1;',
+      '    return;',
+      '  }',
+      '  const request = JSON.parse(line);',
+      "  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id ?? 1, result: { protocolVersion: '2024-11-05' } }) + '\\n');",
+      '});'
+    ].join('\n'),
+    'utf8'
+  );
+  return scriptPath;
+}
+
 function buildDoctorCloudEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
   return {
     ...sanitizeProviderOverrideEnv(process.env),
@@ -234,20 +261,22 @@ describe('runDoctor', () => {
     const originalCodexHome = process.env.CODEX_HOME;
     const originalCodexCliBin = process.env.CODEX_CLI_BIN;
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
+    const tempRepo = await mkdtemp(join(tmpdir(), 'doctor-direct-dist-repo-'));
     process.env.CODEX_HOME = tempHome;
     process.env.CODEX_CLI_BIN = join(tempHome, 'missing-codex');
     try {
+      const distPath = await writeFakeDirectDistDelegateServer(tempRepo);
       await writeFile(
         join(tempHome, 'config.toml'),
         [
           '[mcp_servers.delegation]',
           `command = "${process.execPath.replace(/\\/g, '\\\\')}"`,
-          `args = ["${join(process.cwd(), 'dist', 'bin', 'codex-orchestrator.js').replace(/\\/g, '\\\\')}", "delegate-server"]`
+          `args = ["${distPath.replace(/\\/g, '\\\\')}", "delegate-server"]`
         ].join('\n'),
         'utf8'
       );
 
-      const result = runDoctor(process.cwd());
+      const result = runDoctor(tempRepo);
       expect(result.delegation.status).not.toBe('missing-config');
       expect(result.delegation.transport.kind).toBe('direct-dist');
       expect(result.delegation.startup.status).not.toBe('failed');
@@ -265,6 +294,7 @@ describe('runDoctor', () => {
         process.env.CODEX_CLI_BIN = originalCodexCliBin;
       }
       await rm(tempHome, { recursive: true, force: true });
+      await rm(tempRepo, { recursive: true, force: true });
     }
   }, 15000);
 
