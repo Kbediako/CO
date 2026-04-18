@@ -1,6 +1,32 @@
 {
   "items": [
     {
+      "id": "20260418-linear-4a34011b-104b-4334-871b-a0a014883548",
+      "title": "CO STATUS / observability: stop direct co-status --format json fetch refusals on healthy control-hosts",
+      "relates_to": "tasks/tasks-linear-4a34011b-104b-4334-871b-a0a014883548.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-4a34011b-104b-4334-871b-a0a014883548-co-246-docs-packet/cli/2026-04-18T08-43-23-951Z-861dc439/manifest.json",
+          "source_anchor": "ctx:sha256:ed8d7cee28dd1ae41d954a39ca3c8ec761012ade0011d04e9e673f3abb5fa86a#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-246 as the bounded direct JSON dashboard-read recovery seam: `co-status --format json` can intermittently fail with `control-host unavailable ... fetch failed (ECONNREFUSED)` even while the control-host read model and provider-intake ledger remain healthy. The packet keeps this explicitly separate from CO-243 provider_intake truth, CO-223 tracked.linear fallback truth, and genuine refresh-stuck / restart-required host failures owned by CO-41, CO-194, and CO-211, and anchors the parent implementation on coStatusCliShell.ts, coStatusAttachCliShell.ts, and their focused shell tests; parent owns implementation, validation, Linear state, workpad, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-4a34011b-104b-4334-871b-a0a014883548.md",
+        "task": "tasks/tasks-linear-4a34011b-104b-4334-871b-a0a014883548.md",
+        "agent_task": ".agent/task/linear-4a34011b-104b-4334-871b-a0a014883548.md",
+        "docs": "docs/TECH_SPEC-linear-4a34011b-104b-4334-871b-a0a014883548.md"
+      }
+    },
+    {
       "id": "20260418-linear-850b66b4-6a56-426a-947e-ce45d7f12a96",
       "title": "CO STATUS / observability: reconcile top-level provider_intake with concurrent running claims and retry/error history",
       "relates_to": "tasks/tasks-linear-850b66b4-6a56-426a-947e-ce45d7f12a96.md",

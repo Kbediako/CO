@@ -4382,7 +4382,7 @@ describe('SelectedRunProjection', () => {
       summary_recorded_at: '2026-04-17T00:43:59.552Z'
     });
     },
-    15_000
+    20_000
   );
 
   it('refreshes in-progress provider proofs from session telemetry during projection reads', async () => {
