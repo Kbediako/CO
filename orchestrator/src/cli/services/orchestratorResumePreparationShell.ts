@@ -106,7 +106,7 @@ export async function runOrchestratorResumePreparationShell(
   const envOverrides = resolver.resolveDesignEnvOverrides(designConfig, pipeline.id);
 
   await params.validateResumeToken(paths, manifest, params.options.resumeToken ?? null);
-  backfillProviderControlHostLocatorFromEnv(manifest);
+  backfillProviderControlHostLocatorFromEnv(manifest, process.env, { overwriteConflicts: true });
   recordResumeEventImpl(manifest, {
     actor: params.options.actor ?? 'cli',
     reason: params.options.reason ?? 'manual-resume',
