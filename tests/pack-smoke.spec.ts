@@ -8,6 +8,7 @@ async function readText(path: string): Promise<string> {
 
 type WorkflowStep = {
   env?: unknown;
+  if?: unknown;
   run?: unknown;
 };
 
@@ -24,6 +25,11 @@ type WorkflowFile = {
 const marketplaceSkipToken = 'PACK_SMOKE_ALLOW_MARKETPLACE_SKIP';
 const codexInstallCommand = 'npm install --global @openai/codex@0.121.0';
 const packSmokeCommand = 'npm run pack:smoke';
+
+type CommandOccurrence = {
+  index: number;
+  line: string;
+};
 
 async function readWorkflow(path: string): Promise<WorkflowFile> {
   const parsed = load(await readText(path));
@@ -54,6 +60,43 @@ function containsMarketplaceSkipEnv(value: unknown): boolean {
 
 function expectNoMarketplaceSkipEnv(value: unknown, label: string): void {
   expect(containsMarketplaceSkipEnv(value), `${label} must not opt out of marketplace smoke via env`).toBe(false);
+}
+
+function getStepCondition(step: WorkflowStep): string {
+  return typeof step.if === 'string' ? step.if.trim() : '';
+}
+
+function isExecutableCommandOccurrence(line: string, index: number): boolean {
+  const trimmed = line.trimStart();
+  if (trimmed.startsWith('#')) {
+    return false;
+  }
+  const prefix = line.slice(0, index).trimEnd();
+  return prefix === '' || prefix.endsWith('&&') || prefix.endsWith(';');
+}
+
+function getExecutableCommandOccurrences(run: string, command: string): CommandOccurrence[] {
+  const occurrences: CommandOccurrence[] = [];
+  let offset = 0;
+  for (const line of run.split(/\r?\n/u)) {
+    let searchFrom = 0;
+    let index = line.indexOf(command, searchFrom);
+    while (index >= 0) {
+      if (isExecutableCommandOccurrence(line, index)) {
+        occurrences.push({ index: offset + index, line });
+      }
+      searchFrom = index + command.length;
+      index = line.indexOf(command, searchFrom);
+    }
+    offset += line.length + 1;
+  }
+  return occurrences;
+}
+
+function isSoftFailedCodexInstall(occurrence: CommandOccurrence): boolean {
+  const commandIndex = occurrence.line.indexOf(codexInstallCommand);
+  const afterCommand = commandIndex >= 0 ? occurrence.line.slice(commandIndex + codexInstallCommand.length) : '';
+  return afterCommand.includes('||');
 }
 
 describe('scripts/pack-smoke env isolation', () => {
@@ -201,24 +244,37 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
       let smokeStepCount = 0;
       for (const [jobName, job] of Object.entries(workflowFile.jobs ?? {})) {
         expectNoMarketplaceSkipEnv(job.env, `${workflow} job ${jobName}`);
-        let codexInstallSeen = false;
+        const codexInstallConditions = new Set<string>();
         for (const [stepIndex, step] of getWorkflowSteps(job).entries()) {
           expectNoMarketplaceSkipEnv(step.env, `${workflow} job ${jobName} step ${stepIndex + 1}`);
+          const stepCondition = getStepCondition(step);
           const run = typeof step.run === 'string' ? step.run : '';
           expect(run, `${workflow} job ${jobName} must not opt out of marketplace smoke`).not.toContain(
             marketplaceSkipToken
           );
-          const installIndex = run.indexOf(codexInstallCommand);
-          const smokeIndices = [...run.matchAll(new RegExp(packSmokeCommand, 'gu'))].map((match) => match.index ?? -1);
-          for (const smokeIndex of smokeIndices) {
-            smokeStepCount += 1;
+          const installOccurrences = getExecutableCommandOccurrences(run, codexInstallCommand);
+          for (const installOccurrence of installOccurrences) {
             expect(
-              codexInstallSeen || (installIndex >= 0 && installIndex < smokeIndex),
-              `${workflow} job ${jobName} step ${stepIndex + 1} must install Codex 0.121.0 before pack:smoke`
+              isSoftFailedCodexInstall(installOccurrence),
+              `${workflow} job ${jobName} step ${stepIndex + 1} must not soft-fail Codex install`
+            ).toBe(false);
+          }
+          const validInstallOccurrences = installOccurrences.filter(
+            (installOccurrence) => !isSoftFailedCodexInstall(installOccurrence)
+          );
+          const smokeOccurrences = getExecutableCommandOccurrences(run, packSmokeCommand);
+          for (const smokeOccurrence of smokeOccurrences) {
+            smokeStepCount += 1;
+            const installBeforeInSameStep = validInstallOccurrences.some(
+              (installOccurrence) => installOccurrence.index < smokeOccurrence.index
+            );
+            expect(
+              codexInstallConditions.has(stepCondition) || installBeforeInSameStep,
+              `${workflow} job ${jobName} step ${stepIndex + 1} must install Codex 0.121.0 before pack:smoke with matching if condition`
             ).toBe(true);
           }
-          if (installIndex >= 0) {
-            codexInstallSeen = true;
+          if (validInstallOccurrences.length > 0) {
+            codexInstallConditions.add(stepCondition);
           }
         }
       }
