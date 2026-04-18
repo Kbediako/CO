@@ -335,6 +335,23 @@ describe('review meta-surface normalization', () => {
     ]);
   });
 
+  it('classifies Windows global review skills case-insensitively', () => {
+    expect(
+      classifyMetaSurfaceDirectDetailed(
+        'sed',
+        ['-n', '1,80p', 'c:/users/alice/.codex/skills/standalone-review/SKILL.md'],
+        new Set(),
+        'C:/repo'
+      )
+    ).toEqual([
+      {
+        kind: 'review-support',
+        candidate: 'c:/users/alice/.codex/skills/standalone-review/SKILL.md',
+        operand: 'c:/users/alice/.codex/skills/standalone-review/SKILL.md'
+      }
+    ]);
+  });
+
   it('keeps Windows repo-local bundled review skills classified as codex-skills across path casing', () => {
     expect(
       classifyMetaSurfaceDirectDetailed(
@@ -376,6 +393,23 @@ describe('review meta-surface normalization', () => {
         ['-n', '1,80p', '/Users/kbediako/Code/CO/.codex/skills/standalone-review/SKILL.md'],
         new Set(),
         '/Users/kbediako/Code/CO'
+      )
+    ).toEqual([
+      {
+        kind: 'codex-skills',
+        candidate: '/Users/kbediako/Code/CO/.codex/skills/standalone-review/SKILL.md',
+        operand: '/Users/kbediako/Code/CO/.codex/skills/standalone-review/SKILL.md'
+      }
+    ]);
+  });
+
+  it('keeps absolute repo-local bundled review skills classified as codex-skills when repoRoot is unavailable', () => {
+    expect(
+      classifyMetaSurfaceDirectDetailed(
+        'sed',
+        ['-n', '1,80p', '/Users/kbediako/Code/CO/.codex/skills/standalone-review/SKILL.md'],
+        new Set(),
+        null
       )
     ).toEqual([
       {

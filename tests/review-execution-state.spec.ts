@@ -1602,6 +1602,35 @@ describe('ReviewExecutionState', () => {
     expect(summary.preAnchorMetaSurfaceKinds).toEqual([]);
   });
 
+  it('does not count Windows global standalone-review skill reads against the startup-anchor budget across path casing', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      enforceStartupAnchorBoundary: true,
+      repoRoot: 'C:/repo',
+      scopeMode: 'uncommitted',
+      touchedPaths: ['scripts/run-review.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc "sed -n '1,220p' c:/users/alice/.codex/skills/standalone-review/SKILL.md"\n`,
+      'stdout',
+      110
+    );
+    state.observeChunk('thinking\nexec\n', 'stdout', 200);
+    state.observeChunk(`/bin/zsh -lc "git diff --stat && sed -n '1,220p' scripts/run-review.ts"\n`, 'stdout', 210);
+
+    const boundary = state.getStartupAnchorBoundaryState(220);
+    const summary = state.buildOutputSummary();
+    expect(boundary.triggered).toBe(false);
+    expect(boundary.anchorObserved).toBe(true);
+    expect(summary.startupAnchorObserved).toBe(true);
+    expect(summary.preAnchorCommandStarts).toBe(1);
+    expect(summary.preAnchorMetaSurfaceSignals).toBe(0);
+    expect(summary.preAnchorMetaSurfaceKinds).toEqual([]);
+  });
+
   it('does not count HOME-prefixed global review skill reads against the startup-anchor budget', () => {
     const state = new ReviewExecutionState({
       startedAtMs: 0,
@@ -1632,6 +1661,33 @@ describe('ReviewExecutionState', () => {
     expect(summary.preAnchorCommandStarts).toBe(1);
     expect(summary.preAnchorMetaSurfaceSignals).toBe(0);
     expect(summary.preAnchorMetaSurfaceKinds).toEqual([]);
+  });
+
+  it('keeps absolute repo-local bundled review skills in startup-anchor accounting when repoRoot is unavailable', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      enforceStartupAnchorBoundary: true,
+      touchedPaths: ['scripts/run-review.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc "sed -n '1,220p' /Users/kbediako/Code/CO/.codex/skills/standalone-review/SKILL.md"\n`,
+      'stdout',
+      110
+    );
+    state.observeChunk('thinking\nexec\n', 'stdout', 200);
+    state.observeChunk(`/bin/zsh -lc "sed -n '1,220p' scripts/run-review.ts"\n`, 'stdout', 210);
+
+    const boundary = state.getStartupAnchorBoundaryState(220);
+    const summary = state.buildOutputSummary();
+    expect(boundary.triggered).toBe(false);
+    expect(boundary.anchorObserved).toBe(true);
+    expect(summary.startupAnchorObserved).toBe(true);
+    expect(summary.preAnchorCommandStarts).toBe(1);
+    expect(summary.preAnchorMetaSurfaceSignals).toBe(1);
+    expect(summary.preAnchorMetaSurfaceKinds).toEqual(['codex-skills']);
   });
 
   it('keeps Windows repo-local bundled review skills in startup-anchor accounting across path casing', () => {

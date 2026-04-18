@@ -1,3 +1,4 @@
+import os from 'node:os';
 import path from 'node:path';
 
 import { normalizeCommandToken } from './review-shell-command-parser.js';
@@ -868,24 +869,47 @@ function isReviewSupportCodexSkillPath(normalized: string, repoRoot: string | nu
   }
   const normalizedRepoRoot = normalizeScopeRoot(repoRoot ?? undefined);
   if (normalizedRepoRoot) {
-    if (relativizeOperandToRepoRoot(normalized, normalizedRepoRoot) !== normalized) {
-      return false;
-    }
-    if (
-      /^[A-Za-z]:\//u.test(normalized) &&
-      /^[A-Za-z]:\//u.test(normalizedRepoRoot) &&
-      normalized.toLowerCase().startsWith(`${normalizedRepoRoot.toLowerCase()}/`)
-    ) {
+    if (isPathInsideNormalizedRoot(normalized, normalizedRepoRoot)) {
       return false;
     }
   }
-  return (
-    normalized.startsWith('/') ||
-    /^[A-Za-z]:\//u.test(normalized) ||
+  return isGlobalCodexSkillPath(normalized);
+}
+
+function isGlobalCodexSkillPath(normalized: string): boolean {
+  if (
     normalized.startsWith('~/.codex/') ||
     normalized.startsWith('$HOME/.codex/') ||
     normalized.startsWith('${HOME}/.codex/')
+  ) {
+    return true;
+  }
+
+  const homeRoots = [process.env.HOME, process.env.USERPROFILE, os.homedir()]
+    .map((candidate) => normalizeScopeRoot(candidate ?? undefined))
+    .filter((candidate): candidate is string => candidate !== null)
+    .map((candidate) => `${candidate}/.codex`);
+  if (homeRoots.some((root) => isPathInsideNormalizedRoot(normalized, root))) {
+    return true;
+  }
+
+  return (
+    /^\/(?:Users|home|var\/home)\/[^/]+\/\.codex\//iu.test(normalized) ||
+    /^\/root\/\.codex\//iu.test(normalized) ||
+    /^[A-Za-z]:\/Users\/[^/]+\/\.codex\//iu.test(normalized)
   );
+}
+
+function isPathInsideNormalizedRoot(normalized: string, normalizedRoot: string): boolean {
+  if (normalized === normalizedRoot || normalized.startsWith(`${normalizedRoot}/`)) {
+    return true;
+  }
+  if (/^[A-Za-z]:\//u.test(normalized) && /^[A-Za-z]:\//u.test(normalizedRoot)) {
+    const lowerNormalized = normalized.toLowerCase();
+    const lowerRoot = normalizedRoot.toLowerCase();
+    return lowerNormalized === lowerRoot || lowerNormalized.startsWith(`${lowerRoot}/`);
+  }
+  return false;
 }
 
 function matchesPathSuffix(value: string, relativePath: string): boolean {
