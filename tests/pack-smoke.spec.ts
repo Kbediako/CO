@@ -75,10 +75,15 @@ function isExecutableCommandOccurrence(line: string, index: number): boolean {
   return prefix === '' || prefix.endsWith('&&') || prefix.endsWith(';');
 }
 
+function normalizeShellContinuations(run: string): string {
+  return run.replace(/\\\r?\n[ \t]*/gu, ' ');
+}
+
 function getExecutableCommandOccurrences(run: string, command: string): CommandOccurrence[] {
   const occurrences: CommandOccurrence[] = [];
+  const normalizedRun = normalizeShellContinuations(run);
   let offset = 0;
-  for (const line of run.split(/\r?\n/u)) {
+  for (const line of normalizedRun.split(/\r?\n/u)) {
     let searchFrom = 0;
     let index = line.indexOf(command, searchFrom);
     while (index >= 0) {
