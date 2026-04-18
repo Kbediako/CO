@@ -238,10 +238,15 @@ export async function closeControlServerPublicLifecycle(
 
 export function runProviderIssueHandoffRefresh(
   providerIssueHandoff: ProviderIssueHandoffService,
-  options?: { queueIfBusy?: boolean; acknowledgeAccepted?: boolean }
+  options?: {
+    queueIfBusy?: boolean;
+    acknowledgeAccepted?: boolean;
+    allowIdleRestartRequiredRetry?: boolean;
+  }
 ): Promise<ProviderIssueHandoffRefreshRequestOutcome> {
   const state = getProviderIssueHandoffOperationState(providerIssueHandoff);
   const acknowledgeAccepted = options?.acknowledgeAccepted === true;
+  const allowIdleRestartRequiredRetry = options?.allowIdleRestartRequiredRetry === true;
   if (state.active) {
     const continueWhileBusy = (): Promise<ProviderIssueHandoffRefreshRequestOutcome> => {
       if (!options?.queueIfBusy) {
@@ -302,7 +307,7 @@ export function runProviderIssueHandoffRefresh(
     return continueWhileBusy();
   }
   const idleStuckError = buildProviderIssueHandoffRestartRequiredError(providerIssueHandoff);
-  if (idleStuckError) {
+  if (idleStuckError && !allowIdleRestartRequiredRetry) {
     clearProviderIssueHandoffOperationState(providerIssueHandoff, state);
     return mapProviderIssueHandoffRefreshOutcome(
       providerIssueHandoff,

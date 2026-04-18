@@ -54,6 +54,7 @@ import {
 import { createProviderIssueRetryQueue } from './providerIssueRetryQueue.js';
 import {
   isProviderPollingStuck,
+  readProviderPollingHealth,
   recordProviderPollingProgress
 } from './providerPollingHealth.js';
 import type { ProviderWorkflowConfigStore } from './providerWorkflowConfigStore.js';
@@ -584,7 +585,23 @@ export function createProviderIssueHandoffService(
       return false;
     }
     const pollingUpdatedAtMs = readProviderPollingSnapshotUpdatedAtMs(options.state.polling);
-    return pollingUpdatedAtMs !== null && pollingUpdatedAtMs >= serviceCreatedAtMs;
+    if (pollingUpdatedAtMs === null || pollingUpdatedAtMs < serviceCreatedAtMs) {
+      return false;
+    }
+    const liveHealth = providerIssueHandoffService
+      ? readProviderPollingHealth(providerIssueHandoffService, pollingUpdatedAtMs)
+      : null;
+    const liveOperationStartedAtMs =
+      liveHealth?.checking && typeof liveHealth.operation_started_at === 'string'
+        ? Date.parse(liveHealth.operation_started_at)
+        : Number.NaN;
+    // A fresh retry may start before the persisted polling snapshot catches up.
+    // Once a newer operation is active, do not let the older restart_required
+    // snapshot fail-close that attempt before it can make progress.
+    if (Number.isFinite(liveOperationStartedAtMs) && liveOperationStartedAtMs > pollingUpdatedAtMs) {
+      return false;
+    }
+    return true;
   };
 
   const pickRestoredProviderStateUpdatedAt = (
