@@ -88,6 +88,12 @@
 - Linear state changes, workpad updates, PR creation, PR review, or merge work in this child lane.
 - Reframing the issue as generic docs debt or a generic `SelectedRunProjection` rewrite.
 
+## Not done if
+- either inherited blocker surface is marked resolved without fresh current-head evidence artifacts
+- the packet drops the `CO-231` / `91749283-6dc8-4df8-aee3-5c9127c1200c` source anchors, blocked branch anchor, or parity/alignment matrix
+- the lane lacks an explicit docs packet, acceptance criteria, or a bounded rerun path for the `SelectedRunProjection` snapshots
+- this lane edits code, tests, registry mirrors, or docs surfaces outside the six packet files
+
 ## Stakeholders
 - Product: CO maintainers who need a truthful follow-up path for blocked `CO-231`
 - Engineering: parent lane owner and reviewers who need exact current-head blocker classification
