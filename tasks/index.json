@@ -181,6 +181,64 @@
       }
     },
     {
+      "id": "20260418-linear-a710d9a7-5187-414d-8a8b-beab7853e446",
+      "title": "CO workflow: restore Apr 18 docs:freshness baseline for Mar 18 stale cohort",
+      "relates_to": "tasks/tasks-linear-a710d9a7-5187-414d-8a8b-beab7853e446.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "succeeded_then_stale_snapshot_invalidated_parent_applied",
+          "manifest": ".runs/linear-a710d9a7-5187-414d-8a8b-beab7853e446-docs-packet/cli/2026-04-18T04-39-54-760Z-8c9db8b8/manifest.json",
+          "source_anchor": "ctx:sha256:0d82ad4fdf8297fae69d0937a0588fb2976cb0c927eb468ec132a5ff9c789318#chunk:c000001",
+          "summary": "Child lane produced the scoped docs-first packet successfully; helper invalidated acceptance because Linear updated_at changed after launch, so the parent reviewed and applied the saved patch artifact without file-scope collision. Parent owns registry mirrors, reports, cohort disposition, validation, Linear workpad, PR, and merge."
+        },
+        "pre_fix_docs_review": {
+          "reviewer": "codex-orchestrator docs-review child stream",
+          "date": "2026-04-18",
+          "status": "failed_delegation_guard_manual_fallback",
+          "manifest": ".runs/linear-a710d9a7-5187-414d-8a8b-beab7853e446-docs-review/cli/2026-04-18T04-54-52-884Z-199bc6b4/manifest.json",
+          "fallback_note": "out/linear-a710d9a7-5187-414d-8a8b-beab7853e446/manual/20260418T045452Z-docs-review-fallback.md",
+          "summary": "The pre-fix docs-review child stream failed closed at delegation guard because the provider-started task had no control-host launch provenance and was not yet registered in tasks/index.json. The parent recorded a manual packet-review fallback and kept implementation bounded to the Mar 18 docs:freshness owner lane."
+        },
+        "freshness_owner_action": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-04-18",
+          "status": "reviewed_refreshed",
+          "before": "out/linear-a710d9a7-5187-414d-8a8b-beab7853e446/before/docs-freshness-maintenance.json",
+          "after": "out/linear-a710d9a7-5187-414d-8a8b-beab7853e446/after/docs-freshness-maintenance.json",
+          "summary": "Classified the Apr 18 last_review=2026-03-18 Mar 18 packet cohort, refreshed exactly 70 reviewed rows, refreshed the edited active-doc registry rows for docs/TASKS.md and docs/guides/docs-freshness-cohorts.md, preserved CO-175 rolling policy, and restored maintenance truth to 221/300 rows and 1/2 cohorts with blocking_changed_paths empty."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review (stalled, manual fallback accepted)",
+          "date": "2026-04-18",
+          "status": "manual_fallback_accepted",
+          "manifest": ".runs/linear-a710d9a7-5187-414d-8a8b-beab7853e446/cli/2026-04-18T04-35-39-294Z-290af894/manifest.json",
+          "summary": "Forced review never emitted telemetry or a verdict; the parent fixed the only plausible docs-truth gap it surfaced and accepted the remaining docs-only diff after explicit manual correctness/regression review.",
+          "override_reason": "Forced standalone review ran under FORCE_CODEX_REVIEW=1 and spent multiple bounded wait windows rereading docs/task/registry surfaces without emitting review telemetry or a terminal verdict. The exploratory pass surfaced one plausible documentation-truth gap around edited active-doc registry freshness and checklist truthfulness; the parent fixed those rows and mirrors, then accepted the remaining docs-only diff after explicit manual correctness/regression review.",
+          "fallback_note": "out/linear-a710d9a7-5187-414d-8a8b-beab7853e446/manual/manual-review.md"
+        },
+        "elegance_review": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-04-18",
+          "status": "passed",
+          "artifact": "out/linear-a710d9a7-5187-414d-8a8b-beab7853e446/manual/elegance-review.md",
+          "summary": "No simplification patch needed; the smallest truthful fix remains the reviewed 70-row registry refresh plus the packet/classification registrations, guidance refresh, and mirror truth updates."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-a710d9a7-5187-414d-8a8b-beab7853e446.md",
+        "task": "tasks/tasks-linear-a710d9a7-5187-414d-8a8b-beab7853e446.md",
+        "agent_task": ".agent/task/linear-a710d9a7-5187-414d-8a8b-beab7853e446.md",
+        "docs": "docs/TECH_SPEC-linear-a710d9a7-5187-414d-8a8b-beab7853e446.md"
+      }
+    },
+    {
       "id": "20260417-linear-5f3bf177-0fa7-4378-9438-5dcaf7919394",
       "title": "CO workflow restore docs/TASKS headroom and make task archiving proactive",
       "relates_to": "tasks/tasks-linear-5f3bf177-0fa7-4378-9438-5dcaf7919394.md",
