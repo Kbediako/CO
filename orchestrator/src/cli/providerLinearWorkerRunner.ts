@@ -4585,12 +4585,18 @@ export async function appendProviderLinearWorkerChildStreamRecord(
 export async function readProviderLinearWorkerChildLanes(
   runDir: string
 ): Promise<ProviderLinearWorkerChildLaneRecord[]> {
+  return (await readProviderLinearWorkerChildLanesWithPresence(runDir)).records;
+}
+
+async function readProviderLinearWorkerChildLanesWithPresence(
+  runDir: string
+): Promise<{ records: ProviderLinearWorkerChildLaneRecord[]; ledgerExists: boolean }> {
   let raw: string;
   try {
     raw = await readFile(buildChildLanesPath(runDir), 'utf8');
   } catch (error) {
     if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
-      return [];
+      return { records: [], ledgerExists: false };
     }
     throw error;
   }
@@ -4603,7 +4609,10 @@ export async function readProviderLinearWorkerChildLanes(
   if (normalized.some((entry) => entry === null)) {
     throw new Error('provider-linear-worker child-lane ledger contains invalid records.');
   }
-  return normalized as ProviderLinearWorkerChildLaneRecord[];
+  return {
+    records: normalized as ProviderLinearWorkerChildLaneRecord[],
+    ledgerExists: true
+  };
 }
 
 interface ProviderLinearWorkerParentManifestHydrationMetadata {
@@ -4656,7 +4665,12 @@ async function readHydratedProviderLinearWorkerChildLanesAndRepairLedger(
   priorProofChildLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined = null
 ): Promise<ProviderLinearWorkerChildLaneRecord[]> {
   return await withProviderLinearWorkerChildLanesLock(runDir, async () => {
-    const existing = await readProviderLinearWorkerChildLanes(runDir);
+    const { records: existing, ledgerExists } = await readProviderLinearWorkerChildLanesWithPresence(runDir);
+    if (!ledgerExists && existing.length === 0 && Array.isArray(priorProofChildLanes)) {
+      return priorProofChildLanes
+        .filter(isProviderLinearWorkerRetiredChildLaneRecord)
+        .map((childLane) => normalizeProviderLinearWorkerRetiredChildLane(childLane));
+    }
     const hydrated = await hydrateProviderLinearWorkerChildLanesFromActiveManifests(
       runDir,
       existing,
@@ -4748,6 +4762,9 @@ async function hydrateProviderLinearWorkerChildLaneFromActiveManifest(
   childLane: ProviderLinearWorkerChildLaneRecord,
   priorHydratedChildLane: ProviderLinearWorkerChildLaneRecord | null = null
 ): Promise<ProviderLinearWorkerChildLaneRecord> {
+  if (isProviderLinearWorkerRetiredChildLanePlaceholder(childLane)) {
+    return retireProviderLinearWorkerChildLanePlaceholder(childLane);
+  }
   if (!isProviderLinearWorkerPendingChildLaneRecord(childLane)) {
     return childLane;
   }
@@ -4809,6 +4826,96 @@ function isProviderLinearWorkerPendingChildLaneRecord(
   return (
     childLane.pipeline_id === PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID &&
     childLane.decision === 'pending'
+  );
+}
+
+function isProviderLinearWorkerRetiredChildLanePlaceholder(
+  childLane: ProviderLinearWorkerChildLaneRecord
+): boolean {
+  if (!isProviderLinearWorkerRetiredChildLaneRecord(childLane)) {
+    return false;
+  }
+  const runId = normalizeOptionalString(childLane.run_id);
+  const summary = normalizeOptionalString(childLane.summary);
+  return (
+    childLane.status === 'launching' ||
+    isActiveLookingProviderLinearWorkerChildLaneStatus(childLane.status) ||
+    Boolean(normalizeOptionalString(childLane.in_flight_action)) ||
+    Boolean(runId?.startsWith('launching-')) ||
+    isActiveLookingProviderLinearWorkerChildLaneSummary(summary)
+  );
+}
+
+function isProviderLinearWorkerRetiredChildLaneRecord(
+  childLane: ProviderLinearWorkerChildLaneRecord
+): boolean {
+  return (
+    childLane.pipeline_id === PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID &&
+    (childLane.decision === 'invalidated' || childLane.decision === 'rejected')
+  );
+}
+
+function normalizeProviderLinearWorkerRetiredChildLane(
+  childLane: ProviderLinearWorkerChildLaneRecord
+): ProviderLinearWorkerChildLaneRecord {
+  return isProviderLinearWorkerRetiredChildLanePlaceholder(childLane) ||
+    Boolean(normalizeOptionalString(childLane.in_flight_action))
+    ? retireProviderLinearWorkerChildLanePlaceholder(childLane)
+    : childLane;
+}
+
+function retireProviderLinearWorkerChildLanePlaceholder(
+  childLane: ProviderLinearWorkerChildLaneRecord
+): ProviderLinearWorkerChildLaneRecord {
+  const decision = childLane.decision === 'rejected' ? 'rejected' : 'invalidated';
+  const existingSummary = normalizeOptionalString(childLane.summary);
+  const reason = normalizeOptionalString(childLane.decision_reason);
+  const retirementSummary = reason
+    ? `Child lane ${childLane.stream} was ${decision}: ${reason}`
+    : `Child lane ${childLane.stream} was ${decision}.`;
+  const summary =
+    existingSummary &&
+    !isActiveLookingProviderLinearWorkerChildLaneStatus(childLane.status) &&
+    !isActiveLookingProviderLinearWorkerChildLaneSummary(existingSummary)
+      ? existingSummary
+      : retirementSummary;
+  const summaryChanged = summary !== existingSummary;
+  return {
+    ...childLane,
+    status: decision,
+    summary,
+    in_flight_action: null,
+    in_flight_started_at: null,
+    summary_recorded_at:
+      summaryChanged
+        ? childLane.decision_at ??
+          childLane.in_flight_started_at ??
+          childLane.summary_recorded_at ??
+          childLane.launched_at
+        : childLane.summary_recorded_at ??
+          childLane.decision_at ??
+          childLane.in_flight_started_at ??
+          childLane.launched_at
+  };
+}
+
+function isActiveLookingProviderLinearWorkerChildLaneStatus(status: string): boolean {
+  return status === 'launching' || status === 'in_progress' || status === 'running' || status === 'queued';
+}
+
+function isActiveLookingProviderLinearWorkerChildLaneSummary(summary: string | null): boolean {
+  if (!summary) {
+    return false;
+  }
+  const normalized = summary.toLowerCase();
+  return (
+    summary === PROVIDER_LINEAR_CHILD_LANE_RESERVED_SUMMARY ||
+    normalized.includes(' is running') ||
+    normalized.includes(' is queued') ||
+    normalized.includes(' status is in_progress') ||
+    normalized.includes(' status is running') ||
+    normalized.includes(' status is queued') ||
+    normalized.includes(' status is launching')
   );
 }
 

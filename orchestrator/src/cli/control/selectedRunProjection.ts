@@ -41,6 +41,7 @@ import {
   type ControlProviderDebugSnapshot,
   type ProviderLinearWorkerProgressSnapshot
 } from './providerIssueObservability.js';
+import { writeJsonAtomic } from '../utils/fs.js';
 import {
   buildProviderLinearWorkerTerminalSummary,
   deriveDeterministicProviderMutationSuppressions,
@@ -55,6 +56,7 @@ import {
 
 const PROVIDER_LINEAR_WORKER_PIPELINE_TITLE = 'Provider Linear Worker';
 const PROVIDER_LINEAR_WORKER_PIPELINE_ID = 'provider-linear-worker';
+const PROVIDER_LINEAR_WORKER_RECONCILIATION_FILENAME = 'provider-linear-worker-reconciliation.json';
 const SYNTHETIC_LINEAR_TASK_ID_PATTERN =
   /^linear-[a-z0-9]+(?:-[a-z0-9]+)*$/i;
 const PROVIDER_LINEAR_CHILD_PIPELINE_IDS = new Set([
@@ -107,6 +109,38 @@ export interface CompatibilityCollectionDiscovery {
 interface DiscoveredTaskCompatibilityContext {
   context: ControlCompatibilitySourceContext;
   retryFallbackEligible: boolean;
+}
+
+interface ProviderLinearWorkerRunArtifactReconciliationRecord {
+  schema_version: 1;
+  kind: 'provider-linear-worker-run-artifact-reconciliation';
+  status: 'reconciled';
+  reconciled_status: string;
+  reason: string;
+  summary: string;
+  recorded_at: string;
+  manifest: {
+    path: string | null;
+    run_id: string | null;
+    task_id: string | null;
+    status: string;
+    updated_at: string | null;
+  };
+  provider_claim: {
+    state: string;
+    reason: string | null;
+    issue_state: string | null;
+    issue_state_type: string | null;
+    updated_at: string | null;
+    run_id: string | null;
+    run_manifest_path: string | null;
+  } | null;
+  replacement_run: {
+    run_id: string | null;
+    status: string;
+    manifest_path: string | null;
+    updated_at: string | null;
+  } | null;
 }
 
 interface ProjectionContextParts {
@@ -189,10 +223,50 @@ export async function discoverCompatibilityCollectionContexts(
     return { running: [], retrying: [], all: [] };
   }
   const controlWorkspacePath = await resolveControlWorkspacePath(context);
+  const selectedSnapshot = await readSelectedRunManifestSnapshotInternal(context);
+  const selectedContext = await buildUnreconciledCompatibilitySourceContextFromSnapshot(
+    context,
+    selectedSnapshot
+  );
+  const discovered = await readDiscoveredTaskCompatibilityContexts(
+    context,
+    runsRoot,
+    currentTaskId,
+    currentRunId,
+    controlWorkspacePath
+  );
 
+  const reconciled = await reconcileProviderLinearWorkerDiscoveredContexts(
+    discovered,
+    context.providerIntakeState ?? null,
+    selectedContext ? [selectedContext] : []
+  );
   const running: ControlCompatibilitySourceContext[] = [];
   const retrying: ControlCompatibilitySourceContext[] = [];
   const all: ControlCompatibilitySourceContext[] = [];
+  for (const entry of reconciled) {
+    const discoveredContext = entry.context;
+    all.push(discoveredContext);
+    if (discoveredContext.rawStatus === 'in_progress') {
+      running.push(discoveredContext);
+      continue;
+    }
+    if ((context.providerIntakeState?.claims.length ?? 0) === 0 && entry.retryFallbackEligible) {
+      retrying.push(discoveredContext);
+    }
+  }
+
+  return { running, retrying, all };
+}
+
+async function readDiscoveredTaskCompatibilityContexts(
+  context: SelectedRunProjectionContext,
+  runsRoot: string,
+  currentTaskId: string | null,
+  currentRunId: string | null,
+  controlWorkspacePath: string | null
+): Promise<DiscoveredTaskCompatibilityContext[]> {
+  const discovered: DiscoveredTaskCompatibilityContext[] = [];
   const taskEntries = await readDirectoryNames(runsRoot);
 
   for (const taskEntry of taskEntries.sort((left, right) => left.localeCompare(right)).reverse()) {
@@ -205,20 +279,10 @@ export async function discoverCompatibilityCollectionContexts(
       providerIntakeState: context.providerIntakeState,
       controlWorkspacePath
     });
-    all.push(...discoveredContexts.map((entry) => entry.context));
-    for (const entry of discoveredContexts) {
-      const discovered = entry.context;
-      if (discovered.rawStatus === 'in_progress') {
-        running.push(discovered);
-        continue;
-      }
-      if ((context.providerIntakeState?.claims.length ?? 0) === 0 && entry.retryFallbackEligible) {
-        retrying.push(discovered);
-      }
-    }
+    discovered.push(...discoveredContexts);
   }
 
-  return { running, retrying, all };
+  return discovered;
 }
 
 export async function discoverAuthoritativeRetryCollectionContexts(
@@ -243,26 +307,23 @@ async function buildSelectedRunContextFromSnapshot(
   context: SelectedRunProjectionContext,
   snapshot: SelectedRunManifestSnapshot | null
 ): Promise<SelectedRunContext | null> {
-  const [parts, controlWorkspacePath] = await Promise.all([
-    resolveProjectionContextParts(context, snapshot),
-    resolveControlWorkspacePath(context)
-  ]);
-  const providerClaim = findMatchingProviderIntakeClaim(
-    context.providerIntakeState,
-    snapshot,
-    parts.providerLinearWorkerProof
-  );
-  return buildProjectionContextFromParts(
-    snapshot,
-    parts,
-    resolveRunsRootFromRunDir(context.paths.runDir),
-    controlWorkspacePath,
-    providerClaim,
-    context.providerIntakeState ?? null
+  return await reconcileSelectedProviderLinearWorkerContext(
+    context,
+    await buildUnreconciledCompatibilitySourceContextFromSnapshot(context, snapshot)
   );
 }
 
 async function buildCompatibilitySourceContextFromSnapshot(
+  context: SelectedRunProjectionContext,
+  snapshot: SelectedRunManifestSnapshot | null
+): Promise<ControlCompatibilitySourceContext | null> {
+  return await reconcileSelectedProviderLinearWorkerContext(
+    context,
+    await buildUnreconciledCompatibilitySourceContextFromSnapshot(context, snapshot)
+  );
+}
+
+async function buildUnreconciledCompatibilitySourceContextFromSnapshot(
   context: SelectedRunProjectionContext,
   snapshot: SelectedRunManifestSnapshot | null
 ): Promise<ControlCompatibilitySourceContext | null> {
@@ -283,6 +344,35 @@ async function buildCompatibilitySourceContextFromSnapshot(
     providerClaim,
     context.providerIntakeState ?? null
   );
+}
+
+async function reconcileSelectedProviderLinearWorkerContext<T extends ControlCompatibilitySourceContext>(
+  context: SelectedRunProjectionContext,
+  selected: T | null
+): Promise<T | null> {
+  if (!selected || !context.providerIntakeState) {
+    return selected;
+  }
+  const runsRoot = resolveRunsRootFromRunDir(context.paths.runDir);
+  const currentTaskId = resolveTaskIdFromManifestPath(context.paths.manifestPath);
+  const currentRunId = resolveRunIdFromManifestPath(context.paths.manifestPath);
+  if (!runsRoot) {
+    return selected;
+  }
+  const controlWorkspacePath = await resolveControlWorkspacePath(context);
+  const discovered = await readDiscoveredTaskCompatibilityContexts(
+    context,
+    runsRoot,
+    currentTaskId,
+    currentRunId,
+    controlWorkspacePath
+  );
+  const [reconciled] = await reconcileProviderLinearWorkerDiscoveredContexts(
+    [{ context: selected, retryFallbackEligible: false }],
+    context.providerIntakeState,
+    discovered.map((entry) => entry.context)
+  );
+  return (reconciled?.context ?? selected) as T;
 }
 
 function buildProjectionContextFromParts(
@@ -1295,6 +1385,498 @@ async function readTaskCompatibilityContexts(
   return discovered;
 }
 
+async function reconcileProviderLinearWorkerDiscoveredContexts(
+  discovered: DiscoveredTaskCompatibilityContext[],
+  providerIntakeState: ProviderIntakeState | null,
+  additionalContexts: ControlCompatibilitySourceContext[] = []
+): Promise<DiscoveredTaskCompatibilityContext[]> {
+  if (!providerIntakeState) {
+    return discovered;
+  }
+  const discoveredContexts = discovered.map((candidate) => candidate.context);
+  const allContexts = additionalContexts.concat(discoveredContexts);
+  return await Promise.all(
+    discovered.map(async (entry) => {
+      const reconciliation = resolveProviderLinearWorkerRunArtifactReconciliation(
+        entry.context,
+        allContexts,
+        providerIntakeState
+      );
+      if (!reconciliation) {
+        return entry;
+      }
+      await writeProviderLinearWorkerRunArtifactReconciliation(
+        entry.context.runDir,
+        reconciliation
+      ).catch(() => undefined);
+      return {
+        ...entry,
+        context: applyProviderLinearWorkerRunArtifactReconciliation(
+          entry.context,
+          reconciliation
+        )
+      };
+    })
+  );
+}
+
+function resolveProviderLinearWorkerRunArtifactReconciliation(
+  context: ControlCompatibilitySourceContext,
+  allContexts: ControlCompatibilitySourceContext[],
+  providerIntakeState: ProviderIntakeState
+): ProviderLinearWorkerRunArtifactReconciliationRecord | null {
+  if (
+    !isProviderLinearWorkerReconciliationSource(context) ||
+    !isActiveLookingProviderLinearWorkerManifestStatus(context.rawStatus)
+  ) {
+    return null;
+  }
+  const claim = findProviderLinearWorkerClaimForContext(providerIntakeState, context);
+  if (claim && isActiveProviderLinearWorkerClaimState(claim.state)) {
+    return null;
+  }
+  const replacementRun = findNewerTerminalProviderLinearWorkerContext(allContexts, context);
+  const supersedingRunBoundClaim = !claim
+    ? findNewerRunBoundProviderLinearWorkerClaimForContext(providerIntakeState, context)
+    : null;
+  const claimReconciliationReason = claim
+    ? resolveProviderLinearWorkerClaimReconciliationReason(claim)
+    : null;
+  const absentClaimReconciliationReason = !claim
+    ? resolveAbsentProviderLinearWorkerClaimReconciliationReason(
+        providerIntakeState,
+        context,
+        replacementRun,
+        supersedingRunBoundClaim
+      )
+    : null;
+  const reason = claimReconciliationReason ?? absentClaimReconciliationReason;
+  if (!reason) {
+    return null;
+  }
+  const claimForRecord = claim ?? supersedingRunBoundClaim;
+  const evidenceUpdatedAt = selectProviderLinearWorkerReconciliationEvidenceUpdatedAt(
+    reason,
+    claimForRecord,
+    replacementRun,
+    providerIntakeState
+  );
+  if (!isProviderLinearWorkerReconciliationEvidenceNewerThanContext(evidenceUpdatedAt, context)) {
+    return null;
+  }
+  const reconciledStatus =
+    replacementRun?.rawStatus ??
+    (claim?.state === 'completed' ? 'succeeded' : 'cancelled');
+  const recordedAt = evidenceUpdatedAt ?? context.updatedAt ?? context.startedAt ?? new Date(0).toISOString();
+  const supersedingRunBoundClaimSummaryPrefix =
+    supersedingRunBoundClaim && isActiveProviderLinearWorkerClaimState(supersedingRunBoundClaim.state)
+      ? 'newer active claim run'
+      : 'newer run-bound claim run';
+  const summary =
+    replacementRun
+      ? `Provider worker artifact reconciled as ${reconciledStatus}: newer terminal run ${replacementRun.runId ?? 'unknown'} supersedes retained ${context.rawStatus} manifest.`
+      : supersedingRunBoundClaim
+        ? `Provider worker artifact reconciled as ${reconciledStatus}: ${supersedingRunBoundClaimSummaryPrefix} ${supersedingRunBoundClaim.run_id ?? 'unknown'} supersedes retained ${context.rawStatus} manifest.`
+        : reason === 'provider_issue_removed'
+          ? `Provider worker artifact reconciled as ${reconciledStatus}: provider intake removed this issue with no active claim.`
+          : `Provider worker artifact reconciled as ${reconciledStatus}: provider claim is ${claimForRecord?.state ?? 'absent'} (${claimForRecord?.reason ?? reason}).`;
+  return {
+    schema_version: 1,
+    kind: 'provider-linear-worker-run-artifact-reconciliation',
+    status: 'reconciled',
+    reconciled_status: reconciledStatus,
+    reason,
+    summary,
+    recorded_at: recordedAt,
+    manifest: {
+      path: context.manifestPath ?? null,
+      run_id: context.runId,
+      task_id: context.taskId,
+      status: context.rawStatus,
+      updated_at: context.updatedAt
+    },
+    provider_claim: claimForRecord
+      ? {
+          state: claimForRecord.state,
+          reason: claimForRecord.reason,
+          issue_state: claimForRecord.issue_state,
+          issue_state_type: claimForRecord.issue_state_type,
+          updated_at: claimForRecord.updated_at,
+          run_id: claimForRecord.run_id,
+          run_manifest_path: claimForRecord.run_manifest_path
+        }
+      : null,
+    replacement_run: replacementRun
+      ? {
+          run_id: replacementRun.runId,
+          status: replacementRun.rawStatus,
+          manifest_path: replacementRun.manifestPath ?? null,
+          updated_at: replacementRun.updatedAt
+        }
+      : null
+  };
+}
+
+function applyProviderLinearWorkerRunArtifactReconciliation(
+  context: ControlCompatibilitySourceContext,
+  reconciliation: ProviderLinearWorkerRunArtifactReconciliationRecord
+): ControlCompatibilitySourceContext {
+  return {
+    ...context,
+    rawStatus: reconciliation.reconciled_status,
+    displayStatus: reconciliation.reconciled_status,
+    statusReason: reconciliation.reason,
+    completedAt: context.completedAt ?? reconciliation.recorded_at,
+    summary: reconciliation.summary,
+    lastError:
+      reconciliation.reconciled_status === 'failed'
+        ? context.lastError ?? reconciliation.summary
+        : context.lastError,
+    latestEvent: {
+      ...(context.latestEvent ?? {
+        requestedBy: null,
+        reason: null
+      }),
+      at: reconciliation.recorded_at,
+      event: reconciliation.reconciled_status,
+      message: reconciliation.summary,
+      reason: reconciliation.reason
+    }
+  };
+}
+
+async function writeProviderLinearWorkerRunArtifactReconciliation(
+  runDir: string | null | undefined,
+  reconciliation: ProviderLinearWorkerRunArtifactReconciliationRecord
+): Promise<void> {
+  if (!runDir) {
+    return;
+  }
+  const targetPath = join(runDir, PROVIDER_LINEAR_WORKER_RECONCILIATION_FILENAME);
+  const existing = await readJsonFile<ProviderLinearWorkerRunArtifactReconciliationRecord>(targetPath);
+  if (JSON.stringify(existing) === JSON.stringify(reconciliation)) {
+    return;
+  }
+  await writeJsonAtomic(targetPath, reconciliation);
+}
+
+function isActiveLookingProviderLinearWorkerManifestStatus(status: string): boolean {
+  return status === 'in_progress' || status === 'launching';
+}
+
+function isProviderLinearWorkerReconciliationSource(
+  context: Pick<
+    ControlCompatibilitySourceContext,
+    'issueProvider' | 'pipelineId' | 'pipelineTitle' | 'providerLinearWorkerProof'
+  >
+): boolean {
+  if (context.issueProvider !== null && context.issueProvider !== 'linear') {
+    return false;
+  }
+  return (
+    context.pipelineId === PROVIDER_LINEAR_WORKER_PIPELINE_ID ||
+    context.pipelineTitle === PROVIDER_LINEAR_WORKER_PIPELINE_TITLE ||
+    context.providerLinearWorkerProof != null
+  );
+}
+
+function findProviderLinearWorkerClaimForContext(
+  providerIntakeState: ProviderIntakeState,
+  context: ControlCompatibilitySourceContext
+): ProviderIntakeClaimRecord | null {
+  const candidates = providerIntakeState.claims.filter((claim) =>
+    providerLinearWorkerClaimMatchesContext(claim, context)
+  );
+  return candidates.sort((left, right) => compareIsoTimestamp(right.updated_at, left.updated_at))[0] ?? null;
+}
+
+function providerLinearWorkerClaimMatchesContext(
+  claim: ProviderIntakeClaimRecord,
+  context: ControlCompatibilitySourceContext
+): boolean {
+  if (claim.provider !== 'linear') {
+    return false;
+  }
+  if (providerLinearWorkerClaimRunIdentityMatchesContext(claim, context)) {
+    return true;
+  }
+  if (
+    isProviderLinearWorkerRunBoundClaimAuthoritative(claim) &&
+    providerLinearWorkerClaimHasRunIdentity(claim)
+  ) {
+    return false;
+  }
+  return providerLinearWorkerClaimIssueIdentityMatchesContext(claim, context);
+}
+
+function isActiveProviderLinearWorkerClaimState(state: string): boolean {
+  return (
+    state === 'accepted' ||
+    state === 'starting' ||
+    state === 'running' ||
+    state === 'resuming' ||
+    state === 'resumable' ||
+    state === 'handoff_failed'
+  );
+}
+
+function resolveProviderLinearWorkerClaimReconciliationReason(
+  claim: ProviderIntakeClaimRecord
+): string | null {
+  if (claim.state === 'completed') {
+    return 'provider_claim_completed';
+  }
+  if (claim.state === 'released') {
+    const reason = claim.reason ?? '';
+    if (isLiveRehydrateProviderLinearWorkerReleasedClaim(claim)) {
+      return null;
+    }
+    if (
+      reason.includes('not_active') ||
+      reason.includes('not_mutable') ||
+      reason.includes('assignee_changed') ||
+      isTerminalProviderLinearIssueState(claim.issue_state, claim.issue_state_type)
+    ) {
+      return 'provider_claim_released';
+    }
+  }
+  if (claim.state === 'stale' || claim.state === 'duplicate' || claim.state === 'ignored') {
+    return `provider_claim_${claim.state}`;
+  }
+  return null;
+}
+
+function isLiveRehydrateProviderLinearWorkerReleasedClaim(
+  claim: Pick<ProviderIntakeClaimRecord, 'reason' | 'issue_state' | 'issue_state_type'>
+): boolean {
+  if (!isProviderLinearWorkerReleasedLiveRehydrateReason(claim.reason)) {
+    return false;
+  }
+  const workflowState = classifyProviderLinearWorkflowState({
+    state: claim.issue_state,
+    state_type: claim.issue_state_type
+  });
+  return workflowState.isActive && !workflowState.isTodo;
+}
+
+function isProviderLinearWorkerReleasedLiveRehydrateReason(
+  reason: string | null | undefined
+): boolean {
+  return (
+    reason === 'provider_issue_released:not_active' ||
+    isProviderLinearWorkerReleasedPendingReopenReason(reason)
+  );
+}
+
+function isProviderLinearWorkerReleasedPendingReopenReason(
+  reason: string | null | undefined
+): boolean {
+  return (
+    typeof reason === 'string' &&
+    reason.startsWith('provider_issue_released_pending_reopen:')
+  );
+}
+
+function resolveAbsentProviderLinearWorkerClaimReconciliationReason(
+  providerIntakeState: ProviderIntakeState,
+  context: ControlCompatibilitySourceContext,
+  replacementRun: ControlCompatibilitySourceContext | null,
+  supersedingActiveClaim: ProviderIntakeClaimRecord | null
+): string | null {
+  if (replacementRun) {
+    return 'provider_claim_absent_newer_terminal_run';
+  }
+  if (supersedingActiveClaim) {
+    return 'provider_claim_active_newer_run';
+  }
+  if (providerLinearWorkerRemovedIntakeReasonMatchesContext(providerIntakeState, context)) {
+    return 'provider_issue_removed';
+  }
+  return null;
+}
+
+function providerLinearWorkerRemovedIntakeReasonMatchesContext(
+  providerIntakeState: ProviderIntakeState,
+  context: ControlCompatibilitySourceContext
+): boolean {
+  return Boolean(
+    providerIntakeState.latest_reason === 'provider_issue_removed' &&
+    context.issueId &&
+    providerIntakeState.latest_provider_key === buildProviderIssueKey('linear', context.issueId)
+  );
+}
+
+function selectProviderLinearWorkerReconciliationEvidenceUpdatedAt(
+  reason: string,
+  claim: ProviderIntakeClaimRecord | null,
+  replacementRun: ControlCompatibilitySourceContext | null,
+  providerIntakeState: ProviderIntakeState
+): string | null {
+  if (reason === 'provider_claim_absent_newer_terminal_run') {
+    return replacementRun?.updatedAt ?? null;
+  }
+  if (reason === 'provider_issue_removed') {
+    return providerIntakeState.updated_at;
+  }
+  return selectLatestIsoTimestamp(claim?.updated_at ?? null, replacementRun?.updatedAt ?? null);
+}
+
+function isProviderLinearWorkerReconciliationEvidenceNewerThanContext(
+  evidenceUpdatedAt: string | null,
+  context: ControlCompatibilitySourceContext
+): boolean {
+  if (!evidenceUpdatedAt) {
+    return false;
+  }
+  const contextUpdatedAt = selectLatestIsoTimestamp(context.updatedAt, context.startedAt);
+  return !contextUpdatedAt || compareIsoTimestamp(evidenceUpdatedAt, contextUpdatedAt) > 0;
+}
+
+function isTerminalProviderLinearIssueState(
+  issueState: string | null | undefined,
+  issueStateType: string | null | undefined
+): boolean {
+  return classifyProviderLinearWorkflowState({
+    state: issueState,
+    state_type: issueStateType
+  }).isTerminal;
+}
+
+function findNewerTerminalProviderLinearWorkerContext(
+  contexts: ControlCompatibilitySourceContext[],
+  context: ControlCompatibilitySourceContext
+): ControlCompatibilitySourceContext | null {
+  return contexts
+    .filter((candidate) =>
+      candidate !== context &&
+      isProviderLinearWorkerReconciliationSource(candidate) &&
+      isTerminalRunStatus(candidate.rawStatus) &&
+      providerLinearWorkerContextsShareIssueIdentity(candidate, context) &&
+      isProviderLinearWorkerContextChronologicallyNewer(candidate, context) &&
+      compareIsoTimestamp(candidate.updatedAt, context.updatedAt) > 0
+    )
+    .sort((left, right) => compareIsoTimestamp(right.updatedAt, left.updatedAt))[0] ?? null;
+}
+
+function isProviderLinearWorkerContextChronologicallyNewer(
+  candidate: ControlCompatibilitySourceContext,
+  context: ControlCompatibilitySourceContext
+): boolean {
+  const candidateStartedAt = selectProviderLinearWorkerContextChronologyTimestamp(candidate);
+  const contextStartedAt = selectProviderLinearWorkerContextChronologyTimestamp(context);
+  return Boolean(
+    candidateStartedAt &&
+    contextStartedAt &&
+    compareIsoTimestamp(candidateStartedAt, contextStartedAt) > 0
+  );
+}
+
+function selectProviderLinearWorkerContextChronologyTimestamp(
+  context: ControlCompatibilitySourceContext
+): string | null {
+  return selectLatestIsoTimestamp(
+    context.startedAt,
+    parseProviderLinearWorkerRunIdTimestamp(context.runId),
+    parseProviderLinearWorkerRunPathTimestamp(context.manifestPath ?? context.runDir ?? null)
+  );
+}
+
+function parseProviderLinearWorkerRunPathTimestamp(pathValue: string | null | undefined): string | null {
+  if (!pathValue) {
+    return null;
+  }
+  const normalized = pathValue.replace(/\\/g, '/');
+  const segments = normalized.split('/').filter(Boolean);
+  const manifestIndex = segments.lastIndexOf('manifest.json');
+  if (manifestIndex > 0) {
+    return parseProviderLinearWorkerRunIdTimestamp(segments[manifestIndex - 1]);
+  }
+  return parseProviderLinearWorkerRunIdTimestamp(segments[segments.length - 1]);
+}
+
+function parseProviderLinearWorkerRunIdTimestamp(runId: string | null | undefined): string | null {
+  if (!runId) {
+    return null;
+  }
+  const match = runId.match(/^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z/);
+  if (!match) {
+    return null;
+  }
+  const iso = match[0].replace(
+    /^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z$/,
+    '$1T$2:$3:$4.$5Z'
+  );
+  return Number.isFinite(Date.parse(iso)) ? iso : null;
+}
+
+function findNewerRunBoundProviderLinearWorkerClaimForContext(
+  providerIntakeState: ProviderIntakeState,
+  context: ControlCompatibilitySourceContext
+): ProviderIntakeClaimRecord | null {
+  return providerIntakeState.claims
+    .filter((claim) =>
+      claim.provider === 'linear' &&
+      isProviderLinearWorkerRunBoundClaimAuthoritative(claim) &&
+      providerLinearWorkerClaimHasRunIdentity(claim) &&
+      !providerLinearWorkerClaimRunIdentityMatchesContext(claim, context) &&
+      providerLinearWorkerClaimIssueIdentityMatchesContext(claim, context) &&
+      compareIsoTimestamp(claim.updated_at, context.updatedAt) > 0
+    )
+    .sort((left, right) => compareIsoTimestamp(right.updated_at, left.updated_at))[0] ?? null;
+}
+
+function isProviderLinearWorkerRunBoundClaimAuthoritative(
+  claim: Pick<ProviderIntakeClaimRecord, 'state' | 'reason' | 'issue_state' | 'issue_state_type'>
+): boolean {
+  return (
+    isActiveProviderLinearWorkerClaimState(claim.state) ||
+    (claim.state === 'released' && isLiveRehydrateProviderLinearWorkerReleasedClaim(claim))
+  );
+}
+
+function providerLinearWorkerClaimHasRunIdentity(claim: ProviderIntakeClaimRecord): boolean {
+  return Boolean(claim.run_id || claim.run_manifest_path);
+}
+
+function providerLinearWorkerClaimRunIdentityMatchesContext(
+  claim: ProviderIntakeClaimRecord,
+  context: ControlCompatibilitySourceContext
+): boolean {
+  const manifestPath = context.manifestPath ?? null;
+  return Boolean(
+    (claim.run_id && claim.run_id === context.runId) ||
+    (claim.run_manifest_path && manifestPath && claim.run_manifest_path === manifestPath)
+  );
+}
+
+function providerLinearWorkerClaimIssueIdentityMatchesContext(
+  claim: ProviderIntakeClaimRecord,
+  context: ControlCompatibilitySourceContext
+): boolean {
+  return Boolean(
+    (claim.issue_id && claim.issue_id === context.issueId) ||
+    (claim.issue_identifier && claim.issue_identifier === context.issueIdentifier) ||
+    (claim.task_id && claim.task_id === context.taskId)
+  );
+}
+
+function providerLinearWorkerContextsShareIssueIdentity(
+  left: ControlCompatibilitySourceContext,
+  right: ControlCompatibilitySourceContext
+): boolean {
+  return Boolean(
+    (left.issueId && right.issueId && left.issueId === right.issueId) ||
+    (left.issueIdentifier && right.issueIdentifier && left.issueIdentifier === right.issueIdentifier) ||
+    (left.taskId && right.taskId && left.taskId === right.taskId)
+  );
+}
+
+function selectLatestIsoTimestamp(...values: Array<string | null | undefined>): string | null {
+  return values
+    .filter((value): value is string => Boolean(value))
+    .sort((left, right) => compareIsoTimestamp(right, left))[0] ?? null;
+}
+
 async function readDirectoryNames(path: string): Promise<string[]> {
   try {
     const entries = await readdir(path, { withFileTypes: true });
@@ -1348,14 +1930,31 @@ async function resolveProviderLinearWorkerProjectionProofRefreshPlan(
     }
   | null
 > {
-  if (!proof || !isProviderLinearWorkerProjectionRefreshEligible(proof)) {
+  if (!proof) {
     return null;
+  }
+  const hasRetiredResidue =
+    hasProviderLinearWorkerProjectionRetiredChildLaneResidue(proof) ||
+    (await hasProviderLinearWorkerProjectionRetiredChildLaneResidueInLedger(runDir));
+  if (!isProviderLinearWorkerProjectionRefreshEligible(proof)) {
+    return hasRetiredResidue
+      ? {
+          updatedAtComparisonScope: 'full',
+          skipSessionLogHydration: true
+        }
+      : null;
   }
   const telemetryGap = hasProviderLinearWorkerProjectionTelemetryGap(proof);
   const canSkipSessionLogHydration = canSkipProviderLinearWorkerProjectionSessionLogHydration(
     proof,
     telemetryGap
   );
+  if (hasRetiredResidue) {
+    return {
+      updatedAtComparisonScope: 'full',
+      skipSessionLogHydration: canSkipSessionLogHydration
+    };
+  }
   if (hasProviderLinearWorkerProjectionReservationPlaceholder(proof)) {
     return {
       updatedAtComparisonScope: 'full',
@@ -1403,6 +2002,12 @@ function hasProviderLinearWorkerProjectionActivePendingChildLane(
   return hasProviderLinearWorkerProjectionActivePendingChildLaneInRecords(proof.child_lanes);
 }
 
+function hasProviderLinearWorkerProjectionRetiredChildLaneResidue(
+  proof: ProviderLinearWorkerProof
+): boolean {
+  return hasProviderLinearWorkerProjectionRetiredChildLaneResidueInRecords(proof.child_lanes);
+}
+
 function hasProviderLinearWorkerProjectionTelemetryGap(
   proof: ProviderLinearWorkerProof
 ): boolean {
@@ -1444,6 +2049,15 @@ async function hasProviderLinearWorkerProjectionActivePendingChildLaneInLedger(
     join(runDir, PROVIDER_LINEAR_WORKER_CHILD_LANES_FILENAME)
   );
   return hasProviderLinearWorkerProjectionActivePendingChildLaneInRecords(records);
+}
+
+async function hasProviderLinearWorkerProjectionRetiredChildLaneResidueInLedger(
+  runDir: string
+): Promise<boolean> {
+  const records = await readJsonFile<unknown>(
+    join(runDir, PROVIDER_LINEAR_WORKER_CHILD_LANES_FILENAME)
+  );
+  return hasProviderLinearWorkerProjectionRetiredChildLaneResidueInRecords(records);
 }
 
 function hasProviderLinearWorkerProjectionReservationPlaceholderInRecords(
@@ -1492,13 +2106,65 @@ function hasProviderLinearWorkerProjectionActivePendingChildLaneInRecords(
   });
 }
 
+function hasProviderLinearWorkerProjectionRetiredChildLaneResidueInRecords(
+  records: unknown
+): boolean {
+  if (!Array.isArray(records)) {
+    return false;
+  }
+  return records.some((childLane) => {
+    if (!isRecord(childLane)) {
+      return false;
+    }
+    const status = readStringValue(childLane, 'status');
+    const summary = readStringValue(childLane, 'summary');
+    const decision = readStringValue(childLane, 'decision');
+    const inFlightAction = readStringValue(childLane, 'in_flight_action');
+    const hasActiveLookingStatus =
+      status === 'launching' ||
+      status === 'in_progress' ||
+      status === 'running' ||
+      status === 'queued';
+    return (
+      readStringValue(childLane, 'pipeline_id') === PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID &&
+      (decision === 'invalidated' || decision === 'rejected') &&
+      (
+        hasActiveLookingStatus ||
+        Boolean(inFlightAction) ||
+        isProviderLinearWorkerProjectionActiveLookingChildLaneSummary(summary)
+      )
+    );
+  });
+}
+
+function isProviderLinearWorkerProjectionActiveLookingChildLaneSummary(
+  summary: string | null | undefined
+): boolean {
+  if (!summary) {
+    return false;
+  }
+  const normalized = summary.toLowerCase();
+  return (
+    summary === PROVIDER_LINEAR_CHILD_LANE_RESERVED_SUMMARY ||
+    normalized.includes(' is running') ||
+    normalized.includes(' is queued') ||
+    normalized.includes(' status is in_progress') ||
+    normalized.includes(' status is running') ||
+    normalized.includes(' status is queued') ||
+    normalized.includes(' status is launching') ||
+    normalized.includes('reserved before child run startup')
+  );
+}
+
 function isProviderLinearWorkerProjectionTerminalChildLaneStatus(status: string | null): boolean {
   return (
     status === 'succeeded' ||
     status === 'failed' ||
     status === 'completed' ||
     status === 'canceled' ||
-    status === 'cancelled'
+    status === 'cancelled' ||
+    status === 'invalidated' ||
+    status === 'rejected'
   );
 }
 
