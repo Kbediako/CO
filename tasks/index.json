@@ -27,6 +27,194 @@
       }
     },
     {
+      "id": "20260418-linear-9ce7811e-45ca-4d04-b759-bc5e7da77511",
+      "title": "Validation floor: restore handoff readiness after SelectedRunProjection timeout and docs/TASKS zero-headroom",
+      "relates_to": "tasks/tasks-linear-9ce7811e-45ca-4d04-b759-bc5e7da77511.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-9ce7811e-45ca-4d04-b759-bc5e7da77511-docs-packet/cli/2026-04-18T09-50-19-200Z-c62c14f9/manifest.json",
+          "source_anchor": "ctx:sha256:435270084f0b1ce52333855ba3d994b5a40a6a98549a81c2fd69d7f806ba3dd0#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-247 as the current-head validation-floor reclassification lane for blocked CO-231: the inherited docs/TASKS zero-headroom story and the exact SelectedRunProjection timeout must each be rerun on the current head before either is treated as still live, while current workpad evidence already shows the docs line count below the historical 450/450 state. Parent owns registry integration, implementation, validation, Linear/workpad reconciliation, PR, and merge."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review --uncommitted",
+          "date": "2026-04-18",
+          "status": "manual-fallback-after-stall",
+          "manifest": ".runs/linear-9ce7811e-45ca-4d04-b759-bc5e7da77511/cli/2026-04-18T09-46-23-035Z-046b6811/manifest.json",
+          "fallback_note": "out/linear-9ce7811e-45ca-4d04-b759-bc5e7da77511/manual/validation/10-review-fallback.md",
+          "summary": "The wrapper executed with FORCE_CODEX_REVIEW=1, but after more than 4 minutes it still had not produced telemetry or a verdict and had drifted into temp-script exploration. The lane closed with manual correctness review and no findings instead of claiming bounded-success."
+        },
+        "elegance_review": {
+          "reviewer": "provider worker parent lane",
+          "date": "2026-04-18",
+          "status": "completed",
+          "artifact": "out/linear-9ce7811e-45ca-4d04-b759-bc5e7da77511/manual/validation/11-elegance-review.md",
+          "summary": "Kept the fix local to the projection refresh plan and proof refresh helper, avoided timeout inflation or broader session discovery changes, and added only one focused regression test for the new fast path."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-9ce7811e-45ca-4d04-b759-bc5e7da77511.md",
+        "task": "tasks/tasks-linear-9ce7811e-45ca-4d04-b759-bc5e7da77511.md",
+        "agent_task": ".agent/task/linear-9ce7811e-45ca-4d04-b759-bc5e7da77511.md",
+        "docs": "docs/TECH_SPEC-linear-9ce7811e-45ca-4d04-b759-bc5e7da77511.md"
+      }
+    },
+    {
+      "id": "20260418-linear-0e426da7-6455-4292-8110-f44ee07b827a",
+      "title": "CO child-lane lineage: preserve parent provenance across manual provider-worker launch and issue workspace rebinding",
+      "relates_to": "tasks/tasks-linear-0e426da7-6455-4292-8110-f44ee07b827a.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-0e426da7-6455-4292-8110-f44ee07b827a-co245-docs-packet/cli/2026-04-18T08-07-11-555Z-d63daa80/manifest.json",
+          "source_anchor": "ctx:sha256:a705905f842ad361de1c5f68a088b5f4210340f7b8dd1105544184664a80283e#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-245 as a narrow lineage/provenance lane: `manual provider-worker launch` must stay fail-closed without real `parent provenance gate` evidence, but real `same-issue child lane` lineage must still survive `issue workspace rebinding` when `parent_run_id` continuity plus an `older canonical parent manifest` prove the same current parent. The expected shared source payload was absent in this child checkout, so the packet is anchored on the protected handoff wording plus current repo seams in `tests/delegation-guard.spec.ts`, `tests/run-review.spec.ts`, `providerLinearChildLaneShell.ts`, `providerLinearChildLaneRunner.ts`, `source0.ts`, `manifest.ts`, `controlHostCliShell.ts`, and `selectedRunProjection.ts`, while staying explicitly distinct from `CO-241` and `CO-244`; parent owns implementation, validation, Linear state, workpad, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-0e426da7-6455-4292-8110-f44ee07b827a.md",
+        "task": "tasks/tasks-linear-0e426da7-6455-4292-8110-f44ee07b827a.md",
+        "agent_task": ".agent/task/linear-0e426da7-6455-4292-8110-f44ee07b827a.md",
+        "docs": "docs/TECH_SPEC-linear-0e426da7-6455-4292-8110-f44ee07b827a.md"
+      }
+    },
+    {
+      "id": "20260418-linear-f2c25700-a367-4e69-923f-cdf3e7f726be",
+      "title": "CO CLI test surface remove clean-tree dependency on prebuilt dist entrypoint",
+      "relates_to": "tasks/tasks-linear-f2c25700-a367-4e69-923f-cdf3e7f726be.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-f2c25700-a367-4e69-923f-cdf3e7f726be.md",
+        "task": "tasks/tasks-linear-f2c25700-a367-4e69-923f-cdf3e7f726be.md",
+        "agent_task": ".agent/task/linear-f2c25700-a367-4e69-923f-cdf3e7f726be.md",
+        "docs": "docs/TECH_SPEC-linear-f2c25700-a367-4e69-923f-cdf3e7f726be.md"
+      }
+    },
+    {
+      "id": "20260418-linear-4a34011b-104b-4334-871b-a0a014883548",
+      "title": "CO STATUS / observability: stop direct co-status --format json fetch refusals on healthy control-hosts",
+      "relates_to": "tasks/tasks-linear-4a34011b-104b-4334-871b-a0a014883548.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-4a34011b-104b-4334-871b-a0a014883548-co-246-docs-packet/cli/2026-04-18T08-43-23-951Z-861dc439/manifest.json",
+          "source_anchor": "ctx:sha256:ed8d7cee28dd1ae41d954a39ca3c8ec761012ade0011d04e9e673f3abb5fa86a#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-246 as the bounded direct JSON dashboard-read recovery seam: `co-status --format json` can intermittently fail with `control-host unavailable ... fetch failed (ECONNREFUSED)` even while the control-host read model and provider-intake ledger remain healthy. The packet keeps this explicitly separate from CO-243 provider_intake truth, CO-223 tracked.linear fallback truth, and genuine refresh-stuck / restart-required host failures owned by CO-41, CO-194, and CO-211, and anchors the parent implementation on coStatusCliShell.ts, coStatusAttachCliShell.ts, and their focused shell tests; parent owns implementation, validation, Linear state, workpad, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-4a34011b-104b-4334-871b-a0a014883548.md",
+        "task": "tasks/tasks-linear-4a34011b-104b-4334-871b-a0a014883548.md",
+        "agent_task": ".agent/task/linear-4a34011b-104b-4334-871b-a0a014883548.md",
+        "docs": "docs/TECH_SPEC-linear-4a34011b-104b-4334-871b-a0a014883548.md"
+      }
+    },
+    {
+      "id": "20260418-linear-850b66b4-6a56-426a-947e-ce45d7f12a96",
+      "title": "CO STATUS / observability: reconcile top-level provider_intake with concurrent running claims and retry/error history",
+      "relates_to": "tasks/tasks-linear-850b66b4-6a56-426a-947e-ce45d7f12a96.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-850b66b4-6a56-426a-947e-ce45d7f12a96-docs-packet/cli/2026-04-18T06-37-07-244Z-a8194450/manifest.json",
+          "source_anchor": "ctx:sha256:e406003646faf7e5ea017cd7f91b297ac8e25a900b7ecb2a26dc8d3eeab09575#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-243 as the bounded top-level provider_intake versus concurrent-running truth gap: .runs/local-mcp/cli/control-host/provider-intake-state.json can retain multiple concurrent running claims, but buildProviderIntakeSummary()/selectProviderIntakeClaim() still collapse top-level provider_intake to one claim by state-rank plus updated_at sort, which can diverge from CO STATUS / co-status --format json and hide retry/error history on non-selected claims. The expected shared source payload is absent in this child checkout, so the packet is anchored on the protected lane wording plus current repo seams in providerIntakeState.ts, controlRuntime.ts, selectedRunProjection.ts, observabilityReadModel.ts, observabilitySurface.ts, and operatorDashboardPresenter.ts; parent owns implementation, validation, Linear state, workpad, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-850b66b4-6a56-426a-947e-ce45d7f12a96.md",
+        "task": "tasks/tasks-linear-850b66b4-6a56-426a-947e-ce45d7f12a96.md",
+        "agent_task": ".agent/task/linear-850b66b4-6a56-426a-947e-ce45d7f12a96.md",
+        "docs": "docs/TECH_SPEC-linear-850b66b4-6a56-426a-947e-ce45d7f12a96.md"
+      }
+    },
+    {
+      "id": "20260418-linear-104aa410-5c94-457c-bbce-9962c7308ac5",
+      "title": "Record provider control-host provenance on provider-worker manifests for same-issue child lanes",
+      "relates_to": "tasks/tasks-linear-104aa410-5c94-457c-bbce-9962c7308ac5.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "rejected_after_success",
+          "manifest": ".runs/linear-104aa410-5c94-457c-bbce-9962c7308ac5-docs-packet/cli/2026-04-18T06-47-21-165Z-f43e496c/manifest.json",
+          "source_anchor": "ctx:sha256:7b36f0086f31a972affc4bd5f989199d7d1bfa3ba460ad8de937b4e7d71916c2#chunk:c000001",
+          "summary": "Same-issue docs child lane completed successfully, satisfying the turn's required child-lane proof, but the parent rejected the patch because it drifted from CO-244 into broader provenance seams and missed the actual provider_launch_source plus child-lane/child-stream contract. The parent re-authored the docs packet directly and kept the change bounded to manifest provenance persistence for control-host-launched provider-worker runs."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-104aa410-5c94-457c-bbce-9962c7308ac5.md",
+        "task": "tasks/tasks-linear-104aa410-5c94-457c-bbce-9962c7308ac5.md",
+        "agent_task": ".agent/task/linear-104aa410-5c94-457c-bbce-9962c7308ac5.md",
+        "docs": "docs/TECH_SPEC-linear-104aa410-5c94-457c-bbce-9962c7308ac5.md"
+      }
+    },
+    {
+      "id": "20260418-linear-9fc9fe23-bd44-4b72-9459-b5b809970bce",
+      "title": "CO: stop review-handoff promotion from parking In Review issues on multiple attached PRs",
+      "relates_to": "tasks/tasks-linear-9fc9fe23-bd44-4b72-9459-b5b809970bce.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-9fc9fe23-bd44-4b72-9459-b5b809970bce-co237-docs-packet/cli/2026-04-18T01-48-20-327Z-dbdc245e/manifest.json",
+          "source_anchor": "ctx:sha256:8391bf9a067e2de9c1d2651dbe67acb9d3c43cf6bde71c5639ee057b9ca37dfc#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-237 as the bounded review-handoff multiple-attachment seam: provider-owned issues can still stay parked in In Review with `provider_issue_review_promotion_action_required` / `multiple_attached_prs` when same-repo attachments include non-primary PRs. The packet carries the exact incident checksum `CO-196`, closed `#508`, `#515`, `CO-219`, `#523`, and `#522`, rejects framing this as just CO-104 again, only a Merging bug, only CO-154, only CO-226, or manual attachment cleanup as the intended steady state, and anchors on the fallback source anchor plus current repo seams in providerMergeCloseout.ts and providerIssueHandoff.ts; parent owns implementation, validation, Linear state, workpad, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-9fc9fe23-bd44-4b72-9459-b5b809970bce.md",
+        "task": "tasks/tasks-linear-9fc9fe23-bd44-4b72-9459-b5b809970bce.md",
+        "agent_task": ".agent/task/linear-9fc9fe23-bd44-4b72-9459-b5b809970bce.md",
+        "docs": "docs/TECH_SPEC-linear-9fc9fe23-bd44-4b72-9459-b5b809970bce.md"
+      }
+    },
+    {
       "id": "20260418-linear-a883b037-8167-4011-8bd4-889a1a160db8",
       "title": "CO: clear stale merge-closeout transition_failed residue once CO-210 / PR #512 are merged and live Linear truth is Done",
       "relates_to": "tasks/tasks-linear-a883b037-8167-4011-8bd4-889a1a160db8.md",
@@ -1149,13 +1337,13 @@
     },
     {
       "id": "20260414-linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8",
-      "title": "CO workflow: add rolling docs:freshness cohort policy for Apr 14 stale baseline",
+      "title": "CO workflow: reopen CO-175 for Apr 18 docs:freshness over-budget historical packet cohort",
       "relates_to": "tasks/tasks-linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8.md",
       "risk": "high",
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-14",
+      "last_review": "2026-04-18",
       "paths": {
         "spec": "tasks/specs/linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8.md",
         "task": "tasks/tasks-linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8.md",
@@ -11594,6 +11782,22 @@
         "task": "tasks/tasks-linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md",
         "agent_task": ".agent/task/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md",
         "docs": "docs/TECH_SPEC-linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md"
+      }
+    },
+    {
+      "id": "20260418-linear-ddb81c93-87b2-4dff-b69b-33d7ae3c91cd",
+      "title": "Control host: reclaim Ready issues suppressed by plain released/not_active stale Backlog cache",
+      "relates_to": "tasks/tasks-linear-ddb81c93-87b2-4dff-b69b-33d7ae3c91cd.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "paths": {
+        "spec": "tasks/specs/linear-ddb81c93-87b2-4dff-b69b-33d7ae3c91cd.md",
+        "task": "tasks/tasks-linear-ddb81c93-87b2-4dff-b69b-33d7ae3c91cd.md",
+        "agent_task": ".agent/task/linear-ddb81c93-87b2-4dff-b69b-33d7ae3c91cd.md",
+        "docs": "docs/TECH_SPEC-linear-ddb81c93-87b2-4dff-b69b-33d7ae3c91cd.md"
       }
     }
   ]

@@ -87,6 +87,72 @@ describe('runCoStatusCliShell', () => {
     expect(payload).toEqual(buildUiPayload());
   });
 
+  it('re-resolves endpoint artifacts for direct json mode when the current endpoint is stale', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+
+    const currentServer = await startUiServer();
+    servers.add(currentServer.instance);
+    const staleServer = await startFailingUiServer(async () => {
+      await writeControlEndpointArtifacts(runDir, currentServer.baseUrl);
+    });
+    servers.add(staleServer.instance);
+    await writeControlEndpointArtifacts(runDir, staleServer.baseUrl);
+
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await runCoStatusCliShell({
+      flags: {
+        format: 'json',
+        'run-dir': runDir
+      },
+      printHelp: vi.fn()
+    });
+
+    expect(staleServer.requests).toEqual([
+      {
+        authorization: 'Bearer snapshot-token',
+        csrfToken: 'snapshot-token'
+      }
+    ]);
+    expect(currentServer.requests).toEqual([
+      {
+        authorization: 'Bearer snapshot-token',
+        csrfToken: 'snapshot-token'
+      }
+    ]);
+    expect(log).toHaveBeenCalledTimes(1);
+    const payload = JSON.parse(String(log.mock.calls[0]?.[0])) as Record<string, unknown>;
+    expect(payload).toEqual(buildUiPayload());
+  });
+
+  it('fails with stale-endpoint guidance when direct json mode hits a dead endpoint that does not rotate', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+
+    const staleServer = await startUiServer();
+    await closeServer(staleServer.instance);
+    await writeControlEndpointArtifacts(runDir, staleServer.baseUrl);
+
+    await expect(
+      runCoStatusCliShell({
+        flags: {
+          format: 'json',
+          'run-dir': runDir
+        },
+        printHelp: vi.fn()
+      })
+    ).rejects.toThrow(
+      /stale endpoint after control-host restart; control-host unavailable; control_endpoint\.json has not rotated to a reachable host\./u
+    );
+  });
+
   it('uses the attach path for default text-mode status instead of starting a control host', async () => {
     const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
     tempDirs.push(root);
@@ -440,6 +506,82 @@ async function startUiServer(payload: Record<string, unknown> = buildUiPayload()
     baseUrl: `http://127.0.0.1:${address.port}`,
     requests
   };
+}
+
+async function startFailingUiServer(
+  beforeNetworkFailure?: () => Promise<void> | void
+): Promise<{
+  instance: http.Server;
+  baseUrl: string;
+  requests: Array<{ authorization: string | null; csrfToken: string | null }>;
+}> {
+  const requests: Array<{ authorization: string | null; csrfToken: string | null }> = [];
+  const server = http.createServer(async (req) => {
+    if (req.url === '/ui/data.json') {
+      requests.push({
+        authorization: typeof req.headers.authorization === 'string' ? req.headers.authorization : null,
+        csrfToken: typeof req.headers['x-csrf-token'] === 'string' ? req.headers['x-csrf-token'] : null
+      });
+      await beforeNetworkFailure?.();
+      req.socket.destroy();
+      return;
+    }
+  });
+
+  await new Promise<void>((resolve) => {
+    server.listen(0, '127.0.0.1', () => resolve());
+  });
+  const address = server.address();
+  if (!address || typeof address === 'string') {
+    throw new Error('expected loopback http server address');
+  }
+  return {
+    instance: server,
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    requests
+  };
+}
+
+async function writeCoStatusRunDir(root: string): Promise<string> {
+  const runDir = join(root, '.runs', 'local-mcp', 'cli', 'control-host');
+  await mkdir(runDir, { recursive: true });
+  await writeFile(
+    join(runDir, 'manifest.json'),
+    JSON.stringify({
+      run_id: 'control-host',
+      task_id: 'local-mcp',
+      status: 'in_progress'
+    }),
+    'utf8'
+  );
+  return runDir;
+}
+
+async function writeControlEndpointArtifacts(
+  runDir: string,
+  baseUrl: string,
+  token = 'snapshot-token'
+): Promise<void> {
+  await writeFile(join(runDir, 'control_auth.json'), JSON.stringify({ token }), 'utf8');
+  await writeFile(
+    join(runDir, 'control_endpoint.json'),
+    JSON.stringify({
+      base_url: baseUrl,
+      token_path: 'control_auth.json'
+    }),
+    'utf8'
+  );
+}
+
+async function closeServer(server: http.Server): Promise<void> {
+  await new Promise<void>((resolve) => {
+    try {
+      server.close(() => resolve());
+    } catch {
+      resolve();
+    }
+  });
+  servers.delete(server);
 }
 
 function buildUiPayload(overrides: Record<string, unknown> = {}): Record<string, unknown> {

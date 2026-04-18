@@ -18,16 +18,16 @@ last_review: 2026-04-18
 ## Traceability
 - Linear issue: `CO-233` / `2594bf7f-12f3-4e59-8b9f-62c551fe58a0`
 - Related issue linkage to preserve: `CO-226`, `CO-219`
-- Source anchor: `ctx:sha256:6c489971dd6f03545c47f5063f802b920c1c52fcee78a5d03e16d6b81d7d17a5#chunk:c000001`
-- Shared source object id: `sha256:6c489971dd6f03545c47f5063f802b920c1c52fcee78a5d03e16d6b81d7d17a5`
-- Parent-provided source payload reference: `../../.runs/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0/cli/2026-04-18T01-28-52-748Z-ffa1574a/memory/source-0/source.txt`
-- Shared source note: the provider-worker prompt source is authoritative for the issue statement and is paired with current repo seams.
-- Docs packet child lane manifest: `.runs/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0-docs-packet/cli/2026-04-18T01-33-37-759Z-74148585/manifest.json`
+- Source anchor: `ctx:sha256:3f6604004897f02bc794db8336db014b25eac836f27afb671f1ef946761d47ee#chunk:c000001`
+- Shared source object id: `sha256:3f6604004897f02bc794db8336db014b25eac836f27afb671f1ef946761d47ee`
+- Parent-provided source payload reference: `.runs/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0-docs-packet-current-main-audit/cli/2026-04-18T13-48-58-782Z-e41ffc06/memory/source-0/source.txt`
+- Shared source note: the current-main audit prompt source is authoritative for the issue statement; the referenced payload is not present in this child checkout, so the packet stays aligned to the prompt-carried issue checksum plus current repo seams.
+- Docs packet audit manifest: `.runs/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0-docs-packet-current-main-audit/cli/2026-04-18T13-48-58-782Z-e41ffc06/manifest.json`
 
 ## Summary
 - Objective: keep `CO-233` as the narrow unrelated full-suite blocker lane for the suite-context timeout around `orchestrator/tests/SelectedRunProjection.test.ts`, specifically `refreshes projection proofs when child-lane reservation ledger placeholders exist`, while isolated repro already passes and `Doctor.test.ts` is no longer the live blocker in the same rerun.
 - Scope:
-  - docs-first packet and bounded registry/checklist mirrors for `CO-233`
+  - existing docs-first packet and bounded issue-local checklist mirrors for `CO-233`
   - parent-owned reproduction of full-suite `npm run test` truth versus isolated repro truth
   - parent-owned implementation and focused validation in the narrow proof-refresh / placeholder-resolution seam
   - explicit linkage to `CO-226` and `CO-219` as adjacent lanes that should not absorb this blocker
@@ -161,9 +161,8 @@ last_review: 2026-04-18
 
 ## Validation Plan
 - Child-lane checks:
-  - `jq empty tasks/index.json docs/docs-freshness-registry.json`
   - protected-term grep across the touched packet files
-  - `git diff --check` over the declared docs scope
+  - `git diff --check` over the six owned issue-doc files only
 - Parent-lane checks:
   - `npx vitest run orchestrator/tests/SelectedRunProjection.test.ts -t "refreshes projection proofs when child-lane reservation ledger placeholders exist"`
   - focused `ProviderLinearChildLaneShell.test.ts` and `ProviderIssueHandoffRefreshSerialization.test.ts` coverage if implementation touches shared proof-refresh helpers

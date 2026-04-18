@@ -2,7 +2,7 @@
 
 ## Summary
 - Goal: give the parent lane a bounded implementation plan for the unrelated full-suite-only timeout around `orchestrator/tests/SelectedRunProjection.test.ts` case `refreshes projection proofs when child-lane reservation ledger placeholders exist`, while preserving the contrast that the isolated repro already passes and `Doctor.test.ts` is no longer the blocker in the same rerun.
-- Scope: docs-first packet, registry/checklist mirrors, parent-owned implementation, parent-owned focused validation, and explicit adjacency to `CO-226` / `CO-219`.
+- Scope: existing docs-first packet, issue-local checklist mirrors, parent-owned implementation, parent-owned focused validation, and explicit adjacency to `CO-226` / `CO-219`.
 - Assumptions:
   - the provider-worker prompt source remains the authoritative issue anchor
   - the parent prompt's wording is authoritative for the issue checksum
@@ -31,7 +31,7 @@
   - 2026-04-18: accepted adjacency is explicit `CO-226` / `CO-219` linkage rather than silent background context
 
 ## Milestones & Sequencing
-1. Create the docs-first packet and bounded registry mirrors for `CO-233` within the declared docs scope.
+1. Audit the existing docs-first packet for `CO-233` and refresh only drifted issue-doc references within the declared six-file scope.
 2. Parent reproduces the branch-baseline mismatch exactly:
    - `npm run test`
    - `npx vitest run orchestrator/tests/SelectedRunProjection.test.ts -t "refreshes projection proofs when child-lane reservation ledger placeholders exist"`
@@ -42,8 +42,9 @@
 6. Parent reruns full `npm run test` and records whether `CO-233` is fixed or whether a narrower residual blocker needs explicit ownership.
 
 ## Dependencies
-- Shared source anchor: `ctx:sha256:6c489971dd6f03545c47f5063f802b920c1c52fcee78a5d03e16d6b81d7d17a5#chunk:c000001`
-- Origin manifest: `.runs/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0-docs-packet/cli/2026-04-18T01-33-37-759Z-74148585/manifest.json`
+- Shared source anchor: `ctx:sha256:3f6604004897f02bc794db8336db014b25eac836f27afb671f1ef946761d47ee#chunk:c000001`
+- Audit manifest: `.runs/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0-docs-packet-current-main-audit/cli/2026-04-18T13-48-58-782Z-e41ffc06/manifest.json`
+- Source payload note: the audit prompt carries `.runs/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0-docs-packet-current-main-audit/cli/2026-04-18T13-48-58-782Z-e41ffc06/memory/source-0/source.txt`, but that payload is not present in this child checkout.
 - Likely parent implementation seams:
   - `orchestrator/src/cli/control/selectedRunProjection.ts`
   - `orchestrator/src/cli/providerLinearWorkerRunner.ts`
@@ -56,9 +57,8 @@
 
 ## Validation
 - Child lane only:
-  - `jq empty tasks/index.json docs/docs-freshness-registry.json`
   - `rg -n "npm run test|orchestrator/tests/SelectedRunProjection.test.ts|refreshes projection proofs when child-lane reservation ledger placeholders exist|npx vitest run orchestrator/tests/SelectedRunProjection.test.ts -t \\\"refreshes projection proofs when child-lane reservation ledger placeholders exist\\\"|orchestrator/tests/Doctor.test.ts|CO-226|CO-219|provider-linear-worker-proof.json|provider-linear-worker-child-lanes.json|Child lane reserved before child run startup." docs/PRD-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md docs/TECH_SPEC-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md docs/ACTION_PLAN-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md tasks/specs/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md tasks/tasks-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md .agent/task/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md`
-  - `git diff --check -- docs/PRD-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md docs/TECH_SPEC-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md docs/ACTION_PLAN-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md tasks/specs/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md tasks/tasks-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md .agent/task/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md tasks/index.json docs/TASKS.md docs/docs-freshness-registry.json`
+  - `git diff --check -- docs/PRD-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md docs/TECH_SPEC-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md docs/ACTION_PLAN-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md tasks/specs/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md tasks/tasks-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md .agent/task/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md`
 - Parent implementation lane:
   - `npx vitest run orchestrator/tests/SelectedRunProjection.test.ts -t "refreshes projection proofs when child-lane reservation ledger placeholders exist"`
   - `npm run test`
@@ -76,6 +76,6 @@
   - Mitigation: keep the proof-refresh / placeholder seam explicit and the adjacent issue linkage bounded.
 
 ## Approvals
-- Docs packet child lane: `.runs/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0-docs-packet/cli/2026-04-18T01-33-37-759Z-74148585/manifest.json`
+- Docs packet audit lane: `.runs/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0-docs-packet-current-main-audit/cli/2026-04-18T13-48-58-782Z-e41ffc06/manifest.json`
 - Parent docs-review: pending parent acceptance
 - Parent implementation/review/PR lifecycle: pending parent lane

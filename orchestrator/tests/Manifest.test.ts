@@ -4,11 +4,13 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
   appendCommandError,
+  backfillProviderControlHostLocatorFromEnv,
   bootstrapManifest,
   buildGuardrailSummary,
   ensureGuardrailStatus,
   loadManifest,
   recordResumeEvent,
+  saveManifest,
   upsertGuardrailSummary
 } from '../src/cli/run/manifest.js';
 import { readRunSource0Payload } from '../src/cli/run/source0.js';
@@ -113,9 +115,146 @@ describe('bootstrapManifest', () => {
         issueUpdatedAt: '2026-03-20T00:00:00.000Z'
       });
 
+      expect(manifest.provider_launch_source).toBe('control-host');
       expect(manifest.provider_control_host_task_id).toBe('provider-host-task');
       expect(manifest.provider_control_host_run_id).toBe('provider-host-run');
       expect(manifest.workspace_path).toBe(repoRoot);
+    } finally {
+      if (previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE =
+          previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE;
+      }
+      if (previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID =
+          previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID;
+      }
+      if (previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID =
+          previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID;
+      }
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('backfills missing control-host provenance fields without overwriting conflicting manifest provenance', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-provider-control-host-backfill-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const pipeline: PipelineDefinition = { id: 'test', title: 'Test Pipeline', stages: [] };
+    const previousProviderEnv = {
+      CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: process.env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE,
+      CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID:
+        process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID,
+      CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID:
+        process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID
+    } as const;
+
+    process.env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE = 'control-host';
+    process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID = 'provider-host-task';
+    process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID = 'provider-host-run';
+
+    try {
+      const { manifest } = await bootstrapManifest('run-provider-contract-backfill', {
+        env,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      manifest.provider_launch_source = null;
+      manifest.provider_control_host_task_id = null;
+      manifest.provider_control_host_run_id = null;
+
+      expect(backfillProviderControlHostLocatorFromEnv(manifest)).toBe(true);
+      expect(manifest.provider_launch_source).toBe('control-host');
+      expect(manifest.provider_control_host_task_id).toBe('provider-host-task');
+      expect(manifest.provider_control_host_run_id).toBe('provider-host-run');
+
+      manifest.provider_control_host_task_id = 'different-control-host';
+      expect(backfillProviderControlHostLocatorFromEnv(manifest)).toBe(false);
+      expect(manifest.provider_control_host_task_id).toBe('different-control-host');
+      expect(manifest.provider_launch_source).toBe('control-host');
+      expect(manifest.provider_control_host_run_id).toBe('provider-host-run');
+    } finally {
+      if (previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE =
+          previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE;
+      }
+      if (previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID =
+          previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID;
+      }
+      if (previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID =
+          previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID;
+      }
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('reapplies missing control-host launch provenance before saving provider-worker manifests', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-provider-control-host-save-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const pipeline: PipelineDefinition = {
+      id: 'provider-linear-worker',
+      title: 'Provider Linear Worker',
+      stages: []
+    };
+    const previousProviderEnv = {
+      CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: process.env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE,
+      CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID:
+        process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID,
+      CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID:
+        process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID
+    } as const;
+
+    process.env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE = 'control-host';
+    process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID = 'provider-host-task';
+    process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID = 'provider-host-run';
+
+    try {
+      const { manifest, paths } = await bootstrapManifest('run-provider-contract-save', {
+        env,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      manifest.provider_launch_source = null;
+      await saveManifest(paths, manifest);
+
+      const persisted = JSON.parse(await readFile(paths.manifestPath, 'utf8')) as {
+        provider_launch_source?: string | null;
+        provider_control_host_task_id?: string | null;
+        provider_control_host_run_id?: string | null;
+      };
+      expect(persisted.provider_launch_source).toBe('control-host');
+      expect(persisted.provider_control_host_task_id).toBe('provider-host-task');
+      expect(persisted.provider_control_host_run_id).toBe('provider-host-run');
+      expect(manifest.provider_launch_source).toBe('control-host');
     } finally {
       if (previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE === undefined) {
         delete process.env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE;

@@ -16,11 +16,15 @@ import {
   type DelegationConfigLayer
 } from './config/delegationConfig.js';
 import {
+  PROVIDER_LAUNCH_SOURCE_ENV,
+  PROVIDER_LAUNCH_TOKEN_ENV,
   PROVIDER_CONTROL_HOST_RUN_ID_ENV,
   PROVIDER_CONTROL_HOST_TASK_ID_ENV,
+  PROVIDER_LAUNCH_SOURCE_CONTROL_HOST,
   readProviderControlHostLocatorFromEnv,
   readProviderControlHostLocatorFromManifest
 } from '../../../scripts/lib/provider-run-contract.js';
+import { resolveEnvironmentPathsForProcess } from '../../../scripts/lib/run-manifests.js';
 import {
   hasLinearSourceBinding,
   resolveLinearSourceSetup,
@@ -71,11 +75,17 @@ import { sanitizeRunId } from '../persistence/sanitizeRunId.js';
 import { sanitizeTaskId } from '../persistence/sanitizeTaskId.js';
 import { acquireLockWithRetry, type LockRetryOptions } from '../persistence/lockFile.js';
 import { resolveCodexHome } from './utils/codexPaths.js';
+import { REPO_CONFIG_REQUIRED_ENV_KEY } from './config/repoConfigPolicy.js';
+import { REPO_CONFIG_PATH_ENV_KEY } from './config/userConfig.js';
 import {
   normalizeProviderLinearChildLanePathSelectors,
   resolveProviderLinearChildLaneSupportedPhases,
   type ProviderLinearChildLanePathSelector
 } from './providerLinearChildLanePhaseContract.js';
+import {
+  PROVIDER_PACKAGE_ROOT_ENV_KEY,
+  PROVIDER_REPO_CONFIG_PATH_ENV_KEY
+} from './utils/providerOverrideEnv.js';
 import {
   PROVIDER_WORKER_HOST_ENV_KEY,
   normalizeProviderWorkerHostName
@@ -614,6 +624,51 @@ function normalizeOptionalString(value: unknown): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function backfillProviderWorkerManifestControlHostProvenance(
+  manifest: Record<string, unknown>,
+  env: NodeJS.ProcessEnv = process.env
+): boolean {
+  const locator = readProviderControlHostLocatorFromEnv({
+    [PROVIDER_CONTROL_HOST_TASK_ID_ENV]: env[PROVIDER_CONTROL_HOST_TASK_ID_ENV],
+    [PROVIDER_CONTROL_HOST_RUN_ID_ENV]: env[PROVIDER_CONTROL_HOST_RUN_ID_ENV],
+    [PROVIDER_LAUNCH_SOURCE_ENV]: env[PROVIDER_LAUNCH_SOURCE_ENV]
+  });
+  if (!locator) {
+    return false;
+  }
+
+  const manifestLaunchSource =
+    normalizeOptionalString(manifest.provider_launch_source) ??
+    normalizeOptionalString(manifest.providerLaunchSource);
+  const manifestTaskId =
+    normalizeOptionalString(manifest.provider_control_host_task_id) ??
+    normalizeOptionalString(manifest.providerControlHostTaskId);
+  const manifestRunId =
+    normalizeOptionalString(manifest.provider_control_host_run_id) ??
+    normalizeOptionalString(manifest.providerControlHostRunId);
+
+  if (
+    (manifestLaunchSource && manifestLaunchSource !== PROVIDER_LAUNCH_SOURCE_CONTROL_HOST) ||
+    (manifestTaskId && manifestTaskId !== locator.taskId) ||
+    (manifestRunId && manifestRunId !== locator.runId)
+  ) {
+    return false;
+  }
+
+  if (
+    manifestLaunchSource === PROVIDER_LAUNCH_SOURCE_CONTROL_HOST &&
+    manifestTaskId === locator.taskId &&
+    manifestRunId === locator.runId
+  ) {
+    return false;
+  }
+
+  manifest.provider_launch_source = PROVIDER_LAUNCH_SOURCE_CONTROL_HOST;
+  manifest.provider_control_host_task_id = locator.taskId;
+  manifest.provider_control_host_run_id = locator.runId;
+  return true;
+}
+
 function normalizeOptionalInteger(value: unknown): number | null {
   if (typeof value === 'number' && Number.isInteger(value)) {
     return value;
@@ -936,6 +991,13 @@ export async function loadProviderLinearWorkerContext(
     manifestPath = selectedManifestPath;
     manifest = await readManifest(manifestPath);
   }
+  const controlHostManifestBackfilled = backfillProviderWorkerManifestControlHostProvenance(
+    controlHostManifest,
+    env
+  );
+  const selectedManifestBackfilled =
+    manifestPath !== controlHostManifestPath &&
+    backfillProviderWorkerManifestControlHostProvenance(manifest, env);
   const manifestTaskId =
     normalizeOptionalString(manifest.task_id) ??
     normalizeOptionalString(manifest.taskId);
@@ -974,6 +1036,11 @@ export async function loadProviderLinearWorkerContext(
   const runId = manifestRunId ?? envRunId ?? `provider-linear-worker-${Date.now()}`;
   const manifestPipelineId = normalizeOptionalString(manifest.pipeline_id) ?? normalizeOptionalString(manifest.pipelineId), envPipelineId = normalizeOptionalString(env.CODEX_ORCHESTRATOR_PIPELINE_ID);
   if (manifestPipelineId && envPipelineId && envPipelineId !== manifestPipelineId) throw new Error(`Provider worker pipeline id mismatch between env (${envPipelineId}) and manifest (${manifestPipelineId}).`);
+  const manifestProviderLaunchSource =
+    normalizeOptionalString(manifest.provider_launch_source) ??
+    normalizeOptionalString(manifest.providerLaunchSource) ??
+    normalizeOptionalString(controlHostManifest.provider_launch_source) ??
+    normalizeOptionalString(controlHostManifest.providerLaunchSource);
   const manifestProviderControlHostTaskId =
     normalizeOptionalString(manifest.provider_control_host_task_id) ??
     normalizeOptionalString(manifest.providerControlHostTaskId) ??
@@ -984,11 +1051,15 @@ export async function loadProviderLinearWorkerContext(
     normalizeOptionalString(manifest.providerControlHostRunId) ??
     normalizeOptionalString(controlHostManifest.provider_control_host_run_id) ??
     normalizeOptionalString(controlHostManifest.providerControlHostRunId);
-  const envProviderControlHostTaskId =
-    normalizeOptionalString(env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID);
-  const envProviderControlHostRunId =
-    normalizeOptionalString(env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID);
+  const envProviderControlHostLocator = readProviderControlHostLocatorFromEnv({
+    [PROVIDER_CONTROL_HOST_TASK_ID_ENV]: env[PROVIDER_CONTROL_HOST_TASK_ID_ENV],
+    [PROVIDER_CONTROL_HOST_RUN_ID_ENV]: env[PROVIDER_CONTROL_HOST_RUN_ID_ENV],
+    [PROVIDER_LAUNCH_SOURCE_ENV]: env[PROVIDER_LAUNCH_SOURCE_ENV]
+  });
+  const envProviderControlHostTaskId = envProviderControlHostLocator?.taskId ?? null;
+  const envProviderControlHostRunId = envProviderControlHostLocator?.runId ?? null;
   const providerControlHostMatchesManifest = Boolean(
+    manifestProviderLaunchSource === PROVIDER_LAUNCH_SOURCE_CONTROL_HOST &&
     envProviderControlHostTaskId &&
       envProviderControlHostRunId &&
       manifestProviderControlHostTaskId &&
@@ -1003,6 +1074,13 @@ export async function loadProviderLinearWorkerContext(
   const envWorkerHost = hasExplicitWorkerHostOverride
     ? normalizeProviderWorkerHostName(env[PROVIDER_WORKER_HOST_ENV_KEY])
     : undefined;
+  const maxTurns = await resolveProviderWorkerMaxTurns(env);
+  if (controlHostManifestBackfilled) {
+    await writeJsonAtomic(controlHostManifestPath, controlHostManifest);
+  }
+  if (selectedManifestBackfilled) {
+    await writeJsonAtomic(manifestPath, manifest);
+  }
   return {
     manifest,
     manifestPath,
@@ -1022,7 +1100,11 @@ export async function loadProviderLinearWorkerContext(
         ? (envProviderControlHostRunId ?? manifestProviderControlHostRunId)
         : null,
     providerControlHostRecordedInManifest:
-      Boolean(manifestProviderControlHostTaskId && manifestProviderControlHostRunId),
+      Boolean(
+        manifestProviderLaunchSource === PROVIDER_LAUNCH_SOURCE_CONTROL_HOST &&
+          manifestProviderControlHostTaskId &&
+          manifestProviderControlHostRunId
+      ),
     providerControlHostMatchesManifest,
     workspacePath: rootAuthority.workspacePath,
     workerHost:
@@ -1036,9 +1118,212 @@ export async function loadProviderLinearWorkerContext(
       normalizeOptionalString(env.CODEX_ORCHESTRATOR_ISSUE_UPDATED_AT) ??
       normalizeOptionalString(manifest.issue_updated_at) ??
       normalizeOptionalString(manifest.issueUpdatedAt),
-    maxTurns: await resolveProviderWorkerMaxTurns(env),
+    maxTurns,
     residentSessionSeed
   };
+}
+
+function applyProviderLinearWorkerContextEnv(
+  env: NodeJS.ProcessEnv,
+  context: Pick<
+    ProviderLinearWorkerContext,
+    | 'manifestPath'
+    | 'runDir'
+    | 'repoRoot'
+    | 'runId'
+    | 'taskId'
+    | 'pipelineId'
+    | 'issueId'
+    | 'issueIdentifier'
+    | 'issueUpdatedAt'
+    | 'providerControlHostTaskId'
+    | 'providerControlHostRunId'
+  >
+): void {
+  const artifactPathResolutionTaskId =
+    resolveProviderLinearWorkerWorkspaceScopeTaskId(context.repoRoot) ?? context.taskId;
+  const artifactPathResolutionRoot = resolveProviderLinearWorkerArtifactPathResolutionRoot(context);
+  const inheritedEnvPaths = resolveEnvironmentPathsForProcess(env, process.cwd());
+  const artifactPathResolutionEnv: NodeJS.ProcessEnv = {
+    ...env,
+    CODEX_ORCHESTRATOR_MANIFEST_PATH: context.manifestPath,
+    CODEX_ORCHESTRATOR_ROOT: artifactPathResolutionRoot,
+    CODEX_ORCHESTRATOR_TASK_ID: artifactPathResolutionTaskId,
+    MCP_RUNNER_TASK_ID: artifactPathResolutionTaskId,
+    TASK: artifactPathResolutionTaskId,
+    CODEX_ORCHESTRATOR_PIPELINE_ID: context.pipelineId ?? 'provider-linear-worker'
+  };
+  const runsDirHint = sanitizeProviderLinearWorkerArtifactDirHint(
+    context,
+    artifactPathResolutionEnv.CODEX_ORCHESTRATOR_RUNS_DIR
+  );
+  const outDirHint = sanitizeProviderLinearWorkerArtifactDirHint(
+    context,
+    artifactPathResolutionEnv.CODEX_ORCHESTRATOR_OUT_DIR
+  );
+  if (runsDirHint) {
+    artifactPathResolutionEnv.CODEX_ORCHESTRATOR_RUNS_DIR = runsDirHint;
+  } else {
+    delete artifactPathResolutionEnv.CODEX_ORCHESTRATOR_RUNS_DIR;
+  }
+  if (outDirHint) {
+    artifactPathResolutionEnv.CODEX_ORCHESTRATOR_OUT_DIR = outDirHint;
+  } else {
+    delete artifactPathResolutionEnv.CODEX_ORCHESTRATOR_OUT_DIR;
+  }
+  const resolvedPaths = resolveEnvironmentPathsForProcess(
+    artifactPathResolutionEnv,
+    context.repoRoot
+  );
+  env.CODEX_ORCHESTRATOR_MANIFEST_PATH = context.manifestPath;
+  env.CODEX_ORCHESTRATOR_RUN_DIR = context.runDir;
+  env.CODEX_ORCHESTRATOR_ROOT = context.repoRoot;
+  env.CODEX_ORCHESTRATOR_RUNS_DIR = resolvedPaths.runsRoot;
+  env.CODEX_ORCHESTRATOR_OUT_DIR = resolvedPaths.outRoot;
+  env.CODEX_ORCHESTRATOR_RUN_ID = context.runId;
+  env.CODEX_ORCHESTRATOR_TASK_ID = context.taskId;
+  env.MCP_RUNNER_TASK_ID = context.taskId;
+  env.TASK = context.taskId;
+  env.CODEX_ORCHESTRATOR_PIPELINE_ID = context.pipelineId ?? 'provider-linear-worker';
+  env.CODEX_ORCHESTRATOR_ISSUE_ID = context.issueId;
+  env.CODEX_ORCHESTRATOR_ISSUE_IDENTIFIER = context.issueIdentifier;
+  if (context.issueUpdatedAt) {
+    env.CODEX_ORCHESTRATOR_ISSUE_UPDATED_AT = context.issueUpdatedAt;
+  } else {
+    delete env.CODEX_ORCHESTRATOR_ISSUE_UPDATED_AT;
+  }
+  if (context.providerControlHostTaskId && context.providerControlHostRunId) {
+    env[PROVIDER_CONTROL_HOST_TASK_ID_ENV] = context.providerControlHostTaskId;
+    env[PROVIDER_CONTROL_HOST_RUN_ID_ENV] = context.providerControlHostRunId;
+    env[PROVIDER_LAUNCH_SOURCE_ENV] = PROVIDER_LAUNCH_SOURCE_CONTROL_HOST;
+  } else {
+    const inheritedRepoConfigPath = normalizeOptionalString(env[REPO_CONFIG_PATH_ENV_KEY]);
+    const preservedRepoConfigPath = resolveProviderLinearWorkerRepoConfigPath(
+      inheritedEnvPaths.repoRoot,
+      env
+    );
+    const currentPackageRoot = resolveProviderLinearWorkerEnvPath(
+      context.repoRoot,
+      env.CODEX_ORCHESTRATOR_PACKAGE_ROOT
+    );
+    const providerPackageRoot = resolveProviderLinearWorkerEnvPath(
+      context.repoRoot,
+      env[PROVIDER_PACKAGE_ROOT_ENV_KEY]
+    );
+    delete env[PROVIDER_CONTROL_HOST_TASK_ID_ENV];
+    delete env[PROVIDER_CONTROL_HOST_RUN_ID_ENV];
+    delete env[PROVIDER_LAUNCH_SOURCE_ENV];
+    delete env[PROVIDER_LAUNCH_TOKEN_ENV];
+    if (preservedRepoConfigPath) {
+      env[REPO_CONFIG_PATH_ENV_KEY] = preservedRepoConfigPath;
+    } else {
+      delete env[REPO_CONFIG_PATH_ENV_KEY];
+      if (inheritedRepoConfigPath) {
+        delete env[REPO_CONFIG_REQUIRED_ENV_KEY];
+      }
+    }
+    delete env[PROVIDER_REPO_CONFIG_PATH_ENV_KEY];
+    if (currentPackageRoot && providerPackageRoot && currentPackageRoot === providerPackageRoot) {
+      delete env.CODEX_ORCHESTRATOR_PACKAGE_ROOT;
+    }
+    delete env[PROVIDER_PACKAGE_ROOT_ENV_KEY];
+  }
+}
+
+function resolveProviderLinearWorkerArtifactPathResolutionRoot(
+  context: Pick<ProviderLinearWorkerContext, 'repoRoot' | 'taskId'>
+): string {
+  const sharedRoot = resolveProviderLinearWorkerSharedRoot(context.repoRoot);
+  return sharedRoot ?? context.repoRoot;
+}
+
+function sanitizeProviderLinearWorkerArtifactDirHint(
+  context: Pick<ProviderLinearWorkerContext, 'repoRoot' | 'taskId'>,
+  value: string | undefined
+): string | undefined {
+  const normalized = normalizeOptionalString(value);
+  if (!normalized || !isAbsolute(normalized)) {
+    return normalized ?? undefined;
+  }
+  const candidate = resolve(normalized);
+  const sharedRoot = resolveProviderLinearWorkerSharedRoot(context.repoRoot);
+  const providerWorkspaceRoot = join(sharedRoot ?? context.repoRoot, PROVIDER_WORKSPACE_ROOT_DIRNAME);
+  const currentWorkspaceRoot = isProviderLinearWorkerWorkspaceRoot(context.repoRoot)
+    ? context.repoRoot
+    : null;
+  if (
+    isPathWithinRoot(candidate, providerWorkspaceRoot) &&
+    (!currentWorkspaceRoot || !isPathWithinRoot(candidate, currentWorkspaceRoot))
+  ) {
+    return undefined;
+  }
+  return candidate;
+}
+
+function resolveProviderLinearWorkerWorkspaceScopeTaskId(repoRoot: string): string | null {
+  if (!isProviderLinearWorkerWorkspaceRoot(repoRoot)) {
+    return null;
+  }
+  return basename(repoRoot);
+}
+
+function resolveProviderLinearWorkerSharedRoot(repoRoot: string): string | null {
+  if (!isProviderLinearWorkerWorkspaceRoot(repoRoot)) {
+    return null;
+  }
+  return dirname(dirname(repoRoot));
+}
+
+function isProviderLinearWorkerWorkspaceRoot(candidate: string | null): candidate is string {
+  return Boolean(candidate && basename(dirname(candidate)) === PROVIDER_WORKSPACE_ROOT_DIRNAME);
+}
+
+function resolveProviderLinearWorkerRepoConfigPath(
+  repoRoot: string,
+  env: NodeJS.ProcessEnv
+): string | null {
+  const repoConfigPath = normalizeOptionalString(env[REPO_CONFIG_PATH_ENV_KEY]);
+  if (!repoConfigPath) {
+    return null;
+  }
+  const providerRepoConfigPath = normalizeOptionalString(env[PROVIDER_REPO_CONFIG_PATH_ENV_KEY]);
+  const resolvedRepoConfigPath = isAbsolute(repoConfigPath)
+    ? resolve(repoConfigPath)
+    : resolve(repoRoot, repoConfigPath);
+  const resolvedProviderRepoConfigPath = providerRepoConfigPath
+    ? isAbsolute(providerRepoConfigPath)
+      ? resolve(providerRepoConfigPath)
+      : resolve(repoRoot, providerRepoConfigPath)
+    : null;
+  if (
+    (resolvedProviderRepoConfigPath && resolvedRepoConfigPath === resolvedProviderRepoConfigPath) ||
+    isProviderWorkflowSnapshotPath(resolvedRepoConfigPath)
+  ) {
+    return null;
+  }
+  return resolvedRepoConfigPath;
+}
+
+function resolveProviderLinearWorkerEnvPath(
+  repoRoot: string,
+  value: string | undefined
+): string | null {
+  const normalized = normalizeOptionalString(value);
+  if (!normalized) {
+    return null;
+  }
+  return isAbsolute(normalized) ? resolve(normalized) : resolve(repoRoot, normalized);
+}
+
+function isProviderWorkflowSnapshotPath(candidate: string): boolean {
+  if (basename(candidate) !== 'provider-workflow.last-known-good.json') {
+    return false;
+  }
+  const runDir = dirname(candidate);
+  const layoutDir = dirname(runDir);
+  const taskDir = dirname(layoutDir);
+  const runsRoot = dirname(taskDir);
+  return basename(layoutDir) === 'cli' && ['.runs', 'runs'].includes(basename(runsRoot));
 }
 
 function contextTaskIdFromManifestPath(manifestPath: string): string | null {
@@ -5840,6 +6125,7 @@ export async function refreshProviderLinearWorkerProofSnapshot(
   env: NodeJS.ProcessEnv = process.env,
   options: {
     updatedAtComparisonScope?: 'full' | 'telemetry';
+    skipSessionLogHydration?: boolean;
     emitProgressEvent?: (message: string) => void;
   } = {}
 ): Promise<ProviderLinearWorkerProof | null> {
@@ -5878,11 +6164,16 @@ export async function refreshProviderLinearWorkerProofSnapshot(
       linear_budget: linearBudget,
       updated_at: parsed.updated_at ?? null
     };
-    const proofWithSessionTelemetryResult = await hydrateProviderLinearWorkerProofFromSessionLog(
-      proofWithHydratedSources,
-      env,
-      priorHydrationState
-    );
+    const proofWithSessionTelemetryResult = options.skipSessionLogHydration
+      ? {
+          proof: proofWithHydratedSources,
+          hydrationState: priorHydrationState
+        }
+      : await hydrateProviderLinearWorkerProofFromSessionLog(
+          proofWithHydratedSources,
+          env,
+          priorHydrationState
+        );
     const proofWithSessionTelemetry = proofWithSessionTelemetryResult.proof;
     const hydratedWithoutUpdatedAt: ProviderLinearWorkerProof = {
       ...proofWithSessionTelemetry,
@@ -5947,6 +6238,7 @@ export async function runProviderLinearWorker(
     ...env,
     ...runtimeContext.env
   };
+  applyProviderLinearWorkerContextEnv(childEnv, context);
   const auditPath = resolve(context.runDir, PROVIDER_LINEAR_WORKER_AUDIT_FILENAME);
   const workerPid = String(process.pid);
   childEnv[PROVIDER_LINEAR_AUDIT_ENV_VAR] = auditPath;
