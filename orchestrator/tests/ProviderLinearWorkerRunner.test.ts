@@ -3793,6 +3793,201 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     });
   });
 
+  it('can skip session-log hydration while refreshing child-lane state for projection reads', async () => {
+    const { runDir } = await createManifestRoot();
+    const issue = createTrackedIssue();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const codexHome = join(tempRoot ?? '', '.codex');
+    const sessionDir = join(codexHome, 'sessions', '2030', '03', '21');
+    const sessionLogPath = join(sessionDir, 'rollout-2030-03-21T09-00-06-000Z-thread-2.jsonl');
+    await mkdir(sessionDir, { recursive: true });
+    await writeFile(
+      sessionLogPath,
+      [
+        `{"timestamp":"2030-03-21T09:00:06.000Z","type":"session_meta","payload":{"id":"thread-2","cwd":"${tempRoot}","source":"exec"}}`,
+        `{"timestamp":"2030-03-21T09:00:06.050Z","type":"turn_context","payload":{"turn_id":"turn-3","user_instructions":"You are the provider worker for Linear issue ${issue.identifier}: ${issue.title}"}}`,
+        '{"timestamp":"2030-03-21T09:00:06.100Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":99,"output_tokens":55,"total_tokens":154}},"rate_limits":{"primary":{"used_percent":90,"window_minutes":300},"secondary":{"used_percent":75,"window_minutes":10080}}}}'
+      ].join('\n'),
+      'utf8'
+    );
+    const sessionLogMtime = new Date('2030-03-21T09:00:06.000Z');
+    await utimes(sessionLogPath, sessionLogMtime, sessionLogMtime);
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        {
+          issue_id: 'lin-issue-1',
+          issue_identifier: issue.identifier,
+          attempt_started_at: '2030-03-21T09:00:05.000Z',
+          current_turn_started_at: '2030-03-21T09:00:05.500Z',
+          pid: '12345',
+          thread_id: 'thread-2',
+          latest_turn_id: 'turn-2',
+          latest_session_id: 'thread-2-turn-2',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          turn_count: 1,
+          last_event: 'item.completed',
+          last_message: null,
+          last_event_at: '2030-03-21T09:00:05.900Z',
+          tokens: {
+            input_tokens: 12,
+            output_tokens: 8,
+            total_tokens: 20
+          },
+          rate_limits: {
+            primary: {
+              used_percent: 12.5,
+              window_minutes: 300
+            },
+            secondary: {
+              used_percent: 48,
+              window_minutes: 10080
+            }
+          },
+          owner_phase: 'turn_completed',
+          owner_status: 'in_progress',
+          workspace_path: tempRoot,
+          source_setup: null,
+          linear_audit: null,
+          child_streams: [],
+          child_lanes: [],
+          progress: null,
+          tracked_issue_error: null,
+          linear_budget: null,
+          end_reason: null,
+          updated_at: '2030-03-21T09:00:05.000Z'
+        } satisfies ProviderLinearWorkerProof,
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const childTaskId = 'linear-lin-issue-1-docs-packet';
+    const childCliDir = join(tempRoot!, '.runs', childTaskId, 'cli');
+    const matchingChildRunDir = join(childCliDir, '2030-03-21T09-00-07-000Z-childlane');
+    await mkdir(matchingChildRunDir, { recursive: true });
+    await appendProviderLinearWorkerChildLaneRecord(runDir, {
+      stream: 'docs-packet',
+      pipeline_id: 'provider-linear-child-lane',
+      task_id: childTaskId,
+      run_id: 'launching-docs-packet',
+      status: 'launching',
+      manifest_path: join(childCliDir, 'launching-docs-packet', 'manifest.json'),
+      artifact_root: join(childCliDir, 'launching-docs-packet'),
+      log_path: null,
+      summary: 'Child lane reserved before child run startup.',
+      issue_id: 'lin-issue-1',
+      issue_identifier: issue.identifier,
+      workspace_path: tempRoot,
+      source_setup: null,
+      launched_at: '2030-03-21T09:00:06.500Z',
+      purpose: 'Build docs packet.',
+      instructions: null,
+      scope: resolveProviderLinearChildLaneScopeContract({
+        files: ['docs/PRD-linear-lin-issue-1.md'],
+        phases: ['docs']
+      }),
+      parent_snapshot: {
+        base_sha: null,
+        issue_updated_at: null,
+        issue_state: null,
+        issue_state_type: null,
+        captured_at: '2030-03-21T09:00:06.500Z'
+      },
+      lane_workspace_path: null,
+      patch_artifact_path: null,
+      patch_bytes: null,
+      decision: 'pending',
+      in_flight_action: null,
+      in_flight_started_at: null,
+      decision_at: null,
+      decision_reason: null
+    });
+    await writeFile(
+      join(matchingChildRunDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: '2030-03-21T09-00-07-000Z-childlane',
+        task_id: childTaskId,
+        parent_run_id: 'run-child',
+        pipeline_id: 'provider-linear-child-lane',
+        issue_id: 'lin-issue-1',
+        issue_identifier: issue.identifier,
+        status: 'in_progress',
+        summary: 'Installing dependencies',
+        started_at: '2030-03-21T09:00:07.000Z',
+        updated_at: '2030-03-21T09:00:08.000Z',
+        artifact_root: matchingChildRunDir,
+        log_path: join(matchingChildRunDir, 'runner.ndjson'),
+        workspace_path: tempRoot
+      }),
+      'utf8'
+    );
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2030-03-21T09:00:09.000Z',
+      async (path, proof) => await writeFile(path, JSON.stringify(proof, null, 2), 'utf8'),
+      { ...process.env, CODEX_HOME: codexHome },
+      {
+        updatedAtComparisonScope: 'full',
+        skipSessionLogHydration: true
+      }
+    );
+    const onDisk = JSON.parse(await readFile(proofPath, 'utf8')) as ProviderLinearWorkerProof;
+
+    expect(refreshed).toMatchObject({
+      thread_id: 'thread-2',
+      latest_turn_id: 'turn-2',
+      latest_session_id: 'thread-2-turn-2',
+      tokens: {
+        input_tokens: 12,
+        output_tokens: 8,
+        total_tokens: 20
+      },
+      rate_limits: {
+        primary: {
+          used_percent: 12.5,
+          window_minutes: 300
+        },
+        secondary: {
+          used_percent: 48,
+          window_minutes: 10080
+        }
+      },
+      updated_at: '2030-03-21T09:00:09.000Z'
+    });
+    expect(refreshed?.child_lanes?.[0]).toMatchObject({
+      run_id: '2030-03-21T09-00-07-000Z-childlane',
+      status: 'in_progress',
+      summary: 'Child lane docs-packet is running. Installing dependencies',
+      manifest_path: join(matchingChildRunDir, 'manifest.json'),
+      artifact_root: matchingChildRunDir
+    });
+    expect(onDisk).toMatchObject({
+      thread_id: 'thread-2',
+      latest_turn_id: 'turn-2',
+      latest_session_id: 'thread-2-turn-2',
+      tokens: {
+        input_tokens: 12,
+        output_tokens: 8,
+        total_tokens: 20
+      },
+      rate_limits: {
+        primary: {
+          used_percent: 12.5,
+          window_minutes: 300
+        },
+        secondary: {
+          used_percent: 48,
+          window_minutes: 10080
+        }
+      },
+      updated_at: '2030-03-21T09:00:09.000Z'
+    });
+  });
+
   it('advances summary_recorded_at for status-only child-lane manifest progress', async () => {
     const { runDir } = await createManifestRoot();
     await writeFile(
