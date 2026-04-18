@@ -222,8 +222,38 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-17",
-      "approvals": {},
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_review_fallback": {
+          "reviewer": "provider worker manual docs review",
+          "date": "2026-04-18",
+          "status": "accepted",
+          "artifact": "out/linear-5561a9a9-39dd-4ed4-99a0-896553327669/manual/20260418T014254Z-rework-r2/13-docs-review-fallback.md",
+          "summary": "The current Rework lane rechecked the existing packet directly after replaying the implementation onto a fresh origin/main branch."
+        },
+        "pack_smoke": {
+          "reviewer": "provider worker",
+          "date": "2026-04-18",
+          "status": "passed",
+          "artifact": "out/linear-5561a9a9-39dd-4ed4-99a0-896553327669/manual/20260418T014254Z-rework-r2/10-pack-smoke.log",
+          "summary": "Pack smoke passed for the packaged marketplace/plugin path, including local-directory and Git-backed marketplace registration."
+        },
+        "standalone_review": {
+          "reviewer": "provider worker manual fallback after review-wrapper boundary",
+          "date": "2026-04-18",
+          "status": "manual-fallback-after-boundary",
+          "telemetry": ".runs/linear-5561a9a9-39dd-4ed4-99a0-896553327669/cli/2026-04-18T01-28-09-196Z-c8f11c3d/review/telemetry.json",
+          "artifact": "out/linear-5561a9a9-39dd-4ed4-99a0-896553327669/manual/20260418T014254Z-rework-r2/14-manual-review-fallback.md",
+          "summary": "The forced wrapper run terminated on the startup-anchor boundary before diff-local analysis, so the parent lane completed a manual diff-local review and fixed the one README wording mismatch it found."
+        },
+        "elegance_review": {
+          "reviewer": "provider worker",
+          "date": "2026-04-18",
+          "status": "passed",
+          "artifact": "out/linear-5561a9a9-39dd-4ed4-99a0-896553327669/manual/20260418T014254Z-rework-r2/15-elegance-review.md",
+          "summary": "The final tree keeps the marketplace path additive and thin: packaged metadata, a small launcher, real Codex smoke coverage, and no authority or packaging refactor beyond the requested path."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-5561a9a9-39dd-4ed4-99a0-896553327669.md",
         "task": "tasks/tasks-linear-5561a9a9-39dd-4ed4-99a0-896553327669.md",
