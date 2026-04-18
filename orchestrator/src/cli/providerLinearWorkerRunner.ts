@@ -5914,6 +5914,7 @@ export async function refreshProviderLinearWorkerProofSnapshot(
   env: NodeJS.ProcessEnv = process.env,
   options: {
     updatedAtComparisonScope?: 'full' | 'telemetry';
+    skipSessionLogHydration?: boolean;
     emitProgressEvent?: (message: string) => void;
   } = {}
 ): Promise<ProviderLinearWorkerProof | null> {
@@ -5952,11 +5953,16 @@ export async function refreshProviderLinearWorkerProofSnapshot(
       linear_budget: linearBudget,
       updated_at: parsed.updated_at ?? null
     };
-    const proofWithSessionTelemetryResult = await hydrateProviderLinearWorkerProofFromSessionLog(
-      proofWithHydratedSources,
-      env,
-      priorHydrationState
-    );
+    const proofWithSessionTelemetryResult = options.skipSessionLogHydration
+      ? {
+          proof: proofWithHydratedSources,
+          hydrationState: priorHydrationState
+        }
+      : await hydrateProviderLinearWorkerProofFromSessionLog(
+          proofWithHydratedSources,
+          env,
+          priorHydrationState
+        );
     const proofWithSessionTelemetry = proofWithSessionTelemetryResult.proof;
     const hydratedWithoutUpdatedAt: ProviderLinearWorkerProof = {
       ...proofWithSessionTelemetry,
