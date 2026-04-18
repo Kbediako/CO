@@ -3,7 +3,6 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:pat
 import process from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
-import { createRequire } from 'node:module';
 import { existsSync } from 'node:fs';
 import { mkdir, open, readFile, readdir, realpath, stat } from 'node:fs/promises';
 
@@ -155,10 +154,6 @@ export const PROVIDER_SEMANTIC_STALL_RECHECK_DELAY_MS = 15 * 60 * 1000 + 1_000;
 const PROVIDER_WORKER_SESSION_LOG_POLL_INTERVAL_MS = 250;
 const PROVIDER_WORKER_SESSION_LOG_DISCOVERY_WINDOW_MS = 15 * 60 * 1000;
 const PROVIDER_WORKER_SESSION_LOG_HEADER_BYTES = 256 * 1024;
-const require = createRequire(import.meta.url);
-const toml = require('@iarna/toml') as {
-  parse: (source: string) => unknown;
-};
 
 export interface ProviderLinearWorkerContext {
   manifest: Record<string, unknown>;
@@ -747,27 +742,289 @@ async function resolveProviderWorkerMaxTurns(
   }
 
   if (rawConfig) {
-    let parsedConfig: unknown;
-    try {
-      parsedConfig = toml.parse(rawConfig);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to parse Codex config TOML at ${configPath}: ${message}`);
-    }
-    if (isRecord(parsedConfig)) {
-      const agentConfig = isRecord(parsedConfig.agent)
-        ? parsedConfig.agent
-        : parsedConfig['agent.max_turns'];
-      const configuredTurns = isRecord(agentConfig)
-        ? parsePositiveInteger(agentConfig.max_turns, `${configPath} [agent].max_turns`)
-        : parsePositiveInteger(agentConfig, `${configPath} agent.max_turns`);
-      if (configuredTurns !== null) {
-        return configuredTurns;
-      }
+    const configuredTurns = readAgentMaxTurnsFromToml(rawConfig, configPath);
+    if (configuredTurns !== null) {
+      return configuredTurns;
     }
   }
 
   return PROVIDER_WORKER_DEFAULT_MAX_TURNS;
+}
+
+function readAgentMaxTurnsFromToml(rawConfig: string, configPath: string): number | null {
+  let currentTablePath: string[] = [];
+  let currentTableKind: 'table' | 'array' | null = null;
+  const scanState: TomlMultilineStringScanState = { delimiter: null };
+  for (const line of rawConfig.split(/\r?\n/u)) {
+    const trimmed = stripTomlComment(line, scanState).trim();
+    if (!trimmed) {
+      continue;
+    }
+    const tableHeader = parseTomlTableHeader(trimmed);
+    if (tableHeader) {
+      currentTablePath = tableHeader.path;
+      currentTableKind = tableHeader.kind;
+      continue;
+    }
+    if (currentTableKind === 'table' && currentTablePath.length === 1 && currentTablePath[0] === 'agent') {
+      const sectionValue = readTomlPositiveIntegerAssignment(trimmed, 'max_turns', `${configPath} [agent].max_turns`);
+      if (sectionValue !== null) {
+        return sectionValue;
+      }
+    }
+    if (currentTablePath.length === 0) {
+      const dottedValue = readTomlPositiveIntegerAssignment(
+        trimmed,
+        'agent.max_turns',
+        `${configPath} agent.max_turns`
+      );
+      if (dottedValue !== null) {
+        return dottedValue;
+      }
+    }
+  }
+  return null;
+}
+
+function readTomlPositiveIntegerAssignment(
+  trimmedLine: string,
+  key: string,
+  sourceLabel: string
+): number | null {
+  const separatorIndex = findTomlAssignmentSeparator(trimmedLine);
+  if (separatorIndex === -1) {
+    return null;
+  }
+  const rawKey = normalizeTomlKey(trimmedLine.slice(0, separatorIndex));
+  if (rawKey !== key) {
+    return null;
+  }
+  return parseTomlPositiveInteger(trimmedLine.slice(separatorIndex + 1).trim(), sourceLabel);
+}
+
+function normalizeTomlKey(raw: string): string | null {
+  const segments = parseTomlDottedPath(raw);
+  if (segments.length === 0) {
+    return null;
+  }
+  return segments.join('.');
+}
+
+function parseTomlDottedPath(raw: string): string[] {
+  const segments: string[] = [];
+  let current = '';
+  let quote: '"' | '\'' | null = null;
+  let escaping = false;
+  const flush = () => {
+    const normalized = normalizeTomlKeySegment(current);
+    if (normalized) {
+      segments.push(normalized);
+    }
+    current = '';
+  };
+  for (const character of raw.trim()) {
+    if (escaping) {
+      current += character;
+      escaping = false;
+      continue;
+    }
+    if (quote === '"' && character === '\\') {
+      current += character;
+      escaping = true;
+      continue;
+    }
+    if (character === '"' || character === '\'') {
+      if (quote === character) {
+        quote = null;
+      } else if (!quote) {
+        quote = character;
+      }
+      current += character;
+      continue;
+    }
+    if (!quote && character === '.') {
+      flush();
+      continue;
+    }
+    current += character;
+  }
+  flush();
+  return segments;
+}
+
+function normalizeTomlKeySegment(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith('\'') && trimmed.endsWith('\''))
+  ) {
+    return decodeTomlString(trimmed);
+  }
+  return trimmed;
+}
+
+function parseTomlTableHeader(
+  line: string
+): { kind: 'table' | 'array'; path: string[] } | null {
+  const trimmed = line.trim();
+  if (trimmed.startsWith('[[') && trimmed.endsWith(']]')) {
+    return {
+      kind: 'array',
+      path: parseTomlDottedPath(trimmed.slice(2, -2))
+    };
+  }
+  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+    return {
+      kind: 'table',
+      path: parseTomlDottedPath(trimmed.slice(1, -1))
+    };
+  }
+  return null;
+}
+
+function parseTomlPositiveInteger(raw: string, source: string): number | null {
+  const parsed = parseTomlInteger(raw);
+  if (parsed === null) {
+    throw new Error(`${source} must be a positive integer.`);
+  }
+  if (parsed > 0) {
+    return parsed;
+  }
+  throw new Error(`${source} must be a positive integer.`);
+}
+
+function parseTomlInteger(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (/^[+-]?(?:0|[1-9](?:_?\d)*)$/u.test(trimmed)) {
+    return Number.parseInt(trimmed.replace(/_/gu, ''), 10);
+  }
+  if (/^[+-]?0x[0-9a-f](?:_?[0-9a-f])*$/iu.test(trimmed)) {
+    return parseTomlBasedInteger(trimmed, /^([+-]?)0x/iu, 16);
+  }
+  if (/^[+-]?0o[0-7](?:_?[0-7])*$/iu.test(trimmed)) {
+    return parseTomlBasedInteger(trimmed, /^([+-]?)0o/iu, 8);
+  }
+  if (/^[+-]?0b[01](?:_?[01])*$/iu.test(trimmed)) {
+    return parseTomlBasedInteger(trimmed, /^([+-]?)0b/iu, 2);
+  }
+  return null;
+}
+
+function parseTomlBasedInteger(raw: string, prefixPattern: RegExp, radix: number): number | null {
+  const normalized = raw.replace(/_/gu, '');
+  const prefixMatch = normalized.match(prefixPattern);
+  if (!prefixMatch) {
+    return null;
+  }
+  const sign = prefixMatch[1] === '-' ? -1 : 1;
+  const digits = normalized.slice(prefixMatch[0].length);
+  return sign * Number.parseInt(digits, radix);
+}
+
+function findTomlAssignmentSeparator(raw: string): number {
+  let quote: '"' | '\'' | null = null;
+  let escaping = false;
+  for (let index = 0; index < raw.length; index += 1) {
+    const character = raw[index];
+    if (escaping) {
+      escaping = false;
+      continue;
+    }
+    if (quote && character === '\\') {
+      escaping = true;
+      continue;
+    }
+    if (character === '"' || character === '\'') {
+      if (quote === character) {
+        quote = null;
+      } else if (!quote) {
+        quote = character;
+      }
+      continue;
+    }
+    if (!quote && character === '=') {
+      return index;
+    }
+  }
+  return -1;
+}
+
+function decodeTomlString(raw: string): string {
+  if (raw.startsWith('"') && raw.endsWith('"')) {
+    try {
+      return JSON.parse(raw) as string;
+    } catch {
+      return raw.slice(1, -1).replace(/\\\\/gu, '\\').replace(/\\"/gu, '"').replace(/\\'/gu, '\'');
+    }
+  }
+  return raw.slice(1, -1).replace(/\\'/gu, '\'');
+}
+
+interface TomlMultilineStringScanState {
+  delimiter: '"""' | '\'\'\'' | null;
+}
+
+function stripTomlComment(line: string, state: TomlMultilineStringScanState): string {
+  let output = '';
+  let quote: '"' | '\'' | null = null;
+  let escaping = false;
+  for (let index = 0; index < line.length; index += 1) {
+    if (state.delimiter) {
+      const delimiter = state.delimiter;
+      if (
+        line.startsWith(delimiter, index) &&
+        (delimiter === '\'\'\'' || !isTomlBasicStringEscape(line, index))
+      ) {
+        state.delimiter = null;
+        index += delimiter.length - 1;
+      }
+      continue;
+    }
+    const character = line[index];
+    if (escaping) {
+      output += character;
+      escaping = false;
+      continue;
+    }
+    if (quote === '"' && character === '\\') {
+      output += character;
+      escaping = true;
+      continue;
+    }
+    if (line.startsWith('"""', index) || line.startsWith('\'\'\'', index)) {
+      state.delimiter = line.startsWith('"""', index) ? '"""' : '\'\'\'';
+      index += 2;
+      continue;
+    }
+    if (character === '"' || character === '\'') {
+      if (quote === character) {
+        quote = null;
+      } else if (!quote) {
+        quote = character;
+      }
+      output += character;
+      continue;
+    }
+    if (!quote && character === '#') {
+      return output;
+    }
+    output += character;
+  }
+  return output;
+}
+
+function isTomlBasicStringEscape(line: string, index: number): boolean {
+  let backslashCount = 0;
+  for (let cursor = index - 1; cursor >= 0 && line[cursor] === '\\'; cursor -= 1) {
+    backslashCount += 1;
+  }
+  return backslashCount % 2 === 1;
 }
 
 function resolveProviderLinearWorkerSourceSetup(
