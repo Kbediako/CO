@@ -204,7 +204,7 @@ interface ProviderMergeCloseoutDependencies {
 
 interface ProviderAttachedSameRepoPullRequestCandidate {
   pr: ProviderMergeCloseoutPullRequestRecord;
-  attachment_title: string | null;
+  attachment_titles: string[];
 }
 
 interface ProviderMergeCloseoutAttachedPrResolution {
@@ -1607,23 +1607,29 @@ async function runProviderMergeCloseoutCommand(input: {
 function collectAttachedGitHubPrCandidates(
   attachments: Array<{ title?: string | null; url?: string | null }>
 ): ProviderAttachedSameRepoPullRequestCandidate[] {
-  const seen = new Set<string>();
-  const candidates: ProviderAttachedSameRepoPullRequestCandidate[] = [];
+  const candidatesByUrl = new Map<string, ProviderAttachedSameRepoPullRequestCandidate>();
   for (const attachment of attachments) {
     const parsed = parseGitHubPullRequestUrl(attachment?.url);
     const comparisonKey = parsed
       ? `${parsed.owner.toLowerCase()}/${parsed.repo.toLowerCase()}#${parsed.number}`
       : null;
-    if (!parsed || !comparisonKey || seen.has(comparisonKey)) {
+    if (!parsed || !comparisonKey) {
       continue;
     }
-    seen.add(comparisonKey);
-    candidates.push({
+    const title = normalizeOptionalString(attachment?.title);
+    const existingCandidate = candidatesByUrl.get(comparisonKey);
+    if (existingCandidate) {
+      if (title && !existingCandidate.attachment_titles.includes(title)) {
+        existingCandidate.attachment_titles.push(title);
+      }
+      continue;
+    }
+    candidatesByUrl.set(comparisonKey, {
       pr: parsed,
-      attachment_title: normalizeOptionalString(attachment?.title)
+      attachment_titles: title ? [title] : []
     });
   }
-  return candidates;
+  return [...candidatesByUrl.values()];
 }
 
 async function resolveAttachedSameRepoPullRequestCandidate(input: {
@@ -1642,7 +1648,7 @@ async function resolveAttachedSameRepoPullRequestCandidate(input: {
   const inspectedCandidates: Array<{
     pr: ProviderMergeCloseoutPullRequestRecord;
     snapshot: ProviderMergeCloseoutSnapshotRecord;
-    attachment_title: string | null;
+    attachment_titles: string[];
   }> = [];
 
   for (const candidate of input.candidates) {
@@ -1664,7 +1670,7 @@ async function resolveAttachedSameRepoPullRequestCandidate(input: {
     inspectedCandidates.push({
       pr: candidate.pr,
       snapshot,
-      attachment_title: candidate.attachment_title
+      attachment_titles: candidate.attachment_titles
     });
   }
 
@@ -1672,7 +1678,7 @@ async function resolveAttachedSameRepoPullRequestCandidate(input: {
     input.mode === 'review_promotion'
       ? inspectedCandidates.filter((candidate) =>
           isReviewPromotionCrossIssueCandidate({
-            attachmentTitle: candidate.attachment_title,
+            attachmentTitles: candidate.attachment_titles,
             issueIdentifier: input.issueIdentifier ?? null,
             blockedBy: input.blockedBy ?? null
           })
@@ -2245,16 +2251,29 @@ function appendReviewPromotionIgnoredSelectionNote(
 }
 
 function isReviewPromotionCrossIssueCandidate(input: {
+  attachmentTitles: readonly string[];
+  issueIdentifier: string | null;
+  blockedBy?: readonly LiveLinearTrackedBlocker[] | null;
+}): boolean {
+  if (input.attachmentTitles.length === 0) {
+    return false;
+  }
+  return input.attachmentTitles.every((attachmentTitle) =>
+    isReviewPromotionCrossIssueTitle({
+      attachmentTitle,
+      issueIdentifier: input.issueIdentifier,
+      blockedBy: input.blockedBy ?? null
+    })
+  );
+}
+
+function isReviewPromotionCrossIssueTitle(input: {
   attachmentTitle: string | null;
   issueIdentifier: string | null;
   blockedBy?: readonly LiveLinearTrackedBlocker[] | null;
 }): boolean {
-  const attachmentIssueIdentifiers = extractIssueIdentifiers(input.attachmentTitle);
   const currentIssueIdentifier = normalizeIssueIdentifierToken(input.issueIdentifier);
-  if (attachmentIssueIdentifiers.length === 0 || !currentIssueIdentifier) {
-    return false;
-  }
-  if (attachmentIssueIdentifiers.includes(currentIssueIdentifier)) {
+  if (!currentIssueIdentifier) {
     return false;
   }
   const leadingIssueIdentifier = extractLeadingIssueIdentifier(input.attachmentTitle);
@@ -2274,17 +2293,6 @@ function isReviewPromotionCrossIssueCandidate(input: {
     return true;
   }
   return /\bfollow(?:-| )up\b/i.test(title);
-}
-
-function extractIssueIdentifiers(value: string | null | undefined): string[] {
-  if (typeof value !== 'string') {
-    return [];
-  }
-  const matches = value.match(/\b[A-Z][A-Z0-9]+-\d+\b/gi) ?? [];
-  const normalized = matches
-    .map((match) => normalizeIssueIdentifierToken(match))
-    .filter((match): match is string => match !== null);
-  return [...new Set(normalized)];
 }
 
 function extractLeadingIssueIdentifier(value: string | null | undefined): string | null {
