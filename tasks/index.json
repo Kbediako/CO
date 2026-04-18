@@ -414,6 +414,14 @@
           "status": "passed",
           "artifact": "out/linear-5561a9a9-39dd-4ed4-99a0-896553327669/manual/20260418T014254Z-rework-r2/15-elegance-review.md",
           "summary": "The final tree keeps the marketplace path additive and thin: packaged metadata, a small launcher, real Codex smoke coverage, and no authority or packaging refactor beyond the requested path."
+        },
+        "packet_refresh_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-5561a9a9-39dd-4ed4-99a0-896553327669-packet-refresh/cli/2026-04-18T12-38-14-882Z-e4ea1f4b/manifest.json",
+          "source_anchor": "ctx:sha256:cb6a64ba6e2f8fc849e39804635bfddb2d7e402bd0058a63ad175132d50f2146#chunk:c000001",
+          "summary": "Refreshed the CO-196 packet/status mirrors after the merged-head unblock: branch `linear/co-196-codex-0121-plugin-marketplace-rework-r2` already includes merged `origin/main` at `57d3c5e88`, `docs:freshness` passed on that merged head, the issue is back in `In Progress`, stale PR `#515` remains closed, no open replacement PR exists yet, and parent-owned next steps are validation, review, workpad refresh, and replacement PR handoff."
         }
       },
       "paths": {
