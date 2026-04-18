@@ -95,8 +95,18 @@ describe('vitest worker-cap config', () => {
     expect(config.test?.minWorkers).toBe(1);
   });
 
-  it('leaves workers uncapped for plain non-interactive runs without the broad-lane signals', async () => {
-    const config = await loadConfig({ CODEX_NON_INTERACTIVE: '1' });
+  it.each([
+    { label: 'CODEX_NON_INTERACTIVE', env: { CODEX_NON_INTERACTIVE: '1' } },
+    { label: 'CODEX_NO_INTERACTIVE', env: { CODEX_NO_INTERACTIVE: 'true' } },
+    { label: 'CODEX_NONINTERACTIVE', env: { CODEX_NONINTERACTIVE: 'yes' } }
+  ])('caps workers for $label worker runs', async ({ env }) => {
+    const config = await loadConfig(env);
+    expect(config.test?.maxWorkers).toBe(4);
+    expect(config.test?.minWorkers).toBe(1);
+  });
+
+  it('leaves workers uncapped for plain interactive local runs', async () => {
+    const config = await loadConfig({});
     expect(config.test?.maxWorkers).toBeUndefined();
     expect(config.test?.minWorkers).toBeUndefined();
   });

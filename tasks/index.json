@@ -1,6 +1,32 @@
 {
   "items": [
     {
+      "id": "20260418-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0",
+      "title": "CO: restore unrelated full-suite SelectedRunProjection reservation-ledger placeholder timeout blocking CO-226 / CO-219",
+      "relates_to": "tasks/tasks-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0-docs-packet/cli/2026-04-18T01-33-37-759Z-74148585/manifest.json",
+          "source_anchor": "ctx:sha256:f00fedabd2d80ab4ca1b6a3cf931775923cd00fba10322614b469d37cab2b002#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-233 as the unrelated full-suite-only SelectedRunProjection blocker: `npm run test` still times out or stalls around `orchestrator/tests/SelectedRunProjection.test.ts` case `refreshes projection proofs when child-lane reservation ledger placeholders exist`, while the isolated `npx vitest run orchestrator/tests/SelectedRunProjection.test.ts -t \"refreshes projection proofs when child-lane reservation ledger placeholders exist\"` repro passes and `orchestrator/tests/Doctor.test.ts` is no longer the live blocker in the same rerun. The packet keeps CO-226 / CO-219 linkage explicit and points the parent at `selectedRunProjection.ts`, `providerLinearWorkerRunner.ts`, `providerLinearChildLaneShell.ts`, and adjacent proof/observability readers only; the shared source payload path was not present in this child checkout, so the packet is anchored on the protected parent-prompt wording plus current repo seams. Parent owns implementation, validation, Linear state, workpad, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md",
+        "task": "tasks/tasks-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md",
+        "agent_task": ".agent/task/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md",
+        "docs": "docs/TECH_SPEC-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md"
+      }
+    },
+    {
       "id": "20260418-linear-a883b037-8167-4011-8bd4-889a1a160db8",
       "title": "CO: clear stale merge-closeout transition_failed residue once CO-210 / PR #512 are merged and live Linear truth is Done",
       "relates_to": "tasks/tasks-linear-a883b037-8167-4011-8bd4-889a1a160db8.md",

@@ -1,0 +1,176 @@
+---
+id: 20260418-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0
+title: 'CO restore unrelated full-suite SelectedRunProjection reservation-ledger placeholder timeout blocking CO-226 / CO-219'
+relates_to: docs/PRD-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md
+risk: high
+owners:
+  - Codex
+last_review: 2026-04-18
+---
+
+## Canonical Reference
+- Canonical TECH_SPEC: `tasks/specs/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md`
+- TECH_SPEC mirror: `docs/TECH_SPEC-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md`
+- PRD: `docs/PRD-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md`
+- Task checklist: `tasks/tasks-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md`
+
+## Traceability
+- Linear issue: `CO-233` / `2594bf7f-12f3-4e59-8b9f-62c551fe58a0`
+- Related issue linkage to preserve: `CO-226`, `CO-219`
+- Source anchor: `ctx:sha256:6c489971dd6f03545c47f5063f802b920c1c52fcee78a5d03e16d6b81d7d17a5#chunk:c000001`
+- Shared source object id: `sha256:6c489971dd6f03545c47f5063f802b920c1c52fcee78a5d03e16d6b81d7d17a5`
+- Parent-provided source payload reference: `../../.runs/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0/cli/2026-04-18T01-28-52-748Z-ffa1574a/memory/source-0/source.txt`
+- Shared source note: the provider-worker prompt source is authoritative for the issue statement and is paired with current repo seams.
+- Docs packet child lane manifest: `.runs/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0-docs-packet/cli/2026-04-18T01-33-37-759Z-74148585/manifest.json`
+
+## Summary
+- Objective: keep `CO-233` as the narrow unrelated full-suite blocker lane for the suite-context timeout around `orchestrator/tests/SelectedRunProjection.test.ts`, specifically `refreshes projection proofs when child-lane reservation ledger placeholders exist`, while isolated repro already passes and `Doctor.test.ts` is no longer the live blocker in the same rerun.
+- Scope:
+  - docs-first packet and bounded registry/checklist mirrors for `CO-233`
+  - parent-owned reproduction of full-suite `npm run test` truth versus isolated repro truth
+  - parent-owned implementation and focused validation in the narrow proof-refresh / placeholder-resolution seam
+  - explicit linkage to `CO-226` and `CO-219` as adjacent lanes that should not absorb this blocker
+- Constraints:
+  - child lane remains docs-only
+  - no runtime/test/Linear/workpad/PR mutations in this patch
+  - parent owns implementation, validation, review, and integration
+
+## Issue-Shaping Contract
+- User-request translation carried forward: this issue is about a suite-context mismatch, not a failing isolated test. The authoritative blocker is that full `npm run test` still times out or stalls around `orchestrator/tests/SelectedRunProjection.test.ts` case `refreshes projection proofs when child-lane reservation ledger placeholders exist`, while `npx vitest run orchestrator/tests/SelectedRunProjection.test.ts -t "refreshes projection proofs when child-lane reservation ledger placeholders exist"` already passes. `orchestrator/tests/Doctor.test.ts` is no longer the live blocker in the same rerun. `CO-226` and `CO-219` must remain explicit linked lanes rather than silent scope sprawl.
+- Protected terms / exact artifact and surface names:
+  - `npm run test`
+  - `orchestrator/tests/SelectedRunProjection.test.ts`
+  - `refreshes projection proofs when child-lane reservation ledger placeholders exist`
+  - `npx vitest run orchestrator/tests/SelectedRunProjection.test.ts -t "refreshes projection proofs when child-lane reservation ledger placeholders exist"`
+  - `orchestrator/tests/Doctor.test.ts`
+  - `CO-226`
+  - `CO-219`
+  - `provider-linear-worker-proof.json`
+  - `provider-linear-worker-child-lanes.json`
+  - `selectedRunProjection.ts`
+  - `providerLinearWorkerRunner.ts`
+  - `providerLinearChildLaneShell.ts`
+  - `Child lane reserved before child run startup.`
+  - `launching-docs-packet`
+- Nearby wrong interpretations to reject:
+  - `Doctor.test.ts` is still the live blocker, so this lane is really doctor-only repair
+  - the isolated repro is green, so no blocker remains
+  - `CO-233` should be folded into `CO-226` or `CO-219`
+  - the fix is "increase Vitest timeout" without proving the narrow proof-refresh / placeholder seam
+  - broad control-runtime or observability redesign is required before reproducing the exact suite-only mismatch
+- Explicit non-goals carried forward:
+  - no code or test edits in this child lane
+  - no Linear or workpad mutation from this lane
+  - no full repo validation from this lane
+  - no reopening `Doctor.test.ts` without fresh evidence
+  - no `CO-226` or `CO-219` implementation work here
+
+## Parity / Alignment Matrix
+- Current truth:
+  - full `npm run test` surfaces the unrelated suite-only timeout around `orchestrator/tests/SelectedRunProjection.test.ts`
+  - the exact case is `refreshes projection proofs when child-lane reservation ledger placeholders exist`
+  - the isolated repro command for that case passes
+  - `orchestrator/tests/Doctor.test.ts` is no longer the live blocker in the same rerun
+- Reference truth:
+  - full-suite and isolated-repro truth should agree, or the mismatch must be explicitly owned as a suite-context defect
+  - unrelated branch-baseline blockers should remain separate from adjacent issue lanes
+  - the smallest truthful fix should sit where projection proof refresh meets child-lane placeholder state
+- Target truth / intended delta:
+  - parent either removes the full-suite-only timeout or classifies it with explicit residual ownership
+  - `CO-226` and `CO-219` can truthfully cite `CO-233` as the unrelated blocker instead of carrying it
+  - SelectedRunProjection proof refresh tolerates reserved child-lane placeholders and matching real child manifests consistently in both full-suite and isolated contexts
+- Explicitly out-of-scope differences:
+  - `CO-226` / `CO-219` feature behavior
+  - unrelated suite failures beyond the named SelectedRunProjection case unless they become the new authoritative blocker after this one is resolved
+  - doctor-only remediation absent new evidence
+
+## Readiness Gate
+- Not done if:
+  - full `npm run test` still times out or stalls around `refreshes projection proofs when child-lane reservation ledger placeholders exist` without explicit owner
+  - the packet implies the isolated repro pass is enough to close the issue
+  - the packet treats `orchestrator/tests/Doctor.test.ts` as the active blocker despite current rerun truth
+  - `CO-226` or `CO-219` are left as implicit background context rather than explicit linked issues
+  - parent implementation broadens into generic timeout padding or unrelated runtime redesign before proving the narrow seam
+- Pre-implementation issue-quality review evidence:
+  - 2026-04-18: the parent prompt already differentiates full-suite-only timeout from isolated passing repro, so the accepted framing is a branch-baseline mismatch rather than a simple single-test failure
+  - 2026-04-18: the packet preserves `Doctor.test.ts` as no longer the live blocker in the same rerun, preventing stale hypothesis drift
+  - 2026-04-18: the packet preserves `CO-226` / `CO-219` linkage explicitly because no local mirrored packet docs for those issues were surfaced during repo-local search
+
+## Requirements
+- Functional requirements:
+  1. Preserve the mismatch between full `npm run test` truth and the passing isolated repro exactly as the parent prompt described it.
+  2. Preserve the exact failing-case string `refreshes projection proofs when child-lane reservation ledger placeholders exist`.
+  3. Preserve the fact that `orchestrator/tests/Doctor.test.ts` is no longer the live blocker in the same rerun.
+  4. Keep `CO-226` and `CO-219` explicit as linked adjacent issues so parent closeout can reference them without scope drift.
+  5. Point the parent at the smallest likely source seam where SelectedRunProjection refreshes proof data while child-lane reservation ledger placeholders still exist.
+  6. Keep parent ownership explicit for implementation, tests, workpad, Linear state, PR lifecycle, and full validation.
+- Non-functional requirements:
+  - deterministic documentation of the suite-only mismatch
+  - bounded implementation seam with no unnecessary redesign pressure
+  - truthful separation between historical blocker hypotheses and current rerun truth
+- Interfaces / contracts:
+  - `orchestrator/src/cli/control/selectedRunProjection.ts`
+  - `orchestrator/src/cli/providerLinearWorkerRunner.ts`
+  - `orchestrator/src/cli/providerLinearChildLaneShell.ts`
+  - `orchestrator/src/cli/control/providerIssueObservability.ts`
+  - `orchestrator/tests/SelectedRunProjection.test.ts`
+
+## Architecture & Data
+- Architecture / design adjustments:
+  - keep the eventual repair bounded to how SelectedRunProjection refreshes provider proof data when a reserved child-lane placeholder ledger entry and a matching real child manifest coexist
+  - preserve the distinction between the proof snapshot (`provider-linear-worker-proof.json`) and the reservation ledger (`provider-linear-worker-child-lanes.json`)
+  - avoid broad runtime changes unless the parent later proves the narrow SelectedRunProjection seam cannot explain the suite-only timeout
+- Required artifact/content expectations:
+  - `provider-linear-worker-proof.json` refreshes accurately when a placeholder reservation and a matching real child run both exist
+  - `provider-linear-worker-child-lanes.json` placeholder records remain truthful rather than being silently rewritten into unrelated states
+  - SelectedRunProjection can surface the refreshed child-lane proof without inducing full-suite-only timeout behavior
+- Data model changes / migrations:
+  - additive hardening around proof refresh or placeholder resolution is acceptable
+  - no destructive migration is implied by this packet
+- External dependencies / integrations:
+  - no Linear mutation from this child lane
+  - parent may need to validate adjacent proof refresh consumers if implementation touches shared helpers
+
+## Current Truth
+- `orchestrator/tests/SelectedRunProjection.test.ts` includes a dedicated case that seeds a reserved child-lane ledger placeholder with `run_id: 'launching-docs-packet'`, `status: 'launching'`, and summary `Child lane reserved before child run startup.`
+- The same case also writes a matching real child manifest at `.runs/<child-task>/cli/<real-run-id>/manifest.json` and expects SelectedRunProjection to refresh `provider-linear-worker-proof.json` from that real child run while leaving the child-lane ledger placeholder record unchanged.
+- The isolated repro for that exact case passes, which means the currently reported failure is the full-suite-only timeout or drift in `npm run test`, not the narrow assertion set when run alone.
+- `orchestrator/tests/Doctor.test.ts` is no longer the blocker in the same rerun, so reopening doctor-only repair would be issue drift.
+
+## Proposed Design
+- Parent implementation should harden the proof-refresh / placeholder-resolution seam so SelectedRunProjection behaves identically in isolated and full-suite contexts.
+- The smallest likely implementation surface is:
+  - `selectedRunProjection.ts` for placeholder-ledger discovery and refreshed proof projection
+  - `providerLinearWorkerRunner.ts` for proof and child-lane ledger contract definitions / refresh helpers
+  - `providerLinearChildLaneShell.ts` if proof-refresh hardening is required when child-lane state is reserved, accepted, invalidated, or finalized
+- Parent should avoid closing the issue with timeout-only tuning unless the suite-only mismatch remains after the narrow proof-refresh seam is proven correct.
+
+## Protected Expectations
+- Preserve the exact strings `npm run test`, `orchestrator/tests/SelectedRunProjection.test.ts`, `refreshes projection proofs when child-lane reservation ledger placeholders exist`, and the isolated repro command.
+- Preserve `orchestrator/tests/Doctor.test.ts` as no longer the live blocker in the same rerun.
+- Preserve `CO-226` / `CO-219` as explicit linked issues.
+- Preserve docs-only scope for this child lane and parent ownership for everything else.
+
+## Reject These Wrong Interpretations
+- `This issue is already fixed because the isolated repro passes.`
+- `This is still really a Doctor.test blocker.`
+- `Merge CO-233 into CO-226 or CO-219 and stop tracking it separately.`
+- `Raise suite timeout budgets and move on.`
+- `Refactor the whole runtime or observability pipeline before reproducing the narrow proof-refresh mismatch.`
+
+## Validation Plan
+- Child-lane checks:
+  - `jq empty tasks/index.json docs/docs-freshness-registry.json`
+  - protected-term grep across the touched packet files
+  - `git diff --check` over the declared docs scope
+- Parent-lane checks:
+  - `npx vitest run orchestrator/tests/SelectedRunProjection.test.ts -t "refreshes projection proofs when child-lane reservation ledger placeholders exist"`
+  - focused `ProviderLinearChildLaneShell.test.ts` and `ProviderIssueHandoffRefreshSerialization.test.ts` coverage if implementation touches shared proof-refresh helpers
+  - `npm run test`
+  - parent docs-review before implementation
+  - parent-selected scoped validation after source edits
+
+## Approvals
+- Reviewer: pending parent docs acceptance / implementation
+- Date: 2026-04-18
