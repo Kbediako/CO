@@ -204,7 +204,7 @@ interface ProviderMergeCloseoutDependencies {
 
 interface ProviderAttachedSameRepoPullRequestCandidate {
   pr: ProviderMergeCloseoutPullRequestRecord;
-  attachment_titles: string[];
+  attachment_title: string | null;
 }
 
 interface ProviderMergeCloseoutAttachedPrResolution {
@@ -1619,14 +1619,12 @@ function collectAttachedGitHubPrCandidates(
     const title = normalizeOptionalString(attachment?.title);
     const existingCandidate = candidatesByUrl.get(comparisonKey);
     if (existingCandidate) {
-      if (title && !existingCandidate.attachment_titles.includes(title)) {
-        existingCandidate.attachment_titles.push(title);
-      }
+      existingCandidate.attachment_title = title;
       continue;
     }
     candidatesByUrl.set(comparisonKey, {
       pr: parsed,
-      attachment_titles: title ? [title] : []
+      attachment_title: title
     });
   }
   return [...candidatesByUrl.values()];
@@ -1645,13 +1643,29 @@ async function resolveAttachedSameRepoPullRequestCandidate(input: {
     options?: { readinessMode?: 'merge' | 'review' }
   ) => string[];
 }): Promise<ProviderMergeCloseoutAttachedPrResolution> {
+  const ignoredCrossIssueCandidates =
+    input.mode === 'review_promotion'
+      ? input.candidates.filter((candidate) =>
+          isReviewPromotionCrossIssueCandidate({
+            attachmentTitle: candidate.attachment_title,
+            issueIdentifier: input.issueIdentifier ?? null,
+            blockedBy: input.blockedBy ?? null
+          })
+        )
+      : [];
+  const ignoredCrossIssuePrUrls = ignoredCrossIssueCandidates.map((candidate) => candidate.pr.url);
+  const ignoredCrossIssueUrlSet = new Set(ignoredCrossIssuePrUrls);
+
   const inspectedCandidates: Array<{
     pr: ProviderMergeCloseoutPullRequestRecord;
     snapshot: ProviderMergeCloseoutSnapshotRecord;
-    attachment_titles: string[];
+    attachment_title: string | null;
   }> = [];
 
   for (const candidate of input.candidates) {
+    if (ignoredCrossIssueUrlSet.has(candidate.pr.url)) {
+      continue;
+    }
     const rawSnapshot = await input.resolveSnapshot({
       owner: candidate.pr.owner,
       repo: candidate.pr.repo,
@@ -1670,25 +1684,11 @@ async function resolveAttachedSameRepoPullRequestCandidate(input: {
     inspectedCandidates.push({
       pr: candidate.pr,
       snapshot,
-      attachment_titles: candidate.attachment_titles
+      attachment_title: candidate.attachment_title
     });
   }
 
-  const ignoredCrossIssueCandidates =
-    input.mode === 'review_promotion'
-      ? inspectedCandidates.filter((candidate) =>
-          isReviewPromotionCrossIssueCandidate({
-            attachmentTitles: candidate.attachment_titles,
-            issueIdentifier: input.issueIdentifier ?? null,
-            blockedBy: input.blockedBy ?? null
-          })
-        )
-      : [];
-  const ignoredCrossIssuePrUrls = ignoredCrossIssueCandidates.map((candidate) => candidate.pr.url);
-  const ignoredCrossIssueUrlSet = new Set(ignoredCrossIssuePrUrls);
-  const filteredCandidates = inspectedCandidates.filter(
-    (candidate) => !ignoredCrossIssueUrlSet.has(candidate.pr.url)
-  );
+  const filteredCandidates = inspectedCandidates;
 
   const openUnmergedCandidates =
     input.mode === 'review_promotion'
@@ -2251,23 +2251,6 @@ function appendReviewPromotionIgnoredSelectionNote(
 }
 
 function isReviewPromotionCrossIssueCandidate(input: {
-  attachmentTitles: readonly string[];
-  issueIdentifier: string | null;
-  blockedBy?: readonly LiveLinearTrackedBlocker[] | null;
-}): boolean {
-  if (input.attachmentTitles.length === 0) {
-    return false;
-  }
-  return input.attachmentTitles.every((attachmentTitle) =>
-    isReviewPromotionCrossIssueTitle({
-      attachmentTitle,
-      issueIdentifier: input.issueIdentifier,
-      blockedBy: input.blockedBy ?? null
-    })
-  );
-}
-
-function isReviewPromotionCrossIssueTitle(input: {
   attachmentTitle: string | null;
   issueIdentifier: string | null;
   blockedBy?: readonly LiveLinearTrackedBlocker[] | null;
