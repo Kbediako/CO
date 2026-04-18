@@ -1191,13 +1191,13 @@
     },
     {
       "id": "20260414-linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8",
-      "title": "CO workflow: add rolling docs:freshness cohort policy for Apr 14 stale baseline",
+      "title": "CO workflow: reopen CO-175 for Apr 18 docs:freshness over-budget historical packet cohort",
       "relates_to": "tasks/tasks-linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8.md",
       "risk": "high",
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-14",
+      "last_review": "2026-04-18",
       "paths": {
         "spec": "tasks/specs/linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8.md",
         "task": "tasks/tasks-linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8.md",
