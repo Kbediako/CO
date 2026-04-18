@@ -11621,6 +11621,22 @@
         "agent_task": ".agent/task/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md",
         "docs": "docs/TECH_SPEC-linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md"
       }
+    },
+    {
+      "id": "20260418-linear-ddb81c93-87b2-4dff-b69b-33d7ae3c91cd",
+      "title": "Control host: reclaim Ready issues suppressed by plain released/not_active stale Backlog cache",
+      "relates_to": "tasks/tasks-linear-ddb81c93-87b2-4dff-b69b-33d7ae3c91cd.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "paths": {
+        "spec": "tasks/specs/linear-ddb81c93-87b2-4dff-b69b-33d7ae3c91cd.md",
+        "task": "tasks/tasks-linear-ddb81c93-87b2-4dff-b69b-33d7ae3c91cd.md",
+        "agent_task": ".agent/task/linear-ddb81c93-87b2-4dff-b69b-33d7ae3c91cd.md",
+        "docs": "docs/TECH_SPEC-linear-ddb81c93-87b2-4dff-b69b-33d7ae3c91cd.md"
+      }
     }
   ]
 }

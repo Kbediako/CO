@@ -19823,7 +19823,10 @@ describe('createProviderIssueHandoffService', () => {
       kind: 'ready' as const,
       trackedIssue: createTrackedIssue()
     }));
-    const refetchTrackedIssues = vi.fn(async (input?: { excludedIssueIds?: string[] }) => {
+    const refetchTrackedIssues = vi.fn(async (input?: {
+      eligibleTargetCount?: number;
+      excludedIssueIds?: string[];
+    }) => {
       expect(input?.excludedIssueIds ?? []).toContain('lin-issue-1');
       return {
         kind: 'ready' as const,
@@ -20032,6 +20035,162 @@ describe('createProviderIssueHandoffService', () => {
       task_id: 'linear-lin-issue-196',
       run_id: 'run-co-196-ready-reclaimed',
       run_manifest_path: '/tmp/provider-run/co-196-ready-reclaimed-manifest.json',
+      launch_source: 'control-host',
+      launch_token: expect.any(String)
+    });
+    expect(persist).toHaveBeenCalled();
+  });
+
+  it('reclaims a stale Backlog plain released not-active claim through fresh discovery', async () => {
+    const { root, paths } = await createHostPaths();
+    const firstActivePaths = resolveRunPaths(
+      {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'task-co-237-active'
+      },
+      'run-co-237-active'
+    );
+    const secondActivePaths = resolveRunPaths(
+      {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'task-co-238-active'
+      },
+      'run-co-238-active'
+    );
+    await mkdir(firstActivePaths.runDir, { recursive: true });
+    await mkdir(secondActivePaths.runDir, { recursive: true });
+    await writeFile(
+      firstActivePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-co-237-active',
+        task_id: 'task-co-237-active',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-237',
+        issue_identifier: 'CO-237',
+        issue_updated_at: '2026-04-18T03:05:00.000Z',
+        updated_at: '2026-04-18T03:20:00.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      secondActivePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-co-238-active',
+        task_id: 'task-co-238-active',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-238',
+        issue_identifier: 'CO-238',
+        issue_updated_at: '2026-04-18T03:12:00.000Z',
+        updated_at: '2026-04-18T03:21:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: 'lin-issue-236',
+      issue_identifier: 'CO-236',
+      issue_title: 'CLI test surface: remove clean-tree dependency on prebuilt dist entrypoint',
+      issue_state: 'Backlog',
+      issue_state_type: 'backlog',
+      issue_updated_at: '2026-04-18T02:47:05.995Z',
+      task_id: 'linear-lin-issue-236',
+      run_id: null,
+      run_manifest_path: null
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = createCo202Launcher(
+      'run-co-236-ready-reclaimed',
+      '/tmp/provider-run/co-236-ready-reclaimed-manifest.json'
+    );
+    const activeTrackedIssues = [
+      createTrackedIssue({
+        id: 'lin-issue-237',
+        identifier: 'CO-237',
+        title: 'Control host: close merge-closeout residue on CO-175',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-04-18T03:05:00.000Z'
+      }),
+      createTrackedIssue({
+        id: 'lin-issue-238',
+        identifier: 'CO-238',
+        title: 'Provider worker: retain reopened merge-closeout residue on CO-175',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-04-18T03:12:00.000Z'
+      })
+    ];
+    const refetchTrackedIssues = vi.fn(async (input?: {
+      eligibleTargetCount?: number;
+      excludedIssueIds?: string[];
+    }) => {
+      expect(input?.eligibleTargetCount).toBe(1);
+      expect(input?.excludedIssueIds ?? []).toEqual(expect.arrayContaining([
+        'lin-issue-237',
+        'lin-issue-238'
+      ]));
+      expect(input?.excludedIssueIds ?? []).not.toContain('lin-issue-236');
+      return {
+        kind: 'ready' as const,
+        trackedIssues: [
+          createCo202ReadyIssue({
+            id: 'lin-issue-236',
+            identifier: 'CO-236',
+            title: 'CLI test surface: remove clean-tree dependency on prebuilt dist entrypoint',
+            updated_at: '2026-04-18T03:24:07.567Z'
+          })
+        ]
+      };
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 3
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: activeTrackedIssues,
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-issue-236',
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-issue-236',
+      issueIdentifier: 'CO-236',
+      issueUpdatedAt: '2026-04-18T03:24:07.567Z',
+      launchToken: expect.any(String)
+    }));
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-18T03:24:07.567Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-issue-236',
+      run_id: 'run-co-236-ready-reclaimed',
+      run_manifest_path: '/tmp/provider-run/co-236-ready-reclaimed-manifest.json',
       launch_source: 'control-host',
       launch_token: expect.any(String)
     });
