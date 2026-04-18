@@ -5936,10 +5936,158 @@ describe('ControlRuntime', () => {
     expect(snapshot.selected?.taskId).toBe('task-1303-child');
     expect(snapshot.selected?.runId).toBe('run-child');
     expect(snapshot.providerIntake).toMatchObject({
-      issue_identifier: 'CO-2',
-      task_id: 'task-1303-child',
-      state: 'running',
-      run_id: 'run-child'
+      summary_scope: 'single_claim',
+      active_claim_count: 1,
+      running_claim_count: 1,
+      selected_claim: {
+        issue_identifier: 'CO-2',
+        task_id: 'task-1303-child',
+        state: 'running',
+        run_id: 'run-child'
+      }
+    });
+  });
+
+  it('serializes concurrent running provider intake as a scoped selected claim with aggregate counts', async () => {
+    const providerIntakeState = createProviderIntakeState([
+      {
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-175',
+        issue_id: 'lin-issue-175',
+        issue_identifier: 'CO-175',
+        issue_title: 'Claim one',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-18T06:09:00.000Z',
+        task_id: 'linear-co-175',
+        mapping_source: 'provider_id_fallback',
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        accepted_at: '2026-04-18T06:09:05.000Z',
+        updated_at: '2026-04-18T06:09:30.000Z',
+        last_delivery_id: 'delivery-175',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_744_960_570_000,
+        run_id: 'run-175',
+        run_manifest_path: '/tmp/run-175/manifest.json',
+        retry_queued: true,
+        retry_attempt: 2,
+        retry_due_at: '2026-04-18T06:10:30.000Z',
+        retry_error: 'selected-claim retry detail',
+        launch_source: 'control-host',
+        launch_token: 'launch-175'
+      },
+      {
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-240',
+        issue_id: 'lin-issue-240',
+        issue_identifier: 'CO-240',
+        issue_title: 'Claim two',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-18T06:08:00.000Z',
+        task_id: 'linear-co-240',
+        mapping_source: 'provider_id_fallback',
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        accepted_at: '2026-04-18T06:08:05.000Z',
+        updated_at: '2026-04-18T06:08:30.000Z',
+        last_delivery_id: 'delivery-240',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_744_960_510_000,
+        run_id: 'run-240',
+        run_manifest_path: '/tmp/run-240/manifest.json',
+        launch_source: 'control-host',
+        launch_token: 'launch-240'
+      },
+      {
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-242',
+        issue_id: 'lin-issue-242',
+        issue_identifier: 'CO-242',
+        issue_title: 'Claim three',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-18T06:07:00.000Z',
+        task_id: 'linear-co-242',
+        mapping_source: 'provider_id_fallback',
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        accepted_at: '2026-04-18T06:07:05.000Z',
+        updated_at: '2026-04-18T06:07:30.000Z',
+        last_delivery_id: 'delivery-242',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_744_960_450_000,
+        run_id: 'run-242',
+        run_manifest_path: '/tmp/run-242/manifest.json',
+        launch_source: 'control-host',
+        launch_token: 'launch-242'
+      }
+    ]);
+    providerIntakeState.updated_at = '2026-04-18T06:10:00.000Z';
+    providerIntakeState.rehydrated_at = null;
+    providerIntakeState.latest_provider_key = 'linear:lin-issue-175';
+    providerIntakeState.latest_reason = 'provider_issue_rehydrated_active_run';
+
+    const fixture = await createFixture({
+      taskId: 'local-mcp',
+      providerIntakeState
+    });
+
+    const projection = await fixture.runtime.snapshot().readCompatibilityProjection();
+    const statePayload = await readCompatibilityState({
+      readCompatibilityProjection: async () => projection
+    });
+
+    expect(projection.providerIntake).toMatchObject({
+      summary_scope: 'selected_claim',
+      selection_strategy: 'state_rank_updated_at',
+      claim_count: 3,
+      active_claim_count: 3,
+      running_claim_count: 3,
+      active_issue_identifiers: ['CO-175', 'CO-240', 'CO-242'],
+      running_issue_identifiers: ['CO-175', 'CO-240', 'CO-242'],
+      selected_claim: {
+        issue_identifier: 'CO-175',
+        task_id: 'linear-co-175',
+        state: 'running',
+        retry: {
+          active: true,
+          attempt: 2,
+          due_at: '2026-04-18T06:10:30.000Z',
+          error: 'selected-claim retry detail'
+        }
+      }
+    });
+    expect(statePayload.provider_intake).toEqual({
+      summary_scope: 'selected_claim',
+      selection_strategy: 'state_rank_updated_at',
+      claim_count: 3,
+      active_claim_count: 3,
+      running_claim_count: 3,
+      active_issue_identifiers: ['CO-175', 'CO-240', 'CO-242'],
+      running_issue_identifiers: ['CO-175', 'CO-240', 'CO-242'],
+      selected_claim: {
+        issue_identifier: 'CO-175',
+        task_id: 'linear-co-175',
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        run_id: 'run-175',
+        freshness: 'rehydrated',
+        retry: {
+          active: true,
+          attempt: 2,
+          due_at: '2026-04-18T06:10:30.000Z',
+          error: 'selected-claim retry detail'
+        },
+        worker_host: null
+      },
+      rehydrated_at: null,
+      is_rehydrated: true,
+      updated_at: '2026-04-18T06:09:30.000Z'
     });
   });
 
