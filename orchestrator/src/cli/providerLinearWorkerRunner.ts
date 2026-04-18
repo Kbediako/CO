@@ -21,7 +21,6 @@ import {
   PROVIDER_CONTROL_HOST_RUN_ID_ENV,
   PROVIDER_CONTROL_HOST_TASK_ID_ENV,
   PROVIDER_LAUNCH_SOURCE_CONTROL_HOST,
-  PROVIDER_LAUNCH_SOURCE_ENV,
   readProviderControlHostLocatorFromEnv,
   readProviderControlHostLocatorFromManifest
 } from '../../../scripts/lib/provider-run-contract.js';
