@@ -9,6 +9,7 @@ const REQUIRED_FILES = [
   '.agents/plugins/marketplace.json',
   'plugins/codex-orchestrator/.codex-plugin/plugin.json',
   'plugins/codex-orchestrator/.mcp.json',
+  'plugins/codex-orchestrator/launcher.mjs',
   'bin/codex-orchestrator.js',
   'dist/bin/codex-orchestrator.js',
   'dist/scripts/run-review.js',

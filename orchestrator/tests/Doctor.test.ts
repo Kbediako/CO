@@ -72,7 +72,6 @@ function buildDoctorCloudEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessE
   };
 }
 
-const RUN_DOCTOR_TIMEOUT_MS = 15000;
 describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
   it('reports missing devtools config and skill when absent', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
@@ -2251,4 +2250,4 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
       await rm(tempDir, { recursive: true, force: true });
     }
   });
-}, RUN_DOCTOR_TIMEOUT_MS);
+});
