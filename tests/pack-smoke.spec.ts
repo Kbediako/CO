@@ -1,8 +1,33 @@
 import { readFile } from 'node:fs/promises';
+import { load } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
 
 async function readText(path: string): Promise<string> {
   return await readFile(path, 'utf8');
+}
+
+type WorkflowStep = {
+  run?: unknown;
+};
+
+type WorkflowJob = {
+  steps?: unknown;
+};
+
+type WorkflowFile = {
+  jobs?: Record<string, WorkflowJob>;
+};
+
+async function readWorkflow(path: string): Promise<WorkflowFile> {
+  const parsed = load(await readText(path));
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error(`${path} must parse as a workflow object`);
+  }
+  return parsed as WorkflowFile;
+}
+
+function getWorkflowSteps(job: WorkflowJob): WorkflowStep[] {
+  return Array.isArray(job.steps) ? (job.steps as WorkflowStep[]) : [];
 }
 
 describe('scripts/pack-smoke env isolation', () => {
@@ -145,19 +170,28 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     ];
 
     for (const workflow of workflows) {
-      const text = await readText(workflow);
-      const installIndex = text.indexOf('npm install --global @openai/codex@0.121.0');
-      const smokeIndices = [...text.matchAll(/npm run pack:smoke/gu)].map((match) => match.index ?? -1);
-      expect(installIndex, `${workflow} must install Codex 0.121.0`).toBeGreaterThanOrEqual(0);
-      expect(smokeIndices.length, `${workflow} must run pack:smoke`).toBeGreaterThan(0);
-      for (const smokeIndex of smokeIndices) {
-        expect(smokeIndex, `${workflow} must run every pack:smoke after Codex install`).toBeGreaterThan(
-          installIndex
-        );
+      const workflowFile = await readWorkflow(workflow);
+      let smokeStepCount = 0;
+      for (const [jobName, job] of Object.entries(workflowFile.jobs ?? {})) {
+        let codexInstallSeen = false;
+        for (const [stepIndex, step] of getWorkflowSteps(job).entries()) {
+          const run = typeof step.run === 'string' ? step.run : '';
+          expect(run, `${workflow} job ${jobName} must not opt out of marketplace smoke`).not.toContain(
+            'PACK_SMOKE_ALLOW_MARKETPLACE_SKIP'
+          );
+          if (run.includes('npm install --global @openai/codex@0.121.0')) {
+            codexInstallSeen = true;
+          }
+          if (run.includes('npm run pack:smoke')) {
+            smokeStepCount += 1;
+            expect(
+              codexInstallSeen,
+              `${workflow} job ${jobName} step ${stepIndex + 1} must install Codex 0.121.0 before pack:smoke`
+            ).toBe(true);
+          }
+        }
       }
-      expect(text, `${workflow} must not opt out of marketplace smoke`).not.toContain(
-        'PACK_SMOKE_ALLOW_MARKETPLACE_SKIP'
-      );
+      expect(smokeStepCount, `${workflow} must run pack:smoke`).toBeGreaterThan(0);
     }
   });
 });
