@@ -4125,7 +4125,6 @@ describe('SelectedRunProjection', () => {
 
   it(
     'refreshes projection proofs when child-lane reservation ledger placeholders exist',
-    { timeout: 30_000 },
     async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {
@@ -4382,7 +4381,8 @@ describe('SelectedRunProjection', () => {
       summary: 'Child lane docs-packet succeeded. Patch artifact ready.',
       summary_recorded_at: '2026-04-17T00:43:59.552Z'
     });
-    }
+    },
+    30_000
   );
 
   it('refreshes in-progress provider proofs from session telemetry during projection reads', async () => {

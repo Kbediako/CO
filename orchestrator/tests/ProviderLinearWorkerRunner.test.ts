@@ -849,7 +849,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
   });
   it('requires matching live control-host env values and accepts manifest.pipelineId', async () => {
     const { manifestPath } = await createManifestRoot();
-    await writeFile(manifestPath, JSON.stringify({ run_id: 'run-child', task_id: 'linear-lin-issue-1', issue_id: 'lin-issue-1', issue_identifier: 'CO-2', pipelineId: 'provider-linear-worker', provider_control_host_task_id: 'local-mcp', provider_control_host_run_id: 'control-host', workspace_path: tempRoot }), 'utf8');
+    await writeFile(manifestPath, JSON.stringify({ run_id: 'run-child', task_id: 'linear-lin-issue-1', issue_id: 'lin-issue-1', issue_identifier: 'CO-2', pipelineId: 'provider-linear-worker', provider_launch_source: 'control-host', provider_control_host_task_id: 'local-mcp', provider_control_host_run_id: 'control-host', workspace_path: tempRoot }), 'utf8');
     expect(await loadProviderLinearWorkerContext({ CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath, CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined })).toMatchObject({
       pipelineId: 'provider-linear-worker',
       providerControlHostTaskId: null,
@@ -859,6 +859,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect((await loadProviderLinearWorkerContext({
       CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
       CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+      CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: 'control-host',
       CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: 'local-mcp',
       CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID: 'control-host'
     }))).toMatchObject({
@@ -876,6 +877,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       issue_id: 'lin-issue-1',
       issue_identifier: 'CO-2',
       pipelineId: 'provider-linear-worker',
+      provider_launch_source: 'control-host',
       provider_control_host_task_id: 'local-mcp',
       provider_control_host_run_id: 'control-host',
       workspace_path: tempRoot
@@ -884,6 +886,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     await expect(loadProviderLinearWorkerContext({
       CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
       CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+      CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: 'control-host',
       CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: 'other-task',
       CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID: 'other-run'
     })).resolves.toMatchObject({
@@ -891,6 +894,77 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       providerControlHostRunId: null,
       providerControlHostMatchesManifest: false
     });
+  });
+
+  it('persists missing control-host provenance onto the provider-worker manifest when the live env matches', async () => {
+    const { manifestPath } = await createManifestRoot();
+
+    const context = await loadProviderLinearWorkerContext({
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+      CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+      CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: 'control-host',
+      CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: 'local-mcp',
+      CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID: 'control-host'
+    });
+
+    expect(context).toMatchObject({
+      providerControlHostTaskId: 'local-mcp',
+      providerControlHostRunId: 'control-host',
+      providerControlHostRecordedInManifest: true,
+      providerControlHostMatchesManifest: true
+    });
+
+    const persistedManifest = JSON.parse(await readFile(manifestPath, 'utf8')) as Record<string, unknown>;
+    expect(persistedManifest).toMatchObject({
+      provider_launch_source: 'control-host',
+      provider_control_host_task_id: 'local-mcp',
+      provider_control_host_run_id: 'control-host'
+    });
+  });
+
+  it('does not persist backfilled provenance when context validation fails', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const issueWorkspacePath = join(tempRoot ?? '', '.workspaces', 'linear-lin-issue-1');
+    const workspaceRunDir = join(issueWorkspacePath, '.runs', 'linear-lin-issue-1', 'cli', 'run-child');
+    const workspaceManifestPath = join(workspaceRunDir, 'manifest.json');
+    await mkdir(workspaceRunDir, { recursive: true });
+    await writeFile(
+      workspaceManifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: issueWorkspacePath
+      }),
+      'utf8'
+    );
+
+    await expect(
+      loadProviderLinearWorkerContext(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_TASK_ID: 'linear-lin-issue-1',
+          CODEX_ORCHESTRATOR_ISSUE_ID: 'lin-issue-2',
+          CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: 'control-host',
+          CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: 'local-mcp',
+          CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID: 'control-host'
+        },
+        undefined,
+        issueWorkspacePath
+      )
+    ).rejects.toThrow('Provider worker issue id mismatch');
+
+    const sharedManifest = JSON.parse(await readFile(manifestPath, 'utf8')) as Record<string, unknown>;
+    const workspaceManifest = JSON.parse(
+      await readFile(workspaceManifestPath, 'utf8')
+    ) as Record<string, unknown>;
+    for (const persistedManifest of [sharedManifest, workspaceManifest]) {
+      expect(persistedManifest.provider_launch_source).toBeUndefined();
+      expect(persistedManifest.provider_control_host_task_id).toBeUndefined();
+      expect(persistedManifest.provider_control_host_run_id).toBeUndefined();
+    }
   });
 
   it('builds a full first-turn prompt and a continuation prompt', () => {

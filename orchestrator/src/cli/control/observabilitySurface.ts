@@ -6,6 +6,7 @@ import type {
   ControlIssuePayload,
   ControlStatePayload
 } from './observabilityReadModel.js';
+import { serializeProviderIntakeSummary } from './observabilityReadModel.js';
 import { findCompatibilityProjectionIssueRecord } from './compatibilityIssuePresenter.js';
 import {
   buildCompatibilityIssueRecordLookups,
@@ -338,7 +339,9 @@ export async function readCompatibilityState(
     codex_totals: projection.codexTotals,
     rate_limits: projection.rateLimits,
     selected: projection.selected,
-    ...(projection.providerIntake ? { provider_intake: projection.providerIntake } : {}),
+    ...(projection.providerIntake
+      ? { provider_intake: serializeProviderIntakeSummary(projection.providerIntake) }
+      : {}),
     ...(projection.providerWorkflow ? { provider_workflow: projection.providerWorkflow } : {}),
     ...(projection.polling ? { polling: projection.polling } : {}),
     ...(projection.dispatchPilot ? { dispatch_pilot: projection.dispatchPilot } : {}),
