@@ -28,9 +28,10 @@ const codexInstallCommand = 'npm install --global @openai/codex@0.121.0';
 const packSmokeCommand = 'npm run pack:smoke';
 const shellAssignmentPattern = String.raw`[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S+)`;
 const packSmokeInvocationPattern = new RegExp(
-  String.raw`^(?:${shellAssignmentPattern}\s+)*npm\s+run\s+pack:smoke(?:\s+.*)?$`,
+  String.raw`^(?:${shellAssignmentPattern}\s+)*npm\s+run\s+pack:smoke(?:$|[\s;|&])`,
   'u'
 );
+const nonBlockingPackSmokePattern = /(?:^|[ \t])\|\|[ \t]|;[ \t]*(?:true|exit[ \t]+0)\b/u;
 
 async function readWorkflow(path: string): Promise<WorkflowFile> {
   const parsed = load(await readText(path));
@@ -124,6 +125,12 @@ function hasCommandText(run: string, command: string): boolean {
 
 function hasPackSmokeCommand(run: string): boolean {
   return getRunCommandLines(run).some((line) => packSmokeInvocationPattern.test(line));
+}
+
+function hasNonBlockingPackSmokeCommand(run: string): boolean {
+  return getRunCommandLines(run).some(
+    (line) => packSmokeInvocationPattern.test(line) && nonBlockingPackSmokePattern.test(line)
+  );
 }
 
 function isDedicatedCodexInstallRun(run: string): boolean {
@@ -305,6 +312,14 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
           if (hasPackSmokeCommand(run)) {
             smokeStepCount += 1;
             expect(
+              isContinueOnErrorEnabled(step['continue-on-error']),
+              `${workflow} job ${jobName} step ${stepIndex + 1} must not continue-on-error pack:smoke`
+            ).toBe(false);
+            expect(
+              hasNonBlockingPackSmokeCommand(run),
+              `${workflow} job ${jobName} step ${stepIndex + 1} must run pack:smoke as a blocking command`
+            ).toBe(false);
+            expect(
               codexInstallConditions.some((installCondition) =>
                 installConditionCoversSmokeStep(installCondition, stepCondition)
               ),
@@ -329,6 +344,10 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(hasPackSmokeCommand(`${packSmokeCommand} -- --flag`)).toBe(true);
     expect(hasPackSmokeCommand(`echo ${packSmokeCommand}`)).toBe(false);
     expect(hasPackSmokeCommand(`${packSmokeCommand}:other`)).toBe(false);
+    expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} || true`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand}; exit 0`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} -- --flag`)).toBe(false);
+    expect(hasNonBlockingPackSmokeCommand(`echo ${packSmokeCommand} || true`)).toBe(false);
     expect(isContinueOnErrorEnabled(true)).toBe(true);
     expect(isContinueOnErrorEnabled('true')).toBe(true);
     expect(isContinueOnErrorEnabled('false')).toBe(false);
