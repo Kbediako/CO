@@ -24,6 +24,7 @@ import {
   readProviderControlHostLocatorFromEnv,
   readProviderControlHostLocatorFromManifest
 } from '../../../scripts/lib/provider-run-contract.js';
+import { resolveEnvironmentPathsForProcess } from '../../../scripts/lib/run-manifests.js';
 import {
   hasLinearSourceBinding,
   resolveLinearSourceSetup,
@@ -74,7 +75,6 @@ import { sanitizeRunId } from '../persistence/sanitizeRunId.js';
 import { sanitizeTaskId } from '../persistence/sanitizeTaskId.js';
 import { acquireLockWithRetry, type LockRetryOptions } from '../persistence/lockFile.js';
 import { resolveCodexHome } from './utils/codexPaths.js';
-import { REPO_CONFIG_REQUIRED_ENV_KEY } from './config/repoConfigPolicy.js';
 import { REPO_CONFIG_PATH_ENV_KEY } from './config/userConfig.js';
 import {
   normalizeProviderLinearChildLanePathSelectors,
@@ -1139,19 +1139,46 @@ function applyProviderLinearWorkerContextEnv(
     | 'providerControlHostRunId'
   >
 ): void {
+  const artifactPathResolutionTaskId =
+    resolveProviderLinearWorkerWorkspaceScopeTaskId(context.repoRoot) ?? context.taskId;
+  const artifactPathResolutionRoot = resolveProviderLinearWorkerArtifactPathResolutionRoot(context);
+  const inheritedEnvPaths = resolveEnvironmentPathsForProcess(env, process.cwd());
+  const artifactPathResolutionEnv: NodeJS.ProcessEnv = {
+    ...env,
+    CODEX_ORCHESTRATOR_MANIFEST_PATH: context.manifestPath,
+    CODEX_ORCHESTRATOR_ROOT: artifactPathResolutionRoot,
+    CODEX_ORCHESTRATOR_TASK_ID: artifactPathResolutionTaskId,
+    MCP_RUNNER_TASK_ID: artifactPathResolutionTaskId,
+    TASK: artifactPathResolutionTaskId,
+    CODEX_ORCHESTRATOR_PIPELINE_ID: context.pipelineId ?? 'provider-linear-worker'
+  };
+  const runsDirHint = sanitizeProviderLinearWorkerArtifactDirHint(
+    context,
+    artifactPathResolutionEnv.CODEX_ORCHESTRATOR_RUNS_DIR
+  );
+  const outDirHint = sanitizeProviderLinearWorkerArtifactDirHint(
+    context,
+    artifactPathResolutionEnv.CODEX_ORCHESTRATOR_OUT_DIR
+  );
+  if (runsDirHint) {
+    artifactPathResolutionEnv.CODEX_ORCHESTRATOR_RUNS_DIR = runsDirHint;
+  } else {
+    delete artifactPathResolutionEnv.CODEX_ORCHESTRATOR_RUNS_DIR;
+  }
+  if (outDirHint) {
+    artifactPathResolutionEnv.CODEX_ORCHESTRATOR_OUT_DIR = outDirHint;
+  } else {
+    delete artifactPathResolutionEnv.CODEX_ORCHESTRATOR_OUT_DIR;
+  }
+  const resolvedPaths = resolveEnvironmentPathsForProcess(
+    artifactPathResolutionEnv,
+    context.repoRoot
+  );
   env.CODEX_ORCHESTRATOR_MANIFEST_PATH = context.manifestPath;
   env.CODEX_ORCHESTRATOR_RUN_DIR = context.runDir;
   env.CODEX_ORCHESTRATOR_ROOT = context.repoRoot;
-  env.CODEX_ORCHESTRATOR_RUNS_DIR = resolveProviderLinearWorkerArtifactDir(
-    context.repoRoot,
-    env.CODEX_ORCHESTRATOR_RUNS_DIR,
-    '.runs'
-  );
-  env.CODEX_ORCHESTRATOR_OUT_DIR = resolveProviderLinearWorkerArtifactDir(
-    context.repoRoot,
-    env.CODEX_ORCHESTRATOR_OUT_DIR,
-    'out'
-  );
+  env.CODEX_ORCHESTRATOR_RUNS_DIR = resolvedPaths.runsRoot;
+  env.CODEX_ORCHESTRATOR_OUT_DIR = resolvedPaths.outRoot;
   env.CODEX_ORCHESTRATOR_RUN_ID = context.runId;
   env.CODEX_ORCHESTRATOR_TASK_ID = context.taskId;
   env.MCP_RUNNER_TASK_ID = context.taskId;
@@ -1167,9 +1194,10 @@ function applyProviderLinearWorkerContextEnv(
   if (context.providerControlHostTaskId && context.providerControlHostRunId) {
     env[PROVIDER_CONTROL_HOST_TASK_ID_ENV] = context.providerControlHostTaskId;
     env[PROVIDER_CONTROL_HOST_RUN_ID_ENV] = context.providerControlHostRunId;
+    env[PROVIDER_LAUNCH_SOURCE_ENV] = PROVIDER_LAUNCH_SOURCE_CONTROL_HOST;
   } else {
     const preservedRepoConfigPath = resolveProviderLinearWorkerRepoConfigPath(
-      context.repoRoot,
+      inheritedEnvPaths.repoRoot,
       env
     );
     const currentPackageRoot = resolveProviderLinearWorkerEnvPath(
@@ -1188,7 +1216,6 @@ function applyProviderLinearWorkerContextEnv(
       env[REPO_CONFIG_PATH_ENV_KEY] = preservedRepoConfigPath;
     } else {
       delete env[REPO_CONFIG_PATH_ENV_KEY];
-      delete env[REPO_CONFIG_REQUIRED_ENV_KEY];
     }
     delete env[PROVIDER_REPO_CONFIG_PATH_ENV_KEY];
     if (currentPackageRoot && providerPackageRoot && currentPackageRoot === providerPackageRoot) {
@@ -1198,35 +1225,52 @@ function applyProviderLinearWorkerContextEnv(
   }
 }
 
-function resolveProviderLinearWorkerArtifactDir(
-  repoRoot: string,
-  value: string | undefined,
-  fallbackDirname: string
+function resolveProviderLinearWorkerArtifactPathResolutionRoot(
+  context: Pick<ProviderLinearWorkerContext, 'repoRoot' | 'taskId'>
 ): string {
-  const normalized = normalizeOptionalString(value);
-  const fallback = join(repoRoot, fallbackDirname);
-  if (!normalized) {
-    return fallback;
-  }
-  const candidate = isAbsolute(normalized) ? resolve(normalized) : resolve(repoRoot, normalized);
-  if (isPathWithinRoot(candidate, repoRoot)) {
-    return isProviderWorkspaceScopedArtifactPath(repoRoot, candidate) ? fallback : candidate;
-  }
-  if (basename(dirname(repoRoot)) !== PROVIDER_WORKSPACE_ROOT_DIRNAME) {
-    return isAbsolute(normalized) ? candidate : fallback;
-  }
-  const sharedRoot = dirname(dirname(repoRoot));
-  if (!isPathWithinRoot(candidate, sharedRoot)) {
-    return isAbsolute(normalized) ? candidate : fallback;
-  }
-  if (isProviderWorkspaceScopedArtifactPath(sharedRoot, candidate)) {
-    return fallback;
-  }
-  return resolve(repoRoot, relative(sharedRoot, candidate));
+  const sharedRoot = resolveProviderLinearWorkerSharedRoot(context.repoRoot);
+  return sharedRoot ?? context.repoRoot;
 }
 
-function isProviderWorkspaceScopedArtifactPath(root: string, candidate: string): boolean {
-  return isPathWithinRoot(candidate, join(root, PROVIDER_WORKSPACE_ROOT_DIRNAME));
+function sanitizeProviderLinearWorkerArtifactDirHint(
+  context: Pick<ProviderLinearWorkerContext, 'repoRoot' | 'taskId'>,
+  value: string | undefined
+): string | undefined {
+  const normalized = normalizeOptionalString(value);
+  if (!normalized || !isAbsolute(normalized)) {
+    return normalized ?? undefined;
+  }
+  const candidate = resolve(normalized);
+  const sharedRoot = resolveProviderLinearWorkerSharedRoot(context.repoRoot);
+  const providerWorkspaceRoot = join(sharedRoot ?? context.repoRoot, PROVIDER_WORKSPACE_ROOT_DIRNAME);
+  const currentWorkspaceRoot = isProviderLinearWorkerWorkspaceRoot(context.repoRoot)
+    ? context.repoRoot
+    : null;
+  if (
+    isPathWithinRoot(candidate, providerWorkspaceRoot) &&
+    (!currentWorkspaceRoot || !isPathWithinRoot(candidate, currentWorkspaceRoot))
+  ) {
+    return undefined;
+  }
+  return candidate;
+}
+
+function resolveProviderLinearWorkerWorkspaceScopeTaskId(repoRoot: string): string | null {
+  if (!isProviderLinearWorkerWorkspaceRoot(repoRoot)) {
+    return null;
+  }
+  return basename(repoRoot);
+}
+
+function resolveProviderLinearWorkerSharedRoot(repoRoot: string): string | null {
+  if (!isProviderLinearWorkerWorkspaceRoot(repoRoot)) {
+    return null;
+  }
+  return dirname(dirname(repoRoot));
+}
+
+function isProviderLinearWorkerWorkspaceRoot(candidate: string | null): candidate is string {
+  return Boolean(candidate && basename(dirname(candidate)) === PROVIDER_WORKSPACE_ROOT_DIRNAME);
 }
 
 function resolveProviderLinearWorkerRepoConfigPath(
@@ -1252,7 +1296,7 @@ function resolveProviderLinearWorkerRepoConfigPath(
   ) {
     return null;
   }
-  return repoConfigPath;
+  return resolvedRepoConfigPath;
 }
 
 function resolveProviderLinearWorkerEnvPath(
