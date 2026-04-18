@@ -1834,7 +1834,7 @@ function parseProviderLinearWorkerRunIdTimestamp(runId: string | null | undefine
   if (!runId) {
     return null;
   }
-  const match = runId.match(/^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z/);
+  const match = runId.match(/\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z/);
   if (!match) {
     return null;
   }
