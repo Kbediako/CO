@@ -234,15 +234,38 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
     const originalCodexHome = process.env.CODEX_HOME;
     const originalCodexCliBin = process.env.CODEX_CLI_BIN;
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
+    const syntheticDistEntrypoint = join(tempHome, 'dist', 'bin', 'codex-orchestrator.js');
     process.env.CODEX_HOME = tempHome;
     process.env.CODEX_CLI_BIN = join(tempHome, 'missing-codex');
     try {
+      await mkdir(join(tempHome, 'dist', 'bin'), { recursive: true });
+      await writeFile(
+        syntheticDistEntrypoint,
+        [
+          '#!/usr/bin/env node',
+          "import { readFileSync } from 'node:fs';",
+          "readFileSync(0, 'utf8');",
+          `process.stdout.write(${JSON.stringify(
+            `${JSON.stringify({
+              jsonrpc: '2.0',
+              id: 1,
+              result: {
+                protocolVersion: '2024-11-05',
+                capabilities: {},
+                serverInfo: { name: 'delegation-test', version: '0.0.0-test' }
+              }
+            })}\n`
+          )});`
+        ].join('\n'),
+        'utf8'
+      );
+      await chmod(syntheticDistEntrypoint, 0o755);
       await writeFile(
         join(tempHome, 'config.toml'),
         [
           '[mcp_servers.delegation]',
           `command = "${process.execPath.replace(/\\/g, '\\\\')}"`,
-          `args = ["${join(process.cwd(), 'dist', 'bin', 'codex-orchestrator.js').replace(/\\/g, '\\\\')}", "delegate-server"]`
+          `args = ["${syntheticDistEntrypoint.replace(/\\/g, '\\\\')}", "delegate-server"]`
         ].join('\n'),
         'utf8'
       );
