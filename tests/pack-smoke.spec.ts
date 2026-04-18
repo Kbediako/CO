@@ -32,7 +32,7 @@ const packSmokeInvocationPattern = new RegExp(
   String.raw`(?:^|[;&|()]\s*|\b(?:if|then|do|while|until)\s+)(?:!\s+)?(?:${shellAssignmentPattern}\s+)*npm\s+run\s+pack:smoke(?=$|[\s;|&)])`,
   'gu'
 );
-const nonBlockingPackSmokePattern = /\|\||\|&?|;[ \t]*(?:true|exit[ \t]+0)\b/u;
+const nonBlockingPackSmokePattern = /\|\||\|&?|(?:^|[\s;])&(?![&>])|;[ \t]*(?:true|exit[ \t]+0)\b/u;
 
 async function readWorkflow(path: string): Promise<WorkflowFile> {
   const parsed = load(await readText(path));
@@ -412,6 +412,9 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} | tee smoke.log`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} |& tee smoke.log`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} |\n tee smoke.log`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} &`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand}&echo done`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} -- --flag &`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand}; exit 0`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand};true`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} -- --flag || true`)).toBe(true);
@@ -423,6 +426,8 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(hasNonBlockingPackSmokeCommand(`! ${packSmokeCommand}`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`npm run lint || true && ${packSmokeCommand}`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} -- --flag`)).toBe(false);
+    expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} 2>&1`)).toBe(false);
+    expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} &> smoke.log`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`echo ${packSmokeCommand} || true`)).toBe(false);
     expect(isContinueOnErrorEnabled(true)).toBe(true);
     expect(isContinueOnErrorEnabled('true')).toBe(true);
