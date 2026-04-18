@@ -1,0 +1,13 @@
+{
+  "templateVersion": 1,
+  "mcpServers": {
+    "codex-orchestrator": {
+      "command": "node",
+      "args": [
+        "./launcher.mjs",
+        "mcp",
+        "serve"
+      ]
+    }
+  }
+}

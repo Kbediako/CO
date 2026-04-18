@@ -1,5 +1,4 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import canonicalize from 'canonicalize';
 
 export type ConfirmationAction = 'cancel' | 'merge' | 'other';
 
@@ -312,12 +311,36 @@ export class ConfirmationStore {
 
 export function buildActionParamsDigest(input: { tool: string; params: Record<string, unknown> }): string {
   const sanitized = stripConfirmNonce({ tool: input.tool, params: input.params });
-  const canonicalizeFn = canonicalize as unknown as (input: unknown) => string | undefined;
-  const canonical = canonicalizeFn(sanitized);
+  const canonical = canonicalizeJsonValue(sanitized);
   if (typeof canonical !== 'string') {
     throw new Error('Unable to canonicalize confirmation params.');
   }
   return createHash('sha256').update(canonical).digest('hex');
+}
+
+function canonicalizeJsonValue(value: unknown): string | undefined {
+  if (value === null) {
+    return 'null';
+  }
+  if (typeof value === 'boolean' || typeof value === 'number' || typeof value === 'string') {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map((entry) => canonicalizeJsonValue(entry) ?? 'null').join(',')}]`;
+  }
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
+      .flatMap(([key, entry]) => {
+        const canonicalEntry = canonicalizeJsonValue(entry);
+        if (typeof canonicalEntry === 'undefined') {
+          return [];
+        }
+        return [`${JSON.stringify(key)}:${canonicalEntry}`];
+      });
+    return `{${entries.join(',')}}`;
+  }
+  return undefined;
 }
 
 function stripConfirmNonce(value: unknown): unknown {
