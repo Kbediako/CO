@@ -5,7 +5,8 @@
 ## Traceability
 - Linear issue: `CO-237` / `9fc9fe23-bd44-4b72-9459-b5b809970bce`
 - Linear URL: https://linear.app/asabeko/issue/CO-237
-- Task id: `linear-9fc9fe23-bd44-4b72-9459-b5b809970bce`
+- MCP Task ID: `linear-9fc9fe23-bd44-4b72-9459-b5b809970bce`
+- Canonical task ID: `20260418-linear-9fc9fe23-bd44-4b72-9459-b5b809970bce`
 - Canonical spec: `tasks/specs/linear-9fc9fe23-bd44-4b72-9459-b5b809970bce.md`
 - Docs packet child lane manifest: `.runs/linear-9fc9fe23-bd44-4b72-9459-b5b809970bce-co237-docs-packet/cli/2026-04-18T01-48-20-327Z-dbdc245e/manifest.json`
 - Source anchor: `ctx:sha256:8391bf9a067e2de9c1d2651dbe67acb9d3c43cf6bde71c5639ee057b9ca37dfc#chunk:c000001`
