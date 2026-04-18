@@ -7,16 +7,21 @@ async function readText(path: string): Promise<string> {
 }
 
 type WorkflowStep = {
+  env?: unknown;
   run?: unknown;
 };
 
 type WorkflowJob = {
+  env?: unknown;
   steps?: unknown;
 };
 
 type WorkflowFile = {
+  env?: unknown;
   jobs?: Record<string, WorkflowJob>;
 };
+
+const marketplaceSkipToken = 'PACK_SMOKE_ALLOW_MARKETPLACE_SKIP';
 
 async function readWorkflow(path: string): Promise<WorkflowFile> {
   const parsed = load(await readText(path));
@@ -28,6 +33,25 @@ async function readWorkflow(path: string): Promise<WorkflowFile> {
 
 function getWorkflowSteps(job: WorkflowJob): WorkflowStep[] {
   return Array.isArray(job.steps) ? (job.steps as WorkflowStep[]) : [];
+}
+
+function containsMarketplaceSkipEnv(value: unknown): boolean {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  if (Array.isArray(value)) {
+    return value.some((entry) => containsMarketplaceSkipEnv(entry));
+  }
+  return Object.entries(value as Record<string, unknown>).some(
+    ([key, entry]) =>
+      key.includes(marketplaceSkipToken) ||
+      (typeof entry === 'string' && entry.includes(marketplaceSkipToken)) ||
+      containsMarketplaceSkipEnv(entry)
+  );
+}
+
+function expectNoMarketplaceSkipEnv(value: unknown, label: string): void {
+  expect(containsMarketplaceSkipEnv(value), `${label} must not opt out of marketplace smoke via env`).toBe(false);
 }
 
 describe('scripts/pack-smoke env isolation', () => {
@@ -171,13 +195,16 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
 
     for (const workflow of workflows) {
       const workflowFile = await readWorkflow(workflow);
+      expectNoMarketplaceSkipEnv(workflowFile.env, `${workflow} workflow`);
       let smokeStepCount = 0;
       for (const [jobName, job] of Object.entries(workflowFile.jobs ?? {})) {
+        expectNoMarketplaceSkipEnv(job.env, `${workflow} job ${jobName}`);
         let codexInstallSeen = false;
         for (const [stepIndex, step] of getWorkflowSteps(job).entries()) {
+          expectNoMarketplaceSkipEnv(step.env, `${workflow} job ${jobName} step ${stepIndex + 1}`);
           const run = typeof step.run === 'string' ? step.run : '';
           expect(run, `${workflow} job ${jobName} must not opt out of marketplace smoke`).not.toContain(
-            'PACK_SMOKE_ALLOW_MARKETPLACE_SKIP'
+            marketplaceSkipToken
           );
           if (run.includes('npm install --global @openai/codex@0.121.0')) {
             codexInstallSeen = true;
