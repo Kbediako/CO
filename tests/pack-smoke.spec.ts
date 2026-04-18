@@ -59,7 +59,25 @@ function expectNoMarketplaceSkipEnv(value: unknown, label: string): void {
 }
 
 function getStepCondition(step: WorkflowStep): string {
-  return typeof step.if === 'string' ? step.if.trim() : '';
+  const condition = typeof step.if === 'string' ? step.if.trim() : '';
+  return condition.length > 0 ? condition : 'success()';
+}
+
+function unwrapActionsExpression(condition: string): string {
+  const trimmed = condition.trim();
+  const match = trimmed.match(/^\$\{\{\s*([\s\S]*?)\s*\}\}$/u);
+  return match?.[1]?.trim() ?? trimmed;
+}
+
+function hasNonSuccessStatusCheck(condition: string): boolean {
+  return /\b(always|cancelled|failure)\s*\(/iu.test(unwrapActionsExpression(condition));
+}
+
+function installConditionCoversSmokeStep(installCondition: string, smokeCondition: string): boolean {
+  if (installCondition === smokeCondition) {
+    return true;
+  }
+  return installCondition === 'success()' && !hasNonSuccessStatusCheck(smokeCondition);
 }
 
 function normalizeShellContinuations(run: string): string {
@@ -260,8 +278,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
       let smokeStepCount = 0;
       for (const [jobName, job] of Object.entries(workflowFile.jobs ?? {})) {
         expectNoMarketplaceSkipEnv(job.env, `${workflow} job ${jobName}`);
-        let hasUnconditionalCodexInstall = false;
-        const conditionalCodexInstallConditions = new Set<string>();
+        const codexInstallConditions: string[] = [];
         for (const [stepIndex, step] of getWorkflowSteps(job).entries()) {
           expectNoMarketplaceSkipEnv(step.env, `${workflow} job ${jobName} step ${stepIndex + 1}`);
           const stepCondition = getStepCondition(step);
@@ -278,16 +295,14 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
               isDedicatedCodexInstallRun(run),
               `${workflow} job ${jobName} step ${stepIndex + 1} must use a dedicated Codex 0.121.0 install step`
             ).toBe(true);
-            if (stepCondition) {
-              conditionalCodexInstallConditions.add(stepCondition);
-            } else {
-              hasUnconditionalCodexInstall = true;
-            }
+            codexInstallConditions.push(stepCondition);
           }
           if (hasExactCommand(run, packSmokeCommand)) {
             smokeStepCount += 1;
             expect(
-              hasUnconditionalCodexInstall || conditionalCodexInstallConditions.has(stepCondition),
+              codexInstallConditions.some((installCondition) =>
+                installConditionCoversSmokeStep(installCondition, stepCondition)
+              ),
               `${workflow} job ${jobName} step ${stepIndex + 1} must install Codex 0.121.0 before pack:smoke with matching if condition`
             ).toBe(true);
           }
@@ -307,5 +322,18 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(isContinueOnErrorEnabled(true)).toBe(true);
     expect(isContinueOnErrorEnabled('true')).toBe(true);
     expect(isContinueOnErrorEnabled('false')).toBe(false);
+    expect(getStepCondition({})).toBe('success()');
+    expect(installConditionCoversSmokeStep('success()', 'success()')).toBe(true);
+    expect(
+      installConditionCoversSmokeStep('success()', "${{ steps.downstream-smoke.outputs.required == 'true' }}")
+    ).toBe(true);
+    expect(installConditionCoversSmokeStep('success()', 'always()')).toBe(false);
+    expect(installConditionCoversSmokeStep("${{ always() && inputs.force == 'true' }}", 'always()')).toBe(false);
+    expect(
+      installConditionCoversSmokeStep(
+        "${{ always() && inputs.force == 'true' }}",
+        "${{ always() && inputs.force == 'true' }}"
+      )
+    ).toBe(true);
   });
 });
