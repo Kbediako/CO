@@ -18,6 +18,7 @@ const createdSandboxes: string[] = [];
 const shellBinary = 'bash';
 const LONG_WAIT_TEST_TIMEOUT_MS = 20_000;
 const RUN_REVIEW_SUBPROCESS_TIMEOUT_MS = 15_000;
+const RUN_REVIEW_HANGING_SUBPROCESS_TIMEOUT_MS = 10_000;
 const RUN_REVIEW_MOCK_REAP_POLL_ATTEMPTS = 10;
 const RUN_REVIEW_MOCK_REAP_POLL_INTERVAL_MS = 50;
 
@@ -2525,7 +2526,10 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       },
       [],
       process.cwd(),
-      { timeoutMs: 5000, killSignal: 'SIGKILL' }
+      // This assertion needs fake Codex to reach hang mode before the outer
+      // subprocess harness kills run-review; full-suite load can spend more
+      // than 5s in wrapper startup before the marker is written.
+      { timeoutMs: RUN_REVIEW_HANGING_SUBPROCESS_TIMEOUT_MS, killSignal: 'SIGKILL' }
     );
 
     expect(result.exitCode).toBeGreaterThan(0);
