@@ -61,8 +61,15 @@ function shouldEnableVitestProgressReporter(env: NodeJS.ProcessEnv): boolean {
 }
 
 function shouldCapVitestWorkers(env: NodeJS.ProcessEnv): boolean {
-  // CLI-heavy suites spawn nested Node processes and become timeout-prone when
-  // the broad lane fully saturates worker threads in CI or explicit
-  // stage-owned Vitest runs that opt into progress reporting.
-  return envFlagEnabled(env.CI) || envFlagEnabled(env.CODEX_VITEST_PROGRESS);
+  // The same subprocess-heavy suites that need the progress reporter in CI and
+  // worker-owned non-interactive lanes also become timeout-prone when the core
+  // suite fully saturates workers. Keep the cap aligned with those unattended
+  // environments so provider-worker broad-lane validation stays truthful.
+  return (
+    envFlagEnabled(env.CI) ||
+    envFlagEnabled(env.CODEX_VITEST_PROGRESS) ||
+    envFlagEnabled(env.CODEX_NON_INTERACTIVE) ||
+    envFlagEnabled(env.CODEX_NONINTERACTIVE) ||
+    envFlagEnabled(env.CODEX_NO_INTERACTIVE)
+  );
 }

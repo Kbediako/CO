@@ -1,6 +1,10 @@
 /* eslint-disable patterns/prefer-logger-over-console */
 
-import { fetchUiDataset, resolveAttachTarget, runCoStatusAttachCliShell } from './coStatusAttachCliShell.js';
+import {
+  readUiDatasetWithEndpointRecovery,
+  resolveAttachTarget,
+  runCoStatusAttachCliShell
+} from './coStatusAttachCliShell.js';
 
 type ArgMap = Record<string, string | boolean>;
 type OutputFormat = 'json' | 'text';
@@ -24,8 +28,14 @@ export async function runCoStatusCliShell(params: RunCoStatusCliShellParams): Pr
     return;
   }
 
-  const target = await resolveAttachTarget(params.flags);
-  const dataset = await fetchUiDataset(target.baseUrl, target.token);
+  let target = await resolveAttachTarget(params.flags);
+  const dataset = await readUiDatasetWithEndpointRecovery({
+    flags: params.flags,
+    getTarget: () => target,
+    setTarget: (nextTarget) => {
+      target = nextTarget;
+    }
+  });
   console.log(JSON.stringify(dataset, null, 2));
 }
 

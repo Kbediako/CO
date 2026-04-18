@@ -1,0 +1,20 @@
+{
+  "name": "codex-orchestrator",
+  "interface": {
+    "displayName": "Codex Orchestrator"
+  },
+  "plugins": [
+    {
+      "name": "codex-orchestrator",
+      "source": {
+        "source": "local",
+        "path": "./plugins/codex-orchestrator"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

@@ -1,0 +1,176 @@
+---
+id: 20260418-linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26
+title: Control host stale plain released/not_active Blocked claim can still strand refresh at refresh:rehydrated and starve Ready admission
+relates_to: docs/PRD-linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26.md
+risk: high
+owners:
+  - Codex
+last_review: 2026-04-18
+---
+
+## Canonical Reference
+- Canonical TECH_SPEC: `tasks/specs/linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26.md`
+- PRD: `docs/PRD-linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26.md`
+- Task checklist: `tasks/tasks-linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26.md`
+- `.agent` mirror: `.agent/task/linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26.md`
+
+## Traceability
+- Linear issue: `CO-248` / `5f2ebb52-e5f5-4367-84e2-4039ba031b26`
+- Linear URL: https://linear.app/asabeko/issue/CO-248/control-host-stale-plain-releasednot-active-blocked-claim-can-still
+- Shared source 0 anchor: `ctx:sha256:90f181707d191588a350b88e2378b3a174ef9814ccc956d90dd6d782f7c437a9#chunk:c000001`
+- Source object id: `sha256:90f181707d191588a350b88e2378b3a174ef9814ccc956d90dd6d782f7c437a9`
+- Context dir: `.runs/linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26-docs-packet/cli/2026-04-18T13-17-17-407Z-341c0733/memory/source-0`
+- Source payload: `.runs/linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26-docs-packet/cli/2026-04-18T13-17-17-407Z-341c0733/memory/source-0/source.txt`
+- Source payload note: the shared `source-0` payload is metadata-only; the current issue body and workpad context came from `.runs/linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26/cli/2026-04-18T13-10-39-584Z-a63bc089/provider-linear-issue-context-cache.json`.
+- Docs packet child lane manifest: `.runs/linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26-docs-packet/cli/2026-04-18T13-17-17-407Z-341c0733/manifest.json`
+
+## Summary
+- Objective: explain and fix the narrow lifecycle starvation shape where live dispatch already wants `CO-233`, `POST /api/v1/refresh` is accepted, but refresh remains stranded at `refresh:rehydrated` with `provider_refresh_lifecycle_stuck`, `claims_scanned=0`, and `fresh_discovery_runs=0`.
+- Scope:
+  - parent-owned reproduction of the issue-body incident bundle under `out/co-233-admission-nudge-20260418T124529Z/`
+  - parent-owned proof of whether stale plain `released/not_active` retained claims wedge the control-host refresh lifecycle itself
+  - parent-owned narrow fix or additive diagnostics that restore `Ready` admission without broad restart
+  - preservation of neighboring `CO-202`, `CO-212`, `CO-238`, `CO-41`, and `CO-211` boundaries
+- Constraints:
+  - child lane owns only packet files and the requested registry/checklist mirrors
+  - reject reclaim-only, `CO-212`, `CO-238`, `manual-launch`, and broad-restart reinterpretations
+  - parent owns authoritative source inspection, implementation, focused tests, docs-review, validation, Linear/workpad reconciliation, PR, and merge
+
+## Issue-Shaping Contract
+- User-request translation carried forward: the incident is not just stale reclaim eligibility. Refresh accepted `POST /api/v1/refresh` but remained stranded at `refresh:rehydrated` with zero claim scanning and zero fresh discovery while a stale plain `released/not_active` cached `Blocked` claim remained in local intake and live dispatch already recommended `CO-233` in `Ready`.
+- Protected terms / exact artifact and surface names:
+  - control-host refresh lifecycle
+  - `refresh:rehydrated`
+  - `provider_refresh_lifecycle_stuck`
+  - stale plain `released/not_active` claim
+  - `provider_issue_released:not_active`
+  - cached `Blocked` issue truth
+  - Ready admission starvation
+  - `POST /api/v1/refresh`
+  - `claims_scanned=0`
+  - `fresh_discovery_runs=0`
+  - `CO-233`
+  - `CO-202`
+  - `CO-212`
+  - `CO-238`
+  - `CO-41`
+  - `CO-211`
+- Nearby wrong interpretations to reject:
+  - reclaim-only or generic stale-eligibility-only framing
+  - the completed-blocker reclaim variant from `CO-212`
+  - the reopened merge-closeout variant from `CO-238`
+  - `manual-launch` as the steady-state fix
+  - broad restart or host reboot as the only acceptable answer
+  - weakening reclaim guardrails or stale-claim validation to make the issue disappear
+- Explicit non-goals carried forward:
+  - no weakening of reclaim guardrails or stale-claim validation
+  - no broad control-host restart policy changes unless no narrower recovery path exists
+  - no reopening the separate `CO-233` test-timeout scope
+  - no duplication or silent collapse of `CO-41`, `CO-202`, `CO-212`, or `CO-238`
+
+## Parity / Alignment Matrix
+- Current truth:
+  - live dispatch already recommends `CO-233` in `Ready`
+  - authenticated `POST /api/v1/refresh` accepts the request but reports `stuck=true`, `restart_required=true`, and `reason=provider_refresh_lifecycle_stuck`
+  - the watch window remains at `refresh_phase=refresh:rehydrated`, `claims_total=128`, `claims_scanned=0`, and `fresh_discovery_runs=0`
+  - the retained intake row still carries plain `provider_issue_released:not_active`, cached `issue_state=Blocked`, and old run id `2026-04-18T11-53-57-793Z-060c77dc`
+  - after 60 seconds, the free slot is still not consumed and the active set stays `CO-196` / `CO-245`
+- Reference truth:
+  - stale retained claims may remain auditable, but they should not wedge the refresh lifecycle once live `Ready` truth and capacity exist
+  - genuine lifecycle stalls must still surface truthful `provider_refresh_lifecycle_stuck` / `restart_required` diagnostics
+  - `Ready` admission should recover through the normal control-host path rather than manual launch or blanket restart
+  - neighboring issue slices remain distinct and auditable
+- Target truth / intended delta:
+  - parent reproduces the exact `refresh:rehydrated` / zero claim-scan starvation shape
+  - parent proves whether stale plain `released/not_active` retained claims wedge refresh lifecycle rather than merely suppress reclaim eligibility
+  - a narrow fix or additive diagnostic lets refresh advance beyond `refresh:rehydrated` and re-admit the `Ready` issue without broad restart
+  - future incidents can distinguish reclaim-shape suppression from lifecycle-stuck starvation using machine-checkable evidence
+- Explicitly out-of-scope differences:
+  - generic reclaim-only fix with no lifecycle explanation
+  - `CO-212` or `CO-238` reinterpretation
+  - `manual-launch` or broad restart as the normal steady state
+  - reopening the unrelated `CO-233` test-timeout lane
+
+## Readiness Gate
+- Not done if:
+  - refresh can still sit at `refresh:rehydrated` with `claims_scanned=0` and `fresh_discovery_runs=0` while live dispatch recommends a `Ready` issue
+  - stale plain `released/not_active` retained claims are still treated only as reclaim eligibility noise without answering the lifecycle wedge
+  - the explanation or fix drifts into `CO-212`, `CO-238`, `manual-launch`, or broad restart
+  - truthful neighboring issue-state modeling is weakened
+- Pre-implementation issue-quality review evidence:
+  - 2026-04-18: issue body plus current issue-context confirm the lane is broader than reclaim-only. The incident proof is explicit lifecycle starvation: refresh accepts the POST but remains stuck at `refresh:rehydrated` with zero claim scanning/discovery while a stale plain released/not-active cached `Blocked` claim persists. The micro-task path is ineligible because correctness depends on exact protected wording, adjacent-issue boundaries, and bundle-backed incident evidence.
+- Safeguard ownership split:
+  - child lane owns only the six packet files plus the requested registry/checklist mirrors
+  - parent lane owns source inspection, implementation, focused tests, docs-review, validation, workpad, Linear state, PR lifecycle, and patch integration
+
+## Technical Requirements
+- Functional requirements:
+  1. Reproduce the issue-body shape where live dispatch recommends a `Ready` issue but refresh remains stranded at `refresh:rehydrated` with `provider_refresh_lifecycle_stuck` and no fresh discovery.
+  2. Use the incident bundle root `out/co-233-admission-nudge-20260418T124529Z/` as the authoritative evidence pack for before/after dispatch, state, claim, refresh ack, and watch-window snapshots.
+  3. Prove whether stale plain `released/not_active` retained claims can keep the refresh lifecycle wedged instead of merely suppressing reclaim eligibility.
+  4. Land the narrowest fix or additive diagnostic that lets control-host consume the newly free slot and re-admit the `Ready` issue without requiring a broad restart.
+  5. Keep `POST /api/v1/refresh` truthful: accepted refresh requests must not imply lifecycle recovery when the host is still stuck.
+  6. Preserve truthful issue-state modeling for neighboring variants already owned by `CO-202`, `CO-212`, `CO-238`, `CO-41`, and `CO-211`.
+  7. Add focused regression coverage or durable diagnostics so future incidents distinguish reclaim-shape suppression from lifecycle-stuck starvation.
+- Non-functional requirements:
+  - no weakening of reclaim guardrails or stale-claim validation
+  - no `manual-launch`-only recovery path
+  - no broad restart policy as steady state
+  - no new ambiguity between accepted refresh acknowledgements and actual refresh progress
+  - incident evidence remains machine-checkable and auditable
+- Interfaces / contracts:
+  - authenticated `POST /api/v1/refresh` acknowledgement surface
+  - refresh lifecycle state surfaces: `refresh_phase`, `claims_total`, `claims_scanned`, `fresh_discovery_runs`, `stuck`, `restart_required`, and `reason`
+  - retained claim / issue snapshot surfaces for the stale local row
+  - live dispatch recommendation for `CO-233`
+  - incident bundle files under `out/co-233-admission-nudge-20260418T124529Z/`
+
+## Architecture & Data
+- Architecture / design adjustments:
+  - keep the fix inside the existing control-host refresh lifecycle and retained-claim reconciliation path rather than introducing a new admission workflow
+  - prefer a narrow recovery or classification seam that explains why refresh can stall before claim scanning
+  - keep acknowledgement semantics and lifecycle progress semantics explicitly distinguishable
+  - preserve stale retained claim evidence for audit even if it no longer wedges recovery
+- Required artifact / diagnostic content:
+  - `refresh_phase`
+  - `claims_total`
+  - `claims_scanned`
+  - `fresh_discovery_runs`
+  - `stuck`
+  - `restart_required`
+  - `reason`
+  - retained claim `reason`
+  - cached issue state and old run id when available
+  - live dispatch recommendation for the candidate `Ready` issue
+- Data model changes / migrations:
+  - prefer additive diagnostics or bounded state transitions
+  - no migration required from this packet
+- External dependencies / integrations:
+  - current issue-context cache
+  - incident bundle under `out/co-233-admission-nudge-20260418T124529Z/`
+  - parent-owned focused regression coverage and docs-review
+
+## Validation Plan
+- Child-lane checks:
+  - `jq empty tasks/index.json docs/docs-freshness-registry.json`
+  - protected-term grep across the six packet/mirror files plus the three registry/checklist mirrors
+  - `git diff --check --` on the touched files only
+- Parent-lane checks:
+  - focused reproduction/regression for `refresh:rehydrated` / zero claim-scan starvation
+  - focused regression or durable diagnostic proving whether stale plain `released/not_active` retained claims wedge the lifecycle
+  - focused adjacent regression review for `CO-202`, `CO-212`, `CO-238`, `CO-41`, and `CO-211` as needed
+  - parent docs-review and ordered validation floor after accepting source edits
+- Rollout verification:
+  - parent records the exact artifact showing recovery beyond `refresh:rehydrated`
+  - parent records final proof that the `Ready` issue is re-admitted without `manual-launch` or broad restart
+  - parent records any final durable diagnostic artifact that distinguishes reclaim suppression from lifecycle starvation
+
+## Open Questions
+- Does the narrowest fix live in the step that rehydrates retained claim state, or in the fail-closed lifecycle latch that currently stops progress before claims are scanned?
+- Should the parent expose a dedicated diagnostic for the blocking retained-claim class at the `refresh:rehydrated` boundary?
+- If the stale plain `released/not_active` claim is only an indirect amplifier, what is the smallest additional guard that keeps refresh progress truthful without reopening broader restart policy?
+
+## Approvals
+- Reviewer: docs child lane self-review for packet shape and issue-shaping contract
+- Date: 2026-04-18
