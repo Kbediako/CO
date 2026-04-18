@@ -31,6 +31,10 @@ type CommandOccurrence = {
   line: string;
 };
 
+type CommandOccurrenceOptions = {
+  allowAndPrefix?: boolean;
+};
+
 async function readWorkflow(path: string): Promise<WorkflowFile> {
   const parsed = load(await readText(path));
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
@@ -66,20 +70,25 @@ function getStepCondition(step: WorkflowStep): string {
   return typeof step.if === 'string' ? step.if.trim() : '';
 }
 
-function isExecutableCommandOccurrence(line: string, index: number): boolean {
+function isExecutableCommandOccurrence(line: string, index: number, options: CommandOccurrenceOptions = {}): boolean {
   const trimmed = line.trimStart();
   if (trimmed.startsWith('#')) {
     return false;
   }
+  const { allowAndPrefix = true } = options;
   const prefix = line.slice(0, index).trimEnd();
-  return prefix === '' || prefix.endsWith('&&') || prefix.endsWith(';');
+  return prefix === '' || prefix.endsWith(';') || (allowAndPrefix && prefix.endsWith('&&'));
 }
 
 function normalizeShellContinuations(run: string): string {
   return run.replace(/\\\r?\n[ \t]*/gu, ' ');
 }
 
-function getExecutableCommandOccurrences(run: string, command: string): CommandOccurrence[] {
+function getExecutableCommandOccurrences(
+  run: string,
+  command: string,
+  options: CommandOccurrenceOptions = {}
+): CommandOccurrence[] {
   const occurrences: CommandOccurrence[] = [];
   const normalizedRun = normalizeShellContinuations(run);
   let offset = 0;
@@ -87,7 +96,7 @@ function getExecutableCommandOccurrences(run: string, command: string): CommandO
     let searchFrom = 0;
     let index = line.indexOf(command, searchFrom);
     while (index >= 0) {
-      if (isExecutableCommandOccurrence(line, index)) {
+      if (isExecutableCommandOccurrence(line, index, options)) {
         occurrences.push({ index: offset + index, line });
       }
       searchFrom = index + command.length;
@@ -102,6 +111,10 @@ function isSoftFailedCodexInstall(occurrence: CommandOccurrence): boolean {
   const commandIndex = occurrence.line.indexOf(codexInstallCommand);
   const afterCommand = commandIndex >= 0 ? occurrence.line.slice(commandIndex + codexInstallCommand.length) : '';
   return afterCommand.includes('||');
+}
+
+function getCodexInstallOccurrences(run: string): CommandOccurrence[] {
+  return getExecutableCommandOccurrences(run, codexInstallCommand, { allowAndPrefix: false });
 }
 
 describe('scripts/pack-smoke env isolation', () => {
@@ -257,7 +270,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
           expect(run, `${workflow} job ${jobName} must not opt out of marketplace smoke`).not.toContain(
             marketplaceSkipToken
           );
-          const installOccurrences = getExecutableCommandOccurrences(run, codexInstallCommand);
+          const installOccurrences = getCodexInstallOccurrences(run);
           for (const installOccurrence of installOccurrences) {
             expect(
               isSoftFailedCodexInstall(installOccurrence),
@@ -285,5 +298,14 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
       }
       expect(smokeStepCount, `${workflow} must run pack:smoke`).toBeGreaterThan(0);
     }
+  });
+
+  it('does not treat conditionally chained Codex installs as workflow proof', () => {
+    expect(getCodexInstallOccurrences(`[[ "$NEEDS_CODEX" == 1 ]] && ${codexInstallCommand}`)).toHaveLength(0);
+    expect(getCodexInstallOccurrences(`echo setup; ${codexInstallCommand}`)).toHaveLength(1);
+
+    const chainedRun = `${codexInstallCommand} && ${packSmokeCommand}`;
+    expect(getCodexInstallOccurrences(chainedRun)).toHaveLength(1);
+    expect(getExecutableCommandOccurrences(chainedRun, packSmokeCommand)).toHaveLength(1);
   });
 });
