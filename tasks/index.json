@@ -1,9 +1,9 @@
 {
   "items": [
     {
-      "id": "20260418-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0",
-      "title": "CO: restore unrelated full-suite SelectedRunProjection reservation-ledger placeholder timeout blocking CO-226 / CO-219",
-      "relates_to": "tasks/tasks-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md",
+      "id": "20260418-linear-0ae7288b-cc5f-493d-896f-713990e51808",
+      "title": "CO: stabilize run-review fake Codex subprocess timeout flake under full npm run test",
+      "relates_to": "tasks/tasks-linear-0ae7288b-cc5f-493d-896f-713990e51808.md",
       "risk": "high",
       "owners": [
         "Codex"
@@ -14,30 +14,31 @@
           "reviewer": "bounded same-issue docs child lane",
           "date": "2026-04-18",
           "status": "produced",
-          "manifest": ".runs/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0-docs-packet-current-main-audit/cli/2026-04-18T13-48-58-782Z-e41ffc06/manifest.json",
-          "source_anchor": "ctx:sha256:3f6604004897f02bc794db8336db014b25eac836f27afb671f1ef946761d47ee#chunk:c000001",
-          "summary": "Docs-first packet now preserves CO-233 as a historical full-suite-only SelectedRunProjection blocker that the current branch clears with a bounded Vitest worker-cap fix. Historical issue truth remains that `npm run test` timed out or stalled around `orchestrator/tests/SelectedRunProjection.test.ts` case `refreshes projection proofs when child-lane reservation ledger placeholders exist`, while the isolated repro already passed and `orchestrator/tests/Doctor.test.ts` was no longer the live blocker in the same rerun. Current branch truth is that the worker-cap change in `vitest.config.core.ts` plus alias coverage in `tests/vitest-progress-config.spec.ts` keeps both the isolated repro and full `npm run test` green, while CO-226 / CO-219 linkage stays explicit and the deeper SelectedRunProjection proof-refresh seam remains documented only as historical context if the issue recurs. Parent owns implementation, validation, Linear state, workpad, PR, and merge."
+          "manifest": ".runs/linear-0ae7288b-cc5f-493d-896f-713990e51808-docs-packet/cli/2026-04-18T16-47-04-916Z-1d67c18a/manifest.json",
+          "source_anchor": "ctx:sha256:7bc40b569a41bfbaead86699849abdfea03d40ad923c988770e2bfb98ef981bc#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-251 as the full-suite run-review fake Codex subprocess timeout flake lane: tests/run-review.spec.ts, scripts/run-review, fake Codex subprocess, hang-started.txt, findRunReviewMockPids, and full npm run test remain protected. The expected shared source payload is absent in this child checkout, so the packet is anchored on the protected issue wording plus the provided source anchor. Parent owns root cause, implementation, validation, Linear state, workpad, PR, and merge; this packet rejects CO-234 LockFile work, generic review-wrapper redesign without evidence, and any skipping or weakening of subprocess cleanup coverage."
         },
         "standalone_review": {
-          "reviewer": "codex-orchestrator review --base origin/main plus explicit manual fallback",
+          "reviewer": "codex-orchestrator review --base origin/main",
           "date": "2026-04-18",
-          "status": "manual-fallback-after-drift",
-          "fallback_note": "out/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0/manual/20260418T143124Z-standalone-review-fallback.md",
-          "summary": "Repeated forced standalone-review reruns produced bounded-success telemetry but kept drifting into disallowed validation attempts after the concrete stale-packet findings were fixed, so the lane closed the final review step with explicit manual correctness/regression review instead of claiming another wrapper verdict."
+          "status": "bounded-success",
+          "manifest": ".runs/linear-0ae7288b-cc5f-493d-896f-713990e51808/cli/2026-04-18T16-44-05-565Z-29a8403b/manifest.json",
+          "telemetry": ".runs/linear-0ae7288b-cc5f-493d-896f-713990e51808/cli/2026-04-18T16-44-05-565Z-29a8403b/review/telemetry.json",
+          "summary": "Final standalone review completed with review_outcome=bounded-success after command-intent retry and reported no actionable findings."
         },
         "elegance_review": {
           "reviewer": "provider worker parent lane",
           "date": "2026-04-18",
           "status": "completed",
-          "artifact": "out/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0/manual/20260418T143124Z-elegance-review.md",
-          "summary": "Kept the closeout at the smallest truthful seam: the worker-cap config plus explicit alias coverage stayed in place, no proof-refresh runtime rewrite was added, and the packet refresh only corrected stale blocker wording."
+          "artifact": "out/linear-0ae7288b-cc5f-493d-896f-713990e51808/manual/20260418T180715Z-elegance-review.md",
+          "summary": "Kept the fix to the hanging fake-Codex subprocess timeout and per-test headroom only; no scripts/run-review.ts or cleanup helper behavior changed."
         }
       },
       "paths": {
-        "spec": "tasks/specs/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md",
-        "task": "tasks/tasks-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md",
-        "agent_task": ".agent/task/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md",
-        "docs": "docs/TECH_SPEC-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md"
+        "spec": "tasks/specs/linear-0ae7288b-cc5f-493d-896f-713990e51808.md",
+        "task": "tasks/tasks-linear-0ae7288b-cc5f-493d-896f-713990e51808.md",
+        "agent_task": ".agent/task/linear-0ae7288b-cc5f-493d-896f-713990e51808.md",
+        "docs": "docs/TECH_SPEC-linear-0ae7288b-cc5f-493d-896f-713990e51808.md"
       }
     },
     {
@@ -135,32 +136,6 @@
         "task": "tasks/tasks-linear-9ce7811e-45ca-4d04-b759-bc5e7da77511.md",
         "agent_task": ".agent/task/linear-9ce7811e-45ca-4d04-b759-bc5e7da77511.md",
         "docs": "docs/TECH_SPEC-linear-9ce7811e-45ca-4d04-b759-bc5e7da77511.md"
-      }
-    },
-    {
-      "id": "20260418-linear-0e426da7-6455-4292-8110-f44ee07b827a",
-      "title": "CO child-lane lineage: preserve parent provenance across manual provider-worker launch and issue workspace rebinding",
-      "relates_to": "tasks/tasks-linear-0e426da7-6455-4292-8110-f44ee07b827a.md",
-      "risk": "high",
-      "owners": [
-        "Codex"
-      ],
-      "last_review": "2026-04-18",
-      "approvals": {
-        "docs_packet_child_lane": {
-          "reviewer": "bounded same-issue docs child lane",
-          "date": "2026-04-18",
-          "status": "produced",
-          "manifest": ".runs/linear-0e426da7-6455-4292-8110-f44ee07b827a-co245-docs-packet/cli/2026-04-18T08-07-11-555Z-d63daa80/manifest.json",
-          "source_anchor": "ctx:sha256:a705905f842ad361de1c5f68a088b5f4210340f7b8dd1105544184664a80283e#chunk:c000001",
-          "summary": "Docs-first packet preserves CO-245 as a narrow lineage/provenance lane: `manual provider-worker launch` must stay fail-closed without real `parent provenance gate` evidence, but real `same-issue child lane` lineage must still survive `issue workspace rebinding` when `parent_run_id` continuity plus an `older canonical parent manifest` prove the same current parent. The expected shared source payload was absent in this child checkout, so the packet is anchored on the protected handoff wording plus current repo seams in `tests/delegation-guard.spec.ts`, `tests/run-review.spec.ts`, `providerLinearChildLaneShell.ts`, `providerLinearChildLaneRunner.ts`, `source0.ts`, `manifest.ts`, `controlHostCliShell.ts`, and `selectedRunProjection.ts`, while staying explicitly distinct from `CO-241` and `CO-244`; parent owns implementation, validation, Linear state, workpad, PR, and merge."
-        }
-      },
-      "paths": {
-        "spec": "tasks/specs/linear-0e426da7-6455-4292-8110-f44ee07b827a.md",
-        "task": "tasks/tasks-linear-0e426da7-6455-4292-8110-f44ee07b827a.md",
-        "agent_task": ".agent/task/linear-0e426da7-6455-4292-8110-f44ee07b827a.md",
-        "docs": "docs/TECH_SPEC-linear-0e426da7-6455-4292-8110-f44ee07b827a.md"
       }
     },
     {
@@ -496,61 +471,6 @@
         "task": "tasks/tasks-linear-5de4b04b-ec1e-4ab5-b75a-270989af4599.md",
         "agent_task": ".agent/task/linear-5de4b04b-ec1e-4ab5-b75a-270989af4599.md",
         "docs": "docs/TECH_SPEC-linear-5de4b04b-ec1e-4ab5-b75a-270989af4599.md"
-      }
-    },
-    {
-      "id": "20260417-linear-5561a9a9-39dd-4ed4-99a0-896553327669",
-      "title": "CO: Add a Codex 0.121 plugin marketplace distribution path for Codex Orchestrator",
-      "relates_to": "tasks/tasks-linear-5561a9a9-39dd-4ed4-99a0-896553327669.md",
-      "risk": "high",
-      "owners": [
-        "Codex"
-      ],
-      "last_review": "2026-04-18",
-      "approvals": {
-        "docs_review_fallback": {
-          "reviewer": "provider worker manual docs review",
-          "date": "2026-04-18",
-          "status": "accepted",
-          "artifact": "out/linear-5561a9a9-39dd-4ed4-99a0-896553327669/manual/20260418T014254Z-rework-r2/13-docs-review-fallback.md",
-          "summary": "The current Rework lane rechecked the existing packet directly after replaying the implementation onto a fresh origin/main branch."
-        },
-        "pack_smoke": {
-          "reviewer": "provider worker",
-          "date": "2026-04-18",
-          "status": "passed",
-          "artifact": "out/linear-5561a9a9-39dd-4ed4-99a0-896553327669/manual/20260418T014254Z-rework-r2/10-pack-smoke.log",
-          "summary": "Pack smoke passed for the packaged marketplace/plugin path, including local-directory and Git-backed marketplace registration."
-        },
-        "standalone_review": {
-          "reviewer": "provider worker manual fallback after review-wrapper boundary",
-          "date": "2026-04-18",
-          "status": "manual-fallback-after-boundary",
-          "telemetry": ".runs/linear-5561a9a9-39dd-4ed4-99a0-896553327669/cli/2026-04-18T01-28-09-196Z-c8f11c3d/review/telemetry.json",
-          "artifact": "out/linear-5561a9a9-39dd-4ed4-99a0-896553327669/manual/20260418T014254Z-rework-r2/14-manual-review-fallback.md",
-          "summary": "The forced wrapper run terminated on the startup-anchor boundary before diff-local analysis, so the parent lane completed a manual diff-local review and fixed the one README wording mismatch it found."
-        },
-        "elegance_review": {
-          "reviewer": "provider worker",
-          "date": "2026-04-18",
-          "status": "passed",
-          "artifact": "out/linear-5561a9a9-39dd-4ed4-99a0-896553327669/manual/20260418T014254Z-rework-r2/15-elegance-review.md",
-          "summary": "The final tree keeps the marketplace path additive and thin: packaged metadata, a small launcher, real Codex smoke coverage, and no authority or packaging refactor beyond the requested path."
-        },
-        "packet_refresh_child_lane": {
-          "reviewer": "bounded same-issue docs child lane",
-          "date": "2026-04-18",
-          "status": "produced",
-          "manifest": ".runs/linear-5561a9a9-39dd-4ed4-99a0-896553327669-packet-refresh/cli/2026-04-18T12-38-14-882Z-e4ea1f4b/manifest.json",
-          "source_anchor": "ctx:sha256:cb6a64ba6e2f8fc849e39804635bfddb2d7e402bd0058a63ad175132d50f2146#chunk:c000001",
-          "summary": "Refreshed the CO-196 packet/status mirrors after the merged-head unblock: branch `linear/co-196-codex-0121-plugin-marketplace-rework-r2` already includes merged `origin/main` at `57d3c5e88`, `docs:freshness` passed on that merged head, the issue is back in `In Progress`, stale PR `#515` remains closed, no open replacement PR exists yet, and parent-owned next steps are validation, review, workpad refresh, and replacement PR handoff."
-        }
-      },
-      "paths": {
-        "spec": "tasks/specs/linear-5561a9a9-39dd-4ed4-99a0-896553327669.md",
-        "task": "tasks/tasks-linear-5561a9a9-39dd-4ed4-99a0-896553327669.md",
-        "agent_task": ".agent/task/linear-5561a9a9-39dd-4ed4-99a0-896553327669.md",
-        "docs": "docs/TECH_SPEC-linear-5561a9a9-39dd-4ed4-99a0-896553327669.md"
       }
     },
     {
@@ -11923,6 +11843,127 @@
         "task": "tasks/tasks-linear-ddb81c93-87b2-4dff-b69b-33d7ae3c91cd.md",
         "agent_task": ".agent/task/linear-ddb81c93-87b2-4dff-b69b-33d7ae3c91cd.md",
         "docs": "docs/TECH_SPEC-linear-ddb81c93-87b2-4dff-b69b-33d7ae3c91cd.md"
+      }
+    },
+    {
+      "id": "20260418-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0",
+      "title": "CO: restore unrelated full-suite SelectedRunProjection reservation-ledger placeholder timeout blocking CO-226 / CO-219",
+      "relates_to": "tasks/tasks-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0-docs-packet-current-main-audit/cli/2026-04-18T13-48-58-782Z-e41ffc06/manifest.json",
+          "source_anchor": "ctx:sha256:3f6604004897f02bc794db8336db014b25eac836f27afb671f1ef946761d47ee#chunk:c000001",
+          "summary": "Docs-first packet now preserves CO-233 as a historical full-suite-only SelectedRunProjection blocker that the current branch clears with a bounded Vitest worker-cap fix. Historical issue truth remains that `npm run test` timed out or stalled around `orchestrator/tests/SelectedRunProjection.test.ts` case `refreshes projection proofs when child-lane reservation ledger placeholders exist`, while the isolated repro already passed and `orchestrator/tests/Doctor.test.ts` was no longer the live blocker in the same rerun. Current branch truth is that the worker-cap change in `vitest.config.core.ts` plus alias coverage in `tests/vitest-progress-config.spec.ts` keeps both the isolated repro and full `npm run test` green, while CO-226 / CO-219 linkage stays explicit and the deeper SelectedRunProjection proof-refresh seam remains documented only as historical context if the issue recurs. Parent owns implementation, validation, Linear state, workpad, PR, and merge."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review --base origin/main plus explicit manual fallback",
+          "date": "2026-04-18",
+          "status": "manual-fallback-after-drift",
+          "fallback_note": "out/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0/manual/20260418T143124Z-standalone-review-fallback.md",
+          "summary": "Repeated forced standalone-review reruns produced bounded-success telemetry but kept drifting into disallowed validation attempts after the concrete stale-packet findings were fixed, so the lane closed the final review step with explicit manual correctness/regression review instead of claiming another wrapper verdict."
+        },
+        "elegance_review": {
+          "reviewer": "provider worker parent lane",
+          "date": "2026-04-18",
+          "status": "completed",
+          "artifact": "out/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0/manual/20260418T143124Z-elegance-review.md",
+          "summary": "Kept the closeout at the smallest truthful seam: the worker-cap config plus explicit alias coverage stayed in place, no proof-refresh runtime rewrite was added, and the packet refresh only corrected stale blocker wording."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md",
+        "task": "tasks/tasks-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md",
+        "agent_task": ".agent/task/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md",
+        "docs": "docs/TECH_SPEC-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md"
+      }
+    },
+    {
+      "id": "20260418-linear-0e426da7-6455-4292-8110-f44ee07b827a",
+      "title": "CO child-lane lineage: preserve parent provenance across manual provider-worker launch and issue workspace rebinding",
+      "relates_to": "tasks/tasks-linear-0e426da7-6455-4292-8110-f44ee07b827a.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-0e426da7-6455-4292-8110-f44ee07b827a-co245-docs-packet/cli/2026-04-18T08-07-11-555Z-d63daa80/manifest.json",
+          "source_anchor": "ctx:sha256:a705905f842ad361de1c5f68a088b5f4210340f7b8dd1105544184664a80283e#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-245 as a narrow lineage/provenance lane: `manual provider-worker launch` must stay fail-closed without real `parent provenance gate` evidence, but real `same-issue child lane` lineage must still survive `issue workspace rebinding` when `parent_run_id` continuity plus an `older canonical parent manifest` prove the same current parent. The expected shared source payload was absent in this child checkout, so the packet is anchored on the protected handoff wording plus current repo seams in `tests/delegation-guard.spec.ts`, `tests/run-review.spec.ts`, `providerLinearChildLaneShell.ts`, `providerLinearChildLaneRunner.ts`, `source0.ts`, `manifest.ts`, `controlHostCliShell.ts`, and `selectedRunProjection.ts`, while staying explicitly distinct from `CO-241` and `CO-244`; parent owns implementation, validation, Linear state, workpad, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-0e426da7-6455-4292-8110-f44ee07b827a.md",
+        "task": "tasks/tasks-linear-0e426da7-6455-4292-8110-f44ee07b827a.md",
+        "agent_task": ".agent/task/linear-0e426da7-6455-4292-8110-f44ee07b827a.md",
+        "docs": "docs/TECH_SPEC-linear-0e426da7-6455-4292-8110-f44ee07b827a.md"
+      }
+    },
+    {
+      "id": "20260417-linear-5561a9a9-39dd-4ed4-99a0-896553327669",
+      "title": "CO: Add a Codex 0.121 plugin marketplace distribution path for Codex Orchestrator",
+      "relates_to": "tasks/tasks-linear-5561a9a9-39dd-4ed4-99a0-896553327669.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_review_fallback": {
+          "reviewer": "provider worker manual docs review",
+          "date": "2026-04-18",
+          "status": "accepted",
+          "artifact": "out/linear-5561a9a9-39dd-4ed4-99a0-896553327669/manual/20260418T014254Z-rework-r2/13-docs-review-fallback.md",
+          "summary": "The current Rework lane rechecked the existing packet directly after replaying the implementation onto a fresh origin/main branch."
+        },
+        "pack_smoke": {
+          "reviewer": "provider worker",
+          "date": "2026-04-18",
+          "status": "passed",
+          "artifact": "out/linear-5561a9a9-39dd-4ed4-99a0-896553327669/manual/20260418T014254Z-rework-r2/10-pack-smoke.log",
+          "summary": "Pack smoke passed for the packaged marketplace/plugin path, including local-directory and Git-backed marketplace registration."
+        },
+        "standalone_review": {
+          "reviewer": "provider worker manual fallback after review-wrapper boundary",
+          "date": "2026-04-18",
+          "status": "manual-fallback-after-boundary",
+          "telemetry": ".runs/linear-5561a9a9-39dd-4ed4-99a0-896553327669/cli/2026-04-18T01-28-09-196Z-c8f11c3d/review/telemetry.json",
+          "artifact": "out/linear-5561a9a9-39dd-4ed4-99a0-896553327669/manual/20260418T014254Z-rework-r2/14-manual-review-fallback.md",
+          "summary": "The forced wrapper run terminated on the startup-anchor boundary before diff-local analysis, so the parent lane completed a manual diff-local review and fixed the one README wording mismatch it found."
+        },
+        "elegance_review": {
+          "reviewer": "provider worker",
+          "date": "2026-04-18",
+          "status": "passed",
+          "artifact": "out/linear-5561a9a9-39dd-4ed4-99a0-896553327669/manual/20260418T014254Z-rework-r2/15-elegance-review.md",
+          "summary": "The final tree keeps the marketplace path additive and thin: packaged metadata, a small launcher, real Codex smoke coverage, and no authority or packaging refactor beyond the requested path."
+        },
+        "packet_refresh_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-5561a9a9-39dd-4ed4-99a0-896553327669-packet-refresh/cli/2026-04-18T12-38-14-882Z-e4ea1f4b/manifest.json",
+          "source_anchor": "ctx:sha256:cb6a64ba6e2f8fc849e39804635bfddb2d7e402bd0058a63ad175132d50f2146#chunk:c000001",
+          "summary": "Refreshed the CO-196 packet/status mirrors after the merged-head unblock: branch `linear/co-196-codex-0121-plugin-marketplace-rework-r2` already includes merged `origin/main` at `57d3c5e88`, `docs:freshness` passed on that merged head, the issue is back in `In Progress`, stale PR `#515` remains closed, no open replacement PR exists yet, and parent-owned next steps are validation, review, workpad refresh, and replacement PR handoff."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-5561a9a9-39dd-4ed4-99a0-896553327669.md",
+        "task": "tasks/tasks-linear-5561a9a9-39dd-4ed4-99a0-896553327669.md",
+        "agent_task": ".agent/task/linear-5561a9a9-39dd-4ed4-99a0-896553327669.md",
+        "docs": "docs/TECH_SPEC-linear-5561a9a9-39dd-4ed4-99a0-896553327669.md"
       }
     },
     {
