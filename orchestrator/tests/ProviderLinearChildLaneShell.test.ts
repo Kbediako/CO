@@ -470,6 +470,76 @@ describe('runProviderLinearChildLaneShell', () => {
     });
   });
 
+  it('fails closed instead of rebinding to an older canonical same-issue parent manifest', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-live-parent-'));
+    const liveRunId = 'manual-parent-run';
+    const liveRunDir = join(tempRoot, '.runs', TASK_ID, 'cli', liveRunId);
+    const liveManifestPath = join(liveRunDir, 'manifest.json');
+    const olderIssueWorkspacePath = join(tempRoot, '.workspaces', TASK_ID);
+    const olderRunDir = join(olderIssueWorkspacePath, '.runs', TASK_ID, 'cli', 'older-parent-run');
+    const olderManifestPath = join(olderRunDir, 'manifest.json');
+    await mkdir(liveRunDir, { recursive: true });
+    await mkdir(olderRunDir, { recursive: true });
+    await writeFile(
+      liveManifestPath,
+      JSON.stringify({
+        run_id: liveRunId,
+        task_id: TASK_ID,
+        pipeline_id: 'provider-linear-worker',
+        ...ISSUE,
+        workspace_path: tempRoot
+      }),
+      'utf8'
+    );
+    await writeFile(
+      olderManifestPath,
+      JSON.stringify({
+        run_id: 'older-parent-run',
+        task_id: TASK_ID,
+        pipeline_id: 'provider-linear-worker',
+        ...ISSUE,
+        workspace_path: olderIssueWorkspacePath,
+        provider_control_host_task_id: CONTROL_HOST_TASK_ID,
+        provider_control_host_run_id: CONTROL_HOST_RUN_ID
+      }),
+      'utf8'
+    );
+
+    const result = await runProviderLinearChildLaneShell({
+      action: 'launch',
+      streamName: 'impl-a',
+      purpose: 'Implement bounded child lane support',
+      files: ['orchestrator/src/cli/providerLinearChildStreamShell.ts'],
+      env: {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: olderManifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot,
+        CODEX_ORCHESTRATOR_RUN_ID: liveRunId,
+        CODEX_ORCHESTRATOR_TASK_ID: TASK_ID,
+        CODEX_ORCHESTRATOR_PIPELINE_ID: 'provider-linear-worker',
+        CODEX_ORCHESTRATOR_ISSUE_ID: ISSUE.issue_id,
+        CODEX_ORCHESTRATOR_ISSUE_IDENTIFIER: ISSUE.issue_identifier,
+        CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: CONTROL_HOST_TASK_ID,
+        CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID: CONTROL_HOST_RUN_ID
+      }
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'launch',
+      error: {
+        code: 'provider_worker_child_lane_context_missing',
+        status: 412
+      }
+    });
+    if (result.ok) {
+      throw new Error('expected same-issue canonical parent rebind to fail closed');
+    }
+    expect(result.error.message).toContain(
+      `Provider worker run id mismatch between env (${liveRunId}) and manifest (older-parent-run).`
+    );
+  });
+
   it('classifies zero-byte child-lane patches as no-output advisory evidence', async () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
     const childRunDir = join(tempRoot ?? '', '.runs', `${TASK_ID}-analysis-a`, 'cli', 'child-run-1');

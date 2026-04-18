@@ -42,6 +42,32 @@
       }
     },
     {
+      "id": "20260418-linear-0e426da7-6455-4292-8110-f44ee07b827a",
+      "title": "CO child-lane lineage: preserve parent provenance across manual provider-worker launch and issue workspace rebinding",
+      "relates_to": "tasks/tasks-linear-0e426da7-6455-4292-8110-f44ee07b827a.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-0e426da7-6455-4292-8110-f44ee07b827a-co245-docs-packet/cli/2026-04-18T08-07-11-555Z-d63daa80/manifest.json",
+          "source_anchor": "ctx:sha256:a705905f842ad361de1c5f68a088b5f4210340f7b8dd1105544184664a80283e#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-245 as a narrow lineage/provenance lane: `manual provider-worker launch` must stay fail-closed without real `parent provenance gate` evidence, but real `same-issue child lane` lineage must still survive `issue workspace rebinding` when `parent_run_id` continuity plus an `older canonical parent manifest` prove the same current parent. The expected shared source payload was absent in this child checkout, so the packet is anchored on the protected handoff wording plus current repo seams in `tests/delegation-guard.spec.ts`, `tests/run-review.spec.ts`, `providerLinearChildLaneShell.ts`, `providerLinearChildLaneRunner.ts`, `source0.ts`, `manifest.ts`, `controlHostCliShell.ts`, and `selectedRunProjection.ts`, while staying explicitly distinct from `CO-241` and `CO-244`; parent owns implementation, validation, Linear state, workpad, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-0e426da7-6455-4292-8110-f44ee07b827a.md",
+        "task": "tasks/tasks-linear-0e426da7-6455-4292-8110-f44ee07b827a.md",
+        "agent_task": ".agent/task/linear-0e426da7-6455-4292-8110-f44ee07b827a.md",
+        "docs": "docs/TECH_SPEC-linear-0e426da7-6455-4292-8110-f44ee07b827a.md"
+      }
+    },
+    {
       "id": "20260418-linear-f2c25700-a367-4e69-923f-cdf3e7f726be",
       "title": "CO CLI test surface remove clean-tree dependency on prebuilt dist entrypoint",
       "relates_to": "tasks/tasks-linear-f2c25700-a367-4e69-923f-cdf3e7f726be.md",
