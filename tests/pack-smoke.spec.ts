@@ -31,7 +31,7 @@ const packSmokeInvocationPattern = new RegExp(
   String.raw`(?:^|[;&|()]\s*|\b(?:if|then|do|while|until)\s+)(?:!\s+)?(?:${shellAssignmentPattern}\s+)*npm\s+run\s+pack:smoke(?=$|[\s;|&)])`,
   'gu'
 );
-const nonBlockingPackSmokePattern = /(?:^|[ \t])\|\|[ \t]|;[ \t]*(?:true|exit[ \t]+0)\b/u;
+const nonBlockingPackSmokePattern = /(?:^|[ \t])(?:\|\|[ \t]|\|&?[ \t])|;[ \t]*(?:true|exit[ \t]+0)\b/u;
 
 async function readWorkflow(path: string): Promise<WorkflowFile> {
   const parsed = load(await readText(path));
@@ -76,7 +76,12 @@ function unwrapActionsExpression(condition: string): string {
 }
 
 function hasNonSuccessStatusCheck(condition: string): boolean {
-  return /\b(always|cancelled|failure)\s*\(/iu.test(unwrapActionsExpression(condition));
+  const expression = unwrapActionsExpression(condition);
+  return (
+    /\b(always|cancelled|failure)\s*\(/iu.test(expression) ||
+    /!\s*success\s*\(/iu.test(expression) ||
+    (/\bsuccess\s*\(/iu.test(expression) && /\|\|/u.test(expression))
+  );
 }
 
 function installConditionCoversSmokeStep(installCondition: string, smokeCondition: string): boolean {
@@ -91,8 +96,8 @@ function normalizeShellContinuations(run: string): string {
 }
 
 function getHeredocDelimiter(line: string): string | null {
-  const match = line.match(/<<-?\s*['"]?([A-Za-z_][A-Za-z0-9_]*)['"]?/u);
-  return match?.[1] ?? null;
+  const match = line.match(/<<-?\s*(?:"([^"]+)"|'([^']+)'|([^<>\s]+))/u);
+  return match?.[1] ?? match?.[2] ?? match?.[3] ?? null;
 }
 
 function getRunCommandLines(run: string): string[] {
@@ -388,6 +393,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(isDedicatedCodexInstallRun(`[[ "$NEEDS_CODEX" == 1 ]] && ${codexInstallCommand}`)).toBe(false);
     expect(isDedicatedCodexInstallRun(`exit 0; ${codexInstallCommand}`)).toBe(false);
     expect(isDedicatedCodexInstallRun(`cat <<EOF\n${codexInstallCommand}\nEOF`)).toBe(false);
+    expect(isDedicatedCodexInstallRun(`cat <<'EOF-MARK'\n${codexInstallCommand}\nEOF-MARK`)).toBe(false);
     expect(hasPackSmokeCommand(packSmokeCommand)).toBe(true);
     expect(hasPackSmokeCommand(`FOO=1 BAR="two words" ${packSmokeCommand}`)).toBe(true);
     expect(hasPackSmokeCommand(`${packSmokeCommand} -- --flag`)).toBe(true);
@@ -395,8 +401,11 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(hasPackSmokeCommand(`if ${packSmokeCommand}; then echo ok; fi`)).toBe(true);
     expect(hasPackSmokeCommand(`if FOO=1 ${packSmokeCommand} -- --flag; then echo ok; fi`)).toBe(true);
     expect(hasPackSmokeCommand(`echo ${packSmokeCommand}`)).toBe(false);
+    expect(hasPackSmokeCommand(`cat <<'EOF-MARK'\n${packSmokeCommand}\nEOF-MARK`)).toBe(false);
     expect(hasPackSmokeCommand(`${packSmokeCommand}:other`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} || true`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} | tee smoke.log`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} |& tee smoke.log`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand}; exit 0`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} -- --flag || true`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`if ${packSmokeCommand}; then echo ok; fi`)).toBe(true);
@@ -416,6 +425,9 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
       installConditionCoversSmokeStep('success()', "${{ steps.downstream-smoke.outputs.required == 'true' }}")
     ).toBe(true);
     expect(installConditionCoversSmokeStep('success()', 'always()')).toBe(false);
+    expect(installConditionCoversSmokeStep('success()', '${{ !success() }}')).toBe(false);
+    expect(installConditionCoversSmokeStep('success()', '${{ success() || inputs.force }}')).toBe(false);
+    expect(installConditionCoversSmokeStep('success()', '${{ success() && inputs.force }}')).toBe(true);
     expect(installConditionCoversSmokeStep("${{ always() && inputs.force == 'true' }}", 'always()')).toBe(false);
     expect(
       installConditionCoversSmokeStep(
