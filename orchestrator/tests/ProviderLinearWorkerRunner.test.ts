@@ -43,6 +43,7 @@ import { resolveProviderLinearChildLaneScopeContract } from '../src/cli/provider
 import type { RuntimeCodexCommandContext } from '../src/cli/runtime/index.js';
 
 let tempRoot: string | null = null;
+let extraTempRoots: string[] = [];
 const providerLinearWorkerRunnerTestTimeoutMs = 60_000;
 const SOURCE_HELPER_COMMAND = 'node "/tmp/co/bin/codex-orchestrator.js" linear';
 const TEST_AUTH_PROVENANCE_FINGERPRINT_KEY = 'provider-linear-worker-test-fingerprint-key';
@@ -58,6 +59,7 @@ function testFingerprint(value: string): string {
 beforeEach(() => {
   originalAuthProvenanceFingerprintKey = process.env.CODEX_AUTH_PROVENANCE_FINGERPRINT_KEY;
   process.env.CODEX_AUTH_PROVENANCE_FINGERPRINT_KEY = TEST_AUTH_PROVENANCE_FINGERPRINT_KEY;
+  extraTempRoots = [];
 });
 
 afterEach(async () => {
@@ -72,6 +74,10 @@ afterEach(async () => {
     await rm(tempRoot, { recursive: true, force: true });
     tempRoot = null;
   }
+  for (const path of extraTempRoots) {
+    await rm(path, { recursive: true, force: true });
+  }
+  extraTempRoots = [];
 });
 
 async function createManifestRoot() {
@@ -6078,6 +6084,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       join(tmpdir(), 'provider-linear-worker-shared-runs-')
     );
     const externalOutDir = await mkdtemp(join(tmpdir(), 'provider-linear-worker-shared-out-'));
+    extraTempRoots.push(externalRunsDir, externalOutDir);
     await mkdir(manualRunDir, { recursive: true });
     await writeFile(
       manualManifestPath,
