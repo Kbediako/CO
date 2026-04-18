@@ -682,7 +682,7 @@ function parseDelegationTomlConfig(raw: string): Record<string, unknown> {
 
 function parseDelegationTomlSubset(raw: string): Record<string, unknown> {
   const parsed: Record<string, unknown> = {};
-  let currentSection: string[] = [];
+  let currentSection: string[] | null = [];
   for (const line of raw.split(/\r?\n/u)) {
     const trimmed = stripTomlComment(line).trim();
     if (!trimmed) {
@@ -691,7 +691,10 @@ function parseDelegationTomlSubset(raw: string): Record<string, unknown> {
     const tableMatch = trimmed.match(/^\[(.+)\]$/u);
     if (tableMatch) {
       const tablePath = parseTomlDottedPath(tableMatch[1] ?? '');
-      currentSection = tablePath.length > 0 && DELEGATION_CONFIG_ROOT_KEYS.has(tablePath[0] ?? '') ? tablePath : [];
+      currentSection =
+        tablePath.length > 0 && DELEGATION_CONFIG_ROOT_KEYS.has(tablePath[0] ?? '')
+          ? tablePath
+          : null;
       continue;
     }
     const separatorIndex = findTomlAssignmentSeparator(trimmed);
@@ -700,6 +703,9 @@ function parseDelegationTomlSubset(raw: string): Record<string, unknown> {
     }
     const keyPath = parseTomlDottedPath(trimmed.slice(0, separatorIndex));
     if (keyPath.length === 0) {
+      continue;
+    }
+    if (currentSection === null) {
       continue;
     }
     const fullPath = [...currentSection, ...keyPath];
@@ -804,11 +810,46 @@ function parseTomlValue(raw: string): unknown {
   if (raw === 'false') {
     return false;
   }
+  const integer = parseTomlInteger(raw);
+  if (integer !== null) {
+    return integer;
+  }
   const numeric = Number(raw);
   if (Number.isFinite(numeric)) {
     return numeric;
   }
   return undefined;
+}
+
+function parseTomlInteger(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (/^[+-]?(?:0|[1-9](?:_?\d)*)$/u.test(trimmed)) {
+    return Number.parseInt(trimmed.replace(/_/gu, ''), 10);
+  }
+  if (/^[+-]?0x[0-9a-f](?:_?[0-9a-f])*$/iu.test(trimmed)) {
+    return parseTomlBasedInteger(trimmed, /^([+-]?)0x/iu, 16);
+  }
+  if (/^[+-]?0o[0-7](?:_?[0-7])*$/iu.test(trimmed)) {
+    return parseTomlBasedInteger(trimmed, /^([+-]?)0o/iu, 8);
+  }
+  if (/^[+-]?0b[01](?:_?[01])*$/iu.test(trimmed)) {
+    return parseTomlBasedInteger(trimmed, /^([+-]?)0b/iu, 2);
+  }
+  return null;
+}
+
+function parseTomlBasedInteger(raw: string, prefixPattern: RegExp, radix: number): number | null {
+  const normalized = raw.replace(/_/gu, '');
+  const prefixMatch = normalized.match(prefixPattern);
+  if (!prefixMatch) {
+    return null;
+  }
+  const sign = prefixMatch[1] === '-' ? -1 : 1;
+  const digits = normalized.slice(prefixMatch[0].length);
+  return sign * Number.parseInt(digits, radix);
 }
 
 function splitTomlArrayEntries(raw: string): string[] {
