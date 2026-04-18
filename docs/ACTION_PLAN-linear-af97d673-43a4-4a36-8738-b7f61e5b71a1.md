@@ -81,5 +81,5 @@
   - Mitigation: preserve `provider_refresh_lifecycle_stuck`, `restart_required`, `stuck`, and `refresh:claim_reconcile` diagnostics in tests and closeout evidence.
 
 ## Approvals
-- March docs-review: `/Users/kbediako/Code/CO/.runs/linear-af97d673-43a4-4a36-8738-b7f61e5b71a1-docs-review/cli/2026-03-30T01-25-36-879Z-17cd2f7d/manifest.json`
+- March docs-review: `.runs/linear-af97d673-43a4-4a36-8738-b7f61e5b71a1-docs-review/cli/2026-03-30T01-25-36-879Z-17cd2f7d/manifest.json`
 - Apr 18 docs refresh: bounded same-issue child lane accepted into this workspace; current lane owns integration and review-gate evidence.

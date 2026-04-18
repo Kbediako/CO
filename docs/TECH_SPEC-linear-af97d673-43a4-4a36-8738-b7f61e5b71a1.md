@@ -65,6 +65,7 @@ last_review: 2026-04-18
 - `The docs refresh can close CO-41.` It cannot; source repair and validation are required.
 
 ## Current / Reference / Target Parity Matrix
+
 | Contract | Reference: March `PR #324` | Current: Apr 18 recurrence | Target |
 | --- | --- | --- | --- |
 | Stuck detection | Original `CO-41` watchdog/reporting fix landed. | `stuck=true` and `restart_required=true` recur in `provider-intake-state.json`. | Detection remains truthful and leads to safe recovery or explicit restart-required closeout. |
@@ -89,6 +90,6 @@ last_review: 2026-04-18
 - Which adjacent issue needs no-regression review first: `CO-211`, `CO-214`, `CO-248`, `CO-217`, or `CO-252`?
 
 ## Approvals
-- Reviewer: March docs-review approved via `/Users/kbediako/Code/CO/.runs/linear-af97d673-43a4-4a36-8738-b7f61e5b71a1-docs-review/cli/2026-03-30T01-25-36-879Z-17cd2f7d/manifest.json`
+- Reviewer: March docs-review approved via `.runs/linear-af97d673-43a4-4a36-8738-b7f61e5b71a1-docs-review/cli/2026-03-30T01-25-36-879Z-17cd2f7d/manifest.json`
 - Date: 2026-03-30
 - Apr 18 docs refresh: bounded same-issue child lane produced the initial packet; this lane owns docs-review / implementation-gate integration.
