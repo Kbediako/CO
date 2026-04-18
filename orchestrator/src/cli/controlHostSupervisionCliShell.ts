@@ -1129,12 +1129,14 @@ function resolveControlHostSupervisionQuarantineUnhealthySamples(input: {
   priorState: ControlHostSupervisionState;
   config: ControlHostSupervisionConfig;
 }): number {
+  const latestRestartRecord =
+    input.priorState.restart_history && input.priorState.restart_history.length > 0
+      ? input.priorState.restart_history[input.priorState.restart_history.length - 1]
+      : null;
   const candidates = [
     input.currentConsecutiveUnhealthySamples,
     input.priorState.consecutive_unhealthy_samples,
-    ...(input.priorState.restart_history ?? []).map(
-      (record) => record.consecutive_unhealthy_samples
-    )
+    latestRestartRecord?.consecutive_unhealthy_samples ?? 0
   ].filter((value) => Number.isFinite(value) && value > 0);
   const priorMaximum = candidates.length > 0 ? Math.max(...candidates) : 0;
   if (priorMaximum > 0) {

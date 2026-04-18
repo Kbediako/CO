@@ -336,6 +336,14 @@ describe('controlHostSupervision helpers', () => {
       status: 'restart_required',
       restartHistory: [
         {
+          requested_at: '2026-04-14T05:00:30.000Z',
+          reason: 'restart_required',
+          message: 'older unrelated launchd restart requested.',
+          consecutive_unhealthy_samples: 8,
+          child_pid: 1200,
+          diagnostic: null
+        },
+        {
           requested_at: '2026-04-14T05:06:30.000Z',
           reason: 'restart_required',
           message: 'launchd restart requested.',
