@@ -18,6 +18,8 @@ import {
 import {
   PROVIDER_CONTROL_HOST_RUN_ID_ENV,
   PROVIDER_CONTROL_HOST_TASK_ID_ENV,
+  PROVIDER_LAUNCH_SOURCE_CONTROL_HOST,
+  PROVIDER_LAUNCH_SOURCE_ENV,
   readProviderControlHostLocatorFromEnv,
   readProviderControlHostLocatorFromManifest
 } from '../../../scripts/lib/provider-run-contract.js';
@@ -614,6 +616,51 @@ function normalizeOptionalString(value: unknown): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function backfillProviderWorkerManifestControlHostProvenance(
+  manifest: Record<string, unknown>,
+  env: NodeJS.ProcessEnv = process.env
+): boolean {
+  const locator = readProviderControlHostLocatorFromEnv({
+    [PROVIDER_CONTROL_HOST_TASK_ID_ENV]: env[PROVIDER_CONTROL_HOST_TASK_ID_ENV],
+    [PROVIDER_CONTROL_HOST_RUN_ID_ENV]: env[PROVIDER_CONTROL_HOST_RUN_ID_ENV],
+    [PROVIDER_LAUNCH_SOURCE_ENV]: env[PROVIDER_LAUNCH_SOURCE_ENV]
+  });
+  if (!locator) {
+    return false;
+  }
+
+  const manifestLaunchSource =
+    normalizeOptionalString(manifest.provider_launch_source) ??
+    normalizeOptionalString(manifest.providerLaunchSource);
+  const manifestTaskId =
+    normalizeOptionalString(manifest.provider_control_host_task_id) ??
+    normalizeOptionalString(manifest.providerControlHostTaskId);
+  const manifestRunId =
+    normalizeOptionalString(manifest.provider_control_host_run_id) ??
+    normalizeOptionalString(manifest.providerControlHostRunId);
+
+  if (
+    (manifestLaunchSource && manifestLaunchSource !== PROVIDER_LAUNCH_SOURCE_CONTROL_HOST) ||
+    (manifestTaskId && manifestTaskId !== locator.taskId) ||
+    (manifestRunId && manifestRunId !== locator.runId)
+  ) {
+    return false;
+  }
+
+  if (
+    manifestLaunchSource === PROVIDER_LAUNCH_SOURCE_CONTROL_HOST &&
+    manifestTaskId === locator.taskId &&
+    manifestRunId === locator.runId
+  ) {
+    return false;
+  }
+
+  manifest.provider_launch_source = PROVIDER_LAUNCH_SOURCE_CONTROL_HOST;
+  manifest.provider_control_host_task_id = locator.taskId;
+  manifest.provider_control_host_run_id = locator.runId;
+  return true;
+}
+
 function normalizeOptionalInteger(value: unknown): number | null {
   if (typeof value === 'number' && Number.isInteger(value)) {
     return value;
@@ -936,6 +983,13 @@ export async function loadProviderLinearWorkerContext(
     manifestPath = selectedManifestPath;
     manifest = await readManifest(manifestPath);
   }
+  const controlHostManifestBackfilled = backfillProviderWorkerManifestControlHostProvenance(
+    controlHostManifest,
+    env
+  );
+  const selectedManifestBackfilled =
+    manifestPath !== controlHostManifestPath &&
+    backfillProviderWorkerManifestControlHostProvenance(manifest, env);
   const manifestTaskId =
     normalizeOptionalString(manifest.task_id) ??
     normalizeOptionalString(manifest.taskId);
@@ -974,6 +1028,11 @@ export async function loadProviderLinearWorkerContext(
   const runId = manifestRunId ?? envRunId ?? `provider-linear-worker-${Date.now()}`;
   const manifestPipelineId = normalizeOptionalString(manifest.pipeline_id) ?? normalizeOptionalString(manifest.pipelineId), envPipelineId = normalizeOptionalString(env.CODEX_ORCHESTRATOR_PIPELINE_ID);
   if (manifestPipelineId && envPipelineId && envPipelineId !== manifestPipelineId) throw new Error(`Provider worker pipeline id mismatch between env (${envPipelineId}) and manifest (${manifestPipelineId}).`);
+  const manifestProviderLaunchSource =
+    normalizeOptionalString(manifest.provider_launch_source) ??
+    normalizeOptionalString(manifest.providerLaunchSource) ??
+    normalizeOptionalString(controlHostManifest.provider_launch_source) ??
+    normalizeOptionalString(controlHostManifest.providerLaunchSource);
   const manifestProviderControlHostTaskId =
     normalizeOptionalString(manifest.provider_control_host_task_id) ??
     normalizeOptionalString(manifest.providerControlHostTaskId) ??
@@ -984,11 +1043,15 @@ export async function loadProviderLinearWorkerContext(
     normalizeOptionalString(manifest.providerControlHostRunId) ??
     normalizeOptionalString(controlHostManifest.provider_control_host_run_id) ??
     normalizeOptionalString(controlHostManifest.providerControlHostRunId);
-  const envProviderControlHostTaskId =
-    normalizeOptionalString(env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID);
-  const envProviderControlHostRunId =
-    normalizeOptionalString(env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID);
+  const envProviderControlHostLocator = readProviderControlHostLocatorFromEnv({
+    [PROVIDER_CONTROL_HOST_TASK_ID_ENV]: env[PROVIDER_CONTROL_HOST_TASK_ID_ENV],
+    [PROVIDER_CONTROL_HOST_RUN_ID_ENV]: env[PROVIDER_CONTROL_HOST_RUN_ID_ENV],
+    [PROVIDER_LAUNCH_SOURCE_ENV]: env[PROVIDER_LAUNCH_SOURCE_ENV]
+  });
+  const envProviderControlHostTaskId = envProviderControlHostLocator?.taskId ?? null;
+  const envProviderControlHostRunId = envProviderControlHostLocator?.runId ?? null;
   const providerControlHostMatchesManifest = Boolean(
+    manifestProviderLaunchSource === PROVIDER_LAUNCH_SOURCE_CONTROL_HOST &&
     envProviderControlHostTaskId &&
       envProviderControlHostRunId &&
       manifestProviderControlHostTaskId &&
@@ -1003,6 +1066,13 @@ export async function loadProviderLinearWorkerContext(
   const envWorkerHost = hasExplicitWorkerHostOverride
     ? normalizeProviderWorkerHostName(env[PROVIDER_WORKER_HOST_ENV_KEY])
     : undefined;
+  const maxTurns = await resolveProviderWorkerMaxTurns(env);
+  if (controlHostManifestBackfilled) {
+    await writeJsonAtomic(controlHostManifestPath, controlHostManifest);
+  }
+  if (selectedManifestBackfilled) {
+    await writeJsonAtomic(manifestPath, manifest);
+  }
   return {
     manifest,
     manifestPath,
@@ -1022,7 +1092,11 @@ export async function loadProviderLinearWorkerContext(
         ? (envProviderControlHostRunId ?? manifestProviderControlHostRunId)
         : null,
     providerControlHostRecordedInManifest:
-      Boolean(manifestProviderControlHostTaskId && manifestProviderControlHostRunId),
+      Boolean(
+        manifestProviderLaunchSource === PROVIDER_LAUNCH_SOURCE_CONTROL_HOST &&
+          manifestProviderControlHostTaskId &&
+          manifestProviderControlHostRunId
+      ),
     providerControlHostMatchesManifest,
     workspacePath: rootAuthority.workspacePath,
     workerHost:
@@ -1036,7 +1110,7 @@ export async function loadProviderLinearWorkerContext(
       normalizeOptionalString(env.CODEX_ORCHESTRATOR_ISSUE_UPDATED_AT) ??
       normalizeOptionalString(manifest.issue_updated_at) ??
       normalizeOptionalString(manifest.issueUpdatedAt),
-    maxTurns: await resolveProviderWorkerMaxTurns(env),
+    maxTurns,
     residentSessionSeed
   };
 }

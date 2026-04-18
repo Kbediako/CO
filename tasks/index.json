@@ -27,6 +27,32 @@
       }
     },
     {
+      "id": "20260418-linear-104aa410-5c94-457c-bbce-9962c7308ac5",
+      "title": "Record provider control-host provenance on provider-worker manifests for same-issue child lanes",
+      "relates_to": "tasks/tasks-linear-104aa410-5c94-457c-bbce-9962c7308ac5.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "rejected_after_success",
+          "manifest": ".runs/linear-104aa410-5c94-457c-bbce-9962c7308ac5-docs-packet/cli/2026-04-18T06-47-21-165Z-f43e496c/manifest.json",
+          "source_anchor": "ctx:sha256:7b36f0086f31a972affc4bd5f989199d7d1bfa3ba460ad8de937b4e7d71916c2#chunk:c000001",
+          "summary": "Same-issue docs child lane completed successfully, satisfying the turn's required child-lane proof, but the parent rejected the patch because it drifted from CO-244 into broader provenance seams and missed the actual provider_launch_source plus child-lane/child-stream contract. The parent re-authored the docs packet directly and kept the change bounded to manifest provenance persistence for control-host-launched provider-worker runs."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-104aa410-5c94-457c-bbce-9962c7308ac5.md",
+        "task": "tasks/tasks-linear-104aa410-5c94-457c-bbce-9962c7308ac5.md",
+        "agent_task": ".agent/task/linear-104aa410-5c94-457c-bbce-9962c7308ac5.md",
+        "docs": "docs/TECH_SPEC-linear-104aa410-5c94-457c-bbce-9962c7308ac5.md"
+      }
+    },
+    {
       "id": "20260418-linear-9fc9fe23-bd44-4b72-9459-b5b809970bce",
       "title": "CO: stop review-handoff promotion from parking In Review issues on multiple attached PRs",
       "relates_to": "tasks/tasks-linear-9fc9fe23-bd44-4b72-9459-b5b809970bce.md",
