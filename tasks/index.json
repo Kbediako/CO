@@ -42,6 +42,53 @@
       }
     },
     {
+      "id": "20260418-linear-56395d00-0da1-447e-8d2d-68b195e8a3dc",
+      "title": "CO: Stabilize unrelated orchestrator/tests/Doctor.test.ts full-suite timeouts blocking CO-219 handoff",
+      "relates_to": "tasks/tasks-linear-56395d00-0da1-447e-8d2d-68b195e8a3dc.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-18",
+          "status": "succeeded",
+          "manifest": ".runs/linear-56395d00-0da1-447e-8d2d-68b195e8a3dc-co226-docs-review/cli/2026-04-17T21-47-30-660Z-b185d824/manifest.json",
+          "summary": "Docs-review completed before implementation and preserved the exact Doctor full-suite-versus-targeted contract for CO-226."
+        },
+        "child_lane": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-18",
+          "status": "accepted",
+          "manifest": ".runs/linear-56395d00-0da1-447e-8d2d-68b195e8a3dc-doctor-targeted-tests/cli/2026-04-17T21-40-57-908Z-850bb2ea/manifest.json",
+          "summary": "Accepted bounded same-issue child lane patch in Doctor.test.ts: replace one real direct-dist startup with a fake direct-dist entrypoint that still waits for the initialize request before returning the expected probe payload."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review --base origin/main",
+          "date": "2026-04-18",
+          "status": "bounded-success",
+          "telemetry": ".runs/linear-56395d00-0da1-447e-8d2d-68b195e8a3dc/cli/2026-04-18T22-36-13-247Z-90cb1362/review/telemetry.json",
+          "review_outcome": "bounded-success",
+          "termination_boundary": "command-intent",
+          "summary": "Forced standalone review executed under FORCE_CODEX_REVIEW=1 and completed as bounded-success after command-intent retry; read-only retry found no actionable regressions in the Doctor test helper or adjacent docs/task registry changes."
+        },
+        "elegance_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-18",
+          "status": "passed",
+          "summary": "Explicit minimality pass kept the local fake direct-dist helper plus initialize and delegate-server argv assertions as the smallest coverage-preserving Doctor fix; no simplification patch was needed."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-56395d00-0da1-447e-8d2d-68b195e8a3dc.md",
+        "task": "tasks/tasks-linear-56395d00-0da1-447e-8d2d-68b195e8a3dc.md",
+        "agent_task": ".agent/task/linear-56395d00-0da1-447e-8d2d-68b195e8a3dc.md",
+        "docs": "docs/TECH_SPEC-linear-56395d00-0da1-447e-8d2d-68b195e8a3dc.md"
+      }
+    },
+    {
       "id": "20260418-linear-42debc45-fa05-4a0a-a7bb-35a48153aea9",
       "title": "Run artifact truth: reconcile orphaned active manifests and child-lane placeholders after release/invalidation",
       "relates_to": "tasks/tasks-linear-42debc45-fa05-4a0a-a7bb-35a48153aea9.md",

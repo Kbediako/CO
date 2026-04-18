@@ -75,6 +75,47 @@ async function withMissingCodexHome(run: (tempHome: string) => Promise<void>): P
   }
 }
 
+async function writeFakeDelegationDistEntrypoint(rootDir: string): Promise<string> {
+  const distDir = join(rootDir, 'dist', 'bin');
+  const entryPath = join(distDir, 'codex-orchestrator.js');
+  await mkdir(distDir, { recursive: true });
+  await writeFile(
+    entryPath,
+    [
+      "let input = '';",
+      "process.stdin.setEncoding('utf8');",
+      "process.stdin.on('data', (chunk) => { input += chunk; });",
+      "process.stdin.on('end', () => {",
+      "  try {",
+      "    if (process.argv[2] !== 'delegate-server') {",
+      "      process.stderr.write('missing delegate-server argument');",
+      "      process.exitCode = 1;",
+      "      return;",
+      "    }",
+      "    const payload = input",
+      "      .split(/\\r?\\n/)",
+      "      .map((line) => line.trim())",
+      "      .find((line) => line.length > 0);",
+      "    const request = payload ? JSON.parse(payload) : null;",
+      "    if (request?.id !== 1 || request?.method !== 'initialize') {",
+      "      process.stderr.write('missing initialize request');",
+      "      process.exitCode = 1;",
+      "      return;",
+      "    }",
+      "    process.stdout.write(",
+      "      JSON.stringify({ jsonrpc: '2.0', id: 1, result: { protocolVersion: '2024-11-05' } }) + '\\n'",
+      "    );",
+      "  } catch (error) {",
+      "    process.stderr.write(error instanceof Error ? error.message : 'invalid initialize request');",
+      "    process.exitCode = 1;",
+      "  }",
+      "});"
+    ].join('\n'),
+    'utf8'
+  );
+  return entryPath;
+}
+
 function buildDoctorCloudEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
   return {
     ...sanitizeProviderOverrideEnv(process.env),
@@ -256,38 +297,17 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
     const originalCodexHome = process.env.CODEX_HOME;
     const originalCodexCliBin = process.env.CODEX_CLI_BIN;
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
-    const syntheticDistEntrypoint = join(tempHome, 'dist', 'bin', 'codex-orchestrator.js');
+    const fakeDistRoot = await mkdtemp(join(tmpdir(), 'codex-dist-'));
     process.env.CODEX_HOME = tempHome;
     process.env.CODEX_CLI_BIN = join(tempHome, 'missing-codex');
     try {
-      await mkdir(join(tempHome, 'dist', 'bin'), { recursive: true });
-      await writeFile(
-        syntheticDistEntrypoint,
-        [
-          '#!/usr/bin/env node',
-          "import { readFileSync } from 'node:fs';",
-          "readFileSync(0, 'utf8');",
-          `process.stdout.write(${JSON.stringify(
-            `${JSON.stringify({
-              jsonrpc: '2.0',
-              id: 1,
-              result: {
-                protocolVersion: '2024-11-05',
-                capabilities: {},
-                serverInfo: { name: 'delegation-test', version: '0.0.0-test' }
-              }
-            })}\n`
-          )});`
-        ].join('\n'),
-        'utf8'
-      );
-      await chmod(syntheticDistEntrypoint, 0o755);
+      const fakeDistEntrypoint = await writeFakeDelegationDistEntrypoint(fakeDistRoot);
       await writeFile(
         join(tempHome, 'config.toml'),
         [
           '[mcp_servers.delegation]',
           `command = "${process.execPath.replace(/\\/g, '\\\\')}"`,
-          `args = ["${syntheticDistEntrypoint.replace(/\\/g, '\\\\')}", "delegate-server"]`
+          `args = ["${fakeDistEntrypoint.replace(/\\/g, '\\\\')}", "delegate-server"]`
         ].join('\n'),
         'utf8'
       );
@@ -310,6 +330,7 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
         process.env.CODEX_CLI_BIN = originalCodexCliBin;
       }
       await rm(tempHome, { recursive: true, force: true });
+      await rm(fakeDistRoot, { recursive: true, force: true });
     }
   });
 
