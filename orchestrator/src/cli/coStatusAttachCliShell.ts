@@ -282,7 +282,7 @@ export async function fetchUiDataset(
   return payload;
 }
 
-async function readUiDatasetWithEndpointRecovery(input: {
+export async function readUiDatasetWithEndpointRecovery(input: {
   flags: ArgMap;
   getTarget: () => CoStatusAttachTarget;
   setTarget: (target: CoStatusAttachTarget) => void;
