@@ -34,6 +34,95 @@
       }
     },
     {
+      "id": "20260418-linear-0ae7288b-cc5f-493d-896f-713990e51808",
+      "title": "CO: stabilize run-review fake Codex subprocess timeout flake under full npm run test",
+      "relates_to": "tasks/tasks-linear-0ae7288b-cc5f-493d-896f-713990e51808.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-0ae7288b-cc5f-493d-896f-713990e51808-docs-packet/cli/2026-04-18T16-47-04-916Z-1d67c18a/manifest.json",
+          "source_anchor": "ctx:sha256:7bc40b569a41bfbaead86699849abdfea03d40ad923c988770e2bfb98ef981bc#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-251 as the full-suite run-review fake Codex subprocess timeout flake lane: tests/run-review.spec.ts, scripts/run-review, fake Codex subprocess, hang-started.txt, findRunReviewMockPids, and full npm run test remain protected. The expected shared source payload is absent in this child checkout, so the packet is anchored on the protected issue wording plus the provided source anchor. Parent owns root cause, implementation, validation, Linear state, workpad, PR, and merge; this packet rejects CO-234 LockFile work, generic review-wrapper redesign without evidence, and any skipping or weakening of subprocess cleanup coverage."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review --base origin/main",
+          "date": "2026-04-18",
+          "status": "bounded-success",
+          "manifest": ".runs/linear-0ae7288b-cc5f-493d-896f-713990e51808/cli/2026-04-18T16-44-05-565Z-29a8403b/manifest.json",
+          "telemetry": ".runs/linear-0ae7288b-cc5f-493d-896f-713990e51808/cli/2026-04-18T16-44-05-565Z-29a8403b/review/telemetry.json",
+          "summary": "Final standalone review completed with review_outcome=bounded-success after command-intent retry and reported no actionable findings."
+        },
+        "elegance_review": {
+          "reviewer": "provider worker parent lane",
+          "date": "2026-04-18",
+          "status": "completed",
+          "artifact": "out/linear-0ae7288b-cc5f-493d-896f-713990e51808/manual/20260418T180715Z-elegance-review.md",
+          "summary": "Kept the fix to the hanging fake-Codex subprocess timeout and per-test headroom only; no scripts/run-review.ts or cleanup helper behavior changed."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-0ae7288b-cc5f-493d-896f-713990e51808.md",
+        "task": "tasks/tasks-linear-0ae7288b-cc5f-493d-896f-713990e51808.md",
+        "agent_task": ".agent/task/linear-0ae7288b-cc5f-493d-896f-713990e51808.md",
+        "docs": "docs/TECH_SPEC-linear-0ae7288b-cc5f-493d-896f-713990e51808.md"
+      }
+    },
+    {
+      "id": "20260418-linear-4b6dd62c-dd51-4edc-89e3-24c773d93124",
+      "title": "CO: eliminate residual startup-anchor standalone-review failures that still force manual fallback after CO-173",
+      "relates_to": "tasks/tasks-linear-4b6dd62c-dd51-4edc-89e3-24c773d93124.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (direct fallback after child-stream provenance failure; repo freshness policy owner CO-175)",
+          "date": "2026-04-18",
+          "manifest": ".runs/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124/cli/2026-04-18T05-48-25-732Z-f5e259ca/manifest.json",
+          "override_reason": "Packaged same-issue child-stream and child-lane helper launches failed closed because the parent provider-worker manifest lacks provider_control_host provenance. Direct docs-review rerun then passed delegation-guard override, spec-guard, and docs:check for the CO-242 packet, and stopped only on docs:freshness:maintain block_policy_over_budget owned by CO-175 after the missing .agent/task registry row was fixed."
+        },
+        "docs_review_continuation": {
+          "reviewer": "codex-orchestrator docs-review child stream",
+          "date": "2026-04-18",
+          "status": "succeeded",
+          "manifest": ".runs/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124-docs-review/cli/2026-04-18T15-54-42-548Z-b8fdf93e/manifest.json",
+          "telemetry": ".runs/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124-docs-review/cli/2026-04-18T15-54-42-548Z-b8fdf93e/review/telemetry.json",
+          "summary": "Continuation docs-review child stream succeeded on the workspace-scoped artifact root with clean-success telemetry; freshness maintenance passed with CO-175 retained as owned rolling debt and no blocking changed paths."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review --base origin/main",
+          "date": "2026-04-18",
+          "status": "succeeded",
+          "review_outcome": "bounded-success",
+          "manifest": ".runs/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124/cli/2026-04-18T05-35-22-749Z-3e368e6f/manifest.json",
+          "telemetry": ".runs/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124/cli/2026-04-18T05-35-22-749Z-3e368e6f/review/telemetry.json",
+          "summary": "Parent review completed with startupAnchorObserved=true, preAnchorMetaSurfaceSignals=0, and bounded-success via command-intent; this was successful bounded review completion, not a failed-boundary wrapper blocker."
+        },
+        "elegance_review": {
+          "reviewer": "provider worker parent lane",
+          "date": "2026-04-18",
+          "status": "completed",
+          "artifact": "out/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124/manual/20260418T1621Z-final-elegance-review.md",
+          "summary": "The final pass kept the implementation limited to the two review-support skill entrypoints, preserved unrelated codex-skills boundary accounting, and found no need for broader abstraction or timeout changes."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124.md",
+        "task": "tasks/tasks-linear-4b6dd62c-dd51-4edc-89e3-24c773d93124.md",
+        "agent_task": ".agent/task/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124.md",
+        "docs": "docs/TECH_SPEC-linear-4b6dd62c-dd51-4edc-89e3-24c773d93124.md"
+      }
+    },
+    {
       "id": "20260418-linear-9ce7811e-45ca-4d04-b759-bc5e7da77511",
       "title": "Validation floor: restore handoff readiness after SelectedRunProjection timeout and docs/TASKS zero-headroom",
       "relates_to": "tasks/tasks-linear-9ce7811e-45ca-4d04-b759-bc5e7da77511.md",
@@ -43,6 +132,14 @@
       ],
       "last_review": "2026-04-18",
       "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-18",
+          "status": "succeeded",
+          "manifest": ".runs/linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26-co-248-docs-review/cli/2026-04-18T13-59-17-756Z-d73e637e/manifest.json",
+          "telemetry": ".runs/linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26-co-248-docs-review/cli/2026-04-18T13-59-17-756Z-d73e637e/review/telemetry.json",
+          "summary": "Docs-review child stream completed before implementation handoff; spec-guard passed and review telemetry reported clean-success for the CO-248 packet."
+        },
         "docs_packet_child_lane": {
           "reviewer": "bounded same-issue docs child lane",
           "date": "2026-04-18",
@@ -11819,54 +11916,6 @@
         "task": "tasks/tasks-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md",
         "agent_task": ".agent/task/linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md",
         "docs": "docs/TECH_SPEC-linear-2594bf7f-12f3-4e59-8b9f-62c551fe58a0.md"
-      }
-    },
-    {
-      "id": "20260418-linear-4b6dd62c-dd51-4edc-89e3-24c773d93124",
-      "title": "CO: eliminate residual startup-anchor standalone-review failures that still force manual fallback after CO-173",
-      "relates_to": "tasks/tasks-linear-4b6dd62c-dd51-4edc-89e3-24c773d93124.md",
-      "risk": "high",
-      "owners": [
-        "Codex"
-      ],
-      "last_review": "2026-04-18",
-      "approvals": {
-        "docs_review": {
-          "reviewer": "codex-orchestrator docs-review (direct fallback after child-stream provenance failure; repo freshness policy owner CO-175)",
-          "date": "2026-04-18",
-          "manifest": ".runs/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124/cli/2026-04-18T05-48-25-732Z-f5e259ca/manifest.json",
-          "override_reason": "Packaged same-issue child-stream and child-lane helper launches failed closed because the parent provider-worker manifest lacks provider_control_host provenance. Direct docs-review rerun then passed delegation-guard override, spec-guard, and docs:check for the CO-242 packet, and stopped only on docs:freshness:maintain block_policy_over_budget owned by CO-175 after the missing .agent/task registry row was fixed."
-        },
-        "docs_review_continuation": {
-          "reviewer": "codex-orchestrator docs-review child stream",
-          "date": "2026-04-18",
-          "status": "succeeded",
-          "manifest": ".runs/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124-docs-review/cli/2026-04-18T15-54-42-548Z-b8fdf93e/manifest.json",
-          "telemetry": ".runs/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124-docs-review/cli/2026-04-18T15-54-42-548Z-b8fdf93e/review/telemetry.json",
-          "summary": "Continuation docs-review child stream succeeded on the workspace-scoped artifact root with clean-success telemetry; freshness maintenance passed with CO-175 retained as owned rolling debt and no blocking changed paths."
-        },
-        "standalone_review": {
-          "reviewer": "codex-orchestrator review --base origin/main",
-          "date": "2026-04-18",
-          "status": "succeeded",
-          "review_outcome": "bounded-success",
-          "manifest": ".runs/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124/cli/2026-04-18T05-35-22-749Z-3e368e6f/manifest.json",
-          "telemetry": ".runs/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124/cli/2026-04-18T05-35-22-749Z-3e368e6f/review/telemetry.json",
-          "summary": "Parent review completed with startupAnchorObserved=true, preAnchorMetaSurfaceSignals=0, and bounded-success via command-intent; this was successful bounded review completion, not a failed-boundary wrapper blocker."
-        },
-        "elegance_review": {
-          "reviewer": "provider worker parent lane",
-          "date": "2026-04-18",
-          "status": "completed",
-          "artifact": "out/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124/manual/20260418T1621Z-final-elegance-review.md",
-          "summary": "The final pass kept the implementation limited to the two review-support skill entrypoints, preserved unrelated codex-skills boundary accounting, and found no need for broader abstraction or timeout changes."
-        }
-      },
-      "paths": {
-        "spec": "tasks/specs/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124.md",
-        "task": "tasks/tasks-linear-4b6dd62c-dd51-4edc-89e3-24c773d93124.md",
-        "agent_task": ".agent/task/linear-4b6dd62c-dd51-4edc-89e3-24c773d93124.md",
-        "docs": "docs/TECH_SPEC-linear-4b6dd62c-dd51-4edc-89e3-24c773d93124.md"
       }
     },
     {
