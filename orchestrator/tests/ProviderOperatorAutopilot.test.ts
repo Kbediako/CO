@@ -261,6 +261,42 @@ describe('providerOperatorAutopilot', () => {
     expect(result.summary).toContain('0 duplicate-cleanup, 1 ready-to-unblock');
   });
 
+  it('ignores unrelated canonical-owner markers as duplicate-cleanup evidence', async () => {
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createTrackedIssue({
+          id: 'lin-issue-266',
+          identifier: 'CO-266',
+          state: 'Blocked',
+          state_type: 'started',
+          description: 'codex-orchestrator:canonical-owner-key=unrelated-cleanup-owner',
+          blocked_by: [
+            {
+              id: 'lin-issue-254',
+              identifier: 'CO-254',
+              state: 'Done',
+              state_type: 'completed'
+            }
+          ]
+        })
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    });
+
+    expect(result.terminal_blocker_advisories).toMatchObject([
+      {
+        issue_id: 'lin-issue-266',
+        issue_identifier: 'CO-266',
+        recommended_action: 'ready_to_unblock',
+        canonical_owner_hints: [],
+        duplicate_hints: []
+      }
+    ]);
+    expect(result.summary).toContain('0 duplicate-cleanup, 1 ready-to-unblock');
+  });
+
   it('does not treat non-duplicate relations to Duplicate-state blockers as duplicate-cleanup evidence', async () => {
     const result = await runProviderOperatorAutopilot({
       tracked_issues: [
@@ -327,6 +363,51 @@ describe('providerOperatorAutopilot', () => {
               identifier: 'CO-255',
               state: 'In Progress',
               state_type: 'started'
+            }
+          ]
+        })
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    });
+
+    expect(result.status).toBe('noop');
+    expect(result.terminal_blocker_advisories).toEqual([]);
+  });
+
+  it.each([
+    {
+      label: 'archived-only',
+      archived_at: '2026-04-09T10:07:00.000Z',
+      trashed: false
+    },
+    {
+      label: 'trashed-only',
+      archived_at: null,
+      trashed: true
+    },
+    {
+      label: 'archived-and-trashed',
+      archived_at: '2026-04-09T10:07:00.000Z',
+      trashed: true
+    }
+  ])('does not surface $label terminal-blocker advisories', async ({ archived_at, trashed }) => {
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createTrackedIssue({
+          id: 'lin-issue-266',
+          identifier: 'CO-266',
+          state: 'Blocked',
+          state_type: 'started',
+          archived_at,
+          trashed,
+          blocked_by: [
+            {
+              id: 'lin-issue-254',
+              identifier: 'CO-254',
+              state: 'Done',
+              state_type: 'completed'
             }
           ]
         })

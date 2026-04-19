@@ -45,6 +45,12 @@ const BLOCKED_STATE_NAME = 'blocked';
 const CANONICAL_OWNER_MARKER_PREFIX = 'codex-orchestrator:canonical-owner-key=';
 const SUPERSEDED_CANONICAL_OWNER_MARKER_PREFIX =
   'codex-orchestrator:superseded-canonical-owner-key=';
+const TERMINAL_BLOCKER_ADVISORY_CANONICAL_OWNER_KEY =
+  'blocked-terminal-blocker-cleanup-advisory';
+const TERMINAL_BLOCKER_ADVISORY_CANONICAL_OWNER_MARKERS = new Set([
+  `${CANONICAL_OWNER_MARKER_PREFIX}${TERMINAL_BLOCKER_ADVISORY_CANONICAL_OWNER_KEY}`,
+  `${SUPERSEDED_CANONICAL_OWNER_MARKER_PREFIX}${TERMINAL_BLOCKER_ADVISORY_CANONICAL_OWNER_KEY}`
+]);
 const DEFAULT_BACKLOG_PROMOTION_SNAPSHOT_MAX_UNTRACKED_CYCLES = 3;
 const DEFAULT_BACKLOG_PROMOTION_SNAPSHOT_TERMINAL_STATE_TYPES = [
   'completed',
@@ -1130,6 +1136,9 @@ function collectTerminalBlockerAdvisories(
       if (normalizeProviderLinearWorkflowState(issue.state) !== BLOCKED_STATE_NAME) {
         return [];
       }
+      if (!isProviderLinearTrackedIssueMutable(issue)) {
+        return [];
+      }
       const blockers = issue.blocked_by ?? [];
       if (blockers.length === 0 || !blockers.every(isTerminalBlocker)) {
         return [];
@@ -1206,7 +1215,10 @@ function resolveCanonicalOwnerHints(issue: Pick<LiveLinearTrackedIssue, 'descrip
       ) {
         markerEnd += 1;
       }
-      hints.add(description.slice(markerStart, markerEnd));
+      const marker = description.slice(markerStart, markerEnd);
+      if (TERMINAL_BLOCKER_ADVISORY_CANONICAL_OWNER_MARKERS.has(marker)) {
+        hints.add(marker);
+      }
       cursor = markerEnd + 1;
     }
   }
