@@ -5,7 +5,7 @@ relates_to: docs/PRD-coordinator-live-linear-tracked-issue-by-id-query-string-co
 risk: high
 owners:
   - Codex
-last_review: 2026-03-19
+last_review: 2026-04-19
 dependencies:
   - docs/findings/1304-live-linear-tracked-issue-by-id-query-string-contract-fix-deliberation.md
   - docs/ACTION_PLAN-coordinator-live-linear-tracked-issue-by-id-query-string-contract-fix.md
