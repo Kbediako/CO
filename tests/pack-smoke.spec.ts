@@ -461,10 +461,34 @@ function updateShellControlDepth(depth: number, line: string): number {
 
 function getCommandSubstitutionDepth(text: string): number {
   let depth = 0;
+  let quote: '"' | "'" | null = null;
   for (let index = 0; index < text.length; index += 1) {
     const current = text[index];
+    if (quote) {
+      if (quote === '"' && current === '\\') {
+        index += 1;
+        continue;
+      }
+      if (current === quote) {
+        quote = null;
+        continue;
+      }
+      if (quote === '"' && current === '$' && text[index + 1] === '(') {
+        depth += 1;
+        index += 1;
+        continue;
+      }
+      if (current === ')' && depth > 0) {
+        depth -= 1;
+      }
+      continue;
+    }
     if (current === '\\') {
       index += 1;
+      continue;
+    }
+    if (current === '"' || current === "'") {
+      quote = current;
       continue;
     }
     if ((current === '$' || current === '<' || current === '>') && text[index + 1] === '(') {
@@ -589,10 +613,25 @@ function getShellFunctionOpenBraceIndexes(line: string, pendingDefinition: boole
 function updateShellFunctionState(depth: number, pendingDefinition: boolean, line: string): ShellFunctionState {
   const functionOpenBraceIndexes = getShellFunctionOpenBraceIndexes(line, pendingDefinition);
   let nextDepth = depth;
+  let quote: '"' | "'" | null = null;
   for (let index = 0; index < line.length; index += 1) {
     const current = line[index];
+    if (quote) {
+      if (quote === '"' && current === '\\') {
+        index += 1;
+        continue;
+      }
+      if (current === quote) {
+        quote = null;
+      }
+      continue;
+    }
     if (current === '\\') {
       index += 1;
+      continue;
+    }
+    if (current === '"' || current === "'") {
+      quote = current;
       continue;
     }
     if (current === '{' && (nextDepth > 0 || functionOpenBraceIndexes.has(index))) {
@@ -749,7 +788,17 @@ function isContinueOnErrorEnabled(value: unknown): boolean {
   if (value === true) {
     return true;
   }
-  return typeof value === 'string' && value.trim().length > 0 && value.trim() !== 'false';
+  if (typeof value !== 'string') {
+    return false;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return false;
+  }
+  if (trimmed === 'true') {
+    return true;
+  }
+  return trimmed !== 'false' && !isAlwaysFalseCondition(trimmed);
 }
 
 describe('scripts/pack-smoke env isolation', () => {
@@ -974,6 +1023,8 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(hasPackSmokeCommand(`echo ok # ; ${packSmokeCommand}`)).toBe(false);
     expect(hasPackSmokeCommand(`printf '%s # ; ${packSmokeCommand}'`)).toBe(false);
     expect(hasPackSmokeCommand(`echo "$(${packSmokeCommand})"`)).toBe(true);
+    expect(hasPackSmokeCommand(`echo "<(${packSmokeCommand})"`)).toBe(false);
+    expect(hasPackSmokeCommand(`echo ">(${packSmokeCommand})"`)).toBe(false);
     expect(hasPackSmokeCommand(`echo before; ${packSmokeCommand}`)).toBe(true);
     expect(hasPackSmokeCommand(`echo foo#bar; ${packSmokeCommand}`)).toBe(true);
     expect(hasPackSmokeCommand(`cat <<'EOF-MARK'\n${packSmokeCommand}\nEOF-MARK`)).toBe(false);
@@ -1041,6 +1092,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(hasNonBlockingPackSmokeCommand(`run_smoke ()\n{\n  ${packSmokeCommand}\n}`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`run_smoke() { ${packSmokeCommand}; }`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`run_smoke() { echo setup; ${packSmokeCommand}; }`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`run_smoke() { echo "}"; ${packSmokeCommand}; }`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`run_smoke() { { echo setup; } ${packSmokeCommand}; }`)).toBe(
       true
     );
@@ -1072,6 +1124,8 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(hasNonBlockingPackSmokeCommand(`printf '%s\\n' '${packSmokeCommand}'`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`echo ok # ; ${packSmokeCommand}`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`echo "$(${packSmokeCommand})"`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`echo "<(${packSmokeCommand})"`)).toBe(false);
+    expect(hasNonBlockingPackSmokeCommand(`echo ">(${packSmokeCommand})"`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`echo <(${packSmokeCommand})`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`cat >(${packSmokeCommand})`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`npm run lint || true && ${packSmokeCommand}`)).toBe(true);
@@ -1083,7 +1137,11 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(hasNonBlockingPackSmokeCommand(`echo ${packSmokeCommand} || true`)).toBe(false);
     expect(isContinueOnErrorEnabled(true)).toBe(true);
     expect(isContinueOnErrorEnabled('true')).toBe(true);
+    expect(isContinueOnErrorEnabled('${{ true }}')).toBe(true);
     expect(isContinueOnErrorEnabled('false')).toBe(false);
+    expect(isContinueOnErrorEnabled('${{ false }}')).toBe(false);
+    expect(isContinueOnErrorEnabled("${{ fromJSON('false') }}")).toBe(false);
+    expect(isContinueOnErrorEnabled('${{ 1 == 2 }}')).toBe(false);
     expect(getStepCondition({})).toBe('success()');
     expect(getJobCondition({})).toBe('success()');
     expect(combineWorkflowConditions('false', 'success()')).toBe('false');
