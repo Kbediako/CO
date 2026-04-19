@@ -42,6 +42,7 @@ const CODERABBIT_ISSUE_COMMENT_COMPLETION_PATTERNS = [
   /Everything is clean\b/iu,
   /PR is ready to merge\b/iu
 ];
+const CODERABBIT_STATUS_NAMES = new Set(['coderabbit', 'coderabbitai', 'code rabbit', 'code rabbit ai']);
 
 function normalizeReadinessMode(rawValue) {
   return typeof rawValue === 'string' && rawValue.trim().toLowerCase() === 'review' ? 'review' : 'merge';
@@ -130,11 +131,14 @@ query($owner:String!, $repo:String!, $number:Int!) {
                     name
                     status
                     conclusion
+                    startedAt
+                    completedAt
                     detailsUrl
                   }
                   ... on StatusContext {
                     context
                     state
+                    createdAt
                     targetUrl
                   }
                 }
@@ -513,6 +517,13 @@ function maxTimestamp(values) {
     }
   }
   return max;
+}
+
+function isCoderabbitStatusName(value) {
+  const normalized = typeof value === 'string'
+    ? value.trim().toLowerCase().replace(/\s+/gu, ' ')
+    : '';
+  return CODERABBIT_STATUS_NAMES.has(normalized);
 }
 
 function resolveBotKindFromLogin(login) {
@@ -931,6 +942,213 @@ function summarizeChecks(nodes) {
   return summary;
 }
 
+function normalizeRollupCheckState(node) {
+  if (!node || typeof node !== 'object') {
+    return null;
+  }
+  const typeName = typeof node.__typename === 'string' ? node.__typename : '';
+  if (typeName === 'CheckRun') {
+    const name = typeof node.name === 'string' && node.name.trim() ? node.name.trim() : 'check-run';
+    const status = normalizeEnum(node.status);
+    const startedAt = typeof node.startedAt === 'string' ? node.startedAt : null;
+    const completedAt = typeof node.completedAt === 'string' ? node.completedAt : null;
+    const observedAt = status === 'COMPLETED' ? completedAt ?? startedAt : startedAt;
+    const observedAtMs = parseTimestampMs(observedAt);
+    if (status !== 'COMPLETED') {
+      return {
+        name,
+        state: 'pending',
+        signal: status || 'PENDING',
+        observedAt,
+        observedAtMs,
+        detailsUrl: typeof node.detailsUrl === 'string' ? node.detailsUrl : null
+      };
+    }
+    const conclusion = normalizeEnum(node.conclusion);
+    if (conclusion === 'SUCCESS') {
+      return {
+        name,
+        state: 'success',
+        signal: conclusion || 'SUCCESS',
+        observedAt,
+        observedAtMs,
+        detailsUrl: typeof node.detailsUrl === 'string' ? node.detailsUrl : null
+      };
+    }
+    return {
+      name,
+      state: 'failed',
+      signal: conclusion || 'UNKNOWN',
+      observedAt,
+      observedAtMs,
+      detailsUrl: typeof node.detailsUrl === 'string' ? node.detailsUrl : null
+    };
+  }
+
+  if (typeName === 'StatusContext') {
+    const name = typeof node.context === 'string' && node.context.trim() ? node.context.trim() : 'status-context';
+    const state = normalizeEnum(node.state);
+    const observedAt = typeof node.createdAt === 'string' ? node.createdAt : null;
+    const observedAtMs = parseTimestampMs(observedAt);
+    if (STATUS_CONTEXT_PENDING_STATES.has(state)) {
+      return {
+        name,
+        state: 'pending',
+        signal: state || 'PENDING',
+        observedAt,
+        observedAtMs,
+        detailsUrl: typeof node.targetUrl === 'string' ? node.targetUrl : null
+      };
+    }
+    if (STATUS_CONTEXT_PASS_STATES.has(state)) {
+      return {
+        name,
+        state: 'success',
+        signal: state || 'SUCCESS',
+        observedAt,
+        observedAtMs,
+        detailsUrl: typeof node.targetUrl === 'string' ? node.targetUrl : null
+      };
+    }
+    return {
+      name,
+      state: 'failed',
+      signal: state || 'UNKNOWN',
+      observedAt,
+      observedAtMs,
+      detailsUrl: typeof node.targetUrl === 'string' ? node.targetUrl : null
+    };
+  }
+
+  return null;
+}
+
+function summarizeCoderabbitStatusCheckRollup(nodes) {
+  const contexts = [];
+  if (Array.isArray(nodes)) {
+    for (const node of nodes) {
+      const context = normalizeRollupCheckState(node);
+      if (!context || !isCoderabbitStatusName(context.name)) {
+        continue;
+      }
+      contexts.push(context);
+    }
+  }
+  let state = 'missing';
+  if (contexts.some((context) => context.state === 'pending')) {
+    state = 'pending';
+  } else if (contexts.some((context) => context.state === 'failed')) {
+    state = 'failed';
+  } else if (contexts.some((context) => context.state === 'success')) {
+    state = 'success';
+  }
+  const latestSuccessAtMs = maxTimestamp(
+    contexts
+      .filter((context) => context.state === 'success')
+      .map((context) => context.observedAtMs)
+  );
+  return {
+    state,
+    contexts,
+    latestSuccessAtMs
+  };
+}
+
+function resolveCoderabbitPendingBlockerSignal(coderabbitStatusCheckRollup, requestAtMs = null) {
+  if (!coderabbitStatusCheckRollup || typeof coderabbitStatusCheckRollup !== 'object') {
+    return 'status_check_rollup=unknown';
+  }
+  const names = Array.isArray(coderabbitStatusCheckRollup.contexts)
+    ? coderabbitStatusCheckRollup.contexts.map((context) => context.name).filter(Boolean)
+    : [];
+  const suffix = names.length > 0 ? `:${names.join('+')}` : '';
+  const baseSignal = `status_check_rollup=${coderabbitStatusCheckRollup.state || 'unknown'}${suffix}`;
+  if (coderabbitStatusCheckRollup.state !== 'success') {
+    return baseSignal;
+  }
+  if (typeof requestAtMs !== 'number' || !Number.isFinite(requestAtMs)) {
+    return `${baseSignal};request_time=unknown`;
+  }
+  const latestSuccessAtMs = coderabbitStatusCheckRollup.latestSuccessAtMs;
+  if (typeof latestSuccessAtMs !== 'number' || !Number.isFinite(latestSuccessAtMs)) {
+    return `${baseSignal};success_time=unknown`;
+  }
+  if (latestSuccessAtMs <= requestAtMs) {
+    return `${baseSignal};success_before_request`;
+  }
+  return baseSignal;
+}
+
+function resolveEffectiveBotRereviewSignals({
+  pendingBots,
+  coderabbitStatusCheckRollup,
+  requestTimesByBot,
+  hasUnresolvedThread,
+  unacknowledgedBotFeedbackCount,
+  botFeedbackFetchError
+}) {
+  const rawPendingBots = Array.isArray(pendingBots) ? pendingBots : [];
+  const effectivePendingBots = [];
+  const clearedPendingBots = [];
+  const canTrustResolvedFeedbackTruth =
+    !hasUnresolvedThread && unacknowledgedBotFeedbackCount === 0 && botFeedbackFetchError !== true;
+  const requestTimes =
+    requestTimesByBot && typeof requestTimesByBot === 'object' ? requestTimesByBot : {};
+  const coderabbitRequestAtMs =
+    typeof requestTimes[BOT_KIND_LABELS.coderabbit] === 'number' &&
+    Number.isFinite(requestTimes[BOT_KIND_LABELS.coderabbit])
+      ? requestTimes[BOT_KIND_LABELS.coderabbit]
+      : null;
+  const coderabbitSuccessAtMs =
+    typeof coderabbitStatusCheckRollup?.latestSuccessAtMs === 'number' &&
+    Number.isFinite(coderabbitStatusCheckRollup.latestSuccessAtMs)
+      ? coderabbitStatusCheckRollup.latestSuccessAtMs
+      : null;
+  const coderabbitSuccessAfterRequest =
+    coderabbitStatusCheckRollup?.state === 'success' &&
+    coderabbitRequestAtMs !== null &&
+    coderabbitSuccessAtMs !== null &&
+    coderabbitSuccessAtMs > coderabbitRequestAtMs;
+  for (const bot of rawPendingBots) {
+    const isCoderabbit = bot === BOT_KIND_LABELS.coderabbit;
+    if (
+      isCoderabbit &&
+      coderabbitSuccessAfterRequest &&
+      canTrustResolvedFeedbackTruth
+    ) {
+      clearedPendingBots.push(bot);
+      continue;
+    }
+    effectivePendingBots.push(bot);
+  }
+  return {
+    rawPendingBots,
+    effectivePendingBots,
+    clearedPendingBots,
+    coderabbit: {
+      statusCheckRollup: coderabbitStatusCheckRollup,
+      stalePendingCleared: clearedPendingBots.includes(BOT_KIND_LABELS.coderabbit),
+      latestRequestAtMs: coderabbitRequestAtMs,
+      latestSuccessAtMs: coderabbitSuccessAtMs,
+      successAfterRequest: coderabbitSuccessAfterRequest,
+      pendingBlockerSignal: resolveCoderabbitPendingBlockerSignal(
+        coderabbitStatusCheckRollup,
+        coderabbitRequestAtMs
+      )
+    }
+  };
+}
+
+function formatBotRereviewPendingGateReason(pendingBots, diagnostics) {
+  const parts = pendingBots.map((bot) => {
+    if (bot === BOT_KIND_LABELS.coderabbit) {
+      return `${bot}(${diagnostics?.coderabbit?.pendingBlockerSignal ?? 'status_check_rollup=unknown'})`;
+    }
+    return bot;
+  });
+  return `bot_rereview_pending=${parts.join(',')}`;
+}
+
 export function summarizeRequiredChecks(entries) {
   const summary = {
     total: 0,
@@ -1118,6 +1336,7 @@ export function buildStatusSnapshot(response, requiredChecks = null, inlineBotFe
   const contexts = pr.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes;
   const checkNodes = Array.isArray(contexts) ? contexts : [];
   const checks = summarizeChecks(checkNodes);
+  const coderabbitStatusCheckRollup = summarizeCoderabbitStatusCheckRollup(checkNodes);
   const requiredCheckSummary =
     requiredChecks && typeof requiredChecks === 'object' && requiredChecks.total > 0 ? requiredChecks : null;
   const unacknowledgedBotFeedbackCount =
@@ -1129,7 +1348,7 @@ export function buildStatusSnapshot(response, requiredChecks = null, inlineBotFe
     ? inlineBotFeedback.rereview
     : null;
   const botRereviewFetchError = botRereview?.fetchError === true;
-  const botRereviewPending = Array.isArray(botRereview?.pendingBots) ? botRereview.pendingBots : [];
+  const rawBotRereviewPending = Array.isArray(botRereview?.pendingBots) ? botRereview.pendingBots : [];
   const botRereviewInProgress = Array.isArray(botRereview?.inProgressBots) ? botRereview.inProgressBots : [];
   const requiredChecksQueryFailed = options.requiredChecksQueryFailed === true;
   const githubRateLimits = Array.isArray(options.githubRateLimits)
@@ -1147,6 +1366,15 @@ export function buildStatusSnapshot(response, requiredChecks = null, inlineBotFe
   const mergeStateStatus = normalizeEnum(pr.mergeStateStatus);
   const state = normalizeEnum(pr.state);
   const isDraft = Boolean(pr.isDraft);
+  const botRereviewDiagnostics = resolveEffectiveBotRereviewSignals({
+    pendingBots: rawBotRereviewPending,
+    coderabbitStatusCheckRollup,
+    requestTimesByBot: botRereview?.requestTimesByBot,
+    hasUnresolvedThread,
+    unacknowledgedBotFeedbackCount,
+    botFeedbackFetchError
+  });
+  const botRereviewPending = botRereviewDiagnostics.effectivePendingBots;
 
   const gateReasons = [];
   if (state !== 'OPEN') {
@@ -1189,7 +1417,7 @@ export function buildStatusSnapshot(response, requiredChecks = null, inlineBotFe
   if (botRereviewFetchError) {
     gateReasons.push('bot_rereview=unknown');
   } else if (botRereviewPending.length > 0) {
-    gateReasons.push(`bot_rereview_pending=${botRereviewPending.join(',')}`);
+    gateReasons.push(formatBotRereviewPendingGateReason(botRereviewPending, botRereviewDiagnostics));
   }
 
   return {
@@ -1209,6 +1437,7 @@ export function buildStatusSnapshot(response, requiredChecks = null, inlineBotFe
     botRereviewFetchError,
     botRereviewPending,
     botRereviewInProgress,
+    botRereviewDiagnostics,
     coderabbitReviewMeta,
     checks,
     requiredChecks: requiredCheckSummary,
@@ -1379,6 +1608,14 @@ function formatStatusLine(snapshot, quietRemainingMs) {
   const githubRateLimit = snapshot.githubRateLimit
     ? `${snapshot.githubRateLimit.surface ?? 'unknown'}/${snapshot.githubRateLimit.limit_type ?? 'unknown'}`
     : 'none';
+  const coderabbitRollup = snapshot.botRereviewDiagnostics?.coderabbit?.statusCheckRollup;
+  const coderabbitRollupState = coderabbitRollup?.state ?? 'unknown';
+  const coderabbitRollupNames = Array.isArray(coderabbitRollup?.contexts)
+    ? coderabbitRollup.contexts.map((context) => context.name).filter(Boolean).join('+') || '-'
+    : '-';
+  const clearedRereviewPending = Array.isArray(snapshot.botRereviewDiagnostics?.clearedPendingBots)
+    ? snapshot.botRereviewDiagnostics.clearedPendingBots.join(', ') || '-'
+    : '-';
   return [
     `PR #${snapshot.number}`,
     `state=${snapshot.state}`,
@@ -1400,6 +1637,9 @@ function formatStatusLine(snapshot, quietRemainingMs) {
     `bot_rereview_fetch_error=${snapshot.botRereviewFetchError ? 'yes' : 'no'}`,
     `bot_rereview_pending=[${snapshot.botRereviewPending.join(', ') || '-'}]`,
     `bot_rereview_in_progress=[${snapshot.botRereviewInProgress.join(', ') || '-'}]`,
+    `bot_rereview_cleared=[${clearedRereviewPending}]`,
+    `coderabbit_rollup=${coderabbitRollupState}`,
+    `coderabbit_rollup_contexts=[${coderabbitRollupNames}]`,
     `coderabbit_actionable=${snapshot.coderabbitReviewMeta.actionableCount}`,
     `coderabbit_out_of_diff=${snapshot.coderabbitReviewMeta.outsideDiffCount}`,
     `coderabbit_nitpick=${snapshot.coderabbitReviewMeta.nitpickCount}`,
@@ -1728,6 +1968,7 @@ async function fetchBotRereviewSignals(owner, repo, prNumber, headOid) {
 
     const pendingBots = [];
     const inProgressBots = [];
+    const requestTimesByBot = {};
     let hadSignalFetchError = false;
     let signalRateLimit = null;
     for (const kind of requestedKinds) {
@@ -1762,6 +2003,7 @@ async function fetchBotRereviewSignals(owner, repo, prNumber, headOid) {
       const hasActiveInProgress =
         inProgressAtMs !== null && (completeAtMs === null || inProgressAtMs > completeAtMs);
       const label = BOT_KIND_LABELS[kind] ?? kind;
+      requestTimesByBot[label] = request.createdAtMs;
       if (hasActiveInProgress) {
         inProgressBots.push(label);
       }
@@ -1775,6 +2017,7 @@ async function fetchBotRereviewSignals(owner, repo, prNumber, headOid) {
       rateLimit: signalRateLimit,
       pendingBots,
       inProgressBots,
+      requestTimesByBot,
       coderabbit
     };
   } catch (error) {

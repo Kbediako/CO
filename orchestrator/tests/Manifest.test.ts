@@ -4,11 +4,14 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
   appendCommandError,
+  backfillProviderControlHostLocatorFromEnv,
   bootstrapManifest,
   buildGuardrailSummary,
   ensureGuardrailStatus,
   loadManifest,
-  recordResumeEvent
+  recordResumeEvent,
+  saveManifest,
+  upsertGuardrailSummary
 } from '../src/cli/run/manifest.js';
 import { readRunSource0Payload } from '../src/cli/run/source0.js';
 import type { EnvironmentPaths } from '../src/cli/run/environment.js';
@@ -112,9 +115,146 @@ describe('bootstrapManifest', () => {
         issueUpdatedAt: '2026-03-20T00:00:00.000Z'
       });
 
+      expect(manifest.provider_launch_source).toBe('control-host');
       expect(manifest.provider_control_host_task_id).toBe('provider-host-task');
       expect(manifest.provider_control_host_run_id).toBe('provider-host-run');
       expect(manifest.workspace_path).toBe(repoRoot);
+    } finally {
+      if (previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE =
+          previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE;
+      }
+      if (previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID =
+          previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID;
+      }
+      if (previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID =
+          previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID;
+      }
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('backfills missing control-host provenance fields without overwriting conflicting manifest provenance', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-provider-control-host-backfill-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const pipeline: PipelineDefinition = { id: 'test', title: 'Test Pipeline', stages: [] };
+    const previousProviderEnv = {
+      CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: process.env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE,
+      CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID:
+        process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID,
+      CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID:
+        process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID
+    } as const;
+
+    process.env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE = 'control-host';
+    process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID = 'provider-host-task';
+    process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID = 'provider-host-run';
+
+    try {
+      const { manifest } = await bootstrapManifest('run-provider-contract-backfill', {
+        env,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      manifest.provider_launch_source = null;
+      manifest.provider_control_host_task_id = null;
+      manifest.provider_control_host_run_id = null;
+
+      expect(backfillProviderControlHostLocatorFromEnv(manifest)).toBe(true);
+      expect(manifest.provider_launch_source).toBe('control-host');
+      expect(manifest.provider_control_host_task_id).toBe('provider-host-task');
+      expect(manifest.provider_control_host_run_id).toBe('provider-host-run');
+
+      manifest.provider_control_host_task_id = 'different-control-host';
+      expect(backfillProviderControlHostLocatorFromEnv(manifest)).toBe(false);
+      expect(manifest.provider_control_host_task_id).toBe('different-control-host');
+      expect(manifest.provider_launch_source).toBe('control-host');
+      expect(manifest.provider_control_host_run_id).toBe('provider-host-run');
+    } finally {
+      if (previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE =
+          previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE;
+      }
+      if (previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID =
+          previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID;
+      }
+      if (previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID =
+          previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID;
+      }
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('reapplies missing control-host launch provenance before saving provider-worker manifests', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-provider-control-host-save-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const pipeline: PipelineDefinition = {
+      id: 'provider-linear-worker',
+      title: 'Provider Linear Worker',
+      stages: []
+    };
+    const previousProviderEnv = {
+      CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: process.env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE,
+      CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID:
+        process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID,
+      CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID:
+        process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID
+    } as const;
+
+    process.env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE = 'control-host';
+    process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID = 'provider-host-task';
+    process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID = 'provider-host-run';
+
+    try {
+      const { manifest, paths } = await bootstrapManifest('run-provider-contract-save', {
+        env,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      manifest.provider_launch_source = null;
+      await saveManifest(paths, manifest);
+
+      const persisted = JSON.parse(await readFile(paths.manifestPath, 'utf8')) as {
+        provider_launch_source?: string | null;
+        provider_control_host_task_id?: string | null;
+        provider_control_host_run_id?: string | null;
+      };
+      expect(persisted.provider_launch_source).toBe('control-host');
+      expect(persisted.provider_control_host_task_id).toBe('provider-host-task');
+      expect(persisted.provider_control_host_run_id).toBe('provider-host-run');
+      expect(manifest.provider_launch_source).toBe('control-host');
     } finally {
       if (previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE === undefined) {
         delete process.env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE;
@@ -1621,8 +1761,124 @@ describe('loadManifest', () => {
 });
 
 describe('buildGuardrailSummary', () => {
+  it('reports when spec-guard is not configured for the pipeline', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-guardrail-not-configured-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'guardrail-task'
+    };
+    try {
+      const pipeline: PipelineDefinition = {
+        id: 'guardrail-pipeline',
+        title: 'Guardrail Pipeline',
+        guardrailsRequired: false,
+        stages: []
+      };
+
+      const { manifest } = await bootstrapManifest('run-guardrail-not-configured', {
+        env,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      const summary = buildGuardrailSummary(manifest);
+      expect(summary).toBe('Guardrails: spec-guard not configured for this pipeline.');
+
+      const snapshot = ensureGuardrailStatus(manifest);
+      expect(snapshot.recommendation).toBeNull();
+      expect(snapshot.counts.total).toBe(0);
+      expect(snapshot.present).toBe(false);
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
   it('treats explicit spec-guard skip summaries as skipped', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-guardrail-skip-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'guardrail-task'
+    };
+
+    try {
+      const pipeline: PipelineDefinition = {
+        id: 'guardrail-pipeline',
+        title: 'Guardrail Pipeline',
+        stages: [{ kind: 'command', id: 'spec-guard', title: 'Spec guard', command: 'echo skip' }]
+      };
+
+      const { manifest } = await bootstrapManifest('run-guardrail-skip', {
+        env,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      const command = manifest.commands[0];
+      if (!command) {
+        throw new Error('Expected spec-guard command in manifest.');
+      }
+      command.status = 'succeeded';
+      command.summary = '[spec-guard] skipped: no guard script found';
+
+      const summary = buildGuardrailSummary(manifest);
+      expect(summary).toBe('Guardrails: spec-guard skipped (all 1 skipped).');
+
+      const snapshot = ensureGuardrailStatus(manifest);
+      expect(snapshot.counts.skipped).toBe(1);
+      expect(snapshot.counts.succeeded).toBe(0);
+      expect(snapshot.present).toBe(false);
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('preserves real failure summaries when guardrails are not configured', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-guardrail-summary-preserve-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'guardrail-task'
+    };
+
+    try {
+      const pipeline: PipelineDefinition = {
+        id: 'guardrail-pipeline',
+        title: 'Guardrail Pipeline',
+        guardrailsRequired: false,
+        stages: []
+      };
+
+      const { manifest } = await bootstrapManifest('run-guardrail-summary-preserve', {
+        env,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      manifest.summary = "Stage 'fail once' failed with exit code 1.";
+      upsertGuardrailSummary(manifest);
+
+      expect(manifest.summary).toBe("Stage 'fail once' failed with exit code 1.");
+      expect(buildGuardrailSummary(manifest)).toBe(
+        'Guardrails: spec-guard not configured for this pipeline.'
+      );
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('strips stale guardrail recommendations when guardrails are not configured', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-guardrail-recommendation-strip-'));
     const env: EnvironmentPaths = {
       repoRoot,
       runsRoot: join(repoRoot, '.runs'),
@@ -1633,10 +1889,11 @@ describe('buildGuardrailSummary', () => {
     const pipeline: PipelineDefinition = {
       id: 'guardrail-pipeline',
       title: 'Guardrail Pipeline',
-      stages: [{ kind: 'command', id: 'spec-guard', title: 'Spec guard', command: 'echo skip' }]
+      guardrailsRequired: false,
+      stages: []
     };
 
-    const { manifest } = await bootstrapManifest('run-guardrail-skip', {
+    const { manifest } = await bootstrapManifest('run-guardrail-recommendation-strip', {
       env,
       pipeline,
       parentRunId: null,
@@ -1644,19 +1901,63 @@ describe('buildGuardrailSummary', () => {
       approvalPolicy: null
     });
 
-    const command = manifest.commands[0];
-    if (!command) {
-      throw new Error('Expected spec-guard command in manifest.');
+    manifest.summary =
+      "Stage 'fail once' failed with exit code 1.\n" +
+      'Guardrail command missing; run "codex-orchestrator start diagnostics --approval-policy never --format json --no-interactive" to capture reviewer diagnostics.';
+
+    upsertGuardrailSummary(manifest);
+
+    expect(manifest.summary).toBe("Stage 'fail once' failed with exit code 1.");
+  });
+
+  it('replaces stale guardrail recommendations when a resumed guardrail later succeeds', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-guardrail-recommendation-refresh-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'guardrail-task'
+    };
+
+    try {
+      const pipeline: PipelineDefinition = {
+        id: 'guardrail-pipeline',
+        title: 'Guardrail Pipeline',
+        stages: [
+          {
+            kind: 'command',
+            id: 'spec-guard',
+            title: 'Spec guard',
+            command: 'echo ok'
+          }
+        ]
+      };
+
+      const { manifest } = await bootstrapManifest('run-guardrail-recommendation-refresh', {
+        env,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      const command = manifest.commands[0];
+      if (!command) {
+        throw new Error('Expected spec-guard command in manifest.');
+      }
+      command.status = 'succeeded';
+      manifest.summary =
+        "Stage 'fail once' failed with exit code 1.\n" +
+        'Guardrail command failed; re-run "codex-orchestrator start diagnostics --approval-policy never --format json --no-interactive" to gather failure artifacts.';
+
+      upsertGuardrailSummary(manifest);
+
+      expect(manifest.summary).toBe(
+        "Stage 'fail once' failed with exit code 1.\n" +
+          'Guardrails: spec-guard succeeded (1 passed).'
+      );
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
     }
-    command.status = 'succeeded';
-    command.summary = '[spec-guard] skipped: no guard script found';
-
-    const summary = buildGuardrailSummary(manifest);
-    expect(summary).toBe('Guardrails: spec-guard skipped (all 1 skipped).');
-
-    const snapshot = ensureGuardrailStatus(manifest);
-    expect(snapshot.counts.skipped).toBe(1);
-    expect(snapshot.counts.succeeded).toBe(0);
-    expect(snapshot.present).toBe(false);
   });
 });

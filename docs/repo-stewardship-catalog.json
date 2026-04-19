@@ -227,6 +227,13 @@
       "rationale": "Tracked `.agent` surfaces remain active agent-instruction or task mirrors that should stay reviewable."
     },
     {
+      "glob": ".agents/**/*",
+      "surface_class": "repo_config",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Packaged repo-root marketplace and plugin catalog metadata remain explicit shipped configuration surfaces."
+    },
+    {
       "glob": ".ai-dev-tasks/**/*",
       "surface_class": "tasking_and_docs",
       "decision": "validate",
@@ -281,6 +288,13 @@
       "decision": "validate",
       "owner": "Codex (top-level agent), Review agent",
       "rationale": "CLI entrypoint sources remain active validation surfaces."
+    },
+    {
+      "glob": "plugins/**/*",
+      "surface_class": "code_surface",
+      "decision": "validate",
+      "owner": "Codex (top-level agent), Review agent",
+      "rationale": "Packaged plugin manifests and launchers remain active shipped runtime surfaces."
     },
     {
       "glob": "scripts/**/*",

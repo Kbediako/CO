@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildProviderIntakeSummary,
   normalizeProviderIntakeState,
+  selectProviderIntakeClaim,
   type ProviderIntakeState,
   upsertProviderIntakeClaim
 } from '../src/cli/control/providerIntakeState.js';
@@ -317,6 +318,79 @@ describe('upsertProviderIntakeClaim', () => {
     });
   });
 
+  it.each([
+    {
+      nextState: 'starting' as const,
+      nextReason: 'provider_issue_start_launched',
+      nextRunId: null,
+      nextRunManifestPath: null
+    },
+    {
+      nextState: 'resuming' as const,
+      nextReason: 'provider_issue_resume_launched',
+      nextRunId: 'run-1',
+      nextRunManifestPath: '/tmp/run-1/manifest.json'
+    },
+    {
+      nextState: 'running' as const,
+      nextReason: 'provider_issue_rehydrated_active_run',
+      nextRunId: 'run-1',
+      nextRunManifestPath: '/tmp/run-1/manifest.json'
+    }
+  ])(
+    'clears stale queued first-retry state while preserving retry error on $nextState claims',
+    ({ nextState, nextReason, nextRunId, nextRunManifestPath }) => {
+      const state = createProviderIntakeState();
+
+      upsertProviderIntakeClaim(state, {
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-1',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_title: 'Autonomous intake handoff',
+        issue_state: 'Ready',
+        issue_state_type: 'unstarted',
+        issue_updated_at: '2026-03-19T04:00:00.000Z',
+        task_id: 'linear-lin-issue-1',
+        mapping_source: 'provider_id_fallback',
+        state: 'accepted',
+        reason: 'provider_issue_retry_queued',
+        run_id: null,
+        run_manifest_path: null,
+        retry_queued: true,
+        retry_attempt: null,
+        retry_due_at: '2026-03-19T04:30:10.000Z',
+        retry_error: 'stale continuation queue'
+      });
+
+      const claim = upsertProviderIntakeClaim(state, {
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-1',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_title: 'Autonomous intake handoff',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-19T04:00:01.000Z',
+        task_id: 'linear-lin-issue-1',
+        mapping_source: 'provider_id_fallback',
+        state: nextState,
+        reason: nextReason,
+        run_id: nextRunId,
+        run_manifest_path: nextRunManifestPath
+      });
+
+      expect(claim).toMatchObject({
+        state: nextState,
+        reason: nextReason,
+        retry_queued: false,
+        retry_attempt: null,
+        retry_due_at: null,
+        retry_error: 'stale continuation queue'
+      });
+    }
+  );
+
   it('preserves launch provenance when the run id is first discovered during rehydrate', () => {
     const state = createProviderIntakeState();
 
@@ -528,14 +602,19 @@ describe('buildProviderIntakeSummary', () => {
     });
 
     expect(buildProviderIntakeSummary(state)).toMatchObject({
-      issue_identifier: 'CO-2',
-      issue_viewer_id: 'viewer-1',
-      state: 'handoff_owned',
-      reason: 'provider_issue_handoff_owned',
-      run_id: 'run-1',
-      freshness: 'fresh',
+      summary_scope: 'single_claim',
+      active_claim_count: 1,
+      running_claim_count: 0,
       rehydrated_at: null,
-      is_rehydrated: false
+      is_rehydrated: false,
+      selected_claim: {
+        issue_identifier: 'CO-2',
+        issue_viewer_id: 'viewer-1',
+        state: 'handoff_owned',
+        reason: 'provider_issue_handoff_owned',
+        run_id: 'run-1',
+        freshness: 'fresh'
+      }
     });
   });
 
@@ -575,10 +654,225 @@ describe('buildProviderIntakeSummary', () => {
     });
 
     expect(summary).toMatchObject({
-      freshness: 'rehydrated',
+      summary_scope: 'single_claim',
+      active_claim_count: 1,
+      running_claim_count: 1,
       rehydrated_at: '2026-03-19T04:45:00.000Z',
-      is_rehydrated: true
+      is_rehydrated: true,
+      selected_claim: {
+        issue_identifier: 'CO-2',
+        freshness: 'rehydrated'
+      }
     });
+  });
+
+  it('marks concurrent active claims as an explicitly scoped selected claim instead of provider-wide singular truth', () => {
+    const summary = buildProviderIntakeSummary({
+      schema_version: 1,
+      updated_at: '2026-04-18T06:10:00.000Z',
+      rehydrated_at: null,
+      latest_provider_key: 'linear:lin-issue-175',
+      latest_reason: 'provider_issue_rehydrated_active_run',
+      claims: [
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-175',
+          issue_id: 'lin-issue-175',
+          issue_identifier: 'CO-175',
+          issue_title: 'Provider intake claim one',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-18T06:09:00.000Z',
+          task_id: 'linear-co-175',
+          mapping_source: 'provider_id_fallback',
+          state: 'running',
+          reason: 'provider_issue_rehydrated_active_run',
+          accepted_at: '2026-04-18T06:09:05.000Z',
+          updated_at: '2026-04-18T06:09:30.000Z',
+          last_delivery_id: 'delivery-175',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_744_960_570_000,
+          run_id: 'run-175',
+          run_manifest_path: '/tmp/run-175/manifest.json',
+          retry_queued: true,
+          retry_attempt: 2,
+          retry_due_at: '2026-04-18T06:10:30.000Z',
+          retry_error: 'selected-claim retry detail',
+          launch_source: 'control-host',
+          launch_token: 'launch-175'
+        },
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-240',
+          issue_id: 'lin-issue-240',
+          issue_identifier: 'CO-240',
+          issue_title: 'Provider intake claim two',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-18T06:08:00.000Z',
+          task_id: 'linear-co-240',
+          mapping_source: 'provider_id_fallback',
+          state: 'running',
+          reason: 'provider_issue_rehydrated_active_run',
+          accepted_at: '2026-04-18T06:08:05.000Z',
+          updated_at: '2026-04-18T06:08:30.000Z',
+          last_delivery_id: 'delivery-240',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_744_960_510_000,
+          run_id: 'run-240',
+          run_manifest_path: '/tmp/run-240/manifest.json',
+          launch_source: 'control-host',
+          launch_token: 'launch-240'
+        },
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-242',
+          issue_id: 'lin-issue-242',
+          issue_identifier: 'CO-242',
+          issue_title: 'Provider intake claim three',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-18T06:07:00.000Z',
+          task_id: 'linear-co-242',
+          mapping_source: 'provider_id_fallback',
+          state: 'running',
+          reason: 'provider_issue_rehydrated_active_run',
+          accepted_at: '2026-04-18T06:07:05.000Z',
+          updated_at: '2026-04-18T06:07:30.000Z',
+          last_delivery_id: 'delivery-242',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_744_960_450_000,
+          run_id: 'run-242',
+          run_manifest_path: '/tmp/run-242/manifest.json',
+          launch_source: 'control-host',
+          launch_token: 'launch-242'
+        }
+      ]
+    });
+
+    expect(summary).toMatchObject({
+      summary_scope: 'selected_claim',
+      selection_strategy: 'state_rank_updated_at',
+      claim_count: 3,
+      active_claim_count: 3,
+      running_claim_count: 3,
+      active_issue_identifiers: ['CO-175', 'CO-240', 'CO-242'],
+      running_issue_identifiers: ['CO-175', 'CO-240', 'CO-242'],
+      selected_claim: {
+        issue_identifier: 'CO-175',
+        task_id: 'linear-co-175',
+        state: 'running',
+        retry: {
+          active: true,
+          attempt: 2,
+          due_at: '2026-04-18T06:10:30.000Z',
+          error: 'selected-claim retry detail'
+        }
+      }
+    });
+  });
+
+  it('prefers an active claim over inactive released history when multiple active claims remain', () => {
+    const state = {
+      schema_version: 1,
+      updated_at: '2026-04-18T06:10:00.000Z',
+      rehydrated_at: null,
+      latest_provider_key: 'linear:lin-issue-300',
+      latest_reason: 'provider_issue_handoff_failed',
+      claims: [
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-300',
+          issue_id: 'lin-issue-300',
+          issue_identifier: 'CO-300',
+          issue_title: 'Released historical claim',
+          issue_state: 'Done',
+          issue_state_type: 'completed',
+          issue_updated_at: '2026-04-18T06:10:00.000Z',
+          task_id: 'linear-co-300',
+          mapping_source: 'provider_id_fallback',
+          state: 'released',
+          reason: 'provider_issue_released',
+          accepted_at: '2026-04-18T06:09:00.000Z',
+          updated_at: '2026-04-18T06:10:00.000Z',
+          last_delivery_id: 'delivery-300',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_744_960_600_000,
+          run_id: 'run-300',
+          run_manifest_path: '/tmp/run-300/manifest.json',
+          launch_source: 'control-host',
+          launch_token: 'launch-300'
+        },
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-301',
+          issue_id: 'lin-issue-301',
+          issue_identifier: 'CO-301',
+          issue_title: 'Active failed handoff claim one',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-18T06:09:00.000Z',
+          task_id: 'linear-co-301',
+          mapping_source: 'provider_id_fallback',
+          state: 'handoff_failed',
+          reason: 'provider_issue_handoff_failed',
+          accepted_at: '2026-04-18T06:09:30.000Z',
+          updated_at: '2026-04-18T06:09:30.000Z',
+          last_delivery_id: 'delivery-301',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_744_960_570_000,
+          run_id: 'run-301',
+          run_manifest_path: '/tmp/run-301/manifest.json',
+          launch_source: 'control-host',
+          launch_token: 'launch-301'
+        },
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-302',
+          issue_id: 'lin-issue-302',
+          issue_identifier: 'CO-302',
+          issue_title: 'Active failed handoff claim two',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-18T06:08:00.000Z',
+          task_id: 'linear-co-302',
+          mapping_source: 'provider_id_fallback',
+          state: 'handoff_failed',
+          reason: 'provider_issue_handoff_failed',
+          accepted_at: '2026-04-18T06:08:30.000Z',
+          updated_at: '2026-04-18T06:08:30.000Z',
+          last_delivery_id: 'delivery-302',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_744_960_540_000,
+          run_id: 'run-302',
+          run_manifest_path: '/tmp/run-302/manifest.json',
+          launch_source: 'control-host',
+          launch_token: 'launch-302'
+        }
+      ]
+    } satisfies ProviderIntakeState;
+    const summary = buildProviderIntakeSummary(state);
+
+    expect(summary).toMatchObject({
+      summary_scope: 'selected_claim',
+      selection_strategy: 'state_rank_updated_at',
+      claim_count: 3,
+      active_claim_count: 2,
+      running_claim_count: 0,
+      active_issue_identifiers: ['CO-301', 'CO-302'],
+      updated_at: '2026-04-18T06:09:30.000Z',
+      selected_claim: {
+        issue_identifier: 'CO-301',
+        state: 'handoff_failed'
+      }
+    });
+    expect(selectProviderIntakeClaim(state)?.issue_identifier).toBe('CO-301');
   });
 });
 

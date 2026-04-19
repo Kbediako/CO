@@ -125,6 +125,10 @@ interface ProviderIssueClaimLike {
   issue_state?: string | null;
   issue_state_type?: string | null;
   issue_updated_at?: string | null;
+  retry_queued?: boolean | null;
+  retry_attempt?: number | null;
+  retry_due_at?: string | null;
+  retry_error?: string | null;
   review_promotion?: ProviderIssueReviewPromotionLike | null;
   merge_closeout?: ProviderIssueMergeCloseoutLike | null;
 }
@@ -275,6 +279,12 @@ export interface ControlProviderDebugSnapshot {
     worker_host?: string | null;
     launch_source: string | null;
     launch_started_at: string | null;
+    retry: {
+      active: boolean;
+      attempt: number | null;
+      due_at: string | null;
+      error: string | null;
+    } | null;
     freshness: ProviderIntakeClaimFreshness | null;
     is_rehydrated: boolean;
     rehydrated_at: string | null;
@@ -470,6 +480,7 @@ export function buildProviderIssueDebugSnapshot(input: {
           worker_host: normalizeProviderWorkerHostName(claim.worker_host),
           launch_source: normalizeOptionalString(claim.launch_source),
           launch_started_at: normalizeOptionalString(claim.launch_started_at),
+          retry: buildProviderClaimRetrySnapshot(claim),
           freshness: claimFreshness,
           is_rehydrated: claimIsRehydrated,
           rehydrated_at: normalizeOptionalString(input.rehydrated_at)
@@ -537,6 +548,30 @@ export function buildProviderIssueDebugSnapshot(input: {
     stall_classification: progress?.stall_classification ?? null,
     stall_reason: progress?.stall_reason ?? null,
     recovery_recommendation: progress?.recovery_recommendation ?? null
+  };
+}
+
+function buildProviderClaimRetrySnapshot(
+  claim: Pick<
+    ProviderIssueClaimLike,
+    'retry_queued' | 'retry_attempt' | 'retry_due_at' | 'retry_error'
+  > | null
+): NonNullable<ControlProviderDebugSnapshot['claim']>['retry'] {
+  if (!claim) {
+    return null;
+  }
+  const active = claim.retry_queued === true;
+  const attempt = normalizeOptionalInteger(claim.retry_attempt);
+  const dueAt = normalizeOptionalString(claim.retry_due_at);
+  const error = normalizeOptionalString(claim.retry_error);
+  if (!active && attempt === null && dueAt === null && error === null) {
+    return null;
+  }
+  return {
+    active,
+    attempt,
+    due_at: dueAt,
+    error
   };
 }
 

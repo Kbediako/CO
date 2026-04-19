@@ -280,7 +280,7 @@ describe('docs hygiene tooling', () => {
     await writeFile(join(repoRoot, 'tasks', 'index.json'), JSON.stringify({ items: [] }, null, 2), 'utf8');
     await writeFile(
       join(repoRoot, 'docs', 'tasks-archive-policy.json'),
-      JSON.stringify({ max_lines: 2 }, null, 2),
+      JSON.stringify({ max_lines: 3, reserve_lines: 1 }, null, 2),
       'utf8'
     );
     await writeFile(join(repoRoot, 'docs', 'TASKS.md'), '# Snapshot\n# Detail\n', 'utf8');
@@ -288,6 +288,43 @@ describe('docs hygiene tooling', () => {
     const errors = await runDocsCheck(repoRoot);
 
     expect(errors.find((error) => error.rule === 'tasks-file-too-large')).toBeUndefined();
+  });
+
+  it('flags docs/TASKS.md once it reaches zero headroom at the hard ceiling', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-tasks-zero-headroom-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot);
+    await writeFile(join(repoRoot, 'tasks', 'index.json'), JSON.stringify({ items: [] }, null, 2), 'utf8');
+    await writeFile(
+      join(repoRoot, 'docs', 'tasks-archive-policy.json'),
+      JSON.stringify({ max_lines: 2, reserve_lines: 1 }, null, 2),
+      'utf8'
+    );
+    await writeFile(join(repoRoot, 'docs', 'TASKS.md'), '# Snapshot\n# Detail', 'utf8');
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'docs/TASKS.md',
+        rule: 'tasks-file-too-large',
+        reference: 'lines=2 max=2 reserve=1 state=zero_headroom'
+      })
+    );
   });
 
   it('flags stale Codex posture references for catalogued front-door docs', async () => {

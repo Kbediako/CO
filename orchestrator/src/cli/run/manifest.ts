@@ -50,6 +50,7 @@ export interface ManifestBootstrapOptions {
 }
 
 interface ProviderControlHostLocator {
+  launchSource: string | null;
   taskId: string | null;
   runId: string | null;
 }
@@ -103,9 +104,9 @@ function resolveProviderControlHostLocatorFromEnv(
   const taskId = normalizeOptionalString(env[PROVIDER_CONTROL_HOST_TASK_ID_ENV]);
   const runId = normalizeOptionalString(env[PROVIDER_CONTROL_HOST_RUN_ID_ENV]);
   if (launchSource !== PROVIDER_LAUNCH_SOURCE_CONTROL_HOST || !taskId || !runId) {
-    return { taskId: null, runId: null };
+    return { launchSource: null, taskId: null, runId: null };
   }
-  return { taskId, runId };
+  return { launchSource, taskId, runId };
 }
 
 function normalizeOptionalString(value: unknown): string | null {
@@ -157,6 +158,7 @@ export async function bootstrapManifest(runId: string, options: ManifestBootstra
     issue_identifier: options.issueIdentifier ?? null,
     issue_updated_at: options.issueUpdatedAt ?? null,
     workspace_path: normalizeWorkspacePath(env.repoRoot),
+    provider_launch_source: providerControlHostLocator.launchSource,
     provider_control_host_task_id: providerControlHostLocator.taskId,
     provider_control_host_run_id: providerControlHostLocator.runId,
     summary: null,
@@ -277,6 +279,10 @@ export async function bootstrapManifest(runId: string, options: ManifestBootstra
 }
 
 export async function saveManifest(paths: RunPaths, manifest: CliManifest): Promise<void> {
+  const pipelineId = normalizeOptionalString(manifest.pipeline_id);
+  if (pipelineId === 'provider-linear-worker') {
+    backfillProviderControlHostLocatorFromEnv(manifest);
+  }
   manifest.updated_at = isoTimestamp();
   await writeJsonAtomic(paths.manifestPath, manifest);
 }
@@ -295,19 +301,37 @@ export async function loadManifest(env: EnvironmentPaths, runId: string): Promis
 
 export function backfillProviderControlHostLocatorFromEnv(
   manifest: CliManifest,
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  options: { overwriteConflicts?: boolean } = {}
 ): boolean {
   const locator = resolveProviderControlHostLocatorFromEnv(env);
-  if (!locator.taskId || !locator.runId) {
+  if (!locator.launchSource || !locator.taskId || !locator.runId) {
     return false;
   }
 
+  const manifestLaunchSource = normalizeOptionalString(manifest.provider_launch_source);
   const manifestTaskId = normalizeOptionalString(manifest.provider_control_host_task_id);
   const manifestRunId = normalizeOptionalString(manifest.provider_control_host_run_id);
-  if (manifestTaskId === locator.taskId && manifestRunId === locator.runId) {
+  if (
+    !options.overwriteConflicts &&
+    (
+      (manifestLaunchSource && manifestLaunchSource !== locator.launchSource) ||
+      (manifestTaskId && manifestTaskId !== locator.taskId) ||
+      (manifestRunId && manifestRunId !== locator.runId)
+    )
+  ) {
     return false;
   }
 
+  if (
+    manifestLaunchSource === locator.launchSource &&
+    manifestTaskId === locator.taskId &&
+    manifestRunId === locator.runId
+  ) {
+    return false;
+  }
+
+  manifest.provider_launch_source = locator.launchSource;
   manifest.provider_control_host_task_id = locator.taskId;
   manifest.provider_control_host_run_id = locator.runId;
   return true;
@@ -513,14 +537,22 @@ export function buildGuardrailSummary(manifest: CliManifest): string {
 }
 
 export function upsertGuardrailSummary(manifest: CliManifest): void {
-  const summary = buildGuardrailSummary(manifest);
+  const guardrailStatus = ensureGuardrailStatus(manifest);
   const existing = manifest.summary ? manifest.summary.split('\n') : [];
-  const filtered = existing.filter((line) => !line.toLowerCase().startsWith('guardrails:'));
-  filtered.push(summary);
-  manifest.summary = filtered.join('\n').trim();
-  if (manifest.summary.length === 0) {
-    manifest.summary = summary;
+  const filtered = existing.filter(
+    (line) =>
+      !line.toLowerCase().startsWith('guardrails:') && !isGuardrailRecommendationLine(line)
+  );
+  if (!shouldEmitGuardrailSummary(manifest, guardrailStatus)) {
+    manifest.summary = filtered.join('\n').trim() || null;
+    return;
   }
+
+  if (guardrailStatus.recommendation) {
+    filtered.push(guardrailStatus.recommendation);
+  }
+  filtered.push(guardrailStatus.summary);
+  manifest.summary = filtered.join('\n').trim() || guardrailStatus.summary;
 }
 
 function computeGuardrailStatus(manifest: CliManifest): GuardrailStatusSnapshot {
@@ -562,7 +594,7 @@ function computeGuardrailStatus(manifest: CliManifest): GuardrailStatusSnapshot 
       'Guardrail command failed; re-run "codex-orchestrator start diagnostics --approval-policy never --format json --no-interactive" to gather failure artifacts.';
   }
 
-  const summary = formatGuardrailSummary(counts);
+  const summary = formatGuardrailSummary(counts, guardrailsRequired);
 
   return {
     present,
@@ -610,9 +642,21 @@ function isExplicitGuardrailSkip(summary: string | null | undefined): boolean {
   );
 }
 
-function formatGuardrailSummary(counts: GuardrailCounts): string {
+function shouldEmitGuardrailSummary(
+  manifest: CliManifest,
+  snapshot: Pick<GuardrailStatusSnapshot, 'counts'>
+): boolean {
+  if (snapshot.counts.total > 0) {
+    return true;
+  }
+  return (manifest.guardrails_required ?? true) !== false;
+}
+
+function formatGuardrailSummary(counts: GuardrailCounts, guardrailsRequired: boolean): string {
   if (counts.total === 0) {
-    return 'Guardrails: spec-guard command not found.';
+    return guardrailsRequired
+      ? 'Guardrails: spec-guard command not found.'
+      : 'Guardrails: spec-guard not configured for this pipeline.';
   }
   if (counts.failed > 0) {
     return `Guardrails: spec-guard failed (${counts.failed}/${counts.total} failed).`;
@@ -636,6 +680,14 @@ function formatGuardrailSummary(counts: GuardrailCounts): string {
   }
 
   return `Guardrails: spec-guard partial (${parts.join(', ')} of ${counts.total}).`;
+}
+
+function isGuardrailRecommendationLine(line: string): boolean {
+  const trimmed = line.trim();
+  return (
+    trimmed.startsWith('Guardrail command missing;') ||
+    trimmed.startsWith('Guardrail command failed;')
+  );
 }
 
 export function appendSummary(manifest: CliManifest, message: string | null | undefined): void {

@@ -1,10 +1,17 @@
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
 import type { ControlPollingHealthPayload } from './providerPollingHealth.js';
-import type { ProviderIntakeSummaryPayload } from './providerIntakeState.js';
+import type {
+  ProviderIntakeRetrySummaryPayload,
+  ProviderIntakeSummaryPayload,
+  ProviderIntakeSummarySelectionStrategy,
+  ProviderIntakeSummaryScope,
+  ProviderIntakeSummaryState
+} from './providerIntakeState.js';
 import type { QuestionUrgency } from './questions.js';
 import type { ProviderLinearWorkerProof } from '../providerLinearWorkerRunner.js';
 import type {
   ControlProviderDebugSnapshot,
+  ProviderIntakeClaimFreshness,
   ProviderLinearWorkerProgressCandidate
 } from './providerIssueObservability.js';
 import { isProviderLinearWorkerProofFreshForStage } from './providerLinearWorkerTruth.js';
@@ -134,6 +141,7 @@ export interface ControlProviderOperatorAutopilotPendingActionPayload {
   merge_closeout_reason: string;
   shared_root_status: string | null;
   linear_transition_status: string | null;
+  executable_action_ids?: string[];
   lifecycle_state: 'pending' | 'acknowledged';
   lifecycle_actor: string | null;
   lifecycle_reason: string | null;
@@ -150,6 +158,7 @@ export interface ControlProviderOperatorAutopilotResolvedActionPayload {
   merge_closeout_reason: string;
   shared_root_status: string | null;
   linear_transition_status: string | null;
+  executable_action_ids?: string[];
   lifecycle_state: 'cleared' | 'dismissed';
   lifecycle_actor: string;
   lifecycle_reason: string;
@@ -165,7 +174,36 @@ export interface ControlProviderOperatorAutopilotLifecycleRecordPayload {
   actor: string;
   reason: string;
   recorded_at: string;
-  source: 'co-status';
+  source: 'co-status' | 'operator-autopilot';
+}
+
+export interface ControlProviderOperatorAutopilotLocalRolloutExecutionAttemptPayload {
+  record_kind?: 'started' | 'terminal';
+  action_instance_id: string;
+  action_id: string;
+  issue_id: string;
+  issue_identifier: string | null;
+  preflight: {
+    status: 'passed' | 'skipped' | 'failed';
+    reason: string | null;
+    checked_at: string;
+    summary: string;
+  };
+  started_at: string | null;
+  ended_at: string;
+  terminal_state: 'succeeded' | 'skipped' | 'failed';
+  reason: string | null;
+  summary: string;
+  command: {
+    runner: 'codex_orchestrator' | 'npm_script' | null;
+    command: string | null;
+    args: string[];
+    cwd: string | null;
+    timeout_ms: number | null;
+  };
+  exit_code: number | null;
+  stdout: string | null;
+  stderr: string | null;
 }
 
 export interface ControlProviderOperatorAutopilotLastResultPayload {
@@ -178,6 +216,7 @@ export interface ControlProviderOperatorAutopilotLastResultPayload {
   pending_actions: ControlProviderOperatorAutopilotPendingActionPayload[];
   resolved_actions?: ControlProviderOperatorAutopilotResolvedActionPayload[];
   lifecycle_records?: ControlProviderOperatorAutopilotLifecycleRecordPayload[];
+  local_rollout_execution_attempts?: ControlProviderOperatorAutopilotLocalRolloutExecutionAttemptPayload[];
 }
 
 export interface ControlProviderOperatorAutopilotPayload {
@@ -195,9 +234,11 @@ export interface ControlProviderOperatorAutopilotPayload {
   post_merge_rollout: {
     enabled: boolean;
     summary: string;
+    execution?: unknown;
   };
   audit_path: string;
   lifecycle_path?: string;
+  execution_path?: string;
   last_result: ControlProviderOperatorAutopilotLastResultPayload | null;
 }
 
@@ -362,12 +403,39 @@ export interface ControlRetryPayload {
   last_event_at: string | null;
 }
 
+export interface ControlProviderIntakeSelectedClaimPayload {
+  issue_identifier: string;
+  task_id: string;
+  state: ProviderIntakeSummaryState;
+  reason: string | null;
+  run_id: string | null;
+  freshness: ProviderIntakeClaimFreshness | null;
+  retry: ProviderIntakeRetrySummaryPayload | null;
+  worker_host?: string | null;
+}
+
+export interface ControlProviderIntakePayload {
+  summary_scope: ProviderIntakeSummaryScope;
+  selection_strategy: ProviderIntakeSummarySelectionStrategy | null;
+  claim_count: number;
+  active_claim_count: number;
+  running_claim_count: number;
+  active_issue_identifiers: string[];
+  running_issue_identifiers: string[];
+  selected_claim: ControlProviderIntakeSelectedClaimPayload;
+  rehydrated_at: string | null;
+  is_rehydrated: boolean;
+  updated_at: string;
+}
+
 export interface ControlStatePayload {
   generated_at: string;
   counts: {
     running: number;
     retrying: number;
   };
+  running_ids: string[];
+  retrying_ids: string[];
   running: ControlRunningPayload[];
   retrying: ControlRetryPayload[];
   codex_totals: ControlCodexTotalsPayload;
@@ -375,7 +443,7 @@ export interface ControlStatePayload {
   selected: ControlSelectedRunPayload | null;
   dispatch_pilot?: ControlDispatchPilotPayload;
   tracked?: ControlTrackedPayload;
-  provider_intake?: ProviderIntakeSummaryPayload;
+  provider_intake?: ControlProviderIntakePayload;
   provider_workflow?: ControlProviderWorkflowPayload;
   polling?: ControlPollingHealthPayload | null;
 }
@@ -556,6 +624,8 @@ export function resolveProviderWorkerHost(input: {
   providerLinearWorkerProof?: ProviderLinearWorkerProof | null | undefined;
   providerDebugSnapshot?: ControlProviderDebugSnapshot | null | undefined;
   providerIntake?: ProviderIntakeSummaryPayload | null | undefined;
+  issueIdentifier?: string | null | undefined;
+  issueId?: string | null | undefined;
   stageStartedAt?: string | null | undefined;
 }): string | null {
   const claimLaunchStartedAt = input.providerDebugSnapshot?.claim?.launch_started_at ?? null;
@@ -582,7 +652,35 @@ export function resolveProviderWorkerHost(input: {
   if (proofHost.kind === 'cleared') {
     return null;
   }
-  return normalizeProviderWorkerHostName(input.providerIntake?.worker_host);
+  const selectedClaim = input.providerIntake?.selected_claim ?? null;
+  if (!selectedClaim) {
+    return null;
+  }
+  const issueIdentifier = input.issueIdentifier ?? null;
+  const issueId = input.issueId ?? null;
+  if (
+    issueIdentifier !== null
+    && selectedClaim.issue_identifier !== issueIdentifier
+    && issueId !== null
+    && selectedClaim.issue_id !== issueId
+  ) {
+    return null;
+  }
+  if (
+    issueIdentifier !== null
+    && selectedClaim.issue_identifier !== issueIdentifier
+    && issueId === null
+  ) {
+    return null;
+  }
+  if (
+    issueId !== null
+    && selectedClaim.issue_id !== issueId
+    && issueIdentifier === null
+  ) {
+    return null;
+  }
+  return normalizeProviderWorkerHostName(selectedClaim.worker_host);
 }
 
 function readResolvedWorkerHost(
@@ -609,6 +707,8 @@ export function buildProjectionSelectedPayload(
     providerLinearWorkerProof: selected.providerLinearWorkerProof,
     providerDebugSnapshot: selected.providerDebugSnapshot,
     providerIntake,
+    issueIdentifier: selected.issueIdentifier,
+    issueId: selected.issueId,
     stageStartedAt: selected.startedAt
   });
   return {
@@ -644,6 +744,33 @@ export function buildProjectionSelectedPayload(
           provider_debug_snapshot: selected.providerDebugSnapshot
         }
       : {})
+  };
+}
+
+export function serializeProviderIntakeSummary(
+  providerIntake: ProviderIntakeSummaryPayload
+): ControlProviderIntakePayload {
+  return {
+    summary_scope: providerIntake.summary_scope,
+    selection_strategy: providerIntake.selection_strategy,
+    claim_count: providerIntake.claim_count,
+    active_claim_count: providerIntake.active_claim_count,
+    running_claim_count: providerIntake.running_claim_count,
+    active_issue_identifiers: [...providerIntake.active_issue_identifiers],
+    running_issue_identifiers: [...providerIntake.running_issue_identifiers],
+    selected_claim: {
+      issue_identifier: providerIntake.selected_claim.issue_identifier,
+      task_id: providerIntake.selected_claim.task_id,
+      state: providerIntake.selected_claim.state,
+      reason: providerIntake.selected_claim.reason,
+      run_id: providerIntake.selected_claim.run_id,
+      freshness: providerIntake.selected_claim.freshness,
+      retry: providerIntake.selected_claim.retry,
+      worker_host: providerIntake.selected_claim.worker_host ?? null
+    },
+    rehydrated_at: providerIntake.rehydrated_at,
+    is_rehydrated: providerIntake.is_rehydrated,
+    updated_at: providerIntake.updated_at
   };
 }
 
@@ -704,17 +831,7 @@ export function buildSelectedRunRuntimeFingerprintInput(
           team_key: trackedLinear.team_key
         }
       : null,
-    provider_intake: providerIntake
-      ? {
-          issue_identifier: providerIntake.issue_identifier,
-          task_id: providerIntake.task_id,
-          state: providerIntake.state,
-          reason: providerIntake.reason,
-          run_id: providerIntake.run_id,
-          freshness: providerIntake.freshness,
-          rehydrated_at: providerIntake.rehydrated_at
-        }
-      : null,
+    provider_intake: providerIntake ? serializeProviderIntakeSummary(providerIntake) : null,
     provider_workflow: providerWorkflow
       ? {
           status: providerWorkflow.status,
@@ -780,10 +897,12 @@ export function buildSelectedRunRuntimeFingerprintInput(
                 },
                 post_merge_rollout: {
                   enabled: providerWorkflow.operator_autopilot.post_merge_rollout.enabled,
-                  summary: providerWorkflow.operator_autopilot.post_merge_rollout.summary
+                  summary: providerWorkflow.operator_autopilot.post_merge_rollout.summary,
+                  execution: providerWorkflow.operator_autopilot.post_merge_rollout.execution
                 },
                 audit_path: providerWorkflow.operator_autopilot.audit_path,
                 lifecycle_path: providerWorkflow.operator_autopilot.lifecycle_path,
+                execution_path: providerWorkflow.operator_autopilot.execution_path,
                 last_result: providerWorkflow.operator_autopilot.last_result
                   ? {
                       recorded_at: providerWorkflow.operator_autopilot.last_result.recorded_at,
@@ -829,6 +948,9 @@ export function buildSelectedRunRuntimeFingerprintInput(
                             merge_closeout_reason: pendingAction.merge_closeout_reason,
                             shared_root_status: pendingAction.shared_root_status,
                             linear_transition_status: pendingAction.linear_transition_status,
+                            executable_action_ids: [
+                              ...(pendingAction.executable_action_ids ?? [])
+                            ],
                             lifecycle_state: pendingAction.lifecycle_state,
                             lifecycle_actor: pendingAction.lifecycle_actor,
                             lifecycle_reason: pendingAction.lifecycle_reason,
@@ -848,6 +970,9 @@ export function buildSelectedRunRuntimeFingerprintInput(
                             merge_closeout_reason: resolvedAction.merge_closeout_reason,
                             shared_root_status: resolvedAction.shared_root_status,
                             linear_transition_status: resolvedAction.linear_transition_status,
+                            executable_action_ids: [
+                              ...(resolvedAction.executable_action_ids ?? [])
+                            ],
                             lifecycle_state: resolvedAction.lifecycle_state,
                             lifecycle_actor: resolvedAction.lifecycle_actor,
                             lifecycle_reason: resolvedAction.lifecycle_reason,
@@ -867,7 +992,39 @@ export function buildSelectedRunRuntimeFingerprintInput(
                             recorded_at: record.recorded_at,
                             source: record.source
                           })
-                        )
+                        ),
+                      local_rollout_execution_attempts:
+                        (
+                          providerWorkflow.operator_autopilot.last_result
+                            .local_rollout_execution_attempts ?? []
+                        ).map((attempt) => ({
+                          action_instance_id: attempt.action_instance_id,
+                          record_kind: attempt.record_kind,
+                          action_id: attempt.action_id,
+                          issue_id: attempt.issue_id,
+                          issue_identifier: attempt.issue_identifier,
+                          preflight: {
+                            status: attempt.preflight.status,
+                            reason: attempt.preflight.reason,
+                            checked_at: attempt.preflight.checked_at,
+                            summary: attempt.preflight.summary
+                          },
+                          started_at: attempt.started_at,
+                          ended_at: attempt.ended_at,
+                          terminal_state: attempt.terminal_state,
+                          reason: attempt.reason,
+                          summary: attempt.summary,
+                          command: {
+                            runner: attempt.command.runner,
+                            command: attempt.command.command,
+                            args: [...attempt.command.args],
+                            cwd: attempt.command.cwd,
+                            timeout_ms: attempt.command.timeout_ms
+                          },
+                          exit_code: attempt.exit_code,
+                          stdout: attempt.stdout,
+                          stderr: attempt.stderr
+                        }))
                     }
                   : null
               }

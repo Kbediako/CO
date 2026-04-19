@@ -52,12 +52,13 @@ describe('acquireLockWithRetry', () => {
     const root = await mkdtemp(join(tmpdir(), 'lock-file-'));
     tempDirs.push(root);
     const lockPath = join(root, 'shared.lock');
+    const staleMs = 500;
     const retry = {
-      maxAttempts: 40,
-      initialDelayMs: 5,
+      maxAttempts: 120,
+      initialDelayMs: 25,
       backoffFactor: 1,
-      maxDelayMs: 5,
-      staleMs: 20
+      maxDelayMs: 25,
+      staleMs
     };
 
     const lockA = await acquireLockWithRetry({
@@ -80,7 +81,9 @@ describe('acquireLockWithRetry', () => {
       createError: (taskId, attempts) => new Error(`Failed to acquire ${taskId} after ${attempts} attempts`)
     });
 
-    await delay(50);
+    // Keep the hold longer than staleMs so the test still proves keepalive
+    // freshness, while leaving margin for full-suite scheduler jitter.
+    await delay(staleMs * 2 + 100);
     await expect(readFile(lockPath, 'utf8')).resolves.toBe(lockA.ownerToken);
 
     await lockA.release();

@@ -14,6 +14,7 @@ import {
 } from '../src/cli/control/providerPollingHealth.js';
 import { createControlRuntime } from '../src/cli/control/controlRuntime.js';
 import { buildUiDataset } from '../src/cli/control/operatorDashboardPresenter.js';
+import { readCompatibilityState } from '../src/cli/control/observabilitySurface.js';
 import * as liveLinearAdvisoryRuntimeModule from '../src/cli/control/liveLinearAdvisoryRuntime.js';
 import type { LiveLinearTrackedIssue } from '../src/cli/control/linearDispatchSource.js';
 import type { ProviderIntakeState } from '../src/cli/control/providerIntakeState.js';
@@ -807,7 +808,7 @@ describe('ControlRuntime', () => {
         retry_queued: false,
         retry_attempt: 2,
         retry_due_at: null,
-        retry_error: null
+        retry_error: 'retryable failure pending rerun'
       }
     ]);
     const fixture = await createFixture({
@@ -905,6 +906,7 @@ describe('ControlRuntime', () => {
         restart_count: 1,
         current_retry_attempt: 2
       },
+      last_error: null,
       question_summary: {
         queued_count: 1
       },
@@ -913,7 +915,11 @@ describe('ControlRuntime', () => {
         session_id: null,
         display_state: 'paused'
       },
-      retry: null
+      retry: {
+        attempt: 2,
+        due_at: null,
+        error: 'retryable failure pending rerun'
+      }
     });
   });
 
@@ -3608,10 +3614,17 @@ describe('ControlRuntime', () => {
         projection: compatibilityProjection,
         generatedAt: '2026-04-15T23:00:00.000Z'
       });
+      const statePayload = await readCompatibilityState({
+        controlStore: fixture.controlStore,
+        paths: fixture.paths,
+        readCompatibilityProjection: async () => compatibilityProjection
+      });
 
       expect(compatibilityProjection.running.map((entry) => entry.issue_identifier)).toEqual([
         'CO-198'
       ]);
+      expect(statePayload.running_ids).toEqual(['CO-198']);
+      expect(statePayload.retrying_ids).toEqual([]);
       const issue = compatibilityProjection.issues.find((entry) => entry.issueIdentifier === 'CO-198');
       expect(issue?.payload.provider_debug_snapshot?.claim).toMatchObject({
         state: 'released',
@@ -3625,7 +3638,17 @@ describe('ControlRuntime', () => {
         updated_at: '2026-04-15T22:59:00.000Z'
       });
       expect(uiDataset.counts.running).toBe(1);
-      expect(uiDataset.running.map((entry) => entry.issue_identifier)).toEqual(['CO-198']);
+      expect(uiDataset.running).toEqual([
+        expect.objectContaining({
+          issue_identifier: 'CO-198',
+          issue_id: 'lin-issue-198',
+          id: 'CO-198',
+          bucket: 'running',
+          state: 'In Progress',
+          reason: null,
+          aliases: expect.arrayContaining(['CO-198', 'lin-issue-198'])
+        })
+      ]);
     } finally {
       vi.useRealTimers();
     }
@@ -3652,7 +3675,7 @@ describe('ControlRuntime', () => {
           issue_state_type: 'started',
           issue_updated_at: '2026-04-16T22:48:01.000Z',
           issue_blocked_by: [completedBlocker],
-          task_id: 'linear-co-196-ready-reclaim',
+          task_id: 'linear-lin-issue-196',
           mapping_source: 'provider_id_fallback',
           state: 'released',
           reason: 'provider_issue_released:not_active',
@@ -3662,14 +3685,14 @@ describe('ControlRuntime', () => {
           last_event: 'Issue',
           last_action: 'update',
           last_webhook_timestamp: 1_744_828_881_000,
-          run_id: null,
-          run_manifest_path: null,
+          run_id: 'run-co-196-manual-start',
+          run_manifest_path: '/tmp/provider-run/run-co-196-manual-start/manifest.json',
           launch_source: 'control-host',
           launch_token: 'launch-co-196'
         }
       ]);
       const fixture = await createFixture({
-        taskId: 'linear-co-196-ready-reclaim',
+        taskId: 'linear-lin-issue-196',
         providerIntakeState,
         linearAdvisoryState: {
           tracked_issue: createTrackedIssue({
@@ -3708,6 +3731,357 @@ describe('ControlRuntime', () => {
       expect(uiDataset.issues).toHaveLength(1);
     } finally {
       vi.useRealTimers();
+    }
+  });
+
+  it('fails closed on top-level tracked fallback when persisted advisory truth conflicts with explicit selected identity', async () => {
+    const providerIntakeState = createProviderIntakeState([
+      {
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-196',
+        issue_id: 'lin-issue-196',
+        issue_identifier: 'CO-196',
+        issue_title: 'Current tracked issue',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-17T04:00:00.000Z',
+        task_id: 'linear-co-196-stale-advisory-fallback',
+        mapping_source: 'provider_id_fallback',
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        accepted_at: '2026-04-17T03:58:00.000Z',
+        updated_at: '2026-04-17T03:59:00.000Z',
+        run_id: 'provider-run-196',
+        run_manifest_path: null,
+        launch_source: 'control-host',
+        launch_token: 'launch-co-196'
+      }
+    ]);
+    const fixture = await createFixture({
+      taskId: 'linear-co-196-stale-advisory-fallback',
+      providerIntakeState,
+      linearAdvisoryState: {
+        tracked_issue: createTrackedIssue({
+          id: 'lin-issue-1',
+          identifier: 'CO-1',
+          title: 'Stale advisory issue',
+          updated_at: '2026-03-22T04:01:03.255Z'
+        })
+      }
+    });
+    await seedManifest(fixture.paths, {
+      task_id: 'linear-co-196-stale-advisory-fallback',
+      issue_provider: 'linear',
+      issue_id: 'lin-issue-196',
+      issue_identifier: 'CO-196',
+      summary: 'selected issue has explicit identity but no tracked payload',
+      updated_at: '2026-04-17T04:00:00.000Z'
+    });
+
+    const snapshot = fixture.runtime.snapshot();
+    const selectedSnapshot = await snapshot.readSelectedRunSnapshot();
+    const compatibilityProjection = await snapshot.readCompatibilityProjection();
+    const uiDataset = buildUiDataset({
+      projection: compatibilityProjection,
+      generatedAt: '2026-04-17T04:00:00.000Z'
+    });
+
+    expect(selectedSnapshot.selected?.issueIdentifier).toBe('CO-196');
+    expect(selectedSnapshot.selected?.tracked?.linear ?? null).toBeNull();
+    expect(selectedSnapshot.tracked?.linear ?? null).toBeNull();
+    expect(compatibilityProjection.tracked?.linear ?? null).toBeNull();
+    expect((uiDataset as { tracked?: { linear?: unknown } }).tracked?.linear ?? null).toBeNull();
+  });
+
+  it('ignores stale advisory fallback that matches only a non-authoritative selected alias', async () => {
+    const fixture = await createFixture({
+      taskId: 'local-mcp',
+      linearAdvisoryState: {
+        tracked_issue: createTrackedIssue({
+          id: 'local-mcp',
+          identifier: 'CO-1',
+          title: 'Stale advisory issue',
+          state: 'Done',
+          state_type: 'completed',
+          updated_at: '2026-03-22T04:01:03.255Z'
+        })
+      }
+    });
+    await seedProviderLinearWorkerProof(fixture.paths, {
+      issue_id: 'lin-issue-196',
+      issue_identifier: 'CO-196',
+      owner_phase: 'turn_running',
+      owner_status: 'in_progress',
+      last_event: 'turn_running',
+      last_message: 'current worker is running',
+      last_event_at: '2026-04-17T04:01:00.000Z',
+      updated_at: '2026-04-17T04:01:00.000Z'
+    });
+    await seedManifest(fixture.paths, {
+      task_id: 'local-mcp',
+      issue_provider: 'linear',
+      issue_id: 'local-mcp',
+      issue_identifier: 'CO-196',
+      summary: 'selected issue has authoritative identifier and fallback issue id alias',
+      updated_at: '2026-04-17T04:00:00.000Z'
+    });
+
+    const snapshot = fixture.runtime.snapshot();
+    const selectedSnapshot = await snapshot.readSelectedRunSnapshot();
+    const compatibilityProjection = await snapshot.readCompatibilityProjection();
+    const uiDataset = buildUiDataset({
+      projection: compatibilityProjection,
+      generatedAt: '2026-04-17T04:00:00.000Z'
+    });
+
+    expect(selectedSnapshot.selected?.issueIdentifier).toBe('CO-196');
+    expect(selectedSnapshot.selected?.issueId).toBe('local-mcp');
+    expect(selectedSnapshot.selected?.compatibilityState ?? null).toBeNull();
+    expect(selectedSnapshot.selected?.displayStatus).toBe('in_progress');
+    expect(selectedSnapshot.selected?.latestEvent).toMatchObject({
+      event: 'in_progress',
+      source: 'run_summary',
+      message: 'selected issue has authoritative identifier and fallback issue id alias'
+    });
+    expect(selectedSnapshot.selected?.tracked?.linear ?? null).toBeNull();
+    expect(selectedSnapshot.selected?.providerDebugSnapshot?.live_linear_state).toEqual({
+      state: null,
+      state_type: null,
+      updated_at: null
+    });
+    expect(selectedSnapshot.selected?.providerDebugSnapshot?.progress ?? null).toBeNull();
+    expect(selectedSnapshot.selected?.providerDebugSnapshot?.stall_classification ?? null).toBeNull();
+    expect(selectedSnapshot.tracked?.linear ?? null).toBeNull();
+    expect(compatibilityProjection.selected?.tracked).toHaveProperty('linear', null);
+    expect(compatibilityProjection.selected?.display_status).toBe('in_progress');
+    expect(compatibilityProjection.selected?.latest_event).toMatchObject({
+      event: 'in_progress',
+      source: 'run_summary',
+      message: 'selected issue has authoritative identifier and fallback issue id alias'
+    });
+    expect(compatibilityProjection.selected?.provider_debug_snapshot?.live_linear_state).toEqual({
+      state: null,
+      state_type: null,
+      updated_at: null
+    });
+    expect(compatibilityProjection.selected?.provider_debug_snapshot?.progress ?? null).toBeNull();
+    expect(
+      compatibilityProjection.selected?.provider_debug_snapshot?.stall_classification ?? null
+    ).toBeNull();
+    expect(compatibilityProjection.issues).toHaveLength(1);
+    expect(compatibilityProjection.issues[0]?.payload.display_status).toBe('in_progress');
+    expect(compatibilityProjection.issues[0]?.payload.latest_event).toMatchObject({
+      event: 'in_progress',
+      source: 'run_summary',
+      message: 'selected issue has authoritative identifier and fallback issue id alias'
+    });
+    expect(compatibilityProjection.issues[0]?.payload.tracked).toHaveProperty('linear', null);
+    expect(
+      compatibilityProjection.issues[0]?.payload.provider_debug_snapshot?.live_linear_state
+    ).toEqual({
+      state: null,
+      state_type: null,
+      updated_at: null
+    });
+    expect(
+      compatibilityProjection.issues[0]?.payload.provider_debug_snapshot?.progress ?? null
+    ).toBeNull();
+    expect(
+      compatibilityProjection.issues[0]?.payload.provider_debug_snapshot?.stall_classification ?? null
+    ).toBeNull();
+    expect(compatibilityProjection.tracked?.linear ?? null).toBeNull();
+    expect(
+      (
+        uiDataset as {
+          selected?: {
+            tracked?: { linear?: unknown };
+            display_status?: string | null;
+            latest_event?: { event?: string | null; source?: string | null; message?: string | null } | null;
+            provider_debug_snapshot?: {
+              live_linear_state?: {
+                state?: string | null;
+                state_type?: string | null;
+                updated_at?: string | null;
+              };
+              progress?: unknown;
+              stall_classification?: string | null;
+            } | null;
+          };
+        }
+      ).selected?.tracked
+    ).toHaveProperty('linear', null);
+    expect(
+      (
+        uiDataset as {
+          selected?: {
+            display_status?: string | null;
+          };
+        }
+      ).selected?.display_status
+    ).toBe('in_progress');
+    expect(
+      (
+        uiDataset as {
+          selected?: {
+            latest_event?: { event?: string | null; source?: string | null; message?: string | null } | null;
+          };
+        }
+      ).selected?.latest_event
+    ).toMatchObject({
+      event: 'in_progress',
+      source: 'run_summary',
+      message: 'selected issue has authoritative identifier and fallback issue id alias'
+    });
+    expect(
+      (
+        uiDataset as {
+          selected?: {
+            provider_debug_snapshot?: {
+              live_linear_state?: {
+                state?: string | null;
+                state_type?: string | null;
+                updated_at?: string | null;
+              };
+            } | null;
+          };
+        }
+      ).selected?.provider_debug_snapshot?.live_linear_state
+    ).toEqual({
+      state: null,
+      state_type: null,
+        updated_at: null
+      });
+    expect(
+      (
+        uiDataset as {
+          selected?: {
+            provider_debug_snapshot?: {
+              progress?: unknown;
+              stall_classification?: string | null;
+            } | null;
+          };
+        }
+      ).selected?.provider_debug_snapshot?.progress ?? null
+    ).toBeNull();
+    expect(
+      (
+        uiDataset as {
+          selected?: {
+            provider_debug_snapshot?: {
+              progress?: unknown;
+              stall_classification?: string | null;
+            } | null;
+          };
+        }
+      ).selected?.provider_debug_snapshot?.stall_classification ?? null
+    ).toBeNull();
+    expect(
+      (uiDataset as { issues?: Array<{ tracked?: { linear?: unknown } }> }).issues?.every(
+        (issue) =>
+          Object.prototype.hasOwnProperty.call(issue, 'tracked') &&
+          issue.tracked !== undefined &&
+          Object.prototype.hasOwnProperty.call(issue.tracked, 'linear') &&
+          issue.tracked.linear === null
+      )
+    ).toBe(true);
+  });
+
+  it('keeps matching tracked truth when issue id is only a task fallback alias', async () => {
+    const fixture = await createFixture({
+      taskId: 'linear-co-196-valid-identifier-only',
+      linearAdvisoryState: {
+        tracked_issue: createTrackedIssue({
+          id: 'lin-issue-196',
+          identifier: 'CO-196',
+          title: 'Current advisory issue',
+          updated_at: '2026-04-17T04:00:00.000Z'
+        })
+      }
+    });
+    await seedManifest(fixture.paths, {
+      task_id: 'linear-co-196-valid-identifier-only',
+      issue_provider: 'linear',
+      issue_identifier: 'CO-196',
+      summary: 'selected issue has authoritative identifier and fallback issue id alias',
+      updated_at: '2026-04-17T04:00:00.000Z'
+    });
+
+    const snapshot = fixture.runtime.snapshot();
+    const selectedSnapshot = await snapshot.readSelectedRunSnapshot();
+    const compatibilityProjection = await snapshot.readCompatibilityProjection();
+    const uiDataset = buildUiDataset({
+      projection: compatibilityProjection,
+      generatedAt: '2026-04-17T04:00:00.000Z'
+    });
+
+    expect(selectedSnapshot.selected?.issueIdentifier).toBe('CO-196');
+    expect(selectedSnapshot.selected?.issueId).toBe('linear-co-196-valid-identifier-only');
+    expect(selectedSnapshot.selected?.tracked?.linear?.identifier).toBe('CO-196');
+    expect(selectedSnapshot.selected?.tracked?.linear?.id).toBe('lin-issue-196');
+    expect(selectedSnapshot.tracked?.linear?.identifier).toBe('CO-196');
+    expect(compatibilityProjection.selected?.tracked.linear?.identifier).toBe('CO-196');
+    expect(compatibilityProjection.issues).toHaveLength(1);
+    expect(compatibilityProjection.issues[0]?.payload.tracked.linear?.identifier).toBe('CO-196');
+    expect(compatibilityProjection.tracked?.linear?.identifier).toBe('CO-196');
+    expect(
+      (uiDataset as { selected?: { tracked?: { linear?: { identifier?: string | null } } } })
+        .selected?.tracked?.linear?.identifier
+    ).toBe('CO-196');
+    expect(
+      (uiDataset as { issues?: Array<{ tracked?: { linear?: { identifier?: string | null } } }> })
+      .issues?.[0]?.tracked?.linear?.identifier
+    ).toBe('CO-196');
+  });
+
+  it('keeps current tracked truth when any authoritative selected alias matches', async () => {
+    for (const manifest of [
+      {
+        task_id: 'linear-co-196-valid-id-stale-identifier',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-196',
+        issue_identifier: 'CO-OLD',
+        summary: 'selected issue id is authoritative while identifier is stale',
+        updated_at: '2026-04-17T04:00:00.000Z'
+      },
+      {
+        task_id: 'linear-co-196-stale-id-valid-identifier',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-old',
+        issue_identifier: 'CO-196',
+        summary: 'selected issue identifier is authoritative while id is stale',
+        updated_at: '2026-04-17T04:00:00.000Z'
+      }
+    ]) {
+      const fixture = await createFixture({
+        taskId: manifest.task_id,
+        linearAdvisoryState: {
+          tracked_issue: createTrackedIssue({
+            id: 'lin-issue-196',
+            identifier: 'CO-196',
+            title: 'Current advisory issue',
+            updated_at: '2026-04-17T04:00:00.000Z'
+          })
+        }
+      });
+      await seedManifest(fixture.paths, manifest);
+
+      const snapshot = fixture.runtime.snapshot();
+      const selectedSnapshot = await snapshot.readSelectedRunSnapshot();
+      const compatibilityProjection = await snapshot.readCompatibilityProjection();
+      const uiDataset = buildUiDataset({
+        projection: compatibilityProjection,
+        generatedAt: '2026-04-17T04:00:00.000Z'
+      });
+
+      expect(selectedSnapshot.selected?.tracked?.linear?.id).toBe('lin-issue-196');
+      expect(selectedSnapshot.selected?.tracked?.linear?.identifier).toBe('CO-196');
+      expect(selectedSnapshot.tracked?.linear?.identifier).toBe('CO-196');
+      expect(compatibilityProjection.selected?.tracked.linear?.identifier).toBe('CO-196');
+      expect(compatibilityProjection.tracked?.linear?.identifier).toBe('CO-196');
+      expect(
+        (uiDataset as { selected?: { tracked?: { linear?: { identifier?: string | null } } } })
+          .selected?.tracked?.linear?.identifier
+      ).toBe('CO-196');
     }
   });
 
@@ -3796,6 +4170,284 @@ describe('ControlRuntime', () => {
       expect(compatibilityProjection.running).toEqual([]);
       expect(uiDataset.counts.running).toBe(0);
       expect(uiDataset.running).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('prunes accepted pending-revalidation workers when fresh local proof has a dead pid', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-17T06:16:00.000Z'));
+    const stalePid = 3391;
+    vi.spyOn(process, 'kill').mockImplementation((pid, signal) => {
+      if (pid === stalePid && signal === 0) {
+        const error = new Error('process not found') as NodeJS.ErrnoException;
+        error.code = 'ESRCH';
+        throw error;
+      }
+      return true;
+    });
+    try {
+      const providerIntakeState = createProviderIntakeState([
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-196',
+          issue_id: 'lin-issue-196',
+          issue_identifier: 'CO-196',
+          issue_title: 'Accepted pending revalidation with dead local proof',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-17T06:15:00.000Z',
+          task_id: 'linear-5561a9a9-39dd-4ed4-99a0-896553327669',
+          mapping_source: 'provider_id_fallback',
+          state: 'accepted',
+          reason: 'provider_issue_rehydration_pending_revalidation',
+          accepted_at: '2026-04-17T03:45:02.315Z',
+          updated_at: '2026-04-17T06:15:00.000Z',
+          last_delivery_id: 'delivery-co-196',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_744_870_500_000,
+          run_id: '2026-04-17T03-45-02-315Z-f469b275',
+          run_manifest_path: null,
+          launch_source: 'control-host',
+          launch_token: 'launch-co-196'
+        }
+      ]);
+      const fixture = await createFixture({
+        taskId: 'linear-5561a9a9-39dd-4ed4-99a0-896553327669',
+        featureToggles: {
+          coordinator: {
+            agent: {
+              max_concurrent_agents: 3
+            }
+          }
+        },
+        providerIntakeState,
+        linearAdvisoryState: {
+          tracked_issue: createTrackedIssue({
+            id: 'lin-issue-196',
+            identifier: 'CO-196',
+            title: 'Accepted pending revalidation with dead local proof',
+            state: 'In Progress',
+            state_type: 'started',
+            updated_at: '2026-04-17T06:15:00.000Z'
+          })
+        }
+      });
+      providerIntakeState.claims[0]!.run_manifest_path = fixture.paths.manifestPath;
+      await seedManifest(fixture.paths, {
+        task_id: 'linear-5561a9a9-39dd-4ed4-99a0-896553327669',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-196',
+        issue_identifier: 'CO-196',
+        pipeline_id: 'provider-linear-worker',
+        pipeline_title: 'Provider Linear Worker',
+        status: 'in_progress',
+        started_at: '2026-04-17T03:45:02.315Z',
+        updated_at: '2026-04-17T06:15:00.000Z',
+        summary: 'stale worker still reports running'
+      });
+      await seedProviderLinearWorkerProof(fixture.paths, {
+        issue_id: 'lin-issue-196',
+        issue_identifier: 'CO-196',
+        pid: stalePid,
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        last_event: 'turn_running',
+        last_message: 'dead local worker still reports running',
+        updated_at: '2026-04-17T06:15:00.000Z'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+      const uiDataset = buildUiDataset({
+        projection: compatibilityProjection,
+        generatedAt: '2026-04-17T06:16:00.000Z'
+      });
+
+      expect(compatibilityProjection.maxConcurrentAgents).toBe(3);
+      expect(compatibilityProjection.running).toEqual([]);
+      expect(uiDataset.counts.max_allowed).toBe(3);
+      expect(uiDataset.counts.running).toBe(0);
+      expect(uiDataset.running).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('prunes accepted pending-revalidation workers when the local proof is stale', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-17T06:16:00.000Z'));
+    try {
+      const providerIntakeState = createProviderIntakeState([
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-211',
+          issue_id: 'lin-issue-211',
+          issue_identifier: 'CO-211',
+          issue_title: 'Accepted pending revalidation with stale local proof',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-17T06:15:00.000Z',
+          task_id: 'linear-issue-211-stale-proof',
+          mapping_source: 'provider_id_fallback',
+          state: 'accepted',
+          reason: 'provider_issue_rehydration_pending_revalidation',
+          accepted_at: '2026-04-17T05:45:00.000Z',
+          updated_at: '2026-04-17T06:15:00.000Z',
+          last_delivery_id: 'delivery-co-211',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_744_870_500_000,
+          run_id: 'run-stale-proof',
+          run_manifest_path: null,
+          launch_source: 'control-host',
+          launch_token: 'launch-co-211'
+        }
+      ]);
+      const fixture = await createFixture({
+        taskId: 'linear-issue-211-stale-proof',
+        providerIntakeState,
+        linearAdvisoryState: {
+          tracked_issue: createTrackedIssue({
+            id: 'lin-issue-211',
+            identifier: 'CO-211',
+            title: 'Accepted pending revalidation with stale local proof',
+            state: 'In Progress',
+            state_type: 'started',
+            updated_at: '2026-04-17T06:15:00.000Z'
+          })
+        }
+      });
+      providerIntakeState.claims[0]!.run_manifest_path = fixture.paths.manifestPath;
+      await seedManifest(fixture.paths, {
+        task_id: 'linear-issue-211-stale-proof',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-211',
+        issue_identifier: 'CO-211',
+        pipeline_id: 'provider-linear-worker',
+        pipeline_title: 'Provider Linear Worker',
+        status: 'in_progress',
+        started_at: '2026-04-17T06:00:00.000Z',
+        updated_at: '2026-04-17T06:15:00.000Z',
+        summary: 'accepted pending revalidation still points at an older attempt proof'
+      });
+      await seedProviderLinearWorkerProof(fixture.paths, {
+        issue_id: 'lin-issue-211',
+        issue_identifier: 'CO-211',
+        attempt_started_at: '2026-04-17T05:55:00.000Z',
+        pid: 59516,
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        last_event: 'turn_running',
+        last_message: 'older attempt proof still reports running',
+        updated_at: '2026-04-17T05:55:00.000Z'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+      const uiDataset = buildUiDataset({
+        projection: compatibilityProjection,
+        generatedAt: '2026-04-17T06:16:00.000Z'
+      });
+
+      expect(compatibilityProjection.running).toEqual([]);
+      expect(uiDataset.counts.running).toBe(0);
+      expect(uiDataset.running).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps accepted pending-revalidation workers running when local proof is still live', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-17T06:16:00.000Z'));
+    const livePid = 59516;
+    vi.spyOn(process, 'kill').mockImplementation((pid, signal) => {
+      if (pid === livePid && signal === 0) {
+        return true;
+      }
+      return true;
+    });
+    try {
+      const providerIntakeState = createProviderIntakeState([
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-210',
+          issue_id: 'lin-issue-210',
+          issue_identifier: 'CO-210',
+          issue_title: 'Accepted pending revalidation with live local proof',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-17T06:15:00.000Z',
+          task_id: 'linear-issue-210-live-proof',
+          mapping_source: 'provider_id_fallback',
+          state: 'accepted',
+          reason: 'provider_issue_rehydration_pending_revalidation',
+          accepted_at: '2026-04-17T05:50:00.000Z',
+          updated_at: '2026-04-17T06:15:00.000Z',
+          last_delivery_id: 'delivery-co-210',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_744_870_500_000,
+          run_id: 'run-live-proof',
+          run_manifest_path: null,
+          launch_source: 'control-host',
+          launch_token: 'launch-co-210'
+        }
+      ]);
+      const fixture = await createFixture({
+        taskId: 'linear-issue-210-live-proof',
+        providerIntakeState,
+        linearAdvisoryState: {
+          tracked_issue: createTrackedIssue({
+            id: 'lin-issue-210',
+            identifier: 'CO-210',
+            title: 'Accepted pending revalidation with live local proof',
+            state: 'In Progress',
+            state_type: 'started',
+            updated_at: '2026-04-17T06:15:00.000Z'
+          })
+        }
+      });
+      providerIntakeState.claims[0]!.run_manifest_path = fixture.paths.manifestPath;
+      await seedManifest(fixture.paths, {
+        task_id: 'linear-issue-210-live-proof',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-210',
+        issue_identifier: 'CO-210',
+        pipeline_id: 'provider-linear-worker',
+        pipeline_title: 'Provider Linear Worker',
+        status: 'in_progress',
+        started_at: '2026-04-17T05:50:00.000Z',
+        updated_at: '2026-04-17T06:15:00.000Z',
+        summary: 'live worker is still running'
+      });
+      await seedProviderLinearWorkerProof(fixture.paths, {
+        issue_id: 'lin-issue-210',
+        issue_identifier: 'CO-210',
+        pid: livePid,
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        last_event: 'turn_running',
+        last_message: 'live local worker still reports running',
+        updated_at: '2026-04-17T06:15:00.000Z'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+      const uiDataset = buildUiDataset({
+        projection: compatibilityProjection,
+        generatedAt: '2026-04-17T06:16:00.000Z'
+      });
+
+      expect(compatibilityProjection.running).toHaveLength(1);
+      expect(compatibilityProjection.running[0]).toMatchObject({
+        issue_identifier: 'CO-210'
+      });
+      expect(uiDataset.counts.running).toBe(1);
+      expect(uiDataset.running[0]).toMatchObject({
+        issue_identifier: 'CO-210',
+        pid: livePid
+      });
     } finally {
       vi.useRealTimers();
     }
@@ -5913,10 +6565,158 @@ describe('ControlRuntime', () => {
     expect(snapshot.selected?.taskId).toBe('task-1303-child');
     expect(snapshot.selected?.runId).toBe('run-child');
     expect(snapshot.providerIntake).toMatchObject({
-      issue_identifier: 'CO-2',
-      task_id: 'task-1303-child',
-      state: 'running',
-      run_id: 'run-child'
+      summary_scope: 'single_claim',
+      active_claim_count: 1,
+      running_claim_count: 1,
+      selected_claim: {
+        issue_identifier: 'CO-2',
+        task_id: 'task-1303-child',
+        state: 'running',
+        run_id: 'run-child'
+      }
+    });
+  });
+
+  it('serializes concurrent running provider intake as a scoped selected claim with aggregate counts', async () => {
+    const providerIntakeState = createProviderIntakeState([
+      {
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-175',
+        issue_id: 'lin-issue-175',
+        issue_identifier: 'CO-175',
+        issue_title: 'Claim one',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-18T06:09:00.000Z',
+        task_id: 'linear-co-175',
+        mapping_source: 'provider_id_fallback',
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        accepted_at: '2026-04-18T06:09:05.000Z',
+        updated_at: '2026-04-18T06:09:30.000Z',
+        last_delivery_id: 'delivery-175',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_744_960_570_000,
+        run_id: 'run-175',
+        run_manifest_path: '/tmp/run-175/manifest.json',
+        retry_queued: true,
+        retry_attempt: 2,
+        retry_due_at: '2026-04-18T06:10:30.000Z',
+        retry_error: 'selected-claim retry detail',
+        launch_source: 'control-host',
+        launch_token: 'launch-175'
+      },
+      {
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-240',
+        issue_id: 'lin-issue-240',
+        issue_identifier: 'CO-240',
+        issue_title: 'Claim two',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-18T06:08:00.000Z',
+        task_id: 'linear-co-240',
+        mapping_source: 'provider_id_fallback',
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        accepted_at: '2026-04-18T06:08:05.000Z',
+        updated_at: '2026-04-18T06:08:30.000Z',
+        last_delivery_id: 'delivery-240',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_744_960_510_000,
+        run_id: 'run-240',
+        run_manifest_path: '/tmp/run-240/manifest.json',
+        launch_source: 'control-host',
+        launch_token: 'launch-240'
+      },
+      {
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-242',
+        issue_id: 'lin-issue-242',
+        issue_identifier: 'CO-242',
+        issue_title: 'Claim three',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-18T06:07:00.000Z',
+        task_id: 'linear-co-242',
+        mapping_source: 'provider_id_fallback',
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        accepted_at: '2026-04-18T06:07:05.000Z',
+        updated_at: '2026-04-18T06:07:30.000Z',
+        last_delivery_id: 'delivery-242',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_744_960_450_000,
+        run_id: 'run-242',
+        run_manifest_path: '/tmp/run-242/manifest.json',
+        launch_source: 'control-host',
+        launch_token: 'launch-242'
+      }
+    ]);
+    providerIntakeState.updated_at = '2026-04-18T06:10:00.000Z';
+    providerIntakeState.rehydrated_at = null;
+    providerIntakeState.latest_provider_key = 'linear:lin-issue-175';
+    providerIntakeState.latest_reason = 'provider_issue_rehydrated_active_run';
+
+    const fixture = await createFixture({
+      taskId: 'local-mcp',
+      providerIntakeState
+    });
+
+    const projection = await fixture.runtime.snapshot().readCompatibilityProjection();
+    const statePayload = await readCompatibilityState({
+      readCompatibilityProjection: async () => projection
+    });
+
+    expect(projection.providerIntake).toMatchObject({
+      summary_scope: 'selected_claim',
+      selection_strategy: 'state_rank_updated_at',
+      claim_count: 3,
+      active_claim_count: 3,
+      running_claim_count: 3,
+      active_issue_identifiers: ['CO-175', 'CO-240', 'CO-242'],
+      running_issue_identifiers: ['CO-175', 'CO-240', 'CO-242'],
+      selected_claim: {
+        issue_identifier: 'CO-175',
+        task_id: 'linear-co-175',
+        state: 'running',
+        retry: {
+          active: true,
+          attempt: 2,
+          due_at: '2026-04-18T06:10:30.000Z',
+          error: 'selected-claim retry detail'
+        }
+      }
+    });
+    expect(statePayload.provider_intake).toEqual({
+      summary_scope: 'selected_claim',
+      selection_strategy: 'state_rank_updated_at',
+      claim_count: 3,
+      active_claim_count: 3,
+      running_claim_count: 3,
+      active_issue_identifiers: ['CO-175', 'CO-240', 'CO-242'],
+      running_issue_identifiers: ['CO-175', 'CO-240', 'CO-242'],
+      selected_claim: {
+        issue_identifier: 'CO-175',
+        task_id: 'linear-co-175',
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        run_id: 'run-175',
+        freshness: 'rehydrated',
+        retry: {
+          active: true,
+          attempt: 2,
+          due_at: '2026-04-18T06:10:30.000Z',
+          error: 'selected-claim retry detail'
+        },
+        worker_host: null
+      },
+      rehydrated_at: null,
+      is_rehydrated: true,
+      updated_at: '2026-04-18T06:09:30.000Z'
     });
   });
 

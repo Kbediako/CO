@@ -16,6 +16,7 @@ import {
   type ProviderOperatorAutopilotResult
 } from './providerOperatorAutopilot.js';
 import { resolveProviderOperatorAutopilotLifecyclePath } from './providerOperatorAutopilotLifecycle.js';
+import { resolveProviderOperatorAutopilotLocalRolloutExecutionPath } from './providerOperatorAutopilotLocalRolloutExecution.js';
 import {
   resolveProviderTerminalCleanupConfig,
   type ProviderTerminalCleanupResult
@@ -342,10 +343,12 @@ function buildDefaultOperatorAutopilotPayload(
     },
     post_merge_rollout: {
       enabled: config.post_merge_rollout.enabled,
-      summary: config.post_merge_rollout.summary
+      summary: config.post_merge_rollout.summary,
+      execution: config.post_merge_rollout.execution
     },
     audit_path: resolveProviderOperatorAutopilotAuditPath(runDir),
     lifecycle_path: resolveProviderOperatorAutopilotLifecyclePath(runDir),
+    execution_path: resolveProviderOperatorAutopilotLocalRolloutExecutionPath(runDir),
     last_result: null
   };
 }
@@ -405,10 +408,12 @@ function buildOperatorAutopilotPayload(
     },
     post_merge_rollout: {
       enabled: config.post_merge_rollout.enabled,
-      summary: config.post_merge_rollout.summary
+      summary: config.post_merge_rollout.summary,
+      execution: config.post_merge_rollout.execution
     },
     audit_path: resolveProviderOperatorAutopilotAuditPath(runDir),
     lifecycle_path: resolveProviderOperatorAutopilotLifecyclePath(runDir),
+    execution_path: resolveProviderOperatorAutopilotLocalRolloutExecutionPath(runDir),
     last_result: lastResult ? cloneOperatorAutopilotLastResult(lastResult) : null
   };
 }
@@ -497,6 +502,7 @@ function cloneOperatorAutopilotLastResult(
       merge_closeout_reason: pendingAction.merge_closeout_reason,
       shared_root_status: pendingAction.shared_root_status,
       linear_transition_status: pendingAction.linear_transition_status,
+      executable_action_ids: [...(pendingAction.executable_action_ids ?? [])],
       lifecycle_state: pendingAction.lifecycle_state,
       lifecycle_actor: pendingAction.lifecycle_actor,
       lifecycle_reason: pendingAction.lifecycle_reason,
@@ -512,6 +518,7 @@ function cloneOperatorAutopilotLastResult(
       merge_closeout_reason: resolvedAction.merge_closeout_reason,
       shared_root_status: resolvedAction.shared_root_status,
       linear_transition_status: resolvedAction.linear_transition_status,
+      executable_action_ids: [...(resolvedAction.executable_action_ids ?? [])],
       lifecycle_state: resolvedAction.lifecycle_state,
       lifecycle_actor: resolvedAction.lifecycle_actor,
       lifecycle_reason: resolvedAction.lifecycle_reason,
@@ -527,6 +534,36 @@ function cloneOperatorAutopilotLastResult(
       reason: record.reason,
       recorded_at: record.recorded_at,
       source: record.source
-    }))
+    })),
+    local_rollout_execution_attempts: (result.local_rollout_execution_attempts ?? []).map(
+      (attempt) => ({
+        record_kind: attempt.record_kind,
+        action_instance_id: attempt.action_instance_id,
+        action_id: attempt.action_id,
+        issue_id: attempt.issue_id,
+        issue_identifier: attempt.issue_identifier,
+        preflight: {
+          status: attempt.preflight.status,
+          reason: attempt.preflight.reason,
+          checked_at: attempt.preflight.checked_at,
+          summary: attempt.preflight.summary
+        },
+        started_at: attempt.started_at,
+        ended_at: attempt.ended_at,
+        terminal_state: attempt.terminal_state,
+        reason: attempt.reason,
+        summary: attempt.summary,
+        command: {
+          runner: attempt.command.runner,
+          command: attempt.command.command,
+          args: [...attempt.command.args],
+          cwd: attempt.command.cwd,
+          timeout_ms: attempt.command.timeout_ms
+        },
+        exit_code: attempt.exit_code,
+        stdout: attempt.stdout,
+        stderr: attempt.stderr
+      })
+    )
   };
 }

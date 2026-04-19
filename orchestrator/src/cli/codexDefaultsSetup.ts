@@ -9,11 +9,13 @@ import { findPackageRoot } from './utils/packageInfo.js';
 import { writeAtomicFile } from '../utils/atomicWrite.js';
 
 const require = createRequire(import.meta.url);
-const toml = require('@iarna/toml') as {
-  parse: (source: string) => unknown;
-  stringify: (value: unknown) => string;
-};
-const canonicalize = require('canonicalize') as (value: unknown) => string | undefined;
+let tomlLibrary:
+  | {
+      parse: (source: string) => unknown;
+      stringify: (value: unknown) => string;
+    }
+  | null
+  | undefined;
 
 export const BASELINE_MODEL = 'gpt-5.4';
 export const BASELINE_REVIEW_MODEL = BASELINE_MODEL;
@@ -109,7 +111,8 @@ export async function runCodexDefaultsSetup(
   const roleDefinitions = await loadRoleDefinitions();
   const configState = await loadConfigState(plan.configPath);
   const nextConfig = mergeBaselineDefaults(configState.parsed, roleDefinitions);
-  const configChanged = canonicalize(configState.parsed) !== canonicalize(nextConfig);
+  const configChanged =
+    canonicalizeConfigValue(configState.parsed) !== canonicalizeConfigValue(nextConfig);
   const roleChanges = await planRoleChanges(plan.agentsDir, force, roleDefinitions);
 
   if (!apply) {
@@ -129,7 +132,7 @@ export async function runCodexDefaultsSetup(
   const changes: CodexDefaultsSetupChange[] = [];
 
   if (configChanged || !configState.exists) {
-    const rendered = `${toml.stringify(nextConfig)}\n`;
+    const rendered = `${getTomlLibrary().stringify(nextConfig)}\n`;
     await writeAtomicFile(plan.configPath, rendered, { ensureDir: true, encoding: 'utf8' });
     changes.push({
       target: 'config',
@@ -225,7 +228,7 @@ async function loadConfigState(configPath: string): Promise<{ exists: boolean; p
 
   const raw = await readFile(configPath, 'utf8');
   try {
-    const parsed = toml.parse(raw);
+    const parsed = getTomlLibrary().parse(raw);
     if (!isRecord(parsed)) {
       throw new Error('top-level TOML document must be a table.');
     }
@@ -234,6 +237,53 @@ async function loadConfigState(configPath: string): Promise<{ exists: boolean; p
     const reason = (error as Error)?.message ?? String(error);
     throw new Error(`Failed to parse Codex config TOML at ${configPath}: ${reason}`);
   }
+}
+
+function getTomlLibrary(): {
+  parse: (source: string) => unknown;
+  stringify: (value: unknown) => string;
+} {
+  if (tomlLibrary) {
+    return tomlLibrary;
+  }
+  if (tomlLibrary === null) {
+    throw new Error('Failed to load @iarna/toml.');
+  }
+  try {
+    tomlLibrary = require('@iarna/toml') as {
+      parse: (source: string) => unknown;
+      stringify: (value: unknown) => string;
+    };
+    return tomlLibrary;
+  } catch (error) {
+    tomlLibrary = null;
+    throw error;
+  }
+}
+
+function canonicalizeConfigValue(value: unknown): string | undefined {
+  if (value === null) {
+    return 'null';
+  }
+  if (typeof value === 'boolean' || typeof value === 'number' || typeof value === 'string') {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map((entry) => canonicalizeConfigValue(entry) ?? 'null').join(',')}]`;
+  }
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
+      .flatMap(([key, entry]) => {
+        const canonicalEntry = canonicalizeConfigValue(entry);
+        if (typeof canonicalEntry === 'undefined') {
+          return [];
+        }
+        return [`${JSON.stringify(key)}:${canonicalEntry}`];
+      });
+    return `{${entries.join(',')}}`;
+  }
+  return undefined;
 }
 
 function mergeBaselineDefaults(

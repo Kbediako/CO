@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp d8b14497f040007d68727971da0ee1cfa05430f3f4fe7b3d98ba735e0bc89c01 -->
+<!-- codex:instruction-stamp aa52c8fc6f2848ea53e160bdea6fc10336366f36a484536f6e3757d9da40137a -->
 # Repository Agent Guidance
 
 Task-specific historical project blocks were removed from this file in `CO-88`. Use the active task packet under `.agent/task/**` for lane-scoped instructions instead of treating old project ids as repo-wide defaults.
@@ -7,7 +7,7 @@ Task-specific historical project blocks were removed from this file in `CO-88`. 
 - Before implementation work, capture a docs-review manifest via `npx codex-orchestrator start docs-review --format json --no-interactive --task <task-id>` with `MCP_RUNNER_TASK_ID` set.
 - Record the manifest path in the task checklists (`tasks/`, `.agent/task/`, `docs/TASKS.md`) and `tasks/index.json` for evidence.
 - The docs-review pipeline runs `npm run docs:freshness` after `npm run docs:check` and emits a class-separated `out/<task-id>/docs-freshness.json`.
-- If `docs:check` fails with `tasks-file-too-large`, the tasks archive automation workflow will open a PR and sync payloads to `task-archives`; use `npm run docs:archive-tasks` for manual fallback.
+- If `docs:check` fails with `tasks-file-too-large`, the repo has reached zero headroom or overflow in `docs/TASKS.md`; the tasks archive automation workflow will open a PR and sync payloads to `task-archives`, and `npm run docs:archive-tasks` remains the manual fallback.
 - Implementation docs archiving follows `docs/implementation-docs-archive-policy.json`; the automation workflow syncs payloads to `doc-archives` and opens a PR with stubs. Use `npm run docs:archive-implementation` for manual fallback.
 
 ## Docs-First Requirement

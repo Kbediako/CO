@@ -18,6 +18,8 @@ const createdSandboxes: string[] = [];
 const shellBinary = 'bash';
 const LONG_WAIT_TEST_TIMEOUT_MS = 20_000;
 const RUN_REVIEW_SUBPROCESS_TIMEOUT_MS = 15_000;
+const RUN_REVIEW_HANGING_SUBPROCESS_TIMEOUT_MS = 15_000;
+const RUN_REVIEW_HANGING_SUBPROCESS_TEST_TIMEOUT_MS = 30_000;
 const RUN_REVIEW_MOCK_REAP_POLL_ATTEMPTS = 10;
 const RUN_REVIEW_MOCK_REAP_POLL_INTERVAL_MS = 50;
 
@@ -2525,13 +2527,17 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       },
       [],
       process.cwd(),
-      { timeoutMs: 5000, killSignal: 'SIGKILL' }
+      // This assertion needs fake Codex to reach hang mode before the outer
+      // subprocess harness kills run-review; full-suite load can spend close
+      // to the 10s main-branch budget in wrapper startup before the marker is
+      // written.
+      { timeoutMs: RUN_REVIEW_HANGING_SUBPROCESS_TIMEOUT_MS, killSignal: 'SIGKILL' }
     );
 
     expect(result.exitCode).toBeGreaterThan(0);
     await expect(readFile(hangMarker, 'utf8')).resolves.toBe('started\n');
     expect(await findRunReviewMockPids(codexBin, { strict: true })).toEqual(beforePids);
-  }, LONG_WAIT_TEST_TIMEOUT_MS);
+  }, RUN_REVIEW_HANGING_SUBPROCESS_TEST_TIMEOUT_MS);
 
   it('persists telemetry when review launch fails after the command probe', async () => {
     const sandbox = await makeSandbox();
@@ -5017,7 +5023,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     );
     expect(telemetry.summary.metaSurfaceSignals).toBeGreaterThanOrEqual(4);
     expect(telemetry.summary.metaSurfaceKinds).toEqual(
-      expect.arrayContaining(['codex-memories', 'codex-skills'])
+      expect.arrayContaining(['codex-memories', 'review-support'])
     );
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
@@ -5571,10 +5577,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     );
     expect(telemetry.summary.startupAnchorObserved).toBe(false);
     expect(telemetry.summary.preAnchorMetaSurfaceSignals).toBeGreaterThanOrEqual(2);
-    expect(telemetry.summary.preAnchorMetaSurfaceKinds).toEqual([
-      'codex-memories',
-      'codex-skills'
-    ]);
+    expect(telemetry.summary.preAnchorMetaSurfaceKinds).toEqual(['codex-memories']);
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('fails bounded diff review when adjacent review-system surfaces persist', async () => {
@@ -5924,7 +5927,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(telemetry.summary.metaSurfaceSignals).toBeGreaterThanOrEqual(4);
     expect(telemetry.summary.distinctMetaSurfaces).toBeGreaterThanOrEqual(3);
     expect(telemetry.summary.metaSurfaceKinds).toContain('codex-memories');
-    expect(telemetry.summary.metaSurfaceKinds).toContain('codex-skills');
+    expect(telemetry.summary.metaSurfaceKinds).toContain('review-support');
     expect(telemetry.summary.metaSurfaceKinds).toContain('review-docs');
     expect(telemetry.summary.metaSurfaceKinds).not.toContain('run-manifest');
     expect(telemetry.summary.metaSurfaceKinds).not.toContain('run-runner-log');

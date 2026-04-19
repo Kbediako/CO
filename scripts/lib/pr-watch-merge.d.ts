@@ -25,11 +25,39 @@ export interface PrWatchMergeCoderabbitReviewMeta {
   nitpickCount: number;
 }
 
+export interface PrWatchMergeBotRereviewRollupContext {
+  name: string;
+  state: 'success' | 'pending' | 'failed' | 'missing' | string;
+  signal: string;
+  observedAt: string | null;
+  observedAtMs: number | null;
+  detailsUrl: string | null;
+}
+
+export interface PrWatchMergeBotRereviewDiagnostics {
+  rawPendingBots: string[];
+  effectivePendingBots: string[];
+  clearedPendingBots: string[];
+  coderabbit: {
+    statusCheckRollup: {
+      state: 'success' | 'pending' | 'failed' | 'missing' | string;
+      contexts: PrWatchMergeBotRereviewRollupContext[];
+      latestSuccessAtMs: number | null;
+    };
+    stalePendingCleared: boolean;
+    latestRequestAtMs: number | null;
+    latestSuccessAtMs: number | null;
+    successAfterRequest: boolean;
+    pendingBlockerSignal: string;
+  };
+}
+
 export interface PrWatchMergeBotRereviewSignals {
   fetchError: boolean;
   rateLimit?: PrWatchMergeGitHubRateLimitStatus | null;
   pendingBots: string[];
   inProgressBots: string[];
+  requestTimesByBot?: Record<string, number>;
   coderabbit: PrWatchMergeCoderabbitReviewMeta;
 }
 
@@ -61,6 +89,7 @@ export interface PrWatchMergeSnapshot {
   botRereviewFetchError: boolean;
   botRereviewPending: string[];
   botRereviewInProgress: string[];
+  botRereviewDiagnostics: PrWatchMergeBotRereviewDiagnostics;
   coderabbitReviewMeta: PrWatchMergeCoderabbitReviewMeta;
   checks: PrWatchMergeCheckSummary;
   requiredChecks: PrWatchMergeCheckSummary | null;
