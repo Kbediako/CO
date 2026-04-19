@@ -40,16 +40,17 @@ const packSmokeInvocationPattern = new RegExp(
   String.raw`(?:^|[;&|(){}]\s*|\b(?:if|then|do|while|until)\s+)(?:!\s+)?${shellCommandPrefixPattern}npm\s+run\s+pack:smoke(?=$|[\s;|&)])`,
   'gu'
 );
+const shellFunctionDefinitionPrefixPattern = String.raw`(?:^|[;&({]\s*)`;
 const shellFunctionOpenPattern = new RegExp(
-  String.raw`(?:^|[;&]\s*)(?:function\s+${shellIdentifierPattern}(?:\s*\(\))?|${shellIdentifierPattern}\s*\(\))\s*\{`,
+  String.raw`${shellFunctionDefinitionPrefixPattern}(?:function\s+${shellIdentifierPattern}(?:\s*\(\))?|${shellIdentifierPattern}\s*\(\))\s*\{`,
   'gu'
 );
 const shellFunctionOpenBeforeOccurrencePattern = new RegExp(
-  String.raw`(?:^|[;&]\s*)(?:function\s+${shellIdentifierPattern}(?:\s*\(\))?|${shellIdentifierPattern}\s*\(\))\s*\{\s*$`,
+  String.raw`${shellFunctionDefinitionPrefixPattern}(?:function\s+${shellIdentifierPattern}(?:\s*\(\))?|${shellIdentifierPattern}\s*\(\))\s*\{\s*$`,
   'u'
 );
 const shellFunctionSignaturePattern = new RegExp(
-  String.raw`(?:^|[;&]\s*)(?:function\s+${shellIdentifierPattern}(?:\s*\(\))?|${shellIdentifierPattern}\s*\(\))\s*$`,
+  String.raw`${shellFunctionDefinitionPrefixPattern}(?:function\s+${shellIdentifierPattern}(?:\s*\(\))?|${shellIdentifierPattern}\s*\(\))\s*$`,
   'u'
 );
 const trueShortCircuitBeforePackSmokePattern = new RegExp(
@@ -1100,6 +1101,11 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
       true
     );
     expect(hasNonBlockingPackSmokeCommand(`function run_smoke() { echo setup; ${packSmokeCommand}; }`)).toBe(
+      true
+    );
+    expect(hasNonBlockingPackSmokeCommand(`{ run_smoke() { ${packSmokeCommand}; }; }`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`( run_smoke() { ${packSmokeCommand}; } )`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`{ function run_smoke() { ${packSmokeCommand}; }; }`)).toBe(
       true
     );
     expect(hasNonBlockingPackSmokeCommand(`run_smoke() { echo setup; }; ${packSmokeCommand}`)).toBe(false);
