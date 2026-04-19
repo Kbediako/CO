@@ -6,6 +6,10 @@ import process from 'node:process';
 import { runPack } from './lib/npm-pack.js';
 
 const REQUIRED_FILES = [
+  '.agents/plugins/marketplace.json',
+  'plugins/codex-orchestrator/.codex-plugin/plugin.json',
+  'plugins/codex-orchestrator/.mcp.json',
+  'plugins/codex-orchestrator/launcher.mjs',
   'bin/codex-orchestrator.js',
   'dist/bin/codex-orchestrator.js',
   'dist/scripts/run-review.js',
@@ -20,9 +24,10 @@ const REQUIRED_FILES = [
   'LICENSE'
 ];
 
-const ALLOWED_PREFIXES = ['dist/', 'schemas/', 'templates/', 'skills/'];
+const ALLOWED_PREFIXES = ['dist/', 'plugins/', 'schemas/', 'templates/', 'skills/'];
 const EXPLICIT_ALLOWED_PREFIXES = ['docs/public/'];
 const ALLOWED_ROOT_FILES = new Set([
+  '.agents/plugins/marketplace.json',
   'bin/codex-orchestrator.js',
   'README.md',
   'LICENSE',

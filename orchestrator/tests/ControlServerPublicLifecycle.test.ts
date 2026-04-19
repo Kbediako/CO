@@ -896,6 +896,45 @@ describe('startControlServerPublicLifecycle', () => {
     });
   });
 
+  it('allows an explicit idle refresh retry to start after restart_required when requested', async () => {
+    const refresh = vi.fn(async () => undefined);
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => undefined),
+      refresh
+    };
+    const stuckError = new Error('provider_refresh_lifecycle_stuck');
+    stuckError.name = 'ProviderRefreshLifecycleStuckError';
+
+    markProviderPollingStarted(providerIssueHandoff, {
+      mode: 'refresh',
+      atMs: Date.parse('2026-03-22T09:00:00.000Z')
+    });
+    await markProviderPollingStuck(providerIssueHandoff, {
+      atMs: Date.parse('2026-03-22T09:00:45.000Z')
+    });
+    markProviderPollingCompleted(providerIssueHandoff, {
+      error: stuckError,
+      atMs: Date.parse('2026-03-22T09:00:45.000Z')
+    });
+
+    await expect(
+      runProviderIssueHandoffRefresh(providerIssueHandoff, {
+        allowIdleRestartRequiredRetry: true
+      })
+    ).resolves.toMatchObject({
+      queued: true,
+      coalesced: false
+    });
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
+      checking: false,
+      stuck: false,
+      restart_required: false,
+      last_error: null
+    });
+  });
+
   it('acknowledges a newly started refresh immediately for public-route callers while the refresh keeps running', async () => {
     let resolveRefresh: (() => void) | null = null;
     const firstRefresh = new Promise<void>((resolve) => {

@@ -1,6 +1,5 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { load as parseYaml } from 'js-yaml';
 
 const DEFAULT_CONFIG_PATH = 'design.config.yaml';
 const DEFAULT_RETENTION_DAYS = 30;
@@ -197,6 +196,7 @@ const DEFAULT_CONFIG: DesignConfig = {
 
 const DESIGN_REFERENCE_PIPELINE_ID = 'design-reference';
 const HI_FI_TOOLKIT_PIPELINE_ID = 'hi-fi-design-toolkit';
+let designConfigYamlLoader: Promise<typeof import('js-yaml').load> | null = null;
 
 interface DesignPipelineSelection {
   id: string;
@@ -218,6 +218,7 @@ export async function loadDesignConfig(
 
   try {
     const raw = await readFile(path, 'utf-8');
+    const parseYaml = await loadDesignConfigYaml();
     const parsed = parseYaml(raw) as unknown;
     const warnings: string[] = [];
     const config = normalizeDesignConfig(parsed, warnings);
@@ -229,6 +230,13 @@ export async function loadDesignConfig(
     }
     throw new Error(`Failed to load design config at ${path}: ${(error as Error).message}`);
   }
+}
+
+async function loadDesignConfigYaml(): Promise<typeof import('js-yaml').load> {
+  if (!designConfigYamlLoader) {
+    designConfigYamlLoader = import('js-yaml').then((module) => module.load);
+  }
+  return await designConfigYamlLoader;
 }
 
 export function shouldActivateDesignPipeline(

@@ -38,6 +38,7 @@ const {
   probeControlHostHealth,
   readFormatFlag,
   readStringFlag,
+  resolveControlHostSupervisionQuarantineUnhealthySamples,
   readIntegerFlag,
   removeInstalledControlHostSupervisionArtifacts,
   resolveReportedSupervisedChildPid,
@@ -318,6 +319,252 @@ describe('controlHostSupervision helpers', () => {
       message:
         'co-status reported restart_required=true for the same provider refresh stuck series already restarted at 2026-04-14T05:06:30.000Z; 1 active provider worker(s) remain visible, so supervision is quarantining repeated restart churn while retaining restart_required in co-status.'
     });
+  });
+
+  it('keeps provider refresh restart_required unhealthy when the same worker series still has free capacity', () => {
+    expect(
+      evaluateControlHostSupervisionHealthPayload(
+        {
+          counts: {
+            running: 2,
+            retrying: 0,
+            max_allowed: 3
+          },
+          running: [
+            {
+              issue_id: 'issue-1',
+              issue_identifier: 'CO-217',
+              state: 'in_progress',
+              display_state: 'In Progress',
+              pid: '555',
+              started_at: '2026-04-18T20:10:00.000Z'
+            },
+            {
+              issue_id: 'issue-2',
+              issue_identifier: 'CO-241',
+              state: 'in_progress',
+              display_state: 'In Progress',
+              pid: '777',
+              started_at: '2026-04-18T20:20:00.000Z'
+            }
+          ],
+          polling: {
+            restart_required: true,
+            reason: 'provider_refresh_lifecycle_stuck',
+            updated_at: '2026-04-18T20:57:22.582Z',
+            refresh_phase: 'refresh:claim_reconcile',
+            refresh_request_class: 'fresh_dispatch:ready',
+            refresh_provider_keys: ['linear:ready-issue'],
+            checking: true,
+            queued: true,
+            operation_elapsed_ms: 48_000,
+            stalled_after_ms: 45_000
+          }
+        },
+        {
+          restartHistory: [
+            {
+              requested_at: '2026-04-18T20:56:00.000Z',
+              reason: 'restart_required',
+              message: 'launchd restart requested',
+              consecutive_unhealthy_samples: 3,
+              child_pid: 4321,
+              diagnostic: {
+                counts: {
+                  running: 2,
+                  retrying: 0,
+                  max_allowed: 3
+                },
+                polling: {
+                  updated_at: '2026-04-18T20:55:45.000Z',
+                  checking: true,
+                  queued: true,
+                  stuck: true,
+                  restart_required: true,
+                  reason: 'provider_refresh_lifecycle_stuck',
+                  last_error: 'provider_refresh_lifecycle_stuck',
+                  refresh_phase: 'refresh:claim_reconcile',
+                  refresh_request_class: 'fresh_dispatch:ready',
+                  refresh_provider_keys: ['linear:ready-issue'],
+                  operation_elapsed_ms: 46_000,
+                  stalled_after_ms: 45_000,
+                  control_host_owner: null
+                },
+                running_workers: [
+                  {
+                    issue_id: 'issue-1',
+                    issue_identifier: 'CO-217',
+                    state: 'in_progress',
+                    display_state: 'In Progress',
+                    pid: '555',
+                    worker_host: null,
+                    session_id: null,
+                    started_at: '2026-04-18T20:10:00.000Z',
+                    last_event_at: null
+                  },
+                  {
+                    issue_id: 'issue-2',
+                    issue_identifier: 'CO-241',
+                    state: 'in_progress',
+                    display_state: 'In Progress',
+                    pid: '777',
+                    worker_host: null,
+                    session_id: null,
+                    started_at: '2026-04-18T20:20:00.000Z',
+                    last_event_at: null
+                  }
+                ]
+              }
+            }
+          ],
+          activeWorkerRestartQuarantineMs: 10 * 60 * 1000,
+          now: '2026-04-18T20:58:00.000Z'
+        }
+      )
+    ).toEqual({
+      healthy: false,
+      reason: 'restart_required',
+      message: 'co-status reported restart_required=true.'
+    });
+  });
+
+  it('keeps repeated active-worker quarantine when retry reservations consume the remaining capacity', () => {
+    expect(
+      evaluateControlHostSupervisionHealthPayload(
+        {
+          counts: {
+            running: 2,
+            retrying: 1,
+            max_allowed: 3
+          },
+          running: [
+            {
+              issue_identifier: 'CO-217'
+            },
+            {
+              issue_identifier: 'CO-241'
+            }
+          ],
+          polling: {
+            restart_required: true,
+            reason: 'provider_refresh_lifecycle_stuck'
+          }
+        },
+        {
+          restartHistory: [
+            {
+              requested_at: '2026-04-18T20:56:00.000Z',
+              reason: 'restart_required',
+              message: 'launchd restart requested',
+              consecutive_unhealthy_samples: 3,
+              child_pid: 4321,
+              diagnostic: {
+                counts: {
+                  running: 2,
+                  retrying: 1,
+                  max_allowed: 3
+                },
+                polling: {
+                  updated_at: '2026-04-18T20:55:45.000Z',
+                  checking: true,
+                  queued: true,
+                  stuck: true,
+                  restart_required: true,
+                  reason: 'provider_refresh_lifecycle_stuck',
+                  last_error: 'provider_refresh_lifecycle_stuck',
+                  refresh_phase: 'refresh:claim_reconcile',
+                  refresh_request_class: 'fresh_dispatch:ready',
+                  refresh_provider_keys: ['linear:ready-issue'],
+                  operation_elapsed_ms: 46_000,
+                  stalled_after_ms: 45_000,
+                  control_host_owner: null
+                },
+                running_workers: [
+                  {
+                    issue_id: null,
+                    issue_identifier: 'CO-217',
+                    state: null,
+                    display_state: null,
+                    pid: null,
+                    worker_host: null,
+                    session_id: null,
+                    started_at: null,
+                    last_event_at: null
+                  },
+                  {
+                    issue_id: null,
+                    issue_identifier: 'CO-241',
+                    state: null,
+                    display_state: null,
+                    pid: null,
+                    worker_host: null,
+                    session_id: null,
+                    started_at: null,
+                    last_event_at: null
+                  }
+                ]
+              }
+            }
+          ],
+          activeWorkerRestartQuarantineMs: 10 * 60 * 1000,
+          now: '2026-04-18T20:58:00.000Z'
+        }
+      )
+    ).toEqual({
+      healthy: true,
+      reason: 'active_worker_restart_quarantine',
+      message:
+        'co-status reported restart_required=true for the same provider refresh stuck series already restarted at 2026-04-18T20:56:00.000Z; 2 active provider worker(s) remain visible, so supervision is quarantining repeated restart churn while retaining restart_required in co-status.'
+    });
+  });
+
+  it('preserves the unhealthy streak while active-worker restart churn is quarantined', () => {
+    const config = buildControlHostSupervisionConfig({
+      homeDir: '/Users/tester',
+      cwd: '/repo/workspace',
+      repoRoot: '/repo/CO',
+      nodePath: '/custom/node',
+      cliEntrypoint: '/opt/codex-orchestrator.js',
+      unhealthyThreshold: 3
+    });
+    const priorState = buildInitialControlHostSupervisionState({
+      config,
+      updatedAt: '2026-04-14T05:06:30.000Z',
+      status: 'restart_required',
+      restartHistory: [
+        {
+          requested_at: '2026-04-14T05:00:30.000Z',
+          reason: 'restart_required',
+          message: 'older unrelated launchd restart requested.',
+          consecutive_unhealthy_samples: 8,
+          child_pid: 1200,
+          diagnostic: null
+        },
+        {
+          requested_at: '2026-04-14T05:06:30.000Z',
+          reason: 'restart_required',
+          message: 'launchd restart requested.',
+          consecutive_unhealthy_samples: 3,
+          child_pid: 1234,
+          diagnostic: null
+        }
+      ]
+    });
+
+    expect(
+      resolveControlHostSupervisionQuarantineUnhealthySamples({
+        currentConsecutiveUnhealthySamples: 0,
+        priorState,
+        config
+      })
+    ).toBe(3);
+    expect(
+      resolveControlHostSupervisionQuarantineUnhealthySamples({
+        currentConsecutiveUnhealthySamples: 4,
+        priorState,
+        config
+      })
+    ).toBe(4);
   });
 
   it('keeps provider refresh restart_required unhealthy after a newer unrelated restart record', () => {

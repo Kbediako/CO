@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -39,6 +39,7 @@ async function createProviderWorkerManifest(
       pipeline_id: pipelineId,
       ...ISSUE,
       issue_updated_at: '2026-03-26T14:32:20.815Z',
+      provider_launch_source: 'control-host',
       provider_control_host_task_id: CONTROL_HOST_TASK_ID,
       provider_control_host_run_id: CONTROL_HOST_RUN_ID,
       workspace_path: tempRoot
@@ -54,6 +55,7 @@ function buildProviderWorkerEnv(manifestPath: string, overrides: NodeJS.ProcessE
     CODEX_ORCHESTRATOR_RUN_ID: RUN_ID,
     CODEX_ORCHESTRATOR_TASK_ID: TASK_ID,
     CODEX_ORCHESTRATOR_PIPELINE_ID: 'provider-linear-worker',
+    CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: 'control-host',
     CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: CONTROL_HOST_TASK_ID,
     CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID: CONTROL_HOST_RUN_ID,
     ...overrides
@@ -206,6 +208,43 @@ describe('runProviderLinearChildStreamShell', () => {
     );
     expect(result).toMatchObject({ ok: false, operation: 'child-stream', ...ISSUE, pipeline_id: pipelineId, child_run: null, error: { code, status } });
     expect(execRunner).not.toHaveBeenCalled();
+  });
+
+  it('backfills missing manifest provenance from the matching control-host env before launching the child stream', async () => {
+    const { manifestPath } = await createProviderWorkerManifest();
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: RUN_ID,
+        task_id: TASK_ID,
+        pipeline_id: 'provider-linear-worker',
+        ...ISSUE,
+        issue_updated_at: '2026-03-26T14:32:20.815Z',
+        provider_launch_source: null,
+        provider_control_host_task_id: null,
+        provider_control_host_run_id: null,
+        workspace_path: tempRoot
+      }),
+      'utf8'
+    );
+
+    const result = await runProviderLinearChildStreamShell(
+      { pipelineId: 'docs-review', env: buildProviderWorkerEnv(manifestPath) },
+      { execRunner: vi.fn(async () => createExecResult('docs-review', 'docs-run-backfill', 'docs-review passed')) as never }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'child-stream',
+      child_run: { run_id: 'docs-run-backfill' }
+    });
+
+    const persistedManifest = JSON.parse(await readFile(manifestPath, 'utf8')) as Record<string, unknown>;
+    expect(persistedManifest).toMatchObject({
+      provider_launch_source: 'control-host',
+      provider_control_host_task_id: CONTROL_HOST_TASK_ID,
+      provider_control_host_run_id: CONTROL_HOST_RUN_ID
+    });
   });
 
   it('rejects punctuation-only explicit stream names instead of collapsing them onto the fallback slug', async () => {

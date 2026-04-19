@@ -22,6 +22,7 @@ import {
 import {
   isLiveLinearTrackedIssueOwnedByCurrentViewerOrUnassigned,
   sortLiveLinearTrackedIssuesForDispatch,
+  type LiveLinearTrackedBlocker,
   type LiveLinearTrackedIssue,
   type LiveLinearTrackedIssuesQueryMode
 } from './linearDispatchSource.js';
@@ -53,6 +54,7 @@ import {
 import { createProviderIssueRetryQueue } from './providerIssueRetryQueue.js';
 import {
   isProviderPollingStuck,
+  readProviderPollingHealth,
   recordProviderPollingProgress
 } from './providerPollingHealth.js';
 import type { ProviderWorkflowConfigStore } from './providerWorkflowConfigStore.js';
@@ -268,6 +270,7 @@ export interface CreateProviderIssueHandoffServiceOptions {
     issueState?: string | null;
     issueStateType?: string | null;
     issueUpdatedAt?: string | null;
+    blockedBy?: readonly LiveLinearTrackedBlocker[] | null;
     previousBranchRecovery?: ProviderReviewHandoffPromotionRecord['branch_recovery'] | null;
     sourceSetup?: DispatchPilotSourceSetup | null;
     repoRoot: string;
@@ -393,6 +396,12 @@ export function createProviderIssueHandoffService(
   }>();
   const serviceCreatedAtMs = Date.now();
   let providerIssueHandoffService: ProviderIssueHandoffService | null = null;
+  let concurrentRestartRequiredSnapshotCutoff:
+    | {
+        pollingUpdatedAtMs: number;
+        effectiveUpdatedAtMs: number;
+      }
+    | null = null;
 
   const shouldAbortRefreshCycle = (): boolean =>
     hasConcurrentRestartRequiredPollingSnapshot() ||
@@ -577,12 +586,66 @@ export function createProviderIssueHandoffService(
         )
     );
 
+  const readConcurrentRestartRequiredSnapshotCutoffMs = (liveNowMs: number): number | null => {
+    const pollingUpdatedAtMs = readProviderPollingSnapshotUpdatedAtMs(options.state.polling);
+    if (pollingUpdatedAtMs === null) {
+      concurrentRestartRequiredSnapshotCutoff = null;
+      return null;
+    }
+    if (
+      concurrentRestartRequiredSnapshotCutoff &&
+      concurrentRestartRequiredSnapshotCutoff.pollingUpdatedAtMs === pollingUpdatedAtMs
+    ) {
+      return concurrentRestartRequiredSnapshotCutoff.effectiveUpdatedAtMs;
+    }
+    if (pollingUpdatedAtMs <= liveNowMs) {
+      concurrentRestartRequiredSnapshotCutoff = {
+        pollingUpdatedAtMs,
+        effectiveUpdatedAtMs: pollingUpdatedAtMs
+      };
+      return pollingUpdatedAtMs;
+    }
+    const effectiveUpdatedAtMs = liveNowMs;
+    concurrentRestartRequiredSnapshotCutoff = {
+      pollingUpdatedAtMs,
+      effectiveUpdatedAtMs
+    };
+    return effectiveUpdatedAtMs;
+  };
+
   const hasConcurrentRestartRequiredPollingSnapshot = (): boolean => {
     if (!isRestartRequiredPollingSnapshot(options.state.polling)) {
+      concurrentRestartRequiredSnapshotCutoff = null;
       return false;
     }
     const pollingUpdatedAtMs = readProviderPollingSnapshotUpdatedAtMs(options.state.polling);
-    return pollingUpdatedAtMs !== null && pollingUpdatedAtMs >= serviceCreatedAtMs;
+    if (pollingUpdatedAtMs === null || pollingUpdatedAtMs < serviceCreatedAtMs) {
+      concurrentRestartRequiredSnapshotCutoff = null;
+      return false;
+    }
+    const liveNowMs = Date.now();
+    const effectivePollingUpdatedAtMs = readConcurrentRestartRequiredSnapshotCutoffMs(liveNowMs);
+    if (effectivePollingUpdatedAtMs === null) {
+      return false;
+    }
+    const liveHealth = providerIssueHandoffService
+      ? readProviderPollingHealth(providerIssueHandoffService, liveNowMs)
+      : null;
+    const liveOperationStartedAtMs =
+      liveHealth?.checking && typeof liveHealth.operation_started_at === 'string'
+        ? Date.parse(liveHealth.operation_started_at)
+        : Number.NaN;
+    // A fresh retry may start before the persisted polling snapshot catches up.
+    // Clamp future-skewed persisted timestamps to the first live-time observation and once a
+    // newer (or same-tick) operation is active, do not let the older restart_required snapshot
+    // fail-close it again while the stale persisted snapshot is still in flight.
+    if (
+      Number.isFinite(liveOperationStartedAtMs) &&
+      liveOperationStartedAtMs >= effectivePollingUpdatedAtMs
+    ) {
+      return false;
+    }
+    return true;
   };
 
   const pickRestoredProviderStateUpdatedAt = (
@@ -716,6 +779,7 @@ export function createProviderIssueHandoffService(
       issueState: input.trackedIssue.state,
       issueStateType: input.trackedIssue.state_type,
       issueUpdatedAt: input.trackedIssue.updated_at,
+      blockedBy: input.trackedIssue.blocked_by ?? null,
       previousBranchRecovery: input.claim.review_promotion?.branch_recovery ?? null,
       sourceSetup: resolveMergeCloseoutSourceSetup(),
       env: buildMergeCloseoutEnv(input.latestRun?.manifestPath ?? input.claim.run_manifest_path),
@@ -3800,12 +3864,22 @@ export function createProviderIssueHandoffService(
       if (!providerIssueHandoffService) {
         return;
       }
-      recordProviderPollingProgress(providerIssueHandoffService, {
+      const progress: {
+        phase: string;
+        requestClass?: string | null;
+        providerKeys?: string[] | null;
+        counts: Record<string, number>;
+      } = {
         phase,
-        requestClass: input.requestClass ?? null,
-        providerKeys: input.providerKeys ?? null,
         counts: refreshCounts
-      });
+      };
+      if (input.requestClass !== undefined) {
+        progress.requestClass = input.requestClass;
+      }
+      if (input.providerKeys !== undefined) {
+        progress.providerKeys = input.providerKeys;
+      }
+      recordProviderPollingProgress(providerIssueHandoffService, progress);
     };
       await runWithProviderIssueRunDiscoveryCache(async () => {
         await runWithRefreshLifecycleLock(async () => {

@@ -4,6 +4,8 @@ Codex Orchestrator is a CLI and runtime for Codex-driven pipelines, auditable ma
 
 ## Install
 
+npm remains the supported baseline because it is the simplest way to install the CO CLI.
+
 ```bash
 npm i -g @kbediako/codex-orchestrator
 codex-orchestrator --version
@@ -12,6 +14,14 @@ codex-orchestrator --version
 Node.js `>=20` is required.
 
 CO currently targets Codex CLI `0.118.0`; newer candidates stay evidence-gated in `docs/guides/codex-version-policy.md`.
+
+For newer Codex releases that expose marketplace/plugin flows, CO also ships a repo marketplace entry plus plugin manifests under `plugins/codex-orchestrator`. You can add the packaged or repo-root marketplace source and install the plugin from Codex:
+
+```bash
+codex marketplace add "$(npm root -g)/@kbediako/codex-orchestrator"
+```
+
+For a local checkout, add the repository root instead of the npm install directory. For a Git-backed install, pass a Git identifier or URL such as `owner/repo[@ref]`, an HTTPS Git URL, or an SSH Git URL. The marketplace entry points at the packaged `plugins/codex-orchestrator` directory, and the installed plugin uses a small `node` launcher to resolve the marketplace runtime root from `${CODEX_HOME:-~/.codex}/config.toml`: local-directory sources run from the recorded source path, while Git-backed sources run from Codex's installed checkout under `${CODEX_HOME:-~/.codex}/.tmp/marketplaces/codex-orchestrator`. That keeps the MCP registration path independent of a second `codex-orchestrator` PATH entry. If you move or replace a local-directory source, or remove Codex's installed marketplace checkout, re-run `codex marketplace add ...` before using the plugin again. Then open `/plugins` in Codex, install `Codex Orchestrator`, and restart Codex if it does not pick up the plugin immediately. Use the plugin browser's uninstall action to remove it, or set the plugin entry in `${CODEX_HOME:-~/.codex}/config.toml` to `enabled = false` to turn it off without uninstalling.
 
 ## 2-minute quickstart
 
