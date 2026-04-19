@@ -477,7 +477,10 @@ export function createProviderIssueHandoffService(
   const runWithRefreshLifecycleLock = async <T>(operation: () => Promise<T>): Promise<T> => {
     const lifecycleScope = refreshLifecycleScope.getStore();
     if (lifecycleScope) {
-      return await operation();
+      assertRefreshLifecycleCurrent();
+      const nestedResult = await operation();
+      assertRefreshLifecycleCurrent();
+      return nestedResult;
     }
     const operationEpoch = refreshLifecycleEpoch;
     const runOperation = (): Promise<T> =>
@@ -485,7 +488,11 @@ export function createProviderIssueHandoffService(
         if (operationEpoch !== refreshLifecycleEpoch) {
           throwRefreshLifecycleStuckError();
         }
-        return await operation();
+        const result = await operation();
+        if (operationEpoch !== refreshLifecycleEpoch) {
+          throwRefreshLifecycleStuckError();
+        }
+        return result;
       });
     const nextOperation = refreshLifecycleChain.then(
       () => runOperation(),
