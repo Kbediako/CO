@@ -2273,7 +2273,7 @@ function isReviewPromotionCrossIssueCandidate(input: {
   ) {
     return true;
   }
-  return hasReviewPromotionBlockerWording(title) || /\bfollow(?:-| )up\b/i.test(title);
+  return /\bfollow(?:-| )up\b/i.test(title);
 }
 
 function extractLeadingIssueIdentifier(value: string | null | undefined): string | null {
