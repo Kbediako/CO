@@ -141,6 +141,7 @@ export interface ControlProviderOperatorAutopilotPendingActionPayload {
   merge_closeout_reason: string;
   shared_root_status: string | null;
   linear_transition_status: string | null;
+  executable_action_ids?: string[];
   lifecycle_state: 'pending' | 'acknowledged';
   lifecycle_actor: string | null;
   lifecycle_reason: string | null;
@@ -157,6 +158,7 @@ export interface ControlProviderOperatorAutopilotResolvedActionPayload {
   merge_closeout_reason: string;
   shared_root_status: string | null;
   linear_transition_status: string | null;
+  executable_action_ids?: string[];
   lifecycle_state: 'cleared' | 'dismissed';
   lifecycle_actor: string;
   lifecycle_reason: string;
@@ -172,7 +174,36 @@ export interface ControlProviderOperatorAutopilotLifecycleRecordPayload {
   actor: string;
   reason: string;
   recorded_at: string;
-  source: 'co-status';
+  source: 'co-status' | 'operator-autopilot';
+}
+
+export interface ControlProviderOperatorAutopilotLocalRolloutExecutionAttemptPayload {
+  record_kind?: 'started' | 'terminal';
+  action_instance_id: string;
+  action_id: string;
+  issue_id: string;
+  issue_identifier: string | null;
+  preflight: {
+    status: 'passed' | 'skipped' | 'failed';
+    reason: string | null;
+    checked_at: string;
+    summary: string;
+  };
+  started_at: string | null;
+  ended_at: string;
+  terminal_state: 'succeeded' | 'skipped' | 'failed';
+  reason: string | null;
+  summary: string;
+  command: {
+    runner: 'codex_orchestrator' | 'npm_script' | null;
+    command: string | null;
+    args: string[];
+    cwd: string | null;
+    timeout_ms: number | null;
+  };
+  exit_code: number | null;
+  stdout: string | null;
+  stderr: string | null;
 }
 
 export interface ControlProviderOperatorAutopilotLastResultPayload {
@@ -185,6 +216,7 @@ export interface ControlProviderOperatorAutopilotLastResultPayload {
   pending_actions: ControlProviderOperatorAutopilotPendingActionPayload[];
   resolved_actions?: ControlProviderOperatorAutopilotResolvedActionPayload[];
   lifecycle_records?: ControlProviderOperatorAutopilotLifecycleRecordPayload[];
+  local_rollout_execution_attempts?: ControlProviderOperatorAutopilotLocalRolloutExecutionAttemptPayload[];
 }
 
 export interface ControlProviderOperatorAutopilotPayload {
@@ -202,9 +234,11 @@ export interface ControlProviderOperatorAutopilotPayload {
   post_merge_rollout: {
     enabled: boolean;
     summary: string;
+    execution?: unknown;
   };
   audit_path: string;
   lifecycle_path?: string;
+  execution_path?: string;
   last_result: ControlProviderOperatorAutopilotLastResultPayload | null;
 }
 
@@ -863,10 +897,12 @@ export function buildSelectedRunRuntimeFingerprintInput(
                 },
                 post_merge_rollout: {
                   enabled: providerWorkflow.operator_autopilot.post_merge_rollout.enabled,
-                  summary: providerWorkflow.operator_autopilot.post_merge_rollout.summary
+                  summary: providerWorkflow.operator_autopilot.post_merge_rollout.summary,
+                  execution: providerWorkflow.operator_autopilot.post_merge_rollout.execution
                 },
                 audit_path: providerWorkflow.operator_autopilot.audit_path,
                 lifecycle_path: providerWorkflow.operator_autopilot.lifecycle_path,
+                execution_path: providerWorkflow.operator_autopilot.execution_path,
                 last_result: providerWorkflow.operator_autopilot.last_result
                   ? {
                       recorded_at: providerWorkflow.operator_autopilot.last_result.recorded_at,
@@ -912,6 +948,9 @@ export function buildSelectedRunRuntimeFingerprintInput(
                             merge_closeout_reason: pendingAction.merge_closeout_reason,
                             shared_root_status: pendingAction.shared_root_status,
                             linear_transition_status: pendingAction.linear_transition_status,
+                            executable_action_ids: [
+                              ...(pendingAction.executable_action_ids ?? [])
+                            ],
                             lifecycle_state: pendingAction.lifecycle_state,
                             lifecycle_actor: pendingAction.lifecycle_actor,
                             lifecycle_reason: pendingAction.lifecycle_reason,
@@ -931,6 +970,9 @@ export function buildSelectedRunRuntimeFingerprintInput(
                             merge_closeout_reason: resolvedAction.merge_closeout_reason,
                             shared_root_status: resolvedAction.shared_root_status,
                             linear_transition_status: resolvedAction.linear_transition_status,
+                            executable_action_ids: [
+                              ...(resolvedAction.executable_action_ids ?? [])
+                            ],
                             lifecycle_state: resolvedAction.lifecycle_state,
                             lifecycle_actor: resolvedAction.lifecycle_actor,
                             lifecycle_reason: resolvedAction.lifecycle_reason,
@@ -950,7 +992,39 @@ export function buildSelectedRunRuntimeFingerprintInput(
                             recorded_at: record.recorded_at,
                             source: record.source
                           })
-                        )
+                        ),
+                      local_rollout_execution_attempts:
+                        (
+                          providerWorkflow.operator_autopilot.last_result
+                            .local_rollout_execution_attempts ?? []
+                        ).map((attempt) => ({
+                          action_instance_id: attempt.action_instance_id,
+                          record_kind: attempt.record_kind,
+                          action_id: attempt.action_id,
+                          issue_id: attempt.issue_id,
+                          issue_identifier: attempt.issue_identifier,
+                          preflight: {
+                            status: attempt.preflight.status,
+                            reason: attempt.preflight.reason,
+                            checked_at: attempt.preflight.checked_at,
+                            summary: attempt.preflight.summary
+                          },
+                          started_at: attempt.started_at,
+                          ended_at: attempt.ended_at,
+                          terminal_state: attempt.terminal_state,
+                          reason: attempt.reason,
+                          summary: attempt.summary,
+                          command: {
+                            runner: attempt.command.runner,
+                            command: attempt.command.command,
+                            args: [...attempt.command.args],
+                            cwd: attempt.command.cwd,
+                            timeout_ms: attempt.command.timeout_ms
+                          },
+                          exit_code: attempt.exit_code,
+                          stdout: attempt.stdout,
+                          stderr: attempt.stderr
+                        }))
                     }
                   : null
               }
