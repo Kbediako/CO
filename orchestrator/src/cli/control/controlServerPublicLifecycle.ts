@@ -741,7 +741,11 @@ function queueProviderIssueHandoffRefresh(
     return state.queuedRefresh;
   }
   const queuedRefresh = waitForProviderIssueHandoffPending(providerIssueHandoff, state.active!)
-    .catch(async () => {
+    .catch(async (error: unknown) => {
+      const stuckReason = resolveProviderIssueHandoffStuckErrorReason(error);
+      if (stuckReason) {
+        throw new Error(stuckReason);
+      }
       if (await resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff)) {
         throw new Error(
           readProviderPollingHealth(providerIssueHandoff)?.reason ??

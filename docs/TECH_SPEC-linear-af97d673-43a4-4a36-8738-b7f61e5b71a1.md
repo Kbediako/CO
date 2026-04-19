@@ -69,7 +69,7 @@ last_review: 2026-04-19
   - focused regression or diagnostic harness for the Apr 19 recurrence
 
 ## Nearby Wrong Interpretations To Reject
-- `PR #324 already fixed this forever.` The March fix is a reference baseline; Apr 19 reopened `CO-41` because the family recurred again.
+- `PR #324 already fixed this forever.` The March fix is a reference baseline; Apr 19 reopened `CO-41` because the family recurred.
 - `PR #547 is current completion proof.` No: `PR #547` is the Apr 18 repair baseline, while Apr 19 evidence is post-merge recurrence evidence.
 - `This is capacity exhaustion.` No: Apr 19 evidence includes spare-capacity no-admission.
 - `This is only Linear status drift.` No: local control-host provider refresh/admission evidence remains central.
@@ -85,7 +85,7 @@ last_review: 2026-04-19
 | Active-worker proof | Not the March focus. | Apr 18 used active-worker series and capacity to avoid wrong quarantine. | `active_worker_proof_missing` is current evidence. | Missing proof is surfaced and cannot masquerade as healthy active-worker protection. |
 | Freshness / recovery | Restart was a mitigation for the original stall. | Apr 18 repair aimed to trigger supervision recovery under free capacity. | Freshness-gauge stale verdict and partial restart recovery show restart is not final proof. | Freshness/recovery state is machine-checkable before closeout. |
 | Capacity / admission | Restart historically allowed stuck `Ready` issues to advance. | `running=2`, `max_allowed=3` represented free-capacity no-admission. | Spare-capacity no-admission recurs after `PR #547`. | Available capacity admits `Ready` work to `In Progress`, or the blocker is explicit. |
-| Adjacent issue boundaries | `CO-41` is the lifecycle-stall lineage anchor. | `CO-217`, `CO-211`, `CO-214`, and `CO-248` stayed boundaries. | Do not widen into `CO-39`, `CO-40`, `CO-33`, or unrelated families. | Source changes preserve neighboring contracts unless parent evidence requires coordinated follow-up. |
+| Adjacent issue boundaries | `CO-41` is the lifecycle-stall lineage anchor. | `CO-217`, `CO-211`, `CO-214`, and `CO-248` stayed boundaries. | Do not widen into `CO-39`, `CO-40`, `CO-33`, or unrelated families. | Source changes preserve neighboring contracts unless parent evidence requires coordination with related contracts. |
 
 ## Validation Plan
 - Child-lane docs checks only:

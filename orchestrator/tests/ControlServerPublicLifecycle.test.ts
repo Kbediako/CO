@@ -959,6 +959,9 @@ describe('startControlServerPublicLifecycle', () => {
 
     const inFlightRefresh = runProviderIssueHandoffRefresh(providerIssueHandoff);
     expect(refresh).toHaveBeenCalledTimes(1);
+    const queuedRefresh = runProviderIssueHandoffRefresh(providerIssueHandoff, {
+      queueIfBusy: true
+    });
 
     await markProviderPollingStuck(providerIssueHandoff);
     const retryOutcome = await runProviderIssueHandoffRefresh(providerIssueHandoff, {
@@ -973,6 +976,11 @@ describe('startControlServerPublicLifecycle', () => {
     expect(resetStuckRefreshLifecycle).toHaveBeenCalledTimes(1);
     expect(refresh).toHaveBeenCalledTimes(2);
     await expect(inFlightRefresh).resolves.toMatchObject({
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck'
+    });
+    await expect(queuedRefresh).resolves.toMatchObject({
       stuck: true,
       restart_required: true,
       reason: 'provider_refresh_lifecycle_stuck'

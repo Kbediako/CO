@@ -2049,14 +2049,18 @@ describe('createProviderIssueHandoffService', () => {
     let resolveCallCount = 0;
     const resolveTrackedIssue = vi.fn(async ({ issueId }: { issueId: string }) => {
       resolveCallCount += 1;
-      if (resolveCallCount === 1) {
+      const callIndex = resolveCallCount;
+      if (callIndex === 1) {
         await new Promise<void>((resolve) => {
           releaseFirstResolve = resolve;
         });
       }
       return {
         kind: 'release' as const,
-        reason: `provider_issue_not_ready:${issueId}`
+        reason:
+          callIndex === 1
+            ? `provider_issue_not_ready:stale:${issueId}`
+            : `provider_issue_not_ready:fresh:${issueId}`
       };
     });
 
@@ -2093,9 +2097,633 @@ describe('createProviderIssueHandoffService', () => {
       stuck: false,
       restart_required: false
     });
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-issue-1')).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:provider_issue_not_ready:fresh:lin-issue-1'
+    });
 
     releaseFirstResolve?.();
     await expect(stuckPoll).rejects.toThrow('provider_refresh_lifecycle_stuck');
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-issue-1')).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:provider_issue_not_ready:fresh:lin-issue-1'
+    });
+  });
+
+  it('aborts a pre-refresh tracked-issue refetch when the refresh lifecycle is reset', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:00:00.000Z'));
+
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    let releaseTrackedIssues: (() => void) | null = null;
+    const resolveTrackedIssues = vi.fn(async () => {
+      await new Promise<void>((resolve) => {
+        releaseTrackedIssues = resolve;
+      });
+      return {
+        kind: 'ready' as const,
+        trackedIssues: [
+          createTrackedIssue({
+            id: 'lin-stale-refresh',
+            identifier: 'CO-44',
+            title: 'Old refresh should not dispatch after reset',
+            state: 'Ready',
+            state_type: 'unstarted',
+            updated_at: '2026-03-19T04:01:00.000Z'
+          })
+        ]
+      };
+    });
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      resolveTrackedIssues
+    });
+
+    const staleRefresh = service.refresh();
+    await waitForMockCalls(resolveTrackedIssues, 1);
+    service.resetStuckRefreshLifecycle?.();
+    releaseTrackedIssues?.();
+
+    await expect(staleRefresh).rejects.toThrow('provider_refresh_lifecycle_stuck');
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(state.claims).toHaveLength(0);
+  });
+
+  it('rethrows a lifecycle reset from active-run metadata refresh fallback paths', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:00:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const activeEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-metadata-reset'
+    };
+    const activePaths = resolveRunPaths(activeEnv, 'run-metadata-reset');
+    await mkdir(activePaths.runDir, { recursive: true });
+    await writeFile(
+      activePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-metadata-reset',
+        task_id: 'linear-lin-metadata-reset',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-metadata-reset',
+        issue_identifier: 'CO-47',
+        issue_updated_at: '2026-03-19T04:01:00.000Z',
+        updated_at: '2026-03-19T04:02:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(
+      createProviderClaim({
+        issue_id: 'lin-metadata-reset',
+        issue_identifier: 'CO-47',
+        issue_state: 'Ready',
+        issue_state_type: 'unstarted',
+        issue_updated_at: '2026-03-19T04:01:00.000Z',
+        task_id: 'linear-lin-metadata-reset',
+        run_id: 'run-metadata-reset',
+        run_manifest_path: activePaths.manifestPath,
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run'
+      })
+    );
+
+    let releaseTrackedIssue: (() => void) | null = null;
+    const resolveTrackedIssue = vi.fn(async () => {
+      await new Promise<void>((resolve) => {
+        releaseTrackedIssue = resolve;
+      });
+      return {
+        kind: 'ready' as const,
+        trackedIssue: createTrackedIssue({
+          id: 'lin-metadata-reset',
+          identifier: 'CO-47',
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-03-19T04:05:00.000Z'
+        })
+      };
+    });
+    const persist = vi.fn(async () => undefined);
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      resolveTrackedIssue
+    });
+
+    const staleRehydrate = service.rehydrate();
+    await waitForMockCalls(resolveTrackedIssue, 1);
+    service.resetStuckRefreshLifecycle?.();
+    releaseTrackedIssue?.();
+
+    await expect(staleRehydrate).rejects.toThrow('provider_refresh_lifecycle_stuck');
+    expect(persist).not.toHaveBeenCalled();
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-metadata-reset')).toMatchObject({
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-03-19T04:01:00.000Z',
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run'
+    });
+  });
+
+  it('rolls back a stale refresh claim mutation when the lifecycle reset lands during persist', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:00:00.000Z'));
+
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(
+      createProviderClaim({
+        issue_id: 'lin-persist-reset',
+        issue_identifier: 'CO-45',
+        state: 'accepted',
+        reason: 'provider_issue_handoff_owned'
+      })
+    );
+
+    let releasePersist: (() => void) | null = null;
+    let persistCallCount = 0;
+    const persistedClaimSnapshots: ProviderIntakeClaimRecord[][] = [];
+    const persist = vi.fn(async () => {
+      persistCallCount += 1;
+      persistedClaimSnapshots.push(state.claims.map((claim) => ({ ...claim })));
+      if (persistCallCount === 2) {
+        await new Promise<void>((resolve) => {
+          releasePersist = resolve;
+        });
+      }
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      resolveTrackedIssue: vi.fn(async () => ({
+        kind: 'release' as const,
+        reason: 'provider_issue_not_ready:stale'
+      }))
+    });
+
+    const stalePoll = service.poll?.({
+      trackedIssues: []
+    });
+    await waitForMockCalls(persist, 2);
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-persist-reset')).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:provider_issue_not_ready:stale'
+    });
+
+    service.resetStuckRefreshLifecycle?.();
+    releasePersist?.();
+
+    await expect(stalePoll).rejects.toThrow('provider_refresh_lifecycle_stuck');
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-persist-reset')).toMatchObject({
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation'
+    });
+    expect(persist).toHaveBeenCalledTimes(3);
+    expect(persistedClaimSnapshots[1].find((claim) => claim.issue_id === 'lin-persist-reset')).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:provider_issue_not_ready:stale'
+    });
+    expect(persistedClaimSnapshots[2].find((claim) => claim.issue_id === 'lin-persist-reset')).toMatchObject({
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation'
+    });
+  });
+
+  it('rolls back a stale rehydrate claim mutation when the lifecycle reset lands during final persist', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:00:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const activeEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-rehydrate-reset'
+    };
+    const activePaths = resolveRunPaths(activeEnv, 'run-rehydrate-reset');
+    await mkdir(activePaths.runDir, { recursive: true });
+    await writeFile(
+      activePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-rehydrate-reset',
+        task_id: 'linear-lin-rehydrate-reset',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-rehydrate-reset',
+        issue_identifier: 'CO-48',
+        issue_updated_at: '2026-03-19T04:01:00.000Z',
+        updated_at: '2026-03-19T04:02:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(
+      createProviderClaim({
+        issue_id: 'lin-rehydrate-reset',
+        issue_identifier: 'CO-48',
+        task_id: 'linear-lin-rehydrate-reset',
+        state: 'starting',
+        reason: 'provider_issue_start_launched',
+        run_id: null,
+        run_manifest_path: null,
+        launch_token: 'launch-token-rehydrate-reset'
+      })
+    );
+
+    let releasePersist: (() => void) | null = null;
+    let persistCallCount = 0;
+    const persistedClaimSnapshots: ProviderIntakeClaimRecord[][] = [];
+    const persist = vi.fn(async () => {
+      persistCallCount += 1;
+      persistedClaimSnapshots.push(state.claims.map((claim) => ({ ...claim })));
+      if (persistCallCount === 1) {
+        await new Promise<void>((resolve) => {
+          releasePersist = resolve;
+        });
+      }
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      }
+    });
+
+    const staleRehydrate = service.rehydrate();
+    await waitForMockCalls(persist, 1);
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-rehydrate-reset')).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: 'run-rehydrate-reset',
+      run_manifest_path: activePaths.manifestPath
+    });
+
+    service.resetStuckRefreshLifecycle?.();
+    releasePersist?.();
+
+    await expect(staleRehydrate).rejects.toThrow('provider_refresh_lifecycle_stuck');
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-rehydrate-reset')).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      run_id: null,
+      run_manifest_path: null
+    });
+    expect(persist).toHaveBeenCalledTimes(2);
+    expect(persistedClaimSnapshots[0].find((claim) => claim.issue_id === 'lin-rehydrate-reset')).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: 'run-rehydrate-reset',
+      run_manifest_path: activePaths.manifestPath
+    });
+    expect(persistedClaimSnapshots[1].find((claim) => claim.issue_id === 'lin-rehydrate-reset')).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      run_id: null,
+      run_manifest_path: null
+    });
+  });
+
+  it('does not let stale refresh rollback overwrite a newer lifecycle mutation', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:00:00.000Z'));
+
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(
+      createProviderClaim({
+        issue_id: 'lin-persist-reset-fresh',
+        issue_identifier: 'CO-46',
+        state: 'accepted',
+        reason: 'provider_issue_handoff_owned'
+      })
+    );
+
+    let releasePersist: (() => void) | null = null;
+    let persistCallCount = 0;
+    const persistedClaimSnapshots: ProviderIntakeClaimRecord[][] = [];
+    const persist = vi.fn(async () => {
+      persistCallCount += 1;
+      persistedClaimSnapshots.push(state.claims.map((claim) => ({ ...claim })));
+      if (persistCallCount === 2) {
+        await new Promise<void>((resolve) => {
+          releasePersist = resolve;
+        });
+      }
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      resolveTrackedIssue: vi.fn(async () => ({
+        kind: 'release' as const,
+        reason: 'provider_issue_not_ready:stale'
+      }))
+    });
+
+    const stalePoll = service.poll?.({
+      trackedIssues: []
+    });
+    await waitForMockCalls(persist, 2);
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-persist-reset-fresh')).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:provider_issue_not_ready:stale'
+    });
+
+    service.resetStuckRefreshLifecycle?.();
+    state.claims[0] = {
+      ...state.claims[0],
+      reason: 'provider_issue_released:provider_issue_not_ready:fresh',
+      updated_at: '2026-03-19T04:01:00.000Z'
+    };
+    releasePersist?.();
+
+    await expect(stalePoll).rejects.toThrow('provider_refresh_lifecycle_stuck');
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-persist-reset-fresh')).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:provider_issue_not_ready:fresh',
+      updated_at: '2026-03-19T04:01:00.000Z'
+    });
+    expect(persist).toHaveBeenCalledTimes(2);
+    expect(persistedClaimSnapshots[1].find((claim) => claim.issue_id === 'lin-persist-reset-fresh')).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:provider_issue_not_ready:stale'
+    });
+  });
+
+  it('rehydrates a worker that starts after the refresh lifecycle is reset', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:00:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(
+      createProviderClaim({
+        issue_id: 'lin-issue-start-reset',
+        issue_identifier: 'CO-41',
+        issue_state: 'Ready',
+        issue_state_type: 'unstarted',
+        state: 'accepted',
+        reason: 'provider_issue_handoff_owned'
+      })
+    );
+
+    const startedEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-start-reset'
+    };
+    const startedPaths = resolveRunPaths(startedEnv, 'run-started-after-reset');
+    let resolveStart: ((value: { runId: string; manifestPath: string }) => void) | null = null;
+    const launcher = {
+      start: vi.fn(async () =>
+        await new Promise<{ runId: string; manifestPath: string }>((resolve) => {
+          resolveStart = resolve;
+        })
+      ),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher
+    });
+
+    const stalePoll = service.poll?.({
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-issue-start-reset',
+          identifier: 'CO-41',
+          title: 'Recover started worker after lifecycle reset',
+          state: 'Ready',
+          state_type: 'unstarted',
+          updated_at: '2026-03-19T04:01:00.000Z'
+        })
+      ]
+    });
+
+    await waitForMockCalls(launcher.start, 1);
+    service.resetStuckRefreshLifecycle?.();
+    await mkdir(startedPaths.runDir, { recursive: true });
+    await writeFile(
+      startedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-started-after-reset',
+        task_id: 'linear-lin-issue-start-reset',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-start-reset',
+        issue_identifier: 'CO-41',
+        issue_updated_at: '2026-03-19T04:01:00.000Z',
+        updated_at: '2026-03-19T04:02:00.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(startedPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        attempt_started_at: '2026-03-19T04:02:00.000Z',
+        updated_at: '2026-03-19T04:02:10.000Z'
+      }),
+      'utf8'
+    );
+    resolveStart?.({
+      runId: 'run-started-after-reset',
+      manifestPath: startedPaths.manifestPath
+    });
+
+    await expect(stalePoll).rejects.toThrow('provider_refresh_lifecycle_stuck');
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-issue-start-reset')).toMatchObject({
+      state: 'starting',
+      run_id: null,
+      run_manifest_path: null
+    });
+
+    await service.rehydrate();
+
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-issue-start-reset')).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: 'run-started-after-reset',
+      run_manifest_path: startedPaths.manifestPath
+    });
+  });
+
+  it('keeps a fresh-discovery worker start recoverable when the refresh lifecycle is reset', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:00:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    const startedEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-fresh-start-reset'
+    };
+    const startedPaths = resolveRunPaths(startedEnv, 'run-fresh-started-after-reset');
+    let resolveStart: ((value: { runId: string; manifestPath: string }) => void) | null = null;
+    const launcher = {
+      start: vi.fn(async () =>
+        await new Promise<{ runId: string; manifestPath: string }>((resolve) => {
+          resolveStart = resolve;
+        })
+      ),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher
+    });
+
+    const stalePoll = service.poll?.({
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-issue-fresh-start-reset',
+          identifier: 'CO-42',
+          title: 'Recover fresh discovery after lifecycle reset',
+          state: 'Ready',
+          state_type: 'unstarted',
+          updated_at: '2026-03-19T04:01:00.000Z'
+        })
+      ]
+    });
+
+    await waitForMockCalls(launcher.start, 1);
+    service.resetStuckRefreshLifecycle?.();
+    await mkdir(startedPaths.runDir, { recursive: true });
+    await writeFile(
+      startedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-fresh-started-after-reset',
+        task_id: 'linear-lin-issue-fresh-start-reset',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-fresh-start-reset',
+        issue_identifier: 'CO-42',
+        issue_updated_at: '2026-03-19T04:01:00.000Z',
+        updated_at: '2026-03-19T04:02:00.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(startedPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        attempt_started_at: '2026-03-19T04:02:00.000Z',
+        updated_at: '2026-03-19T04:02:10.000Z'
+      }),
+      'utf8'
+    );
+    resolveStart?.({
+      runId: 'run-fresh-started-after-reset',
+      manifestPath: startedPaths.manifestPath
+    });
+
+    await expect(stalePoll).rejects.toThrow('provider_refresh_lifecycle_stuck');
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-issue-fresh-start-reset')).toMatchObject({
+      state: 'starting',
+      run_id: null,
+      run_manifest_path: null
+    });
+
+    await service.rehydrate();
+
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-issue-fresh-start-reset')).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: 'run-fresh-started-after-reset',
+      run_manifest_path: startedPaths.manifestPath
+    });
+  });
+
+  it('aborts a manifest-timeout start that returns null after the refresh lifecycle is reset', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:00:00.000Z'));
+
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    let resolveStart: ((value: { runId: string; manifestPath: string } | null) => void) | null = null;
+    const launcher = {
+      start: vi.fn(async () =>
+        await new Promise<{ runId: string; manifestPath: string } | null>((resolve) => {
+          resolveStart = resolve;
+        })
+      ),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher
+    });
+
+    const stalePoll = service.poll?.({
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-issue-null-start-reset',
+          identifier: 'CO-43',
+          title: 'Abort manifest timeout after lifecycle reset',
+          state: 'Ready',
+          state_type: 'unstarted',
+          updated_at: '2026-03-19T04:01:00.000Z'
+        })
+      ]
+    });
+
+    await waitForMockCalls(launcher.start, 1);
+    service.resetStuckRefreshLifecycle?.();
+    resolveStart?.(null);
+
+    await expect(stalePoll).rejects.toThrow('provider_refresh_lifecycle_stuck');
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-issue-null-start-reset')).toMatchObject({
+      state: 'starting',
+      run_id: null,
+      run_manifest_path: null
+    });
   });
 
   it('does not treat a future-skewed persisted restart_required snapshot as newer than a live retry', async () => {
@@ -23144,6 +23772,115 @@ describe('createProviderIssueHandoffService', () => {
       retry_attempt: 1,
       retry_due_at: null,
       retry_error: 'retryable failure pending rerun'
+    });
+  });
+
+  it('does not convert a resume that completes after lifecycle reset into handoff_failed', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const failedEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-failed-reset'
+    };
+    const childPaths = resolveRunPaths(failedEnv, 'run-failed-reset');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-failed-reset',
+        task_id: 'task-1303-failed-reset',
+        status: 'failed',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        attempt_started_at: '2026-03-19T04:29:59.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: 'task-1303-failed-reset',
+      mapping_source: 'provider_id_fallback',
+      state: 'resumable',
+      reason: 'provider_issue_rehydrated_resumable_run',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-failed',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-failed-reset',
+      run_manifest_path: childPaths.manifestPath,
+      worker_host: null,
+      launch_source: null,
+      launch_token: null
+    });
+
+    let resolveResume: (() => void) | null = null;
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () =>
+        await new Promise<void>((resolve) => {
+          resolveResume = resolve;
+        })
+      )
+    };
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          updated_at: '2026-03-19T04:20:00.000Z'
+        })
+      })
+    });
+
+    await service.refresh();
+    await waitForMockCalls(setTimeoutSpy);
+    await vi.advanceTimersByTimeAsync(10_001);
+    await flushAsyncWork();
+    await waitForMockCalls(launcher.resume, 1, 1024);
+
+    service.resetStuckRefreshLifecycle?.();
+    resolveResume?.();
+    await flushAsyncWork();
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'resuming',
+      reason: 'provider_issue_retry_resume_launched',
+      task_id: 'task-1303-failed-reset',
+      run_id: 'run-failed-reset',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: 'control-host',
+      launch_token: expect.any(String),
+      retry_queued: false
     });
   });
 

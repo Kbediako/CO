@@ -450,10 +450,14 @@ async function discoverClaimLinkedRunArtifactSources(
       if (!manifestPath) {
         continue;
       }
-      const resolvedManifestPath = resolve(manifestPath);
-      if (await isReadableFile(resolvedManifestPath)) {
-        provider_manifests.push(resolvedManifestPath);
+      const resolvedManifestPath = await firstReadablePath([
+        resolve(dirname(artifact.path), manifestPath),
+        resolve(manifestPath)
+      ]);
+      if (!resolvedManifestPath) {
+        continue;
       }
+      provider_manifests.push(resolvedManifestPath);
       const proofPath = resolve(dirname(resolvedManifestPath), 'provider-linear-worker-proof.json');
       if (await isReadableFile(proofPath)) {
         provider_proofs.push(proofPath);
@@ -464,6 +468,15 @@ async function discoverClaimLinkedRunArtifactSources(
     provider_manifests,
     provider_proofs
   };
+}
+
+async function firstReadablePath(candidates: string[]): Promise<string | null> {
+  for (const candidate of candidates) {
+    if (await isReadableFile(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
 }
 
 async function isReadableFile(path: string): Promise<boolean> {
