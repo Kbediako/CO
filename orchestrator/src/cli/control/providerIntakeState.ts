@@ -90,7 +90,10 @@ export interface ProviderIntakeRetrySummaryPayload {
   error: string | null;
 }
 
-export interface ProviderIntakeSummaryPayload {
+export type ProviderIntakeSummaryScope = 'single_claim' | 'selected_claim';
+export type ProviderIntakeSummarySelectionStrategy = 'state_rank_updated_at';
+
+export interface ProviderIntakeClaimSummaryPayload {
   provider: 'linear';
   issue_id: string;
   issue_identifier: string;
@@ -111,6 +114,19 @@ export interface ProviderIntakeSummaryPayload {
   worker_host?: string | null;
   freshness: ProviderIntakeClaimFreshness | null;
   retry: ProviderIntakeRetrySummaryPayload | null;
+  updated_at: string;
+}
+
+export interface ProviderIntakeSummaryPayload {
+  provider: 'linear';
+  summary_scope: ProviderIntakeSummaryScope;
+  selection_strategy: ProviderIntakeSummarySelectionStrategy | null;
+  claim_count: number;
+  active_claim_count: number;
+  running_claim_count: number;
+  active_issue_identifiers: string[];
+  running_issue_identifiers: string[];
+  selected_claim: ProviderIntakeClaimSummaryPayload;
   rehydrated_at: string | null;
   is_rehydrated: boolean;
   updated_at: string;
@@ -378,45 +394,72 @@ export function selectProviderIntakeClaim(
   if (!state || state.claims.length === 0) {
     return null;
   }
-  return [...state.claims].sort(compareProviderClaims)[0] ?? null;
+  const claims = [...state.claims].sort(compareProviderClaims);
+  const activeClaims = claims.filter((candidate) => isActiveProviderIntakeClaim(candidate.state));
+  return activeClaims[0] ?? claims[0] ?? null;
 }
 
 export function buildProviderIntakeSummary(
   state: ProviderIntakeState | null | undefined
 ): ProviderIntakeSummaryPayload | null {
   const normalizedState = normalizeProviderIntakeState(state);
+  const claims = [...normalizedState.claims].sort(compareProviderClaims);
+  const activeClaims = claims.filter((candidate) => isActiveProviderIntakeClaim(candidate.state));
+  const runningClaims = claims.filter((candidate) => candidate.state === 'running');
   const claim = selectProviderIntakeClaim(normalizedState);
   if (!claim) {
     return null;
   }
-  const freshness = deriveProviderIntakeClaimFreshness({
+  const selectedClaim = buildProviderIntakeClaimSummary({
     claim,
-    rehydrated_at: normalizedState.rehydrated_at
+    rehydratedAt: normalizedState.rehydrated_at
   });
   return {
     provider: claim.provider,
-    issue_id: claim.issue_id,
-    issue_identifier: claim.issue_identifier,
-    issue_title: claim.issue_title,
-    issue_state: claim.issue_state,
-    issue_state_type: claim.issue_state_type,
-    issue_updated_at: claim.issue_updated_at,
-    issue_archived_at: claim.issue_archived_at ?? null,
-    issue_trashed: claim.issue_trashed ?? null,
-    issue_viewer_id: claim.issue_viewer_id ?? null,
-    issue_assignee_id: claim.issue_assignee_id ?? null,
-    issue_assignee_name: claim.issue_assignee_name ?? null,
-    task_id: claim.task_id,
-    mapping_source: claim.mapping_source,
-    state: deriveProviderIntakeSummaryState(claim),
-    reason: claim.reason,
-    run_id: claim.run_id,
-    worker_host: claim.worker_host ?? null,
-    freshness,
-    retry: buildProviderIntakeRetrySummary(claim),
+    summary_scope: activeClaims.length > 1 ? 'selected_claim' : 'single_claim',
+    selection_strategy: activeClaims.length > 1 ? 'state_rank_updated_at' : null,
+    claim_count: claims.length,
+    active_claim_count: activeClaims.length,
+    running_claim_count: runningClaims.length,
+    active_issue_identifiers: activeClaims.map((candidate) => candidate.issue_identifier),
+    running_issue_identifiers: runningClaims.map((candidate) => candidate.issue_identifier),
+    selected_claim: selectedClaim,
     rehydrated_at: normalizedState.rehydrated_at,
-    is_rehydrated: freshness === 'rehydrated',
-    updated_at: claim.updated_at
+    is_rehydrated: selectedClaim.freshness === 'rehydrated',
+    updated_at: selectedClaim.updated_at
+  };
+}
+
+function buildProviderIntakeClaimSummary(input: {
+  claim: ProviderIntakeClaimRecord;
+  rehydratedAt: string | null;
+}): ProviderIntakeClaimSummaryPayload {
+  const freshness = deriveProviderIntakeClaimFreshness({
+    claim: input.claim,
+    rehydrated_at: input.rehydratedAt
+  });
+  return {
+    provider: input.claim.provider,
+    issue_id: input.claim.issue_id,
+    issue_identifier: input.claim.issue_identifier,
+    issue_title: input.claim.issue_title,
+    issue_state: input.claim.issue_state,
+    issue_state_type: input.claim.issue_state_type,
+    issue_updated_at: input.claim.issue_updated_at,
+    issue_archived_at: input.claim.issue_archived_at ?? null,
+    issue_trashed: input.claim.issue_trashed ?? null,
+    issue_viewer_id: input.claim.issue_viewer_id ?? null,
+    issue_assignee_id: input.claim.issue_assignee_id ?? null,
+    issue_assignee_name: input.claim.issue_assignee_name ?? null,
+    task_id: input.claim.task_id,
+    mapping_source: input.claim.mapping_source,
+    state: deriveProviderIntakeSummaryState(input.claim),
+    reason: input.claim.reason,
+    run_id: input.claim.run_id,
+    worker_host: input.claim.worker_host ?? null,
+    freshness,
+    retry: buildProviderIntakeRetrySummary(input.claim),
+    updated_at: input.claim.updated_at
   };
 }
 
@@ -617,6 +660,25 @@ function deriveProviderIntakeSummaryState(
     return 'handoff_owned';
   }
   return claim.state;
+}
+
+function isActiveProviderIntakeClaim(state: ProviderIntakeClaimState): boolean {
+  switch (state) {
+    case 'accepted':
+    case 'starting':
+    case 'running':
+    case 'resuming':
+    case 'resumable':
+    case 'handoff_failed':
+      return true;
+    case 'released':
+    case 'completed':
+    case 'stale':
+    case 'duplicate':
+    case 'ignored':
+    default:
+      return false;
+  }
 }
 
 function compareProviderClaims(

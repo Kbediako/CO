@@ -136,17 +136,33 @@ export async function callChildControlEndpoint(input: {
   payload: Record<string, unknown>;
   allowedRunRoots: string[];
   allowedBindHosts?: string[];
+  assertCurrent?: () => void;
 }): Promise<void> {
+  input.assertCurrent?.();
   const { baseUrl, token } = await loadControlEndpoint({
     manifestPath: input.manifestPath,
     allowedRunRoots: input.allowedRunRoots,
     allowedBindHosts: input.allowedBindHosts
   });
+  input.assertCurrent?.();
   const url = new URL('/control/action', baseUrl);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), CHILD_CONTROL_TIMEOUT_MS);
+  let staleAssertionError: unknown = null;
+  const currentCheckTimer =
+    input.assertCurrent === undefined
+      ? null
+      : setInterval(() => {
+          try {
+            input.assertCurrent?.();
+          } catch (error) {
+            staleAssertionError = error;
+            controller.abort();
+          }
+        }, 50);
   let res: Awaited<ReturnType<typeof fetch>>;
   try {
+    input.assertCurrent?.();
     res = await fetch(url.toString(), {
       method: 'POST',
       headers: {
@@ -157,16 +173,25 @@ export async function callChildControlEndpoint(input: {
       body: JSON.stringify(input.payload),
       signal: controller.signal
     });
+    input.assertCurrent?.();
   } catch (error) {
+    if (staleAssertionError) {
+      throw staleAssertionError;
+    }
     if ((error as Error)?.name === 'AbortError') {
       throw new Error('child control request timeout');
     }
     throw error;
   } finally {
     clearTimeout(timer);
+    if (currentCheckTimer !== null) {
+      clearInterval(currentCheckTimer);
+    }
   }
+  input.assertCurrent?.();
   if (!res.ok) {
     const message = await res.text();
+    input.assertCurrent?.();
     throw new Error(`child control error: ${res.status} ${message}`);
   }
 }

@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -59,6 +59,7 @@ async function createProviderWorkerManifest(runsRootOverride: string | null = nu
       pipeline_id: 'provider-linear-worker',
       ...ISSUE,
       issue_updated_at: '2026-03-30T07:10:00.000Z',
+      provider_launch_source: 'control-host',
       provider_control_host_task_id: CONTROL_HOST_TASK_ID,
       provider_control_host_run_id: CONTROL_HOST_RUN_ID,
       workspace_path: tempRoot
@@ -78,6 +79,7 @@ function buildProviderWorkerEnv(
     CODEX_ORCHESTRATOR_RUN_ID: RUN_ID,
     CODEX_ORCHESTRATOR_TASK_ID: TASK_ID,
     CODEX_ORCHESTRATOR_PIPELINE_ID: 'provider-linear-worker',
+    CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: 'control-host',
     CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: CONTROL_HOST_TASK_ID,
     CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID: CONTROL_HOST_RUN_ID,
     ...overrides
@@ -348,6 +350,194 @@ describe('runProviderLinearChildLaneShell', () => {
         decision: 'pending'
       })
     ]);
+  });
+
+  it('backfills missing manifest provenance from the matching control-host env before launching a child lane', async () => {
+    const { manifestPath } = await createProviderWorkerManifest();
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: RUN_ID,
+        task_id: TASK_ID,
+        pipeline_id: 'provider-linear-worker',
+        ...ISSUE,
+        issue_updated_at: '2026-03-30T07:10:00.000Z',
+        provider_launch_source: null,
+        provider_control_host_task_id: null,
+        provider_control_host_run_id: null,
+        workspace_path: tempRoot
+      }),
+      'utf8'
+    );
+
+    const childRunDir = join(tempRoot ?? '', '.runs', `${TASK_ID}-docs-a`, 'cli', 'child-run-backfill');
+    const execRunner = vi.fn(async () => {
+      await mkdir(childRunDir, { recursive: true });
+      await writeFile(
+        join(childRunDir, PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME),
+        JSON.stringify({
+          issue_id: ISSUE.issue_id,
+          issue_identifier: ISSUE.issue_identifier,
+          task_id: `${TASK_ID}-docs-a`,
+          run_id: 'child-run-backfill',
+          parent_run_id: RUN_ID,
+          stream: 'docs-a',
+          purpose: 'Backfill launch provenance before docs lane start',
+          instructions: null,
+          scope: {
+            files: ['docs/TECH_SPEC-linear-104aa410-5c94-457c-bbce-9962c7308ac5.md'],
+            phases: ['docs']
+          },
+          parent_snapshot: {
+            base_sha: 'parent-base-sha',
+            issue_updated_at: '2026-03-30T07:10:00.000Z',
+            issue_state: 'In Progress',
+            issue_state_type: 'started',
+            captured_at: '2026-03-30T07:11:00.000Z'
+          },
+          lane_workspace_path: join(tempRoot ?? '', '.child-lanes', 'docs-a-child-run-backfill'),
+          lane_branch: 'child-lane/docs-a-child-run-backfill',
+          patch_artifact_path: join(childRunDir, 'provider-linear-child-lane.patch'),
+          patch_bytes: 32,
+          thread_id: 'thread-backfill',
+          latest_turn_id: 'turn-backfill',
+          latest_session_id: 'thread-backfill-turn-backfill',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          last_event: 'task_complete',
+          last_message: 'child lane complete',
+          last_event_at: '2026-03-30T07:12:00.000Z',
+          tokens: {
+            input_tokens: 10,
+            output_tokens: 12,
+            total_tokens: 22
+          },
+          rate_limits: null,
+          status: 'succeeded',
+          updated_at: '2026-03-30T07:12:00.000Z'
+        }),
+        'utf8'
+      );
+      return {
+        exitCode: 0,
+        stdout: JSON.stringify({
+          run_id: 'child-run-backfill',
+          status: 'succeeded',
+          artifact_root: `.runs/${TASK_ID}-docs-a/cli/child-run-backfill`,
+          manifest: `.runs/${TASK_ID}-docs-a/cli/child-run-backfill/manifest.json`,
+          log_path: `.runs/${TASK_ID}-docs-a/cli/child-run-backfill/run.log`,
+          summary: 'child lane finished'
+        }),
+        stderr: ''
+      };
+    });
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'launch',
+        streamName: 'docs-a',
+        purpose: 'Backfill launch provenance before docs lane start',
+        files: ['docs/TECH_SPEC-linear-104aa410-5c94-457c-bbce-9962c7308ac5.md'],
+        phases: ['docs'],
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        execRunner,
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: '2026-03-30T07:10:00.000Z',
+          state: 'In Progress',
+          state_type: 'started'
+        })) as never,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
+        readParentHeadSha: vi.fn(async () => 'parent-base-sha'),
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'child-lane',
+      action: 'launched',
+      child_run: { run_id: 'child-run-backfill' }
+    });
+
+    const persistedManifest = JSON.parse(await readFile(manifestPath, 'utf8')) as Record<string, unknown>;
+    expect(persistedManifest).toMatchObject({
+      provider_launch_source: 'control-host',
+      provider_control_host_task_id: CONTROL_HOST_TASK_ID,
+      provider_control_host_run_id: CONTROL_HOST_RUN_ID
+    });
+  });
+
+  it('fails closed instead of rebinding to an older canonical same-issue parent manifest', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-live-parent-'));
+    const liveRunId = 'manual-parent-run';
+    const liveRunDir = join(tempRoot, '.runs', TASK_ID, 'cli', liveRunId);
+    const liveManifestPath = join(liveRunDir, 'manifest.json');
+    const olderIssueWorkspacePath = join(tempRoot, '.workspaces', TASK_ID);
+    const olderRunDir = join(olderIssueWorkspacePath, '.runs', TASK_ID, 'cli', 'older-parent-run');
+    const olderManifestPath = join(olderRunDir, 'manifest.json');
+    await mkdir(liveRunDir, { recursive: true });
+    await mkdir(olderRunDir, { recursive: true });
+    await writeFile(
+      liveManifestPath,
+      JSON.stringify({
+        run_id: liveRunId,
+        task_id: TASK_ID,
+        pipeline_id: 'provider-linear-worker',
+        ...ISSUE,
+        workspace_path: tempRoot
+      }),
+      'utf8'
+    );
+    await writeFile(
+      olderManifestPath,
+      JSON.stringify({
+        run_id: 'older-parent-run',
+        task_id: TASK_ID,
+        pipeline_id: 'provider-linear-worker',
+        ...ISSUE,
+        workspace_path: olderIssueWorkspacePath,
+        provider_control_host_task_id: CONTROL_HOST_TASK_ID,
+        provider_control_host_run_id: CONTROL_HOST_RUN_ID
+      }),
+      'utf8'
+    );
+
+    const result = await runProviderLinearChildLaneShell({
+      action: 'launch',
+      streamName: 'impl-a',
+      purpose: 'Implement bounded child lane support',
+      files: ['orchestrator/src/cli/providerLinearChildStreamShell.ts'],
+      env: {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: olderManifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot,
+        CODEX_ORCHESTRATOR_RUN_ID: liveRunId,
+        CODEX_ORCHESTRATOR_TASK_ID: TASK_ID,
+        CODEX_ORCHESTRATOR_PIPELINE_ID: 'provider-linear-worker',
+        CODEX_ORCHESTRATOR_ISSUE_ID: ISSUE.issue_id,
+        CODEX_ORCHESTRATOR_ISSUE_IDENTIFIER: ISSUE.issue_identifier,
+        CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: CONTROL_HOST_TASK_ID,
+        CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID: CONTROL_HOST_RUN_ID
+      }
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'launch',
+      error: {
+        code: 'provider_worker_child_lane_context_missing',
+        status: 412
+      }
+    });
+    if (result.ok) {
+      throw new Error('expected same-issue canonical parent rebind to fail closed');
+    }
+    expect(result.error.message).toContain(
+      `Provider worker run id mismatch between env (${liveRunId}) and manifest (older-parent-run).`
+    );
   });
 
   it('classifies zero-byte child-lane patches as no-output advisory evidence', async () => {

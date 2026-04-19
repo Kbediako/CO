@@ -5,7 +5,10 @@ import { describe, expect, it } from 'vitest';
 import { buildUiDataset } from '../src/cli/control/operatorDashboardPresenter.js';
 import { readCompatibilityState } from '../src/cli/control/observabilitySurface.js';
 import { handleUiDataRequest } from '../src/cli/control/uiDataController.js';
-import type { ControlCompatibilityProjectionSnapshot } from '../src/cli/control/observabilityReadModel.js';
+import type {
+  CompatibilityProjectionIssueRecord,
+  ControlCompatibilityProjectionSnapshot
+} from '../src/cli/control/observabilityReadModel.js';
 
 function createResponseRecorder() {
   const state: {
@@ -54,6 +57,53 @@ function buildProjection(
     providerWorkflow: null,
     polling: null,
     ...overrides
+  };
+}
+
+function buildIssueRecord(input: {
+  issueIdentifier: string;
+  issueId: string | null;
+  taskId: string | null;
+  runId: string | null;
+  aliases: string[];
+  summary: string | null;
+}): CompatibilityProjectionIssueRecord {
+  return {
+    issueIdentifier: input.issueIdentifier,
+    aliases: input.aliases,
+    payload: {
+      issue_identifier: input.issueIdentifier,
+      issue_id: input.issueId,
+      task_id: input.taskId,
+      run_id: input.runId,
+      status: 'running',
+      raw_status: 'in_progress',
+      display_status: 'running',
+      status_reason: null,
+      workspace: {
+        path: input.taskId ? `/tmp/${input.taskId}` : null
+      },
+      attempts: {
+        restart_count: null,
+        current_retry_attempt: null
+      },
+      running: null,
+      retry: null,
+      logs: {
+        codex_session_logs: []
+      },
+      summary: input.summary,
+      latest_event: null,
+      question_summary: {
+        queued_count: 0,
+        latest_question: null
+      },
+      recent_events: [],
+      last_error: null,
+      tracked: {
+        linear: null
+      }
+    }
   };
 }
 
@@ -175,7 +225,7 @@ describe('UiDataController', () => {
     const projection = buildProjection({
       running: [
         {
-          issue_identifier: 'CO-76',
+          issue_identifier: 'linear-co-76-fallback',
           issue_id: 'issue-76',
           state: 'running',
           display_state: 'running',
@@ -195,8 +245,8 @@ describe('UiDataController', () => {
       ],
       retrying: [
         {
-          issue_identifier: 'CO-77',
-          issue_id: 'issue-77',
+          issue_identifier: 'linear-co-77-fallback',
+          issue_id: 'issue-77-row',
           task_id: 'linear-co-77',
           run_id: 'run-co-77',
           state: 'retrying',
@@ -214,6 +264,24 @@ describe('UiDataController', () => {
           started_at: '2026-04-03T07:55:00.000Z',
           last_event_at: '2026-04-03T08:00:40.000Z'
         }
+      ],
+      issues: [
+        buildIssueRecord({
+          issueIdentifier: 'CO-76',
+          issueId: 'issue-76',
+          taskId: 'linear-co-76',
+          runId: 'run-1',
+          aliases: ['CO-76', 'issue-76', 'linear-co-76-fallback'],
+          summary: 'Worker turn active'
+        }),
+        buildIssueRecord({
+          issueIdentifier: 'CO-77',
+          issueId: 'issue-77-canonical',
+          taskId: 'linear-co-77',
+          runId: 'run-co-77',
+          aliases: ['CO-77', 'issue-77-canonical', 'linear-co-77-fallback', 'run-co-77'],
+          summary: 'Retry queued'
+        })
       ],
       codexTotals: {
         input_tokens: 12,
@@ -304,6 +372,36 @@ describe('UiDataController', () => {
 
     expect(dataset.counts.running).toBe(state.counts.running);
     expect(dataset.counts.retrying).toBe(state.counts.retrying);
+    expect(state.running_ids).toEqual(['CO-76']);
+    expect(state.retrying_ids).toEqual(['CO-77']);
+    expect(dataset.running).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'linear-co-76-fallback',
+        issue_id: 'issue-76',
+        id: 'CO-76',
+        bucket: 'running',
+        state: 'running',
+        reason: null,
+        aliases: expect.arrayContaining(['CO-76', 'issue-76', 'linear-co-76-fallback'])
+      })
+    ]);
+    expect(dataset.retrying).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'linear-co-77-fallback',
+        issue_id: 'issue-77-row',
+        id: 'CO-77',
+        bucket: 'retrying',
+        state: 'retrying',
+        reason: 'rate_limited',
+        aliases: expect.arrayContaining([
+          'CO-77',
+          'issue-77-canonical',
+          'linear-co-77-fallback',
+          'issue-77-row',
+          'run-co-77'
+        ])
+      })
+    ]);
     expect(
       dataset.running.map((entry) => ({
         issue_identifier: entry.issue_identifier,

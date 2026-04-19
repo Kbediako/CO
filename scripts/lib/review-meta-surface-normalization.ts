@@ -1,9 +1,12 @@
+import os from 'node:os';
 import path from 'node:path';
 
 import { normalizeCommandToken } from './review-shell-command-parser.js';
 
 const REVIEW_ACTIVE_CLOSEOUT_BUNDLE_KIND = 'review-closeout-bundle';
 export const ARCHITECTURE_CONTEXT_META_SURFACE_KIND = 'architecture-context';
+const REVIEW_SUPPORT_CODEX_SKILL_PATH_RE =
+  /(?:^|\/)\.codex\/skills\/(?:standalone-review|delegation-usage)\/SKILL\.md$/u;
 
 export type ReviewMetaSurfaceSample = {
   kind: string;
@@ -760,6 +763,9 @@ function classifyMetaSurfaceOperand(
   if (normalized.includes('.codex/memories/')) {
     return 'codex-memories';
   }
+  if (isReviewSupportCodexSkillPath(normalized, repoRoot)) {
+    return 'review-support';
+  }
   if (normalized.includes('.codex/skills/')) {
     return 'codex-skills';
   }
@@ -855,6 +861,55 @@ function classifyMetaSurfaceOperand(
     return 'review-docs';
   }
   return null;
+}
+
+function isReviewSupportCodexSkillPath(normalized: string, repoRoot: string | null): boolean {
+  if (!REVIEW_SUPPORT_CODEX_SKILL_PATH_RE.test(normalized)) {
+    return false;
+  }
+  const normalizedRepoRoot = normalizeScopeRoot(repoRoot ?? undefined);
+  if (normalizedRepoRoot) {
+    if (isPathInsideNormalizedRoot(normalized, normalizedRepoRoot)) {
+      return false;
+    }
+  }
+  return isGlobalCodexSkillPath(normalized);
+}
+
+function isGlobalCodexSkillPath(normalized: string): boolean {
+  if (
+    normalized.startsWith('~/.codex/') ||
+    normalized.startsWith('$HOME/.codex/') ||
+    normalized.startsWith('${HOME}/.codex/')
+  ) {
+    return true;
+  }
+
+  const homeRoots = [process.env.HOME, process.env.USERPROFILE, os.homedir()]
+    .map((candidate) => normalizeScopeRoot(candidate ?? undefined))
+    .filter((candidate): candidate is string => candidate !== null)
+    .map((candidate) => `${candidate}/.codex`);
+  if (homeRoots.some((root) => isPathInsideNormalizedRoot(normalized, root))) {
+    return true;
+  }
+
+  return (
+    /^\/(?:Users|home|var\/home)\/[^/]+\/\.codex\//iu.test(normalized) ||
+    /^\/root\/\.codex\//iu.test(normalized) ||
+    /^[A-Za-z]:\/Users\/[^/]+\/\.codex\//iu.test(normalized)
+  );
+}
+
+function isPathInsideNormalizedRoot(normalized: string, normalizedRoot: string): boolean {
+  if (normalized === normalizedRoot || normalized.startsWith(`${normalizedRoot}/`)) {
+    return true;
+  }
+  if (/^[A-Za-z]:\//u.test(normalized) && /^[A-Za-z]:\//u.test(normalizedRoot)) {
+    const lowerNormalized = normalized.toLowerCase();
+    const lowerRoot = normalizedRoot.toLowerCase();
+    return lowerNormalized === lowerRoot || lowerNormalized.startsWith(`${lowerRoot}/`);
+  }
+  return false;
 }
 
 function matchesPathSuffix(value: string, relativePath: string): boolean {

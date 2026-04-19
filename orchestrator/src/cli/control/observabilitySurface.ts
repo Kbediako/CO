@@ -6,7 +6,13 @@ import type {
   ControlIssuePayload,
   ControlStatePayload
 } from './observabilityReadModel.js';
+import { serializeProviderIntakeSummary } from './observabilityReadModel.js';
 import { findCompatibilityProjectionIssueRecord } from './compatibilityIssuePresenter.js';
+import {
+  buildCompatibilityIssueRecordLookups,
+  resolveRetryIssueRecord,
+  resolveRunningIssueRecord
+} from './operatorDashboardPresenter.js';
 import type {
   DispatchPilotEvaluation,
   DispatchPilotFailure
@@ -318,15 +324,24 @@ export async function readCompatibilityState(
 ): Promise<ControlStatePayload> {
   const projection = await context.readCompatibilityProjection();
   const generatedAt = isoTimestamp();
+  const issueRecordLookups = buildCompatibilityIssueRecordLookups(projection.issues);
   return {
     generated_at: generatedAt,
     counts: { running: projection.running.length, retrying: projection.retrying.length },
+    running_ids: projection.running.map(
+      (entry) => resolveRunningIssueRecord(entry, issueRecordLookups)?.issueIdentifier ?? entry.issue_identifier
+    ),
+    retrying_ids: projection.retrying.map(
+      (entry) => resolveRetryIssueRecord(entry, issueRecordLookups)?.issueIdentifier ?? entry.issue_identifier
+    ),
     running: projection.running,
     retrying: projection.retrying,
     codex_totals: projection.codexTotals,
     rate_limits: projection.rateLimits,
     selected: projection.selected,
-    ...(projection.providerIntake ? { provider_intake: projection.providerIntake } : {}),
+    ...(projection.providerIntake
+      ? { provider_intake: serializeProviderIntakeSummary(projection.providerIntake) }
+      : {}),
     ...(projection.providerWorkflow ? { provider_workflow: projection.providerWorkflow } : {}),
     ...(projection.polling ? { polling: projection.polling } : {}),
     ...(projection.dispatchPilot ? { dispatch_pilot: projection.dispatchPilot } : {}),

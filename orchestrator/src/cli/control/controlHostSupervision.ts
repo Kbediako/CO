@@ -14,6 +14,7 @@ export const DEFAULT_CONTROL_HOST_SUPERVISION_RESTART_EXIT_CODE = 75;
 export const DEFAULT_CONTROL_HOST_SUPERVISION_SHELL_PATH = '/bin/zsh';
 export const DEFAULT_CONTROL_HOST_SUPERVISION_ACTIVE_WORKER_RESTART_QUARANTINE_MS =
   10 * 60 * 1000;
+export const CONTROL_HOST_SUPERVISION_RESTART_HISTORY_LIMIT = 20;
 export const CONTROL_HOST_SUPERVISION_MAX_NODE_TIMER_SECONDS = Math.floor(
   2_147_483_647 / 1_000
 );
@@ -123,6 +124,7 @@ export interface ControlHostSupervisionHealthDiagnostic {
   counts: {
     running: number | null;
     retrying: number | null;
+    max_allowed?: number | null;
   };
   polling: ControlHostSupervisionPollingDiagnostic | null;
   running_workers: ControlHostSupervisionRunningWorkerSnapshot[];
@@ -376,7 +378,8 @@ export function readControlHostSupervisionHealthDiagnostic(
   return {
     counts: {
       running: readFiniteNumber(counts?.running),
-      retrying: readFiniteNumber(counts?.retrying)
+      retrying: readFiniteNumber(counts?.retrying),
+      max_allowed: readFiniteNumber(counts?.max_allowed)
     },
     polling: polling ? buildControlHostSupervisionPollingDiagnostic(polling) : null,
     running_workers: running
@@ -397,7 +400,8 @@ function normalizeStoredControlHostSupervisionHealthDiagnostic(
   return {
     counts: {
       running: readFiniteNumber(counts?.running),
-      retrying: readFiniteNumber(counts?.retrying)
+      retrying: readFiniteNumber(counts?.retrying),
+      max_allowed: readFiniteNumber(counts?.max_allowed)
     },
     polling: polling ? buildControlHostSupervisionPollingDiagnostic(polling) : null,
     running_workers: runningWorkers
@@ -521,6 +525,9 @@ function resolveRepeatedActiveWorkerRestartQuarantine(input: {
   if (!diagnostic || diagnostic.running_workers.length === 0) {
     return null;
   }
+  if (hasAvailableProviderWorkerCapacity(diagnostic)) {
+    return null;
+  }
   const restartHistory = normalizeControlHostSupervisionRestartHistory(input.restartHistory);
   if (restartHistory.length === 0) {
     return null;
@@ -557,6 +564,18 @@ function resolveRepeatedActiveWorkerRestartQuarantine(input: {
     };
   }
   return null;
+}
+
+function hasAvailableProviderWorkerCapacity(
+  diagnostic: ControlHostSupervisionHealthDiagnostic
+): boolean {
+  const running = diagnostic.counts.running;
+  const retrying = diagnostic.counts.retrying;
+  const maxAllowed = diagnostic.counts.max_allowed ?? null;
+  if (running === null || retrying === null || maxAllowed === null) {
+    return false;
+  }
+  return running + retrying < maxAllowed;
 }
 
 function buildControlHostSupervisionPollingDiagnostic(
@@ -611,7 +630,7 @@ function normalizeControlHostSupervisionRestartHistory(
   const normalized = value
     .map((entry) => normalizeControlHostSupervisionRestartRecord(entry))
     .filter((entry): entry is ControlHostSupervisionRestartRecord => entry !== null);
-  return normalized.slice(-20);
+  return normalized.slice(-CONTROL_HOST_SUPERVISION_RESTART_HISTORY_LIMIT);
 }
 
 function normalizeControlHostSupervisionRestartRecord(
