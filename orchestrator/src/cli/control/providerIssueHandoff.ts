@@ -734,16 +734,14 @@ export function createProviderIssueHandoffService(
     claims: options.state.claims.map((claim) => ({ ...claim }))
   });
 
-  const areProviderStateSnapshotsEqual = (
+  const areProviderMutationSnapshotsEqual = (
     left: ProviderStateSnapshot,
     right: ProviderStateSnapshot
   ): boolean =>
     left.schema_version === right.schema_version &&
-    left.updated_at === right.updated_at &&
     left.rehydrated_at === right.rehydrated_at &&
     left.latest_provider_key === right.latest_provider_key &&
     left.latest_reason === right.latest_reason &&
-    JSON.stringify(left.polling ?? null) === JSON.stringify(right.polling ?? null) &&
     JSON.stringify(left.claims) === JSON.stringify(right.claims);
 
   const restoreProviderStateSnapshot = (snapshot: ProviderStateSnapshot): void => {
@@ -777,22 +775,16 @@ export function createProviderIssueHandoffService(
       rebuildRetryQueue();
     } catch (error) {
       const isLifecycleStuckError = isRefreshLifecycleStuckError(error);
-      const stillOwnsInFlightMutation = areProviderStateSnapshotsEqual(
+      const stillOwnsInFlightMutation = areProviderMutationSnapshotsEqual(
         captureProviderStateSnapshot(),
         inFlightMutationSnapshot
       );
       const shouldRollback =
         persistOptions.rollbackOnPersistFailure !== false ||
         isLifecycleStuckError;
-      if (
-        shouldRollback &&
-        (
-          !isLifecycleStuckError ||
-          stillOwnsInFlightMutation
-        )
-      ) {
+      if (shouldRollback && stillOwnsInFlightMutation) {
         restoreProviderStateSnapshot(snapshot);
-        if (isLifecycleStuckError && persistCompleted && stillOwnsInFlightMutation) {
+        if (isLifecycleStuckError && persistCompleted) {
           // Keep rehydrate's fallback snapshot aligned even if rollback persist fails.
           recordProviderStatePersistedSnapshot();
           try {
@@ -2066,8 +2058,10 @@ export function createProviderIssueHandoffService(
     assertRefreshLifecycleCurrent();
     await retryReleaseCancel({
       releaseRun: input.releaseRun,
-      reason: input.nextReason
+      reason: input.nextReason,
+      assertCurrent: assertRefreshLifecycleCurrent
     });
+    assertRefreshLifecycleCurrent();
   };
 
   const hasPendingReleaseCancel = (manifestPath: string | null | undefined): boolean =>
@@ -2076,9 +2070,24 @@ export function createProviderIssueHandoffService(
   const retryReleaseCancel = async (input: {
     releaseRun: ProviderIssueRunRecord | null;
     reason: string;
+    assertCurrent?: () => void;
   }): Promise<void> => {
     const manifestPath = input.releaseRun?.manifestPath ?? null;
     if (!shouldAttemptReleaseCancel(input.releaseRun) || !manifestPath) {
+      return;
+    }
+    const isCurrent = (): boolean => {
+      try {
+        input.assertCurrent?.();
+        return true;
+      } catch (error) {
+        if (isRefreshLifecycleStuckError(error)) {
+          return false;
+        }
+        throw error;
+      }
+    };
+    if (!isCurrent()) {
       return;
     }
     const existingAttempt = releaseCancelInFlight.get(manifestPath);
@@ -2087,9 +2096,15 @@ export function createProviderIssueHandoffService(
         existingAttempt.retryRequested = true;
       }
       await existingAttempt.attempt;
+      if (!isCurrent()) {
+        return;
+      }
       return;
     }
     const performCancelAttempt = async (): Promise<boolean> => {
+      if (!isCurrent()) {
+        return true;
+      }
       try {
         await callChildControlEndpoint({
           manifestPath,
@@ -2098,10 +2113,17 @@ export function createProviderIssueHandoffService(
             requested_by: 'control-host',
             reason: input.reason
           },
-          allowedRunRoots
+          allowedRunRoots,
+          assertCurrent: input.assertCurrent
         });
+        if (!isCurrent()) {
+          return true;
+        }
         return true;
-      } catch {
+      } catch (error) {
+        if (isRefreshLifecycleStuckError(error)) {
+          return true;
+        }
         // Keep the claim released and let the next rehydrate/refresh retry cancellation
         // while the child run drains.
         return false;
@@ -4384,7 +4406,8 @@ export function createProviderIssueHandoffService(
               ) {
                 void retryReleaseCancel({
                   releaseRun,
-                  reason: claim.reason ?? 'provider_issue_released'
+                  reason: claim.reason ?? 'provider_issue_released',
+                  assertCurrent: assertRefreshLifecycleCurrent
                 });
               }
             }
@@ -4519,7 +4542,8 @@ export function createProviderIssueHandoffService(
             ) {
               void retryReleaseCancel({
                 releaseRun: releaseRunForCancel,
-                reason: claim.reason ?? 'provider_issue_released'
+                reason: claim.reason ?? 'provider_issue_released',
+                assertCurrent: assertRefreshLifecycleCurrent
               });
               continue;
             }

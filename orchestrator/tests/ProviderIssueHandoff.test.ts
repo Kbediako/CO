@@ -3029,6 +3029,80 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('does not let a non-lifecycle persist rollback overwrite a newer claim mutation', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:00:00.000Z'));
+
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(
+      createProviderClaim({
+        issue_id: 'lin-persist-reset-write-failure',
+        issue_identifier: 'CO-49',
+        state: 'accepted',
+        reason: 'provider_issue_handoff_owned'
+      })
+    );
+
+    let releasePersist: (() => void) | null = null;
+    let persistCallCount = 0;
+    const persistedClaimSnapshots: ProviderIntakeClaimRecord[][] = [];
+    const persist = vi.fn(async () => {
+      persistCallCount += 1;
+      persistedClaimSnapshots.push(state.claims.map((claim) => ({ ...claim })));
+      if (persistCallCount === 2) {
+        await new Promise<void>((resolve) => {
+          releasePersist = resolve;
+        });
+        throw new Error('provider state write failed');
+      }
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      resolveTrackedIssue: vi.fn(async () => ({
+        kind: 'release' as const,
+        reason: 'provider_issue_not_ready:stale'
+      }))
+    });
+
+    const stalePoll = service.poll?.({
+      trackedIssues: []
+    });
+    await waitForMockCalls(persist, 2);
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-persist-reset-write-failure')).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:provider_issue_not_ready:stale'
+    });
+
+    state.claims[0] = {
+      ...state.claims[0],
+      reason: 'provider_issue_released:provider_issue_not_ready:fresh',
+      updated_at: '2026-03-19T04:01:00.000Z'
+    };
+    releasePersist?.();
+
+    await expect(stalePoll).resolves.toBeUndefined();
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-persist-reset-write-failure')).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:provider_issue_not_ready:fresh',
+      updated_at: '2026-03-19T04:01:00.000Z'
+    });
+    expect(persist).toHaveBeenCalledTimes(2);
+    expect(persistedClaimSnapshots[1].find(
+      (claim) => claim.issue_id === 'lin-persist-reset-write-failure'
+    )).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:provider_issue_not_ready:stale'
+    });
+  });
+
   it('rehydrates a worker that starts after the refresh lifecycle is reset', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-19T04:00:00.000Z'));
