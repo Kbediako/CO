@@ -1063,6 +1063,9 @@ function isProviderIntakeClaimActiveForSourceCurrentActivity(
   if (isStaleTerminalReleasedProviderSource(claim, source)) {
     return false;
   }
+  if (isAcceptedPendingRevalidationSourceWithInactiveLocalProof(claim, source)) {
+    return false;
+  }
   if (
     source.rawStatus === 'in_progress' &&
     claim.state === 'released' &&
@@ -1073,6 +1076,22 @@ function isProviderIntakeClaimActiveForSourceCurrentActivity(
     return true;
   }
   return isProviderIntakeClaimActiveCurrentActivity(claim);
+}
+
+function isAcceptedPendingRevalidationSourceWithInactiveLocalProof(
+  claim: Pick<ProviderIntakeClaimRecord, 'state' | 'reason'>,
+  source: Pick<ControlCompatibilitySourceContext, 'rawStatus' | 'providerLinearWorkerProof' | 'startedAt'>
+): boolean {
+  return (
+    source.rawStatus === 'in_progress' &&
+    claim.state === 'accepted' &&
+    claim.reason === 'provider_issue_rehydration_pending_revalidation' &&
+    source.providerLinearWorkerProof !== null &&
+    (!isProviderLinearWorkerProofFreshForStage(
+      source.providerLinearWorkerProof as unknown as Record<string, unknown>,
+      source.startedAt
+    ) || hasStaleLocalProviderInProgressProof(source.providerLinearWorkerProof, source.startedAt))
+  );
 }
 
 function isProviderStartedWorkerSourceIssueState(
