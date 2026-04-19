@@ -9704,6 +9704,184 @@ describe('providerLinearWorkflowFacade', () => {
     expect(calls).not.toContain('create');
   });
 
+  it('reuses the source issue itself as canonical owner without self relations', async () => {
+    const canonicalOwnerKey = 'baseline_cohort_id:apr-19-docs-freshness';
+    const canonicalOwnerMarker = `codex-orchestrator:canonical-owner-key=${canonicalOwnerKey}`;
+    const canonicalOwnerDescription = [
+      'Apr 19 baseline owner.',
+      '## Canonical Owner',
+      `- Canonical owner key: \`${canonicalOwnerKey}\``,
+      `- Canonical owner marker: \`${canonicalOwnerMarker}\``
+    ].join('\n');
+    const calls: string[] = [];
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+      };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        calls.push('issue-summary');
+        return jsonResponse(
+          buildIssueContextBody({
+            id: 'lin-issue-254',
+            identifier: 'CO-254',
+            title: 'Apr 19 spec/docs freshness baseline owner',
+            url: 'https://linear.app/example/issue/CO-254'
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearCanonicalFollowUpOwners')) {
+        calls.push('owner-search');
+        return jsonResponse(
+          buildCanonicalOwnerIssuesBody([
+            buildCanonicalOwnerIssue({
+              id: 'lin-issue-254',
+              identifier: 'CO-254',
+              title: 'Apr 19 spec/docs freshness baseline owner',
+              description: canonicalOwnerDescription,
+              state: {
+                id: 'state-backlog',
+                name: 'Backlog',
+                type: 'unstarted'
+              }
+            })
+          ])
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateFollowUpIssue')) {
+        throw new Error('source owner reuse must not create another issue');
+      }
+      if (body.query?.includes('ProviderLinearCreateIssueRelation')) {
+        throw new Error('source owner reuse must not create a self relation');
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await createProviderLinearFollowUpIssue({
+      issueId: 'lin-issue-254',
+      title: 'Apr 19 spec/docs freshness baseline owner',
+      description: 'Keep the Apr 19 duplicate cluster on one owner.',
+      intentChecksum: '- Preserve Apr 19 spec/docs freshness baseline owner routing.',
+      nonGoals: '- [ ] Do not create duplicate Apr 19 owner issues.',
+      notDoneIf: '- [ ] A repeated lane creates a new owner.',
+      acceptanceCriteria: '- [ ] Repeated lanes reuse the stamped owner.',
+      blockedBySource: true,
+      canonicalOwnerKey,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'create-follow-up',
+      action: 'reused',
+      issue: {
+        id: 'lin-issue-254',
+        identifier: 'CO-254'
+      },
+      follow_up_issue: {
+        id: 'lin-issue-254',
+        identifier: 'CO-254',
+        description: canonicalOwnerDescription
+      },
+      relations: {
+        related: true,
+        blocked_by_source: true
+      }
+    });
+    expect(calls).toEqual(['issue-summary', 'owner-search']);
+  });
+
+  it('treats already-existing canonical owner relations as reuse success', async () => {
+    const canonicalOwnerKey = 'baseline_cohort_id:apr-19-docs-freshness';
+    const canonicalOwnerMarker = `codex-orchestrator:canonical-owner-key=${canonicalOwnerKey}`;
+    const canonicalOwnerDescription = [
+      'Apr 19 baseline owner.',
+      '## Canonical Owner',
+      `- Canonical owner key: \`${canonicalOwnerKey}\``,
+      `- Canonical owner marker: \`${canonicalOwnerMarker}\``
+    ].join('\n');
+    const calls: string[] = [];
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, unknown>;
+      };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        calls.push('issue-summary');
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearCanonicalFollowUpOwners')) {
+        calls.push('owner-search');
+        return jsonResponse(
+          buildCanonicalOwnerIssuesBody([
+            buildCanonicalOwnerIssue({
+              id: 'lin-issue-254',
+              identifier: 'CO-254',
+              title: 'Apr 19 spec/docs freshness baseline owner',
+              description: canonicalOwnerDescription,
+              state: {
+                id: 'state-backlog',
+                name: 'Backlog',
+                type: 'unstarted'
+              }
+            })
+          ])
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateFollowUpIssue')) {
+        throw new Error('canonical owner existing relation reuse must not create another issue');
+      }
+      if (body.query?.includes('ProviderLinearCreateIssueRelation')) {
+        const input = body.variables?.input as Record<string, unknown> | undefined;
+        calls.push(input?.type === 'blocks' ? 'blocks-relation' : 'related-relation');
+        return jsonResponse({
+          errors: [
+            {
+              message: 'Issue relation already exists.',
+              extensions: {
+                code: 'RELATION_ALREADY_EXISTS'
+              }
+            }
+          ]
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await createProviderLinearFollowUpIssue({
+      issueId: 'lin-issue-1',
+      title: 'Apr 19 spec/docs freshness baseline owner',
+      description: 'Keep the Apr 19 duplicate cluster on one owner.',
+      intentChecksum: '- Preserve Apr 19 spec/docs freshness baseline owner routing.',
+      nonGoals: '- [ ] Do not create duplicate Apr 19 owner issues.',
+      notDoneIf: '- [ ] A repeated lane creates a new owner.',
+      acceptanceCriteria: '- [ ] Repeated lanes reuse the stamped owner.',
+      blockedBySource: true,
+      canonicalOwnerKey,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'create-follow-up',
+      action: 'reused',
+      follow_up_issue: {
+        id: 'lin-issue-254',
+        identifier: 'CO-254'
+      },
+      relations: {
+        related: true,
+        blocked_by_source: true
+      }
+    });
+    expect(calls).toEqual(['issue-summary', 'owner-search', 'related-relation', 'blocks-relation']);
+  });
+
   it('reuses a stamped canonical owner when budget is below the create-path floor', async () => {
     const codexHome = await mkdtemp(join(tmpdir(), 'provider-linear-workflow-facade-'));
     tempDirs.push(codexHome);

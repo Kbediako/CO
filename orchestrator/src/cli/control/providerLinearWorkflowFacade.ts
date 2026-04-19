@@ -2402,6 +2402,38 @@ function parseLinearIssueNumber(identifier: string): number | null {
   return Number.isSafeInteger(value) ? value : null;
 }
 
+function isIssueRelationAlreadySatisfiedError(
+  error: ProviderLinearWorkflowError,
+  relationType: 'related' | 'blocks'
+): boolean {
+  if (error.code !== 'linear_graphql_error') {
+    return false;
+  }
+  const errors = Array.isArray(error.details?.errors) ? error.details.errors : [];
+  const relationNeedles = relationType === 'blocks'
+    ? ['relation', 'issue_relation', 'block']
+    : ['relation', 'issue_relation', 'related'];
+  return errors.some((entry) => {
+    if (!entry || typeof entry !== 'object') {
+      return false;
+    }
+    const record = entry as Record<string, unknown>;
+    const extensions = record.extensions && typeof record.extensions === 'object'
+      ? (record.extensions as Record<string, unknown>)
+      : {};
+    const extensionText = Object.values(extensions)
+      .filter((value): value is string | number => typeof value === 'string' || typeof value === 'number')
+      .map((value) => String(value))
+      .join(' ');
+    const message = typeof record.message === 'string' ? record.message : '';
+    const text = `${message} ${extensionText}`.toLowerCase();
+    const alreadySatisfied =
+      text.includes('already') || text.includes('duplicate') || text.includes('exists');
+    const isRelationError = relationNeedles.some((needle) => text.includes(needle));
+    return alreadySatisfied && isRelationError;
+  });
+}
+
 async function createFollowUpRelations(input: {
   session: ResolvedLinearWorkflowSession;
   sourceIssue: ProviderLinearIssueSummary;
@@ -2416,6 +2448,10 @@ async function createFollowUpRelations(input: {
       result: Extract<ProviderLinearCreateFollowUpResult, { ok: false }>;
     }
 > {
+  if (input.sourceIssue.id === input.followUpIssue.id) {
+    return { ok: true };
+  }
+
   const relatedRelationResult = await executeProviderLinearGraphql<IssueRelationMutationResponse>({
     session: input.session,
     operation: 'create-follow-up',
@@ -2430,23 +2466,28 @@ async function createFollowUpRelations(input: {
     }
   });
   if (!relatedRelationResult.ok) {
-    return {
-      ok: false,
-      result: failure(
-        'create-follow-up',
-        relatedRelationResult.error.code,
-        relatedRelationResult.error.message,
-        409,
-        {
-          ...(relatedRelationResult.error.details ?? {}),
-          created_issue: input.followUpIssue,
-          failed_relation_type: 'related'
-        },
-        false
-      )
-    };
-  }
-  if (relatedRelationResult.payload.data?.issueRelationCreate?.success !== true) {
+    if (isIssueRelationAlreadySatisfiedError(relatedRelationResult.error, 'related')) {
+      if (!input.blockedBySource) {
+        return { ok: true };
+      }
+    } else {
+      return {
+        ok: false,
+        result: failure(
+          'create-follow-up',
+          relatedRelationResult.error.code,
+          relatedRelationResult.error.message,
+          409,
+          {
+            ...(relatedRelationResult.error.details ?? {}),
+            created_issue: input.followUpIssue,
+            failed_relation_type: 'related'
+          },
+          false
+        )
+      };
+    }
+  } else if (relatedRelationResult.payload.data?.issueRelationCreate?.success !== true) {
     return {
       ok: false,
       result: failure(
@@ -2481,6 +2522,9 @@ async function createFollowUpRelations(input: {
     }
   });
   if (!blockingRelationResult.ok) {
+    if (isIssueRelationAlreadySatisfiedError(blockingRelationResult.error, 'blocks')) {
+      return { ok: true };
+    }
     return {
       ok: false,
       result: failure(
