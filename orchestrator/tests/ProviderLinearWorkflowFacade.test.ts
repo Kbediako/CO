@@ -631,7 +631,7 @@ describe('providerLinearWorkflowFacade', () => {
           name: 'Merging',
           type: 'started'
         },
-        attachments: [cachedAttachment],
+        attachments: [],
         pull_request_attachments: {
           current: cachedAttachment,
           historical: [],
@@ -696,10 +696,91 @@ describe('providerLinearWorkflowFacade', () => {
           name: 'Rework',
           type: 'started'
         },
-        attachments: []
+        attachments: [],
+        pull_request_attachments: {
+          current: null,
+          historical: [],
+          conflicting: [],
+          unknown: []
+        }
       }
     });
     expect(result).not.toHaveProperty('cache_fallback_used');
+  });
+
+  it('preserves cached PR classification on partial reads that skip attachment hydration', async () => {
+    const env = await createBudgetedRunScopedEnv();
+    const cachedAttachment = {
+      id: 'attachment-pr-510',
+      title: 'PR 510',
+      url: 'https://github.com/asabeko/CO/pull/510',
+      source_type: 'github'
+    };
+    const recordedAt = '2026-03-22T10:00:00.000Z';
+
+    await writeCachedIssueContext(
+      env,
+      buildCachedIssueContext({
+        comments: [],
+        workpad_comment: null,
+        attachments: [cachedAttachment],
+        pull_request_attachments: {
+          current: cachedAttachment,
+          historical: [],
+          conflicting: [],
+          unknown: []
+        }
+      }),
+      {
+        recordedAt
+      }
+    );
+
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string; variables?: { issueId?: string } };
+      expect(body.variables?.issueId).toBe('lin-issue-1');
+      expect(body.query).not.toContain('attachments(first: 20)');
+      return jsonResponse(
+        buildIssueContextBody({
+          comments: {
+            nodes: []
+          },
+          attachments: undefined
+        })
+      );
+    });
+
+    const result = await deleteProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      env,
+      fetchImpl
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'delete-workpad',
+      action: 'noop'
+    });
+
+    const auditPath = env.CODEX_PROVIDER_LINEAR_AUDIT_PATH;
+    expect(auditPath).toBeTruthy();
+    const cachedRecord = JSON.parse(
+      await readFile(join(dirname(auditPath as string), 'provider-linear-issue-context-cache.json'), 'utf8')
+    ) as {
+      recorded_at: string;
+      issue: {
+        attachments: Array<{ id: string }>;
+        pull_request_attachments: {
+          current: { id: string } | null;
+        };
+      };
+    };
+
+    expect(cachedRecord.issue.attachments).toMatchObject([{ id: 'attachment-pr-510' }]);
+    expect(cachedRecord.issue.pull_request_attachments.current).toMatchObject({
+      id: 'attachment-pr-510'
+    });
+    expect(cachedRecord.recorded_at).toBe(recordedAt);
   });
 
   it.each([

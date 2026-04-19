@@ -148,6 +148,7 @@ interface ProviderIssuePullRequestSnapshotLike {
 
 interface ProviderIssuePullRequestLifecycleLike {
   recorded_at?: string | null;
+  issue_updated_at?: string | null;
   status?: string | null;
   reason?: string | null;
   summary?: string | null;
@@ -932,10 +933,7 @@ function resolveReworkResetUpdatedAt(input: {
     return normalizeOptionalString(input.trackedIssue?.updated_at);
   }
   if (input.claimWorkflowState?.normalizedState === 'rework') {
-    return (
-      normalizeOptionalString(input.claim?.issue_updated_at)
-      ?? normalizeOptionalString(input.claim?.updated_at)
-    );
+    return normalizeOptionalString(input.claim?.issue_updated_at);
   }
   return null;
 }
@@ -947,10 +945,14 @@ function isPullRequestLifecycleSupersededByReworkReset(
   if (!record || !reworkResetUpdatedAt) {
     return false;
   }
-  const lifecycleUpdatedAt = latestIsoTimestamp(
+  const semanticLifecycleUpdatedAt = latestIsoTimestamp(
+    normalizeOptionalString(record.issue_updated_at),
+    normalizeOptionalString(
+      (record as ProviderIssueReviewPromotionLike).linear_transition?.issue_updated_at
+    ),
     normalizeOptionalString((record as ProviderIssueMergeCloseoutLike).issue_updated_at),
-    normalizeOptionalString(record.recorded_at)
   );
+  const lifecycleUpdatedAt = semanticLifecycleUpdatedAt ?? normalizeOptionalString(record.recorded_at);
   if (!lifecycleUpdatedAt) {
     return false;
   }

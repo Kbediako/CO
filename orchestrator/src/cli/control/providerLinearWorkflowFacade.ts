@@ -1314,7 +1314,9 @@ export async function upsertProviderLinearWorkpadComment(input: {
 
   if (selectedComment && !bodyHasLocalImageReferences && selectedComment.body === body) {
     await writeCachedIssueContextRecord(input.env, issueContext, session.session.sourceSetup, {
-      embeddedWorkpad: null
+      embeddedWorkpad: null,
+      preserveExistingAttachmentTruthWhenEmpty: true,
+      preserveRecordedAtWhenAttachmentTruthUnchanged: true
     });
     return {
       ok: true,
@@ -1336,7 +1338,9 @@ export async function upsertProviderLinearWorkpadComment(input: {
   });
   if (selectedComment && matchingEmbeddedWorkpadNoopCache) {
     await writeCachedIssueContextRecord(input.env, issueContext, session.session.sourceSetup, {
-      embeddedWorkpad: matchingEmbeddedWorkpadNoopCache
+      embeddedWorkpad: matchingEmbeddedWorkpadNoopCache,
+      preserveExistingAttachmentTruthWhenEmpty: true,
+      preserveRecordedAtWhenAttachmentTruthUnchanged: true
     });
     return {
       ok: true,
@@ -1371,7 +1375,9 @@ export async function upsertProviderLinearWorkpadComment(input: {
     selectedComment = selectedCommentResult.comment;
     if (selectedComment && !bodyHasLocalImageReferences && selectedComment.body === body) {
       await writeCachedIssueContextRecord(input.env, issueContext, session.session.sourceSetup, {
-        embeddedWorkpad: null
+        embeddedWorkpad: null,
+        preserveExistingAttachmentTruthWhenEmpty: true,
+        preserveRecordedAtWhenAttachmentTruthUnchanged: true
       });
       return {
         ok: true,
@@ -1393,7 +1399,9 @@ export async function upsertProviderLinearWorkpadComment(input: {
     });
     if (selectedComment && liveMatchingEmbeddedWorkpadNoopCache) {
       await writeCachedIssueContextRecord(input.env, issueContext, session.session.sourceSetup, {
-        embeddedWorkpad: liveMatchingEmbeddedWorkpadNoopCache
+        embeddedWorkpad: liveMatchingEmbeddedWorkpadNoopCache,
+        preserveExistingAttachmentTruthWhenEmpty: true,
+        preserveRecordedAtWhenAttachmentTruthUnchanged: true
       });
       return {
         ok: true,
@@ -1463,7 +1471,9 @@ export async function upsertProviderLinearWorkpadComment(input: {
           originalBody: body,
           resolvedBody,
           localImages: currentLocalImageCacheEntries
-        })
+        }),
+        preserveExistingAttachmentTruthWhenEmpty: true,
+        preserveRecordedAtWhenAttachmentTruthUnchanged: true
       }
     );
     return {
@@ -1511,7 +1521,9 @@ export async function upsertProviderLinearWorkpadComment(input: {
         originalBody: body,
         resolvedBody,
         localImages: currentLocalImageCacheEntries
-      })
+      }),
+      preserveExistingAttachmentTruthWhenEmpty: true,
+      preserveRecordedAtWhenAttachmentTruthUnchanged: true
     }
   );
   return {
@@ -1602,7 +1614,9 @@ export async function deleteProviderLinearWorkpadComment(input: {
 
   if (!selectedComment) {
     await writeCachedIssueContextRecord(input.env, context.issue, session.session.sourceSetup, {
-      embeddedWorkpad: null
+      embeddedWorkpad: null,
+      preserveExistingAttachmentTruthWhenEmpty: true,
+      preserveRecordedAtWhenAttachmentTruthUnchanged: true
     });
     return {
       ok: true,
@@ -1658,7 +1672,9 @@ export async function deleteProviderLinearWorkpadComment(input: {
     removeIssueContextComment(context.issue, deletedCommentId),
     session.session.sourceSetup,
     {
-      embeddedWorkpad: null
+      embeddedWorkpad: null,
+      preserveExistingAttachmentTruthWhenEmpty: true,
+      preserveRecordedAtWhenAttachmentTruthUnchanged: true
     }
   );
   return {
@@ -3501,28 +3517,116 @@ function issueContextCacheRecordCarriesLivePrTruth(issue: ProviderLinearIssueCon
   return false;
 }
 
+function sameIssueContextAttachmentTruth(
+  left: Pick<ProviderLinearIssueContext, 'attachments' | 'pull_request_attachments'>,
+  right: Pick<ProviderLinearIssueContext, 'attachments' | 'pull_request_attachments'>
+): boolean {
+  return serializeIssueContextAttachmentTruth(left) === serializeIssueContextAttachmentTruth(right);
+}
+
+function issueContextHasAnyAttachmentTruth(
+  issue: Pick<ProviderLinearIssueContext, 'attachments' | 'pull_request_attachments'>
+): boolean {
+  return (
+    issue.attachments.length > 0 ||
+    issue.pull_request_attachments.current !== null ||
+    issue.pull_request_attachments.historical.length > 0 ||
+    issue.pull_request_attachments.conflicting.length > 0 ||
+    issue.pull_request_attachments.unknown.length > 0
+  );
+}
+
+function cloneIssueContextAttachmentTruth(
+  issue: Pick<ProviderLinearIssueContext, 'attachments' | 'pull_request_attachments'>
+): Pick<ProviderLinearIssueContext, 'attachments' | 'pull_request_attachments'> {
+  return {
+    attachments: [...issue.attachments],
+    pull_request_attachments: {
+      current: issue.pull_request_attachments.current,
+      historical: [...issue.pull_request_attachments.historical],
+      conflicting: [...issue.pull_request_attachments.conflicting],
+      unknown: [...issue.pull_request_attachments.unknown]
+    }
+  };
+}
+
+function serializeIssueContextAttachmentTruth(
+  issue: Pick<ProviderLinearIssueContext, 'attachments' | 'pull_request_attachments'>
+): string {
+  return JSON.stringify({
+    attachments: issue.attachments.map((attachment) =>
+      serializeIssueContextAttachmentTruthEntry(attachment)
+    ),
+    pull_request_attachments: {
+      current: serializeIssueContextAttachmentTruthEntry(issue.pull_request_attachments.current),
+      historical: issue.pull_request_attachments.historical.map((attachment) =>
+        serializeIssueContextAttachmentTruthEntry(attachment)
+      ),
+      conflicting: issue.pull_request_attachments.conflicting.map((attachment) =>
+        serializeIssueContextAttachmentTruthEntry(attachment)
+      ),
+      unknown: issue.pull_request_attachments.unknown.map((attachment) =>
+        serializeIssueContextAttachmentTruthEntry(attachment)
+      )
+    }
+  });
+}
+
+function serializeIssueContextAttachmentTruthEntry(
+  attachment: ProviderLinearWorkflowAttachment | null
+): { id: string; title: string | null; url: string | null; source_type: string | null } | null {
+  if (!attachment) {
+    return null;
+  }
+  return {
+    id: attachment.id,
+    title: attachment.title,
+    url: attachment.url,
+    source_type: attachment.source_type
+  };
+}
+
 async function writeCachedIssueContextRecord(
   env: NodeJS.ProcessEnv | undefined,
   issue: ProviderLinearIssueContext,
   sourceSetup: DispatchPilotSourceSetup | null,
   options?: {
     embeddedWorkpad?: ProviderLinearEmbeddedWorkpadCacheRecord | null;
+    preserveExistingAttachmentTruthWhenEmpty?: boolean;
+    preserveRecordedAtWhenAttachmentTruthUnchanged?: boolean;
   }
 ): Promise<void> {
   const cachePath = resolveIssueContextCachePath(env);
   if (!cachePath) {
     return;
   }
+  const existingRecord = await readCachedIssueContextRecord(env, issue.id, sourceSetup);
   const embeddedWorkpad =
     options && Object.prototype.hasOwnProperty.call(options, 'embeddedWorkpad')
       ? options.embeddedWorkpad ?? null
-      : (await readCachedIssueContextRecord(env, issue.id, sourceSetup))?.embedded_workpad ?? null;
+      : existingRecord?.embedded_workpad ?? null;
+  const issueWithPreservedAttachmentTruth =
+    options?.preserveExistingAttachmentTruthWhenEmpty === true &&
+    existingRecord &&
+    !issueContextHasAnyAttachmentTruth(issue) &&
+    issueContextHasAnyAttachmentTruth(existingRecord.issue)
+      ? {
+          ...issue,
+          ...cloneIssueContextAttachmentTruth(existingRecord.issue)
+        }
+      : issue;
+  const recordedAt =
+    options?.preserveRecordedAtWhenAttachmentTruthUnchanged === true &&
+    existingRecord &&
+    sameIssueContextAttachmentTruth(existingRecord.issue, issueWithPreservedAttachmentTruth)
+      ? existingRecord.recorded_at
+      : new Date().toISOString();
   const record: ProviderLinearIssueContextCacheRecord = {
     schema_version: 2,
     issue_id: issue.id,
-    recorded_at: new Date().toISOString(),
+    recorded_at: recordedAt,
     source_setup: sourceSetup,
-    issue,
+    issue: issueWithPreservedAttachmentTruth,
     ...(embeddedWorkpad ? { embedded_workpad: embeddedWorkpad } : {})
   };
   try {
@@ -4141,7 +4245,14 @@ async function readIssueContext(
     return attachmentResult;
   }
 
-  const parsedIssue = parseIssueContext(issueNode, workspaceId, session.sourceSetup, comments, attachmentResult.attachments);
+  const parsedIssue = parseIssueContext(
+    issueNode,
+    workspaceId,
+    session.sourceSetup,
+    comments,
+    attachmentResult.attachments,
+    includeAttachments ? undefined : null
+  );
   if (!parsedIssue.ok) {
     return {
       ok: false,
@@ -4232,7 +4343,8 @@ function parseIssueContext(
   workspaceId: string | null | undefined,
   sourceSetup: DispatchPilotSourceSetup | null,
   commentsOverride?: readonly ProviderLinearWorkflowComment[] | null,
-  attachmentsOverride?: readonly ProviderLinearWorkflowAttachment[] | null
+  attachmentsOverride?: readonly ProviderLinearWorkflowAttachment[] | null,
+  pullRequestAttachmentsOverride?: ProviderLinearIssuePullRequestAttachments | null
 ):
   | {
       ok: true;
@@ -4319,7 +4431,8 @@ function parseIssueContext(
                 .map((entry) => parseAttachment(entry))
                 .filter((entry): entry is ProviderLinearWorkflowAttachment => entry !== null)
             : [],
-      pull_request_attachments: buildEmptyIssuePullRequestAttachments(),
+      pull_request_attachments:
+        pullRequestAttachmentsOverride ?? buildEmptyIssuePullRequestAttachments(),
       workpad_comment: workpadComment
     }
   };

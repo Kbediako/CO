@@ -1905,6 +1905,170 @@ describe('provider issue observability', () => {
     });
   });
 
+  it('does not let polling freshness alone suppress live merge closeout truth after Rework', () => {
+    const snapshot = buildProviderIssueDebugSnapshot({
+      claim: {
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        updated_at: '2026-04-05T07:05:00.000Z',
+        issue_state: 'Rework',
+        issue_state_type: 'started',
+        issue_updated_at: null,
+        run_id: 'run-82-polling-rework',
+        merge_closeout: {
+          recorded_at: '2026-04-05T07:02:00.000Z',
+          issue_updated_at: '2026-04-05T07:02:00.000Z',
+          status: 'watching',
+          reason: 'checks_pending',
+          summary: 'Waiting for required checks before merge.',
+          attached_pr_urls: ['https://github.com/asabeko/CO/pull/82'],
+          pr: {
+            url: 'https://github.com/asabeko/CO/pull/82',
+            owner: 'asabeko',
+            repo: 'CO',
+            number: 82
+          },
+          snapshot: {
+            review_decision: 'APPROVED',
+            merge_state_status: 'BLOCKED',
+            ready_to_merge: false,
+            gate_reasons: ['required_checks_pending'],
+            action_required_reasons: [],
+            unresolved_thread_count: 0,
+            checks_pending: 2,
+            checks_failed: 0,
+            required_checks_pending: 2,
+            required_checks_failed: 0,
+            updated_at: '2026-04-05T07:02:00.000Z',
+            merged_at: null
+          }
+        }
+      },
+      proof: null
+    });
+
+    expect(snapshot).toMatchObject({
+      pull_request: {
+        number: 82,
+        required_checks_pending: 2
+      },
+      progress: {
+        kind: 'merge_closeout',
+        status: 'waiting',
+        stall_classification: 'waiting_on_checks',
+        recovery_recommendation: 'wait_for_checks'
+      }
+    });
+  });
+
+  it('suppresses stale review-promotion truth when Rework is newer than the semantic transition timestamp', () => {
+    const snapshot = buildProviderIssueDebugSnapshot({
+      claim: {
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        updated_at: '2026-04-05T07:05:00.000Z',
+        issue_state: 'Rework',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-05T07:04:00.000Z',
+        run_id: 'run-416-stale-review-promotion',
+        review_promotion: {
+          recorded_at: '2026-04-05T07:05:00.000Z',
+          status: 'promoted',
+          reason: 'promoted_to_merging',
+          summary: 'Promoted the issue from In Review to Merging after confirming the attached PR is merge-ready.',
+          attached_pr_urls: ['https://github.com/asabeko/CO/pull/416'],
+          ignored_historical_pr_urls: [],
+          conflicting_attached_pr_urls: [],
+          pr: {
+            url: 'https://github.com/asabeko/CO/pull/416',
+            owner: 'asabeko',
+            repo: 'CO',
+            number: 416
+          },
+          snapshot: {
+            state: 'OPEN',
+            review_decision: 'APPROVED',
+            merge_state_status: 'CLEAN',
+            ready_to_merge: true,
+            gate_reasons: [],
+            action_required_reasons: [],
+            unresolved_thread_count: 0,
+            checks_pending: 0,
+            checks_failed: 0,
+            required_checks_pending: 0,
+            required_checks_failed: 0,
+            updated_at: '2026-04-05T07:05:00.000Z',
+            merged_at: null
+          },
+          linear_transition: {
+            status: 'transitioned',
+            attempted_at: '2026-04-05T07:03:00.000Z',
+            previous_state: 'In Review',
+            target_state: 'Merging',
+            issue_state: 'Merging',
+            issue_state_type: 'started',
+            issue_updated_at: '2026-04-05T07:03:00.000Z',
+            error: null
+          }
+        }
+      },
+      proof: null
+    });
+
+    expect(snapshot?.pull_request).toBeNull();
+    expect(snapshot?.progress?.kind).not.toBe('review_promotion');
+  });
+
+  it('suppresses stale review-promotion truth when Rework is newer than the top-level issue timestamp', () => {
+    const snapshot = buildProviderIssueDebugSnapshot({
+      claim: {
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        updated_at: '2026-04-09T03:15:00.000Z',
+        issue_state: 'Rework',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-09T03:14:45.000Z',
+        run_id: 'run-416-review-promotion-action-required',
+        review_promotion: {
+          recorded_at: '2026-04-09T03:15:00.000Z',
+          issue_updated_at: '2026-04-09T03:14:00.000Z',
+          status: 'action_required',
+          reason: 'review=REVIEW_REQUIRED',
+          summary: 'Review-handoff promotion is blocked by: review=REVIEW_REQUIRED.',
+          attached_pr_urls: ['https://github.com/asabeko/CO/pull/416'],
+          ignored_historical_pr_urls: [],
+          conflicting_attached_pr_urls: [],
+          pr: {
+            url: 'https://github.com/asabeko/CO/pull/416',
+            owner: 'asabeko',
+            repo: 'CO',
+            number: 416
+          },
+          snapshot: {
+            state: 'OPEN',
+            review_decision: 'REVIEW_REQUIRED',
+            merge_state_status: 'CLEAN',
+            ready_to_merge: false,
+            gate_reasons: ['review=REVIEW_REQUIRED'],
+            action_required_reasons: ['review=REVIEW_REQUIRED'],
+            unresolved_thread_count: 0,
+            checks_pending: 0,
+            checks_failed: 0,
+            required_checks_pending: 0,
+            required_checks_failed: 0,
+            updated_at: '2026-04-09T03:14:30.000Z',
+            merged_at: null
+          },
+          linear_transition: null
+        }
+      },
+      proof: null
+    });
+
+    expect(snapshot?.pull_request).toBeNull();
+    expect(snapshot?.progress?.kind).not.toBe('review_promotion');
+  });
+
   it('surfaces skipped shared-root reconciliation as pending after merge closeout', () => {
     const snapshot = buildProviderIssueDebugSnapshot({
       tracked_issue: {
