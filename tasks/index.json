@@ -1,6 +1,34 @@
 {
   "items": [
     {
+      "id": "20260420-linear-4c1c8aed-2724-4072-9218-74b55e0cc4a7",
+      "title": "CO-264 backlog promotion snapshot retention policy",
+      "relates_to": "tasks/tasks-linear-4c1c8aed-2724-4072-9218-74b55e0cc4a7.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-20",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-20",
+          "status": "produced",
+          "manifest": ".runs/linear-4c1c8aed-2724-4072-9218-74b55e0cc4a7-docs-packet/cli/2026-04-19T18-52-58-375Z-f391d2b8/manifest.json",
+          "source_anchor": "ctx:sha256:3a42ae593f1afd8a89a2ee9ef88ad1acfe18d4db4930d453565ab22e66e7433b#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-264 as the backlog promotion snapshot retention policy: `backlog_promotion_snapshots` are retained through temporary untracked cycles by default, `resolveNextBacklogPromotionSnapshots` prunes only with explicit stale/permanent evidence, one missing finite tracked-issue page is not terminal evidence, blanket time-only deletion is rejected, audit/read-model decisions must include age, cycle, terminal evidence, tracked-page visibility, and force-path status, and `CO-216` manual Ready -> Backlog demotion suppression remains intact until explicit retention policy regressions exist."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-4c1c8aed-2724-4072-9218-74b55e0cc4a7.md",
+        "task": "tasks/tasks-linear-4c1c8aed-2724-4072-9218-74b55e0cc4a7.md",
+        "agent_task": ".agent/task/linear-4c1c8aed-2724-4072-9218-74b55e0cc4a7.md",
+        "docs": {
+          "TECH_SPEC": "docs/TECH_SPEC-linear-4c1c8aed-2724-4072-9218-74b55e0cc4a7.md"
+        }
+      }
+    },
+    {
       "id": "20260420-linear-7988e9a6-8258-4cff-b585-fadc31741ce1",
       "title": "Merge closeout: ignore closed prior-attempt PR attachments",
       "relates_to": "tasks/tasks-linear-7988e9a6-8258-4cff-b585-fadc31741ce1.md",

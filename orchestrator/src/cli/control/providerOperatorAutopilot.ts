@@ -15,6 +15,7 @@ import {
 } from './linearDispatchSource.js';
 import {
   classifyProviderLinearWorkflowState,
+  isProviderLinearTrackedIssueMutable,
   normalizeProviderLinearWorkflowState,
   providerLinearTodoBlockedByNonTerminal
 } from './providerLinearWorkflowStates.js';
@@ -40,6 +41,11 @@ export const DEFAULT_PROVIDER_OPERATOR_AUTOPILOT_PENDING_SUMMARY =
 const DEFAULT_BACKLOG_STATE_NAME = 'Backlog';
 const DEFAULT_READY_STATE_NAME = 'Ready';
 const DEFAULT_REWORK_STATE_NAME = 'Rework';
+const DEFAULT_BACKLOG_PROMOTION_SNAPSHOT_MAX_UNTRACKED_CYCLES = 3;
+const DEFAULT_BACKLOG_PROMOTION_SNAPSHOT_TERMINAL_STATE_TYPES = [
+  'completed',
+  'canceled'
+] as const;
 const DEFAULT_REWORK_EXCLUDED_ACTION_REQUIRED_REASONS = [
   'draft',
   'label:do-not-merge',
@@ -61,6 +67,10 @@ export interface ProviderOperatorAutopilotConfig {
     enabled: boolean;
     state_name: string;
     target_state_name: string;
+    snapshot_retention: {
+      max_untracked_cycles: number;
+      terminal_state_types: string[];
+    };
   };
   review_handoff_rework: {
     enabled: boolean;
@@ -152,6 +162,40 @@ export interface ProviderOperatorAutopilotBacklogPromotionSnapshot {
   attempted_at: string;
   issue_updated_at: string | null;
   force_path_used: boolean;
+  untracked_cycles?: number;
+}
+
+export type ProviderOperatorAutopilotBacklogPromotionSnapshotRetentionDecision =
+  | 'retained'
+  | 'pruned';
+
+export type ProviderOperatorAutopilotBacklogPromotionSnapshotRetentionReason =
+  | 'temporarily_untracked'
+  | 'stale_untracked_cycle_limit'
+  | 'terminal_state'
+  | 'tracked_archived_or_trashed'
+  | 'tracked_non_backlog_non_target_state'
+  | 'tracked_state_reset_untracked_cycles';
+
+export interface ProviderOperatorAutopilotBacklogPromotionSnapshotRetentionRecord {
+  issue_id: string;
+  issue_identifier: string | null;
+  target_state: string;
+  attempted_at: string;
+  issue_updated_at: string | null;
+  evaluated_at: string;
+  decision: ProviderOperatorAutopilotBacklogPromotionSnapshotRetentionDecision;
+  reason: ProviderOperatorAutopilotBacklogPromotionSnapshotRetentionReason;
+  age_ms: number | null;
+  untracked_cycles: number;
+  max_untracked_cycles: number;
+  issue_state: string | null;
+  issue_state_type: string | null;
+  issue_archived_at: string | null;
+  issue_trashed: boolean | null;
+  issue_observed_updated_at: string | null;
+  terminal_state_evidence: boolean;
+  force_path_used: boolean;
 }
 
 export interface ProviderOperatorAutopilotResult {
@@ -166,6 +210,7 @@ export interface ProviderOperatorAutopilotResult {
   lifecycle_records?: ProviderOperatorAutopilotLifecycleRecord[];
   local_rollout_execution_attempts?: ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord[];
   backlog_promotion_snapshots?: ProviderOperatorAutopilotBacklogPromotionSnapshot[];
+  backlog_promotion_snapshot_retention_records?: ProviderOperatorAutopilotBacklogPromotionSnapshotRetentionRecord[];
 }
 
 interface ProviderOperatorAutopilotDependencies {
@@ -195,6 +240,9 @@ export function resolveProviderOperatorAutopilotConfig(
   const backlogPromotion = asRecord(
     operatorAutopilot?.backlog_promotion ?? operatorAutopilot?.backlogPromotion
   );
+  const snapshotRetention = asRecord(
+    backlogPromotion?.snapshot_retention ?? backlogPromotion?.snapshotRetention
+  );
   const reviewHandoffRework = asRecord(
     operatorAutopilot?.review_handoff_rework ?? operatorAutopilot?.reviewHandoffRework
   );
@@ -210,7 +258,26 @@ export function resolveProviderOperatorAutopilotConfig(
         DEFAULT_BACKLOG_STATE_NAME,
       target_state_name:
         readNonEmptyString(backlogPromotion, 'target_state_name', 'targetStateName') ??
-        DEFAULT_READY_STATE_NAME
+        DEFAULT_READY_STATE_NAME,
+      snapshot_retention: {
+        // Keep at least one missing-page cycle before pruning so CO-216 manual
+        // demotion suppression cannot be erased by a single temporary omission.
+        max_untracked_cycles: Math.max(
+          2,
+          readPositiveInteger(
+            snapshotRetention,
+            'max_untracked_cycles',
+            'maxUntrackedCycles'
+          ) ?? DEFAULT_BACKLOG_PROMOTION_SNAPSHOT_MAX_UNTRACKED_CYCLES
+        ),
+        terminal_state_types: normalizeStringArray(
+          readStringArray(
+            snapshotRetention,
+            'terminal_state_types',
+            'terminalStateTypes'
+          ) ?? [...DEFAULT_BACKLOG_PROMOTION_SNAPSHOT_TERMINAL_STATE_TYPES]
+        )
+      }
     },
     review_handoff_rework: {
       enabled: readBoolean(reviewHandoffRework, 'enabled') ?? enabled,
@@ -278,7 +345,8 @@ export async function runProviderOperatorAutopilot(
       resolved_actions: [],
       lifecycle_records: [],
       local_rollout_execution_attempts: [],
-      backlog_promotion_snapshots: []
+      backlog_promotion_snapshots: [],
+      backlog_promotion_snapshot_retention_records: []
     };
   }
 
@@ -297,15 +365,31 @@ export async function runProviderOperatorAutopilot(
   const lifecycleRecords = (input.lifecycle_records ?? []).map(
     cloneProviderOperatorAutopilotLifecycleRecord
   );
-  const resolveBacklogPromotionSnapshots = () =>
+  const resolveBacklogPromotionSnapshotState = () =>
     resolveNextBacklogPromotionSnapshots({
       previousResult: input.previous_result ?? null,
       trackedIssuesById,
       actions,
       holds,
       targetStateName: input.config.backlog_promotion.target_state_name,
-      backlogStateName: input.config.backlog_promotion.state_name
+      backlogStateName: input.config.backlog_promotion.state_name,
+      retentionConfig: input.config.backlog_promotion.snapshot_retention,
+      evaluatedAt: recordedAt
     });
+  const buildResultWithBacklogPromotionSnapshotState = (
+    result: Omit<
+      ProviderOperatorAutopilotResult,
+      | 'backlog_promotion_snapshots'
+      | 'backlog_promotion_snapshot_retention_records'
+    >
+  ): ProviderOperatorAutopilotResult => {
+    const snapshotState = resolveBacklogPromotionSnapshotState();
+    return {
+      ...result,
+      backlog_promotion_snapshots: snapshotState.snapshots,
+      backlog_promotion_snapshot_retention_records: snapshotState.retention_records
+    };
+  };
 
   const reviewHandoffOutcome = await maybeRunReviewHandoffRework({
     claims: input.claims,
@@ -323,7 +407,7 @@ export async function runProviderOperatorAutopilot(
       postMergeRolloutEnabled: input.config.post_merge_rollout.enabled,
       lifecycleRecords
     });
-    return {
+    return buildResultWithBacklogPromotionSnapshotState({
       recorded_at: recordedAt,
       status: 'failed',
       summary: reviewHandoffOutcome.summary,
@@ -335,9 +419,8 @@ export async function runProviderOperatorAutopilot(
       lifecycle_records: effectiveLocalRolloutActions.lifecycle_records,
       local_rollout_execution_attempts: cloneLocalRolloutExecutionAttempts(
         input.local_rollout_execution_attempts
-      ),
-      backlog_promotion_snapshots: resolveBacklogPromotionSnapshots()
-    };
+      )
+    });
   }
   if (reviewHandoffOutcome.action) {
     actions.push(reviewHandoffOutcome.action);
@@ -363,7 +446,7 @@ export async function runProviderOperatorAutopilot(
         postMergeRolloutEnabled: input.config.post_merge_rollout.enabled,
         lifecycleRecords
       });
-      return {
+      return buildResultWithBacklogPromotionSnapshotState({
         recorded_at: recordedAt,
         status: 'failed',
         summary: backlogOutcome.summary,
@@ -375,9 +458,8 @@ export async function runProviderOperatorAutopilot(
         lifecycle_records: effectiveLocalRolloutActions.lifecycle_records,
         local_rollout_execution_attempts: cloneLocalRolloutExecutionAttempts(
           input.local_rollout_execution_attempts
-        ),
-        backlog_promotion_snapshots: resolveBacklogPromotionSnapshots()
-      };
+        )
+      });
     }
     if (backlogOutcome.action) {
       actions.push(backlogOutcome.action);
@@ -400,7 +482,7 @@ export async function runProviderOperatorAutopilot(
     effectiveLocalRolloutActions.pending_actions.length > 0
   ) {
     if (!input.repo_root) {
-      return {
+      return buildResultWithBacklogPromotionSnapshotState({
         recorded_at: recordedAt,
         status: 'failed',
         summary: 'Local rollout execution is enabled but repo_root was not provided.',
@@ -410,9 +492,8 @@ export async function runProviderOperatorAutopilot(
         pending_actions: effectiveLocalRolloutActions.pending_actions,
         resolved_actions: effectiveLocalRolloutActions.resolved_actions,
         lifecycle_records: effectiveLocalRolloutActions.lifecycle_records,
-        local_rollout_execution_attempts: localRolloutExecutionAttempts,
-        backlog_promotion_snapshots: resolveBacklogPromotionSnapshots()
-      };
+        local_rollout_execution_attempts: localRolloutExecutionAttempts
+      });
     }
     const executionOutcome = await executeProviderOperatorAutopilotLocalRolloutActions(
       {
@@ -451,7 +532,7 @@ export async function runProviderOperatorAutopilot(
     effectiveLocalRolloutActions.resolved_actions.length > 0
       ? 'acted'
       : 'noop';
-  return {
+  return buildResultWithBacklogPromotionSnapshotState({
     recorded_at: recordedAt,
     status,
     summary: summarizeOperatorAutopilotResult({
@@ -466,9 +547,8 @@ export async function runProviderOperatorAutopilot(
     pending_actions: effectiveLocalRolloutActions.pending_actions,
     resolved_actions: effectiveLocalRolloutActions.resolved_actions,
     lifecycle_records: effectiveLocalRolloutActions.lifecycle_records,
-    local_rollout_execution_attempts: localRolloutExecutionAttempts,
-    backlog_promotion_snapshots: resolveBacklogPromotionSnapshots()
-  };
+    local_rollout_execution_attempts: localRolloutExecutionAttempts
+  });
 }
 
 async function maybeRunBacklogPromotion(input: {
@@ -492,7 +572,9 @@ async function maybeRunBacklogPromotion(input: {
   }
   const backlogState = normalizeProviderLinearWorkflowState(input.config.backlog_promotion.state_name);
   const candidateIndex = input.sortedTrackedIssues.findIndex(
-    (issue) => normalizeProviderLinearWorkflowState(issue.state) === backlogState
+    (issue) =>
+      normalizeProviderLinearWorkflowState(issue.state) === backlogState &&
+      isProviderLinearTrackedIssueMutable(issue)
   );
   const candidate = candidateIndex >= 0 ? input.sortedTrackedIssues[candidateIndex] : null;
   if (!candidate) {
@@ -502,7 +584,11 @@ async function maybeRunBacklogPromotion(input: {
     candidateIndex > 0
       ? input.sortedTrackedIssues.slice(0, candidateIndex).find((issue) => {
           const workflowState = classifyProviderLinearWorkflowState(issue);
-          return workflowState.isTodo && providerLinearTodoBlockedByNonTerminal(issue.blocked_by);
+          return (
+            isProviderLinearTrackedIssueMutable(issue) &&
+            workflowState.isTodo &&
+            providerLinearTodoBlockedByNonTerminal(issue.blocked_by)
+          );
         }) ?? null
       : null;
   if (higherRankedBlockedQueueLane) {
@@ -1131,39 +1217,225 @@ function resolveNextBacklogPromotionSnapshots(input: {
   holds: ProviderOperatorAutopilotHoldRecord[];
   targetStateName: string;
   backlogStateName: string;
-}): ProviderOperatorAutopilotBacklogPromotionSnapshot[] {
+  retentionConfig: ProviderOperatorAutopilotConfig['backlog_promotion']['snapshot_retention'];
+  evaluatedAt: string;
+}): {
+  snapshots: ProviderOperatorAutopilotBacklogPromotionSnapshot[];
+  retention_records: ProviderOperatorAutopilotBacklogPromotionSnapshotRetentionRecord[];
+} {
   const normalizedBacklogState = normalizeProviderLinearWorkflowState(input.backlogStateName);
   const normalizedTargetState = normalizeProviderLinearWorkflowState(input.targetStateName);
   const snapshotsByIssueId = new Map<string, ProviderOperatorAutopilotBacklogPromotionSnapshot>();
+  const retentionRecords: ProviderOperatorAutopilotBacklogPromotionSnapshotRetentionRecord[] = [];
+  const prunedPreviousSnapshotIssueIds = new Set<string>();
+  // Repeat the minimum defensively for persisted/legacy configs loaded before
+  // resolveProviderOperatorAutopilotConfig normalized snapshot_retention.
+  const maxUntrackedCycles = Math.max(2, input.retentionConfig.max_untracked_cycles);
   for (const snapshot of collectBacklogPromotionSnapshotsFromResult(
     input.previousResult,
     input.targetStateName
   )) {
     const issue = input.trackedIssuesById.get(snapshot.issue_id) ?? null;
+    const currentUntrackedCycles = normalizeNonNegativeInteger(snapshot.untracked_cycles);
     if (!issue) {
-      snapshotsByIssueId.set(snapshot.issue_id, snapshot);
+      const nextUntrackedCycles = currentUntrackedCycles + 1;
+      const shouldPrune = nextUntrackedCycles >= maxUntrackedCycles;
+      retentionRecords.push(
+        buildBacklogPromotionSnapshotRetentionRecord({
+          snapshot,
+          evaluatedAt: input.evaluatedAt,
+          decision: shouldPrune ? 'pruned' : 'retained',
+          reason: shouldPrune
+            ? 'stale_untracked_cycle_limit'
+            : 'temporarily_untracked',
+          ageMs: calculateSnapshotAgeMs(input.evaluatedAt, snapshot.attempted_at),
+          untrackedCycles: nextUntrackedCycles,
+          maxUntrackedCycles,
+          issue: null,
+          terminalStateEvidence: false
+        })
+      );
+      if (!shouldPrune) {
+        snapshotsByIssueId.set(snapshot.issue_id, {
+          ...snapshot,
+          untracked_cycles: nextUntrackedCycles
+        });
+      }
       continue;
     }
     const issueState = normalizeProviderLinearWorkflowState(issue?.state);
+    const terminalStateEvidence = isBacklogPromotionSnapshotTerminalIssueState(
+      issue,
+      input.retentionConfig.terminal_state_types
+    );
+    if (terminalStateEvidence) {
+      retentionRecords.push(
+        buildBacklogPromotionSnapshotRetentionRecord({
+          snapshot,
+          evaluatedAt: input.evaluatedAt,
+          decision: 'pruned',
+          reason: 'terminal_state',
+          ageMs: calculateSnapshotAgeMs(input.evaluatedAt, snapshot.attempted_at),
+          untrackedCycles: 0,
+          maxUntrackedCycles,
+          issue,
+          terminalStateEvidence: true
+        })
+      );
+      prunedPreviousSnapshotIssueIds.add(snapshot.issue_id);
+      continue;
+    }
+    if (!isProviderLinearTrackedIssueMutable(issue)) {
+      retentionRecords.push(
+        buildBacklogPromotionSnapshotRetentionRecord({
+          snapshot,
+          evaluatedAt: input.evaluatedAt,
+          decision: 'pruned',
+          reason: 'tracked_archived_or_trashed',
+          ageMs: calculateSnapshotAgeMs(input.evaluatedAt, snapshot.attempted_at),
+          untrackedCycles: 0,
+          maxUntrackedCycles,
+          issue,
+          terminalStateEvidence: false
+        })
+      );
+      prunedPreviousSnapshotIssueIds.add(snapshot.issue_id);
+      continue;
+    }
     if (
       (issueState === normalizedBacklogState || issueState === normalizedTargetState)
     ) {
-      snapshotsByIssueId.set(snapshot.issue_id, snapshot);
+      const nextSnapshot = {
+        ...snapshot,
+        issue_identifier: issue.identifier ?? snapshot.issue_identifier,
+        untracked_cycles: 0
+      };
+      if (currentUntrackedCycles > 0) {
+        retentionRecords.push(
+          buildBacklogPromotionSnapshotRetentionRecord({
+            snapshot: nextSnapshot,
+            evaluatedAt: input.evaluatedAt,
+            decision: 'retained',
+            reason: 'tracked_state_reset_untracked_cycles',
+            ageMs: calculateSnapshotAgeMs(input.evaluatedAt, snapshot.attempted_at),
+            untrackedCycles: 0,
+            maxUntrackedCycles,
+            issue,
+            terminalStateEvidence: false
+          })
+        );
+      }
+      snapshotsByIssueId.set(snapshot.issue_id, nextSnapshot);
+      continue;
     }
+    retentionRecords.push(
+      buildBacklogPromotionSnapshotRetentionRecord({
+        snapshot,
+        evaluatedAt: input.evaluatedAt,
+        decision: 'pruned',
+        reason: 'tracked_non_backlog_non_target_state',
+        ageMs: calculateSnapshotAgeMs(input.evaluatedAt, snapshot.attempted_at),
+        untrackedCycles: 0,
+        maxUntrackedCycles,
+        issue,
+        terminalStateEvidence: false
+      })
+    );
+    prunedPreviousSnapshotIssueIds.add(snapshot.issue_id);
   }
   for (const action of input.actions) {
     const snapshot = buildBacklogPromotionSnapshotFromAction(action, input.targetStateName);
     if (snapshot) {
+      prunedPreviousSnapshotIssueIds.delete(snapshot.issue_id);
       snapshotsByIssueId.set(snapshot.issue_id, snapshot);
     }
   }
   for (const hold of input.holds) {
     const snapshot = buildBacklogPromotionSnapshotFromHold(hold, input.targetStateName);
-    if (snapshot) {
+    if (snapshot && !prunedPreviousSnapshotIssueIds.has(snapshot.issue_id)) {
       snapshotsByIssueId.set(snapshot.issue_id, snapshot);
     }
   }
-  return [...snapshotsByIssueId.values()].sort((left, right) =>
+  return {
+    snapshots: sortBacklogPromotionSnapshots([...snapshotsByIssueId.values()]),
+    retention_records: sortBacklogPromotionSnapshotRetentionRecords(retentionRecords)
+  };
+}
+
+function buildBacklogPromotionSnapshotRetentionRecord(input: {
+  snapshot: ProviderOperatorAutopilotBacklogPromotionSnapshot;
+  evaluatedAt: string;
+  decision: ProviderOperatorAutopilotBacklogPromotionSnapshotRetentionDecision;
+  reason: ProviderOperatorAutopilotBacklogPromotionSnapshotRetentionReason;
+  ageMs: number | null;
+  untrackedCycles: number;
+  maxUntrackedCycles: number;
+  issue: LiveLinearTrackedIssue | null;
+  terminalStateEvidence: boolean;
+}): ProviderOperatorAutopilotBacklogPromotionSnapshotRetentionRecord {
+  return {
+    issue_id: input.snapshot.issue_id,
+    issue_identifier: input.issue?.identifier ?? input.snapshot.issue_identifier,
+    target_state: input.snapshot.target_state,
+    attempted_at: input.snapshot.attempted_at,
+    issue_updated_at: input.snapshot.issue_updated_at,
+    evaluated_at: input.evaluatedAt,
+    decision: input.decision,
+    reason: input.reason,
+    age_ms: input.ageMs,
+    untracked_cycles: input.untrackedCycles,
+    max_untracked_cycles: input.maxUntrackedCycles,
+    issue_state: input.issue?.state ?? null,
+    issue_state_type: input.issue?.state_type ?? null,
+    issue_archived_at: input.issue?.archived_at ?? null,
+    issue_trashed: input.issue?.trashed ?? null,
+    issue_observed_updated_at: input.issue?.updated_at ?? null,
+    terminal_state_evidence: input.terminalStateEvidence,
+    force_path_used: input.snapshot.force_path_used ?? false
+  };
+}
+
+function isBacklogPromotionSnapshotTerminalIssueState(
+  issue: Pick<LiveLinearTrackedIssue, 'state' | 'state_type'>,
+  terminalStateTypes: string[]
+): boolean {
+  const normalizedTerminalStateTypes = terminalStateTypes
+    .map((stateType) => normalizeProviderLinearWorkflowState(stateType))
+    .filter((stateType): stateType is string => stateType !== null);
+  const normalizedType = normalizeProviderLinearWorkflowState(issue.state_type);
+  if (normalizedType !== null && normalizedTerminalStateTypes.includes(normalizedType)) {
+    return true;
+  }
+  const normalizedState = normalizeProviderLinearWorkflowState(issue.state);
+  if (normalizedState !== null && normalizedTerminalStateTypes.includes(normalizedState)) {
+    return true;
+  }
+  return classifyProviderLinearWorkflowState(issue).isTerminal;
+}
+
+function calculateSnapshotAgeMs(evaluatedAt: string, attemptedAt: string): number | null {
+  const evaluatedAtMs = Date.parse(evaluatedAt);
+  const attemptedAtMs = Date.parse(attemptedAt);
+  if (!Number.isFinite(evaluatedAtMs) || !Number.isFinite(attemptedAtMs)) {
+    return null;
+  }
+  return Math.max(0, evaluatedAtMs - attemptedAtMs);
+}
+
+function sortBacklogPromotionSnapshots(
+  snapshots: ProviderOperatorAutopilotBacklogPromotionSnapshot[]
+): ProviderOperatorAutopilotBacklogPromotionSnapshot[] {
+  return [...snapshots].sort((left, right) =>
+    (left.issue_identifier ?? left.issue_id).localeCompare(
+      right.issue_identifier ?? right.issue_id
+    )
+  );
+}
+
+function sortBacklogPromotionSnapshotRetentionRecords(
+  records: ProviderOperatorAutopilotBacklogPromotionSnapshotRetentionRecord[]
+): ProviderOperatorAutopilotBacklogPromotionSnapshotRetentionRecord[] {
+  return [...records].sort((left, right) =>
     (left.issue_identifier ?? left.issue_id).localeCompare(
       right.issue_identifier ?? right.issue_id
     )
@@ -1178,6 +1450,10 @@ function collectBacklogPromotionSnapshotsFromResult(
     return [];
   }
   const snapshotsByIssueId = new Map<string, ProviderOperatorAutopilotBacklogPromotionSnapshot>();
+  const prunedSnapshotKeys = collectPrunedBacklogPromotionSnapshotKeysFromResult(
+    result,
+    targetStateName
+  );
   const normalizedTarget = normalizeProviderLinearWorkflowState(targetStateName);
   for (const snapshot of result.backlog_promotion_snapshots ?? []) {
     if (
@@ -1192,23 +1468,60 @@ function collectBacklogPromotionSnapshotsFromResult(
         target_state: snapshot.target_state,
         attempted_at: snapshot.attempted_at,
         issue_updated_at: snapshot.issue_updated_at ?? null,
-        force_path_used: snapshot.force_path_used ?? false
+        force_path_used: snapshot.force_path_used ?? false,
+        untracked_cycles: normalizeNonNegativeInteger(snapshot.untracked_cycles)
       });
     }
   }
   for (const action of result.actions) {
     const snapshot = buildBacklogPromotionSnapshotFromAction(action, targetStateName);
-    if (snapshot) {
+    if (snapshot && !prunedSnapshotKeys.has(buildBacklogPromotionSnapshotKey(snapshot))) {
       snapshotsByIssueId.set(snapshot.issue_id, snapshot);
     }
   }
   for (const hold of result.holds) {
     const snapshot = buildBacklogPromotionSnapshotFromHold(hold, targetStateName);
-    if (snapshot) {
+    if (snapshot && !prunedSnapshotKeys.has(buildBacklogPromotionSnapshotKey(snapshot))) {
       snapshotsByIssueId.set(snapshot.issue_id, snapshot);
     }
   }
   return [...snapshotsByIssueId.values()];
+}
+
+function collectPrunedBacklogPromotionSnapshotKeysFromResult(
+  result: ProviderOperatorAutopilotResult,
+  targetStateName: string
+): Set<string> {
+  const keys = new Set<string>();
+  const normalizedTarget = normalizeProviderLinearWorkflowState(targetStateName);
+  for (const record of result.backlog_promotion_snapshot_retention_records ?? []) {
+    if (
+      record.decision === 'pruned' &&
+      normalizedTarget !== null &&
+      normalizeProviderLinearWorkflowState(record.target_state) === normalizedTarget &&
+      normalizeOptionalString(record.issue_id) &&
+      normalizeOptionalString(record.attempted_at)
+    ) {
+      keys.add(
+        buildBacklogPromotionSnapshotKey({
+          issue_id: record.issue_id,
+          target_state: record.target_state,
+          attempted_at: record.attempted_at
+        })
+      );
+    }
+  }
+  return keys;
+}
+
+function buildBacklogPromotionSnapshotKey(input: {
+  issue_id: string;
+  target_state: string;
+  attempted_at: string;
+}): string {
+  const normalizedTarget =
+    normalizeProviderLinearWorkflowState(input.target_state) ?? input.target_state;
+  return `${input.issue_id}\u0000${normalizedTarget}\u0000${input.attempted_at}`;
 }
 
 function buildBacklogPromotionSnapshotFromAction(
@@ -1231,7 +1544,8 @@ function buildBacklogPromotionSnapshotFromAction(
     target_state: action.transition.target_state,
     attempted_at: action.transition.attempted_at,
     issue_updated_at: action.transition.issue_updated_at,
-    force_path_used: action.transition.force_path_used ?? false
+    force_path_used: action.transition.force_path_used ?? false,
+    untracked_cycles: 0
   };
 }
 
@@ -1253,7 +1567,8 @@ function buildBacklogPromotionSnapshotFromHold(
     target_state: targetStateName,
     attempted_at: hold.promotion_attempted_at,
     issue_updated_at: hold.promotion_issue_updated_at ?? null,
-    force_path_used: hold.force_path_used ?? false
+    force_path_used: hold.force_path_used ?? false,
+    untracked_cycles: 0
   };
 }
 
@@ -1386,7 +1701,9 @@ function normalizeComparableResult(
     resolved_actions: result.resolved_actions ?? [],
     lifecycle_records: result.lifecycle_records ?? [],
     local_rollout_execution_attempts: result.local_rollout_execution_attempts ?? [],
-    backlog_promotion_snapshots: result.backlog_promotion_snapshots ?? []
+    backlog_promotion_snapshots: result.backlog_promotion_snapshots ?? [],
+    backlog_promotion_snapshot_retention_records:
+      result.backlog_promotion_snapshot_retention_records ?? []
   };
 }
 
@@ -1484,6 +1801,36 @@ function readStringArray(
     return normalized;
   }
   return null;
+}
+
+function readPositiveInteger(
+  record: Record<string, unknown> | null,
+  ...keys: string[]
+): number | null {
+  for (const key of keys) {
+    const value = record?.[key];
+    if (typeof value === 'number' && Number.isInteger(value) && value > 0) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function normalizeNonNegativeInteger(value: unknown): number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0
+    ? value
+    : 0;
+}
+
+function normalizeStringArray(values: string[]): string[] {
+  const normalized = values
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+  // Empty terminal_state_types is treated as unset; disabling terminal-state
+  // pruning is not supported because terminal evidence is the safest prune path.
+  return normalized.length > 0
+    ? normalized
+    : [...DEFAULT_BACKLOG_PROMOTION_SNAPSHOT_TERMINAL_STATE_TYPES];
 }
 
 function normalizeOptionalString(value: unknown): string | null {

@@ -17852,7 +17852,11 @@ describe('createProviderIssueHandoffService', () => {
         backlog_promotion: {
           enabled: true,
           state_name: 'Backlog',
-          target_state_name: 'Ready'
+          target_state_name: 'Ready',
+          snapshot_retention: {
+            max_untracked_cycles: 3,
+            terminal_state_types: ['completed', 'canceled']
+          }
         },
         review_handoff_rework: {
           enabled: true,
@@ -17926,7 +17930,11 @@ describe('createProviderIssueHandoffService', () => {
         backlog_promotion: {
           enabled: true,
           state_name: 'Backlog',
-          target_state_name: 'Ready'
+          target_state_name: 'Ready',
+          snapshot_retention: {
+            max_untracked_cycles: 3,
+            terminal_state_types: ['completed', 'canceled']
+          }
         },
         review_handoff_rework: {
           enabled: true,
@@ -18531,7 +18539,11 @@ describe('createProviderIssueHandoffService', () => {
         backlog_promotion: {
           enabled: true,
           state_name: 'Backlog',
-          target_state_name: 'Ready'
+          target_state_name: 'Ready',
+          snapshot_retention: {
+            max_untracked_cycles: 3,
+            terminal_state_types: ['completed', 'canceled']
+          }
         },
         review_handoff_rework: {
           enabled: true,
