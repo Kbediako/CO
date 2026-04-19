@@ -1731,6 +1731,106 @@ describe('providerOperatorAutopilot', () => {
     ]);
   });
 
+  it('preserves audit failure start markers when executable action ids are empty', async () => {
+    const claim = createClaim({
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-118',
+      merge_closeout: createMergeCloseout({
+        status: 'merged',
+        reason: 'merged_and_transitioned_done'
+      })
+    });
+    const firstRun = await runProviderOperatorAutopilot({
+      tracked_issues: [],
+      claims: [claim],
+      config: buildConfigWithLocalRolloutExecution(),
+      previous_result: null,
+      repo_root: process.cwd()
+    }, {
+      run_local_rollout_command: async () => ({
+        ok: true,
+        exitCode: 0,
+        stdout: 'ok',
+        stderr: ''
+      }),
+      append_local_rollout_execution_attempt: async (record) => {
+        if (record.record_kind === 'terminal') {
+          throw new Error('terminal audit write failed');
+        }
+      }
+    });
+    const disabledCommand = vi.fn(async () => {
+      throw new Error('disabled rollout action should not rerun');
+    });
+
+    const disabledRun = await runProviderOperatorAutopilot({
+      tracked_issues: [],
+      claims: [claim],
+      config: buildConfigWithLocalRolloutExecution({ enabled: false }),
+      previous_result: null,
+      lifecycle_records: [],
+      local_rollout_execution_attempts: firstRun.local_rollout_execution_attempts,
+      repo_root: process.cwd()
+    }, {
+      run_local_rollout_command: disabledCommand,
+      append_local_rollout_execution_attempt: appendExecutionAttemptNoop
+    });
+
+    expect(disabledCommand).not.toHaveBeenCalled();
+    expect(disabledRun.pending_actions).toMatchObject([
+      {
+        issue_identifier: 'CO-118',
+        executable_action_ids: []
+      }
+    ]);
+    expect(disabledRun.local_rollout_execution_attempts).toMatchObject([
+      {
+        record_kind: 'started',
+        action_id: 'local-rebuild',
+        terminal_state: 'failed',
+        reason: 'execution_interrupted'
+      },
+      {
+        record_kind: 'terminal',
+        action_id: 'local-rebuild',
+        terminal_state: 'failed',
+        reason: 'execution_audit_failed'
+      }
+    ]);
+
+    const reenabledCommand = vi.fn(async () => {
+      throw new Error('reenabled rollout action should reuse prior audit-failed attempt');
+    });
+    const reenabledRun = await runProviderOperatorAutopilot({
+      tracked_issues: [],
+      claims: [claim],
+      config: buildConfigWithLocalRolloutExecution(),
+      previous_result: null,
+      lifecycle_records: [],
+      local_rollout_execution_attempts: disabledRun.local_rollout_execution_attempts,
+      repo_root: process.cwd()
+    }, {
+      run_local_rollout_command: reenabledCommand,
+      append_local_rollout_execution_attempt: appendExecutionAttemptNoop
+    });
+
+    expect(reenabledCommand).not.toHaveBeenCalled();
+    expect(reenabledRun.local_rollout_execution_attempts).toMatchObject([
+      {
+        record_kind: 'started',
+        action_id: 'local-rebuild',
+        terminal_state: 'failed',
+        reason: 'execution_interrupted'
+      },
+      {
+        record_kind: 'terminal',
+        action_id: 'local-rebuild',
+        terminal_state: 'failed',
+        reason: 'execution_audit_failed'
+      }
+    ]);
+  });
+
   it('preserves lifecycle clear failure evidence when the action is disabled later', async () => {
     const claim = createClaim({
       issue_id: 'lin-issue-1',

@@ -310,6 +310,7 @@ export async function executeProviderOperatorAutopilotLocalRolloutActions(
       appendPriorAttemptsForActionInstance({
         target: relevantAttempts,
         priorByActionKey: priorByActionKeyForEmptyProjection,
+        priorAttemptsByActionKey,
         actionInstanceId: pendingAction.action_instance_id
       });
       continue;
@@ -435,13 +436,22 @@ export async function executeProviderOperatorAutopilotLocalRolloutActions(
 function appendPriorAttemptsForActionInstance(input: {
   target: ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord[];
   priorByActionKey: Map<string, ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord>;
+  priorAttemptsByActionKey: Map<
+    string,
+    ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord[]
+  >;
   actionInstanceId: string;
 }): void {
-  for (const attempt of input.priorByActionKey.values()) {
+  for (const [actionKey, attempt] of input.priorByActionKey.entries()) {
     if (attempt.action_instance_id !== input.actionInstanceId) {
       continue;
     }
-    input.target.push(cloneLocalRolloutExecutionAttempt(attempt));
+    input.target.push(
+      ...selectPriorExecutionAttemptsForReuse(
+        input.priorAttemptsByActionKey.get(actionKey) ?? [],
+        attempt
+      )
+    );
   }
 }
 
