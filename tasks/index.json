@@ -1,6 +1,33 @@
 {
   "items": [
     {
+      "id": "linear-c9e99e2c-bc48-48f1-a8ca-4bd2a9289be2",
+      "title": "CO-260 bounded unattended local_rollout executor",
+      "relates_to": "docs/PRD-CO-260-local-rollout-executor.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-19",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-19",
+          "status": "produced",
+          "source_anchor": "ctx:sha256:ecb20eb8e16ad47e418cdc8fe938edf8bb0d43a7f803cc128ea57992cb228951#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-260 as the bounded unattended local_rollout executor follow-on: execute only allowlisted repo-tracked post-merge local_rollout actions through operator-autopilot/control-host continuity, gate execution on authoritative merged-closeout truth, keep shared-root sync in merge closeout, reuse source-authoritative execution, record machine-readable attempts, resolve lifecycle only on success, and leave failed/skipped actions operator-visible with durable reason text. The source payload is present in the parent workspace."
+        }
+      },
+      "paths": {
+        "task": "tasks/tasks-linear-c9e99e2c-bc48-48f1-a8ca-4bd2a9289be2.md",
+        "spec": "tasks/specs/CO-260-local-rollout-executor.md",
+        "docs": "tasks/specs/CO-260-local-rollout-executor.md",
+        "prd": "docs/PRD-CO-260-local-rollout-executor.md",
+        "action_plan": "docs/ACTION_PLAN-CO-260-local-rollout-executor.md",
+        "agent_task": ".agent/task/linear-c9e99e2c-bc48-48f1-a8ca-4bd2a9289be2.md"
+      }
+    },
+    {
       "id": "20260419-linear-5348c2fb-8897-48e3-a848-7831778b1b00",
       "title": "CO workflow: restore Apr 19 spec/docs freshness baseline blocking unrelated handoffs",
       "relates_to": "tasks/tasks-linear-5348c2fb-8897-48e3-a848-7831778b1b00.md",

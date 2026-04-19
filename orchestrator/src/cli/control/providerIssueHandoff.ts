@@ -73,10 +73,18 @@ import {
   type ProviderOperatorAutopilotResult
 } from './providerOperatorAutopilot.js';
 import {
+  appendProviderOperatorAutopilotLifecycleRecord,
   readProviderOperatorAutopilotLifecycleRecords,
   resolveProviderOperatorAutopilotLifecyclePath,
   type ProviderOperatorAutopilotLifecycleRecord
 } from './providerOperatorAutopilotLifecycle.js';
+import {
+  appendProviderOperatorAutopilotLocalRolloutExecutionRecord,
+  cloneLocalRolloutExecutionAttempt,
+  readProviderOperatorAutopilotLocalRolloutExecutionRecords,
+  resolveProviderOperatorAutopilotLocalRolloutExecutionPath,
+  type ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord
+} from './providerOperatorAutopilotLocalRolloutExecution.js';
 import {
   runProviderTerminalCleanup,
   type ProviderTerminalCleanupConfig
@@ -289,15 +297,7 @@ export interface CreateProviderIssueHandoffServiceOptions {
     env?: NodeJS.ProcessEnv;
   }) => Promise<ProviderMergeCloseoutRecord>) | null;
   isProcessAlive?: ((pid: number) => boolean) | null;
-  runOperatorAutopilot?: ((input: {
-    tracked_issues: LiveLinearTrackedIssue[];
-    claims: ProviderIntakeClaimRecord[];
-    config: ProviderOperatorAutopilotConfig;
-    source_setup?: DispatchPilotSourceSetup | null;
-    env?: NodeJS.ProcessEnv;
-    previous_result?: ProviderOperatorAutopilotResult | null;
-    lifecycle_records?: ProviderOperatorAutopilotLifecycleRecord[];
-  }) => Promise<ProviderOperatorAutopilotResult>) | null;
+  runOperatorAutopilot?: typeof runProviderOperatorAutopilot | null;
   appendOperatorAutopilotAuditResult?: typeof appendProviderOperatorAutopilotAuditResult;
 }
 
@@ -4948,6 +4948,9 @@ export function createProviderIssueHandoffService(
     const autopilotLifecyclePath = resolveProviderOperatorAutopilotLifecyclePathFromPayload(
       providerWorkflow
     );
+    const autopilotExecutionPath = resolveProviderOperatorAutopilotExecutionPathFromPayload(
+      providerWorkflow
+    );
     const previousResult = resolveProviderOperatorAutopilotPreviousResultFromPayload(
       providerWorkflow
     );
@@ -4959,17 +4962,45 @@ export function createProviderIssueHandoffService(
       (Array.isArray(previousResult?.lifecycle_records)
         ? previousResult.lifecycle_records.map((record) => ({ ...record }))
         : []);
+    const executionRecordsForCycle =
+      await readProviderOperatorAutopilotExecutionRecordsForCycle(autopilotExecutionPath);
+    const localRolloutExecutionAttempts = resolveLocalRolloutExecutionAttemptsForCycle(
+      executionRecordsForCycle,
+      previousResult?.local_rollout_execution_attempts
+    );
+    const effectiveAutopilotConfig =
+      lifecycleRecordsForCycle === undefined || executionRecordsForCycle === undefined
+        ? disableProviderOperatorAutopilotLocalRolloutExecution(autopilotConfig)
+        : autopilotConfig;
     let nextResult: ProviderOperatorAutopilotResult;
     let loggedAutopilotFailure = false;
     try {
       nextResult = await runOperatorAutopilot({
         tracked_issues: input.pollInput.trackedIssues,
         claims: options.state.claims,
-        config: autopilotConfig,
+        config: effectiveAutopilotConfig,
         source_setup: input.sourceSetup,
         env: process.env,
         previous_result: previousResult,
-        lifecycle_records: lifecycleRecords
+        lifecycle_records: lifecycleRecords,
+        local_rollout_execution_attempts: localRolloutExecutionAttempts,
+        repo_root: resolve(options.paths.repoRoot)
+      },
+      {
+        append_local_rollout_execution_attempt: autopilotExecutionPath
+          ? (record) =>
+              appendProviderOperatorAutopilotLocalRolloutExecutionRecord(
+                autopilotExecutionPath,
+                record
+              ).then(() => undefined)
+          : undefined,
+        append_local_rollout_lifecycle_record: autopilotLifecyclePath
+          ? (record) =>
+              appendProviderOperatorAutopilotLifecycleRecord(
+                autopilotLifecyclePath,
+                record
+              ).then(() => undefined)
+          : undefined
       });
     } catch (error) {
       const message = (error as Error)?.message ?? String(error);
@@ -5010,7 +5041,10 @@ export function createProviderIssueHandoffService(
         lifecycle_records:
           autopilotConfig.post_merge_rollout.enabled
             ? lifecycleRecords.map((record) => ({ ...record }))
-            : []
+            : [],
+        local_rollout_execution_attempts: autopilotConfig.post_merge_rollout.enabled
+          ? localRolloutExecutionAttempts.map((record) => ({ ...record }))
+          : []
       };
       loggedAutopilotFailure = true;
       logger.warn(`[provider-operator-autopilot] ${nextResult.summary} error=${message}`);
@@ -6018,8 +6052,82 @@ function resolveProviderOperatorAutopilotPreviousResultFromPayload(
       : [],
     lifecycle_records: Array.isArray(record.lifecycle_records)
       ? (record.lifecycle_records as ProviderOperatorAutopilotResult['lifecycle_records'])
+      : [],
+    local_rollout_execution_attempts: Array.isArray(record.local_rollout_execution_attempts)
+      ? (record.local_rollout_execution_attempts as ProviderOperatorAutopilotResult['local_rollout_execution_attempts'])
       : []
   };
+}
+
+function resolveLocalRolloutExecutionAttemptsForCycle(
+  executionRecordsForCycle:
+    | ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord[]
+    | undefined,
+  previousAttempts:
+    | ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord[]
+    | undefined
+): ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord[] {
+  const previous = Array.isArray(previousAttempts)
+    ? previousAttempts.map(cloneLocalRolloutExecutionAttempt)
+    : [];
+  if (executionRecordsForCycle === undefined) {
+    return previous;
+  }
+  const current = executionRecordsForCycle.map(cloneLocalRolloutExecutionAttempt);
+  const terminalKeys = new Set(
+    current
+      .filter((attempt) => attempt.record_kind === 'terminal')
+      .map((attempt) => localRolloutExecutionAttemptKey(attempt))
+  );
+  const preservedFailureKeys = new Set(
+    current
+      .filter(
+        (attempt) => attempt.record_kind === 'terminal' && attempt.terminal_state === 'failed'
+      )
+      .map((attempt) => localRolloutExecutionAttemptFailureKey(attempt))
+  );
+  for (const attempt of previous) {
+    if (!shouldPreservePreviousLocalRolloutExecutionAttempt(attempt, terminalKeys)) {
+      continue;
+    }
+    const failureKey = localRolloutExecutionAttemptFailureKey(attempt);
+    if (!preservedFailureKeys.has(failureKey)) {
+      current.push(cloneLocalRolloutExecutionAttempt(attempt));
+      preservedFailureKeys.add(failureKey);
+    }
+  }
+  return current;
+}
+
+function shouldPreservePreviousLocalRolloutExecutionAttempt(
+  attempt: ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord,
+  currentTerminalKeys: ReadonlySet<string>
+): boolean {
+  if (attempt.record_kind !== 'terminal' || attempt.terminal_state !== 'failed') {
+    return false;
+  }
+  if (attempt.reason === 'execution_audit_failed') {
+    return !currentTerminalKeys.has(localRolloutExecutionAttemptKey(attempt));
+  }
+  return attempt.reason === 'lifecycle_record_failed';
+}
+
+function localRolloutExecutionAttemptKey(
+  attempt: Pick<
+    ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord,
+    'action_instance_id' | 'action_id'
+  >
+): string {
+  return `${attempt.action_instance_id}\u0000${attempt.action_id}`;
+}
+
+function localRolloutExecutionAttemptFailureKey(
+  attempt: Pick<
+    ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord,
+    'action_instance_id' | 'action_id' | 'reason'
+  >
+): string {
+  return `${localRolloutExecutionAttemptKey(attempt)}\u0000${attempt.reason ?? ''}`;
 }
 
 function resolveProviderOperatorAutopilotAuditPathFromPayload(
@@ -6045,6 +6153,22 @@ function resolveProviderOperatorAutopilotLifecyclePathFromPayload(
   return auditPath ? resolveProviderOperatorAutopilotLifecyclePath(dirname(auditPath)) : null;
 }
 
+function resolveProviderOperatorAutopilotExecutionPathFromPayload(
+  providerWorkflow: {
+    operator_autopilot?: unknown;
+  } | null
+): string | null {
+  const operatorAutopilot = resolveProviderOperatorAutopilotPayload(providerWorkflow);
+  const executionPath = operatorAutopilot?.execution_path;
+  if (typeof executionPath === 'string' && executionPath.trim().length > 0) {
+    return executionPath;
+  }
+  const auditPath = resolveProviderOperatorAutopilotAuditPathFromPayload(providerWorkflow);
+  return auditPath
+    ? resolveProviderOperatorAutopilotLocalRolloutExecutionPath(dirname(auditPath))
+    : null;
+}
+
 async function readProviderOperatorAutopilotLifecycleRecordsForCycle(
   lifecyclePath: string | null
 ): Promise<ProviderOperatorAutopilotLifecycleRecord[] | undefined> {
@@ -6063,6 +6187,39 @@ async function readProviderOperatorAutopilotLifecycleRecordsForCycle(
   }
 }
 
+async function readProviderOperatorAutopilotExecutionRecordsForCycle(
+  executionPath: string | null
+): Promise<ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord[] | undefined> {
+  if (!executionPath) {
+    return [];
+  }
+  try {
+    return await readProviderOperatorAutopilotLocalRolloutExecutionRecords(executionPath);
+  } catch (error) {
+    logger.warn(
+      `[provider-operator-autopilot] Failed to read local rollout execution records path=${executionPath}: ${
+        (error as Error)?.message ?? String(error)
+      }`
+    );
+    return undefined;
+  }
+}
+
+function disableProviderOperatorAutopilotLocalRolloutExecution(
+  config: ProviderOperatorAutopilotConfig
+): ProviderOperatorAutopilotConfig {
+  return {
+    ...config,
+    post_merge_rollout: {
+      ...config.post_merge_rollout,
+      execution: {
+        ...config.post_merge_rollout.execution,
+        enabled: false
+      }
+    }
+  };
+}
+
 function resolveProviderOperatorAutopilotPayload(
   providerWorkflow: {
     operator_autopilot?: unknown;
@@ -6070,6 +6227,7 @@ function resolveProviderOperatorAutopilotPayload(
 ): {
   audit_path?: unknown;
   lifecycle_path?: unknown;
+  execution_path?: unknown;
   last_result?: unknown;
 } | null {
   const operatorAutopilot = providerWorkflow?.operator_autopilot;
@@ -6079,6 +6237,7 @@ function resolveProviderOperatorAutopilotPayload(
   return operatorAutopilot as {
     audit_path?: unknown;
     lifecycle_path?: unknown;
+    execution_path?: unknown;
     last_result?: unknown;
   };
 }

@@ -24,6 +24,15 @@ import {
   cloneProviderOperatorAutopilotLifecycleRecord,
   type ProviderOperatorAutopilotLifecycleRecord
 } from './providerOperatorAutopilotLifecycle.js';
+import {
+  cloneLocalRolloutExecutionAttempt,
+  executeProviderOperatorAutopilotLocalRolloutActions,
+  resolveEnabledLocalRolloutExecutionActionIds,
+  resolveProviderOperatorAutopilotLocalRolloutExecutionConfig,
+  type ProviderOperatorAutopilotLocalRolloutCommandRunner,
+  type ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord,
+  type ProviderOperatorAutopilotLocalRolloutExecutionConfig
+} from './providerOperatorAutopilotLocalRolloutExecution.js';
 
 export const PROVIDER_OPERATOR_AUTOPILOT_AUDIT_FILENAME = 'provider-operator-autopilot.jsonl';
 export const DEFAULT_PROVIDER_OPERATOR_AUTOPILOT_PENDING_SUMMARY =
@@ -61,6 +70,7 @@ export interface ProviderOperatorAutopilotConfig {
   post_merge_rollout: {
     enabled: boolean;
     summary: string;
+    execution: ProviderOperatorAutopilotLocalRolloutExecutionConfig;
   };
 }
 
@@ -104,6 +114,7 @@ export interface ProviderOperatorAutopilotPendingActionRecord {
   merge_closeout_reason: string;
   shared_root_status: string | null;
   linear_transition_status: string | null;
+  executable_action_ids?: string[];
   lifecycle_state: 'pending' | 'acknowledged';
   lifecycle_actor: string | null;
   lifecycle_reason: string | null;
@@ -120,6 +131,7 @@ export interface ProviderOperatorAutopilotResolvedActionRecord {
   merge_closeout_reason: string;
   shared_root_status: string | null;
   linear_transition_status: string | null;
+  executable_action_ids?: string[];
   lifecycle_state: 'cleared' | 'dismissed';
   lifecycle_actor: string;
   lifecycle_reason: string;
@@ -136,11 +148,19 @@ export interface ProviderOperatorAutopilotResult {
   pending_actions: ProviderOperatorAutopilotPendingActionRecord[];
   resolved_actions?: ProviderOperatorAutopilotResolvedActionRecord[];
   lifecycle_records?: ProviderOperatorAutopilotLifecycleRecord[];
+  local_rollout_execution_attempts?: ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord[];
 }
 
 interface ProviderOperatorAutopilotDependencies {
   now?: () => string;
   transition_issue_state?: typeof transitionProviderLinearIssueState;
+  run_local_rollout_command?: ProviderOperatorAutopilotLocalRolloutCommandRunner;
+  append_local_rollout_execution_attempt?: (
+    record: ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord
+  ) => Promise<void>;
+  append_local_rollout_lifecycle_record?: (
+    record: ProviderOperatorAutopilotLifecycleRecord
+  ) => Promise<void>;
 }
 
 export function resolveProviderOperatorAutopilotAuditPath(runDir: string): string {
@@ -191,7 +211,8 @@ export function resolveProviderOperatorAutopilotConfig(
       enabled: readBoolean(postMergeRollout, 'enabled') ?? enabled,
       summary:
         readNonEmptyString(postMergeRollout, 'summary') ??
-        DEFAULT_PROVIDER_OPERATOR_AUTOPILOT_PENDING_SUMMARY
+        DEFAULT_PROVIDER_OPERATOR_AUTOPILOT_PENDING_SUMMARY,
+      execution: resolveProviderOperatorAutopilotLocalRolloutExecutionConfig(postMergeRollout)
     }
   };
 }
@@ -220,6 +241,8 @@ export async function runProviderOperatorAutopilot(
     env?: NodeJS.ProcessEnv;
     previous_result?: ProviderOperatorAutopilotResult | null;
     lifecycle_records?: ProviderOperatorAutopilotLifecycleRecord[];
+    local_rollout_execution_attempts?: ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord[];
+    repo_root?: string;
   },
   deps: ProviderOperatorAutopilotDependencies = {}
 ): Promise<ProviderOperatorAutopilotResult> {
@@ -236,7 +259,8 @@ export async function runProviderOperatorAutopilot(
       holds: [],
       pending_actions: [],
       resolved_actions: [],
-      lifecycle_records: []
+      lifecycle_records: [],
+      local_rollout_execution_attempts: []
     };
   }
 
@@ -281,7 +305,10 @@ export async function runProviderOperatorAutopilot(
       holds,
       pending_actions: effectiveLocalRolloutActions.pending_actions,
       resolved_actions: effectiveLocalRolloutActions.resolved_actions,
-      lifecycle_records: effectiveLocalRolloutActions.lifecycle_records
+      lifecycle_records: effectiveLocalRolloutActions.lifecycle_records,
+      local_rollout_execution_attempts: cloneLocalRolloutExecutionAttempts(
+        input.local_rollout_execution_attempts
+      )
     };
   }
   if (reviewHandoffOutcome.action) {
@@ -316,7 +343,10 @@ export async function runProviderOperatorAutopilot(
         holds,
         pending_actions: effectiveLocalRolloutActions.pending_actions,
         resolved_actions: effectiveLocalRolloutActions.resolved_actions,
-        lifecycle_records: effectiveLocalRolloutActions.lifecycle_records
+        lifecycle_records: effectiveLocalRolloutActions.lifecycle_records,
+        local_rollout_execution_attempts: cloneLocalRolloutExecutionAttempts(
+          input.local_rollout_execution_attempts
+        )
       };
     }
     if (backlogOutcome.action) {
@@ -327,11 +357,46 @@ export async function runProviderOperatorAutopilot(
     }
   }
 
-  const effectiveLocalRolloutActions = resolveEffectiveLocalRolloutActions({
+  let effectiveLocalRolloutActions = resolveEffectiveLocalRolloutActions({
     pendingActions,
     postMergeRolloutEnabled: input.config.post_merge_rollout.enabled,
     lifecycleRecords
   });
+  let localRolloutExecutionAttempts = cloneLocalRolloutExecutionAttempts(
+    input.local_rollout_execution_attempts
+  );
+  if (
+    input.config.post_merge_rollout.execution.enabled &&
+    effectiveLocalRolloutActions.pending_actions.length > 0
+  ) {
+    const executionOutcome = await executeProviderOperatorAutopilotLocalRolloutActions(
+      {
+        pendingActions: effectiveLocalRolloutActions.pending_actions,
+        config: input.config.post_merge_rollout.execution,
+        repoRoot: input.repo_root ?? process.cwd(),
+        priorAttempts: localRolloutExecutionAttempts
+      },
+      {
+        now,
+        runCommand: deps.run_local_rollout_command,
+        appendExecutionAttempt: deps.append_local_rollout_execution_attempt,
+        appendLifecycleRecord: deps.append_local_rollout_lifecycle_record
+      }
+    );
+    localRolloutExecutionAttempts = executionOutcome.attempts.map(
+      cloneLocalRolloutExecutionAttempt
+    );
+    if (executionOutcome.lifecycle_records.length > 0) {
+      lifecycleRecords.push(
+        ...executionOutcome.lifecycle_records.map(cloneProviderOperatorAutopilotLifecycleRecord)
+      );
+      effectiveLocalRolloutActions = resolveEffectiveLocalRolloutActions({
+        pendingActions,
+        postMergeRolloutEnabled: input.config.post_merge_rollout.enabled,
+        lifecycleRecords
+      });
+    }
+  }
   const hasTransitionedAction = actions.some(
     (action) => action.transition.status === 'transitioned'
   );
@@ -355,7 +420,8 @@ export async function runProviderOperatorAutopilot(
     holds,
     pending_actions: effectiveLocalRolloutActions.pending_actions,
     resolved_actions: effectiveLocalRolloutActions.resolved_actions,
-    lifecycle_records: effectiveLocalRolloutActions.lifecycle_records
+    lifecycle_records: effectiveLocalRolloutActions.lifecycle_records,
+    local_rollout_execution_attempts: localRolloutExecutionAttempts
   };
 }
 
@@ -684,7 +750,10 @@ function collectPendingActions(input: {
     }
     const nextAction = buildLocalRolloutPendingAction({
       claim,
-      summary: input.config.post_merge_rollout.summary
+      summary: input.config.post_merge_rollout.summary,
+      executableActionIds: resolveEnabledLocalRolloutExecutionActionIds(
+        input.config.post_merge_rollout.execution
+      )
     });
     const existingAction = pendingByIssueId.get(claim.issue_id) ?? null;
     if (
@@ -706,6 +775,7 @@ function collectPendingActions(input: {
 function buildLocalRolloutPendingAction(input: {
   claim: ProviderIntakeClaimRecord;
   summary: string;
+  executableActionIds: string[];
 }): ProviderOperatorAutopilotPendingActionRecord {
   const mergeCloseout = input.claim.merge_closeout;
   if (!mergeCloseout || mergeCloseout.status !== 'merged') {
@@ -725,6 +795,7 @@ function buildLocalRolloutPendingAction(input: {
     merge_closeout_reason: mergeCloseout.reason,
     shared_root_status: mergeCloseout.shared_root?.status ?? null,
     linear_transition_status: mergeCloseout.linear_transition?.status ?? null,
+    executable_action_ids: [...input.executableActionIds],
     lifecycle_state: 'pending',
     lifecycle_actor: null,
     lifecycle_reason: null,
@@ -968,8 +1039,15 @@ function normalizeComparableResult(
     holds: result.holds,
     pending_actions: result.pending_actions,
     resolved_actions: result.resolved_actions ?? [],
-    lifecycle_records: result.lifecycle_records ?? []
+    lifecycle_records: result.lifecycle_records ?? [],
+    local_rollout_execution_attempts: result.local_rollout_execution_attempts ?? []
   };
+}
+
+function cloneLocalRolloutExecutionAttempts(
+  attempts: ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord[] | null | undefined
+): ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord[] {
+  return (attempts ?? []).map(cloneLocalRolloutExecutionAttempt);
 }
 
 function clonePendingActionRecord(
@@ -985,6 +1063,7 @@ function clonePendingActionRecord(
     merge_closeout_reason: record.merge_closeout_reason,
     shared_root_status: record.shared_root_status,
     linear_transition_status: record.linear_transition_status,
+    executable_action_ids: [...(record.executable_action_ids ?? [])],
     lifecycle_state: record.lifecycle_state,
     lifecycle_actor: record.lifecycle_actor,
     lifecycle_reason: record.lifecycle_reason,
