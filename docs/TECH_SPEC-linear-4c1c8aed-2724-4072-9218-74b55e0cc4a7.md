@@ -8,7 +8,7 @@
 - Last review: `2026-04-20`
 - Source anchor: `ctx:sha256:3a42ae593f1afd8a89a2ee9ef88ad1acfe18d4db4930d453565ab22e66e7433b#chunk:c000001`
 - Declared shared source payload: `.runs/linear-4c1c8aed-2724-4072-9218-74b55e0cc4a7-docs-packet/cli/2026-04-19T18-52-58-375Z-f391d2b8/memory/source-0/source.txt`
-- Parent source payload: `.runs/linear-4c1c8aed-2724-4072-9218-74b55e0cc4a7/cli/2026-04-19T18-49-38-645Z-8e0e4d9a/memory/source-0/source.txt`
+- Parent source payload (worker-workspace relative): `../../.runs/linear-4c1c8aed-2724-4072-9218-74b55e0cc4a7/cli/2026-04-19T18-49-38-645Z-8e0e4d9a/memory/source-0/source.txt`
 - Child-lane caveat: the copied shared payload path is absent in this checkout; the parent source payload contains run metadata only, so the technical contract below preserves the parent-provided issue terms.
 
 ## Scope
