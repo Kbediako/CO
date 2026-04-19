@@ -162,9 +162,29 @@ function countMatches(text: string, pattern: RegExp): number {
 }
 
 function updateShellControlDepth(depth: number, line: string): number {
-  const openCount = countMatches(line, /(?:^|[;&]\s*)(?:if|while|until|case)\b/gu);
+  const openCount = countMatches(line, /(?:^|[;&]\s*)(?:for|if|while|until|case)\b/gu);
   const closeCount = countMatches(line, /(?:^|[;&]\s*)(?:fi|done|esac)\b/gu);
   return Math.max(0, depth + openCount - closeCount);
+}
+
+function getCommandSubstitutionDepth(text: string): number {
+  let depth = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    const current = text[index];
+    if (current === '\\') {
+      index += 1;
+      continue;
+    }
+    if (current === '$' && text[index + 1] === '(') {
+      depth += 1;
+      index += 1;
+      continue;
+    }
+    if (current === ')' && depth > 0) {
+      depth -= 1;
+    }
+  }
+  return depth;
 }
 
 function updateShellFunctionDepth(depth: number, line: string): number {
@@ -209,7 +229,7 @@ function hasPackSmokeCommand(run: string): boolean {
 }
 
 function hasOpenShellControlBlock(beforeOccurrence: string): boolean {
-  const openCount = countMatches(beforeOccurrence, /(?:^|[;&]\s*)(?:if|while|until|case)\b/gu);
+  const openCount = countMatches(beforeOccurrence, /(?:^|[;&]\s*)(?:for|if|while|until|case)\b/gu);
   const closeCount = countMatches(beforeOccurrence, /(?:^|[;&]\s*)(?:fi|done|esac)\b/gu);
   return openCount > closeCount;
 }
@@ -253,6 +273,10 @@ function isNegatedPackSmokeOccurrence(occurrence: PackSmokeCommandOccurrence): b
   );
 }
 
+function isCommandSubstitutionPackSmokeOccurrence(occurrence: PackSmokeCommandOccurrence): boolean {
+  return getCommandSubstitutionDepth(occurrence.line.slice(0, occurrence.commandStartIndex)) > 0;
+}
+
 function hasNonBlockingPackSmokeCommand(run: string): boolean {
   return getPackSmokeCommandOccurrences(run).some((occurrence) =>
     (
@@ -260,6 +284,7 @@ function hasNonBlockingPackSmokeCommand(run: string): boolean {
       isFunctionPackSmokeOccurrence(occurrence) ||
       isConstantShortCircuitPackSmokeOccurrence(occurrence) ||
       isNegatedPackSmokeOccurrence(occurrence) ||
+      isCommandSubstitutionPackSmokeOccurrence(occurrence) ||
       occurrence.hasErrexitDisabled ||
       nonBlockingPackSmokePattern.test(occurrence.line.slice(occurrence.endIndex))
     )
@@ -508,6 +533,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(hasNonBlockingPackSmokeCommand(`if test -f marker; then ${packSmokeCommand}; fi`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`if test -f marker; then\n  ${packSmokeCommand}\nfi`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`if test -f marker\nthen\n  ${packSmokeCommand}\nfi`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`for marker in "$MARKERS"; do\n  ${packSmokeCommand}\ndone`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`while false; do ${packSmokeCommand}; done`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`while false; do\n  ${packSmokeCommand}\ndone`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`if test -f marker; then\n  echo skip\nfi\n${packSmokeCommand}`)).toBe(false);
@@ -515,6 +541,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
       false
     );
     expect(hasNonBlockingPackSmokeCommand(`while false; do echo skip; done; ${packSmokeCommand}`)).toBe(false);
+    expect(hasNonBlockingPackSmokeCommand(`for marker in "$MARKERS"; do echo skip; done; ${packSmokeCommand}`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`cat <<EOF; ${packSmokeCommand} || true\nbody\nEOF`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`if ${packSmokeCommand} <<'EOF-MARK'; then echo ok; fi\nbody\nEOF-MARK`)).toBe(
       true
@@ -525,6 +552,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(hasNonBlockingPackSmokeCommand(`set +e; ${packSmokeCommand}`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`set +e\nset -e\n${packSmokeCommand}`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`! ${packSmokeCommand}`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`echo "$(${packSmokeCommand})"`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`npm run lint || true && ${packSmokeCommand}`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} -- --flag`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} 2>&1`)).toBe(false);
