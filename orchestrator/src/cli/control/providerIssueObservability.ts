@@ -197,6 +197,16 @@ interface ProviderIssueMergeCloseoutLike extends ProviderIssuePullRequestLifecyc
   issue_state?: string | null;
   issue_state_type?: string | null;
   issue_updated_at?: string | null;
+  linear_transition?: {
+    status?: string | null;
+    attempted_at?: string | null;
+    previous_state?: string | null;
+    target_state?: string | null;
+    issue_state?: string | null;
+    issue_state_type?: string | null;
+    issue_updated_at?: string | null;
+    error?: string | null;
+  } | null;
   shared_root?: {
     status?: string | null;
     reason?: string | null;
@@ -964,13 +974,19 @@ function resolveReworkResetUpdatedAt(input: {
   trackedWorkflowState: ReturnType<typeof classifyProviderLinearWorkflowState> | null;
   claimWorkflowState: ReturnType<typeof resolveClaimWorkflowStateClassification> | null;
 }): string | null {
-  if (input.trackedWorkflowState?.normalizedState === 'rework') {
-    return normalizeOptionalString(input.trackedIssue?.updated_at);
-  }
-  if (input.claimWorkflowState?.normalizedState === 'rework') {
-    return normalizeOptionalString(input.claim?.issue_updated_at);
-  }
-  return null;
+  const trackedIssueIsRework = input.trackedWorkflowState?.normalizedState === 'rework';
+  const canUseClaimReworkTruth = !input.trackedIssue || trackedIssueIsRework;
+  const claimWorkflowState = canUseClaimReworkTruth
+    ? input.claimWorkflowState ?? resolveClaimWorkflowStateClassification(input.claim)
+    : null;
+  return latestIsoTimestamp(
+    trackedIssueIsRework
+      ? normalizeOptionalString(input.trackedIssue?.updated_at)
+      : null,
+    claimWorkflowState?.normalizedState === 'rework'
+      ? normalizeOptionalString(input.claim?.issue_updated_at)
+      : null
+  );
 }
 
 function isPullRequestLifecycleSupersededByReworkReset(
@@ -991,7 +1007,26 @@ function isPullRequestLifecycleSupersededByReworkReset(
   if (!lifecycleUpdatedAt) {
     return false;
   }
-  return compareIsoTimestamp(reworkResetUpdatedAt, lifecycleUpdatedAt) >= 0;
+  const reworkResetComparison = compareIsoTimestamp(reworkResetUpdatedAt, lifecycleUpdatedAt);
+  if (
+    reworkResetComparison === 0 &&
+    isPullRequestLifecycleCurrentReworkTransition(record)
+  ) {
+    return false;
+  }
+  return reworkResetComparison >= 0;
+}
+
+function isPullRequestLifecycleCurrentReworkTransition(
+  record: ProviderIssuePullRequestLifecycleLike
+): boolean {
+  const lifecycle = record as ProviderIssueMergeCloseoutLike | ProviderIssueReviewPromotionLike;
+  const transition = lifecycle.linear_transition;
+  return [
+    normalizeOptionalString((lifecycle as ProviderIssueMergeCloseoutLike).issue_state),
+    normalizeOptionalString(transition?.target_state),
+    normalizeOptionalString(transition?.issue_state)
+  ].some((state) => normalizeProviderLinearWorkflowState(state) === 'rework');
 }
 
 function resolveClaimWorkflowStateClassification(

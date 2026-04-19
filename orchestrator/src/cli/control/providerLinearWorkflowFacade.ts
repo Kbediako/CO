@@ -1229,11 +1229,10 @@ function selectCurrentMergingPullRequestAttachment(
   const active = candidates.filter((candidate) => !isIssuePullRequestSnapshotTerminal(candidate.snapshot));
   if (active.length === 1) {
     const current = active[0]!;
-    const historical = terminal.filter((candidate) =>
-      isIssuePullRequestSnapshotStrictlyOlderThanSelection(candidate.snapshot, current.snapshot)
-    );
+    const historical = terminal.filter((candidate) => candidate.attachment.id !== current.attachment.id);
+    const historicalIds = new Set(historical.map((candidate) => candidate.attachment.id));
     const conflicting = candidates.filter(
-      (candidate) => candidate.attachment.id !== current.attachment.id && !historical.includes(candidate)
+      (candidate) => candidate.attachment.id !== current.attachment.id && !historicalIds.has(candidate.attachment.id)
     );
     if (conflicting.length === 0) {
       return {
@@ -4166,6 +4165,15 @@ function issueContextCacheRecordCarriesLivePrTruth(issue: ProviderLinearIssueCon
     state: issue.state?.name ?? null,
     state_type: issue.state?.type ?? null
   });
+  const githubPullRequestAttachmentCount = issue.attachments.filter((attachment) =>
+    parseGitHubPullRequestUrl(attachment.url)
+  ).length;
+  const classifiedPullRequestAttachmentCount = (
+    (issue.pull_request_attachments.current ? 1 : 0)
+    + issue.pull_request_attachments.historical.length
+    + issue.pull_request_attachments.conflicting.length
+    + issue.pull_request_attachments.unknown.length
+  );
   if (
     issue.pull_request_attachments.current
     || issue.pull_request_attachments.conflicting.length > 0
@@ -4173,16 +4181,19 @@ function issueContextCacheRecordCarriesLivePrTruth(issue: ProviderLinearIssueCon
   ) {
     return true;
   }
+  if (githubPullRequestAttachmentCount > classifiedPullRequestAttachmentCount) {
+    return true;
+  }
   if (workflowState.normalizedState === 'merging') {
     return (
       issue.pull_request_attachments.historical.length > 0
-      || issue.attachments.some((attachment) => parseGitHubPullRequestUrl(attachment.url))
+      || githubPullRequestAttachmentCount > 0
     );
   }
   if (issue.pull_request_attachments.historical.length > 0) {
     return false;
   }
-  if (issue.attachments.some((attachment) => parseGitHubPullRequestUrl(attachment.url))) {
+  if (githubPullRequestAttachmentCount > 0) {
     return true;
   }
   return false;

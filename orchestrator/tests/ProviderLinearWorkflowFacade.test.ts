@@ -688,6 +688,86 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it('bypasses degraded-headroom cache reuse when cached GitHub attachments lack structured PR truth', async () => {
+    const env = await createBudgetedRunScopedEnv();
+    const resetAt = String(Date.now() + 60_000);
+
+    await writeCachedIssueContext(
+      env,
+      buildCachedIssueContext({
+        title: 'Cached pre-attach issue context',
+        attachments: [buildGitHubAttachment('attachment-pr-560', 560)],
+        pull_request_attachments: {
+          current: null,
+          historical: [],
+          conflicting: [],
+          unknown: []
+        }
+      }),
+      {
+        recordedAt: new Date(Date.now() - 45_000).toISOString()
+      }
+    );
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'provider-linear:issue-context',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '5',
+        'x-ratelimit-requests-reset': resetAt
+      }
+    });
+
+    const fetchImpl: typeof fetch = vi.fn(async () =>
+      jsonResponse(
+        buildIssueContextBody({
+          identifier: 'CO-220',
+          title: 'Live post-attach issue context',
+          attachments: {
+            nodes: [buildGitHubAttachment('attachment-pr-560', 560)]
+          }
+        }),
+        200,
+        {
+          'x-ratelimit-requests-limit': '100',
+          'x-ratelimit-requests-remaining': '4',
+          'x-ratelimit-requests-reset': resetAt
+        }
+      )
+    );
+
+    const result = await getProviderLinearIssueContext({
+      issueId: 'lin-issue-1',
+      env,
+      allowReadOnlyCacheReuse: true,
+      fetchImpl,
+      resolvePullRequestSnapshot: async () => ({
+        state: 'OPEN',
+        mergedAt: null,
+        updatedAt: '2026-04-19T18:31:00.000Z'
+      })
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-220',
+        title: 'Live post-attach issue context',
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-560'
+          },
+          historical: [],
+          conflicting: [],
+          unknown: []
+        }
+      }
+    });
+    expect(result).not.toHaveProperty('cache_fallback_used');
+  });
+
   it('bypasses stale read-only cache reuse when cached structured current PR truth conflicts with a live Rework reset', async () => {
     const env = await createBudgetedRunScopedEnv();
     const resetAt = String(Date.now() + 60_000);
@@ -993,7 +1073,11 @@ describe('providerLinearWorkflowFacade', () => {
         }
       }
     });
-    expect(Boolean('cache_fallback_used' in result && result.cache_fallback_used === true)).toBe(cacheFallbackUsed);
+    if (cacheFallbackUsed) {
+      expect(result).toHaveProperty('cache_fallback_used', true);
+    } else {
+      expect(result).not.toHaveProperty('cache_fallback_used');
+    }
   });
 
   it('keeps degraded-headroom cache reuse opt-in so mutation-adjacent callers still live-read', async () => {
@@ -1430,9 +1514,9 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
-  it('keeps merge-state PR truth unresolved when candidates cannot be deterministically disambiguated', async () => {
+  it('keeps a single active merge-state PR current even when a retired PR closed later', async () => {
     const { result } = await readIssueContextAttachmentTruth({
-      title: 'Ambiguous merge-state PR truth',
+      title: 'Active merge-state PR truth with retired PR history',
       state: {
         id: 'state-merging',
         name: 'Merging',
@@ -1466,17 +1550,15 @@ describe('providerLinearWorkflowFacade', () => {
           type: 'started'
         },
         pull_request_attachments: {
-          current: null,
+          current: {
+            id: 'attachment-pr-360'
+          },
           historical: [
             {
               id: 'attachment-pr-372'
             }
           ],
-          conflicting: [
-            {
-              id: 'attachment-pr-360'
-            }
-          ],
+          conflicting: [],
           unknown: []
         }
       }
