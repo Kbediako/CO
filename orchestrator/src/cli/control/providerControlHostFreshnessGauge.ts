@@ -1,5 +1,5 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
-import { dirname, relative, resolve } from 'node:path';
+import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 
 import {
   readProviderLinearParallelizationSnapshots,
@@ -390,7 +390,8 @@ async function readGaugeArtifacts(
   const providerIntakeStates = await readJsonArtifacts(sources.provider_intake_state, findings);
   const latestProviderIntakeState = selectLatestJsonArtifact(providerIntakeStates);
   const claimLinkedSources = await discoverClaimLinkedRunArtifactSources(
-    latestProviderIntakeState ? [latestProviderIntakeState] : []
+    latestProviderIntakeState ? [latestProviderIntakeState] : [],
+    sources.artifact_root
   );
   appendUnique(sources.provider_manifests, claimLinkedSources.provider_manifests);
   appendUnique(sources.provider_proofs, claimLinkedSources.provider_proofs);
@@ -432,7 +433,8 @@ async function readGaugeArtifacts(
 }
 
 async function discoverClaimLinkedRunArtifactSources(
-  providerIntakeStates: JsonArtifact[]
+  providerIntakeStates: JsonArtifact[],
+  artifactRoot: string | null
 ): Promise<{
   provider_manifests: string[];
   provider_proofs: string[];
@@ -453,10 +455,13 @@ async function discoverClaimLinkedRunArtifactSources(
       if (!manifestPath) {
         continue;
       }
-      const resolvedManifestPath = await firstReadablePath([
-        resolve(dirname(artifact.path), manifestPath),
-        resolve(manifestPath)
-      ]);
+      const resolvedManifestPath = await firstReadablePath(
+        resolveClaimLinkedRunManifestPathCandidates({
+          artifact,
+          artifactRoot,
+          manifestPath
+        })
+      );
       if (!resolvedManifestPath) {
         continue;
       }
@@ -471,6 +476,34 @@ async function discoverClaimLinkedRunArtifactSources(
     provider_manifests,
     provider_proofs
   };
+}
+
+function resolveClaimLinkedRunManifestPathCandidates(input: {
+  artifact: JsonArtifact;
+  artifactRoot: string | null;
+  manifestPath: string;
+}): string[] {
+  if (isAbsolute(input.manifestPath)) {
+    return [input.manifestPath];
+  }
+  const bases = [
+    dirname(input.artifact.path),
+    input.artifactRoot,
+    findRepoRootFromRunsPath(input.artifact.path),
+    input.artifactRoot ? findRepoRootFromRunsPath(input.artifactRoot) : null
+  ];
+  return Array.from(new Set(
+    bases.flatMap((base) => (base ? [resolve(base, input.manifestPath)] : []))
+  ));
+}
+
+function findRepoRootFromRunsPath(path: string): string | null {
+  const parts = resolve(path).split(sep);
+  const runsIndex = parts.lastIndexOf('.runs');
+  if (runsIndex <= 0) {
+    return null;
+  }
+  return parts.slice(0, runsIndex).join(sep) || sep;
 }
 
 async function firstReadablePath(candidates: string[]): Promise<string | null> {

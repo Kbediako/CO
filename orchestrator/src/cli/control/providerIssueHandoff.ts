@@ -787,9 +787,26 @@ export function createProviderIssueHandoffService(
         if (isLifecycleStuckError && persistCompleted) {
           // Keep rehydrate's fallback snapshot aligned even if rollback persist fails.
           recordProviderStatePersistedSnapshot();
+          const rollbackMutationSnapshot = captureProviderStateSnapshot();
           try {
             await options.persist();
-            recordProviderStatePersistedSnapshot();
+            if (areProviderMutationSnapshotsEqual(captureProviderStateSnapshot(), rollbackMutationSnapshot)) {
+              recordProviderStatePersistedSnapshot();
+            } else {
+              // A replacement lifecycle advanced while the stale rollback write was in flight.
+              // Persist the current replacement state so durable state does not stay clobbered.
+              recordProviderStatePersistedSnapshot();
+              try {
+                await options.persist();
+                recordProviderStatePersistedSnapshot();
+              } catch (repairError) {
+                logger.warn(
+                  `[provider-intake] Failed to repair stale lifecycle rollback persist: ${
+                    (repairError as Error)?.message ?? String(repairError)
+                  }`
+                );
+              }
+            }
           } catch (rollbackError) {
             logger.warn(
               `[provider-intake] Failed to persist stale lifecycle rollback: ${

@@ -2858,6 +2858,90 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('repersists replacement state when stale rollback persist loses ownership while in flight', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:00:00.000Z'));
+
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(
+      createProviderClaim({
+        issue_id: 'lin-rollback-persist-race',
+        issue_identifier: 'CO-50',
+        state: 'accepted',
+        reason: 'provider_issue_handoff_owned'
+      })
+    );
+
+    let releaseMutationPersist: (() => void) | null = null;
+    let releaseRollbackPersist: (() => void) | null = null;
+    let persistCallCount = 0;
+    let persistedState = cloneProviderIntakeState(state);
+    const persist = vi.fn(async () => {
+      persistCallCount += 1;
+      const capturedState = cloneProviderIntakeState(state);
+      if (persistCallCount === 2) {
+        await new Promise<void>((resolve) => {
+          releaseMutationPersist = resolve;
+        });
+        persistedState = capturedState;
+        return;
+      }
+      if (persistCallCount === 3) {
+        await new Promise<void>((resolve) => {
+          releaseRollbackPersist = resolve;
+        });
+        persistedState = capturedState;
+        return;
+      }
+      persistedState = capturedState;
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      resolveTrackedIssue: vi.fn(async () => ({
+        kind: 'release' as const,
+        reason: 'provider_issue_not_ready:stale'
+      }))
+    });
+
+    const stalePoll = service.poll?.({
+      trackedIssues: []
+    });
+    await waitForMockCalls(persist, 2);
+
+    service.resetStuckRefreshLifecycle?.();
+    releaseMutationPersist?.();
+    await waitForMockCalls(persist, 3);
+
+    state.claims[0] = {
+      ...state.claims[0],
+      state: 'released',
+      reason: 'provider_issue_released:provider_issue_not_ready:fresh',
+      updated_at: '2026-03-19T04:01:00.000Z'
+    };
+    releaseRollbackPersist?.();
+
+    await expect(stalePoll).rejects.toThrow('provider_refresh_lifecycle_stuck');
+    expect(persist).toHaveBeenCalledTimes(4);
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-rollback-persist-race')).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:provider_issue_not_ready:fresh',
+      updated_at: '2026-03-19T04:01:00.000Z'
+    });
+    expect(persistedState.claims.find((claim) => claim.issue_id === 'lin-rollback-persist-race')).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:provider_issue_not_ready:fresh',
+      updated_at: '2026-03-19T04:01:00.000Z'
+    });
+  });
+
   it('rolls back a stale rehydrate claim mutation when the lifecycle reset lands during final persist', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-19T04:00:00.000Z'));

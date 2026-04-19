@@ -1,3 +1,5 @@
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -9,10 +11,12 @@ import { runControlHostFreshnessGaugeCliShell } from '../src/cli/controlHostFres
 
 const FIXTURE_ROOT = join(process.cwd(), 'orchestrator/tests/fixtures/provider-control-host-freshness');
 const NOW = '2026-04-14T06:00:00.000Z';
+const cleanupRoots: string[] = [];
 
-afterEach(() => {
+afterEach(async () => {
   vi.restoreAllMocks();
   process.exitCode = 0;
+  await Promise.all(cleanupRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
 describe('provider/control-host freshness gauge', () => {
@@ -515,6 +519,89 @@ describe('provider/control-host freshness gauge', () => {
       verdict: 'healthy',
       source_field: 'updated_at'
     });
+    expect(report.findings.map((finding) => finding.code)).not.toContain('active_worker_proof_missing');
+  });
+
+  it('resolves repo-relative claim run_manifest_path evidence from a .runs intake without using cwd', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'provider-freshness-repo-'));
+    cleanupRoots.push(repoRoot);
+    const controlHostRoot = join(repoRoot, '.runs/local-mcp/cli/control-host');
+    const runRoot = join(repoRoot, 'out/linear-claim-linked-proof/cli/run-claim-linked-proof');
+    await mkdir(controlHostRoot, { recursive: true });
+    await mkdir(runRoot, { recursive: true });
+    await writeFile(
+      join(controlHostRoot, 'provider-intake-state.json'),
+      JSON.stringify({
+        schema_version: 1,
+        updated_at: '2026-04-14T05:59:30.000Z',
+        polling: {
+          last_success_at: '2026-04-14T05:59:30.000Z',
+          stuck: false,
+          restart_required: false
+        },
+        claims: [
+          {
+            provider: 'linear',
+            provider_key: 'linear:claim-linked-proof',
+            issue_id: 'claim-linked-proof',
+            issue_identifier: 'CO-CLAIM-LINKED-PROOF',
+            issue_title: 'Running claim with repo-relative manifest proof',
+            issue_state: 'In Progress',
+            issue_state_type: 'started',
+            task_id: 'linear-claim-linked-proof',
+            mapping_source: 'provider_id_fallback',
+            state: 'running',
+            accepted_at: '2026-04-14T05:57:00.000Z',
+            updated_at: '2026-04-14T05:59:30.000Z',
+            run_id: 'run-claim-linked-proof',
+            run_manifest_path: 'out/linear-claim-linked-proof/cli/run-claim-linked-proof/manifest.json',
+            launch_started_at: '2026-04-14T05:57:10.000Z'
+          }
+        ]
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(runRoot, 'manifest.json'),
+      JSON.stringify({
+        run_id: 'run-claim-linked-proof',
+        status: 'running',
+        started_at: '2026-04-14T05:57:10.000Z',
+        heartbeat_at: '2026-04-14T05:59:45.000Z',
+        updated_at: '2026-04-14T05:59:45.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(runRoot, 'provider-linear-worker-proof.json'),
+      JSON.stringify({
+        run_id: 'run-claim-linked-proof',
+        attempt_started_at: '2026-04-14T05:57:10.000Z',
+        first_heartbeat_at: '2026-04-14T05:57:40.000Z',
+        current_turn_activity: {
+          recorded_at: '2026-04-14T05:59:45.000Z'
+        },
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        child_lanes: [],
+        updated_at: '2026-04-14T05:59:45.000Z'
+      }),
+      'utf8'
+    );
+
+    const report = await evaluateProviderControlHostFreshnessGauge({
+      artifactRoot: controlHostRoot,
+      now: NOW,
+      strict: true
+    });
+
+    expect(report.verdict).toBe('healthy');
+    expect(report.sources.provider_manifests).toEqual([
+      join(runRoot, 'manifest.json')
+    ]);
+    expect(report.sources.provider_proofs).toEqual([
+      join(runRoot, 'provider-linear-worker-proof.json')
+    ]);
     expect(report.findings.map((finding) => finding.code)).not.toContain('active_worker_proof_missing');
   });
 
