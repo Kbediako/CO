@@ -230,7 +230,7 @@ describe('QuestionChildResolutionAdapter', () => {
         return 0 as unknown as NodeJS.Timeout;
       }) as unknown as typeof setTimeout
     );
-    global.fetch = vi.fn((_url, options) => {
+    const fetchMock = vi.fn((_url, options) => {
       const signal = (options as { signal?: AbortSignal } | undefined)?.signal;
       return new Promise((_, reject) => {
         const abortHandler = () => {
@@ -244,7 +244,8 @@ describe('QuestionChildResolutionAdapter', () => {
         }
         signal?.addEventListener('abort', abortHandler);
       });
-    }) as typeof fetch;
+    });
+    global.fetch = fetchMock as typeof fetch;
 
     try {
       await expect(
@@ -257,6 +258,67 @@ describe('QuestionChildResolutionAdapter', () => {
       ).rejects.toThrow('child control request timeout');
     } finally {
       setTimeoutSpy.mockRestore();
+      global.fetch = originalFetch;
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('aborts child control requests when the current assertion fails while a request is in flight', async () => {
+    const { root, env, paths } = await createRunRoot('task-0940');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const tokenPath = join(paths.runDir, 'control_auth.json');
+    const endpointPath = join(paths.runDir, 'control_endpoint.json');
+    await writeFile(paths.manifestPath, JSON.stringify({ run_id: 'child-run' }), 'utf8');
+    await writeFile(tokenPath, JSON.stringify({ token: 'child-token' }), 'utf8');
+    await writeFile(
+      endpointPath,
+      JSON.stringify({ base_url: 'http://127.0.0.1:8123', token_path: tokenPath }),
+      'utf8'
+    );
+
+    const originalFetch = global.fetch;
+    let stale = false;
+    const staleError = new Error('provider_refresh_lifecycle_stuck');
+    staleError.name = 'ProviderRefreshLifecycleStuckError';
+    const assertCurrent = vi.fn(() => {
+      if (stale) {
+        throw staleError;
+      }
+    });
+    const fetchMock = vi.fn((_url, options) => {
+      const signal = (options as { signal?: AbortSignal } | undefined)?.signal;
+      return new Promise((_, reject) => {
+        const abortHandler = () => {
+          const error = new Error('aborted');
+          (error as Error & { name?: string }).name = 'AbortError';
+          reject(error);
+        };
+        if (signal?.aborted) {
+          abortHandler();
+          return;
+        }
+        signal?.addEventListener('abort', abortHandler);
+      });
+    });
+    global.fetch = fetchMock as typeof fetch;
+
+    try {
+      const request = callChildControlEndpoint({
+        manifestPath: paths.manifestPath,
+        payload: { action: 'resume' },
+        allowedRunRoots: config.ui.allowedRunRoots,
+        allowedBindHosts: config.ui.allowedBindHosts,
+        assertCurrent
+      });
+      await vi.waitFor(() => {
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+      });
+
+      stale = true;
+
+      await expect(request).rejects.toThrow('provider_refresh_lifecycle_stuck');
+      expect(assertCurrent).toHaveBeenCalled();
+    } finally {
       global.fetch = originalFetch;
       await rm(root, { recursive: true, force: true });
     }

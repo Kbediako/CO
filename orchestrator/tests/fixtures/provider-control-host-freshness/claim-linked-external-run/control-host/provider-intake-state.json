@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-04-14T05:59:30.000Z",
+  "polling": {
+    "last_success_at": "2026-04-14T05:59:30.000Z",
+    "stuck": false,
+    "restart_required": false
+  },
+  "claims": [
+    {
+      "provider": "linear",
+      "provider_key": "linear:claim-linked-proof",
+      "issue_id": "claim-linked-proof",
+      "issue_identifier": "CO-CLAIM-LINKED-PROOF",
+      "issue_title": "Running claim with external manifest proof",
+      "issue_state": "In Progress",
+      "issue_state_type": "started",
+      "task_id": "linear-claim-linked-proof",
+      "mapping_source": "provider_id_fallback",
+      "state": "running",
+      "accepted_at": "2026-04-14T05:57:00.000Z",
+      "updated_at": "2026-04-14T05:59:30.000Z",
+      "run_id": "run-claim-linked-proof",
+      "run_manifest_path": "../run/manifest.json",
+      "launch_started_at": "2026-04-14T05:57:10.000Z"
+    }
+  ]
+}

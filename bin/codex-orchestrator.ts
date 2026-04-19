@@ -1683,6 +1683,8 @@ Subcommands:
     --parity-lane                     Require a parity/alignment matrix for this follow-up.
     --parity-matrix <text>            Current/reference/target matrix (required when --parity-lane is set).
     --parity-matrix-file <path>       Read the parity/alignment matrix from a file (required when --parity-lane is set).
+    --canonical-owner-key <text>      Exact canonical owner key for reuse before creating a new issue.
+    --canonical-owner-key-file <path> Read the canonical owner key from a file.
     --blocked-by-source               Add blocker linkage when the follow-up depends on the source issue.
     --workspace-id <id>               Optional workspace scope check.
     --team-id <id>                    Optional team scope check.

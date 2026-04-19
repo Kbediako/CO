@@ -98,6 +98,7 @@ describe('startControlServerReadyInstanceLifecycle', () => {
       ])
     } as unknown as ControlRequestSharedContext;
     const server = {
+      listening: true,
       closeIdleConnections: vi.fn(() => {
         order.push('idle');
       }),
@@ -187,6 +188,7 @@ describe('closeControlServerOwnedRuntime', () => {
       })
     } as unknown as http.ServerResponse;
     const server = {
+      listening: true,
       closeIdleConnections: vi.fn(() => {
         order.push('idle');
       }),

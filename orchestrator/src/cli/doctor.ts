@@ -56,9 +56,7 @@ import type { EnvironmentPaths } from './run/environment.js';
 import type { TaskContext } from '../types.js';
 
 const require = createRequire(import.meta.url);
-const toml = require('@iarna/toml') as {
-  parse: (source: string) => unknown;
-};
+let tomlParser: { parse: (source: string) => unknown } | null | undefined;
 
 const OPTIONAL_DEPENDENCIES = [
   {
@@ -606,7 +604,7 @@ export function inspectCodexSandboxSecurityAdvisories(options: {
   if (existsSync(configPath)) {
     try {
       const raw = readFileSync(configPath, 'utf8');
-      const parsed = toml.parse(raw);
+      const parsed = getTomlParser().parse(raw);
       if (isRecord(parsed)) {
         const sandboxMode = normalizeOptionalString(readStringValue(parsed.sandbox_mode));
         if (sandboxMode === 'danger-full-access') {
@@ -1080,7 +1078,7 @@ function inspectCodexDefaultsAdvisory(env: NodeJS.ProcessEnv = process.env): Doc
   let parsed: Record<string, unknown>;
   try {
     const raw = readFileSync(configPath, 'utf8');
-    const value = toml.parse(raw);
+    const value = getTomlParser().parse(raw);
     if (!isRecord(value)) {
       throw new Error('top-level TOML document must be a table.');
     }
@@ -1148,6 +1146,22 @@ function inspectCodexDefaultsAdvisory(env: NodeJS.ProcessEnv = process.env): Doc
     legacy_max_spawn_depth: legacyMaxSpawnDepth,
     guidance
   };
+}
+
+function getTomlParser(): { parse: (source: string) => unknown } {
+  if (tomlParser) {
+    return tomlParser;
+  }
+  if (tomlParser === null) {
+    throw new Error('Failed to load @iarna/toml.');
+  }
+  try {
+    tomlParser = require('@iarna/toml') as { parse: (source: string) => unknown };
+    return tomlParser;
+  } catch (error) {
+    tomlParser = null;
+    throw error;
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

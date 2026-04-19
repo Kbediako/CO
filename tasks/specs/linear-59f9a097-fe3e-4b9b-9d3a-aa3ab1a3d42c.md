@@ -5,7 +5,7 @@ relates_to: docs/PRD-linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-17
+last_review: 2026-04-18
 ---
 
 ## Canonical Reference
@@ -20,25 +20,31 @@ last_review: 2026-04-17
 - Linear URL: https://linear.app/asabeko/issue/CO-211/control-host-prevent-repeated-refresh-stuck-restart-churn-while-active
 - Source anchor: `ctx:sha256:d4239a4784c1cf71c95ab480b4a3821dc2c83dc3648d3b8d4a8c5387ccdfb3f8#chunk:c000001`
 - Shared source-0 metadata anchor: `ctx:sha256:737c3cf3d517b1a44673a4ef90593a10f7303f6e022a667e75cceca113e8acb8#chunk:c000001`
+- Apr 18 recurrence source anchor: `ctx:sha256:6a9427aa000f73b2f7d86bab415ae29c6ebbeb9172e159c03bc6d29ae012ff52#chunk:c000001`
 - Shared source-0 note: this payload carries run metadata and prompt-pack provenance only; it is not the issue body.
+- Apr 18 source-0 note: the recurrence refresh payload also carries run metadata and prompt-pack provenance only; it is not the issue body.
 - Read-only issue-body source: `node /Users/kbediako/Code/CO/dist/bin/codex-orchestrator.js linear issue-context --issue-id 59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c --format json`
 - Docs packet child lane: `.runs/linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c-docs-packet/cli/2026-04-17T02-07-55-950Z-cb83673c/manifest.json`
+- Apr 18 docs refresh child lane: `.runs/linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c-docs-apr18-refresh/cli/2026-04-18T18-35-19-649Z-1ede381a/manifest.json`
+- Merged PR #506 commit: `e98d459f4dfdb47a22d981fedbf5ba11053d3a95` (`fix(control-host): quarantine repeated refresh-stuck restart churn`)
 
 ## Summary
-- Objective: stop repeated refresh-stuck restart churn from re-entering while active provider workers remain healthy, and make the churn sequence durable enough to audit without operator memory.
+- Objective: stop repeated refresh-stuck restart churn from re-entering while active provider workers remain healthy, make the churn sequence durable enough to audit without operator memory, and refresh the packet for Apr 18 recurrence evidence after merged PR #506.
 - Scope:
   - docs-first packet and registry/checklist mirrors for `CO-211`
   - machine-checkable restart/churn evidence with `owner rotations`, `refresh phases`, and `surviving provider workers`
   - phase/request/claim diagnostics around `stalled_after_ms=45000`
   - worker-preserving, no-request-burn recovery
   - post-recovery verification through `co-status --format json`
+  - parent-owned recurrence source fix for quarantined samples preserving fail-closed unhealthy streaks and diagnostic retention
 - Constraints:
   - keep `CO-210` child-lane manifest hydration semantics out of scope
   - preserve adjacent safeguards from `CO-194`, `CO-163`, `CO-179`, `CO-119`, and `CO-41`
+  - do not edit parent-owned source/tests for the Apr 18 recurrence fix in this docs child lane
   - child lane remains docs-only; parent owns implementation, tests, docs-review, validation, Linear/workpad reconciliation, PR, and merge
 
 ## Issue-Shaping Contract
-- User-request translation carried forward: repeated `provider_refresh_lifecycle_stuck` / `restart_required` recovery while active `CO-207` and `CO-210` provider workers remain healthy is a distinct control-host/provider lifecycle problem that needs its own machine-checkable evidence, diagnostics, and bounded fix.
+- User-request translation carried forward: repeated `provider_refresh_lifecycle_stuck` / `restart_required` recovery while active `CO-207` and `CO-210` provider workers remain healthy is a distinct control-host/provider lifecycle problem. PR #506 landed the initial quarantine, but Apr 18 recurrence evidence requires the parent source fix to keep quarantined samples from clearing fail-closed unhealthy streaks or dropping diagnostic retention while preserving machine-checkable evidence, diagnostics, and bounded recovery.
 - Protected terms / exact artifact and surface names:
   - `provider_refresh_lifecycle_stuck`
   - `restart_required`
@@ -78,6 +84,7 @@ last_review: 2026-04-17
   - read-only status can recover and show `polling.stuck=false` / `polling.restart_required=false`, but the restart churn itself is not yet owned end to end
 - Reference truth:
   - healthy active workers should not trigger repeated supervisor restart churn
+  - quarantined samples must not erase fail-closed unhealthy streaks or diagnostic retention
   - restart-series evidence should be artifact-backed and machine-checkable
   - fail-closed truth for genuine stuck refreshes must stay visible
   - request-budget/no-request-burn safeguards after `restart_required=true` remain authoritative
@@ -86,6 +93,7 @@ last_review: 2026-04-17
   - one durable artifact records restart series, `owner rotations`, `refresh phases`, `surviving provider workers`, current provider keys, and operation age
   - diagnostics identify the phase/request/claim class that exceeded `stalled_after_ms=45000`
   - the re-entry condition is fixed or quarantined so healthy active workers do not cause repeated restart churn
+  - quarantined samples preserve fail-closed unhealthy streaks and diagnostic retention after PR #506
   - `co-status --format json` verifies post-recovery truth with `polling.stuck=false`, `polling.restart_required=false`, and live provider workers visible
 - Explicitly out-of-scope differences:
   - `CO-210` manifest hydration semantics
@@ -99,10 +107,12 @@ last_review: 2026-04-17
   - supervisor still reaches `restart_required` every few minutes under active healthy workers
   - the fix only makes `co-status attach` reconnect after endpoint rotation
   - the fix suppresses `provider_refresh_lifecycle_stuck` without exposing or resolving the underlying lifecycle stall
+  - quarantined samples clear fail-closed unhealthy streaks or drop diagnostic retention
   - active provider workers are killed or restarted as part of recovery
   - `CO-210` child-lane manifest hydration semantics are changed
 - Pre-implementation issue-quality review evidence:
   - 2026-04-17: docs child lane read the current issue body through the packaged read-only `linear issue-context` helper and confirmed the issue is broader than attach-only or status-only recovery. The issue explicitly requires restart-series evidence, `owner rotations`, `refresh phases`, `surviving provider workers`, `stalled_after_ms=45000` diagnostics, worker-preserving recovery, request-budget/no-request-burn safety, and post-recovery `co-status --format json` truth while keeping `CO-210` manifest hydration semantics out of scope. The micro-task path is ineligible because correctness depends on exact protected terms, exact surfaces, and a cross-issue boundary with `CO-194`, `CO-163`, `CO-179`, `CO-119`, and `CO-41`.
+  - 2026-04-18: docs refresh child lane confirmed the supplied source-0 payload is metadata/provenance only and refreshed the packet from the parent prompt plus local git evidence that PR #506 merged as `e98d459f4dfdb47a22d981fedbf5ba11053d3a95`. The Apr 18 recurrence keeps the issue open for parent-owned source work on quarantined samples preserving fail-closed unhealthy streaks and diagnostic retention.
 - Safeguard ownership split:
   - child lane owns only the packet files and listed registry/checklist mirrors
   - parent lane owns source/test inspection, implementation, docs-review, validation, Linear/workpad reconciliation, PR lifecycle, and patch integration
@@ -115,14 +125,16 @@ last_review: 2026-04-17
   4. Add diagnostics that identify which refresh phase, request, or claim class exceeded `stalled_after_ms=45000`.
   5. Include operation age, queued/checking state, and current provider keys at the stuck boundary.
   6. Fix or quarantine the root re-entry condition so healthy active provider workers do not cause repeated supervisor restarts within normal polling cadence.
-  7. Preserve fail-closed truth: genuine stuck refreshes still set `provider_refresh_lifecycle_stuck` and `restart_required=true`.
-  8. Preserve worker safety: supervised recovery must not kill active `provider-linear-worker` issue processes.
-  9. Preserve request-budget/no-request-burn behavior from `CO-163` / `CO-179` after `restart_required=true`; do not add new direct issue-by-id burn in the same stuck pass.
-  10. Verify `co-status --format json` succeeds after recovery and reports `polling.stuck=false`, `polling.restart_required=false`, and live running provider workers.
-  11. Keep a focused no-regression path for `CO-194` stale terminal claims.
+  7. Keep quarantined samples diagnostic-retentive: no clearing fail-closed unhealthy streaks and no loss of diagnostic retention.
+  8. Preserve fail-closed truth: genuine stuck refreshes still set `provider_refresh_lifecycle_stuck` and `restart_required=true`.
+  9. Preserve worker safety: supervised recovery must not kill active `provider-linear-worker` issue processes.
+  10. Preserve request-budget/no-request-burn behavior from `CO-163` / `CO-179` after `restart_required=true`; do not add new direct issue-by-id burn in the same stuck pass.
+  11. Verify `co-status --format json` succeeds after recovery and reports `polling.stuck=false`, `polling.restart_required=false`, and live running provider workers.
+  12. Keep a focused no-regression path for `CO-194` stale terminal claims.
 - Non-functional requirements:
   - restart-series evidence must be machine-checkable and durable under `.runs/` or `out/`
   - diagnostics must be additive and safe to log
+  - diagnostic retention survives quarantine behavior
   - recovery must remain bounded; no tight restart loop
   - no worker kill/restart side effect for healthy active provider workers
   - no request-budget or issue-by-id burn regression after `restart_required=true`
@@ -138,6 +150,7 @@ last_review: 2026-04-17
 - Architecture / design adjustments:
   - add a narrow, durable restart/churn artifact rather than relying on operator memory or transient terminal logs
   - keep churn ownership on the lifecycle/recovery seam, not on `CO-210` manifest hydration or attach-only UX
+  - keep post-PR #506 recurrence ownership on the parent source fix, not on this docs child lane
   - use one authoritative diagnostic shape for phase/request/claim metadata at `stalled_after_ms=45000`
   - keep `co-status --format json` as post-recovery verification, not the sole source of churn evidence
 - Required artifact content:
@@ -153,6 +166,7 @@ last_review: 2026-04-17
   - post-recovery `polling.stuck` / `polling.restart_required` result
 - Data model changes / migrations:
   - prefer additive fields in existing JSON artifacts or a new bounded artifact under the issue task path
+  - parent-owned quarantine state may add or retain diagnostic fields only if fail-closed unhealthy streaks remain auditable
   - no schema changes to `CO-210` child-lane hydration semantics
 - External dependencies / integrations:
   - no Linear mutation from this child lane
@@ -164,6 +178,7 @@ last_review: 2026-04-17
   - `git diff --check -- docs/PRD-linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c.md tasks/specs/linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c.md docs/TECH_SPEC-linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c.md docs/ACTION_PLAN-linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c.md tasks/tasks-linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c.md .agent/task/linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c.md tasks/index.json docs/TASKS.md docs/docs-freshness-registry.json`
 - Parent-lane checks:
   - focused regression coverage for repeated restart churn
+  - focused recurrence coverage proving quarantined samples preserve fail-closed unhealthy streaks and diagnostic retention
   - focused no-regression coverage for `CO-194` stale terminal claims
   - manifest-backed docs-review before implementation
   - parent-selected implementation validation after source edits
@@ -175,8 +190,9 @@ last_review: 2026-04-17
 ## Open Questions
 - Which lifecycle seam should own the restart-series artifact so supervision, provider polling, and status all read the same truth?
 - Which request or claim classes are most likely to survive restart while healthy active workers remain alive?
-- Is the smallest safe fix a re-entry guard, a stale retained-state quarantine, or richer lifecycle classification at the stuck boundary?
+- Is the smallest safe parent-owned source fix a re-entry guard, a stale retained-state quarantine, or richer lifecycle classification at the stuck boundary?
+- How should quarantined samples expose preserved fail-closed unhealthy streaks and diagnostic retention without triggering another active-worker restart loop?
 
 ## Approvals
 - Reviewer: docs child lane self-review for packet shape and issue-shaping contract.
-- Date: 2026-04-17
+- Date: 2026-04-18

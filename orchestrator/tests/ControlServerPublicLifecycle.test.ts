@@ -8,6 +8,7 @@ import type { ControlRequestSharedContext } from '../src/cli/control/controlRequ
 import type { LiveLinearTrackedIssue } from '../src/cli/control/linearDispatchSource.js';
 import type { ProviderIssueHandoffPollInput } from '../src/cli/control/providerIssueHandoff.js';
 import {
+  beginClosingControlServerHttpServer,
   closeControlServerOwnedRuntime,
   startControlServerReadyInstanceLifecycle,
   type ControlServerOwnedLifecycleState
@@ -28,6 +29,7 @@ import {
 import { resolveLiveLinearTrackedIssues } from '../src/cli/control/linearDispatchSource.js';
 import { resolveLinearWebhookSourceSetup } from '../src/cli/control/linearWebhookController.js';
 import {
+  initializeProviderPollingHealth,
   markProviderPollingCompleted,
   markProviderPollingStarted,
   markProviderPollingStuck,
@@ -54,7 +56,8 @@ vi.mock('../src/cli/control/controlHostOwnership.js', () => ({
 
 vi.mock('../src/cli/control/controlServerReadyInstanceLifecycle.js', () => ({
   startControlServerReadyInstanceLifecycle: vi.fn(),
-  closeControlServerOwnedRuntime: vi.fn()
+  closeControlServerOwnedRuntime: vi.fn(),
+  beginClosingControlServerHttpServer: vi.fn(() => Promise.resolve())
 }));
 
 vi.mock('../src/cli/control/linearDispatchSource.js', () => ({
@@ -289,7 +292,7 @@ describe('startControlServerPublicLifecycle', () => {
     expect(release).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps the control-host ownership lock when runtime shutdown fails', async () => {
+  it('releases the control-host ownership lock when runtime shutdown fails', async () => {
     const release = vi.fn(async () => undefined);
     vi.mocked(closeControlServerOwnedRuntime).mockRejectedValueOnce(
       new Error('runtime shutdown failed')
@@ -311,7 +314,7 @@ describe('startControlServerPublicLifecycle', () => {
       'runtime shutdown failed'
     );
 
-    expect(release).not.toHaveBeenCalled();
+    expect(release).toHaveBeenCalledOnce();
   });
 
   it('triggers an immediate provider refresh, keeps the timer active, and clears it on shutdown', async () => {
@@ -893,6 +896,112 @@ describe('startControlServerPublicLifecycle', () => {
       stuck: true,
       restart_required: true,
       reason: 'provider_poll_lifecycle_stuck'
+    });
+  });
+
+  it('allows an explicit idle refresh retry to start after restart_required when requested', async () => {
+    const refresh = vi.fn(async () => undefined);
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => undefined),
+      refresh
+    };
+    const stuckError = new Error('provider_refresh_lifecycle_stuck');
+    stuckError.name = 'ProviderRefreshLifecycleStuckError';
+
+    markProviderPollingStarted(providerIssueHandoff, {
+      mode: 'refresh',
+      atMs: Date.parse('2026-03-22T09:00:00.000Z')
+    });
+    await markProviderPollingStuck(providerIssueHandoff, {
+      atMs: Date.parse('2026-03-22T09:00:45.000Z')
+    });
+    markProviderPollingCompleted(providerIssueHandoff, {
+      error: stuckError,
+      atMs: Date.parse('2026-03-22T09:00:45.000Z')
+    });
+
+    await expect(
+      runProviderIssueHandoffRefresh(providerIssueHandoff, {
+        allowIdleRestartRequiredRetry: true
+      })
+    ).resolves.toMatchObject({
+      queued: true,
+      coalesced: false
+    });
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
+      checking: false,
+      stuck: false,
+      restart_required: false,
+      last_error: null
+    });
+  });
+
+  it('allows an explicit refresh retry to replace an active stuck refresh operation', async () => {
+    let resolveFirstRefresh: (() => void) | null = null;
+    const firstRefresh = new Promise<void>((resolve) => {
+      resolveFirstRefresh = resolve;
+    });
+    const refresh = vi
+      .fn<() => Promise<void>>()
+      .mockImplementationOnce(async () => {
+        await firstRefresh;
+        const error = new Error('provider_refresh_lifecycle_stuck');
+        error.name = 'ProviderRefreshLifecycleStuckError';
+        throw error;
+      })
+      .mockImplementationOnce(async () => undefined);
+    const resetStuckRefreshLifecycle = vi.fn();
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => undefined),
+      refresh,
+      resetStuckRefreshLifecycle
+    };
+
+    const inFlightRefresh = runProviderIssueHandoffRefresh(providerIssueHandoff);
+    expect(refresh).toHaveBeenCalledTimes(1);
+    const queuedRefresh = runProviderIssueHandoffRefresh(providerIssueHandoff, {
+      queueIfBusy: true
+    });
+
+    await markProviderPollingStuck(providerIssueHandoff);
+    const retryOutcome = await runProviderIssueHandoffRefresh(providerIssueHandoff, {
+      queueIfBusy: true,
+      allowIdleRestartRequiredRetry: true
+    });
+
+    expect(retryOutcome).toMatchObject({
+      queued: true,
+      coalesced: false
+    });
+    expect(resetStuckRefreshLifecycle).toHaveBeenCalledTimes(1);
+    expect(refresh).toHaveBeenCalledTimes(2);
+    await expect(inFlightRefresh).resolves.toMatchObject({
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck'
+    });
+    await expect(queuedRefresh).resolves.toMatchObject({
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck'
+    });
+    expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
+      checking: false,
+      stuck: false,
+      restart_required: false,
+      last_error: null
+    });
+
+    resolveFirstRefresh?.();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
+      checking: false,
+      stuck: false,
+      restart_required: false,
+      last_error: null
     });
   });
 
@@ -2669,6 +2778,7 @@ describe('startControlServerPublicLifecycle', () => {
 describe('closeControlServerPublicLifecycle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useRealTimers();
   });
 
   it('delegates owned shutdown through the ready-instance lifecycle closer', async () => {
@@ -2686,7 +2796,93 @@ describe('closeControlServerPublicLifecycle', () => {
     expect(closeControlServerOwnedRuntime).toHaveBeenCalledWith({
       server: state.server,
       requestContextShared: state.requestContextShared,
-      lifecycleState: state.lifecycleState
+      lifecycleState: state.lifecycleState,
+      serverClosePromise: expect.any(Promise)
+    });
+    expect(beginClosingControlServerHttpServer).toHaveBeenCalledWith(state.server);
+  });
+
+  it('settles HTTP close and releases ownership when owned shutdown fails', async () => {
+    let resolveServerClose: () => void = () => undefined;
+    const serverClosePromise = new Promise<void>((resolve) => {
+      resolveServerClose = resolve;
+    });
+    const closeError = new Error('owned close failed');
+    const release = vi.fn(async () => undefined);
+    vi.mocked(beginClosingControlServerHttpServer).mockReturnValueOnce(serverClosePromise);
+    vi.mocked(closeControlServerOwnedRuntime).mockRejectedValueOnce(closeError);
+    const state = {
+      server: { kind: 'server' } as unknown as http.Server,
+      requestContextShared: { clients: new Set() } as unknown as ControlRequestSharedContext,
+      lifecycleState: {
+        expiryLifecycle: { close: vi.fn() },
+        bootstrapLifecycle: { close: vi.fn(async () => undefined) }
+      } as unknown as ControlServerOwnedLifecycleState,
+      controlHostOwnership: buildMockControlHostOwnershipHandle({ release })
+    } satisfies ControlServerPublicLifecycleState;
+
+    const closePromise = closeControlServerPublicLifecycle(state);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(release).not.toHaveBeenCalled();
+
+    resolveServerClose();
+    await expect(closePromise).rejects.toThrow('owned close failed');
+
+    expect(beginClosingControlServerHttpServer).toHaveBeenCalledWith(state.server);
+    expect(closeControlServerOwnedRuntime).toHaveBeenCalledWith({
+      server: state.server,
+      requestContextShared: state.requestContextShared,
+      lifecycleState: state.lifecycleState,
+      serverClosePromise
+    });
+    expect(release).toHaveBeenCalledOnce();
+  });
+
+  it('bounds shutdown when a stuck provider refresh never settles', async () => {
+    const resetStuckRefreshLifecycle = vi.fn();
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => undefined),
+      refresh: vi.fn(async () => {
+        await new Promise<void>(() => undefined);
+      }),
+      resetStuckRefreshLifecycle
+    };
+    initializeProviderPollingHealth(providerIssueHandoff, {
+      intervalMs: 15_000,
+      stuckAfterMs: 1,
+      skipInitialUpdate: true
+    });
+    await runProviderIssueHandoffRefresh(providerIssueHandoff, {
+      acknowledgeAccepted: true
+    });
+    const state = {
+      server: { kind: 'server' } as unknown as http.Server,
+      requestContextShared: {
+        clients: new Set(),
+        providerIssueHandoff
+      } as unknown as ControlRequestSharedContext,
+      lifecycleState: {
+        expiryLifecycle: { close: vi.fn() },
+        bootstrapLifecycle: { close: vi.fn(async () => undefined) }
+      } as unknown as ControlServerOwnedLifecycleState
+    } satisfies ControlServerPublicLifecycleState;
+
+    await markProviderPollingStuck(providerIssueHandoff);
+    expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
+      stuck: true,
+      reason: 'provider_refresh_lifecycle_stuck'
+    });
+
+    const closePromise = closeControlServerPublicLifecycle(state);
+    await expect(closePromise).resolves.toBeUndefined();
+
+    expect(resetStuckRefreshLifecycle).toHaveBeenCalledOnce();
+    expect(closeControlServerOwnedRuntime).toHaveBeenCalledWith({
+      server: state.server,
+      requestContextShared: state.requestContextShared,
+      lifecycleState: state.lifecycleState,
+      serverClosePromise: expect.any(Promise)
     });
   });
 
@@ -2752,7 +2948,9 @@ describe('closeControlServerPublicLifecycle', () => {
     expect(closeControlServerOwnedRuntime).toHaveBeenCalledWith({
       server: state.server,
       requestContextShared: state.requestContextShared,
-      lifecycleState: state.lifecycleState
+      lifecycleState: state.lifecycleState,
+      serverClosePromise: expect.any(Promise)
     });
+    expect(beginClosingControlServerHttpServer).toHaveBeenCalledWith(state.server);
   });
 });

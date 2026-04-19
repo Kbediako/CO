@@ -50,6 +50,7 @@ export interface ManifestBootstrapOptions {
 }
 
 interface ProviderControlHostLocator {
+  launchSource: string | null;
   taskId: string | null;
   runId: string | null;
 }
@@ -103,9 +104,9 @@ function resolveProviderControlHostLocatorFromEnv(
   const taskId = normalizeOptionalString(env[PROVIDER_CONTROL_HOST_TASK_ID_ENV]);
   const runId = normalizeOptionalString(env[PROVIDER_CONTROL_HOST_RUN_ID_ENV]);
   if (launchSource !== PROVIDER_LAUNCH_SOURCE_CONTROL_HOST || !taskId || !runId) {
-    return { taskId: null, runId: null };
+    return { launchSource: null, taskId: null, runId: null };
   }
-  return { taskId, runId };
+  return { launchSource, taskId, runId };
 }
 
 function normalizeOptionalString(value: unknown): string | null {
@@ -157,6 +158,7 @@ export async function bootstrapManifest(runId: string, options: ManifestBootstra
     issue_identifier: options.issueIdentifier ?? null,
     issue_updated_at: options.issueUpdatedAt ?? null,
     workspace_path: normalizeWorkspacePath(env.repoRoot),
+    provider_launch_source: providerControlHostLocator.launchSource,
     provider_control_host_task_id: providerControlHostLocator.taskId,
     provider_control_host_run_id: providerControlHostLocator.runId,
     summary: null,
@@ -277,6 +279,10 @@ export async function bootstrapManifest(runId: string, options: ManifestBootstra
 }
 
 export async function saveManifest(paths: RunPaths, manifest: CliManifest): Promise<void> {
+  const pipelineId = normalizeOptionalString(manifest.pipeline_id);
+  if (pipelineId === 'provider-linear-worker') {
+    backfillProviderControlHostLocatorFromEnv(manifest);
+  }
   manifest.updated_at = isoTimestamp();
   await writeJsonAtomic(paths.manifestPath, manifest);
 }
@@ -295,19 +301,37 @@ export async function loadManifest(env: EnvironmentPaths, runId: string): Promis
 
 export function backfillProviderControlHostLocatorFromEnv(
   manifest: CliManifest,
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  options: { overwriteConflicts?: boolean } = {}
 ): boolean {
   const locator = resolveProviderControlHostLocatorFromEnv(env);
-  if (!locator.taskId || !locator.runId) {
+  if (!locator.launchSource || !locator.taskId || !locator.runId) {
     return false;
   }
 
+  const manifestLaunchSource = normalizeOptionalString(manifest.provider_launch_source);
   const manifestTaskId = normalizeOptionalString(manifest.provider_control_host_task_id);
   const manifestRunId = normalizeOptionalString(manifest.provider_control_host_run_id);
-  if (manifestTaskId === locator.taskId && manifestRunId === locator.runId) {
+  if (
+    !options.overwriteConflicts &&
+    (
+      (manifestLaunchSource && manifestLaunchSource !== locator.launchSource) ||
+      (manifestTaskId && manifestTaskId !== locator.taskId) ||
+      (manifestRunId && manifestRunId !== locator.runId)
+    )
+  ) {
     return false;
   }
 
+  if (
+    manifestLaunchSource === locator.launchSource &&
+    manifestTaskId === locator.taskId &&
+    manifestRunId === locator.runId
+  ) {
+    return false;
+  }
+
+  manifest.provider_launch_source = locator.launchSource;
   manifest.provider_control_host_task_id = locator.taskId;
   manifest.provider_control_host_run_id = locator.runId;
   return true;

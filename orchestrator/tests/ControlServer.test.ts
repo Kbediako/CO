@@ -14,8 +14,10 @@ import {
   isLoopbackAddress
 } from '../src/cli/control/controlServer.js';
 import { computeEffectiveDelegationConfig } from '../src/cli/config/delegationConfig.js';
+import { PROVIDER_LINEAR_WORKER_PROOF_FILENAME } from '../src/cli/providerLinearWorkerRunner.js';
 import { resolveRunPaths } from '../src/cli/run/runPaths.js';
 import { RunEventStream } from '../src/cli/events/runEventStream.js';
+import { readProviderPollingHealth } from '../src/cli/control/providerPollingHealth.js';
 
 const originalCreateServer = http.createServer;
 const originalControlServerStart = ControlServer.start.bind(ControlServer);
@@ -202,6 +204,43 @@ async function seedProviderIntakeState(
       latest_provider_key: claims.at(-1)?.provider_key ?? null,
       latest_reason: claims.at(-1)?.reason ?? null,
       claims
+    }),
+    'utf8'
+  );
+}
+
+async function seedProviderLinearWorkerProof(
+  paths: Pick<ReturnType<typeof resolveRunPaths>, 'runDir'>,
+  overrides: Record<string, unknown> = {}
+): Promise<void> {
+  await writeFile(
+    join(paths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+    JSON.stringify({
+      issue_id: 'issue-1',
+      issue_identifier: 'ISSUE-1',
+      attempt_started_at: '2026-03-07T00:10:00.000Z',
+      pid: null,
+      thread_id: 'thread-1',
+      latest_turn_id: 'turn-1',
+      latest_session_id: 'thread-1-turn-1',
+      latest_session_id_source: 'derived_from_thread_and_turn',
+      turn_count: 1,
+      last_event: 'turn_running',
+      last_message: 'task is running',
+      last_event_at: '2026-03-07T00:10:00.000Z',
+      tokens: {
+        input_tokens: 1,
+        output_tokens: 1,
+        total_tokens: 2
+      },
+      rate_limits: {},
+      owner_phase: 'turn_running',
+      owner_status: 'in_progress',
+      workspace_path: null,
+      linear_audit: null,
+      end_reason: null,
+      updated_at: '2026-03-07T00:10:00.000Z',
+      ...overrides
     }),
     'utf8'
   );
@@ -2011,6 +2050,174 @@ describe('ControlServer', () => {
     }
   });
 
+  it('does not surface accepted pending-revalidation claims with dead local proofs in /ui/data.json running output', async () => {
+    const startedAt = '2026-04-16T10:00:00.000Z';
+    const updatedAt = '2026-04-16T10:05:00.000Z';
+    const { root, env, paths } = await createRunRoot('linear-lin-issue-219');
+    await seedManifest(paths, {
+      task_id: 'linear-lin-issue-219',
+      issue_provider: 'linear',
+      issue_id: 'lin-issue-219',
+      issue_identifier: 'CO-219',
+      pipeline_id: 'provider-linear-worker',
+      pipeline_title: 'Provider Linear Worker',
+      status: 'in_progress',
+      started_at: startedAt,
+      updated_at: updatedAt,
+      summary: 'stale provider worker still appears to be running'
+    });
+    await seedProviderIntakeState(paths, [
+      {
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-219',
+        issue_id: 'lin-issue-219',
+        issue_identifier: 'CO-219',
+        issue_title: 'Pending revalidation issue with stale local proof',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: updatedAt,
+        task_id: 'linear-lin-issue-219',
+        mapping_source: 'provider_id_fallback',
+        state: 'accepted',
+        reason: 'provider_issue_rehydration_pending_revalidation',
+        accepted_at: '2026-04-16T10:00:05.000Z',
+        updated_at: updatedAt,
+        last_delivery_id: 'delivery-co-219',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_744_768_300_000,
+        run_id: 'run-1',
+        run_manifest_path: paths.manifestPath,
+        launch_source: 'control-host',
+        launch_token: 'launch-co-219'
+      }
+    ]);
+    await seedProviderLinearWorkerProof(paths, {
+      issue_id: 'lin-issue-219',
+      issue_identifier: 'CO-219',
+      attempt_started_at: startedAt,
+      pid: '999999',
+      owner_phase: 'turn_running',
+      owner_status: 'in_progress',
+      last_event: 'turn_running',
+      last_message: 'dead local worker still reports running',
+      last_event_at: updatedAt,
+      updated_at: updatedAt,
+      workspace_path: root
+    });
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(uiRes.status).toBe(200);
+      const uiPayload = (await uiRes.json()) as {
+        counts?: { running?: number };
+        running?: Array<{ issue_identifier?: string }>;
+      };
+      expect(uiPayload.counts?.running).toBe(0);
+      expect(uiPayload.running).toEqual([]);
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not surface accepted pending-revalidation claims with stale local proofs in /ui/data.json running output', async () => {
+    const startedAt = '2026-04-16T10:00:00.000Z';
+    const updatedAt = '2026-04-16T10:05:00.000Z';
+    const { root, env, paths } = await createRunRoot('linear-lin-issue-220');
+    await seedManifest(paths, {
+      task_id: 'linear-lin-issue-220',
+      issue_provider: 'linear',
+      issue_id: 'lin-issue-220',
+      issue_identifier: 'CO-220',
+      pipeline_id: 'provider-linear-worker',
+      pipeline_title: 'Provider Linear Worker',
+      status: 'in_progress',
+      started_at: startedAt,
+      updated_at: updatedAt,
+      summary: 'accepted pending revalidation still points at an older attempt proof'
+    });
+    await seedProviderIntakeState(paths, [
+      {
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-220',
+        issue_id: 'lin-issue-220',
+        issue_identifier: 'CO-220',
+        issue_title: 'Pending revalidation issue with stale local proof',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: updatedAt,
+        task_id: 'linear-lin-issue-220',
+        mapping_source: 'provider_id_fallback',
+        state: 'accepted',
+        reason: 'provider_issue_rehydration_pending_revalidation',
+        accepted_at: '2026-04-16T10:00:05.000Z',
+        updated_at: updatedAt,
+        last_delivery_id: 'delivery-co-220',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_744_768_300_000,
+        run_id: 'run-1',
+        run_manifest_path: paths.manifestPath,
+        launch_source: 'control-host',
+        launch_token: 'launch-co-220'
+      }
+    ]);
+    await seedProviderLinearWorkerProof(paths, {
+      issue_id: 'lin-issue-220',
+      issue_identifier: 'CO-220',
+      attempt_started_at: '2026-04-16T09:55:00.000Z',
+      pid: '999999',
+      owner_phase: 'turn_running',
+      owner_status: 'in_progress',
+      last_event: 'turn_running',
+      last_message: 'older attempt proof still reports running',
+      last_event_at: '2026-04-16T09:55:00.000Z',
+      updated_at: '2026-04-16T09:55:00.000Z',
+      workspace_path: root
+    });
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(uiRes.status).toBe(200);
+      const uiPayload = (await uiRes.json()) as {
+        counts?: { running?: number };
+        running?: Array<{ issue_identifier?: string }>;
+      };
+      expect(uiPayload.counts?.running).toBe(0);
+      expect(uiPayload.running).toEqual([]);
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('resolves same-issue multi-run compatibility lookups while leaving ui data on the selected run', async () => {
     const { root, env, paths } = await createRunRoot('task-1035-current');
     await seedManifest(paths, {
@@ -2840,6 +3047,279 @@ describe('ControlServer', () => {
       expect(after.latest_action ?? null).toEqual(before.latest_action ?? null);
     } finally {
       await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('waits for read-only refresh polling health writes before close returns', async () => {
+    const { root, env, paths } = await createRunRoot('task-0940');
+    await seedManifest(paths, { summary: 'task is running' });
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const providerIntakeStatePath = join(paths.runDir, 'provider-intake-state.json');
+    const originalWriteJsonAtomic = fsUtils.writeJsonAtomic;
+    let providerIntakeWrites = 0;
+    let blockProviderPollingWrite = false;
+    let releaseBlockedWrite: (() => void) | null = null;
+    let resolveFirstProviderIntakeWrite: () => void = () => undefined;
+    let resolveBlockedProviderPollingWrite: () => void = () => undefined;
+    const firstProviderIntakeWrite = new Promise<void>((resolve) => {
+      resolveFirstProviderIntakeWrite = resolve;
+    });
+    const blockedProviderPollingWrite = new Promise<void>((resolve) => {
+      resolveBlockedProviderPollingWrite = resolve;
+    });
+    const writeSpy = vi.spyOn(fsUtils, 'writeJsonAtomic').mockImplementation(async (...args) => {
+      const [path] = args as Parameters<typeof fsUtils.writeJsonAtomic>;
+      if (path === providerIntakeStatePath) {
+        providerIntakeWrites += 1;
+        if (providerIntakeWrites === 1) {
+          resolveFirstProviderIntakeWrite();
+        }
+        if (blockProviderPollingWrite && !releaseBlockedWrite) {
+          resolveBlockedProviderPollingWrite();
+          await new Promise<void>((release) => {
+            releaseBlockedWrite = release;
+          });
+          blockProviderPollingWrite = false;
+        }
+      }
+      return originalWriteJsonAtomic(...args);
+    });
+    const refreshProviderIssues = vi.fn(async () => undefined);
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1',
+      createProviderIssueHandoff: () => ({
+        handleAcceptedTrackedIssue: vi.fn(),
+        rehydrate: vi.fn(async () => undefined),
+        refresh: refreshProviderIssues
+      })
+    });
+    let closePromise: Promise<void> | null = null;
+
+    try {
+      await firstProviderIntakeWrite;
+      blockProviderPollingWrite = true;
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+
+      const refreshRes = await fetch(new URL('/api/v1/refresh', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action: 'refresh' })
+      });
+      expect(refreshRes.status).toBe(202);
+      await blockedProviderPollingWrite;
+
+      let closeResolved = false;
+      closePromise = server.close().then(() => {
+        closeResolved = true;
+      });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(closeResolved).toBe(false);
+
+      releaseBlockedWrite?.();
+      await closePromise;
+      expect(closeResolved).toBe(true);
+    } finally {
+      releaseBlockedWrite?.();
+      if (closePromise) {
+        await closePromise.catch(() => undefined);
+      } else {
+        await server.close().catch(() => undefined);
+      }
+      writeSpy.mockRestore();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('stops accepting read-only refresh requests while close drains provider work', async () => {
+    const { root, env, paths } = await createRunRoot('task-0940');
+    await seedManifest(paths, { summary: 'task is running' });
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    let blockRefresh = false;
+    let releaseRefresh: (() => void) | null = null;
+    let resolveRefreshStarted: () => void = () => undefined;
+    const refreshStarted = new Promise<void>((resolve) => {
+      resolveRefreshStarted = resolve;
+    });
+    const refreshProviderIssues = vi.fn(async () => {
+      if (!blockRefresh) {
+        return;
+      }
+      resolveRefreshStarted();
+      await new Promise<void>((resolve) => {
+        releaseRefresh = resolve;
+      });
+    });
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1',
+      createProviderIssueHandoff: () => ({
+        handleAcceptedTrackedIssue: vi.fn(),
+        rehydrate: vi.fn(async () => undefined),
+        refresh: refreshProviderIssues
+      })
+    });
+    let closePromise: Promise<void> | null = null;
+
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      const refreshCallsBefore = refreshProviderIssues.mock.calls.length;
+      blockRefresh = true;
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const refreshUrl = new URL('/api/v1/refresh', baseUrl);
+
+      const refreshRes = await fetch(refreshUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action: 'refresh' })
+      });
+      expect(refreshRes.status).toBe(202);
+      await refreshRes.text();
+      await refreshStarted;
+
+      closePromise = server.close();
+      const refreshRejectedDuringClose = await new Promise<boolean>((resolve) => {
+        let settled = false;
+        const settle = (value: boolean): void => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          resolve(value);
+        };
+        const request = http.request(
+          refreshUrl,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'x-csrf-token': token,
+              'Content-Type': 'application/json'
+            },
+            timeout: 1_000
+          },
+          (response) => {
+            response.resume();
+            response.on('end', () => settle(false));
+          }
+        );
+        request.on('error', (error: NodeJS.ErrnoException) => {
+          settle(error.code === 'ECONNREFUSED' || error.code === 'ECONNRESET');
+        });
+        request.on('timeout', () => {
+          settle(false);
+          request.destroy();
+        });
+        request.end(JSON.stringify({ action: 'refresh' }));
+      });
+      expect(refreshRejectedDuringClose).toBe(true);
+
+      releaseRefresh?.();
+      await closePromise;
+      expect(refreshProviderIssues).toHaveBeenCalledTimes(refreshCallsBefore + 1);
+    } finally {
+      releaseRefresh?.();
+      if (closePromise) {
+        await closePromise.catch(() => undefined);
+      } else {
+        await server.close().catch(() => undefined);
+      }
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('reuses the elapsed read-only refresh watchdog budget while closing', async () => {
+    const startedAtMs = Date.parse('2026-03-06T03:01:00.000Z');
+    let nowMs = startedAtMs;
+    const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => nowMs);
+    const { root, env, paths } = await createRunRoot('task-0940');
+    await seedManifest(paths, { summary: 'task is running' });
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    let blockRefresh = false;
+    let releaseRefresh: (() => void) | null = null;
+    let resolveRefreshStarted: () => void = () => undefined;
+    const refreshStarted = new Promise<void>((resolve) => {
+      resolveRefreshStarted = resolve;
+    });
+    const refreshProviderIssues = vi.fn(async () => {
+      if (!blockRefresh) {
+        return;
+      }
+      resolveRefreshStarted();
+      await new Promise<void>((resolve) => {
+        releaseRefresh = resolve;
+      });
+    });
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => undefined),
+      refresh: refreshProviderIssues
+    };
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1',
+      createProviderIssueHandoff: () => providerIssueHandoff
+    });
+    let closePromise: Promise<void> | null = null;
+    let closeResolved = false;
+
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      blockRefresh = true;
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const refreshRes = await fetch(new URL('/api/v1/refresh', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action: 'refresh' })
+      });
+      expect(refreshRes.status).toBe(202);
+      await refreshRes.text();
+      await refreshStarted;
+
+      nowMs = startedAtMs + 44_950;
+      closePromise = server.close().then(() => {
+        closeResolved = true;
+      });
+      setTimeout(() => {
+        nowMs = startedAtMs + 45_001;
+      }, 25);
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
+        stuck: true,
+        reason: 'provider_refresh_lifecycle_stuck'
+      });
+      expect(closeResolved).toBe(false);
+      releaseRefresh?.();
+      await closePromise;
+      expect(closeResolved).toBe(true);
+    } finally {
+      releaseRefresh?.();
+      if (closePromise) {
+        await closePromise.catch(() => undefined);
+      } else {
+        await server.close().catch(() => undefined);
+      }
+      nowSpy.mockRestore();
       await rm(root, { recursive: true, force: true });
     }
   });
@@ -7623,7 +8103,7 @@ describe('ControlServer', () => {
     }
   });
 
-  it('closes owned runtime state in order and resets lifecycle fields', async () => {
+  it('starts HTTP close before closing owned runtime state and resets lifecycle fields', async () => {
     const { root, env, paths } = await createRunRoot('task-0940');
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
     const order: string[] = [];
@@ -7680,7 +8160,7 @@ describe('ControlServer', () => {
       expect(expiryClose).toHaveBeenCalledOnce();
       expect(bootstrapClose).toHaveBeenCalledOnce();
       expect(clientEnd).toHaveBeenCalledOnce();
-      expect(order).toEqual(['expiry', 'bootstrap', 'client', 'server']);
+      expect(order).toEqual(['server', 'expiry', 'bootstrap', 'client']);
       expect(runtimeServer.lifecycleState.expiryLifecycle).toBeNull();
       expect(runtimeServer.lifecycleState.bootstrapLifecycle).toBeNull();
     } finally {

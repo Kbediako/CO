@@ -15,9 +15,7 @@ Current CO policy:
 - Maximum active rolling cohorts: `2`
 - Maximum rolling rows: `300`
 - Eligible doc classes: `Task Packet`, `Task Mirror`, and `Report Only`
-- Declared baseline cohorts:
-  - `co-175-apr-14-march-14-tasks-1164-1195`
-  - `co-175-apr-18-march-18-cli-1289-1298`
+- Declared baseline cohort: `co-175-apr-14-march-14-tasks-1164-1195`
 - Ineligible docs: Front Door, Public Guide, Repository Guide, Agent Policy, Active Guide, shipped skills, companions, templates, and uncatalogued docs
 
 Eligibility is not class-only. A stale row must match a declared baseline cohort by `last_review`, `cadence_days`, path family, and either task-number range or declared path prefix before it can move from blocking stale failures into rolling debt. This prevents a newly stale feature-lane packet from being hidden just because it is in an eligible doc class and still inside the rolling window.
@@ -136,23 +134,35 @@ CO-209 reproduced the Apr 17 baseline failure in `out/linear-901cd944-fc0c-4372-
 
 The Apr 17 blocking cohort was reviewed in `docs/findings/linear-901cd944-fc0c-4372-92ce-65bb8bb411c0-docs-freshness-classification.md` and refreshed instead of added to rolling deferral. Adding the `263` rows beside the existing CO-175 `221` rows would create `484` candidate rows and `8` candidate cohorts, exceeding both `max_entries=300` and `max_cohorts=2`, so CO-209 keeps the rolling policy unchanged and updates only the reviewed historical packet rows to `last_review=2026-04-17`.
 
-## Apr 18 Reopened Owner Update
-CO-175 reopened on Apr 18 when current main at `b678ce4e41ccc17b8715d65fb6a48cc0ed389059` reported:
+## Apr 18 Reviewed Refresh
+CO-239 reproduced the Apr 18 baseline failure in `out/linear-a710d9a7-5187-414d-8a8b-beab7853e446/before/docs-freshness.json`:
 
-- `70` blocking stale entries outside the then-declared CO-175 rolling cohort
+- `70` blocking stale entries outside the CO-175 rolling cohort
 - `221` CO-175 rolling cohort entries still visible
 - `0` missing registry rows
 - `0` missing-on-disk rows
 - `0` invalid registry entries
 - `0` uncatalogued docs
 - blocking classes: Task Packet `50`, Task Mirror `10`, Report Only `10`
-- blocking path families: `.agent/task` `10`, `tasks/specs` `10`, `tasks/tasks-*` `10`, `docs/findings` `10`, `docs/PRD-*` `10`, `docs/TECH_SPEC-*` `10`, `docs/ACTION_PLAN-*` `10`
-- candidate cohort: `last_review=2026-03-18`, `cadence_days=30`, `age_days=31`, `lineage=1289-1298`
+- blocking path families: `.agent/task` `10`, `docs/findings` `10`, `tasks/specs` `10`, `tasks/tasks-*` `10`, `docs/PRD-*` `10`, `docs/TECH_SPEC-*` `10`, `docs/ACTION_PLAN-*` `10`
+- date cohort: `2026-03-18` / `30` days (`70` rows)
+- lineage: `1289-1298`
 
-The saved before-artifacts are:
+The Apr 18 blocking cohort was reviewed in `docs/findings/linear-a710d9a7-5187-414d-8a8b-beab7853e446-docs-freshness-classification.md` and refreshed instead of added to rolling deferral. Adding the `70` rows beside the existing CO-175 `221` rows would create `291` candidate rows and `8` candidate cohorts, staying within `max_entries=300` but still exceeding `max_cohorts=2`, so CO-239 keeps the rolling policy unchanged and updates only the reviewed historical packet rows to `last_review=2026-04-18`.
 
-- `out/linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8/manual/apr18-before-docs-freshness.json`
-- `out/linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8/manual/apr18-before-docs-freshness.md`
-- `out/linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8/manual/apr18-before-maintenance.json`
+## Apr 19 Reviewed Refresh
+CO-254 reproduced the Apr 19 baseline failure in `out/linear-5348c2fb-8897-48e3-a848-7831778b1b00/before/docs-freshness.json`:
 
-`docs:freshness:maintain` classified the shape as `block_policy_over_budget`, not because of row count (`291 <= 300`), but because the undeclared March 18 packet split into `7` per-path-family candidate cohorts beside the existing Apr 14 cohort. CO-175 resolves that by declaring a second explicit baseline cohort, `co-175-apr-18-march-18-cli-1289-1298`, for the March 18 `1289-1298` CLI packet family. The cohort stays narrow by combining the numeric task range for numbered packet surfaces with exact declared PRD / TECH_SPEC / ACTION_PLAN file paths for the three doc families that do not carry task ids in their filenames. This keeps the repo-wide debt machine-visible under the same owner issue, uses the existing `2`-cohort / `300`-row cap without expanding policy, and lets unrelated clean feature diffs pass again while the owned cohorts stay visible through their expiry dates (`2026-04-20` for the Apr 14 cohort and `2026-04-24` for the Apr 18 cohort).
+- `47` blocking stale entries outside the CO-175 rolling cohort
+- `221` CO-175 rolling cohort entries still visible
+- `0` missing registry rows
+- `0` missing-on-disk rows
+- `0` invalid registry entries
+- `0` uncatalogued docs
+- blocking classes: Task Packet `31`, Task Mirror `6`, Report Only `6`, Active Guide `2`, Public Guide `2`
+- blocking path families: `.agent/task` `6`, `docs/ACTION_PLAN-*` `7`, `docs/PRD-*` `7`, `docs/TECH_SPEC-*` `6`, `docs/findings` `6`, `docs/public` `2`, `docs/diagnostics-prompt-guide.md` `1`, `docs/FOLLOWUP-0951-true-rlm-symbolic.md` `1`, `tasks/specs` `5`, `tasks/tasks-*` `6`
+- date cohorts: `2026-01-18` / `90` days (`5` rows), `2026-03-19` / `30` days (`40` rows), and `2026-04-04` / `14` days (`2` rows)
+- task lineage: `1299-1304`
+- `spec-guard --dry-run` separately reported `17` active spec frontmatters with `last_review=2026-03-19`
+
+The Apr 19 blocking set was reviewed in `docs/findings/linear-5348c2fb-8897-48e3-a848-7831778b1b00-docs-freshness-classification.md` and refreshed instead of added to rolling deferral. The stale set includes Active Guide and Public Guide entries, which are ineligible for rolling deferral, and the matching `spec-guard` frontmatter rows require direct spec review. CO-254 keeps the rolling policy unchanged, preserves the existing CO-175 `221`-row advisory ledger, and updates only the reviewed Apr 19 stale docs plus the stale spec frontmatters to `last_review=2026-04-19`.

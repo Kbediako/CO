@@ -1,10 +1,17 @@
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
 import type { ControlPollingHealthPayload } from './providerPollingHealth.js';
-import type { ProviderIntakeSummaryPayload } from './providerIntakeState.js';
+import type {
+  ProviderIntakeRetrySummaryPayload,
+  ProviderIntakeSummaryPayload,
+  ProviderIntakeSummarySelectionStrategy,
+  ProviderIntakeSummaryScope,
+  ProviderIntakeSummaryState
+} from './providerIntakeState.js';
 import type { QuestionUrgency } from './questions.js';
 import type { ProviderLinearWorkerProof } from '../providerLinearWorkerRunner.js';
 import type {
   ControlProviderDebugSnapshot,
+  ProviderIntakeClaimFreshness,
   ProviderLinearWorkerProgressCandidate
 } from './providerIssueObservability.js';
 import { isProviderLinearWorkerProofFreshForStage } from './providerLinearWorkerTruth.js';
@@ -362,6 +369,31 @@ export interface ControlRetryPayload {
   last_event_at: string | null;
 }
 
+export interface ControlProviderIntakeSelectedClaimPayload {
+  issue_identifier: string;
+  task_id: string;
+  state: ProviderIntakeSummaryState;
+  reason: string | null;
+  run_id: string | null;
+  freshness: ProviderIntakeClaimFreshness | null;
+  retry: ProviderIntakeRetrySummaryPayload | null;
+  worker_host?: string | null;
+}
+
+export interface ControlProviderIntakePayload {
+  summary_scope: ProviderIntakeSummaryScope;
+  selection_strategy: ProviderIntakeSummarySelectionStrategy | null;
+  claim_count: number;
+  active_claim_count: number;
+  running_claim_count: number;
+  active_issue_identifiers: string[];
+  running_issue_identifiers: string[];
+  selected_claim: ControlProviderIntakeSelectedClaimPayload;
+  rehydrated_at: string | null;
+  is_rehydrated: boolean;
+  updated_at: string;
+}
+
 export interface ControlStatePayload {
   generated_at: string;
   counts: {
@@ -377,7 +409,7 @@ export interface ControlStatePayload {
   selected: ControlSelectedRunPayload | null;
   dispatch_pilot?: ControlDispatchPilotPayload;
   tracked?: ControlTrackedPayload;
-  provider_intake?: ProviderIntakeSummaryPayload;
+  provider_intake?: ControlProviderIntakePayload;
   provider_workflow?: ControlProviderWorkflowPayload;
   polling?: ControlPollingHealthPayload | null;
 }
@@ -558,6 +590,8 @@ export function resolveProviderWorkerHost(input: {
   providerLinearWorkerProof?: ProviderLinearWorkerProof | null | undefined;
   providerDebugSnapshot?: ControlProviderDebugSnapshot | null | undefined;
   providerIntake?: ProviderIntakeSummaryPayload | null | undefined;
+  issueIdentifier?: string | null | undefined;
+  issueId?: string | null | undefined;
   stageStartedAt?: string | null | undefined;
 }): string | null {
   const claimLaunchStartedAt = input.providerDebugSnapshot?.claim?.launch_started_at ?? null;
@@ -584,7 +618,35 @@ export function resolveProviderWorkerHost(input: {
   if (proofHost.kind === 'cleared') {
     return null;
   }
-  return normalizeProviderWorkerHostName(input.providerIntake?.worker_host);
+  const selectedClaim = input.providerIntake?.selected_claim ?? null;
+  if (!selectedClaim) {
+    return null;
+  }
+  const issueIdentifier = input.issueIdentifier ?? null;
+  const issueId = input.issueId ?? null;
+  if (
+    issueIdentifier !== null
+    && selectedClaim.issue_identifier !== issueIdentifier
+    && issueId !== null
+    && selectedClaim.issue_id !== issueId
+  ) {
+    return null;
+  }
+  if (
+    issueIdentifier !== null
+    && selectedClaim.issue_identifier !== issueIdentifier
+    && issueId === null
+  ) {
+    return null;
+  }
+  if (
+    issueId !== null
+    && selectedClaim.issue_id !== issueId
+    && issueIdentifier === null
+  ) {
+    return null;
+  }
+  return normalizeProviderWorkerHostName(selectedClaim.worker_host);
 }
 
 function readResolvedWorkerHost(
@@ -611,6 +673,8 @@ export function buildProjectionSelectedPayload(
     providerLinearWorkerProof: selected.providerLinearWorkerProof,
     providerDebugSnapshot: selected.providerDebugSnapshot,
     providerIntake,
+    issueIdentifier: selected.issueIdentifier,
+    issueId: selected.issueId,
     stageStartedAt: selected.startedAt
   });
   return {
@@ -646,6 +710,33 @@ export function buildProjectionSelectedPayload(
           provider_debug_snapshot: selected.providerDebugSnapshot
         }
       : {})
+  };
+}
+
+export function serializeProviderIntakeSummary(
+  providerIntake: ProviderIntakeSummaryPayload
+): ControlProviderIntakePayload {
+  return {
+    summary_scope: providerIntake.summary_scope,
+    selection_strategy: providerIntake.selection_strategy,
+    claim_count: providerIntake.claim_count,
+    active_claim_count: providerIntake.active_claim_count,
+    running_claim_count: providerIntake.running_claim_count,
+    active_issue_identifiers: [...providerIntake.active_issue_identifiers],
+    running_issue_identifiers: [...providerIntake.running_issue_identifiers],
+    selected_claim: {
+      issue_identifier: providerIntake.selected_claim.issue_identifier,
+      task_id: providerIntake.selected_claim.task_id,
+      state: providerIntake.selected_claim.state,
+      reason: providerIntake.selected_claim.reason,
+      run_id: providerIntake.selected_claim.run_id,
+      freshness: providerIntake.selected_claim.freshness,
+      retry: providerIntake.selected_claim.retry,
+      worker_host: providerIntake.selected_claim.worker_host ?? null
+    },
+    rehydrated_at: providerIntake.rehydrated_at,
+    is_rehydrated: providerIntake.is_rehydrated,
+    updated_at: providerIntake.updated_at
   };
 }
 
@@ -706,17 +797,7 @@ export function buildSelectedRunRuntimeFingerprintInput(
           team_key: trackedLinear.team_key
         }
       : null,
-    provider_intake: providerIntake
-      ? {
-          issue_identifier: providerIntake.issue_identifier,
-          task_id: providerIntake.task_id,
-          state: providerIntake.state,
-          reason: providerIntake.reason,
-          run_id: providerIntake.run_id,
-          freshness: providerIntake.freshness,
-          rehydrated_at: providerIntake.rehydrated_at
-        }
-      : null,
+    provider_intake: providerIntake ? serializeProviderIntakeSummary(providerIntake) : null,
     provider_workflow: providerWorkflow
       ? {
           status: providerWorkflow.status,
