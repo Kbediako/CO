@@ -5,7 +5,7 @@ relates_to: docs/PRD-linear-fb4c95d0-da68-4312-b3bb-3bd6282aa79f.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-18
+last_review: 2026-04-19
 ---
 
 ## Canonical Reference
@@ -33,7 +33,7 @@ last_review: 2026-04-18
   - parent-owned focused regressions distinct from `CO-219`, `CO-220`, and `CO-222`
 - Constraints:
   - child lane remains docs-only; parent owns implementation, tests, docs-review, validation, Linear/workpad state, PR, and merge
-  - `docs/TASKS.md` is already at the `450`-line cap in this checkout, so this child lane leaves that file untouched and records the omission for parent-owned wider-scope handling
+  - parent added the CO-223 `docs/TASKS.md` active-task snapshot row after current `origin/main` had line-count headroom, so no archive movement was required
   - preserve the exact seams `tracked.linear`, `controlRuntime.ts`, `selectedRunProjection.ts`, `observabilityReadModel.ts`, `linear-advisory-state.json`, `co-status`, `/api/v1/state`, and `/ui/data.json`
 
 ## Issue-Shaping Contract
@@ -92,7 +92,7 @@ last_review: 2026-04-18
   - 2026-04-18: child-lane review confirms the issue is narrower than a generic dispatch redesign. The explicit seam is the advisory fallback precedence from `controlRuntime.ts` through `selectedRunProjection.ts` and persisted `linear-advisory-state.json` into top-level `tracked.linear`. The micro-task path is ineligible because correctness depends on exact protected names, exact cross-surface alignment, and exact separation from `CO-219`, `CO-220`, and `CO-222`.
 - Safeguard ownership split:
   - child lane owns only the packet files plus `tasks/index.json` and `docs/docs-freshness-registry.json`
-  - parent lane owns implementation, focused tests, docs-review, validation, Linear/workpad reconciliation, PR lifecycle, and any `docs/TASKS.md` archive-supported update
+  - parent lane owns implementation, focused tests, docs-review, validation, Linear/workpad reconciliation, PR lifecycle, and `docs/TASKS.md` mirror maintenance
 
 ## Technical Requirements
 - Functional requirements:

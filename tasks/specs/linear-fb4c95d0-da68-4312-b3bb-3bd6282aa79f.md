@@ -4,7 +4,7 @@ title: Control host / CO STATUS: prevent top-level tracked.linear from leaking s
 status: in_progress
 owner: Codex
 created: 2026-04-18
-last_review: 2026-04-18
+last_review: 2026-04-19
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-fb4c95d0-da68-4312-b3bb-3bd6282aa79f.md
@@ -14,7 +14,8 @@ related_tasks:
 review_notes:
   - 2026-04-18: Opened from bounded same-issue docs child lane for `CO-223` with source anchor `ctx:sha256:ff78d09226d759620c87d1f1ae2de5782e81e7eda07b01112ef35807344be9b1#chunk:c000001` and origin manifest `.runs/linear-fb4c95d0-da68-4312-b3bb-3bd6282aa79f-co223-docs-packet/cli/2026-04-17T18-00-08-729Z-4c76d75d/manifest.json`.
   - 2026-04-18: The expected shared source payload path is absent in this child checkout, so the packet preserves the verbatim CO-223 issue prompt recovered via read-only Linear fetch plus direct repo inspection of `controlRuntime.ts`, `selectedRunProjection.ts`, and `observabilityReadModel.ts`.
-  - 2026-04-18: `docs/TASKS.md` is already at the `450`-line cap in this checkout, so this child lane leaves that file untouched and records the omission for parent-owned archive or wider-scope handling.
+  - 2026-04-18: The docs child lane left `docs/TASKS.md` untouched because that checkout reported a `450`-line cap constraint.
+  - 2026-04-19: Parent lane added the CO-223 active-task snapshot row to `docs/TASKS.md` after current `origin/main` had line-count headroom, so no archive movement was required.
 ---
 
 # Technical Specification
@@ -108,7 +109,7 @@ This issue is about authority precedence and fail-closed null behavior for the t
   - 2026-04-18: child-lane review confirms the issue is not narrower than a single renderer string change and not broader than the named tracked-authority seams. The exact issue wording requires current dispatch/intake truth or a truthful empty/null shape, explicit separation from `CO-219`, `CO-220`, and `CO-222`, and cross-surface alignment across `co-status`, `/api/v1/state`, and `/ui/data.json`. The micro-task path is ineligible because correctness depends on exact protected seams, exact surface names, and explicit non-goals.
 - Safeguard ownership split:
   - child lane owns only the packet files and listed registry/checklist mirrors
-  - parent lane owns implementation, focused tests, docs-review, validation, Linear/workpad reconciliation, PR lifecycle, and any archive-supported `docs/TASKS.md` update
+  - parent lane owns implementation, focused tests, docs-review, validation, Linear/workpad reconciliation, PR lifecycle, and `docs/TASKS.md` mirror maintenance
 
 ## Technical Requirements
 

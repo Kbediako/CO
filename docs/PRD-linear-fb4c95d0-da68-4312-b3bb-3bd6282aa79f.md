@@ -12,7 +12,7 @@
 - Expected source payload: `.runs/linear-fb4c95d0-da68-4312-b3bb-3bd6282aa79f-co223-docs-packet/cli/2026-04-17T18-00-08-729Z-4c76d75d/memory/source-0/source.txt`
 - Origin manifest: `.runs/linear-fb4c95d0-da68-4312-b3bb-3bd6282aa79f-co223-docs-packet/cli/2026-04-17T18-00-08-729Z-4c76d75d/manifest.json`
 - Issue body source: the expected shared source payload is absent in this child checkout, so the verbatim CO-223 issue prompt below was recovered via read-only Linear fetch on 2026-04-18 and paired with direct repo inspection of `controlRuntime.ts`, `selectedRunProjection.ts`, and `observabilityReadModel.ts`.
-- Parent lane ownership: authoritative issue workspace, Linear state, workpad, implementation, validation, review, PR, merge, and any wider-scope `docs/TASKS.md` archive handling.
+- Parent lane ownership: authoritative issue workspace, Linear state, workpad, implementation, validation, review, PR, merge, and active `docs/TASKS.md` snapshot mirroring.
 
 ## Verbatim Issue Prompt
 
@@ -72,7 +72,7 @@ When the selected projection has no authoritative tracked payload, top-level `tr
   - preserve explicit separation from `CO-219`, `CO-220`, and `CO-222`
 - Constraints / non-goals:
   - this child lane edits only the declared docs/checklist/registry files
-  - parent owns implementation, tests, docs-review, validation, Linear state, workpad refreshes, review, PR, merge, and any `docs/TASKS.md` archive action
+  - parent owns implementation, tests, docs-review, validation, Linear state, workpad refreshes, review, PR, merge, and `docs/TASKS.md` mirror maintenance
   - the packet must use the verbatim issue prompt recovered above rather than inventing narrower or broader wording
 
 ## Intent Checksum

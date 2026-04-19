@@ -22,6 +22,7 @@ import {
   type ControlCodexTotalsPayload,
   type ControlProviderRetryState,
   type ControlPollingHealthPayload,
+  type ControlTrackedLinearPayload,
   type ControlCompatibilityRuntimeSnapshot,
   type ControlSelectedRunRuntimeSnapshot,
   type SelectedRunContext,
@@ -169,7 +170,9 @@ function createControlRuntimeSnapshot(
   async function readSelectedRunSnapshot(): Promise<ControlSelectedRunRuntimeSnapshot> {
     selectedRunSnapshotPromise ??= (async () => {
       const selected = enrichProjectionSourceWithProviderRetryState(
-        await selectedRunProjection.buildSelectedRunContext(),
+        suppressConflictingProjectionTrackedPayload(
+          await selectedRunProjection.buildSelectedRunContext()
+        ),
         context.providerIntakeState
       );
       const issueIdentifier = selected?.issueIdentifier ?? selected?.taskId ?? selected?.runId ?? null;
@@ -194,16 +197,22 @@ function createControlRuntimeSnapshot(
     compatibilityRuntimeSnapshotPromise ??= (async () => {
       const selectedManifest = await compatibilityProjectionSource.readSelectedRunManifestSnapshot();
       const selected = enrichProjectionSourceWithProviderRetryState(
-        await compatibilityProjectionSource.buildCompatibilitySourceContext(selectedManifest),
+        suppressConflictingProjectionTrackedPayload(
+          await compatibilityProjectionSource.buildCompatibilitySourceContext(selectedManifest)
+        ),
         context.providerIntakeState
       );
       const discoveredCollections = await discoverCompatibilityCollectionContexts(context);
-      const authoritativeRetrying = await discoverAuthoritativeRetryCollectionContexts(context);
+      const authoritativeRetrying = (await discoverAuthoritativeRetryCollectionContexts(context))
+        .map((source) => suppressConflictingProjectionTrackedPayload(source))
+        .filter((source): source is ControlCompatibilitySourceContext => source !== null);
       const discoveredSources = discoveredCollections.all
+        .map((source) => suppressConflictingProjectionTrackedPayload(source))
         .map((source) => enrichProjectionSourceWithProviderRetryState(source, context.providerIntakeState))
         .filter((source): source is ControlCompatibilitySourceContext => source !== null);
       const fallbackRetrying = discoveredCollections.retrying
         .concat(isSelectedManifestRetryFallbackCandidate(selectedManifest, selected) ? [selected] : [])
+        .map((source) => suppressConflictingProjectionTrackedPayload(source))
         .map((source) => enrichProjectionSourceWithProviderRetryState(source, context.providerIntakeState))
         .filter((source): source is ControlCompatibilitySourceContext => source !== null);
       const issueIdentifier = selected?.issueIdentifier ?? selected?.taskId ?? selected?.runId ?? null;
@@ -901,9 +910,6 @@ function readAuthoritativeProviderIssueId(
   if (!issueId) {
     return null;
   }
-  if (source.taskId !== 'local-mcp') {
-    return issueId;
-  }
   return isFallbackCompatibilityIdentityValue(issueId, source) ? null : issueId;
 }
 
@@ -922,9 +928,6 @@ function readAuthoritativeProviderIssueIdentifier(
   const issueIdentifier = source.issueIdentifier ?? null;
   if (!issueIdentifier) {
     return null;
-  }
-  if (source.taskId !== 'local-mcp') {
-    return issueIdentifier;
   }
   return isFallbackCompatibilityIdentityValue(issueIdentifier, source) ? null : issueIdentifier;
 }
@@ -962,20 +965,112 @@ function resolveRuntimeTrackedPayload(
   advisoryTrackedIssue: LiveLinearTrackedIssue | null
 ) {
   if (selected?.tracked) {
+    if (linearTrackedIssueConflictsWithAuthoritativeIdentity(selected, selected.tracked.linear)) {
+      return null;
+    }
     return selected.tracked;
   }
   if (!advisoryTrackedIssue) {
     return null;
   }
-  if (
-    selected &&
-    hasExplicitCompatibilityIssueIdentity(selected) &&
-    advisoryTrackedIssue.id !== selected.issueId &&
-    advisoryTrackedIssue.identifier !== selected.issueIdentifier
-  ) {
+  if (linearTrackedIssueConflictsWithAuthoritativeIdentity(selected, advisoryTrackedIssue)) {
     return null;
   }
   return buildTrackedLinearPayload(advisoryTrackedIssue);
+}
+
+function suppressConflictingProjectionTrackedPayload<
+  TSource extends SelectedRunContext | ControlCompatibilitySourceContext
+>(source: TSource | null): TSource | null {
+  if (!source?.tracked) {
+    return source;
+  }
+  if (!linearTrackedIssueConflictsWithAuthoritativeIdentity(source, source.tracked.linear)) {
+    return source;
+  }
+  const shouldResetDisplayStatus =
+    source.compatibilityState !== null &&
+    source.compatibilityState !== undefined &&
+    source.displayStatus === source.compatibilityState;
+  const providerDebugSnapshot = clearProviderDebugLiveLinearState(source.providerDebugSnapshot ?? null);
+  return {
+    ...source,
+    displayStatus: shouldResetDisplayStatus ? source.rawStatus : source.displayStatus,
+    statusReason: shouldResetDisplayStatus ? null : source.statusReason,
+    latestEvent: resetAdvisoryDerivedLatestEvent(source, providerDebugSnapshot),
+    tracked: { linear: null },
+    compatibilityState: null,
+    providerDebugSnapshot
+  };
+}
+
+function clearProviderDebugLiveLinearState(
+  snapshot: ControlCompatibilitySourceContext['providerDebugSnapshot'] | null
+): ControlCompatibilitySourceContext['providerDebugSnapshot'] | null {
+  if (!snapshot) {
+    return snapshot;
+  }
+  const shouldClearAdvisoryDerivedProgress = snapshot.progress?.kind === 'workflow';
+  return {
+    ...snapshot,
+    live_linear_state: {
+      state: null,
+      state_type: null,
+      updated_at: null
+    },
+    ...(shouldClearAdvisoryDerivedProgress
+      ? {
+          progress: null,
+          last_semantic_progress_at: snapshot.last_audit_operation?.recorded_at ?? null,
+          stall_classification: null,
+          stall_reason: null,
+          recovery_recommendation: null
+        }
+      : {})
+  };
+}
+
+function resetAdvisoryDerivedLatestEvent<
+  TSource extends SelectedRunContext | ControlCompatibilitySourceContext
+>(
+  source: TSource,
+  providerDebugSnapshot: ControlCompatibilitySourceContext['providerDebugSnapshot'] | null
+): TSource['latestEvent'] {
+  if (
+    source.latestEvent?.source !== 'provider_debug_progress' ||
+    providerDebugSnapshot?.progress !== null
+  ) {
+    return source.latestEvent;
+  }
+  return {
+    at: source.updatedAt,
+    event: source.rawStatus,
+    message: source.summary,
+    source: 'run_summary',
+    messageRecordedAt: null,
+    sourceUpdatedAt: source.updatedAt,
+    candidates: [],
+    requestedBy: null,
+    reason: null
+  };
+}
+
+function linearTrackedIssueConflictsWithAuthoritativeIdentity(
+  selected: SelectedRunContext | ControlCompatibilitySourceContext | null,
+  linear: Pick<ControlTrackedLinearPayload, 'id' | 'identifier'> | null
+): boolean {
+  if (!selected || !linear || !hasExplicitCompatibilityIssueIdentity(selected)) {
+    return false;
+  }
+  const authoritativeIssueId = readAuthoritativeProviderIssueId(selected);
+  const authoritativeIssueIdentifier = readAuthoritativeProviderIssueIdentifier(selected);
+  if (authoritativeIssueId !== null && linear.id === authoritativeIssueId) {
+    return false;
+  }
+  if (authoritativeIssueIdentifier !== null && linear.identifier === authoritativeIssueIdentifier) {
+    return false;
+  }
+  return authoritativeIssueId !== null || authoritativeIssueIdentifier !== null;
 }
 
 function hasExplicitCompatibilityIssueIdentity(

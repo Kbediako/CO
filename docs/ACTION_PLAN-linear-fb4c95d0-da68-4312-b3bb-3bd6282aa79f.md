@@ -4,7 +4,7 @@
 
 ## Summary
 - Goal: give the parent lane a bounded implementation plan for the CO-223 top-level tracked fallback leak where stale advisory `CO-1` truth outranks current dispatch/intake `CO-196` truth.
-- Scope: this child lane creates the docs-first packet and registry/checklist mirrors only; parent owns implementation, focused tests, docs-review, validation, Linear/workpad state, review, PR, merge, and any archive-supported `docs/TASKS.md` update.
+- Scope: this child lane creates the docs-first packet and registry/checklist mirrors only; parent owns implementation, focused tests, docs-review, validation, Linear/workpad state, review, PR, merge, and `docs/TASKS.md` mirror maintenance.
 - Assumptions:
   - the authoritative issue wording is the verbatim CO-223 prompt captured in the PRD
   - `controlRuntime.ts` currently falls back from `selected?.tracked` to advisory-state `tracked_issue`
@@ -72,8 +72,8 @@
   - Mitigation: keep one shared tracked contract across `co-status`, `/api/v1/state`, and `/ui/data.json`.
 - Risk: the lane drifts into generic dispatch selection redesign.
   - Mitigation: keep the packet’s rejection language explicit and require parent evidence before widening beyond the named seams.
-- Risk: `docs/TASKS.md` remains untouched in this child lane because it is already at the `450`-line cap.
-  - Mitigation: record the omission explicitly and leave any archive-supported update to the parent lane.
+- Risk: `docs/TASKS.md` row insertion was parent-owned; current parent lane added the CO-223 snapshot once refreshed main had line-count headroom.
+  - Mitigation: parent lane added the snapshot row once refreshed main had line-count headroom.
 
 ## Approvals
 - Reviewer: pending parent implementation and docs-review.
