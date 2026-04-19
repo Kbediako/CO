@@ -518,6 +518,23 @@ describe('provider/control-host freshness gauge', () => {
     expect(report.findings.map((finding) => finding.code)).not.toContain('active_worker_proof_missing');
   });
 
+  it('ignores claim-linked run artifacts from stale intake snapshots', async () => {
+    const report = await evaluateProviderControlHostFreshnessGauge({
+      paths: {
+        provider_intake_state: [
+          join(FIXTURE_ROOT, 'claim-linked-external-run/control-host/provider-intake-state.json'),
+          join(FIXTURE_ROOT, 'claim-linked-external-run/current-provider-intake-state.json')
+        ]
+      },
+      now: NOW,
+      strict: true
+    });
+
+    expect(report.sources.provider_intake_state).toHaveLength(2);
+    expect(report.sources.provider_manifests).toEqual([]);
+    expect(report.sources.provider_proofs).toEqual([]);
+  });
+
   it('rejects invalid now values instead of using wall-clock time', async () => {
     await expect(evaluateProviderControlHostFreshnessGauge({
       artifactRoot: join(FIXTURE_ROOT, 'healthy'),

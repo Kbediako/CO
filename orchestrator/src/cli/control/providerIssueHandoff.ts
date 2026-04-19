@@ -394,6 +394,8 @@ export function createProviderIssueHandoffService(
   let bestEffortRehydrateTimer: NodeJS.Timeout | null = null;
   const queuedRetryTrackedIssueRefetches = new Map<string, ProviderTrackedIssueRefetch>();
   const refreshLifecycleScope = new AsyncLocalStorage<{ epoch: number } | null>();
+  const providerStatePersistedSnapshotObserverScope =
+    new AsyncLocalStorage<((snapshot: ProviderStateSnapshot) => void) | null>();
   const providerIssueRunDiscoveryScope = new AsyncLocalStorage<{
     snapshot: Promise<ProviderIssueRunDiscoverySnapshot> | null;
   }>();
@@ -601,6 +603,10 @@ export function createProviderIssueHandoffService(
     claims: ProviderIntakeClaimRecord[];
   };
 
+  type ProviderStatePersistOptions = {
+    rollbackOnPersistFailure?: boolean;
+  };
+
   const cloneProviderPollingSnapshot = (
     polling: ProviderStateSnapshot['polling']
   ): ProviderStateSnapshot['polling'] => (polling ? { ...polling } : polling);
@@ -752,9 +758,13 @@ export function createProviderIssueHandoffService(
     rebuildRetryQueue();
   };
 
+  const recordProviderStatePersistedSnapshot = (): void => {
+    providerStatePersistedSnapshotObserverScope.getStore()?.(captureProviderStateSnapshot());
+  };
+
   const persistStateOrRollback = async (
     snapshot: ProviderStateSnapshot,
-    persistOptions: { rollbackOnPersistFailure?: boolean } = {}
+    persistOptions: ProviderStatePersistOptions = {}
   ): Promise<void> => {
     const inFlightMutationSnapshot = captureProviderStateSnapshot();
     let persistCompleted = false;
@@ -762,6 +772,7 @@ export function createProviderIssueHandoffService(
       assertRefreshLifecycleCurrent();
       await options.persist();
       persistCompleted = true;
+      recordProviderStatePersistedSnapshot();
       assertRefreshLifecycleCurrent();
       rebuildRetryQueue();
     } catch (error) {
@@ -784,6 +795,7 @@ export function createProviderIssueHandoffService(
         if (isLifecycleStuckError && persistCompleted && stillOwnsInFlightMutation) {
           try {
             await options.persist();
+            recordProviderStatePersistedSnapshot();
           } catch (rollbackError) {
             logger.warn(
               `[provider-intake] Failed to persist stale lifecycle rollback: ${
@@ -800,7 +812,7 @@ export function createProviderIssueHandoffService(
 
   const upsertProviderClaimAndPersist = async (
     input: Parameters<typeof upsertProviderIntakeClaim>[1],
-    persistOptions: { rollbackOnPersistFailure?: boolean } = {}
+    persistOptions: ProviderStatePersistOptions = {}
   ): Promise<ProviderIntakeClaimRecord> => {
     assertRefreshLifecycleCurrent();
     const snapshot = captureProviderStateSnapshot();
@@ -2116,58 +2128,193 @@ export function createProviderIssueHandoffService(
     const now = isoTimestamp();
     const discoveredRuns = await discoverProviderIssueRunsForCurrentOperation();
     const runsByProviderIssue = groupProviderIssueRuns(discoveredRuns);
-    const rehydrateSnapshot = captureProviderStateSnapshot();
+    let rehydrateRollbackSnapshot = captureProviderStateSnapshot();
     let hasPendingClaims = false;
     let publishRuntime = false;
+    const rehydratePersistedSnapshotObserver = (snapshot: ProviderStateSnapshot): void => {
+      rehydrateRollbackSnapshot = snapshot;
+    };
+    const restoreRehydrateRollbackSnapshot = (): void => {
+      restoreProviderStateSnapshot(rehydrateRollbackSnapshot);
+    };
+    const assertRehydrateLifecycleCurrent = (): void => {
+      try {
+        assertRefreshLifecycleCurrent();
+      } catch (error) {
+        restoreRehydrateRollbackSnapshot();
+        throw error;
+      }
+    };
+    const upsertRehydratedProviderIntakeClaim = (
+      input: Parameters<typeof upsertProviderIntakeClaim>[1]
+    ): ProviderIntakeClaimRecord => {
+      assertRehydrateLifecycleCurrent();
+      return upsertProviderIntakeClaim(options.state, input);
+    };
+    const cleanupReleasedProviderWorkspaceWhenCurrent = async (
+      input: Parameters<typeof cleanupReleasedProviderWorkspace>[0]
+    ): Promise<void> => {
+      assertRehydrateLifecycleCurrent();
+      await cleanupReleasedProviderWorkspace(input);
+      assertRehydrateLifecycleCurrent();
+    };
 
-    for (const claim of [...options.state.claims]) {
-      const claimRuns = runsByProviderIssue.get(buildProviderIssueKey(claim.provider, claim.issue_id)) ?? [];
-      const attachableClaimRuns = filterProviderIssueRunsForStartPipeline(claimRuns, startPipelineId);
-      const releasedRun =
-        claim.state === 'released' ? resolveProviderReleaseRun(claim, attachableClaimRuns) : null;
-      // Manifest-less inflight claims belong to a fresh launch attempt, so they
-      // must not collapse onto older terminal-completed runs from prior sessions.
-      const manifestlessDetachedClaim =
-        (
-          claim.state === 'starting' ||
-          claim.state === 'resuming' ||
-          claim.state === 'handoff_failed'
-        ) &&
-        !claim.run_manifest_path &&
-        !claim.run_id;
-      if (claim.state === 'released') {
-        const activeRun = attachableClaimRuns.find((run) => run.status === 'in_progress');
-        const releasedPendingReopen = isProviderIssueReleasedPendingReopen(claim.reason);
-        const releasedLiveWorkerRehydrateCandidate =
-          isProviderIssueReleasedLiveWorkerRehydrateCandidate(claim);
-        const activeRunReleaseCancelPending = hasPendingReleaseCancel(
-          activeRun?.manifestPath ?? releasedRun?.manifestPath
-        );
-        const shouldRefreshReleasedActiveRunIssue =
-          activeRun !== undefined &&
-          releasedLiveWorkerRehydrateCandidate &&
+    const runRehydrate = async (): Promise<{ hasPendingClaims: boolean }> => {
+      for (const claim of [...options.state.claims]) {
+        assertRehydrateLifecycleCurrent();
+        const claimRuns = runsByProviderIssue.get(buildProviderIssueKey(claim.provider, claim.issue_id)) ?? [];
+        const attachableClaimRuns = filterProviderIssueRunsForStartPipeline(claimRuns, startPipelineId);
+        const releasedRun =
+          claim.state === 'released' ? resolveProviderReleaseRun(claim, attachableClaimRuns) : null;
+        // Manifest-less inflight claims belong to a fresh launch attempt, so they
+        // must not collapse onto older terminal-completed runs from prior sessions.
+        const manifestlessDetachedClaim =
           (
-            releasedPendingReopen
-              ? input?.refreshTrackedIssueMetadata === true || resolveTrackedIssueWhenNotStuck !== null
-              : input?.refreshTrackedIssueMetadata === true
+            claim.state === 'starting' ||
+            claim.state === 'resuming' ||
+            claim.state === 'handoff_failed'
+          ) &&
+          !claim.run_manifest_path &&
+          !claim.run_id;
+        if (claim.state === 'released') {
+          const activeRun = attachableClaimRuns.find((run) => run.status === 'in_progress');
+          const releasedPendingReopen = isProviderIssueReleasedPendingReopen(claim.reason);
+          const releasedLiveWorkerRehydrateCandidate =
+            isProviderIssueReleasedLiveWorkerRehydrateCandidate(claim);
+          const activeRunReleaseCancelPending = hasPendingReleaseCancel(
+            activeRun?.manifestPath ?? releasedRun?.manifestPath
           );
-        const freshTrackedIssue =
-          shouldRefreshReleasedActiveRunIssue
-            ? await resolveFreshTrackedIssueForActiveClaim(claim)
-            : buildActiveClaimFreshTrackedIssueFallback(releasedPendingReopen);
-        const allowCachedStartedWorkerIssue =
-          releasedPendingReopen && freshTrackedIssue.useCachedClaimIssueState;
-        const startedWorkerIssue =
-          freshTrackedIssue.trackedIssue !== null
-            ? isProviderStartedWorkerTrackedIssue(freshTrackedIssue.trackedIssue)
-            : allowCachedStartedWorkerIssue && isProviderStartedWorkerClaim(claim);
-        if (
-          activeRun &&
-          !activeRunReleaseCancelPending &&
-          releasedLiveWorkerRehydrateCandidate &&
-          startedWorkerIssue
-        ) {
+          const shouldRefreshReleasedActiveRunIssue =
+            activeRun !== undefined &&
+            releasedLiveWorkerRehydrateCandidate &&
+            (
+              releasedPendingReopen
+                ? input?.refreshTrackedIssueMetadata === true || resolveTrackedIssueWhenNotStuck !== null
+                : input?.refreshTrackedIssueMetadata === true
+            );
+          const freshTrackedIssue =
+            shouldRefreshReleasedActiveRunIssue
+              ? await resolveFreshTrackedIssueForActiveClaim(claim)
+              : buildActiveClaimFreshTrackedIssueFallback(releasedPendingReopen);
+          const allowCachedStartedWorkerIssue =
+            releasedPendingReopen && freshTrackedIssue.useCachedClaimIssueState;
+          const startedWorkerIssue =
+            freshTrackedIssue.trackedIssue !== null
+              ? isProviderStartedWorkerTrackedIssue(freshTrackedIssue.trackedIssue)
+              : allowCachedStartedWorkerIssue && isProviderStartedWorkerClaim(claim);
+          if (
+            activeRun &&
+            !activeRunReleaseCancelPending &&
+            releasedLiveWorkerRehydrateCandidate &&
+            startedWorkerIssue
+          ) {
+            const workerHost = resolveRehydratedActiveRunWorkerHost(activeRun, claim);
+            const trackedIssueFields = freshTrackedIssue.claimFields;
+            const reactivatedMergeCloseoutReset =
+              claim.reason === 'provider_issue_rehydrated_active_run'
+                ? {}
+                : { review_promotion: null, merge_closeout: null };
+            publishRuntime ||= hasProviderClaimTransitioned(claim, {
+              ...trackedIssueFields,
+              state: 'running',
+              reason: 'provider_issue_rehydrated_active_run',
+              task_id: activeRun.taskId,
+              run_id: activeRun.runId,
+              run_manifest_path: activeRun.manifestPath,
+              worker_host: workerHost,
+              ...buildActiveRunRetryFields(claim),
+              ...reactivatedMergeCloseoutReset
+            });
+            upsertRehydratedProviderIntakeClaim({
+              ...claim,
+              ...trackedIssueFields,
+              launch_source: undefined,
+              launch_token: undefined,
+              task_id: activeRun.taskId,
+              state: 'running',
+              reason: 'provider_issue_rehydrated_active_run',
+              run_id: activeRun.runId,
+              run_manifest_path: activeRun.manifestPath,
+              worker_host: workerHost,
+              ...buildActiveRunRetryFields(claim),
+              ...reactivatedMergeCloseoutReset,
+              updated_at: now
+            });
+            hasPendingClaims = true;
+            continue;
+          }
+          if (activeRunReleaseCancelPending) {
+            hasPendingClaims = true;
+          }
+          const releaseClaimFields = freshTrackedIssue.releaseClaimFields;
+          const releaseReason =
+            freshTrackedIssue.releaseReason ?? claim.reason ?? 'provider_issue_released';
+          const releasedRunForActiveClaim = releasedRun ?? activeRun;
+          const releasedClaimTransitioned = hasProviderClaimTransitioned(claim, {
+            ...releaseClaimFields,
+            state: 'released',
+            reason: releaseReason,
+            task_id: releasedRunForActiveClaim?.taskId ?? claim.task_id,
+            run_id: releasedRunForActiveClaim?.runId ?? claim.run_id,
+            run_manifest_path: releasedRunForActiveClaim?.manifestPath ?? claim.run_manifest_path
+          });
+          publishRuntime ||= releasedClaimTransitioned;
+          upsertRehydratedProviderIntakeClaim({
+            ...claim,
+            ...releaseClaimFields,
+            launch_source: undefined,
+            launch_token: undefined,
+            task_id: releasedRunForActiveClaim?.taskId ?? claim.task_id,
+            state: 'released',
+            reason: releaseReason,
+            run_id: releasedRunForActiveClaim?.runId ?? claim.run_id,
+            run_manifest_path: releasedRunForActiveClaim?.manifestPath ?? claim.run_manifest_path,
+            updated_at: releasedClaimTransitioned ? now : claim.updated_at
+          });
+          if (shouldAttemptReleaseCancel(releasedRun)) {
+            hasPendingClaims = true;
+          }
+          if (
+            shouldCleanupReleasedProviderWorkspace(claim) &&
+            canCleanupReleasedProviderWorkspace(releasedRun)
+          ) {
+            await cleanupReleasedProviderWorkspaceWhenCurrent({
+              repoRoot,
+              taskId: releasedRun?.taskId ?? claim.task_id,
+              manifestPath: releasedRun?.manifestPath ?? claim.run_manifest_path,
+              issueId: claim.issue_id,
+              issueIdentifier: claim.issue_identifier,
+              providerWorkflowConfigStore: options.providerWorkflowConfigStore ?? null,
+              runTerminalCleanup
+            });
+          }
+          continue;
+        }
+
+        const activeRun = attachableClaimRuns.find((run) => run.status === 'in_progress');
+        if (activeRun) {
           const workerHost = resolveRehydratedActiveRunWorkerHost(activeRun, claim);
+          const preserveMergeCloseoutClaim =
+            isProviderMergeCloseoutWatchingClaim(claim) || isTerminalProviderMergeCloseoutClaim(claim);
+          const freshTrackedIssue = input?.refreshTrackedIssueMetadata
+            ? await resolveFreshTrackedIssueForActiveClaim(claim)
+            : buildActiveClaimFreshTrackedIssueFallback(true);
+          const mergeTrackedIssue = freshTrackedIssue.trackedIssue;
+          if (preserveMergeCloseoutClaim && !mergeTrackedIssue) {
+            hasPendingClaims = true;
+            continue;
+          }
+          if (mergeTrackedIssue && Object.keys(freshTrackedIssue.claimFields).length > 0) {
+            const mergeCloseoutClaim = await maybeHandleRecoveredActiveRunMergedCloseout({
+              claim,
+              trackedIssue: mergeTrackedIssue,
+              latestRun: activeRun
+            });
+            if (mergeCloseoutClaim) {
+              hasPendingClaims = true;
+              continue;
+            }
+          }
           const trackedIssueFields = freshTrackedIssue.claimFields;
           const reactivatedMergeCloseoutReset =
             claim.reason === 'provider_issue_rehydrated_active_run'
@@ -2184,7 +2331,7 @@ export function createProviderIssueHandoffService(
             ...buildActiveRunRetryFields(claim),
             ...reactivatedMergeCloseoutReset
           });
-          upsertProviderIntakeClaim(options.state, {
+          upsertRehydratedProviderIntakeClaim({
             ...claim,
             ...trackedIssueFields,
             launch_source: undefined,
@@ -2202,262 +2349,209 @@ export function createProviderIssueHandoffService(
           hasPendingClaims = true;
           continue;
         }
-        if (activeRunReleaseCancelPending) {
-          hasPendingClaims = true;
-        }
-        const releaseClaimFields = freshTrackedIssue.releaseClaimFields;
-        const releaseReason =
-          freshTrackedIssue.releaseReason ?? claim.reason ?? 'provider_issue_released';
-        const releasedRunForActiveClaim = releasedRun ?? activeRun;
-        const releasedClaimTransitioned = hasProviderClaimTransitioned(claim, {
-          ...releaseClaimFields,
-          state: 'released',
-          reason: releaseReason,
-          task_id: releasedRunForActiveClaim?.taskId ?? claim.task_id,
-          run_id: releasedRunForActiveClaim?.runId ?? claim.run_id,
-          run_manifest_path: releasedRunForActiveClaim?.manifestPath ?? claim.run_manifest_path
-        });
-        publishRuntime ||= releasedClaimTransitioned;
-        upsertProviderIntakeClaim(options.state, {
-          ...claim,
-          ...releaseClaimFields,
-          launch_source: undefined,
-          launch_token: undefined,
-          task_id: releasedRunForActiveClaim?.taskId ?? claim.task_id,
-          state: 'released',
-          reason: releaseReason,
-          run_id: releasedRunForActiveClaim?.runId ?? claim.run_id,
-          run_manifest_path: releasedRunForActiveClaim?.manifestPath ?? claim.run_manifest_path,
-          updated_at: releasedClaimTransitioned ? now : claim.updated_at
-        });
-        if (shouldAttemptReleaseCancel(releasedRun)) {
-          hasPendingClaims = true;
-        }
-        if (
-          shouldCleanupReleasedProviderWorkspace(claim) &&
-          canCleanupReleasedProviderWorkspace(releasedRun)
-        ) {
-          await cleanupReleasedProviderWorkspace({
-            repoRoot,
-            taskId: releasedRun?.taskId ?? claim.task_id,
-            manifestPath: releasedRun?.manifestPath ?? claim.run_manifest_path,
-            issueId: claim.issue_id,
-            issueIdentifier: claim.issue_identifier,
-            providerWorkflowConfigStore: options.providerWorkflowConfigStore ?? null,
-            runTerminalCleanup
-          });
-        }
-        continue;
-      }
 
-      const activeRun = attachableClaimRuns.find((run) => run.status === 'in_progress');
-      if (activeRun) {
-        const workerHost = resolveRehydratedActiveRunWorkerHost(activeRun, claim);
-        const preserveMergeCloseoutClaim =
-          isProviderMergeCloseoutWatchingClaim(claim) || isTerminalProviderMergeCloseoutClaim(claim);
-        const freshTrackedIssue = input?.refreshTrackedIssueMetadata
-          ? await resolveFreshTrackedIssueForActiveClaim(claim)
-          : buildActiveClaimFreshTrackedIssueFallback(true);
-        const mergeTrackedIssue = freshTrackedIssue.trackedIssue;
-        if (preserveMergeCloseoutClaim && !mergeTrackedIssue) {
-          hasPendingClaims = true;
+        const resumableRun = attachableClaimRuns.find(
+          (run) => run.status !== null && RESUME_ELIGIBLE_STATUSES.has(run.status)
+        );
+        if (resumableRun) {
+          const queuedRetryFields = buildQueuedProviderRetryFields({
+            claim,
+            previousRun: resumableRun,
+            error: resolveProviderRetryErrorFromRun(resumableRun),
+            preserveCurrentAttempt: claim.retry_queued === true,
+            preserveExistingDueAt: claim.retry_queued === true,
+            delayType: 'failure'
+          });
+          const workerHost = resolveRehydratedActiveRunWorkerHost(resumableRun, claim);
+          publishRuntime ||= hasProviderClaimTransitioned(claim, {
+            state: 'resumable',
+            reason: 'provider_issue_rehydrated_resumable_run',
+            task_id: resumableRun.taskId,
+            run_id: resumableRun.runId,
+            run_manifest_path: resumableRun.manifestPath,
+            worker_host: workerHost,
+            ...queuedRetryFields
+          });
+          upsertRehydratedProviderIntakeClaim({
+            ...claim,
+            launch_source: undefined,
+            launch_token: undefined,
+            task_id: resumableRun.taskId,
+            state: 'resumable',
+            reason: 'provider_issue_rehydrated_resumable_run',
+            run_id: resumableRun.runId,
+            run_manifest_path: resumableRun.manifestPath,
+            worker_host: workerHost,
+            ...queuedRetryFields,
+            updated_at: now
+          });
           continue;
         }
-        if (mergeTrackedIssue && Object.keys(freshTrackedIssue.claimFields).length > 0) {
-          const mergeCloseoutClaim = await maybeHandleRecoveredActiveRunMergedCloseout({
-            claim,
-            trackedIssue: mergeTrackedIssue,
-            latestRun: activeRun
-          });
-          if (mergeCloseoutClaim) {
-            hasPendingClaims = true;
-            continue;
-          }
-        }
-        const trackedIssueFields = freshTrackedIssue.claimFields;
-        const reactivatedMergeCloseoutReset =
-          claim.reason === 'provider_issue_rehydrated_active_run'
-            ? {}
-            : { review_promotion: null, merge_closeout: null };
-        publishRuntime ||= hasProviderClaimTransitioned(claim, {
-          ...trackedIssueFields,
-          state: 'running',
-          reason: 'provider_issue_rehydrated_active_run',
-          task_id: activeRun.taskId,
-          run_id: activeRun.runId,
-          run_manifest_path: activeRun.manifestPath,
-          worker_host: workerHost,
-          ...buildActiveRunRetryFields(claim),
-          ...reactivatedMergeCloseoutReset
-        });
-        upsertProviderIntakeClaim(options.state, {
-          ...claim,
-          ...trackedIssueFields,
-          launch_source: undefined,
-          launch_token: undefined,
-          task_id: activeRun.taskId,
-          state: 'running',
-          reason: 'provider_issue_rehydrated_active_run',
-          run_id: activeRun.runId,
-          run_manifest_path: activeRun.manifestPath,
-          worker_host: workerHost,
-          ...buildActiveRunRetryFields(claim),
-          ...reactivatedMergeCloseoutReset,
-          updated_at: now
-        });
-        hasPendingClaims = true;
-        continue;
-      }
 
-      const resumableRun = attachableClaimRuns.find(
-        (run) => run.status !== null && RESUME_ELIGIBLE_STATUSES.has(run.status)
-      );
-      if (resumableRun) {
-        const queuedRetryFields = buildQueuedProviderRetryFields({
-          claim,
-          previousRun: resumableRun,
-          error: resolveProviderRetryErrorFromRun(resumableRun),
-          preserveCurrentAttempt: claim.retry_queued === true,
-          preserveExistingDueAt: claim.retry_queued === true,
-          delayType: 'failure'
-        });
-        const workerHost = resolveRehydratedActiveRunWorkerHost(resumableRun, claim);
-        publishRuntime ||= hasProviderClaimTransitioned(claim, {
-          state: 'resumable',
-          reason: 'provider_issue_rehydrated_resumable_run',
-          task_id: resumableRun.taskId,
-          run_id: resumableRun.runId,
-          run_manifest_path: resumableRun.manifestPath,
-          worker_host: workerHost,
-          ...queuedRetryFields
-        });
-        upsertProviderIntakeClaim(options.state, {
-          ...claim,
-          launch_source: undefined,
-          launch_token: undefined,
-          task_id: resumableRun.taskId,
-          state: 'resumable',
-          reason: 'provider_issue_rehydrated_resumable_run',
-          run_id: resumableRun.runId,
-          run_manifest_path: resumableRun.manifestPath,
-          worker_host: workerHost,
-          ...queuedRetryFields,
-          updated_at: now
-        });
-        continue;
-      }
-
-      const matchedCompletedRun = resolveProviderClaimRunIdentity(claim, attachableClaimRuns);
-      const completedRun =
-        matchedCompletedRun?.status === 'succeeded'
-          ? matchedCompletedRun
-          : claim.run_id || claim.run_manifest_path
-            ? null
-            : attachableClaimRuns.find((run) => run.status === 'succeeded');
-      if (
-        completedRun &&
-        (
-          !manifestlessDetachedClaim ||
-          didRunMatchClaimAttempt(claim, completedRun)
-        )
-      ) {
-        let completedClaim = claim;
+        const matchedCompletedRun = resolveProviderClaimRunIdentity(claim, attachableClaimRuns);
+        const completedRun =
+          matchedCompletedRun?.status === 'succeeded'
+            ? matchedCompletedRun
+            : claim.run_id || claim.run_manifest_path
+              ? null
+              : attachableClaimRuns.find((run) => run.status === 'succeeded');
         if (
-          input?.refreshTrackedIssueMetadata ||
-          shouldForceTrackedIssueMetadataRefreshForCompletedClaim(claim)
+          completedRun &&
+          (
+            !manifestlessDetachedClaim ||
+            didRunMatchClaimAttempt(claim, completedRun)
+          )
         ) {
-          const freshTrackedIssue = await resolveFreshTrackedIssueForActiveClaim(claim);
-          if (freshTrackedIssue.trackedIssue) {
-            completedClaim = {
-              ...completedClaim,
-              ...freshTrackedIssue.claimFields
-            };
-            const reviewPromotionClaim = await maybeHandleReviewHandoffPromotion({
-              claim: completedClaim,
-              trackedIssue: freshTrackedIssue.trackedIssue,
-              latestRun: completedRun
-            });
-            if (reviewPromotionClaim) {
-              hasPendingClaims = true;
-              continue;
-            }
-            if (
-              shouldAttemptDeterministicMergeCloseoutForRecoveredRun({
-                claim: completedClaim,
-                trackedIssue: freshTrackedIssue.trackedIssue,
-                run: completedRun
-              })
-            ) {
-              const mergeCloseoutClaim = await maybeHandleDeterministicMergingCloseout({
+          let completedClaim = claim;
+          if (
+            input?.refreshTrackedIssueMetadata ||
+            shouldForceTrackedIssueMetadataRefreshForCompletedClaim(claim)
+          ) {
+            const freshTrackedIssue = await resolveFreshTrackedIssueForActiveClaim(claim);
+            if (freshTrackedIssue.trackedIssue) {
+              completedClaim = {
+                ...completedClaim,
+                ...freshTrackedIssue.claimFields
+              };
+              const reviewPromotionClaim = await maybeHandleReviewHandoffPromotion({
                 claim: completedClaim,
                 trackedIssue: freshTrackedIssue.trackedIssue,
                 latestRun: completedRun
               });
-              if (mergeCloseoutClaim) {
+              if (reviewPromotionClaim) {
                 hasPendingClaims = true;
                 continue;
               }
-            }
-          } else {
-            const hasFreshReleaseIssueMetadata =
-              freshTrackedIssue.releaseClaimFields.issue_state !== undefined ||
-              freshTrackedIssue.releaseClaimFields.issue_state_type !== undefined ||
-              freshTrackedIssue.releaseClaimFields.issue_updated_at !== undefined;
-            if (
-              hasFreshReleaseIssueMetadata &&
-              (
-                shouldApplySupersededTerminalMergeCloseoutReleaseClaim({
-                  releaseReason: freshTrackedIssue.releaseReason,
-                  claim: {
-                    ...completedClaim,
-                    ...freshTrackedIssue.releaseClaimFields
-                  }
-                }) ||
-                shouldApplySupersededTransitionFailedMergeCloseoutReleaseClaim({
-                  releaseReason: freshTrackedIssue.releaseReason,
+              if (
+                shouldAttemptDeterministicMergeCloseoutForRecoveredRun({
                   claim: completedClaim,
-                  nextIssueState:
-                    freshTrackedIssue.releaseClaimFields.issue_state ?? completedClaim.issue_state,
-                  nextIssueStateType:
-                    freshTrackedIssue.releaseClaimFields.issue_state_type ??
-                    completedClaim.issue_state_type,
-                  nextIssueUpdatedAt:
-                    freshTrackedIssue.releaseClaimFields.issue_updated_at ??
-                    completedClaim.issue_updated_at
+                  trackedIssue: freshTrackedIssue.trackedIssue,
+                  run: completedRun
                 })
-              )
-            ) {
-              completedClaim = {
-                ...completedClaim,
-                ...freshTrackedIssue.releaseClaimFields
-              };
+              ) {
+                const mergeCloseoutClaim = await maybeHandleDeterministicMergingCloseout({
+                  claim: completedClaim,
+                  trackedIssue: freshTrackedIssue.trackedIssue,
+                  latestRun: completedRun
+                });
+                if (mergeCloseoutClaim) {
+                  hasPendingClaims = true;
+                  continue;
+                }
+              }
+            } else {
+              const hasFreshReleaseIssueMetadata =
+                freshTrackedIssue.releaseClaimFields.issue_state !== undefined ||
+                freshTrackedIssue.releaseClaimFields.issue_state_type !== undefined ||
+                freshTrackedIssue.releaseClaimFields.issue_updated_at !== undefined;
+              if (
+                hasFreshReleaseIssueMetadata &&
+                (
+                  shouldApplySupersededTerminalMergeCloseoutReleaseClaim({
+                    releaseReason: freshTrackedIssue.releaseReason,
+                    claim: {
+                      ...completedClaim,
+                      ...freshTrackedIssue.releaseClaimFields
+                    }
+                  }) ||
+                  shouldApplySupersededTransitionFailedMergeCloseoutReleaseClaim({
+                    releaseReason: freshTrackedIssue.releaseReason,
+                    claim: completedClaim,
+                    nextIssueState:
+                      freshTrackedIssue.releaseClaimFields.issue_state ?? completedClaim.issue_state,
+                    nextIssueStateType:
+                      freshTrackedIssue.releaseClaimFields.issue_state_type ??
+                      completedClaim.issue_state_type,
+                    nextIssueUpdatedAt:
+                      freshTrackedIssue.releaseClaimFields.issue_updated_at ??
+                      completedClaim.issue_updated_at
+                  })
+                )
+              ) {
+                completedClaim = {
+                  ...completedClaim,
+                  ...freshTrackedIssue.releaseClaimFields
+                };
+              }
             }
           }
+          const completedState = buildProviderCompletedRunRehydrateState({
+            claim: completedClaim,
+            run: completedRun,
+            preserveCurrentAttempt: completedClaim.retry_queued === true,
+            preserveExistingDueAt: completedClaim.retry_queued === true,
+            queueContinuationRetry: shouldQueuePostWorkerRetryClaim(completedClaim)
+          });
+          const nextCompletedClaim = {
+            ...completedClaim,
+            launch_source: undefined,
+            launch_token: undefined,
+            ...completedState,
+            updated_at: now
+          };
+          publishRuntime ||= hasProviderClaimTransitioned(claim, nextCompletedClaim);
+          upsertRehydratedProviderIntakeClaim({
+            ...nextCompletedClaim
+          });
+          continue;
         }
-        const completedState = buildProviderCompletedRunRehydrateState({
-          claim: completedClaim,
-          run: completedRun,
-          preserveCurrentAttempt: completedClaim.retry_queued === true,
-          preserveExistingDueAt: completedClaim.retry_queued === true,
-          queueContinuationRetry: shouldQueuePostWorkerRetryClaim(completedClaim)
-        });
-        const nextCompletedClaim = {
-          ...completedClaim,
-          launch_source: undefined,
-          launch_token: undefined,
-          ...completedState,
-          updated_at: now
-        };
-        publishRuntime ||= hasProviderClaimTransitioned(claim, nextCompletedClaim);
-        upsertProviderIntakeClaim(options.state, {
-          ...nextCompletedClaim
-        });
-        continue;
-      }
 
-      if (claim.state === 'starting' || claim.state === 'resuming') {
-        const queuedRun = attachableClaimRuns.find((run) => run.status === 'queued');
-        if (queuedRun) {
+        if (claim.state === 'starting' || claim.state === 'resuming') {
+          const queuedRun = attachableClaimRuns.find((run) => run.status === 'queued');
+          if (queuedRun) {
+            if (isProviderClaimRehydrationTimedOut(claim, now)) {
+              const queuedRetryFields = buildQueuedProviderRetryFields({
+                claim,
+                previousRun: null,
+                error: 'provider_issue_rehydration_timeout',
+                preserveCurrentAttempt: true,
+                delayType: 'failure'
+              });
+              publishRuntime ||= hasProviderClaimTransitioned(claim, {
+                state: 'handoff_failed',
+                reason: 'provider_issue_rehydration_timeout',
+                task_id: queuedRun.taskId,
+                run_id: queuedRun.runId,
+                run_manifest_path: queuedRun.manifestPath,
+                ...queuedRetryFields
+              });
+              upsertRehydratedProviderIntakeClaim({
+                ...claim,
+                launch_source: undefined,
+                launch_token: undefined,
+                task_id: queuedRun.taskId,
+                state: 'handoff_failed',
+                reason: 'provider_issue_rehydration_timeout',
+                run_id: queuedRun.runId,
+                run_manifest_path: queuedRun.manifestPath,
+                ...queuedRetryFields,
+                updated_at: now
+              });
+              continue;
+            }
+
+            publishRuntime ||= hasProviderClaimTransitioned(claim, {
+              state: claim.state,
+              reason: 'provider_issue_rehydrated_queued_run',
+              task_id: queuedRun.taskId,
+              run_id: queuedRun.runId,
+              run_manifest_path: queuedRun.manifestPath
+            });
+            upsertRehydratedProviderIntakeClaim({
+              ...claim,
+              launch_source: undefined,
+              launch_token: undefined,
+              task_id: queuedRun.taskId,
+              state: claim.state,
+              reason: 'provider_issue_rehydrated_queued_run',
+              run_id: queuedRun.runId,
+              run_manifest_path: queuedRun.manifestPath,
+              updated_at: claim.updated_at
+            });
+            hasPendingClaims = true;
+            continue;
+          }
+
           if (isProviderClaimRehydrationTimedOut(claim, now)) {
             const queuedRetryFields = buildQueuedProviderRetryFields({
               claim,
@@ -2469,155 +2563,119 @@ export function createProviderIssueHandoffService(
             publishRuntime ||= hasProviderClaimTransitioned(claim, {
               state: 'handoff_failed',
               reason: 'provider_issue_rehydration_timeout',
-              task_id: queuedRun.taskId,
-              run_id: queuedRun.runId,
-              run_manifest_path: queuedRun.manifestPath,
+              task_id: claim.task_id,
+              run_id: claim.run_id,
+              run_manifest_path: claim.run_manifest_path,
               ...queuedRetryFields
             });
-            upsertProviderIntakeClaim(options.state, {
+            upsertRehydratedProviderIntakeClaim({
               ...claim,
               launch_source: undefined,
               launch_token: undefined,
-              task_id: queuedRun.taskId,
               state: 'handoff_failed',
               reason: 'provider_issue_rehydration_timeout',
-              run_id: queuedRun.runId,
-              run_manifest_path: queuedRun.manifestPath,
               ...queuedRetryFields,
               updated_at: now
             });
             continue;
           }
 
-          publishRuntime ||= hasProviderClaimTransitioned(claim, {
-            state: claim.state,
-            reason: 'provider_issue_rehydrated_queued_run',
-            task_id: queuedRun.taskId,
-            run_id: queuedRun.runId,
-            run_manifest_path: queuedRun.manifestPath
-          });
-          upsertProviderIntakeClaim(options.state, {
-            ...claim,
-            launch_source: undefined,
-            launch_token: undefined,
-            task_id: queuedRun.taskId,
-            state: claim.state,
-            reason: 'provider_issue_rehydrated_queued_run',
-            run_id: queuedRun.runId,
-            run_manifest_path: queuedRun.manifestPath,
-            updated_at: claim.updated_at
-          });
           hasPendingClaims = true;
           continue;
         }
 
-        if (isProviderClaimRehydrationTimedOut(claim, now)) {
-          const queuedRetryFields = buildQueuedProviderRetryFields({
-            claim,
-            previousRun: null,
-            error: 'provider_issue_rehydration_timeout',
-            preserveCurrentAttempt: true,
-            delayType: 'failure'
-          });
-          publishRuntime ||= hasProviderClaimTransitioned(claim, {
-            state: 'handoff_failed',
-            reason: 'provider_issue_rehydration_timeout',
-            task_id: claim.task_id,
-            run_id: claim.run_id,
-            run_manifest_path: claim.run_manifest_path,
-            ...queuedRetryFields
-          });
-          upsertProviderIntakeClaim(options.state, {
+        if (claim.state === 'accepted') {
+          if (hasQueuedProviderIntakeRetry(claim)) {
+            if (!isValidProviderRetryTimestamp(claim.retry_due_at)) {
+              const queuedRetryFields = buildQueuedProviderRetryFields({
+                claim,
+                previousRun: null,
+                error: claim.retry_error ?? null,
+                preserveCurrentAttempt: true,
+                preserveExistingDueAt: true,
+                delayType: resolveProviderRetryDelayType({
+                  claim,
+                  previousRun: null
+                })
+              });
+              const nextReason = claim.reason ?? 'provider_issue_rehydration_pending_revalidation';
+              publishRuntime ||= hasProviderClaimTransitioned(claim, {
+                state: 'accepted',
+                reason: nextReason,
+                task_id: claim.task_id,
+                run_id: claim.run_id,
+                run_manifest_path: claim.run_manifest_path,
+                ...queuedRetryFields
+              });
+              upsertRehydratedProviderIntakeClaim({
+                ...claim,
+                launch_source: undefined,
+                launch_token: undefined,
+                state: 'accepted',
+                reason: nextReason,
+                ...queuedRetryFields,
+                updated_at: now
+              });
+            }
+            continue;
+          }
+          upsertRehydratedProviderIntakeClaim({
             ...claim,
             launch_source: undefined,
             launch_token: undefined,
-            state: 'handoff_failed',
-            reason: 'provider_issue_rehydration_timeout',
-            ...queuedRetryFields,
+            state: 'accepted',
+            reason: 'provider_issue_rehydration_pending_revalidation',
+            updated_at: now
+          });
+        }
+
+        if (claim.state === 'running' || claim.state === 'resumable') {
+          publishRuntime ||= hasProviderClaimTransitioned(claim, {
+            state: 'accepted',
+            reason: 'provider_issue_rehydration_pending_revalidation',
+            task_id: claim.task_id,
+            run_id: claim.run_id,
+            run_manifest_path: claim.run_manifest_path,
+            retry_queued: claim.retry_queued ?? null,
+            retry_attempt: claim.retry_attempt ?? null,
+            retry_due_at: claim.retry_due_at ?? null,
+            retry_error: claim.retry_error ?? null
+          });
+          upsertRehydratedProviderIntakeClaim({
+            ...claim,
+            launch_source: undefined,
+            launch_token: undefined,
+            state: 'accepted',
+            reason: 'provider_issue_rehydration_pending_revalidation',
             updated_at: now
           });
           continue;
         }
-
-        hasPendingClaims = true;
-        continue;
       }
 
-      if (claim.state === 'accepted') {
-        if (hasQueuedProviderIntakeRetry(claim)) {
-          if (!isValidProviderRetryTimestamp(claim.retry_due_at)) {
-            const queuedRetryFields = buildQueuedProviderRetryFields({
-              claim,
-              previousRun: null,
-              error: claim.retry_error ?? null,
-              preserveCurrentAttempt: true,
-              preserveExistingDueAt: true,
-              delayType: resolveProviderRetryDelayType({
-                claim,
-                previousRun: null
-              })
-            });
-            const nextReason = claim.reason ?? 'provider_issue_rehydration_pending_revalidation';
-            publishRuntime ||= hasProviderClaimTransitioned(claim, {
-              state: 'accepted',
-              reason: nextReason,
-              task_id: claim.task_id,
-              run_id: claim.run_id,
-              run_manifest_path: claim.run_manifest_path,
-              ...queuedRetryFields
-            });
-            upsertProviderIntakeClaim(options.state, {
-              ...claim,
-              launch_source: undefined,
-              launch_token: undefined,
-              state: 'accepted',
-              reason: nextReason,
-              ...queuedRetryFields,
-              updated_at: now
-            });
+      assertRehydrateLifecycleCurrent();
+      markProviderIntakeRehydrated(options.state, now);
+      await persistStateOrRollback(rehydrateRollbackSnapshot, { rollbackOnPersistFailure: false });
+      if (publishRuntime) {
+        assertRefreshLifecycleCurrent();
+        options.publishRuntime?.('provider-intake.rehydrate');
+      }
+      return { hasPendingClaims };
+    };
+
+    return await providerStatePersistedSnapshotObserverScope.run(
+      rehydratePersistedSnapshotObserver,
+      async () => {
+        try {
+          return await runRehydrate();
+        } catch (error) {
+          if (isRefreshLifecycleStuckError(error)) {
+            restoreRehydrateRollbackSnapshot();
           }
-          continue;
+          throw error;
         }
-        upsertProviderIntakeClaim(options.state, {
-          ...claim,
-          launch_source: undefined,
-          launch_token: undefined,
-          state: 'accepted',
-          reason: 'provider_issue_rehydration_pending_revalidation',
-          updated_at: now
-        });
       }
-
-      if (claim.state === 'running' || claim.state === 'resumable') {
-        publishRuntime ||= hasProviderClaimTransitioned(claim, {
-          state: 'accepted',
-          reason: 'provider_issue_rehydration_pending_revalidation',
-          task_id: claim.task_id,
-          run_id: claim.run_id,
-          run_manifest_path: claim.run_manifest_path,
-          retry_queued: claim.retry_queued ?? null,
-          retry_attempt: claim.retry_attempt ?? null,
-          retry_due_at: claim.retry_due_at ?? null,
-          retry_error: claim.retry_error ?? null
-        });
-        upsertProviderIntakeClaim(options.state, {
-          ...claim,
-          launch_source: undefined,
-          launch_token: undefined,
-          state: 'accepted',
-          reason: 'provider_issue_rehydration_pending_revalidation',
-          updated_at: now
-        });
-        continue;
-      }
-    }
-
-    markProviderIntakeRehydrated(options.state, now);
-    await persistStateOrRollback(rehydrateSnapshot, { rollbackOnPersistFailure: false });
-    if (publishRuntime) {
-      options.publishRuntime?.('provider-intake.rehydrate');
-    }
-    return { hasPendingClaims };
+    );
   };
 
   const ensureQueuedProviderRetryDeadline = async (input: {

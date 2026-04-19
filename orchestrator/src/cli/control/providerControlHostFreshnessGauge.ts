@@ -388,7 +388,10 @@ async function readGaugeArtifacts(
   linearBudgetState: JsonArtifact[];
 }> {
   const providerIntakeStates = await readJsonArtifacts(sources.provider_intake_state, findings);
-  const claimLinkedSources = await discoverClaimLinkedRunArtifactSources(providerIntakeStates);
+  const latestProviderIntakeState = selectLatestJsonArtifact(providerIntakeStates);
+  const claimLinkedSources = await discoverClaimLinkedRunArtifactSources(
+    latestProviderIntakeState ? [latestProviderIntakeState] : []
+  );
   appendUnique(sources.provider_manifests, claimLinkedSources.provider_manifests);
   appendUnique(sources.provider_proofs, claimLinkedSources.provider_proofs);
   const [

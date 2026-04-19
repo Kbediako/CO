@@ -2246,6 +2246,548 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('rolls back earlier rehydrate mutations when a later metadata refresh becomes stale', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:00:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const activeEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-later-reset'
+    };
+    const activePaths = resolveRunPaths(activeEnv, 'run-later-reset');
+    await mkdir(activePaths.runDir, { recursive: true });
+    await writeFile(
+      activePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-later-reset',
+        task_id: 'linear-lin-later-reset',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-later-reset',
+        issue_identifier: 'CO-48',
+        updated_at: '2026-03-19T04:02:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(
+      createProviderClaim({
+        issue_id: 'lin-earlier-accepted',
+        issue_identifier: 'CO-47',
+        state: 'accepted',
+        reason: null,
+        updated_at: '2026-03-19T03:59:00.000Z'
+      }),
+      createProviderClaim({
+        issue_id: 'lin-later-reset',
+        issue_identifier: 'CO-48',
+        task_id: 'linear-lin-later-reset',
+        run_id: 'run-later-reset',
+        run_manifest_path: activePaths.manifestPath,
+        state: 'running',
+        reason: 'provider_issue_start_launched',
+        updated_at: '2026-03-19T04:00:30.000Z'
+      })
+    );
+
+    let releaseTrackedIssue: (() => void) | null = null;
+    const resolveTrackedIssue = vi.fn(async () => {
+      await new Promise<void>((resolve) => {
+        releaseTrackedIssue = resolve;
+      });
+      return {
+        kind: 'ready' as const,
+        trackedIssue: createTrackedIssue({
+          id: 'lin-later-reset',
+          identifier: 'CO-48',
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-03-19T04:05:00.000Z'
+        })
+      };
+    });
+    const persist = vi.fn(async () => undefined);
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      resolveTrackedIssue
+    });
+
+    const staleRehydrate = service.rehydrate();
+    await waitForMockCalls(resolveTrackedIssue, 1);
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-earlier-accepted')).toMatchObject({
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation'
+    });
+
+    service.resetStuckRefreshLifecycle?.();
+    releaseTrackedIssue?.();
+
+    await expect(staleRehydrate).rejects.toThrow('provider_refresh_lifecycle_stuck');
+    expect(persist).not.toHaveBeenCalled();
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-earlier-accepted')).toMatchObject({
+      state: 'accepted',
+      reason: null,
+      updated_at: '2026-03-19T03:59:00.000Z'
+    });
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-later-reset')).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_start_launched',
+      run_id: 'run-later-reset',
+      run_manifest_path: activePaths.manifestPath
+    });
+  });
+
+  it('keeps earlier nested rehydrate persists when a later metadata refresh becomes stale', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:00:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const promotedEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-promoted-before-reset'
+    };
+    const promotedPaths = resolveRunPaths(promotedEnv, 'run-promoted-before-reset');
+    await mkdir(promotedPaths.runDir, { recursive: true });
+    await writeFile(
+      promotedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-promoted-before-reset',
+        task_id: promotedEnv.taskId,
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-promoted-before-reset',
+        issue_identifier: 'CO-47',
+        issue_updated_at: '2026-03-19T04:01:00.000Z',
+        updated_at: '2026-03-19T04:02:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const activeEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-later-reset'
+    };
+    const activePaths = resolveRunPaths(activeEnv, 'run-later-reset');
+    await mkdir(activePaths.runDir, { recursive: true });
+    await writeFile(
+      activePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-later-reset',
+        task_id: activeEnv.taskId,
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-later-reset',
+        issue_identifier: 'CO-48',
+        issue_updated_at: '2026-03-19T04:01:30.000Z',
+        updated_at: '2026-03-19T04:02:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(
+      createProviderClaim({
+        issue_id: 'lin-promoted-before-reset',
+        issue_identifier: 'CO-47',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-19T04:00:00.000Z',
+        task_id: promotedEnv.taskId,
+        state: 'completed',
+        reason: 'provider_issue_rehydrated_completed_run',
+        updated_at: '2026-03-19T04:00:10.000Z'
+      }),
+      createProviderClaim({
+        issue_id: 'lin-later-reset',
+        issue_identifier: 'CO-48',
+        task_id: activeEnv.taskId,
+        run_id: 'run-later-reset',
+        run_manifest_path: activePaths.manifestPath,
+        state: 'running',
+        reason: 'provider_issue_start_launched',
+        updated_at: '2026-03-19T04:00:30.000Z'
+      })
+    );
+
+    let releaseTrackedIssue: (() => void) | null = null;
+    const resolveTrackedIssue = vi.fn(async (input) => {
+      if (input.issueId === 'lin-promoted-before-reset') {
+        return {
+          kind: 'ready' as const,
+          trackedIssue: createTrackedIssue({
+            id: 'lin-promoted-before-reset',
+            identifier: 'CO-47',
+            state: 'In Review',
+            state_type: 'started',
+            updated_at: '2026-03-19T04:05:00.000Z'
+          })
+        };
+      }
+      await new Promise<void>((resolve) => {
+        releaseTrackedIssue = resolve;
+      });
+      return {
+        kind: 'ready' as const,
+        trackedIssue: createTrackedIssue({
+          id: 'lin-later-reset',
+          identifier: 'CO-48',
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-03-19T04:06:00.000Z'
+        })
+      };
+    });
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const runReviewHandoffPromotion = vi.fn(async () => ({
+      recorded_at: '2026-03-19T04:05:00.000Z',
+      issue_id: 'lin-promoted-before-reset',
+      issue_identifier: 'CO-47',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:05:00.000Z',
+      status: 'promoted' as const,
+      reason: 'promoted_to_merging',
+      summary: 'Promoted attached PR from review handoff into Merging.',
+      attached_pr_urls: ['https://github.com/asabeko/CO/pull/552'],
+      ignored_historical_pr_urls: [],
+      conflicting_attached_pr_urls: [],
+      pr: {
+        url: 'https://github.com/asabeko/CO/pull/552',
+        owner: 'asabeko',
+        repo: 'CO',
+        number: 552
+      },
+      snapshot: {
+        state: 'OPEN',
+        review_decision: 'APPROVED',
+        merge_state_status: 'CLEAN',
+        ready_to_merge: true,
+        gate_reasons: [],
+        action_required_reasons: [],
+        unresolved_thread_count: 0,
+        checks_pending: 0,
+        checks_failed: 0,
+        required_checks_pending: 0,
+        required_checks_failed: 0,
+        updated_at: '2026-03-19T04:04:30.000Z',
+        merged_at: null,
+        head_oid: 'abc123'
+      },
+      linear_transition: {
+        status: 'transitioned',
+        attempted_at: '2026-03-19T04:05:00.000Z',
+        previous_state: 'In Review',
+        target_state: 'Merging',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-19T04:05:00.000Z',
+        error: null
+      }
+    }));
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      resolveTrackedIssue,
+      runReviewHandoffPromotion
+    });
+
+    const staleRehydrate = service.rehydrate();
+    await waitForMockCalls(persist, 1);
+    await waitForMockCalls(resolveTrackedIssue, 2);
+    expect(getPersistedState().claims[0]).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_review_promotion_promoted',
+      issue_state: 'Merging'
+    });
+
+    service.resetStuckRefreshLifecycle?.();
+    releaseTrackedIssue?.();
+
+    await expect(staleRehydrate).rejects.toThrow('provider_refresh_lifecycle_stuck');
+    expect(state.claims[0]).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_review_promotion_promoted',
+      issue_state: 'Merging'
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_review_promotion_promoted',
+      issue_state: 'Merging'
+    });
+    expect(state.claims[1]).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_start_launched',
+      run_id: 'run-later-reset',
+      run_manifest_path: activePaths.manifestPath
+    });
+  });
+
+  it('keeps replacement rehydrate rollback tracking after a stale rehydrate unwinds', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:00:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const blockerEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-blocker'
+    };
+    const blockerPaths = resolveRunPaths(blockerEnv, 'run-blocker');
+    await mkdir(blockerPaths.runDir, { recursive: true });
+    await writeFile(
+      blockerPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-blocker',
+        task_id: blockerEnv.taskId,
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-blocker',
+        issue_identifier: 'CO-46',
+        updated_at: '2026-03-19T04:01:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const promotedEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-replacement-promoted'
+    };
+    const promotedPaths = resolveRunPaths(promotedEnv, 'run-replacement-promoted');
+    await mkdir(promotedPaths.runDir, { recursive: true });
+    await writeFile(
+      promotedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-replacement-promoted',
+        task_id: promotedEnv.taskId,
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-replacement-promoted',
+        issue_identifier: 'CO-47',
+        updated_at: '2026-03-19T04:02:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const laterEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-replacement-later-reset'
+    };
+    const laterPaths = resolveRunPaths(laterEnv, 'run-replacement-later-reset');
+    await mkdir(laterPaths.runDir, { recursive: true });
+    await writeFile(
+      laterPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-replacement-later-reset',
+        task_id: laterEnv.taskId,
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-replacement-later-reset',
+        issue_identifier: 'CO-48',
+        updated_at: '2026-03-19T04:03:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(
+      createProviderClaim({
+        issue_id: 'lin-blocker',
+        issue_identifier: 'CO-46',
+        issue_updated_at: '2026-03-19T04:00:00.000Z',
+        task_id: blockerEnv.taskId,
+        run_id: 'run-blocker',
+        run_manifest_path: blockerPaths.manifestPath,
+        state: 'running',
+        reason: 'provider_issue_start_launched'
+      }),
+      createProviderClaim({
+        issue_id: 'lin-replacement-promoted',
+        issue_identifier: 'CO-47',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-19T04:00:30.000Z',
+        task_id: promotedEnv.taskId,
+        state: 'completed',
+        reason: 'provider_issue_rehydrated_completed_run'
+      }),
+      createProviderClaim({
+        issue_id: 'lin-replacement-later-reset',
+        issue_identifier: 'CO-48',
+        issue_updated_at: '2026-03-19T04:01:00.000Z',
+        task_id: laterEnv.taskId,
+        run_id: 'run-replacement-later-reset',
+        run_manifest_path: laterPaths.manifestPath,
+        state: 'running',
+        reason: 'provider_issue_start_launched'
+      })
+    );
+
+    let blockerCallCount = 0;
+    let releaseStaleBlocker: (() => void) | null = null;
+    let releaseReplacementBlocker: (() => void) | null = null;
+    let releaseLaterReset: (() => void) | null = null;
+    const resolveTrackedIssue = vi.fn(async (input) => {
+      if (input.issueId === 'lin-blocker') {
+        blockerCallCount += 1;
+        await new Promise<void>((resolve) => {
+          if (blockerCallCount === 1) {
+            releaseStaleBlocker = resolve;
+          } else {
+            releaseReplacementBlocker = resolve;
+          }
+        });
+        return {
+          kind: 'ready' as const,
+          trackedIssue: createTrackedIssue({
+            id: 'lin-blocker',
+            identifier: 'CO-46',
+            state: 'In Progress',
+            state_type: 'started',
+            updated_at: '2026-03-19T04:05:00.000Z'
+          })
+        };
+      }
+      if (input.issueId === 'lin-replacement-promoted') {
+        return {
+          kind: 'ready' as const,
+          trackedIssue: createTrackedIssue({
+            id: 'lin-replacement-promoted',
+            identifier: 'CO-47',
+            state: 'In Review',
+            state_type: 'started',
+            updated_at: '2026-03-19T04:06:00.000Z'
+          })
+        };
+      }
+      await new Promise<void>((resolve) => {
+        releaseLaterReset = resolve;
+      });
+      return {
+        kind: 'ready' as const,
+        trackedIssue: createTrackedIssue({
+          id: 'lin-replacement-later-reset',
+          identifier: 'CO-48',
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-03-19T04:07:00.000Z'
+        })
+      };
+    });
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const runReviewHandoffPromotion = vi.fn(async () => ({
+      recorded_at: '2026-03-19T04:06:00.000Z',
+      issue_id: 'lin-replacement-promoted',
+      issue_identifier: 'CO-47',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:06:00.000Z',
+      status: 'promoted' as const,
+      reason: 'promoted_to_merging',
+      summary: 'Promoted attached PR from review handoff into Merging.',
+      attached_pr_urls: ['https://github.com/asabeko/CO/pull/552'],
+      ignored_historical_pr_urls: [],
+      conflicting_attached_pr_urls: [],
+      pr: {
+        url: 'https://github.com/asabeko/CO/pull/552',
+        owner: 'asabeko',
+        repo: 'CO',
+        number: 552
+      },
+      snapshot: {
+        state: 'OPEN',
+        review_decision: 'APPROVED',
+        merge_state_status: 'CLEAN',
+        ready_to_merge: true,
+        gate_reasons: [],
+        action_required_reasons: [],
+        unresolved_thread_count: 0,
+        checks_pending: 0,
+        checks_failed: 0,
+        required_checks_pending: 0,
+        required_checks_failed: 0,
+        updated_at: '2026-03-19T04:05:30.000Z',
+        merged_at: null,
+        head_oid: 'abc123'
+      },
+      linear_transition: {
+        status: 'transitioned',
+        attempted_at: '2026-03-19T04:06:00.000Z',
+        previous_state: 'In Review',
+        target_state: 'Merging',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-19T04:06:00.000Z',
+        error: null
+      }
+    }));
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      resolveTrackedIssue,
+      runReviewHandoffPromotion
+    });
+
+    const staleRehydrate = service.rehydrate();
+    await waitForMockCalls(resolveTrackedIssue, 1);
+    service.resetStuckRefreshLifecycle?.();
+
+    const replacementRehydrate = service.rehydrate();
+    await waitForCondition(() => blockerCallCount === 2);
+    releaseStaleBlocker?.();
+    await expect(staleRehydrate).rejects.toThrow('provider_refresh_lifecycle_stuck');
+
+    releaseReplacementBlocker?.();
+    await waitForMockCalls(persist, 1);
+    await waitForCondition(() =>
+      resolveTrackedIssue.mock.calls.some(([input]) =>
+        (input as { issueId?: string }).issueId === 'lin-replacement-later-reset'
+      )
+    );
+    service.resetStuckRefreshLifecycle?.();
+    releaseLaterReset?.();
+
+    await expect(replacementRehydrate).rejects.toThrow('provider_refresh_lifecycle_stuck');
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-replacement-promoted')).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_review_promotion_promoted',
+      issue_state: 'Merging'
+    });
+    expect(getPersistedState().claims.find((claim) => claim.issue_id === 'lin-replacement-promoted')).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_review_promotion_promoted',
+      issue_state: 'Merging'
+    });
+  });
+
   it('rolls back a stale refresh claim mutation when the lifecycle reset lands during persist', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-19T04:00:00.000Z'));
