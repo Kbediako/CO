@@ -26,6 +26,7 @@ import type { ProviderWorkflowConfigStore } from './providerWorkflowConfigStore.
 import {
   initializeProviderPollingHealth,
   isProviderPollingStuck,
+  flushProviderPollingHealthUpdates,
   markProviderPollingStuck,
   markProviderPollingCompleted,
   markProviderPollingStarted,
@@ -35,6 +36,7 @@ import {
   type ControlPollingMode
 } from './providerPollingHealth.js';
 import {
+  beginClosingControlServerHttpServer,
   closeControlServerOwnedRuntime,
   startControlServerReadyInstanceLifecycle,
   type ControlServerOwnedLifecycleState
@@ -48,6 +50,7 @@ import {
 const EXPIRY_INTERVAL_MS = 15_000;
 const PROVIDER_REFRESH_INTERVAL_MS = 15_000;
 const PROVIDER_REFRESH_STUCK_AFTER_MS = 45_000;
+const PROVIDER_CLOSE_STUCK_DRAIN_GRACE_MS = 1_000;
 const PROVIDER_FULL_RECOVERY_SWEEP_INTERVAL_MS = 10 * 60 * 1000;
 const SESSION_TTL_MS = 15 * 60 * 1000;
 interface ProviderIssueHandoffOperationState {
@@ -220,20 +223,54 @@ export async function closeControlServerPublicLifecycle(
   if (state.providerRefreshTimer) {
     state.providerRefreshTimer.cancel();
   }
+  const serverClosePromise = beginClosingControlServerHttpServer(state.server);
+  void serverClosePromise.catch(() => undefined);
+  const providerIssueHandoff = state.requestContextShared.providerIssueHandoff ?? null;
   let closeError: unknown = null;
+  const captureCloseError = (error: unknown): void => {
+    if (closeError === null) {
+      closeError = error;
+    }
+  };
+
+  if (providerIssueHandoff) {
+    try {
+      await waitForProviderIssueHandoffQueueToDrain(
+        providerIssueHandoff,
+        () => resolveProviderIssueHandoffWatchdogDelayMs(providerIssueHandoff),
+        { settleStuckPending: true }
+      );
+      await flushProviderPollingHealthUpdates(providerIssueHandoff);
+    } catch (error) {
+      captureCloseError(error);
+    }
+  }
   try {
     await closeControlServerOwnedRuntime({
       server: state.server,
       requestContextShared: state.requestContextShared,
-      lifecycleState: state.lifecycleState
+      lifecycleState: state.lifecycleState,
+      serverClosePromise
     });
   } catch (error) {
-    closeError = error;
+    captureCloseError(error);
   }
-  if (closeError) {
+
+  try {
+    await serverClosePromise;
+  } catch (error) {
+    captureCloseError(error);
+  }
+
+  try {
+    await state.controlHostOwnership?.release();
+  } catch (error) {
+    captureCloseError(error);
+  }
+
+  if (closeError !== null) {
     throw closeError;
   }
-  await state.controlHostOwnership?.release();
 }
 
 export function runProviderIssueHandoffRefresh(
@@ -439,13 +476,8 @@ function createProviderRefreshCoordinator(
       operation: 'dispatch_source_tracked_issues'
     });
 
-  const resolveWatchdogDelayMs = (): number => {
-    const health = readProviderPollingHealth(providerIssueHandoff);
-    if (!health?.checking || health.operation_elapsed_ms === null) {
-      return PROVIDER_REFRESH_STUCK_AFTER_MS;
-    }
-    return Math.max(0, PROVIDER_REFRESH_STUCK_AFTER_MS - health.operation_elapsed_ms);
-  };
+  const resolveWatchdogDelayMs = (): number =>
+    resolveProviderIssueHandoffWatchdogDelayMs(providerIssueHandoff);
 
   const shouldRunFullRecoverySweep = (nowMs: number): boolean =>
     lastSuccessfulFullRecoverySweepAtMs === null ||
@@ -555,6 +587,16 @@ function scheduleStartupProviderRefresh(trigger: () => Promise<void>): NodeJS.Ti
   }, 0);
   startupTrigger.unref?.();
   return startupTrigger;
+}
+
+function resolveProviderIssueHandoffWatchdogDelayMs(
+  providerIssueHandoff: ProviderIssueHandoffService
+): number {
+  const health = readProviderPollingHealth(providerIssueHandoff);
+  if (!health?.checking || health.operation_elapsed_ms === null) {
+    return PROVIDER_REFRESH_STUCK_AFTER_MS;
+  }
+  return Math.max(0, PROVIDER_REFRESH_STUCK_AFTER_MS - health.operation_elapsed_ms);
 }
 
 async function resolveProviderPollTrackedIssues(
@@ -791,7 +833,8 @@ function detachProviderIssueHandoffPending(pending: Promise<void> | null): void 
 
 async function waitForProviderIssueHandoffQueueToDrain(
   providerIssueHandoff: ProviderIssueHandoffService,
-  resolveWatchdogDelayMs: () => number
+  resolveWatchdogDelayMs: () => number,
+  options: { settleStuckPending?: boolean; stuckPendingGraceMs?: number } = {}
 ): Promise<void> {
   for (;;) {
     const state = getProviderIssueHandoffOperationState(providerIssueHandoff);
@@ -800,6 +843,10 @@ async function waitForProviderIssueHandoffQueueToDrain(
       return;
     }
     if (await resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff)) {
+      if (options.settleStuckPending) {
+        await settleProviderIssueHandoffStuckPending(providerIssueHandoff, state, pending, options);
+        continue;
+      }
       return;
     }
     try {
@@ -810,10 +857,52 @@ async function waitForProviderIssueHandoffQueueToDrain(
       );
     } catch {
       if (await resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff)) {
+        if (options.settleStuckPending) {
+          await settleProviderIssueHandoffStuckPending(providerIssueHandoff, state, pending, options);
+          continue;
+        }
         return;
       }
     }
   }
+}
+
+async function settleProviderIssueHandoffStuckPending(
+  providerIssueHandoff: ProviderIssueHandoffService,
+  state: ProviderIssueHandoffOperationState,
+  pending: Promise<void>,
+  options: { stuckPendingGraceMs?: number }
+): Promise<void> {
+  let timeout: NodeJS.Timeout | null = null;
+  const graceMs = Math.max(
+    0,
+    options.stuckPendingGraceMs ?? PROVIDER_CLOSE_STUCK_DRAIN_GRACE_MS
+  );
+  const outcome = await Promise.race([
+    pending.then(
+      () => 'settled' as const,
+      () => 'settled' as const
+    ),
+    new Promise<'timed_out'>((resolve) => {
+      timeout = setTimeout(() => resolve('timed_out'), graceMs);
+      timeout.unref?.();
+    })
+  ]);
+  if (timeout) {
+    clearTimeout(timeout);
+  }
+  if (outcome === 'settled') {
+    return;
+  }
+  detachProviderIssueHandoffPending(pending);
+  providerIssueHandoff.resetStuckRefreshLifecycle?.();
+  if (state.active === pending) {
+    state.active = null;
+  }
+  if (state.queuedRefresh === pending) {
+    state.queuedRefresh = null;
+  }
+  clearProviderIssueHandoffOperationState(providerIssueHandoff, state);
 }
 
 function getProviderIssueHandoffOperationState(

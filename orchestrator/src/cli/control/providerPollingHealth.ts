@@ -295,6 +295,19 @@ export function readProviderPollingHealth(
   return buildProviderPollingHealthPayload(state, nowMs);
 }
 
+export async function flushProviderPollingHealthUpdates(
+  providerIssueHandoff: ProviderIssueHandoffService | null | undefined
+): Promise<void> {
+  if (!providerIssueHandoff) {
+    return;
+  }
+  const state = providerPollingHealthStates.get(providerIssueHandoff);
+  if (!state) {
+    return;
+  }
+  await state.updateChain;
+}
+
 export function resolveControlPollingNextRefreshProjection(input: {
   checking: boolean;
   nextPollAt?: string | null;
