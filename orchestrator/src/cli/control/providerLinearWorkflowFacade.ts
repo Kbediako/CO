@@ -239,6 +239,7 @@ const LINEAR_ISSUE_LOWERCASE_SETEXT_AMBIGUOUS_COMMAND_SUBCOMMANDS = new Set([
 const LINEAR_WORKFLOW_COMMENT_LIMIT = 50;
 const LINEAR_WORKFLOW_STATE_LIMIT = 50;
 const LINEAR_WORKFLOW_ATTACHMENT_LIMIT = 20;
+const ISSUE_CONTEXT_PULL_REQUEST_HYDRATION_CONCURRENCY = 4;
 const PROVIDER_LINEAR_ISSUE_CONTEXT_CACHE_FILENAME = 'provider-linear-issue-context-cache.json';
 const PROVIDER_LINEAR_DIRECT_MUTATION_CACHE_MAX_AGE_MS = 10_000;
 const PROVIDER_LINEAR_LOW_HEADROOM_READ_CACHE_MAX_AGE_MS = 60_000;
@@ -971,26 +972,63 @@ interface ProviderLinearIssuePullRequestCandidate {
   };
 }
 
+interface ProviderLinearIssuePullRequestAttachmentCandidate {
+  attachment: ProviderLinearWorkflowAttachment;
+  owner: string;
+  repo: string;
+  prNumber: number;
+}
+
+interface ProviderLinearIssuePullRequestHydrationResult {
+  candidate: ProviderLinearIssuePullRequestAttachmentCandidate;
+  snapshot: ProviderLinearIssuePullRequestCandidate['snapshot'] | null;
+}
+
+async function mapWithConcurrencyLimit<T, R>(
+  items: readonly T[],
+  concurrency: number,
+  mapper: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  if (items.length === 0) {
+    return [];
+  }
+  const workerCount = Math.min(Math.max(1, Math.trunc(concurrency)), items.length);
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (nextIndex < items.length) {
+        const currentIndex = nextIndex;
+        nextIndex += 1;
+        results[currentIndex] = await mapper(items[currentIndex]!, currentIndex);
+      }
+    })
+  );
+  return results;
+}
+
 async function hydrateIssuePullRequestAttachments(
   issue: ProviderLinearIssueContext,
   resolvePullRequestSnapshot: (input: ProviderLinearPullRequestSnapshotResolverInput) => Promise<unknown>
 ): Promise<ProviderLinearIssueContext> {
   const seenComparisonKeys = new Set<string>();
-  const pullRequestAttachments = issue.attachments.flatMap((attachment) => {
-    const parsed = parseGitHubPullRequestUrl(attachment.url);
-    if (!parsed || seenComparisonKeys.has(parsed.comparisonKey)) {
-      return [];
-    }
-    seenComparisonKeys.add(parsed.comparisonKey);
-    return parsed
-      ? [{
+  const pullRequestAttachments: ProviderLinearIssuePullRequestAttachmentCandidate[] = issue.attachments.flatMap(
+    (attachment) => {
+      const parsed = parseGitHubPullRequestUrl(attachment.url);
+      if (!parsed || seenComparisonKeys.has(parsed.comparisonKey)) {
+        return [];
+      }
+      seenComparisonKeys.add(parsed.comparisonKey);
+      return [
+        {
           attachment,
           owner: parsed.owner,
           repo: parsed.repo,
           prNumber: parsed.number
-        }]
-      : [];
-  });
+        }
+      ];
+    }
+  );
   if (pullRequestAttachments.length === 0) {
     return {
       ...issue,
@@ -1000,26 +1038,41 @@ async function hydrateIssuePullRequestAttachments(
 
   const resolved: ProviderLinearIssuePullRequestCandidate[] = [];
   const unknown: ProviderLinearWorkflowAttachment[] = [];
-  for (const candidate of pullRequestAttachments) {
-    try {
-      const rawSnapshot = await resolvePullRequestSnapshot({
-        owner: candidate.owner,
-        repo: candidate.repo,
-        prNumber: candidate.prNumber,
-        readinessMode: 'merge'
-      });
-      const snapshot = mapIssuePullRequestAttachmentSnapshot(rawSnapshot);
-      if (!snapshot) {
-        unknown.push(candidate.attachment);
-        continue;
+  const hydrationResults = await mapWithConcurrencyLimit<
+    ProviderLinearIssuePullRequestAttachmentCandidate,
+    ProviderLinearIssuePullRequestHydrationResult
+  >(
+    pullRequestAttachments,
+    ISSUE_CONTEXT_PULL_REQUEST_HYDRATION_CONCURRENCY,
+    async (candidate) => {
+      try {
+        const rawSnapshot = await resolvePullRequestSnapshot({
+          owner: candidate.owner,
+          repo: candidate.repo,
+          prNumber: candidate.prNumber,
+          readinessMode: 'merge'
+        });
+        return {
+          candidate,
+          snapshot: mapIssuePullRequestAttachmentSnapshot(rawSnapshot)
+        };
+      } catch {
+        return {
+          candidate,
+          snapshot: null
+        };
       }
-      resolved.push({
-        attachment: candidate.attachment,
-        snapshot
-      });
-    } catch {
-      unknown.push(candidate.attachment);
     }
+  );
+  for (const { candidate, snapshot } of hydrationResults) {
+    if (!snapshot) {
+      unknown.push(candidate.attachment);
+      continue;
+    }
+    resolved.push({
+      attachment: candidate.attachment,
+      snapshot
+    });
   }
 
   return {

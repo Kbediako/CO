@@ -559,11 +559,33 @@ function buildGitHubAttachment(id: string, prNumber: number, title = `PR ${prNum
   };
 }
 
+interface Deferred<T> {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (reason?: unknown) => void;
+}
+
+interface IssueContextTestPullRequestSnapshot {
+  state: string;
+  mergedAt: string | null;
+  updatedAt: string;
+}
+
+function createDeferred<T>(): Deferred<T> {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, resolve, reject };
+}
+
 async function readIssueContextAttachmentTruth(options: {
   title: string;
   state: { id: string; name: string; type: 'started' };
   attachments: Record<string, unknown>[];
-  snapshotForPr: (prNumber: number) => { state: string; mergedAt: string | null; updatedAt: string };
+  snapshotForPr: (prNumber: number) => unknown | Promise<unknown>;
 }) {
   const fetchImpl: typeof fetch = vi.fn(async () =>
     jsonResponse(
@@ -1560,6 +1582,134 @@ describe('providerLinearWorkflowFacade', () => {
           ],
           conflicting: [],
           unknown: []
+        }
+      }
+    });
+  });
+
+  it('hydrates issue-context PR attachment snapshots with bounded concurrency', async () => {
+    const startedPrs: number[] = [];
+    const deferredByPr = new Map<number, Deferred<IssueContextTestPullRequestSnapshot>>();
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const buildSnapshot = (prNumber: number) => ({
+      state: 'MERGED',
+      mergedAt: `2026-04-17T13:${String(prNumber - 500).padStart(2, '0')}:00.000Z`,
+      updatedAt: `2026-04-17T13:${String(prNumber - 500).padStart(2, '0')}:00.000Z`
+    });
+
+    const issueContextPromise = readIssueContextAttachmentTruth({
+      title: 'Many attached PR snapshots',
+      state: {
+        id: 'state-human-review',
+        name: 'Human Review',
+        type: 'started'
+      },
+      attachments: [501, 502, 503, 504, 505, 506].map((prNumber) =>
+        buildGitHubAttachment(`attachment-pr-${prNumber}`, prNumber)
+      ),
+      snapshotForPr: async (prNumber) => {
+        startedPrs.push(prNumber);
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        const deferred = createDeferred<IssueContextTestPullRequestSnapshot>();
+        deferredByPr.set(prNumber, deferred);
+        try {
+          return await deferred.promise;
+        } finally {
+          inFlight -= 1;
+        }
+      }
+    });
+
+    await vi.waitFor(() => expect(startedPrs).toEqual([501, 502, 503, 504]));
+    expect(maxInFlight).toBe(4);
+    expect(deferredByPr.has(505)).toBe(false);
+
+    deferredByPr.get(501)!.resolve(buildSnapshot(501));
+    await vi.waitFor(() => expect(startedPrs).toEqual([501, 502, 503, 504, 505]));
+    expect(maxInFlight).toBe(4);
+    expect(deferredByPr.has(506)).toBe(false);
+
+    deferredByPr.get(502)!.resolve(buildSnapshot(502));
+    await vi.waitFor(() => expect(startedPrs).toEqual([501, 502, 503, 504, 505, 506]));
+    expect(maxInFlight).toBe(4);
+
+    for (const prNumber of [503, 504, 505, 506]) {
+      deferredByPr.get(prNumber)!.resolve(buildSnapshot(prNumber));
+    }
+
+    const { result, resolvePullRequestSnapshot } = await issueContextPromise;
+    expect(resolvePullRequestSnapshot).toHaveBeenCalledTimes(6);
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-506'
+          },
+          historical: [
+            { id: 'attachment-pr-501' },
+            { id: 'attachment-pr-502' },
+            { id: 'attachment-pr-503' },
+            { id: 'attachment-pr-504' },
+            { id: 'attachment-pr-505' }
+          ],
+          conflicting: [],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it('keeps failed and unrecognized bounded hydration results isolated as unknown', async () => {
+    const { result, resolvePullRequestSnapshot } = await readIssueContextAttachmentTruth({
+      title: 'Mixed bounded hydration outcomes',
+      state: { id: 'state-human-review', name: 'Human Review', type: 'started' },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-512', 512),
+        buildGitHubAttachment('attachment-pr-513', 513),
+        buildGitHubAttachment('attachment-pr-514', 514),
+        buildGitHubAttachment('attachment-pr-515', 515)
+      ],
+      snapshotForPr: (prNumber) => {
+        if (prNumber === 513) {
+          throw new Error('snapshot lookup failed');
+        }
+        if (prNumber === 514) {
+          return {};
+        }
+        return prNumber === 512
+          ? {
+              state: 'MERGED',
+              mergedAt: '2026-04-17T13:12:00.000Z',
+              updatedAt: '2026-04-17T13:12:00.000Z'
+            }
+          : {
+              state: 'MERGED',
+              mergedAt: '2026-04-17T13:15:00.000Z',
+              updatedAt: '2026-04-17T13:15:00.000Z'
+            };
+      }
+    });
+
+    expect(resolvePullRequestSnapshot).toHaveBeenCalledTimes(4);
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-515'
+          },
+          historical: [
+            {
+              id: 'attachment-pr-512'
+            }
+          ],
+          conflicting: [],
+          unknown: [{ id: 'attachment-pr-513' }, { id: 'attachment-pr-514' }]
         }
       }
     });
