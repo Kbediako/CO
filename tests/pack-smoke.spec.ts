@@ -272,13 +272,40 @@ type ShellFunctionState = {
   pendingDefinition: boolean;
 };
 
+function getShellFunctionOpenBraceIndexes(line: string, pendingDefinition: boolean): Set<number> {
+  const indexes = new Set<number>();
+  if (pendingDefinition) {
+    const pendingOpenMatch = line.match(/^\s*\{/u);
+    if (pendingOpenMatch?.index !== undefined) {
+      indexes.add(pendingOpenMatch.index + pendingOpenMatch[0].lastIndexOf('{'));
+    }
+  }
+  for (const match of line.matchAll(shellFunctionOpenPattern)) {
+    indexes.add((match.index ?? 0) + match[0].lastIndexOf('{'));
+  }
+  return indexes;
+}
+
 function updateShellFunctionState(depth: number, pendingDefinition: boolean, line: string): ShellFunctionState {
-  const opensPendingDefinition = pendingDefinition && /^\{\s*$/u.test(line);
-  const openCount = countMatches(line, shellFunctionOpenPattern) + (opensPendingDefinition ? 1 : 0);
-  const closeCount = countMatches(line, /(?:^|[;&]\s*)\}/gu);
+  const functionOpenBraceIndexes = getShellFunctionOpenBraceIndexes(line, pendingDefinition);
+  let nextDepth = depth;
+  for (let index = 0; index < line.length; index += 1) {
+    const current = line[index];
+    if (current === '\\') {
+      index += 1;
+      continue;
+    }
+    if (current === '{' && (nextDepth > 0 || functionOpenBraceIndexes.has(index))) {
+      nextDepth += 1;
+      continue;
+    }
+    if (current === '}' && nextDepth > 0) {
+      nextDepth -= 1;
+    }
+  }
   return {
-    depth: Math.max(0, depth + openCount - closeCount),
-    pendingDefinition: !opensPendingDefinition && shellFunctionSignaturePattern.test(line)
+    depth: nextDepth,
+    pendingDefinition: nextDepth === 0 && functionOpenBraceIndexes.size === 0 && shellFunctionSignaturePattern.test(line)
   };
 }
 
@@ -293,12 +320,17 @@ function getPackSmokeCommandOccurrences(run: string): PackSmokeCommandOccurrence
       const startIndex = match.index ?? 0;
       const commandOffset = match[0].search(/npm\s+run\s+pack:smoke/u);
       const commandStartIndex = startIndex + (commandOffset >= 0 ? commandOffset : 0);
+      const functionStateBeforeOccurrence = updateShellFunctionState(
+        functionDepth,
+        pendingFunctionDefinition,
+        line.slice(0, commandStartIndex)
+      );
       occurrences.push({
         startIndex,
         commandStartIndex,
         hasErrexitDisabled: updateErrexitDisabled(errexitDisabled, line.slice(0, commandStartIndex)),
         isInsideControlBlock: controlDepth > 0,
-        isInsideFunctionBlock: functionDepth > 0,
+        isInsideFunctionBlock: functionStateBeforeOccurrence.depth > 0,
         line,
         matchText: match[0],
         endIndex: startIndex + match[0].length
@@ -343,9 +375,10 @@ function hasFallbackShortCircuitBeforeOccurrence(beforeOccurrence: string): bool
 }
 
 function hasFunctionDefinitionBeforeOccurrence(beforeOccurrence: string): boolean {
-  const openCount = countMatches(beforeOccurrence, shellFunctionOpenPattern);
-  const closeCount = countMatches(beforeOccurrence, /(?:^|[;&]\s*)\}/gu);
-  return openCount > closeCount || shellFunctionOpenBeforeOccurrencePattern.test(beforeOccurrence);
+  return (
+    updateShellFunctionState(0, false, beforeOccurrence).depth > 0 ||
+    shellFunctionOpenBeforeOccurrencePattern.test(beforeOccurrence)
+  );
 }
 
 function isConditionPackSmokeOccurrence(occurrence: PackSmokeCommandOccurrence): boolean {
@@ -664,10 +697,19 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(hasNonBlockingPackSmokeCommand(`run_smoke ()\n{\n  ${packSmokeCommand}\n}`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`run_smoke() { ${packSmokeCommand}; }`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`run_smoke() { echo setup; ${packSmokeCommand}; }`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`run_smoke() { { echo setup; } ${packSmokeCommand}; }`)).toBe(
+      true
+    );
+    expect(hasNonBlockingPackSmokeCommand(`run_smoke() {\n  { echo setup; }\n  ${packSmokeCommand}\n}`)).toBe(
+      true
+    );
     expect(hasNonBlockingPackSmokeCommand(`function run_smoke() { echo setup; ${packSmokeCommand}; }`)).toBe(
       true
     );
     expect(hasNonBlockingPackSmokeCommand(`run_smoke() { echo setup; }; ${packSmokeCommand}`)).toBe(false);
+    expect(hasNonBlockingPackSmokeCommand(`run_smoke() { { echo setup; } }; ${packSmokeCommand}`)).toBe(
+      false
+    );
     expect(hasNonBlockingPackSmokeCommand(`{ ${packSmokeCommand}; }`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`set +e\n${packSmokeCommand}`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`set +e; ${packSmokeCommand}`)).toBe(true);
