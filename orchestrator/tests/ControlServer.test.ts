@@ -4012,6 +4012,188 @@ describe('ControlServer', () => {
     }
   });
 
+  it('suppresses stale advisory tracked fallback when current selected identity disagrees', async () => {
+    const { root, env, paths } = await createRunRoot('task-1014-live-linear-stale-advisory-fallback');
+    await seedManifest(paths, {
+      issue_provider: 'linear',
+      issue_id: 'lin-issue-196',
+      issue_identifier: 'CO-196'
+    });
+    await seedProviderIntakeState(paths, [
+      {
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-196',
+        issue_id: 'lin-issue-196',
+        issue_identifier: 'CO-196',
+        issue_title: 'Current tracked issue',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-17T04:00:00.000Z',
+        task_id: 'linear-co-196-stale-advisory-fallback',
+        mapping_source: 'provider_id_fallback',
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        accepted_at: '2026-04-17T03:58:00.000Z',
+        updated_at: '2026-04-17T03:59:00.000Z',
+        run_id: 'provider-run-196',
+        run_manifest_path: null,
+        launch_source: 'control-host',
+        launch_token: 'launch-co-196'
+      }
+    ]);
+    await seedDispatchPilot(paths, {
+      enabled: true,
+      source: {
+        provider: 'linear',
+        live: true,
+        workspace_id: 'lin-workspace-1',
+        team_id: 'lin-team-live',
+        project_id: 'lin-project-1'
+      }
+    });
+    await writeFile(
+      join(paths.runDir, 'linear-advisory-state.json'),
+      JSON.stringify({
+        latest_result: 'accepted',
+        tracked_issue: {
+          provider: 'linear',
+          id: 'lin-issue-1',
+          identifier: 'CO-1',
+          title: 'Stale advisory issue',
+          url: 'https://linear.app/asabeko/issue/CO-1',
+          state: 'In Progress',
+          state_type: 'started',
+          workspace_id: 'lin-workspace-1',
+          team_id: 'lin-team-live',
+          team_key: 'CO',
+          team_name: 'CO',
+          project_id: 'lin-project-1',
+          project_name: 'Coordinator',
+          updated_at: '2026-03-22T04:01:03.255Z',
+          recent_activity: []
+        }
+      }),
+      'utf8'
+    );
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const realFetch = globalThis.fetch;
+    let linearFetchCount = 0;
+
+    vi.stubEnv('CO_LINEAR_API_TOKEN', 'lin-api-token');
+    vi.stubGlobal('fetch', async (input, init) => {
+      const rawUrl = input instanceof Request ? input.url : String(input);
+      const url = new URL(rawUrl);
+      if (url.toString() === 'https://api.linear.app/graphql') {
+        linearFetchCount += 1;
+        return new Response(
+          JSON.stringify({
+            data: {
+              viewer: {
+                organization: {
+                  id: 'lin-workspace-1'
+                }
+              },
+              issues: {
+                nodes: [
+                  {
+                    id: 'lin-issue-196',
+                    identifier: 'CO-196',
+                    title: 'Current tracked issue',
+                    url: 'https://linear.app/asabeko/issue/CO-196',
+                    updatedAt: '2026-04-17T04:00:00.000Z',
+                    state: {
+                      name: 'In Progress',
+                      type: 'started'
+                    },
+                    team: {
+                      id: 'lin-team-live',
+                      key: 'CO',
+                      name: 'CO'
+                    },
+                    project: {
+                      id: 'lin-project-1',
+                      name: 'Coordinator'
+                    },
+                    history: {
+                      nodes: []
+                    }
+                  }
+                ]
+              }
+            }
+          }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
+      }
+      return realFetch(input, init);
+    });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+
+      const dispatchRes = await fetch(new URL('/api/v1/dispatch', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(dispatchRes.status).toBe(200);
+      const dispatchPayload = (await dispatchRes.json()) as {
+        recommendation?: {
+          tracked_issue?: {
+            identifier?: string | null;
+          } | null;
+        } | null;
+      };
+      expect(dispatchPayload.recommendation?.tracked_issue?.identifier).toBe('CO-196');
+
+      const stateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(stateRes.status).toBe(200);
+      const statePayload = (await stateRes.json()) as {
+        tracked?: {
+          linear?: {
+            identifier?: string | null;
+          } | null;
+        } | null;
+      };
+      expect(statePayload.tracked?.linear ?? null).toBeNull();
+
+      const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(uiRes.status).toBe(200);
+      const uiPayload = (await uiRes.json()) as {
+        tracked?: {
+          linear?: {
+            identifier?: string | null;
+          } | null;
+        } | null;
+      };
+      expect(uiPayload.tracked?.linear ?? null).toBeNull();
+      expect(linearFetchCount).toBe(1);
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+      vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('fails missing compatibility issues without triggering live Linear provider fetches', async () => {
     const { root, env, paths } = await createRunRoot('task-1015-live-linear-missing');
     await seedManifest(paths);

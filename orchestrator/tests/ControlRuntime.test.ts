@@ -3734,6 +3734,65 @@ describe('ControlRuntime', () => {
     }
   });
 
+  it('fails closed on top-level tracked fallback when persisted advisory truth conflicts with explicit selected identity', async () => {
+    const providerIntakeState = createProviderIntakeState([
+      {
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-196',
+        issue_id: 'lin-issue-196',
+        issue_identifier: 'CO-196',
+        issue_title: 'Current tracked issue',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-17T04:00:00.000Z',
+        task_id: 'linear-co-196-stale-advisory-fallback',
+        mapping_source: 'provider_id_fallback',
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        accepted_at: '2026-04-17T03:58:00.000Z',
+        updated_at: '2026-04-17T03:59:00.000Z',
+        run_id: 'provider-run-196',
+        run_manifest_path: null,
+        launch_source: 'control-host',
+        launch_token: 'launch-co-196'
+      }
+    ]);
+    const fixture = await createFixture({
+      taskId: 'linear-co-196-stale-advisory-fallback',
+      providerIntakeState,
+      linearAdvisoryState: {
+        tracked_issue: createTrackedIssue({
+          id: 'lin-issue-1',
+          identifier: 'CO-1',
+          title: 'Stale advisory issue',
+          updated_at: '2026-03-22T04:01:03.255Z'
+        })
+      }
+    });
+    await seedManifest(fixture.paths, {
+      task_id: 'linear-co-196-stale-advisory-fallback',
+      issue_provider: 'linear',
+      issue_id: 'lin-issue-196',
+      issue_identifier: 'CO-196',
+      summary: 'selected issue has explicit identity but no tracked payload',
+      updated_at: '2026-04-17T04:00:00.000Z'
+    });
+
+    const snapshot = fixture.runtime.snapshot();
+    const selectedSnapshot = await snapshot.readSelectedRunSnapshot();
+    const compatibilityProjection = await snapshot.readCompatibilityProjection();
+    const uiDataset = buildUiDataset({
+      projection: compatibilityProjection,
+      generatedAt: '2026-04-17T04:00:00.000Z'
+    });
+
+    expect(selectedSnapshot.selected?.issueIdentifier).toBe('CO-196');
+    expect(selectedSnapshot.selected?.tracked?.linear ?? null).toBeNull();
+    expect(selectedSnapshot.tracked?.linear ?? null).toBeNull();
+    expect(compatibilityProjection.tracked?.linear ?? null).toBeNull();
+    expect((uiDataset as { tracked?: { linear?: unknown } }).tracked?.linear ?? null).toBeNull();
+  });
+
   it('prunes ordinary released not-active workers when fresh proof has a dead pid', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-15T23:00:00.000Z'));

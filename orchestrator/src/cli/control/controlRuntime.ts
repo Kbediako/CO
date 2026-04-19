@@ -70,6 +70,17 @@ const PROVIDER_RELEASED_PENDING_REOPEN_PREFIX = 'provider_issue_released_pending
 const SYNTHETIC_LINEAR_TASK_ID_PATTERN =
   /^linear-[a-z0-9]+(?:-[a-z0-9]+)*$/i;
 
+interface CompatibilityIdentitySource {
+  issueIdentifier?: string | null;
+  issueId?: string | null;
+  issueProvider: string | null;
+  pipelineId?: string | null;
+  pipelineTitle: string | null;
+  providerLinearWorkerProof?: ControlCompatibilitySourceContext['providerLinearWorkerProof'];
+  taskId: string | null;
+  runId: string | null;
+}
+
 export interface ControlRuntimeSnapshot {
   readSelectedRunSnapshot(): Promise<ControlSelectedRunRuntimeSnapshot>;
   readCompatibilityProjection(): Promise<ControlCompatibilityProjectionSnapshot>;
@@ -163,7 +174,7 @@ function createControlRuntimeSnapshot(
       );
       const issueIdentifier = selected?.issueIdentifier ?? selected?.taskId ?? selected?.runId ?? null;
       const dispatchPilotSummary = liveLinearAdvisoryRuntime.readSnapshotSummary(issueIdentifier);
-      const tracked = selected?.tracked ?? buildTrackedLinearPayload(context.linearAdvisoryState.tracked_issue);
+      const tracked = resolveRuntimeTrackedPayload(selected, context.linearAdvisoryState.tracked_issue);
       const providerIntake = buildProviderIntakeSummary(context.providerIntakeState);
       const providerWorkflow = context.providerWorkflowConfigStore
         ? await context.providerWorkflowConfigStore.refresh()
@@ -197,7 +208,7 @@ function createControlRuntimeSnapshot(
         .filter((source): source is ControlCompatibilitySourceContext => source !== null);
       const issueIdentifier = selected?.issueIdentifier ?? selected?.taskId ?? selected?.runId ?? null;
       const dispatchPilotSummary = liveLinearAdvisoryRuntime.readSnapshotSummary(issueIdentifier);
-      const tracked = selected?.tracked ?? buildTrackedLinearPayload(context.linearAdvisoryState.tracked_issue);
+      const tracked = resolveRuntimeTrackedPayload(selected, context.linearAdvisoryState.tracked_issue);
       const providerIntake = buildProviderIntakeSummary(context.providerIntakeState);
       const polling = readProviderPollingSnapshot(context);
       const providerWorkflow = context.providerWorkflowConfigStore
@@ -920,15 +931,7 @@ function readAuthoritativeProviderIssueIdentifier(
 
 function isFallbackCompatibilityIdentityValue(
   value: string,
-  source: Pick<
-    ControlCompatibilitySourceContext,
-    | 'issueProvider'
-    | 'pipelineId'
-    | 'pipelineTitle'
-    | 'providerLinearWorkerProof'
-    | 'taskId'
-    | 'runId'
-  >
+  source: CompatibilityIdentitySource
 ): boolean {
   return (
     isFallbackCompatibilityIdentityAlias(value, source.taskId, source) ||
@@ -939,10 +942,7 @@ function isFallbackCompatibilityIdentityValue(
 function isFallbackCompatibilityIdentityAlias(
   value: string,
   candidate: string | null,
-  source: Pick<
-    ControlCompatibilitySourceContext,
-    'issueProvider' | 'pipelineId' | 'pipelineTitle' | 'providerLinearWorkerProof'
-  >
+  source: CompatibilityIdentitySource
 ): boolean {
   if (!candidate) {
     return false;
@@ -957,18 +957,29 @@ function isFallbackCompatibilityIdentityAlias(
   );
 }
 
+function resolveRuntimeTrackedPayload(
+  selected: SelectedRunContext | ControlCompatibilitySourceContext | null,
+  advisoryTrackedIssue: LiveLinearTrackedIssue | null
+) {
+  if (selected?.tracked) {
+    return selected.tracked;
+  }
+  if (!advisoryTrackedIssue) {
+    return null;
+  }
+  if (
+    selected &&
+    hasExplicitCompatibilityIssueIdentity(selected) &&
+    advisoryTrackedIssue.id !== selected.issueId &&
+    advisoryTrackedIssue.identifier !== selected.issueIdentifier
+  ) {
+    return null;
+  }
+  return buildTrackedLinearPayload(advisoryTrackedIssue);
+}
+
 function hasExplicitCompatibilityIssueIdentity(
-  source: Pick<
-    ControlCompatibilitySourceContext,
-    | 'issueIdentifier'
-    | 'issueId'
-    | 'issueProvider'
-    | 'pipelineId'
-    | 'pipelineTitle'
-    | 'providerLinearWorkerProof'
-    | 'taskId'
-    | 'runId'
-  >
+  source: CompatibilityIdentitySource
 ): boolean {
   if (
     source.issueIdentifier &&
@@ -983,10 +994,7 @@ function hasExplicitCompatibilityIssueIdentity(
 }
 
 function hasSyntheticLinearFallbackProvenance(
-  source: Pick<
-    ControlCompatibilitySourceContext,
-    'issueProvider' | 'pipelineId' | 'pipelineTitle' | 'providerLinearWorkerProof'
-  >
+  source: CompatibilityIdentitySource
 ): boolean {
   if (source.issueProvider !== null && source.issueProvider !== 'linear') {
     return false;
