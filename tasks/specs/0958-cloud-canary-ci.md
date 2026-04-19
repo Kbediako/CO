@@ -5,7 +5,7 @@ relates_to: docs/PRD-cloud-canary-ci.md
 risk: medium
 owners:
   - Codex
-last_review: 2026-03-19
+last_review: 2026-04-19
 ---
 
 ## Summary
