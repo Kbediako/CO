@@ -166,14 +166,20 @@ function buildExpectedFollowUpDescription(options: {
   return sections.join('\n\n');
 }
 
-function buildCanonicalOwnerIssuesBody(nodes: unknown[]): unknown {
+function buildCanonicalOwnerIssuesBody(
+  nodes: unknown[],
+  pageInfo: {
+    hasNextPage?: boolean;
+    endCursor?: string | null;
+  } = {}
+): unknown {
   return {
     data: {
       issues: {
         nodes,
         pageInfo: {
-          hasNextPage: false,
-          endCursor: null
+          hasNextPage: pageInfo.hasNextPage ?? false,
+          endCursor: pageInfo.endCursor ?? null
         }
       }
     }
@@ -185,6 +191,15 @@ function buildCanonicalOwnerIssue(input: {
   identifier: string;
   title: string;
   description: string;
+  team?: {
+    id: string;
+    key: string;
+    name: string;
+  };
+  project?: {
+    id: string;
+    name: string;
+  } | null;
   state: {
     id: string;
     name: string;
@@ -200,15 +215,17 @@ function buildCanonicalOwnerIssue(input: {
     archivedAt: null,
     trashed: false,
     state: input.state,
-    team: {
+    team: input.team ?? {
       id: 'lin-team-1',
       key: 'CO',
       name: 'Codex Orchestrator'
     },
-    project: {
-      id: 'lin-project-1',
-      name: 'CO'
-    }
+    project: input.project === undefined
+      ? {
+          id: 'lin-project-1',
+          name: 'CO'
+        }
+      : input.project
   };
 }
 
@@ -9593,6 +9610,7 @@ describe('providerLinearWorkflowFacade', () => {
       { id: 'lin-issue-258', identifier: 'CO-258' }
     ];
     const calls: string[] = [];
+    let currentSourceIssueId: string | null = null;
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
         query?: string;
@@ -9601,6 +9619,7 @@ describe('providerLinearWorkflowFacade', () => {
       if (body.query?.includes('ProviderLinearIssueSummary')) {
         const issueId = String(body.variables?.issueId ?? '');
         const source = sourceIssues.find((entry) => entry.id === issueId) ?? sourceIssues[0];
+        currentSourceIssueId = source.id;
         return jsonResponse(
           buildIssueContextBody({
             id: source.id,
@@ -9641,6 +9660,7 @@ describe('providerLinearWorkflowFacade', () => {
         expect(body.variables).toMatchObject({
           input: {
             type: 'related',
+            issueId: currentSourceIssueId,
             relatedIssueId: 'lin-issue-254'
           }
         });
@@ -9702,6 +9722,130 @@ describe('providerLinearWorkflowFacade', () => {
     expect(calls.filter((call) => call === 'owner-search')).toHaveLength(4);
     expect(calls.filter((call) => call === 'related-relation')).toHaveLength(4);
     expect(calls).not.toContain('create');
+  });
+
+  it('pages through canonical owner search results before selecting a reusable owner', async () => {
+    const canonicalOwnerKey = 'baseline_cohort_id:apr-19-docs-freshness';
+    const canonicalOwnerMarker = `codex-orchestrator:canonical-owner-key=${canonicalOwnerKey}`;
+    const canonicalOwnerDescription = [
+      'Apr 19 baseline owner.',
+      '## Canonical Owner',
+      `- Canonical owner key: \`${canonicalOwnerKey}\``,
+      `- Canonical owner marker: \`${canonicalOwnerMarker}\``
+    ].join('\n');
+    const longerCanonicalOwnerMarker = `${canonicalOwnerMarker}-other`;
+    const calls: string[] = [];
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, unknown>;
+      };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearCanonicalFollowUpOwners')) {
+        calls.push(`owner-search:${body.variables?.after ?? 'first'}`);
+        expect(body.variables).toMatchObject({
+          teamId: 'lin-team-1',
+          projectId: 'lin-project-1',
+          marker: canonicalOwnerMarker,
+          first: 50
+        });
+        if (body.variables?.after === null) {
+          return jsonResponse(
+            buildCanonicalOwnerIssuesBody([
+              buildCanonicalOwnerIssue({
+                id: 'lin-issue-300',
+                identifier: 'CO-300',
+                title: 'Prefix-only canonical owner',
+                description: [
+                  'Different owner.',
+                  '## Canonical Owner',
+                  `- Canonical owner key: \`${canonicalOwnerKey}-other\``,
+                  `- Canonical owner marker: \`${longerCanonicalOwnerMarker}\``
+                ].join('\n'),
+                state: {
+                  id: 'state-backlog',
+                  name: 'Backlog',
+                  type: 'unstarted'
+                }
+              })
+            ], {
+              hasNextPage: true,
+              endCursor: 'owner-cursor-1'
+            })
+          );
+        }
+        expect(body.variables?.after).toBe('owner-cursor-1');
+        return jsonResponse(
+          buildCanonicalOwnerIssuesBody([
+            buildCanonicalOwnerIssue({
+              id: 'lin-issue-254',
+              identifier: 'CO-254',
+              title: 'Apr 19 spec/docs freshness baseline owner',
+              description: canonicalOwnerDescription,
+              state: {
+                id: 'state-backlog',
+                name: 'Backlog',
+                type: 'unstarted'
+              }
+            })
+          ])
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateFollowUpIssue')) {
+        calls.push('create');
+        throw new Error('later-page canonical owner reuse must not create another issue');
+      }
+      if (body.query?.includes('ProviderLinearCreateIssueRelation')) {
+        calls.push('related-relation');
+        expect(body.variables).toMatchObject({
+          input: {
+            type: 'related',
+            issueId: 'lin-issue-1',
+            relatedIssueId: 'lin-issue-254'
+          }
+        });
+        return jsonResponse({
+          data: {
+            issueRelationCreate: {
+              success: true,
+              issueRelation: {
+                id: 'relation-related',
+                type: 'related'
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await createProviderLinearFollowUpIssue({
+      issueId: 'lin-issue-1',
+      title: 'Apr 19 spec/docs freshness baseline owner',
+      description: 'Keep duplicate lanes on one owner.',
+      intentChecksum: '- Preserve Apr 19 owner routing.',
+      nonGoals: '- [ ] Do not create duplicates.',
+      notDoneIf: '- [ ] Repeated lanes create fresh owners.',
+      acceptanceCriteria: '- [ ] Later-page owners are reused.',
+      canonicalOwnerKey,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'create-follow-up',
+      action: 'reused',
+      follow_up_issue: {
+        id: 'lin-issue-254',
+        identifier: 'CO-254'
+      }
+    });
+    expect(calls).toEqual(['owner-search:first', 'owner-search:owner-cursor-1', 'related-relation']);
   });
 
   it('reuses the source issue itself as canonical owner without self relations', async () => {
@@ -10381,6 +10525,168 @@ describe('providerLinearWorkflowFacade', () => {
         expect(body.variables).toMatchObject({
           input: {
             type: 'related',
+            relatedIssueId: 'lin-issue-2'
+          }
+        });
+        return jsonResponse({
+          data: {
+            issueRelationCreate: {
+              success: true,
+              issueRelation: {
+                id: 'relation-related',
+                type: 'related'
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await createProviderLinearFollowUpIssue({
+      issueId: 'lin-issue-1',
+      title: 'Follow-up issue',
+      description: 'Investigate the remaining improvement.',
+      intentChecksum: '- Preserve exact `CO STATUS` wording.',
+      nonGoals: '- [ ] Do not reopen the browser surface.',
+      notDoneIf: '- [ ] The issue still allows browser-first parity.',
+      acceptanceCriteria: '- [ ] Captured',
+      canonicalOwnerKey,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'create-follow-up',
+      action: 'created',
+      follow_up_issue: {
+        id: 'lin-issue-2',
+        identifier: 'CO-2'
+      }
+    });
+    expect(calls).toEqual(['owner-search', 'create', 'update-description', 'owner-search', 'related-relation']);
+  });
+
+  it('does not reuse an exact stamped canonical owner from another team or project', async () => {
+    const canonicalOwnerKey = 'baseline_cohort_id:apr-19-docs-freshness';
+    const canonicalOwnerMarker = `codex-orchestrator:canonical-owner-key=${canonicalOwnerKey}`;
+    const initialDescription = buildExpectedFollowUpDescription();
+    const finalDescription = buildExpectedFollowUpDescription({
+      canonicalOwnerKey,
+      includeTraceability: true
+    });
+    const calls: string[] = [];
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, unknown>;
+      };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearCanonicalFollowUpOwners')) {
+        calls.push('owner-search');
+        return jsonResponse(
+          buildCanonicalOwnerIssuesBody([
+            buildCanonicalOwnerIssue({
+              id: 'lin-issue-other-project',
+              identifier: 'CO-300',
+              title: 'Wrong project owner',
+              description: [
+                'Same marker but wrong scope.',
+                '## Canonical Owner',
+                `- Canonical owner key: \`${canonicalOwnerKey}\``,
+                `- Canonical owner marker: \`${canonicalOwnerMarker}\``
+              ].join('\n'),
+              team: {
+                id: 'lin-team-other',
+                key: 'OPS',
+                name: 'Operations'
+              },
+              project: {
+                id: 'lin-project-other',
+                name: 'Other'
+              },
+              state: {
+                id: 'state-backlog',
+                name: 'Backlog',
+                type: 'unstarted'
+              }
+            })
+          ])
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateFollowUpIssue')) {
+        calls.push('create');
+        return jsonResponse({
+          data: {
+            issueCreate: {
+              success: true,
+              issue: {
+                id: 'lin-issue-2',
+                identifier: 'CO-2',
+                title: 'Follow-up issue',
+                description: initialDescription,
+                url: 'https://linear.app/example/issue/CO-2',
+                state: {
+                  id: 'state-backlog',
+                  name: 'Backlog',
+                  type: 'unstarted'
+                },
+                team: {
+                  id: 'lin-team-1',
+                  key: 'CO',
+                  name: 'Codex Orchestrator'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'CO'
+                }
+              }
+            }
+          }
+        });
+      }
+      if (body.query?.includes('ProviderLinearUpdateIssueDescription')) {
+        calls.push('update-description');
+        return jsonResponse({
+          data: {
+            issueUpdate: {
+              success: true,
+              issue: {
+                id: 'lin-issue-2',
+                identifier: 'CO-2',
+                title: 'Follow-up issue',
+                description: finalDescription,
+                url: 'https://linear.app/example/issue/CO-2',
+                state: {
+                  id: 'state-backlog',
+                  name: 'Backlog',
+                  type: 'unstarted'
+                },
+                team: {
+                  id: 'lin-team-1',
+                  key: 'CO',
+                  name: 'Codex Orchestrator'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'CO'
+                }
+              }
+            }
+          }
+        });
+      }
+      if (body.query?.includes('ProviderLinearCreateIssueRelation')) {
+        calls.push('related-relation');
+        expect(body.variables).toMatchObject({
+          input: {
+            type: 'related',
+            issueId: 'lin-issue-1',
             relatedIssueId: 'lin-issue-2'
           }
         });

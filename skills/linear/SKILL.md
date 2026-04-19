@@ -193,10 +193,12 @@ codex-orchestrator linear create-follow-up \
   --format json
 ```
 
-For recurring baseline debt, prefer canonical-owner reuse/update over a fresh issue. Use the exact `canonical_owner_key` emitted by machine output such as `docs:freshness:maintain`; the helper reuses only open same-team same-project issues stamped with the exact marker and treats `Done`, `Duplicate`, and `Cancelled`/`Canceled` issues as evidence only.
+For recurring baseline debt, prefer canonical-owner reuse/update over a fresh issue. Inspect the `candidate_cohorts` emitted by machine output such as `docs:freshness:maintain`, choose the intended cohort, and pass that cohort's exact `canonical_owner_key`; the helper reuses only open same-team same-project issues stamped with the exact marker and treats `Done`, `Duplicate`, and `Cancelled`/`Canceled` issues as evidence only.
 
 ```bash
-canonical_owner_key="$(jq -er '.candidate_cohorts[0].canonical_owner_key // empty' out/<task-id>/docs-freshness-maintenance.json)"
+jq '.candidate_cohorts[] | {id, status, canonical_owner_key, sample_paths}' out/<task-id>/docs-freshness-maintenance.json
+# After selecting the intended cohort, replace <cohort-id> with its id.
+canonical_owner_key="$(jq -er '.candidate_cohorts[] | select(.id == "<cohort-id>") | .canonical_owner_key // empty' out/<task-id>/docs-freshness-maintenance.json)"
 codex-orchestrator linear create-follow-up \
   --issue-id "$ISSUE_ID" \
   --title "Recurring baseline owner" \

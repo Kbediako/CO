@@ -2314,28 +2314,51 @@ async function findCanonicalFollowUpOwnerIssues(input: {
         error: ProviderLinearWorkflowError;
       }
   > {
-  const result = await executeProviderLinearGraphql<LinearCanonicalOwnerIssuesQueryResponse>({
-    session: input.session,
-    operation: 'create-follow-up',
-    step: 'find-canonical-owner',
-    query: buildCanonicalOwnerIssuesQuery(),
-    variables: {
-      teamId: input.teamId,
-      projectId: input.projectId,
-      marker: input.marker,
-      first: PROVIDER_LINEAR_CANONICAL_OWNER_SEARCH_LIMIT
+  const nodes: NonNullable<NonNullable<LinearCanonicalOwnerIssuesQueryResponse['issues']>['nodes']> = [];
+  let after: string | null = null;
+
+  for (;;) {
+    const result = await executeProviderLinearGraphql<LinearCanonicalOwnerIssuesQueryResponse>({
+      session: input.session,
+      operation: 'create-follow-up',
+      step: 'find-canonical-owner',
+      query: buildCanonicalOwnerIssuesQuery(),
+      variables: {
+        teamId: input.teamId,
+        projectId: input.projectId,
+        marker: input.marker,
+        first: PROVIDER_LINEAR_CANONICAL_OWNER_SEARCH_LIMIT,
+        after
+      }
+    });
+    if (!result.ok) {
+      return {
+        ok: false,
+        error: result.error
+      };
     }
-  });
-  if (!result.ok) {
-    return {
-      ok: false,
-      error: result.error
-    };
+
+    if (Array.isArray(result.payload.data?.issues?.nodes)) {
+      nodes.push(...result.payload.data.issues.nodes);
+    }
+    const pageInfo = result.payload.data?.issues?.pageInfo ?? null;
+    if (pageInfo?.hasNextPage !== true) {
+      break;
+    }
+    const nextCursor = normalizeOptionalString(pageInfo.endCursor);
+    if (!nextCursor) {
+      return {
+        ok: false,
+        error: {
+          code: 'linear_canonical_owner_pagination_invalid',
+          message: 'Linear canonical owner search pagination returned an invalid cursor.',
+          status: 503
+        }
+      };
+    }
+    after = nextCursor;
   }
 
-  const nodes = Array.isArray(result.payload.data?.issues?.nodes)
-    ? result.payload.data.issues.nodes
-    : [];
   const issues: ProviderLinearCreatedIssue[] = [];
   for (const node of nodes) {
     if (node.trashed === true || normalizeOptionalString(node.archivedAt)) {
@@ -4724,9 +4747,10 @@ function buildCreateFollowUpIssueMutation(): string {
 }
 
 function buildCanonicalOwnerIssuesQuery(): string {
-  return `query ProviderLinearCanonicalFollowUpOwners($teamId: ID!, $projectId: ID!, $marker: String!, $first: Int!) {
+  return `query ProviderLinearCanonicalFollowUpOwners($teamId: ID!, $projectId: ID!, $marker: String!, $first: Int!, $after: String) {
     issues(
       first: $first
+      after: $after
       orderBy: updatedAt
       filter: {
         team: { id: { eq: $teamId } }

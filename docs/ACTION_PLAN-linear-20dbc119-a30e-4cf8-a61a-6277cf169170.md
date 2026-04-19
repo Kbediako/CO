@@ -25,7 +25,7 @@
 ## Validation
 - Checks / tests:
   - focused facade/CLI tests for canonical owner reuse and closed-owner non-reuse
-  - `npm run docs:freshness:maintain -- --format json` shape check as needed
+  - `npm run docs:freshness:maintain -- --format json` shape check (optional)
   - required repo validation floor before handoff
 - Rollback plan: revert the helper/key additions and guidance changes; existing follow-up creation behavior remains the fallback.
 

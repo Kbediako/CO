@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
@@ -17,6 +18,7 @@ const DEFAULT_REGISTRY_PATH = 'docs/docs-freshness-registry.json';
 const GIT_COMMAND_TIMEOUT_MS = 60_000;
 const PASSING_DECISIONS = new Set(['clean', 'pass_with_owned_rolling_debt']);
 const CANONICAL_OWNER_MARKER_PREFIX = 'codex-orchestrator:canonical-owner-key=';
+const CANONICAL_OWNER_KEY_MAX_LENGTH = 512;
 
 function showUsage() {
   console.log(`Usage: node scripts/docs-freshness-maintain.mjs [options]
@@ -165,6 +167,18 @@ function candidateCohortKey(entry) {
 }
 
 function canonicalOwnerKeyForCandidateEntry(entry) {
+  const rawKey = rawCanonicalOwnerKeyForCandidateEntry(entry);
+  if (rawKey.length <= CANONICAL_OWNER_KEY_MAX_LENGTH) {
+    return rawKey;
+  }
+  const digest = createHash('sha256').update(rawKey).digest('hex');
+  const prefix = entry.baseline_cohort_id
+    ? 'baseline_cohort_id_sha256'
+    : 'docs_freshness_candidate_sha256';
+  return `${prefix}:${digest}`;
+}
+
+function rawCanonicalOwnerKeyForCandidateEntry(entry) {
   if (entry.baseline_cohort_id) {
     return `baseline_cohort_id:${entry.baseline_cohort_id}`;
   }
