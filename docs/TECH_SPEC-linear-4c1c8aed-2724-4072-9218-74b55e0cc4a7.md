@@ -8,7 +8,7 @@
 - Last review: `2026-04-20`
 - Source anchor: `ctx:sha256:3a42ae593f1afd8a89a2ee9ef88ad1acfe18d4db4930d453565ab22e66e7433b#chunk:c000001`
 - Declared shared source payload: `.runs/linear-4c1c8aed-2724-4072-9218-74b55e0cc4a7-docs-packet/cli/2026-04-19T18-52-58-375Z-f391d2b8/memory/source-0/source.txt`
-- Parent source payload: `/Users/kbediako/Code/CO/.runs/linear-4c1c8aed-2724-4072-9218-74b55e0cc4a7/cli/2026-04-19T18-49-38-645Z-8e0e4d9a/memory/source-0/source.txt`
+- Parent source payload: `.runs/linear-4c1c8aed-2724-4072-9218-74b55e0cc4a7/cli/2026-04-19T18-49-38-645Z-8e0e4d9a/memory/source-0/source.txt`
 - Child-lane caveat: the copied shared payload path is absent in this checkout; the parent source payload contains run metadata only, so the technical contract below preserves the parent-provided issue terms.
 
 ## Scope
@@ -39,28 +39,33 @@ Blanket time-only deletion is not allowed. Age can contribute to a decision, but
 
 ## Data Contract
 
-Each `backlog_promotion_snapshots` entry should retain enough decision input to avoid ambiguity:
+`backlog_promotion_snapshots` remain the retained snapshot set. Each retained entry carries the promotion identity and bounded-missing-page counter:
 
-- Snapshot identity: issue id, issue identifier, source state, target state, and last observed workflow state.
-- Observation timing: first seen, last seen, last tracked-page visibility, retained-at, and pruned-at when applicable.
-- Cycle evidence: missing-cycle count, visible-cycle count, and last refresh cycle id or timestamp.
-- Terminal evidence: terminal workflow state name/type, terminal evidence source, and terminal evidence recorded time.
-- Paging evidence: whether the issue was absent from one page or absent across the configured bounded stale threshold.
-- Force-path status: whether force-retain or force-prune was used, plus actor, reason, and recorded time when available.
-- Decision result: retained, pruned, or pending-more-evidence with machine-readable reason.
+- `issue_id`
+- `issue_identifier`
+- `target_state`
+- `attempted_at`
+- `issue_updated_at`
+- `force_path_used`
+- `untracked_cycles`
 
-`resolveNextBacklogPromotionSnapshots` should return both the next retained snapshot set and a per-snapshot decision list suitable for audit/read-model projection.
+`resolveNextBacklogPromotionSnapshots` returns both the next retained snapshot set and a separate `backlog_promotion_snapshot_retention_records` decision list suitable for audit/read-model projection. Each decision record is machine-readable and includes:
 
-Suggested decision reasons:
+- Snapshot identity: `issue_id`, `issue_identifier`, `target_state`, `attempted_at`, and `issue_updated_at`.
+- Decision timing: `evaluated_at` and `age_ms`.
+- Decision result: `decision` (`retained` or `pruned`) and `reason`.
+- Cycle evidence: `untracked_cycles` and `max_untracked_cycles`.
+- Tracked issue evidence: `issue_state`, `issue_state_type`, `issue_archived_at`, `issue_trashed`, and `issue_observed_updated_at`.
+- Terminal and force-path evidence: `terminal_state_evidence` and `force_path_used`.
 
-- `retained_visible`
-- `retained_temporarily_untracked`
-- `retained_missing_below_threshold`
-- `retained_forced`
-- `pruned_terminal_state`
-- `pruned_permanently_out_of_scope`
-- `pruned_missing_threshold_exceeded`
-- `pruned_forced`
+Live retention reasons emitted by `providerOperatorAutopilot.ts`:
+
+- `temporarily_untracked`
+- `stale_untracked_cycle_limit`
+- `terminal_state`
+- `tracked_archived_or_trashed`
+- `tracked_non_backlog_non_target_state`
+- `tracked_state_reset_untracked_cycles`
 
 ## Required Behavior
 
@@ -93,13 +98,16 @@ The parent implementation should expose the selected retention policy through:
 Minimum read-model fields:
 
 ```text
-operator_autopilot.backlog_promotion.snapshots[].decision
-operator_autopilot.backlog_promotion.snapshots[].age_ms
-operator_autopilot.backlog_promotion.snapshots[].missing_cycles
-operator_autopilot.backlog_promotion.snapshots[].last_seen_at
-operator_autopilot.backlog_promotion.snapshots[].terminal_evidence
-operator_autopilot.backlog_promotion.snapshots[].force_path
-operator_autopilot.backlog_promotion.snapshots[].decision_reason
+operator_autopilot.backlog_promotion.snapshots[].untracked_cycles
+operator_autopilot.backlog_promotion.snapshot_retention.max_untracked_cycles
+operator_autopilot.backlog_promotion.snapshot_retention.terminal_state_types[]
+operator_autopilot.backlog_promotion.snapshot_retention_records[].decision
+operator_autopilot.backlog_promotion.snapshot_retention_records[].reason
+operator_autopilot.backlog_promotion.snapshot_retention_records[].age_ms
+operator_autopilot.backlog_promotion.snapshot_retention_records[].untracked_cycles
+operator_autopilot.backlog_promotion.snapshot_retention_records[].max_untracked_cycles
+operator_autopilot.backlog_promotion.snapshot_retention_records[].terminal_state_evidence
+operator_autopilot.backlog_promotion.snapshot_retention_records[].force_path_used
 ```
 
 Exact field names may differ if parent implementation uses an existing payload convention, but the information must be machine-readable.
@@ -129,5 +137,9 @@ This child lane should run only docs-scoped checks:
 
 ```bash
 rg -n "backlog_promotion_snapshots|resolveNextBacklogPromotionSnapshots|providerOperatorAutopilot\\.ts|providerWorkflowConfigStore\\.ts|observabilityReadModel\\.ts|manual Ready -> Backlog demotion|finite tracked-issue paging|terminal workflow states|CO-216" docs/PRD-linear-4c1c8aed-2724-4072-9218-74b55e0cc4a7.md docs/TECH_SPEC-linear-4c1c8aed-2724-4072-9218-74b55e0cc4a7.md docs/ACTION_PLAN-linear-4c1c8aed-2724-4072-9218-74b55e0cc4a7.md tasks/specs/linear-4c1c8aed-2724-4072-9218-74b55e0cc4a7.md tasks/tasks-linear-4c1c8aed-2724-4072-9218-74b55e0cc4a7.md .agent/task/linear-4c1c8aed-2724-4072-9218-74b55e0cc4a7.md
+node scripts/spec-guard.mjs --dry-run
+npm run docs:check
+npm run docs:freshness
+node scripts/diff-budget.mjs
 git diff --check -- docs/PRD-linear-4c1c8aed-2724-4072-9218-74b55e0cc4a7.md docs/TECH_SPEC-linear-4c1c8aed-2724-4072-9218-74b55e0cc4a7.md docs/ACTION_PLAN-linear-4c1c8aed-2724-4072-9218-74b55e0cc4a7.md tasks/specs/linear-4c1c8aed-2724-4072-9218-74b55e0cc4a7.md tasks/tasks-linear-4c1c8aed-2724-4072-9218-74b55e0cc4a7.md .agent/task/linear-4c1c8aed-2724-4072-9218-74b55e0cc4a7.md tasks/index.json docs/TASKS.md docs/docs-freshness-registry.json
 ```

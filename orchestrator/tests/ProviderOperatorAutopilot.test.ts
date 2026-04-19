@@ -519,6 +519,27 @@ describe('providerOperatorAutopilot', () => {
           target_state: 'Ready',
           attempted_at: '2026-04-09T10:00:00.000Z',
           issue_updated_at: '2026-04-09T10:00:00.000Z',
+          force_path_used: false,
+          untracked_cycles: 1
+        }
+      ],
+      backlog_promotion_snapshot_retention_records: [
+        {
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-118',
+          target_state: 'Ready',
+          attempted_at: '2026-04-09T10:00:00.000Z',
+          issue_updated_at: '2026-04-09T10:00:00.000Z',
+          evaluated_at: '2026-04-09T10:05:00.000Z',
+          decision: 'retained',
+          reason: 'temporarily_untracked',
+          age_ms: 300000,
+          untracked_cycles: 1,
+          max_untracked_cycles: 3,
+          issue_state: null,
+          issue_state_type: null,
+          issue_observed_updated_at: null,
+          terminal_state_evidence: false,
           force_path_used: false
         }
       ]
@@ -878,7 +899,25 @@ describe('providerOperatorAutopilot', () => {
     });
   });
 
-  it('prunes tracked archived or trashed backlog promotion snapshots before resetting missing cycles', async () => {
+  it.each([
+    {
+      label: 'archived-only',
+      archivedAt: '2026-04-09T10:07:00.000Z',
+      trashed: false
+    },
+    {
+      label: 'trashed-only',
+      archivedAt: null,
+      trashed: true
+    },
+    {
+      label: 'archived-and-trashed',
+      archivedAt: '2026-04-09T10:07:00.000Z',
+      trashed: true
+    }
+  ])(
+    'prunes tracked $label backlog promotion snapshots before resetting missing cycles',
+    async ({ archivedAt, trashed }) => {
     const baselineTransition = vi.fn(async () => ({
       ok: true as const,
       operation: 'transition' as const,
@@ -921,8 +960,8 @@ describe('providerOperatorAutopilot', () => {
             identifier: 'CO-118',
             state: 'Ready',
             state_type: 'unstarted',
-            archived_at: '2026-04-09T10:07:00.000Z',
-            trashed: true,
+            archived_at: archivedAt,
+            trashed,
             updated_at: '2026-04-09T10:08:00.000Z'
           })
         ],
@@ -961,8 +1000,8 @@ describe('providerOperatorAutopilot', () => {
           max_untracked_cycles: 3,
           issue_state: 'Ready',
           issue_state_type: 'unstarted',
-          issue_archived_at: '2026-04-09T10:07:00.000Z',
-          issue_trashed: true,
+          issue_archived_at: archivedAt,
+          issue_trashed: trashed,
           issue_observed_updated_at: '2026-04-09T10:08:00.000Z',
           terminal_state_evidence: false,
           force_path_used: false
@@ -1351,7 +1390,25 @@ describe('providerOperatorAutopilot', () => {
     });
   });
 
-  it('ignores immutable higher-ranked blocked lanes before promoting a mutable backlog issue', async () => {
+  it.each([
+    {
+      label: 'archived-only',
+      archivedAt: '2026-04-09T10:07:00.000Z',
+      trashed: false
+    },
+    {
+      label: 'trashed-only',
+      archivedAt: null,
+      trashed: true
+    },
+    {
+      label: 'archived-and-trashed',
+      archivedAt: '2026-04-09T10:07:00.000Z',
+      trashed: true
+    }
+  ])(
+    'ignores immutable $label higher-ranked blocked lanes before promoting a mutable backlog issue',
+    async ({ archivedAt, trashed }) => {
     const transitionIssueState = vi.fn(async () => ({
       ok: true as const,
       operation: 'transition' as const,
@@ -1376,8 +1433,8 @@ describe('providerOperatorAutopilot', () => {
             state: 'Ready',
             state_type: 'unstarted',
             priority: 1,
-            archived_at: '2026-04-09T10:07:00.000Z',
-            trashed: true,
+            archived_at: archivedAt,
+            trashed,
             blocked_by: [
               {
                 id: 'lin-issue-0',

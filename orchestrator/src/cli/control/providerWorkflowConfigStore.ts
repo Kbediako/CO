@@ -615,7 +615,7 @@ function cloneOperatorAutopilotLastResult(
       issue_trashed: record.issue_trashed,
       issue_observed_updated_at: record.issue_observed_updated_at,
       terminal_state_evidence: record.terminal_state_evidence,
-      force_path_used: record.force_path_used
+      force_path_used: record.force_path_used ?? false
     }))
   };
 }

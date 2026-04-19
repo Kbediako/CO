@@ -260,6 +260,8 @@ export function resolveProviderOperatorAutopilotConfig(
         readNonEmptyString(backlogPromotion, 'target_state_name', 'targetStateName') ??
         DEFAULT_READY_STATE_NAME,
       snapshot_retention: {
+        // Keep at least one missing-page cycle before pruning so CO-216 manual
+        // demotion suppression cannot be erased by a single temporary omission.
         max_untracked_cycles: Math.max(
           2,
           readPositiveInteger(
@@ -1226,6 +1228,8 @@ function resolveNextBacklogPromotionSnapshots(input: {
   const snapshotsByIssueId = new Map<string, ProviderOperatorAutopilotBacklogPromotionSnapshot>();
   const retentionRecords: ProviderOperatorAutopilotBacklogPromotionSnapshotRetentionRecord[] = [];
   const prunedPreviousSnapshotIssueIds = new Set<string>();
+  // Repeat the minimum defensively for persisted/legacy configs loaded before
+  // resolveProviderOperatorAutopilotConfig normalized snapshot_retention.
   const maxUntrackedCycles = Math.max(2, input.retentionConfig.max_untracked_cycles);
   for (const snapshot of collectBacklogPromotionSnapshotsFromResult(
     input.previousResult,
@@ -1822,6 +1826,8 @@ function normalizeStringArray(values: string[]): string[] {
   const normalized = values
     .map((value) => value.trim())
     .filter((value) => value.length > 0);
+  // Empty terminal_state_types is treated as unset; disabling terminal-state
+  // pruning is not supported because terminal evidence is the safest prune path.
   return normalized.length > 0
     ? normalized
     : [...DEFAULT_BACKLOG_PROMOTION_SNAPSHOT_TERMINAL_STATE_TYPES];
