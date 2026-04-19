@@ -1702,13 +1702,18 @@ async function resolveAttachedSameRepoPullRequestCandidate(input: {
       !isMergedPullRequestSnapshot(candidate.snapshot) && candidate.snapshot.state !== 'CLOSED'
   );
 
-  const ignoredClosedUnmergedCandidates = inspectedCandidates.filter(
-    (candidate) =>
-      isClosedUnmergedPullRequestSnapshot(candidate.snapshot) &&
-      openUnmergedCandidates.some((openCandidate) =>
-        isSnapshotStrictlyOlderThanSelection(candidate.snapshot, openCandidate.snapshot)
-      )
-  );
+  const ignoredClosedUnmergedCandidates =
+    mode === 'merge_closeout' && openUnmergedCandidates.length === 1
+      ? inspectedCandidates.filter((candidate) =>
+          isClosedUnmergedPullRequestSnapshot(candidate.snapshot)
+        )
+      : inspectedCandidates.filter(
+          (candidate) =>
+            isClosedUnmergedPullRequestSnapshot(candidate.snapshot) &&
+            openUnmergedCandidates.some((openCandidate) =>
+              isSnapshotStrictlyOlderThanSelection(candidate.snapshot, openCandidate.snapshot)
+            )
+        );
   const ignoredClosedUnmergedPrUrls = ignoredClosedUnmergedCandidates.map(
     (candidate) => candidate.pr.url
   );

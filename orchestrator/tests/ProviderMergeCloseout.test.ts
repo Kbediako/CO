@@ -1715,7 +1715,7 @@ describe('runProviderDeterministicMergeCloseout', () => {
     );
   });
 
-  it('selects the current merge-closeout PR after ignoring an older closed-unmerged prior attempt', async () => {
+  it('selects the current merge-closeout PR after ignoring a later-closed unmerged prior attempt', async () => {
     const runCommand = vi
       .fn()
       .mockResolvedValueOnce({
@@ -1764,7 +1764,7 @@ describe('runProviderDeterministicMergeCloseout', () => {
           readyToMerge: false,
           gateReasons: ['state=CLOSED'],
           unresolvedThreadCount: 0,
-          updatedAt: '2026-04-18T20:00:00.000Z',
+          updatedAt: '2026-04-19T18:10:00.000Z',
           mergedAt: null,
           headOid: 'closed516',
           checks: { pending: [], failed: [] },
