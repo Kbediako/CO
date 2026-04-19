@@ -179,6 +179,34 @@ export interface ControlProviderOperatorAutopilotBacklogPromotionSnapshotPayload
   attempted_at: string;
   issue_updated_at: string | null;
   force_path_used: boolean;
+  untracked_cycles?: number;
+}
+
+export interface ControlProviderOperatorAutopilotBacklogPromotionSnapshotRetentionPayload {
+  issue_id: string;
+  issue_identifier: string | null;
+  target_state: string;
+  attempted_at: string;
+  issue_updated_at: string | null;
+  evaluated_at: string;
+  decision: 'retained' | 'pruned';
+  reason:
+    | 'temporarily_untracked'
+    | 'stale_untracked_cycle_limit'
+    | 'terminal_state'
+    | 'tracked_archived_or_trashed'
+    | 'tracked_non_backlog_non_target_state'
+    | 'tracked_state_reset_untracked_cycles';
+  age_ms: number | null;
+  untracked_cycles: number;
+  max_untracked_cycles: number;
+  issue_state: string | null;
+  issue_state_type: string | null;
+  issue_archived_at: string | null;
+  issue_trashed: boolean | null;
+  issue_observed_updated_at: string | null;
+  terminal_state_evidence: boolean;
+  force_path_used: boolean;
 }
 
 export interface ControlProviderOperatorAutopilotLifecycleRecordPayload {
@@ -254,6 +282,7 @@ export interface ControlProviderOperatorAutopilotLastResultPayload {
   lifecycle_records?: ControlProviderOperatorAutopilotLifecycleRecordPayload[];
   local_rollout_execution_attempts?: ControlProviderOperatorAutopilotLocalRolloutExecutionAttemptPayload[];
   backlog_promotion_snapshots?: ControlProviderOperatorAutopilotBacklogPromotionSnapshotPayload[];
+  backlog_promotion_snapshot_retention_records?: ControlProviderOperatorAutopilotBacklogPromotionSnapshotRetentionPayload[];
 }
 
 export interface ControlProviderOperatorAutopilotPayload {
@@ -262,6 +291,10 @@ export interface ControlProviderOperatorAutopilotPayload {
     enabled: boolean;
     state_name: string;
     target_state_name: string;
+    snapshot_retention?: {
+      max_untracked_cycles: number;
+      terminal_state_types: string[];
+    };
   };
   review_handoff_rework: {
     enabled: boolean;
@@ -922,7 +955,21 @@ export function buildSelectedRunRuntimeFingerprintInput(
                   enabled: providerWorkflow.operator_autopilot.backlog_promotion.enabled,
                   state_name: providerWorkflow.operator_autopilot.backlog_promotion.state_name,
                   target_state_name:
-                    providerWorkflow.operator_autopilot.backlog_promotion.target_state_name
+                    providerWorkflow.operator_autopilot.backlog_promotion.target_state_name,
+                  snapshot_retention: {
+                    max_untracked_cycles:
+                      providerWorkflow.operator_autopilot.backlog_promotion
+                        .snapshot_retention?.max_untracked_cycles ?? 3,
+                    terminal_state_types: [
+                      ...(
+                        providerWorkflow.operator_autopilot.backlog_promotion
+                          .snapshot_retention?.terminal_state_types ?? [
+                          'completed',
+                          'canceled'
+                        ]
+                      )
+                    ]
+                  }
                 },
                 review_handoff_rework: {
                   enabled: providerWorkflow.operator_autopilot.review_handoff_rework.enabled,
@@ -1101,7 +1148,32 @@ export function buildSelectedRunRuntimeFingerprintInput(
                           target_state: snapshot.target_state,
                           attempted_at: snapshot.attempted_at,
                           issue_updated_at: snapshot.issue_updated_at,
-                          force_path_used: snapshot.force_path_used
+                          force_path_used: snapshot.force_path_used,
+                          untracked_cycles: snapshot.untracked_cycles ?? 0
+                        })),
+                      backlog_promotion_snapshot_retention_records:
+                        (
+                          providerWorkflow.operator_autopilot.last_result
+                            .backlog_promotion_snapshot_retention_records ?? []
+                        ).map((record) => ({
+                          issue_id: record.issue_id,
+                          issue_identifier: record.issue_identifier,
+                          target_state: record.target_state,
+                          attempted_at: record.attempted_at,
+                          issue_updated_at: record.issue_updated_at,
+                          evaluated_at: record.evaluated_at,
+                          decision: record.decision,
+                          reason: record.reason,
+                          age_ms: record.age_ms,
+                          untracked_cycles: record.untracked_cycles,
+                          max_untracked_cycles: record.max_untracked_cycles,
+                          issue_state: record.issue_state,
+                          issue_state_type: record.issue_state_type,
+                          issue_archived_at: record.issue_archived_at,
+                          issue_trashed: record.issue_trashed,
+                          issue_observed_updated_at: record.issue_observed_updated_at,
+                          terminal_state_evidence: record.terminal_state_evidence,
+                          force_path_used: record.force_path_used
                         }))
                     }
                   : null

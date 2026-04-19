@@ -402,7 +402,15 @@ describe('providerWorkflowConfigStore', () => {
 
     expect(bootstrapped.operator_autopilot).toMatchObject({
       enabled: true,
-      backlog_promotion: { enabled: true, state_name: 'Backlog', target_state_name: 'Ready' },
+      backlog_promotion: {
+        enabled: true,
+        state_name: 'Backlog',
+        target_state_name: 'Ready',
+        snapshot_retention: {
+          max_untracked_cycles: 3,
+          terminal_state_types: ['completed', 'canceled']
+        }
+      },
       review_handoff_rework: {
         enabled: true,
         target_state_name: 'Rework',
@@ -503,6 +511,29 @@ describe('providerWorkflowConfigStore', () => {
           target_state: 'Ready',
           attempted_at: '2026-04-09T09:30:00.000Z',
           issue_updated_at: '2026-04-09T09:30:00.000Z',
+          force_path_used: true,
+          untracked_cycles: 1
+        }
+      ],
+      backlog_promotion_snapshot_retention_records: [
+        {
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-118',
+          target_state: 'Ready',
+          attempted_at: '2026-04-09T09:30:00.000Z',
+          issue_updated_at: '2026-04-09T09:30:00.000Z',
+          evaluated_at: '2026-04-09T09:40:30.000Z',
+          decision: 'retained',
+          reason: 'temporarily_untracked',
+          age_ms: 630000,
+          untracked_cycles: 1,
+          max_untracked_cycles: 3,
+          issue_state: null,
+          issue_state_type: null,
+          issue_archived_at: null,
+          issue_trashed: null,
+          issue_observed_updated_at: null,
+          terminal_state_evidence: false,
           force_path_used: true
         }
       ]
@@ -543,6 +574,19 @@ describe('providerWorkflowConfigStore', () => {
           target_state: 'Ready',
           attempted_at: '2026-04-09T09:30:00.000Z',
           issue_updated_at: '2026-04-09T09:30:00.000Z',
+          force_path_used: true,
+          untracked_cycles: 1
+        }
+      ],
+      backlog_promotion_snapshot_retention_records: [
+        {
+          issue_identifier: 'CO-118',
+          decision: 'retained',
+          reason: 'temporarily_untracked',
+          age_ms: 630000,
+          untracked_cycles: 1,
+          max_untracked_cycles: 3,
+          terminal_state_evidence: false,
           force_path_used: true
         }
       ]
@@ -557,6 +601,7 @@ describe('providerWorkflowConfigStore', () => {
       snapshotted.operator_autopilot.last_result.terminal_blocker_advisories[0]!.recommended_action =
         'ready_to_unblock';
       snapshotted.operator_autopilot.last_result.backlog_promotion_snapshots![0]!.force_path_used = false;
+      snapshotted.operator_autopilot.last_result.backlog_promotion_snapshot_retention_records![0]!.force_path_used = false;
     }
 
     expect(store.snapshot().operator_autopilot?.last_result?.status).toBe('acted');
@@ -572,6 +617,10 @@ describe('providerWorkflowConfigStore', () => {
     ).toBe('duplicate_cleanup');
     expect(
       store.snapshot().operator_autopilot?.last_result?.backlog_promotion_snapshots?.[0]?.force_path_used
+    ).toBe(true);
+    expect(
+      store.snapshot().operator_autopilot?.last_result
+        ?.backlog_promotion_snapshot_retention_records?.[0]?.force_path_used
     ).toBe(true);
   });
 

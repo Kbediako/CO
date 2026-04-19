@@ -6414,6 +6414,10 @@ function resolveProviderOperatorAutopilotPreviousResultFromPayload(
   if (!new Set<ProviderOperatorAutopilotResult['status']>(['disabled', 'noop', 'acted', 'failed']).has(status as ProviderOperatorAutopilotResult['status'])) {
     return null;
   }
+  const backlogPromotionSnapshotRetentionRecords =
+    sanitizeProviderOperatorAutopilotRetentionRecords(
+      record.backlog_promotion_snapshot_retention_records
+    );
   return {
     recorded_at: record.recorded_at,
     status: status as ProviderOperatorAutopilotResult['status'],
@@ -6436,8 +6440,20 @@ function resolveProviderOperatorAutopilotPreviousResultFromPayload(
       : [],
     backlog_promotion_snapshots: Array.isArray(record.backlog_promotion_snapshots)
       ? (record.backlog_promotion_snapshots as ProviderOperatorAutopilotResult['backlog_promotion_snapshots'])
-      : []
+      : [],
+    backlog_promotion_snapshot_retention_records: backlogPromotionSnapshotRetentionRecords
   };
+}
+
+function sanitizeProviderOperatorAutopilotRetentionRecords(
+  value: unknown
+): ProviderOperatorAutopilotResult['backlog_promotion_snapshot_retention_records'] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((entry) =>
+    isRecord(entry) && typeof entry.issue_id === 'string' && entry.issue_id.trim().length > 0
+  ) as ProviderOperatorAutopilotResult['backlog_promotion_snapshot_retention_records'];
 }
 
 function resolveLocalRolloutExecutionAttemptsForCycle(
