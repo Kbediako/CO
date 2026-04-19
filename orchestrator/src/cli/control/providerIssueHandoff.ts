@@ -347,6 +347,7 @@ type ProviderTrackedIssueRefreshDisposition =
   | {
       kind: 'release';
       reason: string;
+      source?: 'direct_issue_by_id';
       trackedIssue: Pick<
         LiveLinearTrackedIssue,
         | 'identifier'
@@ -4198,6 +4199,7 @@ export function createProviderIssueHandoffService(
           if (resolution.kind === 'release') {
             if (
               resolution.reason === 'not_found' &&
+              resolution.source !== 'direct_issue_by_id' &&
               claim.state === 'released' &&
               pollInput?.deferFreshDiscovery === true &&
               canRecheckPlainReleasedNotActiveClaim(claim) &&
@@ -7704,6 +7706,7 @@ async function resolveTrackedIssuePollResolutionWithFallback(
     return {
       kind: 'release',
       reason: stripProviderIssueReleasedPrefix(eligibility.releaseReason),
+      source: 'direct_issue_by_id',
       trackedIssue: directResolution.trackedIssue,
       cleanupWorkspace: eligibility.cleanupWorkspace
     };
@@ -7713,6 +7716,7 @@ async function resolveTrackedIssuePollResolutionWithFallback(
     return {
       kind: 'release',
       reason: directResolution.reason,
+      source: 'direct_issue_by_id',
       trackedIssue: null,
       cleanupWorkspace: false
     };

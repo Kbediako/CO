@@ -20233,6 +20233,69 @@ describe('createProviderIssueHandoffService', () => {
     expect(cancelSpy).not.toHaveBeenCalled();
   });
 
+  it('releases a reclaimable plain released not-active claim when direct issue-by-id returns not_found during deferred poll', async () => {
+    const { root, paths } = await createHostPaths();
+    const missingManifestPath = join(
+      root,
+      '.runs',
+      'linear-lin-issue-1',
+      'cli',
+      'run-ready-not-active-direct-not-found',
+      'manifest.json'
+    );
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      run_id: 'run-ready-not-active-direct-not-found',
+      run_manifest_path: missingManifestPath
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = createCo202Launcher(
+      'run-ready-not-active-should-not-start',
+      '/tmp/provider-run/ready-not-active-should-not-start-manifest.json'
+    );
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'release' as const,
+      reason: 'not_found'
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 2
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-1'
+    });
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_found',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-15T15:00:00.000Z',
+      run_id: 'run-ready-not-active-direct-not-found',
+      run_manifest_path: missingManifestPath
+    });
+    expect(persist).toHaveBeenCalled();
+  });
+
   it('reclaims a stale Blocked plain released not-active claim with only completed blockers through fresh discovery even without retained run identity', async () => {
     const { paths } = await createHostPaths();
     const completedBlocker = {
@@ -20323,7 +20386,7 @@ describe('createProviderIssueHandoffService', () => {
     expect(persist).toHaveBeenCalled();
   });
 
-  it('reclaims a stale Blocked plain released not-active claim with only completed blockers when retained terminal run started after live Ready truth', async () => {
+  it('reclaims a stale Blocked plain released not-active claim with only completed blockers when retained terminal run has no issue_updated_at proof', async () => {
     const { root, paths } = await createHostPaths();
     const retainedEnv = {
       repoRoot: root,
