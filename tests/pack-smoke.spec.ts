@@ -130,9 +130,14 @@ function combineWorkflowConditions(jobCondition: string, stepCondition: string):
 
 function hasNonSuccessStatusCheck(condition: string): boolean {
   const expression = unwrapActionsExpression(condition);
+  const compactExpression = expression.replace(/\s+/gu, '').toLowerCase();
   return (
     /\b(always|cancelled|failure)\s*\(/iu.test(expression) ||
     /!\s*(?:\(\s*)*success\s*\(/iu.test(expression) ||
+    /(?:^|[(!&|])\(?success\(\)\)?==(?:false|fromjson\((['"])false\1\))/iu.test(compactExpression) ||
+    /(?:^|[(!&|])\(?success\(\)\)?!=(?:true|fromjson\((['"])true\1\))/iu.test(compactExpression) ||
+    /(?:false|fromjson\((['"])false\1\))==\(?success\(\)\)?(?:$|[)!&|])/iu.test(compactExpression) ||
+    /(?:true|fromjson\((['"])true\1\))!=\(?success\(\)\)?(?:$|[)!&|])/iu.test(compactExpression) ||
     (/\bsuccess\s*\(/iu.test(expression) && /\|\|/u.test(expression))
   );
 }
@@ -395,13 +400,14 @@ function getRunCommandLines(run: string): string[] {
   const commandLines: string[] = [];
   let heredocDelimiter: string | null = null;
   for (const rawLine of normalizeShellContinuations(run).split(/\r?\n/u)) {
-    const line = stripInlineShellComment(rawLine.trim());
+    const trimmedRawLine = rawLine.trim();
     if (heredocDelimiter) {
-      if (line === heredocDelimiter) {
+      if (trimmedRawLine === heredocDelimiter) {
         heredocDelimiter = null;
       }
       continue;
     }
+    const line = stripInlineShellComment(trimmedRawLine);
     if (!line || line.startsWith('#')) {
       continue;
     }
@@ -972,6 +978,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(hasPackSmokeCommand(`echo foo#bar; ${packSmokeCommand}`)).toBe(true);
     expect(hasPackSmokeCommand(`cat <<'EOF-MARK'\n${packSmokeCommand}\nEOF-MARK`)).toBe(false);
     expect(hasPackSmokeCommand(`${packSmokeCommand}:other`)).toBe(false);
+    expect(hasPackSmokeCommand(`cat <<EOF\nEOF # still body\n${packSmokeCommand}\nEOF`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} || true`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand}||true`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand}\n|| true`)).toBe(true);
@@ -1125,7 +1132,14 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(installConditionCoversSmokeStep('success()', '${{ !success() }}')).toBe(false);
     expect(installConditionCoversSmokeStep('success()', '${{ !(success()) }}')).toBe(false);
     expect(installConditionCoversSmokeStep('success()', '${{ ! ( success() ) }}')).toBe(false);
+    expect(installConditionCoversSmokeStep('success()', '${{ success() == false }}')).toBe(false);
+    expect(installConditionCoversSmokeStep('success()', '${{ success() != true }}')).toBe(false);
+    expect(installConditionCoversSmokeStep('success()', "${{ success() == fromJSON('false') }}")).toBe(false);
+    expect(installConditionCoversSmokeStep('success()', '${{ false == success() }}')).toBe(false);
+    expect(installConditionCoversSmokeStep('success()', '${{ true != success() }}')).toBe(false);
     expect(installConditionCoversSmokeStep('success()', '${{ success() || inputs.force }}')).toBe(false);
+    expect(installConditionCoversSmokeStep('success()', '${{ success() == true }}')).toBe(true);
+    expect(installConditionCoversSmokeStep('success()', '${{ success() != false }}')).toBe(true);
     expect(installConditionCoversSmokeStep('success()', '${{ success() && inputs.force }}')).toBe(true);
     expect(installConditionCoversSmokeStep("${{ always() && inputs.force == 'true' }}", 'always()')).toBe(false);
     expect(
