@@ -495,6 +495,29 @@ describe('provider/control-host freshness gauge', () => {
     expect(report.findings.map((finding) => finding.code)).toContain('active_worker_proof_missing');
   });
 
+  it('follows claim run_manifest_path evidence outside the control-host artifact root', async () => {
+    const report = await evaluateProviderControlHostFreshnessGauge({
+      artifactRoot: join(FIXTURE_ROOT, 'claim-linked-external-run/control-host'),
+      now: NOW,
+      strict: true
+    });
+
+    expect(report.verdict).toBe('healthy');
+    expect(report.sources.provider_intake_state).toHaveLength(1);
+    expect(report.sources.provider_manifests).toEqual([
+      join(FIXTURE_ROOT, 'claim-linked-external-run/run/manifest.json')
+    ]);
+    expect(report.sources.provider_proofs).toEqual([
+      join(FIXTURE_ROOT, 'claim-linked-external-run/run/provider-linear-worker-proof.json')
+    ]);
+    expect(report.metrics.active_heartbeat_age_ms).toMatchObject({
+      value: 15_000,
+      verdict: 'healthy',
+      source_field: 'updated_at'
+    });
+    expect(report.findings.map((finding) => finding.code)).not.toContain('active_worker_proof_missing');
+  });
+
   it('rejects invalid now values instead of using wall-clock time', async () => {
     await expect(evaluateProviderControlHostFreshnessGauge({
       artifactRoot: join(FIXTURE_ROOT, 'healthy'),

@@ -2030,6 +2030,74 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('resets the internal refresh lifecycle chain for an explicit stuck-refresh retry', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:00:00.000Z'));
+
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(
+      createProviderClaim({
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        state: 'accepted',
+        reason: 'provider_issue_handoff_owned'
+      })
+    );
+
+    let releaseFirstResolve: (() => void) | null = null;
+    let resolveCallCount = 0;
+    const resolveTrackedIssue = vi.fn(async ({ issueId }: { issueId: string }) => {
+      resolveCallCount += 1;
+      if (resolveCallCount === 1) {
+        await new Promise<void>((resolve) => {
+          releaseFirstResolve = resolve;
+        });
+      }
+      return {
+        kind: 'release' as const,
+        reason: `provider_issue_not_ready:${issueId}`
+      };
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      resolveTrackedIssue
+    });
+
+    markProviderPollingStarted(service, { mode: 'poll' });
+    const stuckPoll = service.poll?.({
+      trackedIssues: []
+    });
+    await waitForMockCalls(resolveTrackedIssue, 1);
+    await markProviderPollingStuck(service);
+    expect(readProviderPollingHealth(service)).toMatchObject({
+      checking: true,
+      stuck: true,
+      restart_required: true
+    });
+
+    service.resetStuckRefreshLifecycle?.();
+    markProviderPollingStarted(service, { mode: 'refresh' });
+
+    await expect(service.refresh()).resolves.toBeUndefined();
+    expect(resolveTrackedIssue).toHaveBeenCalledTimes(2);
+    expect(readProviderPollingHealth(service)).toMatchObject({
+      checking: true,
+      stuck: false,
+      restart_required: false
+    });
+
+    releaseFirstResolve?.();
+    await expect(stuckPoll).rejects.toThrow('provider_refresh_lifecycle_stuck');
+  });
+
   it('does not treat a future-skewed persisted restart_required snapshot as newer than a live retry', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-19T04:00:00.000Z'));

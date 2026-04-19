@@ -240,6 +240,7 @@ export interface ProviderIssueHandoffService {
   rehydrate(): Promise<void>;
   refresh(): Promise<void>;
   poll?(input: ProviderIssueHandoffPollInput): Promise<void>;
+  resetStuckRefreshLifecycle?(): void;
 }
 
 export type ProviderTrackedIssueRefreshResolution =
@@ -388,9 +389,10 @@ export function createProviderIssueHandoffService(
     }
   >();
   let refreshLifecycleChain: Promise<void> = Promise.resolve();
+  let refreshLifecycleEpoch = 0;
   let bestEffortRehydrateTimer: NodeJS.Timeout | null = null;
   const queuedRetryTrackedIssueRefetches = new Map<string, ProviderTrackedIssueRefetch>();
-  const refreshLifecycleScope = new AsyncLocalStorage<boolean>();
+  const refreshLifecycleScope = new AsyncLocalStorage<{ epoch: number } | null>();
   const providerIssueRunDiscoveryScope = new AsyncLocalStorage<{
     snapshot: Promise<ProviderIssueRunDiscoverySnapshot> | null;
   }>();
@@ -403,7 +405,12 @@ export function createProviderIssueHandoffService(
       }
     | null = null;
 
+  const isStaleRefreshLifecycleOperation = (): boolean => {
+    const lifecycleScope = refreshLifecycleScope.getStore();
+    return Boolean(lifecycleScope && lifecycleScope.epoch !== refreshLifecycleEpoch);
+  };
   const shouldAbortRefreshCycle = (): boolean =>
+    isStaleRefreshLifecycleOperation() ||
     hasConcurrentRestartRequiredPollingSnapshot() ||
     (providerIssueHandoffService !== null && isProviderPollingStuck(providerIssueHandoffService));
   const throwRefreshLifecycleStuckError = (): never => {
@@ -447,18 +454,33 @@ export function createProviderIssueHandoffService(
             : await trackedIssueRefetch(input);
 
   const runWithRefreshLifecycleLock = async <T>(operation: () => Promise<T>): Promise<T> => {
-    if (refreshLifecycleScope.getStore()) {
+    const lifecycleScope = refreshLifecycleScope.getStore();
+    if (lifecycleScope) {
       return await operation();
     }
+    const operationEpoch = refreshLifecycleEpoch;
+    const runOperation = (): Promise<T> =>
+      refreshLifecycleScope.run({ epoch: operationEpoch }, async () => {
+        if (operationEpoch !== refreshLifecycleEpoch) {
+          throwRefreshLifecycleStuckError();
+        }
+        return await operation();
+      });
     const nextOperation = refreshLifecycleChain.then(
-      () => refreshLifecycleScope.run(true, operation),
-      () => refreshLifecycleScope.run(true, operation)
+      () => runOperation(),
+      () => runOperation()
     );
     refreshLifecycleChain = nextOperation.then(
       () => undefined,
       () => undefined
     );
     return nextOperation;
+  };
+
+  const resetStuckRefreshLifecycle = (): void => {
+    refreshLifecycleEpoch += 1;
+    refreshLifecycleChain = Promise.resolve();
+    resetProviderIssueRunDiscoveryCache();
   };
 
   const resetProviderIssueRunDiscoveryCache = (): void => {
@@ -531,7 +553,7 @@ export function createProviderIssueHandoffService(
 
   const runOutsideRefreshLifecycleScope = async <T>(
     operation: () => Promise<T>
-  ): Promise<T> => await refreshLifecycleScope.run(false, operation);
+  ): Promise<T> => await refreshLifecycleScope.run(null, operation);
 
   const persistState = async (): Promise<void> => {
     await options.persist();
@@ -5095,6 +5117,10 @@ export function createProviderIssueHandoffService(
 
     async poll(input: ProviderIssueHandoffPollInput): Promise<void> {
       await runRefreshCycle(input);
+    },
+
+    resetStuckRefreshLifecycle(): void {
+      resetStuckRefreshLifecycle();
     }
   };
 

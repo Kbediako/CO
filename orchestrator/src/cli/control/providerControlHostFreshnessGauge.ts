@@ -387,8 +387,11 @@ async function readGaugeArtifacts(
   statusDatasets: JsonArtifact[];
   linearBudgetState: JsonArtifact[];
 }> {
+  const providerIntakeStates = await readJsonArtifacts(sources.provider_intake_state, findings);
+  const claimLinkedSources = await discoverClaimLinkedRunArtifactSources(providerIntakeStates);
+  appendUnique(sources.provider_manifests, claimLinkedSources.provider_manifests);
+  appendUnique(sources.provider_proofs, claimLinkedSources.provider_proofs);
   const [
-    providerIntakeStates,
     rawManifests,
     rawProofs,
     workerAudits,
@@ -397,7 +400,6 @@ async function readGaugeArtifacts(
     statusDatasets,
     linearBudgetState
   ] = await Promise.all([
-    readJsonArtifacts(sources.provider_intake_state, findings),
     readJsonArtifacts(sources.provider_manifests, findings),
     readJsonArtifacts(sources.provider_proofs, findings),
     readWorkerAuditArtifacts(sources.worker_audit_jsonl, findings),
@@ -424,6 +426,52 @@ async function readGaugeArtifacts(
     statusDatasets,
     linearBudgetState
   };
+}
+
+async function discoverClaimLinkedRunArtifactSources(
+  providerIntakeStates: JsonArtifact[]
+): Promise<{
+  provider_manifests: string[];
+  provider_proofs: string[];
+}> {
+  const provider_manifests: string[] = [];
+  const provider_proofs: string[] = [];
+  for (const artifact of providerIntakeStates) {
+    const claims = asRecord(artifact.value)?.claims;
+    if (!Array.isArray(claims)) {
+      continue;
+    }
+    for (const rawClaim of claims) {
+      const claim = asRecord(rawClaim);
+      if (!claim || !ACTIVE_CLAIM_STATES.has(readState(claim))) {
+        continue;
+      }
+      const manifestPath = normalizeOptionalString(claim?.run_manifest_path);
+      if (!manifestPath) {
+        continue;
+      }
+      const resolvedManifestPath = resolve(manifestPath);
+      if (await isReadableFile(resolvedManifestPath)) {
+        provider_manifests.push(resolvedManifestPath);
+      }
+      const proofPath = resolve(dirname(resolvedManifestPath), 'provider-linear-worker-proof.json');
+      if (await isReadableFile(proofPath)) {
+        provider_proofs.push(proofPath);
+      }
+    }
+  }
+  return {
+    provider_manifests,
+    provider_proofs
+  };
+}
+
+async function isReadableFile(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isFile();
+  } catch {
+    return false;
+  }
 }
 
 async function readJsonArtifacts(

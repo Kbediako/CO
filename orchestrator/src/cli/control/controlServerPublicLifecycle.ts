@@ -295,6 +295,31 @@ export function runProviderIssueHandoffRefresh(
         if (!stuckOutcome) {
           return continueWhileBusy();
         }
+        if (allowIdleRestartRequiredRetry) {
+          detachProviderIssueHandoffPending(state.active);
+          detachProviderIssueHandoffPending(state.queuedRefresh);
+          state.active = null;
+          state.queuedRefresh = null;
+          providerIssueHandoff.resetStuckRefreshLifecycle?.();
+          const activeRefresh = waitForProviderIssueHandoffPending(
+            providerIssueHandoff,
+            startProviderIssueHandoffOperation(
+              providerIssueHandoff,
+              state,
+              () => providerIssueHandoff.refresh(),
+              {
+                mode: 'refresh'
+              }
+            )
+          );
+          const activeOutcome: ProviderIssueHandoffRefreshRequestOutcome = {
+            queued: true,
+            coalesced: false
+          };
+          return acknowledgeAccepted
+            ? acknowledgeProviderIssueHandoffAccepted(activeRefresh, activeOutcome)
+            : mapProviderIssueHandoffRefreshOutcome(providerIssueHandoff, activeRefresh, activeOutcome);
+        }
         noteProviderPollingRequest(providerIssueHandoff, {
           mode: 'refresh',
           queued: state.queuedRefresh !== null,
@@ -682,13 +707,13 @@ function startProviderIssueHandoffOperation(
   const operationPromise = operationResult
     .then(
       (value) => {
-        if (healthContext) {
+        if (healthContext && state.active === operationPromise) {
           markProviderPollingCompleted(providerIssueHandoff);
         }
         return value;
       },
       (error: unknown) => {
-        if (healthContext) {
+        if (healthContext && state.active === operationPromise) {
           markProviderPollingCompleted(providerIssueHandoff, {
             error
           });
@@ -751,6 +776,13 @@ function queueProviderIssueHandoffRefresh(
     });
   state.queuedRefresh = queuedRefresh;
   return queuedRefresh;
+}
+
+function detachProviderIssueHandoffPending(pending: Promise<void> | null): void {
+  if (!pending) {
+    return;
+  }
+  void pending.catch(() => undefined);
 }
 
 async function waitForProviderIssueHandoffQueueToDrain(
@@ -835,9 +867,38 @@ function mapProviderIssueHandoffRefreshOutcome(
       if (stuckOutcome) {
         return stuckOutcome;
       }
+      const stuckReason = resolveProviderIssueHandoffStuckErrorReason(error);
+      if (stuckReason) {
+        return {
+          queued: true,
+          coalesced: true,
+          stuck: true,
+          restart_required: true,
+          reason: stuckReason
+        };
+      }
       throw error;
     }
   );
+}
+
+function resolveProviderIssueHandoffStuckErrorReason(error: unknown): string | null {
+  if (!(error instanceof Error)) {
+    return null;
+  }
+  if (
+    error.name === 'ProviderRefreshLifecycleStuckError' ||
+    error.message === 'provider_refresh_lifecycle_stuck'
+  ) {
+    return 'provider_refresh_lifecycle_stuck';
+  }
+  if (
+    error.name === 'ProviderPollLifecycleStuckError' ||
+    error.message === 'provider_poll_lifecycle_stuck'
+  ) {
+    return 'provider_poll_lifecycle_stuck';
+  }
+  return null;
 }
 
 function acknowledgeProviderIssueHandoffAccepted(
