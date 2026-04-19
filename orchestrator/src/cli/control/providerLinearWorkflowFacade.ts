@@ -2441,7 +2441,7 @@ function compareCanonicalOwnerIssues(left: ProviderLinearCreatedIssue, right: Pr
 }
 
 function parseLinearIssueNumber(identifier: string): number | null {
-  const match = /^[A-Z]+-(\d+)$/u.exec(identifier);
+  const match = /^[A-Z][A-Z0-9]*-(\d+)$/u.exec(identifier);
   if (!match) {
     return null;
   }

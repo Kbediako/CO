@@ -9848,6 +9848,108 @@ describe('providerLinearWorkflowFacade', () => {
     expect(calls).toEqual(['owner-search:first', 'owner-search:owner-cursor-1', 'related-relation']);
   });
 
+  it('sorts canonical owners numerically when the Linear team key contains digits', async () => {
+    const canonicalOwnerKey = 'baseline_cohort_id:accessibility-docs-freshness';
+    const canonicalOwnerMarker = `codex-orchestrator:canonical-owner-key=${canonicalOwnerKey}`;
+    const canonicalOwnerDescription = [
+      'Accessibility baseline owner.',
+      '## Canonical Owner',
+      `- Canonical owner key: \`${canonicalOwnerKey}\``,
+      `- Canonical owner marker: \`${canonicalOwnerMarker}\``
+    ].join('\n');
+    const calls: string[] = [];
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, unknown>;
+      };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearCanonicalFollowUpOwners')) {
+        calls.push('owner-search');
+        return jsonResponse(
+          buildCanonicalOwnerIssuesBody([
+            buildCanonicalOwnerIssue({
+              id: 'lin-issue-10',
+              identifier: 'A11Y-10',
+              title: 'Newer accessibility owner',
+              description: canonicalOwnerDescription,
+              state: {
+                id: 'state-backlog',
+                name: 'Backlog',
+                type: 'unstarted'
+              }
+            }),
+            buildCanonicalOwnerIssue({
+              id: 'lin-issue-9',
+              identifier: 'A11Y-9',
+              title: 'Older accessibility owner',
+              description: canonicalOwnerDescription,
+              state: {
+                id: 'state-backlog',
+                name: 'Backlog',
+                type: 'unstarted'
+              }
+            })
+          ])
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateFollowUpIssue')) {
+        calls.push('create');
+        throw new Error('alphanumeric team-key owner reuse must not create another issue');
+      }
+      if (body.query?.includes('ProviderLinearCreateIssueRelation')) {
+        calls.push('related-relation');
+        expect(body.variables).toMatchObject({
+          input: {
+            type: 'related',
+            issueId: 'lin-issue-1',
+            relatedIssueId: 'lin-issue-9'
+          }
+        });
+        return jsonResponse({
+          data: {
+            issueRelationCreate: {
+              success: true,
+              issueRelation: {
+                id: 'relation-related',
+                type: 'related'
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await createProviderLinearFollowUpIssue({
+      issueId: 'lin-issue-1',
+      title: 'Accessibility docs freshness baseline owner',
+      description: 'Keep duplicate lanes on one owner.',
+      intentChecksum: '- Preserve accessibility owner routing.',
+      nonGoals: '- [ ] Do not create duplicates.',
+      notDoneIf: '- [ ] Repeated lanes create fresh owners.',
+      acceptanceCriteria: '- [ ] The oldest alphanumeric-team owner is reused.',
+      canonicalOwnerKey,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'create-follow-up',
+      action: 'reused',
+      follow_up_issue: {
+        id: 'lin-issue-9',
+        identifier: 'A11Y-9'
+      }
+    });
+    expect(calls).toEqual(['owner-search', 'related-relation']);
+  });
+
   it('fails closed when canonical owner pagination repeats a cursor', async () => {
     const canonicalOwnerKey = 'baseline_cohort_id:apr-19-docs-freshness';
     const canonicalOwnerMarker = `codex-orchestrator:canonical-owner-key=${canonicalOwnerKey}`;
