@@ -578,7 +578,7 @@ function cloneOperatorAutopilotLastResult(
       target_state: snapshot.target_state,
       attempted_at: snapshot.attempted_at,
       issue_updated_at: snapshot.issue_updated_at,
-      force_path_used: snapshot.force_path_used
+      force_path_used: snapshot.force_path_used ?? false
     }))
   };
 }

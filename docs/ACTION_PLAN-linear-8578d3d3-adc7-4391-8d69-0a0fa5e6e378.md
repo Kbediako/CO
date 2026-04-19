@@ -38,7 +38,7 @@
 - `orchestrator/src/cli/control/observabilityReadModel.ts`
 - `orchestrator/tests/ProviderOperatorAutopilot.test.ts`
 - `orchestrator/tests/ProviderWorkflowConfigStore.test.ts`
-- `orchestrator/tests/ControlRuntime.test.ts`
+- `orchestrator/tests/ObservabilityReadModel.test.ts`
 - existing `ProviderLinearWorkflowFacade.test.ts` transition-guard coverage
 
 ## Validation
@@ -46,7 +46,7 @@
   - child lane: scoped docs/JSON, protected-term, and diff sanity only
   - parent lane: focused `ProviderOperatorAutopilot.test.ts`
   - parent lane: focused `ProviderWorkflowConfigStore.test.ts`
-  - parent lane: focused `ControlRuntime.test.ts`
+  - parent lane: focused `ObservabilityReadModel.test.ts`
   - parent lane: preserve-contract `ProviderLinearWorkflowFacade.test.ts` when metadata projection changes
   - parent lane: manifest-backed docs-review or implementation gate selected by parent
 - Rollback plan:

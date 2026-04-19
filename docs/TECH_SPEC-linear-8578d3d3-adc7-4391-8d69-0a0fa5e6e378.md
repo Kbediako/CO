@@ -30,7 +30,7 @@ last_review: 2026-04-17
   - docs-first packet and registry/checklist mirrors for `CO-216`
   - parent-owned backlog-promotion hold logic in `providerOperatorAutopilot.ts`
   - parent-owned autopilot result persistence/projection updates in `providerWorkflowConfigStore.ts` and `observabilityReadModel.ts`
-  - parent-owned focused validation in `ProviderOperatorAutopilot.test.ts`, `ProviderWorkflowConfigStore.test.ts`, `ControlRuntime.test.ts`, and existing `ProviderLinearWorkflowFacade.test.ts` preserve coverage where needed
+  - parent-owned focused validation in `ProviderOperatorAutopilot.test.ts`, `ProviderWorkflowConfigStore.test.ts`, `ObservabilityReadModel.test.ts`, and existing `ProviderLinearWorkflowFacade.test.ts` preserve coverage where needed
 - Constraints:
   - child lane remains docs-only; parent owns implementation, tests, docs-review, validation, Linear/workpad reconciliation, PR, and merge
   - preserve normal safe backlog-head promotion when no manual-demotion signal exists
@@ -142,7 +142,7 @@ last_review: 2026-04-17
   - no broad queue or lifecycle migration expected
   - no changes to reclaim or refresh-stall artifacts
 - External dependencies / integrations:
-  - parent-owned focused regression harness in `ProviderOperatorAutopilot.test.ts`, `ProviderWorkflowConfigStore.test.ts`, `ControlRuntime.test.ts`, and existing `ProviderLinearWorkflowFacade.test.ts`
+  - parent-owned focused regression harness in `ProviderOperatorAutopilot.test.ts`, `ProviderWorkflowConfigStore.test.ts`, `ObservabilityReadModel.test.ts`, and existing `ProviderLinearWorkflowFacade.test.ts`
 
 ## Validation Plan
 - Child-lane checks:
@@ -151,7 +151,7 @@ last_review: 2026-04-17
 - Parent-lane checks:
   - focused `orchestrator/tests/ProviderOperatorAutopilot.test.ts`
   - focused `orchestrator/tests/ProviderWorkflowConfigStore.test.ts`
-  - focused `orchestrator/tests/ControlRuntime.test.ts`
+  - focused `orchestrator/tests/ObservabilityReadModel.test.ts`
   - preserve-contract `orchestrator/tests/ProviderLinearWorkflowFacade.test.ts` when parent changes transition metadata projection
   - parent-owned docs-review or implementation gate after source edits
 - Rollout verification:
