@@ -297,11 +297,11 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
     const originalCodexHome = process.env.CODEX_HOME;
     const originalCodexCliBin = process.env.CODEX_CLI_BIN;
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
-    const fakeDistRoot = await mkdtemp(join(tmpdir(), 'codex-dist-'));
+    const tempRepo = await mkdtemp(join(tmpdir(), 'doctor-direct-dist-repo-'));
     process.env.CODEX_HOME = tempHome;
     process.env.CODEX_CLI_BIN = join(tempHome, 'missing-codex');
     try {
-      const fakeDistEntrypoint = await writeFakeDelegationDistEntrypoint(fakeDistRoot);
+      const fakeDistEntrypoint = await writeFakeDelegationDistEntrypoint(tempRepo);
       await writeFile(
         join(tempHome, 'config.toml'),
         [
@@ -312,7 +312,7 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
         'utf8'
       );
 
-      const result = runDoctor(process.cwd());
+      const result = runDoctor(tempRepo);
       expect(result.delegation.status).not.toBe('missing-config');
       expect(result.delegation.transport.kind).toBe('direct-dist');
       expect(result.delegation.startup.status).not.toBe('failed');
@@ -330,7 +330,7 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
         process.env.CODEX_CLI_BIN = originalCodexCliBin;
       }
       await rm(tempHome, { recursive: true, force: true });
-      await rm(fakeDistRoot, { recursive: true, force: true });
+      await rm(tempRepo, { recursive: true, force: true });
     }
   });
 

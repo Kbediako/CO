@@ -27,6 +27,47 @@
       }
     },
     {
+      "id": "20260418-linear-91749283-6dc8-4df8-aee3-5c9127c1200c",
+      "title": "Doctor validation: classify and restore current Doctor readiness stability for CO-220 handoff",
+      "relates_to": "tasks/tasks-linear-91749283-6dc8-4df8-aee3-5c9127c1200c.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-19",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "same-issue docs child lanes plus parent fallback",
+          "date": "2026-04-18",
+          "status": "stalled-parent-fallback",
+          "manifest": ".runs/linear-91749283-6dc8-4df8-aee3-5c9127c1200c-docs-packet/cli/2026-04-18T02-13-50-957Z-9629b96d/manifest.json",
+          "source_anchor": "ctx:sha256:2e68cd2fda454db25cb1007f4066d1660e095ddaaf609630cabcc4697c11670e#chunk:c000001",
+          "summary": "Two same-issue docs child lanes stalled under appserver and a forced-CLI docs lane drifted into unrelated packet content, so the parent workspace authored the authoritative docs-first packet after the successful classification-note child lane preserved the current-head, clean-main, and CO-220 Doctor buckets. The resulting packet keeps CO-231 limited to Doctor validation stability for CO-220 handoff, records the hermetic direct-dist Doctor fixture repair, and explicitly preserves the separation from CO-220 stale-attachment logic."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review --base origin/main",
+          "date": "2026-04-19",
+          "status": "bounded-success-no-findings-after-p2-fix",
+          "manifest": ".runs/linear-91749283-6dc8-4df8-aee3-5c9127c1200c/cli/2026-04-19T13-44-28-601Z-e33f5de7/manifest.json",
+          "telemetry": ".runs/linear-91749283-6dc8-4df8-aee3-5c9127c1200c/cli/2026-04-19T13-44-28-601Z-e33f5de7/review/telemetry.json",
+          "summary": "Manifest-backed review completed as bounded-success via command-intent retry and first found one P2 stale docs:freshness checklist status. After the task checklist and .agent mirror were updated to the current green docs:freshness result, the rerun reported no actionable diff-local findings."
+        },
+        "elegance_review": {
+          "reviewer": "provider worker parent lane",
+          "date": "2026-04-19",
+          "status": "completed",
+          "artifact": "out/linear-91749283-6dc8-4df8-aee3-5c9127c1200c/manual/20260419-elegance-review.md",
+          "summary": "The final solution stays minimal: one local Doctor.test fixture seam keeps the direct-dist readiness case hermetic, plus only the mandatory CO-231 docs/spec/task packet and mirror truth updates."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-91749283-6dc8-4df8-aee3-5c9127c1200c.md",
+        "task": "tasks/tasks-linear-91749283-6dc8-4df8-aee3-5c9127c1200c.md",
+        "agent_task": ".agent/task/linear-91749283-6dc8-4df8-aee3-5c9127c1200c.md",
+        "docs": "docs/TECH_SPEC-linear-91749283-6dc8-4df8-aee3-5c9127c1200c.md"
+      }
+    },
+    {
       "id": "20260419-linear-d334cd3d-b560-497c-9e07-ec8084890493",
       "title": "CO: stabilize ControlServer read-only refresh temp cleanup ENOTEMPTY flake",
       "relates_to": "tasks/tasks-linear-d334cd3d-b560-497c-9e07-ec8084890493.md",
