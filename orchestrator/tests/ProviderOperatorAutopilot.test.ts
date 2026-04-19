@@ -133,6 +133,498 @@ describe('providerOperatorAutopilot', () => {
     });
   });
 
+  it('holds backlog promotion after an explicit Ready to Backlog demotion of the previously autopilot-promoted issue until a newer acknowledgement update appears', async () => {
+    const baselineTransition = vi.fn(async () => ({
+      ok: true as const,
+      operation: 'transition' as const,
+      action: 'updated' as const,
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-118',
+        state: { id: 'ready', name: 'Ready', type: 'unstarted' },
+        updated_at: '2026-04-09T10:00:00.000Z'
+      },
+      previous_state: { id: 'backlog', name: 'Backlog', type: 'backlog' },
+      target_state: { id: 'ready', name: 'Ready', type: 'unstarted' },
+      source_setup: null
+    }));
+    const baseline = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [
+          createTrackedIssue({
+            id: 'lin-issue-1',
+            identifier: 'CO-118',
+            state: 'Backlog',
+            state_type: 'backlog'
+          })
+        ],
+        claims: [],
+        config: buildConfig(),
+        previous_result: null
+      },
+      {
+        now: () => '2026-04-09T10:00:00.000Z',
+        transition_issue_state: baselineTransition
+      }
+    );
+
+    const transitionIssueState = vi.fn(async () => {
+      throw new Error('transition should not run while an explicit manual demotion remains unacknowledged');
+    });
+
+    const result = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [
+          createTrackedIssue({
+            id: 'lin-issue-1',
+            identifier: 'CO-118',
+            state: 'Backlog',
+            state_type: 'backlog',
+            updated_at: '2026-04-09T10:10:00.000Z',
+            recent_activity: [
+              {
+                id: 'hist-1',
+                created_at: '2026-04-09T10:10:00.000Z',
+                actor_name: 'Operator Example',
+                summary: 'State Ready -> Backlog'
+              }
+            ]
+          })
+        ],
+        claims: [],
+        config: buildConfig(),
+        previous_result: baseline
+      },
+      {
+        transition_issue_state: transitionIssueState
+      }
+    );
+
+    expect(transitionIssueState).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      status: 'noop',
+      holds: [
+        {
+          kind: 'backlog_promotion',
+          issue_identifier: 'CO-118',
+          issue_state: 'Backlog',
+          issue_state_type: 'backlog',
+          issue_updated_at: '2026-04-09T10:10:00.000Z',
+          promotion_attempted_at: '2026-04-09T10:00:00.000Z',
+          promotion_issue_updated_at: '2026-04-09T10:00:00.000Z',
+          force_path_used: false,
+          reason: 'backlog_head_manual_demotion_unacknowledged'
+        }
+      ]
+    });
+    expect(result.holds[0]?.summary).toContain('Ready -> Backlog');
+    expect(result.holds[0]?.summary).toContain('autopilot last promoted it at 2026-04-09T10:00:00.000Z');
+  });
+
+  it('keeps the same manual-demotion hold active across consecutive autopilot cycles until a newer acknowledgement update appears', async () => {
+    const baselineTransition = vi.fn(async () => ({
+      ok: true as const,
+      operation: 'transition' as const,
+      action: 'updated' as const,
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-118',
+        state: { id: 'ready', name: 'Ready', type: 'unstarted' },
+        updated_at: '2026-04-09T10:00:00.000Z'
+      },
+      previous_state: { id: 'backlog', name: 'Backlog', type: 'backlog' },
+      target_state: { id: 'ready', name: 'Ready', type: 'unstarted' },
+      source_setup: null
+    }));
+    const baseline = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [
+          createTrackedIssue({
+            id: 'lin-issue-1',
+            identifier: 'CO-118',
+            state: 'Backlog',
+            state_type: 'backlog'
+          })
+        ],
+        claims: [],
+        config: buildConfig(),
+        previous_result: null
+      },
+      {
+        now: () => '2026-04-09T10:00:00.000Z',
+        transition_issue_state: baselineTransition
+      }
+    );
+
+    const holdTransition = vi.fn(async () => {
+      throw new Error('transition should not run while the same manual demotion remains unacknowledged');
+    });
+    const manualDemotionSnapshot = [
+      createTrackedIssue({
+        id: 'lin-issue-1',
+        identifier: 'CO-118',
+        state: 'Backlog',
+        state_type: 'backlog',
+        updated_at: '2026-04-09T10:10:00.000Z',
+        recent_activity: [
+          {
+            id: 'hist-1',
+            created_at: '2026-04-09T10:10:00.000Z',
+            actor_name: 'Operator Example',
+            summary: 'State Ready -> Backlog'
+          }
+        ]
+      })
+    ];
+    const firstHold = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: manualDemotionSnapshot,
+        claims: [],
+        config: buildConfig(),
+        previous_result: baseline
+      },
+      {
+        transition_issue_state: holdTransition
+      }
+    );
+    const secondHold = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: manualDemotionSnapshot,
+        claims: [],
+        config: buildConfig(),
+        previous_result: firstHold
+      },
+      {
+        now: () => '2026-04-09T10:11:00.000Z',
+        transition_issue_state: holdTransition
+      }
+    );
+
+    expect(holdTransition).not.toHaveBeenCalled();
+    expect(firstHold.holds[0]).toMatchObject({
+      promotion_attempted_at: '2026-04-09T10:00:00.000Z',
+      promotion_issue_updated_at: '2026-04-09T10:00:00.000Z',
+      reason: 'backlog_head_manual_demotion_unacknowledged'
+    });
+    expect(secondHold).toMatchObject({
+      status: 'noop',
+      actions: [],
+      holds: [
+        {
+          kind: 'backlog_promotion',
+          issue_identifier: 'CO-118',
+          promotion_attempted_at: '2026-04-09T10:00:00.000Z',
+          promotion_issue_updated_at: '2026-04-09T10:00:00.000Z',
+          reason: 'backlog_head_manual_demotion_unacknowledged'
+        }
+      ]
+    });
+  });
+
+  it('holds manual demotion even after an intervening no-op cycle overwrites the latest action list', async () => {
+    const baselineTransition = vi.fn(async () => ({
+      ok: true as const,
+      operation: 'transition' as const,
+      action: 'updated' as const,
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-118',
+        state: { id: 'ready', name: 'Ready', type: 'unstarted' },
+        updated_at: '2026-04-09T10:00:00.000Z'
+      },
+      previous_state: { id: 'backlog', name: 'Backlog', type: 'backlog' },
+      target_state: { id: 'ready', name: 'Ready', type: 'unstarted' },
+      source_setup: null
+    }));
+    const baseline = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [
+          createTrackedIssue({
+            id: 'lin-issue-1',
+            identifier: 'CO-118',
+            state: 'Backlog',
+            state_type: 'backlog'
+          })
+        ],
+        claims: [],
+        config: buildConfig(),
+        previous_result: null
+      },
+      {
+        now: () => '2026-04-09T10:00:00.000Z',
+        transition_issue_state: baselineTransition
+      }
+    );
+
+    const noOpCycle = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [
+          createTrackedIssue({
+            id: 'lin-issue-1',
+            identifier: 'CO-118',
+            state: 'Ready',
+            state_type: 'unstarted',
+            updated_at: '2026-04-09T10:00:00.000Z'
+          })
+        ],
+        claims: [],
+        config: buildConfig(),
+        previous_result: baseline
+      },
+      {
+        now: () => '2026-04-09T10:05:00.000Z'
+      }
+    );
+
+    expect(noOpCycle).toMatchObject({
+      status: 'noop',
+      actions: [],
+      holds: [],
+      backlog_promotion_snapshots: [
+        {
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-118',
+          target_state: 'Ready',
+          attempted_at: '2026-04-09T10:00:00.000Z',
+          issue_updated_at: '2026-04-09T10:00:00.000Z',
+          force_path_used: false
+        }
+      ]
+    });
+
+    const transitionIssueState = vi.fn(async () => {
+      throw new Error('transition should not run after a remembered promotion is manually demoted');
+    });
+    const result = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [
+          createTrackedIssue({
+            id: 'lin-issue-1',
+            identifier: 'CO-118',
+            state: 'Backlog',
+            state_type: 'backlog',
+            updated_at: '2026-04-09T10:10:00.000Z',
+            recent_activity: [
+              {
+                id: 'hist-1',
+                created_at: '2026-04-09T10:10:00.000Z',
+                actor_name: 'Operator Example',
+                summary: 'State Ready -> Backlog'
+              }
+            ]
+          })
+        ],
+        claims: [],
+        config: buildConfig(),
+        previous_result: noOpCycle
+      },
+      {
+        transition_issue_state: transitionIssueState
+      }
+    );
+
+    expect(transitionIssueState).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      status: 'noop',
+      holds: [
+        {
+          kind: 'backlog_promotion',
+          issue_identifier: 'CO-118',
+          reason: 'backlog_head_manual_demotion_unacknowledged',
+          promotion_attempted_at: '2026-04-09T10:00:00.000Z',
+          promotion_issue_updated_at: '2026-04-09T10:00:00.000Z'
+        }
+      ],
+      backlog_promotion_snapshots: [
+        {
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-118',
+          target_state: 'Ready',
+          attempted_at: '2026-04-09T10:00:00.000Z',
+          issue_updated_at: '2026-04-09T10:00:00.000Z',
+          force_path_used: false
+        }
+      ]
+    });
+  });
+
+  it('still promotes backlog heads when a Ready to Backlog history entry has no matching previous autopilot promotion snapshot', async () => {
+    const transitionIssueState = vi.fn(async () => ({
+      ok: true as const,
+      operation: 'transition' as const,
+      action: 'updated' as const,
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-118',
+        state: { id: 'ready', name: 'Ready', type: 'unstarted' },
+        updated_at: '2026-04-09T10:10:30.000Z'
+      },
+      previous_state: { id: 'backlog', name: 'Backlog', type: 'backlog' },
+      target_state: { id: 'ready', name: 'Ready', type: 'unstarted' },
+      source_setup: null
+    }));
+
+    const result = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [
+          createTrackedIssue({
+            id: 'lin-issue-1',
+            identifier: 'CO-118',
+            state: 'Backlog',
+            state_type: 'backlog',
+            updated_at: '2026-04-09T10:10:00.000Z',
+            recent_activity: [
+              {
+                id: 'hist-1',
+                created_at: '2026-04-09T10:10:00.000Z',
+                actor_name: 'Operator Example',
+                summary: 'State Ready -> Backlog'
+              }
+            ]
+          })
+        ],
+        claims: [],
+        config: buildConfig(),
+        previous_result: null
+      },
+      {
+        now: () => '2026-04-09T10:10:30.000Z',
+        transition_issue_state: transitionIssueState
+      }
+    );
+
+    expect(transitionIssueState).toHaveBeenCalledWith({
+      issueId: 'lin-issue-1',
+      stateName: 'Ready',
+      expectedStateName: 'Backlog',
+      expectedStateType: 'backlog',
+      expectedUpdatedAt: '2026-04-09T10:10:00.000Z',
+      sourceSetup: null,
+      env: expect.any(Object)
+    });
+    expect(result).toMatchObject({
+      status: 'acted',
+      actions: [
+        {
+          kind: 'backlog_promotion',
+          issue_identifier: 'CO-118',
+          reason: 'backlog_head_promoted'
+        }
+      ],
+      holds: []
+    });
+  });
+
+  it('re-promotes the backlog head after a newer acknowledgement update follows an explicit Ready to Backlog demotion of the previously autopilot-promoted issue', async () => {
+    const baselineTransition = vi.fn(async () => ({
+      ok: true as const,
+      operation: 'transition' as const,
+      action: 'updated' as const,
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-118',
+        state: { id: 'ready', name: 'Ready', type: 'unstarted' },
+        updated_at: '2026-04-09T10:00:00.000Z'
+      },
+      previous_state: { id: 'backlog', name: 'Backlog', type: 'backlog' },
+      target_state: { id: 'ready', name: 'Ready', type: 'unstarted' },
+      source_setup: null
+    }));
+    const baseline = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [
+          createTrackedIssue({
+            id: 'lin-issue-1',
+            identifier: 'CO-118',
+            state: 'Backlog',
+            state_type: 'backlog'
+          })
+        ],
+        claims: [],
+        config: buildConfig(),
+        previous_result: null
+      },
+      {
+        now: () => '2026-04-09T10:00:00.000Z',
+        transition_issue_state: baselineTransition
+      }
+    );
+
+    const transitionIssueState = vi.fn(async () => ({
+      ok: true as const,
+      operation: 'transition' as const,
+      action: 'updated' as const,
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-118',
+        state: { id: 'ready', name: 'Ready', type: 'unstarted' },
+        updated_at: '2026-04-09T10:12:30.000Z'
+      },
+      previous_state: { id: 'backlog', name: 'Backlog', type: 'backlog' },
+      target_state: { id: 'ready', name: 'Ready', type: 'unstarted' },
+      source_setup: null
+    }));
+
+    const result = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [
+          createTrackedIssue({
+            id: 'lin-issue-1',
+            identifier: 'CO-118',
+            state: 'Backlog',
+            state_type: 'backlog',
+            updated_at: '2026-04-09T10:12:00.000Z',
+            recent_activity: [
+              {
+                id: 'hist-ack',
+                created_at: '2026-04-09T10:12:00.000Z',
+                actor_name: 'Operator Example',
+                summary: 'Title updated'
+              },
+              {
+                id: 'hist-demote',
+                created_at: '2026-04-09T10:10:00.000Z',
+                actor_name: 'Operator Example',
+                summary: 'State Ready -> Backlog'
+              }
+            ]
+          })
+        ],
+        claims: [],
+        config: buildConfig(),
+        previous_result: baseline
+      },
+      {
+        now: () => '2026-04-09T10:12:30.000Z',
+        transition_issue_state: transitionIssueState
+      }
+    );
+
+    expect(transitionIssueState).toHaveBeenCalledWith({
+      issueId: 'lin-issue-1',
+      stateName: 'Ready',
+      expectedStateName: 'Backlog',
+      expectedStateType: 'backlog',
+      expectedUpdatedAt: '2026-04-09T10:12:00.000Z',
+      sourceSetup: null,
+      env: expect.any(Object)
+    });
+    expect(result).toMatchObject({
+      status: 'acted',
+      actions: [
+        {
+          kind: 'backlog_promotion',
+          issue_identifier: 'CO-118',
+          reason: 'backlog_head_promoted',
+          transition: {
+            force_path_used: false
+          }
+        }
+      ],
+      holds: []
+    });
+  });
+
   it('holds backlog promotion when a higher-ranked todo lane is still blocked ahead of the first backlog issue', async () => {
     const transitionIssueState = vi.fn(async () => {
       throw new Error('transition should not run while a higher-ranked queue lane is blocked');

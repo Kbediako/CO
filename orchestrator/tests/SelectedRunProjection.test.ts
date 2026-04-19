@@ -21,9 +21,15 @@ import {
 import { resolveRunPaths } from '../src/cli/run/runPaths.js';
 
 const cleanupRoots: string[] = [];
+const originalCodexHome = process.env.CODEX_HOME;
 
 afterEach(async () => {
   vi.useRealTimers();
+  if (originalCodexHome === undefined) {
+    delete process.env.CODEX_HOME;
+  } else {
+    process.env.CODEX_HOME = originalCodexHome;
+  }
   await Promise.all(cleanupRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
@@ -4758,6 +4764,9 @@ describe('SelectedRunProjection', () => {
     'refreshes projection proofs when child-lane reservation ledger placeholders exist',
     async () => {
     const { root, paths } = await createHostPaths();
+    const codexHome = join(root, '.codex');
+    process.env.CODEX_HOME = codexHome;
+    await mkdir(join(codexHome, 'sessions'), { recursive: true });
     const childEnv = {
       repoRoot: root,
       runsRoot: join(root, '.runs'),
