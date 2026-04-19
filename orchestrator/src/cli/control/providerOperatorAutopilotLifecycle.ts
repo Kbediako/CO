@@ -28,7 +28,7 @@ export interface ProviderOperatorAutopilotLifecycleRecord {
   actor: string;
   reason: string;
   recorded_at: string;
-  source: 'co-status';
+  source: 'co-status' | 'operator-autopilot';
 }
 
 export interface ProviderOperatorAutopilotLifecycleStore {
@@ -107,7 +107,7 @@ export function parseProviderOperatorAutopilotLifecycleRecord(
     !actor ||
     !reason ||
     !recordedAt ||
-    value.source !== 'co-status'
+    (value.source !== 'co-status' && value.source !== 'operator-autopilot')
   ) {
     return null;
   }
@@ -120,7 +120,7 @@ export function parseProviderOperatorAutopilotLifecycleRecord(
     actor,
     reason,
     recorded_at: recordedAt,
-    source: 'co-status'
+    source: value.source
   };
 }
 
