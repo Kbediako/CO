@@ -1,6 +1,38 @@
 {
   "items": [
     {
+      "id": "20260419-linear-5348c2fb-8897-48e3-a848-7831778b1b00",
+      "title": "CO workflow: restore Apr 19 spec/docs freshness baseline blocking unrelated handoffs",
+      "relates_to": "tasks/tasks-linear-5348c2fb-8897-48e3-a848-7831778b1b00.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-19",
+      "approvals": {
+        "baseline_repro": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-19",
+          "status": "reproduced",
+          "artifact": "out/linear-5348c2fb-8897-48e3-a848-7831778b1b00/before/docs-freshness.json",
+          "summary": "Current main reproduced the Apr 19 baseline with 47 blocking stale docs, 221 visible CO-175 rolling cohort rows, and no missing registry, missing-on-disk, invalid, or uncatalogued docs."
+        },
+        "classification_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-19",
+          "status": "accepted",
+          "artifact": "docs/findings/linear-5348c2fb-8897-48e3-a848-7831778b1b00-docs-freshness-classification.md",
+          "summary": "Classified the Apr 19 stale set by class, path family, lineage, changed-path impact, and CO-175 / CO-239 relationship; selected reviewed refresh for the 47 stale docs and 17 spec-frontmatter rows without weakening freshness gates."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-5348c2fb-8897-48e3-a848-7831778b1b00.md",
+        "task": "tasks/tasks-linear-5348c2fb-8897-48e3-a848-7831778b1b00.md",
+        "agent_task": ".agent/task/linear-5348c2fb-8897-48e3-a848-7831778b1b00.md",
+        "docs": "docs/TECH_SPEC-linear-5348c2fb-8897-48e3-a848-7831778b1b00.md"
+      }
+    },
+    {
       "id": "20260418-linear-f29c2953-192f-455c-aa67-5418d2607a3a",
       "title": "Control host: stabilize Doctor.test.ts full-suite timeout cluster under suite load",
       "relates_to": "tasks/tasks-linear-f29c2953-192f-455c-aa67-5418d2607a3a.md",
@@ -752,7 +784,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-17",
+      "last_review": "2026-04-19",
       "approvals": {
         "docs_packet_child_lane": {
           "reviewer": "bounded same-issue docs child lane",
@@ -775,6 +807,26 @@
           "status": "passed",
           "artifact": "out/linear-31794e73-bc33-44b7-96d0-41334119a038/manual/elegance-review.md",
           "summary": "No extra abstraction was needed; the completed-blocker reclaim fix stays localized to providerIssueHandoff.ts and existing blocker-terminality helpers while preserving synthetic-detached exclusion."
+        },
+        "reopened_parent_docs": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-04-19",
+          "status": "updated",
+          "manifest": ".runs/linear-31794e73-bc33-44b7-96d0-41334119a038-co212-reopened-docs-refresh/cli/2026-04-19T01-07-35-927Z-7d8b6d4e/manifest.json",
+          "summary": "Parent rejected the reopened docs child patch for CO-223/CO-238 evidence drift and refreshed the CO-212 packet for the retained terminal run / deferred fresh-discovery residual while keeping the original CO-196 completed-blocker acceptance criteria."
+        },
+        "reopened_standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-19",
+          "status": "bounded_success",
+          "telemetry": ".runs/linear-31794e73-bc33-44b7-96d0-41334119a038/cli/2026-04-19T01-03-33-277Z-313c32c5/review/telemetry.json",
+          "summary": "First reopened review found a P2 that the run started_at bypass was too broad for cancelable retained runs. Parent gated that bypass to non-cancelable retained runs, added a fail-closed cancelable-run regression, and reran manifest-backed review to bounded-success with no actionable findings."
+        },
+        "reopened_elegance_review": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-04-19",
+          "status": "passed",
+          "summary": "The reopened fix stays localized to providerIssueHandoff.ts: one shared freshness helper, one completed-blocker-only predicate using existing blocker terminality logic, and no broader workflow-state rewrite or duplicate-worker relaxation."
         }
       },
       "paths": {

@@ -5,7 +5,7 @@ relates_to: docs/PRD-delegation-skills-optimization-patch-release.md
 risk: low
 owners:
   - Codex
-last_review: 2026-03-19
+last_review: 2026-04-19
 ---
 
 ## Summary
