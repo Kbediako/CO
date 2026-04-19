@@ -22,6 +22,7 @@ import { mapLinearRateLimitedFailure } from './linearRateLimit.js';
 import { resolveLinearSourceSetup } from './linearDispatchSource.js';
 import { resolveProviderLinearAuditPath } from './providerLinearWorkflowAudit.js';
 import {
+  classifyProviderLinearWorkflowState,
   isProviderLinearTerminalReopenTransition,
   normalizeProviderLinearWorkflowState
 } from './providerLinearWorkflowStates.js';
@@ -248,6 +249,10 @@ const LOCAL_IMAGE_CONTENT_TYPE_BY_EXTENSION = new Map<string, string>([
   ['.webp', 'image/webp'],
   ['.gif', 'image/gif']
 ]);
+const PROVIDER_LINEAR_CANONICAL_OWNER_MARKER_PREFIX = 'codex-orchestrator:canonical-owner-key=';
+const PROVIDER_LINEAR_SUPERSEDED_CANONICAL_OWNER_MARKER_PREFIX =
+  'codex-orchestrator:superseded-canonical-owner-key=';
+const PROVIDER_LINEAR_CANONICAL_OWNER_SEARCH_LIMIT = 50;
 
 type ProviderLinearOperation =
   | 'issue-context'
@@ -478,9 +483,13 @@ export type ProviderLinearCreateFollowUpResult =
   | {
       ok: true;
       operation: 'create-follow-up';
-      action: 'created';
+      action: 'created' | 'reused';
       issue: Pick<ProviderLinearIssueContext, 'id' | 'identifier'>;
       follow_up_issue: ProviderLinearCreatedIssue;
+      canonical_owner: {
+        key: string;
+        marker: string;
+      } | null;
       relations: {
         related: true;
         blocked_by_source: boolean;
@@ -603,6 +612,35 @@ interface LinearIssueSummaryQueryResponse {
       id?: string | null;
       name?: string | null;
     } | null;
+  } | null;
+}
+
+interface LinearCanonicalOwnerIssuesQueryResponse {
+  issues?: {
+    nodes?: Array<{
+      id?: string | null;
+      identifier?: string | null;
+      title?: string | null;
+      description?: string | null;
+      url?: string | null;
+      archivedAt?: string | null;
+      trashed?: boolean | null;
+      state?: {
+        id?: string | null;
+        name?: string | null;
+        type?: string | null;
+      } | null;
+      team?: {
+        id?: string | null;
+        key?: string | null;
+        name?: string | null;
+      } | null;
+      project?: {
+        id?: string | null;
+        name?: string | null;
+      } | null;
+    }> | null;
+    pageInfo?: LinearConnectionPageInfo | null;
   } | null;
 }
 
@@ -1790,6 +1828,7 @@ export async function createProviderLinearFollowUpIssue(input: {
   acceptanceCriteria: string;
   parityLane?: boolean;
   parityMatrix?: string | null;
+  canonicalOwnerKey?: string | null;
   blockedBySource?: boolean;
   sourceSetup?: DispatchPilotSourceSetup | null;
   env?: NodeJS.ProcessEnv;
@@ -1858,6 +1897,25 @@ export async function createProviderLinearFollowUpIssue(input: {
       422
     );
   }
+  const canonicalOwnerKey = normalizeOptionalString(input.canonicalOwnerKey ?? null);
+  if (canonicalOwnerKey && /[\r\n]/u.test(canonicalOwnerKey)) {
+    return failure(
+      'create-follow-up',
+      'linear_follow_up_canonical_owner_key_invalid',
+      'Follow-up canonical owner key must be a single line.',
+      422
+    );
+  }
+  if (canonicalOwnerKey && canonicalOwnerKey.length > 512) {
+    return failure(
+      'create-follow-up',
+      'linear_follow_up_canonical_owner_key_too_long',
+      'Follow-up canonical owner key must be 512 characters or fewer.',
+      422
+    );
+  }
+  const canonicalOwnerMarker = canonicalOwnerKey ? buildCanonicalOwnerMarker(canonicalOwnerKey) : null;
+  const blockedBySource = input.blockedBySource === true;
 
   const session = resolveLinearWorkflowSession(input.env, input.fetchImpl, input.sourceSetup);
   if (!session.ok) {
@@ -1867,7 +1925,9 @@ export async function createProviderLinearFollowUpIssue(input: {
   const budgetError = await preflightProviderLinearBudget({
     session: session.session,
     operation: 'create-follow-up',
-    minimumRequestsRemaining: input.blockedBySource === true ? 5 : 4
+    minimumRequestsRemaining: blockedBySource
+      ? (canonicalOwnerKey ? 4 : 5)
+      : (canonicalOwnerKey ? 3 : 4)
   });
   if (budgetError) {
     return failureFromWorkflowError('create-follow-up', budgetError);
@@ -1898,6 +1958,48 @@ export async function createProviderLinearFollowUpIssue(input: {
     );
   }
 
+  const canonicalOwner = canonicalOwnerKey && canonicalOwnerMarker
+    ? await findCanonicalFollowUpOwnerIssue({
+        session: session.session,
+        teamId,
+        projectId,
+        marker: canonicalOwnerMarker
+      })
+    : null;
+  if (canonicalOwner && !canonicalOwner.ok) {
+    return failureFromWorkflowError('create-follow-up', canonicalOwner.error);
+  }
+  if (canonicalOwner?.ok && canonicalOwner.issue && canonicalOwnerKey && canonicalOwnerMarker) {
+    const relationResult = await createFollowUpRelations({
+      session: session.session,
+      sourceIssue: issueSummary.issue,
+      followUpIssue: canonicalOwner.issue,
+      blockedBySource
+    });
+    if (!relationResult.ok) {
+      return relationResult.result;
+    }
+    return {
+      ok: true,
+      operation: 'create-follow-up',
+      action: 'reused',
+      issue: {
+        id: issueSummary.issue.id,
+        identifier: issueSummary.issue.identifier
+      },
+      follow_up_issue: canonicalOwner.issue,
+      canonical_owner: {
+        key: canonicalOwnerKey,
+        marker: canonicalOwnerMarker
+      },
+      relations: {
+        related: true,
+        blocked_by_source: blockedBySource
+      },
+      source_setup: session.session.sourceSetup
+    };
+  }
+
   const backlogState = resolveWorkflowStateByName(issueSummary.issue.team?.states ?? [], 'Backlog');
   if (!backlogState) {
     return failure(
@@ -1906,6 +2008,17 @@ export async function createProviderLinearFollowUpIssue(input: {
       `Linear team state "Backlog" was not found for issue ${issueSummary.issue.identifier}.`,
       422
     );
+  }
+
+  if (canonicalOwnerKey) {
+    const createPathBudgetError = await preflightProviderLinearBudget({
+      session: session.session,
+      operation: 'create-follow-up',
+      minimumRequestsRemaining: blockedBySource ? 6 : 5
+    });
+    if (createPathBudgetError) {
+      return failureFromWorkflowError('create-follow-up', createPathBudgetError);
+    }
   }
 
   const createdIssueResult = await executeProviderLinearGraphql<IssueCreateMutationResponse>({
@@ -1951,6 +2064,9 @@ export async function createProviderLinearFollowUpIssue(input: {
     notDoneIf,
     acceptanceCriteria,
     parityMatrix,
+    canonicalOwner: canonicalOwnerKey && canonicalOwnerMarker
+      ? { key: canonicalOwnerKey, marker: canonicalOwnerMarker }
+      : null,
     traceability: buildFollowUpTraceabilitySection({
       sourceIssue: issueSummary.issue,
       followUpIssue: createdIssue
@@ -1998,106 +2114,407 @@ export async function createProviderLinearFollowUpIssue(input: {
     createdIssue = updatedIssue;
   }
 
-  const relatedRelationResult = await executeProviderLinearGraphql<IssueRelationMutationResponse>({
-    session: session.session,
-    operation: 'create-follow-up',
-    step: 'create-related-relation',
-    query: buildCreateIssueRelationMutation(),
-    variables: {
-      input: {
-        type: 'related',
-        issueId: issueSummary.issue.id,
-        relatedIssueId: createdIssue.id
-      }
-    }
-  });
-  if (!relatedRelationResult.ok) {
-    return failure(
-      'create-follow-up',
-      relatedRelationResult.error.code,
-      relatedRelationResult.error.message,
-      409,
-      {
-        ...(relatedRelationResult.error.details ?? {}),
-        created_issue: createdIssue,
-        failed_relation_type: 'related'
-      },
-      false
-    );
-  }
-  if (relatedRelationResult.payload.data?.issueRelationCreate?.success !== true) {
-    return failure(
-      'create-follow-up',
-      'linear_follow_up_relation_failed',
-      'Linear follow-up issue relation creation did not succeed.',
-      409,
-      {
-        created_issue: createdIssue,
-        failed_relation_type: 'related'
-      },
-      false
-    );
-  }
-
-  const blockedBySource = input.blockedBySource === true;
-  if (blockedBySource) {
-    const blockingRelationResult = await executeProviderLinearGraphql<IssueRelationMutationResponse>({
+  let followUpIssue = createdIssue;
+  let action: 'created' | 'reused' = 'created';
+  if (canonicalOwnerKey && canonicalOwnerMarker) {
+    const reconciliation = await reconcileCreatedCanonicalOwner({
       session: session.session,
-      operation: 'create-follow-up',
-      step: 'create-blocks-relation',
-      query: buildCreateIssueRelationMutation(),
-      variables: {
-        input: {
-          type: 'blocks',
-          issueId: issueSummary.issue.id,
-          relatedIssueId: createdIssue.id
-        }
+      teamId,
+      projectId,
+      createdIssue,
+      canonicalOwner: {
+        key: canonicalOwnerKey,
+        marker: canonicalOwnerMarker
       }
     });
-    if (!blockingRelationResult.ok) {
-      return failure(
-        'create-follow-up',
-        blockingRelationResult.error.code,
-        blockingRelationResult.error.message,
-        409,
-        {
-          ...(blockingRelationResult.error.details ?? {}),
-          created_issue: createdIssue,
-          failed_relation_type: 'blocks'
-        },
-        false
-      );
+    if (!reconciliation.ok) {
+      return reconciliation.result;
     }
-    if (blockingRelationResult.payload.data?.issueRelationCreate?.success !== true) {
-      return failure(
-        'create-follow-up',
-        'linear_follow_up_relation_failed',
-        'Linear follow-up issue relation creation did not succeed.',
-        409,
-        {
-          created_issue: createdIssue,
-          failed_relation_type: 'blocks'
-        },
-        false
-      );
-    }
+    followUpIssue = reconciliation.issue;
+    action = reconciliation.issue.id === createdIssue.id ? 'created' : 'reused';
+  }
+
+  const relationResult = await createFollowUpRelations({
+    session: session.session,
+    sourceIssue: issueSummary.issue,
+    followUpIssue,
+    blockedBySource
+  });
+  if (!relationResult.ok) {
+    return relationResult.result;
   }
 
   return {
     ok: true,
     operation: 'create-follow-up',
-    action: 'created',
+    action,
     issue: {
       id: issueSummary.issue.id,
       identifier: issueSummary.issue.identifier
     },
-    follow_up_issue: createdIssue,
+    follow_up_issue: followUpIssue,
+    canonical_owner: canonicalOwnerKey && canonicalOwnerMarker
+      ? {
+          key: canonicalOwnerKey,
+          marker: canonicalOwnerMarker
+        }
+      : null,
     relations: {
       related: true,
       blocked_by_source: blockedBySource
     },
     source_setup: session.session.sourceSetup
   };
+}
+
+async function reconcileCreatedCanonicalOwner(input: {
+  session: ResolvedLinearWorkflowSession;
+  teamId: string;
+  projectId: string;
+  createdIssue: ProviderLinearCreatedIssue;
+  canonicalOwner: {
+    key: string;
+    marker: string;
+  };
+}): Promise<
+  | {
+      ok: true;
+      issue: ProviderLinearCreatedIssue;
+    }
+  | {
+      ok: false;
+      result: Extract<ProviderLinearCreateFollowUpResult, { ok: false }>;
+    }
+> {
+  const ownerSearch = await findCanonicalFollowUpOwnerIssues({
+    session: input.session,
+    teamId: input.teamId,
+    projectId: input.projectId,
+    marker: input.canonicalOwner.marker
+  });
+  if (!ownerSearch.ok) {
+    return {
+      ok: false,
+      result: failureFromWorkflowError('create-follow-up', ownerSearch.error)
+    };
+  }
+
+  const candidates = [...ownerSearch.issues];
+  if (
+    !candidates.some((issue) => issue.id === input.createdIssue.id) &&
+    descriptionHasExactCanonicalOwnerMarker(input.createdIssue.description, input.canonicalOwner.marker)
+  ) {
+    candidates.push(input.createdIssue);
+  }
+  const selectedOwner = selectCanonicalOwnerIssue(candidates) ?? input.createdIssue;
+  if (selectedOwner.id === input.createdIssue.id) {
+    return {
+      ok: true,
+      issue: input.createdIssue
+    };
+  }
+
+  const supersededDescription = buildSupersededCanonicalOwnerDescription({
+    description: input.createdIssue.description,
+    createdIssue: input.createdIssue,
+    selectedOwner,
+    canonicalOwner: input.canonicalOwner
+  });
+  const updateResult = await executeProviderLinearGraphql<IssueDescriptionUpdateMutationResponse>({
+    session: input.session,
+    operation: 'create-follow-up',
+    step: 'supersede-created-canonical-owner',
+    query: buildIssueDescriptionUpdateMutation(),
+    variables: {
+      id: input.createdIssue.id,
+      description: supersededDescription
+    }
+  });
+  if (!updateResult.ok) {
+    return {
+      ok: false,
+      result: failure(
+        'create-follow-up',
+        updateResult.error.code,
+        updateResult.error.message,
+        409,
+        {
+          ...(updateResult.error.details ?? {}),
+          created_issue: input.createdIssue,
+          canonical_owner_issue: selectedOwner,
+          failed_step: 'canonical_owner_reconciliation'
+        },
+        false
+      )
+    };
+  }
+  if (updateResult.payload.data?.issueUpdate?.success !== true) {
+    return {
+      ok: false,
+      result: failure(
+        'create-follow-up',
+        'linear_follow_up_canonical_owner_reconciliation_failed',
+        'Linear follow-up canonical owner reconciliation did not succeed.',
+        409,
+        {
+          created_issue: input.createdIssue,
+          canonical_owner_issue: selectedOwner,
+          failed_step: 'canonical_owner_reconciliation'
+        },
+        false
+      )
+    };
+  }
+
+  return {
+    ok: true,
+    issue: selectedOwner
+  };
+}
+
+async function findCanonicalFollowUpOwnerIssue(input: {
+  session: ResolvedLinearWorkflowSession;
+  teamId: string;
+  projectId: string;
+  marker: string;
+}):
+  Promise<
+    | {
+        ok: true;
+        issue: ProviderLinearCreatedIssue | null;
+      }
+    | {
+        ok: false;
+        error: ProviderLinearWorkflowError;
+      }
+  > {
+  const result = await findCanonicalFollowUpOwnerIssues(input);
+  if (!result.ok) {
+    return result;
+  }
+  return {
+    ok: true,
+    issue: selectCanonicalOwnerIssue(result.issues)
+  };
+}
+
+async function findCanonicalFollowUpOwnerIssues(input: {
+  session: ResolvedLinearWorkflowSession;
+  teamId: string;
+  projectId: string;
+  marker: string;
+}):
+  Promise<
+    | {
+        ok: true;
+        issues: ProviderLinearCreatedIssue[];
+      }
+    | {
+        ok: false;
+        error: ProviderLinearWorkflowError;
+      }
+  > {
+  const result = await executeProviderLinearGraphql<LinearCanonicalOwnerIssuesQueryResponse>({
+    session: input.session,
+    operation: 'create-follow-up',
+    step: 'find-canonical-owner',
+    query: buildCanonicalOwnerIssuesQuery(),
+    variables: {
+      teamId: input.teamId,
+      projectId: input.projectId,
+      marker: input.marker,
+      first: PROVIDER_LINEAR_CANONICAL_OWNER_SEARCH_LIMIT
+    }
+  });
+  if (!result.ok) {
+    return {
+      ok: false,
+      error: result.error
+    };
+  }
+
+  const nodes = Array.isArray(result.payload.data?.issues?.nodes)
+    ? result.payload.data.issues.nodes
+    : [];
+  const issues: ProviderLinearCreatedIssue[] = [];
+  for (const node of nodes) {
+    if (node.trashed === true || normalizeOptionalString(node.archivedAt)) {
+      continue;
+    }
+    const workflowState = classifyProviderLinearWorkflowState({
+      state: node.state?.name ?? null,
+      state_type: node.state?.type ?? null
+    });
+    if (workflowState.isTerminal) {
+      continue;
+    }
+    if (normalizeOptionalString(node.team?.id) !== input.teamId) {
+      continue;
+    }
+    if (normalizeOptionalString(node.project?.id) !== input.projectId) {
+      continue;
+    }
+    if (!descriptionHasExactCanonicalOwnerMarker(node.description, input.marker)) {
+      continue;
+    }
+    const issue = parseCreatedIssue(node);
+    if (issue) {
+      issues.push(issue);
+    }
+  }
+
+  return {
+    ok: true,
+    issues
+  };
+}
+
+function descriptionHasExactCanonicalOwnerMarker(description: string | null | undefined, marker: string): boolean {
+  const markerLine = `- Canonical owner marker: \`${marker}\``;
+  const unquotedMarkerLine = `- Canonical owner marker: ${marker}`;
+  return normalizeOptionalString(description)
+    ?.split(/\r?\n/u)
+    .some((line) => {
+      const normalized = line.trim();
+      return normalized === markerLine || normalized === unquotedMarkerLine;
+    }) ?? false;
+}
+
+function selectCanonicalOwnerIssue(issues: ProviderLinearCreatedIssue[]): ProviderLinearCreatedIssue | null {
+  return [...issues].sort(compareCanonicalOwnerIssues)[0] ?? null;
+}
+
+function compareCanonicalOwnerIssues(left: ProviderLinearCreatedIssue, right: ProviderLinearCreatedIssue): number {
+  const leftNumber = parseLinearIssueNumber(left.identifier);
+  const rightNumber = parseLinearIssueNumber(right.identifier);
+  if (leftNumber !== null && rightNumber !== null && leftNumber !== rightNumber) {
+    return leftNumber - rightNumber;
+  }
+  return `${left.identifier}:${left.id}`.localeCompare(`${right.identifier}:${right.id}`);
+}
+
+function parseLinearIssueNumber(identifier: string): number | null {
+  const match = /^[A-Z]+-(\d+)$/u.exec(identifier);
+  if (!match) {
+    return null;
+  }
+  const value = Number.parseInt(match[1] ?? '', 10);
+  return Number.isSafeInteger(value) ? value : null;
+}
+
+async function createFollowUpRelations(input: {
+  session: ResolvedLinearWorkflowSession;
+  sourceIssue: ProviderLinearIssueSummary;
+  followUpIssue: ProviderLinearCreatedIssue;
+  blockedBySource: boolean;
+}): Promise<
+  | {
+      ok: true;
+    }
+  | {
+      ok: false;
+      result: Extract<ProviderLinearCreateFollowUpResult, { ok: false }>;
+    }
+> {
+  const relatedRelationResult = await executeProviderLinearGraphql<IssueRelationMutationResponse>({
+    session: input.session,
+    operation: 'create-follow-up',
+    step: 'create-related-relation',
+    query: buildCreateIssueRelationMutation(),
+    variables: {
+      input: {
+        type: 'related',
+        issueId: input.sourceIssue.id,
+        relatedIssueId: input.followUpIssue.id
+      }
+    }
+  });
+  if (!relatedRelationResult.ok) {
+    return {
+      ok: false,
+      result: failure(
+        'create-follow-up',
+        relatedRelationResult.error.code,
+        relatedRelationResult.error.message,
+        409,
+        {
+          ...(relatedRelationResult.error.details ?? {}),
+          created_issue: input.followUpIssue,
+          failed_relation_type: 'related'
+        },
+        false
+      )
+    };
+  }
+  if (relatedRelationResult.payload.data?.issueRelationCreate?.success !== true) {
+    return {
+      ok: false,
+      result: failure(
+        'create-follow-up',
+        'linear_follow_up_relation_failed',
+        'Linear follow-up issue relation creation did not succeed.',
+        409,
+        {
+          created_issue: input.followUpIssue,
+          failed_relation_type: 'related'
+        },
+        false
+      )
+    };
+  }
+
+  if (!input.blockedBySource) {
+    return { ok: true };
+  }
+
+  const blockingRelationResult = await executeProviderLinearGraphql<IssueRelationMutationResponse>({
+    session: input.session,
+    operation: 'create-follow-up',
+    step: 'create-blocks-relation',
+    query: buildCreateIssueRelationMutation(),
+    variables: {
+      input: {
+        type: 'blocks',
+        issueId: input.sourceIssue.id,
+        relatedIssueId: input.followUpIssue.id
+      }
+    }
+  });
+  if (!blockingRelationResult.ok) {
+    return {
+      ok: false,
+      result: failure(
+        'create-follow-up',
+        blockingRelationResult.error.code,
+        blockingRelationResult.error.message,
+        409,
+        {
+          ...(blockingRelationResult.error.details ?? {}),
+          created_issue: input.followUpIssue,
+          failed_relation_type: 'blocks'
+        },
+        false
+      )
+    };
+  }
+  if (blockingRelationResult.payload.data?.issueRelationCreate?.success !== true) {
+    return {
+      ok: false,
+      result: failure(
+        'create-follow-up',
+        'linear_follow_up_relation_failed',
+        'Linear follow-up issue relation creation did not succeed.',
+        409,
+        {
+          created_issue: input.followUpIssue,
+          failed_relation_type: 'blocks'
+        },
+        false
+      )
+    };
+  }
+
+  return { ok: true };
 }
 
 function resolveLinearWorkflowSession(
@@ -4262,6 +4679,49 @@ function buildCreateFollowUpIssueMutation(): string {
   }`;
 }
 
+function buildCanonicalOwnerIssuesQuery(): string {
+  return `query ProviderLinearCanonicalFollowUpOwners($teamId: ID!, $projectId: ID!, $marker: String!, $first: Int!) {
+    issues(
+      first: $first
+      orderBy: updatedAt
+      filter: {
+        team: { id: { eq: $teamId } }
+        project: { id: { eq: $projectId } }
+        state: { type: { nin: ["completed", "canceled"] } }
+        description: { contains: $marker }
+      }
+    ) {
+      nodes {
+        id
+        identifier
+        title
+        description
+        url
+        archivedAt
+        trashed
+        state {
+          id
+          name
+          type
+        }
+        team {
+          id
+          key
+          name
+        }
+        project {
+          id
+          name
+        }
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }`;
+}
+
 function buildCreateIssueRelationMutation(): string {
   return `mutation ProviderLinearCreateIssueRelation($input: IssueRelationCreateInput!) {
     issueRelationCreate(input: $input) {
@@ -6052,10 +6512,17 @@ function buildFollowUpIssueDescription(input: {
   notDoneIf: string;
   acceptanceCriteria: string;
   parityMatrix?: string | null;
+  canonicalOwner?: {
+    key: string;
+    marker: string;
+  } | null;
   traceability?: string | null;
 }): string {
   const sections = [
     input.description.trim(),
+    input.canonicalOwner
+      ? renderMarkdownSection('Canonical Owner', buildCanonicalOwnerSection(input.canonicalOwner))
+      : null,
     renderMarkdownSection('Intent Checksum', input.intentChecksum),
     renderMarkdownSection('Non-Goals', input.nonGoals),
     input.parityMatrix ? renderMarkdownSection('Parity / Alignment Matrix', input.parityMatrix) : null,
@@ -6064,6 +6531,46 @@ function buildFollowUpIssueDescription(input: {
     renderMarkdownSection('Acceptance Criteria', input.acceptanceCriteria)
   ].filter((section): section is string => Boolean(section));
   return sections.join('\n\n');
+}
+
+function buildCanonicalOwnerMarker(key: string): string {
+  return `${PROVIDER_LINEAR_CANONICAL_OWNER_MARKER_PREFIX}${key}`;
+}
+
+function buildCanonicalOwnerSection(input: { key: string; marker: string }): string {
+  return [
+    `- Canonical owner key: \`${input.key}\``,
+    `- Canonical owner marker: \`${input.marker}\``
+  ].join('\n');
+}
+
+function buildSupersededCanonicalOwnerDescription(input: {
+  description: string | null;
+  createdIssue: ProviderLinearCreatedIssue;
+  selectedOwner: ProviderLinearCreatedIssue;
+  canonicalOwner: {
+    key: string;
+    marker: string;
+  };
+}): string {
+  const baseDescription = (input.description ?? '').replaceAll(
+    input.canonicalOwner.marker,
+    `${PROVIDER_LINEAR_SUPERSEDED_CANONICAL_OWNER_MARKER_PREFIX}${input.canonicalOwner.key}`
+  );
+  return [
+    baseDescription.trim(),
+    renderMarkdownSection(
+      'Superseded Canonical Owner',
+      [
+        `- Created issue: \`${input.createdIssue.identifier}\``,
+        `- Reused canonical owner: \`${input.selectedOwner.identifier}\``,
+        `- Canonical owner key: \`${input.canonicalOwner.key}\``,
+        '- Reason: another stamped owner for this key existed before relation handoff; this issue is no longer a reusable canonical owner.'
+      ].join('\n')
+    )
+  ]
+    .filter((section) => section.length > 0)
+    .join('\n\n');
 }
 
 function renderMarkdownSection(title: string, body: string): string {

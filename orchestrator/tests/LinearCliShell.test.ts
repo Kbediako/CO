@@ -582,6 +582,7 @@ describe('runLinearCliShell', () => {
       acceptanceCriteria: '- [ ] Captured',
       parityLane: false,
       parityMatrix: null,
+      canonicalOwnerKey: null,
       blockedBySource: true,
       sourceSetup: null,
       env: {
@@ -1107,6 +1108,7 @@ describe('runLinearCliShell', () => {
           'acceptance-criteria-file': '/tmp/acceptance.md',
           'parity-lane': true,
           'parity-matrix-file': '/tmp/parity.md',
+          'canonical-owner-key-file': '/tmp/canonical-owner-key.txt',
           'blocked-by-source': true,
           'workspace-id': 'lin-workspace-1',
           'team-id': 'lin-team-1',
@@ -1128,6 +1130,9 @@ describe('runLinearCliShell', () => {
           }
           if (path === '/tmp/parity.md') {
             return '- Current: browser-first\n- Reference: Symphony terminal parity\n- Target: exact terminal parity\n- Out of scope: unrelated UI additions';
+          }
+          if (path === '/tmp/canonical-owner-key.txt') {
+            return 'baseline_cohort_id:co-175-apr-14-march-14-tasks-1164-1195';
           }
           return '- [ ] Captured';
         }),
@@ -1152,6 +1157,7 @@ describe('runLinearCliShell', () => {
       parityLane: true,
       parityMatrix:
         '- Current: browser-first\n- Reference: Symphony terminal parity\n- Target: exact terminal parity\n- Out of scope: unrelated UI additions',
+      canonicalOwnerKey: 'baseline_cohort_id:co-175-apr-14-march-14-tasks-1164-1195',
       blockedBySource: true,
       sourceSetup: {
         provider: 'linear',

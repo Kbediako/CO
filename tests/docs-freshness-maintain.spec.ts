@@ -181,6 +181,9 @@ describe('docs freshness maintenance decisions', () => {
     expect(decision.policy_capacity_status).toEqual(expect.objectContaining({ status: 'within_policy' }));
     expect(decision.candidate_cohorts).toEqual([
       expect.objectContaining({
+        canonical_owner_key: 'baseline_cohort_id:co-175-apr-14-march-14-tasks-1164-1195',
+        canonical_owner_marker:
+          'codex-orchestrator:canonical-owner-key=baseline_cohort_id:co-175-apr-14-march-14-tasks-1164-1195',
         stale_entries: 1,
         sample_paths: [historicalPath]
       })
@@ -249,6 +252,10 @@ describe('docs freshness maintenance decisions', () => {
     expect(decision.totals.owned_rolling_entries).toBe(0);
     expect(decision.candidate_cohorts).toEqual([
       expect.objectContaining({
+        canonical_owner_key:
+          `docs_freshness_candidate|doc_class:task_packet|path_family:tasks/tasks-*|last_review:${reviewDateDaysAgo(31)}|cadence_days:30`,
+        canonical_owner_marker:
+          `codex-orchestrator:canonical-owner-key=docs_freshness_candidate|doc_class:task_packet|path_family:tasks/tasks-*|last_review:${reviewDateDaysAgo(31)}|cadence_days:30`,
         declared_baseline_ids: [],
         sample_paths: [undeclaredPath]
       })

@@ -407,6 +407,8 @@ export async function runLinearCliShell(
           'parity-lane',
           'parity-matrix',
           'parity-matrix-file',
+          'canonical-owner-key',
+          'canonical-owner-key-file',
           'blocked-by-source'
         ]);
         const result = await dependencies.createProviderLinearFollowUpIssue({
@@ -448,6 +450,12 @@ export async function runLinearCliShell(
             dependencies.readTextFile,
             'parity-matrix',
             'parity-matrix-file'
+          ),
+          canonicalOwnerKey: await resolveOptionalText(
+            params.flags,
+            dependencies.readTextFile,
+            'canonical-owner-key',
+            'canonical-owner-key-file'
           ),
           blockedBySource: readBooleanFlag(params.flags, 'blocked-by-source'),
           sourceSetup: readSourceSetup(params.flags),
