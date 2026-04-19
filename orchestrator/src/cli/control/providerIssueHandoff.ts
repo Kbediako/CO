@@ -5254,40 +5254,49 @@ export function createProviderIssueHandoffService(
       executionRecordsForCycle,
       previousResult?.local_rollout_execution_attempts
     );
+    const localRolloutPersistenceUnavailable =
+      !autopilotLifecyclePath ||
+      !autopilotExecutionPath ||
+      lifecycleRecordsForCycle === undefined ||
+      executionRecordsForCycle === undefined;
     const effectiveAutopilotConfig =
-      lifecycleRecordsForCycle === undefined || executionRecordsForCycle === undefined
+      localRolloutPersistenceUnavailable
         ? disableProviderOperatorAutopilotLocalRolloutExecution(autopilotConfig)
         : autopilotConfig;
     let nextResult: ProviderOperatorAutopilotResult;
     let loggedAutopilotFailure = false;
     try {
-      nextResult = await runOperatorAutopilot({
-        tracked_issues: input.pollInput.trackedIssues,
-        claims: options.state.claims,
-        config: effectiveAutopilotConfig,
-        source_setup: input.sourceSetup,
-        env: process.env,
-        previous_result: previousResult,
-        lifecycle_records: lifecycleRecords,
-        local_rollout_execution_attempts: localRolloutExecutionAttempts,
-        repo_root: resolve(options.paths.repoRoot)
-      },
-      {
-        append_local_rollout_execution_attempt: autopilotExecutionPath
-          ? (record) =>
-              appendProviderOperatorAutopilotLocalRolloutExecutionRecord(
-                autopilotExecutionPath,
-                record
-              ).then(() => undefined)
-          : undefined,
-        append_local_rollout_lifecycle_record: autopilotLifecyclePath
-          ? (record) =>
-              appendProviderOperatorAutopilotLifecycleRecord(
-                autopilotLifecyclePath,
-                record
-              ).then(() => undefined)
-          : undefined
-      });
+      nextResult = await runOperatorAutopilot(
+        {
+          tracked_issues: input.pollInput.trackedIssues,
+          claims: options.state.claims,
+          config: effectiveAutopilotConfig,
+          source_setup: input.sourceSetup,
+          env: process.env,
+          previous_result: previousResult,
+          lifecycle_records: lifecycleRecords,
+          local_rollout_execution_attempts: localRolloutExecutionAttempts,
+          repo_root: resolve(options.paths.repoRoot)
+        },
+        {
+          append_local_rollout_execution_attempt:
+            !localRolloutPersistenceUnavailable && autopilotExecutionPath
+              ? (record) =>
+                  appendProviderOperatorAutopilotLocalRolloutExecutionRecord(
+                    autopilotExecutionPath,
+                    record
+                  ).then(() => undefined)
+              : undefined,
+          append_local_rollout_lifecycle_record:
+            !localRolloutPersistenceUnavailable && autopilotLifecyclePath
+              ? (record) =>
+                  appendProviderOperatorAutopilotLifecycleRecord(
+                    autopilotLifecyclePath,
+                    record
+                  ).then(() => undefined)
+              : undefined
+        }
+      );
       assertRefreshLifecycleCurrent();
     } catch (error) {
       rethrowRefreshLifecycleStuckError(error);

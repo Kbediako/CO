@@ -369,11 +369,25 @@ export async function runProviderOperatorAutopilot(
     input.config.post_merge_rollout.execution.enabled &&
     effectiveLocalRolloutActions.pending_actions.length > 0
   ) {
+    if (!input.repo_root) {
+      return {
+        recorded_at: recordedAt,
+        status: 'failed',
+        summary: 'Local rollout execution is enabled but repo_root was not provided.',
+        error: 'missing_repo_root',
+        actions,
+        holds,
+        pending_actions: effectiveLocalRolloutActions.pending_actions,
+        resolved_actions: effectiveLocalRolloutActions.resolved_actions,
+        lifecycle_records: effectiveLocalRolloutActions.lifecycle_records,
+        local_rollout_execution_attempts: localRolloutExecutionAttempts
+      };
+    }
     const executionOutcome = await executeProviderOperatorAutopilotLocalRolloutActions(
       {
         pendingActions: effectiveLocalRolloutActions.pending_actions,
         config: input.config.post_merge_rollout.execution,
-        repoRoot: input.repo_root ?? process.cwd(),
+        repoRoot: input.repo_root,
         priorAttempts: localRolloutExecutionAttempts
       },
       {

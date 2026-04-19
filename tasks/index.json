@@ -22,8 +22,6 @@
         "task": "tasks/tasks-linear-c9e99e2c-bc48-48f1-a8ca-4bd2a9289be2.md",
         "spec": "tasks/specs/CO-260-local-rollout-executor.md",
         "docs": "tasks/specs/CO-260-local-rollout-executor.md",
-        "prd": "docs/PRD-CO-260-local-rollout-executor.md",
-        "action_plan": "docs/ACTION_PLAN-CO-260-local-rollout-executor.md",
         "agent_task": ".agent/task/linear-c9e99e2c-bc48-48f1-a8ca-4bd2a9289be2.md"
       }
     },

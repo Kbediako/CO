@@ -988,6 +988,48 @@ describe('providerOperatorAutopilot', () => {
     });
   });
 
+  it('fails closed without launching local rollout execution when repo_root is missing', async () => {
+    const runCommand = vi.fn(async () => ({
+      ok: true,
+      exitCode: 0,
+      stdout: 'rebuilt\n',
+      stderr: ''
+    }));
+
+    const result = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [],
+        claims: [
+          createClaim({
+            issue_id: 'lin-issue-1',
+            issue_identifier: 'CO-118',
+            merge_closeout: createMergeCloseout({
+              status: 'merged',
+              reason: 'merged_and_transitioned_done'
+            })
+          })
+        ],
+        config: buildConfigWithLocalRolloutExecution(),
+        previous_result: null
+      },
+      {
+        now: () => '2026-04-09T10:00:00.000Z',
+        run_local_rollout_command: runCommand,
+        append_local_rollout_execution_attempt: appendExecutionAttemptNoop,
+        append_local_rollout_lifecycle_record: appendLifecycleRecordNoop
+      }
+    );
+
+    expect(runCommand).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      status: 'failed',
+      summary: 'Local rollout execution is enabled but repo_root was not provided.',
+      error: 'missing_repo_root',
+      local_rollout_execution_attempts: []
+    });
+    expect(result.pending_actions).toHaveLength(1);
+  });
+
   it('passes npm_script rollout args after npm separator', async () => {
     const runCommand = vi.fn(async () => ({
       ok: true,

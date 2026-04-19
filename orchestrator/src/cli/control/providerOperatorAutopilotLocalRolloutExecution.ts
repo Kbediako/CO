@@ -967,7 +967,8 @@ async function runLocalRolloutCommand(input: {
   try {
     const { stdout, stderr } = await execFileAsync(input.command, input.args, {
       cwd: input.cwd,
-      timeout: input.timeoutMs
+      timeout: input.timeoutMs,
+      maxBuffer: 10 * 1024 * 1024
     });
     return { ok: true, exitCode: 0, stdout, stderr };
   } catch (error) {
