@@ -8,6 +8,7 @@ import type { ControlRequestSharedContext } from '../src/cli/control/controlRequ
 import type { LiveLinearTrackedIssue } from '../src/cli/control/linearDispatchSource.js';
 import type { ProviderIssueHandoffPollInput } from '../src/cli/control/providerIssueHandoff.js';
 import {
+  beginClosingControlServerHttpServer,
   closeControlServerOwnedRuntime,
   startControlServerReadyInstanceLifecycle,
   type ControlServerOwnedLifecycleState
@@ -54,7 +55,8 @@ vi.mock('../src/cli/control/controlHostOwnership.js', () => ({
 
 vi.mock('../src/cli/control/controlServerReadyInstanceLifecycle.js', () => ({
   startControlServerReadyInstanceLifecycle: vi.fn(),
-  closeControlServerOwnedRuntime: vi.fn()
+  closeControlServerOwnedRuntime: vi.fn(),
+  beginClosingControlServerHttpServer: vi.fn(() => Promise.resolve())
 }));
 
 vi.mock('../src/cli/control/linearDispatchSource.js', () => ({
@@ -2725,8 +2727,10 @@ describe('closeControlServerPublicLifecycle', () => {
     expect(closeControlServerOwnedRuntime).toHaveBeenCalledWith({
       server: state.server,
       requestContextShared: state.requestContextShared,
-      lifecycleState: state.lifecycleState
+      lifecycleState: state.lifecycleState,
+      serverClosePromise: expect.any(Promise)
     });
+    expect(beginClosingControlServerHttpServer).toHaveBeenCalledWith(state.server);
   });
 
   it('preserves persisted queued provider retry ownership across shutdown', async () => {
@@ -2791,7 +2795,9 @@ describe('closeControlServerPublicLifecycle', () => {
     expect(closeControlServerOwnedRuntime).toHaveBeenCalledWith({
       server: state.server,
       requestContextShared: state.requestContextShared,
-      lifecycleState: state.lifecycleState
+      lifecycleState: state.lifecycleState,
+      serverClosePromise: expect.any(Promise)
     });
+    expect(beginClosingControlServerHttpServer).toHaveBeenCalledWith(state.server);
   });
 });

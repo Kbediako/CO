@@ -22,6 +22,7 @@ interface CloseControlServerOwnedRuntimeOptions {
   server: http.Server;
   requestContextShared: Pick<ControlRequestSharedContext, 'clients'>;
   lifecycleState: ControlServerOwnedLifecycleState;
+  serverClosePromise?: Promise<void>;
 }
 
 export function createControlServerOwnedRuntime(
@@ -72,15 +73,35 @@ export async function closeControlServerOwnedRuntime(
     client.end();
   }
 
-  await new Promise<void>((resolve, reject) => {
-    options.server.close((error) => {
-      if (error) {
-        reject(error);
+  await (options.serverClosePromise ?? beginClosingControlServerHttpServer(options.server));
+}
+
+export function beginClosingControlServerHttpServer(server: http.Server): Promise<void> {
+  if (!server.listening) {
+    return Promise.resolve();
+  }
+  return new Promise<void>((resolve, reject) => {
+    const settleError = (error: unknown): void => {
+      const code = (error as NodeJS.ErrnoException | null)?.code;
+      if (code === 'ERR_SERVER_NOT_RUNNING') {
+        resolve();
         return;
       }
-      resolve();
-    });
-    options.server.closeIdleConnections?.();
-    options.server.closeAllConnections?.();
+      reject(error);
+    };
+
+    try {
+      server.close((error) => {
+        if (error) {
+          settleError(error);
+          return;
+        }
+        resolve();
+      });
+      server.closeIdleConnections?.();
+      server.closeAllConnections?.();
+    } catch (error) {
+      settleError(error);
+    }
   });
 }

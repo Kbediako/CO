@@ -1,6 +1,32 @@
 {
   "items": [
     {
+      "id": "20260419-linear-d334cd3d-b560-497c-9e07-ec8084890493",
+      "title": "CO: stabilize ControlServer read-only refresh temp cleanup ENOTEMPTY flake",
+      "relates_to": "tasks/tasks-linear-d334cd3d-b560-497c-9e07-ec8084890493.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-19",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-19",
+          "status": "produced",
+          "manifest": ".runs/linear-d334cd3d-b560-497c-9e07-ec8084890493-docs-packet/cli/2026-04-19T09-43-09-262Z-5b353e4d/manifest.json",
+          "source_anchor": "ctx:sha256:ce789eed64ab33a58fd40f1d77f4e6b2752cfaa7e0b79fefd4c6e638bc4f1128#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-261 as the bounded ControlServer.test.ts read-only refresh temp cleanup flake: protected test `acknowledges read-only refresh requests without mutating control state`, ENOTEMPTY at `/tmp/control-server-*/.runs/task-0940/cli/run-1`, main Core Lane run `24623956000`, commit `c382730e0e6364cbfeb736a1999fc160c98b03cf`, and explicit non-goal scopes `CO-181` and `CO-150`."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-d334cd3d-b560-497c-9e07-ec8084890493.md",
+        "task": "tasks/tasks-linear-d334cd3d-b560-497c-9e07-ec8084890493.md",
+        "agent_task": ".agent/task/linear-d334cd3d-b560-497c-9e07-ec8084890493.md",
+        "docs": "docs/TECH_SPEC-linear-d334cd3d-b560-497c-9e07-ec8084890493.md"
+      }
+    },
+    {
       "id": "20260419-linear-5348c2fb-8897-48e3-a848-7831778b1b00",
       "title": "CO workflow: restore Apr 19 spec/docs freshness baseline blocking unrelated handoffs",
       "relates_to": "tasks/tasks-linear-5348c2fb-8897-48e3-a848-7831778b1b00.md",

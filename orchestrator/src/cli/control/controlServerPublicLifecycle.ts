@@ -26,6 +26,7 @@ import type { ProviderWorkflowConfigStore } from './providerWorkflowConfigStore.
 import {
   initializeProviderPollingHealth,
   isProviderPollingStuck,
+  flushProviderPollingHealthUpdates,
   markProviderPollingStuck,
   markProviderPollingCompleted,
   markProviderPollingStarted,
@@ -35,6 +36,7 @@ import {
   type ControlPollingMode
 } from './providerPollingHealth.js';
 import {
+  beginClosingControlServerHttpServer,
   closeControlServerOwnedRuntime,
   startControlServerReadyInstanceLifecycle,
   type ControlServerOwnedLifecycleState
@@ -220,12 +222,22 @@ export async function closeControlServerPublicLifecycle(
   if (state.providerRefreshTimer) {
     state.providerRefreshTimer.cancel();
   }
+  const serverClosePromise = beginClosingControlServerHttpServer(state.server);
+  const providerIssueHandoff = state.requestContextShared.providerIssueHandoff ?? null;
+  if (providerIssueHandoff) {
+    await waitForProviderIssueHandoffQueueToDrain(
+      providerIssueHandoff,
+      () => resolveProviderIssueHandoffWatchdogDelayMs(providerIssueHandoff)
+    );
+    await flushProviderPollingHealthUpdates(providerIssueHandoff);
+  }
   let closeError: unknown = null;
   try {
     await closeControlServerOwnedRuntime({
       server: state.server,
       requestContextShared: state.requestContextShared,
-      lifecycleState: state.lifecycleState
+      lifecycleState: state.lifecycleState,
+      serverClosePromise
     });
   } catch (error) {
     closeError = error;
@@ -414,13 +426,8 @@ function createProviderRefreshCoordinator(
       operation: 'dispatch_source_tracked_issues'
     });
 
-  const resolveWatchdogDelayMs = (): number => {
-    const health = readProviderPollingHealth(providerIssueHandoff);
-    if (!health?.checking || health.operation_elapsed_ms === null) {
-      return PROVIDER_REFRESH_STUCK_AFTER_MS;
-    }
-    return Math.max(0, PROVIDER_REFRESH_STUCK_AFTER_MS - health.operation_elapsed_ms);
-  };
+  const resolveWatchdogDelayMs = (): number =>
+    resolveProviderIssueHandoffWatchdogDelayMs(providerIssueHandoff);
 
   const shouldRunFullRecoverySweep = (nowMs: number): boolean =>
     lastSuccessfulFullRecoverySweepAtMs === null ||
@@ -530,6 +537,16 @@ function scheduleStartupProviderRefresh(trigger: () => Promise<void>): NodeJS.Ti
   }, 0);
   startupTrigger.unref?.();
   return startupTrigger;
+}
+
+function resolveProviderIssueHandoffWatchdogDelayMs(
+  providerIssueHandoff: ProviderIssueHandoffService
+): number {
+  const health = readProviderPollingHealth(providerIssueHandoff);
+  if (!health?.checking || health.operation_elapsed_ms === null) {
+    return PROVIDER_REFRESH_STUCK_AFTER_MS;
+  }
+  return Math.max(0, PROVIDER_REFRESH_STUCK_AFTER_MS - health.operation_elapsed_ms);
 }
 
 async function resolveProviderPollTrackedIssues(
