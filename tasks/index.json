@@ -12384,6 +12384,38 @@
         "agent_task": ".agent/task/linear-0cca0c91-1a3f-4a75-b629-f7c56648d129.md",
         "docs": "docs/TECH_SPEC-linear-0cca0c91-1a3f-4a75-b629-f7c56648d129.md"
       }
+    },
+    {
+      "id": "20260417-linear-9f101328-ca10-47b3-9dc9-b0984d339794",
+      "title": "CO STATUS: exclude accepted dead-proof rehydration rows from running/max-allowed projection",
+      "relates_to": "tasks/tasks-linear-9f101328-ca10-47b3-9dc9-b0984d339794.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_parent_reset": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-17",
+          "status": "reclaimed_after_invalidated_child_lane",
+          "manifest": ".runs/linear-9f101328-ca10-47b3-9dc9-b0984d339794-docs-packet/cli/2026-04-17T10-19-43-393Z-9e912c15/manifest.json",
+          "summary": "Initial docs child lane stayed heartbeat-only without a patch artifact; parent invalidated it and recreated the docs-first packet locally before implementation."
+        },
+        "docs_review_preimplementation_fallback": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-18",
+          "status": "bounded_fallback_recorded",
+          "manifest": ".runs/linear-9f101328-ca10-47b3-9dc9-b0984d339794-docs-packet/cli/2026-04-17T10-19-43-393Z-9e912c15/manifest.json",
+          "summary": "Pre-implementation docs-review fallback recorded after the initial docs child lane stayed heartbeat-only; parent completed the docs-first packet locally before implementation and mirrored that fallback into the task checklists."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-9f101328-ca10-47b3-9dc9-b0984d339794.md",
+        "task": "tasks/tasks-linear-9f101328-ca10-47b3-9dc9-b0984d339794.md",
+        "agent_task": ".agent/task/linear-9f101328-ca10-47b3-9dc9-b0984d339794.md",
+        "docs": "docs/TECH_SPEC-linear-9f101328-ca10-47b3-9dc9-b0984d339794.md"
+      }
     }
   ]
 }
