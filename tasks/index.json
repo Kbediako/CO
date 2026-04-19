@@ -29,6 +29,36 @@
       }
     },
     {
+      "id": "20260420-linear-49206921-3c8d-4db6-bfd9-62414509e96a",
+      "title": "CO-230 bounded-concurrency PR snapshot hydration",
+      "relates_to": "tasks/tasks-linear-49206921-3c8d-4db6-bfd9-62414509e96a.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-20",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane plus parent traceability correction",
+          "date": "2026-04-20",
+          "status": "succeeded-stale-parent-applied",
+          "manifest": ".runs/linear-49206921-3c8d-4db6-bfd9-62414509e96a-co230-docs-packet/cli/2026-04-19T21-48-39-626Z-0a8ba281/manifest.json",
+          "source_anchor": "ctx:sha256:860a5cbc598adab7ef66949c71caa66fd1bfa1937a4abd6bf98fe3f3ebc2ecc9#chunk:c000001",
+          "summary": "Docs child lane produced the CO-230 docs-first packet for bounded-concurrency PR snapshot hydration in providerLinearWorkflowFacade.ts. The accept helper invalidated the patch after Linear updated_at changed during parent progress updates, so the parent verified git apply --check, applied it mechanically, removed the untracked child-lane checkout, and corrected traceability to the workspace-local child-lane source payload. Scope rejects CO-220 correctness-scope changes, unbounded fanout, semantics changes, and broad GitHub/Linear redesign."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-49206921-3c8d-4db6-bfd9-62414509e96a.md",
+        "task": "tasks/tasks-linear-49206921-3c8d-4db6-bfd9-62414509e96a.md",
+        "agent_task": ".agent/task/linear-49206921-3c8d-4db6-bfd9-62414509e96a.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-49206921-3c8d-4db6-bfd9-62414509e96a.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-49206921-3c8d-4db6-bfd9-62414509e96a.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-49206921-3c8d-4db6-bfd9-62414509e96a.md"
+        }
+      }
+    },
+    {
       "id": "20260420-linear-4c1c8aed-2724-4072-9218-74b55e0cc4a7",
       "title": "CO-264 backlog promotion snapshot retention policy",
       "relates_to": "tasks/tasks-linear-4c1c8aed-2724-4072-9218-74b55e0cc4a7.md",
