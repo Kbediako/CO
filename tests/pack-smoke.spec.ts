@@ -16,6 +16,7 @@ type WorkflowStep = {
 type WorkflowJob = {
   'continue-on-error'?: unknown;
   env?: unknown;
+  if?: unknown;
   steps?: unknown;
 };
 
@@ -106,10 +107,25 @@ function getStepCondition(step: WorkflowStep): string {
   return condition.length > 0 ? condition : 'success()';
 }
 
+function getJobCondition(job: WorkflowJob): string {
+  const condition = typeof job.if === 'string' ? job.if.trim() : '';
+  return condition.length > 0 ? condition : 'success()';
+}
+
 function unwrapActionsExpression(condition: string): string {
   const trimmed = condition.trim();
   const match = trimmed.match(/^\$\{\{\s*([\s\S]*?)\s*\}\}$/u);
   return match?.[1]?.trim() ?? trimmed;
+}
+
+function combineWorkflowConditions(jobCondition: string, stepCondition: string): string {
+  if (jobCondition === 'success()') {
+    return stepCondition;
+  }
+  if (stepCondition === 'success()') {
+    return jobCondition;
+  }
+  return `\${{ (${unwrapActionsExpression(jobCondition)}) && (${unwrapActionsExpression(stepCondition)}) }}`;
 }
 
 function hasNonSuccessStatusCheck(condition: string): boolean {
@@ -344,6 +360,40 @@ function getCommandSubstitutionDepth(text: string): number {
   return depth;
 }
 
+function getShellQuoteContext(text: string): '"' | "'" | null {
+  let quote: '"' | "'" | null = null;
+  for (let index = 0; index < text.length; index += 1) {
+    const current = text[index];
+    if (quote) {
+      if (quote === '"' && current === '\\') {
+        index += 1;
+        continue;
+      }
+      if (current === quote) {
+        quote = null;
+      }
+      continue;
+    }
+    if (current === '\\') {
+      index += 1;
+      continue;
+    }
+    if (current === '"' || current === "'") {
+      quote = current;
+    }
+  }
+  return quote;
+}
+
+function isQuotedShellLiteralOccurrence(line: string, commandStartIndex: number): boolean {
+  const beforeOccurrence = line.slice(0, commandStartIndex);
+  const quote = getShellQuoteContext(beforeOccurrence);
+  if (!quote) {
+    return false;
+  }
+  return quote === "'" || getCommandSubstitutionDepth(beforeOccurrence) === 0;
+}
+
 function getShellGroupingDepth(text: string): number {
   let depth = 0;
   for (let index = 0; index < text.length; index += 1) {
@@ -451,6 +501,9 @@ function getPackSmokeCommandOccurrences(run: string): PackSmokeCommandOccurrence
       const startIndex = match.index ?? 0;
       const commandOffset = match[0].search(/npm\s+run\s+pack:smoke/u);
       const commandStartIndex = startIndex + (commandOffset >= 0 ? commandOffset : 0);
+      if (isQuotedShellLiteralOccurrence(line, commandStartIndex)) {
+        continue;
+      }
       const functionStateBeforeOccurrence = updateShellFunctionState(
         functionDepth,
         pendingFunctionDefinition,
@@ -725,10 +778,12 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
       let smokeStepCount = 0;
       for (const [jobName, job] of Object.entries(workflowFile.jobs ?? {})) {
         expectNoMarketplaceSkipEnv(job.env, `${workflow} job ${jobName}`);
+        const jobCondition = getJobCondition(job);
         const codexInstallConditions: string[] = [];
         for (const [stepIndex, step] of getWorkflowSteps(job).entries()) {
           expectNoMarketplaceSkipEnv(step.env, `${workflow} job ${jobName} step ${stepIndex + 1}`);
           const stepCondition = getStepCondition(step);
+          const effectiveStepCondition = combineWorkflowConditions(jobCondition, stepCondition);
           const run = typeof step.run === 'string' ? step.run : '';
           expect(run, `${workflow} job ${jobName} must not opt out of marketplace smoke`).not.toContain(
             marketplaceSkipToken
@@ -742,7 +797,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
               isDedicatedCodexInstallRun(run),
               `${workflow} job ${jobName} step ${stepIndex + 1} must use a dedicated Codex 0.121.0 install step`
             ).toBe(true);
-            codexInstallConditions.push(stepCondition);
+            codexInstallConditions.push(effectiveStepCondition);
           }
           if (hasPackSmokeCommand(run)) {
             smokeStepCount += 1;
@@ -759,12 +814,12 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
               `${workflow} job ${jobName} step ${stepIndex + 1} must run pack:smoke as a blocking command`
             ).toBe(false);
             expect(
-              isAlwaysFalseCondition(stepCondition),
+              isAlwaysFalseCondition(effectiveStepCondition),
               `${workflow} job ${jobName} step ${stepIndex + 1} must not disable pack:smoke with an always-false if condition`
             ).toBe(false);
             expect(
               codexInstallConditions.some((installCondition) =>
-                installConditionCoversSmokeStep(installCondition, stepCondition)
+                installConditionCoversSmokeStep(installCondition, effectiveStepCondition)
               ),
               `${workflow} job ${jobName} step ${stepIndex + 1} must install Codex 0.121.0 before pack:smoke with matching if condition`
             ).toBe(true);
@@ -794,6 +849,11 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(hasPackSmokeCommand(`${packSmokeCommand} <<'EOF-MARK'\nbody\nEOF-MARK`)).toBe(true);
     expect(hasPackSmokeCommand(`cat <<EOF; ${packSmokeCommand}\nbody\nEOF`)).toBe(true);
     expect(hasPackSmokeCommand(`echo ${packSmokeCommand}`)).toBe(false);
+    expect(hasPackSmokeCommand(`echo "; ${packSmokeCommand};"`)).toBe(false);
+    expect(hasPackSmokeCommand(`printf '%s\\n' '${packSmokeCommand}'`)).toBe(false);
+    expect(hasPackSmokeCommand(`echo "${packSmokeCommand}"`)).toBe(false);
+    expect(hasPackSmokeCommand(`echo "$(${packSmokeCommand})"`)).toBe(true);
+    expect(hasPackSmokeCommand(`echo before; ${packSmokeCommand}`)).toBe(true);
     expect(hasPackSmokeCommand(`cat <<'EOF-MARK'\n${packSmokeCommand}\nEOF-MARK`)).toBe(false);
     expect(hasPackSmokeCommand(`${packSmokeCommand}:other`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} || true`)).toBe(true);
@@ -885,6 +945,8 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(hasNonBlockingPackSmokeCommand(`! ${packSmokeCommand}`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`! env FOO=1 ${packSmokeCommand}`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`! command ${packSmokeCommand}`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`echo "; ${packSmokeCommand};"`)).toBe(false);
+    expect(hasNonBlockingPackSmokeCommand(`printf '%s\\n' '${packSmokeCommand}'`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`echo "$(${packSmokeCommand})"`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`echo <(${packSmokeCommand})`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`cat >(${packSmokeCommand})`)).toBe(true);
@@ -899,6 +961,12 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(isContinueOnErrorEnabled('true')).toBe(true);
     expect(isContinueOnErrorEnabled('false')).toBe(false);
     expect(getStepCondition({})).toBe('success()');
+    expect(getJobCondition({})).toBe('success()');
+    expect(combineWorkflowConditions('false', 'success()')).toBe('false');
+    expect(combineWorkflowConditions('success()', '${{ false }}')).toBe('${{ false }}');
+    expect(combineWorkflowConditions("${{ matrix.os == 'macos' }}", "${{ inputs.smoke == 'true' }}")).toBe(
+      "${{ (matrix.os == 'macos') && (inputs.smoke == 'true') }}"
+    );
     expect(installConditionCoversSmokeStep('success()', 'success()')).toBe(true);
     expect(
       installConditionCoversSmokeStep('success()', "${{ steps.downstream-smoke.outputs.required == 'true' }}")
@@ -915,12 +983,16 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(isAlwaysFalseCondition('${{ !true }}')).toBe(true);
     expect(isAlwaysFalseCondition('${{ !(true) }}')).toBe(true);
     expect(isAlwaysFalseCondition('${{ success() && !true }}')).toBe(true);
+    expect(isAlwaysFalseCondition(combineWorkflowConditions('${{ false }}', 'success()'))).toBe(true);
     expect(isAlwaysFalseCondition("${{ steps.downstream-smoke.outputs.required == 'true' }}")).toBe(false);
     expect(isAlwaysFalseCondition('${{ inputs.enabled || false }}')).toBe(false);
     expect(isAlwaysFalseCondition('${{ false || inputs.force }}')).toBe(false);
     expect(isAlwaysFalseCondition('${{ !false }}')).toBe(false);
     expect(installConditionCoversSmokeStep('success()', 'false')).toBe(false);
     expect(installConditionCoversSmokeStep('success()', '${{ false }}')).toBe(false);
+    expect(installConditionCoversSmokeStep('success()', combineWorkflowConditions('${{ false }}', 'success()'))).toBe(
+      false
+    );
     expect(installConditionCoversSmokeStep('success()', 'always()')).toBe(false);
     expect(installConditionCoversSmokeStep('success()', '${{ !success() }}')).toBe(false);
     expect(installConditionCoversSmokeStep('success()', '${{ success() || inputs.force }}')).toBe(false);
