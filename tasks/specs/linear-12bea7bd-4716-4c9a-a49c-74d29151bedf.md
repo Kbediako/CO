@@ -1,3 +1,13 @@
+---
+id: 20260420-linear-12bea7bd-4716-4c9a-a49c-74d29151bedf
+title: "CO-262 ready-review CodeRabbit rereview latch"
+relates_to: docs/PRD-linear-12bea7bd-4716-4c9a-a49c-74d29151bedf.md
+risk: high
+owners:
+  - Codex
+last_review: 2026-04-20
+---
+
 # Task Spec: CO-262 ready-review CodeRabbit rereview latch
 
 ## Metadata
