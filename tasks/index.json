@@ -23,7 +23,9 @@
         "spec": "tasks/specs/linear-12bea7bd-4716-4c9a-a49c-74d29151bedf.md",
         "task": "tasks/tasks-linear-12bea7bd-4716-4c9a-a49c-74d29151bedf.md",
         "agent_task": ".agent/task/linear-12bea7bd-4716-4c9a-a49c-74d29151bedf.md",
-        "docs": "docs/TECH_SPEC-linear-12bea7bd-4716-4c9a-a49c-74d29151bedf.md"
+        "docs": {
+          "TECH_SPEC": "docs/TECH_SPEC-linear-12bea7bd-4716-4c9a-a49c-74d29151bedf.md"
+        }
       }
     },
     {

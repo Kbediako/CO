@@ -57,15 +57,16 @@ The parent implementation should make `ready-review` clear `CodeRabbit rereview 
 
 - `statusCheckRollup` contains current-head `CodeRabbit SUCCESS`.
 - `unresolved review threads` is zero.
-- `mergeStateStatus CLEAN` is present.
 - No current-head actionable review blocker remains.
 
 The parent implementation should keep blocking when:
 
 - CodeRabbit is missing, pending, failed, or stale.
 - `unresolved review threads` is nonzero.
-- merge state is not clean.
+- merge state is not clean, as an independent merge-state blocker rather than part of the `CodeRabbit rereview pending` latch-clear condition.
 - actionable current-head review feedback remains.
+
+`mergeStateStatus CLEAN` remains the merge-readiness target for a fully ready PR, but `ready-review` must report merge-state truth separately when current-head CodeRabbit evidence is already clean.
 
 ## Protected Terms
 
