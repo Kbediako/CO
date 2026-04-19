@@ -12266,6 +12266,40 @@
         "agent_task": ".agent/task/linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26.md",
         "docs": "docs/TECH_SPEC-linear-5f2ebb52-e5f5-4367-84e2-4039ba031b26.md"
       }
+    },
+    {
+      "id": "20260418-linear-0cca0c91-1a3f-4a75-b629-f7c56648d129",
+      "title": "CO: harden marketplace pack:smoke coverage after CO-196",
+      "relates_to": "tasks/tasks-linear-0cca0c91-1a3f-4a75-b629-f7c56648d129.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-0cca0c91-1a3f-4a75-b629-f7c56648d129-docs-packet/cli/2026-04-18T20-19-38-475Z-02ff97ee/manifest.json",
+          "source_anchor": "ctx:sha256:c68320feb662fb56167ab93a196f71369d54a97a84bca89b2d0c0206ee122e0f#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-217 as the post-CO-196 marketplace pack-smoke hardening lane: npm run pack:smoke and relevant CI/release workflows must run Codex marketplace install/register coverage by default or emit explicit allowed opt-out evidence. Parent owns implementation, validation, Linear state, workpad, PR, and merge."
+        },
+        "parent_validation": {
+          "reviewer": "provider worker parent lane",
+          "date": "2026-04-19",
+          "status": "passed",
+          "manifest": ".runs/linear-0cca0c91-1a3f-4a75-b629-f7c56648d129/cli/2026-04-18T20-39-25-026Z-e0620b3d/manifest.json",
+          "review_telemetry": ".runs/linear-0cca0c91-1a3f-4a75-b629-f7c56648d129/cli/2026-04-18T20-39-25-026Z-e0620b3d/review/telemetry.json",
+          "summary": "Parent lane merged CO-196 from origin/main, hardened pack:smoke marketplace prerequisites to fail closed unless local skip has reason evidence, pinned workflow Codex 0.121.0 provisioning assertions, and passed focused tests, full test suite, docs/spec gates, clean standalone review/elegance, and npm run pack:smoke."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-0cca0c91-1a3f-4a75-b629-f7c56648d129.md",
+        "task": "tasks/tasks-linear-0cca0c91-1a3f-4a75-b629-f7c56648d129.md",
+        "agent_task": ".agent/task/linear-0cca0c91-1a3f-4a75-b629-f7c56648d129.md",
+        "docs": "docs/TECH_SPEC-linear-0cca0c91-1a3f-4a75-b629-f7c56648d129.md"
+      }
     }
   ]
 }
