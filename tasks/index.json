@@ -4348,7 +4348,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-18",
+      "last_review": "2026-04-19",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
@@ -4362,7 +4362,35 @@
           "status": "produced",
           "manifest": ".runs/linear-af97d673-43a4-4a36-8738-b7f61e5b71a1-docs-refresh/cli/2026-04-18T21-09-55-260Z-b69a5e6c/manifest.json",
           "source_anchor": "ctx:sha256:32d01f29a223917c3e47b5f30f7753d44d23e7cfafd3dc6fb8977eb8a2d0c633#chunk:c000001",
-          "summary": "Docs refresh preserves the Apr 18 reopened CO-41 recurrence after March PR #324 landed the original stuck polling / refresh watchdog fix: provider-intake-state.json reported stuck=true, restart_required=true, last_error=provider_refresh_lifecycle_stuck, refresh_phase=refresh:claim_reconcile, and free capacity running=2/max_allowed=3 while a Ready issue (CO-252) was not admitted until restart. Implementation identified the current seam as repeated active-worker restart quarantine ignoring free provider capacity and carries counts.max_allowed through supervision diagnostics; packet preserves boundaries for CO-217, CO-211, CO-214, and CO-248."
+          "summary": "Docs refresh preserves the Apr 18 reopened CO-41 recurrence after March PR #324 landed the original stuck polling / refresh watchdog fix: provider-intake-state.json reported stuck=true, restart_required=true, last_error=provider_refresh_lifecycle_stuck, refresh_phase=refresh:claim_reconcile, and free capacity running=2/max_allowed=3 while a Ready issue (CO-252) was not admitted until restart. PR #547 later became the Apr 18 repair baseline for repeated active-worker restart quarantine and counts.max_allowed supervision diagnostics."
+        },
+        "docs_apr19_refresh_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-19",
+          "status": "produced",
+          "manifest": ".runs/linear-af97d673-43a4-4a36-8738-b7f61e5b71a1-docs-apr19-refresh/cli/2026-04-19T02-56-26-118Z-98ad9a6f/manifest.json",
+          "source_anchor": "ctx:sha256:1bc7b3ac282ad1ebac36e250c2a063346e8497500fbf4b407ca3ea84ae327f35#chunk:c000001",
+          "summary": "Apr 19 docs refresh records reopened post-PR #547 CO-41 recurrence evidence from Linear comments: post-#547 restart_required recurrences, stale released:not_active/provider_issue_released:not_active rows, active_worker_proof_missing, freshness-gauge stale verdict, partial restart recovery, and spare-capacity no-admission. March PR #324 and Apr 18 PR #547 remain baselines only; parent owns source implementation, tests, review, Linear/workpad state, PR lifecycle, and merge."
+        },
+        "parent_implementation_apr19": {
+          "reviewer": "provider worker parent lane",
+          "date": "2026-04-19",
+          "status": "validated_on_merged_main_before_pr",
+          "summary": "Parent source repair identified the nested provider handoff refreshLifecycleChain as the post-#547 blocking seam and added explicit stuck-refresh retry replacement, internal lifecycle epoch reset, stale-operation abort, and active claim run_manifest_path proof discovery. After fast-forwarding to origin/main at 1f54452a1, build, lint, full npm run test, docs gates, stewardship, diff budget, and pack smoke passed before PR handoff."
+        },
+        "standalone_review_apr19": {
+          "reviewer": "codex-orchestrator review --uncommitted",
+          "date": "2026-04-19",
+          "status": "succeeded",
+          "review_outcome": "bounded-success",
+          "telemetry": ".runs/linear-af97d673-43a4-4a36-8738-b7f61e5b71a1/cli/2026-04-19T02-51-10-179Z-caed3895/review/telemetry.json",
+          "summary": "First standalone review found a P1 late detached-operation health completion risk. Parent patched the current-operation guard, reran focused lifecycle coverage, touched suites, build, lint, full npm run test, deterministic guards, and pack smoke; rerun telemetry reports bounded-success via command-intent boundary, which lane policy treats as successful bounded review completion."
+        },
+        "elegance_review_apr19": {
+          "reviewer": "provider worker parent lane",
+          "date": "2026-04-19",
+          "status": "passed",
+          "summary": "Kept the repair limited to explicit stuck-refresh retry replacement, internal lifecycle epoch reset, stale-operation abort, current-operation health completion guarding, active-claim freshness-gauge proof discovery, and focused regression tests; no broader abstraction or unrelated cleanup added."
         }
       },
       "paths": {
