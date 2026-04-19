@@ -216,28 +216,38 @@ describe('providerOperatorAutopilot', () => {
   });
 
   it('surfaces Blocked issues with only terminal blockers as ready-to-unblock candidates when no duplicate evidence exists', async () => {
-    const result = await runProviderOperatorAutopilot({
-      tracked_issues: [
-        createTrackedIssue({
-          id: 'lin-issue-266',
-          identifier: 'CO-266',
-          state: 'Blocked',
-          state_type: 'started',
-          blocked_by: [
-            {
-              id: 'lin-issue-254',
-              identifier: 'CO-254',
-              state: 'Done',
-              state_type: 'completed'
-            }
-          ]
-        })
-      ],
-      claims: [],
-      config: buildConfig(),
-      previous_result: null
+    const transitionIssueState = vi.fn(async () => {
+      throw new Error('read-only terminal-blocker advisories must not transition issues');
     });
 
+    const result = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [
+          createTrackedIssue({
+            id: 'lin-issue-266',
+            identifier: 'CO-266',
+            state: 'Blocked',
+            state_type: 'started',
+            blocked_by: [
+              {
+                id: 'lin-issue-254',
+                identifier: 'CO-254',
+                state: 'Done',
+                state_type: 'completed'
+              }
+            ]
+          })
+        ],
+        claims: [],
+        config: buildConfig(),
+        previous_result: null
+      },
+      {
+        transition_issue_state: transitionIssueState
+      }
+    );
+
+    expect(transitionIssueState).not.toHaveBeenCalled();
     expect(result.status).toBe('acted');
     expect(result.terminal_blocker_advisories).toMatchObject([
       {

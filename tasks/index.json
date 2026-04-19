@@ -24,9 +24,7 @@
         "task": "tasks/tasks-linear-025f5748-bed9-4512-9fd6-53ad57dd1466.md",
         "agent_task": ".agent/task/linear-025f5748-bed9-4512-9fd6-53ad57dd1466.md",
         "docs": {
-          "PRD": "docs/PRD-linear-025f5748-bed9-4512-9fd6-53ad57dd1466.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-025f5748-bed9-4512-9fd6-53ad57dd1466.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-025f5748-bed9-4512-9fd6-53ad57dd1466.md"
+          "TECH_SPEC": "docs/TECH_SPEC-linear-025f5748-bed9-4512-9fd6-53ad57dd1466.md"
         }
       }
     },
