@@ -220,18 +220,31 @@ type ConstantExpressionLiteral =
   | { kind: 'number'; value: number }
   | { kind: 'string'; value: string };
 
+function toConstantExpressionLiteral(value: unknown): ConstantExpressionLiteral | null {
+  if (typeof value === 'boolean') {
+    return { kind: 'boolean', value };
+  }
+  if (value === null) {
+    return { kind: 'null', value: null };
+  }
+  if (typeof value === 'number') {
+    return { kind: 'number', value };
+  }
+  if (typeof value === 'string') {
+    return { kind: 'string', value };
+  }
+  return null;
+}
+
 function parseConstantExpressionLiteral(term: string): ConstantExpressionLiteral | null {
   const expression = stripOuterParentheses(term);
-  const fromJsonBooleanMatch = expression.match(/^fromJSON\s*\(\s*(['"])(true|false)\1\s*\)$/iu);
-  if (fromJsonBooleanMatch) {
-    return {
-      kind: 'boolean',
-      value: /^true$/iu.test(fromJsonBooleanMatch[2] ?? '')
-    };
-  }
-  const fromJsonNullMatch = expression.match(/^fromJSON\s*\(\s*(['"])null\1\s*\)$/iu);
-  if (fromJsonNullMatch) {
-    return { kind: 'null', value: null };
+  const fromJsonMatch = expression.match(/^fromJSON\s*\(\s*(['"])([\s\S]*)\1\s*\)$/iu);
+  if (fromJsonMatch) {
+    try {
+      return toConstantExpressionLiteral(JSON.parse(fromJsonMatch[2] ?? ''));
+    } catch {
+      return null;
+    }
   }
   if (/^true$/iu.test(expression)) {
     return { kind: 'boolean', value: true };
@@ -1225,6 +1238,8 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(isAlwaysFalseCondition('${{ 0 }}')).toBe(true);
     expect(isAlwaysFalseCondition("${{ '' }}")).toBe(true);
     expect(isAlwaysFalseCondition('${{ null }}')).toBe(true);
+    expect(isAlwaysFalseCondition("${{ fromJSON('0') }}")).toBe(true);
+    expect(isAlwaysFalseCondition('${{ fromJSON(\'""\') }}')).toBe(true);
     expect(isAlwaysFalseCondition("${{ fromJSON('null') }}")).toBe(true);
     expect(isAlwaysFalseCondition('${{ 1 == 2 }}')).toBe(true);
     expect(isAlwaysFalseCondition("${{ fromJSON('false') }}")).toBe(true);
@@ -1243,6 +1258,8 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(isAlwaysFalseCondition(combineWorkflowConditions('${{ false }}', 'success()'))).toBe(true);
     expect(isAlwaysFalseCondition('${{ 1 }}')).toBe(false);
     expect(isAlwaysFalseCondition("${{ 'nonempty' }}")).toBe(false);
+    expect(isAlwaysFalseCondition("${{ fromJSON('1') }}")).toBe(false);
+    expect(isAlwaysFalseCondition('${{ fromJSON(\'"nonempty"\') }}')).toBe(false);
     expect(isAlwaysFalseCondition('${{ 1 == 1 }}')).toBe(false);
     expect(isAlwaysFalseCondition("${{ fromJSON('true') }}")).toBe(false);
     expect(isAlwaysFalseCondition("${{ inputs.force == 'true' }}")).toBe(false);
