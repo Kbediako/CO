@@ -26,6 +26,7 @@ describe('provider issue observability', () => {
           summary: 'Waiting for required checks before merge.',
           attached_pr_urls: ['https://github.com/asabeko/CO/pull/82'],
           ignored_historical_pr_urls: ['https://github.com/asabeko/CO/pull/80'],
+          ignored_closed_unmerged_pr_urls: ['https://github.com/asabeko/CO/pull/81'],
           conflicting_attached_pr_urls: ['https://github.com/asabeko/CO/pull/83'],
           pr: {
             url: 'https://github.com/asabeko/CO/pull/82',
@@ -94,6 +95,7 @@ describe('provider issue observability', () => {
       },
       pull_request: {
         ignored_historical_pr_urls: ['https://github.com/asabeko/CO/pull/80'],
+        ignored_closed_unmerged_pr_urls: ['https://github.com/asabeko/CO/pull/81'],
         conflicting_attached_pr_urls: ['https://github.com/asabeko/CO/pull/83'],
         number: 82,
         merge_closeout_status: 'watching',
