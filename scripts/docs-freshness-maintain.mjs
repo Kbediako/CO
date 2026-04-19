@@ -218,13 +218,14 @@ function summarizeCandidateCohorts(entries, policy) {
       }
       const baselineIds = uniqueSorted(cohortEntries.map((entry) => entry.baseline_cohort_id).filter(Boolean));
       const expiresAfter = addDaysToIsoDate(first.last_review, first.cadence_days + policy.window_days);
+      const cohortKey = candidateCohortKey(first);
       return {
         id:
           baselineIds.length === 1 && cohortEntries.every((entry) => entry.baseline_cohort_id === baselineIds[0])
             ? baselineIds[0]
             : `candidate-${first.last_review}-cadence-${first.cadence_days}-age-${first.age_days}`,
-        canonical_owner_key: candidateCohortKey(first),
-        canonical_owner_marker: canonicalOwnerMarkerForKey(candidateCohortKey(first)),
+        canonical_owner_key: cohortKey,
+        canonical_owner_marker: canonicalOwnerMarkerForKey(cohortKey),
         owner_issue: policy.owner_issue ?? null,
         status: cohortEntries.some((entry) => entry.overdue_days > policy.window_days)
           ? 'expired_candidate'

@@ -2315,6 +2315,7 @@ async function findCanonicalFollowUpOwnerIssues(input: {
       }
   > {
   const nodes: NonNullable<NonNullable<LinearCanonicalOwnerIssuesQueryResponse['issues']>['nodes']> = [];
+  const seenCursors = new Set<string>();
   let after: string | null = null;
 
   for (;;) {
@@ -2356,6 +2357,17 @@ async function findCanonicalFollowUpOwnerIssues(input: {
         }
       };
     }
+    if (seenCursors.has(nextCursor)) {
+      return {
+        ok: false,
+        error: {
+          code: 'linear_canonical_owner_pagination_reused_cursor',
+          message: 'Linear canonical owner search pagination returned a repeated cursor.',
+          status: 503
+        }
+      };
+    }
+    seenCursors.add(nextCursor);
     after = nextCursor;
   }
 
@@ -2451,7 +2463,14 @@ function isIssueRelationAlreadySatisfiedError(
     const message = typeof record.message === 'string' ? record.message : '';
     const text = `${message} ${extensionText}`.toLowerCase();
     const alreadySatisfied =
-      text.includes('already') || text.includes('duplicate') || text.includes('exists');
+      text.includes('already exists') ||
+      text.includes('already exist') ||
+      text.includes('already satisfied') ||
+      text.includes('already present') ||
+      text.includes('duplicate') ||
+      text.includes('relation_already_exists') ||
+      text.includes('issue_relation_already_exists') ||
+      text.includes('already_exists');
     const isRelationError = relationNeedles.some((needle) => text.includes(needle));
     return alreadySatisfied && isRelationError;
   });

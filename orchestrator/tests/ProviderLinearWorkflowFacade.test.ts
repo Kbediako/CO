@@ -9848,6 +9848,64 @@ describe('providerLinearWorkflowFacade', () => {
     expect(calls).toEqual(['owner-search:first', 'owner-search:owner-cursor-1', 'related-relation']);
   });
 
+  it('fails closed when canonical owner pagination repeats a cursor', async () => {
+    const canonicalOwnerKey = 'baseline_cohort_id:apr-19-docs-freshness';
+    const canonicalOwnerMarker = `codex-orchestrator:canonical-owner-key=${canonicalOwnerKey}`;
+    const calls: string[] = [];
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, unknown>;
+      };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearCanonicalFollowUpOwners')) {
+        calls.push(`owner-search:${body.variables?.after ?? 'first'}`);
+        expect(body.variables).toMatchObject({
+          marker: canonicalOwnerMarker,
+          first: 50
+        });
+        return jsonResponse(
+          buildCanonicalOwnerIssuesBody([], {
+            hasNextPage: true,
+            endCursor: 'owner-cursor-1'
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateFollowUpIssue')) {
+        calls.push('create');
+        throw new Error('reused pagination cursors must fail closed before create');
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await createProviderLinearFollowUpIssue({
+      issueId: 'lin-issue-1',
+      title: 'Apr 19 spec/docs freshness baseline owner',
+      description: 'Keep duplicate lanes on one owner.',
+      intentChecksum: '- Preserve Apr 19 owner routing.',
+      nonGoals: '- [ ] Do not create duplicates.',
+      notDoneIf: '- [ ] Repeated lanes create fresh owners.',
+      acceptanceCriteria: '- [ ] Later-page owners are reused.',
+      canonicalOwnerKey,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_canonical_owner_pagination_reused_cursor',
+        status: 503
+      }
+    });
+    expect(calls).toEqual(['owner-search:first', 'owner-search:owner-cursor-1']);
+  });
+
   it('reuses the source issue itself as canonical owner without self relations', async () => {
     const canonicalOwnerKey = 'baseline_cohort_id:apr-19-docs-freshness';
     const canonicalOwnerMarker = `codex-orchestrator:canonical-owner-key=${canonicalOwnerKey}`;
@@ -9947,6 +10005,7 @@ describe('providerLinearWorkflowFacade', () => {
       `- Canonical owner marker: \`${canonicalOwnerMarker}\``
     ].join('\n');
     const calls: string[] = [];
+    const relationInputs: Record<string, unknown>[] = [];
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
         query?: string;
@@ -9979,6 +10038,7 @@ describe('providerLinearWorkflowFacade', () => {
       }
       if (body.query?.includes('ProviderLinearCreateIssueRelation')) {
         const input = body.variables?.input as Record<string, unknown> | undefined;
+        relationInputs.push(input ?? {});
         calls.push(input?.type === 'blocks' ? 'blocks-relation' : 'related-relation');
         return jsonResponse({
           errors: [
@@ -10024,6 +10084,111 @@ describe('providerLinearWorkflowFacade', () => {
       }
     });
     expect(calls).toEqual(['issue-summary', 'owner-search', 'related-relation', 'blocks-relation']);
+    expect(relationInputs).toEqual([
+      {
+        type: 'related',
+        issueId: 'lin-issue-1',
+        relatedIssueId: 'lin-issue-254'
+      },
+      {
+        type: 'blocks',
+        issueId: 'lin-issue-1',
+        relatedIssueId: 'lin-issue-254'
+      }
+    ]);
+  });
+
+  it('does not treat missing relation GraphQL errors as already satisfied', async () => {
+    const canonicalOwnerKey = 'baseline_cohort_id:apr-19-docs-freshness';
+    const canonicalOwnerMarker = `codex-orchestrator:canonical-owner-key=${canonicalOwnerKey}`;
+    const canonicalOwnerDescription = [
+      'Apr 19 baseline owner.',
+      '## Canonical Owner',
+      `- Canonical owner key: \`${canonicalOwnerKey}\``,
+      `- Canonical owner marker: \`${canonicalOwnerMarker}\``
+    ].join('\n');
+    const calls: string[] = [];
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, unknown>;
+      };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        calls.push('issue-summary');
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearCanonicalFollowUpOwners')) {
+        calls.push('owner-search');
+        return jsonResponse(
+          buildCanonicalOwnerIssuesBody([
+            buildCanonicalOwnerIssue({
+              id: 'lin-issue-254',
+              identifier: 'CO-254',
+              title: 'Apr 19 spec/docs freshness baseline owner',
+              description: canonicalOwnerDescription,
+              state: {
+                id: 'state-backlog',
+                name: 'Backlog',
+                type: 'unstarted'
+              }
+            })
+          ])
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateIssueRelation')) {
+        const input = body.variables?.input as Record<string, unknown> | undefined;
+        calls.push(input?.type === 'blocks' ? 'blocks-relation' : 'related-relation');
+        expect(input).toMatchObject({
+          type: 'related',
+          issueId: 'lin-issue-1',
+          relatedIssueId: 'lin-issue-254'
+        });
+        return jsonResponse({
+          errors: [
+            {
+              message: 'Issue relation does not exist.',
+              extensions: {
+                code: 'RELATION_DOES_NOT_EXIST'
+              }
+            }
+          ]
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await createProviderLinearFollowUpIssue({
+      issueId: 'lin-issue-1',
+      title: 'Apr 19 spec/docs freshness baseline owner',
+      description: 'Keep the Apr 19 duplicate cluster on one owner.',
+      intentChecksum: '- Preserve Apr 19 spec/docs freshness baseline owner routing.',
+      nonGoals: '- [ ] Do not create duplicate Apr 19 owner issues.',
+      notDoneIf: '- [ ] A repeated lane creates a new owner.',
+      acceptanceCriteria: '- [ ] Repeated lanes reuse the stamped owner.',
+      blockedBySource: true,
+      canonicalOwnerKey,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_graphql_error',
+        status: 409,
+        details: {
+          failed_relation_type: 'related',
+          created_issue: {
+            id: 'lin-issue-254',
+            identifier: 'CO-254'
+          }
+        }
+      }
+    });
+    expect(calls).toEqual(['issue-summary', 'owner-search', 'related-relation']);
   });
 
   it('reuses a stamped canonical owner when budget is below the create-path floor', async () => {
@@ -10841,8 +11006,9 @@ describe('providerLinearWorkflowFacade', () => {
       }
     });
     if (!result.ok) {
-      expect(String(result.error.details?.created_issue)).not.toContain(canonicalOwnerMarker);
-      expect(JSON.stringify(result.error.details?.created_issue)).not.toContain(canonicalOwnerMarker);
+      const createdIssue = result.error.details?.created_issue as { description?: string } | undefined;
+      expect(String(createdIssue?.description ?? '')).not.toContain(canonicalOwnerMarker);
+      expect(JSON.stringify(createdIssue)).not.toContain(canonicalOwnerMarker);
     }
     expect(calls).toEqual(['owner-search', 'create', 'update-description']);
   });
