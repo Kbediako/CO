@@ -3734,6 +3734,357 @@ describe('ControlRuntime', () => {
     }
   });
 
+  it('fails closed on top-level tracked fallback when persisted advisory truth conflicts with explicit selected identity', async () => {
+    const providerIntakeState = createProviderIntakeState([
+      {
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-196',
+        issue_id: 'lin-issue-196',
+        issue_identifier: 'CO-196',
+        issue_title: 'Current tracked issue',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-17T04:00:00.000Z',
+        task_id: 'linear-co-196-stale-advisory-fallback',
+        mapping_source: 'provider_id_fallback',
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        accepted_at: '2026-04-17T03:58:00.000Z',
+        updated_at: '2026-04-17T03:59:00.000Z',
+        run_id: 'provider-run-196',
+        run_manifest_path: null,
+        launch_source: 'control-host',
+        launch_token: 'launch-co-196'
+      }
+    ]);
+    const fixture = await createFixture({
+      taskId: 'linear-co-196-stale-advisory-fallback',
+      providerIntakeState,
+      linearAdvisoryState: {
+        tracked_issue: createTrackedIssue({
+          id: 'lin-issue-1',
+          identifier: 'CO-1',
+          title: 'Stale advisory issue',
+          updated_at: '2026-03-22T04:01:03.255Z'
+        })
+      }
+    });
+    await seedManifest(fixture.paths, {
+      task_id: 'linear-co-196-stale-advisory-fallback',
+      issue_provider: 'linear',
+      issue_id: 'lin-issue-196',
+      issue_identifier: 'CO-196',
+      summary: 'selected issue has explicit identity but no tracked payload',
+      updated_at: '2026-04-17T04:00:00.000Z'
+    });
+
+    const snapshot = fixture.runtime.snapshot();
+    const selectedSnapshot = await snapshot.readSelectedRunSnapshot();
+    const compatibilityProjection = await snapshot.readCompatibilityProjection();
+    const uiDataset = buildUiDataset({
+      projection: compatibilityProjection,
+      generatedAt: '2026-04-17T04:00:00.000Z'
+    });
+
+    expect(selectedSnapshot.selected?.issueIdentifier).toBe('CO-196');
+    expect(selectedSnapshot.selected?.tracked?.linear ?? null).toBeNull();
+    expect(selectedSnapshot.tracked?.linear ?? null).toBeNull();
+    expect(compatibilityProjection.tracked?.linear ?? null).toBeNull();
+    expect((uiDataset as { tracked?: { linear?: unknown } }).tracked?.linear ?? null).toBeNull();
+  });
+
+  it('ignores stale advisory fallback that matches only a non-authoritative selected alias', async () => {
+    const fixture = await createFixture({
+      taskId: 'local-mcp',
+      linearAdvisoryState: {
+        tracked_issue: createTrackedIssue({
+          id: 'local-mcp',
+          identifier: 'CO-1',
+          title: 'Stale advisory issue',
+          state: 'Done',
+          state_type: 'completed',
+          updated_at: '2026-03-22T04:01:03.255Z'
+        })
+      }
+    });
+    await seedProviderLinearWorkerProof(fixture.paths, {
+      issue_id: 'lin-issue-196',
+      issue_identifier: 'CO-196',
+      owner_phase: 'turn_running',
+      owner_status: 'in_progress',
+      last_event: 'turn_running',
+      last_message: 'current worker is running',
+      last_event_at: '2026-04-17T04:01:00.000Z',
+      updated_at: '2026-04-17T04:01:00.000Z'
+    });
+    await seedManifest(fixture.paths, {
+      task_id: 'local-mcp',
+      issue_provider: 'linear',
+      issue_id: 'local-mcp',
+      issue_identifier: 'CO-196',
+      summary: 'selected issue has authoritative identifier and fallback issue id alias',
+      updated_at: '2026-04-17T04:00:00.000Z'
+    });
+
+    const snapshot = fixture.runtime.snapshot();
+    const selectedSnapshot = await snapshot.readSelectedRunSnapshot();
+    const compatibilityProjection = await snapshot.readCompatibilityProjection();
+    const uiDataset = buildUiDataset({
+      projection: compatibilityProjection,
+      generatedAt: '2026-04-17T04:00:00.000Z'
+    });
+
+    expect(selectedSnapshot.selected?.issueIdentifier).toBe('CO-196');
+    expect(selectedSnapshot.selected?.issueId).toBe('local-mcp');
+    expect(selectedSnapshot.selected?.compatibilityState ?? null).toBeNull();
+    expect(selectedSnapshot.selected?.displayStatus).toBe('in_progress');
+    expect(selectedSnapshot.selected?.latestEvent).toMatchObject({
+      event: 'in_progress',
+      source: 'run_summary',
+      message: 'selected issue has authoritative identifier and fallback issue id alias'
+    });
+    expect(selectedSnapshot.selected?.tracked?.linear ?? null).toBeNull();
+    expect(selectedSnapshot.selected?.providerDebugSnapshot?.live_linear_state).toEqual({
+      state: null,
+      state_type: null,
+      updated_at: null
+    });
+    expect(selectedSnapshot.selected?.providerDebugSnapshot?.progress ?? null).toBeNull();
+    expect(selectedSnapshot.selected?.providerDebugSnapshot?.stall_classification ?? null).toBeNull();
+    expect(selectedSnapshot.tracked?.linear ?? null).toBeNull();
+    expect(compatibilityProjection.selected?.tracked).toHaveProperty('linear', null);
+    expect(compatibilityProjection.selected?.display_status).toBe('in_progress');
+    expect(compatibilityProjection.selected?.latest_event).toMatchObject({
+      event: 'in_progress',
+      source: 'run_summary',
+      message: 'selected issue has authoritative identifier and fallback issue id alias'
+    });
+    expect(compatibilityProjection.selected?.provider_debug_snapshot?.live_linear_state).toEqual({
+      state: null,
+      state_type: null,
+      updated_at: null
+    });
+    expect(compatibilityProjection.selected?.provider_debug_snapshot?.progress ?? null).toBeNull();
+    expect(
+      compatibilityProjection.selected?.provider_debug_snapshot?.stall_classification ?? null
+    ).toBeNull();
+    expect(compatibilityProjection.issues).toHaveLength(1);
+    expect(compatibilityProjection.issues[0]?.payload.display_status).toBe('in_progress');
+    expect(compatibilityProjection.issues[0]?.payload.latest_event).toMatchObject({
+      event: 'in_progress',
+      source: 'run_summary',
+      message: 'selected issue has authoritative identifier and fallback issue id alias'
+    });
+    expect(compatibilityProjection.issues[0]?.payload.tracked).toHaveProperty('linear', null);
+    expect(
+      compatibilityProjection.issues[0]?.payload.provider_debug_snapshot?.live_linear_state
+    ).toEqual({
+      state: null,
+      state_type: null,
+      updated_at: null
+    });
+    expect(
+      compatibilityProjection.issues[0]?.payload.provider_debug_snapshot?.progress ?? null
+    ).toBeNull();
+    expect(
+      compatibilityProjection.issues[0]?.payload.provider_debug_snapshot?.stall_classification ?? null
+    ).toBeNull();
+    expect(compatibilityProjection.tracked?.linear ?? null).toBeNull();
+    expect(
+      (
+        uiDataset as {
+          selected?: {
+            tracked?: { linear?: unknown };
+            display_status?: string | null;
+            latest_event?: { event?: string | null; source?: string | null; message?: string | null } | null;
+            provider_debug_snapshot?: {
+              live_linear_state?: {
+                state?: string | null;
+                state_type?: string | null;
+                updated_at?: string | null;
+              };
+              progress?: unknown;
+              stall_classification?: string | null;
+            } | null;
+          };
+        }
+      ).selected?.tracked
+    ).toHaveProperty('linear', null);
+    expect(
+      (
+        uiDataset as {
+          selected?: {
+            display_status?: string | null;
+          };
+        }
+      ).selected?.display_status
+    ).toBe('in_progress');
+    expect(
+      (
+        uiDataset as {
+          selected?: {
+            latest_event?: { event?: string | null; source?: string | null; message?: string | null } | null;
+          };
+        }
+      ).selected?.latest_event
+    ).toMatchObject({
+      event: 'in_progress',
+      source: 'run_summary',
+      message: 'selected issue has authoritative identifier and fallback issue id alias'
+    });
+    expect(
+      (
+        uiDataset as {
+          selected?: {
+            provider_debug_snapshot?: {
+              live_linear_state?: {
+                state?: string | null;
+                state_type?: string | null;
+                updated_at?: string | null;
+              };
+            } | null;
+          };
+        }
+      ).selected?.provider_debug_snapshot?.live_linear_state
+    ).toEqual({
+      state: null,
+      state_type: null,
+        updated_at: null
+      });
+    expect(
+      (
+        uiDataset as {
+          selected?: {
+            provider_debug_snapshot?: {
+              progress?: unknown;
+              stall_classification?: string | null;
+            } | null;
+          };
+        }
+      ).selected?.provider_debug_snapshot?.progress ?? null
+    ).toBeNull();
+    expect(
+      (
+        uiDataset as {
+          selected?: {
+            provider_debug_snapshot?: {
+              progress?: unknown;
+              stall_classification?: string | null;
+            } | null;
+          };
+        }
+      ).selected?.provider_debug_snapshot?.stall_classification ?? null
+    ).toBeNull();
+    expect(
+      (uiDataset as { issues?: Array<{ tracked?: { linear?: unknown } }> }).issues?.every(
+        (issue) =>
+          Object.prototype.hasOwnProperty.call(issue, 'tracked') &&
+          issue.tracked !== undefined &&
+          Object.prototype.hasOwnProperty.call(issue.tracked, 'linear') &&
+          issue.tracked.linear === null
+      )
+    ).toBe(true);
+  });
+
+  it('keeps matching tracked truth when issue id is only a task fallback alias', async () => {
+    const fixture = await createFixture({
+      taskId: 'linear-co-196-valid-identifier-only',
+      linearAdvisoryState: {
+        tracked_issue: createTrackedIssue({
+          id: 'lin-issue-196',
+          identifier: 'CO-196',
+          title: 'Current advisory issue',
+          updated_at: '2026-04-17T04:00:00.000Z'
+        })
+      }
+    });
+    await seedManifest(fixture.paths, {
+      task_id: 'linear-co-196-valid-identifier-only',
+      issue_provider: 'linear',
+      issue_identifier: 'CO-196',
+      summary: 'selected issue has authoritative identifier and fallback issue id alias',
+      updated_at: '2026-04-17T04:00:00.000Z'
+    });
+
+    const snapshot = fixture.runtime.snapshot();
+    const selectedSnapshot = await snapshot.readSelectedRunSnapshot();
+    const compatibilityProjection = await snapshot.readCompatibilityProjection();
+    const uiDataset = buildUiDataset({
+      projection: compatibilityProjection,
+      generatedAt: '2026-04-17T04:00:00.000Z'
+    });
+
+    expect(selectedSnapshot.selected?.issueIdentifier).toBe('CO-196');
+    expect(selectedSnapshot.selected?.issueId).toBe('linear-co-196-valid-identifier-only');
+    expect(selectedSnapshot.selected?.tracked?.linear?.identifier).toBe('CO-196');
+    expect(selectedSnapshot.selected?.tracked?.linear?.id).toBe('lin-issue-196');
+    expect(selectedSnapshot.tracked?.linear?.identifier).toBe('CO-196');
+    expect(compatibilityProjection.selected?.tracked.linear?.identifier).toBe('CO-196');
+    expect(compatibilityProjection.issues).toHaveLength(1);
+    expect(compatibilityProjection.issues[0]?.payload.tracked.linear?.identifier).toBe('CO-196');
+    expect(compatibilityProjection.tracked?.linear?.identifier).toBe('CO-196');
+    expect(
+      (uiDataset as { selected?: { tracked?: { linear?: { identifier?: string | null } } } })
+        .selected?.tracked?.linear?.identifier
+    ).toBe('CO-196');
+    expect(
+      (uiDataset as { issues?: Array<{ tracked?: { linear?: { identifier?: string | null } } }> })
+      .issues?.[0]?.tracked?.linear?.identifier
+    ).toBe('CO-196');
+  });
+
+  it('keeps current tracked truth when any authoritative selected alias matches', async () => {
+    for (const manifest of [
+      {
+        task_id: 'linear-co-196-valid-id-stale-identifier',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-196',
+        issue_identifier: 'CO-OLD',
+        summary: 'selected issue id is authoritative while identifier is stale',
+        updated_at: '2026-04-17T04:00:00.000Z'
+      },
+      {
+        task_id: 'linear-co-196-stale-id-valid-identifier',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-old',
+        issue_identifier: 'CO-196',
+        summary: 'selected issue identifier is authoritative while id is stale',
+        updated_at: '2026-04-17T04:00:00.000Z'
+      }
+    ]) {
+      const fixture = await createFixture({
+        taskId: manifest.task_id,
+        linearAdvisoryState: {
+          tracked_issue: createTrackedIssue({
+            id: 'lin-issue-196',
+            identifier: 'CO-196',
+            title: 'Current advisory issue',
+            updated_at: '2026-04-17T04:00:00.000Z'
+          })
+        }
+      });
+      await seedManifest(fixture.paths, manifest);
+
+      const snapshot = fixture.runtime.snapshot();
+      const selectedSnapshot = await snapshot.readSelectedRunSnapshot();
+      const compatibilityProjection = await snapshot.readCompatibilityProjection();
+      const uiDataset = buildUiDataset({
+        projection: compatibilityProjection,
+        generatedAt: '2026-04-17T04:00:00.000Z'
+      });
+
+      expect(selectedSnapshot.selected?.tracked?.linear?.id).toBe('lin-issue-196');
+      expect(selectedSnapshot.selected?.tracked?.linear?.identifier).toBe('CO-196');
+      expect(selectedSnapshot.tracked?.linear?.identifier).toBe('CO-196');
+      expect(compatibilityProjection.selected?.tracked.linear?.identifier).toBe('CO-196');
+      expect(compatibilityProjection.tracked?.linear?.identifier).toBe('CO-196');
+      expect(
+        (uiDataset as { selected?: { tracked?: { linear?: { identifier?: string | null } } } })
+          .selected?.tracked?.linear?.identifier
+      ).toBe('CO-196');
+    }
+  });
+
   it('prunes ordinary released not-active workers when fresh proof has a dead pid', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-15T23:00:00.000Z'));
