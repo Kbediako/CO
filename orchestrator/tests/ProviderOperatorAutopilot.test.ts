@@ -84,7 +84,16 @@ describe('providerOperatorAutopilot', () => {
             target_state: 'Ready'
           }
         }
-      ]
+      ],
+      backlog_promotion_snapshots: [
+        {
+          issue_identifier: 'CO-118',
+          target_state: 'Ready',
+          force_path_used: false,
+          untracked_cycles: 0
+        }
+      ],
+      backlog_promotion_snapshot_retention_records: []
     });
   });
 
@@ -387,9 +396,11 @@ describe('providerOperatorAutopilot', () => {
           target_state: 'Ready',
           attempted_at: '2026-04-09T10:00:00.000Z',
           issue_updated_at: '2026-04-09T10:00:00.000Z',
-          force_path_used: false
+          force_path_used: false,
+          untracked_cycles: 0
         }
-      ]
+      ],
+      backlog_promotion_snapshot_retention_records: []
     });
 
     const transitionIssueState = vi.fn(async () => {
@@ -442,9 +453,11 @@ describe('providerOperatorAutopilot', () => {
           target_state: 'Ready',
           attempted_at: '2026-04-09T10:00:00.000Z',
           issue_updated_at: '2026-04-09T10:00:00.000Z',
-          force_path_used: false
+          force_path_used: false,
+          untracked_cycles: 0
         }
-      ]
+      ],
+      backlog_promotion_snapshot_retention_records: []
     });
   });
 
@@ -506,6 +519,27 @@ describe('providerOperatorAutopilot', () => {
           target_state: 'Ready',
           attempted_at: '2026-04-09T10:00:00.000Z',
           issue_updated_at: '2026-04-09T10:00:00.000Z',
+          force_path_used: false,
+          untracked_cycles: 1
+        }
+      ],
+      backlog_promotion_snapshot_retention_records: [
+        {
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-118',
+          target_state: 'Ready',
+          attempted_at: '2026-04-09T10:00:00.000Z',
+          issue_updated_at: '2026-04-09T10:00:00.000Z',
+          evaluated_at: '2026-04-09T10:05:00.000Z',
+          decision: 'retained',
+          reason: 'temporarily_untracked',
+          age_ms: 300000,
+          untracked_cycles: 1,
+          max_untracked_cycles: 3,
+          issue_state: null,
+          issue_state_type: null,
+          issue_observed_updated_at: null,
+          terminal_state_evidence: false,
           force_path_used: false
         }
       ]
@@ -554,6 +588,575 @@ describe('providerOperatorAutopilot', () => {
           promotion_issue_updated_at: '2026-04-09T10:00:00.000Z'
         }
       ]
+    });
+  });
+
+  it('preserves the original promotion timestamp when another hold masks a manual demotion for one cycle', async () => {
+    const baselineTransition = vi.fn(async () => ({
+      ok: true as const,
+      operation: 'transition' as const,
+      action: 'updated' as const,
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-118',
+        state: { id: 'ready', name: 'Ready', type: 'unstarted' },
+        updated_at: '2026-04-09T10:00:00.000Z'
+      },
+      previous_state: { id: 'backlog', name: 'Backlog', type: 'backlog' },
+      target_state: { id: 'ready', name: 'Ready', type: 'unstarted' },
+      source_setup: null
+    }));
+    const baseline = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [
+          createTrackedIssue({
+            id: 'lin-issue-1',
+            identifier: 'CO-118',
+            state: 'Backlog',
+            state_type: 'backlog'
+          })
+        ],
+        claims: [],
+        config: buildConfig(),
+        previous_result: null
+      },
+      {
+        now: () => '2026-04-09T10:00:00.000Z',
+        transition_issue_state: baselineTransition
+      }
+    );
+    const demotedBlockedIssue = createTrackedIssue({
+      id: 'lin-issue-1',
+      identifier: 'CO-118',
+      state: 'Backlog',
+      state_type: 'backlog',
+      updated_at: '2026-04-09T10:10:00.000Z',
+      blocked_by: [
+        {
+          id: 'lin-issue-0',
+          identifier: 'CO-117',
+          state: 'In Progress',
+          state_type: 'started'
+        }
+      ],
+      recent_activity: [
+        {
+          id: 'hist-1',
+          created_at: '2026-04-09T10:10:00.000Z',
+          actor_name: 'Operator Example',
+          summary: 'State Ready -> Backlog'
+        }
+      ]
+    });
+    const blockedTransition = vi.fn(async () => {
+      throw new Error('transition should not run while the demoted issue is blocked');
+    });
+    const blockedCycle = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [demotedBlockedIssue],
+        claims: [],
+        config: buildConfig(),
+        previous_result: baseline
+      },
+      {
+        now: () => '2026-04-09T10:10:30.000Z',
+        transition_issue_state: blockedTransition
+      }
+    );
+
+    expect(blockedTransition).not.toHaveBeenCalled();
+    expect(blockedCycle).toMatchObject({
+      holds: [{ reason: 'backlog_head_blocked_by_non_terminal' }],
+      backlog_promotion_snapshots: [
+        {
+          issue_identifier: 'CO-118',
+          issue_updated_at: '2026-04-09T10:00:00.000Z',
+          untracked_cycles: 0
+        }
+      ]
+    });
+
+    const clearedDemotionIssue = {
+      ...demotedBlockedIssue,
+      blocked_by: []
+    };
+    const clearedTransition = vi.fn(async () => {
+      throw new Error('transition should not run after the blocker clears');
+    });
+    const result = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [clearedDemotionIssue],
+        claims: [],
+        config: buildConfig(),
+        previous_result: blockedCycle
+      },
+      {
+        now: () => '2026-04-09T10:11:00.000Z',
+        transition_issue_state: clearedTransition
+      }
+    );
+
+    expect(clearedTransition).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      holds: [
+        {
+          reason: 'backlog_head_manual_demotion_unacknowledged',
+          promotion_issue_updated_at: '2026-04-09T10:00:00.000Z'
+        }
+      ]
+    });
+  });
+
+  it('prunes permanently untracked backlog promotion snapshots after the bounded retention cycle limit', async () => {
+    const baselineTransition = vi.fn(async () => ({
+      ok: true as const,
+      operation: 'transition' as const,
+      action: 'updated' as const,
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-118',
+        state: { id: 'ready', name: 'Ready', type: 'unstarted' },
+        updated_at: '2026-04-09T10:00:00.000Z'
+      },
+      previous_state: { id: 'backlog', name: 'Backlog', type: 'backlog' },
+      target_state: { id: 'ready', name: 'Ready', type: 'unstarted' },
+      source_setup: null
+    }));
+    const baseline = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [
+          createTrackedIssue({
+            id: 'lin-issue-1',
+            identifier: 'CO-118',
+            state: 'Backlog',
+            state_type: 'backlog'
+          })
+        ],
+        claims: [],
+        config: buildConfig(),
+        previous_result: null
+      },
+      {
+        now: () => '2026-04-09T10:00:00.000Z',
+        transition_issue_state: baselineTransition
+      }
+    );
+
+    const firstMissingCycle = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [],
+        claims: [],
+        config: buildConfig(),
+        previous_result: baseline
+      },
+      {
+        now: () => '2026-04-09T10:05:00.000Z'
+      }
+    );
+    const secondMissingCycle = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [],
+        claims: [],
+        config: buildConfig(),
+        previous_result: firstMissingCycle
+      },
+      {
+        now: () => '2026-04-09T10:10:00.000Z'
+      }
+    );
+    const prunedCycle = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [],
+        claims: [],
+        config: buildConfig(),
+        previous_result: secondMissingCycle
+      },
+      {
+        now: () => '2026-04-09T10:15:00.000Z'
+      }
+    );
+
+    expect(firstMissingCycle.backlog_promotion_snapshots).toMatchObject([
+      {
+        issue_identifier: 'CO-118',
+        untracked_cycles: 1
+      }
+    ]);
+    expect(secondMissingCycle.backlog_promotion_snapshots).toMatchObject([
+      {
+        issue_identifier: 'CO-118',
+        untracked_cycles: 2
+      }
+    ]);
+    expect(prunedCycle).toMatchObject({
+      status: 'noop',
+      actions: [],
+      holds: [],
+      backlog_promotion_snapshots: [],
+      backlog_promotion_snapshot_retention_records: [
+        {
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-118',
+          target_state: 'Ready',
+          attempted_at: '2026-04-09T10:00:00.000Z',
+          issue_updated_at: '2026-04-09T10:00:00.000Z',
+          evaluated_at: '2026-04-09T10:15:00.000Z',
+          decision: 'pruned',
+          reason: 'stale_untracked_cycle_limit',
+          age_ms: 900000,
+          untracked_cycles: 3,
+          max_untracked_cycles: 3,
+          issue_state: null,
+          issue_state_type: null,
+          issue_observed_updated_at: null,
+          terminal_state_evidence: false,
+          force_path_used: false
+        }
+      ]
+    });
+  });
+
+  it('prunes backlog promotion snapshots when tracked terminal state evidence is present', async () => {
+    const baselineTransition = vi.fn(async () => ({
+      ok: true as const,
+      operation: 'transition' as const,
+      action: 'updated' as const,
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-118',
+        state: { id: 'ready', name: 'Ready', type: 'unstarted' },
+        updated_at: '2026-04-09T10:00:00.000Z'
+      },
+      previous_state: { id: 'backlog', name: 'Backlog', type: 'backlog' },
+      target_state: { id: 'ready', name: 'Ready', type: 'unstarted' },
+      source_setup: null
+    }));
+    const baseline = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [
+          createTrackedIssue({
+            id: 'lin-issue-1',
+            identifier: 'CO-118',
+            state: 'Backlog',
+            state_type: 'backlog'
+          })
+        ],
+        claims: [],
+        config: buildConfig(),
+        previous_result: null
+      },
+      {
+        now: () => '2026-04-09T10:00:00.000Z',
+        transition_issue_state: baselineTransition
+      }
+    );
+
+    const result = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [
+          createTrackedIssue({
+            id: 'lin-issue-1',
+            identifier: 'CO-118',
+            state: 'Done',
+            state_type: 'started',
+            updated_at: '2026-04-09T10:08:00.000Z'
+          })
+        ],
+        claims: [],
+        config: buildConfig(),
+        previous_result: baseline
+      },
+      {
+        now: () => '2026-04-09T10:08:30.000Z'
+      }
+    );
+
+    expect(result).toMatchObject({
+      status: 'noop',
+      actions: [],
+      holds: [],
+      backlog_promotion_snapshots: [],
+      backlog_promotion_snapshot_retention_records: [
+        {
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-118',
+          target_state: 'Ready',
+          attempted_at: '2026-04-09T10:00:00.000Z',
+          issue_updated_at: '2026-04-09T10:00:00.000Z',
+          evaluated_at: '2026-04-09T10:08:30.000Z',
+          decision: 'pruned',
+          reason: 'terminal_state',
+          age_ms: 510000,
+          untracked_cycles: 0,
+          max_untracked_cycles: 3,
+          issue_state: 'Done',
+          issue_state_type: 'started',
+          issue_observed_updated_at: '2026-04-09T10:08:00.000Z',
+          terminal_state_evidence: true,
+          force_path_used: false
+        }
+      ]
+    });
+  });
+
+  it.each([
+    {
+      label: 'archived-only',
+      archivedAt: '2026-04-09T10:07:00.000Z',
+      trashed: false
+    },
+    {
+      label: 'trashed-only',
+      archivedAt: null,
+      trashed: true
+    },
+    {
+      label: 'archived-and-trashed',
+      archivedAt: '2026-04-09T10:07:00.000Z',
+      trashed: true
+    }
+  ])(
+    'prunes tracked $label backlog promotion snapshots before resetting missing cycles',
+    async ({ archivedAt, trashed }) => {
+    const baselineTransition = vi.fn(async () => ({
+      ok: true as const,
+      operation: 'transition' as const,
+      action: 'updated' as const,
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-118',
+        state: { id: 'ready', name: 'Ready', type: 'unstarted' },
+        updated_at: '2026-04-09T10:00:00.000Z'
+      },
+      previous_state: { id: 'backlog', name: 'Backlog', type: 'backlog' },
+      target_state: { id: 'ready', name: 'Ready', type: 'unstarted' },
+      source_setup: null
+    }));
+    const baseline = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [
+          createTrackedIssue({
+            id: 'lin-issue-1',
+            identifier: 'CO-118',
+            state: 'Backlog',
+            state_type: 'backlog'
+          })
+        ],
+        claims: [],
+        config: buildConfig(),
+        previous_result: null
+      },
+      {
+        now: () => '2026-04-09T10:00:00.000Z',
+        transition_issue_state: baselineTransition
+      }
+    );
+
+    const result = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [
+          createTrackedIssue({
+            id: 'lin-issue-1',
+            identifier: 'CO-118',
+            state: 'Ready',
+            state_type: 'unstarted',
+            archived_at: archivedAt,
+            trashed,
+            updated_at: '2026-04-09T10:08:00.000Z'
+          })
+        ],
+        claims: [],
+        config: buildConfig(),
+        previous_result: {
+          ...baseline,
+          backlog_promotion_snapshots: baseline.backlog_promotion_snapshots?.map((snapshot) => ({
+            ...snapshot,
+            untracked_cycles: 2
+          }))
+        }
+      },
+      {
+        now: () => '2026-04-09T10:08:30.000Z'
+      }
+    );
+
+    expect(result).toMatchObject({
+      status: 'noop',
+      actions: [],
+      holds: [],
+      backlog_promotion_snapshots: [],
+      backlog_promotion_snapshot_retention_records: [
+        {
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-118',
+          target_state: 'Ready',
+          attempted_at: '2026-04-09T10:00:00.000Z',
+          issue_updated_at: '2026-04-09T10:00:00.000Z',
+          evaluated_at: '2026-04-09T10:08:30.000Z',
+          decision: 'pruned',
+          reason: 'tracked_archived_or_trashed',
+          age_ms: 510000,
+          untracked_cycles: 0,
+          max_untracked_cycles: 3,
+          issue_state: 'Ready',
+          issue_state_type: 'unstarted',
+          issue_archived_at: archivedAt,
+          issue_trashed: trashed,
+          issue_observed_updated_at: '2026-04-09T10:08:00.000Z',
+          terminal_state_evidence: false,
+          force_path_used: false
+        }
+      ]
+    });
+  });
+
+  it('prunes archived snapshots and ignores legacy pruned demotion holds as future snapshot sources', async () => {
+    const baselineTransition = vi.fn(async () => ({
+      ok: true as const,
+      operation: 'transition' as const,
+      action: 'updated' as const,
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-118',
+        state: { id: 'ready', name: 'Ready', type: 'unstarted' },
+        updated_at: '2026-04-09T10:00:00.000Z'
+      },
+      previous_state: { id: 'backlog', name: 'Backlog', type: 'backlog' },
+      target_state: { id: 'ready', name: 'Ready', type: 'unstarted' },
+      source_setup: null
+    }));
+    const baseline = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [
+          createTrackedIssue({
+            id: 'lin-issue-1',
+            identifier: 'CO-118',
+            state: 'Backlog',
+            state_type: 'backlog'
+          })
+        ],
+        claims: [],
+        config: buildConfig(),
+        previous_result: null
+      },
+      {
+        now: () => '2026-04-09T10:00:00.000Z',
+        transition_issue_state: baselineTransition
+      }
+    );
+    const transitionIssueState = vi.fn(async () => {
+      throw new Error('transition should not run for archived backlog issues');
+    });
+
+    const result = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [
+          createTrackedIssue({
+            id: 'lin-issue-1',
+            identifier: 'CO-118',
+            state: 'Backlog',
+            state_type: 'backlog',
+            archived_at: '2026-04-09T10:07:00.000Z',
+            trashed: true,
+            updated_at: '2026-04-09T10:08:00.000Z',
+            recent_activity: [
+              {
+                id: 'hist-1',
+                created_at: '2026-04-09T10:08:00.000Z',
+                actor_name: 'Operator Example',
+                summary: 'State Ready -> Backlog'
+              }
+            ]
+          })
+        ],
+        claims: [],
+        config: buildConfig(),
+        previous_result: baseline
+      },
+      {
+        now: () => '2026-04-09T10:08:30.000Z',
+        transition_issue_state: transitionIssueState
+      }
+    );
+
+    expect(transitionIssueState).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      status: 'noop',
+      holds: [],
+      backlog_promotion_snapshots: [],
+      backlog_promotion_snapshot_retention_records: [
+        {
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-118',
+          target_state: 'Ready',
+          attempted_at: '2026-04-09T10:00:00.000Z',
+          issue_updated_at: '2026-04-09T10:00:00.000Z',
+          evaluated_at: '2026-04-09T10:08:30.000Z',
+          decision: 'pruned',
+          reason: 'tracked_archived_or_trashed',
+          age_ms: 510000,
+          untracked_cycles: 0,
+          max_untracked_cycles: 3,
+          issue_state: 'Backlog',
+          issue_state_type: 'backlog',
+          issue_archived_at: '2026-04-09T10:07:00.000Z',
+          issue_trashed: true,
+          issue_observed_updated_at: '2026-04-09T10:08:00.000Z',
+          terminal_state_evidence: false,
+          force_path_used: false
+        }
+      ]
+    });
+
+    const legacyResultWithPrunedHold = {
+      ...result,
+      holds: [
+        {
+          kind: 'backlog_promotion' as const,
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-118',
+          issue_state: 'Backlog',
+          issue_state_type: 'backlog',
+          issue_updated_at: '2026-04-09T10:08:00.000Z',
+          promotion_attempted_at: '2026-04-09T10:00:00.000Z',
+          promotion_issue_updated_at: '2026-04-09T10:00:00.000Z',
+          force_path_used: false,
+          reason: 'backlog_head_manual_demotion_unacknowledged',
+          summary: 'Legacy pruned archived demotion hold.',
+          action_required_reasons: []
+        }
+      ]
+    };
+    const nextCycle = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [
+          createTrackedIssue({
+            id: 'lin-issue-1',
+            identifier: 'CO-118',
+            state: 'Backlog',
+            state_type: 'backlog',
+            archived_at: '2026-04-09T10:07:00.000Z',
+            trashed: true,
+            updated_at: '2026-04-09T10:09:00.000Z'
+          })
+        ],
+        claims: [],
+        config: buildConfig(),
+        previous_result: legacyResultWithPrunedHold
+      },
+      {
+        now: () => '2026-04-09T10:09:30.000Z',
+        transition_issue_state: transitionIssueState
+      }
+    );
+
+    expect(transitionIssueState).not.toHaveBeenCalled();
+    expect(nextCycle).toMatchObject({
+      status: 'noop',
+      actions: [],
+      holds: [],
+      backlog_promotion_snapshots: [],
+      backlog_promotion_snapshot_retention_records: []
     });
   });
 
@@ -784,6 +1387,101 @@ describe('providerOperatorAutopilot', () => {
           reason: 'backlog_head_blocked_by_higher_ranked_lane'
         }
       ]
+    });
+  });
+
+  it.each([
+    {
+      label: 'archived-only',
+      archivedAt: '2026-04-09T10:07:00.000Z',
+      trashed: false
+    },
+    {
+      label: 'trashed-only',
+      archivedAt: null,
+      trashed: true
+    },
+    {
+      label: 'archived-and-trashed',
+      archivedAt: '2026-04-09T10:07:00.000Z',
+      trashed: true
+    }
+  ])(
+    'ignores immutable $label higher-ranked blocked lanes before promoting a mutable backlog issue',
+    async ({ archivedAt, trashed }) => {
+    const transitionIssueState = vi.fn(async () => ({
+      ok: true as const,
+      operation: 'transition' as const,
+      action: 'updated' as const,
+      issue: {
+        id: 'lin-issue-2',
+        identifier: 'CO-118',
+        state: { id: 'ready', name: 'Ready', type: 'unstarted' },
+        updated_at: '2026-04-09T10:12:30.000Z'
+      },
+      previous_state: { id: 'backlog', name: 'Backlog', type: 'backlog' },
+      target_state: { id: 'ready', name: 'Ready', type: 'unstarted' },
+      source_setup: null
+    }));
+
+    const result = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [
+          createTrackedIssue({
+            id: 'lin-issue-1',
+            identifier: 'CO-117',
+            state: 'Ready',
+            state_type: 'unstarted',
+            priority: 1,
+            archived_at: archivedAt,
+            trashed,
+            blocked_by: [
+              {
+                id: 'lin-issue-0',
+                identifier: 'CO-116',
+                state: 'In Progress',
+                state_type: 'started'
+              }
+            ]
+          }),
+          createTrackedIssue({
+            id: 'lin-issue-2',
+            identifier: 'CO-118',
+            state: 'Backlog',
+            state_type: 'backlog',
+            priority: 2,
+            updated_at: '2026-04-09T10:12:00.000Z'
+          })
+        ],
+        claims: [],
+        config: buildConfig(),
+        previous_result: null
+      },
+      {
+        now: () => '2026-04-09T10:12:30.000Z',
+        transition_issue_state: transitionIssueState
+      }
+    );
+
+    expect(transitionIssueState).toHaveBeenCalledWith({
+      issueId: 'lin-issue-2',
+      stateName: 'Ready',
+      expectedStateName: 'Backlog',
+      expectedStateType: 'backlog',
+      expectedUpdatedAt: '2026-04-09T10:12:00.000Z',
+      sourceSetup: null,
+      env: expect.any(Object)
+    });
+    expect(result).toMatchObject({
+      status: 'acted',
+      actions: [
+        {
+          kind: 'backlog_promotion',
+          issue_identifier: 'CO-118',
+          reason: 'backlog_head_promoted'
+        }
+      ],
+      holds: []
     });
   });
 
@@ -3963,6 +4661,8 @@ function createTrackedIssue(
     url: overrides.url ?? `https://linear.app/asabeko/issue/${overrides.identifier}`,
     state: overrides.state ?? 'Backlog',
     state_type: overrides.state_type ?? 'backlog',
+    archived_at: overrides.archived_at ?? null,
+    trashed: overrides.trashed ?? null,
     viewer_id: overrides.viewer_id ?? 'viewer-1',
     assignee_id: overrides.assignee_id ?? 'viewer-1',
     assignee_name: overrides.assignee_name ?? 'Codex Operator',
