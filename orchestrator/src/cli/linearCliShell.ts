@@ -407,6 +407,8 @@ export async function runLinearCliShell(
           'parity-lane',
           'parity-matrix',
           'parity-matrix-file',
+          'canonical-owner-key',
+          'canonical-owner-key-file',
           'blocked-by-source'
         ]);
         const result = await dependencies.createProviderLinearFollowUpIssue({
@@ -448,6 +450,12 @@ export async function runLinearCliShell(
             dependencies.readTextFile,
             'parity-matrix',
             'parity-matrix-file'
+          ),
+          canonicalOwnerKey: await resolveOptionalText(
+            params.flags,
+            dependencies.readTextFile,
+            'canonical-owner-key',
+            'canonical-owner-key-file'
           ),
           blockedBySource: readBooleanFlag(params.flags, 'blocked-by-source'),
           sourceSetup: readSourceSetup(params.flags),
@@ -1443,15 +1451,17 @@ function resolveFollowUpAuditFields(
     };
   }
   const details = result.error.details;
-  const createdIssue =
-    details && typeof details === 'object' && details.created_issue && typeof details.created_issue === 'object'
-      ? (details.created_issue as Record<string, unknown>)
-      : null;
+  const followUpIssue = readIssueLikeRecord(details?.follow_up_issue)
+    ?? readIssueLikeRecord(details?.created_issue);
   return {
-    follow_up_issue_id: readRecordString(createdIssue, 'id'),
-    follow_up_issue_identifier: readRecordString(createdIssue, 'identifier'),
+    follow_up_issue_id: readRecordString(followUpIssue, 'id'),
+    follow_up_issue_identifier: readRecordString(followUpIssue, 'identifier'),
     failed_relation_type: readUnknownString(details?.failed_relation_type)
   };
+}
+
+function readIssueLikeRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' ? (value as Record<string, unknown>) : null;
 }
 
 function readRecordString(record: Record<string, unknown> | null, key: string): string | null {

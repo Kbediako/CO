@@ -5,7 +5,7 @@ relates_to: docs/PRD-linear-9fc9fe23-bd44-4b72-9459-b5b809970bce.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-18
+last_review: 2026-04-19
 ---
 
 ## Canonical Reference
@@ -33,6 +33,7 @@ last_review: 2026-04-18
   - child lane remains docs-only
   - no runtime/test/Linear/workpad/PR mutations in this patch
   - parent owns implementation, validation, review, and integration
+  - 2026-04-19 reopened-attempt implementation narrowed the live `CO-219` regression to auxiliary PR `#522` titled `CO-226: stabilize Doctor full-suite timeout lane blocking CO-219 handoff`; the bounded repair is the review-promotion cross-issue blocker wording predicate, not a generic attachment cleanup path
 
 ## Issue-Shaping Contract
 - User-request translation carried forward: this is a review-handoff promotion lane, not a generic attachment or `Merging` lane. `CO-196` and `CO-219` show that provider-owned issues can still stay in `In Review` with `provider_issue_review_promotion_action_required` / `multiple_attached_prs` when same-repo attachments include closed superseded PRs or auxiliary attached PRs. The parent lane needs a bounded contract so one truthful current candidate can proceed without manual attachment cleanup while true ambiguity stays explicit.
@@ -68,6 +69,7 @@ last_review: 2026-04-18
   - that selection can still end in `multiple_attached_prs` for bounded non-primary attachment shapes
   - `providerIssueHandoff.ts` inherits that result during `review-handoff promotion` and persists `provider_issue_review_promotion_action_required`, leaving the issue in `In Review`
   - `CO-196` and `CO-219` provide concrete real-world checksums for that seam
+  - the `CO-219` / `#522` checksum uses `blocking CO-219 handoff` wording rather than the narrower exact `blocker` wording
 - Reference truth:
   - one truthful current review-handoff candidate should not be blocked by clearly non-primary same-repo attachments
   - true ambiguity should remain explicit and fail-closed
@@ -107,6 +109,7 @@ last_review: 2026-04-18
   - keep ownership at the shared attached-PR candidate-selection seam rather than inventing a review-only special case
   - require one bounded distinction between real current candidates and bounded non-primary same-repo attachments
   - reuse the same bounded truth wherever review-handoff promotion would otherwise persist generic `multiple_attached_prs`
+  - as implemented for the reopened `CO-219` regression, review-promotion cross-issue filtering treats `block`, `blocked`, `blocker`, and `blocking` wording as blocker evidence when the attachment's leading issue key is the issue that blocks the current lane; follow-up wording remains ignored cross-issue baggage
 - Expected implementation surfaces:
   - `orchestrator/src/cli/control/providerMergeCloseout.ts`
   - `orchestrator/src/cli/control/providerIssueHandoff.ts`
@@ -122,8 +125,8 @@ last_review: 2026-04-18
   - `git diff --check -- docs/PRD-linear-9fc9fe23-bd44-4b72-9459-b5b809970bce.md tasks/specs/linear-9fc9fe23-bd44-4b72-9459-b5b809970bce.md docs/TECH_SPEC-linear-9fc9fe23-bd44-4b72-9459-b5b809970bce.md docs/ACTION_PLAN-linear-9fc9fe23-bd44-4b72-9459-b5b809970bce.md tasks/tasks-linear-9fc9fe23-bd44-4b72-9459-b5b809970bce.md .agent/task/linear-9fc9fe23-bd44-4b72-9459-b5b809970bce.md tasks/index.json docs/TASKS.md docs/docs-freshness-registry.json`
   - `rg -n "provider_issue_review_promotion_action_required|multiple_attached_prs|In Review|review-handoff promotion|providerMergeCloseout.ts|providerIssueHandoff.ts|CO-196|CO-219|#515|closed #508|#523|#522|CO-104|CO-154|CO-226|manual attachment cleanup" docs/PRD-linear-9fc9fe23-bd44-4b72-9459-b5b809970bce.md docs/TECH_SPEC-linear-9fc9fe23-bd44-4b72-9459-b5b809970bce.md docs/ACTION_PLAN-linear-9fc9fe23-bd44-4b72-9459-b5b809970bce.md tasks/specs/linear-9fc9fe23-bd44-4b72-9459-b5b809970bce.md tasks/tasks-linear-9fc9fe23-bd44-4b72-9459-b5b809970bce.md .agent/task/linear-9fc9fe23-bd44-4b72-9459-b5b809970bce.md`
 - Parent-lane checks:
-  - focused `orchestrator/tests/ProviderMergeCloseout.test.ts`
-  - focused `orchestrator/tests/ProviderIssueHandoff.test.ts`
+  - focused `orchestrator/tests/ProviderMergeCloseout.test.ts` coverage for existing `CO-196` closed-prior-attempt selection and the reopened `CO-219` / `#522` `blocking CO-219 handoff` selection shape
+  - shared review-promotion helper coverage is sufficient for `providerIssueHandoff.ts` in this slice because the handoff surface already delegates to `runProviderReviewHandoffPromotion`; add handoff integration coverage only if the handoff call contract changes
   - focused `orchestrator/tests/ProviderIssueObservability.test.ts` only if proof output changes
   - parent-owned `node scripts/spec-guard.mjs --dry-run`
   - parent-owned docs-review before implementation

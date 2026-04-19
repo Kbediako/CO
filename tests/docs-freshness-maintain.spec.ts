@@ -181,6 +181,9 @@ describe('docs freshness maintenance decisions', () => {
     expect(decision.policy_capacity_status).toEqual(expect.objectContaining({ status: 'within_policy' }));
     expect(decision.candidate_cohorts).toEqual([
       expect.objectContaining({
+        canonical_owner_key: 'baseline_cohort_id:co-175-apr-14-march-14-tasks-1164-1195',
+        canonical_owner_marker:
+          'codex-orchestrator:canonical-owner-key=baseline_cohort_id:co-175-apr-14-march-14-tasks-1164-1195',
         stale_entries: 1,
         sample_paths: [historicalPath]
       })
@@ -237,8 +240,9 @@ describe('docs freshness maintenance decisions', () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-maintain-undeclared-'));
     createdDirs.push(repoRoot);
     const undeclaredPath = 'tasks/tasks-2001-historical.md';
+    const lastReview = reviewDateDaysAgo(31);
     await writeFixture(repoRoot, {
-      entries: [{ path: undeclaredPath, daysOld: 31 }]
+      entries: [{ path: undeclaredPath, lastReview }]
     });
 
     const { decision, shouldBlock } = await runMaintain(repoRoot);
@@ -249,10 +253,47 @@ describe('docs freshness maintenance decisions', () => {
     expect(decision.totals.owned_rolling_entries).toBe(0);
     expect(decision.candidate_cohorts).toEqual([
       expect.objectContaining({
+        canonical_owner_key:
+          `docs_freshness_candidate|doc_class:task_packet|path_family:tasks/tasks-*|last_review:${lastReview}|cadence_days:30`,
+        canonical_owner_marker:
+          `codex-orchestrator:canonical-owner-key=docs_freshness_candidate|doc_class:task_packet|path_family:tasks/tasks-*|last_review:${lastReview}|cadence_days:30`,
         declared_baseline_ids: [],
         sample_paths: [undeclaredPath]
       })
     ]);
+  });
+
+  it('bounds oversized machine-derived canonical owner keys before follow-up creation consumes them', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-maintain-long-key-'));
+    createdDirs.push(repoRoot);
+    const oversizedBaselineCohortId = `co-oversized-${'x'.repeat(700)}`;
+    const historicalPath = 'tasks/tasks-2001-historical.md';
+    await writeFixture(repoRoot, {
+      entries: [{ path: historicalPath, daysOld: 31 }],
+      policy: rollingFreshnessPolicy({
+        baseline_cohorts: [
+          {
+            id: oversizedBaselineCohortId,
+            last_review: reviewDateDaysAgo(31),
+            cadence_days: 30,
+            path_families: ['tasks/tasks-*'],
+            task_number_range: { start: '2001', end: '2001' }
+          }
+        ]
+      })
+    });
+
+    const { decision, shouldBlock } = await runMaintain(repoRoot);
+
+    expect(shouldBlock).toBe(false);
+    expect(decision.candidate_cohorts).toHaveLength(1);
+    const cohort = decision.candidate_cohorts[0];
+    expect(cohort.id).toBe(oversizedBaselineCohortId);
+    expect(cohort.canonical_owner_key).toMatch(/^baseline_cohort_id_sha256:[a-f0-9]{64}$/u);
+    expect(cohort.canonical_owner_key.length).toBeLessThanOrEqual(512);
+    expect(cohort.canonical_owner_marker).toBe(
+      `codex-orchestrator:canonical-owner-key=${cohort.canonical_owner_key}`
+    );
   });
 
   it('blocks owned historical debt when the current diff touches the stale task packet', async () => {
