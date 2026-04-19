@@ -6455,9 +6455,6 @@ function resolveLocalRolloutExecutionAttemptsForCycle(
   );
   const preservedAttemptKeys = new Set(
     current
-      .filter(
-        (attempt) => attempt.record_kind === 'terminal' && attempt.terminal_state === 'failed'
-      )
       .map((attempt) => localRolloutExecutionAttemptReasonKey(attempt))
   );
   for (const attempt of previous) {
@@ -6477,8 +6474,8 @@ function shouldPreservePreviousLocalRolloutExecutionAttempt(
   attempt: ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord,
   currentTerminalKeys: ReadonlySet<string>
 ): boolean {
-  if (attempt.record_kind !== 'terminal') {
-    return false;
+  if (attempt.record_kind === 'started') {
+    return !currentTerminalKeys.has(localRolloutExecutionAttemptKey(attempt));
   }
   return (
     attempt.reason === 'lifecycle_record_failed' ||

@@ -1,3 +1,7 @@
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, expect, it, vi } from 'vitest';
 
 import type { LiveLinearTrackedIssue } from '../src/cli/control/linearDispatchSource.js';
@@ -9,6 +13,7 @@ import {
 import type { ProviderOperatorAutopilotLifecycleRecord } from '../src/cli/control/providerOperatorAutopilotLifecycle.js';
 import {
   executeProviderOperatorAutopilotLocalRolloutActions,
+  readProviderOperatorAutopilotLocalRolloutExecutionRecords,
   shouldUseShellForLocalRolloutCommand,
   type ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord
 } from '../src/cli/control/providerOperatorAutopilotLocalRolloutExecution.js';
@@ -1330,6 +1335,118 @@ describe('providerOperatorAutopilot', () => {
     ]);
   });
 
+  it('records git cleanliness probe failures as command_failed preflight failures', async () => {
+    const runCommand = vi.fn(async (request: { command: string; args: string[] }) => {
+      if (request.command === 'git' && request.args.includes('status')) {
+        return {
+          ok: false,
+          exitCode: 128,
+          stdout: ' M package.json\n',
+          stderr: 'fatal: not a git repository\n'
+        };
+      }
+      throw new Error('rollout command should not run after git status probe failure');
+    });
+
+    const result = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [],
+        claims: [
+          createClaim({
+            issue_id: 'lin-issue-1',
+            issue_identifier: 'CO-118',
+            merge_closeout: createMergeCloseout({
+              status: 'merged',
+              reason: 'merged_and_transitioned_done'
+            })
+          })
+        ],
+        config: buildConfigWithLocalRolloutExecution({ require_clean_repo: true }),
+        previous_result: null,
+        repo_root: process.cwd()
+      },
+      {
+        run_local_rollout_command: runCommand,
+        append_local_rollout_execution_attempt: appendExecutionAttemptNoop
+      }
+    );
+
+    expect(result.pending_actions).toHaveLength(1);
+    expect(result.local_rollout_execution_attempts).toMatchObject([
+      {
+        record_kind: 'terminal',
+        action_id: 'local-rebuild',
+        terminal_state: 'failed',
+        reason: 'command_failed',
+        preflight: {
+          status: 'failed',
+          reason: 'command_failed',
+          summary: 'fatal: not a git repository'
+        }
+      }
+    ]);
+  });
+
+  it('records git branch probe failures as command_failed preflight failures', async () => {
+    const pendingAction = {
+      kind: 'local_rollout' as const,
+      action_instance_id: 'local_rollout:branch-probe-failed',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-118',
+      summary: 'pending rollout',
+      merge_closeout_recorded_at: '2026-04-09T09:15:00.000Z',
+      merge_closeout_reason: 'merged_and_transitioned_done',
+      shared_root_status: 'reconciled',
+      linear_transition_status: 'transitioned',
+      executable_action_ids: ['local-rebuild'],
+      lifecycle_state: 'pending' as const,
+      lifecycle_actor: null,
+      lifecycle_reason: null,
+      lifecycle_recorded_at: null
+    };
+    const runCommand = vi.fn(async (request: { command: string; args: string[] }) => {
+      if (request.command === 'git' && request.args.includes('branch')) {
+        return {
+          ok: false,
+          exitCode: 128,
+          stdout: 'feature/stale\n',
+          stderr: 'fatal: not a git repository\n'
+        };
+      }
+      throw new Error('rollout command should not run after git branch probe failure');
+    });
+
+    const outcome = await executeProviderOperatorAutopilotLocalRolloutActions(
+      {
+        pendingActions: [pendingAction],
+        config: buildConfigWithLocalRolloutExecution({
+          required_branch: 'main'
+        }).post_merge_rollout.execution,
+        repoRoot: process.cwd(),
+        priorAttempts: []
+      },
+      {
+        runCommand,
+        fileExists: async () => true,
+        appendExecutionAttempt: appendExecutionAttemptNoop
+      }
+    );
+
+    expect(outcome.attempts).toMatchObject([
+      {
+        record_kind: 'terminal',
+        action_id: 'local-rebuild',
+        terminal_state: 'failed',
+        reason: 'command_failed',
+        preflight: {
+          status: 'failed',
+          reason: 'command_failed',
+          summary: 'fatal: not a git repository'
+        }
+      }
+    ]);
+  });
+
   it('retries skipped local rollout preflight attempts after unsafe conditions clear', async () => {
     const pendingAction = {
       kind: 'local_rollout' as const,
@@ -2193,6 +2310,57 @@ describe('providerOperatorAutopilot', () => {
         reason: 'execution_interrupted'
       }
     ]);
+  });
+
+  it('preserves raw stdout and stderr when reading local rollout execution records', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'local-rollout-output-'));
+    try {
+      const executionPath = join(
+        dir,
+        'provider-operator-autopilot-local-rollout-executions.json'
+      );
+      const record: ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord = {
+        record_kind: 'terminal',
+        action_instance_id: 'local_rollout:raw-output',
+        action_id: 'local-rebuild',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-118',
+        preflight: {
+          status: 'passed',
+          reason: null,
+          checked_at: '2026-04-09T10:00:00.000Z',
+          summary: 'Local rollout action preflight passed.'
+        },
+        started_at: '2026-04-09T10:00:01.000Z',
+        ended_at: '2026-04-09T10:00:02.000Z',
+        terminal_state: 'failed',
+        reason: 'command_failed',
+        summary: 'Local rollout action local-rebuild failed.',
+        command: {
+          runner: 'npm_script',
+          command: 'npm',
+          args: ['run', 'rollout:local'],
+          cwd: process.cwd(),
+          timeout_ms: 15000
+        },
+        exit_code: 1,
+        stdout: '',
+        stderr: '  spaced stderr\n'
+      };
+      await writeFile(
+        executionPath,
+        JSON.stringify({ version: 1, records: [record] }, null, 2),
+        'utf8'
+      );
+
+      const records =
+        await readProviderOperatorAutopilotLocalRolloutExecutionRecords(executionPath);
+
+      expect(records[0]?.stdout).toBe('');
+      expect(records[0]?.stderr).toBe('  spaced stderr\n');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   it('refuses undeclared local rollout action ids without running a command', async () => {

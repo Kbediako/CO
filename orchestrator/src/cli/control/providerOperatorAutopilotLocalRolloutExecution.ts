@@ -730,7 +730,14 @@ async function preflightLocalRolloutAction(input: {
       cwd: input.repoRoot,
       timeoutMs: DEFAULT_LOCAL_ROLLOUT_EXECUTION_TIMEOUT_MS
     });
-    if (!statusResult.ok || normalizeCommandText(statusResult.stdout)) {
+    if (!statusResult.ok) {
+      return preflightSkip(
+        'command_failed',
+        normalizeCommandText(statusResult.stderr) ||
+          `Local rollout action ${action.id} could not verify repository cleanliness.`
+      );
+    }
+    if (normalizeCommandText(statusResult.stdout)) {
       return preflightSkip(
         'dirty_repo',
         `Local rollout action ${action.id} requires a clean repository.`
@@ -744,8 +751,15 @@ async function preflightLocalRolloutAction(input: {
       cwd: input.repoRoot,
       timeoutMs: DEFAULT_LOCAL_ROLLOUT_EXECUTION_TIMEOUT_MS
     });
+    if (!branchResult.ok) {
+      return preflightSkip(
+        'command_failed',
+        normalizeCommandText(branchResult.stderr) ||
+          `Local rollout action ${action.id} could not verify the current branch.`
+      );
+    }
     const currentBranch = normalizeCommandText(branchResult.stdout);
-    if (!branchResult.ok || currentBranch !== action.required_branch) {
+    if (currentBranch !== action.required_branch) {
       return preflightSkip(
         'wrong_branch',
         `Local rollout action ${action.id} requires branch ${action.required_branch}; current branch is ${currentBranch || 'detached'}.`
@@ -1184,8 +1198,8 @@ function parseExecutionAttemptRecord(
       timeout_ms: readInteger(command, 'timeout_ms')
     },
     exit_code: readInteger(record, 'exit_code'),
-    stdout: readOptionalString(record, 'stdout'),
-    stderr: readOptionalString(record, 'stderr')
+    stdout: readRawOptionalString(record, 'stdout'),
+    stderr: readRawOptionalString(record, 'stderr')
   };
 }
 
@@ -1263,6 +1277,19 @@ function readOptionalString(record: Record<string, unknown> | null | undefined, 
     const value = record?.[key];
     if (typeof value === 'string' && value.trim()) {
       return value.trim();
+    }
+  }
+  return null;
+}
+
+function readRawOptionalString(
+  record: Record<string, unknown> | null | undefined,
+  ...keys: string[]
+): string | null {
+  for (const key of keys) {
+    const value = record?.[key];
+    if (typeof value === 'string') {
+      return value;
     }
   }
   return null;

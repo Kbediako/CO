@@ -19844,7 +19844,7 @@ describe('createProviderIssueHandoffService', () => {
     );
   });
 
-  it('preserves prior terminal local rollout attempts when execution sidecar is missing', async () => {
+  it('preserves prior terminal and started local rollout attempts when execution sidecar is missing', async () => {
     const { paths } = await createHostPaths();
     const trackedIssue = createTrackedIssue();
     const state = createProviderIntakeState();
@@ -19900,6 +19900,26 @@ describe('createProviderIssueHandoffService', () => {
       stdout: '',
       stderr: 'boom'
     };
+    const startedAttempt = {
+      ...succeededAttempt,
+      record_kind: 'started' as const,
+      action_id: 'local-rehydrate',
+      started_at: '2026-04-09T10:00:04.000Z',
+      ended_at: '2026-04-09T10:00:04.000Z',
+      terminal_state: 'failed' as const,
+      reason: 'execution_interrupted' as const,
+      summary: 'Local rollout action local-rehydrate started; terminal result has not been recorded.',
+      command: {
+        runner: 'npm_script' as const,
+        command: 'npm',
+        args: ['run', 'rollout:rehydrate'],
+        cwd: paths.repoRoot,
+        timeout_ms: 15000
+      },
+      exit_code: null,
+      stdout: null,
+      stderr: null
+    };
     const previousResult = {
       recorded_at: '2026-04-09T10:00:03.000Z',
       status: 'acted' as const,
@@ -19910,7 +19930,7 @@ describe('createProviderIssueHandoffService', () => {
       pending_actions: [],
       resolved_actions: [],
       lifecycle_records: [],
-      local_rollout_execution_attempts: [succeededAttempt, failedAttempt]
+      local_rollout_execution_attempts: [succeededAttempt, failedAttempt, startedAttempt]
     };
     const providerWorkflowState = () => ({
       status: 'ready' as const,
@@ -19964,6 +19984,16 @@ describe('createProviderIssueHandoffService', () => {
                 timeout_ms: 15000,
                 require_clean_repo: false,
                 deploy_class: false
+              },
+              {
+                id: 'local-rehydrate',
+                enabled: true,
+                order: 30,
+                runner: 'npm_script',
+                script: 'rollout:rehydrate',
+                timeout_ms: 15000,
+                require_clean_repo: false,
+                deploy_class: false
               }
             ]
           }
@@ -19995,6 +20025,12 @@ describe('createProviderIssueHandoffService', () => {
           action_id: 'local-restart',
           terminal_state: 'failed',
           reason: 'command_failed'
+        },
+        {
+          record_kind: 'started',
+          action_id: 'local-rehydrate',
+          terminal_state: 'failed',
+          reason: 'execution_interrupted'
         }
       ]);
       return {
@@ -20040,6 +20076,12 @@ describe('createProviderIssueHandoffService', () => {
             action_id: 'local-restart',
             terminal_state: 'failed',
             reason: 'command_failed'
+          }),
+          expect.objectContaining({
+            record_kind: 'started',
+            action_id: 'local-rehydrate',
+            terminal_state: 'failed',
+            reason: 'execution_interrupted'
           })
         ])
       })
