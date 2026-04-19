@@ -29,6 +29,34 @@
       }
     },
     {
+      "id": "20260420-linear-7988e9a6-8258-4cff-b585-fadc31741ce1",
+      "title": "Merge closeout: ignore closed prior-attempt PR attachments",
+      "relates_to": "tasks/tasks-linear-7988e9a6-8258-4cff-b585-fadc31741ce1.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-20",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-20",
+          "status": "accepted",
+          "manifest": ".runs/linear-7988e9a6-8258-4cff-b585-fadc31741ce1-docs-packet-r2/cli/2026-04-19T20-14-50-934Z-8d384eca/manifest.json",
+          "source_anchor": "ctx:sha256:66e32cdd7a1c41a0c9b4a4929c72b4ad9bfddfd4107c5f4520b27cb2192a2678#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-265 as a narrow merge_closeout closed-unmerged PR attachment disambiguation fix: align merge closeout with review_promotion stale closed-unmerged prior-attempt filtering, keep current ready PR selection deterministic, record ignored_closed_unmerged_pr_urls, retain conflicting_attached_pr_urls and multiple_attached_prs for real current PR ambiguity, and avoid deleting Linear attachments or weakening merge readiness gates. The r2 source payload available to this lane carries run metadata plus issue id, identifier, and updated_at only, so the packet preserves the same-issue CO-265 issue wording from parent evidence plus current providerMergeCloseout.ts seams; no Linear mutation was performed."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-7988e9a6-8258-4cff-b585-fadc31741ce1.md",
+        "task": "tasks/tasks-linear-7988e9a6-8258-4cff-b585-fadc31741ce1.md",
+        "agent_task": ".agent/task/linear-7988e9a6-8258-4cff-b585-fadc31741ce1.md",
+        "docs": {
+          "TECH_SPEC": "docs/TECH_SPEC-linear-7988e9a6-8258-4cff-b585-fadc31741ce1.md"
+        }
+      }
+    },
+    {
       "id": "20260420-linear-12bea7bd-4716-4c9a-a49c-74d29151bedf",
       "title": "CO-262 ready-review CodeRabbit rereview latch",
       "relates_to": "tasks/tasks-linear-12bea7bd-4716-4c9a-a49c-74d29151bedf.md",

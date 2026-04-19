@@ -158,6 +158,7 @@ interface ProviderIssuePullRequestLifecycleLike {
   summary?: string | null;
   attached_pr_urls?: string[] | null;
   ignored_historical_pr_urls?: string[] | null;
+  ignored_closed_unmerged_pr_urls?: string[] | null;
   conflicting_attached_pr_urls?: string[] | null;
   pr?: {
     url?: string | null;
@@ -337,6 +338,7 @@ export interface ControlProviderDebugSnapshot {
     review_promotion_status: string | null;
     attached_pr_urls: string[];
     ignored_historical_pr_urls: string[];
+    ignored_closed_unmerged_pr_urls: string[];
     conflicting_attached_pr_urls: string[];
     url: string | null;
     owner: string | null;
@@ -1791,6 +1793,7 @@ function buildProviderDebugPullRequestSnapshot(input: {
     review_promotion_status: normalizeOptionalString(input.reviewPromotion?.status),
     attached_pr_urls: normalizeStringArray(selectedRecord.attached_pr_urls),
     ignored_historical_pr_urls: normalizeStringArray(selectedRecord.ignored_historical_pr_urls),
+    ignored_closed_unmerged_pr_urls: normalizeStringArray(selectedRecord.ignored_closed_unmerged_pr_urls),
     conflicting_attached_pr_urls: normalizeStringArray(selectedRecord.conflicting_attached_pr_urls),
     url: normalizeOptionalString(selectedRecord.pr?.url),
     owner: normalizeOptionalString(selectedRecord.pr?.owner),

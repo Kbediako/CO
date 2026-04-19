@@ -1715,6 +1715,384 @@ describe('runProviderDeterministicMergeCloseout', () => {
     );
   });
 
+  it('selects the current merge-closeout PR after ignoring a later-closed unmerged prior attempt', async () => {
+    const runCommand = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        exitCode: 0,
+        stdout: 'git@github.com:asabeko/CO.git\n',
+        stderr: ''
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        exitCode: 0,
+        stdout: 'merged',
+        stderr: ''
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        exitCode: 0,
+        stdout: '## main...origin/main\n',
+        stderr: ''
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        exitCode: 0,
+        stdout: '',
+        stderr: ''
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        exitCode: 0,
+        stdout: 'Already up to date.\n',
+        stderr: ''
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        exitCode: 0,
+        stdout: '## main...origin/main\n',
+        stderr: ''
+      });
+    let currentSnapshotReads = 0;
+    const fetchSnapshot = vi.fn(async ({ prNumber }: { prNumber: number }) => {
+      if (prNumber === 516) {
+        return {
+          state: 'CLOSED',
+          reviewDecision: 'APPROVED',
+          mergeStateStatus: 'UNKNOWN',
+          readyToMerge: false,
+          gateReasons: ['state=CLOSED'],
+          unresolvedThreadCount: 0,
+          updatedAt: '2026-04-19T18:10:00.000Z',
+          mergedAt: null,
+          headOid: 'closed516',
+          checks: { pending: [], failed: [] },
+          requiredChecks: { pending: [], failed: [] }
+        };
+      }
+      if (prNumber === 560) {
+        currentSnapshotReads += 1;
+        return currentSnapshotReads === 1
+          ? {
+              state: 'OPEN',
+              reviewDecision: 'APPROVED',
+              mergeStateStatus: 'CLEAN',
+              readyToMerge: true,
+              gateReasons: [],
+              unresolvedThreadCount: 0,
+              updatedAt: '2026-04-19T18:00:00.000Z',
+              mergedAt: null,
+              headOid: 'head560',
+              checks: { pending: [], failed: [] },
+              requiredChecks: { pending: [], failed: [] }
+            }
+          : {
+              state: 'MERGED',
+              reviewDecision: 'APPROVED',
+              mergeStateStatus: 'UNKNOWN',
+              readyToMerge: false,
+              gateReasons: ['state=MERGED'],
+              unresolvedThreadCount: 0,
+              updatedAt: '2026-04-19T19:00:00.000Z',
+              mergedAt: '2026-04-19T19:00:00.000Z',
+              headOid: 'head560',
+              checks: { pending: [], failed: [] },
+              requiredChecks: { pending: [], failed: [] }
+            };
+      }
+      throw new Error(`Unexpected PR ${String(prNumber)}`);
+    });
+
+    const result = await runProviderDeterministicMergeCloseout(
+      {
+        issueId: 'lin-issue-1',
+        issueIdentifier: 'CO-220',
+        issueState: 'Merging',
+        issueStateType: 'started',
+        issueUpdatedAt: '2026-04-19T18:30:00.000Z',
+        repoRoot: '/tmp/co'
+      },
+      {
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-04-19T18:30:00.000Z')
+          .mockReturnValueOnce('2026-04-19T19:00:00.000Z')
+          .mockReturnValueOnce('2026-04-19T19:00:01.000Z'),
+        readIssueContext: vi.fn(async () => ({
+          ok: true,
+          operation: 'issue-context',
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-220',
+            title: 'Merge closeout prior attempts',
+            description: null,
+            url: null,
+            updated_at: '2026-04-19T18:30:00.000Z',
+            workspace_id: null,
+            state: { id: 'state-merging', name: 'Merging', type: 'started' },
+            team: null,
+            project: null,
+            comments: [],
+            attachments: [
+              { id: 'att-516', title: 'CO-220: stale closed prior attempt', url: 'https://github.com/asabeko/CO/pull/516' },
+              { id: 'att-560', title: 'CO-220: current ready PR', url: 'https://github.com/asabeko/CO/pull/560' }
+            ],
+            workpad_comment: null
+          },
+          source_setup: null
+        })),
+        fetchSnapshot,
+        resolveSnapshotActionRequiredReasons: vi.fn(() => []),
+        runCommand,
+        transitionIssueState: vi.fn(async () => ({
+          ok: true,
+          operation: 'transition',
+          action: 'updated',
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-220',
+            state: { id: 'state-done', name: 'Done', type: 'completed' },
+            updated_at: '2026-04-19T19:00:01.000Z'
+          },
+          previous_state: { id: 'state-merging', name: 'Merging', type: 'started' },
+          target_state: { id: 'state-done', name: 'Done', type: 'completed' },
+          source_setup: null
+        }))
+      }
+    );
+
+    expect(result).toMatchObject({
+      status: 'merged',
+      reason: 'merged_and_transitioned_done',
+      attached_pr_urls: [
+        'https://github.com/asabeko/CO/pull/516',
+        'https://github.com/asabeko/CO/pull/560'
+      ],
+      ignored_historical_pr_urls: [],
+      ignored_closed_unmerged_pr_urls: ['https://github.com/asabeko/CO/pull/516'],
+      conflicting_attached_pr_urls: [],
+      pr: {
+        owner: 'asabeko',
+        repo: 'CO',
+        number: 560
+      }
+    });
+    expect(result.summary).toContain('Ignored closed prior-attempt PR URLs');
+    expect(fetchSnapshot).toHaveBeenCalledTimes(3);
+    expect(runCommand).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: 'gh',
+        args: expect.arrayContaining(['pr', 'merge', '560', '--repo', 'asabeko/CO', '--match-head-commit', 'head560'])
+      })
+    );
+  });
+
+  it('keeps merge closeout ambiguous after ignoring a closed-unmerged prior attempt when multiple current PRs remain', async () => {
+    const runCommand = vi.fn(async () => ({
+      ok: true,
+      exitCode: 0,
+      stdout: 'git@github.com:asabeko/CO.git\n',
+      stderr: ''
+    }));
+    const fetchSnapshot = vi.fn(async ({ prNumber }: { prNumber: number }) => {
+      if (prNumber === 516) {
+        return {
+          state: 'CLOSED',
+          reviewDecision: 'APPROVED',
+          mergeStateStatus: 'UNKNOWN',
+          readyToMerge: false,
+          gateReasons: ['state=CLOSED'],
+          unresolvedThreadCount: 0,
+          updatedAt: '2026-04-18T20:00:00.000Z',
+          mergedAt: null,
+          headOid: 'closed516',
+          checks: { pending: [], failed: [] },
+          requiredChecks: { pending: [], failed: [] }
+        };
+      }
+      if (prNumber === 560 || prNumber === 561) {
+        return {
+          state: 'OPEN',
+          reviewDecision: 'APPROVED',
+          mergeStateStatus: 'CLEAN',
+          readyToMerge: true,
+          gateReasons: [],
+          unresolvedThreadCount: 0,
+          updatedAt: prNumber === 560 ? '2026-04-19T18:00:00.000Z' : '2026-04-19T18:10:00.000Z',
+          mergedAt: null,
+          headOid: prNumber === 560 ? 'head560' : 'head561',
+          checks: { pending: [], failed: [] },
+          requiredChecks: { pending: [], failed: [] }
+        };
+      }
+      throw new Error(`Unexpected PR ${String(prNumber)}`);
+    });
+
+    const result = await runProviderDeterministicMergeCloseout(
+      {
+        issueId: 'lin-issue-1',
+        issueIdentifier: 'CO-220',
+        issueState: 'Merging',
+        issueStateType: 'started',
+        issueUpdatedAt: '2026-04-19T18:30:00.000Z',
+        repoRoot: '/tmp/co'
+      },
+      {
+        now: () => '2026-04-19T18:30:00.000Z',
+        readIssueContext: vi.fn(async () => ({
+          ok: true,
+          operation: 'issue-context',
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-220',
+            title: 'Merge closeout prior attempts',
+            description: null,
+            url: null,
+            updated_at: '2026-04-19T18:30:00.000Z',
+            workspace_id: null,
+            state: { id: 'state-merging', name: 'Merging', type: 'started' },
+            team: null,
+            project: null,
+            comments: [],
+            attachments: [
+              { id: 'att-516', title: 'CO-220: stale closed prior attempt', url: 'https://github.com/asabeko/CO/pull/516' },
+              { id: 'att-560', title: 'CO-220: current ready PR A', url: 'https://github.com/asabeko/CO/pull/560' },
+              { id: 'att-561', title: 'CO-220: current ready PR B', url: 'https://github.com/asabeko/CO/pull/561' }
+            ],
+            workpad_comment: null
+          },
+          source_setup: null
+        })),
+        fetchSnapshot,
+        resolveSnapshotActionRequiredReasons: vi.fn(() => []),
+        runCommand
+      }
+    );
+
+    expect(result).toMatchObject({
+      status: 'action_required',
+      reason: 'multiple_attached_prs',
+      ignored_historical_pr_urls: [],
+      ignored_closed_unmerged_pr_urls: ['https://github.com/asabeko/CO/pull/516'],
+      conflicting_attached_pr_urls: [
+        'https://github.com/asabeko/CO/pull/560',
+        'https://github.com/asabeko/CO/pull/561'
+      ],
+      pr: null,
+      snapshot: null
+    });
+    expect(result.summary).toContain('Ignored closed prior-attempt PR URLs');
+    expect(fetchSnapshot).toHaveBeenCalledTimes(3);
+    expect(runCommand).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps merge readiness blockers after selecting a current PR over an older closed-unmerged prior attempt', async () => {
+    const runCommand = vi.fn(async () => ({
+      ok: true,
+      exitCode: 0,
+      stdout: 'git@github.com:asabeko/CO.git\n',
+      stderr: ''
+    }));
+    const fetchSnapshot = vi.fn(async ({ prNumber }: { prNumber: number }) => {
+      if (prNumber === 516) {
+        return {
+          state: 'CLOSED',
+          reviewDecision: 'APPROVED',
+          mergeStateStatus: 'UNKNOWN',
+          readyToMerge: false,
+          gateReasons: ['state=CLOSED'],
+          unresolvedThreadCount: 0,
+          updatedAt: '2026-04-18T20:00:00.000Z',
+          mergedAt: null,
+          headOid: 'closed516',
+          checks: { pending: [], failed: [] },
+          requiredChecks: { pending: [], failed: [] }
+        };
+      }
+      if (prNumber === 560) {
+        return {
+          state: 'OPEN',
+          reviewDecision: 'CHANGES_REQUESTED',
+          mergeStateStatus: 'BLOCKED',
+          readyToMerge: false,
+          gateReasons: ['review_decision=CHANGES_REQUESTED'],
+          unresolvedThreadCount: 1,
+          updatedAt: '2026-04-19T18:00:00.000Z',
+          mergedAt: null,
+          headOid: 'head560',
+          checks: { pending: [], failed: [] },
+          requiredChecks: { pending: [], failed: [] }
+        };
+      }
+      throw new Error(`Unexpected PR ${String(prNumber)}`);
+    });
+    const transitionIssueState = vi.fn();
+
+    const result = await runProviderDeterministicMergeCloseout(
+      {
+        issueId: 'lin-issue-1',
+        issueIdentifier: 'CO-220',
+        issueState: 'Merging',
+        issueStateType: 'started',
+        issueUpdatedAt: '2026-04-19T18:30:00.000Z',
+        repoRoot: '/tmp/co'
+      },
+      {
+        now: () => '2026-04-19T18:30:00.000Z',
+        readIssueContext: vi.fn(async () => ({
+          ok: true,
+          operation: 'issue-context',
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-220',
+            title: 'Merge closeout prior attempts',
+            description: null,
+            url: null,
+            updated_at: '2026-04-19T18:30:00.000Z',
+            workspace_id: null,
+            state: { id: 'state-merging', name: 'Merging', type: 'started' },
+            team: null,
+            project: null,
+            comments: [],
+            attachments: [
+              { id: 'att-516', title: 'CO-220: stale closed prior attempt', url: 'https://github.com/asabeko/CO/pull/516' },
+              { id: 'att-560', title: 'CO-220: current blocked PR', url: 'https://github.com/asabeko/CO/pull/560' }
+            ],
+            workpad_comment: null
+          },
+          source_setup: null
+        })),
+        fetchSnapshot,
+        resolveSnapshotActionRequiredReasons: vi.fn((snapshot) =>
+          (snapshot as { headOid?: string }).headOid === 'head560'
+            ? ['review_decision=CHANGES_REQUESTED']
+            : []
+        ),
+        runCommand,
+        transitionIssueState
+      }
+    );
+
+    expect(result).toMatchObject({
+      status: 'action_required',
+      reason: 'review_decision=CHANGES_REQUESTED',
+      ignored_closed_unmerged_pr_urls: ['https://github.com/asabeko/CO/pull/516'],
+      conflicting_attached_pr_urls: [],
+      pr: {
+        number: 560
+      },
+      snapshot: {
+        state: 'OPEN',
+        action_required_reasons: ['review_decision=CHANGES_REQUESTED']
+      }
+    });
+    expect(result.summary).toContain('Merge closeout is blocked by: review_decision=CHANGES_REQUESTED');
+    expect(result.summary).toContain('Ignored closed prior-attempt PR URLs');
+    expect(runCommand).toHaveBeenCalledTimes(1);
+    expect(transitionIssueState).not.toHaveBeenCalled();
+  });
+
   it('recovers the newest merged replacement PR when older merged historical and older unmerged stale same-repo attachments remain', async () => {
     const runCommand = vi
       .fn()
