@@ -158,6 +158,7 @@ export interface ProviderMergeCloseoutRecord {
   summary: string;
   attached_pr_urls: string[];
   ignored_historical_pr_urls: string[];
+  ignored_closed_unmerged_pr_urls?: string[];
   conflicting_attached_pr_urls: string[];
   pr: ProviderMergeCloseoutPullRequestRecord | null;
   snapshot: ProviderMergeCloseoutSnapshotRecord | null;
@@ -254,6 +255,7 @@ export async function runProviderDeterministicMergeCloseout(
     issue_updated_at: normalizeOptionalString(input.issueUpdatedAt),
     attached_pr_urls: [] as string[],
     ignored_historical_pr_urls: [] as string[],
+    ignored_closed_unmerged_pr_urls: [] as string[],
     conflicting_attached_pr_urls: [] as string[],
     pr: null as ProviderMergeCloseoutPullRequestRecord | null,
     snapshot: null as ProviderMergeCloseoutSnapshotRecord | null,
@@ -396,6 +398,7 @@ export async function runProviderDeterministicMergeCloseout(
   }
 
   let ignoredHistoricalPrUrls: string[] = [];
+  let ignoredClosedUnmergedPrUrls: string[] = [];
   let conflictingAttachedPrUrls: string[] = [];
   let selectionNote: string | null = null;
   let pr = sameRepoPrs[0]!.pr;
@@ -406,6 +409,7 @@ export async function runProviderDeterministicMergeCloseout(
     try {
       resolution = await resolveAttachedSameRepoPullRequestCandidate({
         candidates: sameRepoPrs,
+        mode: 'merge_closeout',
         resolveSnapshot,
         resolveSnapshotActionRequiredReasons
       });
@@ -429,18 +433,21 @@ export async function runProviderDeterministicMergeCloseout(
     }
 
     ignoredHistoricalPrUrls = resolution.ignored_historical_pr_urls;
+    ignoredClosedUnmergedPrUrls = resolution.ignored_closed_unmerged_pr_urls;
     conflictingAttachedPrUrls = resolution.conflicting_attached_pr_urls;
     selectionNote = resolution.selection_note;
     if (!resolution.selected_pr) {
       return {
         ...baseWithContext,
         ignored_historical_pr_urls: [...ignoredHistoricalPrUrls],
+        ignored_closed_unmerged_pr_urls: [...ignoredClosedUnmergedPrUrls],
         conflicting_attached_pr_urls: [...conflictingAttachedPrUrls],
         status: 'action_required',
         reason: 'multiple_attached_prs',
         summary: buildMultipleAttachedPrsSummary({
           repoKey,
           ignoredHistoricalPrUrls,
+          ignoredClosedUnmergedPrUrls,
           conflictingAttachedPrUrls
         })
       };
@@ -453,6 +460,7 @@ export async function runProviderDeterministicMergeCloseout(
   const baseWithResolution = {
     ...baseWithContext,
     ignored_historical_pr_urls: [...ignoredHistoricalPrUrls],
+    ignored_closed_unmerged_pr_urls: [...ignoredClosedUnmergedPrUrls],
     conflicting_attached_pr_urls: [...conflictingAttachedPrUrls]
   };
   const summarizeSelection = (summary: string): string =>
@@ -1643,8 +1651,9 @@ async function resolveAttachedSameRepoPullRequestCandidate(input: {
     options?: { readinessMode?: 'merge' | 'review' }
   ) => string[];
 }): Promise<ProviderMergeCloseoutAttachedPrResolution> {
+  const mode = input.mode ?? 'merge_closeout';
   const ignoredCrossIssueCandidates =
-    input.mode === 'review_promotion'
+    mode === 'review_promotion'
       ? input.candidates.filter((candidate) =>
           isReviewPromotionCrossIssueCandidate({
             attachmentTitle: candidate.attachment_title,
@@ -1688,24 +1697,18 @@ async function resolveAttachedSameRepoPullRequestCandidate(input: {
     });
   }
 
-  const openUnmergedCandidates =
-    input.mode === 'review_promotion'
-      ? inspectedCandidates.filter(
-          (candidate) =>
-            !isMergedPullRequestSnapshot(candidate.snapshot) && candidate.snapshot.state !== 'CLOSED'
-        )
-      : [];
+  const openUnmergedCandidates = inspectedCandidates.filter(
+    (candidate) =>
+      !isMergedPullRequestSnapshot(candidate.snapshot) && candidate.snapshot.state !== 'CLOSED'
+  );
 
-  const ignoredClosedUnmergedCandidates =
-    input.mode === 'review_promotion'
-      ? inspectedCandidates.filter(
-          (candidate) =>
-            isClosedUnmergedPullRequestSnapshot(candidate.snapshot) &&
-            openUnmergedCandidates.some((openCandidate) =>
-              isSnapshotStrictlyOlderThanSelection(candidate.snapshot, openCandidate.snapshot)
-            )
-        )
-      : [];
+  const ignoredClosedUnmergedCandidates = inspectedCandidates.filter(
+    (candidate) =>
+      isClosedUnmergedPullRequestSnapshot(candidate.snapshot) &&
+      openUnmergedCandidates.some((openCandidate) =>
+        isSnapshotStrictlyOlderThanSelection(candidate.snapshot, openCandidate.snapshot)
+      )
+  );
   const ignoredClosedUnmergedPrUrls = ignoredClosedUnmergedCandidates.map(
     (candidate) => candidate.pr.url
   );
@@ -1723,7 +1726,7 @@ async function resolveAttachedSameRepoPullRequestCandidate(input: {
       ignored_closed_unmerged_pr_urls: ignoredClosedUnmergedPrUrls,
       ignored_cross_issue_pr_urls: ignoredCrossIssuePrUrls,
       conflicting_attached_pr_urls: [],
-      selection_note: buildReviewPromotionIgnoredSelectionNote({
+      selection_note: buildIgnoredAttachedPrSelectionNote({
         ignoredClosedUnmergedPrUrls,
         ignoredCrossIssuePrUrls
       })
@@ -1751,7 +1754,7 @@ async function resolveAttachedSameRepoPullRequestCandidate(input: {
         ignored_closed_unmerged_pr_urls: ignoredClosedUnmergedPrUrls,
         ignored_cross_issue_pr_urls: ignoredCrossIssuePrUrls,
         conflicting_attached_pr_urls: [],
-        selection_note: appendReviewPromotionIgnoredSelectionNote(
+        selection_note: appendIgnoredAttachedPrSelectionNote(
           ignoredHistoricalPrUrls.length > 0
             ? `Ignored historical merged PR URLs: ${ignoredHistoricalPrUrls.join(', ')}.`
             : null,
@@ -1806,7 +1809,7 @@ async function resolveAttachedSameRepoPullRequestCandidate(input: {
         ignored_closed_unmerged_pr_urls: ignoredClosedUnmergedPrUrls,
         ignored_cross_issue_pr_urls: ignoredCrossIssuePrUrls,
         conflicting_attached_pr_urls: [],
-        selection_note: appendReviewPromotionIgnoredSelectionNote(
+        selection_note: appendIgnoredAttachedPrSelectionNote(
           `Selected already-merged PR ${selectedMergedCandidate.pr.url} because all remaining attached same-repo PR URLs are older.${ignoredHistoricalMergedPrUrls.length > 0 ? ` Ignored older merged PR URLs: ${ignoredHistoricalMergedPrUrls.join(', ')}.` : ''}${staleUnmergedPrUrls.length > 0 ? ` Older unmerged PR URLs: ${staleUnmergedPrUrls.join(', ')}.` : ''}`,
           {
             ignoredClosedUnmergedPrUrls,
@@ -1844,16 +1847,18 @@ async function resolveAttachedSameRepoPullRequestCandidate(input: {
 function buildMultipleAttachedPrsSummary(input: {
   repoKey: string;
   ignoredHistoricalPrUrls: string[];
+  ignoredClosedUnmergedPrUrls: string[];
   conflictingAttachedPrUrls: string[];
 }): string {
-  const ignoredHistoricalSummary =
-    input.ignoredHistoricalPrUrls.length > 0
-      ? ` Ignored historical merged PR URLs: ${input.ignoredHistoricalPrUrls.join(', ')}.`
-      : '';
+  const ignoredSummary = buildIgnoredAttachedPrSummary({
+    ignoredHistoricalPrUrls: input.ignoredHistoricalPrUrls,
+    ignoredClosedUnmergedPrUrls: input.ignoredClosedUnmergedPrUrls,
+    ignoredCrossIssuePrUrls: []
+  });
   if (input.conflictingAttachedPrUrls.length === 0) {
-    return `Attached GitHub pull requests match ${input.repoKey}, but no current merge candidate remains after historical filtering; merge closeout is not armed.${ignoredHistoricalSummary}`;
+    return `Attached GitHub pull requests match ${input.repoKey}, but no current merge candidate remains after bounded filtering; merge closeout is not armed.${ignoredSummary}`;
   }
-  return `Multiple attached GitHub pull requests match ${input.repoKey}; conflicting attached PR URLs still require deterministic disambiguation: ${input.conflictingAttachedPrUrls.join(', ')}.${ignoredHistoricalSummary}`;
+  return `Multiple attached GitHub pull requests match ${input.repoKey}; conflicting attached PR URLs still require deterministic disambiguation: ${input.conflictingAttachedPrUrls.join(', ')}.${ignoredSummary}`;
 }
 
 function buildMultipleAttachedPrsPromotionSummary(input: {
@@ -1863,7 +1868,7 @@ function buildMultipleAttachedPrsPromotionSummary(input: {
   ignoredCrossIssuePrUrls: string[];
   conflictingAttachedPrUrls: string[];
 }): string {
-  const ignoredSummary = buildReviewPromotionIgnoredSummary({
+  const ignoredSummary = buildIgnoredAttachedPrSummary({
     ignoredHistoricalPrUrls: input.ignoredHistoricalPrUrls,
     ignoredClosedUnmergedPrUrls: input.ignoredClosedUnmergedPrUrls,
     ignoredCrossIssuePrUrls: input.ignoredCrossIssuePrUrls
@@ -2199,7 +2204,7 @@ function isSnapshotStrictlyOlderThanSelection(
   return candidateTimestamp < selectedTimestamp;
 }
 
-function buildReviewPromotionIgnoredSummary(input: {
+function buildIgnoredAttachedPrSummary(input: {
   ignoredHistoricalPrUrls: string[];
   ignoredClosedUnmergedPrUrls: string[];
   ignoredCrossIssuePrUrls: string[];
@@ -2219,14 +2224,14 @@ function buildReviewPromotionIgnoredSummary(input: {
   return parts.length > 0 ? ` ${parts.join(' ')}` : '';
 }
 
-function buildReviewPromotionIgnoredSelectionNote(input: {
+function buildIgnoredAttachedPrSelectionNote(input: {
   ignoredClosedUnmergedPrUrls: string[];
   ignoredCrossIssuePrUrls: string[];
 }): string | null {
-  return appendReviewPromotionIgnoredSelectionNote(null, input);
+  return appendIgnoredAttachedPrSelectionNote(null, input);
 }
 
-function appendReviewPromotionIgnoredSelectionNote(
+function appendIgnoredAttachedPrSelectionNote(
   baseNote: string | null,
   input: {
     ignoredClosedUnmergedPrUrls: string[];
