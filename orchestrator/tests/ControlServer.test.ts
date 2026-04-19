@@ -16,6 +16,7 @@ import {
 import { computeEffectiveDelegationConfig } from '../src/cli/config/delegationConfig.js';
 import { resolveRunPaths } from '../src/cli/run/runPaths.js';
 import { RunEventStream } from '../src/cli/events/runEventStream.js';
+import { readProviderPollingHealth } from '../src/cli/control/providerPollingHealth.js';
 
 const originalCreateServer = http.createServer;
 const originalControlServerStart = ControlServer.start.bind(ControlServer);
@@ -2840,6 +2841,279 @@ describe('ControlServer', () => {
       expect(after.latest_action ?? null).toEqual(before.latest_action ?? null);
     } finally {
       await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('waits for read-only refresh polling health writes before close returns', async () => {
+    const { root, env, paths } = await createRunRoot('task-0940');
+    await seedManifest(paths, { summary: 'task is running' });
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const providerIntakeStatePath = join(paths.runDir, 'provider-intake-state.json');
+    const originalWriteJsonAtomic = fsUtils.writeJsonAtomic;
+    let providerIntakeWrites = 0;
+    let blockProviderPollingWrite = false;
+    let releaseBlockedWrite: (() => void) | null = null;
+    let resolveFirstProviderIntakeWrite: () => void = () => undefined;
+    let resolveBlockedProviderPollingWrite: () => void = () => undefined;
+    const firstProviderIntakeWrite = new Promise<void>((resolve) => {
+      resolveFirstProviderIntakeWrite = resolve;
+    });
+    const blockedProviderPollingWrite = new Promise<void>((resolve) => {
+      resolveBlockedProviderPollingWrite = resolve;
+    });
+    const writeSpy = vi.spyOn(fsUtils, 'writeJsonAtomic').mockImplementation(async (...args) => {
+      const [path] = args as Parameters<typeof fsUtils.writeJsonAtomic>;
+      if (path === providerIntakeStatePath) {
+        providerIntakeWrites += 1;
+        if (providerIntakeWrites === 1) {
+          resolveFirstProviderIntakeWrite();
+        }
+        if (blockProviderPollingWrite && !releaseBlockedWrite) {
+          resolveBlockedProviderPollingWrite();
+          await new Promise<void>((release) => {
+            releaseBlockedWrite = release;
+          });
+          blockProviderPollingWrite = false;
+        }
+      }
+      return originalWriteJsonAtomic(...args);
+    });
+    const refreshProviderIssues = vi.fn(async () => undefined);
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1',
+      createProviderIssueHandoff: () => ({
+        handleAcceptedTrackedIssue: vi.fn(),
+        rehydrate: vi.fn(async () => undefined),
+        refresh: refreshProviderIssues
+      })
+    });
+    let closePromise: Promise<void> | null = null;
+
+    try {
+      await firstProviderIntakeWrite;
+      blockProviderPollingWrite = true;
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+
+      const refreshRes = await fetch(new URL('/api/v1/refresh', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action: 'refresh' })
+      });
+      expect(refreshRes.status).toBe(202);
+      await blockedProviderPollingWrite;
+
+      let closeResolved = false;
+      closePromise = server.close().then(() => {
+        closeResolved = true;
+      });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(closeResolved).toBe(false);
+
+      releaseBlockedWrite?.();
+      await closePromise;
+      expect(closeResolved).toBe(true);
+    } finally {
+      releaseBlockedWrite?.();
+      if (closePromise) {
+        await closePromise.catch(() => undefined);
+      } else {
+        await server.close().catch(() => undefined);
+      }
+      writeSpy.mockRestore();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('stops accepting read-only refresh requests while close drains provider work', async () => {
+    const { root, env, paths } = await createRunRoot('task-0940');
+    await seedManifest(paths, { summary: 'task is running' });
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    let blockRefresh = false;
+    let releaseRefresh: (() => void) | null = null;
+    let resolveRefreshStarted: () => void = () => undefined;
+    const refreshStarted = new Promise<void>((resolve) => {
+      resolveRefreshStarted = resolve;
+    });
+    const refreshProviderIssues = vi.fn(async () => {
+      if (!blockRefresh) {
+        return;
+      }
+      resolveRefreshStarted();
+      await new Promise<void>((resolve) => {
+        releaseRefresh = resolve;
+      });
+    });
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1',
+      createProviderIssueHandoff: () => ({
+        handleAcceptedTrackedIssue: vi.fn(),
+        rehydrate: vi.fn(async () => undefined),
+        refresh: refreshProviderIssues
+      })
+    });
+    let closePromise: Promise<void> | null = null;
+
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      const refreshCallsBefore = refreshProviderIssues.mock.calls.length;
+      blockRefresh = true;
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const refreshUrl = new URL('/api/v1/refresh', baseUrl);
+
+      const refreshRes = await fetch(refreshUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action: 'refresh' })
+      });
+      expect(refreshRes.status).toBe(202);
+      await refreshRes.text();
+      await refreshStarted;
+
+      closePromise = server.close();
+      const refreshRejectedDuringClose = await new Promise<boolean>((resolve) => {
+        let settled = false;
+        const settle = (value: boolean): void => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          resolve(value);
+        };
+        const request = http.request(
+          refreshUrl,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'x-csrf-token': token,
+              'Content-Type': 'application/json'
+            },
+            timeout: 1_000
+          },
+          (response) => {
+            response.resume();
+            response.on('end', () => settle(false));
+          }
+        );
+        request.on('error', (error: NodeJS.ErrnoException) => {
+          settle(error.code === 'ECONNREFUSED' || error.code === 'ECONNRESET');
+        });
+        request.on('timeout', () => {
+          settle(false);
+          request.destroy();
+        });
+        request.end(JSON.stringify({ action: 'refresh' }));
+      });
+      expect(refreshRejectedDuringClose).toBe(true);
+
+      releaseRefresh?.();
+      await closePromise;
+      expect(refreshProviderIssues).toHaveBeenCalledTimes(refreshCallsBefore + 1);
+    } finally {
+      releaseRefresh?.();
+      if (closePromise) {
+        await closePromise.catch(() => undefined);
+      } else {
+        await server.close().catch(() => undefined);
+      }
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('reuses the elapsed read-only refresh watchdog budget while closing', async () => {
+    const startedAtMs = Date.parse('2026-03-06T03:01:00.000Z');
+    let nowMs = startedAtMs;
+    const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => nowMs);
+    const { root, env, paths } = await createRunRoot('task-0940');
+    await seedManifest(paths, { summary: 'task is running' });
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    let blockRefresh = false;
+    let releaseRefresh: (() => void) | null = null;
+    let resolveRefreshStarted: () => void = () => undefined;
+    const refreshStarted = new Promise<void>((resolve) => {
+      resolveRefreshStarted = resolve;
+    });
+    const refreshProviderIssues = vi.fn(async () => {
+      if (!blockRefresh) {
+        return;
+      }
+      resolveRefreshStarted();
+      await new Promise<void>((resolve) => {
+        releaseRefresh = resolve;
+      });
+    });
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => undefined),
+      refresh: refreshProviderIssues
+    };
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1',
+      createProviderIssueHandoff: () => providerIssueHandoff
+    });
+    let closePromise: Promise<void> | null = null;
+    let closeResolved = false;
+
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      blockRefresh = true;
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const refreshRes = await fetch(new URL('/api/v1/refresh', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action: 'refresh' })
+      });
+      expect(refreshRes.status).toBe(202);
+      await refreshRes.text();
+      await refreshStarted;
+
+      nowMs = startedAtMs + 44_950;
+      closePromise = server.close().then(() => {
+        closeResolved = true;
+      });
+      setTimeout(() => {
+        nowMs = startedAtMs + 45_001;
+      }, 25);
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
+        stuck: true,
+        reason: 'provider_refresh_lifecycle_stuck'
+      });
+      expect(closeResolved).toBe(false);
+      releaseRefresh?.();
+      await closePromise;
+      expect(closeResolved).toBe(true);
+    } finally {
+      releaseRefresh?.();
+      if (closePromise) {
+        await closePromise.catch(() => undefined);
+      } else {
+        await server.close().catch(() => undefined);
+      }
+      nowSpy.mockRestore();
       await rm(root, { recursive: true, force: true });
     }
   });
@@ -7623,7 +7897,7 @@ describe('ControlServer', () => {
     }
   });
 
-  it('closes owned runtime state in order and resets lifecycle fields', async () => {
+  it('starts HTTP close before closing owned runtime state and resets lifecycle fields', async () => {
     const { root, env, paths } = await createRunRoot('task-0940');
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
     const order: string[] = [];
@@ -7680,7 +7954,7 @@ describe('ControlServer', () => {
       expect(expiryClose).toHaveBeenCalledOnce();
       expect(bootstrapClose).toHaveBeenCalledOnce();
       expect(clientEnd).toHaveBeenCalledOnce();
-      expect(order).toEqual(['expiry', 'bootstrap', 'client', 'server']);
+      expect(order).toEqual(['server', 'expiry', 'bootstrap', 'client']);
       expect(runtimeServer.lifecycleState.expiryLifecycle).toBeNull();
       expect(runtimeServer.lifecycleState.bootstrapLifecycle).toBeNull();
     } finally {

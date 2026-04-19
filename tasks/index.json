@@ -28,6 +28,32 @@
       }
     },
     {
+      "id": "20260419-linear-d334cd3d-b560-497c-9e07-ec8084890493",
+      "title": "CO: stabilize ControlServer read-only refresh temp cleanup ENOTEMPTY flake",
+      "relates_to": "tasks/tasks-linear-d334cd3d-b560-497c-9e07-ec8084890493.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-19",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-19",
+          "status": "produced",
+          "manifest": ".runs/linear-d334cd3d-b560-497c-9e07-ec8084890493-docs-packet/cli/2026-04-19T09-43-09-262Z-5b353e4d/manifest.json",
+          "source_anchor": "ctx:sha256:ce789eed64ab33a58fd40f1d77f4e6b2752cfaa7e0b79fefd4c6e638bc4f1128#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-261 as the bounded ControlServer.test.ts read-only refresh temp cleanup flake: protected test `acknowledges read-only refresh requests without mutating control state`, ENOTEMPTY at `/tmp/control-server-*/.runs/task-0940/cli/run-1`, main Core Lane run `24623956000`, commit `c382730e0e6364cbfeb736a1999fc160c98b03cf`, and explicit non-goal scopes `CO-181` and `CO-150`."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-d334cd3d-b560-497c-9e07-ec8084890493.md",
+        "task": "tasks/tasks-linear-d334cd3d-b560-497c-9e07-ec8084890493.md",
+        "agent_task": ".agent/task/linear-d334cd3d-b560-497c-9e07-ec8084890493.md",
+        "docs": "docs/TECH_SPEC-linear-d334cd3d-b560-497c-9e07-ec8084890493.md"
+      }
+    },
+    {
       "id": "20260419-linear-20dbc119-a30e-4cf8-a61a-6277cf169170",
       "title": "CO: Reuse canonical owner issues before create-follow-up for recurring baseline debt",
       "relates_to": "tasks/tasks-linear-20dbc119-a30e-4cf8-a61a-6277cf169170.md",
@@ -89,6 +115,32 @@
         "task": "tasks/tasks-linear-5348c2fb-8897-48e3-a848-7831778b1b00.md",
         "agent_task": ".agent/task/linear-5348c2fb-8897-48e3-a848-7831778b1b00.md",
         "docs": "docs/TECH_SPEC-linear-5348c2fb-8897-48e3-a848-7831778b1b00.md"
+      }
+    },
+    {
+      "id": "20260418-linear-5570250a-1361-4af0-857c-119649b902ab",
+      "title": "CO: restore same-issue re-admission for reopened terminal released/not_active claims without stale merge_closeout or replay-block suppression",
+      "relates_to": "tasks/tasks-linear-5570250a-1361-4af0-857c-119649b902ab.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-5570250a-1361-4af0-857c-119649b902ab-co-238-docs/cli/2026-04-18T02-50-07-931Z-b4fa7aed/manifest.json",
+          "source_anchor": "ctx:sha256:1d858a457b5eb91c9daeee7c4422ca5926d9bde1dda0409a099abb0b9acfa930#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-238 as the reopened-terminal same-issue re-admission seam: a previously terminal `provider_issue_released:not_active` claim can retain stale `merge_closeout residue` or release-family `replay-block` and keep `fresh discovery` from re-admitting the same issue after live runnable truth returns. The packet keeps this explicitly separate from `CO-138` stale merge-closeout cleanup, `CO-212` `Ready reclaim`, and `CO-175` docs-freshness ownership. The expected shared source payload is absent in this child checkout, so the packet is anchored on the protected issue wording plus adjacent repo seams in `providerIssueHandoff.ts`, `providerMergeCloseout.ts`, `providerLinearWorkflowStates.ts`, and `controlRuntime.ts`; parent owns implementation, validation, Linear state, workpad, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-5570250a-1361-4af0-857c-119649b902ab.md",
+        "task": "tasks/tasks-linear-5570250a-1361-4af0-857c-119649b902ab.md",
+        "agent_task": ".agent/task/linear-5570250a-1361-4af0-857c-119649b902ab.md",
+        "docs": "docs/TECH_SPEC-linear-5570250a-1361-4af0-857c-119649b902ab.md"
       }
     },
     {
