@@ -91,6 +91,32 @@
       }
     },
     {
+      "id": "20260418-linear-5570250a-1361-4af0-857c-119649b902ab",
+      "title": "CO: restore same-issue re-admission for reopened terminal released/not_active claims without stale merge_closeout or replay-block suppression",
+      "relates_to": "tasks/tasks-linear-5570250a-1361-4af0-857c-119649b902ab.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-5570250a-1361-4af0-857c-119649b902ab-co-238-docs/cli/2026-04-18T02-50-07-931Z-b4fa7aed/manifest.json",
+          "source_anchor": "ctx:sha256:1d858a457b5eb91c9daeee7c4422ca5926d9bde1dda0409a099abb0b9acfa930#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-238 as the reopened-terminal same-issue re-admission seam: a previously terminal `provider_issue_released:not_active` claim can retain stale `merge_closeout residue` or release-family `replay-block` and keep `fresh discovery` from re-admitting the same issue after live runnable truth returns. The packet keeps this explicitly separate from `CO-138` stale merge-closeout cleanup, `CO-212` `Ready reclaim`, and `CO-175` docs-freshness ownership. The expected shared source payload is absent in this child checkout, so the packet is anchored on the protected issue wording plus adjacent repo seams in `providerIssueHandoff.ts`, `providerMergeCloseout.ts`, `providerLinearWorkflowStates.ts`, and `controlRuntime.ts`; parent owns implementation, validation, Linear state, workpad, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-5570250a-1361-4af0-857c-119649b902ab.md",
+        "task": "tasks/tasks-linear-5570250a-1361-4af0-857c-119649b902ab.md",
+        "agent_task": ".agent/task/linear-5570250a-1361-4af0-857c-119649b902ab.md",
+        "docs": "docs/TECH_SPEC-linear-5570250a-1361-4af0-857c-119649b902ab.md"
+      }
+    },
+    {
       "id": "20260418-linear-f29c2953-192f-455c-aa67-5418d2607a3a",
       "title": "Control host: stabilize Doctor.test.ts full-suite timeout cluster under suite load",
       "relates_to": "tasks/tasks-linear-f29c2953-192f-455c-aa67-5418d2607a3a.md",

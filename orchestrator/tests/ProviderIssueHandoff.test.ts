@@ -22633,6 +22633,128 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('does not launch a Ready merged closeout released refresh with unresolved retained run identity', async () => {
+    const { root, paths } = await createHostPaths();
+    const missingManifestPath = join(
+      root,
+      '.runs',
+      'linear-lin-issue-175',
+      'cli',
+      'run-co-175-refresh-missing',
+      'manifest.json'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: 'lin-issue-175',
+      issue_identifier: 'CO-175',
+      issue_title: 'Reopened provider issue blocked by terminal released merge-closeout residue',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-04-14T01:14:59.466Z',
+      task_id: 'linear-lin-issue-175',
+      run_id: 'run-co-175-refresh-missing',
+      run_manifest_path: missingManifestPath,
+      merge_closeout: {
+        recorded_at: '2026-04-14T01:20:00.000Z',
+        issue_id: 'lin-issue-175',
+        issue_identifier: 'CO-175',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        issue_updated_at: '2026-04-14T01:14:59.466Z',
+        status: 'merged',
+        reason: 'merged_and_transitioned_done',
+        summary: 'Attached PR #472 merged and Linear transitioned the issue to Done.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/472'],
+        ignored_historical_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/472',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 472
+        },
+        snapshot: {
+          state: 'MERGED',
+          review_decision: 'APPROVED',
+          merge_state_status: 'UNKNOWN',
+          ready_to_merge: false,
+          gate_reasons: ['state=MERGED'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 0,
+          checks_failed: 0,
+          required_checks_pending: 0,
+          required_checks_failed: 0,
+          updated_at: '2026-04-14T01:19:00.000Z',
+          merged_at: '2026-04-14T01:19:00.000Z',
+          head_oid: 'abc175'
+        },
+        branch_recovery: null,
+        merge_attempt: null,
+        shared_root: {
+          status: 'reconciled',
+          attempted_at: '2026-04-14T01:19:30.000Z',
+          before_status: '## main...origin/main',
+          after_status: '## main...origin/main',
+          reason: 'shared_root_reconciled'
+        },
+        linear_transition: {
+          status: 'transitioned',
+          attempted_at: '2026-04-14T01:19:45.000Z',
+          previous_state: 'Merging',
+          target_state: 'Done',
+          issue_state: 'Done',
+          issue_state_type: 'completed',
+          issue_updated_at: '2026-04-14T01:14:59.466Z',
+          error: null
+        }
+      }
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = createCo202Launcher(
+      'run-co-175-refresh-reclaimed',
+      '/tmp/provider-run/co-175-refresh-reclaimed-manifest.json'
+    );
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createCo202ReadyIssue({
+        id: 'lin-issue-175',
+        identifier: 'CO-175',
+        title: 'Reopened provider issue blocked by terminal released merge-closeout residue',
+        updated_at: '2026-04-18T02:21:31.169Z'
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    await service.refresh();
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-175'
+    });
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-04-14T01:14:59.466Z',
+      run_id: 'run-co-175-refresh-missing',
+      run_manifest_path: missingManifestPath
+    });
+  });
+
   it('does not launch a Ready plain released not-active webhook replay with unresolved retained run identity', async () => {
     const { root, paths } = await createHostPaths();
     const missingManifestPath = join(
@@ -22916,6 +23038,415 @@ describe('createProviderIssueHandoffService', () => {
     });
     expect(persist).toHaveBeenCalled();
   });
+
+  it('reclaims a Ready plain released not-active claim with retained merged closeout residue and terminal cached truth through fresh discovery', async () => {
+    const { root, paths } = await createHostPaths();
+    const staleEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-175'
+    };
+    const stalePaths = resolveRunPaths(staleEnv, 'run-co-175-completed');
+    await mkdir(stalePaths.runDir, { recursive: true });
+    await writeFile(
+      stalePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-co-175-completed',
+        task_id: 'linear-lin-issue-175',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-175',
+        issue_identifier: 'CO-175',
+        issue_updated_at: '2026-04-14T01:14:59.466Z',
+        updated_at: '2026-04-14T01:30:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: 'lin-issue-175',
+      issue_identifier: 'CO-175',
+      issue_title: 'Reopened provider issue blocked by terminal released merge-closeout residue',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-04-14T01:14:59.466Z',
+      task_id: 'linear-lin-issue-175',
+      run_id: 'run-co-175-completed',
+      run_manifest_path: stalePaths.manifestPath,
+      merge_closeout: {
+        recorded_at: '2026-04-14T01:20:00.000Z',
+        issue_id: 'lin-issue-175',
+        issue_identifier: 'CO-175',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        issue_updated_at: '2026-04-14T01:14:59.466Z',
+        status: 'merged',
+        reason: 'merged_and_transitioned_done',
+        summary: 'Attached PR #472 merged and Linear transitioned the issue to Done.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/472'],
+        ignored_historical_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/472',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 472
+        },
+        snapshot: {
+          state: 'MERGED',
+          review_decision: 'APPROVED',
+          merge_state_status: 'UNKNOWN',
+          ready_to_merge: false,
+          gate_reasons: ['state=MERGED'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 0,
+          checks_failed: 0,
+          required_checks_pending: 0,
+          required_checks_failed: 0,
+          updated_at: '2026-04-14T01:19:00.000Z',
+          merged_at: '2026-04-14T01:19:00.000Z',
+          head_oid: 'abc175'
+        },
+        branch_recovery: null,
+        merge_attempt: null,
+        shared_root: {
+          status: 'reconciled',
+          attempted_at: '2026-04-14T01:19:30.000Z',
+          before_status: '## main...origin/main',
+          after_status: '## main...origin/main',
+          reason: 'shared_root_reconciled'
+        },
+        linear_transition: {
+          status: 'transitioned',
+          attempted_at: '2026-04-14T01:19:45.000Z',
+          previous_state: 'Merging',
+          target_state: 'Done',
+          issue_state: 'Done',
+          issue_state_type: 'completed',
+          issue_updated_at: '2026-04-14T01:14:59.466Z',
+          error: null
+        }
+      }
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = createCo202Launcher(
+      'run-co-175-reclaimed',
+      '/tmp/provider-run/co-175-reclaimed-manifest.json'
+    );
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue()
+    }));
+    const refetchTrackedIssues = vi.fn(async (input?: { excludedIssueIds?: string[] }) => {
+      expect(input?.excludedIssueIds ?? []).not.toContain('lin-issue-175');
+      return {
+        kind: 'ready' as const,
+        trackedIssues: [
+          createCo202ReadyIssue({
+            id: 'lin-issue-175',
+            identifier: 'CO-175',
+            title: 'Reopened provider issue blocked by terminal released merge-closeout residue',
+            updated_at: '2026-04-18T02:21:31.169Z'
+          })
+        ]
+      };
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue,
+      isProcessAlive: () => false,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-issue-175',
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-issue-175',
+      issueIdentifier: 'CO-175',
+      issueUpdatedAt: '2026-04-18T02:21:31.169Z',
+      launchToken: expect.any(String)
+    }));
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-18T02:21:31.169Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-issue-175',
+      run_id: 'run-co-175-reclaimed',
+      run_manifest_path: '/tmp/provider-run/co-175-reclaimed-manifest.json',
+      launch_source: 'control-host',
+      launch_token: expect.any(String),
+      merge_closeout: null
+    });
+    expect(persist).toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      issueId: 'lin-issue-176',
+      issueIdentifier: 'CO-176',
+      issueTitle: 'Reopened provider issue blocked by transition_failed merge-closeout residue',
+      runId: 'run-co-176-completed',
+      reclaimedRunId: 'run-co-176-reclaimed',
+      reclaimedManifestPath: '/tmp/provider-run/co-176-reclaimed-manifest.json',
+      liveUpdatedAt: '2026-04-18T02:25:31.169Z',
+      mergeCloseout: {
+        recorded_at: '2026-04-14T01:20:00.000Z',
+        issue_id: 'lin-issue-176',
+        issue_identifier: 'CO-176',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-14T01:10:00.000Z',
+        status: 'transition_failed' as const,
+        reason: 'linear_done_transition_failed',
+        summary: 'Attached PR #473 merged, but the Linear Done transition failed after shared-root reconciliation.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/473'],
+        ignored_historical_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/473',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 473
+        },
+        snapshot: {
+          state: 'MERGED',
+          review_decision: 'APPROVED',
+          merge_state_status: 'UNKNOWN',
+          ready_to_merge: false,
+          gate_reasons: ['state=MERGED'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 0,
+          checks_failed: 0,
+          required_checks_pending: 0,
+          required_checks_failed: 0,
+          updated_at: '2026-04-14T01:19:00.000Z',
+          merged_at: '2026-04-14T01:19:00.000Z',
+          head_oid: 'abc176'
+        },
+        branch_recovery: null,
+        merge_attempt: null,
+        shared_root: {
+          status: 'reconciled' as const,
+          attempted_at: '2026-04-14T01:19:30.000Z',
+          before_status: '## main...origin/main',
+          after_status: '## main...origin/main',
+          reason: 'shared_root_reconciled'
+        },
+        linear_transition: {
+          status: 'failed' as const,
+          attempted_at: '2026-04-14T01:19:45.000Z',
+          previous_state: 'Merging',
+          target_state: 'Done',
+          issue_state: 'Merging',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-14T01:10:00.000Z',
+          error: 'linear_transition_conflict'
+        }
+      }
+    },
+    {
+      issueId: 'lin-issue-177',
+      issueIdentifier: 'CO-177',
+      issueTitle: 'Reopened provider issue blocked by action_required merge-closeout residue',
+      runId: 'run-co-177-completed',
+      reclaimedRunId: 'run-co-177-reclaimed',
+      reclaimedManifestPath: '/tmp/provider-run/co-177-reclaimed-manifest.json',
+      liveUpdatedAt: '2026-04-18T02:29:31.169Z',
+      mergeCloseout: {
+        recorded_at: '2026-04-14T01:20:00.000Z',
+        issue_id: 'lin-issue-177',
+        issue_identifier: 'CO-177',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-14T01:10:00.000Z',
+        status: 'action_required' as const,
+        reason: 'pending_shared_root_reconciliation',
+        summary: 'Attached PR #474 merged, but shared-root reconciliation was skipped and the stale closeout residue remained.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/474'],
+        ignored_historical_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/474',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 474
+        },
+        snapshot: {
+          state: 'MERGED',
+          review_decision: 'APPROVED',
+          merge_state_status: 'UNKNOWN',
+          ready_to_merge: false,
+          gate_reasons: ['state=MERGED'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 0,
+          checks_failed: 0,
+          required_checks_pending: 0,
+          required_checks_failed: 0,
+          updated_at: '2026-04-14T01:19:00.000Z',
+          merged_at: '2026-04-14T01:19:00.000Z',
+          head_oid: 'abc177'
+        },
+        branch_recovery: null,
+        merge_attempt: null,
+        shared_root: {
+          status: 'skipped' as const,
+          attempted_at: '2026-04-14T01:19:30.000Z',
+          before_status: '## main...origin/main',
+          after_status: null,
+          reason: 'shared_root_dirty'
+        },
+        linear_transition: null
+      }
+    }
+  ])(
+    'reclaims a Ready plain released not-active claim with retained $mergeCloseout.status merge-closeout residue through fresh discovery',
+    async ({
+      issueId,
+      issueIdentifier,
+      issueTitle,
+      runId,
+      reclaimedRunId,
+      reclaimedManifestPath,
+      liveUpdatedAt,
+      mergeCloseout
+    }) => {
+      const { root, paths } = await createHostPaths();
+      const staleEnv = {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: `linear-${issueId}`
+      };
+      const stalePaths = resolveRunPaths(staleEnv, runId);
+      await mkdir(stalePaths.runDir, { recursive: true });
+      await writeFile(
+        stalePaths.manifestPath,
+        JSON.stringify({
+          run_id: runId,
+          task_id: `linear-${issueId}`,
+          status: 'succeeded',
+          issue_provider: 'linear',
+          issue_id: issueId,
+          issue_identifier: issueIdentifier,
+          issue_updated_at: '2026-04-14T01:14:59.466Z',
+          updated_at: '2026-04-14T01:30:00.000Z'
+        }),
+        'utf8'
+      );
+
+      const state = createProviderIntakeState();
+      state.claims.push(createCo202ReleasedClaim({
+        issue_id: issueId,
+        issue_identifier: issueIdentifier,
+        issue_title: issueTitle,
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        issue_updated_at: '2026-04-14T01:14:59.466Z',
+        task_id: `linear-${issueId}`,
+        run_id: runId,
+        run_manifest_path: stalePaths.manifestPath,
+        merge_closeout: mergeCloseout
+      }));
+
+      const persist = vi.fn(async () => undefined);
+      const launcher = createCo202Launcher(reclaimedRunId, reclaimedManifestPath);
+      const resolveTrackedIssue = vi.fn(async () => ({
+        kind: 'ready' as const,
+        trackedIssue: createTrackedIssue()
+      }));
+      const refetchTrackedIssues = vi.fn(async (input?: { excludedIssueIds?: string[] }) => {
+        expect(input?.excludedIssueIds ?? []).not.toContain(issueId);
+        return {
+          kind: 'ready' as const,
+          trackedIssues: [
+            createCo202ReadyIssue({
+              id: issueId,
+              identifier: issueIdentifier,
+              title: issueTitle,
+              updated_at: liveUpdatedAt
+            })
+          ]
+        };
+      });
+
+      const service = createProviderIssueHandoffService({
+        paths,
+        state,
+        persist,
+        launcher,
+        resolveTrackedIssue,
+        isProcessAlive: () => false,
+        startPipelineId: 'diagnostics',
+        readFeatureToggles: () => ({
+          agent: {
+            max_concurrent_agents: 1
+          }
+        })
+      });
+
+      await service.poll?.({
+        trackedIssues: [],
+        refetchTrackedIssues,
+        deferFreshDiscovery: true
+      });
+
+      expect(resolveTrackedIssue).not.toHaveBeenCalled();
+      expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
+      expect(launcher.resume).not.toHaveBeenCalled();
+      expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+        taskId: `linear-${issueId}`,
+        pipelineId: 'diagnostics',
+        provider: 'linear',
+        issueId,
+        issueIdentifier,
+        issueUpdatedAt: liveUpdatedAt,
+        launchToken: expect.any(String)
+      }));
+      expect(state.claims[0]).toMatchObject({
+        state: 'starting',
+        reason: 'provider_issue_start_launched',
+        issue_state: 'Ready',
+        issue_state_type: 'unstarted',
+        issue_updated_at: liveUpdatedAt,
+        issue_blocked_by: [],
+        task_id: `linear-${issueId}`,
+        run_id: reclaimedRunId,
+        run_manifest_path: reclaimedManifestPath,
+        launch_source: 'control-host',
+        launch_token: expect.any(String),
+        merge_closeout: null
+      });
+      expect(persist).toHaveBeenCalled();
+    }
+  );
 
   it('reclaims a Ready released pending-reopen claim through fresh discovery after blockers clear', async () => {
     const { root, paths } = await createHostPaths();
