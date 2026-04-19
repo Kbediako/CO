@@ -26,6 +26,32 @@
       }
     },
     {
+      "id": "20260418-linear-fb4c95d0-da68-4312-b3bb-3bd6282aa79f",
+      "title": "Control host / CO STATUS: prevent top-level tracked.linear from leaking stale linear-advisory fallback truth",
+      "relates_to": "tasks/tasks-linear-fb4c95d0-da68-4312-b3bb-3bd6282aa79f.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-19",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-fb4c95d0-da68-4312-b3bb-3bd6282aa79f-co223-docs-packet/cli/2026-04-17T18-00-08-729Z-4c76d75d/manifest.json",
+          "source_anchor": "ctx:sha256:ff78d09226d759620c87d1f1ae2de5782e81e7eda07b01112ef35807344be9b1#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-223 as a narrow top-level `tracked.linear` stale advisory fallback leak: when the selected projection has no authoritative tracked payload, top-level `tracked.linear` must prefer current dispatch/intake truth or fail closed empty instead of leaking persisted `linear-advisory-state.json` `CO-1` truth while live dispatch/intake already point at `CO-196`. The expected shared source payload was absent in this child checkout, so the packet uses the verbatim CO-223 issue prompt recovered via read-only Linear fetch plus current repo seams in `controlRuntime.ts`, `selectedRunProjection.ts`, and `observabilityReadModel.ts`; parent owns implementation, validation, workpad, PR, and any wider-scope `docs/TASKS.md` archive handling."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-fb4c95d0-da68-4312-b3bb-3bd6282aa79f.md",
+        "task": "tasks/tasks-linear-fb4c95d0-da68-4312-b3bb-3bd6282aa79f.md",
+        "agent_task": ".agent/task/linear-fb4c95d0-da68-4312-b3bb-3bd6282aa79f.md",
+        "docs": "docs/TECH_SPEC-linear-fb4c95d0-da68-4312-b3bb-3bd6282aa79f.md"
+      }
+    },
+    {
       "id": "20260418-linear-91749283-6dc8-4df8-aee3-5c9127c1200c",
       "title": "Doctor validation: classify and restore current Doctor readiness stability for CO-220 handoff",
       "relates_to": "tasks/tasks-linear-91749283-6dc8-4df8-aee3-5c9127c1200c.md",
