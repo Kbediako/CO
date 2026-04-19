@@ -75,6 +75,20 @@ describe('workspacePath', () => {
     await expect(runGit(repoRoot, ['worktree', 'list'])).resolves.not.toContain(workspacePath);
   });
 
+  it('checks current ownership immediately before provider workspace removal', async () => {
+    const repoRoot = await createRepoRoot();
+    const workspacePath = await ensureProviderWorkspace(repoRoot, 'task-123');
+    const beforeRemove = () => {
+      throw new Error('provider_refresh_lifecycle_stuck');
+    };
+
+    await expect(cleanupProviderWorkspace(repoRoot, workspacePath, { beforeRemove })).rejects.toThrow(
+      'provider_refresh_lifecycle_stuck'
+    );
+    await expect(access(workspacePath)).resolves.toBeUndefined();
+    await expect(runGit(repoRoot, ['worktree', 'list'])).resolves.toContain(workspacePath);
+  });
+
   it('refuses to remove workspaces outside the provider-managed root', async () => {
     const repoRoot = await createRepoRoot();
 

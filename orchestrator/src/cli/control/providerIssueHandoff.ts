@@ -793,6 +793,8 @@ export function createProviderIssueHandoffService(
       ) {
         restoreProviderStateSnapshot(snapshot);
         if (isLifecycleStuckError && persistCompleted && stillOwnsInFlightMutation) {
+          // Keep rehydrate's fallback snapshot aligned even if rollback persist fails.
+          recordProviderStatePersistedSnapshot();
           try {
             await options.persist();
             recordProviderStatePersistedSnapshot();
@@ -2052,7 +2054,8 @@ export function createProviderIssueHandoffService(
         issueId: input.claim.issue_id,
         issueIdentifier: input.claim.issue_identifier,
         providerWorkflowConfigStore: options.providerWorkflowConfigStore ?? null,
-        runTerminalCleanup
+        runTerminalCleanup,
+        assertCurrent: assertRefreshLifecycleCurrent
       });
       assertRefreshLifecycleCurrent();
     }
@@ -2159,7 +2162,10 @@ export function createProviderIssueHandoffService(
       input: Parameters<typeof cleanupReleasedProviderWorkspace>[0]
     ): Promise<void> => {
       assertRehydrateLifecycleCurrent();
-      await cleanupReleasedProviderWorkspace(input);
+      await cleanupReleasedProviderWorkspace({
+        ...input,
+        assertCurrent: assertRehydrateLifecycleCurrent
+      });
       assertRehydrateLifecycleCurrent();
     };
 
@@ -6157,20 +6163,26 @@ async function cleanupReleasedProviderWorkspace(input: {
   issueIdentifier: string | null;
   providerWorkflowConfigStore: ProviderWorkflowConfigStore | null;
   runTerminalCleanup: typeof runProviderTerminalCleanup;
+  assertCurrent?: () => void;
 }): Promise<void> {
   const workspacePath = await resolveProviderCleanupWorkspacePath(
     input.repoRoot,
     input.taskId,
     input.manifestPath
   );
+  input.assertCurrent?.();
   await maybeRunReleasedProviderTerminalCleanup({
     issueId: input.issueId,
     issueIdentifier: input.issueIdentifier,
     workspacePath,
     providerWorkflowConfigStore: input.providerWorkflowConfigStore,
-    runTerminalCleanup: input.runTerminalCleanup
+    runTerminalCleanup: input.runTerminalCleanup,
+    assertCurrent: input.assertCurrent
   });
-  await cleanupProviderWorkspace(input.repoRoot, workspacePath);
+  input.assertCurrent?.();
+  await cleanupProviderWorkspace(input.repoRoot, workspacePath, {
+    beforeRemove: input.assertCurrent
+  });
 }
 
 async function maybeRunReleasedProviderTerminalCleanup(input: {
@@ -6179,15 +6191,18 @@ async function maybeRunReleasedProviderTerminalCleanup(input: {
   workspacePath: string;
   providerWorkflowConfigStore: ProviderWorkflowConfigStore | null;
   runTerminalCleanup: typeof runProviderTerminalCleanup;
+  assertCurrent?: () => void;
 }): Promise<void> {
   try {
     const providerWorkflow = input.providerWorkflowConfigStore
       ? await input.providerWorkflowConfigStore.refresh()
       : null;
+    input.assertCurrent?.();
     const cleanupConfig = resolveProviderTerminalCleanupConfigFromPayload(providerWorkflow);
     if (!cleanupConfig) {
       return;
     }
+    input.assertCurrent?.();
     const cleanupResult = await input.runTerminalCleanup({
       issueId: input.issueId,
       issueIdentifier: input.issueIdentifier,
@@ -6195,6 +6210,7 @@ async function maybeRunReleasedProviderTerminalCleanup(input: {
       config: cleanupConfig,
       env: process.env
     });
+    input.assertCurrent?.();
     input.providerWorkflowConfigStore?.recordTerminalCleanupResult(cleanupResult);
     if (cleanupResult.status === 'failed') {
       logger.error(

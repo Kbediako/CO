@@ -69,14 +69,20 @@ export async function resolveProviderResumeWorkspacePath(
   return ensureProviderWorkspace(repoRoot, taskId);
 }
 
-export async function cleanupProviderWorkspace(repoRoot: string, workspacePath: string): Promise<boolean> {
+export async function cleanupProviderWorkspace(
+  repoRoot: string,
+  workspacePath: string,
+  options: { beforeRemove?: () => void } = {}
+): Promise<boolean> {
   if (!isProviderWorkspacePathWithinRoot(repoRoot, workspacePath)) {
     return false;
   }
   const resolvedWorkspacePath = resolve(workspacePath);
+  options.beforeRemove?.();
   await execFileAsync('git', ['-C', repoRoot, 'worktree', 'remove', '--force', resolvedWorkspacePath]).catch(
     () => undefined
   );
+  options.beforeRemove?.();
   await rm(resolvedWorkspacePath, { recursive: true, force: true });
   await execFileAsync('git', ['-C', repoRoot, 'worktree', 'prune', '--expire', 'now']).catch(
     () => undefined
