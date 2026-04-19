@@ -132,7 +132,7 @@ function hasNonSuccessStatusCheck(condition: string): boolean {
   const expression = unwrapActionsExpression(condition);
   return (
     /\b(always|cancelled|failure)\s*\(/iu.test(expression) ||
-    /!\s*success\s*\(/iu.test(expression) ||
+    /!\s*(?:\(\s*)*success\s*\(/iu.test(expression) ||
     (/\bsuccess\s*\(/iu.test(expression) && /\|\|/u.test(expression))
   );
 }
@@ -278,11 +278,40 @@ function getHeredocDelimiter(line: string): string | null {
   return match?.[1] ?? match?.[2] ?? match?.[3] ?? null;
 }
 
+function stripInlineShellComment(line: string): string {
+  let quote: '"' | "'" | null = null;
+  for (let index = 0; index < line.length; index += 1) {
+    const current = line[index];
+    if (quote) {
+      if (quote === '"' && current === '\\') {
+        index += 1;
+        continue;
+      }
+      if (current === quote) {
+        quote = null;
+      }
+      continue;
+    }
+    if (current === '\\') {
+      index += 1;
+      continue;
+    }
+    if (current === '"' || current === "'") {
+      quote = current;
+      continue;
+    }
+    if (current === '#' && (index === 0 || /[\s;&|(){}]/u.test(line[index - 1] ?? ''))) {
+      return line.slice(0, index).trim();
+    }
+  }
+  return line.trim();
+}
+
 function getRunCommandLines(run: string): string[] {
   const commandLines: string[] = [];
   let heredocDelimiter: string | null = null;
   for (const rawLine of normalizeShellContinuations(run).split(/\r?\n/u)) {
-    const line = rawLine.trim();
+    const line = stripInlineShellComment(rawLine.trim());
     if (heredocDelimiter) {
       if (line === heredocDelimiter) {
         heredocDelimiter = null;
@@ -852,8 +881,11 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(hasPackSmokeCommand(`echo "; ${packSmokeCommand};"`)).toBe(false);
     expect(hasPackSmokeCommand(`printf '%s\\n' '${packSmokeCommand}'`)).toBe(false);
     expect(hasPackSmokeCommand(`echo "${packSmokeCommand}"`)).toBe(false);
+    expect(hasPackSmokeCommand(`echo ok # ; ${packSmokeCommand}`)).toBe(false);
+    expect(hasPackSmokeCommand(`printf '%s # ; ${packSmokeCommand}'`)).toBe(false);
     expect(hasPackSmokeCommand(`echo "$(${packSmokeCommand})"`)).toBe(true);
     expect(hasPackSmokeCommand(`echo before; ${packSmokeCommand}`)).toBe(true);
+    expect(hasPackSmokeCommand(`echo foo#bar; ${packSmokeCommand}`)).toBe(true);
     expect(hasPackSmokeCommand(`cat <<'EOF-MARK'\n${packSmokeCommand}\nEOF-MARK`)).toBe(false);
     expect(hasPackSmokeCommand(`${packSmokeCommand}:other`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} || true`)).toBe(true);
@@ -947,6 +979,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(hasNonBlockingPackSmokeCommand(`! command ${packSmokeCommand}`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`echo "; ${packSmokeCommand};"`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`printf '%s\\n' '${packSmokeCommand}'`)).toBe(false);
+    expect(hasNonBlockingPackSmokeCommand(`echo ok # ; ${packSmokeCommand}`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`echo "$(${packSmokeCommand})"`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`echo <(${packSmokeCommand})`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`cat >(${packSmokeCommand})`)).toBe(true);
@@ -995,6 +1028,8 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     );
     expect(installConditionCoversSmokeStep('success()', 'always()')).toBe(false);
     expect(installConditionCoversSmokeStep('success()', '${{ !success() }}')).toBe(false);
+    expect(installConditionCoversSmokeStep('success()', '${{ !(success()) }}')).toBe(false);
+    expect(installConditionCoversSmokeStep('success()', '${{ ! ( success() ) }}')).toBe(false);
     expect(installConditionCoversSmokeStep('success()', '${{ success() || inputs.force }}')).toBe(false);
     expect(installConditionCoversSmokeStep('success()', '${{ success() && inputs.force }}')).toBe(true);
     expect(installConditionCoversSmokeStep("${{ always() && inputs.force == 'true' }}", 'always()')).toBe(false);
