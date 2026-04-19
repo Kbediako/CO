@@ -192,8 +192,39 @@ function isFalseExpressionTerm(term: string): boolean {
   return /^false$/iu.test(expression);
 }
 
+function isTrueExpressionTerm(term: string): boolean {
+  const expression = stripOuterParentheses(term);
+  return /^true$/iu.test(expression);
+}
+
+function getNegatedExpression(expression: string): string | null {
+  const match = stripOuterParentheses(expression).match(/^!\s*([\s\S]+)$/u);
+  return match?.[1]?.trim() ?? null;
+}
+
+function isAlwaysTrueExpression(expression: string): boolean {
+  const strippedExpression = stripOuterParentheses(expression);
+  const negatedExpression = getNegatedExpression(strippedExpression);
+  if (negatedExpression !== null) {
+    return isAlwaysFalseExpression(negatedExpression);
+  }
+  const orTerms = splitTopLevelExpression(strippedExpression, '||');
+  if (orTerms.length > 1) {
+    return orTerms.some((term) => isAlwaysTrueExpression(term));
+  }
+  const andTerms = splitTopLevelExpression(strippedExpression, '&&');
+  if (andTerms.length > 1) {
+    return andTerms.every((term) => isAlwaysTrueExpression(term));
+  }
+  return isTrueExpressionTerm(strippedExpression);
+}
+
 function isAlwaysFalseExpression(expression: string): boolean {
   const strippedExpression = stripOuterParentheses(expression);
+  const negatedExpression = getNegatedExpression(strippedExpression);
+  if (negatedExpression !== null) {
+    return isAlwaysTrueExpression(negatedExpression);
+  }
   const orTerms = splitTopLevelExpression(strippedExpression, '||');
   if (orTerms.length > 1) {
     return orTerms.every((term) => isAlwaysFalseExpression(term));
@@ -222,7 +253,7 @@ function installConditionCoversSmokeStep(installCondition: string, smokeConditio
 function normalizeShellContinuations(run: string): string {
   return run
     .replace(/\\\r?\n[ \t]*/gu, ' ')
-    .replace(/(\|\||&&|\|&?)[ \t]*\r?\n[ \t]*/gu, '$1 ')
+    .replace(/(\|\||&&|\|&?)[ \t]*\r?\n(?:[ \t]*(?:#.*)?\r?\n)*[ \t]*/gu, '$1 ')
     .replace(/\r?\n[ \t]*(?=(?:\|\||&&|\|&?)(?:\s|$))/gu, ' ');
 }
 
@@ -787,6 +818,13 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(hasNonBlockingPackSmokeCommand(`npm run lint || env FOO=1 ${packSmokeCommand}`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`npm run lint &&\n  ${packSmokeCommand}`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`npm run lint\n&& ${packSmokeCommand}`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`npm run lint &&\n  # gated smoke\n  ${packSmokeCommand}`)).toBe(
+      true
+    );
+    expect(hasNonBlockingPackSmokeCommand(`npm run lint &&\n\n  ${packSmokeCommand}`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`npm run lint ||\n  # fallback smoke\n  ${packSmokeCommand}`)).toBe(
+      true
+    );
     expect(hasNonBlockingPackSmokeCommand(`false && (FOO=1 ${packSmokeCommand})`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`false && (command ${packSmokeCommand})`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`false && { FOO=1 ${packSmokeCommand}; }`)).toBe(true);
@@ -872,9 +910,13 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(isAlwaysFalseCondition('${{ (false) || (false) }}')).toBe(true);
     expect(isAlwaysFalseCondition('${{ success() && false || false }}')).toBe(true);
     expect(isAlwaysFalseCondition('${{ (success() && false) || false }}')).toBe(true);
+    expect(isAlwaysFalseCondition('${{ !true }}')).toBe(true);
+    expect(isAlwaysFalseCondition('${{ !(true) }}')).toBe(true);
+    expect(isAlwaysFalseCondition('${{ success() && !true }}')).toBe(true);
     expect(isAlwaysFalseCondition("${{ steps.downstream-smoke.outputs.required == 'true' }}")).toBe(false);
     expect(isAlwaysFalseCondition('${{ inputs.enabled || false }}')).toBe(false);
     expect(isAlwaysFalseCondition('${{ false || inputs.force }}')).toBe(false);
+    expect(isAlwaysFalseCondition('${{ !false }}')).toBe(false);
     expect(installConditionCoversSmokeStep('success()', 'false')).toBe(false);
     expect(installConditionCoversSmokeStep('success()', '${{ false }}')).toBe(false);
     expect(installConditionCoversSmokeStep('success()', 'always()')).toBe(false);
