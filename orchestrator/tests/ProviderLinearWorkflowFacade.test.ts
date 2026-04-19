@@ -8,6 +8,7 @@ import {
   attachProviderLinearIssuePr,
   createProviderLinearFollowUpIssue,
   deleteProviderLinearWorkpadComment,
+  fetchIssueContextPullRequestSnapshot,
   getProviderLinearIssueContext,
   transitionProviderLinearIssueState,
   upsertProviderLinearWorkpadComment
@@ -1322,6 +1323,37 @@ describe('providerLinearWorkflowFacade', () => {
           unknown: []
         }
       }
+    });
+  });
+
+  it('uses a lightweight PR metadata resolver for issue-context attachment snapshots', async () => {
+    const ghCalls: string[][] = [];
+    const snapshot = await fetchIssueContextPullRequestSnapshot(
+      {
+        owner: 'asabeko',
+        repo: 'CO',
+        prNumber: 509,
+        readinessMode: 'merge'
+      },
+      {
+        runGitHubJson: async (args) => {
+          ghCalls.push(args);
+          return {
+            state: 'CLOSED',
+            mergedAt: null,
+            updatedAt: '2026-04-17T13:10:30.000Z'
+          };
+        }
+      }
+    );
+
+    expect(ghCalls).toEqual([
+      ['pr', 'view', '509', '--repo', 'asabeko/CO', '--json', 'state,mergedAt,updatedAt']
+    ]);
+    expect(snapshot).toEqual({
+      state: 'CLOSED',
+      mergedAt: null,
+      updatedAt: '2026-04-17T13:10:30.000Z'
     });
   });
 

@@ -1,8 +1,8 @@
+import { spawn } from 'node:child_process';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, join, resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { fetchPrStatusSnapshot } from '../../../../scripts/lib/pr-watch-merge.js';
 import {
   executeLinearGraphql,
   resolveLinearApiToken,
@@ -816,17 +816,33 @@ interface ProviderLinearIssueContextCacheRecord {
   embedded_workpad?: ProviderLinearEmbeddedWorkpadCacheRecord | null;
 }
 
+interface ProviderLinearPullRequestSnapshotResolverInput {
+  owner: string;
+  repo: string;
+  prNumber: number;
+  readinessMode?: 'merge' | 'review';
+}
+
+interface IssueContextPullRequestSnapshot {
+  state: string | null;
+  mergedAt: string | null;
+  updatedAt: string | null;
+}
+
+interface GitHubJsonCommandResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+  signal: NodeJS.Signals | null;
+  timedOut: boolean;
+}
+
 export async function getProviderLinearIssueContext(input: {
   issueId: string;
   sourceSetup?: DispatchPilotSourceSetup | null;
   fallbackToCacheOnFailure?: boolean;
   allowReadOnlyCacheReuse?: boolean;
-  resolvePullRequestSnapshot?: (input: {
-    owner: string;
-    repo: string;
-    prNumber: number;
-    readinessMode?: 'merge' | 'review';
-  }) => Promise<unknown>;
+  resolvePullRequestSnapshot?: (input: ProviderLinearPullRequestSnapshotResolverInput) => Promise<unknown>;
   env?: NodeJS.ProcessEnv;
   fetchImpl?: typeof fetch;
 }): Promise<ProviderLinearIssueContextResult> {
@@ -901,7 +917,7 @@ export async function getProviderLinearIssueContext(input: {
 
   const issue = await hydrateIssuePullRequestAttachments(
     context.issue,
-    input.resolvePullRequestSnapshot ?? fetchPrStatusSnapshot
+    input.resolvePullRequestSnapshot ?? fetchIssueContextPullRequestSnapshot
   );
   await writeCachedIssueContextRecord(input.env, issue, session.session.sourceSetup);
   return {
@@ -938,12 +954,7 @@ interface ProviderLinearIssuePullRequestCandidate {
 
 async function hydrateIssuePullRequestAttachments(
   issue: ProviderLinearIssueContext,
-  resolvePullRequestSnapshot: (input: {
-    owner: string;
-    repo: string;
-    prNumber: number;
-    readinessMode?: 'merge' | 'review';
-  }) => Promise<unknown>
+  resolvePullRequestSnapshot: (input: ProviderLinearPullRequestSnapshotResolverInput) => Promise<unknown>
 ): Promise<ProviderLinearIssueContext> {
   const seenComparisonKeys = new Set<string>();
   const pullRequestAttachments = issue.attachments.flatMap((attachment) => {
@@ -996,6 +1007,109 @@ async function hydrateIssuePullRequestAttachments(
     ...issue,
     pull_request_attachments: classifyIssuePullRequestAttachments(issue, resolved, unknown)
   };
+}
+
+export async function fetchIssueContextPullRequestSnapshot(
+  input: ProviderLinearPullRequestSnapshotResolverInput,
+  options: {
+    runGitHubJson?: (args: string[]) => Promise<unknown>;
+  } = {}
+): Promise<IssueContextPullRequestSnapshot> {
+  const owner = normalizeOptionalString(input.owner);
+  const repo = normalizeOptionalString(input.repo);
+  const prNumber = Number(input.prNumber);
+  if (!owner || !repo || !Number.isInteger(prNumber) || prNumber <= 0) {
+    throw new Error('fetchIssueContextPullRequestSnapshot requires owner, repo, and a positive integer prNumber.');
+  }
+
+  const payload = await (options.runGitHubJson ?? runGitHubJsonForIssueContext)([
+    'pr',
+    'view',
+    String(prNumber),
+    '--repo',
+    `${owner}/${repo}`,
+    '--json',
+    'state,mergedAt,updatedAt'
+  ]);
+  if (!payload || typeof payload !== 'object') {
+    throw new Error(`gh pr view ${owner}/${repo}#${prNumber} returned invalid JSON.`);
+  }
+  const record = payload as Record<string, unknown>;
+  return {
+    state: normalizeOptionalString(record.state as string | null | undefined),
+    mergedAt: normalizeOptionalString(record.mergedAt as string | null | undefined),
+    updatedAt: normalizeOptionalString(record.updatedAt as string | null | undefined)
+  };
+}
+
+async function runGitHubJsonForIssueContext(args: string[]): Promise<unknown> {
+  const result = await runGitHubCommandForIssueContext(args, 15_000);
+  if (result.timedOut) {
+    throw new Error(`gh ${args.join(' ')} timed out.`);
+  }
+  if (result.exitCode !== 0) {
+    const detail = result.stderr.trim() || result.stdout.trim() || `exit ${result.exitCode ?? result.signal ?? 'unknown'}`;
+    throw new Error(`gh ${args.join(' ')} failed: ${detail}`);
+  }
+  try {
+    return JSON.parse(result.stdout);
+  } catch (error) {
+    throw new Error(
+      `Failed to parse JSON from gh ${args.join(' ')}: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
+}
+
+function runGitHubCommandForIssueContext(
+  args: string[],
+  timeoutMs: number
+): Promise<GitHubJsonCommandResult> {
+  return new Promise((resolve, reject) => {
+    const child = spawn('gh', args, {
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    let stdout = '';
+    let stderr = '';
+    let settled = false;
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill('SIGTERM');
+    }, timeoutMs);
+
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', (chunk: string) => {
+      stdout += chunk;
+    });
+    child.stderr.on('data', (chunk: string) => {
+      stderr += chunk;
+    });
+    child.on('error', (error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.on('close', (exitCode, signal) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      resolve({
+        stdout,
+        stderr,
+        exitCode,
+        signal,
+        timedOut
+      });
+    });
+  });
 }
 
 function mapIssuePullRequestAttachmentSnapshot(
