@@ -278,6 +278,10 @@ export async function executeProviderOperatorAutopilotLocalRolloutActions(
     string,
     ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord
   >();
+  const priorAttemptsByActionKey = new Map<
+    string,
+    ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord[]
+  >();
   const priorByActionKeyForEmptyProjection = new Map<
     string,
     ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord
@@ -285,6 +289,10 @@ export async function executeProviderOperatorAutopilotLocalRolloutActions(
   for (const attempt of priorAttempts) {
     const attemptKey = executionAttemptKey(attempt);
     priorByActionKey.set(attemptKey, selectPriorExecutionAttempt(priorByActionKey.get(attemptKey), attempt));
+    priorAttemptsByActionKey.set(attemptKey, [
+      ...(priorAttemptsByActionKey.get(attemptKey) ?? []),
+      cloneLocalRolloutExecutionAttempt(attempt)
+    ]);
     priorByActionKeyForEmptyProjection.set(
       attemptKey,
       selectPriorExecutionAttemptForProjection(
@@ -307,11 +315,15 @@ export async function executeProviderOperatorAutopilotLocalRolloutActions(
       continue;
     }
     for (const actionId of actionIds) {
-      const priorAttempt = priorByActionKey.get(
-        `${pendingAction.action_instance_id}\u0000${actionId}`
-      );
+      const actionKey = `${pendingAction.action_instance_id}\u0000${actionId}`;
+      const priorAttempt = priorByActionKey.get(actionKey);
       if (priorAttempt && shouldReusePriorExecutionAttempt(priorAttempt)) {
-        relevantAttempts.push(cloneLocalRolloutExecutionAttempt(priorAttempt));
+        relevantAttempts.push(
+          ...selectPriorExecutionAttemptsForReuse(
+            priorAttemptsByActionKey.get(actionKey) ?? [],
+            priorAttempt
+          )
+        );
         if (isSucceededTerminalAttempt(priorAttempt)) {
           succeededActionIds.add(actionId);
         } else {
@@ -665,8 +677,8 @@ async function runSingleLocalRolloutAction(input: {
       : `Local rollout action ${input.actionId} failed.`,
     command: preflight.command,
     exitCode: result.exitCode,
-    stdout: normalizeCommandText(result.stdout),
-    stderr: normalizeCommandText(result.stderr)
+    stdout: result.stdout,
+    stderr: result.stderr
   });
   return {
     records: [startedAttempt, terminalAttempt],
@@ -913,6 +925,28 @@ function buildAttempt(input: {
     stdout: input.stdout,
     stderr: input.stderr
   };
+}
+
+function selectPriorExecutionAttemptsForReuse(
+  candidates: ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord[],
+  selected: ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord
+): ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord[] {
+  if (selected.record_kind !== 'terminal' || selected.reason !== 'execution_audit_failed') {
+    return [cloneLocalRolloutExecutionAttempt(selected)];
+  }
+  const started = candidates
+    .filter((candidate) => candidate.record_kind === 'started')
+    .reduce<ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord | null>(
+      (current, candidate) =>
+        current
+          ? selectPriorExecutionAttemptForProjection(current, candidate)
+          : candidate,
+      null
+    );
+  return [
+    ...(started ? [cloneLocalRolloutExecutionAttempt(started)] : []),
+    cloneLocalRolloutExecutionAttempt(selected)
+  ];
 }
 
 function selectPriorExecutionAttempt(

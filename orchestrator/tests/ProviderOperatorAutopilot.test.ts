@@ -1923,6 +1923,55 @@ describe('providerOperatorAutopilot', () => {
         })
       ])
     );
+
+    const rerunCommand = vi.fn(async () => {
+      throw new Error('prior execution audit failure should not rerun automatically');
+    });
+    const rerunOutcome = await executeProviderOperatorAutopilotLocalRolloutActions(
+      {
+        pendingActions: [
+          {
+            kind: 'local_rollout',
+            action_instance_id: 'local_rollout:audit-failed',
+            issue_id: 'lin-issue-1',
+            issue_identifier: 'CO-118',
+            summary: 'pending rollout',
+            merge_closeout_recorded_at: '2026-04-09T09:15:00.000Z',
+            merge_closeout_reason: 'merged_and_transitioned_done',
+            shared_root_status: 'reconciled',
+            linear_transition_status: 'transitioned',
+            executable_action_ids: ['local-rebuild'],
+            lifecycle_state: 'pending',
+            lifecycle_actor: null,
+            lifecycle_reason: null,
+            lifecycle_recorded_at: null
+          }
+        ],
+        config: buildConfigWithLocalRolloutExecution().post_merge_rollout.execution,
+        repoRoot: process.cwd(),
+        priorAttempts: outcome.attempts
+      },
+      {
+        runCommand: rerunCommand,
+        appendExecutionAttempt: appendExecutionAttemptNoop
+      }
+    );
+
+    expect(rerunCommand).not.toHaveBeenCalled();
+    expect(rerunOutcome.attempts).toMatchObject([
+      {
+        record_kind: 'started',
+        action_id: 'local-rebuild',
+        terminal_state: 'failed',
+        reason: 'execution_interrupted'
+      },
+      {
+        record_kind: 'terminal',
+        action_id: 'local-rebuild',
+        terminal_state: 'failed',
+        reason: 'execution_audit_failed'
+      }
+    ]);
   });
 
   it('does not launch a local rollout command when started audit persistence fails', async () => {
@@ -2361,6 +2410,51 @@ describe('providerOperatorAutopilot', () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+
+  it('stores raw stdout and stderr when recording local rollout command output', async () => {
+    const outcome = await executeProviderOperatorAutopilotLocalRolloutActions(
+      {
+        pendingActions: [
+          {
+            kind: 'local_rollout',
+            action_instance_id: 'local_rollout:raw-command-output',
+            issue_id: 'lin-issue-1',
+            issue_identifier: 'CO-118',
+            summary: 'pending rollout',
+            merge_closeout_recorded_at: '2026-04-09T09:15:00.000Z',
+            merge_closeout_reason: 'merged_and_transitioned_done',
+            shared_root_status: 'reconciled',
+            linear_transition_status: 'transitioned',
+            executable_action_ids: ['local-rebuild'],
+            lifecycle_state: 'pending',
+            lifecycle_actor: null,
+            lifecycle_reason: null,
+            lifecycle_recorded_at: null
+          }
+        ],
+        config: buildConfigWithLocalRolloutExecution().post_merge_rollout.execution,
+        repoRoot: process.cwd()
+      },
+      {
+        runCommand: async () => ({
+          ok: false,
+          exitCode: 1,
+          stdout: '  raw stdout\n',
+          stderr: '\n  raw stderr\n'
+        }),
+        appendExecutionAttempt: appendExecutionAttemptNoop
+      }
+    );
+
+    expect(outcome.attempts.at(-1)).toMatchObject({
+      record_kind: 'terminal',
+      action_id: 'local-rebuild',
+      terminal_state: 'failed',
+      reason: 'command_failed',
+      stdout: '  raw stdout\n',
+      stderr: '\n  raw stderr\n'
+    });
   });
 
   it('refuses undeclared local rollout action ids without running a command', async () => {
