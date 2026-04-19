@@ -943,6 +943,25 @@ function buildEmptyIssuePullRequestAttachments(): ProviderLinearIssuePullRequest
   };
 }
 
+function buildUnknownIssuePullRequestAttachments(
+  attachments: readonly ProviderLinearWorkflowAttachment[]
+): ProviderLinearIssuePullRequestAttachments {
+  const seenComparisonKeys = new Set<string>();
+  const unknown: ProviderLinearWorkflowAttachment[] = [];
+  for (const attachment of attachments) {
+    const parsed = parseGitHubPullRequestUrl(attachment.url);
+    if (!parsed || seenComparisonKeys.has(parsed.comparisonKey)) {
+      continue;
+    }
+    seenComparisonKeys.add(parsed.comparisonKey);
+    unknown.push(attachment);
+  }
+  return {
+    ...buildEmptyIssuePullRequestAttachments(),
+    unknown
+  };
+}
+
 interface ProviderLinearIssuePullRequestCandidate {
   attachment: ProviderLinearWorkflowAttachment;
   snapshot: {
@@ -4432,6 +4451,8 @@ function parseCachedIssueContext(value: unknown): ProviderLinearIssueContext | n
   if (issue.workpad_comment !== undefined && issue.workpad_comment !== null && workpadComment === null) {
     return null;
   }
+  const cachedPullRequestAttachments =
+    pullRequestAttachments ?? buildUnknownIssuePullRequestAttachments(attachments);
 
   return {
     id,
@@ -4448,7 +4469,7 @@ function parseCachedIssueContext(value: unknown): ProviderLinearIssueContext | n
     project,
     comments,
     attachments,
-    pull_request_attachments: pullRequestAttachments ?? buildEmptyIssuePullRequestAttachments(),
+    pull_request_attachments: cachedPullRequestAttachments,
     workpad_comment: workpadComment
   };
 }

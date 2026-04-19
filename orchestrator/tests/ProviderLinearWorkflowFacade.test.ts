@@ -783,6 +783,57 @@ describe('providerLinearWorkflowFacade', () => {
     expect(result).not.toHaveProperty('cache_fallback_used');
   });
 
+  it('preserves legacy cached GitHub attachments as unknown PR truth during cache fallback', async () => {
+    const env = await createBudgetedRunScopedEnv();
+    const resetAt = String(Date.now() + 60_000);
+
+    await writeCachedIssueContext(
+      env,
+      buildCachedIssueContext({
+        attachments: [buildGitHubAttachment('attachment-pr-509', 509)]
+      }),
+      {
+        recordedAt: new Date(Date.now() - 45_000).toISOString()
+      }
+    );
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'provider-linear:issue-context',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '0',
+        'x-ratelimit-requests-reset': resetAt
+      }
+    });
+
+    const fetchImpl: typeof fetch = vi.fn(async () => {
+      throw new Error('shared cooldown should fall back before live fetch');
+    });
+
+    const result = await getProviderLinearIssueContext({
+      issueId: 'lin-issue-1',
+      env,
+      fallbackToCacheOnFailure: true,
+      fetchImpl
+    });
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      cache_fallback_used: true,
+      issue: {
+        attachments: [{ id: 'attachment-pr-509' }],
+        pull_request_attachments: {
+          current: null,
+          historical: [],
+          conflicting: [],
+          unknown: [{ id: 'attachment-pr-509' }]
+        }
+      }
+    });
+  });
+
   it('preserves cached PR classification on partial reads that skip attachment hydration', async () => {
     const env = await createBudgetedRunScopedEnv();
     const cachedAttachment = {
