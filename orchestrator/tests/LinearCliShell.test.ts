@@ -1293,6 +1293,83 @@ describe('runLinearCliShell', () => {
     });
   });
 
+  it('records the canonical follow-up owner from split relation failure metadata', async () => {
+    const log = vi.fn();
+    const setExitCode = vi.fn();
+    const appendAuditEntry = vi.fn();
+    const createProviderLinearFollowUpIssueMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').createProviderLinearFollowUpIssue>()
+        .mockResolvedValue({
+          ok: false,
+          operation: 'create-follow-up',
+          error: {
+            code: 'linear_graphql_error',
+            message: 'Linear GraphQL returned operation errors.',
+            status: 409,
+            details: {
+              errors: [{ message: 'relation failed after race reconciliation' }],
+              follow_up_issue: {
+                id: 'lin-issue-254',
+                identifier: 'CO-254'
+              },
+              created_issue: {
+                id: 'lin-issue-260',
+                identifier: 'CO-260'
+              },
+              failed_relation_type: 'related'
+            }
+          }
+        } as never);
+
+    await runLinearCliShell(
+      {
+        positionals: ['create-follow-up'],
+        flags: {
+          format: 'json',
+          'issue-id': 'lin-issue-1',
+          title: 'Follow-up',
+          description: 'Investigate the remaining improvement',
+          'intent-checksum': '- Preserve exact `CO STATUS` wording.',
+          'non-goals': '- [ ] Do not reopen the browser surface.',
+          'not-done-if': '- [ ] The issue still allows browser-first parity.',
+          'acceptance-criteria': '- [ ] Captured'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        createProviderLinearFollowUpIssue: createProviderLinearFollowUpIssueMock,
+        getEnv: () => ({
+          CO_LINEAR_API_TOKEN: 'lin-api-token',
+          CODEX_PROVIDER_LINEAR_AUDIT_PATH: '/tmp/provider-linear-audit.jsonl'
+        }),
+        now: () => '2026-03-22T12:00:00.000Z',
+        appendAuditEntry,
+        log,
+        setExitCode
+      }
+    );
+
+    expect(setExitCode).toHaveBeenCalledWith(1);
+    expect(appendAuditEntry).toHaveBeenCalledWith('/tmp/provider-linear-audit.jsonl', {
+      recorded_at: '2026-03-22T12:00:00.000Z',
+      operation: 'create-follow-up',
+      ok: false,
+      issue_id: 'lin-issue-1',
+      issue_identifier: null,
+      source_setup: null,
+      action: null,
+      via: null,
+      state: null,
+      follow_up_issue_id: 'lin-issue-254',
+      follow_up_issue_identifier: 'CO-254',
+      failed_relation_type: 'related',
+      comment_id: null,
+      attachment_id: null,
+      error_code: 'linear_graphql_error',
+      error_message: 'Linear GraphQL returned operation errors.'
+    });
+  });
+
   it('fails closed when create-follow-up omits the required intent checksum', async () => {
     const log = vi.fn();
     const setExitCode = vi.fn();

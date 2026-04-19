@@ -10181,13 +10181,17 @@ describe('providerLinearWorkflowFacade', () => {
         status: 409,
         details: {
           failed_relation_type: 'related',
-          created_issue: {
+          follow_up_issue: {
             id: 'lin-issue-254',
             identifier: 'CO-254'
           }
         }
       }
     });
+    if (result.ok) {
+      throw new Error('expected relation GraphQL error to fail');
+    }
+    expect(result.error.details).not.toHaveProperty('created_issue');
     expect(calls).toEqual(['issue-summary', 'owner-search', 'related-relation']);
   });
 
@@ -11239,6 +11243,402 @@ describe('providerLinearWorkflowFacade', () => {
     ]);
   });
 
+  it('surfaces the created issue and preserves retryability when post-create canonical owner reconciliation search fails', async () => {
+    const canonicalOwnerKey = 'baseline_cohort_id:apr-19-docs-freshness';
+    const initialDescription = buildExpectedFollowUpDescription();
+    const finalDescription = buildExpectedFollowUpDescription({
+      canonicalOwnerKey,
+      includeTraceability: true
+    });
+    let ownerSearchCount = 0;
+    const calls: string[] = [];
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, unknown>;
+      };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearCanonicalFollowUpOwners')) {
+        ownerSearchCount += 1;
+        calls.push('owner-search');
+        if (ownerSearchCount === 1) {
+          return jsonResponse(buildCanonicalOwnerIssuesBody([]));
+        }
+        return jsonResponse(
+          {
+            errors: [
+              {
+                message: 'Rate limit exceeded. Only 5000 requests are allowed per 1 hour.',
+                path: ['issues'],
+                extensions: {
+                  code: 'RATELIMITED',
+                  statusCode: 429
+                }
+              }
+            ]
+          },
+          429,
+          {
+            'retry-after': '3600',
+            'x-ratelimit-requests-limit': '5000',
+            'x-ratelimit-requests-remaining': '0',
+            'x-ratelimit-requests-reset': '1774701380970',
+            'x-request-id': 'req-reconcile-1'
+          }
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateFollowUpIssue')) {
+        calls.push('create');
+        return jsonResponse({
+          data: {
+            issueCreate: {
+              success: true,
+              issue: {
+                id: 'lin-issue-2',
+                identifier: 'CO-2',
+                title: 'Follow-up issue',
+                description: initialDescription,
+                url: 'https://linear.app/example/issue/CO-2',
+                state: {
+                  id: 'state-backlog',
+                  name: 'Backlog',
+                  type: 'unstarted'
+                },
+                team: {
+                  id: 'lin-team-1',
+                  key: 'CO',
+                  name: 'Codex Orchestrator'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'CO'
+                }
+              }
+            }
+          }
+        });
+      }
+      if (body.query?.includes('ProviderLinearUpdateIssueDescription')) {
+        calls.push('update-description');
+        expect(body.variables).toEqual({
+          id: 'lin-issue-2',
+          description: finalDescription
+        });
+        return jsonResponse({
+          data: {
+            issueUpdate: {
+              success: true,
+              issue: {
+                id: 'lin-issue-2',
+                identifier: 'CO-2',
+                title: 'Follow-up issue',
+                description: finalDescription,
+                url: 'https://linear.app/example/issue/CO-2',
+                state: {
+                  id: 'state-backlog',
+                  name: 'Backlog',
+                  type: 'unstarted'
+                },
+                team: {
+                  id: 'lin-team-1',
+                  key: 'CO',
+                  name: 'Codex Orchestrator'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'CO'
+                }
+              }
+            }
+          }
+        });
+      }
+      if (body.query?.includes('ProviderLinearCreateIssueRelation')) {
+        throw new Error('relations must not be created after reconciliation search fails');
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await createProviderLinearFollowUpIssue({
+      issueId: 'lin-issue-1',
+      title: 'Follow-up issue',
+      description: 'Investigate the remaining improvement.',
+      intentChecksum: '- Preserve exact `CO STATUS` wording.',
+      nonGoals: '- [ ] Do not reopen the browser surface.',
+      notDoneIf: '- [ ] The issue still allows browser-first parity.',
+      acceptanceCriteria: '- [ ] Captured',
+      canonicalOwnerKey,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_rate_limited',
+        message: 'Linear API rate limit exceeded.',
+        status: 429,
+        retryable: true,
+        details: {
+          errors: [
+            {
+              message: 'Rate limit exceeded. Only 5000 requests are allowed per 1 hour.',
+              path: ['issues'],
+              extensions: {
+                code: 'RATELIMITED',
+                statusCode: 429
+              }
+            }
+          ],
+          retry_after_seconds: 3600,
+          requests_remaining: 0,
+          requests_limit: 5000,
+          requests_reset_at: '2026-03-28T12:36:20.970Z',
+          request_id: 'req-reconcile-1',
+          created_issue: {
+            id: 'lin-issue-2',
+            identifier: 'CO-2',
+            title: 'Follow-up issue',
+            description: finalDescription,
+            url: 'https://linear.app/example/issue/CO-2',
+            state: {
+              id: 'state-backlog',
+              name: 'Backlog',
+              type: 'unstarted'
+            },
+            team: {
+              id: 'lin-team-1',
+              key: 'CO',
+              name: 'Codex Orchestrator'
+            },
+            project: {
+              id: 'lin-project-1',
+              name: 'CO'
+            }
+          },
+          failed_step: 'canonical_owner_reconciliation'
+        }
+      }
+    });
+    expect(calls).toEqual(['owner-search', 'create', 'update-description', 'owner-search']);
+  });
+
+  it('separates the created issue from the canonical owner when post-create race relation creation fails', async () => {
+    const canonicalOwnerKey = 'baseline_cohort_id:apr-19-docs-freshness';
+    const canonicalOwnerMarker = `codex-orchestrator:canonical-owner-key=${canonicalOwnerKey}`;
+    const supersededMarker = `codex-orchestrator:superseded-canonical-owner-key=${canonicalOwnerKey}`;
+    const initialDescription = buildExpectedFollowUpDescription();
+    const finalDescription = buildExpectedFollowUpDescription({
+      canonicalOwnerKey,
+      includeTraceability: true
+    })
+      .replaceAll('CO-2', 'CO-260')
+      .replaceAll('lin-issue-2', 'lin-issue-260')
+      .replaceAll('linear-lin-issue-2', 'linear-lin-issue-260');
+    const canonicalOwnerDescription = [
+      'Existing owner.',
+      '## Canonical Owner',
+      `- Canonical owner key: \`${canonicalOwnerKey}\``,
+      `- Canonical owner marker: \`${canonicalOwnerMarker}\``
+    ].join('\n');
+    let ownerSearchCount = 0;
+    let finalizedCreatedDescription = finalDescription;
+    const calls: string[] = [];
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, unknown>;
+      };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearCanonicalFollowUpOwners')) {
+        ownerSearchCount += 1;
+        calls.push('owner-search');
+        if (ownerSearchCount === 1) {
+          return jsonResponse(buildCanonicalOwnerIssuesBody([]));
+        }
+        return jsonResponse(
+          buildCanonicalOwnerIssuesBody([
+            buildCanonicalOwnerIssue({
+              id: 'lin-issue-260',
+              identifier: 'CO-260',
+              title: 'Race-created owner',
+              description: finalizedCreatedDescription,
+              state: {
+                id: 'state-backlog',
+                name: 'Backlog',
+                type: 'unstarted'
+              }
+            }),
+            buildCanonicalOwnerIssue({
+              id: 'lin-issue-254',
+              identifier: 'CO-254',
+              title: 'Existing canonical owner',
+              description: canonicalOwnerDescription,
+              state: {
+                id: 'state-backlog',
+                name: 'Backlog',
+                type: 'unstarted'
+              }
+            })
+          ])
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateFollowUpIssue')) {
+        calls.push('create');
+        return jsonResponse({
+          data: {
+            issueCreate: {
+              success: true,
+              issue: {
+                id: 'lin-issue-260',
+                identifier: 'CO-260',
+                title: 'Race-created owner',
+                description: initialDescription,
+                url: 'https://linear.app/example/issue/CO-260',
+                state: {
+                  id: 'state-backlog',
+                  name: 'Backlog',
+                  type: 'unstarted'
+                },
+                team: {
+                  id: 'lin-team-1',
+                  key: 'CO',
+                  name: 'Codex Orchestrator'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'CO'
+                }
+              }
+            }
+          }
+        });
+      }
+      if (body.query?.includes('ProviderLinearUpdateIssueDescription')) {
+        if (!calls.includes('update-description')) {
+          finalizedCreatedDescription = String((body.variables as Record<string, unknown>).description ?? '');
+          calls.push('update-description');
+          return jsonResponse({
+            data: {
+              issueUpdate: {
+                success: true,
+                issue: {
+                  id: 'lin-issue-260',
+                  identifier: 'CO-260',
+                  title: 'Race-created owner',
+                  description: finalizedCreatedDescription,
+                  url: 'https://linear.app/example/issue/CO-260',
+                  state: {
+                    id: 'state-backlog',
+                    name: 'Backlog',
+                    type: 'unstarted'
+                  },
+                  team: {
+                    id: 'lin-team-1',
+                    key: 'CO',
+                    name: 'Codex Orchestrator'
+                  },
+                  project: {
+                    id: 'lin-project-1',
+                    name: 'CO'
+                  }
+                }
+              }
+            }
+          });
+        }
+        calls.push('supersede-created-owner');
+        expect(body.variables).toMatchObject({
+          id: 'lin-issue-260'
+        });
+        expect(String(body.variables?.description ?? '')).toContain(supersededMarker);
+        return jsonResponse({
+          data: {
+            issueUpdate: {
+              success: true
+            }
+          }
+        });
+      }
+      if (body.query?.includes('ProviderLinearCreateIssueRelation')) {
+        calls.push('related-relation');
+        expect(body.variables).toMatchObject({
+          input: {
+            type: 'related',
+            issueId: 'lin-issue-1',
+            relatedIssueId: 'lin-issue-254'
+          }
+        });
+        return jsonResponse({
+          errors: [{ message: 'relation failed after race reconciliation' }]
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await createProviderLinearFollowUpIssue({
+      issueId: 'lin-issue-1',
+      title: 'Race-created owner',
+      description: 'Investigate the remaining improvement.',
+      intentChecksum: '- Preserve exact `CO STATUS` wording.',
+      nonGoals: '- [ ] Do not reopen the browser surface.',
+      notDoneIf: '- [ ] The issue still allows browser-first parity.',
+      acceptanceCriteria: '- [ ] Captured',
+      canonicalOwnerKey,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_graphql_error',
+        status: 409,
+        retryable: false,
+        details: {
+          errors: [{ message: 'relation failed after race reconciliation' }],
+          follow_up_issue: {
+            id: 'lin-issue-254',
+            identifier: 'CO-254'
+          },
+          created_issue: {
+            id: 'lin-issue-260',
+            identifier: 'CO-260'
+          },
+          canonical_owner_issue: {
+            id: 'lin-issue-254',
+            identifier: 'CO-254'
+          },
+          failed_relation_type: 'related'
+        }
+      }
+    });
+    if (result.ok) {
+      throw new Error('expected relation creation after race reconciliation to fail');
+    }
+    expect(result.error.details?.created_issue).not.toMatchObject({
+      id: 'lin-issue-254'
+    });
+    expect(calls).toEqual([
+      'owner-search',
+      'create',
+      'update-description',
+      'owner-search',
+      'supersede-created-owner',
+      'related-relation'
+    ]);
+  });
+
   it('fails follow-up creation fast when the shared request budget is clearly insufficient', async () => {
     const codexHome = await mkdtemp(join(tmpdir(), 'provider-linear-workflow-facade-'));
     tempDirs.push(codexHome);
@@ -11677,6 +12077,27 @@ describe('providerLinearWorkflowFacade', () => {
         details: {
           http_status: 200,
           errors: [{ message: 'relation failed' }],
+          follow_up_issue: {
+            id: 'lin-issue-2',
+            identifier: 'CO-2',
+            title: 'Follow-up issue',
+            description: finalDescription,
+            url: 'https://linear.app/example/issue/CO-2',
+            state: {
+              id: 'state-backlog',
+              name: 'Backlog',
+              type: 'unstarted'
+            },
+            team: {
+              id: 'lin-team-1',
+              key: 'CO',
+              name: 'Codex Orchestrator'
+            },
+            project: {
+              id: 'lin-project-1',
+              name: 'CO'
+            }
+          },
           created_issue: {
             id: 'lin-issue-2',
             identifier: 'CO-2',
@@ -11830,6 +12251,27 @@ describe('providerLinearWorkflowFacade', () => {
         details: {
           http_status: 200,
           errors: [{ message: 'block relation failed' }],
+          follow_up_issue: {
+            id: 'lin-issue-2',
+            identifier: 'CO-2',
+            title: 'Follow-up issue',
+            description: finalDescription,
+            url: 'https://linear.app/example/issue/CO-2',
+            state: {
+              id: 'state-backlog',
+              name: 'Backlog',
+              type: 'unstarted'
+            },
+            team: {
+              id: 'lin-team-1',
+              key: 'CO',
+              name: 'Codex Orchestrator'
+            },
+            project: {
+              id: 'lin-project-1',
+              name: 'CO'
+            }
+          },
           created_issue: {
             id: 'lin-issue-2',
             identifier: 'CO-2',

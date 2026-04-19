@@ -2138,6 +2138,7 @@ export async function createProviderLinearFollowUpIssue(input: {
     session: session.session,
     sourceIssue: issueSummary.issue,
     followUpIssue,
+    createdIssue,
     blockedBySource
   });
   if (!relationResult.ok) {
@@ -2195,7 +2196,18 @@ async function reconcileCreatedCanonicalOwner(input: {
   if (!ownerSearch.ok) {
     return {
       ok: false,
-      result: failureFromWorkflowError('create-follow-up', ownerSearch.error)
+      result: failure(
+        'create-follow-up',
+        ownerSearch.error.code,
+        ownerSearch.error.message,
+        ownerSearch.error.status,
+        {
+          ...(ownerSearch.error.details ?? {}),
+          created_issue: input.createdIssue,
+          failed_step: 'canonical_owner_reconciliation'
+        },
+        ownerSearch.error.retryable
+      )
     };
   }
 
@@ -2480,6 +2492,7 @@ async function createFollowUpRelations(input: {
   session: ResolvedLinearWorkflowSession;
   sourceIssue: ProviderLinearIssueSummary;
   followUpIssue: ProviderLinearCreatedIssue;
+  createdIssue?: ProviderLinearCreatedIssue | null;
   blockedBySource: boolean;
 }): Promise<
   | {
@@ -2522,8 +2535,11 @@ async function createFollowUpRelations(input: {
           409,
           {
             ...(relatedRelationResult.error.details ?? {}),
-            created_issue: input.followUpIssue,
-            failed_relation_type: 'related'
+            ...buildFollowUpRelationFailureDetails({
+              followUpIssue: input.followUpIssue,
+              createdIssue: input.createdIssue,
+              failedRelationType: 'related'
+            })
           },
           false
         )
@@ -2537,10 +2553,11 @@ async function createFollowUpRelations(input: {
         'linear_follow_up_relation_failed',
         'Linear follow-up issue relation creation did not succeed.',
         409,
-        {
-          created_issue: input.followUpIssue,
-          failed_relation_type: 'related'
-        },
+        buildFollowUpRelationFailureDetails({
+          followUpIssue: input.followUpIssue,
+          createdIssue: input.createdIssue,
+          failedRelationType: 'related'
+        }),
         false
       )
     };
@@ -2576,8 +2593,11 @@ async function createFollowUpRelations(input: {
         409,
         {
           ...(blockingRelationResult.error.details ?? {}),
-          created_issue: input.followUpIssue,
-          failed_relation_type: 'blocks'
+          ...buildFollowUpRelationFailureDetails({
+            followUpIssue: input.followUpIssue,
+            createdIssue: input.createdIssue,
+            failedRelationType: 'blocks'
+          })
         },
         false
       )
@@ -2591,16 +2611,32 @@ async function createFollowUpRelations(input: {
         'linear_follow_up_relation_failed',
         'Linear follow-up issue relation creation did not succeed.',
         409,
-        {
-          created_issue: input.followUpIssue,
-          failed_relation_type: 'blocks'
-        },
+        buildFollowUpRelationFailureDetails({
+          followUpIssue: input.followUpIssue,
+          createdIssue: input.createdIssue,
+          failedRelationType: 'blocks'
+        }),
         false
       )
     };
   }
 
   return { ok: true };
+}
+
+function buildFollowUpRelationFailureDetails(input: {
+  followUpIssue: ProviderLinearCreatedIssue;
+  createdIssue?: ProviderLinearCreatedIssue | null;
+  failedRelationType: 'related' | 'blocks';
+}): Record<string, unknown> {
+  return {
+    follow_up_issue: input.followUpIssue,
+    ...(input.createdIssue ? { created_issue: input.createdIssue } : {}),
+    ...(input.createdIssue && input.createdIssue.id !== input.followUpIssue.id
+      ? { canonical_owner_issue: input.followUpIssue }
+      : {}),
+    failed_relation_type: input.failedRelationType
+  };
 }
 
 function resolveLinearWorkflowSession(
