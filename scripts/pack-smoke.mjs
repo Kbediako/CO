@@ -372,6 +372,70 @@ async function codexSupportsMarketplace(command, options = {}) {
   return await commandSucceeds(command, ['marketplace', 'add', '--help'], options);
 }
 
+export function resolveMarketplaceSmokePrerequisite({
+  codexBin = 'codex',
+  allowMarketplaceSkip = false,
+  marketplaceSkipReason = '',
+  codexAvailable,
+  marketplaceCapable
+}) {
+  const skipReason = String(marketplaceSkipReason ?? '').trim();
+  if (!codexAvailable) {
+    if (allowMarketplaceSkip && skipReason.length > 0) {
+      return {
+        status: 'skip',
+        reason: 'codex-unavailable',
+        message: `Skipping marketplace smoke: ${codexBin} is unavailable in this environment. Reason: ${skipReason}`
+      };
+    }
+    if (allowMarketplaceSkip) {
+      return {
+        status: 'fail',
+        reason: 'missing-skip-reason',
+        message:
+          'PACK_SMOKE_MARKETPLACE_SKIP_REASON is required when PACK_SMOKE_ALLOW_MARKETPLACE_SKIP=1 skips marketplace coverage.'
+      };
+    }
+    return {
+      status: 'fail',
+      reason: 'codex-unavailable',
+      message:
+        `Marketplace smoke requires ${codexBin} in PATH. Set PACK_SMOKE_ALLOW_MARKETPLACE_SKIP=1 with PACK_SMOKE_MARKETPLACE_SKIP_REASON only for local-dev opt-out.`
+    };
+  }
+
+  if (!marketplaceCapable) {
+    if (allowMarketplaceSkip && skipReason.length > 0) {
+      return {
+        status: 'skip',
+        reason: 'marketplace-unsupported',
+        message:
+          `Skipping marketplace smoke: ${codexBin} does not expose codex marketplace add. Reason: ${skipReason}`
+      };
+    }
+    if (allowMarketplaceSkip) {
+      return {
+        status: 'fail',
+        reason: 'missing-skip-reason',
+        message:
+          'PACK_SMOKE_MARKETPLACE_SKIP_REASON is required when PACK_SMOKE_ALLOW_MARKETPLACE_SKIP=1 skips marketplace coverage.'
+      };
+    }
+    return {
+      status: 'fail',
+      reason: 'marketplace-unsupported',
+      message:
+        'Marketplace smoke requires a Codex CLI with `marketplace add` support. Set PACK_SMOKE_ALLOW_MARKETPLACE_SKIP=1 with PACK_SMOKE_MARKETPLACE_SKIP_REASON only for local-dev opt-out.'
+    };
+  }
+
+  return {
+    status: 'run',
+    reason: 'marketplace-supported',
+    message: 'Marketplace smoke prerequisites satisfied.'
+  };
+}
+
 async function assertPluginLauncherShape(pluginRoot, label) {
   const manifestPath = path.join(pluginRoot, '.mcp.json');
   const mcpManifest = await readJsonFile(manifestPath, `${label} mcp manifest`);
@@ -742,25 +806,22 @@ async function rewriteMarketplaceSourceToRelative(configPath, sourceRoot) {
 async function runMarketplacePluginSmoke(packageRoot, tempDir) {
   const codexBin = process.env.PACK_SMOKE_CODEX_BIN ?? 'codex';
   const allowMarketplaceSkip = process.env.PACK_SMOKE_ALLOW_MARKETPLACE_SKIP === '1';
+  const marketplaceSkipReason = process.env.PACK_SMOKE_MARKETPLACE_SKIP_REASON ?? '';
   const codexAvailable = await commandSucceeds(codexBin, ['--version']);
-  if (!codexAvailable) {
-    if (allowMarketplaceSkip) {
-      console.warn(`Skipping marketplace smoke: ${codexBin} is unavailable in this environment.`);
-      return;
-    }
-    throw new Error(
-      `Marketplace smoke requires ${codexBin} in PATH. Set PACK_SMOKE_ALLOW_MARKETPLACE_SKIP=1 only for local-dev opt-out.`
-    );
+  const marketplaceCapable = codexAvailable ? await codexSupportsMarketplace(codexBin) : false;
+  const prerequisite = resolveMarketplaceSmokePrerequisite({
+    codexBin,
+    allowMarketplaceSkip,
+    marketplaceSkipReason,
+    codexAvailable,
+    marketplaceCapable
+  });
+  if (prerequisite.status === 'skip') {
+    console.warn(prerequisite.message);
+    return;
   }
-  const marketplaceCapable = await codexSupportsMarketplace(codexBin);
-  if (!marketplaceCapable) {
-    if (allowMarketplaceSkip) {
-      console.warn(`Skipping marketplace smoke: ${codexBin} does not expose codex marketplace add.`);
-      return;
-    }
-    throw new Error(
-      'Marketplace smoke requires a Codex CLI with `marketplace add` support. Set PACK_SMOKE_ALLOW_MARKETPLACE_SKIP=1 only for local-dev opt-out.'
-    );
+  if (prerequisite.status === 'fail') {
+    throw new Error(prerequisite.message);
   }
 
   const marketplaceRoot = path.join(tempDir, 'codex-marketplace-root');

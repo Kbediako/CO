@@ -289,7 +289,33 @@
           },
           "post_merge_rollout": {
             "enabled": true,
-            "summary": "Merge closeout completed; local rollout follow-up may still be required."
+            "summary": "Merge closeout completed; local rollout follow-up may still be required.",
+            "execution": {
+              "enabled": true,
+              "actions": [
+                {
+                  "id": "control-host-supervision-status",
+                  "enabled": false,
+                  "order": 10,
+                  "runner": "codex_orchestrator",
+                  "args": ["control-host", "supervise", "status", "--format", "json"],
+                  "timeout_ms": 15000,
+                  "require_clean_repo": true,
+                  "supported_platforms": ["darwin"],
+                  "deploy_class": false
+                },
+                {
+                  "id": "pack-smoke-local-rebuild",
+                  "enabled": false,
+                  "order": 20,
+                  "runner": "npm_script",
+                  "script": "pack:smoke",
+                  "timeout_ms": 120000,
+                  "require_clean_repo": true,
+                  "deploy_class": false
+                }
+              ]
+            }
           }
         },
         "terminal_cleanup": {
