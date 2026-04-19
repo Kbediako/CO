@@ -25,6 +25,27 @@ export interface PrWatchMergeCoderabbitReviewMeta {
   nitpickCount: number;
 }
 
+export interface PrWatchMergeBotRereviewRollupContext {
+  name: string;
+  state: 'success' | 'pending' | 'failed' | 'missing' | string;
+  signal: string;
+  detailsUrl: string | null;
+}
+
+export interface PrWatchMergeBotRereviewDiagnostics {
+  rawPendingBots: string[];
+  effectivePendingBots: string[];
+  clearedPendingBots: string[];
+  coderabbit: {
+    statusCheckRollup: {
+      state: 'success' | 'pending' | 'failed' | 'missing' | string;
+      contexts: PrWatchMergeBotRereviewRollupContext[];
+    };
+    stalePendingCleared: boolean;
+    pendingBlockerSignal: string;
+  };
+}
+
 export interface PrWatchMergeBotRereviewSignals {
   fetchError: boolean;
   rateLimit?: PrWatchMergeGitHubRateLimitStatus | null;
@@ -61,6 +82,7 @@ export interface PrWatchMergeSnapshot {
   botRereviewFetchError: boolean;
   botRereviewPending: string[];
   botRereviewInProgress: string[];
+  botRereviewDiagnostics: PrWatchMergeBotRereviewDiagnostics;
   coderabbitReviewMeta: PrWatchMergeCoderabbitReviewMeta;
   checks: PrWatchMergeCheckSummary;
   requiredChecks: PrWatchMergeCheckSummary | null;
