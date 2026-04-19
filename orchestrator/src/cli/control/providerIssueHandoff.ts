@@ -347,6 +347,7 @@ type ProviderTrackedIssueRefreshDisposition =
   | {
       kind: 'release';
       reason: string;
+      source?: 'direct_issue_by_id';
       trackedIssue: Pick<
         LiveLinearTrackedIssue,
         | 'identifier'
@@ -2923,7 +2924,7 @@ export function createProviderIssueHandoffService(
         const releasedRun = resolveProviderReleaseRun(existing, attachableReleasedRuns);
         const releasedClaimIssueUpdatedAt = selectMostRecentTrackedIssueUpdatedAt(
           existing.issue_updated_at ?? null,
-          releasedRun?.issueUpdatedAt ?? releasedRun?.startedAt ?? null
+          resolveReleasedRunIssueUpdatedAtForReclaim(existing, releasedRun)
         );
         const releasedWebhookTiming = compareTrackedIssueUpdatedAt({
           existingIssueUpdatedAt: releasedClaimIssueUpdatedAt,
@@ -4196,6 +4197,23 @@ export function createProviderIssueHandoffService(
             continue;
           }
           if (resolution.kind === 'release') {
+            if (
+              resolution.reason === 'not_found' &&
+              resolution.source !== 'direct_issue_by_id' &&
+              claim.state === 'released' &&
+              pollInput?.deferFreshDiscovery === true &&
+              canRecheckPlainReleasedNotActiveClaim(claim) &&
+              (
+                canFreshDiscoverReleasedReclaimClaim(
+                  claim,
+                  releaseRun,
+                  hasPendingReleaseCancel
+                ) ||
+                canFreshDiscoverReleasedMissingRetainedRun
+              )
+            ) {
+              continue;
+            }
             await releaseClaim({
               claim,
               nextReason: `provider_issue_released:${resolution.reason}`,
@@ -5219,7 +5237,7 @@ function shouldReopenReleasedClaimAtCurrentTimestamp(input: {
 function shouldReopenReleasedClaimOnRefresh(input: {
   claim: Pick<
     ProviderIntakeClaimRecord,
-    'state' | 'reason' | 'issue_state' | 'issue_state_type' | 'issue_updated_at'
+    'state' | 'reason' | 'issue_state' | 'issue_state_type' | 'issue_updated_at' | 'issue_blocked_by'
   >;
   releaseRun: ProviderIssueRunRecord | null;
   trackedIssue: Pick<
@@ -5232,7 +5250,7 @@ function shouldReopenReleasedClaimOnRefresh(input: {
   }
   const latestReleasedIssueUpdatedAt = selectMostRecentTrackedIssueUpdatedAt(
     input.claim.issue_updated_at ?? null,
-    input.releaseRun?.issueUpdatedAt ?? input.releaseRun?.startedAt ?? null
+    resolveReleasedRunIssueUpdatedAtForReclaim(input.claim, input.releaseRun)
   );
   const updatedAtComparison = compareTrackedIssueUpdatedAt({
     existingIssueUpdatedAt: latestReleasedIssueUpdatedAt,
@@ -5247,6 +5265,49 @@ function shouldReopenReleasedClaimOnRefresh(input: {
         trackedIssue: input.trackedIssue
       })
     )
+  );
+}
+
+function resolveReleasedRunIssueUpdatedAtForReclaim(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'state' | 'reason' | 'issue_state' | 'issue_state_type' | 'issue_blocked_by'
+  >,
+  run: ProviderIssueRunRecord | null
+): string | null {
+  if (!run) {
+    return null;
+  }
+  if (run.issueUpdatedAt) {
+    return run.issueUpdatedAt;
+  }
+  if (
+    isPlainReleasedBlockedByCompletedOnlyClaim(claim) &&
+    !shouldAttemptReleaseCancel(run)
+  ) {
+    return null;
+  }
+  return run.startedAt;
+}
+
+function isPlainReleasedBlockedByCompletedOnlyClaim(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'state' | 'reason' | 'issue_state' | 'issue_state_type' | 'issue_blocked_by'
+  >
+): boolean {
+  if (!canRecheckPlainReleasedNotActiveClaim(claim)) {
+    return false;
+  }
+  const workflowState = classifyProviderLinearWorkflowState({
+    state: claim.issue_state,
+    state_type: claim.issue_state_type
+  });
+  return (
+    workflowState.normalizedState === 'blocked' &&
+    Array.isArray(claim.issue_blocked_by) &&
+    claim.issue_blocked_by.length > 0 &&
+    !providerLinearTodoBlockedByNonTerminal(claim.issue_blocked_by)
   );
 }
 
@@ -7645,6 +7706,7 @@ async function resolveTrackedIssuePollResolutionWithFallback(
     return {
       kind: 'release',
       reason: stripProviderIssueReleasedPrefix(eligibility.releaseReason),
+      source: 'direct_issue_by_id',
       trackedIssue: directResolution.trackedIssue,
       cleanupWorkspace: eligibility.cleanupWorkspace
     };
@@ -7654,6 +7716,7 @@ async function resolveTrackedIssuePollResolutionWithFallback(
     return {
       kind: 'release',
       reason: directResolution.reason,
+      source: 'direct_issue_by_id',
       trackedIssue: null,
       cleanupWorkspace: false
     };

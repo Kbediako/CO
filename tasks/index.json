@@ -816,7 +816,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-17",
+      "last_review": "2026-04-19",
       "approvals": {
         "docs_packet_child_lane": {
           "reviewer": "bounded same-issue docs child lane",
@@ -839,6 +839,26 @@
           "status": "passed",
           "artifact": "out/linear-31794e73-bc33-44b7-96d0-41334119a038/manual/elegance-review.md",
           "summary": "No extra abstraction was needed; the completed-blocker reclaim fix stays localized to providerIssueHandoff.ts and existing blocker-terminality helpers while preserving synthetic-detached exclusion."
+        },
+        "reopened_parent_docs": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-04-19",
+          "status": "updated",
+          "manifest": ".runs/linear-31794e73-bc33-44b7-96d0-41334119a038-co212-reopened-docs-refresh/cli/2026-04-19T01-07-35-927Z-7d8b6d4e/manifest.json",
+          "summary": "Parent rejected the reopened docs child patch for CO-223/CO-238 evidence drift and refreshed the CO-212 packet for the retained terminal run / deferred fresh-discovery residual while keeping the original CO-196 completed-blocker acceptance criteria."
+        },
+        "reopened_standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-19",
+          "status": "bounded_success",
+          "telemetry": ".runs/linear-31794e73-bc33-44b7-96d0-41334119a038/cli/2026-04-19T01-03-33-277Z-313c32c5/review/telemetry.json",
+          "summary": "First reopened review found a P2 that the run started_at bypass was too broad for cancelable retained runs. Parent gated that bypass to non-cancelable retained runs, added a fail-closed cancelable-run regression, and reran manifest-backed review to bounded-success with no actionable findings."
+        },
+        "reopened_elegance_review": {
+          "reviewer": "Codex parent lane",
+          "date": "2026-04-19",
+          "status": "passed",
+          "summary": "The reopened fix stays localized to providerIssueHandoff.ts: one shared freshness helper, one completed-blocker-only predicate using existing blocker terminality logic, and no broader workflow-state rewrite or duplicate-worker relaxation."
         }
       },
       "paths": {

@@ -4099,6 +4099,380 @@ describe('runProviderReviewHandoffPromotion', () => {
     }));
   });
 
+  it('selects open CO-219 PR 523 over merged CO-226 blocking attachment 522 during review promotion', async () => {
+    const runCommand = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      exitCode: 0,
+      stdout: 'git@github.com:asabeko/CO.git\n',
+      stderr: ''
+    });
+    const fetchSnapshot = vi.fn(async ({ prNumber }: { prNumber: number }) => {
+      if (prNumber === 522) {
+        return {
+          state: 'MERGED',
+          reviewDecision: 'APPROVED',
+          mergeStateStatus: 'UNKNOWN',
+          readyToMerge: false,
+          gateReasons: ['state=MERGED'],
+          unresolvedThreadCount: 0,
+          updatedAt: '2026-04-19T02:30:00.000Z',
+          mergedAt: '2026-04-19T02:30:00.000Z',
+          headOid: 'merged522',
+          checks: { pending: [], failed: [] },
+          requiredChecks: { pending: [], failed: [] }
+        };
+      }
+      if (prNumber === 523) {
+        return {
+          state: 'OPEN',
+          reviewDecision: 'APPROVED',
+          mergeStateStatus: 'CLEAN',
+          readyToMerge: true,
+          gateReasons: [],
+          unresolvedThreadCount: 0,
+          updatedAt: '2026-04-19T02:20:00.000Z',
+          mergedAt: null,
+          headOid: 'head523',
+          checks: { pending: [], failed: [] },
+          requiredChecks: { pending: [], failed: [] }
+        };
+      }
+      throw new Error(`Unexpected PR ${String(prNumber)}`);
+    });
+    const transitionIssueState = vi.fn(async () => ({
+      ok: true as const,
+      operation: 'transition' as const,
+      action: 'transitioned' as const,
+      previous_state: { id: 'state-in-review', name: 'In Review', type: 'started' },
+      target_state: { id: 'state-merging', name: 'Merging', type: 'started' },
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-219',
+        title: 'Review handoff promotion',
+        description: null,
+        url: null,
+        updated_at: '2026-04-19T02:41:00.000Z',
+        workspace_id: null,
+        state: { id: 'state-merging', name: 'Merging', type: 'started' },
+        team: null,
+        project: null,
+        comments: [],
+        attachments: [
+          { id: 'att-522', title: 'CO-226: stabilize Doctor full-suite timeout lane blocking CO-219 handoff', url: 'https://github.com/asabeko/CO/pull/522' },
+          { id: 'att-523', title: 'Fix stale accepted rehydration rows in CO STATUS', url: 'https://github.com/asabeko/CO/pull/523' }
+        ],
+        workpad_comment: null
+      },
+      source_setup: null
+    }));
+
+    const result = await runProviderReviewHandoffPromotion(
+      {
+        issueId: 'lin-issue-1',
+        issueIdentifier: 'CO-219',
+        issueState: 'In Review',
+        issueStateType: 'started',
+        issueUpdatedAt: '2026-04-19T02:40:00.000Z',
+        blockedBy: [
+          {
+            id: 'lin-issue-2',
+            identifier: 'CO-226',
+            state: 'In Progress',
+            state_type: 'started'
+          }
+        ],
+        repoRoot: '/tmp/co'
+      },
+      {
+        now: vi.fn().mockReturnValue('2026-04-19T02:41:00.000Z'),
+        readIssueContext: vi.fn(async () => ({
+          ok: true,
+          operation: 'issue-context',
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-219',
+            title: 'Review handoff promotion',
+            description: null,
+            url: null,
+            updated_at: '2026-04-19T02:40:00.000Z',
+            workspace_id: null,
+            state: { id: 'state-in-review', name: 'In Review', type: 'started' },
+            team: null,
+            project: null,
+            comments: [],
+            attachments: [
+              { id: 'att-522', title: 'CO-226: stabilize Doctor full-suite timeout lane blocking CO-219 handoff', url: 'https://github.com/asabeko/CO/pull/522' },
+              { id: 'att-523', title: 'Fix stale accepted rehydration rows in CO STATUS', url: 'https://github.com/asabeko/CO/pull/523' }
+            ],
+            workpad_comment: null
+          },
+          source_setup: null
+        })),
+        fetchSnapshot,
+        resolveSnapshotActionRequiredReasons: vi.fn(() => []),
+        runCommand,
+        transitionIssueState
+      }
+    );
+
+    expect(result).toMatchObject({
+      status: 'promoted',
+      reason: 'promoted_to_merging',
+      issue_state: 'Merging',
+      attached_pr_urls: [
+        'https://github.com/asabeko/CO/pull/522',
+        'https://github.com/asabeko/CO/pull/523'
+      ],
+      ignored_historical_pr_urls: [],
+      ignored_closed_unmerged_pr_urls: [],
+      ignored_cross_issue_pr_urls: ['https://github.com/asabeko/CO/pull/522'],
+      conflicting_attached_pr_urls: [],
+      pr: {
+        number: 523
+      },
+      snapshot: {
+        state: 'OPEN',
+        review_decision: 'APPROVED',
+        merge_state_status: 'CLEAN',
+        ready_to_merge: true,
+        head_oid: 'head523'
+      },
+      linear_transition: {
+        status: 'transitioned',
+        target_state: 'Merging',
+        issue_state: 'Merging'
+      }
+    });
+    expect(result.summary).toContain('Ignored cross-issue PR URLs');
+    expect(fetchSnapshot).toHaveBeenCalledTimes(1);
+    expect(fetchSnapshot).toHaveBeenCalledWith(expect.objectContaining({
+      prNumber: 523
+    }));
+    expect(fetchSnapshot).not.toHaveBeenCalledWith(expect.objectContaining({
+      prNumber: 522
+    }));
+    expect(transitionIssueState).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'lin-issue-1',
+      stateName: 'Merging',
+      expectedStateName: 'In Review',
+      expectedStateType: 'started',
+      expectedUpdatedAt: '2026-04-19T02:40:00.000Z'
+    }));
+  });
+
+  it('keeps review promotion ambiguous when merged CO-226 blocking attachment 522 leaves two current candidates', async () => {
+    const runCommand = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      exitCode: 0,
+      stdout: 'git@github.com:asabeko/CO.git\n',
+      stderr: ''
+    });
+    const fetchSnapshot = vi.fn(async ({ prNumber }: { prNumber: number }) => {
+      if (prNumber === 522) {
+        return {
+          state: 'MERGED',
+          reviewDecision: 'APPROVED',
+          mergeStateStatus: 'UNKNOWN',
+          readyToMerge: false,
+          gateReasons: ['state=MERGED'],
+          unresolvedThreadCount: 0,
+          updatedAt: '2026-04-19T02:30:00.000Z',
+          mergedAt: '2026-04-19T02:30:00.000Z',
+          headOid: 'merged522',
+          checks: { pending: [], failed: [] },
+          requiredChecks: { pending: [], failed: [] }
+        };
+      }
+      if (prNumber === 523 || prNumber === 524) {
+        return {
+          state: 'OPEN',
+          reviewDecision: 'APPROVED',
+          mergeStateStatus: 'CLEAN',
+          readyToMerge: true,
+          gateReasons: [],
+          unresolvedThreadCount: 0,
+          updatedAt: prNumber === 523 ? '2026-04-19T02:20:00.000Z' : '2026-04-19T02:22:00.000Z',
+          mergedAt: null,
+          headOid: prNumber === 523 ? 'head523' : 'head524',
+          checks: { pending: [], failed: [] },
+          requiredChecks: { pending: [], failed: [] }
+        };
+      }
+      throw new Error(`Unexpected PR ${String(prNumber)}`);
+    });
+    const transitionIssueState = vi.fn();
+
+    const result = await runProviderReviewHandoffPromotion(
+      {
+        issueId: 'lin-issue-1',
+        issueIdentifier: 'CO-219',
+        issueState: 'In Review',
+        issueStateType: 'started',
+        issueUpdatedAt: '2026-04-19T02:40:00.000Z',
+        blockedBy: [
+          {
+            id: 'lin-issue-2',
+            identifier: 'CO-226',
+            state: 'In Progress',
+            state_type: 'started'
+          }
+        ],
+        repoRoot: '/tmp/co'
+      },
+      {
+        now: vi.fn().mockReturnValue('2026-04-19T02:41:00.000Z'),
+        readIssueContext: vi.fn(async () => ({
+          ok: true,
+          operation: 'issue-context',
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-219',
+            title: 'Review handoff promotion',
+            description: null,
+            url: null,
+            updated_at: '2026-04-19T02:40:00.000Z',
+            workspace_id: null,
+            state: { id: 'state-in-review', name: 'In Review', type: 'started' },
+            team: null,
+            project: null,
+            comments: [],
+            attachments: [
+              { id: 'att-522', title: 'CO-226: stabilize Doctor full-suite timeout lane blocking CO-219 handoff', url: 'https://github.com/asabeko/CO/pull/522' },
+              { id: 'att-523', title: 'Fix stale accepted rehydration rows in CO STATUS', url: 'https://github.com/asabeko/CO/pull/523' },
+              { id: 'att-524', title: 'CO-219: alternate current review handoff PR', url: 'https://github.com/asabeko/CO/pull/524' }
+            ],
+            workpad_comment: null
+          },
+          source_setup: null
+        })),
+        fetchSnapshot,
+        resolveSnapshotActionRequiredReasons: vi.fn(() => []),
+        runCommand,
+        transitionIssueState
+      }
+    );
+
+    expect(result).toMatchObject({
+      status: 'action_required',
+      reason: 'multiple_attached_prs',
+      issue_state: 'In Review',
+      attached_pr_urls: [
+        'https://github.com/asabeko/CO/pull/522',
+        'https://github.com/asabeko/CO/pull/523',
+        'https://github.com/asabeko/CO/pull/524'
+      ],
+      ignored_historical_pr_urls: [],
+      ignored_closed_unmerged_pr_urls: [],
+      ignored_cross_issue_pr_urls: ['https://github.com/asabeko/CO/pull/522'],
+      conflicting_attached_pr_urls: [
+        'https://github.com/asabeko/CO/pull/523',
+        'https://github.com/asabeko/CO/pull/524'
+      ],
+      pr: null,
+      snapshot: null,
+      linear_transition: null
+    });
+    expect(result.summary).toContain('conflicting current-candidate PR URLs');
+    expect(result.summary).toContain('Ignored cross-issue PR URLs');
+    expect(fetchSnapshot).toHaveBeenCalledTimes(2);
+    expect(fetchSnapshot).not.toHaveBeenCalledWith(expect.objectContaining({
+      prNumber: 522
+    }));
+    expect(transitionIssueState).not.toHaveBeenCalled();
+  });
+
+  it('keeps undeclared cross-issue blocking attachments conflicting during review promotion', async () => {
+    const runCommand = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      exitCode: 0,
+      stdout: 'git@github.com:asabeko/CO.git\n',
+      stderr: ''
+    });
+    const fetchSnapshot = vi.fn(async ({ prNumber }: { prNumber: number }) => {
+      if (prNumber === 522 || prNumber === 523) {
+        return {
+          state: 'OPEN',
+          reviewDecision: 'APPROVED',
+          mergeStateStatus: 'CLEAN',
+          readyToMerge: true,
+          gateReasons: [],
+          unresolvedThreadCount: 0,
+          updatedAt: prNumber === 522 ? '2026-04-19T02:18:00.000Z' : '2026-04-19T02:20:00.000Z',
+          mergedAt: null,
+          headOid: prNumber === 522 ? 'head522' : 'head523',
+          checks: { pending: [], failed: [] },
+          requiredChecks: { pending: [], failed: [] }
+        };
+      }
+      throw new Error(`Unexpected PR ${String(prNumber)}`);
+    });
+    const transitionIssueState = vi.fn();
+
+    const result = await runProviderReviewHandoffPromotion(
+      {
+        issueId: 'lin-issue-1',
+        issueIdentifier: 'CO-219',
+        issueState: 'In Review',
+        issueStateType: 'started',
+        issueUpdatedAt: '2026-04-19T02:40:00.000Z',
+        blockedBy: [],
+        repoRoot: '/tmp/co'
+      },
+      {
+        now: vi.fn().mockReturnValue('2026-04-19T02:41:00.000Z'),
+        readIssueContext: vi.fn(async () => ({
+          ok: true,
+          operation: 'issue-context',
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-219',
+            title: 'Review handoff promotion',
+            description: null,
+            url: null,
+            updated_at: '2026-04-19T02:40:00.000Z',
+            workspace_id: null,
+            state: { id: 'state-in-review', name: 'In Review', type: 'started' },
+            team: null,
+            project: null,
+            comments: [],
+            attachments: [
+              { id: 'att-522', title: 'CO-226: blocking cleanup not declared as a blocker', url: 'https://github.com/asabeko/CO/pull/522' },
+              { id: 'att-523', title: 'Fix stale accepted rehydration rows in CO STATUS', url: 'https://github.com/asabeko/CO/pull/523' }
+            ],
+            workpad_comment: null
+          },
+          source_setup: null
+        })),
+        fetchSnapshot,
+        resolveSnapshotActionRequiredReasons: vi.fn(() => []),
+        runCommand,
+        transitionIssueState
+      }
+    );
+
+    expect(result).toMatchObject({
+      status: 'action_required',
+      reason: 'multiple_attached_prs',
+      issue_state: 'In Review',
+      ignored_cross_issue_pr_urls: [],
+      conflicting_attached_pr_urls: [
+        'https://github.com/asabeko/CO/pull/522',
+        'https://github.com/asabeko/CO/pull/523'
+      ],
+      pr: null,
+      snapshot: null,
+      linear_transition: null
+    });
+    expect(fetchSnapshot).toHaveBeenCalledTimes(2);
+    expect(fetchSnapshot).toHaveBeenCalledWith(expect.objectContaining({
+      prNumber: 522
+    }));
+    expect(fetchSnapshot).toHaveBeenCalledWith(expect.objectContaining({
+      prNumber: 523
+    }));
+    expect(transitionIssueState).not.toHaveBeenCalled();
+  });
+
   it('keeps a newer closed replacement PR from promoting an older merged attachment', async () => {
     const runCommand = vi.fn().mockResolvedValueOnce({
       ok: true,

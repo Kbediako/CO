@@ -20233,6 +20233,69 @@ describe('createProviderIssueHandoffService', () => {
     expect(cancelSpy).not.toHaveBeenCalled();
   });
 
+  it('releases a reclaimable plain released not-active claim when direct issue-by-id returns not_found during deferred poll', async () => {
+    const { root, paths } = await createHostPaths();
+    const missingManifestPath = join(
+      root,
+      '.runs',
+      'linear-lin-issue-1',
+      'cli',
+      'run-ready-not-active-direct-not-found',
+      'manifest.json'
+    );
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      run_id: 'run-ready-not-active-direct-not-found',
+      run_manifest_path: missingManifestPath
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = createCo202Launcher(
+      'run-ready-not-active-should-not-start',
+      '/tmp/provider-run/ready-not-active-should-not-start-manifest.json'
+    );
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'release' as const,
+      reason: 'not_found'
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 2
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-1'
+    });
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_found',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-15T15:00:00.000Z',
+      run_id: 'run-ready-not-active-direct-not-found',
+      run_manifest_path: missingManifestPath
+    });
+    expect(persist).toHaveBeenCalled();
+  });
+
   it('reclaims a stale Blocked plain released not-active claim with only completed blockers through fresh discovery even without retained run identity', async () => {
     const { paths } = await createHostPaths();
     const completedBlocker = {
@@ -20321,6 +20384,208 @@ describe('createProviderIssueHandoffService', () => {
       launch_token: expect.any(String)
     });
     expect(persist).toHaveBeenCalled();
+  });
+
+  it('reclaims a stale Blocked plain released not-active claim with only completed blockers when retained terminal run has no issue_updated_at proof', async () => {
+    const { root, paths } = await createHostPaths();
+    const retainedEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-196'
+    };
+    const retainedPaths = resolveRunPaths(retainedEnv, 'run-co-196-manual-start');
+    await mkdir(retainedPaths.runDir, { recursive: true });
+    await writeFile(
+      retainedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-co-196-manual-start',
+        task_id: 'linear-lin-issue-196',
+        status: 'succeeded',
+        pipeline_id: 'provider-linear-worker',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-196',
+        issue_identifier: 'CO-196',
+        started_at: '2026-04-17T03:45:02.315Z',
+        updated_at: '2026-04-17T03:50:00.000Z',
+        completed_at: '2026-04-17T03:50:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const completedBlocker = {
+      id: 'lin-blocker-207',
+      identifier: 'CO-207',
+      state: 'Done',
+      state_type: 'completed'
+    };
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: 'lin-issue-196',
+      issue_identifier: 'CO-196',
+      issue_title: 'Add Codex plugin marketplace distribution path',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-16T22:48:01.000Z',
+      issue_blocked_by: [completedBlocker],
+      task_id: 'linear-lin-issue-196',
+      run_id: 'run-co-196-manual-start',
+      run_manifest_path: retainedPaths.manifestPath
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = createCo202Launcher(
+      'run-co-196-ready-reclaimed',
+      '/tmp/provider-run/co-196-ready-reclaimed-manifest.json'
+    );
+    const refetchTrackedIssues = vi.fn(async (input?: { excludedIssueIds?: string[] }) => {
+      expect(input?.excludedIssueIds ?? []).not.toContain('lin-issue-196');
+      return {
+        kind: 'ready' as const,
+        trackedIssues: [
+          createCo202ReadyIssue({
+            id: 'lin-issue-196',
+            identifier: 'CO-196',
+            title: 'Add Codex plugin marketplace distribution path',
+            updated_at: '2026-04-17T03:33:27.936Z',
+            blocked_by: [completedBlocker]
+          })
+        ]
+      };
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'provider-linear-worker',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 2
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-issue-196',
+      pipelineId: 'provider-linear-worker',
+      provider: 'linear',
+      issueId: 'lin-issue-196',
+      issueIdentifier: 'CO-196',
+      issueUpdatedAt: '2026-04-17T03:33:27.936Z',
+      launchToken: expect.any(String)
+    }));
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-17T03:33:27.936Z',
+      issue_blocked_by: [completedBlocker],
+      task_id: 'linear-lin-issue-196',
+      run_id: 'run-co-196-ready-reclaimed',
+      run_manifest_path: '/tmp/provider-run/co-196-ready-reclaimed-manifest.json',
+      launch_source: 'control-host',
+      launch_token: expect.any(String)
+    });
+    expect(persist).toHaveBeenCalled();
+  });
+
+  it('keeps a cancelable retained run fail-closed when completed-blocker stale cache sees older live Ready truth', async () => {
+    const { root, paths } = await createHostPaths();
+    const retainedEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-196'
+    };
+    const retainedPaths = resolveRunPaths(retainedEnv, 'run-co-196-draining');
+    await mkdir(retainedPaths.runDir, { recursive: true });
+    await writeFile(
+      retainedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-co-196-draining',
+        task_id: 'linear-lin-issue-196',
+        status: 'in_progress',
+        pipeline_id: 'provider-linear-worker',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-196',
+        issue_identifier: 'CO-196',
+        started_at: '2026-04-17T03:45:02.315Z',
+        updated_at: '2026-04-17T03:50:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const completedBlocker = {
+      id: 'lin-blocker-207',
+      identifier: 'CO-207',
+      state: 'Done',
+      state_type: 'completed'
+    };
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: 'lin-issue-196',
+      issue_identifier: 'CO-196',
+      issue_title: 'Add Codex plugin marketplace distribution path',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-16T22:48:01.000Z',
+      issue_blocked_by: [completedBlocker],
+      task_id: 'linear-lin-issue-196',
+      run_id: 'run-co-196-draining',
+      run_manifest_path: retainedPaths.manifestPath
+    }));
+
+    const launcher = createCo202Launcher(
+      'run-co-196-should-not-start',
+      '/tmp/provider-run/co-196-should-not-start-manifest.json'
+    );
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'provider-linear-worker'
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createCo202ReadyIssue({
+        id: 'lin-issue-196',
+        identifier: 'CO-196',
+        title: 'Add Codex plugin marketplace distribution path',
+        updated_at: '2026-04-17T03:33:27.936Z',
+        blocked_by: [completedBlocker]
+      }),
+      deliveryId: 'delivery-co-196-ready-while-draining',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_744_878_807_936
+    });
+
+    expect(result.kind).toBe('ignored');
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-16T22:48:01.000Z',
+      issue_blocked_by: [completedBlocker],
+      task_id: 'linear-lin-issue-196',
+      run_id: 'run-co-196-draining',
+      run_manifest_path: retainedPaths.manifestPath
+    });
   });
 
   it('reclaims a stale Backlog plain released not-active claim through fresh discovery', async () => {
