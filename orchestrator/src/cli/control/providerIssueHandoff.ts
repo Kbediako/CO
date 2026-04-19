@@ -2043,6 +2043,7 @@ export function createProviderIssueHandoffService(
       ...clearProviderRetryFields(),
       updated_at: now
     });
+    assertRefreshLifecycleCurrent();
     if (input.cleanupWorkspace && canCleanupReleasedProviderWorkspace(input.releaseRun)) {
       await cleanupReleasedProviderWorkspace({
         repoRoot,
@@ -2053,10 +2054,13 @@ export function createProviderIssueHandoffService(
         providerWorkflowConfigStore: options.providerWorkflowConfigStore ?? null,
         runTerminalCleanup
       });
+      assertRefreshLifecycleCurrent();
     }
+    assertRefreshLifecycleCurrent();
     if (transitioned) {
       options.publishRuntime?.('provider-intake.refresh');
     }
+    assertRefreshLifecycleCurrent();
     await retryReleaseCancel({
       releaseRun: input.releaseRun,
       reason: input.nextReason
@@ -5137,7 +5141,10 @@ export function createProviderIssueHandoffService(
     let providerWorkflow: Awaited<ReturnType<ProviderWorkflowConfigStore['refresh']>>;
     try {
       providerWorkflow = await options.providerWorkflowConfigStore.refresh();
+      assertRefreshLifecycleCurrent();
     } catch (error) {
+      rethrowRefreshLifecycleStuckError(error);
+      assertRefreshLifecycleCurrent();
       logger.warn(
         `[provider-operator-autopilot] Failed to refresh provider workflow config: ${
           (error as Error)?.message ?? String(error)
@@ -5159,6 +5166,7 @@ export function createProviderIssueHandoffService(
     const lifecycleRecordsForCycle = await readProviderOperatorAutopilotLifecycleRecordsForCycle(
       autopilotLifecyclePath
     );
+    assertRefreshLifecycleCurrent();
     const lifecycleRecords =
       lifecycleRecordsForCycle ??
       (Array.isArray(previousResult?.lifecycle_records)
@@ -5176,7 +5184,10 @@ export function createProviderIssueHandoffService(
         previous_result: previousResult,
         lifecycle_records: lifecycleRecords
       });
+      assertRefreshLifecycleCurrent();
     } catch (error) {
+      rethrowRefreshLifecycleStuckError(error);
+      assertRefreshLifecycleCurrent();
       const message = (error as Error)?.message ?? String(error);
       const fallbackPendingActions =
         autopilotConfig.post_merge_rollout.enabled &&
@@ -5225,12 +5236,16 @@ export function createProviderIssueHandoffService(
       nextResult
     );
     if (autopilotAuditPath && resultChanged) {
+      assertRefreshLifecycleCurrent();
       try {
         await appendOperatorAutopilotAuditResult(
           autopilotAuditPath,
           nextResult
         );
+        assertRefreshLifecycleCurrent();
       } catch (error) {
+        rethrowRefreshLifecycleStuckError(error);
+        assertRefreshLifecycleCurrent();
         logger.warn(
           `[provider-operator-autopilot] Failed to append audit result path=${
             autopilotAuditPath
@@ -5239,6 +5254,7 @@ export function createProviderIssueHandoffService(
       }
     }
     if (resultChanged) {
+      assertRefreshLifecycleCurrent();
       options.providerWorkflowConfigStore.recordOperatorAutopilotResult(nextResult);
     }
     if (resultChanged && nextResult.status === 'failed' && !loggedAutopilotFailure) {
