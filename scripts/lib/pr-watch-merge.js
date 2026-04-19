@@ -131,11 +131,14 @@ query($owner:String!, $repo:String!, $number:Int!) {
                     name
                     status
                     conclusion
+                    startedAt
+                    completedAt
                     detailsUrl
                   }
                   ... on StatusContext {
                     context
                     state
+                    createdAt
                     targetUrl
                   }
                 }
@@ -940,11 +943,17 @@ function normalizeRollupCheckState(node) {
   if (typeName === 'CheckRun') {
     const name = typeof node.name === 'string' && node.name.trim() ? node.name.trim() : 'check-run';
     const status = normalizeEnum(node.status);
+    const startedAt = typeof node.startedAt === 'string' ? node.startedAt : null;
+    const completedAt = typeof node.completedAt === 'string' ? node.completedAt : null;
+    const observedAt = status === 'COMPLETED' ? completedAt ?? startedAt : startedAt;
+    const observedAtMs = parseTimestampMs(observedAt);
     if (status !== 'COMPLETED') {
       return {
         name,
         state: 'pending',
         signal: status || 'PENDING',
+        observedAt,
+        observedAtMs,
         detailsUrl: typeof node.detailsUrl === 'string' ? node.detailsUrl : null
       };
     }
@@ -954,6 +963,8 @@ function normalizeRollupCheckState(node) {
         name,
         state: 'success',
         signal: conclusion || 'SUCCESS',
+        observedAt,
+        observedAtMs,
         detailsUrl: typeof node.detailsUrl === 'string' ? node.detailsUrl : null
       };
     }
@@ -961,6 +972,8 @@ function normalizeRollupCheckState(node) {
       name,
       state: 'failed',
       signal: conclusion || 'UNKNOWN',
+      observedAt,
+      observedAtMs,
       detailsUrl: typeof node.detailsUrl === 'string' ? node.detailsUrl : null
     };
   }
@@ -968,11 +981,15 @@ function normalizeRollupCheckState(node) {
   if (typeName === 'StatusContext') {
     const name = typeof node.context === 'string' && node.context.trim() ? node.context.trim() : 'status-context';
     const state = normalizeEnum(node.state);
+    const observedAt = typeof node.createdAt === 'string' ? node.createdAt : null;
+    const observedAtMs = parseTimestampMs(observedAt);
     if (STATUS_CONTEXT_PENDING_STATES.has(state)) {
       return {
         name,
         state: 'pending',
         signal: state || 'PENDING',
+        observedAt,
+        observedAtMs,
         detailsUrl: typeof node.targetUrl === 'string' ? node.targetUrl : null
       };
     }
@@ -981,6 +998,8 @@ function normalizeRollupCheckState(node) {
         name,
         state: 'success',
         signal: state || 'SUCCESS',
+        observedAt,
+        observedAtMs,
         detailsUrl: typeof node.targetUrl === 'string' ? node.targetUrl : null
       };
     }
@@ -988,6 +1007,8 @@ function normalizeRollupCheckState(node) {
       name,
       state: 'failed',
       signal: state || 'UNKNOWN',
+      observedAt,
+      observedAtMs,
       detailsUrl: typeof node.targetUrl === 'string' ? node.targetUrl : null
     };
   }
@@ -1014,13 +1035,19 @@ function summarizeCoderabbitStatusCheckRollup(nodes) {
   } else if (contexts.some((context) => context.state === 'success')) {
     state = 'success';
   }
+  const latestSuccessAtMs = maxTimestamp(
+    contexts
+      .filter((context) => context.state === 'success')
+      .map((context) => context.observedAtMs)
+  );
   return {
     state,
-    contexts
+    contexts,
+    latestSuccessAtMs
   };
 }
 
-function resolveCoderabbitPendingBlockerSignal(coderabbitStatusCheckRollup) {
+function resolveCoderabbitPendingBlockerSignal(coderabbitStatusCheckRollup, requestAtMs = null) {
   if (!coderabbitStatusCheckRollup || typeof coderabbitStatusCheckRollup !== 'object') {
     return 'status_check_rollup=unknown';
   }
@@ -1028,12 +1055,27 @@ function resolveCoderabbitPendingBlockerSignal(coderabbitStatusCheckRollup) {
     ? coderabbitStatusCheckRollup.contexts.map((context) => context.name).filter(Boolean)
     : [];
   const suffix = names.length > 0 ? `:${names.join('+')}` : '';
-  return `status_check_rollup=${coderabbitStatusCheckRollup.state || 'unknown'}${suffix}`;
+  const baseSignal = `status_check_rollup=${coderabbitStatusCheckRollup.state || 'unknown'}${suffix}`;
+  if (coderabbitStatusCheckRollup.state !== 'success') {
+    return baseSignal;
+  }
+  if (typeof requestAtMs !== 'number' || !Number.isFinite(requestAtMs)) {
+    return `${baseSignal};request_time=unknown`;
+  }
+  const latestSuccessAtMs = coderabbitStatusCheckRollup.latestSuccessAtMs;
+  if (typeof latestSuccessAtMs !== 'number' || !Number.isFinite(latestSuccessAtMs)) {
+    return `${baseSignal};success_time=unknown`;
+  }
+  if (latestSuccessAtMs <= requestAtMs) {
+    return `${baseSignal};success_before_request`;
+  }
+  return baseSignal;
 }
 
 function resolveEffectiveBotRereviewSignals({
   pendingBots,
   coderabbitStatusCheckRollup,
+  requestTimesByBot,
   hasUnresolvedThread,
   unacknowledgedBotFeedbackCount,
   botFeedbackFetchError
@@ -1043,11 +1085,28 @@ function resolveEffectiveBotRereviewSignals({
   const clearedPendingBots = [];
   const canTrustResolvedFeedbackTruth =
     !hasUnresolvedThread && unacknowledgedBotFeedbackCount === 0 && botFeedbackFetchError !== true;
+  const requestTimes =
+    requestTimesByBot && typeof requestTimesByBot === 'object' ? requestTimesByBot : {};
+  const coderabbitRequestAtMs =
+    typeof requestTimes[BOT_KIND_LABELS.coderabbit] === 'number' &&
+    Number.isFinite(requestTimes[BOT_KIND_LABELS.coderabbit])
+      ? requestTimes[BOT_KIND_LABELS.coderabbit]
+      : null;
+  const coderabbitSuccessAtMs =
+    typeof coderabbitStatusCheckRollup?.latestSuccessAtMs === 'number' &&
+    Number.isFinite(coderabbitStatusCheckRollup.latestSuccessAtMs)
+      ? coderabbitStatusCheckRollup.latestSuccessAtMs
+      : null;
+  const coderabbitSuccessAfterRequest =
+    coderabbitStatusCheckRollup?.state === 'success' &&
+    coderabbitRequestAtMs !== null &&
+    coderabbitSuccessAtMs !== null &&
+    coderabbitSuccessAtMs > coderabbitRequestAtMs;
   for (const bot of rawPendingBots) {
     const isCoderabbit = bot === BOT_KIND_LABELS.coderabbit;
     if (
       isCoderabbit &&
-      coderabbitStatusCheckRollup?.state === 'success' &&
+      coderabbitSuccessAfterRequest &&
       canTrustResolvedFeedbackTruth
     ) {
       clearedPendingBots.push(bot);
@@ -1062,7 +1121,13 @@ function resolveEffectiveBotRereviewSignals({
     coderabbit: {
       statusCheckRollup: coderabbitStatusCheckRollup,
       stalePendingCleared: clearedPendingBots.includes(BOT_KIND_LABELS.coderabbit),
-      pendingBlockerSignal: resolveCoderabbitPendingBlockerSignal(coderabbitStatusCheckRollup)
+      latestRequestAtMs: coderabbitRequestAtMs,
+      latestSuccessAtMs: coderabbitSuccessAtMs,
+      successAfterRequest: coderabbitSuccessAfterRequest,
+      pendingBlockerSignal: resolveCoderabbitPendingBlockerSignal(
+        coderabbitStatusCheckRollup,
+        coderabbitRequestAtMs
+      )
     }
   };
 }
@@ -1297,6 +1362,7 @@ export function buildStatusSnapshot(response, requiredChecks = null, inlineBotFe
   const botRereviewDiagnostics = resolveEffectiveBotRereviewSignals({
     pendingBots: rawBotRereviewPending,
     coderabbitStatusCheckRollup,
+    requestTimesByBot: botRereview?.requestTimesByBot,
     hasUnresolvedThread,
     unacknowledgedBotFeedbackCount,
     botFeedbackFetchError
@@ -1895,6 +1961,7 @@ async function fetchBotRereviewSignals(owner, repo, prNumber, headOid) {
 
     const pendingBots = [];
     const inProgressBots = [];
+    const requestTimesByBot = {};
     let hadSignalFetchError = false;
     let signalRateLimit = null;
     for (const kind of requestedKinds) {
@@ -1929,6 +1996,7 @@ async function fetchBotRereviewSignals(owner, repo, prNumber, headOid) {
       const hasActiveInProgress =
         inProgressAtMs !== null && (completeAtMs === null || inProgressAtMs > completeAtMs);
       const label = BOT_KIND_LABELS[kind] ?? kind;
+      requestTimesByBot[label] = request.createdAtMs;
       if (hasActiveInProgress) {
         inProgressBots.push(label);
       }
@@ -1942,6 +2010,7 @@ async function fetchBotRereviewSignals(owner, repo, prNumber, headOid) {
       rateLimit: signalRateLimit,
       pendingBots,
       inProgressBots,
+      requestTimesByBot,
       coderabbit
     };
   } catch (error) {

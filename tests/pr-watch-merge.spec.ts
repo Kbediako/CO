@@ -246,6 +246,7 @@ describe('pr watch-merge required-check gating', () => {
         __typename: 'StatusContext',
         context: 'CodeRabbit',
         state: 'SUCCESS',
+        createdAt: '2026-02-18T04:45:00.000Z',
         targetUrl: 'https://example.com/coderabbit'
       }
     ]);
@@ -260,6 +261,9 @@ describe('pr watch-merge required-check gating', () => {
         fetchError: false,
         pendingBots: ['coderabbitai'],
         inProgressBots: [],
+        requestTimesByBot: {
+          coderabbitai: Date.parse('2026-02-18T04:43:00.000Z')
+        },
         coderabbit: {
           actionableCount: 0,
           outsideDiffCount: 0,
@@ -275,6 +279,7 @@ describe('pr watch-merge required-check gating', () => {
     expect(snapshot.botRereviewDiagnostics.clearedPendingBots).toEqual(['coderabbitai']);
     expect(snapshot.botRereviewDiagnostics.coderabbit.stalePendingCleared).toBe(true);
     expect(snapshot.botRereviewDiagnostics.coderabbit.statusCheckRollup.state).toBe('success');
+    expect(snapshot.botRereviewDiagnostics.coderabbit.successAfterRequest).toBe(true);
   });
 
   it('reports merge-state blockers instead of stale coderabbit rereview pending after current-head success', () => {
@@ -284,6 +289,7 @@ describe('pr watch-merge required-check gating', () => {
           __typename: 'StatusContext',
           context: 'CodeRabbit',
           state: 'SUCCESS',
+          createdAt: '2026-02-18T04:45:00.000Z',
           targetUrl: 'https://example.com/coderabbit'
         }
       ],
@@ -300,6 +306,9 @@ describe('pr watch-merge required-check gating', () => {
         fetchError: false,
         pendingBots: ['coderabbitai'],
         inProgressBots: [],
+        requestTimesByBot: {
+          coderabbitai: Date.parse('2026-02-18T04:43:00.000Z')
+        },
         coderabbit: {
           actionableCount: 0,
           outsideDiffCount: 0,
@@ -314,6 +323,47 @@ describe('pr watch-merge required-check gating', () => {
     expect(snapshot.botRereviewDiagnostics.clearedPendingBots).toEqual(['coderabbitai']);
   });
 
+  it('keeps coderabbit rereview pending when the current-head success predates the latest request', () => {
+    const response = makeResponse([
+      {
+        __typename: 'StatusContext',
+        context: 'CodeRabbit',
+        state: 'SUCCESS',
+        createdAt: '2026-02-18T04:40:00.000Z',
+        targetUrl: 'https://example.com/coderabbit'
+      }
+    ]);
+    const requiredChecks = summarizeRequiredChecks([
+      { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+    ]);
+
+    const snapshot = buildStatusSnapshot(response, requiredChecks, {
+      fetchError: false,
+      unacknowledgedCount: 0,
+      rereview: {
+        fetchError: false,
+        pendingBots: ['coderabbitai'],
+        inProgressBots: [],
+        requestTimesByBot: {
+          coderabbitai: Date.parse('2026-02-18T04:43:00.000Z')
+        },
+        coderabbit: {
+          actionableCount: 0,
+          outsideDiffCount: 0,
+          nitpickCount: 0
+        }
+      }
+    });
+
+    expect(snapshot.readyToMerge).toBe(false);
+    expect(snapshot.botRereviewPending).toEqual(['coderabbitai']);
+    expect(snapshot.gateReasons).toContain(
+      'bot_rereview_pending=coderabbitai(status_check_rollup=success:CodeRabbit;success_before_request)'
+    );
+    expect(snapshot.botRereviewDiagnostics.clearedPendingBots).toEqual([]);
+    expect(snapshot.botRereviewDiagnostics.coderabbit.successAfterRequest).toBe(false);
+  });
+
   it('keeps coderabbit rereview pending when the current-head rollup is still in progress', () => {
     const response = makeResponse([
       {
@@ -321,6 +371,7 @@ describe('pr watch-merge required-check gating', () => {
         name: 'CodeRabbit',
         status: 'IN_PROGRESS',
         conclusion: null,
+        startedAt: '2026-02-18T04:44:00.000Z',
         detailsUrl: 'https://example.com/coderabbit'
       }
     ]);
@@ -335,6 +386,9 @@ describe('pr watch-merge required-check gating', () => {
         fetchError: false,
         pendingBots: ['coderabbitai'],
         inProgressBots: ['coderabbitai'],
+        requestTimesByBot: {
+          coderabbitai: Date.parse('2026-02-18T04:43:00.000Z')
+        },
         coderabbit: {
           actionableCount: 0,
           outsideDiffCount: 0,
@@ -357,6 +411,7 @@ describe('pr watch-merge required-check gating', () => {
           __typename: 'StatusContext',
           context: 'CodeRabbit',
           state: 'SUCCESS',
+          createdAt: '2026-02-18T04:45:00.000Z',
           targetUrl: 'https://example.com/coderabbit'
         }
       ],
@@ -377,6 +432,9 @@ describe('pr watch-merge required-check gating', () => {
         fetchError: false,
         pendingBots: ['coderabbitai'],
         inProgressBots: [],
+        requestTimesByBot: {
+          coderabbitai: Date.parse('2026-02-18T04:43:00.000Z')
+        },
         coderabbit: {
           actionableCount: 0,
           outsideDiffCount: 0,

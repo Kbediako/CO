@@ -29,6 +29,8 @@ export interface PrWatchMergeBotRereviewRollupContext {
   name: string;
   state: 'success' | 'pending' | 'failed' | 'missing' | string;
   signal: string;
+  observedAt: string | null;
+  observedAtMs: number | null;
   detailsUrl: string | null;
 }
 
@@ -40,8 +42,12 @@ export interface PrWatchMergeBotRereviewDiagnostics {
     statusCheckRollup: {
       state: 'success' | 'pending' | 'failed' | 'missing' | string;
       contexts: PrWatchMergeBotRereviewRollupContext[];
+      latestSuccessAtMs: number | null;
     };
     stalePendingCleared: boolean;
+    latestRequestAtMs: number | null;
+    latestSuccessAtMs: number | null;
+    successAfterRequest: boolean;
     pendingBlockerSignal: string;
   };
 }
@@ -51,6 +57,7 @@ export interface PrWatchMergeBotRereviewSignals {
   rateLimit?: PrWatchMergeGitHubRateLimitStatus | null;
   pendingBots: string[];
   inProgressBots: string[];
+  requestTimesByBot?: Record<string, number>;
   coderabbit: PrWatchMergeCoderabbitReviewMeta;
 }
 
