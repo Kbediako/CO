@@ -910,10 +910,29 @@ function selectPriorExecutionAttempt(
   if (!existing) {
     return candidate;
   }
+  const recency = compareExecutionAttemptRecency(candidate, existing);
+  if (recency > 0 && candidate.record_kind === 'started') {
+    return candidate;
+  }
+  if (recency < 0 && existing.record_kind === 'started') {
+    return existing;
+  }
   if (
     candidate.reason === 'lifecycle_record_failed' &&
     isSucceededTerminalAttempt(existing)
   ) {
+    return existing;
+  }
+  if (
+    existing.reason === 'lifecycle_record_failed' &&
+    isSucceededTerminalAttempt(candidate)
+  ) {
+    return candidate;
+  }
+  if (recency > 0) {
+    return candidate;
+  }
+  if (recency < 0) {
     return existing;
   }
   if (candidate.record_kind === 'terminal') {
@@ -933,6 +952,13 @@ function selectPriorExecutionAttemptForProjection(
 ): ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord {
   if (!existing) {
     return candidate;
+  }
+  const recency = compareExecutionAttemptRecency(candidate, existing);
+  if (recency > 0) {
+    return candidate;
+  }
+  if (recency < 0) {
+    return existing;
   }
   if (candidate.record_kind === 'terminal') {
     return candidate;
@@ -956,6 +982,40 @@ function isSucceededTerminalAttempt(
   attempt: ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord
 ): boolean {
   return attempt.record_kind === 'terminal' && attempt.terminal_state === 'succeeded';
+}
+
+function compareExecutionAttemptRecency(
+  left: ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord,
+  right: ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord
+): number {
+  const leftTime = executionAttemptRecordedAtMs(left);
+  const rightTime = executionAttemptRecordedAtMs(right);
+  if (leftTime !== null && rightTime !== null && leftTime !== rightTime) {
+    return leftTime > rightTime ? 1 : -1;
+  }
+  if (leftTime !== null && rightTime === null) {
+    return 1;
+  }
+  if (leftTime === null && rightTime !== null) {
+    return -1;
+  }
+  return 0;
+}
+
+function executionAttemptRecordedAtMs(
+  attempt: ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord
+): number | null {
+  return parseExecutionAttemptTimestamp(
+    attempt.ended_at || attempt.started_at || attempt.preflight.checked_at
+  );
+}
+
+function parseExecutionAttemptTimestamp(value: string | null | undefined): number | null {
+  if (!value) {
+    return null;
+  }
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 async function runLocalRolloutCommand(input: {

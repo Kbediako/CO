@@ -2110,6 +2110,91 @@ describe('providerOperatorAutopilot', () => {
     ]);
   });
 
+  it('prefers a newer started local rollout marker over stale terminal execution', async () => {
+    const claim = createClaim({
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-118',
+      merge_closeout: createMergeCloseout({
+        status: 'merged',
+        reason: 'merged_and_transitioned_done'
+      })
+    });
+    const firstRun = await runProviderOperatorAutopilot({
+      tracked_issues: [],
+      claims: [claim],
+      config: buildConfigWithLocalRolloutExecution(),
+      previous_result: null,
+      repo_root: process.cwd()
+    }, {
+      run_local_rollout_command: async () => ({
+        ok: true,
+        exitCode: 0,
+        stdout: 'ok',
+        stderr: ''
+      }),
+      append_local_rollout_execution_attempt: appendExecutionAttemptNoop,
+      append_local_rollout_lifecycle_record: appendLifecycleRecordNoop
+    });
+    const terminalSuccess = firstRun.local_rollout_execution_attempts?.find(
+      (attempt) => attempt.record_kind === 'terminal' && attempt.terminal_state === 'succeeded'
+    );
+    const startedMarker = firstRun.local_rollout_execution_attempts?.find(
+      (attempt) => attempt.record_kind === 'started'
+    );
+    expect(terminalSuccess).toBeDefined();
+    expect(startedMarker).toBeDefined();
+    if (!terminalSuccess || !startedMarker) {
+      throw new Error('expected both started and terminal local rollout records');
+    }
+    const staleTerminal: ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord = {
+      ...terminalSuccess,
+      preflight: {
+        ...terminalSuccess.preflight,
+        checked_at: '2026-04-09T10:00:00.000Z'
+      },
+      started_at: '2026-04-09T10:00:00.000Z',
+      ended_at: '2026-04-09T10:01:00.000Z'
+    };
+    const newerStarted: ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord = {
+      ...startedMarker,
+      preflight: {
+        ...startedMarker.preflight,
+        checked_at: '2026-04-09T10:05:00.000Z'
+      },
+      started_at: '2026-04-09T10:05:00.000Z',
+      ended_at: '2026-04-09T10:05:00.000Z'
+    };
+    const rerunCommand = vi.fn(async () => {
+      throw new Error('newer started local rollout marker should not rerun blindly');
+    });
+
+    const secondRun = await runProviderOperatorAutopilot({
+      tracked_issues: [],
+      claims: [claim],
+      config: buildConfigWithLocalRolloutExecution(),
+      previous_result: null,
+      lifecycle_records: [],
+      local_rollout_execution_attempts: [staleTerminal, newerStarted],
+      repo_root: process.cwd()
+    }, {
+      run_local_rollout_command: rerunCommand,
+      append_local_rollout_lifecycle_record: appendLifecycleRecordNoop
+    });
+
+    expect(rerunCommand).not.toHaveBeenCalled();
+    expect(secondRun.pending_actions).toHaveLength(1);
+    expect(secondRun.resolved_actions).toEqual([]);
+    expect(secondRun.local_rollout_execution_attempts).toMatchObject([
+      {
+        record_kind: 'started',
+        action_id: 'local-rebuild',
+        started_at: '2026-04-09T10:05:00.000Z',
+        terminal_state: 'failed',
+        reason: 'execution_interrupted'
+      }
+    ]);
+  });
+
   it('refuses undeclared local rollout action ids without running a command', async () => {
     const runCommand = vi.fn(async () => {
       throw new Error('undeclared action should not run');
