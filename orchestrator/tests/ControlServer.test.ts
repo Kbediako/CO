@@ -16,6 +16,7 @@ import {
 import { computeEffectiveDelegationConfig } from '../src/cli/config/delegationConfig.js';
 import { resolveRunPaths } from '../src/cli/run/runPaths.js';
 import { RunEventStream } from '../src/cli/events/runEventStream.js';
+import { readProviderPollingHealth } from '../src/cli/control/providerPollingHealth.js';
 
 const originalCreateServer = http.createServer;
 const originalControlServerStart = ControlServer.start.bind(ControlServer);
@@ -2985,6 +2986,14 @@ describe('ControlServer', () => {
 
       closePromise = server.close();
       const refreshRejectedDuringClose = await new Promise<boolean>((resolve) => {
+        let settled = false;
+        const settle = (value: boolean): void => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          resolve(value);
+        };
         const request = http.request(
           refreshUrl,
           {
@@ -2998,13 +3007,15 @@ describe('ControlServer', () => {
           },
           (response) => {
             response.resume();
-            response.on('end', () => resolve(false));
+            response.on('end', () => settle(false));
           }
         );
-        request.on('error', () => resolve(true));
+        request.on('error', (error: NodeJS.ErrnoException) => {
+          settle(error.code === 'ECONNREFUSED' || error.code === 'ECONNRESET');
+        });
         request.on('timeout', () => {
+          settle(false);
           request.destroy();
-          resolve(true);
         });
         request.end(JSON.stringify({ action: 'refresh' }));
       });
@@ -3046,15 +3057,16 @@ describe('ControlServer', () => {
         releaseRefresh = resolve;
       });
     });
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => undefined),
+      refresh: refreshProviderIssues
+    };
     const server = await ControlServer.start({
       paths,
       config,
       runId: 'run-1',
-      createProviderIssueHandoff: () => ({
-        handleAcceptedTrackedIssue: vi.fn(),
-        rehydrate: vi.fn(async () => undefined),
-        refresh: refreshProviderIssues
-      })
+      createProviderIssueHandoff: () => providerIssueHandoff
     });
     let closePromise: Promise<void> | null = null;
     let closeResolved = false;
@@ -3085,17 +3097,17 @@ describe('ControlServer', () => {
         nowMs = startedAtMs + 45_001;
       }, 25);
 
-      await expect(
-        Promise.race([
-          closePromise.then(() => true),
-          new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 1_000))
-        ])
-      ).resolves.toBe(true);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
+        stuck: true,
+        reason: 'provider_refresh_lifecycle_stuck'
+      });
+      expect(closeResolved).toBe(false);
+      releaseRefresh?.();
+      await closePromise;
       expect(closeResolved).toBe(true);
     } finally {
-      if (!closeResolved) {
-        releaseRefresh?.();
-      }
+      releaseRefresh?.();
       if (closePromise) {
         await closePromise.catch(() => undefined);
       } else {
