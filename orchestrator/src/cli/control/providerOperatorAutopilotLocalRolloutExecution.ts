@@ -317,10 +317,11 @@ export async function executeProviderOperatorAutopilotLocalRolloutActions(
     for (const actionId of actionIds) {
       const actionKey = `${pendingAction.action_instance_id}\u0000${actionId}`;
       const priorAttempt = priorByActionKey.get(actionKey);
-      if (priorAttempt && shouldReusePriorExecutionAttempt(priorAttempt)) {
+      const priorAttemptCandidates = priorAttemptsByActionKey.get(actionKey) ?? [];
+      if (priorAttempt && shouldReusePriorExecutionAttempt(priorAttempt, priorAttemptCandidates)) {
         relevantAttempts.push(
           ...selectPriorExecutionAttemptsForReuse(
-            priorAttemptsByActionKey.get(actionKey) ?? [],
+            priorAttemptCandidates,
             priorAttempt
           )
         );
@@ -1018,10 +1019,14 @@ function selectPriorExecutionAttemptForProjection(
 }
 
 function shouldReusePriorExecutionAttempt(
-  attempt: ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord
+  attempt: ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord,
+  candidates: ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord[]
 ): boolean {
   if (attempt.record_kind === 'started') {
     return true;
+  }
+  if (attempt.reason === 'execution_audit_failed') {
+    return candidates.some((candidate) => candidate.record_kind === 'started');
   }
   return attempt.terminal_state !== 'skipped';
 }
