@@ -70,7 +70,12 @@ const fallbackShortCircuitBeforePackSmokePattern = new RegExp(
   'u'
 );
 const nonBlockingPackSmokePattern = /\|\||\|&?|(?:^|[\s;])&(?![&>])|;[ \t]*(?:true|exit[ \t]+0)\b/u;
-const heredocOperatorPattern = /<<-?\s*(?:"([^"]+)"|'([^']+)'|([^<>\s;&|()]+))/u;
+const heredocOperatorPattern = /(<<-?)\s*(?:"([^"]+)"|'([^']+)'|([^<>\s;&|()]+))/u;
+
+type HeredocState = {
+  allowLeadingTabs: boolean;
+  delimiter: string;
+};
 
 async function readWorkflow(path: string): Promise<WorkflowFile> {
   const parsed = load(await readText(path));
@@ -363,9 +368,21 @@ function normalizeShellContinuations(run: string): string {
     .replace(/\r?\n[ \t]*(?=(?:\|\||&&|\|&?)(?:\s|$))/gu, ' ');
 }
 
-function getHeredocDelimiter(line: string): string | null {
+function getHeredocState(line: string): HeredocState | null {
   const match = line.match(heredocOperatorPattern);
-  return match?.[1] ?? match?.[2] ?? match?.[3] ?? null;
+  const delimiter = match?.[2] ?? match?.[3] ?? match?.[4] ?? null;
+  if (!match || !delimiter) {
+    return null;
+  }
+  return {
+    allowLeadingTabs: match[1] === '<<-',
+    delimiter
+  };
+}
+
+function isHeredocTerminator(line: string, state: HeredocState): boolean {
+  const comparableLine = state.allowLeadingTabs ? line.replace(/^\t+/u, '') : line;
+  return comparableLine === state.delimiter;
 }
 
 function stripInlineShellComment(line: string): string {
@@ -399,12 +416,12 @@ function stripInlineShellComment(line: string): string {
 
 function getRunCommandLines(run: string): string[] {
   const commandLines: string[] = [];
-  let heredocDelimiter: string | null = null;
+  let heredocState: HeredocState | null = null;
   for (const rawLine of normalizeShellContinuations(run).split(/\r?\n/u)) {
     const trimmedRawLine = rawLine.trim();
-    if (heredocDelimiter) {
-      if (trimmedRawLine === heredocDelimiter) {
-        heredocDelimiter = null;
+    if (heredocState) {
+      if (isHeredocTerminator(rawLine, heredocState)) {
+        heredocState = null;
       }
       continue;
     }
@@ -412,13 +429,13 @@ function getRunCommandLines(run: string): string[] {
     if (!line || line.startsWith('#')) {
       continue;
     }
-    const nextHeredocDelimiter = getHeredocDelimiter(line);
-    if (nextHeredocDelimiter) {
+    const nextHeredocState = getHeredocState(line);
+    if (nextHeredocState) {
       const commandLine = line.replace(heredocOperatorPattern, '').trim();
       if (commandLine.length > 0) {
         commandLines.push(commandLine);
       }
-      heredocDelimiter = nextHeredocDelimiter;
+      heredocState = nextHeredocState;
       continue;
     }
     commandLines.push(line);
@@ -463,11 +480,26 @@ function updateShellControlDepth(depth: number, line: string): number {
 function getCommandSubstitutionDepth(text: string): number {
   let depth = 0;
   let quote: '"' | "'" | null = null;
+  let nestedQuote: '"' | "'" | null = null;
   for (let index = 0; index < text.length; index += 1) {
     const current = text[index];
     if (quote) {
+      if (nestedQuote) {
+        if (nestedQuote === '"' && current === '\\') {
+          index += 1;
+          continue;
+        }
+        if (current === nestedQuote) {
+          nestedQuote = null;
+        }
+        continue;
+      }
       if (quote === '"' && current === '\\') {
         index += 1;
+        continue;
+      }
+      if (quote === '"' && depth > 0 && (current === '"' || current === "'")) {
+        nestedQuote = current;
         continue;
       }
       if (current === quote) {
@@ -1024,6 +1056,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(hasPackSmokeCommand(`echo ok # ; ${packSmokeCommand}`)).toBe(false);
     expect(hasPackSmokeCommand(`printf '%s # ; ${packSmokeCommand}'`)).toBe(false);
     expect(hasPackSmokeCommand(`echo "$(${packSmokeCommand})"`)).toBe(true);
+    expect(hasPackSmokeCommand(`echo "$(printf ')'; ${packSmokeCommand})"`)).toBe(true);
     expect(hasPackSmokeCommand(`echo "<(${packSmokeCommand})"`)).toBe(false);
     expect(hasPackSmokeCommand(`echo ">(${packSmokeCommand})"`)).toBe(false);
     expect(hasPackSmokeCommand(`echo before; ${packSmokeCommand}`)).toBe(true);
@@ -1031,6 +1064,9 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(hasPackSmokeCommand(`cat <<'EOF-MARK'\n${packSmokeCommand}\nEOF-MARK`)).toBe(false);
     expect(hasPackSmokeCommand(`${packSmokeCommand}:other`)).toBe(false);
     expect(hasPackSmokeCommand(`cat <<EOF\nEOF # still body\n${packSmokeCommand}\nEOF`)).toBe(false);
+    expect(hasPackSmokeCommand(`cat <<EOF\n  EOF\n${packSmokeCommand}\nEOF`)).toBe(false);
+    expect(hasPackSmokeCommand(`cat <<-EOF\n\tEOF\n${packSmokeCommand}`)).toBe(true);
+    expect(hasPackSmokeCommand(`cat <<-EOF\n  EOF\n${packSmokeCommand}\nEOF`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} || true`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand}||true`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand}\n|| true`)).toBe(true);
@@ -1130,6 +1166,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(hasNonBlockingPackSmokeCommand(`printf '%s\\n' '${packSmokeCommand}'`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`echo ok # ; ${packSmokeCommand}`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`echo "$(${packSmokeCommand})"`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`echo "$(printf ')'; ${packSmokeCommand})"`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`echo "<(${packSmokeCommand})"`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`echo ">(${packSmokeCommand})"`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`echo <(${packSmokeCommand})`)).toBe(true);
