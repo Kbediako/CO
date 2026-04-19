@@ -332,7 +332,14 @@ function buildDefaultOperatorAutopilotPayload(
     backlog_promotion: {
       enabled: config.backlog_promotion.enabled,
       state_name: config.backlog_promotion.state_name,
-      target_state_name: config.backlog_promotion.target_state_name
+      target_state_name: config.backlog_promotion.target_state_name,
+      snapshot_retention: {
+        max_untracked_cycles:
+          config.backlog_promotion.snapshot_retention.max_untracked_cycles,
+        terminal_state_types: [
+          ...config.backlog_promotion.snapshot_retention.terminal_state_types
+        ]
+      }
     },
     review_handoff_rework: {
       enabled: config.review_handoff_rework.enabled,
@@ -397,7 +404,14 @@ function buildOperatorAutopilotPayload(
     backlog_promotion: {
       enabled: config.backlog_promotion.enabled,
       state_name: config.backlog_promotion.state_name,
-      target_state_name: config.backlog_promotion.target_state_name
+      target_state_name: config.backlog_promotion.target_state_name,
+      snapshot_retention: {
+        max_untracked_cycles:
+          config.backlog_promotion.snapshot_retention.max_untracked_cycles,
+        terminal_state_types: [
+          ...config.backlog_promotion.snapshot_retention.terminal_state_types
+        ]
+      }
     },
     review_handoff_rework: {
       enabled: config.review_handoff_rework.enabled,
@@ -578,7 +592,30 @@ function cloneOperatorAutopilotLastResult(
       target_state: snapshot.target_state,
       attempted_at: snapshot.attempted_at,
       issue_updated_at: snapshot.issue_updated_at,
-      force_path_used: snapshot.force_path_used ?? false
+      force_path_used: snapshot.force_path_used ?? false,
+      untracked_cycles: snapshot.untracked_cycles ?? 0
+    })),
+    backlog_promotion_snapshot_retention_records: (
+      result.backlog_promotion_snapshot_retention_records ?? []
+    ).map((record) => ({
+      issue_id: record.issue_id,
+      issue_identifier: record.issue_identifier,
+      target_state: record.target_state,
+      attempted_at: record.attempted_at,
+      issue_updated_at: record.issue_updated_at,
+      evaluated_at: record.evaluated_at,
+      decision: record.decision,
+      reason: record.reason,
+      age_ms: record.age_ms,
+      untracked_cycles: record.untracked_cycles,
+      max_untracked_cycles: record.max_untracked_cycles,
+      issue_state: record.issue_state,
+      issue_state_type: record.issue_state_type,
+      issue_archived_at: record.issue_archived_at,
+      issue_trashed: record.issue_trashed,
+      issue_observed_updated_at: record.issue_observed_updated_at,
+      terminal_state_evidence: record.terminal_state_evidence,
+      force_path_used: record.force_path_used
     }))
   };
 }

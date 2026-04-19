@@ -6432,6 +6432,11 @@ function resolveProviderOperatorAutopilotPreviousResultFromPayload(
       : [],
     backlog_promotion_snapshots: Array.isArray(record.backlog_promotion_snapshots)
       ? (record.backlog_promotion_snapshots as ProviderOperatorAutopilotResult['backlog_promotion_snapshots'])
+      : [],
+    backlog_promotion_snapshot_retention_records: Array.isArray(
+      record.backlog_promotion_snapshot_retention_records
+    )
+      ? (record.backlog_promotion_snapshot_retention_records as ProviderOperatorAutopilotResult['backlog_promotion_snapshot_retention_records'])
       : []
   };
 }
