@@ -404,6 +404,89 @@ describe('pr watch-merge required-check gating', () => {
     expect(snapshot.botRereviewDiagnostics.coderabbit.statusCheckRollup.state).toBe('pending');
   });
 
+  it('keeps coderabbit rereview pending when the current-head check run is skipped', () => {
+    const response = makeResponse([
+      {
+        __typename: 'CheckRun',
+        name: 'CodeRabbit',
+        status: 'COMPLETED',
+        conclusion: 'SKIPPED',
+        startedAt: '2026-02-18T04:44:00.000Z',
+        completedAt: '2026-02-18T04:45:00.000Z',
+        detailsUrl: 'https://example.com/coderabbit'
+      }
+    ]);
+    const requiredChecks = summarizeRequiredChecks([
+      { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+    ]);
+
+    const snapshot = buildStatusSnapshot(response, requiredChecks, {
+      fetchError: false,
+      unacknowledgedCount: 0,
+      rereview: {
+        fetchError: false,
+        pendingBots: ['coderabbitai'],
+        inProgressBots: [],
+        requestTimesByBot: {
+          coderabbitai: Date.parse('2026-02-18T04:43:00.000Z')
+        },
+        coderabbit: {
+          actionableCount: 0,
+          outsideDiffCount: 0,
+          nitpickCount: 0
+        }
+      }
+    });
+
+    expect(snapshot.readyToMerge).toBe(false);
+    expect(snapshot.botRereviewPending).toEqual(['coderabbitai']);
+    expect(snapshot.gateReasons).toContain('bot_rereview_pending=coderabbitai(status_check_rollup=failed:CodeRabbit)');
+    expect(snapshot.botRereviewDiagnostics.clearedPendingBots).toEqual([]);
+    expect(snapshot.botRereviewDiagnostics.coderabbit.statusCheckRollup.state).toBe('failed');
+    expect(snapshot.botRereviewDiagnostics.coderabbit.successAfterRequest).toBe(false);
+  });
+
+  it('does not clear coderabbit rereview pending from unrelated matching-name checks', () => {
+    const response = makeResponse([
+      {
+        __typename: 'CheckRun',
+        name: 'not-coderabbit-cache',
+        status: 'COMPLETED',
+        conclusion: 'SUCCESS',
+        startedAt: '2026-02-18T04:44:00.000Z',
+        completedAt: '2026-02-18T04:45:00.000Z',
+        detailsUrl: 'https://example.com/not-coderabbit-cache'
+      }
+    ]);
+    const requiredChecks = summarizeRequiredChecks([
+      { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+    ]);
+
+    const snapshot = buildStatusSnapshot(response, requiredChecks, {
+      fetchError: false,
+      unacknowledgedCount: 0,
+      rereview: {
+        fetchError: false,
+        pendingBots: ['coderabbitai'],
+        inProgressBots: [],
+        requestTimesByBot: {
+          coderabbitai: Date.parse('2026-02-18T04:43:00.000Z')
+        },
+        coderabbit: {
+          actionableCount: 0,
+          outsideDiffCount: 0,
+          nitpickCount: 0
+        }
+      }
+    });
+
+    expect(snapshot.readyToMerge).toBe(false);
+    expect(snapshot.botRereviewPending).toEqual(['coderabbitai']);
+    expect(snapshot.gateReasons).toContain('bot_rereview_pending=coderabbitai(status_check_rollup=missing)');
+    expect(snapshot.botRereviewDiagnostics.clearedPendingBots).toEqual([]);
+    expect(snapshot.botRereviewDiagnostics.coderabbit.statusCheckRollup.contexts).toEqual([]);
+  });
+
   it('does not clear coderabbit rereview pending while current-head review threads remain unresolved', () => {
     const response = makeResponse(
       [

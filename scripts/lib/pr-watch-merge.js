@@ -42,7 +42,7 @@ const CODERABBIT_ISSUE_COMMENT_COMPLETION_PATTERNS = [
   /Everything is clean\b/iu,
   /PR is ready to merge\b/iu
 ];
-const CODERABBIT_STATUS_NAME = /coderabbit/iu;
+const CODERABBIT_STATUS_NAMES = new Set(['coderabbit', 'coderabbitai', 'code rabbit', 'code rabbit ai']);
 
 function normalizeReadinessMode(rawValue) {
   return typeof rawValue === 'string' && rawValue.trim().toLowerCase() === 'review' ? 'review' : 'merge';
@@ -519,6 +519,13 @@ function maxTimestamp(values) {
   return max;
 }
 
+function isCoderabbitStatusName(value) {
+  const normalized = typeof value === 'string'
+    ? value.trim().toLowerCase().replace(/\s+/gu, ' ')
+    : '';
+  return CODERABBIT_STATUS_NAMES.has(normalized);
+}
+
 function resolveBotKindFromLogin(login) {
   const normalized = normalizeLogin(login);
   if (!normalized) {
@@ -958,7 +965,7 @@ function normalizeRollupCheckState(node) {
       };
     }
     const conclusion = normalizeEnum(node.conclusion);
-    if (CHECKRUN_PASS_CONCLUSIONS.has(conclusion)) {
+    if (conclusion === 'SUCCESS') {
       return {
         name,
         state: 'success',
@@ -1021,7 +1028,7 @@ function summarizeCoderabbitStatusCheckRollup(nodes) {
   if (Array.isArray(nodes)) {
     for (const node of nodes) {
       const context = normalizeRollupCheckState(node);
-      if (!context || !CODERABBIT_STATUS_NAME.test(context.name)) {
+      if (!context || !isCoderabbitStatusName(context.name)) {
         continue;
       }
       contexts.push(context);
