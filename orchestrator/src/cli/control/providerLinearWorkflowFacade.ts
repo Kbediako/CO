@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, join, resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -297,6 +298,13 @@ export interface ProviderLinearWorkflowAttachment {
   source_type: string | null;
 }
 
+export interface ProviderLinearIssuePullRequestAttachments {
+  current: ProviderLinearWorkflowAttachment | null;
+  historical: ProviderLinearWorkflowAttachment[];
+  conflicting: ProviderLinearWorkflowAttachment[];
+  unknown: ProviderLinearWorkflowAttachment[];
+}
+
 export interface ProviderLinearEmbeddedAsset {
   original_reference: string;
   resolved_path: string;
@@ -362,6 +370,7 @@ export interface ProviderLinearIssueContext {
   } | null;
   comments: ProviderLinearWorkflowComment[];
   attachments: ProviderLinearWorkflowAttachment[];
+  pull_request_attachments: ProviderLinearIssuePullRequestAttachments;
   workpad_comment: ProviderLinearWorkflowComment | null;
 }
 
@@ -807,11 +816,33 @@ interface ProviderLinearIssueContextCacheRecord {
   embedded_workpad?: ProviderLinearEmbeddedWorkpadCacheRecord | null;
 }
 
+interface ProviderLinearPullRequestSnapshotResolverInput {
+  owner: string;
+  repo: string;
+  prNumber: number;
+  readinessMode?: 'merge' | 'review';
+}
+
+interface IssueContextPullRequestSnapshot {
+  state: string | null;
+  mergedAt: string | null;
+  updatedAt: string | null;
+}
+
+interface GitHubJsonCommandResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+  signal: NodeJS.Signals | null;
+  timedOut: boolean;
+}
+
 export async function getProviderLinearIssueContext(input: {
   issueId: string;
   sourceSetup?: DispatchPilotSourceSetup | null;
   fallbackToCacheOnFailure?: boolean;
   allowReadOnlyCacheReuse?: boolean;
+  resolvePullRequestSnapshot?: (input: ProviderLinearPullRequestSnapshotResolverInput) => Promise<unknown>;
   env?: NodeJS.ProcessEnv;
   fetchImpl?: typeof fetch;
 }): Promise<ProviderLinearIssueContextResult> {
@@ -884,11 +915,15 @@ export async function getProviderLinearIssueContext(input: {
     return failureFromWorkflowError('issue-context', context.error);
   }
 
-  await writeCachedIssueContextRecord(input.env, context.issue, session.session.sourceSetup);
+  const issue = await hydrateIssuePullRequestAttachments(
+    context.issue,
+    input.resolvePullRequestSnapshot ?? fetchIssueContextPullRequestSnapshot
+  );
+  await writeCachedIssueContextRecord(input.env, issue, session.session.sourceSetup);
   return {
     ok: true,
     operation: 'issue-context',
-    issue: context.issue,
+    issue,
     source_setup: session.session.sourceSetup
   };
 }
@@ -897,6 +932,377 @@ function shouldFallbackToCachedIssueContextFromWorkflowError(
   error: ProviderLinearWorkflowError
 ): boolean {
   return error.code === 'linear_rate_limited';
+}
+
+function buildEmptyIssuePullRequestAttachments(): ProviderLinearIssuePullRequestAttachments {
+  return {
+    current: null,
+    historical: [],
+    conflicting: [],
+    unknown: []
+  };
+}
+
+function buildUnknownIssuePullRequestAttachments(
+  attachments: readonly ProviderLinearWorkflowAttachment[]
+): ProviderLinearIssuePullRequestAttachments {
+  const seenComparisonKeys = new Set<string>();
+  const unknown: ProviderLinearWorkflowAttachment[] = [];
+  for (const attachment of attachments) {
+    const parsed = parseGitHubPullRequestUrl(attachment.url);
+    if (!parsed || seenComparisonKeys.has(parsed.comparisonKey)) {
+      continue;
+    }
+    seenComparisonKeys.add(parsed.comparisonKey);
+    unknown.push(attachment);
+  }
+  return {
+    ...buildEmptyIssuePullRequestAttachments(),
+    unknown
+  };
+}
+
+interface ProviderLinearIssuePullRequestCandidate {
+  attachment: ProviderLinearWorkflowAttachment;
+  snapshot: {
+    state: string | null;
+    merged_at: string | null;
+    updated_at: string | null;
+  };
+}
+
+async function hydrateIssuePullRequestAttachments(
+  issue: ProviderLinearIssueContext,
+  resolvePullRequestSnapshot: (input: ProviderLinearPullRequestSnapshotResolverInput) => Promise<unknown>
+): Promise<ProviderLinearIssueContext> {
+  const seenComparisonKeys = new Set<string>();
+  const pullRequestAttachments = issue.attachments.flatMap((attachment) => {
+    const parsed = parseGitHubPullRequestUrl(attachment.url);
+    if (!parsed || seenComparisonKeys.has(parsed.comparisonKey)) {
+      return [];
+    }
+    seenComparisonKeys.add(parsed.comparisonKey);
+    return parsed
+      ? [{
+          attachment,
+          owner: parsed.owner,
+          repo: parsed.repo,
+          prNumber: parsed.number
+        }]
+      : [];
+  });
+  if (pullRequestAttachments.length === 0) {
+    return {
+      ...issue,
+      pull_request_attachments: buildEmptyIssuePullRequestAttachments()
+    };
+  }
+
+  const resolved: ProviderLinearIssuePullRequestCandidate[] = [];
+  const unknown: ProviderLinearWorkflowAttachment[] = [];
+  for (const candidate of pullRequestAttachments) {
+    try {
+      const rawSnapshot = await resolvePullRequestSnapshot({
+        owner: candidate.owner,
+        repo: candidate.repo,
+        prNumber: candidate.prNumber,
+        readinessMode: 'merge'
+      });
+      const snapshot = mapIssuePullRequestAttachmentSnapshot(rawSnapshot);
+      if (!snapshot) {
+        unknown.push(candidate.attachment);
+        continue;
+      }
+      resolved.push({
+        attachment: candidate.attachment,
+        snapshot
+      });
+    } catch {
+      unknown.push(candidate.attachment);
+    }
+  }
+
+  return {
+    ...issue,
+    pull_request_attachments: classifyIssuePullRequestAttachments(issue, resolved, unknown)
+  };
+}
+
+export async function fetchIssueContextPullRequestSnapshot(
+  input: ProviderLinearPullRequestSnapshotResolverInput,
+  options: {
+    runGitHubJson?: (args: string[]) => Promise<unknown>;
+  } = {}
+): Promise<IssueContextPullRequestSnapshot> {
+  const owner = normalizeOptionalString(input.owner);
+  const repo = normalizeOptionalString(input.repo);
+  const prNumber = Number(input.prNumber);
+  if (!owner || !repo || !Number.isInteger(prNumber) || prNumber <= 0) {
+    throw new Error('fetchIssueContextPullRequestSnapshot requires owner, repo, and a positive integer prNumber.');
+  }
+
+  const payload = await (options.runGitHubJson ?? runGitHubJsonForIssueContext)([
+    'pr',
+    'view',
+    String(prNumber),
+    '--repo',
+    `${owner}/${repo}`,
+    '--json',
+    'state,mergedAt,updatedAt'
+  ]);
+  if (!payload || typeof payload !== 'object') {
+    throw new Error(`gh pr view ${owner}/${repo}#${prNumber} returned invalid JSON.`);
+  }
+  const record = payload as Record<string, unknown>;
+  return {
+    state: normalizeOptionalString(record.state as string | null | undefined),
+    mergedAt: normalizeOptionalString(record.mergedAt as string | null | undefined),
+    updatedAt: normalizeOptionalString(record.updatedAt as string | null | undefined)
+  };
+}
+
+async function runGitHubJsonForIssueContext(args: string[]): Promise<unknown> {
+  const result = await runGitHubCommandForIssueContext(args, 15_000);
+  if (result.timedOut) {
+    throw new Error(`gh ${args.join(' ')} timed out.`);
+  }
+  if (result.exitCode !== 0) {
+    const detail = result.stderr.trim() || result.stdout.trim() || `exit ${result.exitCode ?? result.signal ?? 'unknown'}`;
+    throw new Error(`gh ${args.join(' ')} failed: ${detail}`);
+  }
+  try {
+    return JSON.parse(result.stdout);
+  } catch (error) {
+    throw new Error(
+      `Failed to parse JSON from gh ${args.join(' ')}: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
+}
+
+function runGitHubCommandForIssueContext(
+  args: string[],
+  timeoutMs: number
+): Promise<GitHubJsonCommandResult> {
+  return new Promise((resolve, reject) => {
+    const child = spawn('gh', args, {
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    let stdout = '';
+    let stderr = '';
+    let settled = false;
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill('SIGTERM');
+    }, timeoutMs);
+
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', (chunk: string) => {
+      stdout += chunk;
+    });
+    child.stderr.on('data', (chunk: string) => {
+      stderr += chunk;
+    });
+    child.on('error', (error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.on('close', (exitCode, signal) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      resolve({
+        stdout,
+        stderr,
+        exitCode,
+        signal,
+        timedOut
+      });
+    });
+  });
+}
+
+function mapIssuePullRequestAttachmentSnapshot(
+  value: unknown
+): ProviderLinearIssuePullRequestCandidate['snapshot'] | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const state = normalizeOptionalString(record.state as string | null | undefined);
+  const mergedAt = normalizeOptionalString(
+    (record.mergedAt ?? record.merged_at) as string | null | undefined
+  );
+  const updatedAt = normalizeOptionalString(
+    (record.updatedAt ?? record.updated_at) as string | null | undefined
+  );
+  if (state === null && mergedAt === null && updatedAt === null) {
+    return null;
+  }
+  return {
+    state,
+    merged_at: mergedAt,
+    updated_at: updatedAt
+  };
+}
+
+function classifyIssuePullRequestAttachments(
+  issue: ProviderLinearIssueContext,
+  resolved: ProviderLinearIssuePullRequestCandidate[],
+  unknown: ProviderLinearWorkflowAttachment[]
+): ProviderLinearIssuePullRequestAttachments {
+  if (resolved.length === 0) {
+    return {
+      ...buildEmptyIssuePullRequestAttachments(),
+      unknown: [...unknown]
+    };
+  }
+  const workflowState = classifyProviderLinearWorkflowState({
+    state: issue.state?.name ?? null,
+    state_type: issue.state?.type ?? null
+  });
+  const terminal = resolved.filter((candidate) => isIssuePullRequestSnapshotTerminal(candidate.snapshot));
+  const active = resolved.filter((candidate) => !isIssuePullRequestSnapshotTerminal(candidate.snapshot));
+  if (workflowState.normalizedState === 'merging') {
+    const mergingSelection = selectCurrentMergingPullRequestAttachment(resolved);
+    if (mergingSelection) {
+      return {
+        current: mergingSelection.current.attachment,
+        historical: mergingSelection.historical.map((candidate) => candidate.attachment),
+        conflicting: mergingSelection.conflicting.map((candidate) => candidate.attachment),
+        unknown: [...unknown]
+      };
+    }
+  }
+  if (workflowState.normalizedState !== 'merging' && active.length === 1) {
+    return {
+      current: active[0]!.attachment,
+      historical: terminal.map((candidate) => candidate.attachment),
+      conflicting: [],
+      unknown: [...unknown]
+    };
+  }
+  if (active.length === 0) {
+    if (workflowState.normalizedState !== 'rework') {
+      const terminalSelection = selectCurrentMergingPullRequestAttachment(resolved);
+      if (terminalSelection) {
+        return {
+          current: terminalSelection.current.attachment,
+          historical: terminalSelection.historical.map((candidate) => candidate.attachment),
+          conflicting: terminalSelection.conflicting.map((candidate) => candidate.attachment),
+          unknown: [...unknown]
+        };
+      }
+    }
+    return {
+      current: null,
+      historical: terminal.map((candidate) => candidate.attachment),
+      conflicting: [],
+      unknown: [...unknown]
+    };
+  }
+  return {
+    current: null,
+    historical: terminal.map((candidate) => candidate.attachment),
+    conflicting: active.map((candidate) => candidate.attachment),
+    unknown: [...unknown]
+  };
+}
+
+function selectCurrentMergingPullRequestAttachment(
+  candidates: ProviderLinearIssuePullRequestCandidate[]
+): {
+  current: ProviderLinearIssuePullRequestCandidate;
+  historical: ProviderLinearIssuePullRequestCandidate[];
+  conflicting: ProviderLinearIssuePullRequestCandidate[];
+} | null {
+  const terminal = candidates.filter((candidate) => isIssuePullRequestSnapshotTerminal(candidate.snapshot));
+  const active = candidates.filter((candidate) => !isIssuePullRequestSnapshotTerminal(candidate.snapshot));
+  if (active.length === 1) {
+    const current = active[0]!;
+    const historical = terminal.filter((candidate) => candidate.attachment.id !== current.attachment.id);
+    const historicalIds = new Set(historical.map((candidate) => candidate.attachment.id));
+    const conflicting = candidates.filter(
+      (candidate) => candidate.attachment.id !== current.attachment.id && !historicalIds.has(candidate.attachment.id)
+    );
+    if (conflicting.length === 0) {
+      return {
+        current,
+        historical,
+        conflicting: []
+      };
+    }
+  }
+  const newestTerminal = terminal.reduce<ProviderLinearIssuePullRequestCandidate | null>(
+    (currentNewest, candidate) =>
+      !currentNewest ||
+      isIssuePullRequestSnapshotStrictlyOlderThanSelection(currentNewest.snapshot, candidate.snapshot)
+        ? candidate
+        : currentNewest,
+    null
+  );
+  if (!newestTerminal) {
+    return null;
+  }
+  const historical = candidates.filter(
+    (candidate) =>
+      candidate.attachment.id !== newestTerminal.attachment.id &&
+      isIssuePullRequestSnapshotStrictlyOlderThanSelection(candidate.snapshot, newestTerminal.snapshot)
+  );
+  const conflicting = candidates.filter(
+    (candidate) => candidate.attachment.id !== newestTerminal.attachment.id && !historical.includes(candidate)
+  );
+  if (conflicting.length > 0) {
+    return null;
+  }
+  return {
+    current: newestTerminal,
+    historical,
+    conflicting: []
+  };
+}
+
+function isIssuePullRequestSnapshotTerminal(snapshot: {
+  state: string | null;
+  merged_at: string | null;
+}): boolean {
+  return snapshot.merged_at !== null || snapshot.state === 'MERGED' || snapshot.state === 'CLOSED';
+}
+
+function isIssuePullRequestSnapshotStrictlyOlderThanSelection(
+  candidate: {
+    merged_at: string | null;
+    updated_at: string | null;
+  },
+  selected: {
+    merged_at: string | null;
+    updated_at: string | null;
+  }
+): boolean {
+  const candidateTimestamp = resolveIssuePullRequestSnapshotTimestamp(candidate);
+  const selectedTimestamp = resolveIssuePullRequestSnapshotTimestamp(selected);
+  if (candidateTimestamp === null || selectedTimestamp === null) {
+    return false;
+  }
+  return candidateTimestamp < selectedTimestamp;
+}
+
+function resolveIssuePullRequestSnapshotTimestamp(snapshot: {
+  merged_at: string | null;
+  updated_at: string | null;
+}): number | null {
+  const preferredTimestamp = snapshot.merged_at ?? snapshot.updated_at;
+  const parsed = Date.parse(preferredTimestamp ?? '');
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 export async function upsertProviderLinearWorkpadComment(input: {
@@ -1077,7 +1483,9 @@ export async function upsertProviderLinearWorkpadComment(input: {
 
   if (selectedComment && !bodyHasLocalImageReferences && selectedComment.body === body) {
     await writeCachedIssueContextRecord(input.env, issueContext, session.session.sourceSetup, {
-      embeddedWorkpad: null
+      embeddedWorkpad: null,
+      preserveExistingAttachmentTruthWhenEmpty: true,
+      preserveRecordedAtWhenAttachmentTruthUnchanged: true
     });
     return {
       ok: true,
@@ -1099,7 +1507,9 @@ export async function upsertProviderLinearWorkpadComment(input: {
   });
   if (selectedComment && matchingEmbeddedWorkpadNoopCache) {
     await writeCachedIssueContextRecord(input.env, issueContext, session.session.sourceSetup, {
-      embeddedWorkpad: matchingEmbeddedWorkpadNoopCache
+      embeddedWorkpad: matchingEmbeddedWorkpadNoopCache,
+      preserveExistingAttachmentTruthWhenEmpty: true,
+      preserveRecordedAtWhenAttachmentTruthUnchanged: true
     });
     return {
       ok: true,
@@ -1134,7 +1544,9 @@ export async function upsertProviderLinearWorkpadComment(input: {
     selectedComment = selectedCommentResult.comment;
     if (selectedComment && !bodyHasLocalImageReferences && selectedComment.body === body) {
       await writeCachedIssueContextRecord(input.env, issueContext, session.session.sourceSetup, {
-        embeddedWorkpad: null
+        embeddedWorkpad: null,
+        preserveExistingAttachmentTruthWhenEmpty: true,
+        preserveRecordedAtWhenAttachmentTruthUnchanged: true
       });
       return {
         ok: true,
@@ -1156,7 +1568,9 @@ export async function upsertProviderLinearWorkpadComment(input: {
     });
     if (selectedComment && liveMatchingEmbeddedWorkpadNoopCache) {
       await writeCachedIssueContextRecord(input.env, issueContext, session.session.sourceSetup, {
-        embeddedWorkpad: liveMatchingEmbeddedWorkpadNoopCache
+        embeddedWorkpad: liveMatchingEmbeddedWorkpadNoopCache,
+        preserveExistingAttachmentTruthWhenEmpty: true,
+        preserveRecordedAtWhenAttachmentTruthUnchanged: true
       });
       return {
         ok: true,
@@ -1226,7 +1640,9 @@ export async function upsertProviderLinearWorkpadComment(input: {
           originalBody: body,
           resolvedBody,
           localImages: currentLocalImageCacheEntries
-        })
+        }),
+        preserveExistingAttachmentTruthWhenEmpty: true,
+        preserveRecordedAtWhenAttachmentTruthUnchanged: true
       }
     );
     return {
@@ -1274,7 +1690,9 @@ export async function upsertProviderLinearWorkpadComment(input: {
         originalBody: body,
         resolvedBody,
         localImages: currentLocalImageCacheEntries
-      })
+      }),
+      preserveExistingAttachmentTruthWhenEmpty: true,
+      preserveRecordedAtWhenAttachmentTruthUnchanged: true
     }
   );
   return {
@@ -1365,7 +1783,9 @@ export async function deleteProviderLinearWorkpadComment(input: {
 
   if (!selectedComment) {
     await writeCachedIssueContextRecord(input.env, context.issue, session.session.sourceSetup, {
-      embeddedWorkpad: null
+      embeddedWorkpad: null,
+      preserveExistingAttachmentTruthWhenEmpty: true,
+      preserveRecordedAtWhenAttachmentTruthUnchanged: true
     });
     return {
       ok: true,
@@ -1421,7 +1841,9 @@ export async function deleteProviderLinearWorkpadComment(input: {
     removeIssueContextComment(context.issue, deletedCommentId),
     session.session.sourceSetup,
     {
-      embeddedWorkpad: null
+      embeddedWorkpad: null,
+      preserveExistingAttachmentTruthWhenEmpty: true,
+      preserveRecordedAtWhenAttachmentTruthUnchanged: true
     }
   );
   return {
@@ -3719,6 +4141,9 @@ function shouldReuseCachedIssueContextForRead(
   record: ProviderLinearIssueContextCacheRecord,
   budget: LinearBudgetStatus | null
 ): boolean {
+  if (issueContextCacheRecordCarriesLivePrTruth(record.issue)) {
+    return false;
+  }
   if (!budget || budget.cooldown_active) {
     return false;
   }
@@ -3735,28 +4160,155 @@ function shouldReuseCachedIssueContextForRead(
   return isIssueContextCacheRecordFresh(record, PROVIDER_LINEAR_LOW_HEADROOM_READ_CACHE_MAX_AGE_MS);
 }
 
+function issueContextCacheRecordCarriesLivePrTruth(issue: ProviderLinearIssueContext): boolean {
+  const workflowState = classifyProviderLinearWorkflowState({
+    state: issue.state?.name ?? null,
+    state_type: issue.state?.type ?? null
+  });
+  const githubPullRequestAttachmentCount = issue.attachments.filter((attachment) =>
+    parseGitHubPullRequestUrl(attachment.url)
+  ).length;
+  const classifiedPullRequestAttachmentCount = (
+    (issue.pull_request_attachments.current ? 1 : 0)
+    + issue.pull_request_attachments.historical.length
+    + issue.pull_request_attachments.conflicting.length
+    + issue.pull_request_attachments.unknown.length
+  );
+  if (
+    issue.pull_request_attachments.current
+    || issue.pull_request_attachments.conflicting.length > 0
+    || issue.pull_request_attachments.unknown.length > 0
+  ) {
+    return true;
+  }
+  if (githubPullRequestAttachmentCount > classifiedPullRequestAttachmentCount) {
+    return true;
+  }
+  if (workflowState.normalizedState === 'merging') {
+    return (
+      issue.pull_request_attachments.historical.length > 0
+      || githubPullRequestAttachmentCount > 0
+    );
+  }
+  if (issue.pull_request_attachments.historical.length > 0) {
+    return false;
+  }
+  if (githubPullRequestAttachmentCount > 0) {
+    return true;
+  }
+  return false;
+}
+
+function sameIssueContextAttachmentTruth(
+  left: Pick<ProviderLinearIssueContext, 'attachments' | 'pull_request_attachments'>,
+  right: Pick<ProviderLinearIssueContext, 'attachments' | 'pull_request_attachments'>
+): boolean {
+  return serializeIssueContextAttachmentTruth(left) === serializeIssueContextAttachmentTruth(right);
+}
+
+function issueContextHasAnyAttachmentTruth(
+  issue: Pick<ProviderLinearIssueContext, 'attachments' | 'pull_request_attachments'>
+): boolean {
+  return (
+    issue.attachments.length > 0 ||
+    issue.pull_request_attachments.current !== null ||
+    issue.pull_request_attachments.historical.length > 0 ||
+    issue.pull_request_attachments.conflicting.length > 0 ||
+    issue.pull_request_attachments.unknown.length > 0
+  );
+}
+
+function cloneIssueContextAttachmentTruth(
+  issue: Pick<ProviderLinearIssueContext, 'attachments' | 'pull_request_attachments'>
+): Pick<ProviderLinearIssueContext, 'attachments' | 'pull_request_attachments'> {
+  return {
+    attachments: [...issue.attachments],
+    pull_request_attachments: {
+      current: issue.pull_request_attachments.current,
+      historical: [...issue.pull_request_attachments.historical],
+      conflicting: [...issue.pull_request_attachments.conflicting],
+      unknown: [...issue.pull_request_attachments.unknown]
+    }
+  };
+}
+
+function serializeIssueContextAttachmentTruth(
+  issue: Pick<ProviderLinearIssueContext, 'attachments' | 'pull_request_attachments'>
+): string {
+  return JSON.stringify({
+    attachments: issue.attachments.map((attachment) =>
+      serializeIssueContextAttachmentTruthEntry(attachment)
+    ),
+    pull_request_attachments: {
+      current: serializeIssueContextAttachmentTruthEntry(issue.pull_request_attachments.current),
+      historical: issue.pull_request_attachments.historical.map((attachment) =>
+        serializeIssueContextAttachmentTruthEntry(attachment)
+      ),
+      conflicting: issue.pull_request_attachments.conflicting.map((attachment) =>
+        serializeIssueContextAttachmentTruthEntry(attachment)
+      ),
+      unknown: issue.pull_request_attachments.unknown.map((attachment) =>
+        serializeIssueContextAttachmentTruthEntry(attachment)
+      )
+    }
+  });
+}
+
+function serializeIssueContextAttachmentTruthEntry(
+  attachment: ProviderLinearWorkflowAttachment | null
+): { id: string; title: string | null; url: string | null; source_type: string | null } | null {
+  if (!attachment) {
+    return null;
+  }
+  return {
+    id: attachment.id,
+    title: attachment.title,
+    url: attachment.url,
+    source_type: attachment.source_type
+  };
+}
+
 async function writeCachedIssueContextRecord(
   env: NodeJS.ProcessEnv | undefined,
   issue: ProviderLinearIssueContext,
   sourceSetup: DispatchPilotSourceSetup | null,
   options?: {
     embeddedWorkpad?: ProviderLinearEmbeddedWorkpadCacheRecord | null;
+    preserveExistingAttachmentTruthWhenEmpty?: boolean;
+    preserveRecordedAtWhenAttachmentTruthUnchanged?: boolean;
   }
 ): Promise<void> {
   const cachePath = resolveIssueContextCachePath(env);
   if (!cachePath) {
     return;
   }
+  const existingRecord = await readCachedIssueContextRecord(env, issue.id, sourceSetup);
   const embeddedWorkpad =
     options && Object.prototype.hasOwnProperty.call(options, 'embeddedWorkpad')
       ? options.embeddedWorkpad ?? null
-      : (await readCachedIssueContextRecord(env, issue.id, sourceSetup))?.embedded_workpad ?? null;
+      : existingRecord?.embedded_workpad ?? null;
+  const issueWithPreservedAttachmentTruth =
+    options?.preserveExistingAttachmentTruthWhenEmpty === true &&
+    existingRecord &&
+    !issueContextHasAnyAttachmentTruth(issue) &&
+    issueContextHasAnyAttachmentTruth(existingRecord.issue)
+      ? {
+          ...issue,
+          ...cloneIssueContextAttachmentTruth(existingRecord.issue)
+        }
+      : issue;
+  const recordedAt =
+    options?.preserveRecordedAtWhenAttachmentTruthUnchanged === true &&
+    existingRecord &&
+    sameIssueContextAttachmentTruth(existingRecord.issue, issueWithPreservedAttachmentTruth)
+      ? existingRecord.recorded_at
+      : new Date().toISOString();
   const record: ProviderLinearIssueContextCacheRecord = {
     schema_version: 2,
     issue_id: issue.id,
-    recorded_at: new Date().toISOString(),
+    recorded_at: recordedAt,
     source_setup: sourceSetup,
-    issue,
+    issue: issueWithPreservedAttachmentTruth,
     ...(embeddedWorkpad ? { embedded_workpad: embeddedWorkpad } : {})
   };
   try {
@@ -3883,6 +4435,9 @@ function parseCachedIssueContext(value: unknown): ProviderLinearIssueContext | n
   const project = parseCachedIssueProject(issue.project);
   const comments = parseCachedIssueComments(issue.comments);
   const attachments = parseCachedIssueAttachments(issue.attachments);
+  const pullRequestAttachments = parseCachedIssuePullRequestAttachments(
+    issue.pull_request_attachments
+  );
   if (!id || !identifier || !title || comments === null || attachments === null) {
     return null;
   }
@@ -3895,11 +4450,20 @@ function parseCachedIssueContext(value: unknown): ProviderLinearIssueContext | n
   if (issue.project !== undefined && issue.project !== null && project === null) {
     return null;
   }
+  if (
+    issue.pull_request_attachments !== undefined &&
+    issue.pull_request_attachments !== null &&
+    pullRequestAttachments === null
+  ) {
+    return null;
+  }
 
   const workpadComment = parseCachedIssueWorkpadComment(issue.workpad_comment, comments);
   if (issue.workpad_comment !== undefined && issue.workpad_comment !== null && workpadComment === null) {
     return null;
   }
+  const cachedPullRequestAttachments =
+    pullRequestAttachments ?? buildUnknownIssuePullRequestAttachments(attachments);
 
   return {
     id,
@@ -3916,6 +4480,7 @@ function parseCachedIssueContext(value: unknown): ProviderLinearIssueContext | n
     project,
     comments,
     attachments,
+    pull_request_attachments: cachedPullRequestAttachments,
     workpad_comment: workpadComment
   };
 }
@@ -4025,6 +4590,47 @@ function parseCachedAttachment(value: unknown): ProviderLinearWorkflowAttachment
     url: normalizeOptionalString(record.url as string | null | undefined),
     source_type: normalizeOptionalString(record.source_type as string | null | undefined)
   };
+}
+
+function parseCachedIssuePullRequestAttachments(
+  value: unknown
+): ProviderLinearIssuePullRequestAttachments | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const current =
+    record.current === null
+      ? null
+      : record.current === undefined
+        ? null
+        : parseCachedAttachment(record.current);
+  const historical = parseOptionalCachedAttachmentArray(record.historical);
+  const conflicting = parseOptionalCachedAttachmentArray(record.conflicting);
+  const unknown = parseOptionalCachedAttachmentArray(record.unknown);
+  if (
+    (record.current !== undefined && record.current !== null && current === null) ||
+    historical === null ||
+    conflicting === null ||
+    unknown === null
+  ) {
+    return null;
+  }
+  return {
+    current,
+    historical,
+    conflicting,
+    unknown
+  };
+}
+
+function parseOptionalCachedAttachmentArray(
+  value: unknown
+): ProviderLinearWorkflowAttachment[] | null {
+  if (value === undefined || value === null) {
+    return [];
+  }
+  return parseCachedIssueAttachments(value);
 }
 
 function parseCachedIssueWorkpadComment(
@@ -4323,7 +4929,14 @@ async function readIssueContext(
     return attachmentResult;
   }
 
-  const parsedIssue = parseIssueContext(issueNode, workspaceId, session.sourceSetup, comments, attachmentResult.attachments);
+  const parsedIssue = parseIssueContext(
+    issueNode,
+    workspaceId,
+    session.sourceSetup,
+    comments,
+    attachmentResult.attachments,
+    includeAttachments ? undefined : null
+  );
   if (!parsedIssue.ok) {
     return {
       ok: false,
@@ -4414,7 +5027,8 @@ function parseIssueContext(
   workspaceId: string | null | undefined,
   sourceSetup: DispatchPilotSourceSetup | null,
   commentsOverride?: readonly ProviderLinearWorkflowComment[] | null,
-  attachmentsOverride?: readonly ProviderLinearWorkflowAttachment[] | null
+  attachmentsOverride?: readonly ProviderLinearWorkflowAttachment[] | null,
+  pullRequestAttachmentsOverride?: ProviderLinearIssuePullRequestAttachments | null
 ):
   | {
       ok: true;
@@ -4501,6 +5115,8 @@ function parseIssueContext(
                 .map((entry) => parseAttachment(entry))
                 .filter((entry): entry is ProviderLinearWorkflowAttachment => entry !== null)
             : [],
+      pull_request_attachments:
+        pullRequestAttachmentsOverride ?? buildEmptyIssuePullRequestAttachments(),
       workpad_comment: workpadComment
     }
   };
@@ -6762,6 +7378,9 @@ function parseGitHubPullRequestUrl(
 ): {
   canonicalUrl: string;
   comparisonKey: string;
+  owner: string;
+  repo: string;
+  number: number;
 } | null {
   const normalized = normalizeOptionalString(value);
   if (!normalized) {
@@ -6789,7 +7408,10 @@ function parseGitHubPullRequestUrl(
 
   return {
     canonicalUrl: `https://github.com/${owner}/${repo}/pull/${pullNumber}`,
-    comparisonKey: `https://github.com/${owner.toLowerCase()}/${repo.toLowerCase()}/pull/${pullNumber}`
+    comparisonKey: `https://github.com/${owner.toLowerCase()}/${repo.toLowerCase()}/pull/${pullNumber}`,
+    owner,
+    repo,
+    number: Number(pullNumber)
   };
 }
 

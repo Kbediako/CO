@@ -2001,6 +2001,112 @@ describe('SelectedRunProjection', () => {
     });
   });
 
+  it('suppresses stale rehydrated merge-closeout PR truth when a fresher tracked issue has reset to Rework', async () => {
+    const taskId = 'linear-lin-issue-220';
+    const { paths } = await createHostPaths(undefined, { taskId, runId: 'provider-run-reset-rework' });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'provider-run-reset-rework',
+        task_id: taskId,
+        pipeline_id: 'provider-linear-worker',
+        issue_provider: 'linear',
+        status: 'in_progress',
+        updated_at: '2026-04-17T13:10:30.000Z',
+        summary: 'Claim still carries stale Merging merge-closeout residue.'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_id: 'lin-issue-220',
+      issue_identifier: 'CO-220',
+      issue_title: 'Reset Rework truth',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-17T13:10:30.000Z',
+      task_id: taskId,
+      run_id: 'provider-run-reset-rework',
+      run_manifest_path: paths.manifestPath,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      merge_closeout: {
+        recorded_at: '2026-04-17T13:10:30.000Z',
+        issue_id: 'lin-issue-220',
+        issue_identifier: 'CO-220',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-17T13:10:30.000Z',
+        status: 'action_required',
+        reason: 'pr_closed_unmerged',
+        summary: 'Attached PR #357 is closed without merging; reopen it or attach a replacement PR.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/357'],
+        ignored_historical_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/357',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 357
+        },
+        snapshot: {
+          state: 'CLOSED',
+          review_decision: 'APPROVED',
+          merge_state_status: 'UNKNOWN',
+          ready_to_merge: false,
+          gate_reasons: ['state=CLOSED'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 0,
+          checks_failed: 0,
+          required_checks_pending: 0,
+          required_checks_failed: 0,
+          updated_at: '2026-04-17T13:10:30.000Z',
+          merged_at: null,
+          head_oid: 'closed-pr-head'
+        },
+        merge_attempt: null,
+        shared_root: null,
+        linear_transition: null
+      }
+    };
+
+    const projectionContext = createProjectionContext(paths, providerIntakeState);
+    projectionContext.linearAdvisoryState = {
+      tracked_issue: {
+        id: 'lin-issue-220',
+        identifier: 'CO-220',
+        title: 'Reset Rework truth',
+        state: 'Rework',
+        state_type: 'started',
+        updated_at: '2026-04-17T13:11:00.000Z'
+      } as never
+    };
+
+    const selected = await createSelectedRunProjectionReader(projectionContext).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: 'CO-220',
+      issueId: 'lin-issue-220',
+      compatibilityState: 'Rework',
+      displayStatus: 'Rework'
+    });
+    expect(selected?.tracked?.linear).toMatchObject({
+      identifier: 'CO-220',
+      state: 'Rework'
+    });
+    expect(selected?.providerDebugSnapshot?.live_linear_state).toEqual({
+      state: 'Rework',
+      state_type: 'started',
+      updated_at: '2026-04-17T13:11:00.000Z'
+    });
+    expect(selected?.providerDebugSnapshot?.pull_request).toBeNull();
+    expect(selected?.providerDebugSnapshot?.progress?.kind).not.toBe('merge_closeout');
+    expect(selected?.latestEvent?.message ?? '').not.toContain('closed without merging');
+  });
+
   it('rebinds fallback-only synthetic child task ids from the parent claim task prefix', async () => {
     const parentTaskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
     const childTaskId = `${parentTaskId}-docs-review`;
