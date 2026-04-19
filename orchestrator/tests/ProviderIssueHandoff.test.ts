@@ -19844,6 +19844,208 @@ describe('createProviderIssueHandoffService', () => {
     );
   });
 
+  it('preserves prior terminal local rollout attempts when execution sidecar is missing', async () => {
+    const { paths } = await createHostPaths();
+    const trackedIssue = createTrackedIssue();
+    const state = createProviderIntakeState();
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-co-118',
+        manifestPath: '/repo/.runs/linear-0af906c6/run-co-118/manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const auditPath = join(paths.runDir, 'provider-operator-autopilot.jsonl');
+    const lifecyclePath = join(paths.runDir, 'provider-operator-autopilot-lifecycle.json');
+    const executionPath = join(
+      paths.runDir,
+      'provider-operator-autopilot-local-rollout-executions.json'
+    );
+    const succeededAttempt = {
+      record_kind: 'terminal' as const,
+      action_instance_id: 'local_rollout:lin-issue-1',
+      action_id: 'local-rebuild',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-118',
+      preflight: {
+        status: 'passed' as const,
+        reason: null,
+        checked_at: '2026-04-09T10:00:00.000Z',
+        summary: 'Local rollout action preflight passed.'
+      },
+      started_at: '2026-04-09T10:00:01.000Z',
+      ended_at: '2026-04-09T10:00:02.000Z',
+      terminal_state: 'succeeded' as const,
+      reason: null,
+      summary: 'Local rollout action local-rebuild succeeded.',
+      command: {
+        runner: 'npm_script' as const,
+        command: 'npm',
+        args: ['run', 'rollout:local'],
+        cwd: paths.repoRoot,
+        timeout_ms: 15000
+      },
+      exit_code: 0,
+      stdout: 'ok',
+      stderr: ''
+    };
+    const failedAttempt = {
+      ...succeededAttempt,
+      action_id: 'local-restart',
+      terminal_state: 'failed' as const,
+      reason: 'command_failed' as const,
+      summary: 'Local rollout action local-restart failed.',
+      exit_code: 2,
+      stdout: '',
+      stderr: 'boom'
+    };
+    const previousResult = {
+      recorded_at: '2026-04-09T10:00:03.000Z',
+      status: 'acted' as const,
+      summary: 'Preserved prior local rollout execution attempts.',
+      error: null,
+      actions: [],
+      holds: [],
+      pending_actions: [],
+      resolved_actions: [],
+      lifecycle_records: [],
+      local_rollout_execution_attempts: [succeededAttempt, failedAttempt]
+    };
+    const providerWorkflowState = () => ({
+      status: 'ready' as const,
+      pipeline_id: 'provider-linear-worker',
+      source_path: '/repo/codex.orchestrator.json',
+      snapshot_path: '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+      last_reload_attempt_at: '2026-04-09T10:00:00.000Z',
+      last_success_at: '2026-04-09T10:00:00.000Z',
+      last_error_at: null,
+      last_error: null,
+      terminal_cleanup: null,
+      operator_autopilot: {
+        enabled: true,
+        backlog_promotion: {
+          enabled: true,
+          state_name: 'Backlog',
+          target_state_name: 'Ready'
+        },
+        review_handoff_rework: {
+          enabled: true,
+          target_state_name: 'Rework',
+          excluded_action_required_reasons: [
+            'draft',
+            'label:do-not-merge',
+            'review=REVIEW_REQUIRED',
+            'required_checks_query_failed'
+          ]
+        },
+        post_merge_rollout: {
+          enabled: true,
+          summary: 'Merge closeout completed; local rollout follow-up may still be required.',
+          execution: {
+            enabled: true,
+            actions: [
+              {
+                id: 'local-rebuild',
+                enabled: true,
+                order: 10,
+                runner: 'npm_script',
+                script: 'rollout:local',
+                timeout_ms: 15000,
+                require_clean_repo: false,
+                deploy_class: false
+              },
+              {
+                id: 'local-restart',
+                enabled: true,
+                order: 20,
+                runner: 'npm_script',
+                script: 'rollout:restart',
+                timeout_ms: 15000,
+                require_clean_repo: false,
+                deploy_class: false
+              }
+            ]
+          }
+        },
+        audit_path: auditPath,
+        lifecycle_path: lifecyclePath,
+        execution_path: executionPath,
+        last_result: previousResult
+      }
+    });
+    const providerWorkflowConfigStore = {
+      bootstrap: vi.fn(async () => providerWorkflowState()),
+      refresh: vi.fn(async () => providerWorkflowState()),
+      snapshot: () => providerWorkflowState(),
+      getLaunchConfigPath: vi.fn(async () => '/repo/.runs/local-mcp/cli/control-host/provider-workflow.json'),
+      recordTerminalCleanupResult: vi.fn(),
+      recordOperatorAutopilotResult: vi.fn()
+    };
+    const runOperatorAutopilot = vi.fn(async (input) => {
+      expect(input.local_rollout_execution_attempts).toMatchObject([
+        {
+          record_kind: 'terminal',
+          action_id: 'local-rebuild',
+          terminal_state: 'succeeded',
+          reason: null
+        },
+        {
+          record_kind: 'terminal',
+          action_id: 'local-restart',
+          terminal_state: 'failed',
+          reason: 'command_failed'
+        }
+      ]);
+      return {
+        recorded_at: '2026-04-09T10:00:04.000Z',
+        status: 'acted' as const,
+        summary: 'Preserved terminal local rollout attempts after execution sidecar disappeared.',
+        error: null,
+        actions: [],
+        holds: [],
+        pending_actions: [],
+        resolved_actions: [],
+        lifecycle_records: [],
+        local_rollout_execution_attempts: input.local_rollout_execution_attempts
+      };
+    });
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      providerWorkflowConfigStore,
+      runOperatorAutopilot,
+      launcher,
+      resolveTrackedIssues: async () => ({
+        kind: 'ready',
+        trackedIssues: [trackedIssue]
+      })
+    });
+
+    await expect(service.refresh()).resolves.toBeUndefined();
+
+    expect(runOperatorAutopilot).toHaveBeenCalledTimes(1);
+    expect(providerWorkflowConfigStore.recordOperatorAutopilotResult).toHaveBeenCalledWith(
+      expect.objectContaining({
+        local_rollout_execution_attempts: expect.arrayContaining([
+          expect.objectContaining({
+            record_kind: 'terminal',
+            action_id: 'local-rebuild',
+            terminal_state: 'succeeded',
+            reason: null
+          }),
+          expect.objectContaining({
+            record_kind: 'terminal',
+            action_id: 'local-restart',
+            terminal_state: 'failed',
+            reason: 'command_failed'
+          })
+        ])
+      })
+    );
+  });
+
   it('preserves lifecycle-clear failures when rehydrating a successful execution sidecar', async () => {
     const { paths } = await createHostPaths();
     const trackedIssue = createTrackedIssue();

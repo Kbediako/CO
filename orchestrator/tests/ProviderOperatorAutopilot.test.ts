@@ -9,6 +9,7 @@ import {
 import type { ProviderOperatorAutopilotLifecycleRecord } from '../src/cli/control/providerOperatorAutopilotLifecycle.js';
 import {
   executeProviderOperatorAutopilotLocalRolloutActions,
+  shouldUseShellForLocalRolloutCommand,
   type ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord
 } from '../src/cli/control/providerOperatorAutopilotLocalRolloutExecution.js';
 import type { ProviderIntakeClaimRecord } from '../src/cli/control/providerIntakeState.js';
@@ -1496,6 +1497,13 @@ describe('providerOperatorAutopilot', () => {
         args: ['run', 'rollout:local']
       })
     );
+  });
+
+  it('uses shell execution for Windows command shims', () => {
+    expect(shouldUseShellForLocalRolloutCommand('npm.cmd', 'win32')).toBe(true);
+    expect(shouldUseShellForLocalRolloutCommand('rollout.bat', 'win32')).toBe(true);
+    expect(shouldUseShellForLocalRolloutCommand('npm', 'win32')).toBe(false);
+    expect(shouldUseShellForLocalRolloutCommand('npm.cmd', 'darwin')).toBe(false);
   });
 
   it('keeps a failed local rollout command pending with command failure audit output', async () => {

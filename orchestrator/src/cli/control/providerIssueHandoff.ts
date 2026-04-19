@@ -6453,21 +6453,21 @@ function resolveLocalRolloutExecutionAttemptsForCycle(
       .filter((attempt) => attempt.record_kind === 'terminal')
       .map((attempt) => localRolloutExecutionAttemptKey(attempt))
   );
-  const preservedFailureKeys = new Set(
+  const preservedAttemptKeys = new Set(
     current
       .filter(
         (attempt) => attempt.record_kind === 'terminal' && attempt.terminal_state === 'failed'
       )
-      .map((attempt) => localRolloutExecutionAttemptFailureKey(attempt))
+      .map((attempt) => localRolloutExecutionAttemptReasonKey(attempt))
   );
   for (const attempt of previous) {
     if (!shouldPreservePreviousLocalRolloutExecutionAttempt(attempt, terminalKeys)) {
       continue;
     }
-    const failureKey = localRolloutExecutionAttemptFailureKey(attempt);
-    if (!preservedFailureKeys.has(failureKey)) {
+    const attemptKey = localRolloutExecutionAttemptReasonKey(attempt);
+    if (!preservedAttemptKeys.has(attemptKey)) {
       current.push(cloneLocalRolloutExecutionAttempt(attempt));
-      preservedFailureKeys.add(failureKey);
+      preservedAttemptKeys.add(attemptKey);
     }
   }
   return current;
@@ -6477,13 +6477,13 @@ function shouldPreservePreviousLocalRolloutExecutionAttempt(
   attempt: ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord,
   currentTerminalKeys: ReadonlySet<string>
 ): boolean {
-  if (attempt.record_kind !== 'terminal' || attempt.terminal_state !== 'failed') {
+  if (attempt.record_kind !== 'terminal') {
     return false;
   }
-  if (attempt.reason === 'execution_audit_failed') {
-    return !currentTerminalKeys.has(localRolloutExecutionAttemptKey(attempt));
-  }
-  return attempt.reason === 'lifecycle_record_failed';
+  return (
+    attempt.reason === 'lifecycle_record_failed' ||
+    !currentTerminalKeys.has(localRolloutExecutionAttemptKey(attempt))
+  );
 }
 
 function localRolloutExecutionAttemptKey(
@@ -6495,7 +6495,7 @@ function localRolloutExecutionAttemptKey(
   return `${attempt.action_instance_id}\u0000${attempt.action_id}`;
 }
 
-function localRolloutExecutionAttemptFailureKey(
+function localRolloutExecutionAttemptReasonKey(
   attempt: Pick<
     ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord,
     'action_instance_id' | 'action_id' | 'reason'

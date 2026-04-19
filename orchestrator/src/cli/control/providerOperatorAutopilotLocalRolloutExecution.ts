@@ -968,7 +968,8 @@ async function runLocalRolloutCommand(input: {
     const { stdout, stderr } = await execFileAsync(input.command, input.args, {
       cwd: input.cwd,
       timeout: input.timeoutMs,
-      maxBuffer: 10 * 1024 * 1024
+      maxBuffer: 10 * 1024 * 1024,
+      shell: shouldUseShellForLocalRolloutCommand(input.command)
     });
     return { ok: true, exitCode: 0, stdout, stderr };
   } catch (error) {
@@ -984,6 +985,13 @@ async function runLocalRolloutCommand(input: {
       stderr: execError.stderr ?? execError.message
     };
   }
+}
+
+export function shouldUseShellForLocalRolloutCommand(
+  command: string,
+  platform: NodeJS.Platform = process.platform
+): boolean {
+  return platform === 'win32' && /\.(?:cmd|bat)$/i.test(command);
 }
 
 function executionAttemptKey(
