@@ -6429,6 +6429,9 @@ function resolveProviderOperatorAutopilotPreviousResultFromPayload(
       : [],
     local_rollout_execution_attempts: Array.isArray(record.local_rollout_execution_attempts)
       ? (record.local_rollout_execution_attempts as ProviderOperatorAutopilotResult['local_rollout_execution_attempts'])
+      : [],
+    backlog_promotion_snapshots: Array.isArray(record.backlog_promotion_snapshots)
+      ? (record.backlog_promotion_snapshots as ProviderOperatorAutopilotResult['backlog_promotion_snapshots'])
       : []
   };
 }

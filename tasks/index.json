@@ -29,6 +29,32 @@
       }
     },
     {
+      "id": "20260417-linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378",
+      "title": "CO: prevent operator-autopilot Backlog to Ready re-promotion churn after a manual Ready to Backlog demotion",
+      "relates_to": "tasks/tasks-linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-17",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-17",
+          "status": "produced",
+          "manifest": ".runs/linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378-docs-packet/cli/2026-04-17T12-58-03-686Z-124efce4/manifest.json",
+          "source_anchor": "ctx:sha256:ce6083384b86554ab408103b1cb76c240fe7afc936fa45247ec8a65e67938015#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-216 as a narrow operator-autopilot backlog-promotion hold lane: prevent Backlog to Ready re-promotion churn after a manual Ready to Backlog demotion, keep normal safe backlog-head promotion when no manual-demotion signal exists, preserve backlog-promotion expected-state metadata, and expose issue updated_at, hold reason, and force-path usage through observability without reopening broad scheduler, CO-215 transition-CAS, or refresh-stall scope. The provided .runs source payload and manifest are absent in this child checkout, so the packet is anchored on the protected issue wording plus current repo seams in providerOperatorAutopilot.ts, providerLinearWorkflowFacade.ts, providerWorkflowConfigStore.ts, and observabilityReadModel.ts; parent owns implementation, validation, Linear state, workpad, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md",
+        "task": "tasks/tasks-linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md",
+        "agent_task": ".agent/task/linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md",
+        "docs": "docs/TECH_SPEC-linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md"
+      }
+    },
+    {
       "id": "linear-c9e99e2c-bc48-48f1-a8ca-4bd2a9289be2",
       "title": "CO-260 bounded unattended local_rollout executor",
       "relates_to": "docs/PRD-CO-260-local-rollout-executor.md",

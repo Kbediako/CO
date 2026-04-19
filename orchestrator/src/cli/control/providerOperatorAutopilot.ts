@@ -82,6 +82,7 @@ export interface ProviderOperatorAutopilotLinearTransitionRecord {
   issue_state: string | null;
   issue_state_type: string | null;
   issue_updated_at: string | null;
+  force_path_used?: boolean;
   error: string | null;
 }
 
@@ -99,6 +100,12 @@ export interface ProviderOperatorAutopilotHoldRecord {
   kind: 'backlog_promotion' | 'review_handoff_rework';
   issue_id: string | null;
   issue_identifier: string | null;
+  issue_state?: string | null;
+  issue_state_type?: string | null;
+  issue_updated_at?: string | null;
+  promotion_attempted_at?: string | null;
+  promotion_issue_updated_at?: string | null;
+  force_path_used?: boolean;
   reason: string;
   summary: string;
   action_required_reasons: string[];
@@ -138,6 +145,15 @@ export interface ProviderOperatorAutopilotResolvedActionRecord {
   lifecycle_recorded_at: string;
 }
 
+export interface ProviderOperatorAutopilotBacklogPromotionSnapshot {
+  issue_id: string;
+  issue_identifier: string | null;
+  target_state: string;
+  attempted_at: string;
+  issue_updated_at: string | null;
+  force_path_used: boolean;
+}
+
 export interface ProviderOperatorAutopilotResult {
   recorded_at: string;
   status: 'disabled' | 'noop' | 'acted' | 'failed';
@@ -149,6 +165,7 @@ export interface ProviderOperatorAutopilotResult {
   resolved_actions?: ProviderOperatorAutopilotResolvedActionRecord[];
   lifecycle_records?: ProviderOperatorAutopilotLifecycleRecord[];
   local_rollout_execution_attempts?: ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord[];
+  backlog_promotion_snapshots?: ProviderOperatorAutopilotBacklogPromotionSnapshot[];
 }
 
 interface ProviderOperatorAutopilotDependencies {
@@ -260,7 +277,8 @@ export async function runProviderOperatorAutopilot(
       pending_actions: [],
       resolved_actions: [],
       lifecycle_records: [],
-      local_rollout_execution_attempts: []
+      local_rollout_execution_attempts: [],
+      backlog_promotion_snapshots: []
     };
   }
 
@@ -279,6 +297,15 @@ export async function runProviderOperatorAutopilot(
   const lifecycleRecords = (input.lifecycle_records ?? []).map(
     cloneProviderOperatorAutopilotLifecycleRecord
   );
+  const resolveBacklogPromotionSnapshots = () =>
+    resolveNextBacklogPromotionSnapshots({
+      previousResult: input.previous_result ?? null,
+      trackedIssuesById,
+      actions,
+      holds,
+      targetStateName: input.config.backlog_promotion.target_state_name,
+      backlogStateName: input.config.backlog_promotion.state_name
+    });
 
   const reviewHandoffOutcome = await maybeRunReviewHandoffRework({
     claims: input.claims,
@@ -308,7 +335,8 @@ export async function runProviderOperatorAutopilot(
       lifecycle_records: effectiveLocalRolloutActions.lifecycle_records,
       local_rollout_execution_attempts: cloneLocalRolloutExecutionAttempts(
         input.local_rollout_execution_attempts
-      )
+      ),
+      backlog_promotion_snapshots: resolveBacklogPromotionSnapshots()
     };
   }
   if (reviewHandoffOutcome.action) {
@@ -324,6 +352,7 @@ export async function runProviderOperatorAutopilot(
       claimsByIssueId,
       config: input.config,
       recordedAt,
+      previousResult: input.previous_result ?? null,
       sourceSetup: input.source_setup ?? null,
       env: input.env ?? process.env,
       transitionIssueState
@@ -346,7 +375,8 @@ export async function runProviderOperatorAutopilot(
         lifecycle_records: effectiveLocalRolloutActions.lifecycle_records,
         local_rollout_execution_attempts: cloneLocalRolloutExecutionAttempts(
           input.local_rollout_execution_attempts
-        )
+        ),
+        backlog_promotion_snapshots: resolveBacklogPromotionSnapshots()
       };
     }
     if (backlogOutcome.action) {
@@ -380,7 +410,8 @@ export async function runProviderOperatorAutopilot(
         pending_actions: effectiveLocalRolloutActions.pending_actions,
         resolved_actions: effectiveLocalRolloutActions.resolved_actions,
         lifecycle_records: effectiveLocalRolloutActions.lifecycle_records,
-        local_rollout_execution_attempts: localRolloutExecutionAttempts
+        local_rollout_execution_attempts: localRolloutExecutionAttempts,
+        backlog_promotion_snapshots: resolveBacklogPromotionSnapshots()
       };
     }
     const executionOutcome = await executeProviderOperatorAutopilotLocalRolloutActions(
@@ -435,7 +466,8 @@ export async function runProviderOperatorAutopilot(
     pending_actions: effectiveLocalRolloutActions.pending_actions,
     resolved_actions: effectiveLocalRolloutActions.resolved_actions,
     lifecycle_records: effectiveLocalRolloutActions.lifecycle_records,
-    local_rollout_execution_attempts: localRolloutExecutionAttempts
+    local_rollout_execution_attempts: localRolloutExecutionAttempts,
+    backlog_promotion_snapshots: resolveBacklogPromotionSnapshots()
   };
 }
 
@@ -444,6 +476,7 @@ async function maybeRunBacklogPromotion(input: {
   claimsByIssueId: Map<string, ProviderIntakeClaimRecord>;
   config: ProviderOperatorAutopilotConfig;
   recordedAt: string;
+  previousResult: ProviderOperatorAutopilotResult | null;
   sourceSetup: DispatchPilotSourceSetup | null;
   env: NodeJS.ProcessEnv;
   transitionIssueState: typeof transitionProviderLinearIssueState;
@@ -475,14 +508,13 @@ async function maybeRunBacklogPromotion(input: {
   if (higherRankedBlockedQueueLane) {
     return {
       action: null,
-      hold: {
+      hold: buildAutopilotHoldRecord({
         kind: 'backlog_promotion',
-        issue_id: candidate.id,
-        issue_identifier: candidate.identifier,
+        issue: candidate,
         reason: 'backlog_head_blocked_by_higher_ranked_lane',
         summary: `Backlog head ${candidate.identifier} remains parked because higher-ranked queue lane ${higherRankedBlockedQueueLane.identifier} is still blocked by non-terminal work: ${formatBlockedBy(higherRankedBlockedQueueLane.blocked_by)}.`,
-        action_required_reasons: []
-      },
+        actionRequiredReasons: []
+      }),
       failed: false,
       summary: '',
       error: null
@@ -492,14 +524,13 @@ async function maybeRunBacklogPromotion(input: {
   if (existingClaim && isBacklogPromotionBlockedByExistingClaimState(existingClaim.state)) {
     return {
       action: null,
-      hold: {
+      hold: buildAutopilotHoldRecord({
         kind: 'backlog_promotion',
-        issue_id: candidate.id,
-        issue_identifier: candidate.identifier,
+        issue: candidate,
         reason: 'backlog_head_already_claimed',
         summary: `Backlog head ${candidate.identifier} remains parked because an intake claim is already present (${existingClaim.state}).`,
-        action_required_reasons: []
-      },
+        actionRequiredReasons: []
+      }),
       failed: false,
       summary: '',
       error: null
@@ -508,14 +539,13 @@ async function maybeRunBacklogPromotion(input: {
   if (!isLiveLinearTrackedIssueOwnedByCurrentViewerOrUnassigned(candidate)) {
     return {
       action: null,
-      hold: {
+      hold: buildAutopilotHoldRecord({
         kind: 'backlog_promotion',
-        issue_id: candidate.id,
-        issue_identifier: candidate.identifier,
+        issue: candidate,
         reason: 'backlog_head_owned_by_other_operator',
         summary: `Backlog head ${candidate.identifier} remains parked because it is assigned to another operator.`,
-        action_required_reasons: []
-      },
+        actionRequiredReasons: []
+      }),
       failed: false,
       summary: '',
       error: null
@@ -524,14 +554,42 @@ async function maybeRunBacklogPromotion(input: {
   if (providerLinearTodoBlockedByNonTerminal(candidate.blocked_by)) {
     return {
       action: null,
-      hold: {
+      hold: buildAutopilotHoldRecord({
         kind: 'backlog_promotion',
-        issue_id: candidate.id,
-        issue_identifier: candidate.identifier,
+        issue: candidate,
         reason: 'backlog_head_blocked_by_non_terminal',
         summary: `Backlog head ${candidate.identifier} remains parked because it is blocked by non-terminal work: ${formatBlockedBy(candidate.blocked_by)}.`,
-        action_required_reasons: []
-      },
+        actionRequiredReasons: []
+      }),
+      failed: false,
+      summary: '',
+      error: null
+    };
+  }
+  const previousBacklogPromotion = resolvePreviousBacklogPromotionSnapshot({
+    previousResult: input.previousResult,
+    issueId: candidate.id,
+    targetStateName: input.config.backlog_promotion.target_state_name
+  });
+  const explicitBacklogDemotion = resolveExplicitBacklogDemotionHold({
+    candidate,
+    previousBacklogPromotion,
+    backlogStateName: input.config.backlog_promotion.state_name,
+    targetStateName: input.config.backlog_promotion.target_state_name
+  });
+  if (explicitBacklogDemotion) {
+    return {
+      action: null,
+      hold: buildAutopilotHoldRecord({
+        kind: 'backlog_promotion',
+        issue: candidate,
+        reason: 'backlog_head_manual_demotion_unacknowledged',
+        summary: explicitBacklogDemotion.summary,
+        promotionAttemptedAt: explicitBacklogDemotion.promotion_attempted_at,
+        promotionIssueUpdatedAt: explicitBacklogDemotion.promotion_issue_updated_at,
+        forcePathUsed: explicitBacklogDemotion.force_path_used,
+        actionRequiredReasons: []
+      }),
       failed: false,
       summary: '',
       error: null
@@ -665,14 +723,13 @@ async function maybeRunReviewHandoffRework(input: {
   if (authorActionReasons.length === 0) {
     return {
       action: null,
-      hold: {
+      hold: buildAutopilotHoldRecord({
         kind: 'review_handoff_rework',
-        issue_id: candidate.trackedIssue.id,
-        issue_identifier: candidate.trackedIssue.identifier,
+        issue: candidate.trackedIssue,
         reason: 'review_handoff_non_author_action_required',
         summary: `Review handoff ${candidate.trackedIssue.identifier} remains parked because the current blockers are not author-action-required: ${formatReasonList(actionRequiredReasons)}.`,
-        action_required_reasons: [...actionRequiredReasons]
-      },
+        actionRequiredReasons: [...actionRequiredReasons]
+      }),
       failed: false,
       summary: '',
       error: null
@@ -998,6 +1055,7 @@ function mapTransitionRecord(input: {
       issue_state: input.previousState,
       issue_state_type: input.previousStateType,
       issue_updated_at: input.previousUpdatedAt,
+      force_path_used: false,
       error: `${input.transition.error.code}: ${input.transition.error.message}`
     };
   }
@@ -1009,7 +1067,280 @@ function mapTransitionRecord(input: {
     issue_state: input.transition.issue.state?.name ?? input.previousState,
     issue_state_type: input.transition.issue.state?.type ?? input.previousStateType,
     issue_updated_at: input.transition.issue.updated_at ?? input.previousUpdatedAt,
+    force_path_used: input.transition.transition_guard?.force ?? false,
     error: null
+  };
+}
+
+function buildAutopilotHoldRecord(input: {
+  kind: ProviderOperatorAutopilotHoldRecord['kind'];
+  issue: Pick<
+    LiveLinearTrackedIssue,
+    'id' | 'identifier' | 'state' | 'state_type' | 'updated_at'
+  > | null;
+  reason: string;
+  summary: string;
+  promotionAttemptedAt?: string | null;
+  promotionIssueUpdatedAt?: string | null;
+  forcePathUsed?: boolean;
+  actionRequiredReasons: string[];
+}): ProviderOperatorAutopilotHoldRecord {
+  return {
+    kind: input.kind,
+    issue_id: input.issue?.id ?? null,
+    issue_identifier: input.issue?.identifier ?? null,
+    issue_state: input.issue?.state ?? null,
+    issue_state_type: input.issue?.state_type ?? null,
+    issue_updated_at: input.issue?.updated_at ?? null,
+    promotion_attempted_at: input.promotionAttemptedAt ?? null,
+    promotion_issue_updated_at: input.promotionIssueUpdatedAt ?? null,
+    force_path_used: input.forcePathUsed ?? false,
+    reason: input.reason,
+    summary: input.summary,
+    action_required_reasons: [...input.actionRequiredReasons]
+  };
+}
+
+function resolvePreviousBacklogPromotionSnapshot(input: {
+  previousResult: ProviderOperatorAutopilotResult | null;
+  issueId: string;
+  targetStateName: string;
+}): {
+  attempted_at: string;
+  issue_updated_at: string | null;
+  force_path_used: boolean;
+} | null {
+  const snapshot = collectBacklogPromotionSnapshotsFromResult(
+    input.previousResult,
+    input.targetStateName
+  ).find((candidate) => candidate.issue_id === input.issueId);
+  if (!snapshot) {
+    return null;
+  }
+  return {
+    attempted_at: snapshot.attempted_at,
+    issue_updated_at: snapshot.issue_updated_at,
+    force_path_used: snapshot.force_path_used
+  };
+}
+
+function resolveNextBacklogPromotionSnapshots(input: {
+  previousResult: ProviderOperatorAutopilotResult | null;
+  trackedIssuesById: Map<string, LiveLinearTrackedIssue>;
+  actions: ProviderOperatorAutopilotActionRecord[];
+  holds: ProviderOperatorAutopilotHoldRecord[];
+  targetStateName: string;
+  backlogStateName: string;
+}): ProviderOperatorAutopilotBacklogPromotionSnapshot[] {
+  const normalizedBacklogState = normalizeProviderLinearWorkflowState(input.backlogStateName);
+  const normalizedTargetState = normalizeProviderLinearWorkflowState(input.targetStateName);
+  const snapshotsByIssueId = new Map<string, ProviderOperatorAutopilotBacklogPromotionSnapshot>();
+  for (const snapshot of collectBacklogPromotionSnapshotsFromResult(
+    input.previousResult,
+    input.targetStateName
+  )) {
+    const issue = input.trackedIssuesById.get(snapshot.issue_id) ?? null;
+    if (!issue) {
+      snapshotsByIssueId.set(snapshot.issue_id, snapshot);
+      continue;
+    }
+    const issueState = normalizeProviderLinearWorkflowState(issue?.state);
+    if (
+      (issueState === normalizedBacklogState || issueState === normalizedTargetState)
+    ) {
+      snapshotsByIssueId.set(snapshot.issue_id, snapshot);
+    }
+  }
+  for (const action of input.actions) {
+    const snapshot = buildBacklogPromotionSnapshotFromAction(action, input.targetStateName);
+    if (snapshot) {
+      snapshotsByIssueId.set(snapshot.issue_id, snapshot);
+    }
+  }
+  for (const hold of input.holds) {
+    const snapshot = buildBacklogPromotionSnapshotFromHold(hold, input.targetStateName);
+    if (snapshot) {
+      snapshotsByIssueId.set(snapshot.issue_id, snapshot);
+    }
+  }
+  return [...snapshotsByIssueId.values()].sort((left, right) =>
+    (left.issue_identifier ?? left.issue_id).localeCompare(
+      right.issue_identifier ?? right.issue_id
+    )
+  );
+}
+
+function collectBacklogPromotionSnapshotsFromResult(
+  result: ProviderOperatorAutopilotResult | null | undefined,
+  targetStateName: string
+): ProviderOperatorAutopilotBacklogPromotionSnapshot[] {
+  if (!result) {
+    return [];
+  }
+  const snapshotsByIssueId = new Map<string, ProviderOperatorAutopilotBacklogPromotionSnapshot>();
+  const normalizedTarget = normalizeProviderLinearWorkflowState(targetStateName);
+  for (const snapshot of result.backlog_promotion_snapshots ?? []) {
+    if (
+      normalizedTarget !== null &&
+      normalizeProviderLinearWorkflowState(snapshot.target_state) === normalizedTarget &&
+      normalizeOptionalString(snapshot.issue_id) &&
+      normalizeOptionalString(snapshot.attempted_at)
+    ) {
+      snapshotsByIssueId.set(snapshot.issue_id, {
+        issue_id: snapshot.issue_id,
+        issue_identifier: snapshot.issue_identifier ?? null,
+        target_state: snapshot.target_state,
+        attempted_at: snapshot.attempted_at,
+        issue_updated_at: snapshot.issue_updated_at ?? null,
+        force_path_used: snapshot.force_path_used ?? false
+      });
+    }
+  }
+  for (const action of result.actions) {
+    const snapshot = buildBacklogPromotionSnapshotFromAction(action, targetStateName);
+    if (snapshot) {
+      snapshotsByIssueId.set(snapshot.issue_id, snapshot);
+    }
+  }
+  for (const hold of result.holds) {
+    const snapshot = buildBacklogPromotionSnapshotFromHold(hold, targetStateName);
+    if (snapshot) {
+      snapshotsByIssueId.set(snapshot.issue_id, snapshot);
+    }
+  }
+  return [...snapshotsByIssueId.values()];
+}
+
+function buildBacklogPromotionSnapshotFromAction(
+  action: ProviderOperatorAutopilotActionRecord,
+  targetStateName: string
+): ProviderOperatorAutopilotBacklogPromotionSnapshot | null {
+  const normalizedTarget = normalizeProviderLinearWorkflowState(targetStateName);
+  if (
+    action.kind !== 'backlog_promotion' ||
+    action.reason !== 'backlog_head_promoted' ||
+    action.transition.status !== 'transitioned' ||
+    normalizedTarget === null ||
+    normalizeProviderLinearWorkflowState(action.transition.target_state) !== normalizedTarget
+  ) {
+    return null;
+  }
+  return {
+    issue_id: action.issue_id,
+    issue_identifier: action.issue_identifier,
+    target_state: action.transition.target_state,
+    attempted_at: action.transition.attempted_at,
+    issue_updated_at: action.transition.issue_updated_at,
+    force_path_used: action.transition.force_path_used ?? false
+  };
+}
+
+function buildBacklogPromotionSnapshotFromHold(
+  hold: ProviderOperatorAutopilotHoldRecord,
+  targetStateName: string
+): ProviderOperatorAutopilotBacklogPromotionSnapshot | null {
+  if (
+    hold.kind !== 'backlog_promotion' ||
+    hold.reason !== 'backlog_head_manual_demotion_unacknowledged' ||
+    !hold.issue_id ||
+    !hold.promotion_attempted_at
+  ) {
+    return null;
+  }
+  return {
+    issue_id: hold.issue_id,
+    issue_identifier: hold.issue_identifier,
+    target_state: targetStateName,
+    attempted_at: hold.promotion_attempted_at,
+    issue_updated_at: hold.promotion_issue_updated_at ?? null,
+    force_path_used: hold.force_path_used ?? false
+  };
+}
+
+function resolveExplicitBacklogDemotionHold(input: {
+  candidate: Pick<LiveLinearTrackedIssue, 'identifier' | 'recent_activity' | 'updated_at'>;
+  previousBacklogPromotion: {
+    attempted_at: string;
+    issue_updated_at: string | null;
+    force_path_used: boolean;
+  } | null;
+  backlogStateName: string;
+  targetStateName: string;
+}): {
+  summary: string;
+  promotion_attempted_at: string;
+  promotion_issue_updated_at: string | null;
+  force_path_used: boolean;
+} | null {
+  if (!input.previousBacklogPromotion) {
+    return null;
+  }
+  const latestActivity = resolveMostRecentTrackedActivity(input.candidate.recent_activity);
+  if (!latestActivity) {
+    return null;
+  }
+  const stateTransition = parseTrackedIssueStateTransitionSummary(latestActivity.summary);
+  const normalizedBacklogState = normalizeProviderLinearWorkflowState(input.backlogStateName);
+  const normalizedTargetState = normalizeProviderLinearWorkflowState(input.targetStateName);
+  if (
+    !stateTransition ||
+    normalizedBacklogState === null ||
+    normalizedTargetState === null ||
+    normalizeProviderLinearWorkflowState(stateTransition.fromState) !== normalizedTargetState ||
+    normalizeProviderLinearWorkflowState(stateTransition.toState) !== normalizedBacklogState
+  ) {
+    return null;
+  }
+  const previousPromotionTimestamp =
+    input.previousBacklogPromotion.issue_updated_at ?? input.previousBacklogPromotion.attempted_at;
+  const demotionTimestamp = latestActivity.created_at ?? input.candidate.updated_at;
+  if (compareNullableIsoTimestamp(demotionTimestamp, previousPromotionTimestamp) <= 0) {
+    return null;
+  }
+  const actorFragment = latestActivity.actor_name ? ` by ${latestActivity.actor_name}` : '';
+  const timestampFragment = latestActivity.created_at ? ` at ${latestActivity.created_at}` : '';
+  return {
+    summary: `Backlog head ${input.candidate.identifier} remains parked because autopilot last promoted it at ${previousPromotionTimestamp} and the latest issue activity is an explicit ${stateTransition.fromState} -> ${stateTransition.toState} demotion${actorFragment}${timestampFragment}; wait for a newer acknowledgement update before re-promoting.`,
+    promotion_attempted_at: input.previousBacklogPromotion.attempted_at,
+    promotion_issue_updated_at: input.previousBacklogPromotion.issue_updated_at,
+    force_path_used: input.previousBacklogPromotion.force_path_used
+  };
+}
+
+function resolveMostRecentTrackedActivity(
+  recentActivity: LiveLinearTrackedIssue['recent_activity']
+): LiveLinearTrackedIssue['recent_activity'][number] | null {
+  if (recentActivity.length === 0) {
+    return null;
+  }
+  return [...recentActivity].sort((left, right) =>
+    compareNullableIsoTimestamp(right.created_at, left.created_at)
+  )[0] ?? null;
+}
+
+function parseTrackedIssueStateTransitionSummary(
+  summary: string | null | undefined
+): {
+  fromState: string | null;
+  toState: string | null;
+} | null {
+  const normalized = normalizeOptionalString(summary);
+  if (!normalized || !normalized.startsWith('State ') || !normalized.includes(' -> ')) {
+    return null;
+  }
+  const transition = normalized.slice('State '.length);
+  const separatorIndex = transition.indexOf(' -> ');
+  if (separatorIndex < 0) {
+    return null;
+  }
+  const fromState = normalizeOptionalString(transition.slice(0, separatorIndex));
+  const toState = normalizeOptionalString(transition.slice(separatorIndex + ' -> '.length));
+  if (!fromState && !toState) {
+    return null;
+  }
+  return {
+    fromState,
+    toState
   };
 }
 
@@ -1054,7 +1385,8 @@ function normalizeComparableResult(
     pending_actions: result.pending_actions,
     resolved_actions: result.resolved_actions ?? [],
     lifecycle_records: result.lifecycle_records ?? [],
-    local_rollout_execution_attempts: result.local_rollout_execution_attempts ?? []
+    local_rollout_execution_attempts: result.local_rollout_execution_attempts ?? [],
+    backlog_promotion_snapshots: result.backlog_promotion_snapshots ?? []
   };
 }
 
