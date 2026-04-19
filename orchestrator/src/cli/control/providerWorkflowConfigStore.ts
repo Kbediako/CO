@@ -515,6 +515,26 @@ function cloneOperatorAutopilotLastResult(
       lifecycle_reason: pendingAction.lifecycle_reason,
       lifecycle_recorded_at: pendingAction.lifecycle_recorded_at
     })),
+    terminal_blocker_advisories: (result.terminal_blocker_advisories ?? []).map(
+      (advisory) => ({
+        kind: advisory.kind,
+        issue_id: advisory.issue_id,
+        issue_identifier: advisory.issue_identifier,
+        issue_state: advisory.issue_state,
+        issue_state_type: advisory.issue_state_type,
+        issue_updated_at: advisory.issue_updated_at,
+        blockers: advisory.blockers.map((blocker) => ({
+          id: blocker.id,
+          identifier: blocker.identifier,
+          state: blocker.state,
+          state_type: blocker.state_type
+        })),
+        canonical_owner_hints: [...advisory.canonical_owner_hints],
+        duplicate_hints: [...advisory.duplicate_hints],
+        recommended_action: advisory.recommended_action,
+        summary: advisory.summary
+      })
+    ),
     resolved_actions: (result.resolved_actions ?? []).map((resolvedAction) => ({
       kind: resolvedAction.kind,
       action_instance_id: resolvedAction.action_instance_id,

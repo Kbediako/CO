@@ -82,6 +82,31 @@ describe('observabilityReadModel', () => {
               }
             ],
             pending_actions: [],
+            terminal_blocker_advisories: [
+              {
+                kind: 'terminal_blocker_cleanup',
+                issue_id: 'lin-issue-2',
+                issue_identifier: 'CO-253',
+                issue_state: 'Blocked',
+                issue_state_type: 'started',
+                issue_updated_at: '2026-04-09T09:40:00.000Z',
+                blockers: [
+                  {
+                    id: 'lin-issue-1',
+                    identifier: 'CO-118',
+                    state: 'Done',
+                    state_type: 'completed'
+                  }
+                ],
+                canonical_owner_hints: [
+                  'codex-orchestrator:canonical-owner-key=blocked-terminal-blocker-cleanup-advisory'
+                ],
+                duplicate_hints: ['outbound:duplicate:CO-118:Done'],
+                recommended_action: 'duplicate_cleanup',
+                summary:
+                  'Blocked issue CO-253 has only terminal blockers (CO-118 Done/completed); recommend duplicate-cleanup candidate.'
+              }
+            ],
             resolved_actions: [],
             lifecycle_records: [],
             backlog_promotion_snapshots: [
@@ -120,6 +145,12 @@ describe('observabilityReadModel', () => {
                 promotion_issue_updated_at: '2026-04-09T09:30:00.000Z',
                 force_path_used: true,
                 reason: 'backlog_head_manual_demotion_unacknowledged'
+              }
+            ],
+            terminal_blocker_advisories: [
+              {
+                issue_identifier: 'CO-253',
+                recommended_action: 'duplicate_cleanup'
               }
             ],
             backlog_promotion_snapshots: [

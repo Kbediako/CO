@@ -222,6 +222,25 @@ export interface ControlProviderOperatorAutopilotLocalRolloutExecutionAttemptPay
   stderr: string | null;
 }
 
+export interface ControlProviderOperatorAutopilotTerminalBlockerAdvisoryPayload {
+  kind: 'terminal_blocker_cleanup';
+  issue_id: string;
+  issue_identifier: string | null;
+  issue_state: string | null;
+  issue_state_type: string | null;
+  issue_updated_at: string | null;
+  blockers: Array<{
+    id: string | null;
+    identifier: string | null;
+    state: string | null;
+    state_type: string | null;
+  }>;
+  canonical_owner_hints: string[];
+  duplicate_hints: string[];
+  recommended_action: 'duplicate_cleanup' | 'ready_to_unblock';
+  summary: string;
+}
+
 export interface ControlProviderOperatorAutopilotLastResultPayload {
   recorded_at: string;
   status: 'disabled' | 'noop' | 'acted' | 'failed';
@@ -230,6 +249,7 @@ export interface ControlProviderOperatorAutopilotLastResultPayload {
   actions: ControlProviderOperatorAutopilotActionPayload[];
   holds: ControlProviderOperatorAutopilotHoldPayload[];
   pending_actions: ControlProviderOperatorAutopilotPendingActionPayload[];
+  terminal_blocker_advisories?: ControlProviderOperatorAutopilotTerminalBlockerAdvisoryPayload[];
   resolved_actions?: ControlProviderOperatorAutopilotResolvedActionPayload[];
   lifecycle_records?: ControlProviderOperatorAutopilotLifecycleRecordPayload[];
   local_rollout_execution_attempts?: ControlProviderOperatorAutopilotLocalRolloutExecutionAttemptPayload[];
@@ -981,6 +1001,28 @@ export function buildSelectedRunRuntimeFingerprintInput(
                             lifecycle_recorded_at: pendingAction.lifecycle_recorded_at
                           })
                         ),
+                      terminal_blocker_advisories:
+                        (
+                          providerWorkflow.operator_autopilot.last_result
+                            .terminal_blocker_advisories ?? []
+                        ).map((advisory) => ({
+                          kind: advisory.kind,
+                          issue_id: advisory.issue_id,
+                          issue_identifier: advisory.issue_identifier,
+                          issue_state: advisory.issue_state,
+                          issue_state_type: advisory.issue_state_type,
+                          issue_updated_at: advisory.issue_updated_at,
+                          blockers: advisory.blockers.map((blocker) => ({
+                            id: blocker.id,
+                            identifier: blocker.identifier,
+                            state: blocker.state,
+                            state_type: blocker.state_type
+                          })),
+                          canonical_owner_hints: [...advisory.canonical_owner_hints],
+                          duplicate_hints: [...advisory.duplicate_hints],
+                          recommended_action: advisory.recommended_action,
+                          summary: advisory.summary
+                        })),
                       resolved_actions:
                         (providerWorkflow.operator_autopilot.last_result.resolved_actions ?? []).map(
                           (resolvedAction) => ({

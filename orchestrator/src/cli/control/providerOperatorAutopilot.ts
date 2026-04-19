@@ -40,6 +40,10 @@ export const DEFAULT_PROVIDER_OPERATOR_AUTOPILOT_PENDING_SUMMARY =
 const DEFAULT_BACKLOG_STATE_NAME = 'Backlog';
 const DEFAULT_READY_STATE_NAME = 'Ready';
 const DEFAULT_REWORK_STATE_NAME = 'Rework';
+const BLOCKED_STATE_NAME = 'blocked';
+const CANONICAL_OWNER_MARKER_PREFIX = 'codex-orchestrator:canonical-owner-key=';
+const SUPERSEDED_CANONICAL_OWNER_MARKER_PREFIX =
+  'codex-orchestrator:superseded-canonical-owner-key=';
 const DEFAULT_REWORK_EXCLUDED_ACTION_REQUIRED_REASONS = [
   'draft',
   'label:do-not-merge',
@@ -111,6 +115,27 @@ export interface ProviderOperatorAutopilotHoldRecord {
   action_required_reasons: string[];
 }
 
+export interface ProviderOperatorAutopilotTerminalBlockerAdvisoryBlocker {
+  id: string | null;
+  identifier: string | null;
+  state: string | null;
+  state_type: string | null;
+}
+
+export interface ProviderOperatorAutopilotTerminalBlockerAdvisoryRecord {
+  kind: 'terminal_blocker_cleanup';
+  issue_id: string;
+  issue_identifier: string | null;
+  issue_state: string | null;
+  issue_state_type: string | null;
+  issue_updated_at: string | null;
+  blockers: ProviderOperatorAutopilotTerminalBlockerAdvisoryBlocker[];
+  canonical_owner_hints: string[];
+  duplicate_hints: string[];
+  recommended_action: 'duplicate_cleanup' | 'ready_to_unblock';
+  summary: string;
+}
+
 export interface ProviderOperatorAutopilotPendingActionRecord {
   kind: 'local_rollout';
   action_instance_id: string;
@@ -162,6 +187,7 @@ export interface ProviderOperatorAutopilotResult {
   actions: ProviderOperatorAutopilotActionRecord[];
   holds: ProviderOperatorAutopilotHoldRecord[];
   pending_actions: ProviderOperatorAutopilotPendingActionRecord[];
+  terminal_blocker_advisories: ProviderOperatorAutopilotTerminalBlockerAdvisoryRecord[];
   resolved_actions?: ProviderOperatorAutopilotResolvedActionRecord[];
   lifecycle_records?: ProviderOperatorAutopilotLifecycleRecord[];
   local_rollout_execution_attempts?: ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord[];
@@ -275,6 +301,7 @@ export async function runProviderOperatorAutopilot(
       actions: [],
       holds: [],
       pending_actions: [],
+      terminal_blocker_advisories: [],
       resolved_actions: [],
       lifecycle_records: [],
       local_rollout_execution_attempts: [],
@@ -290,6 +317,7 @@ export async function runProviderOperatorAutopilot(
   );
   const actions: ProviderOperatorAutopilotActionRecord[] = [];
   const holds: ProviderOperatorAutopilotHoldRecord[] = [];
+  const terminalBlockerAdvisories = collectTerminalBlockerAdvisories(sortedTrackedIssues);
   const pendingActions = collectPendingActions({
     claims: input.claims,
     config: input.config
@@ -331,6 +359,7 @@ export async function runProviderOperatorAutopilot(
       actions: [],
       holds,
       pending_actions: effectiveLocalRolloutActions.pending_actions,
+      terminal_blocker_advisories: terminalBlockerAdvisories,
       resolved_actions: effectiveLocalRolloutActions.resolved_actions,
       lifecycle_records: effectiveLocalRolloutActions.lifecycle_records,
       local_rollout_execution_attempts: cloneLocalRolloutExecutionAttempts(
@@ -371,6 +400,7 @@ export async function runProviderOperatorAutopilot(
         actions,
         holds,
         pending_actions: effectiveLocalRolloutActions.pending_actions,
+        terminal_blocker_advisories: terminalBlockerAdvisories,
         resolved_actions: effectiveLocalRolloutActions.resolved_actions,
         lifecycle_records: effectiveLocalRolloutActions.lifecycle_records,
         local_rollout_execution_attempts: cloneLocalRolloutExecutionAttempts(
@@ -408,6 +438,7 @@ export async function runProviderOperatorAutopilot(
         actions,
         holds,
         pending_actions: effectiveLocalRolloutActions.pending_actions,
+        terminal_blocker_advisories: terminalBlockerAdvisories,
         resolved_actions: effectiveLocalRolloutActions.resolved_actions,
         lifecycle_records: effectiveLocalRolloutActions.lifecycle_records,
         local_rollout_execution_attempts: localRolloutExecutionAttempts,
@@ -448,7 +479,8 @@ export async function runProviderOperatorAutopilot(
   const status =
     hasTransitionedAction ||
     effectiveLocalRolloutActions.pending_actions.length > 0 ||
-    effectiveLocalRolloutActions.resolved_actions.length > 0
+    effectiveLocalRolloutActions.resolved_actions.length > 0 ||
+    terminalBlockerAdvisories.length > 0
       ? 'acted'
       : 'noop';
   return {
@@ -458,12 +490,14 @@ export async function runProviderOperatorAutopilot(
       actions,
       holds,
       pendingActions: effectiveLocalRolloutActions.pending_actions,
-      resolvedActions: effectiveLocalRolloutActions.resolved_actions
+      resolvedActions: effectiveLocalRolloutActions.resolved_actions,
+      terminalBlockerAdvisories
     }),
     error: null,
     actions,
     holds,
     pending_actions: effectiveLocalRolloutActions.pending_actions,
+    terminal_blocker_advisories: terminalBlockerAdvisories,
     resolved_actions: effectiveLocalRolloutActions.resolved_actions,
     lifecycle_records: effectiveLocalRolloutActions.lifecycle_records,
     local_rollout_execution_attempts: localRolloutExecutionAttempts,
@@ -1002,11 +1036,150 @@ function isTerminalLifecycleRecord(
   return record.state === 'cleared' || record.state === 'dismissed';
 }
 
+function collectTerminalBlockerAdvisories(
+  trackedIssues: LiveLinearTrackedIssue[]
+): ProviderOperatorAutopilotTerminalBlockerAdvisoryRecord[] {
+  return trackedIssues
+    .flatMap((issue) => {
+      if (normalizeProviderLinearWorkflowState(issue.state) !== BLOCKED_STATE_NAME) {
+        return [];
+      }
+      const blockers = issue.blocked_by ?? [];
+      if (blockers.length === 0 || !blockers.every(isTerminalBlocker)) {
+        return [];
+      }
+      const canonicalOwnerHints = resolveCanonicalOwnerHints(issue);
+      const duplicateHints = resolveDuplicateHints(issue);
+      const recommendedAction =
+        duplicateHints.length > 0 || canonicalOwnerHints.length > 0
+          ? 'duplicate_cleanup'
+          : 'ready_to_unblock';
+      const advisory: ProviderOperatorAutopilotTerminalBlockerAdvisoryRecord = {
+        kind: 'terminal_blocker_cleanup',
+        issue_id: issue.id,
+        issue_identifier: issue.identifier,
+        issue_state: issue.state,
+        issue_state_type: issue.state_type,
+        issue_updated_at: issue.updated_at,
+        blockers: blockers.map((blocker) => ({
+          id: blocker.id,
+          identifier: blocker.identifier,
+          state: blocker.state,
+          state_type: blocker.state_type
+        })),
+        canonical_owner_hints: canonicalOwnerHints,
+        duplicate_hints: duplicateHints,
+        recommended_action: recommendedAction,
+        summary: buildTerminalBlockerAdvisorySummary({
+          issue,
+          blockers,
+          canonicalOwnerHints,
+          duplicateHints,
+          recommendedAction
+        })
+      };
+      return [advisory];
+    })
+    .sort((left, right) =>
+      (left.issue_identifier ?? left.issue_id).localeCompare(
+        right.issue_identifier ?? right.issue_id
+      )
+    );
+}
+
+function isTerminalBlocker(
+  blocker: NonNullable<LiveLinearTrackedIssue['blocked_by']>[number]
+): boolean {
+  return classifyProviderLinearWorkflowState({
+    state: blocker.state,
+    state_type: blocker.state_type
+  }).isTerminal;
+}
+
+function resolveCanonicalOwnerHints(issue: Pick<LiveLinearTrackedIssue, 'description'>): string[] {
+  const description = normalizeOptionalString(issue.description);
+  if (!description) {
+    return [];
+  }
+  const hints = new Set<string>();
+  for (const markerPrefix of [
+    CANONICAL_OWNER_MARKER_PREFIX,
+    SUPERSEDED_CANONICAL_OWNER_MARKER_PREFIX
+  ]) {
+    let cursor = 0;
+    while (cursor < description.length) {
+      const markerIndex = description.indexOf(markerPrefix, cursor);
+      if (markerIndex < 0) {
+        break;
+      }
+      const markerStart = markerIndex;
+      let markerEnd = markerIndex + markerPrefix.length;
+      while (
+        markerEnd < description.length &&
+        !/[\s`'")\]}]/u.test(description[markerEnd]!)
+      ) {
+        markerEnd += 1;
+      }
+      hints.add(description.slice(markerStart, markerEnd));
+      cursor = markerEnd + 1;
+    }
+  }
+  return [...hints].sort();
+}
+
+function resolveDuplicateHints(issue: Pick<LiveLinearTrackedIssue, 'relations'>): string[] {
+  const hints = new Set<string>();
+  for (const relation of issue.relations ?? []) {
+    const normalizedType = normalizeProviderLinearWorkflowState(relation.type);
+    const relatedIssueState = classifyProviderLinearWorkflowState({
+      state: relation.issue.state,
+      state_type: relation.issue.state_type
+    });
+    if (
+      normalizedType !== 'duplicate' &&
+      normalizedType !== 'duplicates' &&
+      normalizedType !== 'duplicated by' &&
+      !relatedIssueState.normalizedState?.includes('duplicate')
+    ) {
+      continue;
+    }
+    const identifier = relation.issue.identifier ?? relation.issue.id ?? 'unknown';
+    const state = relation.issue.state ?? relation.issue.state_type ?? 'unknown';
+    hints.add(`${relation.direction}:${relation.type ?? 'unknown'}:${identifier}:${state}`);
+  }
+  return [...hints].sort();
+}
+
+function buildTerminalBlockerAdvisorySummary(input: {
+  issue: Pick<LiveLinearTrackedIssue, 'identifier' | 'id' | 'state'>;
+  blockers: NonNullable<LiveLinearTrackedIssue['blocked_by']>;
+  canonicalOwnerHints: string[];
+  duplicateHints: string[];
+  recommendedAction: ProviderOperatorAutopilotTerminalBlockerAdvisoryRecord['recommended_action'];
+}): string {
+  const issueIdentifier = input.issue.identifier ?? input.issue.id;
+  const action =
+    input.recommendedAction === 'duplicate_cleanup'
+      ? 'duplicate-cleanup candidate'
+      : 'ready-to-unblock candidate';
+  const hintParts = [
+    input.duplicateHints.length > 0
+      ? `duplicate hints=${input.duplicateHints.join(', ')}`
+      : null,
+    input.canonicalOwnerHints.length > 0
+      ? `canonical owner hints=${input.canonicalOwnerHints.join(', ')}`
+      : null
+  ].filter((part): part is string => part !== null);
+  const hintSuffix = hintParts.length > 0 ? `; ${hintParts.join('; ')}` : '';
+  return `Blocked issue ${issueIdentifier} has only terminal blockers (${formatBlockedBy(input.blockers)}); recommend ${action}${hintSuffix}.`;
+}
+
 function summarizeOperatorAutopilotResult(input: {
   actions: ProviderOperatorAutopilotActionRecord[];
   holds: ProviderOperatorAutopilotHoldRecord[];
   pendingActions: ProviderOperatorAutopilotPendingActionRecord[];
   resolvedActions: ProviderOperatorAutopilotResolvedActionRecord[];
+  terminalBlockerAdvisories: ProviderOperatorAutopilotTerminalBlockerAdvisoryRecord[];
 }): string {
   const parts: string[] = [];
   if (input.actions.length > 0) {
@@ -1030,6 +1203,19 @@ function summarizeOperatorAutopilotResult(input: {
       input.resolvedActions.length === 1
         ? `Suppressed 1 ${input.resolvedActions[0]!.lifecycle_state} local rollout action (${input.resolvedActions[0]!.issue_identifier ?? input.resolvedActions[0]!.issue_id}).`
         : `Suppressed ${input.resolvedActions.length} cleared or dismissed local rollout actions.`
+    );
+  }
+  if (input.terminalBlockerAdvisories.length > 0) {
+    const duplicateCleanupCount = input.terminalBlockerAdvisories.filter(
+      (advisory) => advisory.recommended_action === 'duplicate_cleanup'
+    ).length;
+    const readyToUnblockCount =
+      input.terminalBlockerAdvisories.length - duplicateCleanupCount;
+    const issueList = input.terminalBlockerAdvisories
+      .map((advisory) => advisory.issue_identifier ?? advisory.issue_id)
+      .join(', ');
+    parts.push(
+      `Surfaced ${input.terminalBlockerAdvisories.length} Blocked terminal-blocker advisory candidate(s): ${duplicateCleanupCount} duplicate-cleanup, ${readyToUnblockCount} ready-to-unblock (${issueList}).`
     );
   }
   if (parts.length === 0) {
@@ -1383,6 +1569,7 @@ function normalizeComparableResult(
     actions: result.actions,
     holds: result.holds,
     pending_actions: result.pending_actions,
+    terminal_blocker_advisories: result.terminal_blocker_advisories ?? [],
     resolved_actions: result.resolved_actions ?? [],
     lifecycle_records: result.lifecycle_records ?? [],
     local_rollout_execution_attempts: result.local_rollout_execution_attempts ?? [],

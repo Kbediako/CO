@@ -38,6 +38,12 @@ export interface LiveLinearTrackedBlocker {
   state_type: string | null;
 }
 
+export interface LiveLinearTrackedRelation {
+  direction: 'outbound' | 'inbound';
+  type: string | null;
+  issue: LiveLinearTrackedBlocker;
+}
+
 export interface LiveLinearTrackedIssue {
   provider: 'linear';
   id: string;
@@ -62,6 +68,7 @@ export interface LiveLinearTrackedIssue {
   created_at?: string | null;
   updated_at: string | null;
   blocked_by?: LiveLinearTrackedBlocker[];
+  relations?: LiveLinearTrackedRelation[];
   recent_activity: LiveLinearTrackedActivity[];
 }
 
@@ -158,6 +165,9 @@ interface LinearIssueNode {
   inverseRelations?: {
     nodes?: LinearIssueInverseRelationNode[] | null;
   } | null;
+  relations?: {
+    nodes?: LinearIssueInverseRelationNode[] | null;
+  } | null;
   history?: {
     nodes?: LinearIssueHistoryNode[] | null;
   } | null;
@@ -166,6 +176,14 @@ interface LinearIssueNode {
 interface LinearIssueInverseRelationNode {
   type?: string | null;
   issue?: {
+    id?: string | null;
+    identifier?: string | null;
+    state?: {
+      name?: string | null;
+      type?: string | null;
+    } | null;
+  } | null;
+  relatedIssue?: {
     id?: string | null;
     identifier?: string | null;
     state?: {
@@ -748,6 +766,19 @@ function buildLinearTrackedIssuesQuery(
               }
             }
           }
+          relations(first: ${LINEAR_BLOCKER_LIMIT}) {
+            nodes {
+              type
+              relatedIssue {
+                id
+                identifier
+                state {
+                  name
+                  type
+                }
+              }
+            }
+          }
           ${
             includeRichIssueDetails
               ? `history(first: ${LINEAR_RECENT_ACTIVITY_LIMIT}) {
@@ -918,6 +949,19 @@ function buildLinearIssueByIdQuery(issueId: string): {
           nodes {
             type
             issue {
+              id
+              identifier
+              state {
+                name
+                type
+              }
+            }
+          }
+        }
+        relations(first: ${LINEAR_BLOCKER_LIMIT}) {
+          nodes {
+            type
+            relatedIssue {
               id
               identifier
               state {
@@ -1155,6 +1199,7 @@ function parseTrackedIssue(
     created_at: normalizeIso(issue.createdAt),
     updated_at: normalizeIso(issue.updatedAt),
     blocked_by: extractTrackedIssueBlockers(issue),
+    relations: extractTrackedIssueRelations(issue),
     recent_activity: Array.isArray(issue.history?.nodes)
       ? issue.history.nodes
           .map((entry) => buildTrackedActivity(entry))
@@ -1219,6 +1264,39 @@ function extractTrackedIssueBlockers(issue: LinearIssueNode): LiveLinearTrackedB
         state_type: normalizeEnvValue(node.issue.state?.type)
       }
     ];
+  });
+}
+
+function extractTrackedIssueRelations(issue: LinearIssueNode): LiveLinearTrackedRelation[] {
+  return [
+    ...extractTrackedIssueRelationNodes(issue.relations?.nodes, 'outbound', 'relatedIssue'),
+    ...extractTrackedIssueRelationNodes(issue.inverseRelations?.nodes, 'inbound', 'issue')
+  ];
+}
+
+function extractTrackedIssueRelationNodes(
+  nodes: LinearIssueInverseRelationNode[] | null | undefined,
+  direction: LiveLinearTrackedRelation['direction'],
+  issueField: 'issue' | 'relatedIssue'
+): LiveLinearTrackedRelation[] {
+  if (!Array.isArray(nodes)) {
+    return [];
+  }
+  return nodes.flatMap((node) => {
+    const relationIssue = node[issueField];
+    if (!relationIssue) {
+      return [];
+    }
+    return [{
+      direction,
+      type: normalizeEnvValue(node.type),
+      issue: {
+        id: normalizeEnvValue(relationIssue.id),
+        identifier: normalizeEnvValue(relationIssue.identifier),
+        state: normalizeEnvValue(relationIssue.state?.name),
+        state_type: normalizeEnvValue(relationIssue.state?.type)
+      }
+    }];
   });
 }
 

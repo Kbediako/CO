@@ -131,6 +131,8 @@ describe('resolveLiveLinearTrackedIssueById', () => {
       expect(body.query).toContain('$issueId: String!');
       expect(body.query).toContain('issue(id: $issueId)');
       expect(body.query).toContain('inverseRelations(first: 50)');
+      expect(body.query).toContain('relations(first: 50)');
+      expect(body.query).toContain('relatedIssue');
       expect(body.variables?.issueId).toBe('lin-issue-1');
       return jsonResponse({
         data: {
@@ -180,6 +182,21 @@ describe('resolveLiveLinearTrackedIssueById', () => {
                     identifier: 'PREPROD-77',
                     state: {
                       name: 'In Progress'
+                    }
+                  }
+                }
+              ]
+            },
+            relations: {
+              nodes: [
+                {
+                  type: 'duplicate',
+                  relatedIssue: {
+                    id: 'lin-duplicate-1',
+                    identifier: 'PREPROD-102',
+                    state: {
+                      name: 'Duplicate',
+                      type: 'canceled'
                     }
                   }
                 }
@@ -241,6 +258,38 @@ describe('resolveLiveLinearTrackedIssueById', () => {
             identifier: 'PREPROD-99',
             state: 'Custom Completed',
             state_type: 'completed'
+          }
+        ],
+        relations: [
+          {
+            direction: 'outbound',
+            type: 'duplicate',
+            issue: {
+              id: 'lin-duplicate-1',
+              identifier: 'PREPROD-102',
+              state: 'Duplicate',
+              state_type: 'canceled'
+            }
+          },
+          {
+            direction: 'inbound',
+            type: 'blocks',
+            issue: {
+              id: 'lin-blocker-1',
+              identifier: 'PREPROD-99',
+              state: 'Custom Completed',
+              state_type: 'completed'
+            }
+          },
+          {
+            direction: 'inbound',
+            type: 'related',
+            issue: {
+              id: 'lin-related-1',
+              identifier: 'PREPROD-77',
+              state: 'In Progress',
+              state_type: null
+            }
           }
         ],
         team_key: 'PREPROD',
