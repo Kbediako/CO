@@ -446,29 +446,96 @@ describe('providerWorkflowConfigStore', () => {
             issue_state: 'Ready',
             issue_state_type: 'unstarted',
             issue_updated_at: '2026-04-09T09:30:00.000Z',
+            force_path_used: true,
             error: null
           },
           action_required_reasons: []
         }
       ],
-      holds: [],
+      holds: [
+        {
+          kind: 'backlog_promotion',
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-118',
+          issue_state: 'Backlog',
+          issue_state_type: 'backlog',
+          issue_updated_at: '2026-04-09T09:40:00.000Z',
+          promotion_attempted_at: '2026-04-09T09:30:00.000Z',
+          promotion_issue_updated_at: '2026-04-09T09:30:00.000Z',
+          force_path_used: true,
+          reason: 'backlog_head_manual_demotion_unacknowledged',
+          summary: 'Backlog head CO-118 remains parked after manual demotion.',
+          action_required_reasons: []
+        }
+      ],
       pending_actions: [],
       resolved_actions: [],
-      lifecycle_records: []
+      lifecycle_records: [],
+      backlog_promotion_snapshots: [
+        {
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-118',
+          target_state: 'Ready',
+          attempted_at: '2026-04-09T09:30:00.000Z',
+          issue_updated_at: '2026-04-09T09:30:00.000Z',
+          force_path_used: true
+        }
+      ]
     });
 
     expect(store.snapshot().operator_autopilot?.last_result).toMatchObject({
       status: 'acted',
-      actions: [{ kind: 'backlog_promotion', issue_identifier: 'CO-118' }]
+      actions: [
+        {
+          kind: 'backlog_promotion',
+          issue_identifier: 'CO-118',
+          transition: {
+            issue_updated_at: '2026-04-09T09:30:00.000Z',
+            force_path_used: true
+          }
+        }
+      ],
+      holds: [
+        {
+          kind: 'backlog_promotion',
+          issue_identifier: 'CO-118',
+          issue_updated_at: '2026-04-09T09:40:00.000Z',
+          promotion_attempted_at: '2026-04-09T09:30:00.000Z',
+          promotion_issue_updated_at: '2026-04-09T09:30:00.000Z',
+          force_path_used: true,
+          reason: 'backlog_head_manual_demotion_unacknowledged'
+        }
+      ],
+      backlog_promotion_snapshots: [
+        {
+          issue_identifier: 'CO-118',
+          target_state: 'Ready',
+          attempted_at: '2026-04-09T09:30:00.000Z',
+          issue_updated_at: '2026-04-09T09:30:00.000Z',
+          force_path_used: true
+        }
+      ]
     });
 
     const snapshotted = store.snapshot();
     expect(snapshotted.operator_autopilot?.last_result).toBeTruthy();
     if (snapshotted.operator_autopilot?.last_result) {
       snapshotted.operator_autopilot.last_result.status = 'failed';
+      snapshotted.operator_autopilot.last_result.actions[0]!.transition.force_path_used = false;
+      snapshotted.operator_autopilot.last_result.holds[0]!.issue_updated_at = 'mutated';
+      snapshotted.operator_autopilot.last_result.backlog_promotion_snapshots![0]!.force_path_used = false;
     }
 
     expect(store.snapshot().operator_autopilot?.last_result?.status).toBe('acted');
+    expect(
+      store.snapshot().operator_autopilot?.last_result?.actions[0]?.transition.force_path_used
+    ).toBe(true);
+    expect(store.snapshot().operator_autopilot?.last_result?.holds[0]?.issue_updated_at).toBe(
+      '2026-04-09T09:40:00.000Z'
+    );
+    expect(
+      store.snapshot().operator_autopilot?.last_result?.backlog_promotion_snapshots?.[0]?.force_path_used
+    ).toBe(true);
   });
 
   it('retries a failed revision when the config is repaired without metadata change', async () => {

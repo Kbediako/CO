@@ -480,6 +480,7 @@ function cloneOperatorAutopilotLastResult(
         issue_state: action.transition.issue_state,
         issue_state_type: action.transition.issue_state_type,
         issue_updated_at: action.transition.issue_updated_at,
+        force_path_used: action.transition.force_path_used ?? false,
         error: action.transition.error
       },
       action_required_reasons: [...action.action_required_reasons]
@@ -488,6 +489,12 @@ function cloneOperatorAutopilotLastResult(
       kind: hold.kind,
       issue_id: hold.issue_id,
       issue_identifier: hold.issue_identifier,
+      issue_state: hold.issue_state ?? null,
+      issue_state_type: hold.issue_state_type ?? null,
+      issue_updated_at: hold.issue_updated_at ?? null,
+      promotion_attempted_at: hold.promotion_attempted_at ?? null,
+      promotion_issue_updated_at: hold.promotion_issue_updated_at ?? null,
+      force_path_used: hold.force_path_used ?? false,
       reason: hold.reason,
       summary: hold.summary,
       action_required_reasons: [...hold.action_required_reasons]
@@ -564,6 +571,14 @@ function cloneOperatorAutopilotLastResult(
         stdout: attempt.stdout,
         stderr: attempt.stderr
       })
-    )
+    ),
+    backlog_promotion_snapshots: (result.backlog_promotion_snapshots ?? []).map((snapshot) => ({
+      issue_id: snapshot.issue_id,
+      issue_identifier: snapshot.issue_identifier,
+      target_state: snapshot.target_state,
+      attempted_at: snapshot.attempted_at,
+      issue_updated_at: snapshot.issue_updated_at,
+      force_path_used: snapshot.force_path_used ?? false
+    }))
   };
 }
