@@ -33,7 +33,7 @@ const packSmokeInvocationPattern = new RegExp(
   'gu'
 );
 const nonBlockingPackSmokePattern = /\|\||\|&?|(?:^|[\s;])&(?![&>])|;[ \t]*(?:true|exit[ \t]+0)\b/u;
-const heredocOperatorPattern = /<<-?\s*(?:"([^"]+)"|'([^']+)'|([^<>\s]+))/u;
+const heredocOperatorPattern = /<<-?\s*(?:"([^"]+)"|'([^']+)'|([^<>\s;&|()]+))/u;
 
 async function readWorkflow(path: string): Promise<WorkflowFile> {
   const parsed = load(await readText(path));
@@ -484,6 +484,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(hasPackSmokeCommand(`if ${packSmokeCommand}; then echo ok; fi`)).toBe(true);
     expect(hasPackSmokeCommand(`if FOO=1 ${packSmokeCommand} -- --flag; then echo ok; fi`)).toBe(true);
     expect(hasPackSmokeCommand(`${packSmokeCommand} <<'EOF-MARK'\nbody\nEOF-MARK`)).toBe(true);
+    expect(hasPackSmokeCommand(`cat <<EOF; ${packSmokeCommand}\nbody\nEOF`)).toBe(true);
     expect(hasPackSmokeCommand(`echo ${packSmokeCommand}`)).toBe(false);
     expect(hasPackSmokeCommand(`cat <<'EOF-MARK'\n${packSmokeCommand}\nEOF-MARK`)).toBe(false);
     expect(hasPackSmokeCommand(`${packSmokeCommand}:other`)).toBe(false);
@@ -514,6 +515,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
       false
     );
     expect(hasNonBlockingPackSmokeCommand(`while false; do echo skip; done; ${packSmokeCommand}`)).toBe(false);
+    expect(hasNonBlockingPackSmokeCommand(`cat <<EOF; ${packSmokeCommand} || true\nbody\nEOF`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`if ${packSmokeCommand} <<'EOF-MARK'; then echo ok; fi\nbody\nEOF-MARK`)).toBe(
       true
     );
