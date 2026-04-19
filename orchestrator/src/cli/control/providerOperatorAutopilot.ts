@@ -1140,9 +1140,12 @@ function resolveNextBacklogPromotionSnapshots(input: {
     input.targetStateName
   )) {
     const issue = input.trackedIssuesById.get(snapshot.issue_id) ?? null;
+    if (!issue) {
+      snapshotsByIssueId.set(snapshot.issue_id, snapshot);
+      continue;
+    }
     const issueState = normalizeProviderLinearWorkflowState(issue?.state);
     if (
-      issue &&
       (issueState === normalizedBacklogState || issueState === normalizedTargetState)
     ) {
       snapshotsByIssueId.set(snapshot.issue_id, snapshot);
