@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { access, lstat, mkdir, rm } from 'node:fs/promises';
+import { access, lstat, mkdir, rename, rm } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { promisify } from 'node:util';
 
@@ -72,18 +72,30 @@ export async function resolveProviderResumeWorkspacePath(
 export async function cleanupProviderWorkspace(
   repoRoot: string,
   workspacePath: string,
-  options: { beforeRemove?: () => void } = {}
+  options: {
+    beforeRemove?: () => void;
+    afterQuarantine?: (quarantinedPath: string) => void | Promise<void>;
+  } = {}
 ): Promise<boolean> {
   if (!isProviderWorkspacePathWithinRoot(repoRoot, workspacePath)) {
     return false;
   }
   const resolvedWorkspacePath = resolve(workspacePath);
+  const quarantinedWorkspacePath = `${resolvedWorkspacePath}.removing-${process.pid}-${Date.now()}`;
   options.beforeRemove?.();
-  await execFileAsync('git', ['-C', repoRoot, 'worktree', 'remove', '--force', resolvedWorkspacePath]).catch(
-    () => undefined
-  );
-  options.beforeRemove?.();
-  await rm(resolvedWorkspacePath, { recursive: true, force: true });
+  try {
+    await rename(resolvedWorkspacePath, quarantinedWorkspacePath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw error;
+    }
+    await execFileAsync('git', ['-C', repoRoot, 'worktree', 'prune', '--expire', 'now']).catch(
+      () => undefined
+    );
+    return true;
+  }
+  await options.afterQuarantine?.(quarantinedWorkspacePath);
+  await rm(quarantinedWorkspacePath, { recursive: true, force: true });
   await execFileAsync('git', ['-C', repoRoot, 'worktree', 'prune', '--expire', 'now']).catch(
     () => undefined
   );

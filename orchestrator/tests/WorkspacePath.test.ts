@@ -75,6 +75,32 @@ describe('workspacePath', () => {
     await expect(runGit(repoRoot, ['worktree', 'list'])).resolves.not.toContain(workspacePath);
   });
 
+  it('quarantines the workspace before removal so stale cleanup cannot delete a replacement', async () => {
+    const repoRoot = await createRepoRoot();
+    const workspacePath = await ensureProviderWorkspace(repoRoot, 'task-123');
+    let quarantinedWorkspacePath: string | null = null;
+
+    await expect(
+      cleanupProviderWorkspace(repoRoot, workspacePath, {
+        afterQuarantine: async (quarantinedPath) => {
+          quarantinedWorkspacePath = quarantinedPath;
+          expect(quarantinedPath).not.toBe(workspacePath);
+          await expect(access(workspacePath)).rejects.toThrow();
+
+          const replacementWorkspacePath = await ensureProviderWorkspace(repoRoot, 'task-123');
+          expect(replacementWorkspacePath).toBe(workspacePath);
+          await writeFile(join(replacementWorkspacePath, 'replacement.txt'), 'fresh', 'utf8');
+        }
+      })
+    ).resolves.toBe(true);
+
+    expect(quarantinedWorkspacePath).toContain(`${workspacePath}.removing-`);
+    await expect(access(quarantinedWorkspacePath ?? '')).rejects.toThrow();
+    await expect(access(join(workspacePath, 'replacement.txt'))).resolves.toBeUndefined();
+    await expect(runGit(workspacePath, ['rev-parse', '--is-inside-work-tree'])).resolves.toBe('true');
+    await expect(runGit(repoRoot, ['worktree', 'list'])).resolves.toContain(workspacePath);
+  });
+
   it('checks current ownership immediately before provider workspace removal', async () => {
     const repoRoot = await createRepoRoot();
     const workspacePath = await ensureProviderWorkspace(repoRoot, 'task-123');
