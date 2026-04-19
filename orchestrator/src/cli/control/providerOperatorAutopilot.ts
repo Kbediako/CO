@@ -1217,15 +1217,11 @@ function resolveDuplicateHints(issue: Pick<LiveLinearTrackedIssue, 'relations'>)
   const hints = new Set<string>();
   for (const relation of issue.relations ?? []) {
     const normalizedType = normalizeProviderLinearWorkflowState(relation.type);
-    const relatedIssueState = classifyProviderLinearWorkflowState({
-      state: relation.issue.state,
-      state_type: relation.issue.state_type
-    });
     if (
       normalizedType !== 'duplicate' &&
       normalizedType !== 'duplicates' &&
       normalizedType !== 'duplicated by' &&
-      !relatedIssueState.normalizedState?.includes('duplicate')
+      normalizedType !== 'duplicate of'
     ) {
       continue;
     }

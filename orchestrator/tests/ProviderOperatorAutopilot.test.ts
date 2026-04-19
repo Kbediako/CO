@@ -251,6 +251,52 @@ describe('providerOperatorAutopilot', () => {
     expect(result.summary).toContain('0 duplicate-cleanup, 1 ready-to-unblock');
   });
 
+  it('does not treat non-duplicate relations to Duplicate-state blockers as duplicate-cleanup evidence', async () => {
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createTrackedIssue({
+          id: 'lin-issue-266',
+          identifier: 'CO-266',
+          state: 'Blocked',
+          state_type: 'started',
+          blocked_by: [
+            {
+              id: 'lin-issue-254',
+              identifier: 'CO-254',
+              state: 'Duplicate',
+              state_type: 'canceled'
+            }
+          ],
+          relations: [
+            {
+              direction: 'inbound',
+              type: 'blocks',
+              issue: {
+                id: 'lin-issue-254',
+                identifier: 'CO-254',
+                state: 'Duplicate',
+                state_type: 'canceled'
+              }
+            }
+          ]
+        })
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    });
+
+    expect(result.terminal_blocker_advisories).toMatchObject([
+      {
+        issue_id: 'lin-issue-266',
+        issue_identifier: 'CO-266',
+        recommended_action: 'ready_to_unblock',
+        duplicate_hints: []
+      }
+    ]);
+    expect(result.summary).toContain('0 duplicate-cleanup, 1 ready-to-unblock');
+  });
+
   it('does not surface Blocked terminal-blocker advisories while any blocker remains non-terminal', async () => {
     const result = await runProviderOperatorAutopilot({
       tracked_issues: [

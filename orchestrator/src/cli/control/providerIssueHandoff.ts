@@ -5312,6 +5312,10 @@ export function createProviderIssueHandoffService(
         Array.isArray(previousResult?.resolved_actions)
           ? previousResult.resolved_actions.map((resolvedAction) => ({ ...resolvedAction }))
           : [];
+      const fallbackTerminalBlockerAdvisories =
+        sanitizeProviderOperatorAutopilotTerminalBlockerAdvisories(
+          previousResult?.terminal_blocker_advisories
+        );
       const effectiveFallbackLocalRolloutActions = resolveEffectiveLocalRolloutActions({
         pendingActions: fallbackPendingActions,
         postMergeRolloutEnabled: autopilotConfig.post_merge_rollout.enabled,
@@ -5330,7 +5334,7 @@ export function createProviderIssueHandoffService(
         actions: [],
         holds: [],
         pending_actions: effectiveFallbackLocalRolloutActions.pending_actions,
-        terminal_blocker_advisories: [],
+        terminal_blocker_advisories: fallbackTerminalBlockerAdvisories,
         resolved_actions: [
           ...fallbackResolvedActions.filter(
             (resolvedAction) => !fallbackResolvedActionIds.has(resolvedAction.action_instance_id)
@@ -6443,6 +6447,100 @@ function resolveProviderOperatorAutopilotPreviousResultFromPayload(
       : [],
     backlog_promotion_snapshot_retention_records: backlogPromotionSnapshotRetentionRecords
   };
+}
+
+function sanitizeProviderOperatorAutopilotTerminalBlockerAdvisories(
+  value: unknown
+): ProviderOperatorAutopilotResult['terminal_blocker_advisories'] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.flatMap((entry) => {
+    if (!isRecord(entry)) {
+      return [];
+    }
+    const issueId = readRequiredString(entry.issue_id);
+    const recommendedAction = readTerminalBlockerAdvisoryRecommendedAction(
+      entry.recommended_action
+    );
+    const summary = readRequiredString(entry.summary);
+    if (!issueId || !recommendedAction || !summary) {
+      return [];
+    }
+    if (
+      !Array.isArray(entry.blockers) ||
+      !Array.isArray(entry.canonical_owner_hints) ||
+      !Array.isArray(entry.duplicate_hints)
+    ) {
+      return [];
+    }
+    const blockers = entry.blockers.flatMap((blocker) => {
+      if (!isRecord(blocker)) {
+        return [];
+      }
+      const sanitizedBlocker = {
+        id: readNullableString(blocker.id),
+        identifier: readNullableString(blocker.identifier),
+        state: readNullableString(blocker.state),
+        state_type: readNullableString(blocker.state_type)
+      };
+      if (
+        !sanitizedBlocker.id &&
+        !sanitizedBlocker.identifier &&
+        !sanitizedBlocker.state &&
+        !sanitizedBlocker.state_type
+      ) {
+        return [];
+      }
+      return [sanitizedBlocker];
+    });
+    if (blockers.length === 0) {
+      return [];
+    }
+    const canonicalOwnerHints = readStringList(entry.canonical_owner_hints);
+    const duplicateHints = readStringList(entry.duplicate_hints);
+    if (
+      recommendedAction === 'duplicate_cleanup' &&
+      canonicalOwnerHints.length === 0 &&
+      duplicateHints.length === 0
+    ) {
+      return [];
+    }
+    return [{
+      kind: 'terminal_blocker_cleanup',
+      issue_id: issueId,
+      issue_identifier: readNullableString(entry.issue_identifier),
+      issue_state: readNullableString(entry.issue_state),
+      issue_state_type: readNullableString(entry.issue_state_type),
+      issue_updated_at: readNullableString(entry.issue_updated_at),
+      blockers,
+      canonical_owner_hints: canonicalOwnerHints,
+      duplicate_hints: duplicateHints,
+      recommended_action: recommendedAction,
+      summary
+    }];
+  });
+}
+
+function readTerminalBlockerAdvisoryRecommendedAction(
+  value: unknown
+): ProviderOperatorAutopilotResult['terminal_blocker_advisories'][number]['recommended_action'] | null {
+  return value === 'duplicate_cleanup' || value === 'ready_to_unblock' ? value : null;
+}
+
+function readNullableString(value: unknown): string | null {
+  return typeof value === 'string' ? value : null;
+}
+
+function readRequiredString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value : null;
+}
+
+function readStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((entry): entry is string => typeof entry === 'string');
 }
 
 function sanitizeProviderOperatorAutopilotRetentionRecords(

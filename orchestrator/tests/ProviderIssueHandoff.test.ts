@@ -20315,6 +20315,88 @@ describe('createProviderIssueHandoffService', () => {
       error: null,
       actions: [],
       holds: [],
+      terminal_blocker_advisories: [
+        {
+          kind: 'terminal_blocker_cleanup' as const,
+          issue_id: 'lin-issue-253',
+          issue_identifier: 'CO-253',
+          issue_state: 'Blocked',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-09T10:10:00.000Z',
+          blockers: [
+            {
+              id: 'lin-issue-254',
+              identifier: 'CO-254',
+              state: 'Done',
+              state_type: 'completed'
+            }
+          ],
+          canonical_owner_hints: [
+            'codex-orchestrator:canonical-owner-key=blocked-terminal-blocker-cleanup-advisory'
+          ],
+          duplicate_hints: ['outbound:duplicate:CO-254:Done'],
+          recommended_action: 'duplicate_cleanup' as const,
+          summary:
+            'Blocked issue CO-253 has only terminal blockers (CO-254 Done/completed); recommend duplicate-cleanup candidate.'
+        },
+        {
+          kind: 'terminal_blocker_cleanup' as const,
+          issue_id: 'lin-malformed',
+          issue_identifier: 'CO-BAD',
+          recommended_action: 'duplicate_cleanup' as const,
+          summary: 'Malformed persisted advisory without nested arrays.'
+        },
+        {
+          kind: 'terminal_blocker_cleanup' as const,
+          issue_id: 'lin-empty-blockers',
+          issue_identifier: 'CO-EMPTY',
+          issue_state: 'Blocked',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-09T10:10:00.000Z',
+          blockers: [],
+          canonical_owner_hints: [
+            'codex-orchestrator:canonical-owner-key=blocked-terminal-blocker-cleanup-advisory'
+          ],
+          duplicate_hints: ['outbound:duplicate:CO-254:Done'],
+          recommended_action: 'duplicate_cleanup' as const,
+          summary: 'Malformed persisted advisory without blocker evidence.'
+        },
+        {
+          kind: 'terminal_blocker_cleanup' as const,
+          issue_id: 'lin-null-blocker',
+          issue_identifier: 'CO-NULL-BLOCKER',
+          issue_state: 'Blocked',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-09T10:10:00.000Z',
+          blockers: [{}],
+          canonical_owner_hints: [
+            'codex-orchestrator:canonical-owner-key=blocked-terminal-blocker-cleanup-advisory'
+          ],
+          duplicate_hints: ['outbound:duplicate:CO-254:Done'],
+          recommended_action: 'duplicate_cleanup' as const,
+          summary: 'Malformed persisted advisory with unusable blocker evidence.'
+        },
+        {
+          kind: 'terminal_blocker_cleanup' as const,
+          issue_id: 'lin-empty-hints',
+          issue_identifier: 'CO-EMPTY-HINTS',
+          issue_state: 'Blocked',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-09T10:10:00.000Z',
+          blockers: [
+            {
+              id: 'lin-issue-254',
+              identifier: 'CO-254',
+              state: 'Done',
+              state_type: 'completed'
+            }
+          ],
+          canonical_owner_hints: [null] as unknown as string[],
+          duplicate_hints: [123] as unknown as string[],
+          recommended_action: 'duplicate_cleanup' as const,
+          summary: 'Malformed persisted duplicate cleanup advisory without usable hints.'
+        }
+      ],
       pending_actions: [
         {
           kind: 'local_rollout' as const,
@@ -20459,7 +20541,16 @@ describe('createProviderIssueHandoffService', () => {
     expect(recordOperatorAutopilotResult).toHaveBeenCalledWith(
       expect.objectContaining({
         status: 'failed',
-        pending_actions: []
+        pending_actions: [],
+        terminal_blocker_advisories: [
+          expect.objectContaining({
+            issue_identifier: 'CO-253',
+            recommended_action: 'duplicate_cleanup',
+            canonical_owner_hints: [
+              'codex-orchestrator:canonical-owner-key=blocked-terminal-blocker-cleanup-advisory'
+            ]
+          })
+        ]
       })
     );
   });
