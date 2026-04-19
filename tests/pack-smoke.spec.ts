@@ -203,14 +203,98 @@ function splitTopLevelExpression(expression: string, operator: '&&' | '||'): str
   return parts;
 }
 
-function isFalseExpressionTerm(term: string): boolean {
+type ConstantExpressionLiteral =
+  | { kind: 'boolean'; value: boolean }
+  | { kind: 'number'; value: number }
+  | { kind: 'string'; value: string };
+
+function parseConstantExpressionLiteral(term: string): ConstantExpressionLiteral | null {
   const expression = stripOuterParentheses(term);
-  return /^false$/iu.test(expression);
+  const fromJsonBooleanMatch = expression.match(/^fromJSON\s*\(\s*(['"])(true|false)\1\s*\)$/iu);
+  if (fromJsonBooleanMatch) {
+    return {
+      kind: 'boolean',
+      value: /^true$/iu.test(fromJsonBooleanMatch[2] ?? '')
+    };
+  }
+  if (/^true$/iu.test(expression)) {
+    return { kind: 'boolean', value: true };
+  }
+  if (/^false$/iu.test(expression)) {
+    return { kind: 'boolean', value: false };
+  }
+  const quotedStringMatch = expression.match(/^(['"])([\s\S]*)\1$/u);
+  if (quotedStringMatch) {
+    return { kind: 'string', value: quotedStringMatch[2] ?? '' };
+  }
+  if (/^-?(?:0|[1-9]\d*)(?:\.\d+)?$/u.test(expression)) {
+    return { kind: 'number', value: Number(expression) };
+  }
+  return null;
+}
+
+function getTopLevelComparison(expression: string): { left: string; operator: '==' | '!='; right: string } | null {
+  let depth = 0;
+  let quote: '"' | "'" | null = null;
+  for (let index = 0; index < expression.length - 1; index += 1) {
+    const current = expression[index];
+    if (quote) {
+      if (current === '\\') {
+        index += 1;
+      } else if (current === quote) {
+        quote = null;
+      }
+      continue;
+    }
+    if (current === '"' || current === "'") {
+      quote = current;
+      continue;
+    }
+    if (current === '(') {
+      depth += 1;
+      continue;
+    }
+    if (current === ')' && depth > 0) {
+      depth -= 1;
+      continue;
+    }
+    const operator = expression.slice(index, index + 2);
+    if (depth === 0 && (operator === '==' || operator === '!=')) {
+      return {
+        left: expression.slice(0, index).trim(),
+        operator,
+        right: expression.slice(index + 2).trim()
+      };
+    }
+  }
+  return null;
+}
+
+function evaluateConstantExpressionTerm(term: string): boolean | null {
+  const expression = stripOuterParentheses(term);
+  const literal = parseConstantExpressionLiteral(expression);
+  if (literal?.kind === 'boolean') {
+    return literal.value;
+  }
+  const comparison = getTopLevelComparison(expression);
+  if (!comparison) {
+    return null;
+  }
+  const left = parseConstantExpressionLiteral(comparison.left);
+  const right = parseConstantExpressionLiteral(comparison.right);
+  if (!left || !right || left.kind !== right.kind) {
+    return null;
+  }
+  const equal = left.value === right.value;
+  return comparison.operator === '==' ? equal : !equal;
+}
+
+function isFalseExpressionTerm(term: string): boolean {
+  return evaluateConstantExpressionTerm(term) === false;
 }
 
 function isTrueExpressionTerm(term: string): boolean {
-  const expression = stripOuterParentheses(term);
-  return /^true$/iu.test(expression);
+  return evaluateConstantExpressionTerm(term) === true;
 }
 
 function getNegatedExpression(expression: string): string | null {
@@ -1007,6 +1091,11 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(isAlwaysFalseCondition('false')).toBe(true);
     expect(isAlwaysFalseCondition('${{ false }}')).toBe(true);
     expect(isAlwaysFalseCondition('${{ (false) }}')).toBe(true);
+    expect(isAlwaysFalseCondition('${{ 1 == 2 }}')).toBe(true);
+    expect(isAlwaysFalseCondition("${{ fromJSON('false') }}")).toBe(true);
+    expect(isAlwaysFalseCondition("${{ 'same' != 'same' }}")).toBe(true);
+    expect(isAlwaysFalseCondition('${{ !(1 == 1) }}')).toBe(true);
+    expect(isAlwaysFalseCondition('${{ fromJSON("true") == false }}')).toBe(true);
     expect(isAlwaysFalseCondition('${{ success() && false }}')).toBe(true);
     expect(isAlwaysFalseCondition('${{ false && inputs.force }}')).toBe(true);
     expect(isAlwaysFalseCondition('${{ false || false }}')).toBe(true);
@@ -1017,12 +1106,18 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(isAlwaysFalseCondition('${{ !(true) }}')).toBe(true);
     expect(isAlwaysFalseCondition('${{ success() && !true }}')).toBe(true);
     expect(isAlwaysFalseCondition(combineWorkflowConditions('${{ false }}', 'success()'))).toBe(true);
+    expect(isAlwaysFalseCondition('${{ 1 == 1 }}')).toBe(false);
+    expect(isAlwaysFalseCondition("${{ fromJSON('true') }}")).toBe(false);
+    expect(isAlwaysFalseCondition("${{ inputs.force == 'true' }}")).toBe(false);
+    expect(isAlwaysFalseCondition("${{ fromJSON('false') == inputs.force }}")).toBe(false);
     expect(isAlwaysFalseCondition("${{ steps.downstream-smoke.outputs.required == 'true' }}")).toBe(false);
     expect(isAlwaysFalseCondition('${{ inputs.enabled || false }}')).toBe(false);
     expect(isAlwaysFalseCondition('${{ false || inputs.force }}')).toBe(false);
     expect(isAlwaysFalseCondition('${{ !false }}')).toBe(false);
     expect(installConditionCoversSmokeStep('success()', 'false')).toBe(false);
     expect(installConditionCoversSmokeStep('success()', '${{ false }}')).toBe(false);
+    expect(installConditionCoversSmokeStep('success()', '${{ 1 == 2 }}')).toBe(false);
+    expect(installConditionCoversSmokeStep('success()', "${{ fromJSON('false') }}")).toBe(false);
     expect(installConditionCoversSmokeStep('success()', combineWorkflowConditions('${{ false }}', 'success()'))).toBe(
       false
     );
