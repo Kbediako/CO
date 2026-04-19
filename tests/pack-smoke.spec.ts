@@ -332,7 +332,7 @@ function getCommandSubstitutionDepth(text: string): number {
       index += 1;
       continue;
     }
-    if (current === '$' && text[index + 1] === '(') {
+    if ((current === '$' || current === '<' || current === '>') && text[index + 1] === '(') {
       depth += 1;
       index += 1;
       continue;
@@ -886,6 +886,8 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(hasNonBlockingPackSmokeCommand(`! env FOO=1 ${packSmokeCommand}`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`! command ${packSmokeCommand}`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`echo "$(${packSmokeCommand})"`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`echo <(${packSmokeCommand})`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`cat >(${packSmokeCommand})`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`npm run lint || true && ${packSmokeCommand}`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`env FOO=1 ${packSmokeCommand} -- --flag`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`command ${packSmokeCommand} -- --flag`)).toBe(false);
