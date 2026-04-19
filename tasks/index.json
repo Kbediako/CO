@@ -537,6 +537,32 @@
       }
     },
     {
+      "id": "20260418-linear-80433961-2c2c-4199-b694-976b3fd67517",
+      "title": "CO: stabilize LockFile keepalive timing flake in full npm run test",
+      "relates_to": "tasks/tasks-linear-80433961-2c2c-4199-b694-976b3fd67517.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-80433961-2c2c-4199-b694-976b3fd67517-docs-packet/cli/2026-04-18T16-15-30-031Z-5847f253/manifest.json",
+          "source_anchor": "ctx:sha256:2b498d1162b00fb3e2b9a5ab23a18ea8fba830298bd8865f8b7bcf08bce46163#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-234 as the bounded ambient full-suite LockFile keepalive timing flake: orchestrator/tests/LockFile.test.ts, acquireLockWithRetry, createLockKeepalive, and full npm run test are protected surfaces. The packet keeps stale orphan recovery, live-lock freshness, and owner-token release behavior explicit, rejects timeout-only fixes and CO-235 / SelectedRunProjection drift, and leaves implementation, validation, Linear state, workpad, PR, and merge to the parent lane."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-80433961-2c2c-4199-b694-976b3fd67517.md",
+        "task": "tasks/tasks-linear-80433961-2c2c-4199-b694-976b3fd67517.md",
+        "agent_task": ".agent/task/linear-80433961-2c2c-4199-b694-976b3fd67517.md",
+        "docs": "docs/TECH_SPEC-linear-80433961-2c2c-4199-b694-976b3fd67517.md"
+      }
+    },
+    {
       "id": "20260418-linear-850b66b4-6a56-426a-947e-ce45d7f12a96",
       "title": "CO STATUS / observability: reconcile top-level provider_intake with concurrent running claims and retry/error history",
       "relates_to": "tasks/tasks-linear-850b66b4-6a56-426a-947e-ce45d7f12a96.md",
