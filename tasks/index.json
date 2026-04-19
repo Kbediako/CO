@@ -1,6 +1,34 @@
 {
   "items": [
     {
+      "id": "20260420-linear-12bea7bd-4716-4c9a-a49c-74d29151bedf",
+      "title": "CO-262 ready-review CodeRabbit rereview latch",
+      "relates_to": "tasks/tasks-linear-12bea7bd-4716-4c9a-a49c-74d29151bedf.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-20",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-20",
+          "status": "accepted",
+          "manifest": ".runs/linear-12bea7bd-4716-4c9a-a49c-74d29151bedf-docs-packet/cli/2026-04-19T15-25-22-612Z-23c80dc9/manifest.json",
+          "source_anchor": "ctx:sha256:da19ec03e5c89cbe79e6e15120de3e9039ee81e75235ba564c59bb026184f5a2#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-262 as the ready-review stale CodeRabbit rereview latch fix: current-head statusCheckRollup CodeRabbit SUCCESS plus resolved review threads and clean feedback truth should clear stale local CodeRabbit rereview pending, while pending or failed CodeRabbit, unresolved review threads, unacknowledged bot feedback, and merge-state blockers remain explicit readiness gates."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-12bea7bd-4716-4c9a-a49c-74d29151bedf.md",
+        "task": "tasks/tasks-linear-12bea7bd-4716-4c9a-a49c-74d29151bedf.md",
+        "agent_task": ".agent/task/linear-12bea7bd-4716-4c9a-a49c-74d29151bedf.md",
+        "docs": {
+          "TECH_SPEC": "docs/TECH_SPEC-linear-12bea7bd-4716-4c9a-a49c-74d29151bedf.md"
+        }
+      }
+    },
+    {
       "id": "linear-c9e99e2c-bc48-48f1-a8ca-4bd2a9289be2",
       "title": "CO-260 bounded unattended local_rollout executor",
       "relates_to": "docs/PRD-CO-260-local-rollout-executor.md",
