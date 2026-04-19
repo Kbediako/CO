@@ -121,20 +121,92 @@ function hasNonSuccessStatusCheck(condition: string): boolean {
   );
 }
 
-function isFalseExpressionTerm(term: string): boolean {
+function stripOuterParentheses(term: string): string {
   let expression = term.trim();
-  while (/^\(\s*[\s\S]*\s*\)$/u.test(expression)) {
-    expression = expression.replace(/^\(\s*([\s\S]*?)\s*\)$/u, '$1').trim();
+  while (expression.startsWith('(') && expression.endsWith(')')) {
+    let depth = 0;
+    let wrapsExpression = true;
+    for (let index = 0; index < expression.length; index += 1) {
+      const current = expression[index];
+      if (current === '(') {
+        depth += 1;
+      } else if (current === ')') {
+        depth -= 1;
+      }
+      if (depth === 0 && index < expression.length - 1) {
+        wrapsExpression = false;
+        break;
+      }
+      if (depth < 0) {
+        wrapsExpression = false;
+        break;
+      }
+    }
+    if (!wrapsExpression || depth !== 0) {
+      break;
+    }
+    expression = expression.slice(1, -1).trim();
   }
+  return expression;
+}
+
+function splitTopLevelExpression(expression: string, operator: '&&' | '||'): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let quote: '"' | "'" | null = null;
+  let partStartIndex = 0;
+  for (let index = 0; index < expression.length; index += 1) {
+    const current = expression[index];
+    if (quote) {
+      if (current === '\\') {
+        index += 1;
+      } else if (current === quote) {
+        quote = null;
+      }
+      continue;
+    }
+    if (current === '"' || current === "'") {
+      quote = current;
+      continue;
+    }
+    if (current === '(') {
+      depth += 1;
+      continue;
+    }
+    if (current === ')' && depth > 0) {
+      depth -= 1;
+      continue;
+    }
+    if (depth === 0 && expression.slice(index, index + operator.length) === operator) {
+      parts.push(expression.slice(partStartIndex, index).trim());
+      index += operator.length - 1;
+      partStartIndex = index + 1;
+    }
+  }
+  parts.push(expression.slice(partStartIndex).trim());
+  return parts;
+}
+
+function isFalseExpressionTerm(term: string): boolean {
+  const expression = stripOuterParentheses(term);
   return /^false$/iu.test(expression);
 }
 
-function isAlwaysFalseCondition(condition: string): boolean {
-  const expression = unwrapActionsExpression(condition).trim();
-  if (/\|\|/u.test(expression)) {
-    return false;
+function isAlwaysFalseExpression(expression: string): boolean {
+  const strippedExpression = stripOuterParentheses(expression);
+  const orTerms = splitTopLevelExpression(strippedExpression, '||');
+  if (orTerms.length > 1) {
+    return orTerms.every((term) => isAlwaysFalseExpression(term));
   }
-  return expression.split(/&&/u).some((term) => isFalseExpressionTerm(term));
+  const andTerms = splitTopLevelExpression(strippedExpression, '&&');
+  if (andTerms.length > 1) {
+    return andTerms.some((term) => isAlwaysFalseExpression(term));
+  }
+  return isFalseExpressionTerm(strippedExpression);
+}
+
+function isAlwaysFalseCondition(condition: string): boolean {
+  return isAlwaysFalseExpression(unwrapActionsExpression(condition).trim());
 }
 
 function installConditionCoversSmokeStep(installCondition: string, smokeCondition: string): boolean {
@@ -150,8 +222,8 @@ function installConditionCoversSmokeStep(installCondition: string, smokeConditio
 function normalizeShellContinuations(run: string): string {
   return run
     .replace(/\\\r?\n[ \t]*/gu, ' ')
-    .replace(/(\|\||\|&?)[ \t]*\r?\n[ \t]*/gu, '$1 ')
-    .replace(/\r?\n[ \t]*(?=(?:\|\||\|&?)(?:\s|$))/gu, ' ');
+    .replace(/(\|\||&&|\|&?)[ \t]*\r?\n[ \t]*/gu, '$1 ')
+    .replace(/\r?\n[ \t]*(?=(?:\|\||&&|\|&?)(?:\s|$))/gu, ' ');
 }
 
 function getHeredocDelimiter(line: string): string | null {
@@ -713,6 +785,8 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(hasNonBlockingPackSmokeCommand(`npm run lint || { echo retry; ${packSmokeCommand}; }`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`npm run lint || FOO=1 ${packSmokeCommand}`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`npm run lint || env FOO=1 ${packSmokeCommand}`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`npm run lint &&\n  ${packSmokeCommand}`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`npm run lint\n&& ${packSmokeCommand}`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`false && (FOO=1 ${packSmokeCommand})`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`false && (command ${packSmokeCommand})`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`false && { FOO=1 ${packSmokeCommand}; }`)).toBe(true);
@@ -794,8 +868,13 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(isAlwaysFalseCondition('${{ (false) }}')).toBe(true);
     expect(isAlwaysFalseCondition('${{ success() && false }}')).toBe(true);
     expect(isAlwaysFalseCondition('${{ false && inputs.force }}')).toBe(true);
+    expect(isAlwaysFalseCondition('${{ false || false }}')).toBe(true);
+    expect(isAlwaysFalseCondition('${{ (false) || (false) }}')).toBe(true);
+    expect(isAlwaysFalseCondition('${{ success() && false || false }}')).toBe(true);
+    expect(isAlwaysFalseCondition('${{ (success() && false) || false }}')).toBe(true);
     expect(isAlwaysFalseCondition("${{ steps.downstream-smoke.outputs.required == 'true' }}")).toBe(false);
     expect(isAlwaysFalseCondition('${{ inputs.enabled || false }}')).toBe(false);
+    expect(isAlwaysFalseCondition('${{ false || inputs.force }}')).toBe(false);
     expect(installConditionCoversSmokeStep('success()', 'false')).toBe(false);
     expect(installConditionCoversSmokeStep('success()', '${{ false }}')).toBe(false);
     expect(installConditionCoversSmokeStep('success()', 'always()')).toBe(false);
