@@ -1,32 +1,7 @@
 # ACTION_PLAN Template
 
-## Added by Bootstrap (refresh as needed)
+<!-- docs-archive:stub -->
+> Archived on 2026-04-19. Full content: https://github.com/Kbediako/CO/blob/doc-archives/.agent/task/templates/action-plan-template.md
 
-## Summary
-- Goal:
-- Scope:
-- Assumptions:
-
-## Issue Readiness Gate
-- Intent checksum / protected terms carried forward:
-- Not done if:
-- Pre-implementation issue-quality review:
-
-## Milestones & Sequencing
-1) 
-2) 
-3) 
-
-## Dependencies
-- 
-
-## Validation
-- Checks / tests:
-- Rollback plan:
-
-## Risks & Mitigations
-- 
-
-## Approvals
-- Reviewer:
-- Date:
+- Archive branch: doc-archives
+- Archive path: .agent/task/templates/action-plan-template.md
