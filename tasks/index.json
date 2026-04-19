@@ -1,6 +1,38 @@
 {
   "items": [
     {
+      "id": "20260419-linear-5348c2fb-8897-48e3-a848-7831778b1b00",
+      "title": "CO workflow: restore Apr 19 spec/docs freshness baseline blocking unrelated handoffs",
+      "relates_to": "tasks/tasks-linear-5348c2fb-8897-48e3-a848-7831778b1b00.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-19",
+      "approvals": {
+        "baseline_repro": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-19",
+          "status": "reproduced",
+          "artifact": "out/linear-5348c2fb-8897-48e3-a848-7831778b1b00/before/docs-freshness.json",
+          "summary": "Current main reproduced the Apr 19 baseline with 47 blocking stale docs, 221 visible CO-175 rolling cohort rows, and no missing registry, missing-on-disk, invalid, or uncatalogued docs."
+        },
+        "classification_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-19",
+          "status": "accepted",
+          "artifact": "docs/findings/linear-5348c2fb-8897-48e3-a848-7831778b1b00-docs-freshness-classification.md",
+          "summary": "Classified the Apr 19 stale set by class, path family, lineage, changed-path impact, and CO-175 / CO-239 relationship; selected reviewed refresh for the 47 stale docs and 17 spec-frontmatter rows without weakening freshness gates."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-5348c2fb-8897-48e3-a848-7831778b1b00.md",
+        "task": "tasks/tasks-linear-5348c2fb-8897-48e3-a848-7831778b1b00.md",
+        "agent_task": ".agent/task/linear-5348c2fb-8897-48e3-a848-7831778b1b00.md",
+        "docs": "docs/TECH_SPEC-linear-5348c2fb-8897-48e3-a848-7831778b1b00.md"
+      }
+    },
+    {
       "id": "20260418-linear-f29c2953-192f-455c-aa67-5418d2607a3a",
       "title": "Control host: stabilize Doctor.test.ts full-suite timeout cluster under suite load",
       "relates_to": "tasks/tasks-linear-f29c2953-192f-455c-aa67-5418d2607a3a.md",
