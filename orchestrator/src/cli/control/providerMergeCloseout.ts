@@ -2269,7 +2269,7 @@ function isReviewPromotionCrossIssueCandidate(input: {
   );
   if (
     blockedIssueIdentifiers.has(leadingIssueIdentifier) &&
-    /\bblocker\b/i.test(title)
+    hasReviewPromotionBlockerWording(title)
   ) {
     return true;
   }
@@ -2282,6 +2282,10 @@ function extractLeadingIssueIdentifier(value: string | null | undefined): string
   }
   const match = /^\s*[[(]?([A-Z][A-Z0-9]+-\d+)\b/i.exec(value);
   return normalizeIssueIdentifierToken(match?.[1] ?? null);
+}
+
+function hasReviewPromotionBlockerWording(value: string): boolean {
+  return /\bblock(?:er|ed|ing)?\b/i.test(value);
 }
 
 function normalizeIssueIdentifierToken(value: string | null | undefined): string | null {
