@@ -112,7 +112,26 @@ function hasNonSuccessStatusCheck(condition: string): boolean {
   );
 }
 
+function isFalseExpressionTerm(term: string): boolean {
+  let expression = term.trim();
+  while (/^\(\s*[\s\S]*\s*\)$/u.test(expression)) {
+    expression = expression.replace(/^\(\s*([\s\S]*?)\s*\)$/u, '$1').trim();
+  }
+  return /^false$/iu.test(expression);
+}
+
+function isAlwaysFalseCondition(condition: string): boolean {
+  const expression = unwrapActionsExpression(condition).trim();
+  if (/\|\|/u.test(expression)) {
+    return false;
+  }
+  return expression.split(/&&/u).some((term) => isFalseExpressionTerm(term));
+}
+
 function installConditionCoversSmokeStep(installCondition: string, smokeCondition: string): boolean {
+  if (isAlwaysFalseCondition(smokeCondition)) {
+    return false;
+  }
   if (installCondition === smokeCondition) {
     return true;
   }
@@ -621,6 +640,10 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
               `${workflow} job ${jobName} step ${stepIndex + 1} must run pack:smoke as a blocking command`
             ).toBe(false);
             expect(
+              isAlwaysFalseCondition(stepCondition),
+              `${workflow} job ${jobName} step ${stepIndex + 1} must not disable pack:smoke with an always-false if condition`
+            ).toBe(false);
+            expect(
               codexInstallConditions.some((installCondition) =>
                 installConditionCoversSmokeStep(installCondition, stepCondition)
               ),
@@ -733,6 +756,15 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(
       installConditionCoversSmokeStep('success()', "${{ steps.downstream-smoke.outputs.required == 'true' }}")
     ).toBe(true);
+    expect(isAlwaysFalseCondition('false')).toBe(true);
+    expect(isAlwaysFalseCondition('${{ false }}')).toBe(true);
+    expect(isAlwaysFalseCondition('${{ (false) }}')).toBe(true);
+    expect(isAlwaysFalseCondition('${{ success() && false }}')).toBe(true);
+    expect(isAlwaysFalseCondition('${{ false && inputs.force }}')).toBe(true);
+    expect(isAlwaysFalseCondition("${{ steps.downstream-smoke.outputs.required == 'true' }}")).toBe(false);
+    expect(isAlwaysFalseCondition('${{ inputs.enabled || false }}')).toBe(false);
+    expect(installConditionCoversSmokeStep('success()', 'false')).toBe(false);
+    expect(installConditionCoversSmokeStep('success()', '${{ false }}')).toBe(false);
     expect(installConditionCoversSmokeStep('success()', 'always()')).toBe(false);
     expect(installConditionCoversSmokeStep('success()', '${{ !success() }}')).toBe(false);
     expect(installConditionCoversSmokeStep('success()', '${{ success() || inputs.force }}')).toBe(false);
