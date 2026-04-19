@@ -54,6 +54,10 @@ const falseShortCircuitBeforePackSmokePattern = new RegExp(
   String.raw`(?:^|[;&()]\s*)false\s*&&\s*${packSmokeInvocationPrefixPattern}$`,
   'u'
 );
+const andGuardBeforePackSmokePattern = new RegExp(
+  String.raw`(?:^|[;&()]\s*)[^\n]*&&\s*${packSmokeInvocationPrefixPattern}$`,
+  'u'
+);
 const fallbackShortCircuitBeforePackSmokePattern = new RegExp(
   String.raw`(?:^|[;&()]\s*)[^\n]*\|\|\s*${packSmokeInvocationPrefixPattern}$`,
   'u'
@@ -385,6 +389,14 @@ function hasConstantShortCircuitBeforeOccurrence(beforeOccurrence: string): bool
   );
 }
 
+function hasAndGuardBeforeOccurrence(beforeOccurrence: string): boolean {
+  return (
+    andGuardBeforePackSmokePattern.test(beforeOccurrence) ||
+    hasOpenShortCircuitGroupBeforeOccurrence(beforeOccurrence, /&&\s*\(/gu) ||
+    hasOpenShortCircuitBraceGroupBeforeOccurrence(beforeOccurrence, /&&\s*\{/gu)
+  );
+}
+
 function hasFallbackShortCircuitBeforeOccurrence(beforeOccurrence: string): boolean {
   return (
     fallbackShortCircuitBeforePackSmokePattern.test(beforeOccurrence) ||
@@ -440,6 +452,7 @@ function hasNonBlockingPackSmokeCommand(run: string): boolean {
       isConditionPackSmokeOccurrence(occurrence) ||
       isFunctionPackSmokeOccurrence(occurrence) ||
       isConstantShortCircuitPackSmokeOccurrence(occurrence) ||
+      hasAndGuardBeforeOccurrence(occurrence.line.slice(0, occurrence.commandStartIndex)) ||
       isFallbackShortCircuitPackSmokeOccurrence(occurrence) ||
       isNegatedPackSmokeOccurrence(occurrence) ||
       isCommandSubstitutionPackSmokeOccurrence(occurrence) ||
@@ -696,6 +709,11 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(hasNonBlockingPackSmokeCommand(`npm run lint || FOO=1 ${packSmokeCommand}`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`false && (FOO=1 ${packSmokeCommand})`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`false && { FOO=1 ${packSmokeCommand}; }`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`[[ "$RUN_SMOKE" == 1 ]] && ${packSmokeCommand}; echo done`)).toBe(
+      true
+    );
+    expect(hasNonBlockingPackSmokeCommand(`test -f marker && (${packSmokeCommand})`)).toBe(true);
+    expect(hasNonBlockingPackSmokeCommand(`test -f marker && { ${packSmokeCommand}; }`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`if ${packSmokeCommand}; then echo ok; fi`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`if FOO=1 ${packSmokeCommand} -- --flag; then echo ok; fi`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`if npm run lint && ${packSmokeCommand}; then echo ok; fi`)).toBe(true);
@@ -743,7 +761,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(hasNonBlockingPackSmokeCommand(`set +euo pipefail\nset -euo pipefail\n${packSmokeCommand}`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`! ${packSmokeCommand}`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`echo "$(${packSmokeCommand})"`)).toBe(true);
-    expect(hasNonBlockingPackSmokeCommand(`npm run lint || true && ${packSmokeCommand}`)).toBe(false);
+    expect(hasNonBlockingPackSmokeCommand(`npm run lint || true && ${packSmokeCommand}`)).toBe(true);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} -- --flag`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} 2>&1`)).toBe(false);
     expect(hasNonBlockingPackSmokeCommand(`${packSmokeCommand} &> smoke.log`)).toBe(false);
