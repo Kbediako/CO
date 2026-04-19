@@ -8,7 +8,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-18",
+      "last_review": "2026-04-19",
       "approvals": {
         "docs_packet_child_lane": {
           "reviewer": "same-issue docs child lanes plus parent fallback",
@@ -19,20 +19,19 @@
           "summary": "Two same-issue docs child lanes stalled under appserver and a forced-CLI docs lane drifted into unrelated packet content, so the parent workspace authored the authoritative docs-first packet after the successful classification-note child lane preserved the current-head, clean-main, and CO-220 Doctor buckets. The resulting packet keeps CO-231 limited to Doctor validation stability for CO-220 handoff, records the hermetic direct-dist Doctor fixture repair, and explicitly preserves the separation from CO-220 stale-attachment logic."
         },
         "standalone_review": {
-          "reviewer": "codex-orchestrator review --uncommitted",
-          "date": "2026-04-18",
-          "status": "manual-fallback-after-boundary",
-          "manifest": ".runs/linear-91749283-6dc8-4df8-aee3-5c9127c1200c/cli/2026-04-18T02-55-49-085Z-4b48cfcc/manifest.json",
-          "telemetry": ".runs/linear-91749283-6dc8-4df8-aee3-5c9127c1200c/cli/2026-04-18T02-55-49-085Z-4b48cfcc/review/telemetry.json",
-          "fallback_note": "out/linear-91749283-6dc8-4df8-aee3-5c9127c1200c/manual/standalone-review-fallback.md",
-          "summary": "Manifest-backed review launched under FORCE_CODEX_REVIEW=1, but the wrapper terminated at the startup-anchor boundary after the spawned reviewer hit memory and skill meta surfaces before grounding on the diff. The lane closed with manual correctness review over the Doctor test seam plus the docs packet scope instead of treating the boundary failure as a clean review."
+          "reviewer": "codex-orchestrator review --base origin/main",
+          "date": "2026-04-19",
+          "status": "bounded-success-no-findings-after-p2-fix",
+          "manifest": ".runs/linear-91749283-6dc8-4df8-aee3-5c9127c1200c/cli/2026-04-19T13-44-28-601Z-e33f5de7/manifest.json",
+          "telemetry": ".runs/linear-91749283-6dc8-4df8-aee3-5c9127c1200c/cli/2026-04-19T13-44-28-601Z-e33f5de7/review/telemetry.json",
+          "summary": "Manifest-backed review completed as bounded-success via command-intent retry and first found one P2 stale docs:freshness checklist status. After the task checklist and .agent mirror were updated to the current green docs:freshness result, the rerun reported no actionable diff-local findings."
         },
         "elegance_review": {
           "reviewer": "provider worker parent lane",
-          "date": "2026-04-18",
+          "date": "2026-04-19",
           "status": "completed",
-          "artifact": "out/linear-91749283-6dc8-4df8-aee3-5c9127c1200c/manual/elegance-review.md",
-          "summary": "The final solution stays minimal: one local helper inside orchestrator/tests/Doctor.test.ts to make the direct-dist readiness case hermetic, plus the mandatory CO-231 docs/spec/task packet and registry mirrors."
+          "artifact": "out/linear-91749283-6dc8-4df8-aee3-5c9127c1200c/manual/20260419-elegance-review.md",
+          "summary": "The final solution stays minimal: one local Doctor.test fixture seam keeps the direct-dist readiness case hermetic, plus only the mandatory CO-231 docs/spec/task packet and mirror truth updates."
         }
       },
       "paths": {

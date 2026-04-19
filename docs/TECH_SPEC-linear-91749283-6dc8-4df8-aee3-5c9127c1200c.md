@@ -5,7 +5,7 @@ relates_to: docs/PRD-linear-91749283-6dc8-4df8-aee3-5c9127c1200c.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-18
+last_review: 2026-04-19
 ---
 
 # TECH_SPEC - Doctor validation: classify and restore current Doctor readiness stability for CO-220 handoff
