@@ -7434,8 +7434,8 @@ function canProbeFreshDiscoveryForReleasedNotActiveTerminalMergeCloseoutClaim(
       state_type: claim.issue_state_type
     }).isTerminal &&
     classifyProviderLinearWorkflowState({
-    state: mergeCloseout.issue_state,
-    state_type: mergeCloseout.issue_state_type
+      state: mergeCloseout.issue_state,
+      state_type: mergeCloseout.issue_state_type
     }).isTerminal
   );
 }
