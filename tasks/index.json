@@ -1,6 +1,38 @@
 {
   "items": [
     {
+      "id": "20260419-linear-20dbc119-a30e-4cf8-a61a-6277cf169170",
+      "title": "CO: Reuse canonical owner issues before create-follow-up for recurring baseline debt",
+      "relates_to": "tasks/tasks-linear-20dbc119-a30e-4cf8-a61a-6277cf169170.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-19",
+      "approvals": {
+        "issue_quality_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-19",
+          "status": "accepted",
+          "artifact": "tasks/specs/linear-20dbc119-a30e-4cf8-a61a-6277cf169170.md",
+          "summary": "Accepted CO-259 as the bounded bridge between docs:freshness:maintain machine-readable candidate cohort output and linear create-follow-up canonical-owner reuse before mutation; explicitly rejects fuzzy duplicate detection, terminal issue reuse, and CO-186 same-attempt retry suppression scope."
+        },
+        "parallelization": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-19",
+          "status": "recorded",
+          "artifact": "out/linear-20dbc119-a30e-4cf8-a61a-6277cf169170/manual/workpad.md",
+          "summary": "Pre-turn matrix found a safe tests child lane and recorded parallelize_now / independent_scope_available; parent owns implementation and docs while child lane owns the listed test files until patch acceptance."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-20dbc119-a30e-4cf8-a61a-6277cf169170.md",
+        "task": "tasks/tasks-linear-20dbc119-a30e-4cf8-a61a-6277cf169170.md",
+        "agent_task": ".agent/task/linear-20dbc119-a30e-4cf8-a61a-6277cf169170.md",
+        "docs": "docs/TECH_SPEC-linear-20dbc119-a30e-4cf8-a61a-6277cf169170.md"
+      }
+    },
+    {
       "id": "20260419-linear-5348c2fb-8897-48e3-a848-7831778b1b00",
       "title": "CO workflow: restore Apr 19 spec/docs freshness baseline blocking unrelated handoffs",
       "relates_to": "tasks/tasks-linear-5348c2fb-8897-48e3-a848-7831778b1b00.md",

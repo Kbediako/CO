@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
@@ -16,6 +17,8 @@ const execFileAsync = promisify(execFile);
 const DEFAULT_REGISTRY_PATH = 'docs/docs-freshness-registry.json';
 const GIT_COMMAND_TIMEOUT_MS = 60_000;
 const PASSING_DECISIONS = new Set(['clean', 'pass_with_owned_rolling_debt']);
+const CANONICAL_OWNER_MARKER_PREFIX = 'codex-orchestrator:canonical-owner-key=';
+const CANONICAL_OWNER_KEY_MAX_LENGTH = 512;
 
 function showUsage() {
   console.log(`Usage: node scripts/docs-freshness-maintain.mjs [options]
@@ -160,8 +163,36 @@ function summarizeTaskLineage(entries) {
 }
 
 function candidateCohortKey(entry) {
-  const cohortIdentity = entry.baseline_cohort_id ?? `candidate:${entry.doc_class}:${entry.path_family}`;
-  return [cohortIdentity, entry.last_review, entry.cadence_days, entry.age_days].join('|');
+  return canonicalOwnerKeyForCandidateEntry(entry);
+}
+
+function canonicalOwnerKeyForCandidateEntry(entry) {
+  const rawKey = rawCanonicalOwnerKeyForCandidateEntry(entry);
+  if (rawKey.length <= CANONICAL_OWNER_KEY_MAX_LENGTH) {
+    return rawKey;
+  }
+  const digest = createHash('sha256').update(rawKey).digest('hex');
+  const prefix = entry.baseline_cohort_id
+    ? 'baseline_cohort_id_sha256'
+    : 'docs_freshness_candidate_sha256';
+  return `${prefix}:${digest}`;
+}
+
+function rawCanonicalOwnerKeyForCandidateEntry(entry) {
+  if (entry.baseline_cohort_id) {
+    return `baseline_cohort_id:${entry.baseline_cohort_id}`;
+  }
+  return [
+    'docs_freshness_candidate',
+    `doc_class:${entry.doc_class || 'unknown'}`,
+    `path_family:${entry.path_family || 'unknown'}`,
+    `last_review:${entry.last_review || 'unknown'}`,
+    `cadence_days:${entry.cadence_days ?? 'unknown'}`
+  ].join('|');
+}
+
+function canonicalOwnerMarkerForKey(key) {
+  return `${CANONICAL_OWNER_MARKER_PREFIX}${key}`;
 }
 
 function summarizeCandidateCohorts(entries, policy) {
@@ -187,11 +218,14 @@ function summarizeCandidateCohorts(entries, policy) {
       }
       const baselineIds = uniqueSorted(cohortEntries.map((entry) => entry.baseline_cohort_id).filter(Boolean));
       const expiresAfter = addDaysToIsoDate(first.last_review, first.cadence_days + policy.window_days);
+      const cohortKey = candidateCohortKey(first);
       return {
         id:
           baselineIds.length === 1 && cohortEntries.every((entry) => entry.baseline_cohort_id === baselineIds[0])
             ? baselineIds[0]
             : `candidate-${first.last_review}-cadence-${first.cadence_days}-age-${first.age_days}`,
+        canonical_owner_key: cohortKey,
+        canonical_owner_marker: canonicalOwnerMarkerForKey(cohortKey),
         owner_issue: policy.owner_issue ?? null,
         status: cohortEntries.some((entry) => entry.overdue_days > policy.window_days)
           ? 'expired_candidate'
