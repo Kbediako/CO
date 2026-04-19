@@ -310,7 +310,7 @@ export async function executeProviderOperatorAutopilotLocalRolloutActions(
       const priorAttempt = priorByActionKey.get(
         `${pendingAction.action_instance_id}\u0000${actionId}`
       );
-      if (priorAttempt) {
+      if (priorAttempt && shouldReusePriorExecutionAttempt(priorAttempt)) {
         relevantAttempts.push(cloneLocalRolloutExecutionAttempt(priorAttempt));
         if (isSucceededTerminalAttempt(priorAttempt)) {
           succeededActionIds.add(actionId);
@@ -752,7 +752,12 @@ async function preflightLocalRolloutAction(input: {
       );
     }
   }
-  const command = await resolveActionCommand({ action, repoRoot: input.repoRoot, fileExists: input.fileExists });
+  const command = await resolveActionCommand({
+    action,
+    repoRoot: input.repoRoot,
+    platform: input.platform,
+    fileExists: input.fileExists
+  });
   if (!command) {
     return preflightSkip(
       'missing_binary',
@@ -787,6 +792,7 @@ function preflightSkip(
 async function resolveActionCommand(input: {
   action: ProviderOperatorAutopilotLocalRolloutActionConfig;
   repoRoot: string;
+  platform?: NodeJS.Platform;
   fileExists: (path: string) => Promise<boolean>;
 }): Promise<ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord['command'] | null> {
   if (input.action.runner === 'codex_orchestrator') {
@@ -812,7 +818,7 @@ async function resolveActionCommand(input: {
     }
     return {
       runner: 'npm_script',
-      command: 'npm',
+      command: input.platform === 'win32' ? 'npm.cmd' : 'npm',
       args: [
         'run',
         input.action.script,
@@ -935,6 +941,15 @@ function selectPriorExecutionAttemptForProjection(
     return existing;
   }
   return candidate;
+}
+
+function shouldReusePriorExecutionAttempt(
+  attempt: ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord
+): boolean {
+  if (attempt.record_kind === 'started') {
+    return true;
+  }
+  return attempt.terminal_state !== 'skipped';
 }
 
 function isSucceededTerminalAttempt(

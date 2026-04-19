@@ -1287,6 +1287,175 @@ describe('providerOperatorAutopilot', () => {
     ]);
   });
 
+  it('retries skipped local rollout preflight attempts after unsafe conditions clear', async () => {
+    const pendingAction = {
+      kind: 'local_rollout' as const,
+      action_instance_id: 'local_rollout:retry-skipped-preflight',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-118',
+      summary: 'pending rollout',
+      merge_closeout_recorded_at: '2026-04-09T09:15:00.000Z',
+      merge_closeout_reason: 'merged_and_transitioned_done',
+      shared_root_status: 'reconciled',
+      linear_transition_status: 'transitioned',
+      executable_action_ids: ['local-rebuild'],
+      lifecycle_state: 'pending' as const,
+      lifecycle_actor: null,
+      lifecycle_reason: null,
+      lifecycle_recorded_at: null
+    };
+    const priorSkippedAttempt: ProviderOperatorAutopilotLocalRolloutExecutionAttemptRecord = {
+      record_kind: 'terminal',
+      action_instance_id: pendingAction.action_instance_id,
+      action_id: 'local-rebuild',
+      issue_id: pendingAction.issue_id,
+      issue_identifier: pendingAction.issue_identifier,
+      preflight: {
+        status: 'skipped',
+        reason: 'dirty_repo',
+        checked_at: '2026-04-09T10:00:00.000Z',
+        summary: 'Local rollout action local-rebuild requires a clean repository.'
+      },
+      started_at: null,
+      ended_at: '2026-04-09T10:00:00.000Z',
+      terminal_state: 'skipped',
+      reason: 'dirty_repo',
+      summary: 'Local rollout action local-rebuild requires a clean repository.',
+      command: {
+        runner: null,
+        command: null,
+        args: [],
+        cwd: null,
+        timeout_ms: null
+      },
+      exit_code: null,
+      stdout: null,
+      stderr: null
+    };
+    const runCommand = vi.fn(async (request: { command: string; args: string[] }) => {
+      if (request.command === 'git' && request.args.includes('status')) {
+        return {
+          ok: true,
+          exitCode: 0,
+          stdout: '',
+          stderr: ''
+        };
+      }
+      return {
+        ok: true,
+        exitCode: 0,
+        stdout: 'ok',
+        stderr: ''
+      };
+    });
+    const lifecycleRecords: ProviderOperatorAutopilotLifecycleRecord[] = [];
+
+    const outcome = await executeProviderOperatorAutopilotLocalRolloutActions(
+      {
+        pendingActions: [pendingAction],
+        config: buildConfigWithLocalRolloutExecution({ require_clean_repo: true })
+          .post_merge_rollout.execution,
+        repoRoot: process.cwd(),
+        priorAttempts: [priorSkippedAttempt]
+      },
+      {
+        now: makeNowSequence([
+          '2026-04-09T10:05:00.000Z',
+          '2026-04-09T10:05:01.000Z',
+          '2026-04-09T10:05:02.000Z',
+          '2026-04-09T10:05:03.000Z'
+        ]),
+        runCommand,
+        fileExists: async () => true,
+        appendExecutionAttempt: appendExecutionAttemptNoop,
+        appendLifecycleRecord: async (record) => {
+          lifecycleRecords.push(record);
+        }
+      }
+    );
+
+    expect(runCommand).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: 'git',
+        args: ['-C', process.cwd(), 'status', '--porcelain']
+      })
+    );
+    expect(runCommand).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: 'npm',
+        args: ['run', 'rollout:local']
+      })
+    );
+    expect(outcome.lifecycle_records).toMatchObject([
+      {
+        action_instance_id: pendingAction.action_instance_id,
+        state: 'cleared',
+        source: 'operator-autopilot'
+      }
+    ]);
+    expect(lifecycleRecords).toHaveLength(1);
+    expect(outcome.attempts).toMatchObject([
+      {
+        record_kind: 'started',
+        action_id: 'local-rebuild',
+        reason: 'execution_interrupted'
+      },
+      {
+        record_kind: 'terminal',
+        action_id: 'local-rebuild',
+        terminal_state: 'succeeded',
+        reason: null
+      }
+    ]);
+  });
+
+  it('uses the Windows npm shim for npm_script local rollout actions', async () => {
+    const pendingAction = {
+      kind: 'local_rollout' as const,
+      action_instance_id: 'local_rollout:windows-npm',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-118',
+      summary: 'pending rollout',
+      merge_closeout_recorded_at: '2026-04-09T09:15:00.000Z',
+      merge_closeout_reason: 'merged_and_transitioned_done',
+      shared_root_status: 'reconciled',
+      linear_transition_status: 'transitioned',
+      executable_action_ids: ['local-rebuild'],
+      lifecycle_state: 'pending' as const,
+      lifecycle_actor: null,
+      lifecycle_reason: null,
+      lifecycle_recorded_at: null
+    };
+    const runCommand = vi.fn(async () => ({
+      ok: true,
+      exitCode: 0,
+      stdout: 'ok',
+      stderr: ''
+    }));
+
+    await executeProviderOperatorAutopilotLocalRolloutActions(
+      {
+        pendingActions: [pendingAction],
+        config: buildConfigWithLocalRolloutExecution().post_merge_rollout.execution,
+        repoRoot: process.cwd()
+      },
+      {
+        platform: 'win32',
+        runCommand,
+        fileExists: async () => true,
+        appendExecutionAttempt: appendExecutionAttemptNoop,
+        appendLifecycleRecord: appendLifecycleRecordNoop
+      }
+    );
+
+    expect(runCommand).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: 'npm.cmd',
+        args: ['run', 'rollout:local']
+      })
+    );
+  });
+
   it('keeps a failed local rollout command pending with command failure audit output', async () => {
     const runCommand = vi.fn(async () => ({
       ok: false,
