@@ -1,5 +1,5 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
-import { dirname, relative, resolve } from 'node:path';
+import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 
 import {
   readProviderLinearParallelizationSnapshots,
@@ -387,8 +387,15 @@ async function readGaugeArtifacts(
   statusDatasets: JsonArtifact[];
   linearBudgetState: JsonArtifact[];
 }> {
+  const providerIntakeStates = await readJsonArtifacts(sources.provider_intake_state, findings);
+  const latestProviderIntakeState = selectLatestJsonArtifact(providerIntakeStates);
+  const claimLinkedSources = await discoverClaimLinkedRunArtifactSources(
+    latestProviderIntakeState ? [latestProviderIntakeState] : [],
+    sources.artifact_root
+  );
+  appendUnique(sources.provider_manifests, claimLinkedSources.provider_manifests);
+  appendUnique(sources.provider_proofs, claimLinkedSources.provider_proofs);
   const [
-    providerIntakeStates,
     rawManifests,
     rawProofs,
     workerAudits,
@@ -397,7 +404,6 @@ async function readGaugeArtifacts(
     statusDatasets,
     linearBudgetState
   ] = await Promise.all([
-    readJsonArtifacts(sources.provider_intake_state, findings),
     readJsonArtifacts(sources.provider_manifests, findings),
     readJsonArtifacts(sources.provider_proofs, findings),
     readWorkerAuditArtifacts(sources.worker_audit_jsonl, findings),
@@ -424,6 +430,97 @@ async function readGaugeArtifacts(
     statusDatasets,
     linearBudgetState
   };
+}
+
+async function discoverClaimLinkedRunArtifactSources(
+  providerIntakeStates: JsonArtifact[],
+  artifactRoot: string | null
+): Promise<{
+  provider_manifests: string[];
+  provider_proofs: string[];
+}> {
+  const provider_manifests: string[] = [];
+  const provider_proofs: string[] = [];
+  for (const artifact of providerIntakeStates) {
+    const claims = asRecord(artifact.value)?.claims;
+    if (!Array.isArray(claims)) {
+      continue;
+    }
+    for (const rawClaim of claims) {
+      const claim = asRecord(rawClaim);
+      if (!claim || !ACTIVE_CLAIM_STATES.has(readState(claim))) {
+        continue;
+      }
+      const manifestPath = normalizeOptionalString(claim?.run_manifest_path);
+      if (!manifestPath) {
+        continue;
+      }
+      const resolvedManifestPath = await firstReadablePath(
+        resolveClaimLinkedRunManifestPathCandidates({
+          artifact,
+          artifactRoot,
+          manifestPath
+        })
+      );
+      if (!resolvedManifestPath) {
+        continue;
+      }
+      provider_manifests.push(resolvedManifestPath);
+      const proofPath = resolve(dirname(resolvedManifestPath), 'provider-linear-worker-proof.json');
+      if (await isReadableFile(proofPath)) {
+        provider_proofs.push(proofPath);
+      }
+    }
+  }
+  return {
+    provider_manifests,
+    provider_proofs
+  };
+}
+
+function resolveClaimLinkedRunManifestPathCandidates(input: {
+  artifact: JsonArtifact;
+  artifactRoot: string | null;
+  manifestPath: string;
+}): string[] {
+  if (isAbsolute(input.manifestPath)) {
+    return [input.manifestPath];
+  }
+  const bases = [
+    dirname(input.artifact.path),
+    input.artifactRoot,
+    findRepoRootFromRunsPath(input.artifact.path),
+    input.artifactRoot ? findRepoRootFromRunsPath(input.artifactRoot) : null
+  ];
+  return Array.from(new Set(
+    bases.flatMap((base) => (base ? [resolve(base, input.manifestPath)] : []))
+  ));
+}
+
+function findRepoRootFromRunsPath(path: string): string | null {
+  const parts = resolve(path).split(sep);
+  const runsIndex = parts.lastIndexOf('.runs');
+  if (runsIndex <= 0) {
+    return null;
+  }
+  return parts.slice(0, runsIndex).join(sep) || sep;
+}
+
+async function firstReadablePath(candidates: string[]): Promise<string | null> {
+  for (const candidate of candidates) {
+    if (await isReadableFile(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+async function isReadableFile(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isFile();
+  } catch {
+    return false;
+  }
 }
 
 async function readJsonArtifacts(
