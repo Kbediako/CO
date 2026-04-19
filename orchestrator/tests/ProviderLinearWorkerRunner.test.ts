@@ -1117,7 +1117,8 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(firstPrompt).toContain('Keep final closeout in that same workpad comment');
     expect(firstPrompt).toContain(`Use \`${helperCommand} issue-context --issue-id lin-issue-1\` to inspect the team workflow states before any transition.`);
     expect(firstPrompt).toContain('`Todo` or the live team\'s equivalent queued state (for example `Ready`)');
-    expect(firstPrompt).toContain(`use \`${helperCommand} create-follow-up --issue-id lin-issue-1 ...\` to file a same-project follow-up issue in \`Backlog\``);
+    expect(firstPrompt).toContain(`use \`${helperCommand} create-follow-up --issue-id lin-issue-1 ...\` to file or reuse a same-project follow-up issue in \`Backlog\``);
+    expect(firstPrompt).toContain('For recurring baseline debt, pass the exact `--canonical-owner-key` from machine output');
     expect(firstPrompt).toContain('intent checksum, non-goals, `Not Done If`, acceptance criteria');
     expect(firstPrompt).toContain('required parity matrix for parity/alignment follow-ups');
     expect(firstPrompt).toContain('Review handoff states are `Human Review` and `In Review`');
@@ -1187,7 +1188,8 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(continuationPrompt).toContain('Keep final closeout in that same workpad comment');
     expect(continuationPrompt).toContain(`${helperCommand} issue-context --issue-id lin-issue-1`);
     expect(continuationPrompt).toContain('`Todo` or the live team\'s equivalent queued state (for example `Ready`)');
-    expect(continuationPrompt).toContain(`use \`${helperCommand} create-follow-up --issue-id lin-issue-1 ...\` to file a same-project follow-up issue in \`Backlog\``);
+    expect(continuationPrompt).toContain(`use \`${helperCommand} create-follow-up --issue-id lin-issue-1 ...\` to file or reuse a same-project follow-up issue in \`Backlog\``);
+    expect(continuationPrompt).toContain('For recurring baseline debt, pass the exact `--canonical-owner-key` from machine output');
     expect(continuationPrompt).toContain('intent checksum, non-goals, `Not Done If`, acceptance criteria');
     expect(continuationPrompt).toContain('required parity matrix for parity/alignment follow-ups');
     expect(continuationPrompt).toContain('If a PR is already attached, run a full PR feedback sweep before any new implementation work');
