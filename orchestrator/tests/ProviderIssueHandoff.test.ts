@@ -20302,6 +20302,119 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('retries release cancel from the current epoch when a stale in-flight cancel aborts before delivery', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:00:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-active'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-active');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-active',
+        task_id: 'task-1303-active',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+
+    let resolveFirstCancelAttempt: (() => void) | null = null;
+    const cancelSpy = vi
+      .spyOn(questionChildResolutionAdapter, 'callChildControlEndpoint')
+      .mockImplementation(async (input) => {
+        if (cancelSpy.mock.calls.length === 1) {
+          await new Promise<void>((resolve) => {
+            resolveFirstCancelAttempt = resolve;
+          });
+          input.assertCurrent?.();
+          return;
+        }
+        input.assertCurrent?.();
+      });
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: 'task-1303-active',
+      mapping_source: 'provider_id_fallback',
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-active',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-active',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      resolveTrackedIssue: async () => ({
+        kind: 'release',
+        reason: 'not_active'
+      })
+    });
+
+    const staleRefresh = service.refresh();
+    await waitForMockCalls(cancelSpy, 1);
+    service.resetStuckRefreshLifecycle?.();
+
+    const freshRefresh = service.refresh();
+    if (!resolveFirstCancelAttempt) {
+      throw new Error('Expected the first child cancel attempt to be in flight.');
+    }
+    resolveFirstCancelAttempt();
+
+    await expect(staleRefresh).rejects.toThrow('provider_refresh_lifecycle_stuck');
+    await expect(freshRefresh).resolves.toBeUndefined();
+
+    expect(cancelSpy).toHaveBeenCalledTimes(2);
+    expect(cancelSpy.mock.calls[1]?.[0]).toMatchObject({
+      manifestPath: childPaths.manifestPath,
+      payload: {
+        action: 'cancel',
+        requested_by: 'control-host',
+        reason: 'provider_issue_released:not_active'
+      }
+    });
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      task_id: 'task-1303-active',
+      run_id: 'run-active',
+      run_manifest_path: childPaths.manifestPath
+    });
+  });
+
   it('preserves equal-timestamp Ready plain released not-active recheck metadata while release drain is active', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {

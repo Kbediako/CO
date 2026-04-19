@@ -2112,15 +2112,22 @@ export function createProviderIssueHandoffService(
       if (!existingAttempt.retryConsumed) {
         existingAttempt.retryRequested = true;
       }
-      await existingAttempt.attempt;
+      const delivered = await existingAttempt.attempt;
       if (!isCurrent()) {
+        return;
+      }
+      if (!delivered) {
+        if (releaseCancelInFlight.get(manifestPath) === existingAttempt) {
+          releaseCancelInFlight.delete(manifestPath);
+        }
+        await retryReleaseCancel(input);
         return;
       }
       return;
     }
     const performCancelAttempt = async (): Promise<boolean> => {
       if (!isCurrent()) {
-        return true;
+        return false;
       }
       try {
         await callChildControlEndpoint({
@@ -2139,7 +2146,7 @@ export function createProviderIssueHandoffService(
         return true;
       } catch (error) {
         if (isRefreshLifecycleStuckError(error)) {
-          return true;
+          return false;
         }
         // Keep the claim released and let the next rehydrate/refresh retry cancellation
         // while the child run drains.
