@@ -1,6 +1,127 @@
 {
   "items": [
     {
+      "id": "20260418-linear-f29c2953-192f-455c-aa67-5418d2607a3a",
+      "title": "Control host: stabilize Doctor.test.ts full-suite timeout cluster under suite load",
+      "relates_to": "tasks/tasks-linear-f29c2953-192f-455c-aa67-5418d2607a3a.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-f29c2953-192f-455c-aa67-5418d2607a3a-docs-packet/cli/2026-04-18T00-31-50-715Z-81077b6b/manifest.json",
+          "source_anchor": "ctx:sha256:ce8d79c8861c039782f62f47ed8c1e50aaa5e0c89390d66072caab9ae13d8df4#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-229 as the bounded Doctor.test.ts suite-load timeout follow-up: full-suite `npm run test` had failed with 5 `Doctor.test.ts` timeouts under suite load while `npx vitest run --config vitest.config.core.ts orchestrator/tests/Doctor.test.ts` passed in isolation with `47 passed` in about `39s`. The packet keeps the exact checksum `Doctor.test.ts`, `full-suite`, `suite load`, `passes in isolation`, `timeouts`, the five named readiness cases, and the explicit rejection of reopening `CO-216` backlog-promotion/manual-demotion logic or broad doctor/docs work."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review --base origin/main",
+          "date": "2026-04-19",
+          "status": "bounded-success",
+          "review_outcome": "bounded-success",
+          "telemetry": ".runs/linear-f29c2953-192f-455c-aa67-5418d2607a3a/cli/2026-04-18T22-54-50-270Z-057eac84/review/telemetry.json",
+          "summary": "Post-merge manifest-backed standalone review ran under FORCE_CODEX_REVIEW=1 against origin/main and reported no actionable regressions; telemetry status=succeeded with review_outcome=bounded-success via command-intent boundary."
+        },
+        "elegance_review": {
+          "reviewer": "provider worker parent lane",
+          "date": "2026-04-19",
+          "status": "passed",
+          "artifact": "out/linear-f29c2953-192f-455c-aa67-5418d2607a3a/manual/20260418T2320Z-elegance-review.md",
+          "summary": "Collapsed the provider-incomplete case onto the new missing Codex-home/bin helper, kept the helper local to Doctor.test.ts, and avoided production doctor changes or global timeout increases."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-f29c2953-192f-455c-aa67-5418d2607a3a.md",
+        "task": "tasks/tasks-linear-f29c2953-192f-455c-aa67-5418d2607a3a.md",
+        "agent_task": ".agent/task/linear-f29c2953-192f-455c-aa67-5418d2607a3a.md",
+        "docs": "docs/TECH_SPEC-linear-f29c2953-192f-455c-aa67-5418d2607a3a.md"
+      }
+    },
+    {
+      "id": "20260418-linear-56395d00-0da1-447e-8d2d-68b195e8a3dc",
+      "title": "CO: Stabilize unrelated orchestrator/tests/Doctor.test.ts full-suite timeouts blocking CO-219 handoff",
+      "relates_to": "tasks/tasks-linear-56395d00-0da1-447e-8d2d-68b195e8a3dc.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-18",
+          "status": "succeeded",
+          "manifest": ".runs/linear-56395d00-0da1-447e-8d2d-68b195e8a3dc-co226-docs-review/cli/2026-04-17T21-47-30-660Z-b185d824/manifest.json",
+          "summary": "Docs-review completed before implementation and preserved the exact Doctor full-suite-versus-targeted contract for CO-226."
+        },
+        "child_lane": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-18",
+          "status": "accepted",
+          "manifest": ".runs/linear-56395d00-0da1-447e-8d2d-68b195e8a3dc-doctor-targeted-tests/cli/2026-04-17T21-40-57-908Z-850bb2ea/manifest.json",
+          "summary": "Accepted bounded same-issue child lane patch in Doctor.test.ts: replace one real direct-dist startup with a fake direct-dist entrypoint that still waits for the initialize request before returning the expected probe payload."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review --base origin/main",
+          "date": "2026-04-18",
+          "status": "bounded-success",
+          "telemetry": ".runs/linear-56395d00-0da1-447e-8d2d-68b195e8a3dc/cli/2026-04-18T22-36-13-247Z-90cb1362/review/telemetry.json",
+          "review_outcome": "bounded-success",
+          "termination_boundary": "command-intent",
+          "summary": "Forced standalone review executed under FORCE_CODEX_REVIEW=1 and completed as bounded-success after command-intent retry; read-only retry found no actionable regressions in the Doctor test helper or adjacent docs/task registry changes."
+        },
+        "elegance_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-18",
+          "status": "passed",
+          "summary": "Explicit minimality pass kept the local fake direct-dist helper plus initialize and delegate-server argv assertions as the smallest coverage-preserving Doctor fix; no simplification patch was needed."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-56395d00-0da1-447e-8d2d-68b195e8a3dc.md",
+        "task": "tasks/tasks-linear-56395d00-0da1-447e-8d2d-68b195e8a3dc.md",
+        "agent_task": ".agent/task/linear-56395d00-0da1-447e-8d2d-68b195e8a3dc.md",
+        "docs": "docs/TECH_SPEC-linear-56395d00-0da1-447e-8d2d-68b195e8a3dc.md"
+      }
+    },
+    {
+      "id": "20260418-linear-42debc45-fa05-4a0a-a7bb-35a48153aea9",
+      "title": "Run artifact truth: reconcile orphaned active manifests and child-lane placeholders after release/invalidation",
+      "relates_to": "tasks/tasks-linear-42debc45-fa05-4a0a-a7bb-35a48153aea9.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-42debc45-fa05-4a0a-a7bb-35a48153aea9-docs-packet/cli/2026-04-18T15-12-30-748Z-ea3efd2f/manifest.json",
+          "source_anchor": "ctx:sha256:63b0749832e8a186a955a92d8fd3c5f60eb8d06d28e3a02f3006b2838e802175#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-241 as the run artifact truth reconciliation lane for orphaned active-looking `.runs/**/manifest.json` records with `status=in_progress` or `status=launching` after provider `released` / `removed` and child-lane `invalidated` / `rejected` truth. The packet keeps `provider-intake-state.json`, file-based audit truth, and child-lane ledger truth distinct, rejects artifact deletion or destructive state cleanup, and leaves implementation, validation, Linear state, workpad, PR, and merge to the parent lane. The expected shared source payload path is absent in this child checkout."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-18",
+          "status": "bounded-success",
+          "telemetry": ".runs/linear-42debc45-fa05-4a0a-a7bb-35a48153aea9/cli/2026-04-18T15-09-04-142Z-ed00e88d/review/telemetry.json",
+          "summary": "Manifest-backed standalone review completed with review_outcome=bounded-success; concrete findings from earlier passes were addressed before PR handoff."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-42debc45-fa05-4a0a-a7bb-35a48153aea9-run-artifact-truth.md",
+        "task": "tasks/tasks-linear-42debc45-fa05-4a0a-a7bb-35a48153aea9.md",
+        "agent_task": ".agent/task/linear-42debc45-fa05-4a0a-a7bb-35a48153aea9.md",
+        "docs": "docs/TECH_SPEC-linear-42debc45-fa05-4a0a-a7bb-35a48153aea9.md"
+      }
+    },
+    {
       "id": "20260418-linear-0ae7288b-cc5f-493d-896f-713990e51808",
       "title": "CO: stabilize run-review fake Codex subprocess timeout flake under full npm run test",
       "relates_to": "tasks/tasks-linear-0ae7288b-cc5f-493d-896f-713990e51808.md",
@@ -4117,13 +4238,21 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-30",
+      "last_review": "2026-04-18",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
           "date": "2026-03-30",
           "manifest": ".runs/linear-af97d673-43a4-4a36-8738-b7f61e5b71a1-docs-review/cli/2026-03-30T01-25-36-879Z-17cd2f7d/manifest.json",
           "override_reason": "child-stream wrapper returned output-invalid after prepended logs, but the underlying docs-review manifest succeeded and is recorded directly"
+        },
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-18",
+          "status": "produced",
+          "manifest": ".runs/linear-af97d673-43a4-4a36-8738-b7f61e5b71a1-docs-refresh/cli/2026-04-18T21-09-55-260Z-b69a5e6c/manifest.json",
+          "source_anchor": "ctx:sha256:32d01f29a223917c3e47b5f30f7753d44d23e7cfafd3dc6fb8977eb8a2d0c633#chunk:c000001",
+          "summary": "Docs refresh preserves the Apr 18 reopened CO-41 recurrence after March PR #324 landed the original stuck polling / refresh watchdog fix: provider-intake-state.json reported stuck=true, restart_required=true, last_error=provider_refresh_lifecycle_stuck, refresh_phase=refresh:claim_reconcile, and free capacity running=2/max_allowed=3 while a Ready issue (CO-252) was not admitted until restart. Implementation identified the current seam as repeated active-worker restart quarantine ignoring free provider capacity and carries counts.max_allowed through supervision diagnostics; packet preserves boundaries for CO-217, CO-211, CO-214, and CO-248."
         }
       },
       "paths": {
