@@ -3675,7 +3675,7 @@ describe('ControlRuntime', () => {
           issue_state_type: 'started',
           issue_updated_at: '2026-04-16T22:48:01.000Z',
           issue_blocked_by: [completedBlocker],
-          task_id: 'linear-co-196-ready-reclaim',
+          task_id: 'linear-lin-issue-196',
           mapping_source: 'provider_id_fallback',
           state: 'released',
           reason: 'provider_issue_released:not_active',
@@ -3685,14 +3685,14 @@ describe('ControlRuntime', () => {
           last_event: 'Issue',
           last_action: 'update',
           last_webhook_timestamp: 1_744_828_881_000,
-          run_id: null,
-          run_manifest_path: null,
+          run_id: 'run-co-196-manual-start',
+          run_manifest_path: '/tmp/provider-run/run-co-196-manual-start/manifest.json',
           launch_source: 'control-host',
           launch_token: 'launch-co-196'
         }
       ]);
       const fixture = await createFixture({
-        taskId: 'linear-co-196-ready-reclaim',
+        taskId: 'linear-lin-issue-196',
         providerIntakeState,
         linearAdvisoryState: {
           tracked_issue: createTrackedIssue({
