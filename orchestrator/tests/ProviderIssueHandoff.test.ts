@@ -5058,6 +5058,355 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('admits fresh Ready work when retained non-retryable merge-closeout failure leaves capacity free', async () => {
+    const { root, paths } = await createHostPaths();
+    const writeRunManifest = async (taskId: string, runId: string, issueId: string, issueIdentifier: string, status: string) => {
+      const runPaths = resolveRunPaths(
+        {
+          repoRoot: root,
+          runsRoot: join(root, '.runs'),
+          outRoot: join(root, 'out'),
+          taskId
+        },
+        runId
+      );
+      await mkdir(runPaths.runDir, { recursive: true });
+      await writeFile(
+        runPaths.manifestPath,
+        JSON.stringify({
+          run_id: runId,
+          task_id: taskId,
+          status,
+          issue_provider: 'linear',
+          issue_id: issueId,
+          issue_identifier: issueIdentifier,
+          issue_updated_at: '2026-04-20T02:12:00.000Z',
+          updated_at: '2026-04-20T02:22:00.000Z'
+        }),
+        'utf8'
+      );
+      return runPaths;
+    };
+    const firstActivePaths = await writeRunManifest(
+      'task-active-a',
+      'run-active-a',
+      'lin-active-a',
+      'CO-212',
+      'in_progress'
+    );
+    const secondActivePaths = await writeRunManifest(
+      'task-active-b',
+      'run-active-b',
+      'lin-active-b',
+      'CO-217',
+      'in_progress'
+    );
+    const mergeCloseoutPaths = await writeRunManifest(
+      'task-merge-closeout-residue',
+      'run-merge-closeout-residue',
+      'lin-merge-closeout-residue',
+      'CO-219',
+      'succeeded'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(
+      createProviderClaim({
+        issue_id: 'lin-active-a',
+        issue_identifier: 'CO-212',
+        issue_title: 'Active worker A',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        task_id: 'task-active-a',
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        run_id: 'run-active-a',
+        run_manifest_path: firstActivePaths.manifestPath
+      }),
+      createProviderClaim({
+        issue_id: 'lin-active-b',
+        issue_identifier: 'CO-217',
+        issue_title: 'Active worker B',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        task_id: 'task-active-b',
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        run_id: 'run-active-b',
+        run_manifest_path: secondActivePaths.manifestPath
+      }),
+      createProviderClaim({
+        issue_id: 'lin-merge-closeout-residue',
+        issue_identifier: 'CO-219',
+        issue_title: 'Merge closeout residue',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-20T02:12:00.000Z',
+        task_id: 'task-merge-closeout-residue',
+        state: 'handoff_failed',
+        reason: 'provider_issue_merge_closeout_action_required',
+        run_id: 'run-merge-closeout-residue',
+        run_manifest_path: mergeCloseoutPaths.manifestPath
+      })
+    );
+
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-ready-fresh-after-residue',
+        manifestPath: '/tmp/provider-run/ready-fresh-after-residue-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const runMergeCloseout = vi.fn(async () => ({
+      recorded_at: '2026-04-20T02:22:30.000Z',
+      issue_id: 'lin-merge-closeout-residue',
+      issue_identifier: 'CO-219',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-20T02:22:30.000Z',
+      status: 'action_required' as const,
+      reason: 'pr_closed_unmerged',
+      summary: 'Attached PR is closed without merging.',
+      attached_pr_urls: ['https://github.com/asabeko/CO/pull/219'],
+      pr: {
+        url: 'https://github.com/asabeko/CO/pull/219',
+        owner: 'asabeko',
+        repo: 'CO',
+        number: 219
+      },
+      snapshot: {
+        state: 'CLOSED',
+        review_decision: 'APPROVED',
+        merge_state_status: 'UNKNOWN',
+        ready_to_merge: false,
+        gate_reasons: ['state=CLOSED'],
+        action_required_reasons: [],
+        unresolved_thread_count: 0,
+        checks_pending: 0,
+        checks_failed: 0,
+        required_checks_pending: 0,
+        required_checks_failed: 0,
+        updated_at: '2026-04-20T02:22:30.000Z',
+        merged_at: null,
+        head_oid: 'abc123'
+      },
+      merge_attempt: null,
+      shared_root: null,
+      linear_transition: null
+    }));
+    const refetchTrackedIssues = vi.fn(async (input?: {
+      mode?: string;
+      eligibleTargetCount?: number;
+      excludedIssueIds?: string[];
+    }) => {
+      if (input?.mode === 'fresh_discovery') {
+        return {
+          kind: 'ready' as const,
+          trackedIssues: [
+            createTrackedIssue({
+              id: 'lin-ready-fresh-after-residue',
+              identifier: 'CO-238',
+              title: 'Fresh Ready issue after residue',
+              state: 'Ready',
+              state_type: 'unstarted',
+              updated_at: '2026-04-20T02:30:00.000Z'
+            })
+          ]
+        };
+      }
+      return {
+        kind: 'ready' as const,
+        trackedIssues: []
+      };
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      runMergeCloseout,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 3
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-active-a',
+          identifier: 'CO-212',
+          title: 'Active worker A',
+          state: 'In Progress',
+          state_type: 'started'
+        }),
+        createTrackedIssue({
+          id: 'lin-active-b',
+          identifier: 'CO-217',
+          title: 'Active worker B',
+          state: 'In Progress',
+          state_type: 'started'
+        }),
+        createTrackedIssue({
+          id: 'lin-merge-closeout-residue',
+          identifier: 'CO-219',
+          title: 'Merge closeout residue',
+          state: 'Merging',
+          state_type: 'started',
+          updated_at: '2026-04-20T02:22:30.000Z'
+        })
+      ],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(runMergeCloseout).toHaveBeenCalledTimes(1);
+    expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(refetchTrackedIssues.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        mode: 'fresh_discovery',
+        eligibleTargetCount: 1,
+        excludedIssueIds: expect.arrayContaining([
+          'lin-active-a',
+          'lin-active-b',
+          'lin-merge-closeout-residue'
+        ])
+      })
+    );
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-ready-fresh-after-residue',
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-ready-fresh-after-residue',
+      issueIdentifier: 'CO-238',
+      issueUpdatedAt: '2026-04-20T02:30:00.000Z',
+      launchToken: expect.any(String)
+    }));
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-merge-closeout-residue')).toMatchObject({
+      state: 'handoff_failed',
+      reason: 'provider_issue_merge_closeout_action_required',
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
+    });
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-ready-fresh-after-residue')).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-20T02:30:00.000Z',
+      run_id: 'run-ready-fresh-after-residue',
+      run_manifest_path: '/tmp/provider-run/ready-fresh-after-residue-manifest.json'
+    });
+  });
+
+  it('keeps queued retained runs occupying capacity while excluding them from fresh discovery', async () => {
+    const { root, paths } = await createHostPaths();
+    const runPaths = resolveRunPaths(
+      {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'task-queued-retained'
+      },
+      'run-queued-retained'
+    );
+    await mkdir(runPaths.runDir, { recursive: true });
+    await writeFile(
+      runPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-queued-retained',
+        task_id: 'task-queued-retained',
+        status: 'queued',
+        issue_provider: 'linear',
+        issue_id: 'lin-queued-retained',
+        issue_identifier: 'CO-260',
+        issue_updated_at: '2026-04-20T02:42:00.000Z',
+        updated_at: '2026-04-20T02:43:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-queued-retained',
+      issue_identifier: 'CO-260',
+      issue_title: 'Queued retained handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-20T02:42:00.000Z',
+      task_id: 'task-queued-retained',
+      state: 'handoff_failed',
+      reason: 'provider_issue_start_failed:worker launch pending',
+      run_id: 'run-queued-retained',
+      run_manifest_path: runPaths.manifestPath
+    }));
+
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-should-not-start',
+        manifestPath: '/tmp/provider-run/should-not-start-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const refetchTrackedIssues = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-ready-while-queued',
+          identifier: 'CO-261',
+          title: 'Ready while queued retained exists',
+          state: 'Ready',
+          state_type: 'unstarted',
+          updated_at: '2026-04-20T02:45:00.000Z'
+        })
+      ]
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-queued-retained',
+          identifier: 'CO-260',
+          title: 'Queued retained handoff',
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-04-20T02:43:00.000Z'
+        })
+      ],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(refetchTrackedIssues).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-queued-retained')).toMatchObject({
+      state: 'handoff_failed',
+      reason: 'provider_issue_start_failed:worker launch pending',
+      run_id: 'run-queued-retained',
+      run_manifest_path: runPaths.manifestPath
+    });
+  });
+
   it('reserves fresh dispatch capacity on the normal poll path before retained direct reads', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();

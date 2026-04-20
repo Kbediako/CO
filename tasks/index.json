@@ -12798,6 +12798,23 @@
         "agent_task": ".agent/task/linear-27a61a75-236f-40c6-8cb0-8e4921708d91.md",
         "docs": "docs/TECH_SPEC-linear-27a61a75-236f-40c6-8cb0-8e4921708d91.md"
       }
+    },
+    {
+      "id": "20260420-linear-b1835ea5-3d28-493a-934e-1b38048270ce",
+      "title": "Control host stale tracked and retained active claim admission repair",
+      "relates_to": "tasks/tasks-linear-b1835ea5-3d28-493a-934e-1b38048270ce.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-20",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-b1835ea5-3d28-493a-934e-1b38048270ce.md",
+        "task": "tasks/tasks-linear-b1835ea5-3d28-493a-934e-1b38048270ce.md",
+        "agent_task": ".agent/task/linear-b1835ea5-3d28-493a-934e-1b38048270ce.md",
+        "docs": "docs/TECH_SPEC-linear-b1835ea5-3d28-493a-934e-1b38048270ce.md"
+      }
     }
   ]
 }
