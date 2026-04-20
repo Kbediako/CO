@@ -1436,13 +1436,17 @@ export function createProviderIssueHandoffService(
     const gate = createProviderPollDispatchBudget(options.readFeatureToggles?.() ?? null);
     const seededOccupancyKeys = new Set<string>();
     const discoveredRuns = await discoverProviderIssueRunsForCurrentOperation();
-    // Host-global admission must count every live provider worker, even when
+    // Host-global admission must count every live or queued provider worker, even when
     // claim attachment and issue ownership stay scoped to the current start pipeline.
     const activeDiscoveredRuns = discoveredRuns.filter((run) => run.status === 'in_progress');
-    const activeRunsByProviderIssue = groupProviderIssueRuns(activeDiscoveredRuns);
+    const queuedDiscoveredRuns = discoveredRuns.filter((run) => run.status === 'queued');
+    const occupyingDiscoveredRuns = [...activeDiscoveredRuns, ...queuedDiscoveredRuns];
+    const occupyingRunsByProviderIssue = groupProviderIssueRuns(occupyingDiscoveredRuns);
+    const claimByProviderKey = new Map<string, ProviderIntakeClaimRecord>();
     const claimStateByProviderKey = new Map<string, string | null>();
 
     for (const claim of options.state.claims) {
+      claimByProviderKey.set(claim.provider_key, claim);
       if (
         claim.state !== 'starting' &&
         claim.state !== 'resuming' &&
@@ -1451,16 +1455,16 @@ export function createProviderIssueHandoffService(
         continue;
       }
       claimStateByProviderKey.set(claim.provider_key, claim.issue_state ?? null);
-      const activeClaimRun =
+      const occupyingClaimRun =
         resolveProviderClaimRunIdentity(
           claim,
-          activeRunsByProviderIssue.get(claim.provider_key) ?? []
+          occupyingRunsByProviderIssue.get(claim.provider_key) ?? []
         ) ??
-        activeRunsByProviderIssue.get(claim.provider_key)?.[0] ??
+        occupyingRunsByProviderIssue.get(claim.provider_key)?.[0] ??
         null;
       const occupancyKey =
-        activeClaimRun?.manifestPath ??
-        activeClaimRun?.runId ??
+        occupyingClaimRun?.manifestPath ??
+        occupyingClaimRun?.runId ??
         (
           claim.state === 'running'
             ? null
@@ -1485,6 +1489,19 @@ export function createProviderIssueHandoffService(
       }
       seededOccupancyKeys.add(occupancyKey);
       const providerKey = buildProviderIssueKey(run.provider, run.issueId);
+      gate.noteOccupied({ state: claimStateByProviderKey.get(providerKey) ?? null });
+    }
+    for (const run of queuedDiscoveredRuns) {
+      const providerKey = buildProviderIssueKey(run.provider, run.issueId);
+      const claim = claimByProviderKey.get(providerKey) ?? null;
+      if (claim?.state === 'released') {
+        continue;
+      }
+      const occupancyKey = run.manifestPath || run.runId;
+      if (seededOccupancyKeys.has(occupancyKey)) {
+        continue;
+      }
+      seededOccupancyKeys.add(occupancyKey);
       gate.noteOccupied({ state: claimStateByProviderKey.get(providerKey) ?? null });
     }
     const unreadableAdmissionOccupancy =
@@ -4248,12 +4265,18 @@ export function createProviderIssueHandoffService(
           pollDispatchBudget.releaseOccupied(trackedIssue);
         };
 
-        // Host-global capacity must count every live provider worker before a
-        // refresh cycle spends retained-claim reads or starts fresh work.
+        // Host-global capacity must count every live or queued provider worker
+        // before a refresh cycle spends retained-claim reads or starts fresh work.
         const activeDiscoveredRuns = discoveredRuns.filter((run) => run.status === 'in_progress');
-        const activeRunsByProviderIssue = groupProviderIssueRuns(activeDiscoveredRuns);
+        const queuedDiscoveredRuns = discoveredRuns.filter((run) => run.status === 'queued');
+        const occupyingRunsByProviderIssue = groupProviderIssueRuns([
+          ...activeDiscoveredRuns,
+          ...queuedDiscoveredRuns
+        ]);
+        const claimByProviderKey = new Map<string, ProviderIntakeClaimRecord>();
         const claimStateByProviderKey = new Map<string, string | null>();
         for (const claim of options.state.claims) {
+          claimByProviderKey.set(claim.provider_key, claim);
           claimStateByProviderKey.set(claim.provider_key, claim.issue_state ?? null);
         }
         const seededPollOccupancyKeys = new Set<string>();
@@ -4262,9 +4285,9 @@ export function createProviderIssueHandoffService(
             continue;
           }
           const claimProviderKey = buildProviderIssueKey(claim.provider, claim.issue_id);
-          const claimRuns = activeRunsByProviderIssue.get(claimProviderKey) ?? [];
-          const activeRun = resolveProviderClaimRunIdentity(claim, claimRuns) ?? claimRuns[0] ?? null;
-          const occupancyKey = resolveClaimPollDispatchSlotKey(claimProviderKey, claim, activeRun);
+          const claimRuns = occupyingRunsByProviderIssue.get(claimProviderKey) ?? [];
+          const occupyingRun = resolveProviderClaimRunIdentity(claim, claimRuns) ?? claimRuns[0] ?? null;
+          const occupancyKey = resolveClaimPollDispatchSlotKey(claimProviderKey, claim, occupyingRun);
           if (!occupancyKey) {
             continue;
           }
@@ -4286,6 +4309,23 @@ export function createProviderIssueHandoffService(
           }
           seededPollOccupancyKeys.add(occupancyKey);
           const providerKey = buildProviderIssueKey(run.provider, run.issueId);
+          noteOccupiedPollDispatchSlot(
+            occupancyKey,
+            providerKey,
+            trackedIssuesByKey?.get(providerKey) ?? { state: claimStateByProviderKey.get(providerKey) ?? null }
+          );
+        }
+        for (const run of queuedDiscoveredRuns) {
+          const providerKey = buildProviderIssueKey(run.provider, run.issueId);
+          const claim = claimByProviderKey.get(providerKey) ?? null;
+          if (claim?.state === 'released') {
+            continue;
+          }
+          const occupancyKey = resolveProviderPollRunOccupancyKey(run);
+          if (seededPollOccupancyKeys.has(occupancyKey)) {
+            continue;
+          }
+          seededPollOccupancyKeys.add(occupancyKey);
           noteOccupiedPollDispatchSlot(
             occupancyKey,
             providerKey,

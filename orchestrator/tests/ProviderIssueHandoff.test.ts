@@ -5407,6 +5407,213 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('keeps foreign queued retained runs occupying global capacity', async () => {
+    const { root, paths } = await createHostPaths();
+    const runPaths = resolveRunPaths(
+      {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'task-foreign-queued-retained'
+      },
+      'run-foreign-queued-retained'
+    );
+    await mkdir(runPaths.runDir, { recursive: true });
+    await writeFile(
+      runPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-foreign-queued-retained',
+        task_id: 'task-foreign-queued-retained',
+        pipeline_id: 'other-provider-pipeline',
+        status: 'queued',
+        issue_provider: 'linear',
+        issue_id: 'lin-foreign-queued-retained',
+        issue_identifier: 'CO-262',
+        issue_updated_at: '2026-04-20T03:10:00.000Z',
+        updated_at: '2026-04-20T03:11:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-foreign-queued-retained',
+      issue_identifier: 'CO-262',
+      issue_title: 'Foreign queued retained handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-20T03:10:00.000Z',
+      task_id: 'task-foreign-queued-retained',
+      state: 'handoff_failed',
+      reason: 'provider_issue_start_failed:foreign worker launch pending',
+      run_id: 'run-foreign-queued-retained',
+      run_manifest_path: runPaths.manifestPath
+    }));
+
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-should-not-start-foreign',
+        manifestPath: '/tmp/provider-run/should-not-start-foreign-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const refetchTrackedIssues = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-ready-while-foreign-queued',
+          identifier: 'CO-263',
+          title: 'Ready while foreign queued retained exists',
+          state: 'Ready',
+          state_type: 'unstarted',
+          updated_at: '2026-04-20T03:12:00.000Z'
+        })
+      ]
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-foreign-queued-retained',
+          identifier: 'CO-262',
+          title: 'Foreign queued retained handoff',
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-04-20T03:11:00.000Z'
+        })
+      ],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(refetchTrackedIssues).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-foreign-queued-retained')).toMatchObject({
+      state: 'handoff_failed',
+      reason: 'provider_issue_start_failed:foreign worker launch pending',
+      run_id: 'run-foreign-queued-retained',
+      run_manifest_path: runPaths.manifestPath
+    });
+  });
+
+  it('does not double-count a queued run for a manifestless inflight retained claim', async () => {
+    const { root, paths } = await createHostPaths();
+    const runPaths = resolveRunPaths(
+      {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'task-manifestless-queued-retained'
+      },
+      'run-manifestless-queued-retained'
+    );
+    await mkdir(runPaths.runDir, { recursive: true });
+    await writeFile(
+      runPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-manifestless-queued-retained',
+        task_id: 'task-manifestless-queued-retained',
+        pipeline_id: 'other-provider-pipeline',
+        status: 'queued',
+        issue_provider: 'linear',
+        issue_id: 'lin-manifestless-queued-retained',
+        issue_identifier: 'CO-264',
+        issue_updated_at: '2026-04-20T03:20:00.000Z',
+        updated_at: '2026-04-20T03:21:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-manifestless-queued-retained',
+      issue_identifier: 'CO-264',
+      issue_title: 'Manifestless queued retained handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-20T03:20:00.000Z',
+      task_id: 'task-manifestless-queued-retained',
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      run_id: null,
+      run_manifest_path: null
+    }));
+
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-ready-after-manifestless-queued',
+        manifestPath: '/tmp/provider-run/ready-after-manifestless-queued-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const refetchTrackedIssues = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-ready-after-manifestless-queued',
+          identifier: 'CO-265',
+          title: 'Ready after manifestless queued retained handoff',
+          state: 'Ready',
+          state_type: 'unstarted',
+          updated_at: '2026-04-20T03:22:00.000Z'
+        })
+      ]
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 2
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-manifestless-queued-retained',
+          identifier: 'CO-264',
+          title: 'Manifestless queued retained handoff',
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-04-20T03:21:00.000Z'
+        })
+      ],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-ready-after-manifestless-queued',
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-ready-after-manifestless-queued',
+      issueIdentifier: 'CO-265'
+    }));
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
   it('reserves fresh dispatch capacity on the normal poll path before retained direct reads', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
@@ -7135,6 +7342,164 @@ describe('createProviderIssueHandoffService', () => {
       }
     });
     expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
+  it('counts queued provider workers from a different start pipeline against direct admission capacity', async () => {
+    const { root, paths } = await createHostPaths();
+    const foreignEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-foreign-queued-pipeline'
+    };
+    const foreignPaths = resolveRunPaths(foreignEnv, 'run-foreign-queued-pipeline');
+    await mkdir(foreignPaths.runDir, { recursive: true });
+    await writeFile(
+      foreignPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-foreign-queued-pipeline',
+        task_id: 'task-foreign-queued-pipeline',
+        pipeline_id: 'provider-linear-worker',
+        status: 'queued',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-foreign-queued',
+        issue_identifier: 'CO-1Q',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state: createProviderIntakeState(),
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-fresh',
+        identifier: 'CO-2',
+        updated_at: '2026-03-19T04:32:00.000Z'
+      }),
+      deliveryId: 'delivery-foreign-queued-pipeline-blocked',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_320_000
+    });
+
+    expect(result).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_start_blocked:max_concurrency',
+      claim: {
+        provider_key: 'linear:lin-issue-fresh',
+        state: 'accepted',
+        reason: 'provider_issue_start_blocked:max_concurrency',
+        task_id: 'linear-lin-issue-fresh',
+        run_id: null,
+        run_manifest_path: null
+      }
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
+  it('does not count released queued drains against direct admission capacity', async () => {
+    const { root, paths } = await createHostPaths();
+    const drainEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-released-queued-drain'
+    };
+    const drainPaths = resolveRunPaths(drainEnv, 'run-released-queued-drain');
+    await mkdir(drainPaths.runDir, { recursive: true });
+    await writeFile(
+      drainPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-released-queued-drain',
+        task_id: 'task-released-queued-drain',
+        status: 'queued',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-released-drain',
+        issue_identifier: 'CO-1D',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-released-drain',
+      issue_identifier: 'CO-1D',
+      issue_title: 'Released queued drain',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: 'task-released-queued-drain',
+      state: 'released',
+      reason: 'provider_issue_released_pending_reopen:provider_issue_released:not_active',
+      run_id: 'run-released-queued-drain',
+      run_manifest_path: drainPaths.manifestPath
+    }));
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-fresh-after-released-drain',
+        manifestPath: '/tmp/provider-run/fresh-after-released-drain.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-fresh',
+        identifier: 'CO-2',
+        updated_at: '2026-03-19T04:32:00.000Z'
+      }),
+      deliveryId: 'delivery-after-released-queued-drain',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_320_000
+    });
+
+    expect(result).toMatchObject({
+      kind: 'start',
+      reason: 'provider_issue_start_launched',
+      claim: {
+        provider_key: 'linear:lin-issue-fresh',
+        state: 'starting',
+        run_id: 'run-fresh-after-released-drain',
+        run_manifest_path: '/tmp/provider-run/fresh-after-released-drain.json'
+      }
+    });
+    expect(launcher.start).toHaveBeenCalledTimes(1);
     expect(launcher.resume).not.toHaveBeenCalled();
   });
 
