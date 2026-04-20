@@ -142,6 +142,379 @@ describe('providerOperatorAutopilot', () => {
     });
   });
 
+  it('surfaces Blocked issues with only terminal blockers as duplicate-cleanup candidates when duplicate or canonical-owner evidence exists', async () => {
+    const transitionIssueState = vi.fn(async () => {
+      throw new Error('read-only terminal-blocker advisories must not transition issues');
+    });
+
+    const result = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [
+          createTrackedIssue({
+            id: 'lin-issue-253',
+            identifier: 'CO-253',
+            state: 'Blocked',
+            state_type: 'started',
+            description:
+              'codex-orchestrator:canonical-owner-key=blocked-terminal-blocker-cleanup-advisory',
+            blocked_by: [
+              {
+                id: 'lin-issue-254',
+                identifier: 'CO-254',
+                state: 'Done',
+                state_type: 'completed'
+              }
+            ],
+            relations: [
+              {
+                direction: 'outbound',
+                type: 'duplicate',
+                issue: {
+                  id: 'lin-issue-254',
+                  identifier: 'CO-254',
+                  state: 'Done',
+                  state_type: 'completed'
+                }
+              }
+            ]
+          })
+        ],
+        claims: [],
+        config: buildConfig(),
+        previous_result: null
+      },
+      {
+        transition_issue_state: transitionIssueState
+      }
+    );
+
+    expect(transitionIssueState).not.toHaveBeenCalled();
+    expect(result.status).toBe('acted');
+    expect(result.terminal_blocker_advisories).toMatchObject([
+      {
+        kind: 'terminal_blocker_cleanup',
+        issue_id: 'lin-issue-253',
+        issue_identifier: 'CO-253',
+        issue_state: 'Blocked',
+        issue_state_type: 'started',
+        blockers: [
+          {
+            id: 'lin-issue-254',
+            identifier: 'CO-254',
+            state: 'Done',
+            state_type: 'completed'
+          }
+        ],
+        recommended_action: 'duplicate_cleanup',
+        canonical_owner_hints: [
+          'codex-orchestrator:canonical-owner-key=blocked-terminal-blocker-cleanup-advisory'
+        ],
+        duplicate_hints: ['outbound:duplicate:CO-254:Done']
+      }
+    ]);
+    expect(result.summary).toContain('1 duplicate-cleanup, 0 ready-to-unblock');
+  });
+
+  it('surfaces Blocked issues with only terminal blockers as ready-to-unblock candidates when no duplicate evidence exists', async () => {
+    const transitionIssueState = vi.fn(async () => {
+      throw new Error('read-only terminal-blocker advisories must not transition issues');
+    });
+
+    const result = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [
+          createTrackedIssue({
+            id: 'lin-issue-266',
+            identifier: 'CO-266',
+            state: 'Blocked',
+            state_type: 'started',
+            blocked_by: [
+              {
+                id: 'lin-issue-254',
+                identifier: 'CO-254',
+                state: 'Done',
+                state_type: 'completed'
+              }
+            ]
+          })
+        ],
+        claims: [],
+        config: buildConfig(),
+        previous_result: null
+      },
+      {
+        transition_issue_state: transitionIssueState
+      }
+    );
+
+    expect(transitionIssueState).not.toHaveBeenCalled();
+    expect(result.status).toBe('acted');
+    expect(result.terminal_blocker_advisories).toMatchObject([
+      {
+        issue_id: 'lin-issue-266',
+        issue_identifier: 'CO-266',
+        recommended_action: 'ready_to_unblock',
+        canonical_owner_hints: [],
+        duplicate_hints: []
+      }
+    ]);
+    expect(result.summary).toContain('0 duplicate-cleanup, 1 ready-to-unblock');
+  });
+
+  it('ignores unrelated canonical-owner markers as duplicate-cleanup evidence', async () => {
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createTrackedIssue({
+          id: 'lin-issue-266',
+          identifier: 'CO-266',
+          state: 'Blocked',
+          state_type: 'started',
+          description: 'codex-orchestrator:canonical-owner-key=unrelated-cleanup-owner',
+          blocked_by: [
+            {
+              id: 'lin-issue-254',
+              identifier: 'CO-254',
+              state: 'Done',
+              state_type: 'completed'
+            }
+          ]
+        })
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    });
+
+    expect(result.terminal_blocker_advisories).toMatchObject([
+      {
+        issue_id: 'lin-issue-266',
+        issue_identifier: 'CO-266',
+        recommended_action: 'ready_to_unblock',
+        canonical_owner_hints: [],
+        duplicate_hints: []
+      }
+    ]);
+    expect(result.summary).toContain('0 duplicate-cleanup, 1 ready-to-unblock');
+  });
+
+  it('does not treat non-duplicate relations to Duplicate-state blockers as duplicate-cleanup evidence', async () => {
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createTrackedIssue({
+          id: 'lin-issue-266',
+          identifier: 'CO-266',
+          state: 'Blocked',
+          state_type: 'started',
+          blocked_by: [
+            {
+              id: 'lin-issue-254',
+              identifier: 'CO-254',
+              state: 'Duplicate',
+              state_type: 'canceled'
+            }
+          ],
+          relations: [
+            {
+              direction: 'inbound',
+              type: 'blocks',
+              issue: {
+                id: 'lin-issue-254',
+                identifier: 'CO-254',
+                state: 'Duplicate',
+                state_type: 'canceled'
+              }
+            }
+          ]
+        })
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    });
+
+    expect(result.terminal_blocker_advisories).toMatchObject([
+      {
+        issue_id: 'lin-issue-266',
+        issue_identifier: 'CO-266',
+        recommended_action: 'ready_to_unblock',
+        duplicate_hints: []
+      }
+    ]);
+    expect(result.summary).toContain('0 duplicate-cleanup, 1 ready-to-unblock');
+  });
+
+  it('does not surface Blocked terminal-blocker advisories while any blocker remains non-terminal', async () => {
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createTrackedIssue({
+          id: 'lin-issue-267',
+          identifier: 'CO-267',
+          state: 'Blocked',
+          state_type: 'started',
+          blocked_by: [
+            {
+              id: 'lin-issue-254',
+              identifier: 'CO-254',
+              state: 'Done',
+              state_type: 'completed'
+            },
+            {
+              id: 'lin-issue-255',
+              identifier: 'CO-255',
+              state: 'In Progress',
+              state_type: 'started'
+            }
+          ]
+        })
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    });
+
+    expect(result.status).toBe('noop');
+    expect(result.terminal_blocker_advisories).toEqual([]);
+  });
+
+  it('does not let terminal-looking state names override non-terminal blocker state types', async () => {
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createTrackedIssue({
+          id: 'lin-issue-267',
+          identifier: 'CO-267',
+          state: 'Blocked',
+          state_type: 'started',
+          blocked_by: [
+            {
+              id: 'lin-issue-254',
+              identifier: 'CO-254',
+              state: 'Done',
+              state_type: 'started'
+            }
+          ]
+        })
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    });
+
+    expect(result.status).toBe('noop');
+    expect(result.terminal_blocker_advisories).toEqual([]);
+  });
+
+  it('does not surface Blocked terminal-blocker advisories when blocker relations are truncated', async () => {
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createTrackedIssue({
+          id: 'lin-issue-267',
+          identifier: 'CO-267',
+          state: 'Blocked',
+          state_type: 'started',
+          blocked_by_truncated: true,
+          blocked_by: [
+            {
+              id: 'lin-issue-254',
+              identifier: 'CO-254',
+              state: 'Done',
+              state_type: 'completed'
+            }
+          ]
+        })
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    });
+
+    expect(result.status).toBe('noop');
+    expect(result.terminal_blocker_advisories).toEqual([]);
+  });
+
+  it('surfaces ready-to-unblock terminal-blocker advisories when generic relations are truncated', async () => {
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createTrackedIssue({
+          id: 'lin-issue-267',
+          identifier: 'CO-267',
+          state: 'Blocked',
+          state_type: 'started',
+          relations_truncated: true,
+          blocked_by: [
+            {
+              id: 'lin-issue-254',
+              identifier: 'CO-254',
+              state: 'Done',
+              state_type: 'completed'
+            }
+          ]
+        })
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    });
+
+    expect(result.status).toBe('acted');
+    expect(result.terminal_blocker_advisories).toMatchObject([
+      {
+        issue_id: 'lin-issue-267',
+        issue_identifier: 'CO-267',
+        duplicate_hints: [],
+        canonical_owner_hints: [],
+        recommended_action: 'ready_to_unblock',
+        summary: expect.stringContaining(
+          'relation evidence may be truncated before duplicate hints are exhausted'
+        )
+      }
+    ]);
+  });
+
+  it.each([
+    {
+      label: 'archived-only',
+      archived_at: '2026-04-09T10:07:00.000Z',
+      trashed: false
+    },
+    {
+      label: 'trashed-only',
+      archived_at: null,
+      trashed: true
+    },
+    {
+      label: 'archived-and-trashed',
+      archived_at: '2026-04-09T10:07:00.000Z',
+      trashed: true
+    }
+  ])('does not surface $label terminal-blocker advisories', async ({ archived_at, trashed }) => {
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createTrackedIssue({
+          id: 'lin-issue-266',
+          identifier: 'CO-266',
+          state: 'Blocked',
+          state_type: 'started',
+          archived_at,
+          trashed,
+          blocked_by: [
+            {
+              id: 'lin-issue-254',
+              identifier: 'CO-254',
+              state: 'Done',
+              state_type: 'completed'
+            }
+          ]
+        })
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    });
+
+    expect(result.status).toBe('noop');
+    expect(result.terminal_blocker_advisories).toEqual([]);
+  });
+
   it('holds backlog promotion after an explicit Ready to Backlog demotion of the previously autopilot-promoted issue until a newer acknowledgement update appears', async () => {
     const baselineTransition = vi.fn(async () => ({
       ok: true as const,
@@ -4676,6 +5049,9 @@ function createTrackedIssue(
     created_at: overrides.created_at ?? '2026-04-09T09:00:00.000Z',
     updated_at: overrides.updated_at ?? '2026-04-09T09:00:00.000Z',
     blocked_by: overrides.blocked_by ?? [],
+    blocked_by_truncated: overrides.blocked_by_truncated ?? false,
+    relations: overrides.relations ?? [],
+    relations_truncated: overrides.relations_truncated ?? false,
     recent_activity: overrides.recent_activity ?? []
   };
 }

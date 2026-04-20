@@ -1,6 +1,34 @@
 {
   "items": [
     {
+      "id": "20260420-linear-025f5748-bed9-4512-9fd6-53ad57dd1466",
+      "title": "CO-266 blocked terminal blocker cleanup advisory",
+      "relates_to": "tasks/tasks-linear-025f5748-bed9-4512-9fd6-53ad57dd1466.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-20",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-20",
+          "status": "produced",
+          "manifest": ".runs/linear-025f5748-bed9-4512-9fd6-53ad57dd1466-docs-packet/cli/2026-04-19T21-54-28-881Z-fe2b535a/manifest.json",
+          "source_anchor": "ctx:sha256:cd9f197bda0c6e6ad7bdb511952c54337b8582a1789b66f97d0a3192d8e4d29e#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-266 as a read-only operator advisory: surface Blocked issues whose blockers are all terminal as ready-to-unblock candidate or duplicate-cleanup candidate items, emit issue id, live state, blocker list, canonical/duplicate hints, and recommended action, keep non-terminal blockers authoritative, avoid auto-close or direct relaunch behavior, and preserve CO-259 canonical-owner reuse with exact key blocked-terminal-blocker-cleanup-advisory. The source payload available to this lane carries run metadata plus issue id, identifier, and updated_at only, so the packet is anchored on the parent-provided issue-shaping contract; no Linear mutation was performed."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-025f5748-bed9-4512-9fd6-53ad57dd1466.md",
+        "task": "tasks/tasks-linear-025f5748-bed9-4512-9fd6-53ad57dd1466.md",
+        "agent_task": ".agent/task/linear-025f5748-bed9-4512-9fd6-53ad57dd1466.md",
+        "docs": {
+          "TECH_SPEC": "docs/TECH_SPEC-linear-025f5748-bed9-4512-9fd6-53ad57dd1466.md"
+        }
+      }
+    },
+    {
       "id": "20260420-linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4",
       "title": "Maintain docs freshness rolling baseline",
       "relates_to": "tasks/tasks-linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4.md",

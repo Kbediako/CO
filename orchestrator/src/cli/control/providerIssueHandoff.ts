@@ -5330,6 +5330,7 @@ export function createProviderIssueHandoffService(
         actions: [],
         holds: [],
         pending_actions: effectiveFallbackLocalRolloutActions.pending_actions,
+        terminal_blocker_advisories: [],
         resolved_actions: [
           ...fallbackResolvedActions.filter(
             (resolvedAction) => !fallbackResolvedActionIds.has(resolvedAction.action_instance_id)
@@ -6425,6 +6426,9 @@ function resolveProviderOperatorAutopilotPreviousResultFromPayload(
     actions: record.actions as ProviderOperatorAutopilotResult['actions'],
     holds: record.holds as ProviderOperatorAutopilotResult['holds'],
     pending_actions: record.pending_actions as ProviderOperatorAutopilotResult['pending_actions'],
+    terminal_blocker_advisories: Array.isArray(record.terminal_blocker_advisories)
+      ? (record.terminal_blocker_advisories as ProviderOperatorAutopilotResult['terminal_blocker_advisories'])
+      : [],
     resolved_actions: Array.isArray(record.resolved_actions)
       ? (record.resolved_actions as ProviderOperatorAutopilotResult['resolved_actions'])
       : [],

@@ -127,10 +127,44 @@ describe('resolveLiveLinearTrackedIssueById', () => {
 
   it('resolves a specific Linear issue by id and preserves the normalized tracked shape', async () => {
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
-      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string; variables?: { issueId?: string } };
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string; variables?: { issueId?: string; after?: string } };
+      if (body.query?.includes('ResolveLiveLinearIssueInverseRelationsPage')) {
+        expect(body.variables).toMatchObject({
+          issueId: 'lin-issue-1',
+          after: 'inverse-cursor-1'
+        });
+        return jsonResponse({
+          data: {
+            issue: {
+              id: 'lin-issue-1',
+              inverseRelations: {
+                nodes: [
+                  {
+                    type: 'related',
+                    issue: {
+                      id: 'lin-related-2',
+                      identifier: 'PREPROD-78',
+                      state: {
+                        name: 'Todo',
+                        type: 'unstarted'
+                      }
+                    }
+                  }
+                ],
+                pageInfo: {
+                  hasNextPage: false,
+                  endCursor: null
+                }
+              }
+            }
+          }
+        });
+      }
       expect(body.query).toContain('$issueId: String!');
       expect(body.query).toContain('issue(id: $issueId)');
       expect(body.query).toContain('inverseRelations(first: 50)');
+      expect(body.query).toContain('relations(first: 50)');
+      expect(body.query).toContain('relatedIssue');
       expect(body.variables?.issueId).toBe('lin-issue-1');
       return jsonResponse({
         data: {
@@ -183,7 +217,29 @@ describe('resolveLiveLinearTrackedIssueById', () => {
                     }
                   }
                 }
-              ]
+              ],
+              pageInfo: {
+                hasNextPage: true,
+                endCursor: 'inverse-cursor-1'
+              }
+            },
+            relations: {
+              nodes: [
+                {
+                  type: 'duplicate',
+                  relatedIssue: {
+                    id: 'lin-duplicate-1',
+                    identifier: 'PREPROD-102',
+                    state: {
+                      name: 'Duplicate',
+                      type: 'canceled'
+                    }
+                  }
+                }
+              ],
+              pageInfo: {
+                hasNextPage: true
+              }
             },
             history: {
               nodes: [
@@ -243,10 +299,153 @@ describe('resolveLiveLinearTrackedIssueById', () => {
             state_type: 'completed'
           }
         ],
+        blocked_by_truncated: false,
+        relations_truncated: true,
+        relations: [
+          {
+            direction: 'outbound',
+            type: 'duplicate',
+            issue: {
+              id: 'lin-duplicate-1',
+              identifier: 'PREPROD-102',
+              state: 'Duplicate',
+              state_type: 'canceled'
+            }
+          },
+          {
+            direction: 'inbound',
+            type: 'blocks',
+            issue: {
+              id: 'lin-blocker-1',
+              identifier: 'PREPROD-99',
+              state: 'Custom Completed',
+              state_type: 'completed'
+            }
+          },
+          {
+            direction: 'inbound',
+            type: 'related',
+            issue: {
+              id: 'lin-related-1',
+              identifier: 'PREPROD-77',
+              state: 'In Progress',
+              state_type: null
+            }
+          },
+          {
+            direction: 'inbound',
+            type: 'related',
+            issue: {
+              id: 'lin-related-2',
+              identifier: 'PREPROD-78',
+              state: 'Todo',
+              state_type: 'unstarted'
+            }
+          }
+        ],
         team_key: 'PREPROD',
         project_name: 'Icon Agency (Bookings)'
       }
     });
+  });
+
+  it('hydrates paginated inbound relations before deciding blocker truncation', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string; variables?: { issueId?: string; after?: string } };
+      if (body.query?.includes('ResolveLiveLinearIssueInverseRelationsPage')) {
+        expect(body.variables).toMatchObject({
+          issueId: 'lin-issue-1',
+          after: 'blocker-cursor-1'
+        });
+        return jsonResponse({
+          data: {
+            issue: {
+              id: 'lin-issue-1',
+              inverseRelations: {
+                nodes: [
+                  {
+                    type: 'blocks',
+                    issue: {
+                      id: 'lin-blocker-50',
+                      identifier: 'PREPROD-50',
+                      state: {
+                        name: 'In Progress',
+                        type: 'started'
+                      }
+                    }
+                  }
+                ],
+                pageInfo: {
+                  hasNextPage: false,
+                  endCursor: null
+                }
+              }
+            }
+          }
+        });
+      }
+      return jsonResponse({
+        data: {
+          viewer: {
+            organization: {
+              id: 'lin-workspace-1'
+            }
+          },
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'PREPROD-101',
+            title: 'Investigate advisory routing',
+            updatedAt: '2026-03-06T02:00:00.000Z',
+            inverseRelations: {
+              nodes: Array.from({ length: 50 }, (_unused, index) => ({
+                type: 'blocks',
+                issue: {
+                  id: `lin-blocker-${index}`,
+                  identifier: `PREPROD-${index}`,
+                  state: {
+                    name: 'Done',
+                    type: 'completed'
+                  }
+                }
+              })),
+              pageInfo: {
+                hasNextPage: true,
+                endCursor: 'blocker-cursor-1'
+              }
+            },
+            relations: {
+              nodes: [],
+              pageInfo: {
+                hasNextPage: false
+              }
+            },
+            history: {
+              nodes: []
+            }
+          }
+        }
+      });
+    });
+
+    const result = await resolveLiveLinearTrackedIssueById({
+      issueId: 'lin-issue-1',
+      sourceSetup: {
+        provider: 'linear',
+        workspace_id: 'lin-workspace-1'
+      },
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toMatchObject({
+      kind: 'ready',
+      tracked_issue: {
+        blocked_by_truncated: false
+      }
+    });
+    expect(result.kind === 'ready' ? result.tracked_issue.blocked_by : []).toHaveLength(51);
   });
 
   it('fails closed when the exact issue falls outside the configured team scope', async () => {
@@ -603,6 +802,157 @@ describe('resolveLiveLinearTrackedIssues', () => {
           id: 'lin-issue-null-priority',
           priority: null,
           created_at: '2026-03-17T04:00:00.000Z'
+        }
+      ]
+    });
+  });
+
+  it('keeps polling when one issue inverse relation hydration page fails', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: { issueId?: string; after?: string | null; limit?: number };
+      };
+      if (body.query?.includes('ResolveLiveLinearIssueInverseRelationsPage')) {
+        expect(body.variables).toMatchObject({
+          issueId: 'lin-issue-a',
+          after: 'inverse-cursor-a'
+        });
+        return jsonResponse(
+          {
+            errors: [
+              {
+                message: 'temporary Linear inverse relation page failure'
+              }
+            ]
+          },
+          503
+        );
+      }
+
+      expect(body.query).toContain('issues(orderBy: updatedAt, first: $limit, after: $after');
+      return jsonResponse({
+        data: {
+          viewer: {
+            organization: {
+              id: 'lin-workspace-1'
+            }
+          },
+          issues: {
+            pageInfo: {
+              hasNextPage: false,
+              endCursor: null
+            },
+            nodes: [
+              {
+                id: 'lin-issue-a',
+                identifier: 'PREPROD-101',
+                title: 'Blocked candidate with partial blockers',
+                priority: 1,
+                createdAt: '2026-03-18T04:00:00.000Z',
+                updatedAt: '2026-03-20T04:00:00.000Z',
+                state: {
+                  name: 'Blocked',
+                  type: 'started'
+                },
+                team: {
+                  id: 'lin-team-1',
+                  key: 'PREPROD',
+                  name: 'PRE-PRO/PRODUCTION'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'Icon Agency (Bookings)'
+                },
+                inverseRelations: {
+                  nodes: [
+                    {
+                      type: 'blocks',
+                      issue: {
+                        id: 'lin-blocker-1',
+                        identifier: 'PREPROD-99',
+                        state: {
+                          name: 'Done',
+                          type: 'completed'
+                        }
+                      }
+                    }
+                  ],
+                  pageInfo: {
+                    hasNextPage: true,
+                    endCursor: 'inverse-cursor-a'
+                  }
+                },
+                history: { nodes: [] }
+              },
+              {
+                id: 'lin-issue-b',
+                identifier: 'PREPROD-102',
+                title: 'Independent tracked issue',
+                priority: 2,
+                createdAt: '2026-03-19T04:00:00.000Z',
+                updatedAt: '2026-03-20T04:00:00.000Z',
+                state: {
+                  name: 'In Progress',
+                  type: 'started'
+                },
+                team: {
+                  id: 'lin-team-1',
+                  key: 'PREPROD',
+                  name: 'PRE-PRO/PRODUCTION'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'Icon Agency (Bookings)'
+                },
+                inverseRelations: {
+                  nodes: [],
+                  pageInfo: {
+                    hasNextPage: false,
+                    endCursor: null
+                  }
+                },
+                history: { nodes: [] }
+              }
+            ]
+          }
+        }
+      });
+    });
+
+    const result = await resolveLiveLinearTrackedIssues({
+      sourceSetup: {
+        provider: 'linear',
+        workspace_id: 'lin-workspace-1',
+        team_id: 'lin-team-1',
+        project_id: 'lin-project-1'
+      },
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({
+      kind: 'ready',
+      tracked_issues: [
+        {
+          id: 'lin-issue-a',
+          blocked_by: [
+            {
+              id: 'lin-blocker-1',
+              identifier: 'PREPROD-99',
+              state: 'Done',
+              state_type: 'completed'
+            }
+          ],
+          blocked_by_truncated: true
+        },
+        {
+          id: 'lin-issue-b',
+          blocked_by: [],
+          blocked_by_truncated: false
         }
       ]
     });
