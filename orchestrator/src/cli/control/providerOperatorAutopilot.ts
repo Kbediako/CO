@@ -1148,6 +1148,13 @@ function collectTerminalBlockerAdvisories(
       }
       const canonicalOwnerHints = resolveCanonicalOwnerHints(issue);
       const duplicateHints = resolveDuplicateHints(issue);
+      if (
+        issue.relations_truncated === true &&
+        canonicalOwnerHints.length === 0 &&
+        duplicateHints.length === 0
+      ) {
+        return [];
+      }
       const recommendedAction =
         duplicateHints.length > 0 || canonicalOwnerHints.length > 0
           ? 'duplicate_cleanup'

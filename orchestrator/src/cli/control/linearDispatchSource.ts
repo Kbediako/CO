@@ -70,6 +70,7 @@ export interface LiveLinearTrackedIssue {
   blocked_by?: LiveLinearTrackedBlocker[];
   blocked_by_truncated?: boolean;
   relations?: LiveLinearTrackedRelation[];
+  relations_truncated?: boolean;
   recent_activity: LiveLinearTrackedActivity[];
 }
 
@@ -1223,6 +1224,7 @@ function parseTrackedIssue(
     blocked_by: extractTrackedIssueBlockers(issue),
     blocked_by_truncated: issue.inverseRelations?.pageInfo?.hasNextPage === true,
     relations: extractTrackedIssueRelations(issue),
+    relations_truncated: issue.relations?.pageInfo?.hasNextPage === true,
     recent_activity: Array.isArray(issue.history?.nodes)
       ? issue.history.nodes
           .map((entry) => buildTrackedActivity(entry))

@@ -205,7 +205,7 @@ describe('resolveLiveLinearTrackedIssueById', () => {
                 }
               ],
               pageInfo: {
-                hasNextPage: false
+                hasNextPage: true
               }
             },
             history: {
@@ -267,6 +267,7 @@ describe('resolveLiveLinearTrackedIssueById', () => {
           }
         ],
         blocked_by_truncated: true,
+        relations_truncated: true,
         relations: [
           {
             direction: 'outbound',
