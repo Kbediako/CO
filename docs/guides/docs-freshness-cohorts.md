@@ -166,3 +166,18 @@ CO-254 reproduced the Apr 19 baseline failure in `out/linear-5348c2fb-8897-48e3-
 - `spec-guard --dry-run` separately reported `17` active spec frontmatters with `last_review=2026-03-19`
 
 The Apr 19 blocking set was reviewed in `docs/findings/linear-5348c2fb-8897-48e3-a848-7831778b1b00-docs-freshness-classification.md` and refreshed instead of added to rolling deferral. The stale set includes Active Guide and Public Guide entries, which are ineligible for rolling deferral, and the matching `spec-guard` frontmatter rows require direct spec review. CO-254 keeps the rolling policy unchanged, preserves the existing CO-175 `221`-row advisory ledger, and updates only the reviewed Apr 19 stale docs plus the stale spec frontmatters to `last_review=2026-04-19`.
+
+## Apr 20 Maintenance Refresh
+CO-267 reproduced the Apr 20 baseline failure in `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/before/docs-freshness.json`:
+
+- `66` blocking stale entries outside the CO-175 rolling cohort
+- `221` CO-175 rolling cohort entries still visible at `overdue=7/7`
+- `0` missing registry rows
+- `0` missing-on-disk rows
+- `0` invalid registry entries
+- `0` uncatalogued docs
+- blocking classes: Agent Policy `7`, Active Guide `4`, Shipped Skill `2`, Task Packet `40`, Task Mirror `6`, Report Only `7`
+- blocking review cohorts: `2026-01-19` / `90` days (`21` rows) and `2026-03-20` / `30` days (`45` rows)
+- `spec-guard --dry-run` separately reported stale active spec frontmatter rows with `last_review=2026-03-20`
+
+The Apr 20 blocking set and the CO-175 rolling cohort were reviewed in `docs/findings/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4-docs-freshness-classification.md` and refreshed instead of weakening freshness gates. CO-267 keeps the rolling policy unchanged, preserves CO-266 terminal-blocker advisory scope, and updates only the reviewed stale registry rows, active spec frontmatter rows, and the CO-175 `1164-1195` rolling cohort rows to `last_review=2026-04-20`.

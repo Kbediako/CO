@@ -1,6 +1,85 @@
 {
   "items": [
     {
+      "id": "20260420-linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4",
+      "title": "Maintain docs freshness rolling baseline",
+      "relates_to": "tasks/tasks-linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-20",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
+      "approvals": {
+        "baseline_reproduction": {
+          "reviewer": "parent provider worker plus same-issue child lane",
+          "date": "2026-04-20",
+          "status": "parent-rerun-after-child-patch-invalidated",
+          "child_manifest": ".runs/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4-freshness-baseline/cli/2026-04-20T00-19-19-851Z-7c494843/manifest.json",
+          "before_freshness": "out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/before/docs-freshness.json",
+          "before_maintenance": "out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/before/docs-freshness-maintenance.json",
+          "before_spec_guard": "out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/before/spec-guard.log",
+          "summary": "Current baseline reproduced 66 blocking stale docs, 221 visible CO-175 rolling rows, no missing/invalid/uncatalogued drift, and six stale active spec frontmatter rows. Child lane completed but accept was invalidated by live Linear updated_at drift, so parent reran and uses parent-owned artifacts."
+        },
+        "reviewed_refresh": {
+          "reviewer": "Codex provider worker",
+          "date": "2026-04-20",
+          "status": "completed",
+          "classification": "docs/findings/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4-docs-freshness-classification.md",
+          "summary": "Classified stale Agent Policy, Active Guide, Shipped Skill, Task Packet, Task Mirror, Report Only, spec frontmatter, registry-only spec README, and the CO-175 rolling cohort for reviewed refresh without weakening freshness policy or expanding CO-266."
+        },
+        "docs_review": {
+          "reviewer": "docs-review child stream plus parent fix",
+          "date": "2026-04-20",
+          "status": "completed",
+          "manifest": ".runs/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4-docs-review/cli/2026-04-20T00-35-11-894Z-c71bbf2a/manifest.json",
+          "finding": "P2 evidence-table issue fixed by separating tasks/specs/README.md from spec-frontmatter rows."
+        },
+        "validation": {
+          "reviewer": "Codex provider worker",
+          "date": "2026-04-20",
+          "status": "passed",
+          "delegation_guard": "out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/validation/delegation-guard.log",
+          "spec_guard": "out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/validation/spec-guard.log",
+          "build": "out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/validation/build.log",
+          "lint": "out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/validation/lint.log",
+          "test": "out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/validation/test.log",
+          "docs_check": "out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/validation/docs-check.log",
+          "docs_freshness": "out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/validation/docs-freshness.json",
+          "docs_freshness_maintain": "out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/validation/docs-freshness-maintenance.json",
+          "repo_stewardship": "out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/validation/repo-stewardship.log",
+          "diff_budget": "out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/validation/diff-budget.log",
+          "git_diff_check": "out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/validation/git-diff-check.log"
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-20",
+          "status": "succeeded",
+          "review_outcome": "bounded-success",
+          "telemetry": "../../.runs/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/cli/2026-04-20T00-16-23-383Z-f8073975/review/telemetry.json",
+          "summary": "Review completed via command-intent retry with no actionable diff-local issues."
+        },
+        "elegance_review": {
+          "reviewer": "Codex provider worker",
+          "date": "2026-04-20",
+          "status": "completed",
+          "evidence": "out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/manual/20260420T0053Z-elegance-review.md",
+          "summary": "No simplification patch needed; diff is limited to docs/registry freshness metadata and required CO-267 packet evidence."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4.md",
+        "task": "tasks/tasks-linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4.md",
+        "agent_task": ".agent/task/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4.md",
+          "classification": "docs/findings/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4-docs-freshness-classification.md"
+        }
+      }
+    },
+    {
       "id": "20260420-linear-49206921-3c8d-4db6-bfd9-62414509e96a",
       "title": "CO-230 bounded-concurrency PR snapshot hydration",
       "relates_to": "tasks/tasks-linear-49206921-3c8d-4db6-bfd9-62414509e96a.md",

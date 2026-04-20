@@ -5,7 +5,7 @@ relates_to: docs/PRD-coordinator-live-provider-child-run-cli-command-surface-sub
 risk: high
 owners:
   - Codex
-last_review: 2026-03-20
+last_review: 2026-04-20
 dependencies:
   - docs/findings/1308-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up-deliberation.md
   - docs/ACTION_PLAN-coordinator-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up.md

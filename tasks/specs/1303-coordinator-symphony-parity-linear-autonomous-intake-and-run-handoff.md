@@ -4,7 +4,7 @@ title: Coordinator Symphony-Parity Provider-Driven Autonomous Intake and Run Han
 status: completed
 owner: Codex
 created: 2026-03-19
-last_review: 2026-03-20
+last_review: 2026-04-20
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md
