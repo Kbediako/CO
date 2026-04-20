@@ -1123,21 +1123,22 @@ async function hydratePaginatedIssueInverseRelations(input: {
   }
   const issueId = normalizeEnvValue(input.issue.id);
   let afterCursor = normalizeEnvValue(connection.pageInfo.endCursor);
+  const firstPageNodes = Array.isArray(connection.nodes) ? connection.nodes : [];
   if (!issueId || !afterCursor || !Array.isArray(connection.nodes)) {
     return {
-      ok: false,
-      resolution: malformed('dispatch_source_provider_response_invalid')
+      ok: true,
+      issue: buildTruncatedInverseRelationsIssue(input.issue, firstPageNodes)
     };
   }
 
-  const nodes = [...connection.nodes];
+  const nodes = [...firstPageNodes];
   let hasNextPage = true;
   let pagesRead = 0;
   while (hasNextPage && pagesRead < LINEAR_INVERSE_RELATION_MAX_PAGES) {
     if (!afterCursor) {
       return {
-        ok: false,
-        resolution: malformed('dispatch_source_provider_response_invalid')
+        ok: true,
+        issue: buildTruncatedInverseRelationsIssue(input.issue, nodes)
       };
     }
     const query = buildLinearIssueInverseRelationsPageQuery(issueId, afterCursor);
@@ -1151,14 +1152,17 @@ async function hydratePaginatedIssueInverseRelations(input: {
       variables: query.variables
     });
     if (!queryResult.ok) {
-      return queryResult;
+      return {
+        ok: true,
+        issue: buildTruncatedInverseRelationsIssue(input.issue, nodes)
+      };
     }
 
     const nextConnection = queryResult.payload.data?.issue?.inverseRelations ?? null;
     if (!Array.isArray(nextConnection?.nodes)) {
       return {
-        ok: false,
-        resolution: malformed('dispatch_source_provider_response_invalid')
+        ok: true,
+        issue: buildTruncatedInverseRelationsIssue(input.issue, nodes)
       };
     }
     nodes.push(...nextConnection.nodes);
@@ -1166,8 +1170,8 @@ async function hydratePaginatedIssueInverseRelations(input: {
     afterCursor = normalizeEnvValue(nextConnection.pageInfo?.endCursor);
     if (hasNextPage && !afterCursor) {
       return {
-        ok: false,
-        resolution: malformed('dispatch_source_provider_response_invalid')
+        ok: true,
+        issue: buildTruncatedInverseRelationsIssue(input.issue, nodes)
       };
     }
     pagesRead += 1;
@@ -1184,6 +1188,22 @@ async function hydratePaginatedIssueInverseRelations(input: {
           hasNextPage,
           endCursor: afterCursor
         }
+      }
+    }
+  };
+}
+
+function buildTruncatedInverseRelationsIssue(
+  issue: LinearIssueNode,
+  nodes: LinearIssueInverseRelationNode[]
+): LinearIssueNode {
+  return {
+    ...issue,
+    inverseRelations: {
+      nodes,
+      pageInfo: {
+        ...(issue.inverseRelations?.pageInfo ?? {}),
+        hasNextPage: true
       }
     }
   };

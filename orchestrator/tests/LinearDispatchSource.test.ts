@@ -807,6 +807,157 @@ describe('resolveLiveLinearTrackedIssues', () => {
     });
   });
 
+  it('keeps polling when one issue inverse relation hydration page fails', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: { issueId?: string; after?: string | null; limit?: number };
+      };
+      if (body.query?.includes('ResolveLiveLinearIssueInverseRelationsPage')) {
+        expect(body.variables).toMatchObject({
+          issueId: 'lin-issue-a',
+          after: 'inverse-cursor-a'
+        });
+        return jsonResponse(
+          {
+            errors: [
+              {
+                message: 'temporary Linear inverse relation page failure'
+              }
+            ]
+          },
+          503
+        );
+      }
+
+      expect(body.query).toContain('issues(orderBy: updatedAt, first: $limit, after: $after');
+      return jsonResponse({
+        data: {
+          viewer: {
+            organization: {
+              id: 'lin-workspace-1'
+            }
+          },
+          issues: {
+            pageInfo: {
+              hasNextPage: false,
+              endCursor: null
+            },
+            nodes: [
+              {
+                id: 'lin-issue-a',
+                identifier: 'PREPROD-101',
+                title: 'Blocked candidate with partial blockers',
+                priority: 1,
+                createdAt: '2026-03-18T04:00:00.000Z',
+                updatedAt: '2026-03-20T04:00:00.000Z',
+                state: {
+                  name: 'Blocked',
+                  type: 'started'
+                },
+                team: {
+                  id: 'lin-team-1',
+                  key: 'PREPROD',
+                  name: 'PRE-PRO/PRODUCTION'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'Icon Agency (Bookings)'
+                },
+                inverseRelations: {
+                  nodes: [
+                    {
+                      type: 'blocks',
+                      issue: {
+                        id: 'lin-blocker-1',
+                        identifier: 'PREPROD-99',
+                        state: {
+                          name: 'Done',
+                          type: 'completed'
+                        }
+                      }
+                    }
+                  ],
+                  pageInfo: {
+                    hasNextPage: true,
+                    endCursor: 'inverse-cursor-a'
+                  }
+                },
+                history: { nodes: [] }
+              },
+              {
+                id: 'lin-issue-b',
+                identifier: 'PREPROD-102',
+                title: 'Independent tracked issue',
+                priority: 2,
+                createdAt: '2026-03-19T04:00:00.000Z',
+                updatedAt: '2026-03-20T04:00:00.000Z',
+                state: {
+                  name: 'In Progress',
+                  type: 'started'
+                },
+                team: {
+                  id: 'lin-team-1',
+                  key: 'PREPROD',
+                  name: 'PRE-PRO/PRODUCTION'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'Icon Agency (Bookings)'
+                },
+                inverseRelations: {
+                  nodes: [],
+                  pageInfo: {
+                    hasNextPage: false,
+                    endCursor: null
+                  }
+                },
+                history: { nodes: [] }
+              }
+            ]
+          }
+        }
+      });
+    });
+
+    const result = await resolveLiveLinearTrackedIssues({
+      sourceSetup: {
+        provider: 'linear',
+        workspace_id: 'lin-workspace-1',
+        team_id: 'lin-team-1',
+        project_id: 'lin-project-1'
+      },
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({
+      kind: 'ready',
+      tracked_issues: [
+        {
+          id: 'lin-issue-a',
+          blocked_by: [
+            {
+              id: 'lin-blocker-1',
+              identifier: 'PREPROD-99',
+              state: 'Done',
+              state_type: 'completed'
+            }
+          ],
+          blocked_by_truncated: true
+        },
+        {
+          id: 'lin-issue-b',
+          blocked_by: [],
+          blocked_by_truncated: false
+        }
+      ]
+    });
+  });
+
   it('paginates the full active candidate set before sorting for dispatch', async () => {
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
