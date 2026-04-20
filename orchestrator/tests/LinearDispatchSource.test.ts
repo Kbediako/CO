@@ -127,7 +127,39 @@ describe('resolveLiveLinearTrackedIssueById', () => {
 
   it('resolves a specific Linear issue by id and preserves the normalized tracked shape', async () => {
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
-      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string; variables?: { issueId?: string } };
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string; variables?: { issueId?: string; after?: string } };
+      if (body.query?.includes('ResolveLiveLinearIssueInverseRelationsPage')) {
+        expect(body.variables).toMatchObject({
+          issueId: 'lin-issue-1',
+          after: 'inverse-cursor-1'
+        });
+        return jsonResponse({
+          data: {
+            issue: {
+              id: 'lin-issue-1',
+              inverseRelations: {
+                nodes: [
+                  {
+                    type: 'related',
+                    issue: {
+                      id: 'lin-related-2',
+                      identifier: 'PREPROD-78',
+                      state: {
+                        name: 'Todo',
+                        type: 'unstarted'
+                      }
+                    }
+                  }
+                ],
+                pageInfo: {
+                  hasNextPage: false,
+                  endCursor: null
+                }
+              }
+            }
+          }
+        });
+      }
       expect(body.query).toContain('$issueId: String!');
       expect(body.query).toContain('issue(id: $issueId)');
       expect(body.query).toContain('inverseRelations(first: 50)');
@@ -187,7 +219,8 @@ describe('resolveLiveLinearTrackedIssueById', () => {
                 }
               ],
               pageInfo: {
-                hasNextPage: true
+                hasNextPage: true,
+                endCursor: 'inverse-cursor-1'
               }
             },
             relations: {
@@ -298,6 +331,16 @@ describe('resolveLiveLinearTrackedIssueById', () => {
               state: 'In Progress',
               state_type: null
             }
+          },
+          {
+            direction: 'inbound',
+            type: 'related',
+            issue: {
+              id: 'lin-related-2',
+              identifier: 'PREPROD-78',
+              state: 'Todo',
+              state_type: 'unstarted'
+            }
           }
         ],
         team_key: 'PREPROD',
@@ -306,9 +349,42 @@ describe('resolveLiveLinearTrackedIssueById', () => {
     });
   });
 
-  it('marks blocker truncation only when the fetched inbound page is saturated with blockers', async () => {
-    const fetchImpl: typeof fetch = vi.fn(async () =>
-      jsonResponse({
+  it('hydrates paginated inbound relations before deciding blocker truncation', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string; variables?: { issueId?: string; after?: string } };
+      if (body.query?.includes('ResolveLiveLinearIssueInverseRelationsPage')) {
+        expect(body.variables).toMatchObject({
+          issueId: 'lin-issue-1',
+          after: 'blocker-cursor-1'
+        });
+        return jsonResponse({
+          data: {
+            issue: {
+              id: 'lin-issue-1',
+              inverseRelations: {
+                nodes: [
+                  {
+                    type: 'blocks',
+                    issue: {
+                      id: 'lin-blocker-50',
+                      identifier: 'PREPROD-50',
+                      state: {
+                        name: 'In Progress',
+                        type: 'started'
+                      }
+                    }
+                  }
+                ],
+                pageInfo: {
+                  hasNextPage: false,
+                  endCursor: null
+                }
+              }
+            }
+          }
+        });
+      }
+      return jsonResponse({
         data: {
           viewer: {
             organization: {
@@ -333,7 +409,8 @@ describe('resolveLiveLinearTrackedIssueById', () => {
                 }
               })),
               pageInfo: {
-                hasNextPage: true
+                hasNextPage: true,
+                endCursor: 'blocker-cursor-1'
               }
             },
             relations: {
@@ -347,8 +424,8 @@ describe('resolveLiveLinearTrackedIssueById', () => {
             }
           }
         }
-      })
-    );
+      });
+    });
 
     const result = await resolveLiveLinearTrackedIssueById({
       issueId: 'lin-issue-1',
@@ -365,10 +442,10 @@ describe('resolveLiveLinearTrackedIssueById', () => {
     expect(result).toMatchObject({
       kind: 'ready',
       tracked_issue: {
-        blocked_by_truncated: true
+        blocked_by_truncated: false
       }
     });
-    expect(result.kind === 'ready' ? result.tracked_issue.blocked_by : []).toHaveLength(50);
+    expect(result.kind === 'ready' ? result.tracked_issue.blocked_by : []).toHaveLength(51);
   });
 
   it('fails closed when the exact issue falls outside the configured team scope', async () => {

@@ -21,6 +21,7 @@ import {
 
 const LINEAR_RECENT_ACTIVITY_LIMIT = 3;
 const LINEAR_BLOCKER_LIMIT = 50;
+const LINEAR_INVERSE_RELATION_MAX_PAGES = 20;
 const DEFAULT_LINEAR_TRACKED_ISSUE_PAGE_SIZE = 50;
 const LINEAR_FRESH_DISCOVERY_PRIORITY_BUCKETS = [1, 2, 3, 4, 0] as const;
 
@@ -328,7 +329,19 @@ export async function resolveLiveLinearTrackedIssueById(input: {
     return unavailable('dispatch_source_issue_not_found');
   }
 
-  const trackedIssue = parseTrackedIssue(issue, {
+  const hydratedIssue = await hydratePaginatedIssueInverseRelations({
+    issue,
+    env,
+    token,
+    timeoutMs,
+    fetchImpl,
+    source: 'dispatch_source_issue_by_id_inverse_relations'
+  });
+  if (!hydratedIssue.ok) {
+    return hydratedIssue.resolution;
+  }
+
+  const trackedIssue = parseTrackedIssue(hydratedIssue.issue, {
     workspaceId: sourceSetup?.workspace_id ?? workspaceId,
     viewerId: queryResult.payload.data?.viewer?.id?.trim() ?? null
   });
@@ -437,7 +450,18 @@ export async function resolveLiveLinearTrackedIssues(input: {
       : [];
     let stopScanning = false;
     for (const node of nodes) {
-      const trackedIssue = parseTrackedIssue(node ?? {}, {
+      const hydratedIssue = await hydratePaginatedIssueInverseRelations({
+        issue: node ?? {},
+        env,
+        token,
+        timeoutMs,
+        fetchImpl,
+        source: `${resolveTrackedIssuesQuerySource(queryMode)}_inverse_relations`
+      });
+      if (!hydratedIssue.ok) {
+        return hydratedIssue.resolution;
+      }
+      const trackedIssue = parseTrackedIssue(hydratedIssue.issue, {
         workspaceId: sourceSetup.workspace_id ?? workspaceId,
         viewerId: queryResult.payload.data?.viewer?.id?.trim() ?? null
       });
@@ -561,7 +585,18 @@ async function resolveFreshDiscoveryTrackedIssues(input: {
         : [];
       let stopScanning = false;
       for (const node of nodes) {
-        const trackedIssue = parseTrackedIssue(node ?? {}, {
+        const hydratedIssue = await hydratePaginatedIssueInverseRelations({
+          issue: node ?? {},
+          env: input.env,
+          token: input.token,
+          timeoutMs: input.timeoutMs,
+          fetchImpl: input.fetchImpl,
+          source: 'dispatch_source_fresh_discovery_inverse_relations'
+        });
+        if (!hydratedIssue.ok) {
+          return hydratedIssue.resolution;
+        }
+        const trackedIssue = parseTrackedIssue(hydratedIssue.issue, {
           workspaceId: input.sourceSetup.workspace_id ?? workspaceId,
           viewerId: queryResult.payload.data?.viewer?.id?.trim() ?? null
         });
@@ -778,6 +813,7 @@ function buildLinearTrackedIssuesQuery(
             }
             pageInfo {
               hasNextPage
+              endCursor
             }
           }
           relations(first: ${LINEAR_BLOCKER_LIMIT}) {
@@ -976,6 +1012,7 @@ function buildLinearIssueByIdQuery(issueId: string): {
           }
           pageInfo {
             hasNextPage
+            endCursor
           }
         }
         relations(first: ${LINEAR_BLOCKER_LIMIT}) {
@@ -1022,6 +1059,132 @@ function buildLinearIssueByIdQuery(issueId: string): {
     }`,
     variables: {
       issueId
+    }
+  };
+}
+
+function buildLinearIssueInverseRelationsPageQuery(issueId: string, afterCursor: string): {
+  query: string;
+  variables: Record<string, string>;
+} {
+  return {
+    query: `query ResolveLiveLinearIssueInverseRelationsPage($issueId: String!, $after: String!) {
+      issue(id: $issueId) {
+        id
+        inverseRelations(first: ${LINEAR_BLOCKER_LIMIT}, after: $after) {
+          nodes {
+            type
+            issue {
+              id
+              identifier
+              state {
+                name
+                type
+              }
+            }
+          }
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+        }
+      }
+    }`,
+    variables: {
+      issueId,
+      after: afterCursor
+    }
+  };
+}
+
+async function hydratePaginatedIssueInverseRelations(input: {
+  issue: LinearIssueNode;
+  env: NodeJS.ProcessEnv;
+  token: string;
+  timeoutMs: number;
+  fetchImpl: typeof fetch;
+  source: string;
+}): Promise<
+  | {
+      ok: true;
+      issue: LinearIssueNode;
+    }
+  | {
+      ok: false;
+      resolution: LiveLinearFailureResolution;
+    }
+> {
+  const connection = input.issue.inverseRelations;
+  if (connection?.pageInfo?.hasNextPage !== true) {
+    return {
+      ok: true,
+      issue: input.issue
+    };
+  }
+  const issueId = normalizeEnvValue(input.issue.id);
+  let afterCursor = normalizeEnvValue(connection.pageInfo.endCursor);
+  if (!issueId || !afterCursor || !Array.isArray(connection.nodes)) {
+    return {
+      ok: false,
+      resolution: malformed('dispatch_source_provider_response_invalid')
+    };
+  }
+
+  const nodes = [...connection.nodes];
+  let hasNextPage = true;
+  let pagesRead = 0;
+  while (hasNextPage && pagesRead < LINEAR_INVERSE_RELATION_MAX_PAGES) {
+    if (!afterCursor) {
+      return {
+        ok: false,
+        resolution: malformed('dispatch_source_provider_response_invalid')
+      };
+    }
+    const query = buildLinearIssueInverseRelationsPageQuery(issueId, afterCursor);
+    const queryResult = await executeLinearQuery({
+      env: input.env,
+      token: input.token,
+      timeoutMs: input.timeoutMs,
+      fetchImpl: input.fetchImpl,
+      source: input.source,
+      query: query.query,
+      variables: query.variables
+    });
+    if (!queryResult.ok) {
+      return queryResult;
+    }
+
+    const nextConnection = queryResult.payload.data?.issue?.inverseRelations ?? null;
+    if (!Array.isArray(nextConnection?.nodes)) {
+      return {
+        ok: false,
+        resolution: malformed('dispatch_source_provider_response_invalid')
+      };
+    }
+    nodes.push(...nextConnection.nodes);
+    hasNextPage = nextConnection.pageInfo?.hasNextPage === true;
+    afterCursor = normalizeEnvValue(nextConnection.pageInfo?.endCursor);
+    if (hasNextPage && !afterCursor) {
+      return {
+        ok: false,
+        resolution: malformed('dispatch_source_provider_response_invalid')
+      };
+    }
+    pagesRead += 1;
+  }
+
+  return {
+    ok: true,
+    issue: {
+      ...input.issue,
+      inverseRelations: {
+        nodes,
+        pageInfo: {
+          ...(input.issue.inverseRelations?.pageInfo ?? {}),
+          hasNextPage,
+          endCursor: afterCursor
+        }
+      }
     }
   };
 }
@@ -1293,13 +1456,7 @@ function extractTrackedIssueBlockers(issue: LinearIssueNode): LiveLinearTrackedB
 }
 
 function isTrackedIssueBlockerPageTruncated(issue: LinearIssueNode): boolean {
-  if (issue.inverseRelations?.pageInfo?.hasNextPage !== true || !Array.isArray(issue.inverseRelations.nodes)) {
-    return false;
-  }
-  const blockerCount = issue.inverseRelations.nodes.filter(
-    (node) => normalizeEnvValue(node.type)?.toLowerCase() === 'blocks' && node.issue
-  ).length;
-  return blockerCount >= LINEAR_BLOCKER_LIMIT;
+  return issue.inverseRelations?.pageInfo?.hasNextPage === true;
 }
 
 function extractTrackedIssueRelations(issue: LinearIssueNode): LiveLinearTrackedRelation[] {
