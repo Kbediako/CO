@@ -1148,13 +1148,6 @@ function collectTerminalBlockerAdvisories(
       }
       const canonicalOwnerHints = resolveCanonicalOwnerHints(issue);
       const duplicateHints = resolveDuplicateHints(issue);
-      if (
-        issue.relations_truncated === true &&
-        canonicalOwnerHints.length === 0 &&
-        duplicateHints.length === 0
-      ) {
-        return [];
-      }
       const recommendedAction =
         duplicateHints.length > 0 || canonicalOwnerHints.length > 0
           ? 'duplicate_cleanup'
@@ -1180,7 +1173,8 @@ function collectTerminalBlockerAdvisories(
           blockers,
           canonicalOwnerHints,
           duplicateHints,
-          recommendedAction
+          recommendedAction,
+          relationsTruncated: issue.relations_truncated === true
         })
       };
       return [advisory];
@@ -1257,6 +1251,7 @@ function buildTerminalBlockerAdvisorySummary(input: {
   canonicalOwnerHints: string[];
   duplicateHints: string[];
   recommendedAction: ProviderOperatorAutopilotTerminalBlockerAdvisoryRecord['recommended_action'];
+  relationsTruncated: boolean;
 }): string {
   const issueIdentifier = input.issue.identifier ?? input.issue.id;
   const action =
@@ -1269,6 +1264,9 @@ function buildTerminalBlockerAdvisorySummary(input: {
       : null,
     input.canonicalOwnerHints.length > 0
       ? `canonical owner hints=${input.canonicalOwnerHints.join(', ')}`
+      : null,
+    input.relationsTruncated
+      ? 'relation evidence may be truncated before duplicate hints are exhausted'
       : null
   ].filter((part): part is string => part !== null);
   const hintSuffix = hintParts.length > 0 ? `; ${hintParts.join('; ')}` : '';

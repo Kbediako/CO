@@ -431,7 +431,7 @@ describe('providerOperatorAutopilot', () => {
     expect(result.terminal_blocker_advisories).toEqual([]);
   });
 
-  it('does not surface ready-to-unblock terminal-blocker advisories when duplicate relations may be truncated', async () => {
+  it('surfaces ready-to-unblock terminal-blocker advisories when generic relations are truncated', async () => {
     const result = await runProviderOperatorAutopilot({
       tracked_issues: [
         createTrackedIssue({
@@ -455,8 +455,19 @@ describe('providerOperatorAutopilot', () => {
       previous_result: null
     });
 
-    expect(result.status).toBe('noop');
-    expect(result.terminal_blocker_advisories).toEqual([]);
+    expect(result.status).toBe('acted');
+    expect(result.terminal_blocker_advisories).toMatchObject([
+      {
+        issue_id: 'lin-issue-267',
+        issue_identifier: 'CO-267',
+        duplicate_hints: [],
+        canonical_owner_hints: [],
+        recommended_action: 'ready_to_unblock',
+        summary: expect.stringContaining(
+          'relation evidence may be truncated before duplicate hints are exhausted'
+        )
+      }
+    ]);
   });
 
   it.each([
