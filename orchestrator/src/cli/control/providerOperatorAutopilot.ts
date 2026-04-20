@@ -1195,10 +1195,7 @@ function collectTerminalBlockerAdvisories(
 function isTerminalBlocker(
   blocker: NonNullable<LiveLinearTrackedIssue['blocked_by']>[number]
 ): boolean {
-  return classifyProviderLinearWorkflowState({
-    state: blocker.state,
-    state_type: blocker.state_type
-  }).isTerminal;
+  return !providerLinearTodoBlockedByNonTerminal([blocker]);
 }
 
 function resolveCanonicalOwnerHints(issue: Pick<LiveLinearTrackedIssue, 'description'>): string[] {
