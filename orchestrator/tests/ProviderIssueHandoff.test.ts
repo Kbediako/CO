@@ -7415,6 +7415,69 @@ describe('createProviderIssueHandoffService', () => {
     });
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
+
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-foreign-queued',
+      issue_identifier: 'CO-1Q',
+      issue_title: 'Foreign queued retained worker',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: 'task-foreign-queued-pipeline',
+      state: 'handoff_failed',
+      reason: 'provider_issue_start_failed:foreign worker launch pending',
+      run_id: 'run-foreign-queued-pipeline',
+      run_manifest_path: foreignPaths.manifestPath
+    }));
+    const stateScopedLauncher = {
+      start: vi.fn(async () => ({
+        runId: 'run-ready-beside-foreign-queued',
+        manifestPath: '/tmp/provider-run/ready-beside-foreign-queued.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const stateScopedService = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher: stateScopedLauncher,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 2,
+          max_concurrent_agents_by_state: {
+            Ready: 1
+          }
+        }
+      })
+    });
+
+    const stateScopedResult = await stateScopedService.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-ready-beside-foreign-queued',
+        identifier: 'CO-2Q',
+        state: 'Ready',
+        state_type: 'unstarted',
+        updated_at: '2026-03-19T04:32:00.000Z'
+      }),
+      deliveryId: 'delivery-foreign-queued-state-scoped',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_320_000
+    });
+
+    expect(stateScopedResult).toMatchObject({
+      kind: 'start',
+      reason: 'provider_issue_start_launched',
+      claim: {
+        provider_key: 'linear:lin-issue-ready-beside-foreign-queued',
+        state: 'starting',
+        run_id: 'run-ready-beside-foreign-queued'
+      }
+    });
+    expect(stateScopedLauncher.start).toHaveBeenCalledTimes(1);
+    expect(stateScopedLauncher.resume).not.toHaveBeenCalled();
   });
 
   it('does not count released queued drains against direct admission capacity', async () => {

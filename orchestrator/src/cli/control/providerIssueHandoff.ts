@@ -1502,7 +1502,7 @@ export function createProviderIssueHandoffService(
         continue;
       }
       seededOccupancyKeys.add(occupancyKey);
-      gate.noteOccupied({ state: claimStateByProviderKey.get(providerKey) ?? null });
+      gate.noteOccupied({ state: claim?.issue_state ?? null });
     }
     const unreadableAdmissionOccupancy =
       await discoverUnreadableProviderAdmissionOccupancyForCurrentOperation();
