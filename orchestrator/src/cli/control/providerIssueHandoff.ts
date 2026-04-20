@@ -1436,13 +1436,17 @@ export function createProviderIssueHandoffService(
     const gate = createProviderPollDispatchBudget(options.readFeatureToggles?.() ?? null);
     const seededOccupancyKeys = new Set<string>();
     const discoveredRuns = await discoverProviderIssueRunsForCurrentOperation();
-    // Host-global admission must count every live provider worker, even when
+    // Host-global admission must count every live or queued provider worker, even when
     // claim attachment and issue ownership stay scoped to the current start pipeline.
     const activeDiscoveredRuns = discoveredRuns.filter((run) => run.status === 'in_progress');
-    const activeRunsByProviderIssue = groupProviderIssueRuns(activeDiscoveredRuns);
+    const queuedDiscoveredRuns = discoveredRuns.filter((run) => run.status === 'queued');
+    const occupyingDiscoveredRuns = [...activeDiscoveredRuns, ...queuedDiscoveredRuns];
+    const occupyingRunsByProviderIssue = groupProviderIssueRuns(occupyingDiscoveredRuns);
+    const claimByProviderKey = new Map<string, ProviderIntakeClaimRecord>();
     const claimStateByProviderKey = new Map<string, string | null>();
 
     for (const claim of options.state.claims) {
+      claimByProviderKey.set(claim.provider_key, claim);
       if (
         claim.state !== 'starting' &&
         claim.state !== 'resuming' &&
@@ -1450,17 +1454,16 @@ export function createProviderIssueHandoffService(
       ) {
         continue;
       }
-      claimStateByProviderKey.set(claim.provider_key, claim.issue_state ?? null);
-      const activeClaimRun =
+      const occupyingClaimRun =
         resolveProviderClaimRunIdentity(
           claim,
-          activeRunsByProviderIssue.get(claim.provider_key) ?? []
+          occupyingRunsByProviderIssue.get(claim.provider_key) ?? []
         ) ??
-        activeRunsByProviderIssue.get(claim.provider_key)?.[0] ??
+        occupyingRunsByProviderIssue.get(claim.provider_key)?.[0] ??
         null;
       const occupancyKey =
-        activeClaimRun?.manifestPath ??
-        activeClaimRun?.runId ??
+        occupyingClaimRun?.manifestPath ??
+        occupyingClaimRun?.runId ??
         (
           claim.state === 'running'
             ? null
@@ -1475,7 +1478,12 @@ export function createProviderIssueHandoffService(
         continue;
       }
       seededOccupancyKeys.add(occupancyKey);
-      gate.noteOccupied({ state: claim.issue_state ?? null });
+      const claimAdmissionState = resolveProviderClaimIssueStateForAdmission(
+        claim,
+        occupyingClaimRun
+      );
+      claimStateByProviderKey.set(claim.provider_key, claimAdmissionState);
+      gate.noteOccupied({ state: claimAdmissionState });
     }
 
     for (const run of activeDiscoveredRuns) {
@@ -1486,6 +1494,21 @@ export function createProviderIssueHandoffService(
       seededOccupancyKeys.add(occupancyKey);
       const providerKey = buildProviderIssueKey(run.provider, run.issueId);
       gate.noteOccupied({ state: claimStateByProviderKey.get(providerKey) ?? null });
+    }
+    for (const run of queuedDiscoveredRuns) {
+      const providerKey = buildProviderIssueKey(run.provider, run.issueId);
+      const claim = claimByProviderKey.get(providerKey) ?? null;
+      const occupancyKey = run.manifestPath || run.runId;
+      if (isReleasedProviderClaimRunIdentityMatch(claim, run)) {
+        continue;
+      }
+      if (seededOccupancyKeys.has(occupancyKey)) {
+        continue;
+      }
+      seededOccupancyKeys.add(occupancyKey);
+      gate.noteOccupied({
+        state: resolveProviderClaimIssueStateForAdmission(claim, run)
+      });
     }
     const unreadableAdmissionOccupancy =
       await discoverUnreadableProviderAdmissionOccupancyForCurrentOperation();
@@ -4204,6 +4227,22 @@ export function createProviderIssueHandoffService(
           refreshCounts.occupied_slots += 1;
           pollDispatchBudget.noteOccupied(trackedIssue);
         };
+        const noteOccupiedPollDispatchSlotForRetainedClaim = (
+          claim: Pick<ProviderIntakeClaimRecord, 'state' | 'retry_queued' | 'run_id' | 'run_manifest_path'>,
+          run: ProviderIssueRunRecord | null,
+          providerKey: string,
+          trackedIssue: Pick<LiveLinearTrackedIssue, 'state'>
+        ): void => {
+          if (!shouldRetainedProviderClaimOccupyPollDispatchSlot(claim, run)) {
+            occupiedPollDispatchProviderKeys.add(providerKey);
+            return;
+          }
+          noteOccupiedPollDispatchSlot(
+            resolveClaimPollDispatchSlotKey(providerKey, claim, run),
+            providerKey,
+            trackedIssue
+          );
+        };
         const releaseOccupiedPollDispatchSlot = (occupancyKey: string | null): void => {
           if (!occupancyKey) {
             return;
@@ -4232,13 +4271,22 @@ export function createProviderIssueHandoffService(
           pollDispatchBudget.releaseOccupied(trackedIssue);
         };
 
-        // Host-global capacity must count every live provider worker before a
-        // refresh cycle spends retained-claim reads or starts fresh work.
+        // Host-global capacity must count every live or queued provider worker
+        // before a refresh cycle spends retained-claim reads or starts fresh work.
         const activeDiscoveredRuns = discoveredRuns.filter((run) => run.status === 'in_progress');
-        const activeRunsByProviderIssue = groupProviderIssueRuns(activeDiscoveredRuns);
+        const queuedDiscoveredRuns = discoveredRuns.filter((run) => run.status === 'queued');
+        const occupyingRunsByProviderIssue = groupProviderIssueRuns([
+          ...activeDiscoveredRuns,
+          ...queuedDiscoveredRuns
+        ]);
+        const claimByProviderKey = new Map<string, ProviderIntakeClaimRecord>();
         const claimStateByProviderKey = new Map<string, string | null>();
         for (const claim of options.state.claims) {
-          claimStateByProviderKey.set(claim.provider_key, claim.issue_state ?? null);
+          claimByProviderKey.set(claim.provider_key, claim);
+          claimStateByProviderKey.set(
+            claim.provider_key,
+            resolveProviderClaimIssueStateForAdmission(claim)
+          );
         }
         const seededPollOccupancyKeys = new Set<string>();
         for (const claim of options.state.claims) {
@@ -4246,9 +4294,9 @@ export function createProviderIssueHandoffService(
             continue;
           }
           const claimProviderKey = buildProviderIssueKey(claim.provider, claim.issue_id);
-          const claimRuns = activeRunsByProviderIssue.get(claimProviderKey) ?? [];
-          const activeRun = resolveProviderClaimRunIdentity(claim, claimRuns) ?? claimRuns[0] ?? null;
-          const occupancyKey = resolveClaimPollDispatchSlotKey(claimProviderKey, claim, activeRun);
+          const claimRuns = occupyingRunsByProviderIssue.get(claimProviderKey) ?? [];
+          const occupyingRun = resolveProviderClaimRunIdentity(claim, claimRuns) ?? claimRuns[0] ?? null;
+          const occupancyKey = resolveClaimPollDispatchSlotKey(claimProviderKey, claim, occupyingRun);
           if (!occupancyKey) {
             continue;
           }
@@ -4256,10 +4304,15 @@ export function createProviderIssueHandoffService(
             continue;
           }
           seededPollOccupancyKeys.add(occupancyKey);
+          const claimAdmissionState = resolveProviderClaimIssueStateForAdmission(
+            claim,
+            occupyingRun
+          );
+          claimStateByProviderKey.set(claimProviderKey, claimAdmissionState);
           noteOccupiedPollDispatchSlot(
             occupancyKey,
             claimProviderKey,
-            trackedIssuesByKey?.get(claimProviderKey) ?? { state: claim.issue_state ?? null }
+            trackedIssuesByKey?.get(claimProviderKey) ?? { state: claimAdmissionState }
           );
         }
 
@@ -4273,7 +4326,31 @@ export function createProviderIssueHandoffService(
           noteOccupiedPollDispatchSlot(
             occupancyKey,
             providerKey,
-            trackedIssuesByKey?.get(providerKey) ?? { state: claimStateByProviderKey.get(providerKey) ?? null }
+            trackedIssuesByKey?.get(providerKey) ?? {
+              state: resolveProviderClaimIssueStateForAdmission(
+                claimByProviderKey.get(providerKey) ?? null,
+                run
+              )
+            }
+          );
+        }
+        for (const run of queuedDiscoveredRuns) {
+          const providerKey = buildProviderIssueKey(run.provider, run.issueId);
+          const claim = claimByProviderKey.get(providerKey) ?? null;
+          const occupancyKey = resolveProviderPollRunOccupancyKey(run);
+          if (isReleasedProviderClaimRunIdentityMatch(claim, run)) {
+            continue;
+          }
+          if (seededPollOccupancyKeys.has(occupancyKey)) {
+            continue;
+          }
+          seededPollOccupancyKeys.add(occupancyKey);
+          noteOccupiedPollDispatchSlot(
+            occupancyKey,
+            providerKey,
+            trackedIssuesByKey?.get(providerKey) ?? {
+              state: resolveProviderClaimIssueStateForAdmission(claim, run)
+            }
           );
         }
         const unreadableAdmissionOccupancy =
@@ -4608,8 +4685,9 @@ export function createProviderIssueHandoffService(
                 latestRun: reviewPromotionRun
               });
               if (reviewPromotionClaim) {
-                noteOccupiedPollDispatchSlot(
-                  resolveClaimPollDispatchSlotKey(claimProviderKey, reviewPromotionClaim, reviewPromotionRun),
+                noteOccupiedPollDispatchSlotForRetainedClaim(
+                  reviewPromotionClaim,
+                  reviewPromotionRun,
                   claimProviderKey,
                   resolution.trackedIssue
                 );
@@ -4793,8 +4871,9 @@ export function createProviderIssueHandoffService(
                 latestRun
               });
               if (reviewPromotionClaim) {
-                noteOccupiedPollDispatchSlot(
-                  resolveClaimPollDispatchSlotKey(claimProviderKey, reviewPromotionClaim, latestRun),
+                noteOccupiedPollDispatchSlotForRetainedClaim(
+                  reviewPromotionClaim,
+                  latestRun,
                   claimProviderKey,
                   resolution.trackedIssue
                 );
@@ -4806,8 +4885,9 @@ export function createProviderIssueHandoffService(
                 latestRun
               });
               if (mergeCloseoutClaim) {
-                noteOccupiedPollDispatchSlot(
-                  resolveClaimPollDispatchSlotKey(claimProviderKey, mergeCloseoutClaim, latestRun),
+                noteOccupiedPollDispatchSlotForRetainedClaim(
+                  mergeCloseoutClaim,
+                  latestRun,
                   claimProviderKey,
                   resolution.trackedIssue
                 );
@@ -4822,8 +4902,9 @@ export function createProviderIssueHandoffService(
               state: currentClaim.state,
               reason: 'provider_issue_handoff_owned'
             });
-            noteOccupiedPollDispatchSlot(
-              resolveClaimPollDispatchSlotKey(claimProviderKey, currentClaim, ownedRun),
+            noteOccupiedPollDispatchSlotForRetainedClaim(
+              currentClaim,
+              ownedRun,
               claimProviderKey,
               resolution.trackedIssue
             );
@@ -4936,8 +5017,9 @@ export function createProviderIssueHandoffService(
               latestRun
             });
             if (mergeCloseoutClaim) {
-              noteOccupiedPollDispatchSlot(
-                resolveClaimPollDispatchSlotKey(claimProviderKey, mergeCloseoutClaim, latestRun),
+              noteOccupiedPollDispatchSlotForRetainedClaim(
+                mergeCloseoutClaim,
+                latestRun,
                 claimProviderKey,
                 resolution.trackedIssue
               );
@@ -4947,6 +5029,15 @@ export function createProviderIssueHandoffService(
           if (currentClaim.retry_queued === true) {
             noteOccupiedPollDispatchSlot(
               resolveClaimPollDispatchSlotKey(claimProviderKey, currentClaim, latestRun),
+              claimProviderKey,
+              resolution.trackedIssue
+            );
+            continue;
+          }
+          if (latestRun?.status === 'queued') {
+            noteOccupiedPollDispatchSlotForRetainedClaim(
+              currentClaim,
+              latestRun,
               claimProviderKey,
               resolution.trackedIssue
             );
@@ -6267,6 +6358,72 @@ function shouldProviderClaimOccupyPollDispatchSlot(
   claim: Pick<ProviderIntakeClaimRecord, 'state'>
 ): boolean {
   return claim.state === 'starting' || claim.state === 'resuming' || claim.state === 'running';
+}
+
+function shouldRetainedProviderClaimOccupyPollDispatchSlot(
+  claim: Pick<ProviderIntakeClaimRecord, 'state' | 'retry_queued'>,
+  run: Pick<ProviderIssueRunRecord, 'status'> | null
+): boolean {
+  if (run?.status === 'in_progress' || run?.status === 'queued') {
+    return true;
+  }
+  if (claim.retry_queued === true) {
+    return true;
+  }
+  return shouldProviderClaimOccupyPollDispatchSlot(claim);
+}
+
+function resolveProviderClaimIssueStateForAdmission(
+  claim: Pick<ProviderIntakeClaimRecord, 'state' | 'issue_state' | 'issue_state_type'> | null,
+  run: Pick<ProviderIssueRunRecord, 'status'> | null = null
+): string | null {
+  if (!claim) {
+    return null;
+  }
+  if (run?.status === 'queued' && !shouldUseQueuedClaimIssueStateForAdmission(claim)) {
+    return null;
+  }
+  if (
+    isTerminalTrackedIssueState(
+      normalizeProviderLinearWorkflowState(claim.issue_state),
+      normalizeProviderLinearWorkflowState(claim.issue_state_type)
+    )
+  ) {
+    return null;
+  }
+  return claim.issue_state ?? null;
+}
+
+function isReleasedProviderClaimRunIdentityMatch(
+  claim: Pick<ProviderIntakeClaimRecord, 'state' | 'run_id' | 'run_manifest_path'> | null,
+  run: Pick<ProviderIssueRunRecord, 'runId' | 'manifestPath'>
+): boolean {
+  if (claim?.state !== 'released') {
+    return false;
+  }
+  return (
+    (claim.run_manifest_path !== null && claim.run_manifest_path === run.manifestPath) ||
+    (claim.run_id !== null && claim.run_id === run.runId)
+  );
+}
+
+function shouldUseQueuedClaimIssueStateForAdmission(
+  claim: Pick<ProviderIntakeClaimRecord, 'state' | 'issue_state' | 'issue_state_type'>
+): boolean {
+  const canReuseRetainedQueuedState =
+    claim.state === 'accepted' ||
+    claim.state === 'starting' ||
+    claim.state === 'running' ||
+    claim.state === 'resuming' ||
+    claim.state === 'resumable' ||
+    claim.state === 'handoff_failed';
+  if (!canReuseRetainedQueuedState) {
+    return false;
+  }
+  return !isTerminalTrackedIssueState(
+    normalizeProviderLinearWorkflowState(claim.issue_state),
+    normalizeProviderLinearWorkflowState(claim.issue_state_type)
+  );
 }
 
 function resolveProviderPollRunOccupancyKey(
