@@ -1502,7 +1502,12 @@ export function createProviderIssueHandoffService(
         continue;
       }
       seededOccupancyKeys.add(occupancyKey);
-      gate.noteOccupied({ state: claim?.issue_state ?? null });
+      gate.noteOccupied({
+        state:
+          claim && shouldUseQueuedClaimIssueStateForAdmission(claim)
+            ? claim.issue_state ?? null
+            : null
+      });
     }
     const unreadableAdmissionOccupancy =
       await discoverUnreadableProviderAdmissionOccupancyForCurrentOperation();
@@ -6350,6 +6355,25 @@ function shouldRetainedProviderClaimOccupyPollDispatchSlot(
     return true;
   }
   return shouldProviderClaimOccupyPollDispatchSlot(claim);
+}
+
+function shouldUseQueuedClaimIssueStateForAdmission(
+  claim: Pick<ProviderIntakeClaimRecord, 'state' | 'issue_state' | 'issue_state_type'>
+): boolean {
+  const canReuseRetainedQueuedState =
+    claim.state === 'accepted' ||
+    claim.state === 'starting' ||
+    claim.state === 'running' ||
+    claim.state === 'resuming' ||
+    claim.state === 'resumable' ||
+    claim.state === 'handoff_failed';
+  if (!canReuseRetainedQueuedState) {
+    return false;
+  }
+  return !isTerminalTrackedIssueState(
+    normalizeProviderLinearWorkflowState(claim.issue_state),
+    normalizeProviderLinearWorkflowState(claim.issue_state_type)
+  );
 }
 
 function resolveProviderPollRunOccupancyKey(
