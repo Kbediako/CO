@@ -1222,7 +1222,7 @@ function parseTrackedIssue(
     created_at: normalizeIso(issue.createdAt),
     updated_at: normalizeIso(issue.updatedAt),
     blocked_by: extractTrackedIssueBlockers(issue),
-    blocked_by_truncated: issue.inverseRelations?.pageInfo?.hasNextPage === true,
+    blocked_by_truncated: isTrackedIssueBlockerPageTruncated(issue),
     relations: extractTrackedIssueRelations(issue),
     relations_truncated: issue.relations?.pageInfo?.hasNextPage === true,
     recent_activity: Array.isArray(issue.history?.nodes)
@@ -1290,6 +1290,16 @@ function extractTrackedIssueBlockers(issue: LinearIssueNode): LiveLinearTrackedB
       }
     ];
   });
+}
+
+function isTrackedIssueBlockerPageTruncated(issue: LinearIssueNode): boolean {
+  if (issue.inverseRelations?.pageInfo?.hasNextPage !== true || !Array.isArray(issue.inverseRelations.nodes)) {
+    return false;
+  }
+  const blockerCount = issue.inverseRelations.nodes.filter(
+    (node) => normalizeEnvValue(node.type)?.toLowerCase() === 'blocks' && node.issue
+  ).length;
+  return blockerCount >= LINEAR_BLOCKER_LIMIT;
 }
 
 function extractTrackedIssueRelations(issue: LinearIssueNode): LiveLinearTrackedRelation[] {

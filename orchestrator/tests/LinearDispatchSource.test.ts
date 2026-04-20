@@ -266,7 +266,7 @@ describe('resolveLiveLinearTrackedIssueById', () => {
             state_type: 'completed'
           }
         ],
-        blocked_by_truncated: true,
+        blocked_by_truncated: false,
         relations_truncated: true,
         relations: [
           {
@@ -304,6 +304,71 @@ describe('resolveLiveLinearTrackedIssueById', () => {
         project_name: 'Icon Agency (Bookings)'
       }
     });
+  });
+
+  it('marks blocker truncation only when the fetched inbound page is saturated with blockers', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async () =>
+      jsonResponse({
+        data: {
+          viewer: {
+            organization: {
+              id: 'lin-workspace-1'
+            }
+          },
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'PREPROD-101',
+            title: 'Investigate advisory routing',
+            updatedAt: '2026-03-06T02:00:00.000Z',
+            inverseRelations: {
+              nodes: Array.from({ length: 50 }, (_unused, index) => ({
+                type: 'blocks',
+                issue: {
+                  id: `lin-blocker-${index}`,
+                  identifier: `PREPROD-${index}`,
+                  state: {
+                    name: 'Done',
+                    type: 'completed'
+                  }
+                }
+              })),
+              pageInfo: {
+                hasNextPage: true
+              }
+            },
+            relations: {
+              nodes: [],
+              pageInfo: {
+                hasNextPage: false
+              }
+            },
+            history: {
+              nodes: []
+            }
+          }
+        }
+      })
+    );
+
+    const result = await resolveLiveLinearTrackedIssueById({
+      issueId: 'lin-issue-1',
+      sourceSetup: {
+        provider: 'linear',
+        workspace_id: 'lin-workspace-1'
+      },
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toMatchObject({
+      kind: 'ready',
+      tracked_issue: {
+        blocked_by_truncated: true
+      }
+    });
+    expect(result.kind === 'ready' ? result.tracked_issue.blocked_by : []).toHaveLength(50);
   });
 
   it('fails closed when the exact issue falls outside the configured team scope', async () => {
