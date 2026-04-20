@@ -376,6 +376,34 @@ describe('providerOperatorAutopilot', () => {
     expect(result.terminal_blocker_advisories).toEqual([]);
   });
 
+  it('does not surface Blocked terminal-blocker advisories when blocker relations are truncated', async () => {
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createTrackedIssue({
+          id: 'lin-issue-267',
+          identifier: 'CO-267',
+          state: 'Blocked',
+          state_type: 'started',
+          blocked_by_truncated: true,
+          blocked_by: [
+            {
+              id: 'lin-issue-254',
+              identifier: 'CO-254',
+              state: 'Done',
+              state_type: 'completed'
+            }
+          ]
+        })
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    });
+
+    expect(result.status).toBe('noop');
+    expect(result.terminal_blocker_advisories).toEqual([]);
+  });
+
   it.each([
     {
       label: 'archived-only',
@@ -4955,6 +4983,7 @@ function createTrackedIssue(
     created_at: overrides.created_at ?? '2026-04-09T09:00:00.000Z',
     updated_at: overrides.updated_at ?? '2026-04-09T09:00:00.000Z',
     blocked_by: overrides.blocked_by ?? [],
+    blocked_by_truncated: overrides.blocked_by_truncated ?? false,
     relations: overrides.relations ?? [],
     recent_activity: overrides.recent_activity ?? []
   };

@@ -185,7 +185,10 @@ describe('resolveLiveLinearTrackedIssueById', () => {
                     }
                   }
                 }
-              ]
+              ],
+              pageInfo: {
+                hasNextPage: true
+              }
             },
             relations: {
               nodes: [
@@ -200,7 +203,10 @@ describe('resolveLiveLinearTrackedIssueById', () => {
                     }
                   }
                 }
-              ]
+              ],
+              pageInfo: {
+                hasNextPage: false
+              }
             },
             history: {
               nodes: [
@@ -260,6 +266,7 @@ describe('resolveLiveLinearTrackedIssueById', () => {
             state_type: 'completed'
           }
         ],
+        blocked_by_truncated: true,
         relations: [
           {
             direction: 'outbound',

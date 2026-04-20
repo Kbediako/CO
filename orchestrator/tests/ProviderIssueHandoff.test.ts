@@ -20293,7 +20293,7 @@ describe('createProviderIssueHandoffService', () => {
     );
   });
 
-  it('clears stale pending rollout actions from failed operator autopilot fallback when rollout is disabled', async () => {
+  it('clears stale pending rollout actions and terminal-blocker advisories from failed operator autopilot fallback when rollout is disabled', async () => {
     const { paths } = await createHostPaths();
     const trackedIssue = createTrackedIssue();
     const state = createProviderIntakeState();
@@ -20542,15 +20542,7 @@ describe('createProviderIssueHandoffService', () => {
       expect.objectContaining({
         status: 'failed',
         pending_actions: [],
-        terminal_blocker_advisories: [
-          expect.objectContaining({
-            issue_identifier: 'CO-253',
-            recommended_action: 'duplicate_cleanup',
-            canonical_owner_hints: [
-              'codex-orchestrator:canonical-owner-key=blocked-terminal-blocker-cleanup-advisory'
-            ]
-          })
-        ]
+        terminal_blocker_advisories: []
       })
     );
   });

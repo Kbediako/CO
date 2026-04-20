@@ -68,6 +68,7 @@ export interface LiveLinearTrackedIssue {
   created_at?: string | null;
   updated_at: string | null;
   blocked_by?: LiveLinearTrackedBlocker[];
+  blocked_by_truncated?: boolean;
   relations?: LiveLinearTrackedRelation[];
   recent_activity: LiveLinearTrackedActivity[];
 }
@@ -164,13 +165,22 @@ interface LinearIssueNode {
   } | null;
   inverseRelations?: {
     nodes?: LinearIssueInverseRelationNode[] | null;
+    pageInfo?: LinearConnectionPageInfo | null;
   } | null;
   relations?: {
     nodes?: LinearIssueInverseRelationNode[] | null;
+    pageInfo?: LinearConnectionPageInfo | null;
   } | null;
   history?: {
     nodes?: LinearIssueHistoryNode[] | null;
   } | null;
+}
+
+interface LinearConnectionPageInfo {
+  hasNextPage?: boolean | null;
+  endCursor?: string | null;
+  hasPreviousPage?: boolean | null;
+  startCursor?: string | null;
 }
 
 interface LinearIssueInverseRelationNode {
@@ -765,6 +775,9 @@ function buildLinearTrackedIssuesQuery(
                 }
               }
             }
+            pageInfo {
+              hasNextPage
+            }
           }
           relations(first: ${LINEAR_BLOCKER_LIMIT}) {
             nodes {
@@ -777,6 +790,9 @@ function buildLinearTrackedIssuesQuery(
                   type
                 }
               }
+            }
+            pageInfo {
+              hasNextPage
             }
           }
           ${
@@ -957,6 +973,9 @@ function buildLinearIssueByIdQuery(issueId: string): {
               }
             }
           }
+          pageInfo {
+            hasNextPage
+          }
         }
         relations(first: ${LINEAR_BLOCKER_LIMIT}) {
           nodes {
@@ -969,6 +988,9 @@ function buildLinearIssueByIdQuery(issueId: string): {
                 type
               }
             }
+          }
+          pageInfo {
+            hasNextPage
           }
         }
         history(first: ${LINEAR_RECENT_ACTIVITY_LIMIT}) {
@@ -1199,6 +1221,7 @@ function parseTrackedIssue(
     created_at: normalizeIso(issue.createdAt),
     updated_at: normalizeIso(issue.updatedAt),
     blocked_by: extractTrackedIssueBlockers(issue),
+    blocked_by_truncated: issue.inverseRelations?.pageInfo?.hasNextPage === true,
     relations: extractTrackedIssueRelations(issue),
     recent_activity: Array.isArray(issue.history?.nodes)
       ? issue.history.nodes

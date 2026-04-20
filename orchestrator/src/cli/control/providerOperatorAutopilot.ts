@@ -1139,6 +1139,9 @@ function collectTerminalBlockerAdvisories(
       if (!isProviderLinearTrackedIssueMutable(issue)) {
         return [];
       }
+      if (issue.blocked_by_truncated === true) {
+        return [];
+      }
       const blockers = issue.blocked_by ?? [];
       if (blockers.length === 0 || !blockers.every(isTerminalBlocker)) {
         return [];
