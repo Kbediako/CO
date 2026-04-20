@@ -1454,7 +1454,6 @@ export function createProviderIssueHandoffService(
       ) {
         continue;
       }
-      claimStateByProviderKey.set(claim.provider_key, claim.issue_state ?? null);
       const occupyingClaimRun =
         resolveProviderClaimRunIdentity(
           claim,
@@ -1479,7 +1478,12 @@ export function createProviderIssueHandoffService(
         continue;
       }
       seededOccupancyKeys.add(occupancyKey);
-      gate.noteOccupied({ state: claim.issue_state ?? null });
+      const claimAdmissionState = resolveProviderClaimIssueStateForAdmission(
+        claim,
+        occupyingClaimRun
+      );
+      claimStateByProviderKey.set(claim.provider_key, claimAdmissionState);
+      gate.noteOccupied({ state: claimAdmissionState });
     }
 
     for (const run of activeDiscoveredRuns) {
@@ -1503,10 +1507,7 @@ export function createProviderIssueHandoffService(
       }
       seededOccupancyKeys.add(occupancyKey);
       gate.noteOccupied({
-        state:
-          claim && shouldUseQueuedClaimIssueStateForAdmission(claim)
-            ? claim.issue_state ?? null
-            : null
+        state: resolveProviderClaimIssueStateForAdmission(claim, run)
       });
     }
     const unreadableAdmissionOccupancy =
@@ -4282,7 +4283,10 @@ export function createProviderIssueHandoffService(
         const claimStateByProviderKey = new Map<string, string | null>();
         for (const claim of options.state.claims) {
           claimByProviderKey.set(claim.provider_key, claim);
-          claimStateByProviderKey.set(claim.provider_key, claim.issue_state ?? null);
+          claimStateByProviderKey.set(
+            claim.provider_key,
+            resolveProviderClaimIssueStateForAdmission(claim)
+          );
         }
         const seededPollOccupancyKeys = new Set<string>();
         for (const claim of options.state.claims) {
@@ -4300,10 +4304,15 @@ export function createProviderIssueHandoffService(
             continue;
           }
           seededPollOccupancyKeys.add(occupancyKey);
+          const claimAdmissionState = resolveProviderClaimIssueStateForAdmission(
+            claim,
+            occupyingRun
+          );
+          claimStateByProviderKey.set(claimProviderKey, claimAdmissionState);
           noteOccupiedPollDispatchSlot(
             occupancyKey,
             claimProviderKey,
-            trackedIssuesByKey?.get(claimProviderKey) ?? { state: claim.issue_state ?? null }
+            trackedIssuesByKey?.get(claimProviderKey) ?? { state: claimAdmissionState }
           );
         }
 
@@ -4317,7 +4326,12 @@ export function createProviderIssueHandoffService(
           noteOccupiedPollDispatchSlot(
             occupancyKey,
             providerKey,
-            trackedIssuesByKey?.get(providerKey) ?? { state: claimStateByProviderKey.get(providerKey) ?? null }
+            trackedIssuesByKey?.get(providerKey) ?? {
+              state: resolveProviderClaimIssueStateForAdmission(
+                claimByProviderKey.get(providerKey) ?? null,
+                run
+              )
+            }
           );
         }
         for (const run of queuedDiscoveredRuns) {
@@ -4334,7 +4348,9 @@ export function createProviderIssueHandoffService(
           noteOccupiedPollDispatchSlot(
             occupancyKey,
             providerKey,
-            trackedIssuesByKey?.get(providerKey) ?? { state: claimStateByProviderKey.get(providerKey) ?? null }
+            trackedIssuesByKey?.get(providerKey) ?? {
+              state: resolveProviderClaimIssueStateForAdmission(claim, run)
+            }
           );
         }
         const unreadableAdmissionOccupancy =
@@ -6355,6 +6371,27 @@ function shouldRetainedProviderClaimOccupyPollDispatchSlot(
     return true;
   }
   return shouldProviderClaimOccupyPollDispatchSlot(claim);
+}
+
+function resolveProviderClaimIssueStateForAdmission(
+  claim: Pick<ProviderIntakeClaimRecord, 'state' | 'issue_state' | 'issue_state_type'> | null,
+  run: Pick<ProviderIssueRunRecord, 'status'> | null = null
+): string | null {
+  if (!claim) {
+    return null;
+  }
+  if (run?.status === 'queued' && !shouldUseQueuedClaimIssueStateForAdmission(claim)) {
+    return null;
+  }
+  if (
+    isTerminalTrackedIssueState(
+      normalizeProviderLinearWorkflowState(claim.issue_state),
+      normalizeProviderLinearWorkflowState(claim.issue_state_type)
+    )
+  ) {
+    return null;
+  }
+  return claim.issue_state ?? null;
 }
 
 function shouldUseQueuedClaimIssueStateForAdmission(
