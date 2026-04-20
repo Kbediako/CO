@@ -5,7 +5,7 @@ relates_to: docs/PRD-coordinator-live-provider-child-run-task-identity-and-deleg
 risk: high
 owners:
   - Codex
-last_review: 2026-04-20
+last_review: 2026-03-20
 dependencies:
   - docs/findings/1305-live-provider-child-run-task-identity-and-delegation-guard-contract-alignment-deliberation.md
   - docs/ACTION_PLAN-coordinator-live-provider-child-run-task-identity-and-delegation-guard-contract-alignment.md

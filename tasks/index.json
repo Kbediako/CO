@@ -5385,7 +5385,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-20",
+      "last_review": "2026-03-20",
       "paths": {
         "spec": "tasks/specs/1309-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md",
         "task": "tasks/tasks-1309-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md",
@@ -5401,7 +5401,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-20",
+      "last_review": "2026-03-20",
       "paths": {
         "spec": "tasks/specs/1308-coordinator-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up.md",
         "task": "tasks/tasks-1308-coordinator-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up.md",
@@ -5417,7 +5417,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-20",
+      "last_review": "2026-03-20",
       "paths": {
         "spec": "tasks/specs/1307-coordinator-live-provider-child-run-test-stage-terminal-completion-follow-up.md",
         "task": "tasks/tasks-1307-coordinator-live-provider-child-run-test-stage-terminal-completion-follow-up.md",
@@ -5433,7 +5433,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-20",
+      "last_review": "2026-03-20",
       "paths": {
         "spec": "tasks/specs/1306-coordinator-live-provider-child-run-test-stage-regression-follow-up.md",
         "task": "tasks/tasks-1306-coordinator-live-provider-child-run-test-stage-regression-follow-up.md",
@@ -5449,7 +5449,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-20",
+      "last_review": "2026-03-20",
       "paths": {
         "spec": "tasks/specs/1305-coordinator-live-provider-child-run-task-identity-and-delegation-guard-contract-alignment.md",
         "task": "tasks/tasks-1305-coordinator-live-provider-child-run-task-identity-and-delegation-guard-contract-alignment.md",
