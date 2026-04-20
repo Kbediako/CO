@@ -5510,6 +5510,94 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('keeps foreign queued workers occupying global capacity when a local released claim points at a different run', async () => {
+    const { root, paths } = await createHostPaths();
+    const runPaths = resolveRunPaths(
+      {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'task-foreign-queued-after-release'
+      },
+      'run-foreign-queued-after-release'
+    );
+    await mkdir(runPaths.runDir, { recursive: true });
+    await writeFile(
+      runPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-foreign-queued-after-release',
+        task_id: 'task-foreign-queued-after-release',
+        pipeline_id: 'other-provider-pipeline',
+        status: 'queued',
+        issue_provider: 'linear',
+        issue_id: 'lin-released-local-foreign-queued',
+        issue_identifier: 'CO-266',
+        issue_updated_at: '2026-04-20T03:30:00.000Z',
+        updated_at: '2026-04-20T03:31:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-released-local-foreign-queued',
+      issue_identifier: 'CO-266',
+      issue_title: 'Released local claim with foreign queued worker',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-20T03:25:00.000Z',
+      task_id: 'task-local-released-drain',
+      state: 'released',
+      reason: 'provider_issue_released_pending_reopen:provider_issue_released:not_active',
+      run_id: 'run-local-released-drain',
+      run_manifest_path: '/tmp/provider-run/local-released-drain.json'
+    }));
+
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-ready-after-foreign-queued-release',
+        manifestPath: '/tmp/provider-run/ready-after-foreign-queued-release-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const refetchTrackedIssues = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-ready-after-foreign-queued-release',
+          identifier: 'CO-267',
+          title: 'Ready after foreign queued release mismatch',
+          state: 'Ready',
+          state_type: 'unstarted',
+          updated_at: '2026-04-20T03:32:00.000Z'
+        })
+      ]
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(refetchTrackedIssues).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
   it('does not double-count a queued run for a manifestless inflight retained claim', async () => {
     const { root, paths } = await createHostPaths();
     const runPaths = resolveRunPaths(
@@ -7563,6 +7651,91 @@ describe('createProviderIssueHandoffService', () => {
       }
     });
     expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
+  it('counts queued workers against direct admission when a local released claim points at a different run', async () => {
+    const { root, paths } = await createHostPaths();
+    const foreignEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-direct-foreign-queued-after-release'
+    };
+    const foreignPaths = resolveRunPaths(foreignEnv, 'run-direct-foreign-queued-after-release');
+    await mkdir(foreignPaths.runDir, { recursive: true });
+    await writeFile(
+      foreignPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-direct-foreign-queued-after-release',
+        task_id: 'task-direct-foreign-queued-after-release',
+        status: 'queued',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-released-foreign-queued',
+        issue_identifier: 'CO-1F',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-released-foreign-queued',
+      issue_identifier: 'CO-1F',
+      issue_title: 'Released local claim with foreign queued worker',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: 'task-direct-local-released-drain',
+      state: 'released',
+      reason: 'provider_issue_released_pending_reopen:provider_issue_released:not_active',
+      run_id: 'run-direct-local-released-drain',
+      run_manifest_path: '/tmp/provider-run/direct-local-released-drain.json'
+    }));
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-fresh-after-foreign-queued-release',
+        manifestPath: '/tmp/provider-run/fresh-after-foreign-queued-release.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-fresh',
+        identifier: 'CO-2',
+        updated_at: '2026-03-19T04:32:00.000Z'
+      }),
+      deliveryId: 'delivery-after-foreign-queued-release-mismatch',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_320_000
+    });
+
+    expect(result).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_start_blocked:max_concurrency',
+      claim: {
+        provider_key: 'linear:lin-issue-fresh',
+        state: 'accepted',
+        reason: 'provider_issue_start_blocked:max_concurrency'
+      }
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
   });
 

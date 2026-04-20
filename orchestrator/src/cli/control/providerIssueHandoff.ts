@@ -1498,10 +1498,10 @@ export function createProviderIssueHandoffService(
     for (const run of queuedDiscoveredRuns) {
       const providerKey = buildProviderIssueKey(run.provider, run.issueId);
       const claim = claimByProviderKey.get(providerKey) ?? null;
-      if (claim?.state === 'released') {
+      const occupancyKey = run.manifestPath || run.runId;
+      if (isReleasedProviderClaimRunIdentityMatch(claim, run)) {
         continue;
       }
-      const occupancyKey = run.manifestPath || run.runId;
       if (seededOccupancyKeys.has(occupancyKey)) {
         continue;
       }
@@ -4337,10 +4337,10 @@ export function createProviderIssueHandoffService(
         for (const run of queuedDiscoveredRuns) {
           const providerKey = buildProviderIssueKey(run.provider, run.issueId);
           const claim = claimByProviderKey.get(providerKey) ?? null;
-          if (claim?.state === 'released') {
+          const occupancyKey = resolveProviderPollRunOccupancyKey(run);
+          if (isReleasedProviderClaimRunIdentityMatch(claim, run)) {
             continue;
           }
-          const occupancyKey = resolveProviderPollRunOccupancyKey(run);
           if (seededPollOccupancyKeys.has(occupancyKey)) {
             continue;
           }
@@ -6392,6 +6392,19 @@ function resolveProviderClaimIssueStateForAdmission(
     return null;
   }
   return claim.issue_state ?? null;
+}
+
+function isReleasedProviderClaimRunIdentityMatch(
+  claim: Pick<ProviderIntakeClaimRecord, 'state' | 'run_id' | 'run_manifest_path'> | null,
+  run: Pick<ProviderIssueRunRecord, 'runId' | 'manifestPath'>
+): boolean {
+  if (claim?.state !== 'released') {
+    return false;
+  }
+  return (
+    (claim.run_manifest_path !== null && claim.run_manifest_path === run.manifestPath) ||
+    (claim.run_id !== null && claim.run_id === run.runId)
+  );
 }
 
 function shouldUseQueuedClaimIssueStateForAdmission(
