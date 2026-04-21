@@ -3374,7 +3374,7 @@ function hasProviderWorkerQuotaFailureSignal(
 }
 
 function hasProviderWorkerStdinBootstrapSignal(normalizedSignal: string): boolean {
-  return /\breading additional input from stdin\b/u.test(normalizedSignal);
+  return /\breading\s+additional\s+input\s+from\s+stdin\b/u.test(normalizedSignal);
 }
 
 const PROVIDER_WORKER_STDIN_BOOTSTRAP_DIAGNOSTIC_VALUES = new Set([

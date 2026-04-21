@@ -34,7 +34,7 @@
           "reviewer": "Codex provider worker",
           "date": "2026-04-22",
           "status": "succeeded",
-          "summary": "After merging latest origin/main, delegation guard passed with scoped child-stream provenance fallback override; spec guard, build, full test (346 files / 4453 tests), docs:check, docs:freshness, repo:stewardship, diff-budget, and pack:smoke passed. Lint passed with the existing DelegationMcpHealth.test.ts no-explicit-any warnings only."
+          "summary": "After merging latest origin/main, delegation guard passed with scoped child-stream provenance fallback override; spec guard, build, full test (347 files / 4461 tests), docs:check, docs:freshness, repo:stewardship, diff-budget, and pack:smoke passed. Lint passed with the existing DelegationMcpHealth.test.ts no-explicit-any warnings only."
         },
         "standalone_review": {
           "reviewer": "codex-orchestrator review",

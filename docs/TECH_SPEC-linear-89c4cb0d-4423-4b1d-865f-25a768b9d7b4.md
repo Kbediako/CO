@@ -38,6 +38,7 @@ last_review: 2026-04-22
 - Explicit non-goals carried forward: no adjacent-issue scope merge, no provider admission redesign, no issue-specific content fixes, and no evidence suppression.
 
 ## Parity / Alignment Matrix
+
 | Current truth | Reference truth | Target truth / intended delta | Explicitly out-of-scope differences |
 | --- | --- | --- | --- |
 | Parent issue evidence points to generic `provider_runtime` for the stdin-read exit signal. | `provider-linear-worker-proof.json` and `manifest.json` are the machine-checkable failure surfaces. | Add or expose a bootstrap/stdin-specific classification while preserving exact stderr. | Do not rewrite historical proof or manifest artifacts. |

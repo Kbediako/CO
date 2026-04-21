@@ -2458,22 +2458,29 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
   });
 
   it('classifies stdin bootstrap provider exits separately from generic runtime failures', () => {
-    const parsed = parseProviderLinearWorkerJsonl(
-      JSON.stringify({
-        type: 'error',
-        message: 'stderr | Reading additional input from stdin...',
-        timestamp: '2026-04-21T04:00:00.000Z'
-      })
-    );
+    const messages = [
+      'stderr | Reading additional input from stdin...',
+      'stderr | Reading    additional\ninput from stdin...'
+    ];
 
-    expect(parsed.failureDiagnosis).toMatchObject({
-      diagnostic_category: 'provider_stdin_bootstrap',
-      signal: expect.stringContaining('Reading additional input from stdin'),
-      source: 'stdout_jsonl',
-      observed_at: '2026-04-21T04:00:00.000Z',
-      guidance: expect.stringContaining('stdin bootstrap')
-    });
-    expect(parsed.failureDiagnosis?.diagnostic_category).not.toBe('provider_runtime');
+    for (const message of messages) {
+      const parsed = parseProviderLinearWorkerJsonl(
+        JSON.stringify({
+          type: 'error',
+          message,
+          timestamp: '2026-04-21T04:00:00.000Z'
+        })
+      );
+
+      expect(parsed.failureDiagnosis).toMatchObject({
+        diagnostic_category: 'provider_stdin_bootstrap',
+        signal: expect.stringContaining('stdin'),
+        source: 'stdout_jsonl',
+        observed_at: '2026-04-21T04:00:00.000Z',
+        guidance: expect.stringContaining('stdin bootstrap')
+      });
+      expect(parsed.failureDiagnosis?.diagnostic_category).not.toBe('provider_runtime');
+    }
   });
 
   it('preserves stronger root-cause diagnostics when the stdin bootstrap preamble is mixed in', () => {
