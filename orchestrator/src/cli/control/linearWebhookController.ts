@@ -378,8 +378,7 @@ function resolveProviderIntakeTruthUpdatedAt(
   if (matchingClaims.length === 0) {
     return null;
   }
-  let truthUpdatedAt =
-    typeof providerIntakeState?.rehydrated_at === 'string' ? providerIntakeState.rehydrated_at : null;
+  let truthUpdatedAt: string | null = null;
   for (const claim of matchingClaims) {
     truthUpdatedAt = pickLatestIsoTimestamp(
       pickLatestIsoTimestamp(truthUpdatedAt, claim.updated_at),

@@ -218,6 +218,58 @@ describe('LinearWebhookController', () => {
     expect(advisoryState.stale_source).toBeUndefined();
   });
 
+  it('does not mark advisory state stale when only global rehydrate time is newer', () => {
+    const advisoryState = normalizeLinearAdvisoryState({
+      schema_version: 1,
+      updated_at: '2026-04-21T15:00:00.000Z',
+      latest_delivery_id: 'delivery-accepted',
+      latest_result: 'accepted',
+      latest_reason: 'linear_delivery_accepted',
+      latest_event: null,
+      latest_accepted_at: '2026-04-21T15:00:00.000Z',
+      tracked_issue: {
+        provider: 'linear',
+        id: 'lin-issue-272',
+        identifier: 'CO-272',
+        title: 'Replace dead archive guidance',
+        description: null,
+        url: null,
+        state: 'Blocked',
+        state_type: 'started',
+        archived_at: null,
+        trashed: false,
+        viewer_id: 'viewer-1',
+        assignee_id: 'viewer-1',
+        assignee_name: 'Codex',
+        workspace_id: 'workspace-1',
+        team_id: 'team-1',
+        team_key: 'CO',
+        team_name: 'CO',
+        project_id: 'project-1',
+        project_name: 'CO',
+        updated_at: '2026-04-21T15:00:00.000Z',
+        blocked_by: [],
+        recent_activity: []
+      },
+      seen_deliveries: []
+    });
+
+    const marked = markLinearAdvisoryStateStaleFromProviderIntake(advisoryState, {
+      rehydrated_at: '2026-04-21T17:00:00.000Z',
+      claims: [
+        createProviderIntakeClaim({
+          issue_id: 'lin-issue-272',
+          issue_identifier: 'CO-272',
+          issue_updated_at: '2026-04-21T14:00:00.000Z',
+          updated_at: '2026-04-21T14:30:00.000Z'
+        })
+      ]
+    });
+
+    expect(marked).toBe(false);
+    expect(advisoryState.stale_source).toBeUndefined();
+  });
+
   it('returns false for non-webhook pathnames without invoking the webhook controller path', async () => {
     const { res, state } = createResponseRecorder();
     const advisoryState = normalizeLinearAdvisoryState(null);
