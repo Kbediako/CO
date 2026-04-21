@@ -21,10 +21,10 @@
         "parent_validation": {
           "reviewer": "parent provider worker",
           "date": "2026-04-21",
-          "status": "implemented-blocked-before-review-handoff",
-          "manifest": ".runs/linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6/cli/2026-04-21T08-38-59-755Z-468836b9/manifest.json",
-          "review_telemetry": ".runs/linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6/cli/2026-04-21T08-38-59-755Z-468836b9/review/telemetry.json",
-          "summary": "Parent implementation refreshed retained released/not_active metadata from newer same-issue tracked issue and dependent blocker truth, preserved release cancellation and terminal release behavior, and passed focused provider handoff regressions, full ProviderIssueHandoff suite, build, lint, full test, delegation guard, spec guard dry-run, repo stewardship, diff budget, pack smoke, and bounded-success standalone review. PR/review handoff is blocked because docs:check and docs:freshness fail on unrelated linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb baseline debt tracked as CO-293."
+          "status": "validated-ready-for-pr-handoff",
+          "manifest": ".runs/linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6/cli/2026-04-21T21-44-13-763Z-2c7478ee/manifest.json",
+          "review_telemetry": ".runs/linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6/cli/2026-04-21T21-44-13-763Z-2c7478ee/review/telemetry.json",
+          "summary": "Parent follow-up implementation fixed the first review's deferred fresh-discovery release and failure-containment defects, added matching regressions, and reran build, lint, full test (4482 tests), pack smoke, a clean standalone review rerun, explicit elegance review, docs:check, docs:freshness, repo:stewardship, and diff-budget successfully on the updated packet. PR creation, attachment, ready-review drain, and review-state handoff remain pending."
         }
       },
       "paths": {

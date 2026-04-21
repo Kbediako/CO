@@ -5519,74 +5519,123 @@ export function createProviderIssueHandoffService(
           for (const providerKey of Array.from(
             deferredRetainedReleasedBlockerRefreshProviderKeys
           )) {
-            const blocker = trackedIssueBlockersByKey?.get(providerKey) ?? null;
-            if (!blocker) {
-              continue;
-            }
-            const claim = readProviderIntakeClaim(options.state, providerKey);
-            if (
-              !claim ||
-              !shouldUseTrackedIssueBlockerSnapshotForRetainedReleasedNotActiveMetadataRefresh({
-                claim,
-                blocker
-              })
-            ) {
-              continue;
-            }
-            const claimRuns = runsByProviderIssue.get(providerKey) ?? [];
-            const attachableClaimRuns = filterProviderIssueRunsForStartPipeline(
-              claimRuns,
-              startPipelineId
-            );
-            const activeRun =
-              attachableClaimRuns.find((run) => run.status === 'in_progress') ?? null;
-            const releaseRun = resolveProviderReleaseRun(claim, attachableClaimRuns);
-            refreshCounts.issue_by_id_reads += 1;
-            if (boundPreDiscoveryIssueByIdReads && activeRun === null) {
-              preDiscoveryNonActiveIssueByIdReads += 1;
-            }
-            recordRefreshProgress('refresh:claim_issue_by_id_reconcile', {
-              requestClass: `claim_issue_by_id:${claim.state ?? 'unknown'}`,
-              providerKeys: [providerKey]
-            });
-            const directResolution = await resolveTrackedIssueWhenNotStuck({
-              provider: claim.provider,
-              issueId: claim.issue_id
-            });
-            assertRefreshCycleNotStuck();
-            if (
-              directResolution.kind !== 'ready' ||
-              !canRefreshRetainedReleasedNotActiveClaimMetadataOnly({
-                claim,
-                trackedIssue: directResolution.trackedIssue
-              })
-            ) {
-              continue;
-            }
-            const refreshedClaim = await refreshRetainedReleasedNotActiveClaimMetadata({
-              claim,
-              trackedIssue: directResolution.trackedIssue
-            });
-            claimByProviderKey.set(refreshedClaim.provider_key, refreshedClaim);
-            claimStateByProviderKey.set(
-              refreshedClaim.provider_key,
-              resolveProviderClaimIssueStateForAdmission(refreshedClaim)
-            );
-            const releaseRunForCancel = releaseRun ?? activeRun;
-            if (
-              shouldAttemptReleaseCancel(releaseRunForCancel) &&
-              !isInactiveReleasedReclaimRun(claim, releaseRunForCancel)
-            ) {
-              void retryReleaseCancel({
-                releaseRun: releaseRunForCancel,
-                reason: claim.reason ?? 'provider_issue_released',
-                assertCurrent: assertRefreshLifecycleCurrent
-              });
-            }
-            if (!activeRun) {
-              releaseOccupiedPollDispatchSlot(
-                resolveClaimPollDispatchSlotKey(providerKey, refreshedClaim)
+            try {
+              const blocker = trackedIssueBlockersByKey?.get(providerKey) ?? null;
+              if (!blocker) {
+                continue;
+              }
+              const claim = readProviderIntakeClaim(options.state, providerKey);
+              if (
+                !claim ||
+                !shouldUseTrackedIssueBlockerSnapshotForRetainedReleasedNotActiveMetadataRefresh({
+                  claim,
+                  blocker
+                })
+              ) {
+                continue;
+              }
+              const claimRuns = runsByProviderIssue.get(providerKey) ?? [];
+              const attachableClaimRuns = filterProviderIssueRunsForStartPipeline(
+                claimRuns,
+                startPipelineId
               );
+              const activeRun =
+                attachableClaimRuns.find((run) => run.status === 'in_progress') ?? null;
+              const releaseRun = resolveProviderReleaseRun(claim, attachableClaimRuns);
+              refreshCounts.issue_by_id_reads += 1;
+              if (boundPreDiscoveryIssueByIdReads && activeRun === null) {
+                preDiscoveryNonActiveIssueByIdReads += 1;
+              }
+              recordRefreshProgress('refresh:claim_issue_by_id_reconcile', {
+                requestClass: `claim_issue_by_id:${claim.state ?? 'unknown'}`,
+                providerKeys: [providerKey]
+              });
+              const directResolution = await resolveTrackedIssueWhenNotStuck({
+                provider: claim.provider,
+                issueId: claim.issue_id
+              });
+              assertRefreshCycleNotStuck();
+              if (directResolution.kind === 'ready') {
+                const eligibility = assessProviderTrackedIssueEligibility(
+                  directResolution.trackedIssue,
+                  {
+                    hasExistingClaim: true
+                  }
+                );
+                if (
+                  canRefreshRetainedReleasedNotActiveClaimMetadataOnly({
+                    claim,
+                    trackedIssue: directResolution.trackedIssue
+                  }) &&
+                  (eligibility.eligible ||
+                    eligibility.releaseReason === 'provider_issue_released:not_active')
+                ) {
+                  const refreshedClaim = await refreshRetainedReleasedNotActiveClaimMetadata({
+                    claim,
+                    trackedIssue: directResolution.trackedIssue
+                  });
+                  claimByProviderKey.set(refreshedClaim.provider_key, refreshedClaim);
+                  claimStateByProviderKey.set(
+                    refreshedClaim.provider_key,
+                    resolveProviderClaimIssueStateForAdmission(refreshedClaim)
+                  );
+                  const releaseRunForCancel = releaseRun ?? activeRun;
+                  if (
+                    shouldAttemptReleaseCancel(releaseRunForCancel) &&
+                    !isInactiveReleasedReclaimRun(claim, releaseRunForCancel)
+                  ) {
+                    void retryReleaseCancel({
+                      releaseRun: releaseRunForCancel,
+                      reason: claim.reason ?? 'provider_issue_released',
+                      assertCurrent: assertRefreshLifecycleCurrent
+                    });
+                  }
+                  if (!activeRun) {
+                    releaseOccupiedPollDispatchSlot(
+                      resolveClaimPollDispatchSlotKey(providerKey, refreshedClaim)
+                    );
+                  }
+                  continue;
+                }
+                if (eligibility.eligible) {
+                  continue;
+                }
+                await releaseClaim({
+                  claim,
+                  nextReason: eligibility.releaseReason,
+                  releaseRun,
+                  trackedIssue: directResolution.trackedIssue,
+                  cleanupWorkspace: eligibility.cleanupWorkspace
+                });
+                if (!activeRun) {
+                  releaseOccupiedPollDispatchSlot(
+                    resolveClaimPollDispatchSlotKey(providerKey, claim, activeRun)
+                  );
+                }
+                continue;
+              }
+              if (directResolution.kind === 'release') {
+                await releaseClaim({
+                  claim,
+                  nextReason: `provider_issue_released:${directResolution.reason}`,
+                  releaseRun
+                });
+                if (!activeRun) {
+                  releaseOccupiedPollDispatchSlot(
+                    resolveClaimPollDispatchSlotKey(providerKey, claim, activeRun)
+                  );
+                }
+              }
+            } catch (error) {
+              if (isRefreshLifecycleStuckError(error)) {
+                throw error;
+              }
+              logger.warn(
+                `Provider issue deferred retained metadata refresh failed for ${providerKey}: ${
+                  (error as Error)?.message ?? String(error)
+                }`
+              );
+              continue;
             }
           }
         };

@@ -25536,6 +25536,241 @@ describe('createProviderIssueHandoffService', () => {
     expect(publishRuntime).toHaveBeenCalledWith('provider-intake.refresh');
   });
 
+  it('releases terminal retained metadata after a fresh-discovery blocker refetch', async () => {
+    const { paths } = await createHostPaths();
+    const co276BlockerSnapshot = {
+      id: 'lin-co-276',
+      identifier: 'CO-276',
+      state: 'Done',
+      state_type: 'completed'
+    };
+    const retainedBlockers = [
+      {
+        id: 'lin-old-blocker',
+        identifier: 'CO-OLD',
+        state: 'Done',
+        state_type: 'completed'
+      }
+    ];
+    const liveBlockers = [
+      {
+        id: 'lin-live-blocker',
+        identifier: 'CO-LIVE',
+        state: 'Done',
+        state_type: 'completed'
+      }
+    ];
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: 'lin-co-276',
+      issue_identifier: 'CO-276',
+      issue_title: 'Cached retained row source issue',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-21T08:05:31.533Z',
+      issue_blocked_by: retainedBlockers,
+      task_id: 'linear-lin-co-276-retained',
+      run_id: null,
+      run_manifest_path: null
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const publishRuntime = vi.fn();
+    const launcher = createCo202Launcher(
+      'run-co-276-should-not-start',
+      '/tmp/provider-run/co-276-should-not-start-manifest.json'
+    );
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-co-276',
+        identifier: 'CO-276',
+        title: 'Live terminal title should refresh after fresh discovery',
+        state: 'Done',
+        state_type: 'completed',
+        updated_at: '2026-04-21T08:06:27.460Z',
+        blocked_by: liveBlockers
+      })
+    }));
+    const refetchTrackedIssues = vi.fn(async (input?: { mode?: string }) => {
+      if (input?.mode !== 'fresh_discovery') {
+        return {
+          kind: 'ready' as const,
+          trackedIssues: []
+        };
+      }
+      return {
+        kind: 'ready' as const,
+        trackedIssues: [
+          createTrackedIssue({
+            id: 'lin-co-282',
+            identifier: 'CO-282',
+            title: 'Dependent issue already seeing terminal blocker truth',
+            state: 'Blocked',
+            state_type: 'started',
+            updated_at: '2026-04-21T08:06:40.000Z',
+            blocked_by: [co276BlockerSnapshot]
+          })
+        ]
+      };
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      publishRuntime,
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-co-276'
+    });
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_title: 'Live terminal title should refresh after fresh discovery',
+      issue_state: co276BlockerSnapshot.state,
+      issue_state_type: co276BlockerSnapshot.state_type,
+      issue_updated_at: '2026-04-21T08:06:27.460Z',
+      issue_blocked_by: liveBlockers,
+      task_id: 'linear-lin-co-276-retained',
+      run_id: null,
+      run_manifest_path: null
+    });
+    expect(persist).toHaveBeenCalled();
+    expect(publishRuntime).toHaveBeenCalledWith('provider-intake.refresh');
+  });
+
+  it('keeps fresh discovery running when a deferred retained blocker refresh fails', async () => {
+    const { paths } = await createHostPaths();
+    const co276BlockerSnapshot = {
+      id: 'lin-co-276',
+      identifier: 'CO-276',
+      state: 'Rework',
+      state_type: 'started'
+    };
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: 'lin-co-276',
+      issue_identifier: 'CO-276',
+      issue_title: 'Cached retained row source issue',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-21T08:05:31.533Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-co-276-retained',
+      run_id: null,
+      run_manifest_path: null
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = createCo202Launcher(
+      'run-unrelated-discovered',
+      '/tmp/provider-run/unrelated-discovered-manifest.json'
+    );
+    const resolveTrackedIssue = vi.fn(async () => {
+      throw new Error('transient retained blocker refresh failure');
+    });
+    const refetchTrackedIssues = vi.fn(async (input?: { mode?: string }) => {
+      if (input?.mode !== 'fresh_discovery') {
+        return {
+          kind: 'ready' as const,
+          trackedIssues: []
+        };
+      }
+      return {
+        kind: 'ready' as const,
+        trackedIssues: [
+          createTrackedIssue({
+            id: 'lin-co-282',
+            identifier: 'CO-282',
+            title: 'Dependent issue already seeing blocker truth',
+            state: 'Blocked',
+            state_type: 'started',
+            updated_at: '2026-04-21T08:06:40.000Z',
+            blocked_by: [co276BlockerSnapshot]
+          }),
+          createTrackedIssue({
+            id: 'lin-issue-unrelated-runnable',
+            identifier: 'CO-299',
+            title: 'Unrelated runnable issue',
+            state: 'In Progress',
+            state_type: 'started',
+            updated_at: '2026-04-21T08:07:10.000Z'
+          })
+        ]
+      };
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-co-276'
+    });
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-issue-unrelated-runnable',
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-issue-unrelated-runnable',
+      issueIdentifier: 'CO-299',
+      issueUpdatedAt: '2026-04-21T08:07:10.000Z',
+      launchToken: expect.any(String)
+    }));
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-co-276')).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-21T08:05:31.533Z'
+    });
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-issue-unrelated-runnable')).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-21T08:07:10.000Z',
+      task_id: 'linear-lin-issue-unrelated-runnable',
+      run_id: 'run-unrelated-discovered',
+      run_manifest_path: '/tmp/provider-run/unrelated-discovered-manifest.json'
+    });
+    expect(persist).toHaveBeenCalled();
+  });
+
   it('keeps still-inactive retained released metadata refreshes metadata-only', async () => {
     const { paths } = await createHostPaths();
     const co276BlockerSnapshot = {
