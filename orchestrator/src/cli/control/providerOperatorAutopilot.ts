@@ -1204,38 +1204,97 @@ function hasExternalPrBlockerHint(
 ): boolean {
   return [
     normalizeOptionalString(issue.description),
-    ...(issue.recent_activity ?? []).map((entry) => normalizeOptionalString(entry.summary))
+    normalizeOptionalString(resolveLatestTrackedActivitySummary(issue.recent_activity ?? []))
   ]
     .filter((value): value is string => Boolean(value))
-    .some((value) => {
-      const segments = value
-        .split(/[\n.;]+/u)
-        .map((segment) => segment.trim())
-        .filter((segment) => segment.length > 0);
-      return segments.some((segment, index) =>
-        isExternalPrBlockerHintSegment(segment) ||
-        (segments[index + 1] !== undefined &&
-          isExternalPrBlockerHintSegment(`${segment} ${segments[index + 1]}`))
-      );
-    });
+    .some(hasCurrentExternalPrBlockerHint);
 }
 
-function isExternalPrBlockerHintSegment(segment: string): boolean {
+function resolveLatestTrackedActivitySummary(
+  recentActivity: LiveLinearTrackedIssue['recent_activity']
+): string | null {
+  let latest: LiveLinearTrackedIssue['recent_activity'][number] | null = null;
+  for (const entry of recentActivity) {
+    if (!latest) {
+      latest = entry;
+      continue;
+    }
+    const candidateMs = Date.parse(entry.created_at ?? '');
+    const latestMs = Date.parse(latest.created_at ?? '');
+    if (Number.isFinite(candidateMs) && (!Number.isFinite(latestMs) || candidateMs >= latestMs)) {
+      latest = entry;
+    }
+  }
+  return latest?.summary ?? null;
+}
+
+function hasCurrentExternalPrBlockerHint(value: string): boolean {
+  const segments = value
+    .split(/[\n.;]+/u)
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0);
+  for (let index = segments.length - 1; index >= 0; index -= 1) {
+    const candidates = [
+      segments[index],
+      segments[index - 1] !== undefined ? `${segments[index - 1]} ${segments[index]}` : null
+    ].filter((segment): segment is string => Boolean(segment));
+    for (const candidate of candidates) {
+      const hint = classifyExternalPrHintSegment(candidate);
+      if (hint) {
+        return hint === 'blocked';
+      }
+    }
+  }
+  return false;
+}
+
+function classifyExternalPrHintSegment(segment: string): 'blocked' | 'resolved' | null {
   if (!/\b(?:pr|pull request)\s*#?\d+\b/iu.test(segment)) {
-    return false;
+    return null;
   }
-  if (
-    /\b(?:no longer|not|isn't|is not)\s+(?:block(?:ed|er|ing)?|pending|failing|dirty|draft)\b/iu.test(
-      segment
-    ) ||
-    /\bchecks?\s+(?:passed|passing|green|clean)\b/iu.test(segment) ||
-    /\b(?:unblocked|closed)\b/iu.test(segment)
-  ) {
-    return false;
-  }
-  return /\b(?:block(?:ed|er|ing)?|wait(?:ing)?\s+(?:on|for)|pending|draft|dirty|fail(?:ed|ing)?|checks?\s+(?:fail(?:ed|ing)?|pending|red)|red\s+checks?|not\s+(?:yet\s+)?merged|needs?\s+(?:to\s+)?be\s+merged|merge\s+pending|pending\s+merge)\b/iu.test(
-    segment
+  const resolvedSignals = collectExternalPrHintSignals(
+    segment,
+    /\b(?:no longer|not|isn't|is not)\s+(?:block(?:ed|er|ing)?|pending|failing|dirty|draft)\b|\bchecks?\s+(?:passed|passing|green|clean)\b|\b(?:unblocked|closed)\b/giu,
+    'resolved'
   );
+  const blockedSignals = collectExternalPrHintSignals(
+    segment,
+    /\b(?:block(?:ed|er|ing)?|wait(?:ing)?\s+(?:on|for)|pending|draft|dirty|fail(?:ed|ing)?|checks?\s+(?:fail(?:ed|ing)?|pending|red)|red\s+checks?|not\s+(?:yet\s+)?merged|needs?\s+(?:to\s+)?be\s+merged|merge\s+pending|pending\s+merge)\b/giu,
+    'blocked',
+    resolvedSignals
+  );
+  const latestSignal = [...resolvedSignals, ...blockedSignals].sort((left, right) =>
+    left.index === right.index ? left.priority - right.priority : left.index - right.index
+  ).at(-1);
+  return latestSignal?.kind ?? null;
+}
+
+function collectExternalPrHintSignals(
+  segment: string,
+  pattern: RegExp,
+  kind: 'blocked' | 'resolved',
+  ignoredSpans: Array<{ start: number; end: number }> = []
+): Array<{ kind: 'blocked' | 'resolved'; index: number; priority: number; start: number; end: number }> {
+  const signals: Array<{ kind: 'blocked' | 'resolved'; index: number; priority: number; start: number; end: number }> = [];
+  for (const match of segment.matchAll(pattern)) {
+    const matched = match[0];
+    const start = match.index ?? -1;
+    if (start < 0 || matched.length === 0) {
+      continue;
+    }
+    const end = start + matched.length;
+    if (ignoredSpans.some((span) => start < span.end && end > span.start)) {
+      continue;
+    }
+    signals.push({
+      kind,
+      index: start,
+      priority: kind === 'blocked' ? 1 : 0,
+      start,
+      end
+    });
+  }
+  return signals;
 }
 
 function resolveCanonicalOwnerHints(issue: Pick<LiveLinearTrackedIssue, 'description'>): string[] {
