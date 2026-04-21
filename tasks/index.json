@@ -14,7 +14,7 @@
           "reviewer": "parent provider worker",
           "date": "2026-04-21",
           "status": "produced",
-          "manifest": "../../.runs/linear-39a559e9-8da2-444d-93e6-2c3ad216f730/cli/2026-04-21T18-54-09-717Z-7a8c49bd/manifest.json",
+          "manifest": ".runs/linear-39a559e9-8da2-444d-93e6-2c3ad216f730/cli/2026-04-21T18-54-09-717Z-7a8c49bd/manifest.json",
           "source_anchor": "ctx:sha256:19f75315765e156751acd52be9fc6dbabd7288795c4a9a58e685bb892d5ca5e0#chunk:c000001",
           "summary": "Docs-first packet preserves CO-296 as the narrow direct JSON current-endpoint timeout seam: `co-status --format json` can fail when the current resolved `/ui/data.json` hangs past the 15s attach timeout budget while healthy-host evidence remains available (`stuck=false`, `restart_required=false`, fresh polling timestamps, and live running claims). The packet explicitly rejects stale/dead endpoint `ECONNREFUSED` recovery (`CO-246`), attach restart/rotation recovery (`CO-179`), refresh-stuck / `restart_required` churn (`CO-211`), silent timeout suppression, and broader queue-truth or provider-intake redesign."
         }
