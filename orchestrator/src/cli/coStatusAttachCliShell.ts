@@ -287,6 +287,7 @@ export async function readUiDatasetWithEndpointRecovery(input: {
   getTarget: () => CoStatusAttachTarget;
   setTarget: (target: CoStatusAttachTarget) => void;
   signal?: AbortSignal;
+  recoverSameEndpointTimeout?: boolean;
 }): Promise<OperatorDashboardDataset> {
   const previousTarget = input.getTarget();
   try {
@@ -322,6 +323,21 @@ export async function readUiDatasetWithEndpointRecovery(input: {
         );
       }
     }
+    if (input.recoverSameEndpointTimeout === true && isTimeoutAttachRequestError(error)) {
+      try {
+        return await fetchUiDataset(previousTarget.baseUrl, previousTarget.token, {
+          signal: input.signal
+        });
+      } catch (retryError) {
+        if (isCancelledAttachRequestError(retryError)) {
+          throw retryError;
+        }
+        if (isTimeoutAttachRequestError(retryError)) {
+          throw new Error(formatSameEndpointTimeoutFailure(retryError, previousTarget));
+        }
+        throw new Error(formatAttachRequestFailure(retryError, previousTarget));
+      }
+    }
     throw new Error(formatAttachRequestFailure(error, previousTarget));
   }
 }
@@ -335,6 +351,21 @@ function isAttachTargetEndpointEquivalent(
 
 function isCancelledAttachRequestError(error: unknown): boolean {
   return error instanceof CoStatusAttachRequestError && error.kind === 'cancelled';
+}
+
+function isTimeoutAttachRequestError(error: unknown): error is CoStatusAttachRequestError {
+  return error instanceof CoStatusAttachRequestError && error.kind === 'timeout';
+}
+
+function formatSameEndpointTimeoutFailure(
+  error: CoStatusAttachRequestError,
+  target: CoStatusAttachTarget
+): string {
+  return [
+    `${error.message}.`,
+    `The current resolved /ui/data.json endpoint at ${target.baseUrl.toString()} timed out again after endpoint re-resolution returned the same endpoint/token; this is a same-endpoint current-endpoint timeout, not stale/dead endpoint ECONNREFUSED recovery or attach restart/rotation.`,
+    'Inspect local control-host polling.stuck, polling.restart_required, and running claim evidence before treating the host as unhealthy.'
+  ].join(' ');
 }
 
 function formatAttachRequestFailure(
