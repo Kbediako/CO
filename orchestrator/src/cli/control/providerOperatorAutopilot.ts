@@ -1148,6 +1148,13 @@ function collectTerminalBlockerAdvisories(
       }
       const canonicalOwnerHints = resolveCanonicalOwnerHints(issue);
       const duplicateHints = resolveDuplicateHints(issue);
+      if (
+        canonicalOwnerHints.length === 0 &&
+        duplicateHints.length === 0 &&
+        hasExternalPrBlockerHint(issue)
+      ) {
+        return [];
+      }
       const recommendedAction =
         duplicateHints.length > 0 || canonicalOwnerHints.length > 0
           ? 'duplicate_cleanup'
@@ -1190,6 +1197,179 @@ function isTerminalBlocker(
   blocker: NonNullable<LiveLinearTrackedIssue['blocked_by']>[number]
 ): boolean {
   return !providerLinearTodoBlockedByNonTerminal([blocker]);
+}
+
+function hasExternalPrBlockerHint(
+  issue: Pick<LiveLinearTrackedIssue, 'description' | 'recent_activity'>
+): boolean {
+  const descriptionHint = classifyCurrentExternalPrBlockerText(
+    normalizeOptionalString(issue.description) ?? ''
+  );
+  if (descriptionHint) {
+    return descriptionHint === 'blocked';
+  }
+  const activityHint = resolveLatestTrackedActivityExternalPrHint(issue.recent_activity ?? []);
+  return activityHint === 'blocked';
+}
+
+function resolveLatestTrackedActivityExternalPrHint(
+  recentActivity: LiveLinearTrackedIssue['recent_activity']
+): 'blocked' | 'resolved' | null {
+  let latestHint: 'blocked' | 'resolved' | null = null;
+  let latestCreatedAtMs = Number.NEGATIVE_INFINITY;
+  let latestOrder = -1;
+  recentActivity.forEach((entry, order) => {
+    const summary = normalizeOptionalString(entry.summary);
+    if (!summary) {
+      return;
+    }
+    const hint = classifyCurrentExternalPrBlockerText(summary);
+    if (!hint) {
+      return;
+    }
+    const candidateMs = Date.parse(entry.created_at ?? '');
+    const createdAtMs = Number.isFinite(candidateMs) ? candidateMs : Number.NEGATIVE_INFINITY;
+    if (
+      !latestHint ||
+      createdAtMs > latestCreatedAtMs ||
+      (createdAtMs === latestCreatedAtMs && order >= latestOrder)
+    ) {
+      latestHint = hint;
+      latestCreatedAtMs = createdAtMs;
+      latestOrder = order;
+    }
+  });
+  return latestHint;
+}
+
+function classifyCurrentExternalPrBlockerText(value: string): 'blocked' | 'resolved' | null {
+  const segments = splitExternalPrHintSegments(value);
+  let latestHint: 'blocked' | 'resolved' | null = null;
+  for (let index = 0; index < segments.length; index += 1) {
+    if (!EXTERNAL_PR_REFERENCE_PATTERN.test(segments[index] ?? '')) {
+      continue;
+    }
+    let endIndex = index + 1;
+    while (
+      endIndex < segments.length &&
+      !EXTERNAL_PR_REFERENCE_PATTERN.test(segments[endIndex] ?? '')
+    ) {
+      endIndex += 1;
+    }
+    const hint = classifyExternalPrHintBlock(segments.slice(index, endIndex).join(' '));
+    if (hint) {
+      latestHint = hint;
+    }
+    index = endIndex - 1;
+  }
+  return latestHint;
+}
+
+const MARKDOWN_LINK_DOT_PLACEHOLDER = '__co_pr_link_dot__';
+
+function splitExternalPrHintSegments(value: string): string[] {
+  return value
+    .replace(/\]\(([^)]*)\)/gu, (_match, target: string) =>
+      `](${target.replaceAll('.', MARKDOWN_LINK_DOT_PLACEHOLDER)})`
+    )
+    .split(/[\n.;]+/u)
+    .map((segment) =>
+      segment.replaceAll(MARKDOWN_LINK_DOT_PLACEHOLDER, '.').trim()
+    )
+    .filter((segment) => segment.length > 0);
+}
+
+const EXTERNAL_PR_REFERENCE_PATTERN =
+  /\b(?:pr|pull request)\b(?:\s|`|\[|\]|\(|\))*#?\d+\b/iu;
+const EXTERNAL_PR_REFERENCE_PATTERN_GLOBAL =
+  /\b(?:pr|pull request)\b(?:\s|`|\[|\]|\(|\))*#?\d+\b/giu;
+const EXTERNAL_PR_MERGE_BLOCKER_PATTERN =
+  /\bclosed\s+unmerged\b|\bunmerged\b|\bnot\s+(?:yet\s+)?merged\b|\bneeds?\s+(?:to\s+)?be\s+merged\b|\bmerge\s+pending\b|\bpending\s+merge\b/giu;
+
+function classifyExternalPrHintBlock(segment: string): 'blocked' | 'resolved' | null {
+  let sawResolved = false;
+  for (const prSegment of splitExternalPrReferenceSegments(segment)) {
+    const hint = classifyExternalPrHintSegment(prSegment);
+    if (hint === 'blocked') {
+      return 'blocked';
+    }
+    if (hint === 'resolved') {
+      sawResolved = true;
+    }
+  }
+  return sawResolved ? 'resolved' : null;
+}
+
+function splitExternalPrReferenceSegments(segment: string): string[] {
+  const matches = [...segment.matchAll(EXTERNAL_PR_REFERENCE_PATTERN_GLOBAL)];
+  if (matches.length <= 1) {
+    return [segment];
+  }
+  return matches
+    .map((match, index) => {
+      const start = index === 0 ? 0 : (match.index ?? 0);
+      const end = matches[index + 1]?.index ?? segment.length;
+      return segment.slice(start, end).trim();
+    })
+    .filter((entry) => entry.length > 0);
+}
+
+function classifyExternalPrHintSegment(segment: string): 'blocked' | 'resolved' | null {
+  if (!EXTERNAL_PR_REFERENCE_PATTERN.test(segment)) {
+    return null;
+  }
+  const resolvedSignals = collectExternalPrHintSignals(
+    segment,
+    /\b(?:no longer|not|isn't|is not)\s+(?:block(?:ed|er|ing)?|pending|failing|dirty|draft)\b|\bchecks?\s+(?:passed|passing|green|clean)\b|\bunblocked\b|\bclosed\b(?!\s+unmerged\b)/giu,
+    'resolved'
+  );
+  const mergeBlockerSignals = collectExternalPrHintSignals(
+    segment,
+    EXTERNAL_PR_MERGE_BLOCKER_PATTERN,
+    'blocked',
+    resolvedSignals
+  );
+  if (mergeBlockerSignals.length > 0) {
+    return 'blocked';
+  }
+  const blockedSignals = collectExternalPrHintSignals(
+    segment,
+    /\b(?:block(?:ed|er|ing)?|wait(?:ing)?\s+(?:on|for)|pending|draft|dirty|fail(?:ed|ing)?|checks?\s+(?:fail(?:ed|ing)?|pending|red)|red\s+checks?)\b/giu,
+    'blocked',
+    resolvedSignals
+  );
+  const latestSignal = [...resolvedSignals, ...blockedSignals].sort((left, right) =>
+    left.index === right.index ? left.priority - right.priority : left.index - right.index
+  ).at(-1);
+  return latestSignal?.kind ?? null;
+}
+
+function collectExternalPrHintSignals(
+  segment: string,
+  pattern: RegExp,
+  kind: 'blocked' | 'resolved',
+  ignoredSpans: Array<{ start: number; end: number }> = []
+): Array<{ kind: 'blocked' | 'resolved'; index: number; priority: number; start: number; end: number }> {
+  const signals: Array<{ kind: 'blocked' | 'resolved'; index: number; priority: number; start: number; end: number }> = [];
+  for (const match of segment.matchAll(pattern)) {
+    const matched = match[0];
+    const start = match.index ?? -1;
+    if (start < 0 || matched.length === 0) {
+      continue;
+    }
+    const end = start + matched.length;
+    if (ignoredSpans.some((span) => start < span.end && end > span.start)) {
+      continue;
+    }
+    signals.push({
+      kind,
+      index: start,
+      priority: kind === 'blocked' ? 1 : 0,
+      start,
+      end
+    });
+  }
+  return signals;
 }
 
 function resolveCanonicalOwnerHints(issue: Pick<LiveLinearTrackedIssue, 'description'>): string[] {

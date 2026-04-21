@@ -59,6 +59,7 @@ interface ControlRuntimeContext {
   paths: Pick<RunPaths, 'manifestPath' | 'runDir' | 'logPath'>;
   linearAdvisoryState: {
     tracked_issue: LiveLinearTrackedIssue | null;
+    stale_source?: unknown;
   };
   providerIntakeState?: ProviderIntakeState;
   providerWorkflowConfigStore?: ProviderWorkflowConfigStore;
@@ -177,7 +178,7 @@ function createControlRuntimeSnapshot(
       );
       const issueIdentifier = selected?.issueIdentifier ?? selected?.taskId ?? selected?.runId ?? null;
       const dispatchPilotSummary = liveLinearAdvisoryRuntime.readSnapshotSummary(issueIdentifier);
-      const tracked = resolveRuntimeTrackedPayload(selected, context.linearAdvisoryState.tracked_issue);
+      const tracked = resolveRuntimeTrackedPayload(selected, context.linearAdvisoryState);
       const providerIntake = buildProviderIntakeSummary(context.providerIntakeState);
       const providerWorkflow = context.providerWorkflowConfigStore
         ? await context.providerWorkflowConfigStore.refresh()
@@ -217,7 +218,7 @@ function createControlRuntimeSnapshot(
         .filter((source): source is ControlCompatibilitySourceContext => source !== null);
       const issueIdentifier = selected?.issueIdentifier ?? selected?.taskId ?? selected?.runId ?? null;
       const dispatchPilotSummary = liveLinearAdvisoryRuntime.readSnapshotSummary(issueIdentifier);
-      const tracked = resolveRuntimeTrackedPayload(selected, context.linearAdvisoryState.tracked_issue);
+      const tracked = resolveRuntimeTrackedPayload(selected, context.linearAdvisoryState);
       const providerIntake = buildProviderIntakeSummary(context.providerIntakeState);
       const polling = readProviderPollingSnapshot(context);
       const providerWorkflow = context.providerWorkflowConfigStore
@@ -962,7 +963,7 @@ function isFallbackCompatibilityIdentityAlias(
 
 function resolveRuntimeTrackedPayload(
   selected: SelectedRunContext | ControlCompatibilitySourceContext | null,
-  advisoryTrackedIssue: LiveLinearTrackedIssue | null
+  advisoryState: { tracked_issue: LiveLinearTrackedIssue | null; stale_source?: unknown }
 ) {
   if (selected?.tracked) {
     if (linearTrackedIssueConflictsWithAuthoritativeIdentity(selected, selected.tracked.linear)) {
@@ -970,6 +971,10 @@ function resolveRuntimeTrackedPayload(
     }
     return selected.tracked;
   }
+  if (advisoryState.stale_source) {
+    return null;
+  }
+  const advisoryTrackedIssue = advisoryState.tracked_issue;
   if (!advisoryTrackedIssue) {
     return null;
   }
