@@ -352,6 +352,123 @@ describe('runProviderLinearChildLaneShell', () => {
     ]);
   });
 
+  it('preserves child stdout guardrail truth when manifest parsing fails', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const childRunDir = join(tempRoot ?? '', '.runs', `${TASK_ID}-guardrail-a`, 'cli', 'child-run-guardrail');
+    const env = buildProviderWorkerEnv(manifestPath, {
+      CODEX_ORCHESTRATOR_RUNS_DIR: join('/tmp', 'shared-runs'),
+      CODEX_ORCHESTRATOR_OUT_DIR: join('/tmp', 'shared-out'),
+      CODEX_HOME: join(tempRoot ?? '', 'codex-home'),
+      CO_LINEAR_API_TOKEN: 'lin-api-token'
+    });
+    const summary =
+      'Child lane guardrail-a failed.\nGuardrails: spec-guard failed (1/1 failed).';
+    const execRunner = vi.fn(async () => {
+      await mkdir(childRunDir, { recursive: true });
+      await writeFile(
+        join(childRunDir, PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME),
+        JSON.stringify({
+          issue_id: ISSUE.issue_id,
+          issue_identifier: ISSUE.issue_identifier,
+          task_id: `${TASK_ID}-guardrail-a`,
+          run_id: 'child-run-guardrail',
+          parent_run_id: RUN_ID,
+          stream: 'guardrail-a',
+          purpose: 'Capture guardrail output',
+          instructions: null,
+          scope: {
+            files: ['orchestrator/src/cli/providerLinearChildLaneShell.ts'],
+            phases: []
+          },
+          parent_snapshot: {
+            base_sha: 'parent-base-sha',
+            issue_updated_at: '2026-03-30T07:10:00.000Z',
+            issue_state: 'In Progress',
+            issue_state_type: 'started',
+            captured_at: '2026-03-30T07:11:00.000Z'
+          },
+          lane_workspace_path: join(tempRoot ?? '', '.child-lanes', 'guardrail-a-child-run-guardrail'),
+          lane_branch: 'child-lane/guardrail-a-child-run-guardrail',
+          patch_artifact_path: null,
+          patch_bytes: null,
+          thread_id: 'thread-1',
+          latest_turn_id: 'turn-1',
+          latest_session_id: 'thread-1-turn-1',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          last_event: 'task_failed',
+          last_message: summary,
+          last_event_at: '2026-03-30T07:12:00.000Z',
+          tokens: null,
+          rate_limits: null,
+          status: 'failed',
+          updated_at: '2026-03-30T07:12:00.000Z'
+        }),
+        'utf8'
+      );
+      return {
+        exitCode: 0,
+        stdout: [
+          'Advanced mode (auto) enabled.',
+          JSON.stringify({
+            run_id: 'child-run-guardrail',
+            status: 'failed',
+            artifact_root: `.runs/${TASK_ID}-guardrail-a/cli/child-run-guardrail`,
+            manifest: `.runs/${TASK_ID}-guardrail-a/cli/child-run-guardrail/manifest.json`,
+            log_path: `.runs/${TASK_ID}-guardrail-a/cli/child-run-guardrail/run.log`,
+            summary
+          }, null, 2)
+        ].join('\n'),
+        stderr: ''
+      };
+    });
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'launch',
+        streamName: 'guardrail-a',
+        purpose: 'Capture guardrail output',
+        files: ['orchestrator/src/cli/providerLinearChildLaneShell.ts'],
+        env
+      },
+      {
+        execRunner,
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: '2026-03-30T07:10:00.000Z',
+          state: 'In Progress',
+          state_type: 'started'
+        })) as never,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
+        readParentHeadSha: vi.fn(async () => 'parent-base-sha'),
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      child_run: {
+        status: 'failed',
+        summary,
+        guardrails_required: null,
+        guardrails_required_source: null,
+        guardrail_command_count: null
+      },
+      child_lane: {
+        summary,
+        guardrails_required: null,
+        guardrails_required_source: null,
+        guardrail_command_count: null
+      }
+    });
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
+      expect.objectContaining({
+        stream: 'guardrail-a',
+        summary
+      })
+    ]);
+  });
+
   it('backfills missing manifest provenance from the matching control-host env before launching a child lane', async () => {
     const { manifestPath } = await createProviderWorkerManifest();
     await writeFile(
