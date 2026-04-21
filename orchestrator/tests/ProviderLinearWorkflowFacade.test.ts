@@ -1977,6 +1977,116 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it('keeps title-prefix low-number foreign NODE keys conflicting without owned evidence', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'NODE-244',
+      title: 'Completed issue with title-prefix foreign NODE PR',
+      state: {
+        id: 'state-done',
+        name: 'Done',
+        type: 'completed'
+      },
+      attachments: [buildGitHubAttachment('attachment-pr-600', 600, 'fix: NODE-20 runtime upgrade')],
+      snapshotForPr: () => ({
+        state: 'OPEN',
+        mergedAt: null,
+        updatedAt: '2026-04-21T09:07:51.000Z',
+        title: 'fix: NODE-20 runtime upgrade',
+        headRefName: 'feature/runtime-upgrade'
+      })
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'NODE-244',
+        pull_request_attachments: {
+          current: null,
+          historical: [],
+          conflicting: [
+            {
+              id: 'attachment-pr-600'
+            }
+          ],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it('ignores low-number NODE title prefixes when another issue key owns the PR', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Active issue with low-number NODE title prefix and owned issue key',
+      state: {
+        id: 'state-in-progress',
+        name: 'In Progress',
+        type: 'started'
+      },
+      attachments: [buildGitHubAttachment('attachment-pr-601', 601, 'fix: NODE-20 provider upgrade for CO-244')],
+      snapshotForPr: () => ({
+        state: 'OPEN',
+        mergedAt: null,
+        updatedAt: '2026-04-21T09:07:51.000Z',
+        title: 'fix: NODE-20 provider upgrade for CO-244',
+        headRefName: 'feature/runtime-upgrade'
+      })
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-601'
+          },
+          historical: [],
+          conflicting: [],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it('keeps bracketed low-number NODE version labels on the conservative path', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'NODE-244',
+      title: 'Active issue with bracketed low-number NODE version label',
+      state: {
+        id: 'state-in-progress',
+        name: 'In Progress',
+        type: 'started'
+      },
+      attachments: [buildGitHubAttachment('attachment-pr-602', 602, 'runtime upgrade (NODE-20)')],
+      snapshotForPr: () => ({
+        state: 'OPEN',
+        mergedAt: null,
+        updatedAt: '2026-04-21T09:07:51.000Z',
+        title: 'runtime upgrade (NODE-20)',
+        headRefName: 'feature/runtime-upgrade'
+      })
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'NODE-244',
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-602'
+          },
+          historical: [],
+          conflicting: [],
+          unknown: []
+        }
+      }
+    });
+  });
+
   it('keeps linear branch namespace evidence for foreign technical-looking team prefixes', async () => {
     const { result } = await readIssueContextAttachmentTruth({
       identifier: 'CO-244',

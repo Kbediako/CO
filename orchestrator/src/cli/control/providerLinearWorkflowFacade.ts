@@ -1374,7 +1374,10 @@ function classifyIssuePullRequestEvidenceOwnership(
     if (entry.identifier === issueIdentifier || !isCommonTechnicalIdentifierToken(entry.identifier, entry.prefix)) {
       return true;
     }
-    return entry.strong_issue_owned_position;
+    if (entry.strong_issue_owned_position) {
+      return true;
+    }
+    return shouldRetainTechnicalForeignEvidence(issueIdentifier, rawEvidence, entry);
   });
   if (evidence.length === 0) {
     return 'unknown';
@@ -1418,6 +1421,18 @@ function extractIssueIdentifierEvidence(
     }
   }
   return [...identifiers.values()];
+}
+
+function shouldRetainTechnicalForeignEvidence(
+  issueIdentifier: string,
+  rawEvidence: readonly ProviderLinearIssueIdentifierEvidence[],
+  entry: ProviderLinearIssueIdentifierEvidence
+): boolean {
+  const issuePrefix = issueIdentifier.slice(0, issueIdentifier.indexOf('-'));
+  if (entry.prefix !== 'NODE' || issuePrefix !== entry.prefix || !entry.title_prefix_position) {
+    return false;
+  }
+  return !rawEvidence.some((candidate) => candidate.identifier === issueIdentifier && candidate.prefix === entry.prefix);
 }
 
 function resolveIssueOwnedIdentifierPositionFlags(
