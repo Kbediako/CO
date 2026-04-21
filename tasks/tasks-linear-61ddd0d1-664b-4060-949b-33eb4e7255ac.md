@@ -34,7 +34,7 @@
 - [x] Structured `CO_ORCHESTRATOR_DESTRUCTIVE_DECISION_REQUIRED` regression passes. Evidence: `npx vitest run --config vitest.config.core.ts tests/co-orchestration-autocontinue-hook.spec.ts`.
 - [x] Indented structured stop example regression passes. Evidence: focused Vitest spec passed after the standalone-review P2 fix.
 - [x] Sibling-prefix cwd regression passes. Evidence: focused Vitest spec passed 8 tests after the repo-root boundary review fix.
-- [x] Relevant repo validation gates pass. Evidence after latest `origin/main` merge: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npx vitest run --config vitest.config.core.ts tests/co-orchestration-autocontinue-hook.spec.ts`, `node scripts/diff-budget.mjs`, checksum parity, `npm run build`, `npm run lint` (three existing warnings only), `npm run test` (348 files / 4469 tests), `npm run docs:check`, `npm run docs:freshness`, and `npm run repo:stewardship`.
+- [x] Relevant repo validation gates pass. Evidence after latest `origin/main` merge and PR conflict recovery: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npx vitest run --config vitest.config.core.ts tests/co-orchestration-autocontinue-hook.spec.ts`, `node scripts/diff-budget.mjs`, checksum parity, `npm run build`, `npm run lint` (three existing warnings only), `npm run test` (348 files / 4470 tests), `npm run docs:check`, `npm run docs:freshness`, and `npm run repo:stewardship`.
 - [x] Standalone review and elegance review complete before review handoff. Evidence: `.runs/linear-61ddd0d1-664b-4060-949b-33eb4e7255ac/cli/2026-04-21T15-20-09-709Z-20bf52c5/review/telemetry.json` status `succeeded`, outcome `clean-success`; manual elegance pass found no simplification patch.
 
 ## Progress Log
@@ -45,6 +45,7 @@
 - 2026-04-22: addressed second standalone-review P2 by replacing string-prefix repo matching with path-boundary matching, added the sibling-prefix cwd regression, reran the focused hook spec (8 tests), and resynced the installed hook.
 - 2026-04-22: post-second-review-fix validation passed through delegation/spec guards, build, lint, full core test (348 files / 4466 tests), docs gates, stewardship, and diff-budget.
 - 2026-04-22: merged current `origin/main` (`0231b52d5`), reran the full validation floor (348 files / 4469 tests), reran forced standalone review to `clean-success`, and completed the explicit elegance pass with no patch.
+- 2026-04-22: PR ready-review detected new `origin/main` (`adfae4702`) and dirty merge state; resolved `docs/TASKS.md`, `docs/docs-freshness-registry.json`, and `tasks/index.json` by preserving both CO-297 and incoming CO-286 entries, then reran the validation floor (348 files / 4470 tests).
 
 ## Notes
 - Do not broaden into provider-worker state transitions or global Codex hook redesign.
