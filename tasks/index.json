@@ -1,6 +1,34 @@
 {
   "items": [
     {
+      "id": "20260422-linear-20102af9-9eb4-44d1-8988-c5de7869d990",
+      "title": "CO-298 stale control-host supervision status truth versus healthy live host truth",
+      "relates_to": "tasks/tasks-linear-20102af9-9eb4-44d1-8988-c5de7869d990.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-22",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-22",
+          "status": "produced",
+          "manifest": ".runs/linear-20102af9-9eb4-44d1-8988-c5de7869d990-docs-packet/cli/2026-04-21T21-55-47-184Z-46412546/manifest.json",
+          "source_anchor": "ctx:sha256:c525de17de4f7d9a3e2563fe0bc9102be9bfa86b386bf459bd96dae6990b5dc5#chunk:c000001",
+          "summary": "Docs-first packet created for CO-298 stale control-host supervision status truth versus healthy live host truth. The child checkout has no .runs tree, so the packet is anchored on the parent-provided live issue wording plus the current repo source audit only: `printControlHostSupervisionStatus()` builds `control-host supervise status --format json` from `launchctl print`, the persisted supervision state, and the LaunchAgent plist; `service.loaded` is derived from the `launchctl` exit code; `runControlHostSupervision()` persists `status=restart_required` and `last_health_status=probe_timeout` or other probe reasons; live health still comes from `co-status --format json`, with `provider-intake-state.json` remaining a separate live-host truth surface. Scope stays bounded to stale launchd/state truth versus healthy live host truth and leaves source, tests, Linear state, workpad, and PR lifecycle to the parent lane."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-20102af9-9eb4-44d1-8988-c5de7869d990.md",
+        "task": "tasks/tasks-linear-20102af9-9eb4-44d1-8988-c5de7869d990.md",
+        "agent_task": ".agent/task/linear-20102af9-9eb4-44d1-8988-c5de7869d990.md",
+        "docs": {
+          "TECH_SPEC": "tasks/specs/linear-20102af9-9eb4-44d1-8988-c5de7869d990.md"
+        }
+      }
+    },
+    {
       "id": "20260421-linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6",
       "title": "CO-292 retained released/not_active claim metadata refresh",
       "relates_to": "tasks/tasks-linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6.md",
