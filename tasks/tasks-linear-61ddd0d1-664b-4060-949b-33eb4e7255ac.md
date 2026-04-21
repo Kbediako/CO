@@ -37,6 +37,7 @@
 - [x] Default state path uses the current operator home instead of a user-specific absolute path. Evidence: focused Vitest spec passed 10 tests after the Codex and CodeRabbit PR feedback fixes.
 - [x] Non-positive `max_in_progress` values clamp to sane resume guidance. Evidence: focused Vitest spec passed 10 tests after the CodeRabbit feedback fix.
 - [x] Relevant repo validation gates pass. Evidence after the CodeRabbit feedback fixes: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npx vitest run --config vitest.config.core.ts tests/co-orchestration-autocontinue-hook.spec.ts` (10 tests), `node scripts/diff-budget.mjs`, checksum parity, `npm run build`, `npm run lint` (three existing warnings only), `npm run test` (348 files / 4472 tests), `npm run docs:check`, `npm run docs:freshness`, and `npm run repo:stewardship`.
+- [x] Final CodeRabbit MD058 table-spacing feedback fixed and docs gates rerun. Evidence: `node scripts/spec-guard.mjs --dry-run`, `npm run docs:check`, and `npm run docs:freshness` passed after adding the task-spec table spacer.
 - [x] Standalone review and elegance review complete before review handoff. Evidence: `.runs/linear-61ddd0d1-664b-4060-949b-33eb4e7255ac/cli/2026-04-21T15-20-09-709Z-20bf52c5/review/telemetry.json` status `succeeded`, outcome `bounded-success` after command-intent containment; final CodeRabbit-fix rerun found no actionable issues and manual elegance pass found no simplification patch.
 
 ## Progress Log
@@ -51,6 +52,7 @@
 - 2026-04-22: addressed Codex PR review P2 by deriving the default state path from `Path.home()` / `~/.codex/hooks/co_orchestration_autocontinue.json`, added a temp-`HOME` regression, reran validation through full core test (348 files / 4471 tests), resynced the installed hook, reran forced standalone review to `bounded-success`, and completed the explicit elegance pass with no patch.
 - 2026-04-22: addressed CodeRabbit feedback by adding the spec comma, clamping non-positive `max_in_progress` to `1`, adding a focused resume-prompt regression, rerunning validation through full core test (348 files / 4472 tests), and resyncing the installed hook.
 - 2026-04-22: reran forced standalone review after the CodeRabbit feedback fixes to `bounded-success`; final manual elegance pass found no simplification patch.
+- 2026-04-22: addressed final CodeRabbit MD058 feedback by adding the blank line before the task-spec parity table, reran `spec-guard`, `docs:check`, and `docs:freshness`, reran forced standalone review to `bounded-success` with no actionable findings, and kept the explicit elegance pass at no simplification patch.
 
 ## Notes
 - Do not broaden into provider-worker state transitions or global Codex hook redesign.
