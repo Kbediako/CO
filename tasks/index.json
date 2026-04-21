@@ -1,6 +1,44 @@
 {
   "items": [
     {
+      "id": "20260421-linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6",
+      "title": "CO-292 retained released/not_active claim metadata refresh",
+      "relates_to": "tasks/tasks-linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-21",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-21",
+          "status": "produced",
+          "manifest": ".runs/linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6-docs-packet/cli/2026-04-21T08-42-08-368Z-fc919095/manifest.json",
+          "source_anchor": "ctx:sha256:5574aa4af60d136430e7ea00cd74f65b764189a922ceb18aa44debc230b470c9#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-292 as metadata-only refresh for retained provider-intake-state.json rows with state=released and reason=provider_issue_released:not_active: update issue_state, issue_state_type, and issue_updated_at from newer same-issue live truth, including non-active Blocked -> Rework changes, while aligning dependent blocker snapshots and rejecting active-claim metadata refresh, Ready reclaim/admission, refresh-stuck restart recovery, destructive retained-row cleanup, and unbounded direct issue-by-id reads over retained released residue. Parent verified and corrected the packet source anchor to the worker prompt payload before implementation; no Linear mutation was performed."
+        },
+        "parent_validation": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-21",
+          "status": "implemented-blocked-before-review-handoff",
+          "manifest": ".runs/linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6/cli/2026-04-21T08-38-59-755Z-468836b9/manifest.json",
+          "review_telemetry": ".runs/linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6/cli/2026-04-21T08-38-59-755Z-468836b9/review/telemetry.json",
+          "summary": "Parent implementation refreshed retained released/not_active metadata from newer same-issue tracked issue and dependent blocker truth, preserved release cancellation and terminal release behavior, and passed focused provider handoff regressions, full ProviderIssueHandoff suite, build, lint, full test, delegation guard, spec guard dry-run, repo stewardship, diff budget, pack smoke, and bounded-success standalone review. PR/review handoff is blocked because docs:check and docs:freshness fail on unrelated linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb baseline debt tracked as CO-293."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6-control-host-refresh-retained-released-not-active-claim-metadata.md",
+        "task": "tasks/tasks-linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6.md",
+        "agent_task": ".agent/task/linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6.md"
+        }
+      }
+    },
+    {
       "id": "20260422-linear-61ddd0d1-664b-4060-949b-33eb4e7255ac",
       "title": "CO-297 stop-hook structured sentinel contract",
       "relates_to": "tasks/tasks-linear-61ddd0d1-664b-4060-949b-33eb4e7255ac.md",
