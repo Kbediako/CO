@@ -2032,6 +2032,7 @@ export function createProviderIssueHandoffService(
     claim: ProviderIntakeClaimRecord;
     nextReason: string;
     releaseRun: ProviderIssueRunRecord | null;
+    allowClearingRunIdentity?: boolean;
     trackedIssue?: Pick<
       LiveLinearTrackedIssue,
       | 'identifier'
@@ -2055,6 +2056,7 @@ export function createProviderIssueHandoffService(
     const retainedRunIdentity = resolveReleasedClaimRetainedRunIdentity({
       claim: input.claim,
       run: input.releaseRun,
+      allowClearing: input.allowClearingRunIdentity,
       trackedIssue: input.trackedIssue ?? null
     });
     const transitioned = hasProviderClaimTransitioned(input.claim, {
@@ -3383,12 +3385,22 @@ export function createProviderIssueHandoffService(
               : preserveReleasedIssueMetadata
                 ? existing.issue_state_type
                 : claimBase.issue_state_type;
+          const canUseWebhookTruthForRetainedIdentity =
+            releasedWebhookTiming === 'newer' ||
+            releasedWebhookTiming === 'equal';
           const retainedRunIdentity = resolveReleasedClaimRetainedRunIdentity({
             claim: existing,
             run: releasedRun,
-            trackedIssue: input.trackedIssue,
-            issueState: nextReleasedIssueState,
-            issueStateType: nextReleasedIssueStateType
+            allowClearing: canUseWebhookTruthForRetainedIdentity,
+            trackedIssue: canUseWebhookTruthForRetainedIdentity ? input.trackedIssue : null,
+            issueState:
+              canUseWebhookTruthForRetainedIdentity
+                ? nextReleasedIssueState
+                : existing.issue_state,
+            issueStateType:
+              canUseWebhookTruthForRetainedIdentity
+                ? nextReleasedIssueStateType
+                : existing.issue_state_type
           });
           const claim = await upsertProviderClaimAndPersist({
             ...claimBase,
@@ -3517,6 +3529,7 @@ export function createProviderIssueHandoffService(
               claim: existing,
               nextReason: eligibility.releaseReason,
               releaseRun,
+              allowClearingRunIdentity: input.webhookTimestamp !== null,
               trackedIssue: input.trackedIssue,
               cleanupWorkspace: eligibility.cleanupWorkspace
             });
@@ -6405,6 +6418,7 @@ function shouldCleanupReleasedProviderWorkspace(claim: ProviderIntakeClaimRecord
 function resolveReleasedClaimRetainedRunIdentity(input: {
   claim: ProviderIntakeClaimRecord;
   run: ProviderIssueRunRecord | null;
+  allowClearing?: boolean;
   trackedIssue?: Pick<LiveLinearTrackedIssue, 'state' | 'state_type'> | null;
   issueState?: string | null;
   issueStateType?: string | null;
@@ -6416,7 +6430,7 @@ function resolveReleasedClaimRetainedRunIdentity(input: {
 > &
   Pick<ProviderIntakeClaimRecord, 'task_id' | 'run_id' | 'run_manifest_path'> {
   const taskId = input.run?.taskId ?? input.claim.task_id;
-  if (shouldClearReleasedClaimRunIdentity(input)) {
+  if (input.allowClearing !== false && shouldClearReleasedClaimRunIdentity(input)) {
     return {
       task_id: taskId,
       run_id: null,

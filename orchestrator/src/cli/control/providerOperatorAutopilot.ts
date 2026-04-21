@@ -1284,7 +1284,7 @@ const EXTERNAL_PR_REFERENCE_PATTERN =
 const EXTERNAL_PR_REFERENCE_PATTERN_GLOBAL =
   /\b(?:pr|pull request)\b(?:\s|`|\[|\]|\(|\))*#?\d+\b/giu;
 const EXTERNAL_PR_MERGE_BLOCKER_PATTERN =
-  /\bnot\s+(?:yet\s+)?merged\b|\bneeds?\s+(?:to\s+)?be\s+merged\b|\bmerge\s+pending\b|\bpending\s+merge\b/giu;
+  /\bclosed\s+unmerged\b|\bunmerged\b|\bnot\s+(?:yet\s+)?merged\b|\bneeds?\s+(?:to\s+)?be\s+merged\b|\bmerge\s+pending\b|\bpending\s+merge\b/giu;
 
 function classifyExternalPrHintBlock(segment: string): 'blocked' | 'resolved' | null {
   let sawResolved = false;
@@ -1307,7 +1307,7 @@ function splitExternalPrReferenceSegments(segment: string): string[] {
   }
   return matches
     .map((match, index) => {
-      const start = match.index ?? 0;
+      const start = index === 0 ? 0 : (match.index ?? 0);
       const end = matches[index + 1]?.index ?? segment.length;
       return segment.slice(start, end).trim();
     })
@@ -1320,7 +1320,7 @@ function classifyExternalPrHintSegment(segment: string): 'blocked' | 'resolved' 
   }
   const resolvedSignals = collectExternalPrHintSignals(
     segment,
-    /\b(?:no longer|not|isn't|is not)\s+(?:block(?:ed|er|ing)?|pending|failing|dirty|draft)\b|\bchecks?\s+(?:passed|passing|green|clean)\b|\b(?:unblocked|closed)\b/giu,
+    /\b(?:no longer|not|isn't|is not)\s+(?:block(?:ed|er|ing)?|pending|failing|dirty|draft)\b|\bchecks?\s+(?:passed|passing|green|clean)\b|\bunblocked\b|\bclosed\b(?!\s+unmerged\b)/giu,
     'resolved'
   );
   const mergeBlockerSignals = collectExternalPrHintSignals(
