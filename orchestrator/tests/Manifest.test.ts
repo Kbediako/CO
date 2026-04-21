@@ -1786,6 +1786,7 @@ describe('buildGuardrailSummary', () => {
       });
 
       expect(manifest.guardrails_required).toBe(false);
+      expect(manifest.guardrails_required_source).toBe('stage_detection');
       const summary = buildGuardrailSummary(manifest);
       expect(summary).toBe('Guardrails: spec-guard not configured for this pipeline.');
 
@@ -1823,6 +1824,7 @@ describe('buildGuardrailSummary', () => {
       });
 
       expect(manifest.guardrails_required).toBe(true);
+      expect(manifest.guardrails_required_source).toBe('explicit');
       expect(buildGuardrailSummary(manifest)).toBe('Guardrails: spec-guard command not found.');
       const snapshot = ensureGuardrailStatus(manifest);
       expect(snapshot.recommendation).toContain('Guardrail command missing;');
@@ -1831,6 +1833,47 @@ describe('buildGuardrailSummary', () => {
 
       expect(manifest.summary).toContain('Guardrail command missing;');
       expect(manifest.summary).toContain('Guardrails: spec-guard command not found.');
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('preserves explicit required missing guardrail truth for provider-worker manifests', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-provider-required-missing-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'guardrail-task'
+    };
+    try {
+      const pipeline: PipelineDefinition = {
+        id: 'provider-linear-worker',
+        title: 'Provider Linear Worker',
+        guardrailsRequired: true,
+        stages: [
+          {
+            kind: 'command',
+            id: 'provider-linear-worker',
+            title: 'Run provider linear worker',
+            command: 'node dist/orchestrator/src/cli/providerLinearWorkerRunner.js'
+          }
+        ]
+      };
+
+      const { manifest } = await bootstrapManifest('run-provider-required-missing', {
+        env,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      expect(manifest.guardrails_required).toBe(true);
+      expect(manifest.guardrails_required_source).toBe('explicit');
+      expect(buildGuardrailSummary(manifest)).toBe('Guardrails: spec-guard command not found.');
+      const snapshot = ensureGuardrailStatus(manifest);
+      expect(snapshot.recommendation).toContain('Guardrail command missing;');
     } finally {
       await rm(repoRoot, { recursive: true, force: true });
     }

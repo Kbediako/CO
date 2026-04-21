@@ -65,9 +65,12 @@ export interface GuardrailStatusSnapshot {
 
 type GuardrailApplicabilityManifestLike = {
   guardrails_required?: unknown;
+  guardrails_required_source?: unknown;
   pipeline_id?: unknown;
   commands?: unknown;
 };
+
+type GuardrailsRequiredSource = 'explicit' | 'stage_detection';
 
 interface GuardrailCounts {
   total: number;
@@ -185,6 +188,7 @@ export async function bootstrapManifest(runId: string, options: ManifestBootstra
     instructions_sources: [],
     prompt_packs: [],
     guardrails_required: resolveGuardrailsRequiredForPipeline(pipeline),
+    guardrails_required_source: resolveGuardrailsRequiredSourceForPipeline(pipeline),
     runtime_mode_requested: 'appserver',
     runtime_mode: 'appserver',
     runtime_provider: runtimeProviderForMode('appserver'),
@@ -553,13 +557,21 @@ export function resolveGuardrailsRequiredForPipeline(pipeline: PipelineDefinitio
   return pipeline.stages.some((stage) => isGuardrailPipelineStage(stage));
 }
 
+export function resolveGuardrailsRequiredSourceForPipeline(
+  pipeline: PipelineDefinition
+): GuardrailsRequiredSource {
+  return typeof pipeline.guardrailsRequired === 'boolean' ? 'explicit' : 'stage_detection';
+}
+
 export function resolveGuardrailsRequiredForManifest(manifest: GuardrailApplicabilityManifestLike): boolean {
   const guardrailCommands = selectGuardrailCommands(manifest);
   if (typeof manifest.guardrails_required === 'boolean') {
+    const source = normalizeGuardrailsRequiredSource(manifest.guardrails_required_source);
     if (
       manifest.guardrails_required &&
       guardrailCommands.length === 0 &&
-      isKnownNonGuardrailPipelineManifest(manifest)
+      isKnownNonGuardrailPipelineManifest(manifest) &&
+      source !== 'explicit'
     ) {
       return false;
     }
@@ -752,6 +764,10 @@ function isGuardrailRecommendationLine(line: string): boolean {
 function isGuardrailSummaryOrRecommendationLine(line: string): boolean {
   const trimmed = line.trim();
   return trimmed.toLowerCase().startsWith('guardrails:') || isGuardrailRecommendationLine(trimmed);
+}
+
+function normalizeGuardrailsRequiredSource(value: unknown): GuardrailsRequiredSource | null {
+  return value === 'explicit' || value === 'stage_detection' ? value : null;
 }
 
 function isKnownNonGuardrailPipelineManifest(manifest: GuardrailApplicabilityManifestLike): boolean {
