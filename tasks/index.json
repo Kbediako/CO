@@ -1,6 +1,44 @@
 {
   "items": [
     {
+      "id": "20260421-linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6",
+      "title": "CO-292 retained released/not_active claim metadata refresh",
+      "relates_to": "tasks/tasks-linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-21",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-21",
+          "status": "produced",
+          "manifest": ".runs/linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6-docs-packet/cli/2026-04-21T08-42-08-368Z-fc919095/manifest.json",
+          "source_anchor": "ctx:sha256:5574aa4af60d136430e7ea00cd74f65b764189a922ceb18aa44debc230b470c9#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-292 as metadata-only refresh for retained provider-intake-state.json rows with state=released and reason=provider_issue_released:not_active: update issue_state, issue_state_type, and issue_updated_at from newer same-issue live truth, including non-active Blocked -> Rework changes, while aligning dependent blocker snapshots and rejecting active-claim metadata refresh, Ready reclaim/admission, refresh-stuck restart recovery, destructive retained-row cleanup, and unbounded direct issue-by-id reads over retained released residue. Parent verified and corrected the packet source anchor to the worker prompt payload before implementation; no Linear mutation was performed."
+        },
+        "parent_validation": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-21",
+          "status": "validated-ready-for-pr-handoff",
+          "manifest": ".runs/linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6/cli/2026-04-21T21-44-13-763Z-2c7478ee/manifest.json",
+          "review_telemetry": ".runs/linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6/cli/2026-04-21T21-44-13-763Z-2c7478ee/review/telemetry.json",
+          "summary": "Parent follow-up implementation fixed the first review's deferred fresh-discovery release and failure-containment defects, added matching regressions, and reran build, lint, full test (4482 tests), pack smoke, a clean standalone review rerun, explicit elegance review, docs:check, docs:freshness, repo:stewardship, and diff-budget successfully on the updated packet. PR creation, attachment, ready-review drain, and review-state handoff remain pending."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6-control-host-refresh-retained-released-not-active-claim-metadata.md",
+        "task": "tasks/tasks-linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6.md",
+        "agent_task": ".agent/task/linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6.md"
+        }
+      }
+    },
+    {
       "id": "20260421-linear-39a559e9-8da2-444d-93e6-2c3ad216f730",
       "title": "CO STATUS / observability: recover direct co-status --format json when current /ui/data.json times out on a healthy control-host",
       "relates_to": "tasks/tasks-linear-39a559e9-8da2-444d-93e6-2c3ad216f730.md",
