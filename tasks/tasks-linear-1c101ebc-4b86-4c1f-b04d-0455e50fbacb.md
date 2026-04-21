@@ -46,13 +46,15 @@
 - [x] `npm run docs:check`. Evidence: `✅ docs:check: OK`.
 - [x] `npm run docs:freshness`. Evidence: `docs:freshness OK - 4325 docs, 4328 registry entries`.
 - [x] `npm run repo:stewardship`. Evidence: `repo:stewardship OK - 5429 tracked files, 0 action-required`.
-- [x] `node scripts/diff-budget.mjs`. Evidence: `✅ Diff budget: OK (scope=working-tree, files=1/25, lines=2/1200, +1/-1); advisory stacked aggregate vs origin/main: files=14/25, lines=430/1200, +409/-21`.
-- [ ] Manifest-backed standalone review plus explicit elegance/minimality pass. Evidence: first review completed with `status=succeeded`, `review_outcome=bounded-success`, and one P2 mirror-status finding now addressed; clean review rerun and elegance pass pending.
+- [x] `npm run docs:archive-tasks`. Evidence: archived one older completed snapshot and kept `docs/TASKS.md` at `440` lines, matching the reserve target.
+- [x] Review-finding targeted checks pass. Evidence: `git diff --check`; targeted protected-README `rg` returned no `0801-dead-code-pruning` archive residue and no package-level `npm start` guidance; `wc -l docs/TASKS.md` returned `440`.
+- [x] `node scripts/diff-budget.mjs`. Evidence: `✅ Diff budget: OK (scope=working-tree, files=3/25, lines=7/1200, +3/-4); advisory stacked aggregate vs origin/main: files=14/25, lines=431/1200, +409/-22`.
+- [ ] Manifest-backed standalone review plus explicit elegance/minimality pass. Evidence: review runs completed with `status=succeeded`, `review_outcome=bounded-success`; addressed P2 findings so far are stale mirror status, `docs/TASKS.md` reserve target, and misleading package-level start guidance. Clean review rerun and elegance pass pending.
 
 ## Handoff
 - [x] Parent kept out-of-scope validation follow-ups out of CO-276. Evidence: CO-290 and CO-291 were closed invalid after current-main validation, so no CO-276 scope expansion is required.
 - [ ] Parent refreshes the single workpad with docs, implementation, validation, and review status before handoff. Evidence: pending final refresh.
-- [ ] Parent attaches a PR and completes the normal review-state prerequisites before `In Review`. Evidence: pending clean review rerun, explicit elegance pass, PR, and ready-review drain.
+- [ ] Parent attaches a PR and completes the normal review-state prerequisites before `In Review`. Evidence: pending clean review rerun after P2 fixes, explicit elegance pass, PR, and ready-review drain.
 
 ## Progress Log
 - 2026-04-21: parent moved CO-276 from `Ready` to `In Progress`, created the single persistent workpad, recorded the required same-turn parallelization decision, and attempted same-issue docs child-lane launch.
@@ -61,3 +63,4 @@
 - 2026-04-21: clean issue worktree `/Users/kbediako/Code/CO/.workspaces/linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb` created from `origin/main` because the shared checkout was on unrelated CO-278 work; seven protected README files were updated and targeted 0801 archive residue search returned no matches.
 - 2026-04-21: resumed provider turn reconciled current `origin/main`, combined CO-276 registry entries with newer main packet entries, and updated the packet away from the earlier blocked CO-290 posture.
 - 2026-04-21: clean intentional full-suite validation showed `346` files / `4450` tests passed, including the previous CLI command-surface and SDK artifact-retention blockers; final handoff still requires clean standalone review rerun, elegance pass, PR attachment, and ready-review drain.
+- 2026-04-21: manifest-backed review surfaced P2 findings for `docs/TASKS.md` reserve headroom and package-level start guidance; parent addressed both by running `npm run docs:archive-tasks`, keeping `docs/TASKS.md` at `440` lines, and removing misleading package-level `npm start` guidance from the affected mirror READMEs.

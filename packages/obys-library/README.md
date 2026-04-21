@@ -9,7 +9,7 @@ Pixel-perfect local clone of https://library.obys.agency for HiFi toolkit testin
 3. Serve through the shared harness: `npm run mirror:serve -- --project obys-library --port 4173`
 4. Open `http://localhost:4173` for the mirrored experience.
 
-The package-level `npm start` also serves this project through the shared mirror harness after `public/` has been regenerated. Set `MCP_RUNNER_TASK_ID=<task-id>` before mirror commands when you need manifests routed to a task-scoped local run directory.
+Set `MCP_RUNNER_TASK_ID=<task-id>` before mirror commands when you need manifests routed to a task-scoped local run directory.
 
 ## Structure
 

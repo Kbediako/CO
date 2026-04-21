@@ -8,4 +8,4 @@ Tracked checkout only retains the mirror configuration, package harness, and a p
 2. Serve the regenerated mirror: `npm run mirror:serve -- --project eminente --port 4173`
 3. Validate the mirror when `public/` changes: `npm run mirror:check -- --project eminente`
 
-The package-level `npm start` also serves this project through the shared mirror harness after `public/` has been regenerated. Set `MCP_RUNNER_TASK_ID=<task-id>` before mirror commands when you need manifests routed to a task-scoped local run directory.
+Set `MCP_RUNNER_TASK_ID=<task-id>` before mirror commands when you need manifests routed to a task-scoped local run directory.
