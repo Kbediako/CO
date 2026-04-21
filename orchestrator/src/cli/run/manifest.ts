@@ -577,7 +577,7 @@ export function resolveGuardrailsRequiredForManifest(manifest: GuardrailApplicab
       manifest.guardrails_required &&
       guardrailCommands.length === 0 &&
       isKnownNonGuardrailPipelineManifest(manifest) &&
-      source !== 'explicit'
+      source === 'stage_detection'
     ) {
       return false;
     }
@@ -601,7 +601,7 @@ export function stripNonApplicableGuardrailSummaryLines(
   }
   const source = resolveGuardrailsRequiredSourceForManifest(manifest);
   const canStripLegacyMixedSummary =
-    source !== 'explicit' &&
+    source === 'stage_detection' &&
     isKnownNonGuardrailPipelineManifest(manifest) &&
     lines.some((line) => !isGuardrailSummaryOrRecommendationLine(line));
   if (resolveGuardrailsRequiredForManifest(manifest) && !canStripLegacyMixedSummary) {

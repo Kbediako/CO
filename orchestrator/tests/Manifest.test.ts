@@ -1879,7 +1879,27 @@ describe('buildGuardrailSummary', () => {
     }
   });
 
-  it('strips legacy provider-worker default missing guardrail summaries', () => {
+  it('strips stage-detected provider-worker default missing guardrail summaries', () => {
+    const summary = stripNonApplicableGuardrailSummaryLines(
+      {
+        pipeline_id: 'provider-linear-worker',
+        guardrails_required: true,
+        guardrails_required_source: 'stage_detection',
+        commands: [
+          {
+            id: 'provider-linear-worker',
+            title: 'Provider Linear Worker',
+            command: 'node dist/orchestrator/src/cli/providerLinearWorkerRunner.js'
+          }
+        ]
+      },
+      "Stage 'fail once' failed with exit code 1.\nGuardrails: spec-guard command not found."
+    );
+
+    expect(summary).toBe("Stage 'fail once' failed with exit code 1.");
+  });
+
+  it('preserves unknown-source required provider missing summaries', () => {
     const summary = stripNonApplicableGuardrailSummaryLines(
       {
         pipeline_id: 'provider-linear-worker',
@@ -1895,7 +1915,9 @@ describe('buildGuardrailSummary', () => {
       "Stage 'fail once' failed with exit code 1.\nGuardrails: spec-guard command not found."
     );
 
-    expect(summary).toBe("Stage 'fail once' failed with exit code 1.");
+    expect(summary).toBe(
+      "Stage 'fail once' failed with exit code 1.\nGuardrails: spec-guard command not found."
+    );
   });
 
   it('preserves explicit provider-worker required missing summaries', () => {
