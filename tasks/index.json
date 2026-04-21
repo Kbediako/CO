@@ -1,6 +1,34 @@
 {
   "items": [
     {
+      "id": "20260422-linear-20102af9-9eb4-44d1-8988-c5de7869d990",
+      "title": "CO-298 stale control-host supervision status truth versus healthy live host truth",
+      "relates_to": "tasks/tasks-linear-20102af9-9eb4-44d1-8988-c5de7869d990.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-22",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-22",
+          "status": "produced",
+          "manifest": ".runs/linear-20102af9-9eb4-44d1-8988-c5de7869d990-docs-packet/cli/2026-04-21T21-55-47-184Z-46412546/manifest.json",
+          "source_anchor": "ctx:sha256:c525de17de4f7d9a3e2563fe0bc9102be9bfa86b386bf459bd96dae6990b5dc5#chunk:c000001",
+          "summary": "Docs-first packet created for CO-298 stale control-host supervision status truth versus healthy live host truth. The child checkout has no .runs tree, so the packet is anchored on the parent-provided live issue wording plus the current repo source audit only: `printControlHostSupervisionStatus()` builds `control-host supervise status --format json` from `launchctl print`, the persisted supervision state, and the LaunchAgent plist; `service.loaded` is derived from the `launchctl` exit code; `runControlHostSupervision()` persists `status=restart_required` and `last_health_status=probe_timeout` or other probe reasons; live health still comes from `co-status --format json`, with `provider-intake-state.json` remaining a separate live-host truth surface. Scope stays bounded to stale launchd/state truth versus healthy live host truth and leaves source, tests, Linear state, workpad, and PR lifecycle to the parent lane."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-20102af9-9eb4-44d1-8988-c5de7869d990.md",
+        "task": "tasks/tasks-linear-20102af9-9eb4-44d1-8988-c5de7869d990.md",
+        "agent_task": ".agent/task/linear-20102af9-9eb4-44d1-8988-c5de7869d990.md",
+        "docs": {
+          "TECH_SPEC": "tasks/specs/linear-20102af9-9eb4-44d1-8988-c5de7869d990.md"
+        }
+      }
+    },
+    {
       "id": "20260422-linear-994efebc-e1e4-4e00-8046-c60143813251",
       "title": "CO-295 Linear PR attachment ownership truth",
       "relates_to": "tasks/tasks-linear-994efebc-e1e4-4e00-8046-c60143813251.md",
@@ -13,8 +41,8 @@
         "rework_reset": {
           "reviewer": "parent provider worker",
           "date": "2026-04-22",
-          "status": "in_progress",
-          "summary": "Fresh Rework attempt is active: live issue-context shows state Rework with current PR null and historical attachments #587/#532/#575; the stale workpad was deleted, PR #587 was closed, and branch linear/co-295-pr-attachment-ownership-truth-rework was cut from origin/main."
+          "status": "completed",
+          "summary": "Fresh Rework attempt reset the lane cleanly: PR #587 was closed, the stale workpad was deleted, and branch linear/co-295-pr-attachment-ownership-truth-rework was cut from origin/main before implementation restarted."
         },
         "parallelization_decision": {
           "reviewer": "parent provider worker",
@@ -39,7 +67,7 @@
           "reviewer": "parent provider worker",
           "date": "2026-04-22",
           "status": "accepted",
-          "summary": "The fresh Rework branch now carries the ownership-aware providerLinearWorkflowFacade source/test diff plus the restored CO-295 docs packet. The .agent/task mirror came from the accepted child lane, and the remaining PRD / TECH_SPEC / ACTION_PLAN / task registry files were restored in the parent workspace from preserved commit baa1a7540c52f7a2a13439deaa6970c4990665e7 before revalidation."
+          "summary": "The fresh branch restored the CO-295 docs packet and registry mirrors before revalidation, combining the accepted same-issue docs lane output with parent-owned packet refresh on the new Rework branch."
         },
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
@@ -48,6 +76,13 @@
           "manifest": ".runs/linear-994efebc-e1e4-4e00-8046-c60143813251-docs-review-r3/cli/2026-04-21T22-30-54-818Z-6b2532c7/manifest.json",
           "telemetry": ".runs/linear-994efebc-e1e4-4e00-8046-c60143813251-docs-review-r3/cli/2026-04-21T22-30-54-818Z-6b2532c7/review/telemetry.json",
           "summary": "Final current-head docs-review rerun `docs-review-r3` succeeded after the ownership-edge fixes; review telemetry recorded `review_outcome: clean-success`."
+        },
+        "parent_validation": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-22",
+          "status": "validated-ready-for-review-drain",
+          "review_telemetry": ".runs/linear-994efebc-e1e4-4e00-8046-c60143813251/cli/2026-04-21T16-08-48-577Z-c085bbbf/review/telemetry.json",
+          "summary": "Current head with follow-up commit 503e3cec4 passed focused facade tests (`245/245`), build, lint (existing warnings only), full test (`4533`), docs:check, docs:freshness, repo:stewardship, diff-budget, pack:smoke, and wrapper review clean-success. Remaining work is the post-push ready-review drain and review-state handoff."
         }
       },
       "paths": {
