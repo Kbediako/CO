@@ -277,6 +277,7 @@ export async function runProviderLinearChildLaneShell(
     !context.providerControlHostRunId ||
     !context.providerControlHostMatchesManifest
   ) {
+    const message = formatProviderWorkerChildLaneProvenanceInvalidMessage(context, env);
     return failureResult({
       action: normalizeAction(params.action) ?? 'launch',
       issueId: context.issueId,
@@ -286,7 +287,7 @@ export async function runProviderLinearChildLaneShell(
       childRun: null,
       childLane: null,
       code: 'provider_worker_child_lane_provenance_invalid',
-      message: 'linear child-lane requires provider control-host provenance recorded on the parent provider-worker manifest and matching active environment.',
+      message,
       status: 412
     });
   }
@@ -2726,6 +2727,38 @@ function failureResult(input: {
       status: input.status
     }
   };
+}
+
+function formatProviderWorkerChildLaneProvenanceInvalidMessage(
+  context: Pick<
+    Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>,
+    | 'manifest'
+    | 'manifestPath'
+    | 'providerControlHostRecordedInManifest'
+    | 'providerControlHostMatchesManifest'
+  >,
+  env: NodeJS.ProcessEnv
+): string {
+  const manifestLaunchSource =
+    normalizeOptionalString(context.manifest.provider_launch_source) ??
+    normalizeOptionalString(context.manifest.providerLaunchSource);
+  const manifestTaskId =
+    normalizeOptionalString(context.manifest.provider_control_host_task_id) ??
+    normalizeOptionalString(context.manifest.providerControlHostTaskId);
+  const manifestRunId =
+    normalizeOptionalString(context.manifest.provider_control_host_run_id) ??
+    normalizeOptionalString(context.manifest.providerControlHostRunId);
+  const envLaunchSource = normalizeOptionalString(env[PROVIDER_LAUNCH_SOURCE_ENV]);
+  const envTaskId = normalizeOptionalString(env[PROVIDER_CONTROL_HOST_TASK_ID_ENV]);
+  const envRunId = normalizeOptionalString(env[PROVIDER_CONTROL_HOST_RUN_ID_ENV]);
+  return [
+    'linear child-lane requires provider control-host provenance recorded on the parent provider-worker manifest and matching active environment.',
+    'Required manifest fields: provider_launch_source=control-host, provider_control_host_task_id, provider_control_host_run_id.',
+    `Parent manifest: ${context.manifestPath}.`,
+    `Manifest values: provider_launch_source=${manifestLaunchSource ?? 'missing'}, provider_control_host_task_id=${manifestTaskId ?? 'missing'}, provider_control_host_run_id=${manifestRunId ?? 'missing'}.`,
+    `Active env values: ${PROVIDER_LAUNCH_SOURCE_ENV}=${envLaunchSource ?? 'missing'}, ${PROVIDER_CONTROL_HOST_TASK_ID_ENV}=${envTaskId ?? 'missing'}, ${PROVIDER_CONTROL_HOST_RUN_ID_ENV}=${envRunId ?? 'missing'}.`,
+    `recorded=${String(context.providerControlHostRecordedInManifest)} matches=${String(context.providerControlHostMatchesManifest)}.`
+  ].join(' ');
 }
 
 function normalizeOptionalString(value: unknown): string | null {
