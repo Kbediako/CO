@@ -1,5 +1,7 @@
-# Des-Obys Mirror Assets (Archived)
+# Des-Obys Mirror Assets
 
-Static mirror output was relocated to `.runs/0801-dead-code-pruning/archive/2025-12-08T10-01-24Z/packages/des-obys/public/` during Task 0801 cleanup.
+`packages/des-obys/public/` is rebuilt on demand and no historical snapshot is tracked in fresh checkouts after Task 0801 dead-code pruning.
 
-If you need the snapshot, pull it from the archive path or re-run the mirror scripts for a fresh capture.
+- Regenerate fresh assets: `npm run mirror:fetch -- --project des-obys`
+- Validate the rebuilt mirror: `npm run mirror:check -- --project des-obys`
+- Serve locally: `npm run mirror:serve -- --project des-obys --port 4173`
