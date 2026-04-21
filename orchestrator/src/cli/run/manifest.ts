@@ -563,10 +563,16 @@ export function resolveGuardrailsRequiredSourceForPipeline(
   return typeof pipeline.guardrailsRequired === 'boolean' ? 'explicit' : 'stage_detection';
 }
 
+export function resolveGuardrailsRequiredSourceForManifest(
+  manifest: GuardrailApplicabilityManifestLike
+): GuardrailsRequiredSource | null {
+  return normalizeGuardrailsRequiredSource(manifest.guardrails_required_source);
+}
+
 export function resolveGuardrailsRequiredForManifest(manifest: GuardrailApplicabilityManifestLike): boolean {
   const guardrailCommands = selectGuardrailCommands(manifest);
   if (typeof manifest.guardrails_required === 'boolean') {
-    const source = normalizeGuardrailsRequiredSource(manifest.guardrails_required_source);
+    const source = resolveGuardrailsRequiredSourceForManifest(manifest);
     if (
       manifest.guardrails_required &&
       guardrailCommands.length === 0 &&
@@ -593,7 +599,9 @@ export function stripNonApplicableGuardrailSummaryLines(
   if (guardrailCommands.length > 0) {
     return normalized;
   }
+  const source = resolveGuardrailsRequiredSourceForManifest(manifest);
   const canStripLegacyMixedSummary =
+    source !== 'explicit' &&
     isKnownNonGuardrailPipelineManifest(manifest) &&
     lines.some((line) => !isGuardrailSummaryOrRecommendationLine(line));
   if (resolveGuardrailsRequiredForManifest(manifest) && !canStripLegacyMixedSummary) {

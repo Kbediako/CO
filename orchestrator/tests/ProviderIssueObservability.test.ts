@@ -1048,6 +1048,43 @@ describe('provider issue observability', () => {
     );
   });
 
+  it('preserves child-lane required-missing guardrail text when manifest metadata proves explicit opt-in', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
+      proof: {
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        last_event: 'turn_started',
+        last_message: 'Provider worker turn is active.',
+        last_event_at: '2026-04-18T02:00:00.000Z',
+        updated_at: '2026-04-18T02:01:00.000Z',
+        child_lanes: [
+          {
+            stream: 'explicit-required-guardrail',
+            pipeline_id: 'provider-linear-child-lane',
+            task_id: 'linear-co-225-explicit-required',
+            run_id: 'run-lane-explicit-required-225',
+            status: 'failed',
+            launched_at: '2026-04-18T02:00:10.000Z',
+            decision: 'pending',
+            summary_recorded_at: '2026-04-18T02:00:40.000Z',
+            guardrails_required: true,
+            guardrails_required_source: 'explicit',
+            guardrail_command_count: 0,
+            summary:
+              'Child lane explicit-required-guardrail failed.\n' +
+              'Guardrails: spec-guard command not found.'
+          }
+        ],
+        linear_audit: null
+      },
+      now: () => '2026-04-18T02:01:00.000Z'
+    });
+
+    expect(progress?.summary).toBe(
+      'Child lane explicit-required-guardrail failed.\nGuardrails: spec-guard command not found.'
+    );
+  });
+
   it('does not rank invalidated rejected or accepted child-lane summaries over current replacement progress', () => {
     const progress = deriveProviderLinearWorkerProgressSnapshot({
       proof: {

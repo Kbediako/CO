@@ -62,6 +62,7 @@ import { parseTrailingJsonObject } from './utils/trailingJsonObject.js';
 import {
   countGuardrailCommands,
   resolveGuardrailsRequiredForManifest,
+  resolveGuardrailsRequiredSourceForManifest,
   stripNonApplicableGuardrailSummaryLines
 } from './run/manifest.js';
 
@@ -109,6 +110,7 @@ export interface ProviderLinearChildLaneRunResult {
   log_path: string | null;
   summary: string | null;
   guardrails_required: boolean | null;
+  guardrails_required_source: string | null;
   guardrail_command_count: number | null;
   runtime_mode_requested: string | null;
   runtime_mode: string | null;
@@ -676,6 +678,7 @@ async function launchChildLane(
     log_path: childRun.log_path,
     summary: childRun.summary ?? normalizeOptionalString(childProof?.last_message),
     guardrails_required: childRun.guardrails_required,
+    guardrails_required_source: childRun.guardrails_required_source,
     guardrail_command_count: childRun.guardrail_command_count,
     issue_id: context.issueId,
     issue_identifier: context.issueIdentifier,
@@ -1719,6 +1722,7 @@ function parseProviderLinearChildLaneRunManifest(input: {
       normalizeOptionalString(input.manifest.summary)
     ),
     guardrails_required: resolveGuardrailsRequiredForManifest(input.manifest),
+    guardrails_required_source: resolveGuardrailsRequiredSourceForManifest(input.manifest),
     guardrail_command_count: countGuardrailCommands(input.manifest),
     runtime_mode_requested: normalizeOptionalString(input.manifest.runtime_mode_requested),
     runtime_mode: normalizeOptionalString(input.manifest.runtime_mode),
@@ -1744,6 +1748,7 @@ function buildRepairedChildLaneRecord(input: {
     log_path: input.childRun.log_path,
     summary: input.childRun.summary,
     guardrails_required: input.childRun.guardrails_required,
+    guardrails_required_source: input.childRun.guardrails_required_source,
     guardrail_command_count: input.childRun.guardrail_command_count,
     issue_id: input.reservation.issue_id,
     issue_identifier: input.reservation.issue_identifier,
@@ -2694,6 +2699,7 @@ async function parseProviderChildLaneRunResult(
     log_path: normalizedLogPath,
     summary: stripNonApplicableGuardrailSummaryLines(guardrailManifest, normalizeOptionalString(parsed.summary)),
     guardrails_required: resolveGuardrailsRequiredForManifest(guardrailManifest),
+    guardrails_required_source: resolveGuardrailsRequiredSourceForManifest(guardrailManifest),
     guardrail_command_count: countGuardrailCommands(guardrailManifest),
     runtime_mode_requested: normalizeOptionalString(parsed.runtime_mode_requested),
     runtime_mode: normalizeOptionalString(parsed.runtime_mode),

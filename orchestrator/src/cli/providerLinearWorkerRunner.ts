@@ -59,6 +59,7 @@ import {
 import {
   countGuardrailCommands,
   resolveGuardrailsRequiredForManifest,
+  resolveGuardrailsRequiredSourceForManifest,
   stripNonApplicableGuardrailSummaryLines
 } from './run/manifest.js';
 import {
@@ -265,6 +266,7 @@ export interface ProviderLinearWorkerChildLaneRecord {
   log_path: string | null;
   summary: string | null;
   guardrails_required?: boolean | null;
+  guardrails_required_source?: string | null;
   guardrail_command_count?: number | null;
   issue_id: string;
   issue_identifier: string;
@@ -624,6 +626,10 @@ function normalizeOptionalString(value: unknown): string | null {
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeGuardrailsRequiredSource(value: unknown): string | null {
+  return value === 'explicit' || value === 'stage_detection' ? value : null;
 }
 
 function backfillProviderWorkerManifestControlHostProvenance(
@@ -5110,6 +5116,7 @@ interface ProviderLinearWorkerChildLaneManifestHydrationCandidate {
   patchArtifactPath: string | null;
   patchBytes: number | null;
   guardrailsRequired: boolean | null;
+  guardrailsRequiredSource: string | null;
   guardrailCommandCount: number | null;
   summaryRecordedAt: string | null;
 }
@@ -5296,6 +5303,7 @@ async function hydrateProviderLinearWorkerChildLaneFromActiveManifest(
     summary,
     summary_recorded_at: summaryRecordedAt,
     guardrails_required: candidate.guardrailsRequired,
+    guardrails_required_source: candidate.guardrailsRequiredSource,
     guardrail_command_count: candidate.guardrailCommandCount,
     lane_workspace_path: candidate.laneWorkspacePath ?? childLane.lane_workspace_path,
     patch_artifact_path: candidate.patchArtifactPath ?? childLane.patch_artifact_path,
@@ -5623,6 +5631,7 @@ async function readProviderLinearWorkerChildLaneManifestCandidate(
     patchArtifactPath: proofMetadata?.patchArtifactPath ?? null,
     patchBytes: proofMetadata?.patchBytes ?? null,
     guardrailsRequired: resolveGuardrailsRequiredForManifest(parsed),
+    guardrailsRequiredSource: resolveGuardrailsRequiredSourceForManifest(parsed),
     guardrailCommandCount: countGuardrailCommands(parsed),
     summaryRecordedAt
   };
@@ -5989,6 +5998,7 @@ function normalizeProviderLinearWorkerChildLaneRecord(
     log_path: normalizeOptionalString(value.log_path),
     summary: normalizeOptionalString(value.summary),
     guardrails_required: typeof value.guardrails_required === 'boolean' ? value.guardrails_required : null,
+    guardrails_required_source: normalizeGuardrailsRequiredSource(value.guardrails_required_source),
     guardrail_command_count: normalizeOptionalInteger(value.guardrail_command_count),
     issue_id: issueId,
     issue_identifier: issueIdentifier,

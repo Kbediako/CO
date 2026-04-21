@@ -238,6 +238,7 @@ interface ProviderIssueChildLaneLike {
   summary_recorded_at?: string | null;
   summary?: string | null;
   guardrails_required?: boolean | null;
+  guardrails_required_source?: string | null;
   guardrail_command_count?: number | null;
   decision?: string | null;
   in_flight_action?: string | null;
@@ -2008,6 +2009,7 @@ function normalizeProviderChildLaneProgressSummary(childLane: ProviderIssueChild
     {
       pipeline_id: PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID,
       guardrails_required: childLane.guardrails_required === true,
+      guardrails_required_source: normalizeGuardrailsRequiredSource(childLane.guardrails_required_source),
       commands: []
     },
     summary
@@ -2148,6 +2150,10 @@ function normalizeOptionalInteger(value: unknown): number | null {
     return Math.trunc(value);
   }
   return null;
+}
+
+function normalizeGuardrailsRequiredSource(value: unknown): string | null {
+  return value === 'explicit' || value === 'stage_detection' ? value : null;
 }
 
 function normalizeStringArray(value: unknown): string[] {
