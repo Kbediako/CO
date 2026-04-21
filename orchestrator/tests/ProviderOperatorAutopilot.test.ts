@@ -337,6 +337,44 @@ describe('providerOperatorAutopilot', () => {
     ]);
   });
 
+  it('keeps ready-to-unblock advisories when current activity supersedes a stale PR blocker description', async () => {
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createBlockedCo272Issue(
+          'Current operator note: PR #571 is draft, dirty, and checks are pending.',
+          {
+            recent_activity: [
+              {
+                id: 'co-272-old-pr-blocker',
+                created_at: '2026-04-21T10:00:00.000Z',
+                actor_name: 'Codex Operator',
+                summary: 'PR #571 still has failing checks.'
+              },
+              {
+                id: 'co-272-current-pr-clear',
+                created_at: '2026-04-21T11:00:00.000Z',
+                actor_name: 'Codex Operator',
+                summary: 'PR #571 is no longer blocking; checks passed.'
+              }
+            ]
+          }
+        )
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    });
+
+    expect(result.status).toBe('acted');
+    expect(result.terminal_blocker_advisories).toMatchObject([
+      {
+        issue_id: 'lin-issue-272',
+        issue_identifier: 'CO-272',
+        recommended_action: 'ready_to_unblock'
+      }
+    ]);
+  });
+
   it('ignores unrelated canonical-owner markers as duplicate-cleanup evidence', async () => {
     const result = await runProviderOperatorAutopilot({
       tracked_issues: [
@@ -5132,7 +5170,10 @@ function createTrackedIssue(
   };
 }
 
-function createBlockedCo272Issue(description: string): LiveLinearTrackedIssue {
+function createBlockedCo272Issue(
+  description: string,
+  overrides: Partial<LiveLinearTrackedIssue> = {}
+): LiveLinearTrackedIssue {
   return createTrackedIssue({
     id: 'lin-issue-272',
     identifier: 'CO-272',
@@ -5141,7 +5182,8 @@ function createBlockedCo272Issue(description: string): LiveLinearTrackedIssue {
     description,
     blocked_by: [
       { id: 'lin-issue-278', identifier: 'CO-278', state: 'Done', state_type: 'completed' }
-    ]
+    ],
+    ...overrides
   });
 }
 

@@ -6463,7 +6463,12 @@ function shouldClearReleasedClaimRunIdentity(input: {
 
 function isTerminalProviderIssueRunOutcome(run: ProviderIssueRunRecord | null): boolean {
   const status = run?.proofTerminalStatus ?? run?.status ?? null;
-  return status === 'succeeded' || status === 'failed' || status === 'cancelled';
+  return (
+    status === 'succeeded' ||
+    status === 'failed' ||
+    status === 'cancelled' ||
+    status === 'completed'
+  );
 }
 
 function createProviderPollDispatchBudget(featureToggles: Record<string, unknown> | null | undefined): {

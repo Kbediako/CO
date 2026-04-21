@@ -23408,6 +23408,83 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.resume).not.toHaveBeenCalled();
   });
 
+  it('preserves completed run identity when a released replay preserves terminal issue metadata', async () => {
+    const { root, paths } = await createHostPaths();
+    const taskId = 'task-1303-terminal-released-completed';
+    const runId = 'run-terminal-released-completed';
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId
+    };
+    const childPaths = resolveRunPaths(childEnv, runId);
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: runId,
+        task_id: taskId,
+        status: 'completed',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-1',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: taskId,
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      last_delivery_id: 'delivery-terminal-released-completed',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: runId,
+      run_manifest_path: childPaths.manifestPath
+    }));
+
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-03-19T04:20:00.000Z'
+      }),
+      deliveryId: 'delivery-terminal-released-completed-replay',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_200_000
+    });
+
+    expect(result.kind).toBe('ignored');
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      task_id: taskId,
+      run_id: runId,
+      run_manifest_path: childPaths.manifestPath
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
   it('preserves released assignee metadata when an equal-timestamp replay arrives with a different assignee', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();

@@ -1202,33 +1202,47 @@ function isTerminalBlocker(
 function hasExternalPrBlockerHint(
   issue: Pick<LiveLinearTrackedIssue, 'description' | 'recent_activity'>
 ): boolean {
-  return [
-    normalizeOptionalString(issue.description),
-    normalizeOptionalString(resolveLatestTrackedActivitySummary(issue.recent_activity ?? []))
-  ]
-    .filter((value): value is string => Boolean(value))
-    .some(hasCurrentExternalPrBlockerHint);
+  const activityHint = resolveLatestTrackedActivityExternalPrHint(issue.recent_activity ?? []);
+  if (activityHint) {
+    return activityHint === 'blocked';
+  }
+  const descriptionHint = classifyCurrentExternalPrBlockerText(
+    normalizeOptionalString(issue.description) ?? ''
+  );
+  return descriptionHint === 'blocked';
 }
 
-function resolveLatestTrackedActivitySummary(
+function resolveLatestTrackedActivityExternalPrHint(
   recentActivity: LiveLinearTrackedIssue['recent_activity']
-): string | null {
-  let latest: LiveLinearTrackedIssue['recent_activity'][number] | null = null;
-  for (const entry of recentActivity) {
-    if (!latest) {
-      latest = entry;
-      continue;
+): 'blocked' | 'resolved' | null {
+  let latestHint: 'blocked' | 'resolved' | null = null;
+  let latestCreatedAtMs = Number.NEGATIVE_INFINITY;
+  let latestOrder = -1;
+  recentActivity.forEach((entry, order) => {
+    const summary = normalizeOptionalString(entry.summary);
+    if (!summary) {
+      return;
+    }
+    const hint = classifyCurrentExternalPrBlockerText(summary);
+    if (!hint) {
+      return;
     }
     const candidateMs = Date.parse(entry.created_at ?? '');
-    const latestMs = Date.parse(latest.created_at ?? '');
-    if (Number.isFinite(candidateMs) && (!Number.isFinite(latestMs) || candidateMs >= latestMs)) {
-      latest = entry;
+    const createdAtMs = Number.isFinite(candidateMs) ? candidateMs : Number.NEGATIVE_INFINITY;
+    if (
+      !latestHint ||
+      createdAtMs > latestCreatedAtMs ||
+      (createdAtMs === latestCreatedAtMs && order >= latestOrder)
+    ) {
+      latestHint = hint;
+      latestCreatedAtMs = createdAtMs;
+      latestOrder = order;
     }
-  }
-  return latest?.summary ?? null;
+  });
+  return latestHint;
 }
 
-function hasCurrentExternalPrBlockerHint(value: string): boolean {
+function classifyCurrentExternalPrBlockerText(value: string): 'blocked' | 'resolved' | null {
   const segments = value
     .split(/[\n.;]+/u)
     .map((segment) => segment.trim())
@@ -1241,11 +1255,11 @@ function hasCurrentExternalPrBlockerHint(value: string): boolean {
     for (const candidate of candidates) {
       const hint = classifyExternalPrHintSegment(candidate);
       if (hint) {
-        return hint === 'blocked';
+        return hint;
       }
     }
   }
-  return false;
+  return null;
 }
 
 function classifyExternalPrHintSegment(segment: string): 'blocked' | 'resolved' | null {
