@@ -122,6 +122,50 @@ describe('CO orchestration auto-continue hook', () => {
     expect(run.state.enabled).toBe(true);
   });
 
+  it('uses the current home directory for the default state path', () => {
+    const sandbox = mkdtempSync(join(tmpdir(), 'co-autocontinue-hook-home-'));
+    try {
+      const home = join(sandbox, 'home');
+      const repoRoot = join(sandbox, 'repo');
+      const statePath = join(home, '.codex', 'hooks', 'co_orchestration_autocontinue.json');
+      mkdirSync(join(home, '.codex', 'hooks'), { recursive: true });
+      writeFileSync(
+        statePath,
+        JSON.stringify({
+          enabled: true,
+          repo_root: repoRoot,
+          max_in_progress: 2
+        }),
+        'utf8'
+      );
+
+      const env = {
+        ...process.env,
+        HOME: home
+      };
+      delete env.CO_ORCHESTRATION_AUTOCONTINUE_STATE_PATH;
+
+      const result = spawnSync(process.env.PYTHON ?? 'python3', [hookPath], {
+        cwd: process.cwd(),
+        encoding: 'utf8',
+        env,
+        input: JSON.stringify({
+          cwd: join(repoRoot, 'workspace'),
+          last_assistant_message: 'CO_ORCHESTRATOR_STOP: CO_ORCHESTRATOR_DONE'
+        })
+      });
+
+      expect(result.status).toBe(0);
+      expect(result.error).toBeUndefined();
+      expect(JSON.parse(result.stdout) as Record<string, unknown>).toEqual({ continue: true });
+      expect(JSON.parse(readFileSync(statePath, 'utf8')) as Record<string, unknown>).toMatchObject({
+        enabled: false
+      });
+    } finally {
+      rmSync(sandbox, { recursive: true, force: true });
+    }
+  });
+
   it.each([
     'CO_ORCHESTRATOR_CRITICAL_BLOCKER',
     'CO_ORCHESTRATOR_DONE',

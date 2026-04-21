@@ -6,12 +6,14 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-STATE_PATH = Path(
-    os.environ.get(
-        "CO_ORCHESTRATION_AUTOCONTINUE_STATE_PATH",
-        "/Users/kbediako/.codex/hooks/co_orchestration_autocontinue.json",
-    )
-)
+def resolve_state_path() -> Path:
+    override = os.environ.get("CO_ORCHESTRATION_AUTOCONTINUE_STATE_PATH")
+    if override:
+        return Path(override).expanduser()
+    return Path.home() / ".codex" / "hooks" / "co_orchestration_autocontinue.json"
+
+
+STATE_PATH = resolve_state_path()
 
 DONE_SENTINEL = "CO_ORCHESTRATOR_DONE"
 CRITICAL_BLOCKER_SENTINEL = "CO_ORCHESTRATOR_CRITICAL_BLOCKER"
