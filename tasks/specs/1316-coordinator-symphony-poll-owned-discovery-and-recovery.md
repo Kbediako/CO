@@ -4,7 +4,7 @@ title: Coordinator Symphony Poll-Owned Discovery Recovery and Observability API 
 status: in_progress
 owner: Codex
 created: 2026-03-21
-last_review: 2026-03-21
+last_review: 2026-04-21
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-coordinator-symphony-poll-owned-discovery-and-recovery.md
