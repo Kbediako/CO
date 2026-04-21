@@ -26,9 +26,7 @@ type WorkflowFile = {
 };
 
 const marketplaceSkipToken = 'PACK_SMOKE_ALLOW_MARKETPLACE_SKIP';
-// CO-275: 0.121.0 is the current marketplace-capable release-facing smoke pin.
-// A newer candidate must restore `codex marketplace add` before replacing it.
-const marketplaceCodexInstallCommand = 'npm install --global @openai/codex@0.121.0';
+const marketplaceCodexInstallCommand = 'npm install --global @openai/codex@0.122.0';
 const cloudCanaryCodexInstallCommand = 'npm install --global @openai/codex@0.122.0';
 const dedicatedCodexInstallCommands = new Set([
   marketplaceCodexInstallCommand,
@@ -988,7 +986,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
       status: 'fail',
       reason: 'marketplace-unsupported',
       message:
-        'Marketplace smoke requires a Codex CLI with `marketplace add` support. Set PACK_SMOKE_ALLOW_MARKETPLACE_SKIP=1 with PACK_SMOKE_MARKETPLACE_SKIP_REASON only for local-dev opt-out.'
+        'Marketplace smoke requires a Codex CLI with `plugin marketplace add` support. Set PACK_SMOKE_ALLOW_MARKETPLACE_SKIP=1 with PACK_SMOKE_MARKETPLACE_SKIP_REASON only for local-dev opt-out.'
     });
 
     expect(
@@ -1003,7 +1001,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
       status: 'skip',
       reason: 'marketplace-unsupported',
       message:
-        'Skipping marketplace smoke: codex-0.118 does not expose codex marketplace add. Reason: explicit pre-0.121 compatibility lane; no release coverage claimed'
+        'Skipping marketplace smoke: codex-0.118 does not expose codex plugin marketplace add. Reason: explicit pre-0.121 compatibility lane; no release coverage claimed'
     });
   });
 
@@ -1037,7 +1035,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
             ).toBe(false);
             expect(
               isDedicatedCodexInstallRun(run),
-              `${workflow} job ${jobName} step ${stepIndex + 1} must use a dedicated marketplace-capable Codex install step`
+              `${workflow} job ${jobName} step ${stepIndex + 1} must use a dedicated Codex 0.122.0 install step`
             ).toBe(true);
             codexInstallConditions.push(effectiveStepCondition);
           }
@@ -1063,7 +1061,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
               codexInstallConditions.some((installCondition) =>
                 installConditionCoversSmokeStep(installCondition, effectiveStepCondition)
               ),
-              `${workflow} job ${jobName} step ${stepIndex + 1} must install the marketplace-capable Codex pin before pack:smoke with matching if condition`
+              `${workflow} job ${jobName} step ${stepIndex + 1} must install Codex 0.122.0 before pack:smoke with matching if condition`
             ).toBe(true);
           }
         }

@@ -15,141 +15,32 @@ last_review: 2026-04-21
 - PRD: `docs/PRD-linear-09c996ec-47b3-4f55-928d-38e0b17c11df.md`
 - ACTION_PLAN: `docs/ACTION_PLAN-linear-09c996ec-47b3-4f55-928d-38e0b17c11df.md`
 - Task checklist: `tasks/tasks-linear-09c996ec-47b3-4f55-928d-38e0b17c11df.md`
-- `.agent` mirror: `.agent/task/linear-09c996ec-47b3-4f55-928d-38e0b17c11df.md`
-
-## Traceability
-- Linear issue: `CO-275` / `09c996ec-47b3-4f55-928d-38e0b17c11df`
-- Provider worker source 0 anchor: `ctx:sha256:cf4c59c717166639a22858ac56e882dec0a882ed6b6255cb9fd4b57d1e75911d#chunk:c000001`
-- Provider worker source object id: `sha256:cf4c59c717166639a22858ac56e882dec0a882ed6b6255cb9fd4b57d1e75911d`
-- Provider worker source payload: `../../.runs/linear-09c996ec-47b3-4f55-928d-38e0b17c11df/cli/2026-04-21T04-28-02-978Z-439d6089/memory/source-0/source.txt`
-- Docs child-lane source 0 anchor: `ctx:sha256:0e9cc806c03afdcd2ad2aeccf80f57549868a86ca946747d78aee3d131e0c83f#chunk:c000001`
-- Docs child-lane source payload: `.runs/linear-09c996ec-47b3-4f55-928d-38e0b17c11df-docs-packet/cli/2026-04-21T04-32-03-882Z-56f78783/memory/source-0/source.txt`
-- Origin manifest: `.runs/linear-09c996ec-47b3-4f55-928d-38e0b17c11df-docs-packet/cli/2026-04-21T04-32-03-882Z-56f78783/manifest.json`
-- Shared source note: the parent provider source and accepted child-lane source are both available; the packet is anchored on the protected handoff wording and current repo marketplace smoke surfaces.
 
 ## Summary
-- Objective: define the evidence-backed contract for marketplace-dependent downstream smoke after `Codex CLI 0.121.0`: keep `codex marketplace add` mandatory for `pack:smoke`, keep release-facing smoke workflows on marketplace-capable `@openai/codex@0.121.0`, and require newer candidates to prove the marketplace surface before replacing that pin.
-- Scope:
-  - docs-first packet and registry/checklist mirrors for `CO-275`
-  - parent-owned pack-smoke, workflow, and test implementation
-  - parent-owned focused validation
-- Constraints:
-  - no edits to `scripts/pack-smoke.mjs`, `tests/pack-smoke.spec.ts`, or `.github/workflows/**` from this child lane
-  - no Linear mutations from this child lane
-  - no full repo validation from this child lane
+- Objective: record the final `CO-275` marketplace-smoke decision after current `origin/main` landed `CO-268`.
+- Decision: replace the temporary `@openai/codex@0.121.0` / `codex marketplace add` release-facing smoke pin with the validated `@openai/codex@0.122.0` / `codex plugin marketplace add` contract.
+- Scope: docs/checklist/registry closeout plus validation that mainline `scripts/pack-smoke.mjs`, `tests/pack-smoke.spec.ts`, `.github/workflows/core-lane.yml`, `.github/workflows/release.yml`, and `.github/workflows/pack-smoke-backstop.yml` align.
+- Non-scope: active CO compatibility target promotion, cloud-canary policy changes, provider-worker app-server migration, package architecture redesign, or weakening marketplace smoke fail-closed behavior.
 
 ## Issue-Shaping Contract
-- User-request translation carried forward: this is a marketplace smoke policy rebaseline lane, not a generic Codex adoption or `0.122.0` promotion lane. Fresh evidence shows `@openai/codex@0.122.0` still cannot satisfy the `scripts/pack-smoke.mjs` `codex marketplace add` prerequisite, so parent implementation should record the keep-`0.121.0` marketplace pin and replacement gate.
-- Protected terms / exact artifact and surface names:
-  - `Codex CLI 0.122.0`
-  - `Codex CLI 0.121.0`
-  - `codex marketplace add`
-  - `pack:smoke`
-  - `scripts/pack-smoke.mjs`
-  - `tests/pack-smoke.spec.ts`
-  - `.github/workflows/core-lane.yml`
-  - `.github/workflows/release.yml`
-  - `.github/workflows/pack-smoke-backstop.yml`
-  - `@openai/codex@0.121.0`
-  - `@openai/codex@0.122.0`
-  - `CO-196`
-  - `CO-217`
-  - `CO-269`
-- Nearby wrong interpretations to reject:
-  - generic Codex CLI version promotion
-  - marketplace smoke optionality
-  - workflow-only string bump without `tests/pack-smoke.spec.ts`
-  - test-only string bump without workflow proof
-  - replacing `CO-196` or weakening `CO-217`
-  - treating the current `0.121.0` marketplace pin as stale while `0.122.0` lacks `codex marketplace add`
-- Explicit non-goals carried forward:
-  - no child-lane source, test, package, or workflow edits
-  - no broad release pipeline redesign
-  - no guardrail, delegation, runtime, or provider-worker policy changes
-  - no Linear state mutation
-
-## Parity / Alignment Matrix
-- Current truth:
-  - `scripts/pack-smoke.mjs` keeps marketplace support explicit through `codex marketplace add` detection and skip/fail evidence
-  - `tests/pack-smoke.spec.ts` currently defines `npm install --global @openai/codex@0.121.0` as the workflow proof install command
-  - `.github/workflows/core-lane.yml`, `.github/workflows/release.yml`, and `.github/workflows/pack-smoke-backstop.yml` install `@openai/codex@0.121.0` before `npm run pack:smoke`
-  - `CO-196` and `CO-217` are the existing marketplace path and mandatory marketplace-smoke hardening lineage
-- Reference truth:
-  - `CO-196` proves the marketplace/plugin distribution path
-  - `CO-217` proves marketplace smoke is mandatory by default and skips are explicit non-coverage evidence
-  - `CO-269` is the handoff-provided split-policy lineage anchor for this issue
-  - `Codex CLI 0.121.0` is the current marketplace-capable proof baseline for release-facing smoke
-- Target truth / intended delta:
-  - parent implementation records that release-facing marketplace smoke remains pinned to `Codex CLI 0.121.0` / `@openai/codex@0.121.0`
-  - `@openai/codex@0.122.0` remains the cloud-canary candidate from `CO-269`, not marketplace smoke proof
-  - `codex marketplace add` coverage remains mandatory inside `pack:smoke`
-  - workflow and test assertions agree on the intended proof version and cannot silently drift
-- Explicitly out-of-scope differences:
-  - non-marketplace Codex CLI adoption posture
-  - release signing/publish semantics
-  - cloud canary or runtime-mode adoption
-  - package descriptor redesign beyond what parent determines is needed for 0.122.0 marketplace smoke
-
-## Readiness Gate
-- Not done if:
-  - any protected term from the handoff is absent from the packet
-  - workflows/tests leave `@openai/codex@0.121.0` pinned without explicit long-term rationale and a newer-candidate replacement gate
-  - `pack:smoke` can pass as marketplace proof without `codex marketplace add` coverage or explicit non-coverage evidence
-  - `CO-196`, `CO-217`, or `CO-269` lineage is omitted
-  - child lane edits implementation, test, or workflow files
-- Pre-implementation issue-quality review evidence:
-  - 2026-04-21: the handoff-protected surfaces make the issue a parity/alignment lane, not a micro-task. Correctness depends on exact version pins, workflow names, protected implementation/test surfaces, and lineage issues, so the micro-task path is ineligible.
-  - 2026-04-21: the parent provider source and accepted child-lane source are both available; the packet preserves the handoff terms and current repo evidence while leaving source-of-truth issue/workpad reconciliation to the parent.
-- Safeguard ownership split:
-  - child lane owns docs packet, task mirrors, `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json`
-  - parent lane owns source/test/workflow inspection, implementation, validation, Linear/workpad reconciliation, PR lifecycle, and merge
+- User-request translation carried forward: decide whether post-`0.121.0` Codex CLIs regain a marketplace-compatible surface or CO revises the marketplace-dependent `pack:smoke` contract. Current mainline evidence chooses the second path through `codex plugin marketplace add`.
+- Protected terms: `Codex CLI 0.122.0`, `Codex CLI 0.121.0`, `codex marketplace add`, `codex plugin marketplace add`, `pack:smoke`, `scripts/pack-smoke.mjs`, `tests/pack-smoke.spec.ts`, `.github/workflows/core-lane.yml`, `.github/workflows/release.yml`, `.github/workflows/pack-smoke-backstop.yml`, `@openai/codex@0.121.0`, `@openai/codex@0.122.0`, `CO-196`, `CO-217`, and `CO-269`.
+- Wrong interpretations rejected: generic `0.122.0` promotion, cloud-canary rework, provider-worker runtime redesign, optional marketplace coverage, or reverting the merged `CO-268` contract back to the old command.
 
 ## Technical Requirements
-- Functional requirements:
-  1. Create docs-first packet and mirrors for `CO-275`.
-  2. Preserve traceability for `Codex CLI 0.122.0`, `Codex CLI 0.121.0`, `@openai/codex@0.122.0`, and `@openai/codex@0.121.0`.
-  3. Preserve `codex marketplace add` as the marketplace proof surface inside `pack:smoke`.
-  4. Parent updates `tests/pack-smoke.spec.ts` wording so workflow assertions describe `@openai/codex@0.121.0` as the current marketplace-capable pin.
-  5. Parent adds release-facing workflow rationale so `npm run pack:smoke` stays preceded by the intended marketplace-capable Codex install.
-  6. Parent preserves `CO-196`, `CO-217`, and `CO-269` traceability.
-- Non-functional requirements:
-  - bounded, reviewable implementation surface
-  - machine-checkable marketplace coverage evidence
-  - no silent fallback from marketplace proof to non-coverage evidence
-  - no broad release pipeline churn
-- Interfaces / contracts:
-  - `scripts/pack-smoke.mjs`
-  - `tests/pack-smoke.spec.ts`
-  - `.github/workflows/core-lane.yml`
-  - `.github/workflows/release.yml`
-  - `.github/workflows/pack-smoke-backstop.yml`
-  - `npm run pack:smoke`
-  - `codex marketplace add`
+1. Keep the prior `0.121.0` versus `0.122.0` old-command evidence attached to `CO-275`.
+2. Treat the merged `CO-268` implementation as the replacement contract for this issue.
+3. Preserve `CO-196` packaged marketplace architecture and `CO-217` mandatory coverage semantics.
+4. Ensure `docs/guides/codex-version-policy.md` records the `CO-268` supersession and this `CO-275` closeout.
+5. Keep `tests/pack-smoke.spec.ts` and the protected workflows aligned on `@openai/codex@0.122.0`.
 
-## Architecture & Data
-- Architecture / design adjustments:
-  - parent should keep one explicit marketplace-capable Codex proof constant in `tests/pack-smoke.spec.ts` or a nearby helper
-  - parent should update workflow install steps and assertions together so workflow and test truth cannot diverge
-  - parent should preserve `scripts/pack-smoke.mjs` skip/fail semantics and only adjust prerequisite text or version behavior if required
-- Data model changes / migrations:
-  - no persistent data migration expected
-  - task/docs registry rows only from this child lane
-- External dependencies / integrations:
-  - npm package `@openai/codex@0.122.0`
-  - previous npm package `@openai/codex@0.121.0`
-  - Codex CLI `codex marketplace add`
+## Acceptance Mapping
+- Evidence capture: prior CO-275 artifact records `0.121.0 marketplace --help` versus `0.122.0 marketplace --help`; `CO-268` records `0.122.0 plugin marketplace add/remove` evidence.
+- Decision: replacement-contract path accepted.
+- If requirement changes: current mainline already updates script, tests, workflows, and docs together.
+- Linkage: docs/checklists/workpad keep `CO-196`, `CO-217`, and `CO-269` explicit.
 
 ## Validation Plan
-- Child-lane checks:
-  - JSON parse / registry presence for `tasks/index.json` and `docs/docs-freshness-registry.json`
-  - protected-term scan across the `CO-275` packet and mirrors
-  - `git diff --check` over the declared docs scope
-- Parent-lane checks:
-  - focused `npx vitest run tests/pack-smoke.spec.ts`
-  - `npm run pack:smoke`
-  - workflow posture review for `.github/workflows/core-lane.yml`, `.github/workflows/release.yml`, and `.github/workflows/pack-smoke-backstop.yml`
-  - parent docs/spec gates and review before PR handoff
-
-## Approvals
-- Reviewer: pending parent docs-review / implementation
-- Date: 2026-04-21
+- `rg` protected contract terms across policy docs, pack-smoke script, tests, workflows, and CO-275 packet files.
+- Focused `npx vitest run tests/pack-smoke.spec.ts tests/cloud-canary-ci.spec.ts`.
+- Required repo gates per AGENTS before handoff: delegation guard, spec guard, build, lint, test, docs checks, freshness, stewardship, diff budget, review/elegance where applicable, and pack smoke for downstream-facing surfaces.

@@ -1,5 +1,7 @@
-# Obys Library Assets (Archived)
+# Obys Library Assets
 
-Public assets were moved to `.runs/0801-dead-code-pruning/archive/2025-12-08T10-01-24Z/packages/obys-library/public/` as part of Task 0801 dead-code pruning.
+`packages/obys-library/public/` is rebuilt on demand and no historical snapshot is tracked in fresh checkouts after Task 0801 dead-code pruning.
 
-Use the archive snapshot or re-run the mirror fetch to rebuild a fresh copy.
+- Regenerate fresh assets: `npm run mirror:fetch -- --project obys-library`
+- Validate the rebuilt mirror: `npm run mirror:check -- --project obys-library`
+- Serve locally: `npm run mirror:serve -- --project obys-library --port 4173`

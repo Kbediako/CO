@@ -11,6 +11,7 @@
 ## Summary
 - Problem Statement: `docs:freshness` is red again on 2026-04-20 with current baseline evidence showing `66` blocking stale docs, `221` visible CO-175 rolling freshness cohort entries at the last day of the rolling window, and stale active spec frontmatter rows surfaced by `spec-guard --dry-run`. CO-266 refreshed only its specific terminal-blocker advisory spec blockers; this repo-wide baseline must stay owned by the canonical docs freshness maintenance lane.
 - Desired Outcome: restore a truthful green `docs:freshness` and `docs:freshness:maintain` posture by reviewing and refreshing or otherwise explicitly disposing of the stale docs, active spec rows, and CO-175 rolling freshness cohort, without weakening freshness checks, hiding stale docs, deleting registry entries to reduce counts, or expanding CO-266.
+- Rework Update 2026-04-21: PR #566 already merged, but current `origin/main` at `98991b622b99b4d0f31fa39cf98425cbfdd1a1b6` still reproduced `37` blocking stale Task Packet / Task Mirror rows and `docs:freshness:maintain=block_policy_over_budget`. CO-267 remains the canonical owner and now records the Apr 21 reviewed refresh for the exact `0954` and `1311`-`1316` historical packet rows.
 
 ## User Request Translation (Context Anchor)
 - User intent / needs: complete the canonical docs freshness maintenance lane for CO-267 so repository-wide stale docs and rolling freshness debt no longer block unrelated provider-worker review handoffs, while preserving machine-visible evidence and exact CO-175 ownership semantics.
@@ -115,5 +116,6 @@
 
 ## Approvals
 - Product: Codex provider worker, 2026-04-20
-- Engineering: pending standalone review
+- Product rework reset: Codex provider worker, 2026-04-21
+- Engineering: rework standalone review completed with `bounded-success`; evidence `.runs/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/cli/2026-04-21T05-34-25-740Z-9cf43116/review/telemetry.json`.
 - Design: N/A

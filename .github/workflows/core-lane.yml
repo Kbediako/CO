@@ -192,9 +192,7 @@ jobs:
 
       - name: Install Codex CLI for marketplace smoke
         if: ${{ steps.downstream-smoke.outputs.required == 'true' }}
-        # CO-275: keep release-facing marketplace smoke on 0.121.0 until a newer
-        # candidate restores `codex marketplace add` and passes pack:smoke without skip env.
-        run: npm install --global @openai/codex@0.121.0
+        run: npm install --global @openai/codex@0.122.0
 
       - name: Downstream simulation smoke
         if: ${{ steps.downstream-smoke.outputs.required == 'true' }}

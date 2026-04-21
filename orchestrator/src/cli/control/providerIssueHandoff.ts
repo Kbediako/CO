@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomBytes } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import process from 'node:process';
 
 import { logger } from '../../logger.js';
@@ -14,6 +14,7 @@ import {
 } from '../providerLinearWorkerRunner.js';
 import { isoTimestamp } from '../utils/time.js';
 import type { RunPaths } from '../run/runPaths.js';
+import { stripNonApplicableGuardrailSummaryLines } from '../run/manifest.js';
 import {
   cleanupProviderWorkspace,
   resolveExplicitProviderWorkspacePathWithinRoot,
@@ -154,6 +155,7 @@ interface ProviderIssueRunRecord {
   taskId: string;
   runId: string;
   manifestPath: string;
+  manifest: Record<string, unknown>;
   pipelineId: string | null;
   status: string | null;
   hasDeadLocalInProgressProof: boolean;
@@ -322,6 +324,11 @@ const PROVIDER_RETRY_START_FAILED_REASON = 'provider_issue_retry_start_failed';
 const PROVIDER_CONTINUATION_RETRY_DELAY_MS = 1_000;
 const PROVIDER_FAILURE_RETRY_BASE_MS = 10_000;
 const PROVIDER_FAILURE_RETRY_MAX_BACKOFF_MS = 300_000;
+type ProviderControlHostRunLocator = { taskId: string; runId: string };
+type ProviderRehydratedLaunchProvenanceFields = {
+  launch_source?: ProviderLaunchSource | null;
+  launch_token?: string | null;
+};
 type ProviderTrackedIssueEligibility =
   | {
       eligible: true;
@@ -380,6 +387,7 @@ export function createProviderIssueHandoffService(
   const runOperatorAutopilot = options.runOperatorAutopilot ?? runProviderOperatorAutopilot;
   const appendOperatorAutopilotAuditResult =
     options.appendOperatorAutopilotAuditResult ?? appendProviderOperatorAutopilotAuditResult;
+  const controlHostRunLocator = resolveControlHostRunLocatorFromRunDir(options.paths.runDir);
   const retryQueue = createProviderIssueRetryQueue();
   const releaseCancelInFlight = new Map<
     string,
@@ -2205,6 +2213,74 @@ export function createProviderIssueHandoffService(
     await cancelState.attempt;
   };
 
+  const buildClearedRehydratedLaunchProvenance = (): ProviderRehydratedLaunchProvenanceFields => ({
+    launch_source: null,
+    launch_token: null
+  });
+
+  const claimIdentifiesActiveRun = (
+    claim: ProviderIntakeClaimRecord,
+    activeRun: ProviderIssueRunRecord
+  ): boolean => {
+    const claimRunId = normalizeOptionalString(claim.run_id);
+    const claimManifestPath = normalizeOptionalString(claim.run_manifest_path);
+    const runIdMatches = claimRunId !== null && claimRunId === activeRun.runId;
+    const manifestMatches =
+      claimManifestPath !== null &&
+      (
+        claimManifestPath === activeRun.manifestPath ||
+        resolve(claimManifestPath) === resolve(activeRun.manifestPath)
+      );
+
+    if (claimRunId && claimManifestPath) {
+      return runIdMatches && manifestMatches;
+    }
+    return runIdMatches || manifestMatches;
+  };
+
+  const resolveRehydratedActiveRunLaunchProvenance = (input: {
+    claim: ProviderIntakeClaimRecord;
+    activeRun: ProviderIssueRunRecord;
+  }): ProviderRehydratedLaunchProvenanceFields => {
+    const launchToken = normalizeOptionalString(input.claim.launch_token);
+    if (
+      input.claim.launch_source !== PROVIDER_LAUNCH_SOURCE ||
+      !launchToken ||
+      input.claim.state === 'resumable' ||
+      !claimIdentifiesActiveRun(input.claim, input.activeRun)
+    ) {
+      return buildClearedRehydratedLaunchProvenance();
+    }
+
+    const manifest = input.activeRun.manifest;
+
+    const manifestLaunchSource =
+      normalizeOptionalString(manifest.provider_launch_source) ??
+      normalizeOptionalString(manifest.providerLaunchSource);
+    const manifestTaskId =
+      normalizeOptionalString(manifest.provider_control_host_task_id) ??
+      normalizeOptionalString(manifest.providerControlHostTaskId);
+    const manifestRunId =
+      normalizeOptionalString(manifest.provider_control_host_run_id) ??
+      normalizeOptionalString(manifest.providerControlHostRunId);
+    const manifestMatchesControlHostLocator =
+      controlHostRunLocator !== null &&
+      manifestLaunchSource === PROVIDER_LAUNCH_SOURCE &&
+      manifestTaskId === controlHostRunLocator.taskId &&
+      manifestRunId === controlHostRunLocator.runId;
+    if (manifestMatchesControlHostLocator) {
+      return {
+        launch_source: PROVIDER_LAUNCH_SOURCE,
+        launch_token: launchToken
+      };
+    }
+
+    logger.warn(
+      `[provider-issue-handoff] cannot preserve rehydrated control-host launch provenance for ${input.claim.issue_identifier}: active run manifest provenance is incomplete or mismatched`
+    );
+    return buildClearedRehydratedLaunchProvenance();
+  };
+
   const rehydrateNow = async (input?: {
     refreshTrackedIssueMetadata?: boolean;
   }): Promise<{ hasPendingClaims: boolean }> => {
@@ -2295,6 +2371,10 @@ export function createProviderIssueHandoffService(
             startedWorkerIssue
           ) {
             const workerHost = resolveRehydratedActiveRunWorkerHost(activeRun, claim);
+            const launchProvenance = await resolveRehydratedActiveRunLaunchProvenance({
+              claim,
+              activeRun
+            });
             const trackedIssueFields = freshTrackedIssue.claimFields;
             const reactivatedMergeCloseoutReset =
               claim.reason === 'provider_issue_rehydrated_active_run'
@@ -2308,14 +2388,14 @@ export function createProviderIssueHandoffService(
               run_id: activeRun.runId,
               run_manifest_path: activeRun.manifestPath,
               worker_host: workerHost,
+              ...launchProvenance,
               ...buildActiveRunRetryFields(claim),
               ...reactivatedMergeCloseoutReset
             });
             upsertRehydratedProviderIntakeClaim({
               ...claim,
               ...trackedIssueFields,
-              launch_source: undefined,
-              launch_token: undefined,
+              ...launchProvenance,
               task_id: activeRun.taskId,
               state: 'running',
               reason: 'provider_issue_rehydrated_active_run',
@@ -2380,6 +2460,10 @@ export function createProviderIssueHandoffService(
         const activeRun = attachableClaimRuns.find((run) => run.status === 'in_progress');
         if (activeRun) {
           const workerHost = resolveRehydratedActiveRunWorkerHost(activeRun, claim);
+          const launchProvenance = await resolveRehydratedActiveRunLaunchProvenance({
+            claim,
+            activeRun
+          });
           const preserveMergeCloseoutClaim =
             isProviderMergeCloseoutWatchingClaim(claim) || isTerminalProviderMergeCloseoutClaim(claim);
           const freshTrackedIssue = input?.refreshTrackedIssueMetadata
@@ -2414,14 +2498,14 @@ export function createProviderIssueHandoffService(
             run_id: activeRun.runId,
             run_manifest_path: activeRun.manifestPath,
             worker_host: workerHost,
+            ...launchProvenance,
             ...buildActiveRunRetryFields(claim),
             ...reactivatedMergeCloseoutReset
           });
           upsertRehydratedProviderIntakeClaim({
             ...claim,
             ...trackedIssueFields,
-            launch_source: undefined,
-            launch_token: undefined,
+            ...launchProvenance,
             task_id: activeRun.taskId,
             state: 'running',
             reason: 'provider_issue_rehydrated_active_run',
@@ -3509,11 +3593,14 @@ export function createProviderIssueHandoffService(
               ? {}
               : { review_promotion: null, merge_closeout: null };
           const workerHost = resolveRehydratedActiveRunWorkerHost(activeRun, existing);
+          const launchProvenance = await resolveRehydratedActiveRunLaunchProvenance({
+            claim: existing,
+            activeRun
+          });
           const claim = await upsertProviderClaimAndPersist({
             ...existing,
             ...trackedIssueFields,
-            launch_source: undefined,
-            launch_token: undefined,
+            ...launchProvenance,
             task_id: activeRun.taskId,
             state: 'running',
             reason: 'provider_issue_rehydrated_active_run',
@@ -4580,6 +4667,10 @@ export function createProviderIssueHandoffService(
                 claim.reason === 'provider_issue_rehydrated_active_run'
                   ? {}
                   : { review_promotion: null, merge_closeout: null };
+              const launchProvenance = await resolveRehydratedActiveRunLaunchProvenance({
+                claim,
+                activeRun
+              });
               const transitioned = hasProviderClaimTransitioned(claim, {
                 ...trackedIssueFields,
                 state: 'running',
@@ -4588,6 +4679,7 @@ export function createProviderIssueHandoffService(
                 run_id: activeRun.runId,
                 run_manifest_path: activeRun.manifestPath,
                 worker_host: workerHost,
+                ...launchProvenance,
                 ...buildActiveRunRetryFields(claim),
                 ...reactivatedMergeCloseoutReset
               });
@@ -4595,8 +4687,7 @@ export function createProviderIssueHandoffService(
               upsertProviderIntakeClaim(options.state, {
                 ...claim,
                 ...trackedIssueFields,
-                launch_source: undefined,
-                launch_token: undefined,
+                ...launchProvenance,
                 task_id: activeRun.taskId,
                 state: 'running',
                 reason: 'provider_issue_rehydrated_active_run',
@@ -4813,6 +4904,10 @@ export function createProviderIssueHandoffService(
                 claim.reason === 'provider_issue_rehydrated_active_run'
                   ? {}
                   : { review_promotion: null, merge_closeout: null };
+              const launchProvenance = await resolveRehydratedActiveRunLaunchProvenance({
+                claim,
+                activeRun
+              });
               const transitioned = hasProviderClaimTransitioned(claim, {
                 ...trackedIssueFields,
                 state: 'running',
@@ -4821,6 +4916,7 @@ export function createProviderIssueHandoffService(
                 run_id: activeRun.runId,
                 run_manifest_path: activeRun.manifestPath,
                 worker_host: workerHost,
+                ...launchProvenance,
                 ...buildActiveRunRetryFields(claim),
                 ...reactivatedMergeCloseoutReset
               });
@@ -4828,8 +4924,7 @@ export function createProviderIssueHandoffService(
               upsertProviderIntakeClaim(options.state, {
                 ...claim,
                 ...trackedIssueFields,
-                launch_source: undefined,
-                launch_token: undefined,
+                ...launchProvenance,
                 task_id: activeRun.taskId,
                 state: 'running',
                 reason: 'provider_issue_rehydrated_active_run',
@@ -4963,6 +5058,10 @@ export function createProviderIssueHandoffService(
               claim.reason === 'provider_issue_rehydrated_active_run'
                 ? {}
                 : { review_promotion: null, merge_closeout: null };
+            const launchProvenance = await resolveRehydratedActiveRunLaunchProvenance({
+              claim,
+              activeRun
+            });
             const transitioned = hasProviderClaimTransitioned(claim, {
               ...trackedIssueFields,
               state: 'running',
@@ -4971,6 +5070,7 @@ export function createProviderIssueHandoffService(
               run_id: activeRun.runId,
               run_manifest_path: activeRun.manifestPath,
               worker_host: workerHost,
+              ...launchProvenance,
               ...buildActiveRunRetryFields(claim),
               ...reactivatedMergeCloseoutReset
             });
@@ -4978,8 +5078,7 @@ export function createProviderIssueHandoffService(
             upsertProviderIntakeClaim(options.state, {
               ...claim,
               ...trackedIssueFields,
-              launch_source: undefined,
-              launch_token: undefined,
+              ...launchProvenance,
               task_id: activeRun.taskId,
               state: 'running',
               reason: 'provider_issue_rehydrated_active_run',
@@ -5190,13 +5289,17 @@ export function createProviderIssueHandoffService(
           ? buildFreshDiscoveryConsumedProviderKeys(consumedTrackedIssueKeys, options.state.claims)
           : consumedTrackedIssueKeys;
         const dispatchFreshDiscoveryCandidates = async (
-          trackedIssues: LiveLinearTrackedIssue[]
+          trackedIssues: LiveLinearTrackedIssue[],
+          priorityIssueIds: readonly string[] = []
         ): Promise<void> => {
           refreshCounts.fresh_discovery_candidates += trackedIssues.length;
           recordRefreshProgress('refresh:fresh_dispatch', {
             requestClass: 'fresh_dispatch'
           });
-          for (const trackedIssue of sortLiveLinearTrackedIssuesForDispatch(trackedIssues)) {
+          for (const trackedIssue of sortProviderDispatchTrackedIssuesWithPriority(
+            trackedIssues,
+            priorityIssueIds
+          )) {
             assertRefreshCycleNotStuck();
             const providerKey = buildProviderIssueKey(trackedIssue.provider, trackedIssue.id);
             if (
@@ -5252,7 +5355,10 @@ export function createProviderIssueHandoffService(
           }
         };
 
-        await dispatchFreshDiscoveryCandidates(autopilotDispatch.trackedIssues);
+        await dispatchFreshDiscoveryCandidates(
+          autopilotDispatch.trackedIssues,
+          autopilotDispatch.priorityIssueIds
+        );
 
         if (
           (pollInput.deferFreshDiscovery === true || pollInput.allowPollFailClosed === true) &&
@@ -5296,11 +5402,16 @@ export function createProviderIssueHandoffService(
   }): Promise<{
     trackedIssues: LiveLinearTrackedIssue[];
     allowConsumedRedispatch: boolean;
+    priorityIssueIds: string[];
   }> => {
     const fallbackTrackedIssues = input.pollInput.trackedIssues;
     const trackedIssueRefetch = wrapTrackedIssueRefetch(input.pollInput.refetchTrackedIssues);
     if (!options.providerWorkflowConfigStore || !runOperatorAutopilot) {
-      return { trackedIssues: fallbackTrackedIssues, allowConsumedRedispatch: false };
+      return {
+        trackedIssues: fallbackTrackedIssues,
+        allowConsumedRedispatch: false,
+        priorityIssueIds: []
+      };
     }
     let providerWorkflow: Awaited<ReturnType<ProviderWorkflowConfigStore['refresh']>>;
     try {
@@ -5314,11 +5425,19 @@ export function createProviderIssueHandoffService(
           (error as Error)?.message ?? String(error)
         }`
       );
-      return { trackedIssues: fallbackTrackedIssues, allowConsumedRedispatch: false };
+      return {
+        trackedIssues: fallbackTrackedIssues,
+        allowConsumedRedispatch: false,
+        priorityIssueIds: []
+      };
     }
     const autopilotConfig = resolveProviderOperatorAutopilotConfigFromPayload(providerWorkflow);
     if (!autopilotConfig) {
-      return { trackedIssues: fallbackTrackedIssues, allowConsumedRedispatch: false };
+      return {
+        trackedIssues: fallbackTrackedIssues,
+        allowConsumedRedispatch: false,
+        priorityIssueIds: []
+      };
     }
     const autopilotAuditPath = resolveProviderOperatorAutopilotAuditPathFromPayload(providerWorkflow);
     const autopilotLifecyclePath = resolveProviderOperatorAutopilotLifecyclePathFromPayload(
@@ -5477,14 +5596,20 @@ export function createProviderIssueHandoffService(
       ) ||
       !trackedIssueRefetch
     ) {
-      return { trackedIssues: fallbackTrackedIssues, allowConsumedRedispatch: false };
+      return {
+        trackedIssues: fallbackTrackedIssues,
+        allowConsumedRedispatch: false,
+        priorityIssueIds: []
+      };
     }
+    const priorityIssueIds = resolveProviderOperatorAutopilotTransitionIssueIds(nextResult);
     try {
       const resolution = await trackedIssueRefetch();
       if (resolution.kind === 'ready') {
         return {
           trackedIssues: resolution.trackedIssues,
-          allowConsumedRedispatch: true
+          allowConsumedRedispatch: true,
+          priorityIssueIds
         };
       }
       logger.warn(
@@ -5498,7 +5623,11 @@ export function createProviderIssueHandoffService(
         }`
       );
     }
-    return { trackedIssues: fallbackTrackedIssues, allowConsumedRedispatch: false };
+    return {
+      trackedIssues: fallbackTrackedIssues,
+      allowConsumedRedispatch: false,
+      priorityIssueIds: []
+    };
   };
 
   providerIssueHandoffService = {
@@ -6832,6 +6961,49 @@ function buildFreshDiscoveryConsumedProviderKeys(
   );
 }
 
+function resolveProviderOperatorAutopilotTransitionIssueIds(
+  result: ProviderOperatorAutopilotResult
+): string[] {
+  const issueIds: string[] = [];
+  const seenIssueIds = new Set<string>();
+  for (const action of result.actions) {
+    if (action.transition.status !== 'transitioned' && action.transition.status !== 'noop') {
+      continue;
+    }
+    if (seenIssueIds.has(action.issue_id)) {
+      continue;
+    }
+    seenIssueIds.add(action.issue_id);
+    issueIds.push(action.issue_id);
+  }
+  return issueIds;
+}
+
+function sortProviderDispatchTrackedIssuesWithPriority(
+  trackedIssues: readonly LiveLinearTrackedIssue[],
+  priorityIssueIds: readonly string[]
+): LiveLinearTrackedIssue[] {
+  const sortedIssues = sortLiveLinearTrackedIssuesForDispatch(trackedIssues);
+  if (priorityIssueIds.length === 0 || sortedIssues.length <= 1) {
+    return sortedIssues;
+  }
+
+  const sortedByIssueId = new Map(sortedIssues.map((trackedIssue) => [trackedIssue.id, trackedIssue]));
+  const prioritizedIssues: LiveLinearTrackedIssue[] = [];
+  for (const issueId of priorityIssueIds) {
+    const trackedIssue = sortedByIssueId.get(issueId);
+    if (!trackedIssue) {
+      continue;
+    }
+    sortedByIssueId.delete(issueId);
+    prioritizedIssues.push(trackedIssue);
+  }
+  return [
+    ...prioritizedIssues,
+    ...sortedIssues.filter((trackedIssue) => sortedByIssueId.has(trackedIssue.id))
+  ];
+}
+
 async function resolveProviderCleanupWorkspacePath(
   repoRoot: string,
   taskId: string,
@@ -6842,6 +7014,20 @@ async function resolveProviderCleanupWorkspacePath(
     ? resolveExplicitProviderWorkspacePathWithinRoot(repoRoot, taskId, manifestRecord)
     : null;
   return explicitWorkspacePath ?? resolveProviderWorkspacePath(repoRoot, taskId);
+}
+
+function resolveControlHostRunLocatorFromRunDir(runDir: string): ProviderControlHostRunLocator | null {
+  const resolvedRunDir = resolve(runDir);
+  const runId = basename(resolvedRunDir);
+  const cliDir = dirname(resolvedRunDir);
+  if (basename(cliDir) !== 'cli') {
+    return null;
+  }
+  const taskId = basename(dirname(cliDir));
+  if (!taskId || !runId) {
+    return null;
+  }
+  return { taskId, runId };
 }
 
 async function readManifestRecord(manifestPath: string | null): Promise<Record<string, unknown> | null> {
@@ -6975,6 +7161,7 @@ async function discoverProviderIssueRunSnapshot(
         taskId: readStringValue(manifest, 'task_id') ?? taskEntry,
         runId: readStringValue(manifest, 'run_id') ?? runEntry,
         manifestPath,
+        manifest,
         pipelineId,
         status: resolveProviderIssueRunStatus(manifest, proof, isProcessAlive),
         hasDeadLocalInProgressProof,
@@ -7166,7 +7353,10 @@ function resolveProviderIssueRunSummary(
   manifest: Record<string, unknown>,
   proof: ProviderLinearWorkerProofRecord | null
 ): string | null {
-  const manifestSummary = readStringValue(manifest, 'summary');
+  const manifestSummary = stripNonApplicableGuardrailSummaryLines(
+    manifest,
+    readStringValue(manifest, 'summary')
+  );
   const manifestStatus = readStringValue(manifest, 'status');
   const proofIsAuthoritative = shouldUseProviderLinearWorkerTerminalProofForSummary(manifest, proof);
   const proofTerminalStatus = proofIsAuthoritative
@@ -7992,7 +8182,9 @@ function hasProviderClaimTransitioned(
           >
         >
     )
-  ) & Partial<Pick<ProviderIntakeClaimRecord, 'review_promotion' | 'merge_closeout'>>
+  ) & Partial<
+    Pick<ProviderIntakeClaimRecord, 'launch_source' | 'launch_token' | 'review_promotion' | 'merge_closeout'>
+  >
 ): boolean {
   return (
     (
@@ -8051,6 +8243,14 @@ function hasProviderClaimTransitioned(
     (
       next.worker_host !== undefined &&
       (claim.worker_host ?? null) !== (next.worker_host ?? null)
+    ) ||
+    (
+      next.launch_source !== undefined &&
+      (claim.launch_source ?? null) !== (next.launch_source ?? null)
+    ) ||
+    (
+      next.launch_token !== undefined &&
+      (claim.launch_token ?? null) !== (next.launch_token ?? null)
     ) ||
     (claim.retry_queued ?? null) !== (next.retry_queued ?? null) ||
     (claim.retry_attempt ?? null) !== (next.retry_attempt ?? null) ||
@@ -8190,6 +8390,7 @@ function resolveProviderReleaseRun(
       taskId: claim.task_id,
       runId: claim.run_id ?? claim.task_id,
       manifestPath: claim.run_manifest_path,
+      manifest: {},
       pipelineId: null,
       status: null,
       hasDeadLocalInProgressProof: false,
