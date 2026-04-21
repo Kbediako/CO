@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ControlState } from '../src/cli/control/controlState.js';
 import {
   handleLinearWebhookRequest,
+  markLinearAdvisoryStateStaleFromProviderIntake,
   normalizeLinearAdvisoryState
 } from '../src/cli/control/linearWebhookController.js';
 
@@ -70,6 +71,63 @@ afterEach(() => {
 });
 
 describe('LinearWebhookController', () => {
+  it('marks stale advisory state against the last accepted tracked issue instead of later ignored deliveries', () => {
+    const advisoryState = normalizeLinearAdvisoryState({
+      schema_version: 1,
+      updated_at: '2026-04-21T17:00:00.000Z',
+      latest_delivery_id: 'delivery-ignored',
+      latest_result: 'ignored',
+      latest_reason: 'dispatch_source_issue_not_found',
+      latest_event: {
+        delivery_id: 'delivery-ignored',
+        event: 'Issue',
+        action: 'update',
+        issue_id: 'lin-issue-other',
+        webhook_timestamp: 1_777_001_000_000,
+        processed_at: '2026-04-21T17:00:00.000Z'
+      },
+      latest_accepted_at: '2026-04-21T15:00:00.000Z',
+      tracked_issue: {
+        provider: 'linear',
+        id: 'lin-issue-272',
+        identifier: 'CO-272',
+        title: 'Replace dead archive guidance',
+        description: null,
+        url: null,
+        state: 'Blocked',
+        state_type: 'started',
+        archived_at: null,
+        trashed: false,
+        viewer_id: 'viewer-1',
+        assignee_id: 'viewer-1',
+        assignee_name: 'Codex',
+        workspace_id: 'workspace-1',
+        team_id: 'team-1',
+        team_key: 'CO',
+        team_name: 'CO',
+        project_id: 'project-1',
+        project_name: 'CO',
+        updated_at: '2026-04-21T15:00:00.000Z',
+        blocked_by: [],
+        recent_activity: []
+      },
+      seen_deliveries: []
+    });
+
+    const marked = markLinearAdvisoryStateStaleFromProviderIntake(advisoryState, {
+      rehydrated_at: '2026-04-21T16:00:00.000Z',
+      claims: []
+    });
+
+    expect(marked).toBe(true);
+    expect(advisoryState.stale_source).toMatchObject({
+      source: 'provider-intake',
+      reason: 'provider_intake_newer_than_linear_advisory',
+      provider_intake_updated_at: '2026-04-21T16:00:00.000Z',
+      advisory_updated_at: '2026-04-21T15:00:00.000Z'
+    });
+  });
+
   it('returns false for non-webhook pathnames without invoking the webhook controller path', async () => {
     const { res, state } = createResponseRecorder();
     const advisoryState = normalizeLinearAdvisoryState(null);

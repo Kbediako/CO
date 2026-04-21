@@ -1148,6 +1148,13 @@ function collectTerminalBlockerAdvisories(
       }
       const canonicalOwnerHints = resolveCanonicalOwnerHints(issue);
       const duplicateHints = resolveDuplicateHints(issue);
+      if (
+        canonicalOwnerHints.length === 0 &&
+        duplicateHints.length === 0 &&
+        hasExternalPrBlockerHint(issue)
+      ) {
+        return [];
+      }
       const recommendedAction =
         duplicateHints.length > 0 || canonicalOwnerHints.length > 0
           ? 'duplicate_cleanup'
@@ -1190,6 +1197,45 @@ function isTerminalBlocker(
   blocker: NonNullable<LiveLinearTrackedIssue['blocked_by']>[number]
 ): boolean {
   return !providerLinearTodoBlockedByNonTerminal([blocker]);
+}
+
+function hasExternalPrBlockerHint(
+  issue: Pick<LiveLinearTrackedIssue, 'description' | 'recent_activity'>
+): boolean {
+  return [
+    normalizeOptionalString(issue.description),
+    ...(issue.recent_activity ?? []).map((entry) => normalizeOptionalString(entry.summary))
+  ]
+    .filter((value): value is string => Boolean(value))
+    .some((value) => {
+      const segments = value
+        .split(/[\n.;]+/u)
+        .map((segment) => segment.trim())
+        .filter((segment) => segment.length > 0);
+      return segments.some((segment, index) =>
+        isExternalPrBlockerHintSegment(segment) ||
+        (segments[index + 1] !== undefined &&
+          isExternalPrBlockerHintSegment(`${segment} ${segments[index + 1]}`))
+      );
+    });
+}
+
+function isExternalPrBlockerHintSegment(segment: string): boolean {
+  if (!/\b(?:pr|pull request)\s*#?\d+\b/iu.test(segment)) {
+    return false;
+  }
+  if (
+    /\b(?:no longer|not|isn't|is not)\s+(?:block(?:ed|er|ing)?|pending|failing|dirty|draft)\b/iu.test(
+      segment
+    ) ||
+    /\bchecks?\s+(?:passed|passing|green|clean)\b/iu.test(segment) ||
+    /\b(?:unblocked|closed)\b/iu.test(segment)
+  ) {
+    return false;
+  }
+  return /\b(?:block(?:ed|er|ing)?|wait(?:ing)?\s+(?:on|for)|pending|draft|dirty|fail(?:ed|ing)?|checks?\s+(?:fail(?:ed|ing)?|pending|red)|red\s+checks?|not\s+(?:yet\s+)?merged|needs?\s+(?:to\s+)?be\s+merged|merge\s+pending|pending\s+merge)\b/iu.test(
+    segment
+  );
 }
 
 function resolveCanonicalOwnerHints(issue: Pick<LiveLinearTrackedIssue, 'description'>): string[] {

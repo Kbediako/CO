@@ -13320,6 +13320,30 @@
         "agent_task": ".agent/task/linear-904f74a5-e1b6-4740-a0df-8c92ec73314b.md",
         "docs": "docs/TECH_SPEC-linear-904f74a5-e1b6-4740-a0df-8c92ec73314b.md"
       }
+    },
+    {
+      "id": "20260422-linear-8bbdd424-d77e-4312-b4b7-2a82c3df2749",
+      "title": "Control host: reconcile released-claim run metadata, operator advisories, and advisory-state truth after issue release",
+      "relates_to": "tasks/tasks-linear-8bbdd424-d77e-4312-b4b7-2a82c3df2749.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-22",
+      "approvals": {
+        "preimplementation_issue_quality": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-22",
+          "status": "approved",
+          "summary": "Full post-release truth surface is explicitly broader than CO-292 and spans retained run pointers, operator advisories, and advisory-state freshness while preserving active-lane attach/admission behavior."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-8bbdd424-d77e-4312-b4b7-2a82c3df2749.md",
+        "task": "tasks/tasks-linear-8bbdd424-d77e-4312-b4b7-2a82c3df2749.md",
+        "agent_task": ".agent/task/linear-8bbdd424-d77e-4312-b4b7-2a82c3df2749.md",
+        "docs": "docs/TECH_SPEC-linear-8bbdd424-d77e-4312-b4b7-2a82c3df2749.md"
+      }
     }
   ]
 }
