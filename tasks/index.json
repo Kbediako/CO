@@ -39,20 +39,20 @@
           "reviewer": "parent provider worker",
           "date": "2026-04-22",
           "status": "succeeded",
-          "summary": "ProviderLinearWorkflowFacade focused tests pass after adding ownership-aware PR attachment classification; CO-244/CO-289 fixture restores PR #532 current and exposes mismatched PR #575 as conflicting while CO-289 keeps PR #575 current. Feedback regressions cover foreign-prefix issue identifiers, snapshot-missing attachment-title conflicts, lowercase branch-only identifiers, and technical-token false positives."
+          "summary": "ProviderLinearWorkflowFacade focused tests pass after adding ownership-aware PR attachment classification; CO-244/CO-289 fixture restores PR #532 current and exposes mismatched PR #575 as conflicting while CO-289 keeps PR #575 current. Feedback regressions cover foreign-prefix issue identifiers, snapshot-missing attachment-title conflicts, lowercase branch-only identifiers, title-owned technical-looking issue keys, and slash-segment technical-token false positives."
         },
         "validation_gates": {
           "reviewer": "parent provider worker",
           "date": "2026-04-22",
           "status": "succeeded",
-          "summary": "After merging latest origin/main and addressing CodeRabbit/Codex feedback, focused facade tests passed (226 tests), delegation guard passed with scoped provenance fallback, spec guard, build, lint, full test (348 files / 4479 tests), docs:check, docs:freshness (4367 docs / 4370 registry entries), repo:stewardship (5477 tracked files / 0 action-required), diff-budget, and pack:smoke passed. Lint only reported existing DelegationMcpHealth.test.ts warnings."
+          "summary": "After merging latest origin/main and addressing CodeRabbit/Codex feedback, focused facade tests passed (227 tests), delegation guard passed with scoped provenance fallback, spec guard, build, lint, full test (348 files / 4480 tests), docs:check, docs:freshness (4367 docs / 4370 registry entries), repo:stewardship (5477 tracked files / 0 action-required), diff-budget, and pack:smoke passed. Lint only reported existing DelegationMcpHealth.test.ts warnings."
         },
         "standalone_review": {
           "reviewer": "codex-orchestrator review",
           "date": "2026-04-22",
           "status": "succeeded",
           "telemetry": ".runs/linear-994efebc-e1e4-4e00-8046-c60143813251/cli/2026-04-21T16-19-14-539Z-9d990cf1/review/telemetry.json",
-          "summary": "Manifest-backed forced standalone review completed with status succeeded and review_outcome bounded-success after command-intent retry, including the CodeRabbit feedback patch and the Codex false-positive token refinement."
+          "summary": "Manifest-backed forced standalone review completed with status succeeded and review_outcome bounded-success after command-intent retry, including the CodeRabbit feedback patch, the Codex false-positive token refinement, and the final slash-segment technical-token fix."
         },
         "elegance_review": {
           "reviewer": "parent provider worker",

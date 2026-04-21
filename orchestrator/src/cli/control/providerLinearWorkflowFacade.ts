@@ -832,7 +832,9 @@ interface IssueContextPullRequestSnapshot {
   headRefName?: string | null;
 }
 
-const NON_LINEAR_ISSUE_IDENTIFIER_PREFIXES = new Set(['GPT', 'HTTP', 'HTTPS', 'ISO', 'NODE', 'RFC']);
+const NON_LINEAR_ISSUE_IDENTIFIER_PREFIXES = new Set(['GPT', 'HTTP', 'HTTPS', 'ISO', 'NODE', 'RFC', 'TLS']);
+const LINEAR_ISSUE_OWNER_PREFIX_PATTERN =
+  /^(?:build|chore|ci|deps|docs|feat|fix|perf|refactor|release|revert|security|style|test|tests)(?:\([^)]+\))?!?:\s*$/iu;
 
 interface GitHubJsonCommandResult {
   stdout: string;
@@ -1356,7 +1358,7 @@ function extractIssueIdentifierEvidence(
   values: readonly (string | null | undefined)[]
 ): Array<{ identifier: string; prefix: string; issue_owned_position: boolean }> {
   const identifiers = new Map<string, { identifier: string; prefix: string; issue_owned_position: boolean }>();
-  const pattern = /\b([A-Z][A-Z0-9]*)-\d+\b/gi;
+  const pattern = /\b([A-Z][A-Z0-9]*)-\d+\b(?!\.\d)/gi;
   for (const value of values) {
     const normalized = normalizeOptionalString(value);
     if (!normalized) {
@@ -1364,13 +1366,13 @@ function extractIssueIdentifierEvidence(
     }
     for (const match of normalized.matchAll(pattern)) {
       const prefix = match[0].slice(0, match[0].indexOf('-')).toUpperCase();
-      if (NON_LINEAR_ISSUE_IDENTIFIER_PREFIXES.has(prefix)) {
+      const issueOwnedPosition = isIssueOwnedIdentifierPosition(normalized, match.index ?? 0, prefix);
+      if (NON_LINEAR_ISSUE_IDENTIFIER_PREFIXES.has(prefix) && !issueOwnedPosition) {
         continue;
       }
       const identifier = normalizeIssueIdentifier(match[0]);
       if (identifier) {
         const existing = identifiers.get(identifier);
-        const issueOwnedPosition = isIssueOwnedIdentifierPosition(normalized, match.index ?? 0);
         identifiers.set(identifier, {
           identifier,
           prefix,
@@ -1382,9 +1384,15 @@ function extractIssueIdentifierEvidence(
   return [...identifiers.values()];
 }
 
-function isIssueOwnedIdentifierPosition(value: string, index: number): boolean {
+function isIssueOwnedIdentifierPosition(value: string, index: number, prefix: string): boolean {
   const previous = value[index - 1];
-  return index === 0 || previous === '/' || previous === '(' || previous === '[';
+  if (index === 0 || previous === '(' || previous === '[') {
+    return true;
+  }
+  if (previous === '/') {
+    return !NON_LINEAR_ISSUE_IDENTIFIER_PREFIXES.has(prefix);
+  }
+  return LINEAR_ISSUE_OWNER_PREFIX_PATTERN.test(value.slice(0, index));
 }
 
 function normalizeIssueIdentifier(value: string | null | undefined): string | null {

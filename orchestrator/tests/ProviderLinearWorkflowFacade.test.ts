@@ -1638,7 +1638,7 @@ describe('providerLinearWorkflowFacade', () => {
       },
       attachments: [
         buildGitHubAttachment('attachment-pr-532', 532, 'CO-244 closeout PR'),
-        buildGitHubAttachment('attachment-pr-580', 580, 'ABC-123 active provider PR')
+        buildGitHubAttachment('attachment-pr-580', 580, 'feat: ABC-123 active provider PR')
       ],
       snapshotForPr: (prNumber) =>
         prNumber === 532
@@ -1653,8 +1653,8 @@ describe('providerLinearWorkflowFacade', () => {
               state: 'OPEN',
               mergedAt: null,
               updatedAt: '2026-04-21T09:07:51.000Z',
-              title: 'ABC-123 active provider PR',
-              headRefName: 'linear/abc-123-active-provider-pr'
+              title: 'feat: ABC-123 active provider PR',
+              headRefName: 'feature/active-provider-pr'
             }
     });
 
@@ -1731,6 +1731,58 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it('keeps issue-owned technical-looking prefixes as conflicting ownership evidence', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Completed issue with technical-prefix misbound branch',
+      state: {
+        id: 'state-done',
+        name: 'Done',
+        type: 'completed'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-532', 532, 'CO-244 closeout PR'),
+        buildGitHubAttachment('attachment-pr-583', 583, 'chore: NODE-123 active runtime PR')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 532
+          ? {
+              state: 'MERGED',
+              mergedAt: '2026-04-10T13:11:30.000Z',
+              updatedAt: '2026-04-10T13:11:30.000Z',
+              title: 'CO-244 completed provider release',
+              headRefName: 'linear/co-244-completed-provider-release'
+            }
+          : {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:07:51.000Z',
+              title: 'chore: NODE-123 active runtime PR',
+              headRefName: 'feature/active-runtime-pr'
+            }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-532'
+          },
+          historical: [],
+          conflicting: [
+            {
+              id: 'attachment-pr-583'
+            }
+          ],
+          unknown: []
+        }
+      }
+    });
+  });
+
   it('does not treat common technical hyphen codes as foreign issue ownership evidence', async () => {
     const { result } = await readIssueContextAttachmentTruth({
       identifier: 'CO-244',
@@ -1744,15 +1796,15 @@ describe('providerLinearWorkflowFacade', () => {
         buildGitHubAttachment(
           'attachment-pr-581',
           581,
-          'CO-244 support ISO-8601 GPT-5 RFC-3339 HTTP-404 Node-20 parsing'
+          'feat: CO-244 support ISO-8601 GPT-5 RFC-3339 HTTP-404 Node-20 TLS-1.3 parsing'
         )
       ],
       snapshotForPr: () => ({
         state: 'OPEN',
         mergedAt: null,
         updatedAt: '2026-04-21T09:07:51.000Z',
-        title: 'CO-244 support ISO-8601 GPT-5 RFC-3339 HTTP-404 Node-20 parsing',
-        headRefName: 'linear/co-244-support-iso-8601-gpt-5-rfc-3339-http-404-node-20-parsing'
+        title: 'feat: CO-244 support ISO-8601 GPT-5 RFC-3339 HTTP-404 Node-20 TLS-1.3 parsing',
+        headRefName: 'feature/node-20-http-404-upgrade'
       })
     });
 
