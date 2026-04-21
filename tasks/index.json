@@ -62,6 +62,34 @@
       }
     },
     {
+      "id": "20260421-linear-810a1d48-4f5e-4557-ab38-8068d77f678c",
+      "title": "CO-282 stale CO-242 workspace path docs:check repair",
+      "relates_to": "tasks/tasks-linear-810a1d48-4f5e-4557-ab38-8068d77f678c.md",
+      "risk": "low",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-21",
+      "approvals": {
+        "parallelization_decision": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-21",
+          "status": "stay_serial_single_bounded_change",
+          "summary": "No safe independent child-lane slice exists because the docs packet, CO-242 wording fix, and docs:check validation all overlap the same tiny docs hygiene surface."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-810a1d48-4f5e-4557-ab38-8068d77f678c.md",
+        "task": "tasks/tasks-linear-810a1d48-4f5e-4557-ab38-8068d77f678c.md",
+        "agent_task": ".agent/task/linear-810a1d48-4f5e-4557-ab38-8068d77f678c.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-810a1d48-4f5e-4557-ab38-8068d77f678c.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-810a1d48-4f5e-4557-ab38-8068d77f678c.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-810a1d48-4f5e-4557-ab38-8068d77f678c.md"
+        }
+      }
+    },
+    {
       "id": "20260421-linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb",
       "title": "CO: replace remaining dead-code-pruning archive README pointers with durable guidance",
       "relates_to": "tasks/tasks-linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md",
