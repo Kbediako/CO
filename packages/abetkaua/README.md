@@ -1,6 +1,6 @@
 # Abetka Mirror
 
-Local, tracker-free mirror of https://abetkaua.com/en/ for HiFi toolkit testing. The previous static snapshot now lives in `.runs/0801-dead-code-pruning/archive/2025-12-08T10-01-24Z/packages/abetkaua/public/`; regenerate fresh output with the mirror scripts when needed.
+Local, tracker-free mirror of https://abetkaua.com/en/ for HiFi toolkit testing. Task 0801 removed the checked-in static snapshot, so fresh checkouts should regenerate `packages/abetkaua/public/` with the mirror scripts when needed instead of expecting a durable `.runs/...` archive copy.
 
 ## Run Locally
 - Refresh the mirror (keeps per-project cache, Web Archive fallback for externals): `npm run mirror:fetch -- --project abetkaua`
@@ -22,5 +22,5 @@ Local, tracker-free mirror of https://abetkaua.com/en/ for HiFi toolkit testing.
 - Tracker/service worker snippets are stripped via `mirror.config.json` (`gtag`, `googletagmanager`, `serviceWorker`, etc.), and share links are rewritten off `facebook.com` to reduce tracker domains.
 
 ## Manifests
-- Mirror fetch (legacy path): `.runs/abetkaua/mirror/2025-11-26T02-15-46.050Z/manifest.json` (status incomplete upstream 503; assets patched locally). New runs will land under `.runs/abetkaua/mirror/abetkaua/<timestamp>/manifest.json`.
-- Review: `.runs/0101/2025-11-26T02-50-23-598Z-fbf8c18f/manifest.json`.
+- Example local mirror fetch manifest path (not tracked in git): `.runs/abetkaua/mirror/2025-11-26T02-15-46.050Z/manifest.json` (status incomplete upstream 503; assets patched locally). New local runs will land under `.runs/abetkaua/mirror/abetkaua/<timestamp>/manifest.json`.
+- Example local review manifest path (not tracked in git): `.runs/0101/2025-11-26T02-50-23-598Z-fbf8c18f/manifest.json`.

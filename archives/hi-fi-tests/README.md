@@ -1,5 +1,8 @@
-# Hi-Fi Test Archives (Relocated)
+# Hi-Fi Test Archives
 
-The previous `archives/hi-fi-tests` snapshots now live under `.runs/0801-dead-code-pruning/archive/2025-12-08T10-01-24Z/archives/hi-fi-tests/` from the Task 0801 cleanup.
+Task 0801 removed the checked-in `archives/hi-fi-tests` payload, so fresh checkouts should treat this directory as a stub instead of expecting a durable `.runs/...` archive copy.
 
-Use that archive for historical assets or re-export fresh fixtures as needed.
+To regenerate reviewer-usable captures:
+- follow `docs/README.md` under `Hi-Fi Design Toolkit Captures`
+- configure the target source in `design.config.yaml`, then run `npx @kbediako/codex-orchestrator start hi-fi-design-toolkit --format json --task <task-id>`
+- keep any intentionally retained snapshot guidance under `reference/` with a local README, following `reference/README.md`
