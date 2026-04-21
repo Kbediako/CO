@@ -89,6 +89,7 @@ export interface SelectedRunProjectionContext {
   paths: Pick<RunPaths, 'manifestPath' | 'runDir'>;
   linearAdvisoryState: {
     tracked_issue: LiveLinearTrackedIssue | null;
+    stale_source?: unknown;
   };
   providerIntakeState?: ProviderIntakeState;
 }
@@ -167,6 +168,19 @@ interface ResolvedCompatibilityState {
 
 interface LinearAdvisoryStateSnapshot {
   tracked_issue?: LiveLinearTrackedIssue | null;
+  stale_source?: unknown;
+}
+
+function selectFreshLinearAdvisoryTrackedIssue(
+  advisoryState:
+    | { tracked_issue?: LiveLinearTrackedIssue | null; stale_source?: unknown }
+    | null
+    | undefined
+): LiveLinearTrackedIssue | null {
+  if (!advisoryState || advisoryState.stale_source) {
+    return null;
+  }
+  return advisoryState.tracked_issue ?? null;
 }
 
 export function createSelectedRunProjectionReader(
@@ -1258,7 +1272,7 @@ async function resolveProjectionContextParts(
       control: context.controlStore.snapshot(),
       questions: context.questionQueue.list(),
       runDir: context.paths.runDir,
-      trackedIssue: context.linearAdvisoryState.tracked_issue,
+      trackedIssue: selectFreshLinearAdvisoryTrackedIssue(context.linearAdvisoryState),
       providerLinearWorkerProof: await readProviderLinearWorkerProofForProjection(context.paths.runDir)
     };
   }
@@ -1277,7 +1291,7 @@ async function resolveProjectionContextParts(
     control,
     questions: Array.isArray(questionSnapshot?.questions) ? questionSnapshot.questions : [],
     runDir: snapshot.runDir,
-    trackedIssue: advisoryState?.tracked_issue ?? null,
+    trackedIssue: selectFreshLinearAdvisoryTrackedIssue(advisoryState),
     providerLinearWorkerProof: await readProviderLinearWorkerProofForProjection(snapshot.runDir)
   };
 }
@@ -1377,7 +1391,7 @@ async function readTaskCompatibilityContexts(
         control,
         questions: Array.isArray(questionSnapshot?.questions) ? questionSnapshot.questions : [],
         runDir,
-        trackedIssue: advisoryState?.tracked_issue ?? null,
+        trackedIssue: selectFreshLinearAdvisoryTrackedIssue(advisoryState),
         providerLinearWorkerProof
       },
       resolveRunsRootFromRunDir(runDir),

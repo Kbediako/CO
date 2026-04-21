@@ -2032,6 +2032,7 @@ export function createProviderIssueHandoffService(
     claim: ProviderIntakeClaimRecord;
     nextReason: string;
     releaseRun: ProviderIssueRunRecord | null;
+    allowClearingRunIdentity?: boolean;
     trackedIssue?: Pick<
       LiveLinearTrackedIssue,
       | 'identifier'
@@ -2049,19 +2050,20 @@ export function createProviderIssueHandoffService(
     cleanupWorkspace?: boolean;
   }): Promise<void> => {
     const now = isoTimestamp();
-    const nextTaskId = input.releaseRun?.taskId ?? input.claim.task_id;
-    const nextRunId = input.releaseRun?.runId ?? input.claim.run_id;
-    const nextManifestPath = input.releaseRun?.manifestPath ?? input.claim.run_manifest_path;
     const trackedIssueFields = input.trackedIssue
       ? buildTrackedIssueClaimFields(input.trackedIssue)
       : null;
+    const retainedRunIdentity = resolveReleasedClaimRetainedRunIdentity({
+      claim: input.claim,
+      run: input.releaseRun,
+      allowClearing: input.allowClearingRunIdentity,
+      trackedIssue: input.trackedIssue ?? null
+    });
     const transitioned = hasProviderClaimTransitioned(input.claim, {
       ...(trackedIssueFields ?? {}),
       state: 'released',
       reason: input.nextReason,
-      task_id: nextTaskId,
-      run_id: nextRunId,
-      run_manifest_path: nextManifestPath,
+      ...retainedRunIdentity,
       ...clearProviderRetryFields()
     });
     await upsertProviderClaimAndPersist({
@@ -2092,11 +2094,9 @@ export function createProviderIssueHandoffService(
           ? input.trackedIssue.assignee_name
           : (input.claim.issue_assignee_name ?? null),
       issue_blocked_by: input.trackedIssue?.blocked_by ?? input.claim.issue_blocked_by ?? null,
-      task_id: nextTaskId,
+      ...retainedRunIdentity,
       state: 'released',
       reason: input.nextReason,
-      run_id: nextRunId,
-      run_manifest_path: nextManifestPath,
       ...clearProviderRetryFields(),
       updated_at: now
     });
@@ -2104,8 +2104,8 @@ export function createProviderIssueHandoffService(
     if (input.cleanupWorkspace && canCleanupReleasedProviderWorkspace(input.releaseRun)) {
       await cleanupReleasedProviderWorkspace({
         repoRoot,
-        taskId: nextTaskId,
-        manifestPath: nextManifestPath,
+        taskId: input.releaseRun?.taskId ?? input.claim.task_id,
+        manifestPath: input.releaseRun?.manifestPath ?? input.claim.run_manifest_path,
         issueId: input.claim.issue_id,
         issueIdentifier: input.claim.issue_identifier,
         providerWorkflowConfigStore: options.providerWorkflowConfigStore ?? null,
@@ -2423,14 +2423,19 @@ export function createProviderIssueHandoffService(
           const releaseClaimFields = freshTrackedIssue.releaseClaimFields;
           const releaseReason =
             freshTrackedIssue.releaseReason ?? claim.reason ?? 'provider_issue_released';
-          const releasedRunForActiveClaim = releasedRun ?? activeRun;
+          const releasedRunForActiveClaim = releasedRun ?? activeRun ?? null;
+          const retainedRunIdentity = resolveReleasedClaimRetainedRunIdentity({
+            claim,
+            run: releasedRunForActiveClaim,
+            trackedIssue: freshTrackedIssue.trackedIssue,
+            issueState: releaseClaimFields.issue_state ?? null,
+            issueStateType: releaseClaimFields.issue_state_type ?? null
+          });
           const releasedClaimTransitioned = hasProviderClaimTransitioned(claim, {
             ...releaseClaimFields,
             state: 'released',
             reason: releaseReason,
-            task_id: releasedRunForActiveClaim?.taskId ?? claim.task_id,
-            run_id: releasedRunForActiveClaim?.runId ?? claim.run_id,
-            run_manifest_path: releasedRunForActiveClaim?.manifestPath ?? claim.run_manifest_path
+            ...retainedRunIdentity
           });
           publishRuntime ||= releasedClaimTransitioned;
           upsertRehydratedProviderIntakeClaim({
@@ -2438,11 +2443,9 @@ export function createProviderIssueHandoffService(
             ...releaseClaimFields,
             launch_source: undefined,
             launch_token: undefined,
-            task_id: releasedRunForActiveClaim?.taskId ?? claim.task_id,
+            ...retainedRunIdentity,
             state: 'released',
             reason: releaseReason,
-            run_id: releasedRunForActiveClaim?.runId ?? claim.run_id,
-            run_manifest_path: releasedRunForActiveClaim?.manifestPath ?? claim.run_manifest_path,
             updated_at: releasedClaimTransitioned ? now : claim.updated_at
           });
           if (shouldAttemptReleaseCancel(releasedRun)) {
@@ -3370,6 +3373,35 @@ export function createProviderIssueHandoffService(
           releaseCancelPending ||
           replayBlockedByReleasedMetadata
         ) {
+          const nextReleasedIssueState =
+            reopenBlockedByReleaseDrain
+              ? claimBase.issue_state
+              : preserveReleasedIssueMetadata
+                ? existing.issue_state
+                : claimBase.issue_state;
+          const nextReleasedIssueStateType =
+            reopenBlockedByReleaseDrain
+              ? claimBase.issue_state_type
+              : preserveReleasedIssueMetadata
+                ? existing.issue_state_type
+                : claimBase.issue_state_type;
+          const canUseWebhookTruthForRetainedIdentity =
+            releasedWebhookTiming === 'newer' ||
+            releasedWebhookTiming === 'equal';
+          const retainedRunIdentity = resolveReleasedClaimRetainedRunIdentity({
+            claim: existing,
+            run: releasedRun,
+            allowClearing: canUseWebhookTruthForRetainedIdentity,
+            trackedIssue: canUseWebhookTruthForRetainedIdentity ? input.trackedIssue : null,
+            issueState:
+              canUseWebhookTruthForRetainedIdentity
+                ? nextReleasedIssueState
+                : existing.issue_state,
+            issueStateType:
+              canUseWebhookTruthForRetainedIdentity
+                ? nextReleasedIssueStateType
+                : existing.issue_state_type
+          });
           const claim = await upsertProviderClaimAndPersist({
             ...claimBase,
             issue_identifier:
@@ -3385,17 +3417,9 @@ export function createProviderIssueHandoffService(
                   ? existing.issue_title
                   : claimBase.issue_title,
             issue_state:
-              reopenBlockedByReleaseDrain
-                ? claimBase.issue_state
-                : preserveReleasedIssueMetadata
-                  ? existing.issue_state
-                  : claimBase.issue_state,
+              nextReleasedIssueState,
             issue_state_type:
-              reopenBlockedByReleaseDrain
-                ? claimBase.issue_state_type
-                : preserveReleasedIssueMetadata
-                  ? existing.issue_state_type
-                  : claimBase.issue_state_type,
+              nextReleasedIssueStateType,
             issue_updated_at:
               reopenBlockedByReleaseDrain
                 ? claimBase.issue_updated_at
@@ -3434,15 +3458,13 @@ export function createProviderIssueHandoffService(
                 : preserveReleasedIssueMetadata
                   ? existing.issue_blocked_by
                   : claimBase.issue_blocked_by,
-            task_id: releasedRun?.taskId ?? existing.task_id,
+            ...retainedRunIdentity,
             mapping_source: existing.mapping_source,
             state: 'released',
             reason:
               reopenBlockedByReleaseDrain
                 ? markProviderIssueReleasedPendingReopen(existing.reason ?? null)
                 : existing.reason ?? 'provider_issue_released',
-            run_id: releasedRun?.runId ?? existing.run_id,
-            run_manifest_path: releasedRun?.manifestPath ?? existing.run_manifest_path,
           });
           return { kind: 'ignored', reason: claim.reason ?? 'provider_issue_released', claim };
         }
@@ -3507,6 +3529,7 @@ export function createProviderIssueHandoffService(
               claim: existing,
               nextReason: eligibility.releaseReason,
               releaseRun,
+              allowClearingRunIdentity: input.webhookTimestamp !== null,
               trackedIssue: input.trackedIssue,
               cleanupWorkspace: eligibility.cleanupWorkspace
             });
@@ -4727,24 +4750,25 @@ export function createProviderIssueHandoffService(
                 claim,
                 resolution.trackedIssue
               );
+              const retainedRunIdentity = resolveReleasedClaimRetainedRunIdentity({
+                claim,
+                run: releaseRun ?? activeRun,
+                trackedIssue: resolution.trackedIssue
+              });
               const transitioned = hasProviderClaimTransitioned(claim, {
                 ...trackedIssueFields,
                 state: 'released',
                 reason: claim.reason ?? 'provider_issue_released',
-                task_id: (releaseRun ?? activeRun).taskId,
-                run_id: (releaseRun ?? activeRun).runId,
-                run_manifest_path: (releaseRun ?? activeRun).manifestPath
+                ...retainedRunIdentity
               });
               await upsertProviderClaimAndPersist({
                 ...claim,
                 ...trackedIssueFields,
                 launch_source: undefined,
                 launch_token: undefined,
-                task_id: (releaseRun ?? activeRun).taskId,
+                ...retainedRunIdentity,
                 state: 'released',
-                reason: claim.reason ?? 'provider_issue_released',
-                run_id: (releaseRun ?? activeRun).runId,
-                run_manifest_path: (releaseRun ?? activeRun).manifestPath
+                reason: claim.reason ?? 'provider_issue_released'
               });
               if (transitioned) {
                 options.publishRuntime?.('provider-intake.refresh');
@@ -6388,6 +6412,76 @@ function shouldCleanupReleasedProviderWorkspace(claim: ProviderIntakeClaimRecord
   return isTerminalTrackedIssueState(
     normalizeProviderLinearWorkflowState(claim.issue_state),
     normalizeProviderLinearWorkflowState(claim.issue_state_type)
+  );
+}
+
+function resolveReleasedClaimRetainedRunIdentity(input: {
+  claim: ProviderIntakeClaimRecord;
+  run: ProviderIssueRunRecord | null;
+  allowClearing?: boolean;
+  trackedIssue?: Pick<LiveLinearTrackedIssue, 'state' | 'state_type'> | null;
+  issueState?: string | null;
+  issueStateType?: string | null;
+}): Partial<
+  Pick<
+    ProviderIntakeClaimRecord,
+    'worker_host' | 'launch_source' | 'launch_token' | 'launch_started_at'
+  >
+> &
+  Pick<ProviderIntakeClaimRecord, 'task_id' | 'run_id' | 'run_manifest_path'> {
+  const taskId = input.run?.taskId ?? input.claim.task_id;
+  if (input.allowClearing !== false && shouldClearReleasedClaimRunIdentity(input)) {
+    return {
+      task_id: taskId,
+      run_id: null,
+      run_manifest_path: null,
+      worker_host: null,
+      launch_source: null,
+      launch_token: null,
+      launch_started_at: null
+    };
+  }
+  return {
+    task_id: taskId,
+    run_id: input.run?.runId ?? input.claim.run_id,
+    run_manifest_path: input.run?.manifestPath ?? input.claim.run_manifest_path
+  };
+}
+
+function shouldClearReleasedClaimRunIdentity(input: {
+  claim: ProviderIntakeClaimRecord;
+  run: ProviderIssueRunRecord | null;
+  trackedIssue?: Pick<LiveLinearTrackedIssue, 'state' | 'state_type'> | null;
+  issueState?: string | null;
+  issueStateType?: string | null;
+}): boolean {
+  const issueState = input.issueState ?? input.trackedIssue?.state ?? input.claim.issue_state;
+  const issueStateType =
+    input.issueStateType ?? input.trackedIssue?.state_type ?? input.claim.issue_state_type;
+  if (
+    !isTerminalTrackedIssueState(
+      normalizeProviderLinearWorkflowState(issueState),
+      normalizeProviderLinearWorkflowState(issueStateType)
+    )
+  ) {
+    return false;
+  }
+  if (isTerminalProviderIssueRunOutcome(input.run)) {
+    return false;
+  }
+  if (!input.run) {
+    return false;
+  }
+  return true;
+}
+
+function isTerminalProviderIssueRunOutcome(run: ProviderIssueRunRecord | null): boolean {
+  const status = run?.proofTerminalStatus ?? run?.status ?? null;
+  return (
+    status === 'succeeded' ||
+    status === 'failed' ||
+    status === 'cancelled' ||
+    status === 'completed'
   );
 }
 
