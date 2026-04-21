@@ -50,6 +50,7 @@ describe('core vs full test command contract', () => {
     expect(scripts['test:core']).toBe('vitest run --config vitest.config.core.ts');
     expect(scripts['test:all']).toBe('npm run test:core && npm run test:adapters');
     expect(scripts['test:orchestrator']).toBe('npm run test:core --');
+    expect(scripts['test:adapters']).toBe('vitest run --passWithNoTests --config vitest.config.ts adapters');
     expect(scripts['test:evaluation']).toBe('vitest run --passWithNoTests --config vitest.config.ts evaluation/tests');
     expect(scripts['eval:test']).toBe('npm run test:evaluation --');
 
