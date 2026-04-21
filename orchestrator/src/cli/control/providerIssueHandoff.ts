@@ -2222,16 +2222,18 @@ export function createProviderIssueHandoffService(
   ): boolean => {
     const claimRunId = normalizeOptionalString(claim.run_id);
     const claimManifestPath = normalizeOptionalString(claim.run_manifest_path);
-    if (claimRunId !== activeRun.runId) {
-      return false;
+    const runIdMatches = claimRunId !== null && claimRunId === activeRun.runId;
+    const manifestMatches =
+      claimManifestPath !== null &&
+      (
+        claimManifestPath === activeRun.manifestPath ||
+        resolve(claimManifestPath) === resolve(activeRun.manifestPath)
+      );
+
+    if (claimRunId && claimManifestPath) {
+      return runIdMatches && manifestMatches;
     }
-    if (!claimManifestPath) {
-      return true;
-    }
-    return (
-      claimManifestPath === activeRun.manifestPath ||
-      resolve(claimManifestPath) === resolve(activeRun.manifestPath)
-    );
+    return runIdMatches || manifestMatches;
   };
 
   const resolveRehydratedActiveRunLaunchProvenance = async (input: {
