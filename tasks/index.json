@@ -1,6 +1,67 @@
 {
   "items": [
     {
+      "id": "20260422-linear-994efebc-e1e4-4e00-8046-c60143813251",
+      "title": "CO-295 Linear PR attachment ownership truth",
+      "relates_to": "tasks/tasks-linear-994efebc-e1e4-4e00-8046-c60143813251.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-22",
+      "approvals": {
+        "rework_reset": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-22",
+          "status": "in_progress",
+          "summary": "Fresh Rework attempt is active: live issue-context shows state Rework with current PR null and historical attachments #587/#532/#575; the stale workpad was deleted, PR #587 was closed, and branch linear/co-295-pr-attachment-ownership-truth-rework was cut from origin/main."
+        },
+        "parallelization_decision": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-22",
+          "status": "accepted",
+          "manifest": ".runs/linear-994efebc-e1e4-4e00-8046-c60143813251-agent-task-restore/cli/2026-04-21T20-59-07-638Z-db747213/manifest.json",
+          "summary": "Recorded parallelize_now / independent_scope_available, invalidated two broader docs child-lane attempts for bounded reasons, then accepted same-issue docs lane agent-task-restore restoring the .agent/task mirror from preserved commit baa1a7540c52f7a2a13439deaa6970c4990665e7."
+        },
+        "pr_sweep": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-22",
+          "status": "succeeded",
+          "summary": "PR #575 was attached as current before implementation; sweep found it is merged CO-289 work with all review threads resolved and no actionable CO-295 feedback, so it is defect evidence only."
+        },
+        "issue_quality_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-22",
+          "status": "accepted",
+          "summary": "Scope covers ownership-aware current PR selection, preservation of historical/current truth, duplicated-current visibility, and operator-safe repair; display-only and manual-attachment cleanup are rejected."
+        },
+        "docs_packet_restore": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-22",
+          "status": "accepted",
+          "summary": "The fresh Rework branch now carries the ownership-aware providerLinearWorkflowFacade source/test diff plus the restored CO-295 docs packet. The .agent/task mirror came from the accepted child lane, and the remaining PRD / TECH_SPEC / ACTION_PLAN / task registry files were restored in the parent workspace from preserved commit baa1a7540c52f7a2a13439deaa6970c4990665e7 before revalidation."
+        },
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-22",
+          "status": "succeeded",
+          "manifest": ".runs/linear-994efebc-e1e4-4e00-8046-c60143813251-docs-review-r3/cli/2026-04-21T22-30-54-818Z-6b2532c7/manifest.json",
+          "telemetry": ".runs/linear-994efebc-e1e4-4e00-8046-c60143813251-docs-review-r3/cli/2026-04-21T22-30-54-818Z-6b2532c7/review/telemetry.json",
+          "summary": "Final current-head docs-review rerun `docs-review-r3` succeeded after the ownership-edge fixes; review telemetry recorded `review_outcome: clean-success`."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-994efebc-e1e4-4e00-8046-c60143813251.md",
+        "task": "tasks/tasks-linear-994efebc-e1e4-4e00-8046-c60143813251.md",
+        "agent_task": ".agent/task/linear-994efebc-e1e4-4e00-8046-c60143813251.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-994efebc-e1e4-4e00-8046-c60143813251.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-994efebc-e1e4-4e00-8046-c60143813251.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-994efebc-e1e4-4e00-8046-c60143813251.md"
+        }
+      }
+    },
+    {
       "id": "20260422-linear-61ddd0d1-664b-4060-949b-33eb4e7255ac",
       "title": "CO-297 stop-hook structured sentinel contract",
       "relates_to": "tasks/tasks-linear-61ddd0d1-664b-4060-949b-33eb4e7255ac.md",
