@@ -1042,6 +1042,7 @@ async function hydrateIssuePullRequestAttachments(
 
   const resolved: ProviderLinearIssuePullRequestCandidate[] = [];
   const unknown: ProviderLinearWorkflowAttachment[] = [];
+  const conflicting: ProviderLinearWorkflowAttachment[] = [];
   const hydrationResults = await mapWithConcurrencyLimit<
     ProviderLinearIssuePullRequestAttachmentCandidate,
     ProviderLinearIssuePullRequestHydrationResult
@@ -1070,7 +1071,11 @@ async function hydrateIssuePullRequestAttachments(
   );
   for (const { candidate, snapshot } of hydrationResults) {
     if (!snapshot) {
-      unknown.push(candidate.attachment);
+      if (issuePullRequestEvidenceTargetsDifferentIssue(issue, [candidate.attachment.title])) {
+        conflicting.push(candidate.attachment);
+      } else {
+        unknown.push(candidate.attachment);
+      }
       continue;
     }
     resolved.push({
@@ -1081,7 +1086,7 @@ async function hydrateIssuePullRequestAttachments(
 
   return {
     ...issue,
-    pull_request_attachments: classifyIssuePullRequestAttachments(issue, resolved, unknown)
+    pull_request_attachments: classifyIssuePullRequestAttachments(issue, resolved, unknown, conflicting)
   };
 }
 
@@ -1221,11 +1226,13 @@ function mapIssuePullRequestAttachmentSnapshot(
 function classifyIssuePullRequestAttachments(
   issue: ProviderLinearIssueContext,
   resolved: ProviderLinearIssuePullRequestCandidate[],
-  unknown: ProviderLinearWorkflowAttachment[]
+  unknown: ProviderLinearWorkflowAttachment[],
+  preclassifiedConflicting: ProviderLinearWorkflowAttachment[] = []
 ): ProviderLinearIssuePullRequestAttachments {
   if (resolved.length === 0) {
     return {
       ...buildEmptyIssuePullRequestAttachments(),
+      conflicting: appendUniqueIssuePullRequestAttachments([], preclassifiedConflicting),
       unknown: [...unknown]
     };
   }
@@ -1239,7 +1246,10 @@ function classifyIssuePullRequestAttachments(
   const ownershipEligible = resolved.filter(
     (candidate) => !ownershipConflicting.some((conflict) => conflict.attachment.id === candidate.attachment.id)
   );
-  const ownershipConflictingAttachments = ownershipConflicting.map((candidate) => candidate.attachment);
+  const ownershipConflictingAttachments = appendUniqueIssuePullRequestAttachments(
+    preclassifiedConflicting,
+    ownershipConflicting.map((candidate) => candidate.attachment)
+  );
   if (ownershipEligible.length === 0) {
     return {
       current: null,
@@ -1309,32 +1319,31 @@ function issuePullRequestCandidateTargetsDifferentIssue(
   issue: ProviderLinearIssueContext,
   candidate: ProviderLinearIssuePullRequestCandidate
 ): boolean {
+  return issuePullRequestEvidenceTargetsDifferentIssue(issue, [
+    candidate.attachment.title,
+    candidate.snapshot.title,
+    candidate.snapshot.head_ref_name
+  ]);
+}
+
+function issuePullRequestEvidenceTargetsDifferentIssue(
+  issue: Pick<ProviderLinearIssueContext, 'identifier'>,
+  values: readonly (string | null | undefined)[]
+): boolean {
   const issueIdentifier = normalizeIssueIdentifier(issue.identifier);
   if (!issueIdentifier) {
     return false;
   }
-  const issuePrefix = issueIdentifier.slice(0, issueIdentifier.indexOf('-'));
-  const identifiers = extractIssueIdentifiersForPrefix(
-    [
-      candidate.attachment.title,
-      candidate.snapshot.title,
-      candidate.snapshot.head_ref_name
-    ],
-    issuePrefix
-  );
+  const identifiers = extractIssueIdentifiers(values);
   if (identifiers.length === 0) {
     return false;
   }
   return identifiers.some((identifier) => identifier !== issueIdentifier);
 }
 
-function extractIssueIdentifiersForPrefix(
-  values: readonly (string | null | undefined)[],
-  issuePrefix: string
-): string[] {
+function extractIssueIdentifiers(values: readonly (string | null | undefined)[]): string[] {
   const identifiers = new Set<string>();
-  const escapedPrefix = issuePrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const pattern = new RegExp(`\\b${escapedPrefix}-\\d+\\b`, 'gi');
+  const pattern = /\b[A-Z][A-Z0-9]*-\d+\b/gi;
   for (const value of values) {
     const normalized = normalizeOptionalString(value);
     if (!normalized) {

@@ -39,20 +39,20 @@
           "reviewer": "parent provider worker",
           "date": "2026-04-22",
           "status": "succeeded",
-          "summary": "ProviderLinearWorkflowFacade focused tests pass after adding ownership-aware PR attachment classification; CO-244/CO-289 fixture restores PR #532 current and exposes mismatched PR #575 as conflicting while CO-289 keeps PR #575 current."
+          "summary": "ProviderLinearWorkflowFacade focused tests pass after adding ownership-aware PR attachment classification; CO-244/CO-289 fixture restores PR #532 current and exposes mismatched PR #575 as conflicting while CO-289 keeps PR #575 current. CodeRabbit follow-up regressions cover foreign-prefix issue identifiers and snapshot-missing attachment-title conflicts."
         },
         "validation_gates": {
           "reviewer": "parent provider worker",
           "date": "2026-04-22",
           "status": "succeeded",
-          "summary": "After merging latest origin/main, focused facade tests passed (222 tests), delegation guard passed with scoped provenance fallback, spec guard, build, lint, full test (347 files / 4465 tests), docs:check, docs:freshness (4361 docs / 4364 registry entries), repo:stewardship (5469 tracked files / 0 action-required), diff-budget, and pack:smoke passed. Lint only reported existing DelegationMcpHealth.test.ts warnings."
+          "summary": "After merging latest origin/main and addressing CodeRabbit feedback, focused facade tests passed (224 tests), delegation guard passed with scoped provenance fallback, spec guard, build, lint, full test (347 files / 4467 tests), docs:check, docs:freshness (4361 docs / 4364 registry entries), repo:stewardship (5469 tracked files / 0 action-required), diff-budget, and pack:smoke passed. Lint only reported existing DelegationMcpHealth.test.ts warnings."
         },
         "standalone_review": {
           "reviewer": "codex-orchestrator review",
           "date": "2026-04-22",
           "status": "succeeded",
           "telemetry": ".runs/linear-994efebc-e1e4-4e00-8046-c60143813251/cli/2026-04-21T16-19-14-539Z-9d990cf1/review/telemetry.json",
-          "summary": "Manifest-backed forced standalone review completed with status succeeded and review_outcome bounded-success after command-intent retry; final output reported no actionable regressions in the changed provider Linear PR attachment classification, snapshot hydration, or focused test coverage."
+          "summary": "Manifest-backed forced standalone review completed with status succeeded and review_outcome bounded-success after command-intent retry, including the CodeRabbit feedback patch for foreign-prefix and snapshot-missing ownership conflicts."
         },
         "elegance_review": {
           "reviewer": "parent provider worker",

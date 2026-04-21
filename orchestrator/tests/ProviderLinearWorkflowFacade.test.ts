@@ -1627,6 +1627,58 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it('treats foreign-prefix issue identifiers as conflicting ownership evidence', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Completed issue with foreign-prefix misbound attachment',
+      state: {
+        id: 'state-done',
+        name: 'Done',
+        type: 'completed'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-532', 532, 'CO-244 closeout PR'),
+        buildGitHubAttachment('attachment-pr-580', 580, 'ABC-123 active provider PR')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 532
+          ? {
+              state: 'MERGED',
+              mergedAt: '2026-04-10T13:11:30.000Z',
+              updatedAt: '2026-04-10T13:11:30.000Z',
+              title: 'CO-244 completed provider release',
+              headRefName: 'linear/co-244-completed-provider-release'
+            }
+          : {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:07:51.000Z',
+              title: 'ABC-123 active provider PR',
+              headRefName: 'linear/abc-123-active-provider-pr'
+            }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-532'
+          },
+          historical: [],
+          conflicting: [
+            {
+              id: 'attachment-pr-580'
+            }
+          ],
+          unknown: []
+        }
+      }
+    });
+  });
+
   it('preserves the owning issue current PR when the PR identifier matches', async () => {
     const { result } = await readIssueContextAttachmentTruth({
       identifier: 'CO-289',
@@ -1659,6 +1711,38 @@ describe('providerLinearWorkflowFacade', () => {
           },
           historical: [],
           conflicting: [],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it('preserves attachment-title ownership conflicts when PR snapshots cannot be hydrated', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Snapshot unavailable for foreign-title attachment',
+      state: {
+        id: 'state-in-progress',
+        name: 'In Progress',
+        type: 'started'
+      },
+      attachments: [buildGitHubAttachment('attachment-pr-580', 580, 'ABC-123 active provider PR')],
+      snapshotForPr: () => ({})
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: null,
+          historical: [],
+          conflicting: [
+            {
+              id: 'attachment-pr-580'
+            }
+          ],
           unknown: []
         }
       }
