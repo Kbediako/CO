@@ -185,7 +185,7 @@ The Apr 20 blocking set and the CO-175 rolling cohort were reviewed in `docs/fin
 ## Apr 21 Rework Refresh
 
 ### Reproduction / Baseline Findings
-After PR #566 had already merged, CO-267 rework reproduced the Apr 21 current-main baseline failure in `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/docs-freshness.json`:
+After PR #566 had already merged, CO-267 rework reproduced the Apr 21 current-main baseline failure in `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/rework-reset/docs-freshness-baseline.json`:
 
 - `37` blocking stale entries
 - `0` rolling cohort entries

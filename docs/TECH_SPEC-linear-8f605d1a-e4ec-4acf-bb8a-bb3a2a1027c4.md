@@ -24,8 +24,8 @@ This mirror points to the canonical task spec at `tasks/specs/linear-8f605d1a-e4
 - Before docs freshness report: `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/before/docs-freshness.json`
 - Before maintenance report: `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/before/docs-freshness-maintenance.json`
 - Before spec guard log: `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/before/spec-guard.log`
-- Rework docs freshness report: `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/docs-freshness.json`
-- Rework maintenance report: `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/docs-freshness-maintenance.json`
+- Rework docs freshness report: `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/rework-reset/docs-freshness-baseline.json`
+- Rework maintenance report: `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/rework-reset/docs-freshness-maintenance-baseline.json`
 - Classification: `docs/findings/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4-docs-freshness-classification.md`
 - Workpad: Linear comment `4f45cf6d-b02f-4feb-b040-9e353abd59e5`
 
