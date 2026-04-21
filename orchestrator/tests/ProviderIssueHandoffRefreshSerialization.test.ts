@@ -1154,6 +1154,93 @@ describe('runProviderIssueHandoffRefresh', () => {
     });
   });
 
+  it('preserves control-host launch provenance from the discovery snapshot when the manifest changes before provenance resolution', async () => {
+    const { root, paths } = await createHostPaths();
+    const childPaths = await createCo185ActiveRun(root);
+    const initialManifest = JSON.parse(
+      await readFile(childPaths.manifestPath, 'utf8')
+    ) as Record<string, unknown>;
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify(
+        {
+          ...initialManifest,
+          provider_launch_source: 'control-host',
+          provider_control_host_task_id: 'local-mcp',
+          provider_control_host_run_id: 'control-host'
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    const state = createProviderIntakeState();
+    pushCo185ReleasedPendingClaim(state, childPaths.manifestPath, {
+      launch_source: 'control-host',
+      launch_token: 'launch-token-snapshot'
+    });
+    const resolveTrackedIssue = vi.fn(async () => {
+      await writeFile(
+        childPaths.manifestPath,
+        JSON.stringify(
+          {
+            ...initialManifest,
+            provider_launch_source: null,
+            provider_control_host_task_id: null,
+            provider_control_host_run_id: null
+          },
+          null,
+          2
+        ),
+        'utf8'
+      );
+      return {
+        kind: 'ready' as const,
+        trackedIssue: createTrackedIssue({
+          id: 'lin-issue-185',
+          identifier: 'CO-185',
+          title: 'Provider helper constraints',
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-04-15T01:18:56.003Z'
+        })
+      };
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue
+    });
+
+    await service.rehydrate();
+
+    expect(resolveTrackedIssue).toHaveBeenCalledTimes(1);
+    expect(state.claims[0]).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: 'run-active',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: 'control-host',
+      launch_token: 'launch-token-snapshot'
+    });
+    const manifest = JSON.parse(await readFile(childPaths.manifestPath, 'utf8')) as Record<
+      string,
+      unknown
+    >;
+    expect(manifest).toMatchObject({
+      provider_launch_source: null,
+      provider_control_host_task_id: null,
+      provider_control_host_run_id: null
+    });
+  });
+
   it('preserves control-host launch provenance when retained claim identity only has the active manifest path and camelCase manifest aliases', async () => {
     const { root, paths } = await createHostPaths();
     const childPaths = await createCo185ActiveRun(root);

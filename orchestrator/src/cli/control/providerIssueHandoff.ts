@@ -154,6 +154,7 @@ interface ProviderIssueRunRecord {
   taskId: string;
   runId: string;
   manifestPath: string;
+  manifest: Record<string, unknown>;
   pipelineId: string | null;
   status: string | null;
   hasDeadLocalInProgressProof: boolean;
@@ -2236,10 +2237,10 @@ export function createProviderIssueHandoffService(
     return runIdMatches || manifestMatches;
   };
 
-  const resolveRehydratedActiveRunLaunchProvenance = async (input: {
+  const resolveRehydratedActiveRunLaunchProvenance = (input: {
     claim: ProviderIntakeClaimRecord;
     activeRun: ProviderIssueRunRecord;
-  }): Promise<ProviderRehydratedLaunchProvenanceFields> => {
+  }): ProviderRehydratedLaunchProvenanceFields => {
     const launchToken = normalizeOptionalString(input.claim.launch_token);
     if (
       input.claim.launch_source !== PROVIDER_LAUNCH_SOURCE ||
@@ -2250,13 +2251,7 @@ export function createProviderIssueHandoffService(
       return buildClearedRehydratedLaunchProvenance();
     }
 
-    const manifest = await readManifestRecord(input.activeRun.manifestPath);
-    if (!manifest) {
-      logger.warn(
-        `[provider-issue-handoff] cannot preserve rehydrated control-host launch provenance for ${input.claim.issue_identifier}: active run manifest is unreadable at ${input.activeRun.manifestPath}`
-      );
-      return buildClearedRehydratedLaunchProvenance();
-    }
+    const manifest = input.activeRun.manifest;
 
     const manifestLaunchSource =
       normalizeOptionalString(manifest.provider_launch_source) ??
@@ -7165,6 +7160,7 @@ async function discoverProviderIssueRunSnapshot(
         taskId: readStringValue(manifest, 'task_id') ?? taskEntry,
         runId: readStringValue(manifest, 'run_id') ?? runEntry,
         manifestPath,
+        manifest,
         pipelineId,
         status: resolveProviderIssueRunStatus(manifest, proof, isProcessAlive),
         hasDeadLocalInProgressProof,
@@ -8390,6 +8386,7 @@ function resolveProviderReleaseRun(
       taskId: claim.task_id,
       runId: claim.run_id ?? claim.task_id,
       manifestPath: claim.run_manifest_path,
+      manifest: {},
       pipelineId: null,
       status: null,
       hasDeadLocalInProgressProof: false,
