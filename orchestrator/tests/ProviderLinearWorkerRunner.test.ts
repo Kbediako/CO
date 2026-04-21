@@ -2476,6 +2476,61 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(parsed.failureDiagnosis?.diagnostic_category).not.toBe('provider_runtime');
   });
 
+  it('preserves stronger root-cause diagnostics when the stdin bootstrap preamble is mixed in', () => {
+    const cases: Array<[Record<string, unknown>, string]> = [
+      [
+        {
+          type: 'error',
+          message: 'stderr | Reading additional input from stdin... unauthorized login required'
+        },
+        'auth_mismatch'
+      ],
+      [
+        {
+          type: 'error',
+          message: 'stderr | Reading additional input from stdin... HTTP 429 too many requests'
+        },
+        'quota_rate_limit'
+      ],
+      [
+        {
+          type: 'error',
+          message: 'stderr | Reading additional input from stdin... cloud execution denied'
+        },
+        'cloud_denial'
+      ],
+      [
+        {
+          type: 'event_msg',
+          payload: {
+            type: 'provider_runtime',
+            status: 'failed',
+            message: 'stderr | Reading additional input from stdin... auth profile mismatch'
+          }
+        },
+        'auth_mismatch'
+      ],
+      [
+        {
+          type: 'event_msg',
+          payload: {
+            type: 'diagnostic',
+            diagnostic_category: 'provider_stdin_bootstrap',
+            message: 'stderr | Reading additional input from stdin... auth profile mismatch'
+          }
+        },
+        'provider_stdin_bootstrap'
+      ]
+    ];
+
+    for (const [payload, expected] of cases) {
+      const parsed = parseProviderLinearWorkerJsonl(
+        JSON.stringify({ ...payload, timestamp: '2026-04-21T04:00:00.000Z' })
+      );
+      expect(parsed.failureDiagnosis?.diagnostic_category).toBe(expected);
+    }
+  });
+
   it('classifies prose rate-limited provider failures', () => {
     const parsed = parseProviderLinearWorkerJsonl(
       JSON.stringify({

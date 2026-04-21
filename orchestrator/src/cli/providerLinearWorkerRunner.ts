@@ -3420,20 +3420,8 @@ function classifyProviderWorkerFailureDiagnosis(
   });
   const structuredCategory = classifyProviderWorkerStructuredDiagnosticCategory(input);
   const hasStdinBootstrapSignal = hasProviderWorkerStdinBootstrapSignal(normalizedClassification);
-  if (structuredCategory) {
-    if (structuredCategory !== 'provider_runtime' || !hasStdinBootstrapSignal) {
-      return build(structuredCategory, providerWorkerDiagnosticGuidance(structuredCategory));
-    }
-    return build(
-      'provider_stdin_bootstrap',
-      providerWorkerDiagnosticGuidance('provider_stdin_bootstrap')
-    );
-  }
-  if (hasStdinBootstrapSignal) {
-    return build(
-      'provider_stdin_bootstrap',
-      providerWorkerDiagnosticGuidance('provider_stdin_bootstrap')
-    );
+  if (structuredCategory && structuredCategory !== 'provider_runtime') {
+    return build(structuredCategory, providerWorkerDiagnosticGuidance(structuredCategory));
   }
   const guardianTimeoutSignal =
     normalizedClassification.includes('guardian') &&
@@ -3508,6 +3496,15 @@ function classifyProviderWorkerFailureDiagnosis(
       'env_config',
       'Codex Cloud environment configuration is missing or invalid; set CODEX_CLOUD_ENV_ID or task metadata.'
     );
+  }
+  if (hasStdinBootstrapSignal) {
+    return build(
+      'provider_stdin_bootstrap',
+      providerWorkerDiagnosticGuidance('provider_stdin_bootstrap')
+    );
+  }
+  if (structuredCategory) {
+    return build(structuredCategory, providerWorkerDiagnosticGuidance(structuredCategory));
   }
   if (
     /\b(appserver|provider runtime|runtime parity|codex exec|enoent|websocket|rpc)\b/u.test(
