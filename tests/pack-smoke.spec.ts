@@ -26,6 +26,8 @@ type WorkflowFile = {
 };
 
 const marketplaceSkipToken = 'PACK_SMOKE_ALLOW_MARKETPLACE_SKIP';
+// CO-275: 0.121.0 is the current marketplace-capable release-facing smoke pin.
+// A newer candidate must restore `codex marketplace add` before replacing it.
 const marketplaceCodexInstallCommand = 'npm install --global @openai/codex@0.121.0';
 const cloudCanaryCodexInstallCommand = 'npm install --global @openai/codex@0.122.0';
 const dedicatedCodexInstallCommands = new Set([
@@ -1035,7 +1037,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
             ).toBe(false);
             expect(
               isDedicatedCodexInstallRun(run),
-              `${workflow} job ${jobName} step ${stepIndex + 1} must use a dedicated Codex 0.121.0 install step`
+              `${workflow} job ${jobName} step ${stepIndex + 1} must use a dedicated marketplace-capable Codex install step`
             ).toBe(true);
             codexInstallConditions.push(effectiveStepCondition);
           }
@@ -1061,7 +1063,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
               codexInstallConditions.some((installCondition) =>
                 installConditionCoversSmokeStep(installCondition, effectiveStepCondition)
               ),
-              `${workflow} job ${jobName} step ${stepIndex + 1} must install Codex 0.121.0 before pack:smoke with matching if condition`
+              `${workflow} job ${jobName} step ${stepIndex + 1} must install the marketplace-capable Codex pin before pack:smoke with matching if condition`
             ).toBe(true);
           }
         }

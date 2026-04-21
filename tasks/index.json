@@ -2,7 +2,7 @@
   "items": [
     {
       "id": "20260421-linear-09c996ec-47b3-4f55-928d-38e0b17c11df",
-      "title": "CO-275 Codex CLI 0.122.0 marketplace pack:smoke parity packet",
+      "title": "CO-275 marketplace-dependent downstream-smoke policy rebaseline",
       "relates_to": "tasks/tasks-linear-09c996ec-47b3-4f55-928d-38e0b17c11df.md",
       "risk": "high",
       "owners": [
@@ -15,8 +15,9 @@
           "date": "2026-04-21",
           "status": "produced",
           "manifest": ".runs/linear-09c996ec-47b3-4f55-928d-38e0b17c11df-docs-packet/cli/2026-04-21T04-32-03-882Z-56f78783/manifest.json",
+          "parent_source_anchor": "ctx:sha256:cf4c59c717166639a22858ac56e882dec0a882ed6b6255cb9fd4b57d1e75911d#chunk:c000001",
           "source_anchor": "ctx:sha256:0e9cc806c03afdcd2ad2aeccf80f57549868a86ca946747d78aee3d131e0c83f#chunk:c000001",
-          "summary": "Docs-first packet preserves CO-275 as the Codex CLI 0.122.0 marketplace pack:smoke alignment lane: release-facing pack:smoke proof must account for @openai/codex@0.122.0 while preserving Codex CLI 0.121.0 / @openai/codex@0.121.0 lineage from CO-196 and CO-217, keeping codex marketplace add coverage mandatory, and treating CO-269 as the 0.122.0 lineage anchor. Parent owns implementation, validation, Linear state, workpad, PR, and merge."
+          "summary": "Docs-first packet preserves CO-275 as the marketplace-dependent downstream-smoke policy rebaseline lane: release-facing pack:smoke keeps codex marketplace add mandatory, current marketplace proof stays on Codex CLI 0.121.0 / @openai/codex@0.121.0, @openai/codex@0.122.0 remains the cloud-canary candidate without marketplace add, and any newer replacement must prove the marketplace surface plus pack:smoke without skip env. CO-196, CO-217, and CO-269 remain explicit lineage. Parent owns implementation, validation, Linear state, workpad, PR, and merge."
         }
       },
       "paths": {
