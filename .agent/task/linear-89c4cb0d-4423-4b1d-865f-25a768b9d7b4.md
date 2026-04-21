@@ -47,7 +47,8 @@
 - [x] Fixture/regression distinguishing this seam from `CO-224` and `CO-225`. Evidence: machine-readable provider_runtime case remains generic, stdin bootstrap gets `provider_stdin_bootstrap`, and stale proof diagnostics do not override manifest-backed failures.
 - [x] Required repo validation gates completed or bounded blockers recorded. Evidence: after merging latest `origin/main`, `node scripts/delegation-guard.mjs` passed with scoped child-stream provenance fallback override; `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run test` (`347` files / `4461` tests), `npm run docs:check`, `npm run docs:freshness`, `npm run repo:stewardship`, `node scripts/diff-budget.mjs`, and `npm run pack:smoke` passed. `npm run lint` passed with three pre-existing warnings in `orchestrator/tests/DelegationMcpHealth.test.ts`.
 - [x] Standalone review plus elegance review completed before review handoff. Evidence: manifest-backed standalone review ended bounded-success with no actionable issues; elegance pass collapsed duplicate stdin-bootstrap structured diagnostic aliases into shared sets and reran focused regressions, build, lint, and pack-smoke.
-- [ ] PR attached and ready-review drain clean before state transition to `In Review`.
+- [x] PR attached before review handoff. Evidence: Linear attachment `3c2fd1ce-4671-408e-b1c9-123fecad3956` points to PR #584, `https://github.com/Kbediako/CO/pull/584`.
+- [ ] `pr ready-review` drain clean before state transition to `In Review`.
 
 ## Notes
 - 2026-04-22: Rework reset started from current `origin/main`; prior dirty CO-274 worktree is retained for audit/reference only and was not mutated.
