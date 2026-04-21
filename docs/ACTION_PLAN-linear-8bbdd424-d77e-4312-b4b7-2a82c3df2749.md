@@ -1,7 +1,5 @@
 # ACTION_PLAN - Control host: reconcile released-claim run metadata, operator advisories, and advisory-state truth after issue release
 
-## Added by Bootstrap 2026-04-22
-
 ## Summary
 - Goal: close `CO-294` by making post-release control-host truth surfaces stop presenting stale run pointers, stale blocker-derived unblock advice, and stale advisory JSON as current operator truth.
 - Scope: docs-first packet, source inspection, focused implementation, regression coverage, validation, standalone review, elegance review, PR attachment/update, and review drain.
@@ -20,20 +18,8 @@
 5. Implement the smallest reconciliation/classification changes that preserve audit history and active-lane attach/admission semantics.
 6. Run targeted regressions, adjacent active-lane coverage, required repo gates, standalone review, elegance pass, PR attachment/update, `pr ready-review`, workpad refresh, and `In Review` handoff only after the drain is clean.
 
-## Dependencies
-- `orchestrator/src/cli/control/providerIssueHandoff.ts`
-- provider intake persistence/projection helpers
-- selected run / control runtime / operator dashboard projection helpers
-- `orchestrator/src/cli/control/providerOperatorAutopilot.ts`
-- advisory-state loading/fallback code
-- focused tests under `orchestrator/tests`
-
 ## Validation
 - Required checks: docs-review, focused run-pointer regression, stale `ready_to_unblock` regression, stale/deprecated advisory-state regression, adjacent active-lane admission/attach tests, `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `npm run repo:stewardship`, `node scripts/diff-budget.mjs`, manifest-backed standalone review, explicit elegance pass, and `npm run pack:smoke` when downstream-facing paths are touched.
 - Rollback plan: revert the narrow reconciliation/classification changes and focused tests together if active-lane attach/admission regresses or retained audit evidence is lost.
-
 ## Risks & Mitigations
-- Clearing run pointers too broadly could destroy audit evidence; mitigate by separating historical/audit pointers from current active-run truth.
-- Suppressing autopilot advice could hide a legitimate unblock; mitigate by requiring live PR/blocker language rather than historical or negated text.
-- Stale advisory fallback changes could break consumers; mitigate by marking stale/deprecated explicitly and preserving fallback when no newer authoritative truth exists.
-- Active-lane attach/cap behavior could regress; mitigate with adjacent active-lane tests and post-release/terminal-only predicates.
+- Risks: broad run-pointer cleanup could destroy audit history, stale-advisory fallback changes could break consumers, and active-lane attach/cap behavior could regress. Mitigation: keep predicates post-release/terminal-only, preserve fallback when no newer truth exists, and cover adjacent active-lane behavior.
