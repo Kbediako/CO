@@ -1,3 +1,11 @@
-# Eminente Mirror (Archived Assets)
+# Eminente Mirror
 
-Public mirror assets were relocated to `.runs/0801-dead-code-pruning/archive/2025-12-08T10-01-24Z/packages/eminente/public/` as part of Task 0801. Regenerate with the mirror scripts to restore `public/` for local serving.
+Tracked checkout only retains the mirror configuration, package harness, and a placeholder `public/` README. The prior Task 0801 static payload is not a durable repository artifact and should not be restored from ignored local archive output.
+
+## Refresh And Serve
+
+1. From the repo root, generate fresh assets: `npm run mirror:fetch -- --project eminente`
+2. Serve the regenerated mirror: `npm run mirror:serve -- --project eminente --port 4173`
+3. Validate the mirror when `public/` changes: `npm run mirror:check -- --project eminente`
+
+The package-level `npm start` also serves this project through the shared mirror harness after `public/` has been regenerated. Set `MCP_RUNNER_TASK_ID=<task-id>` before mirror commands when you need manifests routed to a task-scoped local run directory.

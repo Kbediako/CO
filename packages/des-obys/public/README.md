@@ -1,5 +1,12 @@
-# Des-Obys Mirror Assets (Archived)
+# Des-Obys Mirror Assets
 
-Static mirror output was relocated to `.runs/0801-dead-code-pruning/archive/2025-12-08T10-01-24Z/packages/des-obys/public/` during Task 0801 cleanup.
+This tracked directory is intentionally a placeholder until fresh local mirror assets are generated.
 
-If you need the snapshot, pull it from the archive path or re-run the mirror scripts for a fresh capture.
+Regenerate from the repo root with:
+
+```bash
+npm run mirror:fetch -- --project des-obys
+npm run mirror:check -- --project des-obys
+```
+
+Mirror fetch writes fresh `public/` contents for local review and task-scoped manifests under `.runs`; do not commit ignored `.runs` archive payloads as a substitute for a fresh capture.
