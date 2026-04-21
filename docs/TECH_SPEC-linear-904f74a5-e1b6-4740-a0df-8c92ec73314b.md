@@ -115,7 +115,7 @@ The protected issue terms are:
   - `codex plugin marketplace add --help`
   - `codex plugin marketplace remove --help`
 - Focused checks:
-  - `npm test -- tests/pack-smoke.spec.ts`
+  - `npm run test:orchestrator -- tests/pack-smoke.spec.ts`
   - any additional focused assertion on `scripts/pack-smoke.mjs` if needed
 - Required gates:
   - `node scripts/delegation-guard.mjs`
