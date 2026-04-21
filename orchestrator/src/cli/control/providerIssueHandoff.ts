@@ -5190,13 +5190,17 @@ export function createProviderIssueHandoffService(
           ? buildFreshDiscoveryConsumedProviderKeys(consumedTrackedIssueKeys, options.state.claims)
           : consumedTrackedIssueKeys;
         const dispatchFreshDiscoveryCandidates = async (
-          trackedIssues: LiveLinearTrackedIssue[]
+          trackedIssues: LiveLinearTrackedIssue[],
+          priorityIssueIds: readonly string[] = []
         ): Promise<void> => {
           refreshCounts.fresh_discovery_candidates += trackedIssues.length;
           recordRefreshProgress('refresh:fresh_dispatch', {
             requestClass: 'fresh_dispatch'
           });
-          for (const trackedIssue of sortLiveLinearTrackedIssuesForDispatch(trackedIssues)) {
+          for (const trackedIssue of sortProviderDispatchTrackedIssuesWithPriority(
+            trackedIssues,
+            priorityIssueIds
+          )) {
             assertRefreshCycleNotStuck();
             const providerKey = buildProviderIssueKey(trackedIssue.provider, trackedIssue.id);
             if (
@@ -5252,7 +5256,10 @@ export function createProviderIssueHandoffService(
           }
         };
 
-        await dispatchFreshDiscoveryCandidates(autopilotDispatch.trackedIssues);
+        await dispatchFreshDiscoveryCandidates(
+          autopilotDispatch.trackedIssues,
+          autopilotDispatch.priorityIssueIds
+        );
 
         if (
           (pollInput.deferFreshDiscovery === true || pollInput.allowPollFailClosed === true) &&
@@ -5296,11 +5303,16 @@ export function createProviderIssueHandoffService(
   }): Promise<{
     trackedIssues: LiveLinearTrackedIssue[];
     allowConsumedRedispatch: boolean;
+    priorityIssueIds: string[];
   }> => {
     const fallbackTrackedIssues = input.pollInput.trackedIssues;
     const trackedIssueRefetch = wrapTrackedIssueRefetch(input.pollInput.refetchTrackedIssues);
     if (!options.providerWorkflowConfigStore || !runOperatorAutopilot) {
-      return { trackedIssues: fallbackTrackedIssues, allowConsumedRedispatch: false };
+      return {
+        trackedIssues: fallbackTrackedIssues,
+        allowConsumedRedispatch: false,
+        priorityIssueIds: []
+      };
     }
     let providerWorkflow: Awaited<ReturnType<ProviderWorkflowConfigStore['refresh']>>;
     try {
@@ -5314,11 +5326,19 @@ export function createProviderIssueHandoffService(
           (error as Error)?.message ?? String(error)
         }`
       );
-      return { trackedIssues: fallbackTrackedIssues, allowConsumedRedispatch: false };
+      return {
+        trackedIssues: fallbackTrackedIssues,
+        allowConsumedRedispatch: false,
+        priorityIssueIds: []
+      };
     }
     const autopilotConfig = resolveProviderOperatorAutopilotConfigFromPayload(providerWorkflow);
     if (!autopilotConfig) {
-      return { trackedIssues: fallbackTrackedIssues, allowConsumedRedispatch: false };
+      return {
+        trackedIssues: fallbackTrackedIssues,
+        allowConsumedRedispatch: false,
+        priorityIssueIds: []
+      };
     }
     const autopilotAuditPath = resolveProviderOperatorAutopilotAuditPathFromPayload(providerWorkflow);
     const autopilotLifecyclePath = resolveProviderOperatorAutopilotLifecyclePathFromPayload(
@@ -5477,14 +5497,20 @@ export function createProviderIssueHandoffService(
       ) ||
       !trackedIssueRefetch
     ) {
-      return { trackedIssues: fallbackTrackedIssues, allowConsumedRedispatch: false };
+      return {
+        trackedIssues: fallbackTrackedIssues,
+        allowConsumedRedispatch: false,
+        priorityIssueIds: []
+      };
     }
+    const priorityIssueIds = resolveProviderOperatorAutopilotTransitionIssueIds(nextResult);
     try {
       const resolution = await trackedIssueRefetch();
       if (resolution.kind === 'ready') {
         return {
           trackedIssues: resolution.trackedIssues,
-          allowConsumedRedispatch: true
+          allowConsumedRedispatch: true,
+          priorityIssueIds
         };
       }
       logger.warn(
@@ -5498,7 +5524,11 @@ export function createProviderIssueHandoffService(
         }`
       );
     }
-    return { trackedIssues: fallbackTrackedIssues, allowConsumedRedispatch: false };
+    return {
+      trackedIssues: fallbackTrackedIssues,
+      allowConsumedRedispatch: false,
+      priorityIssueIds: []
+    };
   };
 
   providerIssueHandoffService = {
@@ -6830,6 +6860,49 @@ function buildFreshDiscoveryConsumedProviderKeys(
   return new Set(
     Array.from(consumedTrackedIssueKeys).filter((providerKey) => !nonBlockingClaimKeys.has(providerKey))
   );
+}
+
+function resolveProviderOperatorAutopilotTransitionIssueIds(
+  result: ProviderOperatorAutopilotResult
+): string[] {
+  const issueIds: string[] = [];
+  const seenIssueIds = new Set<string>();
+  for (const action of result.actions) {
+    if (action.transition.status !== 'transitioned' && action.transition.status !== 'noop') {
+      continue;
+    }
+    if (seenIssueIds.has(action.issue_id)) {
+      continue;
+    }
+    seenIssueIds.add(action.issue_id);
+    issueIds.push(action.issue_id);
+  }
+  return issueIds;
+}
+
+function sortProviderDispatchTrackedIssuesWithPriority(
+  trackedIssues: readonly LiveLinearTrackedIssue[],
+  priorityIssueIds: readonly string[]
+): LiveLinearTrackedIssue[] {
+  const sortedIssues = sortLiveLinearTrackedIssuesForDispatch(trackedIssues);
+  if (priorityIssueIds.length === 0 || sortedIssues.length <= 1) {
+    return sortedIssues;
+  }
+
+  const sortedByIssueId = new Map(sortedIssues.map((trackedIssue) => [trackedIssue.id, trackedIssue]));
+  const prioritizedIssues: LiveLinearTrackedIssue[] = [];
+  for (const issueId of priorityIssueIds) {
+    const trackedIssue = sortedByIssueId.get(issueId);
+    if (!trackedIssue) {
+      continue;
+    }
+    sortedByIssueId.delete(issueId);
+    prioritizedIssues.push(trackedIssue);
+  }
+  return [
+    ...prioritizedIssues,
+    ...sortedIssues.filter((trackedIssue) => sortedByIssueId.has(trackedIssue.id))
+  ];
 }
 
 async function resolveProviderCleanupWorkspacePath(
