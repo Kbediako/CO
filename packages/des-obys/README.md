@@ -1,6 +1,6 @@
 # Des-Obys Mirror
 
-Tracked checkout only retains the mirror configuration and a placeholder `public/` README. The prior Task 0801 static payload is not a durable repository artifact and should not be restored from ignored local archive output.
+Tracked checkout only retains the mirror configuration and a placeholder `public/` README. Task 0801 removed the checked-in static mirror payload; the prior `.runs` archive copy is not a durable repository artifact and should not be restored from ignored local output.
 
 ## Refresh And Serve
 

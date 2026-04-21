@@ -56,6 +56,36 @@
       }
     },
     {
+      "id": "20260421-linear-9dacc402-e9b6-40c4-b657-d4b91b68c941",
+      "title": "CO-272 replace dead-code-pruning .runs archive pointers with durable tracked guidance",
+      "relates_to": "tasks/tasks-linear-9dacc402-e9b6-40c4-b657-d4b91b68c941.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-21",
+      "approvals": {
+        "docs_implementation_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-21",
+          "status": "produced",
+          "manifest": ".runs/linear-9dacc402-e9b6-40c4-b657-d4b91b68c941-co272-readme-guidance/cli/2026-04-21T13-03-01-509Z-99593f7b/manifest.json",
+          "source_anchor": "ctx:sha256:89eae343f6b7d6c89e08d2ae54c394e5c638f9dcb5407f0a55fe38560772d55b#chunk:c000001",
+          "summary": "Docs implementation slice replaces the dead Task 0801 .runs archive guidance in tracked README residue with durable tracked guidance and regeneration commands across archives/hi-fi-tests, abetkaua, des-obys, eminente, obys-library, and reference/plus-ex-15th surfaces while preserving valid non-0801 abetkaua mirror workflow/manifests."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-9dacc402-e9b6-40c4-b657-d4b91b68c941.md",
+        "task": "tasks/tasks-linear-9dacc402-e9b6-40c4-b657-d4b91b68c941.md",
+        "agent_task": ".agent/task/linear-9dacc402-e9b6-40c4-b657-d4b91b68c941.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-9dacc402-e9b6-40c4-b657-d4b91b68c941.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-9dacc402-e9b6-40c4-b657-d4b91b68c941.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-9dacc402-e9b6-40c4-b657-d4b91b68c941.md"
+        }
+      }
+    },
+    {
       "id": "20260421-linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13",
       "title": "CO: clarify README when main documents behavior newer than the latest tagged package",
       "relates_to": "tasks/tasks-linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13.md",

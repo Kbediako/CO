@@ -1,6 +1,6 @@
 # Obys Library Clone
 
-Pixel-perfect local clone of https://library.obys.agency for HiFi toolkit testing. Tracked checkout only retains the mirror configuration, package harness, and a placeholder `public/` README. The prior Task 0801 static payload is not a durable repository artifact and should not be restored from ignored local archive output.
+Pixel-perfect local clone of https://library.obys.agency for HiFi toolkit testing. Tracked checkout only retains the mirror configuration, package harness, and a placeholder `public/` README. Task 0801 removed the checked-in static payload; the prior `.runs` archive copy is not a durable repository artifact and should not be restored from ignored local output.
 
 ## Run locally
 
@@ -13,9 +13,9 @@ Set `MCP_RUNNER_TASK_ID=<task-id>` before mirror commands when you need manifest
 
 ## Structure
 
-- `public/` — mirrored HTML for all routes after regeneration; currently a README placeholder.
-- `mirror.config.json` — origin/routes/rewrites used by the root mirror:fetch + mirror:check scripts.
-- `package.json` — scripts for serving the site; no external dependencies required.
+- `public/` - mirrored HTML for all routes after regeneration; currently a README placeholder.
+- `mirror.config.json` - origin/routes/rewrites used by the root mirror:fetch + mirror:check scripts.
+- `package.json` - scripts for serving the site; no external dependencies required.
 
 ## Notes
 
