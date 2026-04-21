@@ -1791,6 +1791,39 @@
       }
     },
     {
+      "id": "20260421-linear-a2949fd4-2319-4cd0-acd1-68e6404766f3",
+      "title": "CO: Re-audit Codex CLI 0.122.0 posture and align workflow pins",
+      "relates_to": "tasks/tasks-linear-a2949fd4-2319-4cd0-acd1-68e6404766f3.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-21",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane plus parent acceptance",
+          "date": "2026-04-21",
+          "status": "accepted",
+          "manifest": ".runs/linear-a2949fd4-2319-4cd0-acd1-68e6404766f3-docs-packet/cli/2026-04-21T01-48-15-998Z-8769df32/manifest.json",
+          "source_anchor": "ctx:sha256:e4b8e1f8adc8e2758f22571617efdd98e2de84222d7657a943878363c53046aa#chunk:c000001",
+          "summary": "Docs packet preserves CO-269 as a posture-and-pins lane: keep `0.118.0` active until required evidence gates pass, re-audit stable `0.122.0` with exact release/npm/local command evidence, preserve CO-183/195/199/207 linkage, classify explicit `@openai/codex@0.121.0` workflow pins plus floating `cloud-canary`, and reject marketplace rebaseline, provider-worker app-server migration, remote-control redesign, and cloud-gate weakening."
+        },
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review plus parent fallback validation",
+          "date": "2026-04-21",
+          "status": "baseline-only-fallback",
+          "manifest": ".runs/linear-a2949fd4-2319-4cd0-acd1-68e6404766f3-co-269-docs-review/cli/2026-04-21T02-30-28-161Z-8d2a09bb/manifest.json",
+          "summary": "Docs-review child stream stopped only on existing repo-baseline docs-freshness/spec debt; local `docs:freshness:maintain` rerun kept `blocking_changed_paths=[]`, so CO-269 accepted the recorded baseline-only fallback instead of widening scope."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-a2949fd4-2319-4cd0-acd1-68e6404766f3.md",
+        "task": "tasks/tasks-linear-a2949fd4-2319-4cd0-acd1-68e6404766f3.md",
+        "agent_task": ".agent/task/linear-a2949fd4-2319-4cd0-acd1-68e6404766f3.md",
+        "docs": "docs/TECH_SPEC-linear-a2949fd4-2319-4cd0-acd1-68e6404766f3.md"
+      }
+    },
+    {
       "id": "20260416-linear-c101cb88-3097-4502-bcd7-723d80da7955",
       "title": "CO workflow: refresh Apr 16 docs:freshness stale cohort blocking handoffs",
       "relates_to": "tasks/tasks-linear-c101cb88-3097-4502-bcd7-723d80da7955.md",
