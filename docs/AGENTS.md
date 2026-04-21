@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp aa52c8fc6f2848ea53e160bdea6fc10336366f36a484536f6e3757d9da40137a -->
+<!-- codex:instruction-stamp c97b3fe73d49b88e1531f6e10190a550f5117a629d8c75e2ea50ebaf5886d4bf -->
 # Repository Agent Guidance
 
 Task-specific historical project blocks were removed from this file in `CO-88`. Use the active task packet under `.agent/task/**` for lane-scoped instructions instead of treating old project ids as repo-wide defaults.
@@ -44,6 +44,7 @@ Task-specific historical project blocks were removed from this file in `CO-88`. 
 ## Codex Version Policy (Execution)
 - Current CO compatibility/adoption target is stable Codex CLI (`0.118.0`).
 - Current `0.118.0` posture re-audit confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, and `codex review --help` exposing `[PROMPT]` alongside scoped review flags.
+- Release-facing downstream-smoke workflows stay on the marketplace-capable version recorded in `docs/guides/codex-version-policy.md`, while `cloud-canary` pins the explicit audited candidate and the active target remains `0.118.0`.
 - Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
 - On ChatGPT-auth sessions, keep delegated/review surfaces on `gpt-5.4` unless a fresh provider lane explicitly validates `gpt-5.4-codex`.
 - CO may run newer stable/prerelease Codex builds in explicit task-scoped canary lanes only; do not treat them as automatic global defaults.
