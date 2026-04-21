@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp a116fef0a0b894aac16e77112263c690c14e5671c5333222314c26da9a3d6c8c -->
+<!-- codex:instruction-stamp c26346ab9f20b38e17499986bcc053f049c2ec9a3f72983ec1a44d0ec2bbda02 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -43,6 +43,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 ## Codex Version Policy (CO Scope)
 - Current CO compatibility/adoption target is stable Codex CLI `0.118.0`.
 - Current `0.118.0` posture re-audit confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, and `codex review --help` exposing `[PROMPT]` alongside scoped review flags.
+- Release-facing downstream-smoke workflows stay on the marketplace-capable version recorded in `docs/guides/codex-version-policy.md`, while `cloud-canary` pins the explicit audited candidate and the active target remains `0.118.0`.
 - Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
 - In ChatGPT-auth sessions, keep delegated/review surfaces on `gpt-5.4` unless a fresh provider lane explicitly validates `gpt-5.4-codex`.
 - Evaluate newer stable/prerelease Codex builds only in explicit, task-scoped CO lanes where evidence is captured under `.runs/<task-id>/` and `out/<task-id>/manual/`.
