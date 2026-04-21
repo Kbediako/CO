@@ -39,6 +39,36 @@
       }
     },
     {
+      "id": "20260421-linear-39a559e9-8da2-444d-93e6-2c3ad216f730",
+      "title": "CO STATUS / observability: recover direct co-status --format json when current /ui/data.json times out on a healthy control-host",
+      "relates_to": "tasks/tasks-linear-39a559e9-8da2-444d-93e6-2c3ad216f730.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-21",
+      "approvals": {
+        "parent_docs_packet": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-21",
+          "status": "produced",
+          "manifest": ".runs/linear-39a559e9-8da2-444d-93e6-2c3ad216f730/cli/2026-04-21T18-54-09-717Z-7a8c49bd/manifest.json",
+          "source_anchor": "ctx:sha256:19f75315765e156751acd52be9fc6dbabd7288795c4a9a58e685bb892d5ca5e0#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-296 as the narrow direct JSON current-endpoint timeout seam: `co-status --format json` can fail when the current resolved `/ui/data.json` hangs past the 15s attach timeout budget while healthy-host evidence remains available (`stuck=false`, `restart_required=false`, fresh polling timestamps, and live running claims). The packet explicitly rejects stale/dead endpoint `ECONNREFUSED` recovery (`CO-246`), attach restart/rotation recovery (`CO-179`), refresh-stuck / `restart_required` churn (`CO-211`), silent timeout suppression, and broader queue-truth or provider-intake redesign."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-39a559e9-8da2-444d-93e6-2c3ad216f730.md",
+        "task": "tasks/tasks-linear-39a559e9-8da2-444d-93e6-2c3ad216f730.md",
+        "agent_task": ".agent/task/linear-39a559e9-8da2-444d-93e6-2c3ad216f730.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-39a559e9-8da2-444d-93e6-2c3ad216f730.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-39a559e9-8da2-444d-93e6-2c3ad216f730.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-39a559e9-8da2-444d-93e6-2c3ad216f730.md"
+        }
+      }
+    },
+    {
       "id": "20260422-linear-61ddd0d1-664b-4060-949b-33eb4e7255ac",
       "title": "CO-297 stop-hook structured sentinel contract",
       "relates_to": "tasks/tasks-linear-61ddd0d1-664b-4060-949b-33eb4e7255ac.md",

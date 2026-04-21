@@ -34,7 +34,8 @@ export async function runCoStatusCliShell(params: RunCoStatusCliShellParams): Pr
     getTarget: () => target,
     setTarget: (nextTarget) => {
       target = nextTarget;
-    }
+    },
+    recoverSameEndpointTimeout: true
   });
   console.log(JSON.stringify(dataset, null, 2));
 }
