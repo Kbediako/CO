@@ -5859,6 +5859,182 @@ describe('createProviderIssueHandoffService', () => {
     expect(state.claims.find((claim) => claim.issue_id === 'lin-ready-blocked-by-foreign')).toBeUndefined();
   });
 
+  it('attaches already-active discovered runs before full-capacity fresh dispatch gating', async () => {
+    const { root, paths } = await createHostPaths();
+    const runsRoot = join(root, '.runs');
+    const outRoot = join(root, 'out');
+    const activeKnownPaths = resolveRunPaths(
+      {
+        repoRoot: root,
+        runsRoot,
+        outRoot,
+        taskId: 'task-active-known'
+      },
+      'run-active-known'
+    );
+    const activeAPaths = resolveRunPaths(
+      {
+        repoRoot: root,
+        runsRoot,
+        outRoot,
+        taskId: 'task-active-a'
+      },
+      'run-active-a'
+    );
+    const activeBPaths = resolveRunPaths(
+      {
+        repoRoot: root,
+        runsRoot,
+        outRoot,
+        taskId: 'task-active-b'
+      },
+      'run-active-b'
+    );
+    for (const [runPaths, manifest] of [
+      [
+        activeKnownPaths,
+        {
+          run_id: 'run-active-known',
+          task_id: 'task-active-known',
+          pipeline_id: 'diagnostics',
+          status: 'in_progress',
+          issue_provider: 'linear',
+          issue_id: 'lin-active-known',
+          issue_identifier: 'CO-267',
+          issue_updated_at: '2026-04-21T05:30:00.000Z',
+          updated_at: '2026-04-21T05:31:00.000Z'
+        }
+      ],
+      [
+        activeAPaths,
+        {
+          run_id: 'run-active-a',
+          task_id: 'task-active-a',
+          pipeline_id: 'diagnostics',
+          status: 'in_progress',
+          issue_provider: 'linear',
+          issue_id: 'lin-active-a',
+          issue_identifier: 'CO-281',
+          issue_updated_at: '2026-04-21T05:38:00.000Z',
+          updated_at: '2026-04-21T05:39:00.000Z'
+        }
+      ],
+      [
+        activeBPaths,
+        {
+          run_id: 'run-active-b',
+          task_id: 'task-active-b',
+          pipeline_id: 'diagnostics',
+          status: 'in_progress',
+          issue_provider: 'linear',
+          issue_id: 'lin-active-b',
+          issue_identifier: 'CO-282',
+          issue_updated_at: '2026-04-21T05:34:00.000Z',
+          updated_at: '2026-04-21T05:35:00.000Z'
+        }
+      ]
+    ] as const) {
+      await mkdir(runPaths.runDir, { recursive: true });
+      await writeFile(runPaths.manifestPath, JSON.stringify(manifest), 'utf8');
+    }
+
+    const state = createProviderIntakeState();
+    state.claims.push(
+      createProviderClaim({
+        issue_id: 'lin-active-known',
+        issue_identifier: 'CO-267',
+        issue_title: 'Known active worker',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-21T05:30:00.000Z',
+        task_id: 'task-active-known',
+        state: 'running',
+        reason: 'provider_issue_handoff_owned',
+        run_id: 'run-active-known',
+        run_manifest_path: activeKnownPaths.manifestPath
+      })
+    );
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-should-not-start',
+        manifestPath: '/tmp/provider-run/should-not-start-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 3
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-ready-no-slot',
+          identifier: 'CO-999',
+          title: 'Ready issue with no remaining capacity',
+          state: 'Ready',
+          state_type: 'unstarted',
+          created_at: '2026-04-21T04:00:00.000Z',
+          updated_at: '2026-04-21T06:00:00.000Z'
+        }),
+        createTrackedIssue({
+          id: 'lin-active-a',
+          identifier: 'CO-281',
+          title: 'Discovered active worker A',
+          state: 'In Progress',
+          state_type: 'started',
+          created_at: '2026-04-21T05:38:00.000Z',
+          updated_at: '2026-04-21T05:38:00.000Z'
+        }),
+        createTrackedIssue({
+          id: 'lin-active-b',
+          identifier: 'CO-282',
+          title: 'Discovered active worker B',
+          state: 'In Progress',
+          state_type: 'started',
+          created_at: '2026-04-21T05:34:00.000Z',
+          updated_at: '2026-04-21T05:34:00.000Z'
+        })
+      ]
+    });
+
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-ready-no-slot')).toBeUndefined();
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-active-a')).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_run_already_active',
+      issue_identifier: 'CO-281',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-21T05:38:00.000Z',
+      task_id: 'task-active-a',
+      run_id: 'run-active-a',
+      run_manifest_path: activeAPaths.manifestPath
+    });
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-active-b')).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_run_already_active',
+      issue_identifier: 'CO-282',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-21T05:34:00.000Z',
+      task_id: 'task-active-b',
+      run_id: 'run-active-b',
+      run_manifest_path: activeBPaths.manifestPath
+    });
+  });
+
   it('counts duplicate live workers for the same issue by run identity before normal fresh dispatch', async () => {
     const { root, paths } = await createHostPaths();
     for (const suffix of ['a', 'b']) {

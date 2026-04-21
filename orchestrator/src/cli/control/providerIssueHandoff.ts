@@ -5311,10 +5311,13 @@ export function createProviderIssueHandoffService(
               continue;
             }
             if (!pollDispatchBudget.canDispatch(trackedIssue)) {
-              if (!pollDispatchBudget.hasGlobalSlots()) {
-                break;
+              const attachableActiveRuns = filterProviderIssueRunsForStartPipeline(
+                runsByProviderIssue.get(providerKey) ?? [],
+                startPipelineId
+              ).filter((run) => run.status === 'in_progress');
+              if (attachableActiveRuns.length === 0) {
+                continue;
               }
-              continue;
             }
             recordRefreshProgress('refresh:fresh_dispatch', {
               requestClass: `fresh_dispatch:${trackedIssue.state ?? 'unknown'}`,
