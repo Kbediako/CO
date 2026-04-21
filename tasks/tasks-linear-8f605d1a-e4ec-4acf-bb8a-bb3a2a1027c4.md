@@ -29,8 +29,8 @@
 - [x] Parent `docs:freshness` failure reproduced. Evidence: `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/before/docs-freshness.log`, `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/before/docs-freshness.json`.
 - [x] Parent `docs:freshness:maintain` failure reproduced. Evidence: `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/before/docs-freshness-maintain.log`, `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/before/docs-freshness-maintenance.json`.
 - [x] Parent `spec-guard --dry-run` stale rows reproduced. Evidence: `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/before/spec-guard.log`.
-- [x] Rework current-main `docs:freshness` failure reproduced. Evidence: `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/rework-reset/docs-freshness.log`, `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/docs-freshness.json` (`37` stale docs, `0` rolling rows).
-- [x] Rework current-main `docs:freshness:maintain` failure reproduced. Evidence: `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/rework-reset/docs-freshness-maintain.log`, `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/docs-freshness-maintenance.json` (`block_policy_over_budget`, `blocking_changed_paths=0`).
+- [x] Rework current-main `docs:freshness` failure reproduced. Evidence: `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/rework-reset/docs-freshness.log`, `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/rework-reset/docs-freshness-baseline.json` (`37` stale docs, `0` rolling rows).
+- [x] Rework current-main `docs:freshness:maintain` failure reproduced. Evidence: `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/rework-reset/docs-freshness-maintain.log`, `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/rework-reset/docs-freshness-maintenance-baseline.json` (`block_policy_over_budget`, `blocking_changed_paths=0`).
 
 ## Classification And Implementation
 - [x] Classified blocking stale docs by class, path family, last_review date, lineage, and disposition. Evidence: `docs/findings/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4-docs-freshness-classification.md`.
