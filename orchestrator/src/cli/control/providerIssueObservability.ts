@@ -1998,18 +1998,29 @@ function normalizeProviderChildLaneProgressSummary(childLane: ProviderIssueChild
   if (!summary) {
     return null;
   }
-  if (normalizeOptionalString(childLane.pipeline_id) !== PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID) {
+  const pipelineId = normalizeOptionalString(childLane.pipeline_id);
+  if (pipelineId !== null && pipelineId !== PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID) {
     return summary;
   }
   const guardrailCommandCount = normalizeOptionalInteger(childLane.guardrail_command_count);
   if (guardrailCommandCount !== null && guardrailCommandCount > 0) {
     return summary;
   }
+  const guardrailsRequiredSource = normalizeGuardrailsRequiredSource(
+    childLane.guardrails_required_source
+  );
+  if (
+    typeof childLane.guardrails_required !== 'boolean' &&
+    guardrailsRequiredSource === null &&
+    guardrailCommandCount === null
+  ) {
+    return summary;
+  }
   return stripNonApplicableGuardrailSummaryLines(
     {
-      pipeline_id: PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID,
+      pipeline_id: pipelineId ?? PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID,
       guardrails_required: childLane.guardrails_required === true,
-      guardrails_required_source: normalizeGuardrailsRequiredSource(childLane.guardrails_required_source),
+      guardrails_required_source: guardrailsRequiredSource,
       commands: []
     },
     summary
