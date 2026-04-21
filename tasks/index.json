@@ -54,6 +54,43 @@
       }
     },
     {
+      "id": "20260421-linear-937a8e46-5f29-49b6-8272-83db7a3f1a83",
+      "title": "CO-286 attach already-active provider-worker runs before capacity gating",
+      "relates_to": "tasks/tasks-linear-937a8e46-5f29-49b6-8272-83db7a3f1a83.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-21",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-21",
+          "status": "produced",
+          "manifest": ".runs/linear-937a8e46-5f29-49b6-8272-83db7a3f1a83-docs-packet/cli/2026-04-21T06-08-56-583Z-f041257c/manifest.json",
+          "source_anchor": "ctx:sha256:084012f69b4bb6720b2260bd7bede38839f9e787c0260245a9c9144c905aad91#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-286 as a narrow attach/rehydration ordering seam: already-active discovered provider-worker runs must be attached/projected into provider-intake and co-status/CO STATUS before capacity gating suppresses new dispatch at max_concurrent_agents occupancy. The packet rejects stale-host restart, cap-only 3-to-4 changes, manual worker starts as steady state, display-only dashboard fixes, active-run truth validation weakening, and treating missing provider-control-host provenance debt as solved by this lane. Parent refreshed the packet provenance to the current prompt source anchor ctx:sha256:084012f69b4bb6720b2260bd7bede38839f9e787c0260245a9c9144c905aad91#chunk:c000001."
+        },
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-21",
+          "status": "succeeded",
+          "manifest": ".runs/linear-937a8e46-5f29-49b6-8272-83db7a3f1a83/cli/2026-04-21T16-14-37-728Z-b2326ad5/manifest.json",
+          "summary": "Review-feedback closeout docs-review succeeded with `MCP_RUNNER_TASK_ID=linear-937a8e46-5f29-49b6-8272-83db7a3f1a83 CODEX_ORCHESTRATOR_ROOT=/Users/kbediako/Code/CO/.workspaces/linear-937a8e46-5f29-49b6-8272-83db7a3f1a83-clean CODEX_ORCHESTRATOR_RUNS_DIR=/Users/kbediako/Code/CO/.runs npx codex-orchestrator start docs-review --format json --no-interactive --task linear-937a8e46-5f29-49b6-8272-83db7a3f1a83`; the repo-local Linear child-stream docs-review attempt failed closed first with provider_worker_child_stream_provenance_invalid in this worker shell."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-937a8e46-5f29-49b6-8272-83db7a3f1a83.md",
+        "task": "tasks/tasks-linear-937a8e46-5f29-49b6-8272-83db7a3f1a83.md",
+        "agent_task": ".agent/task/linear-937a8e46-5f29-49b6-8272-83db7a3f1a83.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-937a8e46-5f29-49b6-8272-83db7a3f1a83.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-937a8e46-5f29-49b6-8272-83db7a3f1a83.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-937a8e46-5f29-49b6-8272-83db7a3f1a83.md"
+        }
+      }
+    },
+    {
       "id": "20260422-linear-89c4cb0d-4423-4b1d-865f-25a768b9d7b4",
       "title": "CO-274 provider-worker stdin bootstrap failure classification",
       "relates_to": "tasks/tasks-linear-89c4cb0d-4423-4b1d-865f-25a768b9d7b4.md",
