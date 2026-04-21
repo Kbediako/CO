@@ -41,6 +41,7 @@ Non-goals:
 - No generic provider restart, dashboard, retry, or admission redesign.
 
 ## Parity / Alignment Matrix
+
 | Surface | Current Truth | Reference Truth | Target Truth |
 | --- | --- | --- | --- |
 | Active manifest | After `CO-244`, a provider worker may carry `provider_launch_source`, `provider_control_host_task_id`, and `provider_control_host_run_id`. | That tuple is the control-host evidence. | Rehydrate consumes it only when complete and matching. |
