@@ -28,8 +28,8 @@ The fix should be a truthfulness contract, not a CI expansion by accident.
 - `npm run test` remains the default repo validation alias to `test:core`, preserving current Core Lane scope while making that scope explicit.
 - `npm run test:orchestrator` remains a compatibility alias to `test:core`.
 - `npm run test:all` is the explicit broader Vitest matrix entrypoint for `test:core` plus `test:adapters`.
-- `npm run test:adapters` remains the adapter-targeted command using `vitest.config.ts adapters`.
-- `npm run test:evaluation` remains the targeted evaluation command using `vitest.config.ts evaluation/tests`.
+- `npm run test:adapters` remains the adapter-targeted command using an adapter-scoped Vitest config so focused filters stay focused.
+- `npm run test:evaluation` remains the targeted evaluation command using an evaluation-scoped Vitest config so focused filters stay focused.
 - `npm run eval:test` remains the opt-in evaluation alias to `test:evaluation`.
 - `.github/workflows/core-lane.yml` calls `npm run test:core`, not ambiguous `npm run test`.
 
@@ -59,7 +59,7 @@ Delegated aliases must preserve npm-run argument forwarding so focused checks su
 - No blanket expansion of Core Lane to the full matrix.
 - No removal of `test:adapters`, `test:evaluation`, or `eval:test`.
 - No unrelated Vitest, CI, or docs cleanup outside the named surfaces.
-- No changes to adapter or evaluation test semantics beyond documenting their command ownership.
+- No adapter or evaluation coverage weakening; scoped config changes are allowed only to preserve focused-filter behavior without changing lane ownership.
 
 ## Acceptance Criteria
 

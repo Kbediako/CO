@@ -16,34 +16,34 @@
 - [x] Task spec refreshed: `tasks/specs/linear-63dbed8c-522b-4c10-8a62-86ebb823ee29.md`
 - [x] Task checklist refreshed: `tasks/tasks-linear-63dbed8c-522b-4c10-8a62-86ebb823ee29.md`
 - [x] Agent task mirror refreshed: `.agent/task/linear-63dbed8c-522b-4c10-8a62-86ebb823ee29.md`
-- [ ] Registry mirrors updated without regressing unrelated mainline entries.
+- [x] Registry mirrors updated without regressing unrelated mainline entries.
 
 ## Implementation Checklist
 
 - [x] Previous PR #570 closed for Rework reset.
 - [x] Fresh branch created from `origin/main`.
 - [x] Required parallelization decision recorded.
-- [ ] Same-issue test child lane completed and patch accepted or rejected.
-- [ ] `package.json` exposes `test:core`, `test:all`, and forwarding aliases.
-- [ ] Core Lane workflow uses `npm run test:core`.
-- [ ] Agent docs distinguish core, broader adapter-inclusive, and opt-in evaluation lanes.
-- [ ] Regression coverage asserts the contract.
+- [x] Same-issue test child lane completed and patch accepted or rejected.
+- [x] `package.json` exposes `test:core`, `test:all`, and forwarding aliases.
+- [x] Core Lane workflow uses `npm run test:core`.
+- [x] Agent docs distinguish core, broader adapter-inclusive, and opt-in evaluation lanes.
+- [x] Regression coverage asserts the contract.
 
 ## Validation Checklist
 
 - [x] PR feedback sweep completed before new implementation.
 - [x] Docs-review child stream attempted; failure recorded at intermediate missing-script/missing-test state.
-- [ ] `npm run test:core -- tests/core-test-matrix-contract.spec.ts`
-- [ ] `node scripts/delegation-guard.mjs`
-- [ ] `node scripts/spec-guard.mjs --dry-run`
-- [ ] `npm run build`
-- [ ] `npm run lint`
-- [ ] `npm run test`
-- [ ] `npm run docs:check`
-- [ ] `npm run docs:freshness`
-- [ ] `npm run repo:stewardship`
-- [ ] `node scripts/diff-budget.mjs`
-- [ ] Manifest-backed standalone review
+- [x] `npm run test:core -- tests/core-test-matrix-contract.spec.ts`
+- [x] `node scripts/delegation-guard.mjs`
+- [x] `node scripts/spec-guard.mjs --dry-run`
+- [x] `npm run build`
+- [x] `npm run lint`
+- [x] `npm run test`
+- [x] `npm run docs:check`
+- [x] `npm run docs:freshness`
+- [x] `npm run repo:stewardship`
+- [x] `node scripts/diff-budget.mjs`
+- [ ] Manifest-backed standalone review final rerun after addressing P2
 - [ ] Elegance/minimality pass
 - [ ] Replacement PR attached and `pr ready-review` drain clean
 

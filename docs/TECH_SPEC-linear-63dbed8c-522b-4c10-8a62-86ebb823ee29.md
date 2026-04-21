@@ -22,13 +22,13 @@
 
 - `test`: `npm run test:core --`
 - `test:core`: `vitest run --config vitest.config.core.ts`
-- `test:all`: broader adapter-inclusive matrix that runs `test:core` and `test:adapters` while preserving forwarded args for both delegated runs
+- `test:all`: portable Node wrapper (`node scripts/run-test-all.mjs`) for the broader adapter-inclusive matrix that runs `test:core` and `test:adapters` while preserving forwarded args for both delegated runs; when forwarded filters are present, the core leg must tolerate no-match filters so adapter-only focused checks still reach `test:adapters`
 - `test:orchestrator`: `npm run test:core --`
-- `test:adapters`: `vitest run --passWithNoTests --config vitest.config.ts adapters`
-- `test:evaluation`: `vitest run --passWithNoTests --config vitest.config.ts evaluation/tests`
+- `test:adapters`: `vitest run --passWithNoTests --config vitest.config.adapters.ts`
+- `test:evaluation`: `vitest run --passWithNoTests --config vitest.config.evaluation.ts`
 - `eval:test`: `npm run test:evaluation --`
 
-`test:all` may use a shell wrapper to preserve forwarded arguments across both delegated npm runs.
+`test:all` uses a Node wrapper instead of a POSIX shell wrapper so the documented package script remains portable across npm environments. If filters are forwarded, the wrapper must avoid failing before `test:adapters` can run when the filter selects only adapter files. The adapter and evaluation package scripts use scoped Vitest configs instead of permanent positional filters so focused filters intersect with the lane rather than broadening to every adapter or evaluation test.
 
 ## Workflow Contract
 
@@ -57,6 +57,7 @@ The same surfaces must identify `test:all` as the broader adapter-inclusive matr
 
 - exact script mappings for `test`, `test:core`, `test:all`, `test:orchestrator`, `test:adapters`, `test:evaluation`, and `eval:test`
 - delegated aliases preserve the `--` forwarding boundary
+- adapter-only filters forwarded through `test:all` still invoke the adapter lane without broadening to every adapter test
 - Core Lane calls `npm run test:core`
 - Core Lane does not call ambiguous `npm run test`
 
@@ -82,4 +83,4 @@ The same surfaces must identify `test:all` as the broader adapter-inclusive matr
 - No blanket Core Lane expansion.
 - No adapter or evaluation command deletion.
 - No unrelated CI performance work.
-- No changes to `vitest.config.core.ts` or `vitest.config.ts` unless the contract test proves a mismatch requiring a narrow fix.
+- No changes to `vitest.config.core.ts` or the full-matrix `vitest.config.ts` unless the contract test proves a mismatch requiring a narrow fix; adapter/evaluation scoped config additions are allowed only for filter preservation.

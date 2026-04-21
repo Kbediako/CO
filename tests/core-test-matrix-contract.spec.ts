@@ -35,15 +35,13 @@ describe('core test matrix command contract', () => {
     expect(scripts.test).toBe('npm run test:core --');
     expect(scripts['test:core']).toBe('vitest run --config vitest.config.core.ts');
     expect(scripts['test:orchestrator']).toBe('npm run test:core --');
-    expect(scripts['test:adapters']).toBe('vitest run --passWithNoTests --config vitest.config.ts adapters');
+    expect(scripts['test:adapters']).toBe('vitest run --passWithNoTests --config vitest.config.adapters.ts');
     expect(scripts['test:evaluation']).toBe(
-      'vitest run --passWithNoTests --config vitest.config.ts evaluation/tests'
+      'vitest run --passWithNoTests --config vitest.config.evaluation.ts'
     );
     expect(scripts['eval:test']).toBe('npm run test:evaluation --');
 
-    expect(scripts['test:all']).toEqual(expect.any(String));
-    expect(scripts['test:all']).toContain('npm run test:core --');
-    expect(scripts['test:all']).toContain('npm run test:adapters --');
+    expect(scripts['test:all']).toBe('node scripts/run-test-all.mjs');
   });
 
   it('forwards npm-run arguments through delegated package-script aliases', async () => {
@@ -66,18 +64,19 @@ describe('core test matrix command contract', () => {
       }
     ]);
 
+    await runPackageScript(harness, 'test:adapters', forwardedArgs);
+    expect(await readVitestInvocations(harness.logPath)).toEqual([
+      {
+        lifecycle: 'test:adapters',
+        argv: ['run', '--passWithNoTests', '--config', 'vitest.config.adapters.ts', ...forwardedArgs]
+      }
+    ]);
+
     await runPackageScript(harness, 'eval:test', forwardedArgs);
     expect(await readVitestInvocations(harness.logPath)).toEqual([
       {
         lifecycle: 'test:evaluation',
-        argv: [
-          'run',
-          '--passWithNoTests',
-          '--config',
-          'vitest.config.ts',
-          'evaluation/tests',
-          ...forwardedArgs
-        ]
+        argv: ['run', '--passWithNoTests', '--config', 'vitest.config.evaluation.ts', ...forwardedArgs]
       }
     ]);
   });
@@ -91,18 +90,31 @@ describe('core test matrix command contract', () => {
     expect(await readVitestInvocations(harness.logPath)).toEqual([
       {
         lifecycle: 'test:core',
-        argv: ['run', '--config', 'vitest.config.core.ts', ...forwardedArgs]
+        argv: ['run', '--config', 'vitest.config.core.ts', '--passWithNoTests', ...forwardedArgs]
       },
       {
         lifecycle: 'test:adapters',
-        argv: [
-          'run',
-          '--passWithNoTests',
-          '--config',
-          'vitest.config.ts',
-          'adapters',
-          ...forwardedArgs
-        ]
+        argv: ['run', '--passWithNoTests', '--config', 'vitest.config.adapters.ts', ...forwardedArgs]
+      }
+    ]);
+  });
+
+  it('lets adapter-only filters reach the adapter lane', async () => {
+    const harness = await createNpmScriptHarness(await readPackageScripts());
+    const forwardedArgs = ['adapters/tests/registry.test.ts'];
+
+    await runPackageScript(harness, 'test:all', forwardedArgs, {
+      VITEST_FAIL_CORE_ADAPTER_FILTER: '1'
+    });
+
+    expect(await readVitestInvocations(harness.logPath)).toEqual([
+      {
+        lifecycle: 'test:core',
+        argv: ['run', '--config', 'vitest.config.core.ts', '--passWithNoTests', ...forwardedArgs]
+      },
+      {
+        lifecycle: 'test:adapters',
+        argv: ['run', '--passWithNoTests', '--config', 'vitest.config.adapters.ts', ...forwardedArgs]
       }
     ]);
   });
@@ -126,18 +138,30 @@ async function createNpmScriptHarness(scripts: Record<string, string>) {
   createdDirs.push(root);
 
   const binDir = join(root, 'bin');
+  const scriptsDir = join(root, 'scripts');
   const logPath = join(root, 'vitest-calls.jsonl');
   await mkdir(binDir, { recursive: true });
+  await mkdir(scriptsDir, { recursive: true });
   await writeFile(join(root, 'package.json'), `${JSON.stringify({ private: true, scripts }, null, 2)}\n`, 'utf8');
+  await writeFile(
+    join(scriptsDir, 'run-test-all.mjs'),
+    await readFile(join(repoRoot, 'scripts', 'run-test-all.mjs'), 'utf8'),
+    'utf8'
+  );
   await writeFile(
     join(binDir, 'vitest'),
     [
       '#!/usr/bin/env node',
       "const { appendFileSync } = require('node:fs');",
+      'const lifecycle = process.env.npm_lifecycle_event;',
+      'const argv = process.argv.slice(2);',
       'appendFileSync(',
       '  process.env.VITEST_CALL_LOG,',
-      "  JSON.stringify({ lifecycle: process.env.npm_lifecycle_event, argv: process.argv.slice(2) }) + '\\n'",
+      "  JSON.stringify({ lifecycle, argv }) + '\\n'",
       ');',
+      "if (process.env.VITEST_FAIL_CORE_ADAPTER_FILTER === '1' && lifecycle === 'test:core' && argv.some((arg) => arg.startsWith('adapters/')) && !argv.includes('--passWithNoTests')) {",
+      '  process.exit(1);',
+      '}',
       ''
     ].join('\n'),
     'utf8'
@@ -150,13 +174,15 @@ async function createNpmScriptHarness(scripts: Record<string, string>) {
 async function runPackageScript(
   harness: { root: string; binDir: string; logPath: string },
   script: string,
-  args: string[]
+  args: string[],
+  extraEnv: NodeJS.ProcessEnv = {}
 ) {
   await writeFile(harness.logPath, '', 'utf8');
   await execFileAsync(npmBin(), ['run', '--silent', script, '--', ...args], {
     cwd: harness.root,
     env: {
       ...process.env,
+      ...extraEnv,
       PATH: `${harness.binDir}${delimiter}${process.env.PATH ?? ''}`,
       VITEST_CALL_LOG: harness.logPath
     },
