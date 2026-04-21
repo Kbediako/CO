@@ -828,6 +828,8 @@ interface IssueContextPullRequestSnapshot {
   state: string | null;
   mergedAt: string | null;
   updatedAt: string | null;
+  title?: string | null;
+  headRefName?: string | null;
 }
 
 interface GitHubJsonCommandResult {
@@ -969,6 +971,8 @@ interface ProviderLinearIssuePullRequestCandidate {
     state: string | null;
     merged_at: string | null;
     updated_at: string | null;
+    title: string | null;
+    head_ref_name: string | null;
   };
 }
 
@@ -1101,7 +1105,7 @@ export async function fetchIssueContextPullRequestSnapshot(
     '--repo',
     `${owner}/${repo}`,
     '--json',
-    'state,mergedAt,updatedAt'
+    'state,mergedAt,updatedAt,title,headRefName'
   ]);
   if (!payload || typeof payload !== 'object') {
     throw new Error(`gh pr view ${owner}/${repo}#${prNumber} returned invalid JSON.`);
@@ -1110,7 +1114,9 @@ export async function fetchIssueContextPullRequestSnapshot(
   return {
     state: normalizeOptionalString(record.state as string | null | undefined),
     mergedAt: normalizeOptionalString(record.mergedAt as string | null | undefined),
-    updatedAt: normalizeOptionalString(record.updatedAt as string | null | undefined)
+    updatedAt: normalizeOptionalString(record.updatedAt as string | null | undefined),
+    title: normalizeOptionalString(record.title as string | null | undefined),
+    headRefName: normalizeOptionalString(record.headRefName as string | null | undefined)
   };
 }
 
@@ -1204,7 +1210,11 @@ function mapIssuePullRequestAttachmentSnapshot(
   return {
     state,
     merged_at: mergedAt,
-    updated_at: updatedAt
+    updated_at: updatedAt,
+    title: normalizeOptionalString(record.title as string | null | undefined),
+    head_ref_name: normalizeOptionalString(
+      (record.headRefName ?? record.head_ref_name) as string | null | undefined
+    )
   };
 }
 
@@ -1223,15 +1233,33 @@ function classifyIssuePullRequestAttachments(
     state: issue.state?.name ?? null,
     state_type: issue.state?.type ?? null
   });
-  const terminal = resolved.filter((candidate) => isIssuePullRequestSnapshotTerminal(candidate.snapshot));
-  const active = resolved.filter((candidate) => !isIssuePullRequestSnapshotTerminal(candidate.snapshot));
+  const ownershipConflicting = resolved.filter((candidate) =>
+    issuePullRequestCandidateTargetsDifferentIssue(issue, candidate)
+  );
+  const ownershipEligible = resolved.filter(
+    (candidate) => !ownershipConflicting.some((conflict) => conflict.attachment.id === candidate.attachment.id)
+  );
+  const ownershipConflictingAttachments = ownershipConflicting.map((candidate) => candidate.attachment);
+  if (ownershipEligible.length === 0) {
+    return {
+      current: null,
+      historical: [],
+      conflicting: appendUniqueIssuePullRequestAttachments([], ownershipConflictingAttachments),
+      unknown: [...unknown]
+    };
+  }
+  const terminal = ownershipEligible.filter((candidate) => isIssuePullRequestSnapshotTerminal(candidate.snapshot));
+  const active = ownershipEligible.filter((candidate) => !isIssuePullRequestSnapshotTerminal(candidate.snapshot));
   if (workflowState.normalizedState === 'merging') {
-    const mergingSelection = selectCurrentMergingPullRequestAttachment(resolved);
+    const mergingSelection = selectCurrentMergingPullRequestAttachment(ownershipEligible);
     if (mergingSelection) {
       return {
         current: mergingSelection.current.attachment,
         historical: mergingSelection.historical.map((candidate) => candidate.attachment),
-        conflicting: mergingSelection.conflicting.map((candidate) => candidate.attachment),
+        conflicting: appendUniqueIssuePullRequestAttachments(
+          mergingSelection.conflicting.map((candidate) => candidate.attachment),
+          ownershipConflictingAttachments
+        ),
         unknown: [...unknown]
       };
     }
@@ -1240,18 +1268,21 @@ function classifyIssuePullRequestAttachments(
     return {
       current: active[0]!.attachment,
       historical: terminal.map((candidate) => candidate.attachment),
-      conflicting: [],
+      conflicting: appendUniqueIssuePullRequestAttachments([], ownershipConflictingAttachments),
       unknown: [...unknown]
     };
   }
   if (active.length === 0) {
     if (workflowState.normalizedState !== 'rework') {
-      const terminalSelection = selectCurrentMergingPullRequestAttachment(resolved);
+      const terminalSelection = selectCurrentMergingPullRequestAttachment(ownershipEligible);
       if (terminalSelection) {
         return {
           current: terminalSelection.current.attachment,
           historical: terminalSelection.historical.map((candidate) => candidate.attachment),
-          conflicting: terminalSelection.conflicting.map((candidate) => candidate.attachment),
+          conflicting: appendUniqueIssuePullRequestAttachments(
+            terminalSelection.conflicting.map((candidate) => candidate.attachment),
+            ownershipConflictingAttachments
+          ),
           unknown: [...unknown]
         };
       }
@@ -1259,16 +1290,85 @@ function classifyIssuePullRequestAttachments(
     return {
       current: null,
       historical: terminal.map((candidate) => candidate.attachment),
-      conflicting: [],
+      conflicting: appendUniqueIssuePullRequestAttachments([], ownershipConflictingAttachments),
       unknown: [...unknown]
     };
   }
   return {
     current: null,
     historical: terminal.map((candidate) => candidate.attachment),
-    conflicting: active.map((candidate) => candidate.attachment),
+    conflicting: appendUniqueIssuePullRequestAttachments(
+      active.map((candidate) => candidate.attachment),
+      ownershipConflictingAttachments
+    ),
     unknown: [...unknown]
   };
+}
+
+function issuePullRequestCandidateTargetsDifferentIssue(
+  issue: ProviderLinearIssueContext,
+  candidate: ProviderLinearIssuePullRequestCandidate
+): boolean {
+  const issueIdentifier = normalizeIssueIdentifier(issue.identifier);
+  if (!issueIdentifier) {
+    return false;
+  }
+  const issuePrefix = issueIdentifier.slice(0, issueIdentifier.indexOf('-'));
+  const identifiers = extractIssueIdentifiersForPrefix(
+    [
+      candidate.attachment.title,
+      candidate.snapshot.title,
+      candidate.snapshot.head_ref_name
+    ],
+    issuePrefix
+  );
+  if (identifiers.length === 0) {
+    return false;
+  }
+  return identifiers.some((identifier) => identifier !== issueIdentifier);
+}
+
+function extractIssueIdentifiersForPrefix(
+  values: readonly (string | null | undefined)[],
+  issuePrefix: string
+): string[] {
+  const identifiers = new Set<string>();
+  const escapedPrefix = issuePrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`\\b${escapedPrefix}-\\d+\\b`, 'gi');
+  for (const value of values) {
+    const normalized = normalizeOptionalString(value);
+    if (!normalized) {
+      continue;
+    }
+    for (const match of normalized.matchAll(pattern)) {
+      const identifier = normalizeIssueIdentifier(match[0]);
+      if (identifier) {
+        identifiers.add(identifier);
+      }
+    }
+  }
+  return [...identifiers];
+}
+
+function normalizeIssueIdentifier(value: string | null | undefined): string | null {
+  const normalized = normalizeOptionalString(value)?.toUpperCase() ?? null;
+  return normalized && /^[A-Z][A-Z0-9]*-\d+$/.test(normalized) ? normalized : null;
+}
+
+function appendUniqueIssuePullRequestAttachments(
+  left: ProviderLinearWorkflowAttachment[],
+  right: ProviderLinearWorkflowAttachment[]
+): ProviderLinearWorkflowAttachment[] {
+  const seen = new Set<string>();
+  const combined: ProviderLinearWorkflowAttachment[] = [];
+  for (const attachment of [...left, ...right]) {
+    if (seen.has(attachment.id)) {
+      continue;
+    }
+    seen.add(attachment.id);
+    combined.push(attachment);
+  }
+  return combined;
 }
 
 function selectCurrentMergingPullRequestAttachment(

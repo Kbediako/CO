@@ -569,6 +569,8 @@ interface IssueContextTestPullRequestSnapshot {
   state: string;
   mergedAt: string | null;
   updatedAt: string;
+  title?: string | null;
+  headRefName?: string | null;
 }
 
 function createDeferred<T>(): Deferred<T> {
@@ -582,15 +584,16 @@ function createDeferred<T>(): Deferred<T> {
 }
 
 async function readIssueContextAttachmentTruth(options: {
+  identifier?: string;
   title: string;
-  state: { id: string; name: string; type: 'started' };
+  state: { id: string; name: string; type: string | null };
   attachments: Record<string, unknown>[];
   snapshotForPr: (prNumber: number) => unknown | Promise<unknown>;
 }) {
   const fetchImpl: typeof fetch = vi.fn(async () =>
     jsonResponse(
       buildIssueContextBody({
-        identifier: 'CO-220',
+        identifier: options.identifier ?? 'CO-220',
         title: options.title,
         updatedAt: '2026-04-17T13:12:00.000Z',
         state: options.state,
@@ -1505,12 +1508,160 @@ describe('providerLinearWorkflowFacade', () => {
     );
 
     expect(ghCalls).toEqual([
-      ['pr', 'view', '509', '--repo', 'asabeko/CO', '--json', 'state,mergedAt,updatedAt']
+      ['pr', 'view', '509', '--repo', 'asabeko/CO', '--json', 'state,mergedAt,updatedAt,title,headRefName']
     ]);
     expect(snapshot).toEqual({
       state: 'CLOSED',
       mergedAt: null,
-      updatedAt: '2026-04-17T13:10:30.000Z'
+      updatedAt: '2026-04-17T13:10:30.000Z',
+      title: null,
+      headRefName: null
+    });
+  });
+
+  it('keeps an unrelated active PR from becoming current on a completed issue', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Completed issue with misbound current PR',
+      state: {
+        id: 'state-done',
+        name: 'Done',
+        type: 'completed'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-532', 532, 'CO-244 closeout PR'),
+        buildGitHubAttachment('attachment-pr-575', 575, 'CO-289 preserve provider worker rehydration provenance')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 532
+          ? {
+              state: 'MERGED',
+              mergedAt: '2026-04-10T13:11:30.000Z',
+              updatedAt: '2026-04-10T13:11:30.000Z',
+              title: 'CO-244 completed provider release',
+              headRefName: 'linear/co-244-completed-provider-release'
+            }
+          : {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:07:51.000Z',
+              title: 'CO-289 preserve provider worker rehydration provenance',
+              headRefName: 'linear/co-289-provider-rehydration-provenance-main'
+            }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        state: {
+          name: 'Done',
+          type: 'completed'
+        },
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-532'
+          },
+          historical: [],
+          conflicting: [
+            {
+              id: 'attachment-pr-575'
+            }
+          ],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it('treats mixed inspected and foreign issue identifiers as conflicting ownership evidence', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Completed issue with customized misbound attachment title',
+      state: {
+        id: 'state-done',
+        name: 'Done',
+        type: 'completed'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-532', 532, 'CO-244 closeout PR'),
+        buildGitHubAttachment('attachment-pr-575', 575, 'CO-244 attachment label for CO-289 PR')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 532
+          ? {
+              state: 'MERGED',
+              mergedAt: '2026-04-10T13:11:30.000Z',
+              updatedAt: '2026-04-10T13:11:30.000Z',
+              title: 'CO-244 completed provider release',
+              headRefName: 'linear/co-244-completed-provider-release'
+            }
+          : {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:07:51.000Z',
+              title: 'CO-289 preserve provider worker rehydration provenance',
+              headRefName: 'linear/co-289-provider-rehydration-provenance-main'
+            }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-532'
+          },
+          historical: [],
+          conflicting: [
+            {
+              id: 'attachment-pr-575'
+            }
+          ],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it('preserves the owning issue current PR when the PR identifier matches', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-289',
+      title: 'Provider worker rehydration should preserve provenance',
+      state: {
+        id: 'state-in-progress',
+        name: 'In Progress',
+        type: 'started'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-575', 575, 'CO-289 preserve provider worker rehydration provenance')
+      ],
+      snapshotForPr: () => ({
+        state: 'OPEN',
+        mergedAt: null,
+        updatedAt: '2026-04-21T09:07:51.000Z',
+        title: 'CO-289 preserve provider worker rehydration provenance',
+        headRefName: 'linear/co-289-provider-rehydration-provenance-main'
+      })
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-289',
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-575'
+          },
+          historical: [],
+          conflicting: [],
+          unknown: []
+        }
+      }
     });
   });
 

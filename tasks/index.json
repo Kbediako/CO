@@ -1,6 +1,59 @@
 {
   "items": [
     {
+      "id": "20260422-linear-994efebc-e1e4-4e00-8046-c60143813251",
+      "title": "CO-295 Linear PR attachment ownership truth",
+      "relates_to": "tasks/tasks-linear-994efebc-e1e4-4e00-8046-c60143813251.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-22",
+      "approvals": {
+        "parallelization_decision": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-22",
+          "status": "parallelize_now_failed_closed_before_launch",
+          "summary": "Recorded parallelize_now / independent_scope_available for a regression-tests lane, then child-lane launch failed with provider_worker_child_lane_provenance_invalid because the parent manifest/env lacks provider control-host provenance; parent owns tests without fabricating delegated evidence."
+        },
+        "pr_sweep": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-22",
+          "status": "succeeded",
+          "summary": "PR #575 was attached as current before implementation; sweep found it is merged CO-289 work with all review threads resolved and no actionable CO-295 feedback, so it is defect evidence only."
+        },
+        "issue_quality_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-22",
+          "status": "accepted",
+          "summary": "Scope covers ownership-aware current PR selection, preservation of historical/current truth, duplicated-current visibility, and operator-safe repair; display-only and manual-attachment cleanup are rejected."
+        },
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-22",
+          "status": "succeeded",
+          "manifest": ".runs/linear-994efebc-e1e4-4e00-8046-c60143813251/cli/2026-04-21T16-19-14-539Z-9d990cf1/manifest.json",
+          "summary": "Repo-local linear child-stream docs-review failed closed with provider_worker_child_stream_provenance_invalid because the parent manifest/env lacks provider control-host provenance. Direct docs-review was rerun with CODEX_ORCHESTRATOR_ROOT pinned to the clean CO-295 worktree and a scoped fallback reason; spec guard passed."
+        },
+        "focused_regressions": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-22",
+          "status": "succeeded",
+          "summary": "ProviderLinearWorkflowFacade focused tests pass after adding ownership-aware PR attachment classification; CO-244/CO-289 fixture restores PR #532 current and exposes mismatched PR #575 as conflicting while CO-289 keeps PR #575 current."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-994efebc-e1e4-4e00-8046-c60143813251.md",
+        "task": "tasks/tasks-linear-994efebc-e1e4-4e00-8046-c60143813251.md",
+        "agent_task": ".agent/task/linear-994efebc-e1e4-4e00-8046-c60143813251.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-994efebc-e1e4-4e00-8046-c60143813251.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-994efebc-e1e4-4e00-8046-c60143813251.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-994efebc-e1e4-4e00-8046-c60143813251.md"
+        }
+      }
+    },
+    {
       "id": "20260422-linear-89c4cb0d-4423-4b1d-865f-25a768b9d7b4",
       "title": "CO-274 provider-worker stdin bootstrap failure classification",
       "relates_to": "tasks/tasks-linear-89c4cb0d-4423-4b1d-865f-25a768b9d7b4.md",
