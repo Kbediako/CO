@@ -129,6 +129,90 @@ describe('runCoStatusCliShell', () => {
     expect(payload).toEqual(buildUiPayload());
   });
 
+  it('retries a direct json current-endpoint timeout once when endpoint artifacts do not rotate', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    await writeControlEndpointArtifacts(runDir, 'http://127.0.0.1:65535');
+    const healthyPayload = buildUiPayload({
+      polling: {
+        ...(buildUiPayload().polling as Record<string, unknown>),
+        stuck: false,
+        restart_required: false
+      },
+      running: [
+        {
+          run_id: 'running-claim-1',
+          issue_identifier: 'CO-296',
+          status: 'running'
+        }
+      ]
+    });
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(buildAbortError())
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(healthyPayload), {
+          status: 200,
+          statusText: 'OK',
+          headers: { 'Content-Type': 'application/json' }
+        })
+      );
+
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await runCoStatusCliShell({
+      flags: {
+        format: 'json',
+        'run-dir': runDir
+      },
+      printHelp: vi.fn()
+    });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(fetchSpy.mock.calls.map((call) => call[0])).toEqual([
+      'http://127.0.0.1:65535/ui/data.json',
+      'http://127.0.0.1:65535/ui/data.json'
+    ]);
+    expect(log).toHaveBeenCalledTimes(1);
+    const payload = JSON.parse(String(log.mock.calls[0]?.[0])) as Record<string, unknown>;
+    expect(payload).toEqual(healthyPayload);
+  });
+
+  it('classifies repeated direct json current-endpoint timeouts without stale-endpoint guidance', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    await writeControlEndpointArtifacts(runDir, 'http://127.0.0.1:65535');
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(buildAbortError())
+      .mockRejectedValueOnce(buildAbortError());
+
+    let thrown: unknown;
+    try {
+      await runCoStatusCliShell({
+        flags: {
+          format: 'json',
+          'run-dir': runDir
+        },
+        printHelp: vi.fn()
+      });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect((thrown as Error)?.message ?? String(thrown)).toMatch(
+      /current resolved \/ui\/data\.json endpoint .* timed out again after endpoint re-resolution returned the same endpoint\/token/u
+    );
+    expect((thrown as Error)?.message ?? String(thrown)).not.toMatch(/control_endpoint\.json has not rotated/u);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
   it('fails with stale-endpoint guidance when direct json mode hits a dead endpoint that does not rotate', async () => {
     const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
     tempDirs.push(root);
@@ -626,4 +710,10 @@ function buildUiPayload(overrides: Record<string, unknown> = {}): Record<string,
     issues: [],
     ...overrides
   };
+}
+
+function buildAbortError(): Error {
+  const error = new Error('operation aborted');
+  error.name = 'AbortError';
+  return error;
 }
