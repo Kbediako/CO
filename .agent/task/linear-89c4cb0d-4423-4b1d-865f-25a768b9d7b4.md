@@ -7,12 +7,12 @@
 - TECH_SPEC mirror: `docs/TECH_SPEC-linear-89c4cb0d-4423-4b1d-865f-25a768b9d7b4.md`
 - ACTION_PLAN: `docs/ACTION_PLAN-linear-89c4cb0d-4423-4b1d-865f-25a768b9d7b4.md`
 - Source anchor: `ctx:sha256:395893ee7f0985529df981453f3c5cc80e32afb59fe1ed6d49d83252a23013ac#chunk:c000001`
-- Source payload: `../../.runs/linear-89c4cb0d-4423-4b1d-865f-25a768b9d7b4/cli/2026-04-21T14-09-01-063Z-719778ff/memory/source-0/source.txt`
+- Source payload: `.runs/linear-89c4cb0d-4423-4b1d-865f-25a768b9d7b4/cli/2026-04-21T14-09-01-063Z-719778ff/memory/source-0/source.txt`
 
 ## Evidence Gates
 - [x] Issue-quality review captured. Evidence: `tasks/specs/linear-89c4cb0d-4423-4b1d-865f-25a768b9d7b4.md`.
-- [x] Standalone review approval captured. Evidence: `../../.runs/linear-89c4cb0d-4423-4b1d-865f-25a768b9d7b4/cli/2026-04-21T14-23-53-414Z-fd53cf4b/review/telemetry.json` reports bounded-success after command-intent retry; output log reported no actionable issues.
-- [x] Docs-review manifest captured before implementation. Evidence: `../../.runs/linear-89c4cb0d-4423-4b1d-865f-25a768b9d7b4/cli/2026-04-21T14-23-53-414Z-fd53cf4b/manifest.json`.
+- [x] Standalone review approval captured. Evidence: `.runs/linear-89c4cb0d-4423-4b1d-865f-25a768b9d7b4/cli/2026-04-21T14-23-53-414Z-fd53cf4b/review/telemetry.json` reports bounded-success after command-intent retry; output log reported no actionable issues.
+- [x] Docs-review manifest captured before implementation. Evidence: `.runs/linear-89c4cb0d-4423-4b1d-865f-25a768b9d7b4/cli/2026-04-21T14-23-53-414Z-fd53cf4b/manifest.json`.
 - [x] Implementation review manifest captured. Evidence: same manifest-backed `npm run review -- --manifest ... --uncommitted` rerun under `FORCE_CODEX_REVIEW=1`; output log reported no actionable issues.
 
 ## Rework Reset
@@ -40,7 +40,7 @@
 
 ## Validation
 - [x] Protected-term check over the packet and mirrors. Evidence: `rg -n "provider-linear-worker|control-host|stderr \\| Reading additional input from stdin\\.\\.\\.|provider_runtime|provider-linear-worker-proof\\.json|manifest\\.json|linear_audit\\.attempted_count|retry/resumable queue behavior|CO-224|CO-225|ctx:sha256:395893ee7f0985529df981453f3c5cc80e32afb59fe1ed6d49d83252a23013ac#chunk:c000001" ...` over the six CO-274 packet/mirror files.
-- [x] Docs-review manifest-backed evidence captured, or documented fallback if unavailable. Evidence: child-stream failed with `provider_worker_child_stream_provenance_invalid`; direct docs-review succeeded with scoped delegation override at `../../.runs/linear-89c4cb0d-4423-4b1d-865f-25a768b9d7b4/cli/2026-04-21T14-23-53-414Z-fd53cf4b/manifest.json`.
+- [x] Docs-review manifest-backed evidence captured, or documented fallback if unavailable. Evidence: child-stream failed with `provider_worker_child_stream_provenance_invalid`; direct docs-review succeeded with scoped delegation override at `.runs/linear-89c4cb0d-4423-4b1d-865f-25a768b9d7b4/cli/2026-04-21T14-23-53-414Z-fd53cf4b/manifest.json`.
 - [x] Focused provider-worker diagnostic regression for `stderr | Reading additional input from stdin...`. Evidence: `npx vitest run orchestrator/tests/ProviderLinearWorkerRunner.test.ts -t "stdin bootstrap|machine-readable provider diagnostic"`.
 - [x] Proof/manifest regression preserving `linear_audit.attempted_count: 0`. Evidence: same focused runner command, `classifies a stdin bootstrap exit in the failed proof sidecar before issue execution`.
 - [x] Retry/resumable queue behavior regression. Evidence: `npx vitest run orchestrator/tests/ProviderIssueHandoff.test.ts -t "terminal failed proof evidence|stale failed proof summary or diagnostics"`.

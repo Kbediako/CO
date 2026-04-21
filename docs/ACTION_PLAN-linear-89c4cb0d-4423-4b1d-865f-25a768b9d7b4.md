@@ -10,7 +10,7 @@
 ## Issue Readiness Gate
 - Intent checksum / protected terms carried forward: preserve `provider-linear-worker`, `control-host`, `stderr | Reading additional input from stdin...`, `provider_runtime`, `provider-linear-worker-proof.json`, `manifest.json`, `linear_audit.attempted_count`, retry/resumable queue behavior, `CO-224`, and `CO-225`.
 - Source anchor carried forward: `ctx:sha256:395893ee7f0985529df981453f3c5cc80e32afb59fe1ed6d49d83252a23013ac#chunk:c000001`.
-- Source payload: `../../.runs/linear-89c4cb0d-4423-4b1d-865f-25a768b9d7b4/cli/2026-04-21T14-09-01-063Z-719778ff/memory/source-0/source.txt`.
+- Source payload: `.runs/linear-89c4cb0d-4423-4b1d-865f-25a768b9d7b4/cli/2026-04-21T14-09-01-063Z-719778ff/memory/source-0/source.txt`.
 - Not done if:
   - `control-host` launched `provider-linear-worker` runs still exit before meaningful work with only generic `provider_runtime` classification
   - `provider-linear-worker-proof.json` or `manifest.json` loses exact stderr or `linear_audit.attempted_count`
