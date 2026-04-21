@@ -7,7 +7,7 @@ This guide is the downstream-safe setup path shipped in the npm package.
 - Once per machine: install Codex CLI, authenticate, install bundled skills, and register delegation or DevTools wiring.
 - Once per repo: seed the CO templates, review the generated config, and start using task-scoped runs.
 - CO currently targets Codex CLI `0.118.0`; newer candidates stay evidence-gated in the version policy.
-- Marketplace packaging is shipped as an additive registration path for newer Codex releases that expose `codex marketplace add`. npm remains the supported baseline because it is the simplest supported CLI install path.
+- CO-196 posture lineage remains unchanged: npm is the supported baseline because it is the simplest supported CLI install path, and marketplace packaging is an additive registration path for newer Codex releases that expose `codex plugin marketplace add` and `codex plugin marketplace remove`.
 
 ## Once per machine
 
@@ -30,13 +30,13 @@ This guide is the downstream-safe setup path shipped in the npm package.
    codex-orchestrator doctor --format json
    ```
 
-## Codex marketplace install
+## Codex plugin marketplace install
 
 Use this when you want Codex to discover and enable CO from the plugin browser, while keeping npm available as the baseline CLI install path.
 
 1. Add the packaged marketplace root:
    ```bash
-   codex marketplace add "$(npm root -g)/@kbediako/codex-orchestrator"
+   codex plugin marketplace add "$(npm root -g)/@kbediako/codex-orchestrator"
    ```
 2. Open `/plugins` inside Codex.
 3. Install `Codex Orchestrator`.
@@ -50,15 +50,18 @@ The shipped marketplace files are:
 - `plugins/codex-orchestrator/launcher.mjs`
 
 - Launcher behaviour: The plugin entry points at `plugins/codex-orchestrator`, and its launcher reads the `codex-orchestrator` marketplace entry in `${CODEX_HOME:-~/.codex}/config.toml` to locate the recorded source checkout before it execs the packaged CO CLI there via `node`. Local-directory sources run from the recorded source path. Git-backed sources run from Codex's installed checkout under `${CODEX_HOME:-~/.codex}/.tmp/marketplaces/codex-orchestrator`, so the MCP registration path stays independent of a second `codex-orchestrator` path entry after install.
-- Local-directory add: Run `codex marketplace add <repository-root>` against the repository root that contains those files instead of the npm install directory.
+- Local-directory add: Run `codex plugin marketplace add <repository-root>` against the repository root that contains those files instead of the npm install directory.
 - Git-backed add: Pass a Git identifier or URL such as `owner/repo[@ref]`, an HTTPS Git URL, or an SSH Git URL rather than a local path.
-- When to re-run add: Re-run `codex marketplace add ...` if you move or replace a local-directory source, or if you remove Codex's installed marketplace checkout and want to restore the Git-backed install. `codex marketplace add --help` currently documents local directories plus Git-backed sources such as `owner/repo[@ref]`, HTTPS Git URLs, and SSH Git URLs.
+- When to re-run add: Re-run `codex plugin marketplace add ...` if you move or replace a local-directory source, or if you remove Codex's installed marketplace checkout and want to restore the Git-backed install. `codex plugin marketplace add --help` currently documents local directories plus Git-backed sources such as `owner/repo[@ref]`, HTTPS Git URLs, and SSH Git URLs.
 
 ## Rollback and removal
 
 - Uninstall the plugin from the Codex plugin browser when you want to remove it completely.
 - Set the plugin entry in `${CODEX_HOME:-~/.codex}/config.toml` to `enabled = false` when you want to keep it installed but turn it off.
-- Remove the `[marketplaces.codex-orchestrator]` block from `${CODEX_HOME:-~/.codex}/config.toml` if you no longer want Codex to read the shipped marketplace registration.
+- Remove the marketplace registration if you no longer want Codex to read the shipped marketplace source:
+  ```bash
+  codex plugin marketplace remove codex-orchestrator
+  ```
 - Remove the npm install when you no longer want the standalone CLI or when you no longer need it as the marketplace source:
   ```bash
   npm uninstall -g @kbediako/codex-orchestrator

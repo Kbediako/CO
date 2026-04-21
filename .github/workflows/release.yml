@@ -158,7 +158,7 @@ jobs:
       - run: npm run clean:dist
       - run: npm run build
       - run: npm run pack:audit
-      - run: npm install --global @openai/codex@0.121.0
+      - run: npm install --global @openai/codex@0.122.0
       - run: npm run pack:smoke
 
       - name: Create tarball
