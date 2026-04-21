@@ -14,6 +14,7 @@ import {
 } from '../providerLinearWorkerRunner.js';
 import { isoTimestamp } from '../utils/time.js';
 import type { RunPaths } from '../run/runPaths.js';
+import { stripNonApplicableGuardrailSummaryLines } from '../run/manifest.js';
 import {
   cleanupProviderWorkspace,
   resolveExplicitProviderWorkspacePathWithinRoot,
@@ -7239,7 +7240,10 @@ function resolveProviderIssueRunSummary(
   manifest: Record<string, unknown>,
   proof: ProviderLinearWorkerProofRecord | null
 ): string | null {
-  const manifestSummary = readStringValue(manifest, 'summary');
+  const manifestSummary = stripNonApplicableGuardrailSummaryLines(
+    manifest,
+    readStringValue(manifest, 'summary')
+  );
   const manifestStatus = readStringValue(manifest, 'status');
   const proofIsAuthoritative = shouldUseProviderLinearWorkerTerminalProofForSummary(manifest, proof);
   const proofTerminalStatus = proofIsAuthoritative

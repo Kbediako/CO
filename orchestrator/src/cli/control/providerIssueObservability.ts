@@ -12,6 +12,9 @@ import {
 import { normalizeProviderWorkerHostName } from './providerWorkerHosts.js';
 
 const PROVIDER_SEMANTIC_STALL_THRESHOLD_MS = 15 * 60 * 1000;
+const PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID = 'provider-linear-child-lane';
+const FALSE_MISSING_SPEC_GUARD_SUMMARY = 'Guardrails: spec-guard command not found.';
+const FALSE_MISSING_SPEC_GUARD_RECOMMENDATION_PREFIX = 'Guardrail command missing;';
 
 export type ProviderIntakeClaimFreshness =
   | 'fresh'
@@ -228,6 +231,7 @@ interface ProviderIssueChildStreamLike {
 
 interface ProviderIssueChildLaneLike {
   stream?: string | null;
+  pipeline_id?: string | null;
   task_id?: string | null;
   run_id?: string | null;
   status?: string | null;
@@ -829,7 +833,7 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
 
   if (activeChildLane) {
     const childLaneSummary =
-      normalizeOptionalString(activeChildLane.summary) ??
+      normalizeProviderChildLaneProgressSummary(activeChildLane) ??
       `Waiting on child lane ${activeChildLane.stream ?? activeChildLane.task_id ?? activeChildLane.run_id ?? 'unknown'}.`;
     return {
       phase: 'child_lane',
@@ -1202,7 +1206,7 @@ function collectCurrentTurnChildProgressSummaryCandidates(
     ...selectCurrentTurnChildLanes(proof?.child_lanes ?? null, currentTurnStartedAt)
       .filter(isCurrentProgressChildLaneSummaryEligible)
       .flatMap((childLane) => {
-        const summary = normalizeOptionalString(childLane.summary);
+        const summary = normalizeProviderChildLaneProgressSummary(childLane);
         const summaryRecordedAt = childLaneSummaryRecordedAt(childLane);
         return summary
           ? [
@@ -1885,7 +1889,7 @@ function selectLatestChildProgressSummaryCandidate(
     ...selectCurrentTurnChildLanes(proof?.child_lanes ?? null, currentTurnStartedAt)
       .filter(isCurrentProgressChildLaneSummaryEligible)
       .flatMap((childLane) => {
-        const summary = normalizeOptionalString(childLane.summary);
+        const summary = normalizeProviderChildLaneProgressSummary(childLane);
         return summary
           ? [
               {
@@ -1985,6 +1989,28 @@ function isCurrentProgressChildLaneSummaryEligible(childLane: ProviderIssueChild
 
 function childLaneSummaryRecordedAt(childLane: ProviderIssueChildLaneLike): string | null {
   return normalizeOptionalString(childLane.summary_recorded_at) ?? normalizeOptionalString(childLane.launched_at);
+}
+
+function normalizeProviderChildLaneProgressSummary(childLane: ProviderIssueChildLaneLike): string | null {
+  const summary = normalizeOptionalString(childLane.summary);
+  if (!summary) {
+    return null;
+  }
+  if (normalizeOptionalString(childLane.pipeline_id) !== PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID) {
+    return summary;
+  }
+  const filtered = summary
+    .split('\n')
+    .map((line) =>
+      line
+        .replace(FALSE_MISSING_SPEC_GUARD_SUMMARY, '')
+        .replace(new RegExp(`\\s*${escapeRegExp(FALSE_MISSING_SPEC_GUARD_RECOMMENDATION_PREFIX)}[^\\n]*$`), '')
+        .trim()
+    )
+    .filter((line) => line.length > 0)
+    .join('\n')
+    .trim();
+  return filtered || null;
 }
 
 function childLaneProgressRecordedAt(childLane: ProviderIssueChildLaneLike): string | null {
@@ -2138,4 +2164,8 @@ function normalizeOptionalString(value: unknown): string | null {
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

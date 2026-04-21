@@ -59,6 +59,7 @@ import {
 } from './utils/packageProgramResolver.js';
 import { slugify } from './utils/strings.js';
 import { parseTrailingJsonObject } from './utils/trailingJsonObject.js';
+import { stripNonApplicableGuardrailSummaryLines } from './run/manifest.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -1705,7 +1706,10 @@ function parseProviderLinearChildLaneRunManifest(input: {
     artifact_root: input.artifactRoot,
     manifest_path: input.manifestPath,
     log_path: logPath,
-    summary: normalizeOptionalString(input.manifest.summary),
+    summary: stripNonApplicableGuardrailSummaryLines(
+      input.manifest,
+      normalizeOptionalString(input.manifest.summary)
+    ),
     runtime_mode_requested: normalizeOptionalString(input.manifest.runtime_mode_requested),
     runtime_mode: normalizeOptionalString(input.manifest.runtime_mode),
     runtime_provider: normalizeOptionalString(input.manifest.runtime_provider)

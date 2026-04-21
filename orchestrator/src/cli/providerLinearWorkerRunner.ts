@@ -56,6 +56,7 @@ import {
   PROVIDER_WORKSPACE_ROOT_DIRNAME,
   resolveProviderWorkspacePath
 } from './run/workspacePath.js';
+import { stripNonApplicableGuardrailSummaryLines } from './run/manifest.js';
 import {
   buildRunMemoryPromptLines,
   selectRunMemoryForRole
@@ -5604,7 +5605,8 @@ async function readProviderLinearWorkerChildLaneManifestCandidate(
       ? patchBytes === 0
         ? 'Child lane completed without patch output; waiting for parent ledger decision.'
         : 'Child lane completed; waiting for patch proof metadata.'
-      : normalizeOptionalString(parsed.summary) ?? normalizeOptionalString(parsed.status_detail),
+      : stripNonApplicableGuardrailSummaryLines(parsed, normalizeOptionalString(parsed.summary)) ??
+        normalizeOptionalString(parsed.status_detail),
     startedAt,
     updatedAt: manifestTimestamp,
     laneWorkspacePath: proofMetadata?.laneWorkspacePath ?? null,

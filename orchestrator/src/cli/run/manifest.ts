@@ -63,6 +63,12 @@ export interface GuardrailStatusSnapshot {
   counts: GuardrailCounts;
 }
 
+type GuardrailApplicabilityManifestLike = {
+  guardrails_required?: unknown;
+  pipeline_id?: unknown;
+  commands?: unknown;
+};
+
 interface GuardrailCounts {
   total: number;
   succeeded: number;
@@ -82,6 +88,10 @@ const HEARTBEAT_INTERVAL_SECONDS = 5;
 const HEARTBEAT_STALE_AFTER_SECONDS = 30;
 const MAX_ERROR_DETAIL_CHARS = 8 * 1024;
 const DEFAULT_MIN_EXPERIENCE_REWARD = 0.1;
+const KNOWN_NON_GUARDRAIL_PIPELINE_IDS = new Set([
+  'provider-linear-worker',
+  'provider-linear-child-lane'
+]);
 function createDefaultRuntimeFallback() {
   return {
     occurred: false,
@@ -174,7 +184,7 @@ export async function bootstrapManifest(runId: string, options: ManifestBootstra
     instructions_hash: null,
     instructions_sources: [],
     prompt_packs: [],
-    guardrails_required: pipeline.guardrailsRequired !== false,
+    guardrails_required: resolveGuardrailsRequiredForPipeline(pipeline),
     runtime_mode_requested: 'appserver',
     runtime_mode: 'appserver',
     runtime_provider: runtimeProviderForMode('appserver'),
@@ -536,6 +546,53 @@ export function buildGuardrailSummary(manifest: CliManifest): string {
   return ensureGuardrailStatus(manifest).summary;
 }
 
+export function resolveGuardrailsRequiredForPipeline(pipeline: PipelineDefinition): boolean {
+  if (typeof pipeline.guardrailsRequired === 'boolean') {
+    return pipeline.guardrailsRequired;
+  }
+  return pipeline.stages.some((stage) => isGuardrailPipelineStage(stage));
+}
+
+export function resolveGuardrailsRequiredForManifest(manifest: GuardrailApplicabilityManifestLike): boolean {
+  const guardrailCommands = selectGuardrailCommands(manifest);
+  if (typeof manifest.guardrails_required === 'boolean') {
+    if (
+      manifest.guardrails_required &&
+      guardrailCommands.length === 0 &&
+      isKnownNonGuardrailPipelineManifest(manifest)
+    ) {
+      return false;
+    }
+    return manifest.guardrails_required;
+  }
+  return guardrailCommands.length > 0;
+}
+
+export function stripNonApplicableGuardrailSummaryLines(
+  manifest: GuardrailApplicabilityManifestLike,
+  summary: string | null | undefined
+): string | null {
+  const normalized = summary?.trim();
+  if (!normalized) {
+    return null;
+  }
+  const lines = normalized.split('\n');
+  const canStripLegacyMixedSummary =
+    isKnownNonGuardrailPipelineManifest(manifest) &&
+    selectGuardrailCommands(manifest).length === 0 &&
+    lines.some((line) => !isGuardrailSummaryOrRecommendationLine(line));
+  if (resolveGuardrailsRequiredForManifest(manifest) && !canStripLegacyMixedSummary) {
+    return normalized;
+  }
+  const filtered = lines
+    .filter((line) => {
+      return !isGuardrailSummaryOrRecommendationLine(line);
+    })
+    .join('\n')
+    .trim();
+  return filtered || null;
+}
+
 export function upsertGuardrailSummary(manifest: CliManifest): void {
   const guardrailStatus = ensureGuardrailStatus(manifest);
   const existing = manifest.summary ? manifest.summary.split('\n') : [];
@@ -557,7 +614,7 @@ export function upsertGuardrailSummary(manifest: CliManifest): void {
 
 function computeGuardrailStatus(manifest: CliManifest): GuardrailStatusSnapshot {
   const guardrailCommands = selectGuardrailCommands(manifest);
-  const guardrailsRequired = manifest.guardrails_required ?? true;
+  const guardrailsRequired = resolveGuardrailsRequiredForManifest(manifest);
   const counts: GuardrailCounts = {
     total: guardrailCommands.length,
     succeeded: 0,
@@ -605,14 +662,9 @@ function computeGuardrailStatus(manifest: CliManifest): GuardrailStatusSnapshot 
   };
 }
 
-function selectGuardrailCommands(manifest: CliManifest): CliManifestCommand[] {
-  return manifest.commands.filter((entry) => {
-    const id = entry.id?.toLowerCase() ?? '';
-    const title = entry.title?.toLowerCase() ?? '';
-    const command = entry.command?.toLowerCase() ?? '';
-    const haystack = `${id} ${title} ${command}`;
-    return haystack.includes('spec-guard') || haystack.includes('specguardrunner');
-  });
+function selectGuardrailCommands(manifest: GuardrailApplicabilityManifestLike): CliManifestCommand[] {
+  const commands = Array.isArray(manifest.commands) ? manifest.commands : [];
+  return commands.filter((entry): entry is CliManifestCommand => isGuardrailCommandEntry(entry));
 }
 
 function classifyGuardrailCommand(
@@ -649,7 +701,7 @@ function shouldEmitGuardrailSummary(
   if (snapshot.counts.total > 0) {
     return true;
   }
-  return (manifest.guardrails_required ?? true) !== false;
+  return resolveGuardrailsRequiredForManifest(manifest);
 }
 
 function formatGuardrailSummary(counts: GuardrailCounts, guardrailsRequired: boolean): string {
@@ -688,6 +740,39 @@ function isGuardrailRecommendationLine(line: string): boolean {
     trimmed.startsWith('Guardrail command missing;') ||
     trimmed.startsWith('Guardrail command failed;')
   );
+}
+
+function isGuardrailSummaryOrRecommendationLine(line: string): boolean {
+  const trimmed = line.trim();
+  return trimmed.toLowerCase().startsWith('guardrails:') || isGuardrailRecommendationLine(trimmed);
+}
+
+function isKnownNonGuardrailPipelineManifest(manifest: GuardrailApplicabilityManifestLike): boolean {
+  return (
+    typeof manifest.pipeline_id === 'string' &&
+    KNOWN_NON_GUARDRAIL_PIPELINE_IDS.has(manifest.pipeline_id.trim().toLowerCase())
+  );
+}
+
+function isGuardrailPipelineStage(stage: PipelineStage): boolean {
+  const command = stage.kind === 'command' ? stage.command : stage.pipeline;
+  return containsGuardrailNeedle(stage.id, stage.title, command);
+}
+
+function isGuardrailCommandEntry(entry: unknown): entry is CliManifestCommand {
+  if (!entry || typeof entry !== 'object') {
+    return false;
+  }
+  const record = entry as Record<string, unknown>;
+  return containsGuardrailNeedle(record.id, record.title, record.command);
+}
+
+function containsGuardrailNeedle(...values: unknown[]): boolean {
+  const haystack = values
+    .filter((value): value is string => typeof value === 'string')
+    .join(' ')
+    .toLowerCase();
+  return haystack.includes('spec-guard') || haystack.includes('specguardrunner');
 }
 
 export function appendSummary(manifest: CliManifest, message: string | null | undefined): void {

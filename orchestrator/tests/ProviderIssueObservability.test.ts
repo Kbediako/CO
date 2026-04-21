@@ -975,6 +975,37 @@ describe('provider issue observability', () => {
     expect(progress?.last_semantic_progress_at).toBe('2026-04-05T05:44:30.000Z');
   });
 
+  it('does not project stale missing spec-guard text from non-guardrail child lanes', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
+      proof: {
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        last_event: 'turn_started',
+        last_message: 'Provider worker turn is active.',
+        last_event_at: '2026-04-18T02:00:00.000Z',
+        updated_at: '2026-04-18T02:01:00.000Z',
+        child_lanes: [
+          {
+            stream: 'truth-surface-regression',
+            pipeline_id: 'provider-linear-child-lane',
+            task_id: 'linear-co-225-truth-surface-regression',
+            run_id: 'run-lane-225',
+            status: 'failed',
+            launched_at: '2026-04-18T02:00:10.000Z',
+            decision: 'pending',
+            summary_recorded_at: '2026-04-18T02:00:40.000Z',
+            summary: "Child lane truth-surface-regression failed.\nGuardrails: spec-guard command not found."
+          }
+        ],
+        linear_audit: null
+      },
+      now: () => '2026-04-18T02:01:00.000Z'
+    });
+
+    expect(progress?.summary).toBe('Child lane truth-surface-regression failed.');
+    expect(progress?.summary).not.toContain('Guardrails: spec-guard command not found.');
+  });
+
   it('does not rank invalidated rejected or accepted child-lane summaries over current replacement progress', () => {
     const progress = deriveProviderLinearWorkerProgressSnapshot({
       proof: {

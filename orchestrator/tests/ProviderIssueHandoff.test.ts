@@ -29037,7 +29037,10 @@ describe('createProviderIssueHandoffService', () => {
         run_id: 'run-failed-direct-intake',
         task_id: 'task-1303-failed-direct-intake',
         status: 'failed',
-        summary: "Stage 'fail once' failed with exit code 1.",
+        guardrails_required: false,
+        summary:
+          "Stage 'fail once' failed with exit code 1.\n" +
+          'Guardrails: spec-guard command not found.',
         issue_provider: 'linear',
         issue_id: 'lin-issue-1',
         issue_identifier: 'CO-2',
@@ -29088,6 +29091,7 @@ describe('createProviderIssueHandoffService', () => {
       retry_due_at: expect.any(String),
       retry_error: "Stage 'fail once' failed with exit code 1."
     });
+    expect(state.claims[0]?.retry_error).not.toContain('Guardrails: spec-guard command not found.');
     expect(Number.isFinite(Date.parse(state.claims[0]?.retry_due_at ?? ''))).toBe(true);
     expect(persist).toHaveBeenCalledTimes(1);
   });
