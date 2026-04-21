@@ -11,6 +11,7 @@ import {
   loadManifest,
   recordResumeEvent,
   saveManifest,
+  stripNonApplicableGuardrailSummaryLines,
   upsertGuardrailSummary
 } from '../src/cli/run/manifest.js';
 import { readRunSource0Payload } from '../src/cli/run/source0.js';
@@ -1773,7 +1774,6 @@ describe('buildGuardrailSummary', () => {
       const pipeline: PipelineDefinition = {
         id: 'guardrail-pipeline',
         title: 'Guardrail Pipeline',
-        guardrailsRequired: false,
         stages: []
       };
 
@@ -1785,6 +1785,8 @@ describe('buildGuardrailSummary', () => {
         approvalPolicy: null
       });
 
+      expect(manifest.guardrails_required).toBe(false);
+      expect(manifest.guardrails_required_source).toBe('stage_detection');
       const summary = buildGuardrailSummary(manifest);
       expect(summary).toBe('Guardrails: spec-guard not configured for this pipeline.');
 
@@ -1795,6 +1797,193 @@ describe('buildGuardrailSummary', () => {
     } finally {
       await rm(repoRoot, { recursive: true, force: true });
     }
+  });
+
+  it('preserves explicit required-missing guardrail truth', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-guardrail-required-missing-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'guardrail-task'
+    };
+    try {
+      const pipeline: PipelineDefinition = {
+        id: 'guardrail-pipeline',
+        title: 'Guardrail Pipeline',
+        guardrailsRequired: true,
+        stages: []
+      };
+
+      const { manifest } = await bootstrapManifest('run-guardrail-required-missing', {
+        env,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      expect(manifest.guardrails_required).toBe(true);
+      expect(manifest.guardrails_required_source).toBe('explicit');
+      expect(buildGuardrailSummary(manifest)).toBe('Guardrails: spec-guard command not found.');
+      const snapshot = ensureGuardrailStatus(manifest);
+      expect(snapshot.recommendation).toContain('Guardrail command missing;');
+
+      upsertGuardrailSummary(manifest);
+
+      expect(manifest.summary).toContain('Guardrail command missing;');
+      expect(manifest.summary).toContain('Guardrails: spec-guard command not found.');
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('preserves explicit required missing guardrail truth for provider-worker manifests', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-provider-required-missing-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'guardrail-task'
+    };
+    try {
+      const pipeline: PipelineDefinition = {
+        id: 'provider-linear-worker',
+        title: 'Provider Linear Worker',
+        guardrailsRequired: true,
+        stages: [
+          {
+            kind: 'command',
+            id: 'provider-linear-worker',
+            title: 'Run provider linear worker',
+            command: 'node dist/orchestrator/src/cli/providerLinearWorkerRunner.js'
+          }
+        ]
+      };
+
+      const { manifest } = await bootstrapManifest('run-provider-required-missing', {
+        env,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+
+      expect(manifest.guardrails_required).toBe(true);
+      expect(manifest.guardrails_required_source).toBe('explicit');
+      expect(buildGuardrailSummary(manifest)).toBe('Guardrails: spec-guard command not found.');
+      const snapshot = ensureGuardrailStatus(manifest);
+      expect(snapshot.recommendation).toContain('Guardrail command missing;');
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('strips stage-detected provider-worker default missing guardrail summaries', () => {
+    const summary = stripNonApplicableGuardrailSummaryLines(
+      {
+        pipeline_id: 'provider-linear-worker',
+        guardrails_required: true,
+        guardrails_required_source: 'stage_detection',
+        commands: [
+          {
+            id: 'provider-linear-worker',
+            title: 'Provider Linear Worker',
+            command: 'node dist/orchestrator/src/cli/providerLinearWorkerRunner.js'
+          }
+        ]
+      },
+      "Stage 'fail once' failed with exit code 1.\nGuardrails: spec-guard command not found."
+    );
+
+    expect(summary).toBe("Stage 'fail once' failed with exit code 1.");
+  });
+
+  it('preserves unknown-source required provider missing summaries', () => {
+    const summary = stripNonApplicableGuardrailSummaryLines(
+      {
+        pipeline_id: 'provider-linear-worker',
+        guardrails_required: true,
+        commands: [
+          {
+            id: 'provider-linear-worker',
+            title: 'Provider Linear Worker',
+            command: 'node dist/orchestrator/src/cli/providerLinearWorkerRunner.js'
+          }
+        ]
+      },
+      "Stage 'fail once' failed with exit code 1.\nGuardrails: spec-guard command not found."
+    );
+
+    expect(summary).toBe(
+      "Stage 'fail once' failed with exit code 1.\nGuardrails: spec-guard command not found."
+    );
+  });
+
+  it('preserves explicit provider-worker required missing summaries', () => {
+    const summary = stripNonApplicableGuardrailSummaryLines(
+      {
+        pipeline_id: 'provider-linear-worker',
+        guardrails_required: true,
+        guardrails_required_source: 'explicit',
+        commands: [
+          {
+            id: 'provider-linear-worker',
+            title: 'Provider Linear Worker',
+            command: 'node dist/orchestrator/src/cli/providerLinearWorkerRunner.js'
+          }
+        ]
+      },
+      "Stage 'fail once' failed with exit code 1.\nGuardrails: spec-guard command not found."
+    );
+
+    expect(summary).toBe(
+      "Stage 'fail once' failed with exit code 1.\nGuardrails: spec-guard command not found."
+    );
+  });
+
+  it('preserves explicit required missing guardrail summaries when another stage also failed', () => {
+    const summary = stripNonApplicableGuardrailSummaryLines(
+      {
+        guardrails_required: true,
+        commands: []
+      },
+      "Stage 'fail once' failed with exit code 1.\nGuardrails: spec-guard command not found."
+    );
+
+    expect(summary).toBe(
+      "Stage 'fail once' failed with exit code 1.\nGuardrails: spec-guard command not found."
+    );
+  });
+
+  it('preserves optional spec-guard outcomes when a command exists', () => {
+    const summary = stripNonApplicableGuardrailSummaryLines(
+      {
+        guardrails_required: false,
+        commands: [
+          {
+            index: 1,
+            id: 'spec-guard',
+            title: 'Spec guard',
+            command: 'node scripts/spec-guard.mjs',
+            kind: 'command',
+            status: 'failed',
+            started_at: null,
+            completed_at: null,
+            exit_code: 1,
+            summary: 'Guardrails: spec-guard failed (1/1 failed).',
+            log_path: null,
+            error_file: null,
+            sub_run_id: null
+          }
+        ]
+      },
+      "Stage 'fail once' failed with exit code 1.\nGuardrails: spec-guard failed (1/1 failed)."
+    );
+
+    expect(summary).toBe(
+      "Stage 'fail once' failed with exit code 1.\nGuardrails: spec-guard failed (1/1 failed)."
+    );
   });
 
   it('treats explicit spec-guard skip summaries as skipped', async () => {

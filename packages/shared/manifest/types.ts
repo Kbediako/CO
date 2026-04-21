@@ -116,6 +116,7 @@ export interface CodexOrchestratorCLIManifest {
     } | null;
   } | null;
   guardrails_required?: boolean | null;
+  guardrails_required_source?: "explicit" | "stage_detection" | null;
   runtime_mode_requested: "cli" | "appserver";
   runtime_mode: "cli" | "appserver";
   runtime_provider: "CliRuntimeProvider" | "AppServerRuntimeProvider";

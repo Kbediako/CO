@@ -26,7 +26,12 @@ type WorkflowFile = {
 };
 
 const marketplaceSkipToken = 'PACK_SMOKE_ALLOW_MARKETPLACE_SKIP';
-const codexInstallCommand = 'npm install --global @openai/codex@0.121.0';
+const marketplaceCodexInstallCommand = 'npm install --global @openai/codex@0.122.0';
+const cloudCanaryCodexInstallCommand = 'npm install --global @openai/codex@0.122.0';
+const dedicatedCodexInstallCommands = new Set([
+  marketplaceCodexInstallCommand,
+  cloudCanaryCodexInstallCommand
+]);
 const packSmokeCommand = 'npm run pack:smoke';
 const shellIdentifierPattern = String.raw`[A-Za-z_][A-Za-z0-9_]*`;
 const shellAssignmentPattern = String.raw`${shellIdentifierPattern}=(?:"[^"]*"|'[^']*'|\S+)`;
@@ -848,7 +853,7 @@ function hasNonBlockingPackSmokeCommand(run: string): boolean {
 
 function isDedicatedCodexInstallRun(run: string): boolean {
   const commandLines = getRunCommandLines(run);
-  return commandLines.length === 1 && commandLines[0] === codexInstallCommand;
+  return commandLines.length === 1 && dedicatedCodexInstallCommands.has(commandLines[0]);
 }
 
 function isContinueOnErrorEnabled(value: unknown): boolean {
@@ -981,7 +986,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
       status: 'fail',
       reason: 'marketplace-unsupported',
       message:
-        'Marketplace smoke requires a Codex CLI with `marketplace add` support. Set PACK_SMOKE_ALLOW_MARKETPLACE_SKIP=1 with PACK_SMOKE_MARKETPLACE_SKIP_REASON only for local-dev opt-out.'
+        'Marketplace smoke requires a Codex CLI with `plugin marketplace add` support. Set PACK_SMOKE_ALLOW_MARKETPLACE_SKIP=1 with PACK_SMOKE_MARKETPLACE_SKIP_REASON only for local-dev opt-out.'
     });
 
     expect(
@@ -996,7 +1001,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
       status: 'skip',
       reason: 'marketplace-unsupported',
       message:
-        'Skipping marketplace smoke: codex-0.118 does not expose codex marketplace add. Reason: explicit pre-0.121 compatibility lane; no release coverage claimed'
+        'Skipping marketplace smoke: codex-0.118 does not expose codex plugin marketplace add. Reason: explicit pre-0.121 compatibility lane; no release coverage claimed'
     });
   });
 
@@ -1023,14 +1028,14 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
           expect(run, `${workflow} job ${jobName} must not opt out of marketplace smoke`).not.toContain(
             marketplaceSkipToken
           );
-          if (hasCommandText(run, codexInstallCommand)) {
+          if (hasCommandText(run, marketplaceCodexInstallCommand)) {
             expect(
               isContinueOnErrorEnabled(step['continue-on-error']),
               `${workflow} job ${jobName} step ${stepIndex + 1} must not continue-on-error Codex install`
             ).toBe(false);
             expect(
               isDedicatedCodexInstallRun(run),
-              `${workflow} job ${jobName} step ${stepIndex + 1} must use a dedicated Codex 0.121.0 install step`
+              `${workflow} job ${jobName} step ${stepIndex + 1} must use a dedicated Codex 0.122.0 install step`
             ).toBe(true);
             codexInstallConditions.push(effectiveStepCondition);
           }
@@ -1056,7 +1061,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
               codexInstallConditions.some((installCondition) =>
                 installConditionCoversSmokeStep(installCondition, effectiveStepCondition)
               ),
-              `${workflow} job ${jobName} step ${stepIndex + 1} must install Codex 0.121.0 before pack:smoke with matching if condition`
+              `${workflow} job ${jobName} step ${stepIndex + 1} must install Codex 0.122.0 before pack:smoke with matching if condition`
             ).toBe(true);
           }
         }
@@ -1065,14 +1070,56 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     }
   });
 
+  it('pins cloud-canary to the explicit audited Codex candidate before running canaries', async () => {
+    const workflow = await readWorkflow('.github/workflows/cloud-canary.yml');
+    let installStepCount = 0;
+    let canaryStepCount = 0;
+
+    for (const [jobName, job] of Object.entries(workflow.jobs ?? {})) {
+      const codexInstallConditions: string[] = [];
+      const jobCondition = getJobCondition(job);
+      for (const [stepIndex, step] of getWorkflowSteps(job).entries()) {
+        const stepCondition = getStepCondition(step);
+        const effectiveStepCondition = combineWorkflowConditions(jobCondition, stepCondition);
+        const run = typeof step.run === 'string' ? step.run : '';
+
+        if (hasCommandText(run, cloudCanaryCodexInstallCommand)) {
+          expect(
+            isDedicatedCodexInstallRun(run),
+            `.github/workflows/cloud-canary.yml job ${jobName} step ${stepIndex + 1} must use a dedicated Codex 0.122.0 install step`
+          ).toBe(true);
+          codexInstallConditions.push(effectiveStepCondition);
+          installStepCount += 1;
+        }
+
+        if (hasCommandText(run, 'npm run ci:cloud-canary')) {
+          canaryStepCount += 1;
+          expect(
+            codexInstallConditions.some((installCondition) =>
+              installConditionCoversSmokeStep(installCondition, effectiveStepCondition)
+            ),
+            `.github/workflows/cloud-canary.yml job ${jobName} step ${stepIndex + 1} must install Codex 0.122.0 before running ci:cloud-canary`
+          ).toBe(true);
+        }
+      }
+    }
+
+    expect(installStepCount, '.github/workflows/cloud-canary.yml must install a pinned Codex candidate').toBe(1);
+    expect(canaryStepCount, '.github/workflows/cloud-canary.yml must run ci:cloud-canary').toBeGreaterThan(0);
+  });
+
   it('only treats dedicated Codex install steps as workflow proof', () => {
-    expect(isDedicatedCodexInstallRun(codexInstallCommand)).toBe(true);
-    expect(isDedicatedCodexInstallRun(`${codexInstallCommand} || true`)).toBe(false);
-    expect(isDedicatedCodexInstallRun(`${codexInstallCommand} \\\n  || true`)).toBe(false);
-    expect(isDedicatedCodexInstallRun(`[[ "$NEEDS_CODEX" == 1 ]] && ${codexInstallCommand}`)).toBe(false);
-    expect(isDedicatedCodexInstallRun(`exit 0; ${codexInstallCommand}`)).toBe(false);
-    expect(isDedicatedCodexInstallRun(`cat <<EOF\n${codexInstallCommand}\nEOF`)).toBe(false);
-    expect(isDedicatedCodexInstallRun(`cat <<'EOF-MARK'\n${codexInstallCommand}\nEOF-MARK`)).toBe(false);
+    expect(isDedicatedCodexInstallRun(marketplaceCodexInstallCommand)).toBe(true);
+    expect(isDedicatedCodexInstallRun(cloudCanaryCodexInstallCommand)).toBe(true);
+    expect(isDedicatedCodexInstallRun(`${marketplaceCodexInstallCommand} || true`)).toBe(false);
+    expect(isDedicatedCodexInstallRun(`${cloudCanaryCodexInstallCommand} || true`)).toBe(false);
+    expect(isDedicatedCodexInstallRun(`${marketplaceCodexInstallCommand} \\\n  || true`)).toBe(false);
+    expect(isDedicatedCodexInstallRun(`[[ "$NEEDS_CODEX" == 1 ]] && ${marketplaceCodexInstallCommand}`)).toBe(false);
+    expect(isDedicatedCodexInstallRun(`[[ "$NEEDS_CODEX" == 1 ]] && ${cloudCanaryCodexInstallCommand}`)).toBe(false);
+    expect(isDedicatedCodexInstallRun(`exit 0; ${marketplaceCodexInstallCommand}`)).toBe(false);
+    expect(isDedicatedCodexInstallRun(`cat <<EOF\n${marketplaceCodexInstallCommand}\nEOF`)).toBe(false);
+    expect(isDedicatedCodexInstallRun(`cat <<EOF\n${cloudCanaryCodexInstallCommand}\nEOF`)).toBe(false);
+    expect(isDedicatedCodexInstallRun(`cat <<'EOF-MARK'\n${marketplaceCodexInstallCommand}\nEOF-MARK`)).toBe(false);
     expect(hasPackSmokeCommand(packSmokeCommand)).toBe(true);
     expect(hasPackSmokeCommand(`FOO=1 BAR="two words" ${packSmokeCommand}`)).toBe(true);
     expect(hasPackSmokeCommand(`env FOO=1 ${packSmokeCommand}`)).toBe(true);

@@ -3,6 +3,7 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 
 import type { RunPaths } from '../run/runPaths.js';
 import type { CliManifest } from '../types.js';
+import { stripNonApplicableGuardrailSummaryLines } from '../run/manifest.js';
 import type { ControlAction, ControlState } from './controlState.js';
 import { LINEAR_ADVISORY_STATE_FILE } from './controlPersistenceFiles.js';
 import {
@@ -434,7 +435,10 @@ function buildProjectionContextFromParts(
       : manifestUpdatedAt;
   const manifestCompletedAt = readStringValue(manifestRecord, 'completed_at', 'completedAt');
   const completedAt = manifestCompletedAt ?? (isTerminalRunStatus(rawStatus) ? proofUpdatedAt ?? updatedAt : null);
-  const manifestSummary = readStringValue(manifestRecord, 'summary') ?? null;
+  const manifestSummary = stripNonApplicableGuardrailSummaryLines(
+    manifestRecord,
+    readStringValue(manifestRecord, 'summary')
+  );
   const proofAttemptStartedAt = useScopedTerminalProof
     ? resolveProviderLinearWorkerAttemptStartedAt(providerProofRecord)
     : null;

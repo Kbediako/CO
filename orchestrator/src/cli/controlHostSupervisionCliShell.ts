@@ -3,7 +3,7 @@
 import { execFile, spawn } from 'node:child_process';
 import { constants as fsConstants } from 'node:fs';
 import { access, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import process from 'node:process';
 import { promisify } from 'node:util';
 
@@ -17,6 +17,7 @@ import {
   buildControlHostSupervisionPlist,
   buildInitialControlHostSupervisionState,
   evaluateControlHostSupervisionHealthPayload,
+  evaluateControlHostSupervisionProbeTimeoutDiagnostic,
   readControlHostSupervisionHealthDiagnostic,
   parseControlHostSupervisionCsv,
   resolveControlHostSupervisionPaths,
@@ -28,7 +29,15 @@ import {
   type ControlHostSupervisionRestartRecord,
   type ControlHostSupervisionState
 } from './control/controlHostSupervision.js';
+import { PROVIDER_INTAKE_STATE_FILE } from './control/controlPersistenceFiles.js';
+import {
+  normalizeProviderIntakeState,
+  type ProviderIntakeClaimRecord,
+  type ProviderIntakeState
+} from './control/providerIntakeState.js';
 import { findPackageRoot } from './utils/packageInfo.js';
+import { sanitizeRunId } from '../persistence/sanitizeRunId.js';
+import { sanitizeTaskId } from '../persistence/sanitizeTaskId.js';
 
 type ArgMap = Record<string, string | boolean>;
 type OutputFormat = 'json' | 'text';
@@ -749,11 +758,24 @@ async function probeControlHostHealth(
     }
   );
   if (result.timedOut === true) {
+    const diagnostic = await readControlHostSupervisionProbeTimeoutDiagnostic(config, env);
+    const timeoutQuarantine = evaluateControlHostSupervisionProbeTimeoutDiagnostic(diagnostic, {
+      minPollingUpdatedAt: options.minPollingUpdatedAt ?? null,
+      restartHistory: options.restartHistory ?? null
+    });
+    if (timeoutQuarantine) {
+      return {
+        healthy: timeoutQuarantine.healthy,
+        reason: timeoutQuarantine.reason,
+        message: timeoutQuarantine.message,
+        diagnostic
+      };
+    }
     return {
       healthy: false,
       reason: 'probe_timeout',
       message: `co-status probe timed out after ${Math.round(probeTimeoutMs / 1_000)}s.`,
-      diagnostic: null
+      diagnostic
     };
   }
   if (result.exitCode !== 0) {
@@ -789,6 +811,83 @@ async function probeControlHostHealth(
     reason: evaluation.reason,
     message: evaluation.message,
     diagnostic
+  };
+}
+
+async function readControlHostSupervisionProbeTimeoutDiagnostic(
+  config: ControlHostSupervisionConfig,
+  env: NodeJS.ProcessEnv
+): Promise<ControlHostSupervisionHealthDiagnostic | null> {
+  try {
+    const statePath = resolveControlHostSupervisionProviderIntakeStatePath(config, env);
+    const persistedState = await readJsonFileIfExists<ProviderIntakeState>(statePath);
+    if (!persistedState) {
+      return null;
+    }
+    const state = normalizeProviderIntakeState(persistedState);
+    const runningClaims = state.claims.filter(isRunningProviderIntakeClaim);
+    return readControlHostSupervisionHealthDiagnostic({
+      counts: {
+        running: runningClaims.length,
+        retrying: null,
+        max_allowed: null
+      },
+      polling: state.polling ?? null,
+      running: runningClaims.map(buildControlHostSupervisionRunningClaimSnapshot)
+    });
+  } catch {
+    return null;
+  }
+}
+
+function resolveControlHostSupervisionProviderIntakeStatePath(
+  config: ControlHostSupervisionConfig,
+  env: NodeJS.ProcessEnv
+): string {
+  const effectiveRepoRoot = resolveControlHostSupervisionEffectiveRepoRoot(config, env);
+  const configuredRunsDir = env.CODEX_ORCHESTRATOR_RUNS_DIR?.trim();
+  const runsRoot =
+    configuredRunsDir && configuredRunsDir.length > 0
+      ? resolve(effectiveRepoRoot, configuredRunsDir)
+      : join(effectiveRepoRoot, '.runs');
+  return join(
+    runsRoot,
+    sanitizeTaskId(config.taskId),
+    'cli',
+    sanitizeRunId(config.runId),
+    PROVIDER_INTAKE_STATE_FILE
+  );
+}
+
+function resolveControlHostSupervisionEffectiveRepoRoot(
+  config: ControlHostSupervisionConfig,
+  env: NodeJS.ProcessEnv
+): string {
+  const envRepoRoot = env.CODEX_ORCHESTRATOR_ROOT?.trim();
+  return envRepoRoot && envRepoRoot.length > 0
+    ? resolve(config.repoRoot, envRepoRoot)
+    : config.repoRoot;
+}
+
+function isRunningProviderIntakeClaim(
+  claim: ProviderIntakeClaimRecord
+): boolean {
+  return claim.state === 'running';
+}
+
+function buildControlHostSupervisionRunningClaimSnapshot(
+  claim: ProviderIntakeClaimRecord
+): Record<string, unknown> {
+  return {
+    issue_id: claim.issue_id,
+    issue_identifier: claim.issue_identifier,
+    state: claim.state,
+    display_state: claim.issue_state,
+    pid: null,
+    worker_host: claim.worker_host ?? null,
+    session_id: claim.run_id,
+    started_at: claim.launch_started_at ?? claim.updated_at,
+    last_event_at: claim.updated_at
   };
 }
 
@@ -1121,7 +1220,10 @@ function appendControlHostSupervisionRestartRecord(
 }
 
 function isControlHostSupervisionQuarantineProbe(probe: { reason: string }): boolean {
-  return probe.reason === 'active_worker_restart_quarantine';
+  return (
+    probe.reason === 'active_worker_restart_quarantine' ||
+    probe.reason === 'active_worker_probe_timeout_quarantine'
+  );
 }
 
 function resolveControlHostSupervisionQuarantineUnhealthySamples(input: {
@@ -2481,6 +2583,7 @@ export const __test__ = {
   probeControlHostHealth,
   readFormatFlag,
   readStringFlag,
+  resolveControlHostSupervisionProviderIntakeStatePath,
   resolveControlHostSupervisionQuarantineUnhealthySamples,
   readIntegerFlag,
   removeInstalledControlHostSupervisionArtifacts,

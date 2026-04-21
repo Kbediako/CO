@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 818381476fde939f844aab6960e4f99ad2df6131506afbcb48ea9701f5eb4739 -->
+<!-- codex:instruction-stamp 8fdcf7de73c87b19a85389bfa6322cae7f6f6322db6b17c2a1e99db6b1b1c3aa -->
 # Agent Enablement
 
 Task-specific project blocks were removed from this file in `CO-88`. Keep repo-wide guidance here and use `.agent/task/**` for active task-scoped instructions.
@@ -43,9 +43,11 @@ Task-specific project blocks were removed from this file in `CO-88`. Keep repo-w
 
 ### Build & Test Quick Reference
 - `npm run lint` — Executes `npm run build:patterns` before linting orchestrator, adapter, and evaluation sources.
-- `npm run test` — Complete Vitest suite (manager, agents, persistence, adapters).
+- `npm run test:core` — Core Lane / narrow core Vitest matrix via `vitest.config.core.ts`; excludes `adapters/**` and `evaluation/tests/**`.
+- `npm run test` — Default repo validation alias to `test:core`; keeps the historical core-only surface explicit while `npm run test:all` remains the broader matrix entrypoint.
+- `npm run test:all` — Explicit broader Vitest matrix (`test:core` + `test:adapters`); evaluation remains separate via `npm run eval:test` / `npm run test:evaluation`.
 - `npx vitest run <pattern>` — Use this non-watch mode for focused suites; plain `npx vitest` launches an interactive watcher that never exits (we can’t press `q`), so always prefer the `run` form in automation.
-- `npm run eval:test` — Exercises evaluation harness scenarios; depends on local `python3` for cross-language fixtures.
+- `npm run eval:test` — Evaluation-only harness lane (alias to `npm run test:evaluation`); depends on local `python3` for cross-language fixtures and stays opt-in outside evaluation-scoped work.
 - `npm run docs:freshness` — Docs freshness audit; writes `out/<task-id>/docs-freshness.json`.
 - `npm run repo:stewardship` — Repo-wide tracked-file stewardship audit; writes `out/<task-id>/repo-stewardship.json` and classifies each tracked surface as `validate`, `update`, `delete`, or `retain_with_rationale`.
 - `npm run build:patterns` — Compile codemods/linters/templates; run whenever `patterns/**` changes.
