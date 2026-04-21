@@ -74,7 +74,7 @@
 - 2026-04-20: reviewed refresh applied to the exact classified stale registry rows, CO-175 rolling cohort rows, and stale active spec frontmatter rows. Focused after checks pass: `spec-guard --dry-run` OK, `docs:freshness` OK with `4277` docs / `4280` registry entries and zero stale rows, and `docs:freshness:maintain` returns `clean`.
 - 2026-04-20: docs-review child stream completed and its P2 evidence-table finding was addressed by moving `tasks/specs/README.md` out of the spec-frontmatter table into registry-only classification.
 - 2026-04-20: full validation floor passed through delegation guard, spec guard, build, lint, test, docs:check, docs:freshness, docs:freshness:maintain, repo:stewardship, diff-budget, standalone review bounded-success, and elegance review.
-- 2026-04-21: Rework reset found PR #566 already merged, created a clean r2 worktree from `origin/main`, and reproduced the remaining current-main failure as `37` stale Task Packet / Task Mirror rows with no rolling cohort rows. The patch refreshes only reviewed `0954` and `1311`-`1316` packet/mirror metadata plus CO-267 evidence docs.
+- 2026-04-21: Rework reset found PR #566 already merged, created a clean r2 worktree from `origin/main`, and reproduced the remaining current-main failure as `37` stale Task Packet / Task Mirror rows with no rolling cohort rows. The patch refreshes only reviewed `0954` and `1311`-`1316` packet/mirror metadata, plus CO-267 evidence docs.
 - 2026-04-21: Rework validation floor passed through delegation guard, spec guard, build, lint, full test suite (`346` files / `4424` tests), docs:check, docs:freshness, docs:freshness:maintain, repo:stewardship, diff-budget, standalone review bounded-success, and elegance review.
 
 ## Notes

@@ -183,7 +183,9 @@ CO-267 reproduced the Apr 20 baseline failure in `out/linear-8f605d1a-e4ec-4acf-
 The Apr 20 blocking set and the CO-175 rolling cohort were reviewed in `docs/findings/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4-docs-freshness-classification.md` and refreshed instead of weakening freshness gates. CO-267 keeps the rolling policy unchanged, preserves CO-266 terminal-blocker advisory scope, and updates only the reviewed stale registry rows, active spec frontmatter rows, and the CO-175 `1164-1195` rolling cohort rows to `last_review=2026-04-20`.
 
 ## Apr 21 Rework Refresh
-CO-267 rework reproduced the Apr 21 current-main baseline failure in `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/docs-freshness.json` after PR #566 had already merged:
+
+### Reproduction / Baseline Findings
+After PR #566 had already merged, CO-267 rework reproduced the Apr 21 current-main baseline failure in `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/docs-freshness.json`:
 
 - `37` blocking stale entries
 - `0` rolling cohort entries
@@ -195,4 +197,5 @@ CO-267 rework reproduced the Apr 21 current-main baseline failure in `out/linear
 - blocking review cohorts: `2026-01-20` / `90` days (`6` rows) and `2026-03-21` / `30` days (`31` rows)
 - `docs:freshness:maintain` reported `block_policy_over_budget`, owner issue `CO-175`, `37` candidate rows, `12` candidate cohorts, and `blocking_changed_paths=0`
 
+### Post-refresh Disposition
 The Apr 21 blocking set was reviewed in `docs/findings/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4-docs-freshness-classification.md` and refreshed without changing freshness policy, rolling caps, or CO-266 scope. The live set is historical Task Packet and Task Mirror evidence for `0954` and the `1311`-`1316` Symphony publication lineage, so CO-267 updates the reviewed stale registry rows to `last_review=2026-04-21`; `tasks/specs/0954-rlm-orchestrator-validation.md` frontmatter is refreshed for consistency, while `1311`-`1316` spec frontmatter was already current on main.

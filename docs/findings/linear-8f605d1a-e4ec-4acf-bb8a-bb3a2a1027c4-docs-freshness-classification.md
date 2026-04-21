@@ -22,7 +22,7 @@ Task: `linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4`
 - Current `docs:freshness`: 37 blocking stale docs, 0 rolling cohort rows, 0 missing registry rows, 0 missing-on-disk rows, 0 invalid registry rows, 0 uncatalogued docs. Evidence: `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/rework-reset/docs-freshness.log` and `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/docs-freshness.json`.
 - Current `docs:freshness:maintain`: `block_policy_over_budget`, owner issue `CO-175`, policy capacity `over_budget`, blocking changed paths 0. Evidence: `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/rework-reset/docs-freshness-maintain.log` and `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/docs-freshness-maintenance.json`.
 - Disposition: reviewed refresh to `2026-04-21` for the exact current-main stale rows below. The rows are historical task packets and task mirrors that remain useful audit evidence; no row is deleted, archived, rolled forward by policy cap/window expansion, or hidden from reporting.
-- Frontmatter note: `tasks/specs/0954-rlm-orchestrator-validation.md` had fresh-enough frontmatter but stale registry metadata; it was reviewed and refreshed directly for consistency. The `1311`-`1316` spec frontmatter rows were already current on main and only their registry rows were stale.
+- Frontmatter note: `tasks/specs/0954-rlm-orchestrator-validation.md` had fresh-enough frontmatter but stale registry metadata; it was reviewed and refreshed directly for consistency. The `1311`-`1316` spec frontmatter rows were already current on main, and only their registry rows were stale.
 
 ## Rework Stale Docs Exact Paths - 2026-04-21
 
