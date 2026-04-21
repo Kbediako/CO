@@ -112,9 +112,10 @@ function buildProbeTimeoutDiagnosticFixture() {
 
 async function writeProviderIntakeStateFixture(
   config: ReturnType<typeof buildControlHostSupervisionConfig>,
-  options: { claimState?: string; polling?: Record<string, unknown> }
+  options: { claimState?: string; polling?: Record<string, unknown> },
+  env: NodeJS.ProcessEnv = {}
 ): Promise<void> {
-  const statePath = resolveControlHostSupervisionProviderIntakeStatePath(config, {});
+  const statePath = resolveControlHostSupervisionProviderIntakeStatePath(config, env);
   await mkdir(dirname(statePath), { recursive: true });
   const claimState = options.claimState ?? 'running';
   await writeFile(
@@ -1776,6 +1777,47 @@ describe('controlHostSupervision shell helpers', () => {
       });
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('resolves timeout diagnostics from CODEX_ORCHESTRATOR_ROOT when co-status uses an env root', async () => {
+    const configRoot = await mkdtemp(join(tmpdir(), 'co-supervision-config-root-'));
+    const envRoot = await mkdtemp(join(tmpdir(), 'co-supervision-env-root-'));
+    try {
+      const config = buildControlHostSupervisionConfig({
+        homeDir: '/Users/tester',
+        cwd: configRoot,
+        repoRoot: configRoot,
+        nodePath: '/custom/node',
+        cliEntrypoint: '/opt/codex-orchestrator.js',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        healthIntervalSeconds: 5
+      });
+      const env = { CODEX_ORCHESTRATOR_ROOT: envRoot };
+      const statePath = resolveControlHostSupervisionProviderIntakeStatePath(config, env);
+      expect(statePath.startsWith(join(envRoot, '.runs'))).toBe(true);
+      await writeProviderIntakeStateFixture(config, {}, env);
+
+      const result = await probeControlHostHealth(
+        config,
+        env,
+        {},
+        async () => ({
+          exitCode: 1,
+          stdout: '',
+          stderr: 'command timed out after 5000ms',
+          timedOut: true
+        })
+      );
+
+      expect(result.reason).toBe('probe_timeout');
+      expect(result.diagnostic?.running_workers.map((worker) => worker.issue_identifier)).toEqual([
+        'CO-225'
+      ]);
+    } finally {
+      await rm(configRoot, { recursive: true, force: true });
+      await rm(envRoot, { recursive: true, force: true });
     }
   });
 

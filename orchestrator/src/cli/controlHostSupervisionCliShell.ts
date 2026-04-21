@@ -843,11 +843,12 @@ function resolveControlHostSupervisionProviderIntakeStatePath(
   config: ControlHostSupervisionConfig,
   env: NodeJS.ProcessEnv
 ): string {
+  const effectiveRepoRoot = resolveControlHostSupervisionEffectiveRepoRoot(config, env);
   const configuredRunsDir = env.CODEX_ORCHESTRATOR_RUNS_DIR?.trim();
   const runsRoot =
     configuredRunsDir && configuredRunsDir.length > 0
-      ? resolve(config.repoRoot, configuredRunsDir)
-      : join(config.repoRoot, '.runs');
+      ? resolve(effectiveRepoRoot, configuredRunsDir)
+      : join(effectiveRepoRoot, '.runs');
   return join(
     runsRoot,
     sanitizeTaskId(config.taskId),
@@ -855,6 +856,16 @@ function resolveControlHostSupervisionProviderIntakeStatePath(
     sanitizeRunId(config.runId),
     PROVIDER_INTAKE_STATE_FILE
   );
+}
+
+function resolveControlHostSupervisionEffectiveRepoRoot(
+  config: ControlHostSupervisionConfig,
+  env: NodeJS.ProcessEnv
+): string {
+  const envRepoRoot = env.CODEX_ORCHESTRATOR_ROOT?.trim();
+  return envRepoRoot && envRepoRoot.length > 0
+    ? resolve(config.repoRoot, envRepoRoot)
+    : config.repoRoot;
 }
 
 function isRunningProviderIntakeClaim(
