@@ -45,7 +45,7 @@
           "reviewer": "parent provider worker",
           "date": "2026-04-22",
           "status": "succeeded",
-          "summary": "After merging latest origin/main and addressing CodeRabbit/Codex feedback, focused facade tests passed (226 tests), delegation guard passed with scoped provenance fallback, spec guard, build, lint, full test (347 files / 4469 tests), docs:check, docs:freshness (4361 docs / 4364 registry entries), repo:stewardship (5469 tracked files / 0 action-required), diff-budget, and pack:smoke passed. Lint only reported existing DelegationMcpHealth.test.ts warnings."
+          "summary": "After merging latest origin/main and addressing CodeRabbit/Codex feedback, focused facade tests passed (226 tests), delegation guard passed with scoped provenance fallback, spec guard, build, lint, full test (348 files / 4479 tests), docs:check, docs:freshness (4367 docs / 4370 registry entries), repo:stewardship (5477 tracked files / 0 action-required), diff-budget, and pack:smoke passed. Lint only reported existing DelegationMcpHealth.test.ts warnings."
         },
         "standalone_review": {
           "reviewer": "codex-orchestrator review",
