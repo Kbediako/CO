@@ -531,6 +531,90 @@ describe('createControlServerSeededRuntimeAssembly', () => {
     }
   });
 
+  it('keeps accepted advisory fallback live when only provider intake rehydrated_at advances', async () => {
+    const { root, env, paths } = await createRunRoot('task-294');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const seededAdvisory = advisoryState(
+      '2026-04-21T15:00:00.000Z',
+      co272TrackedIssue()
+    );
+    const seededProviderIntake: ProviderIntakeState = {
+      schema_version: 1,
+      updated_at: '2026-04-21T14:59:00.000Z',
+      rehydrated_at: null,
+      latest_provider_key: 'linear:lin-issue-272',
+      latest_reason: 'provider_issue_start_launched',
+      claims: [co272ProviderIntakeClaim()]
+    };
+
+    try {
+      const assembly = createControlServerSeededRuntimeAssembly({
+        runId: 'run-1',
+        token: 'control-token',
+        config,
+        paths,
+        sessionTtlMs: 60_000,
+        controlSeed: null,
+        confirmationsSeed: null,
+        questionsSeed: null,
+        delegationSeed: null,
+        linearAdvisorySeed: seededAdvisory,
+        providerIntakeSeed: seededProviderIntake
+      });
+
+      await seedManifest(paths, {
+        task_id: 'linear-co-272-current-advisory',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-272',
+        issue_identifier: 'CO-272',
+        summary: 'selected issue has no authoritative tracked payload',
+        updated_at: '2026-04-21T16:00:00.000Z'
+      });
+      await assembly.requestContextShared.persist.linearAdvisory();
+
+      const baselineSnapshot =
+        await assembly.requestContextShared.runtime.snapshot().readSelectedRunSnapshot();
+      expect(assembly.requestContextShared.linearAdvisoryState.stale_source ?? null).toBeNull();
+      expect(baselineSnapshot.selected?.tracked?.linear?.identifier).toBe('CO-272');
+      expect(baselineSnapshot.tracked?.linear?.identifier).toBe('CO-272');
+
+      const providerIntakeState = assembly.requestContextShared.providerIntakeState!;
+      providerIntakeState.rehydrated_at = '2026-04-21T16:30:00.000Z';
+
+      const beforePersistSnapshot =
+        await assembly.requestContextShared.runtime.snapshot().readSelectedRunSnapshot();
+      expect(assembly.requestContextShared.linearAdvisoryState.stale_source ?? null).toBeNull();
+      expect(beforePersistSnapshot.selected?.tracked?.linear?.identifier).toBe('CO-272');
+      expect(beforePersistSnapshot.tracked?.linear?.identifier).toBe('CO-272');
+
+      await assembly.requestContextShared.persist.providerIntake?.();
+
+      const afterPersistSnapshot =
+        await assembly.requestContextShared.runtime.snapshot().readSelectedRunSnapshot();
+      expect(assembly.requestContextShared.linearAdvisoryState.stale_source ?? null).toBeNull();
+      expect(afterPersistSnapshot.selected?.tracked?.linear?.identifier).toBe('CO-272');
+      expect(afterPersistSnapshot.tracked?.linear?.identifier).toBe('CO-272');
+
+      const advisorySnapshot = JSON.parse(
+        await readFile(join(paths.runDir, LINEAR_ADVISORY_STATE_FILE), 'utf8')
+      ) as LinearAdvisoryState;
+      expect(advisorySnapshot.updated_at).toBe('2026-04-21T15:00:00.000Z');
+      expect(advisorySnapshot.stale_source ?? null).toBeNull();
+
+      const providerIntakeSnapshot = JSON.parse(
+        await readFile(join(paths.runDir, PROVIDER_INTAKE_STATE_FILE), 'utf8')
+      ) as ProviderIntakeState;
+      expect(providerIntakeSnapshot.updated_at).toBe('2026-04-21T14:59:00.000Z');
+      expect(providerIntakeSnapshot.rehydrated_at).toBe('2026-04-21T16:30:00.000Z');
+      expect(providerIntakeSnapshot.claims[0]).toMatchObject({
+        updated_at: '2026-04-21T14:59:00.000Z',
+        issue_updated_at: '2026-04-21T14:59:00.000Z'
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('invalidates cached runtime snapshots when provider intake marks the advisory stale', async () => {
     const { root, env, paths } = await createRunRoot('task-294');
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
