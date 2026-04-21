@@ -11927,6 +11927,9 @@ describe('createProviderIssueHandoffService', () => {
         issue_provider: 'linear',
         issue_id: 'lin-issue-1',
         issue_identifier: 'CO-2',
+        provider_launch_source: 'control-host',
+        provider_control_host_task_id: 'local-mcp',
+        provider_control_host_run_id: 'control-host',
         updated_at: '2026-03-19T04:32:00.000Z'
       }),
       'utf8'
@@ -11976,6 +11979,9 @@ describe('createProviderIssueHandoffService', () => {
         issue_provider: 'linear',
         issue_id: 'lin-issue-1',
         issue_identifier: 'CO-2',
+        provider_launch_source: 'control-host',
+        provider_control_host_task_id: 'local-mcp',
+        provider_control_host_run_id: 'control-host',
         updated_at: '2026-03-19T04:32:00.000Z'
       }),
       'utf8'
@@ -12471,6 +12477,9 @@ describe('createProviderIssueHandoffService', () => {
         issue_provider: 'linear',
         issue_id: 'lin-issue-1',
         issue_identifier: 'CO-2',
+        provider_launch_source: 'control-host',
+        provider_control_host_task_id: 'local-mcp',
+        provider_control_host_run_id: 'control-host',
         updated_at: '2026-03-19T04:32:00.000Z'
       }),
       'utf8'
@@ -15885,6 +15894,9 @@ describe('createProviderIssueHandoffService', () => {
         issue_id: 'lin-issue-1',
         issue_identifier: 'CO-2',
         issue_updated_at: '2026-03-19T04:30:30.000Z',
+        provider_launch_source: 'control-host',
+        provider_control_host_task_id: 'local-mcp',
+        provider_control_host_run_id: 'control-host',
         updated_at: '2026-03-19T04:31:00.000Z'
       }),
       'utf8'
@@ -29037,7 +29049,10 @@ describe('createProviderIssueHandoffService', () => {
         run_id: 'run-failed-direct-intake',
         task_id: 'task-1303-failed-direct-intake',
         status: 'failed',
-        summary: "Stage 'fail once' failed with exit code 1.",
+        guardrails_required: false,
+        summary:
+          "Stage 'fail once' failed with exit code 1.\n" +
+          'Guardrails: spec-guard command not found.',
         issue_provider: 'linear',
         issue_id: 'lin-issue-1',
         issue_identifier: 'CO-2',
@@ -29088,6 +29103,7 @@ describe('createProviderIssueHandoffService', () => {
       retry_due_at: expect.any(String),
       retry_error: "Stage 'fail once' failed with exit code 1."
     });
+    expect(state.claims[0]?.retry_error).not.toContain('Guardrails: spec-guard command not found.');
     expect(Number.isFinite(Date.parse(state.claims[0]?.retry_due_at ?? ''))).toBe(true);
     expect(persist).toHaveBeenCalledTimes(1);
   });

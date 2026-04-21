@@ -146,6 +146,7 @@ export interface ControlHostSupervisionHealthEvaluation {
     | 'restart_required'
     | 'stale_restart_required'
     | 'active_worker_restart_quarantine'
+    | 'active_worker_probe_timeout_quarantine'
     | 'invalid_payload';
   message: string;
 }
@@ -564,6 +565,95 @@ function resolveRepeatedActiveWorkerRestartQuarantine(input: {
     };
   }
   return null;
+}
+
+export function evaluateControlHostSupervisionProbeTimeoutDiagnostic(
+  diagnostic: ControlHostSupervisionHealthDiagnostic | null,
+  options: {
+    minPollingUpdatedAt?: string | null;
+    restartHistory?: ControlHostSupervisionRestartRecord[] | null;
+    activeWorkerRestartQuarantineMs?: number | null;
+    now?: string | null;
+  } = {}
+): ControlHostSupervisionHealthEvaluation | null {
+  if (!diagnostic || diagnostic.running_workers.length === 0) {
+    return null;
+  }
+  if (!isProviderRefreshLifecycleRestartRequiredDiagnostic(diagnostic.polling)) {
+    return null;
+  }
+  if (!isCurrentControlHostSupervisionPollingDiagnostic(diagnostic.polling, options.minPollingUpdatedAt)) {
+    return null;
+  }
+  const pollingReason = diagnostic.polling?.reason ?? diagnostic.polling?.last_error ?? null;
+  if (!pollingReason) {
+    return null;
+  }
+  if (hasAvailableProviderWorkerCapacity(diagnostic)) {
+    return null;
+  }
+  const restartHistory = normalizeControlHostSupervisionRestartHistory(options.restartHistory);
+  if (restartHistory.length === 0) {
+    return null;
+  }
+  const currentSignature = buildControlHostSupervisionRestartSignature(diagnostic);
+  if (currentSignature === null) {
+    return null;
+  }
+  const nowMs = parseIsoTimestampToMs(options.now ?? new Date().toISOString());
+  const quarantineMs =
+    typeof options.activeWorkerRestartQuarantineMs === 'number' &&
+    Number.isFinite(options.activeWorkerRestartQuarantineMs)
+      ? Math.max(0, options.activeWorkerRestartQuarantineMs)
+      : DEFAULT_CONTROL_HOST_SUPERVISION_ACTIVE_WORKER_RESTART_QUARANTINE_MS;
+  for (let index = restartHistory.length - 1; index >= 0; index -= 1) {
+    const record = restartHistory[index];
+    const requestedAtMs = parseIsoTimestampToMs(record.requested_at);
+    if (
+      nowMs !== null &&
+      requestedAtMs !== null &&
+      nowMs - requestedAtMs > quarantineMs
+    ) {
+      break;
+    }
+    if (record.reason !== 'probe_timeout') {
+      return null;
+    }
+    const recordSignature = buildControlHostSupervisionRestartSignature(record.diagnostic);
+    if (recordSignature === null || recordSignature !== currentSignature) {
+      return null;
+    }
+    return {
+      healthy: true,
+      reason: 'active_worker_probe_timeout_quarantine',
+      message: `co-status probe timed out for the same active provider worker series already restarted at ${record.requested_at}; ${diagnostic.running_workers.length} active provider worker(s) remain visible in local provider-intake state, so supervision is quarantining repeated probe timeout restart churn while retaining the prior fail-closed timeout record.`
+    };
+  }
+  return null;
+}
+
+function isProviderRefreshLifecycleRestartRequiredDiagnostic(
+  polling: ControlHostSupervisionPollingDiagnostic | null
+): boolean {
+  if (!polling || polling.restart_required !== true) {
+    return false;
+  }
+  return (
+    polling.reason === 'provider_refresh_lifecycle_stuck' ||
+    polling.last_error === 'provider_refresh_lifecycle_stuck'
+  );
+}
+
+function isCurrentControlHostSupervisionPollingDiagnostic(
+  polling: ControlHostSupervisionPollingDiagnostic | null,
+  minPollingUpdatedAt: string | null | undefined
+): boolean {
+  const minimumUpdatedAt = parseIsoTimestampToMs(minPollingUpdatedAt);
+  if (minimumUpdatedAt === null) {
+    return true;
+  }
+  const pollingUpdatedAt = parseIsoTimestampToMs(polling?.updated_at);
+  return pollingUpdatedAt !== null && pollingUpdatedAt >= minimumUpdatedAt;
 }
 
 function hasAvailableProviderWorkerCapacity(

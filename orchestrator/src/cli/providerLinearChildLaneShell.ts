@@ -59,6 +59,12 @@ import {
 } from './utils/packageProgramResolver.js';
 import { slugify } from './utils/strings.js';
 import { parseTrailingJsonObject } from './utils/trailingJsonObject.js';
+import {
+  countGuardrailCommands,
+  resolveGuardrailsRequiredForManifest,
+  resolveGuardrailsRequiredSourceForManifest,
+  stripNonApplicableGuardrailSummaryLines
+} from './run/manifest.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -103,6 +109,9 @@ export interface ProviderLinearChildLaneRunResult {
   manifest_path: string;
   log_path: string | null;
   summary: string | null;
+  guardrails_required: boolean | null;
+  guardrails_required_source: string | null;
+  guardrail_command_count: number | null;
   runtime_mode_requested: string | null;
   runtime_mode: string | null;
   runtime_provider: string | null;
@@ -277,6 +286,7 @@ export async function runProviderLinearChildLaneShell(
     !context.providerControlHostRunId ||
     !context.providerControlHostMatchesManifest
   ) {
+    const message = formatProviderWorkerChildLaneProvenanceInvalidMessage(context, env);
     return failureResult({
       action: normalizeAction(params.action) ?? 'launch',
       issueId: context.issueId,
@@ -286,7 +296,7 @@ export async function runProviderLinearChildLaneShell(
       childRun: null,
       childLane: null,
       code: 'provider_worker_child_lane_provenance_invalid',
-      message: 'linear child-lane requires provider control-host provenance recorded on the parent provider-worker manifest and matching active environment.',
+      message,
       status: 412
     });
   }
@@ -580,7 +590,7 @@ async function launchChildLane(
       status: 502
     });
   }
-  const childRun = parseProviderChildLaneRunResult(
+  const childRun = await parseProviderChildLaneRunResult(
     execResult.stdout,
     context.repoRoot,
     childStartEnv.CODEX_ORCHESTRATOR_RUNS_DIR ?? join(context.repoRoot, '.runs'),
@@ -668,6 +678,9 @@ async function launchChildLane(
     artifact_root: childRun.artifact_root,
     log_path: childRun.log_path,
     summary: childRun.summary ?? normalizeOptionalString(childProof?.last_message),
+    guardrails_required: childRun.guardrails_required,
+    guardrails_required_source: childRun.guardrails_required_source,
+    guardrail_command_count: childRun.guardrail_command_count,
     issue_id: context.issueId,
     issue_identifier: context.issueIdentifier,
     workspace_path: context.repoRoot,
@@ -1705,7 +1718,13 @@ function parseProviderLinearChildLaneRunManifest(input: {
     artifact_root: input.artifactRoot,
     manifest_path: input.manifestPath,
     log_path: logPath,
-    summary: normalizeOptionalString(input.manifest.summary),
+    summary: stripNonApplicableGuardrailSummaryLines(
+      input.manifest,
+      normalizeOptionalString(input.manifest.summary)
+    ),
+    guardrails_required: resolveGuardrailsRequiredForManifest(input.manifest),
+    guardrails_required_source: resolveGuardrailsRequiredSourceForManifest(input.manifest),
+    guardrail_command_count: countGuardrailCommands(input.manifest),
     runtime_mode_requested: normalizeOptionalString(input.manifest.runtime_mode_requested),
     runtime_mode: normalizeOptionalString(input.manifest.runtime_mode),
     runtime_provider: normalizeOptionalString(input.manifest.runtime_provider)
@@ -1729,6 +1748,9 @@ function buildRepairedChildLaneRecord(input: {
     artifact_root: input.childRun.artifact_root,
     log_path: input.childRun.log_path,
     summary: input.childRun.summary,
+    guardrails_required: input.childRun.guardrails_required,
+    guardrails_required_source: input.childRun.guardrails_required_source,
+    guardrail_command_count: input.childRun.guardrail_command_count,
     issue_id: input.reservation.issue_id,
     issue_identifier: input.reservation.issue_identifier,
     workspace_path: input.reservation.workspace_path,
@@ -2615,12 +2637,12 @@ function resolveCodexOrchestratorInvocation(env: NodeJS.ProcessEnv): {
   return { command: invocation.command, argsPrefix: invocation.args, envOverrides: invocation.envOverrides };
 }
 
-function parseProviderChildLaneRunResult(
+async function parseProviderChildLaneRunResult(
   raw: string,
   repoRoot: string,
   childRunsRoot: string,
   taskId: string
-): ProviderLinearChildLaneRunResult | null {
+): Promise<ProviderLinearChildLaneRunResult | null> {
   const parsed = parseTrailingJsonObject(raw);
   if (!parsed) {
     return null;
@@ -2654,6 +2676,19 @@ function parseProviderChildLaneRunResult(
   ) {
     return null;
   }
+  let manifestRecord: Record<string, unknown> | null = null;
+  try {
+    const candidate = JSON.parse(await readFile(resolvedManifestPath, 'utf8')) as unknown;
+    if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
+      manifestRecord = candidate as Record<string, unknown>;
+    }
+  } catch {
+    manifestRecord = null;
+  }
+  const rawSummary = normalizeOptionalString(parsed.summary);
+  const summary = manifestRecord
+    ? stripNonApplicableGuardrailSummaryLines(manifestRecord, rawSummary)
+    : rawSummary;
   return {
     run_id: safeRunId,
     task_id: taskId,
@@ -2662,7 +2697,10 @@ function parseProviderChildLaneRunResult(
     artifact_root: resolvedArtifactRoot,
     manifest_path: resolvedManifestPath,
     log_path: normalizedLogPath,
-    summary: normalizeOptionalString(parsed.summary),
+    summary,
+    guardrails_required: manifestRecord ? resolveGuardrailsRequiredForManifest(manifestRecord) : null,
+    guardrails_required_source: manifestRecord ? resolveGuardrailsRequiredSourceForManifest(manifestRecord) : null,
+    guardrail_command_count: manifestRecord ? countGuardrailCommands(manifestRecord) : null,
     runtime_mode_requested: normalizeOptionalString(parsed.runtime_mode_requested),
     runtime_mode: normalizeOptionalString(parsed.runtime_mode),
     runtime_provider: normalizeOptionalString(parsed.runtime_provider)
@@ -2726,6 +2764,38 @@ function failureResult(input: {
       status: input.status
     }
   };
+}
+
+function formatProviderWorkerChildLaneProvenanceInvalidMessage(
+  context: Pick<
+    Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>,
+    | 'manifest'
+    | 'manifestPath'
+    | 'providerControlHostRecordedInManifest'
+    | 'providerControlHostMatchesManifest'
+  >,
+  env: NodeJS.ProcessEnv
+): string {
+  const manifestLaunchSource =
+    normalizeOptionalString(context.manifest.provider_launch_source) ??
+    normalizeOptionalString(context.manifest.providerLaunchSource);
+  const manifestTaskId =
+    normalizeOptionalString(context.manifest.provider_control_host_task_id) ??
+    normalizeOptionalString(context.manifest.providerControlHostTaskId);
+  const manifestRunId =
+    normalizeOptionalString(context.manifest.provider_control_host_run_id) ??
+    normalizeOptionalString(context.manifest.providerControlHostRunId);
+  const envLaunchSource = normalizeOptionalString(env[PROVIDER_LAUNCH_SOURCE_ENV]);
+  const envTaskId = normalizeOptionalString(env[PROVIDER_CONTROL_HOST_TASK_ID_ENV]);
+  const envRunId = normalizeOptionalString(env[PROVIDER_CONTROL_HOST_RUN_ID_ENV]);
+  return [
+    'linear child-lane requires provider control-host provenance recorded on the parent provider-worker manifest and matching active environment.',
+    'Required manifest fields: provider_launch_source=control-host, provider_control_host_task_id, provider_control_host_run_id.',
+    `Parent manifest: ${context.manifestPath}.`,
+    `Manifest values: provider_launch_source=${manifestLaunchSource ?? 'missing'}, provider_control_host_task_id=${manifestTaskId ?? 'missing'}, provider_control_host_run_id=${manifestRunId ?? 'missing'}.`,
+    `Active env values: ${PROVIDER_LAUNCH_SOURCE_ENV}=${envLaunchSource ?? 'missing'}, ${PROVIDER_CONTROL_HOST_TASK_ID_ENV}=${envTaskId ?? 'missing'}, ${PROVIDER_CONTROL_HOST_RUN_ID_ENV}=${envRunId ?? 'missing'}.`,
+    `recorded=${String(context.providerControlHostRecordedInManifest)} matches=${String(context.providerControlHostMatchesManifest)}.`
+  ].join(' ');
 }
 
 function normalizeOptionalString(value: unknown): string | null {

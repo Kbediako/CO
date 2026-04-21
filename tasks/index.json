@@ -26,6 +26,56 @@
       }
     },
     {
+      "id": "20260421-linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9",
+      "title": "Preserve provider-worker provenance across rehydrated active-run resume",
+      "relates_to": "tasks/tasks-linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-21",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-21",
+          "status": "completed",
+          "manifest": ".runs/linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9-co289-docs-packet/cli/2026-04-21T06-56-20-392Z-b41cf2db/manifest.json",
+          "source_anchor": "ctx:sha256:6c59a269dfa69e9b7db180869f29ed426f66424f7f5cab6c4650cd494af19246#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-289 as the rehydrated active-run provenance follow-up to completed CO-244: provider_issue_rehydrated_active_run claims must not lose valid control-host provenance as launch_source: null when the attached active run manifest proves provider_launch_source, provider_control_host_task_id, and provider_control_host_run_id. CO-216 operator-autopilot behavior is explicitly out of scope."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
+        "task": "tasks/tasks-linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
+        "agent_task": ".agent/task/linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md"
+        }
+      }
+    },
+    {
+      "id": "20260421-linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13",
+      "title": "CO: clarify README when main documents behavior newer than the latest tagged package",
+      "relates_to": "tasks/tasks-linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-21",
+      "paths": {
+        "spec": "tasks/specs/linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13.md",
+        "task": "tasks/tasks-linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13.md",
+        "agent_task": ".agent/task/linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13.md"
+        }
+      }
+    },
+    {
       "id": "20260420-linear-025f5748-bed9-4512-9fd6-53ad57dd1466",
       "title": "CO-266 blocked terminal blocker cleanup advisory",
       "relates_to": "tasks/tasks-linear-025f5748-bed9-4512-9fd6-53ad57dd1466.md",
@@ -996,7 +1046,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-18",
+      "last_review": "2026-04-21",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
@@ -1368,7 +1418,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-18",
+      "last_review": "2026-04-21",
       "approvals": {
         "docs_packet_child_lane": {
           "reviewer": "bounded same-issue docs child lane",
@@ -1385,6 +1435,14 @@
           "manifest": ".runs/linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c-docs-apr18-refresh/cli/2026-04-18T18-35-19-649Z-1ede381a/manifest.json",
           "source_anchor": "ctx:sha256:6a9427aa000f73b2f7d86bab415ae29c6ebbeb9172e159c03bc6d29ae012ff52#chunk:c000001",
           "summary": "Apr 18 docs refresh records recurrence evidence after merged PR #506 (`e98d459f4dfdb47a22d981fedbf5ba11053d3a95`) while preserving the original CO-211 lifecycle contract: `provider_refresh_lifecycle_stuck`, `restart_required`, `owner rotations`, `refresh phases`, `surviving provider workers`, `stalled_after_ms=45000`, and CO-210 out-of-scope semantics remain protected. The supplied source-0 payload is metadata/provenance only; parent owns the source fix for quarantined samples preserving fail-closed unhealthy streaks and diagnostic retention."
+        },
+        "docs_apr21_rework_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-21",
+          "status": "produced_zero_byte_advisory",
+          "manifest": ".runs/linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c-docs-apr21-rework/cli/2026-04-21T10-55-06-746Z-91d3806a/manifest.json",
+          "source_anchor": "ctx:sha256:159ce815aa248f1705d76a533af179440608299883a742a504b31e83b029a294#chunk:c000001",
+          "summary": "Apr 21 Rework refresh records live recurrence after merged PRs #506 and #544: supervision reached `restart_required` with `last_health_status=probe_timeout`, `restart_count=1374`, stale owner reclamation, and active CO-225, CO-276, and CO-289 workers still heartbeating. Parent owns the source fix for timeout restart records retaining local provider-intake diagnostics and quarantining repeated same-active-worker-series timeout churn without hiding first-sample fail-closed truth."
         }
       },
       "paths": {
@@ -12951,6 +13009,36 @@
         "task": "tasks/tasks-linear-b1835ea5-3d28-493a-934e-1b38048270ce.md",
         "agent_task": ".agent/task/linear-b1835ea5-3d28-493a-934e-1b38048270ce.md",
         "docs": "docs/TECH_SPEC-linear-b1835ea5-3d28-493a-934e-1b38048270ce.md"
+      }
+    },
+    {
+      "id": "20260421-linear-904f74a5-e1b6-4740-a0df-8c92ec73314b",
+      "title": "CO: Align marketplace docs and smoke coverage to Codex 0.122 plugin marketplace commands",
+      "relates_to": "tasks/tasks-linear-904f74a5-e1b6-4740-a0df-8c92ec73314b.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-21",
+      "approvals": {
+        "rework_reset": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-21",
+          "status": "completed",
+          "summary": "Closed stale PR #568, deleted the old workpad, and recreated the issue branch from origin/main before new implementation."
+        },
+        "preimplementation_issue_quality": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-21",
+          "status": "approved",
+          "summary": "Narrow command-surface rebaseline; preserves npm baseline and CO-196 packaging architecture while rejecting posture promotion and authority changes."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-904f74a5-e1b6-4740-a0df-8c92ec73314b.md",
+        "task": "tasks/tasks-linear-904f74a5-e1b6-4740-a0df-8c92ec73314b.md",
+        "agent_task": ".agent/task/linear-904f74a5-e1b6-4740-a0df-8c92ec73314b.md",
+        "docs": "docs/TECH_SPEC-linear-904f74a5-e1b6-4740-a0df-8c92ec73314b.md"
       }
     }
   ]

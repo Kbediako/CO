@@ -20,7 +20,7 @@ last_review: 2026-04-21
 - Linear issue: `CO-276` / `1c101ebc-4b86-4c1f-b04d-0455e50fbacb`
 - Linear URL: https://linear.app/asabeko/issue/CO-276/co-replace-remaining-dead-code-pruning-archive-readme-pointers-with
 - Source issue: `CO-272` / `9dacc402-e9b6-40c4-b657-d4b91b68c941`
-- Source anchor: `ctx:sha256:4530a34d5bcac82b728b1d666d80f35624d95a695580a9c4b1d49238f69e7603#chunk:c000001`
+- Source anchor: `ctx:sha256:037f0a76dfa8211a54a56b272676253d1646041df2073a17c9a971e9ea74ea69#chunk:c000001`
 
 ## Summary
 - Objective: replace the remaining dead-code-pruning `.runs` archive README pointers in the seven protected surfaces with durable tracked guidance or explicit regeneration steps.

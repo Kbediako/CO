@@ -6,7 +6,7 @@
 - Task id: `linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb`
 - Canonical spec: `tasks/specs/linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md`
 - Source issue: `CO-272` / `9dacc402-e9b6-40c4-b657-d4b91b68c941`
-- Source anchor: `ctx:sha256:4530a34d5bcac82b728b1d666d80f35624d95a695580a9c4b1d49238f69e7603#chunk:c000001`
+- Source anchor: `ctx:sha256:037f0a76dfa8211a54a56b272676253d1646041df2073a17c9a971e9ea74ea69#chunk:c000001`
 
 ## Summary
 - Problem Statement: seven tracked README files still present ignored `.runs/0801-dead-code-pruning/archive/2025-12-08T10-01-24Z/...` payload paths as if they are durable checkout guidance, so fresh clones point readers at absent archives.
