@@ -21,6 +21,36 @@
       }
     },
     {
+      "id": "20260421-linear-45363c7e-c083-4eaa-911f-8fc7873141d8",
+      "title": "CO-271 MCP client command/args normalization",
+      "relates_to": "tasks/tasks-linear-45363c7e-c083-4eaa-911f-8fc7873141d8.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-21",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-21",
+          "status": "produced",
+          "manifest": ".runs/linear-45363c7e-c083-4eaa-911f-8fc7873141d8-docs-packet/cli/2026-04-21T17-58-18-708Z-854771ba/manifest.json",
+          "source_anchor": "ctx:sha256:68ccac7f9d7c412b12a2c9b2515960ed6753a82e0142f6ade2d904c04758f0bd#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-271 as a narrow shipped MCP client config normalization: root `mcp-client.json` and `templates/codex/mcp-client.json` should move from single-string `command: codex-orchestrator mcp serve` to split `command: codex-orchestrator` plus `args: [\"mcp\", \"serve\"]`, while `plugins/codex-orchestrator/.mcp.json` remains a protected split-launch reference surface. The declared source payload was absent in this child checkout, so the packet is anchored on the parent-provided issue prompt plus read-only inspection of the protected config files; no Linear mutation was performed."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-45363c7e-c083-4eaa-911f-8fc7873141d8.md",
+        "task": "tasks/tasks-linear-45363c7e-c083-4eaa-911f-8fc7873141d8.md",
+        "agent_task": ".agent/task/linear-45363c7e-c083-4eaa-911f-8fc7873141d8.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-45363c7e-c083-4eaa-911f-8fc7873141d8.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-45363c7e-c083-4eaa-911f-8fc7873141d8.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-45363c7e-c083-4eaa-911f-8fc7873141d8.md"
+        }
+      }
+    },
+    {
       "id": "20260421-linear-937a8e46-5f29-49b6-8272-83db7a3f1a83",
       "title": "CO-286 attach already-active provider-worker runs before capacity gating",
       "relates_to": "tasks/tasks-linear-937a8e46-5f29-49b6-8272-83db7a3f1a83.md",
