@@ -61,6 +61,9 @@ export async function prepareControlServerStartupInputs(
     providerWorkflowConfigStore: options.providerWorkflowConfigStore,
     createProviderIssueHandoff: options.createProviderIssueHandoff
   });
+  if (requestContextShared.linearAdvisoryState.stale_source) {
+    await requestContextShared.persist.linearAdvisory();
+  }
 
   return {
     requestContextShared,

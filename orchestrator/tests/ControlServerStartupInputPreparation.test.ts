@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -227,6 +227,18 @@ describe('prepareControlServerStartupInputs', () => {
         }
       });
       expect(context.linearAdvisoryState.stale_source?.marked_at).toEqual(expect.any(String));
+      const persistedAdvisoryState = JSON.parse(
+        await readFile(join(paths.runDir, LINEAR_ADVISORY_STATE_FILE), 'utf8')
+      ) as LinearAdvisoryState;
+      expect(persistedAdvisoryState).toMatchObject({
+        ...linearAdvisorySeed,
+        stale_source: {
+          source: 'provider-intake',
+          reason: 'provider_intake_newer_than_linear_advisory',
+          provider_intake_updated_at: '2026-03-12T00:04:30.000Z',
+          advisory_updated_at: '2026-03-12T00:04:00.000Z'
+        }
+      });
       expect(context.providerIntakeState).toMatchObject({
         ...providerIntakeSeed,
         polling: null
