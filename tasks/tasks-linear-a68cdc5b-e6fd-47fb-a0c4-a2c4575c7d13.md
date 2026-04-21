@@ -38,7 +38,7 @@
 - [x] `npm run docs:freshness` Evidence: `out/linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13/validation/docs-freshness.log` reports the post-merge freshness baseline green after current `origin/main` brought in the separate `docs:freshness:maintain` cleanup.
 - [x] `npm run repo:stewardship` Evidence: `out/linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13/validation/repo-stewardship.log`.
 - [x] `node scripts/diff-budget.mjs` Evidence: `out/linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13/validation/diff-budget.log`.
-- [x] `FORCE_CODEX_REVIEW=1 npm run review` Evidence: `/Users/kbediako/Code/CO/.runs/linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13/cli/2026-04-21T07-35-34-622Z-391b3ca3/review/telemetry.json` reports `status: succeeded` and `review_outcome: bounded-success`; after addressing the stale handoff-status and unrelated registry-row P2s, the final rerun found no actionable diff-local issues.
+- [x] `FORCE_CODEX_REVIEW=1 npm run review` Evidence: `.runs/linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13/cli/2026-04-21T07-35-34-622Z-391b3ca3/review/telemetry.json` reports `status: succeeded` and `review_outcome: bounded-success`; after addressing the stale handoff-status and unrelated registry-row P2s, the final rerun found no actionable diff-local issues.
 - [x] `npm run pack:smoke` Evidence: `out/linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13/validation/pack-smoke.log` after rerun with `PACK_SMOKE_ALLOW_MARKETPLACE_SKIP=1`; original environment-specific marketplace gap recorded in `pack-smoke-marketplace-blocked.log`.
 - [ ] PR attachment and `pr ready-review` drain before review handoff. Remaining workflow step after committing the refreshed packet and opening the PR.
 
