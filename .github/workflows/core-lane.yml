@@ -187,8 +187,8 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Test
-        run: npm run test
+      - name: Test (core matrix)
+        run: npm run test:core
 
       - name: Install Codex CLI for marketplace smoke
         if: ${{ steps.downstream-smoke.outputs.required == 'true' }}
