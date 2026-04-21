@@ -87,6 +87,50 @@
       }
     },
     {
+      "id": "20260421-linear-63dbed8c-522b-4c10-8a62-86ebb823ee29",
+      "title": "CO-270 Core Lane vs full test matrix contract",
+      "relates_to": "tasks/tasks-linear-63dbed8c-522b-4c10-8a62-86ebb823ee29.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-21",
+      "approvals": {
+        "rework_reset": {
+          "reviewer": "provider worker",
+          "date": "2026-04-21",
+          "status": "in_progress",
+          "summary": "Fresh Rework attempt closed PR #570, deleted the stale workpad, created a branch from origin/main, recorded parallelize_now, and launched same-issue child lane test-contract-regression."
+        },
+        "docs_review_rework": {
+          "reviewer": "codex-orchestrator docs-review child stream",
+          "date": "2026-04-21",
+          "status": "failed_intermediate",
+          "manifest": ".runs/linear-63dbed8c-522b-4c10-8a62-86ebb823ee29-docs-review-rework/cli/2026-04-21T12-40-31-182Z-7c56ec2b/manifest.json",
+          "summary": "Docs-review ran before implementation and failed at docs:check because the fresh branch did not yet contain the referenced test:core/test:all scripts or contract test file. Parent continued by adding the missing command/workflow/docs/test surfaces."
+        },
+        "standalone_review_final": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-21",
+          "status": "bounded_success",
+          "telemetry": ".runs/linear-63dbed8c-522b-4c10-8a62-86ebb823ee29/cli/2026-04-21T12-34-13-569Z-b254c807/review/telemetry.json",
+          "summary": "Final forced standalone review completed with review_outcome=bounded-success via command-intent retry and no actionable diff-local findings."
+        },
+        "elegance_review": {
+          "reviewer": "provider worker",
+          "date": "2026-04-21",
+          "status": "completed",
+          "summary": "Manual elegance/minimality pass kept the small runner plus scoped Vitest config split; no simplification patch was warranted without losing forwarding, no-match, or focused-filter behavior."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-63dbed8c-522b-4c10-8a62-86ebb823ee29.md",
+        "task": "tasks/tasks-linear-63dbed8c-522b-4c10-8a62-86ebb823ee29.md",
+        "agent_task": ".agent/task/linear-63dbed8c-522b-4c10-8a62-86ebb823ee29.md",
+        "docs": "docs/TECH_SPEC-linear-63dbed8c-522b-4c10-8a62-86ebb823ee29.md"
+      }
+    },
+    {
       "id": "20260421-linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9",
       "title": "Preserve provider-worker provenance across rehydrated active-run resume",
       "relates_to": "tasks/tasks-linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
