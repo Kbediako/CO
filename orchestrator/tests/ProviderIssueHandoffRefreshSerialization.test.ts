@@ -467,8 +467,8 @@ describe('runProviderIssueHandoffRefresh', () => {
       state: 'released',
       reason: 'provider_issue_released:not_mutable',
       task_id: 'task-1303-active',
-      run_id: 'run-active',
-      run_manifest_path: childPaths.manifestPath
+      run_id: null,
+      run_manifest_path: null
     });
   });
 
@@ -635,8 +635,8 @@ describe('runProviderIssueHandoffRefresh', () => {
       state: 'released',
       reason: 'provider_issue_released:not_mutable',
       task_id: 'task-1303-active',
-      run_id: 'run-active',
-      run_manifest_path: childPaths.manifestPath
+      run_id: null,
+      run_manifest_path: null
     });
   });
 
@@ -797,8 +797,8 @@ describe('runProviderIssueHandoffRefresh', () => {
       state: 'released',
       reason: 'provider_issue_released:not_mutable',
       task_id: 'task-1303-active',
-      run_id: 'run-active',
-      run_manifest_path: childPaths.manifestPath
+      run_id: null,
+      run_manifest_path: null
     });
   });
 
@@ -924,8 +924,8 @@ describe('runProviderIssueHandoffRefresh', () => {
     expect(state.claims[0]).toMatchObject({
       state: 'released',
       reason: 'provider_issue_released:not_mutable',
-      run_id: 'run-active',
-      run_manifest_path: childPaths.manifestPath
+      run_id: null,
+      run_manifest_path: null
     });
   });
 
@@ -1533,8 +1533,8 @@ describe('runProviderIssueHandoffRefresh', () => {
       issue_state: 'Done',
       issue_state_type: 'completed',
       issue_updated_at: '2026-04-15T01:30:00.000Z',
-      run_id: 'run-active',
-      run_manifest_path: childPaths.manifestPath
+      run_id: null,
+      run_manifest_path: null
     });
     expect(state.latest_reason).toBe('provider_issue_released:not_active');
   });
@@ -1725,8 +1725,8 @@ describe('runProviderIssueHandoffRefresh', () => {
       issue_state: 'Done',
       issue_state_type: 'completed',
       issue_updated_at: '2026-04-15T16:38:07.274Z',
-      run_id: 'run-dead-merging',
-      run_manifest_path: stalePaths.manifestPath
+      run_id: null,
+      run_manifest_path: null
     });
     expect(state.claims[1]).toMatchObject({
       state: 'running',
@@ -2503,8 +2503,8 @@ describe('runProviderIssueHandoffRefresh', () => {
       issue_state: 'Done',
       issue_state_type: 'completed',
       issue_updated_at: '2026-04-15T01:10:00.000Z',
-      run_id: 'run-missing-co-185',
-      run_manifest_path: `${paths.runDir}/missing-co-185-manifest.json`
+      run_id: null,
+      run_manifest_path: null
     });
 
     const launcher = {
@@ -2562,8 +2562,8 @@ describe('runProviderIssueHandoffRefresh', () => {
       issue_state: 'Done',
       issue_state_type: 'completed',
       issue_updated_at: '2026-04-15T01:10:00.000Z',
-      run_id: 'run-missing-co-185',
-      run_manifest_path: `${paths.runDir}/missing-co-185-manifest.json`
+      run_id: null,
+      run_manifest_path: null
     });
   });
 
@@ -2575,7 +2575,7 @@ describe('runProviderIssueHandoffRefresh', () => {
       issue_state: 'Done',
       issue_state_type: 'completed',
       issue_updated_at: '2026-04-15T01:10:00.000Z',
-      run_id: co185TaskId,
+      run_id: null,
       run_manifest_path: null
     });
 
@@ -2633,7 +2633,7 @@ describe('runProviderIssueHandoffRefresh', () => {
       issue_state: 'Done',
       issue_state_type: 'completed',
       issue_updated_at: '2026-04-15T01:10:00.000Z',
-      run_id: co185TaskId,
+      run_id: null,
       run_manifest_path: null
     });
   });
@@ -2776,8 +2776,8 @@ describe('runProviderIssueHandoffRefresh', () => {
     expect(state.claims[0]).toMatchObject({
       state: 'released',
       reason: 'provider_issue_released:not_active',
-      run_id: 'run-queued',
-      run_manifest_path: queuedPaths.manifestPath
+      run_id: null,
+      run_manifest_path: null
     });
 
     settleNextCancel('reject');
@@ -2804,8 +2804,8 @@ describe('runProviderIssueHandoffRefresh', () => {
     expect(state.claims[0]).toMatchObject({
       state: 'released',
       reason: 'provider_issue_released:not_active',
-      run_id: 'run-queued',
-      run_manifest_path: queuedPaths.manifestPath
+      run_id: null,
+      run_manifest_path: null
     });
 
     settleNextCancel('resolve');

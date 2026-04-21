@@ -261,6 +261,43 @@ describe('providerOperatorAutopilot', () => {
     expect(result.summary).toContain('0 duplicate-cleanup, 1 ready-to-unblock');
   });
 
+  it('suppresses ready-to-unblock advisories when the issue records a live PR blocker', async () => {
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createBlockedCo272Issue(
+          'Current operator note:\nPR #571\n- draft, dirty\n- checks pending'
+        )
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    });
+
+    expect(result.status).toBe('noop');
+    expect(result.terminal_blocker_advisories).toEqual([]);
+    expect(result.summary).toContain('found no bounded action');
+  });
+
+  it('keeps ready-to-unblock advisories when PR blocker notes are resolved', async () => {
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createBlockedCo272Issue('Operator note: PR #571 is no longer blocking; checks passed.')
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    });
+
+    expect(result.status).toBe('acted');
+    expect(result.terminal_blocker_advisories).toMatchObject([
+      {
+        issue_id: 'lin-issue-272',
+        issue_identifier: 'CO-272',
+        recommended_action: 'ready_to_unblock'
+      }
+    ]);
+  });
+
   it('ignores unrelated canonical-owner markers as duplicate-cleanup evidence', async () => {
     const result = await runProviderOperatorAutopilot({
       tracked_issues: [
@@ -5054,6 +5091,19 @@ function createTrackedIssue(
     relations_truncated: overrides.relations_truncated ?? false,
     recent_activity: overrides.recent_activity ?? []
   };
+}
+
+function createBlockedCo272Issue(description: string): LiveLinearTrackedIssue {
+  return createTrackedIssue({
+    id: 'lin-issue-272',
+    identifier: 'CO-272',
+    state: 'Blocked',
+    state_type: 'started',
+    description,
+    blocked_by: [
+      { id: 'lin-issue-278', identifier: 'CO-278', state: 'Done', state_type: 'completed' }
+    ]
+  });
 }
 
 function createClaim(

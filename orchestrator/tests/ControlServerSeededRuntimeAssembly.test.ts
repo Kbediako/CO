@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { mkdtemp, mkdir, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -10,8 +10,12 @@ import {
   PROVIDER_INTAKE_STATE_FILE
 } from '../src/cli/control/controlPersistenceFiles.js';
 import { createControlServerSeededRuntimeAssembly } from '../src/cli/control/controlServerSeededRuntimeAssembly.js';
+import type { LiveLinearTrackedIssue } from '../src/cli/control/linearDispatchSource.js';
 import type { LinearAdvisoryState } from '../src/cli/control/linearWebhookController.js';
-import type { ProviderIntakeState } from '../src/cli/control/providerIntakeState.js';
+import type {
+  ProviderIntakeClaimRecord,
+  ProviderIntakeState
+} from '../src/cli/control/providerIntakeState.js';
 
 async function createRunRoot(taskId: string) {
   const root = await mkdtemp(join(tmpdir(), 'control-server-seeded-runtime-'));
@@ -19,6 +23,115 @@ async function createRunRoot(taskId: string) {
   const paths = resolveRunPaths(env, 'run-1');
   await mkdir(paths.runDir, { recursive: true });
   return { root, env, paths };
+}
+
+async function seedManifest(
+  paths: { manifestPath: string },
+  overrides: Record<string, unknown> = {}
+): Promise<void> {
+  await writeFile(
+    paths.manifestPath,
+    JSON.stringify({
+      run_id: 'run-1',
+      task_id: 'task-294',
+      status: 'in_progress',
+      started_at: '2026-04-21T16:00:00.000Z',
+      updated_at: '2026-04-21T16:00:00.000Z',
+      completed_at: null,
+      summary: 'task is running',
+      commands: [],
+      approvals: [],
+      ...overrides
+    }),
+    'utf8'
+  );
+}
+
+function co272TrackedIssue(overrides: Partial<LiveLinearTrackedIssue> = {}): LiveLinearTrackedIssue {
+  return {
+    provider: 'linear',
+    id: 'lin-issue-272',
+    identifier: 'CO-272',
+    title: 'Replace dead archive guidance',
+    description: null,
+    url: null,
+    state: 'In Progress',
+    state_type: 'started',
+    archived_at: null,
+    trashed: false,
+    viewer_id: 'viewer-1',
+    assignee_id: 'viewer-1',
+    assignee_name: 'Codex',
+    workspace_id: 'workspace-1',
+    team_id: 'team-1',
+    team_key: 'CO',
+    team_name: 'CO',
+    project_id: 'project-1',
+    project_name: 'CO',
+    updated_at: '2026-04-21T15:00:00.000Z',
+    blocked_by: [],
+    recent_activity: [],
+    ...overrides
+  };
+}
+
+function advisoryState(
+  updatedAt: string,
+  trackedIssue: LiveLinearTrackedIssue,
+  deliveryId = 'delivery-current'
+): LinearAdvisoryState {
+  return {
+    schema_version: 1,
+    updated_at: updatedAt,
+    latest_delivery_id: deliveryId,
+    latest_result: 'accepted',
+    latest_reason: 'linear_delivery_accepted',
+    latest_event: null,
+    latest_accepted_at: updatedAt,
+    tracked_issue: trackedIssue,
+    seen_deliveries: []
+  };
+}
+
+function co272ProviderIntakeClaim(
+  overrides: Partial<ProviderIntakeClaimRecord> = {}
+): ProviderIntakeClaimRecord {
+  return {
+    provider: 'linear',
+    provider_key: 'linear:lin-issue-272',
+    issue_id: 'lin-issue-272',
+    issue_identifier: 'CO-272',
+    issue_title: 'Replace dead archive guidance',
+    issue_state: 'In Progress',
+    issue_state_type: 'started',
+    issue_updated_at: '2026-04-21T14:59:00.000Z',
+    issue_viewer_id: null,
+    issue_viewer_auth_fingerprint: null,
+    issue_assignee_id: null,
+    issue_assignee_name: null,
+    issue_blocked_by: null,
+    task_id: 'linear-co-272-current-advisory',
+    mapping_source: 'provider_id_fallback',
+    state: 'starting',
+    reason: 'provider_issue_start_launched',
+    accepted_at: '2026-04-21T14:59:00.000Z',
+    updated_at: '2026-04-21T14:59:00.000Z',
+    last_delivery_id: 'delivery-prior',
+    last_event: 'issue',
+    last_action: 'update',
+    last_webhook_timestamp: 1_777_000_000_000,
+    run_id: null,
+    run_manifest_path: null,
+    launch_source: null,
+    launch_token: null,
+    launch_started_at: null,
+    retry_queued: null,
+    retry_attempt: null,
+    retry_due_at: null,
+    retry_error: null,
+    merge_closeout: null,
+    ...overrides
+  };
 }
 
 describe('createControlServerSeededRuntimeAssembly', () => {
@@ -280,6 +393,134 @@ describe('createControlServerSeededRuntimeAssembly', () => {
         state: 'starting',
         task_id: 'linear-issue-1'
       });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('marks advisory state stale when provider intake persists newer truth', async () => {
+    const { root, env, paths } = await createRunRoot('task-294');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const seededAdvisory = advisoryState(
+      '2026-03-22T04:01:03.255Z',
+      co272TrackedIssue({
+        state: 'Blocked',
+        updated_at: '2026-03-22T04:01:03.255Z'
+      }),
+      'delivery-old'
+    );
+    const seededProviderIntake: ProviderIntakeState = {
+      schema_version: 1,
+      updated_at: '2026-04-21T16:00:00.000Z',
+      rehydrated_at: '2026-04-21T16:00:00.000Z',
+      latest_provider_key: null,
+      latest_reason: null,
+      claims: []
+    };
+
+    try {
+      const assembly = createControlServerSeededRuntimeAssembly({
+        runId: 'run-1',
+        token: 'control-token',
+        config,
+        paths,
+        sessionTtlMs: 60_000,
+        controlSeed: null,
+        confirmationsSeed: null,
+        questionsSeed: null,
+        delegationSeed: null,
+        linearAdvisorySeed: seededAdvisory,
+        providerIntakeSeed: seededProviderIntake
+      });
+
+      await seedManifest(paths, {
+        task_id: 'linear-co-294-stale-advisory-state',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-272',
+        issue_identifier: 'CO-272',
+        summary: 'selected issue has no authoritative tracked payload',
+        updated_at: '2026-04-21T16:00:00.000Z'
+      });
+
+      const selectedSnapshot =
+        await assembly.requestContextShared.runtime.snapshot().readSelectedRunSnapshot();
+      expect(assembly.requestContextShared.linearAdvisoryState.stale_source).toMatchObject({
+        source: 'provider-intake',
+        reason: 'provider_intake_newer_than_linear_advisory',
+        provider_intake_updated_at: '2026-04-21T16:00:00.000Z',
+        advisory_updated_at: '2026-03-22T04:01:03.255Z'
+      });
+      expect(selectedSnapshot.selected?.issueIdentifier).toBe('CO-272');
+      expect(selectedSnapshot.selected?.tracked?.linear ?? null).toBeNull();
+      expect(selectedSnapshot.tracked?.linear ?? null).toBeNull();
+
+      await assembly.requestContextShared.persist.providerIntake?.();
+
+      const advisorySnapshot = JSON.parse(
+        await readFile(join(paths.runDir, LINEAR_ADVISORY_STATE_FILE), 'utf8')
+      ) as LinearAdvisoryState;
+      expect(advisorySnapshot.updated_at).toBe('2026-03-22T04:01:03.255Z');
+      expect(advisorySnapshot.stale_source).toMatchObject({
+        source: 'provider-intake',
+        reason: 'provider_intake_newer_than_linear_advisory',
+        provider_intake_updated_at: '2026-04-21T16:00:00.000Z',
+        advisory_updated_at: '2026-03-22T04:01:03.255Z'
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps accepted advisory fallback live for polling-only provider intake heartbeats', async () => {
+    const { root, env, paths } = await createRunRoot('task-294');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const seededAdvisory = advisoryState(
+      '2026-04-21T15:00:00.000Z',
+      co272TrackedIssue()
+    );
+    const seededProviderIntake: ProviderIntakeState = {
+      schema_version: 1,
+      updated_at: '2026-04-21T14:59:00.000Z',
+      rehydrated_at: null,
+      latest_provider_key: 'linear:lin-issue-272',
+      latest_reason: 'provider_issue_start_launched',
+      claims: [co272ProviderIntakeClaim()]
+    };
+
+    try {
+      const assembly = createControlServerSeededRuntimeAssembly({
+        runId: 'run-1',
+        token: 'control-token',
+        config,
+        paths,
+        sessionTtlMs: 60_000,
+        controlSeed: null,
+        confirmationsSeed: null,
+        questionsSeed: null,
+        delegationSeed: null,
+        linearAdvisorySeed: seededAdvisory,
+        providerIntakeSeed: seededProviderIntake
+      });
+
+      await seedManifest(paths, {
+        task_id: 'linear-co-272-current-advisory',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-272',
+        issue_identifier: 'CO-272',
+        summary: 'selected issue has no authoritative tracked payload',
+        updated_at: '2026-04-21T16:00:00.000Z'
+      });
+
+      await assembly.requestContextShared.persist.providerIntakePolling?.(
+        { updated_at: '2026-04-21T16:00:00.000Z', status: 'ok' },
+        '2026-04-21T16:00:00.000Z'
+      );
+
+      const selectedSnapshot =
+        await assembly.requestContextShared.runtime.snapshot().readSelectedRunSnapshot();
+      expect(assembly.requestContextShared.linearAdvisoryState.stale_source ?? null).toBeNull();
+      expect(selectedSnapshot.selected?.tracked?.linear?.identifier).toBe('CO-272');
+      expect(selectedSnapshot.tracked?.linear?.identifier).toBe('CO-272');
     } finally {
       await rm(root, { recursive: true, force: true });
     }

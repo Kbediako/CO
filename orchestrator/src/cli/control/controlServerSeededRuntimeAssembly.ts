@@ -28,6 +28,7 @@ import {
   createControlEventTransport
 } from './controlEventTransport.js';
 import {
+  markLinearAdvisoryStateStaleFromProviderIntake,
   normalizeLinearAdvisoryState,
   type LinearAdvisoryState
 } from './linearWebhookController.js';
@@ -144,6 +145,10 @@ export function createControlServerSeededRuntimeAssembly(
   const sessionTokens = new SessionTokenStore(options.sessionTtlMs);
   const linearAdvisoryState = normalizeLinearAdvisoryState(options.linearAdvisorySeed);
   const providerIntakeState = normalizeProviderIntakeState(options.providerIntakeSeed);
+  let linearAdvisoryStaleWritePending = markLinearAdvisoryStateStaleFromProviderIntake(
+    linearAdvisoryState,
+    providerIntakeState
+  );
   let providerIssueHandoff: ProviderIssueHandoffService | null = null;
   const controlRuntime = createControlRuntime({
     controlStore,
@@ -190,10 +195,21 @@ export function createControlServerSeededRuntimeAssembly(
     questions: async () => writeJsonAtomic(options.paths.questionsPath, { questions: questionQueue.list() }),
     delegationTokens: async () =>
       writeJsonAtomic(options.paths.delegationTokensPath, { tokens: delegationTokens.list() }),
-    linearAdvisory: async () => writeJsonAtomic(linearAdvisoryStatePath, linearAdvisoryState),
+    linearAdvisory: async () => {
+      await writeJsonAtomic(linearAdvisoryStatePath, linearAdvisoryState);
+      linearAdvisoryStaleWritePending = false;
+    },
     providerIntake: async () =>
       await queueProviderIntakePersist(async () => {
         await writeJsonAtomic(providerIntakeStatePath, providerIntakeState);
+        const linearAdvisoryMarkedStale = markLinearAdvisoryStateStaleFromProviderIntake(
+          linearAdvisoryState,
+          providerIntakeState
+        );
+        if (linearAdvisoryStaleWritePending || linearAdvisoryMarkedStale) {
+          await writeJsonAtomic(linearAdvisoryStatePath, linearAdvisoryState);
+          linearAdvisoryStaleWritePending = false;
+        }
       }),
     providerIntakePolling: async (polling, updatedAt) =>
       await queueProviderIntakePersist(async () => {
@@ -208,6 +224,14 @@ export function createControlServerSeededRuntimeAssembly(
           typeof updatedAt === 'string' && updatedAt.trim().length > 0 ? updatedAt : nextPollingUpdatedAt;
         nextState.updated_at = pickLatestTimestamp(nextState.updated_at, nextStateUpdatedAt);
         await writeJsonAtomic(providerIntakeStatePath, nextState);
+        const linearAdvisoryMarkedStale = markLinearAdvisoryStateStaleFromProviderIntake(
+          linearAdvisoryState,
+          nextState
+        );
+        if (linearAdvisoryStaleWritePending || linearAdvisoryMarkedStale) {
+          await writeJsonAtomic(linearAdvisoryStatePath, linearAdvisoryState);
+          linearAdvisoryStaleWritePending = false;
+        }
       })
   } satisfies ControlRequestPersist;
   providerIssueHandoff =

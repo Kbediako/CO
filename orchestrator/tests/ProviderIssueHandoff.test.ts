@@ -15369,8 +15369,8 @@ describe('createProviderIssueHandoffService', () => {
         reason: 'provider_issue_released:not_active',
         issue_state: 'Done',
         issue_state_type: 'completed',
-        run_id: 'run-child',
-        run_manifest_path: childPaths.manifestPath
+        run_id: null,
+        run_manifest_path: null
       });
       await expect(access(workspacePath)).resolves.toBeUndefined();
       expect(launcher.start).not.toHaveBeenCalled();
@@ -15479,8 +15479,8 @@ describe('createProviderIssueHandoffService', () => {
     expect(state.claims[0]).toMatchObject({
       state: 'released',
       reason: 'provider_issue_released:not_active',
-      run_id: 'run-queued',
-      run_manifest_path: childPaths.manifestPath
+      run_id: null,
+      run_manifest_path: null
     });
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
@@ -17957,8 +17957,8 @@ describe('createProviderIssueHandoffService', () => {
     expect(state.claims[0]).toMatchObject({
       state: 'released',
       reason: 'provider_issue_released:not_active',
-      run_id: 'run-queued',
-      run_manifest_path: childPaths.manifestPath
+      run_id: null,
+      run_manifest_path: null
     });
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
@@ -22691,12 +22691,12 @@ describe('createProviderIssueHandoffService', () => {
     expect(state.claims[0]).toMatchObject({
       state: 'released',
       reason: 'provider_issue_released:not_active',
-      run_id: 'run-queued',
-      run_manifest_path: childPaths.manifestPath
+      run_id: null,
+      run_manifest_path: null
     });
   });
 
-  it('keeps released claims bound to the matching pipeline during rehydrate while another pipeline stays active', async () => {
+  it('clears released claim run identity during rehydrate while another pipeline stays active', async () => {
     const { root, paths } = await createHostPaths();
     const otherEnv = {
       repoRoot: root,
@@ -22791,8 +22791,8 @@ describe('createProviderIssueHandoffService', () => {
       reason: 'provider_issue_released:not_active',
       issue_updated_at: '2026-03-19T04:20:00.000Z',
       task_id: 'task-1303-active',
-      run_id: 'run-active',
-      run_manifest_path: childPaths.manifestPath
+      run_id: null,
+      run_manifest_path: null
     });
   });
 
@@ -23323,6 +23323,83 @@ describe('createProviderIssueHandoffService', () => {
     });
     expect(result.claim.issue_blocked_by).toEqual(existingBlockers);
     expect(state.claims[0]?.issue_blocked_by).toEqual(existingBlockers);
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
+  it('clears stale active run identity when a released replay preserves terminal issue metadata', async () => {
+    const { root, paths } = await createHostPaths();
+    const taskId = 'task-1303-terminal-released';
+    const runId = 'run-terminal-released-active';
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId
+    };
+    const childPaths = resolveRunPaths(childEnv, runId);
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: runId,
+        task_id: taskId,
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-1',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: taskId,
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      last_delivery_id: 'delivery-terminal-released',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: runId,
+      run_manifest_path: childPaths.manifestPath
+    }));
+
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-03-19T04:20:00.000Z'
+      }),
+      deliveryId: 'delivery-terminal-released-replay',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_200_000
+    });
+
+    expect(result.kind).toBe('ignored');
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      task_id: taskId,
+      run_id: null,
+      run_manifest_path: null
+    });
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
   });
