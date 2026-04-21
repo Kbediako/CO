@@ -220,8 +220,10 @@ Note: the commands below assume a source checkout; `scripts/` helpers are not in
 | --- | --- |
 | `npm run build` | Compiles TypeScript to `dist/` (required for packaging and running the CLI from `dist/`). |
 | `npm run lint` | Lints orchestrator, adapters, shared packages. Auto-runs `node scripts/build-patterns-if-needed.mjs` so codemods compile when missing/outdated. |
-| `npm run test` | Vitest suite covering orchestration core, CLI services, and patterns. |
-| `npm run eval:test` | Optional evaluation harness (enable when `evaluation/fixtures/**` is populated). |
+| `npm run test:core` | Narrow Core Lane matrix via `vitest.config.core.ts`; excludes `adapters/**` and `evaluation/tests/**`. |
+| `npm run test` | Default repo validation alias; runs `test:core` so the historical core-only surface stays explicit. |
+| `npm run test:all` | Explicit broader Vitest matrix (`test:core` + `test:adapters`) without implicitly enabling the opt-in evaluation lane. |
+| `npm run eval:test` | Optional evaluation-only harness lane; alias to `npm run test:evaluation` when `evaluation/fixtures/**` or evaluation scope is in play. |
 | `npm run docs:check` | Deterministically validates scripts/pipelines/paths referenced in agent-facing docs, current posture locks, bundled-skill roster parity, and the README front-door budget. |
 | `npm run docs:freshness` | Validates docs registry coverage plus catalog class coverage and writes a class-separated report to `out/<task-id>/docs-freshness.json`. |
 | `npm run repo:stewardship` | Audits every tracked file via `git ls-files`, classifies each tracked surface as `validate`, `update`, `delete`, or `retain_with_rationale`, and writes `out/<task-id>/repo-stewardship.json`. |
