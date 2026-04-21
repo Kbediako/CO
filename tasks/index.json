@@ -1,6 +1,31 @@
 {
   "items": [
     {
+      "id": "20260421-linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb",
+      "title": "CO: replace remaining dead-code-pruning archive README pointers with durable guidance",
+      "relates_to": "tasks/tasks-linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md",
+      "risk": "low",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-21",
+      "approvals": {
+        "child_lane_attempt": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-21",
+          "status": "failed-closed-provenance-invalid",
+          "audit": ".runs/linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb/cli/2026-04-21T05-01-57-505Z-73d5a803/provider-linear-worker-linear-audit.jsonl",
+          "summary": "Same-issue docs child-lane launch was attempted after the required parallelize_now decision but failed closed with provider_worker_child_lane_provenance_invalid because the parent manifest lacks provider control-host provenance; parent owns docs and README implementation without fabricating child evidence."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md",
+        "task": "tasks/tasks-linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md",
+        "agent_task": ".agent/task/linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md",
+        "docs": "docs/TECH_SPEC-linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md"
+      }
+    },
+    {
       "id": "20260421-linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9",
       "title": "Preserve provider-worker provenance across rehydrated active-run resume",
       "relates_to": "tasks/tasks-linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
