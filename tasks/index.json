@@ -36,7 +36,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-20",
+      "last_review": "2026-04-21",
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
       "approvals": {
         "baseline_reproduction": {
@@ -84,7 +84,7 @@
           "date": "2026-04-20",
           "status": "succeeded",
           "review_outcome": "bounded-success",
-          "telemetry": "../../.runs/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/cli/2026-04-20T00-16-23-383Z-f8073975/review/telemetry.json",
+          "telemetry": ".runs/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/cli/2026-04-20T00-16-23-383Z-f8073975/review/telemetry.json",
           "summary": "Review completed via command-intent retry with no actionable diff-local issues."
         },
         "elegance_review": {
@@ -93,6 +93,56 @@
           "status": "completed",
           "evidence": "out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/manual/20260420T0053Z-elegance-review.md",
           "summary": "No simplification patch needed; diff is limited to docs/registry freshness metadata and required CO-267 packet evidence."
+        },
+        "rework_reproduction": {
+          "reviewer": "Codex provider worker",
+          "date": "2026-04-21",
+          "status": "completed",
+          "base": "98991b622b99b4d0f31fa39cf98425cbfdd1a1b6",
+          "docs_freshness_log": "out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/rework-reset/docs-freshness.log",
+          "docs_freshness": "out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/docs-freshness.json",
+          "docs_freshness_maintain_log": "out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/rework-reset/docs-freshness-maintain.log",
+          "docs_freshness_maintain": "out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/docs-freshness-maintenance.json",
+          "summary": "Rework current-main reproduction found 37 stale Task Packet / Task Mirror rows, no rolling cohort rows, block_policy_over_budget, and blocking_changed_paths=0 after prior PR #566 had already merged."
+        },
+        "rework_reviewed_refresh": {
+          "reviewer": "Codex provider worker",
+          "date": "2026-04-21",
+          "status": "completed",
+          "classification": "docs/findings/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4-docs-freshness-classification.md",
+          "summary": "Reviewed and refreshed exact Apr 21 stale 0954 and 1311-1316 Task Packet / Task Mirror registry rows without changing freshness policy, rolling caps, or CO-266 scope."
+        },
+        "rework_validation": {
+          "reviewer": "Codex provider worker",
+          "date": "2026-04-21",
+          "status": "passed",
+          "delegation_guard": "out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/rework-validation/delegation-guard.log",
+          "diagnostics_fallback": ".runs/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4-guard/cli/2026-04-21T05-46-49-274Z-af06141c/manifest.json",
+          "spec_guard": "out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/rework-validation/spec-guard.log",
+          "build": "out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/rework-validation/build.log",
+          "lint": "out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/rework-validation/lint.log",
+          "test": "out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/rework-validation/test.log",
+          "docs_check": "out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/rework-validation/docs-check.log",
+          "docs_freshness": "out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/docs-freshness.json",
+          "docs_freshness_maintain": "out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/docs-freshness-maintenance.json",
+          "repo_stewardship": "out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/rework-validation/repo-stewardship.log",
+          "diff_budget": "out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/rework-validation/diff-budget.log",
+          "summary": "Rework validation passed; tests reported 346 files and 4424 tests passed; docs freshness maintain is clean with no candidates and blocking_changed_paths=0."
+        },
+        "rework_standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-21",
+          "status": "succeeded",
+          "review_outcome": "bounded-success",
+          "telemetry": ".runs/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/cli/2026-04-21T05-34-25-740Z-9cf43116/review/telemetry.json",
+          "summary": "Review completed with no actionable issues; bounded-success termination preserved."
+        },
+        "rework_elegance_review": {
+          "reviewer": "Codex provider worker",
+          "date": "2026-04-21",
+          "status": "completed",
+          "evidence": "out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/manual/20260421T0600Z-elegance-review.md",
+          "summary": "No simplification patch needed; diff remains limited to reviewed freshness metadata and required CO-267 evidence surfaces."
         }
       },
       "paths": {
