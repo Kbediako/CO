@@ -2685,11 +2685,10 @@ async function parseProviderChildLaneRunResult(
   } catch {
     manifestRecord = null;
   }
-  const guardrailManifest = manifestRecord ?? {
-    pipeline_id: PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID,
-    guardrails_required: false,
-    commands: []
-  };
+  const rawSummary = normalizeOptionalString(parsed.summary);
+  const summary = manifestRecord
+    ? stripNonApplicableGuardrailSummaryLines(manifestRecord, rawSummary)
+    : rawSummary;
   return {
     run_id: safeRunId,
     task_id: taskId,
@@ -2698,10 +2697,10 @@ async function parseProviderChildLaneRunResult(
     artifact_root: resolvedArtifactRoot,
     manifest_path: resolvedManifestPath,
     log_path: normalizedLogPath,
-    summary: stripNonApplicableGuardrailSummaryLines(guardrailManifest, normalizeOptionalString(parsed.summary)),
-    guardrails_required: resolveGuardrailsRequiredForManifest(guardrailManifest),
-    guardrails_required_source: resolveGuardrailsRequiredSourceForManifest(guardrailManifest),
-    guardrail_command_count: countGuardrailCommands(guardrailManifest),
+    summary,
+    guardrails_required: manifestRecord ? resolveGuardrailsRequiredForManifest(manifestRecord) : null,
+    guardrails_required_source: manifestRecord ? resolveGuardrailsRequiredSourceForManifest(manifestRecord) : null,
+    guardrail_command_count: manifestRecord ? countGuardrailCommands(manifestRecord) : null,
     runtime_mode_requested: normalizeOptionalString(parsed.runtime_mode_requested),
     runtime_mode: normalizeOptionalString(parsed.runtime_mode),
     runtime_provider: normalizeOptionalString(parsed.runtime_provider)
