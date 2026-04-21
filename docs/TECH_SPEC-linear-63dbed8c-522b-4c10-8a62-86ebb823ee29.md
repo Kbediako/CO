@@ -46,13 +46,13 @@ The issue is not a generic request for more CI or fewer tests. It is a request t
 ## Current Repo Truth
 
 - `package.json` currently defines:
-  - `test` as `npm run test:core`
+  - `test` as `npm run test:core --`
   - `test:core` as `vitest run --config vitest.config.core.ts`
   - `test:all` as `npm run test:core && npm run test:adapters`
-  - `test:orchestrator` as `npm run test:core`
+  - `test:orchestrator` as `npm run test:core --`
   - `test:adapters` as `vitest run --passWithNoTests --config vitest.config.ts adapters`
   - `test:evaluation` as `vitest run --passWithNoTests --config vitest.config.ts evaluation/tests`
-  - `eval:test` as `npm run test:evaluation`
+  - `eval:test` as `npm run test:evaluation --`
 - `.github/workflows/core-lane.yml` runs `npm run test:core` in the `Test (core matrix)` step.
 - `AGENTS.md` documents `npm run test` as the explicit core/default validation alias, `npm run test:all` as the broader matrix, and `npm run test:core` as the narrow Core Lane matrix.
 - `.agent/AGENTS.md` documents the same split and keeps `npm run eval:test` opt-in.

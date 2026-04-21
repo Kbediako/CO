@@ -46,15 +46,19 @@ describe('core vs full test command contract', () => {
   it('keeps the package test scripts explicit about core and full matrices', () => {
     const scripts = readPackageJson().scripts ?? {};
 
-    expect(scripts.test).toBe('npm run test:core');
+    expect(scripts.test).toBe('npm run test:core --');
     expect(scripts['test:core']).toBe('vitest run --config vitest.config.core.ts');
     expect(scripts['test:all']).toBe('npm run test:core && npm run test:adapters');
-    expect(scripts['test:orchestrator']).toBe('npm run test:core');
+    expect(scripts['test:orchestrator']).toBe('npm run test:core --');
     expect(scripts['test:evaluation']).toBe('vitest run --passWithNoTests --config vitest.config.ts evaluation/tests');
-    expect(scripts['eval:test']).toBe('npm run test:evaluation');
+    expect(scripts['eval:test']).toBe('npm run test:evaluation --');
 
     const defaultMatrixCalls = calledNpmRunScripts(scripts.test);
     expect(defaultMatrixCalls, 'npm run test should stay pinned to the explicit core matrix').toEqual(['test:core']);
+    expect(
+      [scripts.test, scripts['test:orchestrator'], scripts['eval:test']],
+      'delegating aliases must preserve npm-run argument forwarding'
+    ).toEqual(['npm run test:core --', 'npm run test:core --', 'npm run test:evaluation --']);
 
     const fullMatrixCalls = calledNpmRunScripts(scripts['test:all']);
     expect(fullMatrixCalls, 'test:all should include the core test matrix').toContain('test:core');
