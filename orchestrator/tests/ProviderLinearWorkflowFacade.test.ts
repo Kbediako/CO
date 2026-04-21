@@ -1977,7 +1977,7 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
-  it('keeps title-prefix low-number foreign NODE keys conflicting without owned evidence', async () => {
+  it('keeps conventional-commit title-prefix low-number foreign NODE keys conflicting without owned evidence', async () => {
     const { result } = await readIssueContextAttachmentTruth({
       identifier: 'NODE-244',
       title: 'Completed issue with title-prefix foreign NODE PR',
@@ -2024,14 +2024,26 @@ describe('providerLinearWorkflowFacade', () => {
         name: 'In Progress',
         type: 'started'
       },
-      attachments: [buildGitHubAttachment('attachment-pr-601', 601, 'fix: NODE-20 provider upgrade for CO-244')],
-      snapshotForPr: () => ({
-        state: 'OPEN',
-        mergedAt: null,
-        updatedAt: '2026-04-21T09:07:51.000Z',
-        title: 'fix: NODE-20 provider upgrade for CO-244',
-        headRefName: 'feature/runtime-upgrade'
-      })
+      attachments: [
+        buildGitHubAttachment('attachment-pr-601', 601, 'fix: NODE-20 provider upgrade for CO-244'),
+        buildGitHubAttachment('attachment-pr-603', 603, 'provider runtime cleanup')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 601
+          ? {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:07:51.000Z',
+              title: 'fix: NODE-20 provider upgrade for CO-244',
+              headRefName: 'feature/runtime-upgrade'
+            }
+          : {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:08:51.000Z',
+              title: 'provider runtime cleanup',
+              headRefName: 'feature/provider-runtime-cleanup'
+            }
     });
 
     expect(result).toMatchObject({
@@ -2045,7 +2057,11 @@ describe('providerLinearWorkflowFacade', () => {
           },
           historical: [],
           conflicting: [],
-          unknown: []
+          unknown: [
+            {
+              id: 'attachment-pr-603'
+            }
+          ]
         }
       }
     });
@@ -2060,14 +2076,26 @@ describe('providerLinearWorkflowFacade', () => {
         name: 'In Progress',
         type: 'started'
       },
-      attachments: [buildGitHubAttachment('attachment-pr-602', 602, 'runtime upgrade (NODE-20)')],
-      snapshotForPr: () => ({
-        state: 'OPEN',
-        mergedAt: null,
-        updatedAt: '2026-04-21T09:07:51.000Z',
-        title: 'runtime upgrade (NODE-20)',
-        headRefName: 'feature/runtime-upgrade'
-      })
+      attachments: [
+        buildGitHubAttachment('attachment-pr-602', 602, 'runtime upgrade (NODE-20)'),
+        buildGitHubAttachment('attachment-pr-604', 604, 'NODE-244 runtime reconciliation')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 602
+          ? {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:07:51.000Z',
+              title: 'runtime upgrade (NODE-20)',
+              headRefName: 'feature/runtime-upgrade'
+            }
+          : {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:08:51.000Z',
+              title: 'NODE-244 runtime reconciliation',
+              headRefName: 'linear/node-244-runtime-reconciliation'
+            }
     });
 
     expect(result).toMatchObject({
@@ -2077,11 +2105,15 @@ describe('providerLinearWorkflowFacade', () => {
         identifier: 'NODE-244',
         pull_request_attachments: {
           current: {
-            id: 'attachment-pr-602'
+            id: 'attachment-pr-604'
           },
           historical: [],
           conflicting: [],
-          unknown: []
+          unknown: [
+            {
+              id: 'attachment-pr-602'
+            }
+          ]
         }
       }
     });
