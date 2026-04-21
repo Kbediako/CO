@@ -19,7 +19,7 @@ function main() {
   const entrypoint = join(sourceRoot, 'bin', 'codex-orchestrator.js');
   if (!existsSync(entrypoint)) {
     throw new Error(
-      `Codex Orchestrator marketplace source is missing ${entrypoint}. Keep the marketplace source installed or re-run codex marketplace add.`
+      `Codex Orchestrator marketplace source is missing ${entrypoint}. Keep the marketplace source installed or re-run codex plugin marketplace add.`
     );
   }
 
@@ -59,7 +59,9 @@ function main() {
 function resolveMarketplaceSourceRoot() {
   const { codexHome, configPath } = resolveCodexPaths();
   if (!existsSync(configPath)) {
-    throw new Error(`Unable to locate Codex config at ${configPath}. Re-run codex marketplace add for Codex Orchestrator.`);
+    throw new Error(
+      `Unable to locate Codex config at ${configPath}. Re-run codex plugin marketplace add for Codex Orchestrator.`
+    );
   }
 
   const raw = readFileSync(configPath, 'utf8');
@@ -68,7 +70,7 @@ function resolveMarketplaceSourceRoot() {
   const sourceType = marketplaceConfig?.sourceType;
   if (!source) {
     throw new Error(
-      `Codex config at ${configPath} is missing ${MARKETPLACE_SECTION}. Re-run codex marketplace add for Codex Orchestrator.`
+      `Codex config at ${configPath} is missing ${MARKETPLACE_SECTION}. Re-run codex plugin marketplace add for Codex Orchestrator.`
     );
   }
   if (sourceType === 'local') {
@@ -98,7 +100,7 @@ function resolveInstalledMarketplaceSourceRoot(codexHome, source) {
     return installedMarketplaceRoot;
   }
   throw new Error(
-    `Codex marketplace source resolved to ${JSON.stringify(source)}, but ${installedMarketplaceRoot} is unavailable. Re-run codex marketplace add for Codex Orchestrator.`
+    `Codex marketplace source resolved to ${JSON.stringify(source)}, but ${installedMarketplaceRoot} is unavailable. Re-run codex plugin marketplace add for Codex Orchestrator.`
   );
 }
 

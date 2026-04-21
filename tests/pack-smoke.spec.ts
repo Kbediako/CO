@@ -26,7 +26,7 @@ type WorkflowFile = {
 };
 
 const marketplaceSkipToken = 'PACK_SMOKE_ALLOW_MARKETPLACE_SKIP';
-const codexInstallCommand = 'npm install --global @openai/codex@0.121.0';
+const codexInstallCommand = 'npm install --global @openai/codex@0.122.0';
 const packSmokeCommand = 'npm run pack:smoke';
 const shellIdentifierPattern = String.raw`[A-Za-z_][A-Za-z0-9_]*`;
 const shellAssignmentPattern = String.raw`${shellIdentifierPattern}=(?:"[^"]*"|'[^']*'|\S+)`;
@@ -981,14 +981,14 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
       status: 'fail',
       reason: 'marketplace-unsupported',
       message:
-        'Marketplace smoke requires a Codex CLI with `marketplace add` support. Set PACK_SMOKE_ALLOW_MARKETPLACE_SKIP=1 with PACK_SMOKE_MARKETPLACE_SKIP_REASON only for local-dev opt-out.'
+        'Marketplace smoke requires a Codex CLI with `plugin marketplace add` support. Set PACK_SMOKE_ALLOW_MARKETPLACE_SKIP=1 with PACK_SMOKE_MARKETPLACE_SKIP_REASON only for local-dev opt-out.'
     });
 
     expect(
       resolveMarketplaceSmokePrerequisite({
         codexBin: 'codex-0.118',
         allowMarketplaceSkip: true,
-        marketplaceSkipReason: 'explicit pre-0.121 compatibility lane; no release coverage claimed',
+        marketplaceSkipReason: 'explicit pre-0.122 compatibility lane; no release coverage claimed',
         codexAvailable: true,
         marketplaceCapable: false
       })
@@ -996,7 +996,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
       status: 'skip',
       reason: 'marketplace-unsupported',
       message:
-        'Skipping marketplace smoke: codex-0.118 does not expose codex marketplace add. Reason: explicit pre-0.121 compatibility lane; no release coverage claimed'
+        'Skipping marketplace smoke: codex-0.118 does not expose codex plugin marketplace add. Reason: explicit pre-0.122 compatibility lane; no release coverage claimed'
     });
   });
 
@@ -1030,7 +1030,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
             ).toBe(false);
             expect(
               isDedicatedCodexInstallRun(run),
-              `${workflow} job ${jobName} step ${stepIndex + 1} must use a dedicated Codex 0.121.0 install step`
+              `${workflow} job ${jobName} step ${stepIndex + 1} must use a dedicated Codex 0.122.0 install step`
             ).toBe(true);
             codexInstallConditions.push(effectiveStepCondition);
           }
@@ -1056,7 +1056,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
               codexInstallConditions.some((installCondition) =>
                 installConditionCoversSmokeStep(installCondition, effectiveStepCondition)
               ),
-              `${workflow} job ${jobName} step ${stepIndex + 1} must install Codex 0.121.0 before pack:smoke with matching if condition`
+              `${workflow} job ${jobName} step ${stepIndex + 1} must install Codex 0.122.0 before pack:smoke with matching if condition`
             ).toBe(true);
           }
         }

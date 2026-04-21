@@ -1,6 +1,27 @@
 {
   "items": [
     {
+      "id": "20260421-linear-904f74a5-e1b6-4740-a0df-8c92ec73314b",
+      "title": "CO-268 marketplace docs and smoke coverage rebaseline to Codex 0.122 plugin marketplace commands",
+      "relates_to": "tasks/tasks-linear-904f74a5-e1b6-4740-a0df-8c92ec73314b.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-21",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=codex-0122-plugin-marketplace-command-rebaseline",
+      "paths": {
+        "spec": "tasks/specs/linear-904f74a5-e1b6-4740-a0df-8c92ec73314b.md",
+        "task": "tasks/tasks-linear-904f74a5-e1b6-4740-a0df-8c92ec73314b.md",
+        "agent_task": ".agent/task/linear-904f74a5-e1b6-4740-a0df-8c92ec73314b.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-904f74a5-e1b6-4740-a0df-8c92ec73314b.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-904f74a5-e1b6-4740-a0df-8c92ec73314b.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-904f74a5-e1b6-4740-a0df-8c92ec73314b.md"
+        }
+      }
+    },
+    {
       "id": "20260420-linear-025f5748-bed9-4512-9fd6-53ad57dd1466",
       "title": "CO-266 blocked terminal blocker cleanup advisory",
       "relates_to": "tasks/tasks-linear-025f5748-bed9-4512-9fd6-53ad57dd1466.md",
