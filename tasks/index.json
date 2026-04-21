@@ -13016,6 +13016,36 @@
         "agent_task": ".agent/task/linear-b1835ea5-3d28-493a-934e-1b38048270ce.md",
         "docs": "docs/TECH_SPEC-linear-b1835ea5-3d28-493a-934e-1b38048270ce.md"
       }
+    },
+    {
+      "id": "20260421-linear-904f74a5-e1b6-4740-a0df-8c92ec73314b",
+      "title": "CO: Align marketplace docs and smoke coverage to Codex 0.122 plugin marketplace commands",
+      "relates_to": "tasks/tasks-linear-904f74a5-e1b6-4740-a0df-8c92ec73314b.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-21",
+      "approvals": {
+        "rework_reset": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-21",
+          "status": "completed",
+          "summary": "Closed stale PR #568, deleted the old workpad, and recreated the issue branch from origin/main before new implementation."
+        },
+        "preimplementation_issue_quality": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-21",
+          "status": "approved",
+          "summary": "Narrow command-surface rebaseline; preserves npm baseline and CO-196 packaging architecture while rejecting posture promotion and authority changes."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-904f74a5-e1b6-4740-a0df-8c92ec73314b.md",
+        "task": "tasks/tasks-linear-904f74a5-e1b6-4740-a0df-8c92ec73314b.md",
+        "agent_task": ".agent/task/linear-904f74a5-e1b6-4740-a0df-8c92ec73314b.md",
+        "docs": "docs/TECH_SPEC-linear-904f74a5-e1b6-4740-a0df-8c92ec73314b.md"
+      }
     }
   ]
 }

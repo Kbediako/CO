@@ -192,7 +192,7 @@ jobs:
 
       - name: Install Codex CLI for marketplace smoke
         if: ${{ steps.downstream-smoke.outputs.required == 'true' }}
-        run: npm install --global @openai/codex@0.121.0
+        run: npm install --global @openai/codex@0.122.0
 
       - name: Downstream simulation smoke
         if: ${{ steps.downstream-smoke.outputs.required == 'true' }}
