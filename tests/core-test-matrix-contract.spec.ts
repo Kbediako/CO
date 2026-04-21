@@ -150,6 +150,13 @@ describe('core test matrix command contract', () => {
     expect(runnerSource).toContain('/\\.(?:cmd|bat)$/i.test(command)');
   });
 
+  it('waits for delegated lane stdio to close before classifying no-match output', async () => {
+    const runnerSource = await readFile(join(repoRoot, 'scripts', 'run-test-all.mjs'), 'utf8');
+
+    expect(runnerSource).toContain("child.on('close'");
+    expect(runnerSource).not.toContain("child.on('exit'");
+  });
+
   it('keeps GitHub Core Lane pointed at the core Vitest lane', async () => {
     const workflow = await readFile(join(repoRoot, '.github', 'workflows', 'core-lane.yml'), 'utf8');
 

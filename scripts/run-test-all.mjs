@@ -42,7 +42,7 @@ function runNpm(args) {
       process.exit(1);
     });
 
-    child.on('exit', (code, signal) => {
+    child.on('close', (code, signal) => {
       if (signal) {
         console.error(`[test:all] ${npmCommand} ${args.join(' ')} exited via ${signal}`);
         process.exit(1);
