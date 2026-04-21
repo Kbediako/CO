@@ -1243,10 +1243,7 @@ function resolveLatestTrackedActivityExternalPrHint(
 }
 
 function classifyCurrentExternalPrBlockerText(value: string): 'blocked' | 'resolved' | null {
-  const segments = value
-    .split(/[\n;]+/u)
-    .map((segment) => segment.trim())
-    .filter((segment) => segment.length > 0);
+  const segments = splitExternalPrHintSegments(value);
   let latestHint: 'blocked' | 'resolved' | null = null;
   for (let index = 0; index < segments.length; index += 1) {
     if (!EXTERNAL_PR_REFERENCE_PATTERN.test(segments[index] ?? '')) {
@@ -1268,8 +1265,24 @@ function classifyCurrentExternalPrBlockerText(value: string): 'blocked' | 'resol
   return latestHint;
 }
 
+const MARKDOWN_LINK_DOT_PLACEHOLDER = '__co_pr_link_dot__';
+
+function splitExternalPrHintSegments(value: string): string[] {
+  return value
+    .replace(/\]\(([^)]*)\)/gu, (_match, target: string) =>
+      `](${target.replaceAll('.', MARKDOWN_LINK_DOT_PLACEHOLDER)})`
+    )
+    .split(/[\n.;]+/u)
+    .map((segment) =>
+      segment.replaceAll(MARKDOWN_LINK_DOT_PLACEHOLDER, '.').trim()
+    )
+    .filter((segment) => segment.length > 0);
+}
+
 const EXTERNAL_PR_REFERENCE_PATTERN =
   /\b(?:pr|pull request)\b(?:\s|`|\[|\]|\(|\))*#?\d+\b/iu;
+const EXTERNAL_PR_MERGE_BLOCKER_PATTERN =
+  /\bnot\s+(?:yet\s+)?merged\b|\bneeds?\s+(?:to\s+)?be\s+merged\b|\bmerge\s+pending\b|\bpending\s+merge\b/giu;
 
 function classifyExternalPrHintSegment(segment: string): 'blocked' | 'resolved' | null {
   if (!EXTERNAL_PR_REFERENCE_PATTERN.test(segment)) {
@@ -1280,9 +1293,18 @@ function classifyExternalPrHintSegment(segment: string): 'blocked' | 'resolved' 
     /\b(?:no longer|not|isn't|is not)\s+(?:block(?:ed|er|ing)?|pending|failing|dirty|draft)\b|\bchecks?\s+(?:passed|passing|green|clean)\b|\b(?:unblocked|closed)\b/giu,
     'resolved'
   );
+  const mergeBlockerSignals = collectExternalPrHintSignals(
+    segment,
+    EXTERNAL_PR_MERGE_BLOCKER_PATTERN,
+    'blocked',
+    resolvedSignals
+  );
+  if (mergeBlockerSignals.length > 0) {
+    return 'blocked';
+  }
   const blockedSignals = collectExternalPrHintSignals(
     segment,
-    /\b(?:block(?:ed|er|ing)?|wait(?:ing)?\s+(?:on|for)|pending|draft|dirty|fail(?:ed|ing)?|checks?\s+(?:fail(?:ed|ing)?|pending|red)|red\s+checks?|not\s+(?:yet\s+)?merged|needs?\s+(?:to\s+)?be\s+merged|merge\s+pending|pending\s+merge)\b/giu,
+    /\b(?:block(?:ed|er|ing)?|wait(?:ing)?\s+(?:on|for)|pending|draft|dirty|fail(?:ed|ing)?|checks?\s+(?:fail(?:ed|ing)?|pending|red)|red\s+checks?)\b/giu,
     'blocked',
     resolvedSignals
   );

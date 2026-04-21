@@ -262,6 +262,7 @@ describe('providerOperatorAutopilot', () => {
   });
 
   it('suppresses ready-to-unblock advisories when the issue records a live PR blocker', async () => {
+    const transitionIssueState = createReadOnlyTerminalBlockerTransition();
     const result = await runProviderOperatorAutopilot({
       tracked_issues: [
         createBlockedCo272Issue(
@@ -271,14 +272,18 @@ describe('providerOperatorAutopilot', () => {
       claims: [],
       config: buildConfig(),
       previous_result: null
+    }, {
+      transition_issue_state: transitionIssueState
     });
 
+    expect(transitionIssueState).not.toHaveBeenCalled();
     expect(result.status).toBe('noop');
     expect(result.terminal_blocker_advisories).toEqual([]);
     expect(result.summary).toContain('found no bounded action');
   });
 
   it('suppresses ready-to-unblock advisories when the current PR note remains unmerged', async () => {
+    const transitionIssueState = createReadOnlyTerminalBlockerTransition();
     const result = await runProviderOperatorAutopilot({
       tracked_issues: [
         createBlockedCo272Issue(
@@ -288,14 +293,39 @@ describe('providerOperatorAutopilot', () => {
       claims: [],
       config: buildConfig(),
       previous_result: null
+    }, {
+      transition_issue_state: transitionIssueState
     });
 
+    expect(transitionIssueState).not.toHaveBeenCalled();
+    expect(result.status).toBe('noop');
+    expect(result.terminal_blocker_advisories).toEqual([]);
+    expect(result.summary).toContain('found no bounded action');
+  });
+
+  it('suppresses ready-to-unblock advisories when unresolved merge status appears before passed checks', async () => {
+    const transitionIssueState = createReadOnlyTerminalBlockerTransition();
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createBlockedCo272Issue(
+          'Current operator note: PR #571 is not yet merged, checks passed.'
+        )
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    }, {
+      transition_issue_state: transitionIssueState
+    });
+
+    expect(transitionIssueState).not.toHaveBeenCalled();
     expect(result.status).toBe('noop');
     expect(result.terminal_blocker_advisories).toEqual([]);
     expect(result.summary).toContain('found no bounded action');
   });
 
   it('suppresses ready-to-unblock advisories when markdown-wrapped PR refs remain unmerged', async () => {
+    const transitionIssueState = createReadOnlyTerminalBlockerTransition();
     const result = await runProviderOperatorAutopilot({
       tracked_issues: [
         createBlockedCo272Issue(
@@ -305,14 +335,18 @@ describe('providerOperatorAutopilot', () => {
       claims: [],
       config: buildConfig(),
       previous_result: null
+    }, {
+      transition_issue_state: transitionIssueState
     });
 
+    expect(transitionIssueState).not.toHaveBeenCalled();
     expect(result.status).toBe('noop');
     expect(result.terminal_blocker_advisories).toEqual([]);
     expect(result.summary).toContain('found no bounded action');
   });
 
   it('suppresses ready-to-unblock advisories when markdown PR links keep the status in a later clause', async () => {
+    const transitionIssueState = createReadOnlyTerminalBlockerTransition();
     const result = await runProviderOperatorAutopilot({
       tracked_issues: [
         createBlockedCo272Issue(
@@ -322,14 +356,18 @@ describe('providerOperatorAutopilot', () => {
       claims: [],
       config: buildConfig(),
       previous_result: null
+    }, {
+      transition_issue_state: transitionIssueState
     });
 
+    expect(transitionIssueState).not.toHaveBeenCalled();
     expect(result.status).toBe('noop');
     expect(result.terminal_blocker_advisories).toEqual([]);
     expect(result.summary).toContain('found no bounded action');
   });
 
   it('keeps ready-to-unblock advisories when PR blocker notes are resolved', async () => {
+    const transitionIssueState = createReadOnlyTerminalBlockerTransition();
     const result = await runProviderOperatorAutopilot({
       tracked_issues: [
         createBlockedCo272Issue('Operator note: PR #571 is no longer blocking; checks passed.')
@@ -337,8 +375,11 @@ describe('providerOperatorAutopilot', () => {
       claims: [],
       config: buildConfig(),
       previous_result: null
+    }, {
+      transition_issue_state: transitionIssueState
     });
 
+    expect(transitionIssueState).not.toHaveBeenCalled();
     expect(result.status).toBe('acted');
     expect(result.terminal_blocker_advisories).toMatchObject([
       {
@@ -350,6 +391,7 @@ describe('providerOperatorAutopilot', () => {
   });
 
   it('keeps ready-to-unblock advisories when markdown-wrapped PR refs are explicitly resolved', async () => {
+    const transitionIssueState = createReadOnlyTerminalBlockerTransition();
     const result = await runProviderOperatorAutopilot({
       tracked_issues: [
         createBlockedCo272Issue(
@@ -359,8 +401,11 @@ describe('providerOperatorAutopilot', () => {
       claims: [],
       config: buildConfig(),
       previous_result: null
+    }, {
+      transition_issue_state: transitionIssueState
     });
 
+    expect(transitionIssueState).not.toHaveBeenCalled();
     expect(result.status).toBe('acted');
     expect(result.terminal_blocker_advisories).toMatchObject([
       {
@@ -372,6 +417,7 @@ describe('providerOperatorAutopilot', () => {
   });
 
   it('keeps ready-to-unblock advisories when latest PR blocker notes supersede historical blockers', async () => {
+    const transitionIssueState = createReadOnlyTerminalBlockerTransition();
     const result = await runProviderOperatorAutopilot({
       tracked_issues: [
         createBlockedCo272Issue(
@@ -381,8 +427,11 @@ describe('providerOperatorAutopilot', () => {
       claims: [],
       config: buildConfig(),
       previous_result: null
+    }, {
+      transition_issue_state: transitionIssueState
     });
 
+    expect(transitionIssueState).not.toHaveBeenCalled();
     expect(result.status).toBe('acted');
     expect(result.terminal_blocker_advisories).toMatchObject([
       {
@@ -394,6 +443,7 @@ describe('providerOperatorAutopilot', () => {
   });
 
   it('keeps ready-to-unblock advisories when the current description note supersedes stale blocked activity', async () => {
+    const transitionIssueState = createReadOnlyTerminalBlockerTransition();
     const result = await runProviderOperatorAutopilot({
       tracked_issues: [
         createBlockedCo272Issue(
@@ -419,8 +469,11 @@ describe('providerOperatorAutopilot', () => {
       claims: [],
       config: buildConfig(),
       previous_result: null
+    }, {
+      transition_issue_state: transitionIssueState
     });
 
+    expect(transitionIssueState).not.toHaveBeenCalled();
     expect(result.status).toBe('acted');
     expect(result.terminal_blocker_advisories).toMatchObject([
       {
@@ -432,6 +485,7 @@ describe('providerOperatorAutopilot', () => {
   });
 
   it('keeps ready-to-unblock advisories when multiline PR notes end with resolved status lines', async () => {
+    const transitionIssueState = createReadOnlyTerminalBlockerTransition();
     const result = await runProviderOperatorAutopilot({
       tracked_issues: [
         createBlockedCo272Issue(
@@ -441,8 +495,11 @@ describe('providerOperatorAutopilot', () => {
       claims: [],
       config: buildConfig(),
       previous_result: null
+    }, {
+      transition_issue_state: transitionIssueState
     });
 
+    expect(transitionIssueState).not.toHaveBeenCalled();
     expect(result.status).toBe('acted');
     expect(result.terminal_blocker_advisories).toMatchObject([
       {
@@ -454,6 +511,7 @@ describe('providerOperatorAutopilot', () => {
   });
 
   it('keeps ready-to-unblock advisories when latest activity resolves the PR blocker and description has no PR hint', async () => {
+    const transitionIssueState = createReadOnlyTerminalBlockerTransition();
     const result = await runProviderOperatorAutopilot({
       tracked_issues: [
         createBlockedCo272Issue('Current operator note: waiting on the latest operator update.', {
@@ -476,8 +534,11 @@ describe('providerOperatorAutopilot', () => {
       claims: [],
       config: buildConfig(),
       previous_result: null
+    }, {
+      transition_issue_state: transitionIssueState
     });
 
+    expect(transitionIssueState).not.toHaveBeenCalled();
     expect(result.status).toBe('acted');
     expect(result.terminal_blocker_advisories).toMatchObject([
       {
@@ -5243,6 +5304,12 @@ function buildConfigWithLocalRolloutExecutionActions(
 async function appendExecutionAttemptNoop(): Promise<void> {}
 
 async function appendLifecycleRecordNoop(): Promise<void> {}
+
+function createReadOnlyTerminalBlockerTransition() {
+  return vi.fn(async () => {
+    throw new Error('read-only terminal-blocker advisories must not transition issues');
+  });
+}
 
 function makeNowSequence(values: string[]): () => string {
   let index = 0;
