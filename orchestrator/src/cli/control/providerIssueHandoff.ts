@@ -162,6 +162,7 @@ interface ProviderIssueRunRecord {
   proofTerminalStatus: 'failed' | 'succeeded' | null;
   hasStaleInProgressProof: boolean;
   summary: string | null;
+  failureDiagnosis: ProviderIssueRunFailureDiagnosisRecord | null;
   issueUpdatedAt: string | null;
   startedAt: string | null;
   updatedAt: string | null;
@@ -170,6 +171,12 @@ interface ProviderIssueRunRecord {
   workerHostProofUpdatedAt: string | null;
   workerHost: string | null;
   residentSessionSeed: ProviderLinearResidentSessionSeed | null;
+}
+
+interface ProviderIssueRunFailureDiagnosisRecord {
+  diagnosticCategory: string | null;
+  signal: string | null;
+  guidance: string | null;
 }
 
 interface ProviderUnreadableManifestAdmissionOccupancyRecord {
@@ -194,6 +201,7 @@ interface ProviderLinearWorkerProofRecord {
   owner_phase?: unknown;
   owner_status?: unknown;
   end_reason?: unknown;
+  failure_diagnosis?: unknown;
   updated_at?: unknown;
   worker_host?: unknown;
   resident_session?: unknown;
@@ -7174,6 +7182,7 @@ async function discoverProviderIssueRunSnapshot(
         ),
         hasStaleInProgressProof,
         summary: resolveProviderIssueRunSummary(manifest, proof),
+        failureDiagnosis: resolveProviderIssueRunFailureDiagnosis(manifest, proof),
         issueUpdatedAt: readStringValue(manifest, 'issue_updated_at'),
         startedAt: manifestStartedAt,
         updatedAt: resolveProviderIssueRunUpdatedAt(manifest, proof),
@@ -7376,6 +7385,29 @@ function resolveProviderIssueRunSummary(
     return proofTerminalReason;
   }
   return manifestSummary ?? proofTerminalReason;
+}
+
+function resolveProviderIssueRunFailureDiagnosis(
+  manifest: Record<string, unknown>,
+  proof: ProviderLinearWorkerProofRecord | null
+): ProviderIssueRunFailureDiagnosisRecord | null {
+  if (!shouldUseProviderLinearWorkerTerminalProofForSummary(manifest, proof)) {
+    return null;
+  }
+  const proofRecord = (proof ?? {}) as Record<string, unknown>;
+  const failureDiagnosisRecord = readRecordValue(proofRecord, 'failure_diagnosis');
+  if (!failureDiagnosisRecord) {
+    return null;
+  }
+  return {
+    diagnosticCategory: readStringValue(
+      failureDiagnosisRecord,
+      'diagnostic_category',
+      'diagnosticCategory'
+    ),
+    signal: readStringValue(failureDiagnosisRecord, 'signal'),
+    guidance: readStringValue(failureDiagnosisRecord, 'guidance')
+  };
 }
 
 function resolveProviderIssueRunUpdatedAt(
@@ -7748,7 +7780,17 @@ function resolveProviderRetryErrorFromRun(run: ProviderIssueRunRecord | null): s
   if (run?.status !== 'failed') {
     return null;
   }
-  return run.summary ?? null;
+  return summarizeProviderRetryFailureDiagnosis(run.failureDiagnosis) ?? run.summary ?? null;
+}
+
+function summarizeProviderRetryFailureDiagnosis(
+  failureDiagnosis: ProviderIssueRunFailureDiagnosisRecord | null
+): string | null {
+  if (failureDiagnosis?.diagnosticCategory !== 'provider_stdin_bootstrap') {
+    return null;
+  }
+  const signal = failureDiagnosis.signal?.trim();
+  return signal ? `provider_stdin_bootstrap: ${signal}` : 'provider_stdin_bootstrap';
 }
 
 function resolveProviderReviewPromotionClaimReason(
@@ -8400,6 +8442,7 @@ function resolveProviderReleaseRun(
       proofTerminalStatus: null,
       hasStaleInProgressProof: false,
       summary: null,
+      failureDiagnosis: null,
       issueUpdatedAt: claim.issue_updated_at,
       startedAt: null,
       updatedAt: claim.updated_at,

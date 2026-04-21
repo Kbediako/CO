@@ -28971,6 +28971,12 @@ describe('createProviderIssueHandoffService', () => {
         owner_phase: 'ended',
         owner_status: 'failed',
         end_reason: 'codex_exit_1',
+        failure_diagnosis: {
+          diagnostic_category: 'provider_stdin_bootstrap',
+          signal: 'stderr | Reading additional input from stdin...',
+          guidance:
+            'Codex exited during stdin bootstrap before issue execution; inspect the control-host to provider-linear-worker Codex exec stdin/prompt handoff, not issue-specific content.'
+        },
         updated_at: '2026-03-19T04:30:00.000Z'
       }),
       'utf8'
@@ -29041,7 +29047,7 @@ describe('createProviderIssueHandoffService', () => {
       retry_queued: true,
       retry_attempt: 1,
       retry_due_at: '2026-03-19T04:30:10.000Z',
-      retry_error: 'codex_exit_1'
+      retry_error: 'provider_stdin_bootstrap: stderr | Reading additional input from stdin...'
     };
     expect(state.claims[0]).toMatchObject(expectedClaim);
     expect(persist).toHaveBeenCalled();
@@ -35331,7 +35337,7 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
-  it('does not leak a stale failed proof summary onto a manifest-backed failed run', async () => {
+  it('does not leak stale failed proof summary or diagnostics onto a manifest-backed failed run', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
 
@@ -35366,6 +35372,12 @@ describe('createProviderIssueHandoffService', () => {
         owner_phase: 'ended',
         owner_status: 'failed',
         end_reason: 'codex_exit_1',
+        failure_diagnosis: {
+          diagnostic_category: 'provider_stdin_bootstrap',
+          signal: 'stderr | Reading additional input from stdin...',
+          guidance:
+            'Codex exited during stdin bootstrap before issue execution; inspect the control-host to provider-linear-worker Codex exec stdin/prompt handoff, not issue-specific content.'
+        },
         updated_at: '2026-03-19T04:30:00.000Z'
       }),
       'utf8'
