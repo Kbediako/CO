@@ -1202,14 +1202,14 @@ function isTerminalBlocker(
 function hasExternalPrBlockerHint(
   issue: Pick<LiveLinearTrackedIssue, 'description' | 'recent_activity'>
 ): boolean {
-  const activityHint = resolveLatestTrackedActivityExternalPrHint(issue.recent_activity ?? []);
-  if (activityHint) {
-    return activityHint === 'blocked';
-  }
   const descriptionHint = classifyCurrentExternalPrBlockerText(
     normalizeOptionalString(issue.description) ?? ''
   );
-  return descriptionHint === 'blocked';
+  if (descriptionHint) {
+    return descriptionHint === 'blocked';
+  }
+  const activityHint = resolveLatestTrackedActivityExternalPrHint(issue.recent_activity ?? []);
+  return activityHint === 'blocked';
 }
 
 function resolveLatestTrackedActivityExternalPrHint(
@@ -1247,23 +1247,32 @@ function classifyCurrentExternalPrBlockerText(value: string): 'blocked' | 'resol
     .split(/[\n.;]+/u)
     .map((segment) => segment.trim())
     .filter((segment) => segment.length > 0);
-  for (let index = segments.length - 1; index >= 0; index -= 1) {
-    const candidates = [
-      segments[index],
-      segments[index - 1] !== undefined ? `${segments[index - 1]} ${segments[index]}` : null
-    ].filter((segment): segment is string => Boolean(segment));
-    for (const candidate of candidates) {
-      const hint = classifyExternalPrHintSegment(candidate);
-      if (hint) {
-        return hint;
-      }
+  let latestHint: 'blocked' | 'resolved' | null = null;
+  for (let index = 0; index < segments.length; index += 1) {
+    if (!EXTERNAL_PR_REFERENCE_PATTERN.test(segments[index] ?? '')) {
+      continue;
     }
+    let endIndex = index + 1;
+    while (
+      endIndex < segments.length &&
+      !EXTERNAL_PR_REFERENCE_PATTERN.test(segments[endIndex] ?? '')
+    ) {
+      endIndex += 1;
+    }
+    const hint = classifyExternalPrHintSegment(segments.slice(index, endIndex).join(' '));
+    if (hint) {
+      latestHint = hint;
+    }
+    index = endIndex - 1;
   }
-  return null;
+  return latestHint;
 }
 
+const EXTERNAL_PR_REFERENCE_PATTERN =
+  /\b(?:pr|pull request)\b(?:\s|`|\[|\]|\(|\))*#?\d+\b/iu;
+
 function classifyExternalPrHintSegment(segment: string): 'blocked' | 'resolved' | null {
-  if (!/\b(?:pr|pull request)\b[\s`\[\]()]*#?\d+\b/iu.test(segment)) {
+  if (!EXTERNAL_PR_REFERENCE_PATTERN.test(segment)) {
     return null;
   }
   const resolvedSignals = collectExternalPrHintSignals(

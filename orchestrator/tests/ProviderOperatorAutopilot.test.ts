@@ -376,11 +376,11 @@ describe('providerOperatorAutopilot', () => {
     ]);
   });
 
-  it('keeps ready-to-unblock advisories when current activity supersedes a stale PR blocker description', async () => {
+  it('keeps ready-to-unblock advisories when the current description note supersedes stale blocked activity', async () => {
     const result = await runProviderOperatorAutopilot({
       tracked_issues: [
         createBlockedCo272Issue(
-          'Current operator note: PR #571 is draft, dirty, and checks are pending.',
+          'Current operator note: PR #571 is no longer blocking; checks passed.',
           {
             recent_activity: [
               {
@@ -398,6 +398,63 @@ describe('providerOperatorAutopilot', () => {
             ]
           }
         )
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    });
+
+    expect(result.status).toBe('acted');
+    expect(result.terminal_blocker_advisories).toMatchObject([
+      {
+        issue_id: 'lin-issue-272',
+        issue_identifier: 'CO-272',
+        recommended_action: 'ready_to_unblock'
+      }
+    ]);
+  });
+
+  it('keeps ready-to-unblock advisories when multiline PR notes end with resolved status lines', async () => {
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createBlockedCo272Issue(
+          'Current operator note:\nPR #571\n- draft, dirty\n- checks pending\n- checks passed\n- no longer blocking'
+        )
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    });
+
+    expect(result.status).toBe('acted');
+    expect(result.terminal_blocker_advisories).toMatchObject([
+      {
+        issue_id: 'lin-issue-272',
+        issue_identifier: 'CO-272',
+        recommended_action: 'ready_to_unblock'
+      }
+    ]);
+  });
+
+  it('keeps ready-to-unblock advisories when latest activity resolves the PR blocker and description has no PR hint', async () => {
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createBlockedCo272Issue('Current operator note: waiting on the latest operator update.', {
+          recent_activity: [
+            {
+              id: 'co-272-old-pr-blocker',
+              created_at: '2026-04-21T10:00:00.000Z',
+              actor_name: 'Codex Operator',
+              summary: 'PR #571 still has failing checks.'
+            },
+            {
+              id: 'co-272-current-pr-clear',
+              created_at: '2026-04-21T11:00:00.000Z',
+              actor_name: 'Codex Operator',
+              summary: 'PR #571 is no longer blocking; checks passed.'
+            }
+          ]
+        })
       ],
       claims: [],
       config: buildConfig(),
