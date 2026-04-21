@@ -312,6 +312,23 @@ describe('providerOperatorAutopilot', () => {
     expect(result.summary).toContain('found no bounded action');
   });
 
+  it('suppresses ready-to-unblock advisories when markdown PR links keep the status in a later clause', async () => {
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createBlockedCo272Issue(
+          'Current operator note: PR [`#571`](https://github.com/asabeko/CO/pull/571); not yet merged.'
+        )
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    });
+
+    expect(result.status).toBe('noop');
+    expect(result.terminal_blocker_advisories).toEqual([]);
+    expect(result.summary).toContain('found no bounded action');
+  });
+
   it('keeps ready-to-unblock advisories when PR blocker notes are resolved', async () => {
     const result = await runProviderOperatorAutopilot({
       tracked_issues: [
