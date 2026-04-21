@@ -43,8 +43,8 @@
 - [x] `npm run docs:freshness`
 - [x] `npm run repo:stewardship`
 - [x] `node scripts/diff-budget.mjs`
-- [ ] Manifest-backed standalone review final rerun after addressing P2
-- [ ] Elegance/minimality pass
+- [x] Manifest-backed standalone review final rerun after addressing P2
+- [x] Elegance/minimality pass
 - [ ] Replacement PR attached and `pr ready-review` drain clean
 
 ## Notes
