@@ -45,7 +45,7 @@ async function initFallbackCanaryRepo(
   await writeExecutable(
     join(binDir, 'codex'),
     `#!/usr/bin/env node
-console.log('codex-cli 0.121.0');
+console.log('codex-cli 0.122.0');
 `
   );
   await writeExecutable(
