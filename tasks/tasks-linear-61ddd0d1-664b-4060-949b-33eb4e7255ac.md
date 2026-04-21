@@ -21,7 +21,7 @@
 
 ## Implementation
 - [x] Repo-owned hook source added. Evidence: `scripts/hooks/continue_co_orchestration.py`.
-- [x] Installed hook synced. Evidence: `/Users/kbediako/.codex/hooks/continue_co_orchestration.py` checksum matches repo-owned source (`f1e3b960e921d56e1be4882587773b0f92a6a9cafeb6b8c7d046482f8613031f`).
+- [x] Installed hook synced. Evidence: `/Users/kbediako/.codex/hooks/continue_co_orchestration.py` checksum matches repo-owned source (`bb617dc49232846921d7a03a1e5937843e82cae65761f8ad228e274aae3147d9`).
 - [x] Raw substring persistence removed. Evidence: source now parses only final structured stop-control lines.
 - [x] Resume prompt updated to require `CO_ORCHESTRATOR_STOP: <sentinel>`.
 - [x] Repo-root matching bounded to path descendants. Evidence: sibling-prefix cwd regression leaves state enabled.
@@ -34,9 +34,10 @@
 - [x] Structured `CO_ORCHESTRATOR_DESTRUCTIVE_DECISION_REQUIRED` regression passes. Evidence: `npx vitest run --config vitest.config.core.ts tests/co-orchestration-autocontinue-hook.spec.ts`.
 - [x] Indented structured stop example regression passes. Evidence: focused Vitest spec passed after the standalone-review P2 fix.
 - [x] Sibling-prefix cwd regression passes. Evidence: focused Vitest spec passed 8 tests after the repo-root boundary review fix.
-- [x] Default state path uses the current operator home instead of a user-specific absolute path. Evidence: focused Vitest spec passed 9 tests after the Codex PR feedback fix.
-- [x] Relevant repo validation gates pass. Evidence after the Codex PR feedback fix: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npx vitest run --config vitest.config.core.ts tests/co-orchestration-autocontinue-hook.spec.ts` (9 tests), `node scripts/diff-budget.mjs`, checksum parity, `npm run build`, `npm run lint` (three existing warnings only), `npm run test` (348 files / 4471 tests), `npm run docs:check`, `npm run docs:freshness`, and `npm run repo:stewardship`.
-- [x] Standalone review and elegance review complete before review handoff. Evidence: `.runs/linear-61ddd0d1-664b-4060-949b-33eb4e7255ac/cli/2026-04-21T15-20-09-709Z-20bf52c5/review/telemetry.json` status `succeeded`, outcome `bounded-success` after command-intent containment; manual elegance pass found no simplification patch.
+- [x] Default state path uses the current operator home instead of a user-specific absolute path. Evidence: focused Vitest spec passed 10 tests after the Codex and CodeRabbit PR feedback fixes.
+- [x] Non-positive `max_in_progress` values clamp to sane resume guidance. Evidence: focused Vitest spec passed 10 tests after the CodeRabbit feedback fix.
+- [x] Relevant repo validation gates pass. Evidence after the CodeRabbit feedback fixes: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npx vitest run --config vitest.config.core.ts tests/co-orchestration-autocontinue-hook.spec.ts` (10 tests), `node scripts/diff-budget.mjs`, checksum parity, `npm run build`, `npm run lint` (three existing warnings only), `npm run test` (348 files / 4472 tests), `npm run docs:check`, `npm run docs:freshness`, and `npm run repo:stewardship`.
+- [x] Standalone review and elegance review complete before review handoff. Evidence: `.runs/linear-61ddd0d1-664b-4060-949b-33eb4e7255ac/cli/2026-04-21T15-20-09-709Z-20bf52c5/review/telemetry.json` status `succeeded`, outcome `bounded-success` after command-intent containment; final CodeRabbit-fix rerun found no actionable issues and manual elegance pass found no simplification patch.
 
 ## Progress Log
 - 2026-04-22: initial context found no existing workpad or PR, transitioned CO-297 into `In Progress`, created the workpad, recorded serial parallelization, and drafted the docs-first packet.
@@ -48,6 +49,8 @@
 - 2026-04-22: merged current `origin/main` (`0231b52d5`), reran the full validation floor (348 files / 4469 tests), reran forced standalone review to `clean-success`, and completed the explicit elegance pass with no patch.
 - 2026-04-22: PR ready-review detected new `origin/main` (`adfae4702`) and dirty merge state; resolved `docs/TASKS.md`, `docs/docs-freshness-registry.json`, and `tasks/index.json` by preserving both CO-297 and incoming CO-286 entries, then reran the validation floor (348 files / 4470 tests).
 - 2026-04-22: addressed Codex PR review P2 by deriving the default state path from `Path.home()` / `~/.codex/hooks/co_orchestration_autocontinue.json`, added a temp-`HOME` regression, reran validation through full core test (348 files / 4471 tests), resynced the installed hook, reran forced standalone review to `bounded-success`, and completed the explicit elegance pass with no patch.
+- 2026-04-22: addressed CodeRabbit feedback by adding the spec comma, clamping non-positive `max_in_progress` to `1`, adding a focused resume-prompt regression, rerunning validation through full core test (348 files / 4472 tests), and resyncing the installed hook.
+- 2026-04-22: reran forced standalone review after the CodeRabbit feedback fixes to `bounded-success`; final manual elegance pass found no simplification patch.
 
 ## Notes
 - Do not broaden into provider-worker state transitions or global Codex hook redesign.

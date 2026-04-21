@@ -62,7 +62,7 @@ def parse_structured_stop_sentinel(last_message: str) -> Optional[str]:
 
 def parse_max_in_progress(value: Any) -> int:
     try:
-        return int(value)
+        return max(1, int(value))
     except (TypeError, ValueError):
         return 4
 

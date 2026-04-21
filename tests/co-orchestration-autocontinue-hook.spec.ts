@@ -17,6 +17,7 @@ type HookRun = {
 type HookRunPaths = {
   cwd?: string;
   repoRoot?: string;
+  state?: Record<string, unknown>;
 };
 
 function runHook(lastAssistantMessage: string, configurePaths?: (sandbox: string) => HookRunPaths): HookRun {
@@ -28,7 +29,8 @@ function runHook(lastAssistantMessage: string, configurePaths?: (sandbox: string
     const initialState = {
       enabled: true,
       repo_root: repoRoot,
-      max_in_progress: 2
+      max_in_progress: 2,
+      ...paths.state
     };
     mkdirSync(join(sandbox, 'state'), { recursive: true });
     writeFileSync(statePath, JSON.stringify(initialState), 'utf8');
@@ -164,6 +166,19 @@ describe('CO orchestration auto-continue hook', () => {
     } finally {
       rmSync(sandbox, { recursive: true, force: true });
     }
+  });
+
+  it('clamps non-positive max_in_progress values in the resume prompt', () => {
+    const run = runHook('Still working without a final stop control line.', () => ({
+      state: {
+        max_in_progress: 0
+      }
+    }));
+
+    expect(run.stderr).toBe('');
+    expect(run.payload).toMatchObject({ decision: 'block' });
+    expect(String(run.payload.reason)).toContain('Do not let more than 1 issues be In Progress at once.');
+    expect(run.state.enabled).toBe(true);
   });
 
   it.each([
