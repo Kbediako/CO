@@ -34,7 +34,7 @@
           "reviewer": "Codex provider worker",
           "date": "2026-04-22",
           "status": "succeeded",
-          "summary": "Delegation guard passed with scoped child-stream provenance fallback override; spec guard, build, full test, docs:check, docs:freshness, repo:stewardship, diff-budget, and pack:smoke passed. Lint passed with the existing DelegationMcpHealth.test.ts no-explicit-any warnings only."
+          "summary": "After merging latest origin/main, delegation guard passed with scoped child-stream provenance fallback override; spec guard, build, full test (346 files / 4452 tests), docs:check, docs:freshness, repo:stewardship, diff-budget, and pack:smoke passed. Lint passed with the existing DelegationMcpHealth.test.ts no-explicit-any warnings only."
         },
         "standalone_review": {
           "reviewer": "codex-orchestrator review",
@@ -59,6 +59,31 @@
           "TECH_SPEC": "docs/TECH_SPEC-linear-89c4cb0d-4423-4b1d-865f-25a768b9d7b4.md",
           "ACTION_PLAN": "docs/ACTION_PLAN-linear-89c4cb0d-4423-4b1d-865f-25a768b9d7b4.md"
         }
+      }
+    },
+    {
+      "id": "20260421-linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb",
+      "title": "CO: replace remaining dead-code-pruning archive README pointers with durable guidance",
+      "relates_to": "tasks/tasks-linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md",
+      "risk": "low",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-21",
+      "approvals": {
+        "child_lane_attempt": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-21",
+          "status": "failed-closed-provenance-invalid",
+          "audit": ".runs/linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb/cli/2026-04-21T05-01-57-505Z-73d5a803/provider-linear-worker-linear-audit.jsonl",
+          "summary": "Same-issue docs child-lane launch was attempted after the required parallelize_now decision but failed closed with provider_worker_child_lane_provenance_invalid because the parent manifest lacks provider control-host provenance; parent owns docs and README implementation without fabricating child evidence."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md",
+        "task": "tasks/tasks-linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md",
+        "agent_task": ".agent/task/linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md",
+        "docs": "docs/TECH_SPEC-linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md"
       }
     },
     {
