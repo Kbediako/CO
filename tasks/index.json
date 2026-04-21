@@ -1,6 +1,56 @@
 {
   "items": [
     {
+      "id": "20260421-linear-63dbed8c-522b-4c10-8a62-86ebb823ee29",
+      "title": "CO-270 exact test surface contract alignment across scripts, configs, core lane, and agent docs",
+      "relates_to": "tasks/tasks-linear-63dbed8c-522b-4c10-8a62-86ebb823ee29.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-21",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-21",
+          "status": "produced",
+          "manifest": ".runs/linear-63dbed8c-522b-4c10-8a62-86ebb823ee29-docs-packet/cli/2026-04-21T01-47-25-589Z-84d38530/manifest.json",
+          "source_anchor": "ctx:sha256:5d2910fa0d93867cfa975aa86260aab30241bc467da1a832b38c1aaa29db0c78#chunk:c000001",
+          "summary": "Initial docs-first packet preserved the exact protected surfaces and rejection criteria for CO-270. Parent later refreshed that packet to match the corrected branch contract: `npm run test` and `test:orchestrator` both point to `test:core`, `test:all` is the explicit broader entrypoint, `eval:test` aliases `test:evaluation`, and Core Lane runs `npm run test:core`."
+        },
+        "contract_proof_child_lane": {
+          "reviewer": "bounded same-issue contract-proof child lane",
+          "date": "2026-04-21",
+          "status": "accepted",
+          "manifest": ".runs/linear-63dbed8c-522b-4c10-8a62-86ebb823ee29-contract-proof/cli/2026-04-21T03-03-34-386Z-337419d9/manifest.json",
+          "summary": "Accepted focused regression coverage on a fresh non-overlapping path: `tests/core-test-matrix-contract.spec.ts` asserts the explicit `test:core` / `test:all` script contract, the `test:orchestrator` and `eval:test` aliases, and the Core Lane workflow step running `npm run test:core`."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-21",
+          "status": "bounded-success",
+          "telemetry": ".runs/linear-63dbed8c-522b-4c10-8a62-86ebb823ee29/cli/2026-04-21T01-44-00-419Z-8963f66b/review/telemetry.json",
+          "summary": "Manifest-backed standalone review completed successfully via the command-intent retry boundary; telemetry reports `review_outcome: bounded-success`."
+        },
+        "elegance_review": {
+          "reviewer": "parent manual elegance pass",
+          "date": "2026-04-21",
+          "status": "passed",
+          "summary": "No simplification patch was needed for the command contract or focused regression; parent refreshed stale packet status lines after the pass."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-63dbed8c-522b-4c10-8a62-86ebb823ee29.md",
+        "task": "tasks/tasks-linear-63dbed8c-522b-4c10-8a62-86ebb823ee29.md",
+        "agent_task": ".agent/task/linear-63dbed8c-522b-4c10-8a62-86ebb823ee29.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-63dbed8c-522b-4c10-8a62-86ebb823ee29.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-63dbed8c-522b-4c10-8a62-86ebb823ee29.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-63dbed8c-522b-4c10-8a62-86ebb823ee29.md"
+        }
+      }
+    },
+    {
       "id": "20260420-linear-025f5748-bed9-4512-9fd6-53ad57dd1466",
       "title": "CO-266 blocked terminal blocker cleanup advisory",
       "relates_to": "tasks/tasks-linear-025f5748-bed9-4512-9fd6-53ad57dd1466.md",
