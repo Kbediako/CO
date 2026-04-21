@@ -1,6 +1,36 @@
 {
   "items": [
     {
+      "id": "20260421-linear-09c996ec-47b3-4f55-928d-38e0b17c11df",
+      "title": "CO-275 Codex CLI 0.122.0 marketplace pack:smoke parity packet",
+      "relates_to": "tasks/tasks-linear-09c996ec-47b3-4f55-928d-38e0b17c11df.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-21",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-21",
+          "status": "produced",
+          "manifest": ".runs/linear-09c996ec-47b3-4f55-928d-38e0b17c11df-docs-packet/cli/2026-04-21T04-32-03-882Z-56f78783/manifest.json",
+          "source_anchor": "ctx:sha256:0e9cc806c03afdcd2ad2aeccf80f57549868a86ca946747d78aee3d131e0c83f#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-275 as the Codex CLI 0.122.0 marketplace pack:smoke alignment lane: release-facing pack:smoke proof must account for @openai/codex@0.122.0 while preserving Codex CLI 0.121.0 / @openai/codex@0.121.0 lineage from CO-196 and CO-217, keeping codex marketplace add coverage mandatory, and treating CO-269 as the 0.122.0 lineage anchor. Parent owns implementation, validation, Linear state, workpad, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-09c996ec-47b3-4f55-928d-38e0b17c11df.md",
+        "task": "tasks/tasks-linear-09c996ec-47b3-4f55-928d-38e0b17c11df.md",
+        "agent_task": ".agent/task/linear-09c996ec-47b3-4f55-928d-38e0b17c11df.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-09c996ec-47b3-4f55-928d-38e0b17c11df.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-09c996ec-47b3-4f55-928d-38e0b17c11df.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-09c996ec-47b3-4f55-928d-38e0b17c11df.md"
+        }
+      }
+    },
+    {
       "id": "20260420-linear-025f5748-bed9-4512-9fd6-53ad57dd1466",
       "title": "CO-266 blocked terminal blocker cleanup advisory",
       "relates_to": "tasks/tasks-linear-025f5748-bed9-4512-9fd6-53ad57dd1466.md",
