@@ -1256,7 +1256,7 @@ function classifyCurrentExternalPrBlockerText(value: string): 'blocked' | 'resol
     ) {
       endIndex += 1;
     }
-    const hint = classifyExternalPrHintSegment(segments.slice(index, endIndex).join(' '));
+    const hint = classifyExternalPrHintBlock(segments.slice(index, endIndex).join(' '));
     if (hint) {
       latestHint = hint;
     }
@@ -1281,8 +1281,38 @@ function splitExternalPrHintSegments(value: string): string[] {
 
 const EXTERNAL_PR_REFERENCE_PATTERN =
   /\b(?:pr|pull request)\b(?:\s|`|\[|\]|\(|\))*#?\d+\b/iu;
+const EXTERNAL_PR_REFERENCE_PATTERN_GLOBAL =
+  /\b(?:pr|pull request)\b(?:\s|`|\[|\]|\(|\))*#?\d+\b/giu;
 const EXTERNAL_PR_MERGE_BLOCKER_PATTERN =
   /\bnot\s+(?:yet\s+)?merged\b|\bneeds?\s+(?:to\s+)?be\s+merged\b|\bmerge\s+pending\b|\bpending\s+merge\b/giu;
+
+function classifyExternalPrHintBlock(segment: string): 'blocked' | 'resolved' | null {
+  let sawResolved = false;
+  for (const prSegment of splitExternalPrReferenceSegments(segment)) {
+    const hint = classifyExternalPrHintSegment(prSegment);
+    if (hint === 'blocked') {
+      return 'blocked';
+    }
+    if (hint === 'resolved') {
+      sawResolved = true;
+    }
+  }
+  return sawResolved ? 'resolved' : null;
+}
+
+function splitExternalPrReferenceSegments(segment: string): string[] {
+  const matches = [...segment.matchAll(EXTERNAL_PR_REFERENCE_PATTERN_GLOBAL)];
+  if (matches.length <= 1) {
+    return [segment];
+  }
+  return matches
+    .map((match, index) => {
+      const start = match.index ?? 0;
+      const end = matches[index + 1]?.index ?? segment.length;
+      return segment.slice(start, end).trim();
+    })
+    .filter((entry) => entry.length > 0);
+}
 
 function classifyExternalPrHintSegment(segment: string): 'blocked' | 'resolved' | null {
   if (!EXTERNAL_PR_REFERENCE_PATTERN.test(segment)) {

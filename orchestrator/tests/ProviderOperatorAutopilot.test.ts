@@ -366,6 +366,27 @@ describe('providerOperatorAutopilot', () => {
     expect(result.summary).toContain('found no bounded action');
   });
 
+  it('suppresses ready-to-unblock advisories when a mixed same-sentence note still has a blocked PR', async () => {
+    const transitionIssueState = createReadOnlyTerminalBlockerTransition();
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createBlockedCo272Issue(
+          'Current operator note: PR #571 still has failing checks, but PR #572 is no longer blocking.'
+        )
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    }, {
+      transition_issue_state: transitionIssueState
+    });
+
+    expect(transitionIssueState).not.toHaveBeenCalled();
+    expect(result.status).toBe('noop');
+    expect(result.terminal_blocker_advisories).toEqual([]);
+    expect(result.summary).toContain('found no bounded action');
+  });
+
   it('keeps ready-to-unblock advisories when PR blocker notes are resolved', async () => {
     const transitionIssueState = createReadOnlyTerminalBlockerTransition();
     const result = await runProviderOperatorAutopilot({
