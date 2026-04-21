@@ -2378,6 +2378,21 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       ],
       [
         {
+          type: 'provider_runtime',
+          status: 'failed',
+          message: 'stderr | Reading additional input from stdin...'
+        },
+        'provider_stdin_bootstrap'
+      ],
+      [
+        {
+          type: 'diagnostic',
+          diagnostic_category: 'provider_stdin_bootstrap'
+        },
+        'provider_stdin_bootstrap'
+      ],
+      [
+        {
           type: 'auth_mismatch',
           status: 'failed',
           message: 'quota exhausted context from a nearby account state'
@@ -2440,6 +2455,25 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       );
       expect(parsed.failureDiagnosis?.diagnostic_category).toBe(expected);
     }
+  });
+
+  it('classifies stdin bootstrap provider exits separately from generic runtime failures', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      JSON.stringify({
+        type: 'error',
+        message: 'stderr | Reading additional input from stdin...',
+        timestamp: '2026-04-21T04:00:00.000Z'
+      })
+    );
+
+    expect(parsed.failureDiagnosis).toMatchObject({
+      diagnostic_category: 'provider_stdin_bootstrap',
+      signal: expect.stringContaining('Reading additional input from stdin'),
+      source: 'stdout_jsonl',
+      observed_at: '2026-04-21T04:00:00.000Z',
+      guidance: expect.stringContaining('stdin bootstrap')
+    });
+    expect(parsed.failureDiagnosis?.diagnostic_category).not.toBe('provider_runtime');
   });
 
   it('classifies prose rate-limited provider failures', () => {
@@ -6836,6 +6870,58 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         signal: expect.stringContaining('boom'),
         source: 'stderr',
         observed_at: '2026-03-21T09:00:01.000Z'
+      }
+    });
+  });
+
+  it('classifies a stdin bootstrap exit in the failed proof sidecar before issue execution', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+
+    await expect(
+      runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '3'
+        },
+        {
+          readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+          resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+          execRunner: vi.fn(async () => {
+            return {
+              exitCode: 1,
+              stdout: '',
+              stderr: 'Reading additional input from stdin...'
+            };
+          }),
+          now: vi
+            .fn()
+            .mockReturnValueOnce('2026-04-21T04:00:00.000Z')
+            .mockReturnValue('2026-04-21T04:00:01.000Z'),
+          log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+        }
+      )
+    ).rejects.toThrow('provider-linear-worker turn 1 failed with exit code 1');
+
+    const written = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      owner_status: 'failed',
+      end_reason: 'codex_exit_1',
+      failure_diagnosis: {
+        diagnostic_category: 'provider_stdin_bootstrap',
+        signal: 'stderr | Reading additional input from stdin...',
+        source: 'stderr',
+        observed_at: '2026-04-21T04:00:01.000Z',
+        guidance: expect.stringContaining('stdin bootstrap')
+      },
+      linear_audit: {
+        attempted_count: 0,
+        success_count: 0,
+        failure_count: 0,
+        parallelization_entries: []
       }
     });
   });
