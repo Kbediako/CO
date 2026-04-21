@@ -23398,7 +23398,11 @@ describe('createProviderIssueHandoffService', () => {
       issue_state_type: 'completed',
       task_id: taskId,
       run_id: null,
-      run_manifest_path: null
+      run_manifest_path: null,
+      worker_host: null,
+      launch_source: null,
+      launch_token: null,
+      launch_started_at: null
     });
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();

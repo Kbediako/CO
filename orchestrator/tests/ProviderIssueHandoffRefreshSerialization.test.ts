@@ -2503,8 +2503,8 @@ describe('runProviderIssueHandoffRefresh', () => {
       issue_state: 'Done',
       issue_state_type: 'completed',
       issue_updated_at: '2026-04-15T01:10:00.000Z',
-      run_id: null,
-      run_manifest_path: null
+      run_id: 'run-retained-missing-manifest',
+      run_manifest_path: ''
     });
 
     const launcher = {
@@ -2562,8 +2562,8 @@ describe('runProviderIssueHandoffRefresh', () => {
       issue_state: 'Done',
       issue_state_type: 'completed',
       issue_updated_at: '2026-04-15T01:10:00.000Z',
-      run_id: null,
-      run_manifest_path: null
+      run_id: 'run-retained-missing-manifest',
+      run_manifest_path: ''
     });
   });
 
@@ -2575,7 +2575,7 @@ describe('runProviderIssueHandoffRefresh', () => {
       issue_state: 'Done',
       issue_state_type: 'completed',
       issue_updated_at: '2026-04-15T01:10:00.000Z',
-      run_id: null,
+      run_id: co185TaskId,
       run_manifest_path: null
     });
 
@@ -2633,7 +2633,7 @@ describe('runProviderIssueHandoffRefresh', () => {
       issue_state: 'Done',
       issue_state_type: 'completed',
       issue_updated_at: '2026-04-15T01:10:00.000Z',
-      run_id: null,
+      run_id: co185TaskId,
       run_manifest_path: null
     });
   });

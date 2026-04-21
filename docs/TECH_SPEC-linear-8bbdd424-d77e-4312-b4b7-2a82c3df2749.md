@@ -18,9 +18,9 @@ This file mirrors the canonical spec at `tasks/specs/linear-8bbdd424-d77e-4312-b
 
 ## Issue-Shaping Contract
 - User-request translation carried forward: close the broader post-release truth gap where released claims retain stale run pointers, operator autopilot suggests unblock from stale blocker truth, and `linear-advisory-state.json` stays stale while refresh/rehydrate is live.
-- Protected terms / exact artifact and surface names: `released claims`, `run_manifest_path`, `manifest.json status=in_progress`, `provider-intake-state.json`, `provider-operator-autopilot.jsonl`, `ready_to_unblock`, `linear-advisory-state.json`, `CO-272`, `CO-278:Done`, PR `#571`, `CO-292`, `CO-286`, `CO-211`.
+- Protected terms / exact artifact and surface names: `released claims`, `run_manifest_path`, `manifest.json status=in_progress`, `provider-intake-state.json`, `provider-operator-autopilot.jsonl`, `ready_to_unblock`, `linear-advisory-state.json`, `refresh/rehydrate`, `CO-272`, `CO-278:Done`, PR `#571`, `CO-292`, `CO-286`, `CO-211`.
 - Nearby wrong interpretations to reject: display-only changes, manual state-file cleanup, deleting retained history, weakening live-worker attach, or treating `CO-292` as the complete fix.
-- Explicit non-goals: no generic scheduler/capacity rewrite, no auto-unblock/auto-close from stale blocker edges, no broad advisory subsystem replacement.
+- Explicit non-goals: no generic scheduler/capacity rewrite, no auto-unblock/auto-close from stale blocker edges, no broad advisory subsystem replacement, and no April 21 local file cleanup as the shipped fix.
 
 ## Parity / Alignment Matrix
 - Current truth: stale post-release run pointers, stale `ready_to_unblock` advice, and stale advisory JSON can appear current.
@@ -44,7 +44,7 @@ This file mirrors the canonical spec at `tasks/specs/linear-8bbdd424-d77e-4312-b
 ## Validation Plan
 - Focused provider-intake/projection regression for terminal released issue plus stale `in_progress` manifest pointer.
 - Focused operator-autopilot regression for stale completed blocker edge with fresher blocker/PR truth.
-- Focused advisory-state freshness/deprecation regression.
+- Focused advisory-state freshness/deprecation regression, including polling-only heartbeat and ignored-delivery edge cases.
 - Adjacent active-lane admission/attach coverage for touched seams.
 - Full repo validation and review gates before handoff.
 
