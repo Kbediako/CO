@@ -34,6 +34,11 @@ export function sanitizeProviderOverrideEnv(
   } = {}
 ): NodeJS.ProcessEnv {
   const sanitized: NodeJS.ProcessEnv = { ...env };
+  if (options.stripWorkspaceArtifactEnv) {
+    for (const key of PROVIDER_WORKSPACE_ARTIFACT_ENV_KEYS) {
+      delete sanitized[key];
+    }
+  }
   const controlHostLocator = readProviderControlHostLocatorFromEnv(sanitized);
   if (!controlHostLocator) {
     return sanitized;
@@ -67,11 +72,6 @@ export function sanitizeProviderOverrideEnv(
   }
   if (shouldStripPackageRoot) {
     delete sanitized.CODEX_ORCHESTRATOR_PACKAGE_ROOT;
-  }
-  if (options.stripWorkspaceArtifactEnv) {
-    for (const key of PROVIDER_WORKSPACE_ARTIFACT_ENV_KEYS) {
-      delete sanitized[key];
-    }
   }
   for (const key of PROVIDER_OVERRIDE_MARKER_ENV_KEYS) {
     delete sanitized[key];

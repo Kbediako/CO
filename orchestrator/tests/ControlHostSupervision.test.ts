@@ -1249,6 +1249,53 @@ describe('controlHostSupervision shell helpers', () => {
     expect(rendered).toContain('Live host: healthy via co-status');
   });
 
+  it('keeps probe-timeout quarantine live health mapped to quarantined', () => {
+    const persistedState = {
+      version: 1 as const,
+      status: 'quarantined',
+      updated_at: '2026-04-22T07:31:39.652Z',
+      label: 'com.example.control-host',
+      repo_root: '/repo/CO',
+      service_target: 'gui/501/com.example.control-host',
+      child_pid: 4321,
+      last_started_at: '2026-04-22T07:20:00.000Z',
+      last_exit_at: null,
+      last_exit_code: null,
+      last_signal: null,
+      last_health_check_at: '2026-04-22T07:31:39.652Z',
+      last_health_status: 'active_worker_probe_timeout_quarantine',
+      consecutive_unhealthy_samples: 3,
+      restart_count: 2,
+      unhealthy_threshold: 3,
+      health_interval_seconds: 30,
+      last_restart_reason: 'probe_timeout',
+      last_restart_requested_at: '2026-04-22T07:31:39.652Z',
+      message: 'The active worker still appears healthy despite probe timeout.'
+    };
+    const liveHost = {
+      checked_at: '2026-04-22T07:38:13.527Z',
+      healthy: true,
+      source: 'co_status' as const,
+      reason: 'active_worker_probe_timeout_quarantine',
+      message: 'The active worker still appears healthy despite probe timeout.',
+      stale_launchctl_metadata: false,
+      stale_persisted_state: false,
+      co_status: {
+        healthy: true,
+        reason: 'active_worker_probe_timeout_quarantine',
+        message: 'The active worker still appears healthy despite probe timeout.',
+        diagnostic: null
+      },
+      freshness_gauge: null
+    };
+
+    expect(resolveEffectiveControlHostSupervisionState(persistedState, liveHost)).toMatchObject({
+      status: 'quarantined',
+      last_health_status: 'active_worker_probe_timeout_quarantine',
+      consecutive_unhealthy_samples: 3
+    });
+  });
+
   it('strips workspace-scoped orchestrator roots from provider override environments when requested', () => {
     const sanitized = sanitizeProviderOverrideEnv(
       {
@@ -1282,6 +1329,9 @@ describe('controlHostSupervision shell helpers', () => {
       cliEntrypoint: '/opt/codex-orchestrator.js'
     });
     const serviceTarget = resolveControlHostSupervisionServiceTarget(config.label);
+    const expectedArtifactRoot = dirname(
+      resolveControlHostSupervisionProviderIntakeStatePath(config, {})
+    );
     const persistedState = {
       version: 1 as const,
       status: 'restart_required',
@@ -1336,7 +1386,10 @@ describe('controlHostSupervision shell helpers', () => {
           diagnostic: null
         };
       },
-      evaluateFreshnessGauge: async () => freshnessReport
+      evaluateFreshnessGauge: async ({ artifactRoot }) => {
+        expect(artifactRoot).toBe(expectedArtifactRoot);
+        return freshnessReport;
+      }
     });
 
     expect(liveHealth).toMatchObject({

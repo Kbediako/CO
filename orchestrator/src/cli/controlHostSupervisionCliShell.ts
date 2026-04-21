@@ -950,9 +950,10 @@ async function inspectControlHostSupervisionLiveHealth(
     dependencies.evaluateFreshnessGauge ?? evaluateProviderControlHostFreshnessGauge;
   const checkedAt = new Date().toISOString();
 
+  let bootstrappedEnv: NodeJS.ProcessEnv = {};
   let coStatus: ControlHostSupervisionCoStatusEvidence | null = null;
   try {
-    const bootstrappedEnv = sanitizeProviderOverrideEnv(
+    bootstrappedEnv = sanitizeProviderOverrideEnv(
       await loadBootstrapEnvironmentImpl(config),
       {
         stripWorkspaceArtifactEnv: true
@@ -979,7 +980,9 @@ async function inspectControlHostSupervisionLiveHealth(
 
   let freshnessGauge: ControlHostSupervisionFreshnessEvidence | null = null;
   try {
-    const artifactRoot = resolve(config.repoRoot, '.runs', config.taskId, 'cli', config.runId);
+    const artifactRoot = dirname(
+      resolveControlHostSupervisionProviderIntakeStatePath(config, bootstrappedEnv)
+    );
     const freshnessReport = await evaluateFreshnessGaugeImpl({
       artifactRoot
     });
@@ -1240,7 +1243,10 @@ function resolveEffectiveControlHostSupervisionState(
     return persistedState;
   }
   const effectiveStatus =
-    liveHost.reason === 'active_worker_restart_quarantine' ? 'quarantined' : 'healthy';
+    liveHost.reason === 'active_worker_restart_quarantine' ||
+    liveHost.reason === 'active_worker_probe_timeout_quarantine'
+      ? 'quarantined'
+      : 'healthy';
   const effectiveLastHealthStatus = liveHost.reason ?? persistedState.last_health_status;
   const effectiveConsecutiveUnhealthySamples =
     effectiveStatus === 'healthy' ? 0 : persistedState.consecutive_unhealthy_samples;

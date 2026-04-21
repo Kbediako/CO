@@ -24,8 +24,7 @@
         "task": "tasks/tasks-linear-20102af9-9eb4-44d1-8988-c5de7869d990.md",
         "agent_task": ".agent/task/linear-20102af9-9eb4-44d1-8988-c5de7869d990.md",
         "docs": {
-          "PRD": "docs/PRD-linear-20102af9-9eb4-44d1-8988-c5de7869d990.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-20102af9-9eb4-44d1-8988-c5de7869d990.md"
+          "TECH_SPEC": "tasks/specs/linear-20102af9-9eb4-44d1-8988-c5de7869d990.md"
         }
       }
     },
