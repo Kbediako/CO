@@ -1,6 +1,36 @@
 {
   "items": [
     {
+      "id": "20260421-linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9",
+      "title": "Preserve provider-worker provenance across rehydrated active-run resume",
+      "relates_to": "tasks/tasks-linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-21",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-21",
+          "status": "completed",
+          "manifest": ".runs/linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9-co289-docs-packet/cli/2026-04-21T06-56-20-392Z-b41cf2db/manifest.json",
+          "source_anchor": "ctx:sha256:6c59a269dfa69e9b7db180869f29ed426f66424f7f5cab6c4650cd494af19246#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-289 as the rehydrated active-run provenance follow-up to completed CO-244: provider_issue_rehydrated_active_run claims must not lose valid control-host provenance as launch_source: null when the attached active run manifest proves provider_launch_source, provider_control_host_task_id, and provider_control_host_run_id. CO-216 operator-autopilot behavior is explicitly out of scope."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
+        "task": "tasks/tasks-linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
+        "agent_task": ".agent/task/linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md"
+        }
+      }
+    },
+    {
       "id": "20260421-linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13",
       "title": "CO: clarify README when main documents behavior newer than the latest tagged package",
       "relates_to": "tasks/tasks-linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13.md",

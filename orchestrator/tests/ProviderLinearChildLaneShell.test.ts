@@ -470,6 +470,40 @@ describe('runProviderLinearChildLaneShell', () => {
     });
   });
 
+  it('reports required manifest and env fields when child-lane provenance is invalid', async () => {
+    const { manifestPath } = await createProviderWorkerManifest();
+
+    const result = await runProviderLinearChildLaneShell({
+      action: 'launch',
+      streamName: 'docs-a',
+      purpose: 'Document provenance diagnostics',
+      files: ['docs/TECH_SPEC-linear-104aa410-5c94-457c-bbce-9962c7308ac5.md'],
+      phases: ['docs'],
+      env: buildProviderWorkerEnv(manifestPath, {
+        CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID: 'different-control-host-run'
+      })
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'launch',
+      error: {
+        code: 'provider_worker_child_lane_provenance_invalid',
+        status: 412
+      }
+    });
+    if (result.ok) {
+      throw new Error('expected child-lane launch to fail provenance validation');
+    }
+    expect(result.error.message).toContain('Required manifest fields: provider_launch_source=control-host, provider_control_host_task_id, provider_control_host_run_id.');
+    expect(result.error.message).toContain(`Parent manifest: ${manifestPath}.`);
+    expect(result.error.message).toContain(`provider_control_host_task_id=${CONTROL_HOST_TASK_ID}`);
+    expect(result.error.message).toContain('provider_control_host_run_id=control-host-run-1');
+    expect(result.error.message).toContain('CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID=different-control-host-run');
+    expect(result.error.message).toContain('recorded=true matches=false');
+  });
+
   it('fails closed instead of rebinding to an older canonical same-issue parent manifest', async () => {
     tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-live-parent-'));
     const liveRunId = 'manual-parent-run';

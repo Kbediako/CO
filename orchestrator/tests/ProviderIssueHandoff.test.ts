@@ -11927,6 +11927,9 @@ describe('createProviderIssueHandoffService', () => {
         issue_provider: 'linear',
         issue_id: 'lin-issue-1',
         issue_identifier: 'CO-2',
+        provider_launch_source: 'control-host',
+        provider_control_host_task_id: 'local-mcp',
+        provider_control_host_run_id: 'control-host',
         updated_at: '2026-03-19T04:32:00.000Z'
       }),
       'utf8'
@@ -11976,6 +11979,9 @@ describe('createProviderIssueHandoffService', () => {
         issue_provider: 'linear',
         issue_id: 'lin-issue-1',
         issue_identifier: 'CO-2',
+        provider_launch_source: 'control-host',
+        provider_control_host_task_id: 'local-mcp',
+        provider_control_host_run_id: 'control-host',
         updated_at: '2026-03-19T04:32:00.000Z'
       }),
       'utf8'
@@ -12471,6 +12477,9 @@ describe('createProviderIssueHandoffService', () => {
         issue_provider: 'linear',
         issue_id: 'lin-issue-1',
         issue_identifier: 'CO-2',
+        provider_launch_source: 'control-host',
+        provider_control_host_task_id: 'local-mcp',
+        provider_control_host_run_id: 'control-host',
         updated_at: '2026-03-19T04:32:00.000Z'
       }),
       'utf8'
@@ -15885,6 +15894,9 @@ describe('createProviderIssueHandoffService', () => {
         issue_id: 'lin-issue-1',
         issue_identifier: 'CO-2',
         issue_updated_at: '2026-03-19T04:30:30.000Z',
+        provider_launch_source: 'control-host',
+        provider_control_host_task_id: 'local-mcp',
+        provider_control_host_run_id: 'control-host',
         updated_at: '2026-03-19T04:31:00.000Z'
       }),
       'utf8'
