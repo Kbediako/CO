@@ -3826,11 +3826,17 @@ describe('ControlRuntime', () => {
     const snapshot = fixture.runtime.snapshot();
     const selectedSnapshot = await snapshot.readSelectedRunSnapshot();
     const compatibilityProjection = await snapshot.readCompatibilityProjection();
+    const uiDataset = buildUiDataset({
+      projection: compatibilityProjection,
+      generatedAt: '2026-04-21T16:00:00.000Z'
+    });
 
     expect(selectedSnapshot.selected?.issueIdentifier).toBe('CO-294');
     expect(selectedSnapshot.selected?.tracked?.linear ?? null).toBeNull();
     expect(selectedSnapshot.tracked?.linear ?? null).toBeNull();
+    expect(compatibilityProjection.selected?.tracked?.linear ?? null).toBeNull();
     expect(compatibilityProjection.tracked?.linear ?? null).toBeNull();
+    expect((uiDataset as { tracked?: { linear?: unknown } }).tracked?.linear ?? null).toBeNull();
   });
 
   it('ignores stale advisory fallback that matches only a non-authoritative selected alias', async () => {

@@ -34,7 +34,8 @@
 - [x] Focused advisory-state freshness/deprecation regression. Evidence: `orchestrator/tests/ControlServerStartupInputPreparation.test.ts`, `orchestrator/tests/ControlServerSeededRuntimeAssembly.test.ts`, `orchestrator/tests/ControlRuntime.test.ts`, `orchestrator/tests/LinearWebhookController.test.ts`.
 - [x] Required repo validation gates. Evidence: delegation guard passed with scoped child-stream provenance override, `node scripts/spec-guard.mjs --dry-run` passed, `npm run build` passed, `npm run lint` passed with three pre-existing `DelegationMcpHealth.test.ts` warnings, `npm run test` passed 348 files / 4479 tests, `npm run docs:check` passed, `npm run docs:freshness` passed, `npm run repo:stewardship` passed, `node scripts/diff-budget.mjs` passed, and `npm run pack:smoke` passed.
 - [x] Standalone review and elegance pass. Evidence: `.runs/linear-8bbdd424-d77e-4312-b4b7-2a82c3df2749/cli/2026-04-21T16-10-47-501Z-6477672f/review/telemetry.json` reports `status: succeeded` / `review_outcome: bounded-success` via command-intent; manual elegance pass found no avoidable abstraction or scope reduction after the startup persistence fix.
-- [ ] PR attached and `pr ready-review` drain clean before `In Review`. Evidence: pending.
+- [x] PR attached (PR `#589`). Evidence: https://github.com/Kbediako/CO/pull/589.
+- [ ] `pr ready-review` drain clean before `In Review`. Evidence: pending.
 
 ## Progress Log
 - 2026-04-22: Parent created isolated worktree `.workspaces/linear-8bbdd424-d77e-4312-b4b7-2a82c3df2749` from `origin/main` because the shared root was dirty on `linear/co-278-refresh-spec-guard-baseline`.
