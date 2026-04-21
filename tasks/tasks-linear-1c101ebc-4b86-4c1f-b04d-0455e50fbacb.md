@@ -39,20 +39,20 @@
 - [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `✅ Spec guard: OK`.
 - [x] `npm run build`. Evidence: diagnostics manifest command `02-build` succeeded.
 - [x] `npm run lint`. Evidence: passed with three existing `no-explicit-any` warnings in `orchestrator/tests/DelegationMcpHealth.test.ts`.
-- [ ] `npm run test`. Evidence: pending clean intentional rerun after latest-main merge and docs cleanup; an accidental command-substitution run showed `346` files / `4450` tests passed, but the enclosing shell command exited non-zero after a later `rg` parse error and is not used as the final gate.
-- [x] Focused Doctor rerun classified as non-blocking for CO-276. Evidence: previous focused rerun passed `1/1`; current full-suite evidence is pending final clean rerun.
-- [x] Focused command-surface blocker classified as resolved by current-main validation. Evidence: accidental full-suite run included `tests/cli-command-surface.spec.ts` passing `115` tests; pending final clean rerun.
-- [x] Focused SDK artifact blocker classified as resolved by current-main validation. Evidence: accidental full-suite run included `packages/sdk-node/tests/orchestrator.artifacts.test.ts` passing `2` tests; pending final clean rerun.
+- [x] `npm run test`. Evidence: clean intentional post-merge rerun passed `346` files / `4450` tests in 146.45s.
+- [x] Focused Doctor rerun classified as non-blocking for CO-276. Evidence: previous focused rerun passed `1/1`; current full-suite validation completed cleanly.
+- [x] Focused command-surface blocker classified as resolved by current-main validation. Evidence: clean full-suite rerun passed with the CLI command-surface coverage included.
+- [x] Focused SDK artifact blocker classified as resolved by current-main validation. Evidence: clean full-suite rerun passed with the SDK artifact-retention coverage included.
 - [x] `npm run docs:check`. Evidence: `✅ docs:check: OK`.
-- [x] `npm run docs:freshness`. Evidence: `docs:freshness OK - 4307 docs, 4310 registry entries`.
-- [x] `npm run repo:stewardship`. Evidence: `repo:stewardship OK - 5411 tracked files, 0 action-required`.
-- [x] `node scripts/diff-budget.mjs`. Evidence: `✅ Diff budget: OK (scope=working-tree, files=20/25, lines=555/1200, +534/-21)`.
-- [ ] Manifest-backed standalone review plus explicit elegance/minimality pass. Evidence: pending after clean final validation.
+- [x] `npm run docs:freshness`. Evidence: `docs:freshness OK - 4325 docs, 4328 registry entries`.
+- [x] `npm run repo:stewardship`. Evidence: `repo:stewardship OK - 5429 tracked files, 0 action-required`.
+- [x] `node scripts/diff-budget.mjs`. Evidence: `✅ Diff budget: OK (scope=working-tree, files=1/25, lines=2/1200, +1/-1); advisory stacked aggregate vs origin/main: files=14/25, lines=430/1200, +409/-21`.
+- [ ] Manifest-backed standalone review plus explicit elegance/minimality pass. Evidence: first review completed with `status=succeeded`, `review_outcome=bounded-success`, and one P2 mirror-status finding now addressed; clean review rerun and elegance pass pending.
 
 ## Handoff
 - [x] Parent kept out-of-scope validation follow-ups out of CO-276. Evidence: CO-290 and CO-291 were closed invalid after current-main validation, so no CO-276 scope expansion is required.
 - [ ] Parent refreshes the single workpad with docs, implementation, validation, and review status before handoff. Evidence: pending final refresh.
-- [ ] Parent attaches a PR and completes the normal review-state prerequisites before `In Review`. Evidence: pending validation, review/elegance, PR, and ready-review drain.
+- [ ] Parent attaches a PR and completes the normal review-state prerequisites before `In Review`. Evidence: pending clean review rerun, explicit elegance pass, PR, and ready-review drain.
 
 ## Progress Log
 - 2026-04-21: parent moved CO-276 from `Ready` to `In Progress`, created the single persistent workpad, recorded the required same-turn parallelization decision, and attempted same-issue docs child-lane launch.
@@ -60,4 +60,4 @@
 - 2026-04-21: docs-review wrapper stopped at delegation guard for missing subagent manifests; direct `linear child-stream --pipeline docs-review` also failed closed with `provider_worker_child_stream_provenance_invalid`, so the parent recorded a manual docs-review fallback before README implementation.
 - 2026-04-21: clean issue worktree `/Users/kbediako/Code/CO/.workspaces/linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb` created from `origin/main` because the shared checkout was on unrelated CO-278 work; seven protected README files were updated and targeted 0801 archive residue search returned no matches.
 - 2026-04-21: resumed provider turn reconciled current `origin/main`, combined CO-276 registry entries with newer main packet entries, and updated the packet away from the earlier blocked CO-290 posture.
-- 2026-04-21: accidental full-suite command-substitution validation showed `346` files / `4450` tests passed, including the previous CLI command-surface and SDK artifact-retention blockers; final handoff still requires clean intentional gate reruns, standalone review, elegance pass, PR attachment, and ready-review drain.
+- 2026-04-21: clean intentional full-suite validation showed `346` files / `4450` tests passed, including the previous CLI command-surface and SDK artifact-retention blockers; final handoff still requires clean standalone review rerun, elegance pass, PR attachment, and ready-review drain.
