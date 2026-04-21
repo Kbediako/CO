@@ -1014,6 +1014,40 @@ describe('provider issue observability', () => {
     expect(progress?.summary).not.toContain('Guardrail command failed;');
   });
 
+  it('preserves child-lane guardrail text when manifest metadata proves a real guardrail command existed', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
+      proof: {
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        last_event: 'turn_started',
+        last_message: 'Provider worker turn is active.',
+        last_event_at: '2026-04-18T02:00:00.000Z',
+        updated_at: '2026-04-18T02:01:00.000Z',
+        child_lanes: [
+          {
+            stream: 'optional-guardrail-regression',
+            pipeline_id: 'provider-linear-child-lane',
+            task_id: 'linear-co-225-optional-guardrail',
+            run_id: 'run-lane-guardrail-225',
+            status: 'failed',
+            launched_at: '2026-04-18T02:00:10.000Z',
+            decision: 'pending',
+            summary_recorded_at: '2026-04-18T02:00:40.000Z',
+            guardrails_required: false,
+            guardrail_command_count: 1,
+            summary: 'Child lane optional-guardrail-regression failed.\nGuardrails: spec-guard failed (1/1 failed).'
+          }
+        ],
+        linear_audit: null
+      },
+      now: () => '2026-04-18T02:01:00.000Z'
+    });
+
+    expect(progress?.summary).toBe(
+      'Child lane optional-guardrail-regression failed.\nGuardrails: spec-guard failed (1/1 failed).'
+    );
+  });
+
   it('does not rank invalidated rejected or accepted child-lane summaries over current replacement progress', () => {
     const progress = deriveProviderLinearWorkerProgressSnapshot({
       proof: {

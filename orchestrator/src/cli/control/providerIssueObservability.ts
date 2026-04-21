@@ -237,6 +237,8 @@ interface ProviderIssueChildLaneLike {
   launched_at?: string | null;
   summary_recorded_at?: string | null;
   summary?: string | null;
+  guardrails_required?: boolean | null;
+  guardrail_command_count?: number | null;
   decision?: string | null;
   in_flight_action?: string | null;
   decision_at?: string | null;
@@ -1998,10 +2000,14 @@ function normalizeProviderChildLaneProgressSummary(childLane: ProviderIssueChild
   if (normalizeOptionalString(childLane.pipeline_id) !== PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID) {
     return summary;
   }
+  const guardrailCommandCount = normalizeOptionalInteger(childLane.guardrail_command_count);
+  if (guardrailCommandCount !== null && guardrailCommandCount > 0) {
+    return summary;
+  }
   return stripNonApplicableGuardrailSummaryLines(
     {
       pipeline_id: PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID,
-      guardrails_required: false,
+      guardrails_required: childLane.guardrails_required === true,
       commands: []
     },
     summary

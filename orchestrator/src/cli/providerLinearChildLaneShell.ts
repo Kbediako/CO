@@ -59,7 +59,11 @@ import {
 } from './utils/packageProgramResolver.js';
 import { slugify } from './utils/strings.js';
 import { parseTrailingJsonObject } from './utils/trailingJsonObject.js';
-import { stripNonApplicableGuardrailSummaryLines } from './run/manifest.js';
+import {
+  countGuardrailCommands,
+  resolveGuardrailsRequiredForManifest,
+  stripNonApplicableGuardrailSummaryLines
+} from './run/manifest.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -104,6 +108,8 @@ export interface ProviderLinearChildLaneRunResult {
   manifest_path: string;
   log_path: string | null;
   summary: string | null;
+  guardrails_required: boolean | null;
+  guardrail_command_count: number | null;
   runtime_mode_requested: string | null;
   runtime_mode: string | null;
   runtime_provider: string | null;
@@ -581,7 +587,7 @@ async function launchChildLane(
       status: 502
     });
   }
-  const childRun = parseProviderChildLaneRunResult(
+  const childRun = await parseProviderChildLaneRunResult(
     execResult.stdout,
     context.repoRoot,
     childStartEnv.CODEX_ORCHESTRATOR_RUNS_DIR ?? join(context.repoRoot, '.runs'),
@@ -669,6 +675,8 @@ async function launchChildLane(
     artifact_root: childRun.artifact_root,
     log_path: childRun.log_path,
     summary: childRun.summary ?? normalizeOptionalString(childProof?.last_message),
+    guardrails_required: childRun.guardrails_required,
+    guardrail_command_count: childRun.guardrail_command_count,
     issue_id: context.issueId,
     issue_identifier: context.issueIdentifier,
     workspace_path: context.repoRoot,
@@ -1710,6 +1718,8 @@ function parseProviderLinearChildLaneRunManifest(input: {
       input.manifest,
       normalizeOptionalString(input.manifest.summary)
     ),
+    guardrails_required: resolveGuardrailsRequiredForManifest(input.manifest),
+    guardrail_command_count: countGuardrailCommands(input.manifest),
     runtime_mode_requested: normalizeOptionalString(input.manifest.runtime_mode_requested),
     runtime_mode: normalizeOptionalString(input.manifest.runtime_mode),
     runtime_provider: normalizeOptionalString(input.manifest.runtime_provider)
@@ -1733,6 +1743,8 @@ function buildRepairedChildLaneRecord(input: {
     artifact_root: input.childRun.artifact_root,
     log_path: input.childRun.log_path,
     summary: input.childRun.summary,
+    guardrails_required: input.childRun.guardrails_required,
+    guardrail_command_count: input.childRun.guardrail_command_count,
     issue_id: input.reservation.issue_id,
     issue_identifier: input.reservation.issue_identifier,
     workspace_path: input.reservation.workspace_path,
@@ -2619,12 +2631,12 @@ function resolveCodexOrchestratorInvocation(env: NodeJS.ProcessEnv): {
   return { command: invocation.command, argsPrefix: invocation.args, envOverrides: invocation.envOverrides };
 }
 
-function parseProviderChildLaneRunResult(
+async function parseProviderChildLaneRunResult(
   raw: string,
   repoRoot: string,
   childRunsRoot: string,
   taskId: string
-): ProviderLinearChildLaneRunResult | null {
+): Promise<ProviderLinearChildLaneRunResult | null> {
   const parsed = parseTrailingJsonObject(raw);
   if (!parsed) {
     return null;
@@ -2658,6 +2670,20 @@ function parseProviderChildLaneRunResult(
   ) {
     return null;
   }
+  let manifestRecord: Record<string, unknown> | null = null;
+  try {
+    const candidate = JSON.parse(await readFile(resolvedManifestPath, 'utf8')) as unknown;
+    if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
+      manifestRecord = candidate as Record<string, unknown>;
+    }
+  } catch {
+    manifestRecord = null;
+  }
+  const guardrailManifest = manifestRecord ?? {
+    pipeline_id: PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID,
+    guardrails_required: false,
+    commands: []
+  };
   return {
     run_id: safeRunId,
     task_id: taskId,
@@ -2666,7 +2692,9 @@ function parseProviderChildLaneRunResult(
     artifact_root: resolvedArtifactRoot,
     manifest_path: resolvedManifestPath,
     log_path: normalizedLogPath,
-    summary: normalizeOptionalString(parsed.summary),
+    summary: stripNonApplicableGuardrailSummaryLines(guardrailManifest, normalizeOptionalString(parsed.summary)),
+    guardrails_required: resolveGuardrailsRequiredForManifest(guardrailManifest),
+    guardrail_command_count: countGuardrailCommands(guardrailManifest),
     runtime_mode_requested: normalizeOptionalString(parsed.runtime_mode_requested),
     runtime_mode: normalizeOptionalString(parsed.runtime_mode),
     runtime_provider: normalizeOptionalString(parsed.runtime_provider)

@@ -665,6 +665,10 @@ function computeGuardrailStatus(manifest: CliManifest): GuardrailStatusSnapshot 
   };
 }
 
+export function countGuardrailCommands(manifest: GuardrailApplicabilityManifestLike): number {
+  return selectGuardrailCommands(manifest).length;
+}
+
 function selectGuardrailCommands(manifest: GuardrailApplicabilityManifestLike): CliManifestCommand[] {
   const commands = Array.isArray(manifest.commands) ? manifest.commands : [];
   return commands.filter((entry): entry is CliManifestCommand => isGuardrailCommandEntry(entry));

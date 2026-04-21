@@ -56,7 +56,11 @@ import {
   PROVIDER_WORKSPACE_ROOT_DIRNAME,
   resolveProviderWorkspacePath
 } from './run/workspacePath.js';
-import { stripNonApplicableGuardrailSummaryLines } from './run/manifest.js';
+import {
+  countGuardrailCommands,
+  resolveGuardrailsRequiredForManifest,
+  stripNonApplicableGuardrailSummaryLines
+} from './run/manifest.js';
 import {
   buildRunMemoryPromptLines,
   selectRunMemoryForRole
@@ -260,6 +264,8 @@ export interface ProviderLinearWorkerChildLaneRecord {
   artifact_root: string;
   log_path: string | null;
   summary: string | null;
+  guardrails_required?: boolean | null;
+  guardrail_command_count?: number | null;
   issue_id: string;
   issue_identifier: string;
   workspace_path: string | null;
@@ -5103,6 +5109,8 @@ interface ProviderLinearWorkerChildLaneManifestHydrationCandidate {
   laneWorkspacePath: string | null;
   patchArtifactPath: string | null;
   patchBytes: number | null;
+  guardrailsRequired: boolean | null;
+  guardrailCommandCount: number | null;
   summaryRecordedAt: string | null;
 }
 
@@ -5287,6 +5295,8 @@ async function hydrateProviderLinearWorkerChildLaneFromActiveManifest(
     log_path: candidate.logPath,
     summary,
     summary_recorded_at: summaryRecordedAt,
+    guardrails_required: candidate.guardrailsRequired,
+    guardrail_command_count: candidate.guardrailCommandCount,
     lane_workspace_path: candidate.laneWorkspacePath ?? childLane.lane_workspace_path,
     patch_artifact_path: candidate.patchArtifactPath ?? childLane.patch_artifact_path,
     patch_bytes: candidate.patchBytes ?? childLane.patch_bytes
@@ -5612,6 +5622,8 @@ async function readProviderLinearWorkerChildLaneManifestCandidate(
     laneWorkspacePath: proofMetadata?.laneWorkspacePath ?? null,
     patchArtifactPath: proofMetadata?.patchArtifactPath ?? null,
     patchBytes: proofMetadata?.patchBytes ?? null,
+    guardrailsRequired: resolveGuardrailsRequiredForManifest(parsed),
+    guardrailCommandCount: countGuardrailCommands(parsed),
     summaryRecordedAt
   };
 }
@@ -5976,6 +5988,8 @@ function normalizeProviderLinearWorkerChildLaneRecord(
     artifact_root: artifactRoot,
     log_path: normalizeOptionalString(value.log_path),
     summary: normalizeOptionalString(value.summary),
+    guardrails_required: typeof value.guardrails_required === 'boolean' ? value.guardrails_required : null,
+    guardrail_command_count: normalizeOptionalInteger(value.guardrail_command_count),
     issue_id: issueId,
     issue_identifier: issueIdentifier,
     workspace_path: normalizeOptionalString(value.workspace_path),
