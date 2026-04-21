@@ -1,5 +1,7 @@
-# Eminente Mirror Assets (Archived)
+# Eminente Mirror Assets
 
-The static assets have been moved to `.runs/0801-dead-code-pruning/archive/2025-12-08T10-01-24Z/packages/eminente/public/` for Task 0801.
+`packages/eminente/public/` is rebuilt on demand and no historical snapshot is tracked in fresh checkouts after Task 0801 dead-code pruning.
 
-Restore from the archive path or regenerate with the mirror scripts if needed.
+- Regenerate fresh assets: `npm run mirror:fetch -- --project eminente`
+- Validate the rebuilt mirror: `npm run mirror:check -- --project eminente`
+- Serve locally: `npm run mirror:serve -- --project eminente --port 4173`
