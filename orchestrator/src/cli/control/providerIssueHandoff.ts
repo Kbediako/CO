@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomBytes } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import process from 'node:process';
 
 import { logger } from '../../logger.js';
@@ -154,6 +154,7 @@ interface ProviderIssueRunRecord {
   taskId: string;
   runId: string;
   manifestPath: string;
+  manifest: Record<string, unknown>;
   pipelineId: string | null;
   status: string | null;
   hasDeadLocalInProgressProof: boolean;
@@ -322,6 +323,11 @@ const PROVIDER_RETRY_START_FAILED_REASON = 'provider_issue_retry_start_failed';
 const PROVIDER_CONTINUATION_RETRY_DELAY_MS = 1_000;
 const PROVIDER_FAILURE_RETRY_BASE_MS = 10_000;
 const PROVIDER_FAILURE_RETRY_MAX_BACKOFF_MS = 300_000;
+type ProviderControlHostRunLocator = { taskId: string; runId: string };
+type ProviderRehydratedLaunchProvenanceFields = {
+  launch_source?: ProviderLaunchSource | null;
+  launch_token?: string | null;
+};
 type ProviderTrackedIssueEligibility =
   | {
       eligible: true;
@@ -380,6 +386,7 @@ export function createProviderIssueHandoffService(
   const runOperatorAutopilot = options.runOperatorAutopilot ?? runProviderOperatorAutopilot;
   const appendOperatorAutopilotAuditResult =
     options.appendOperatorAutopilotAuditResult ?? appendProviderOperatorAutopilotAuditResult;
+  const controlHostRunLocator = resolveControlHostRunLocatorFromRunDir(options.paths.runDir);
   const retryQueue = createProviderIssueRetryQueue();
   const releaseCancelInFlight = new Map<
     string,
@@ -2205,6 +2212,74 @@ export function createProviderIssueHandoffService(
     await cancelState.attempt;
   };
 
+  const buildClearedRehydratedLaunchProvenance = (): ProviderRehydratedLaunchProvenanceFields => ({
+    launch_source: null,
+    launch_token: null
+  });
+
+  const claimIdentifiesActiveRun = (
+    claim: ProviderIntakeClaimRecord,
+    activeRun: ProviderIssueRunRecord
+  ): boolean => {
+    const claimRunId = normalizeOptionalString(claim.run_id);
+    const claimManifestPath = normalizeOptionalString(claim.run_manifest_path);
+    const runIdMatches = claimRunId !== null && claimRunId === activeRun.runId;
+    const manifestMatches =
+      claimManifestPath !== null &&
+      (
+        claimManifestPath === activeRun.manifestPath ||
+        resolve(claimManifestPath) === resolve(activeRun.manifestPath)
+      );
+
+    if (claimRunId && claimManifestPath) {
+      return runIdMatches && manifestMatches;
+    }
+    return runIdMatches || manifestMatches;
+  };
+
+  const resolveRehydratedActiveRunLaunchProvenance = (input: {
+    claim: ProviderIntakeClaimRecord;
+    activeRun: ProviderIssueRunRecord;
+  }): ProviderRehydratedLaunchProvenanceFields => {
+    const launchToken = normalizeOptionalString(input.claim.launch_token);
+    if (
+      input.claim.launch_source !== PROVIDER_LAUNCH_SOURCE ||
+      !launchToken ||
+      input.claim.state === 'resumable' ||
+      !claimIdentifiesActiveRun(input.claim, input.activeRun)
+    ) {
+      return buildClearedRehydratedLaunchProvenance();
+    }
+
+    const manifest = input.activeRun.manifest;
+
+    const manifestLaunchSource =
+      normalizeOptionalString(manifest.provider_launch_source) ??
+      normalizeOptionalString(manifest.providerLaunchSource);
+    const manifestTaskId =
+      normalizeOptionalString(manifest.provider_control_host_task_id) ??
+      normalizeOptionalString(manifest.providerControlHostTaskId);
+    const manifestRunId =
+      normalizeOptionalString(manifest.provider_control_host_run_id) ??
+      normalizeOptionalString(manifest.providerControlHostRunId);
+    const manifestMatchesControlHostLocator =
+      controlHostRunLocator !== null &&
+      manifestLaunchSource === PROVIDER_LAUNCH_SOURCE &&
+      manifestTaskId === controlHostRunLocator.taskId &&
+      manifestRunId === controlHostRunLocator.runId;
+    if (manifestMatchesControlHostLocator) {
+      return {
+        launch_source: PROVIDER_LAUNCH_SOURCE,
+        launch_token: launchToken
+      };
+    }
+
+    logger.warn(
+      `[provider-issue-handoff] cannot preserve rehydrated control-host launch provenance for ${input.claim.issue_identifier}: active run manifest provenance is incomplete or mismatched`
+    );
+    return buildClearedRehydratedLaunchProvenance();
+  };
+
   const rehydrateNow = async (input?: {
     refreshTrackedIssueMetadata?: boolean;
   }): Promise<{ hasPendingClaims: boolean }> => {
@@ -2295,6 +2370,10 @@ export function createProviderIssueHandoffService(
             startedWorkerIssue
           ) {
             const workerHost = resolveRehydratedActiveRunWorkerHost(activeRun, claim);
+            const launchProvenance = await resolveRehydratedActiveRunLaunchProvenance({
+              claim,
+              activeRun
+            });
             const trackedIssueFields = freshTrackedIssue.claimFields;
             const reactivatedMergeCloseoutReset =
               claim.reason === 'provider_issue_rehydrated_active_run'
@@ -2308,14 +2387,14 @@ export function createProviderIssueHandoffService(
               run_id: activeRun.runId,
               run_manifest_path: activeRun.manifestPath,
               worker_host: workerHost,
+              ...launchProvenance,
               ...buildActiveRunRetryFields(claim),
               ...reactivatedMergeCloseoutReset
             });
             upsertRehydratedProviderIntakeClaim({
               ...claim,
               ...trackedIssueFields,
-              launch_source: undefined,
-              launch_token: undefined,
+              ...launchProvenance,
               task_id: activeRun.taskId,
               state: 'running',
               reason: 'provider_issue_rehydrated_active_run',
@@ -2380,6 +2459,10 @@ export function createProviderIssueHandoffService(
         const activeRun = attachableClaimRuns.find((run) => run.status === 'in_progress');
         if (activeRun) {
           const workerHost = resolveRehydratedActiveRunWorkerHost(activeRun, claim);
+          const launchProvenance = await resolveRehydratedActiveRunLaunchProvenance({
+            claim,
+            activeRun
+          });
           const preserveMergeCloseoutClaim =
             isProviderMergeCloseoutWatchingClaim(claim) || isTerminalProviderMergeCloseoutClaim(claim);
           const freshTrackedIssue = input?.refreshTrackedIssueMetadata
@@ -2414,14 +2497,14 @@ export function createProviderIssueHandoffService(
             run_id: activeRun.runId,
             run_manifest_path: activeRun.manifestPath,
             worker_host: workerHost,
+            ...launchProvenance,
             ...buildActiveRunRetryFields(claim),
             ...reactivatedMergeCloseoutReset
           });
           upsertRehydratedProviderIntakeClaim({
             ...claim,
             ...trackedIssueFields,
-            launch_source: undefined,
-            launch_token: undefined,
+            ...launchProvenance,
             task_id: activeRun.taskId,
             state: 'running',
             reason: 'provider_issue_rehydrated_active_run',
@@ -3509,11 +3592,14 @@ export function createProviderIssueHandoffService(
               ? {}
               : { review_promotion: null, merge_closeout: null };
           const workerHost = resolveRehydratedActiveRunWorkerHost(activeRun, existing);
+          const launchProvenance = await resolveRehydratedActiveRunLaunchProvenance({
+            claim: existing,
+            activeRun
+          });
           const claim = await upsertProviderClaimAndPersist({
             ...existing,
             ...trackedIssueFields,
-            launch_source: undefined,
-            launch_token: undefined,
+            ...launchProvenance,
             task_id: activeRun.taskId,
             state: 'running',
             reason: 'provider_issue_rehydrated_active_run',
@@ -4580,6 +4666,10 @@ export function createProviderIssueHandoffService(
                 claim.reason === 'provider_issue_rehydrated_active_run'
                   ? {}
                   : { review_promotion: null, merge_closeout: null };
+              const launchProvenance = await resolveRehydratedActiveRunLaunchProvenance({
+                claim,
+                activeRun
+              });
               const transitioned = hasProviderClaimTransitioned(claim, {
                 ...trackedIssueFields,
                 state: 'running',
@@ -4588,6 +4678,7 @@ export function createProviderIssueHandoffService(
                 run_id: activeRun.runId,
                 run_manifest_path: activeRun.manifestPath,
                 worker_host: workerHost,
+                ...launchProvenance,
                 ...buildActiveRunRetryFields(claim),
                 ...reactivatedMergeCloseoutReset
               });
@@ -4595,8 +4686,7 @@ export function createProviderIssueHandoffService(
               upsertProviderIntakeClaim(options.state, {
                 ...claim,
                 ...trackedIssueFields,
-                launch_source: undefined,
-                launch_token: undefined,
+                ...launchProvenance,
                 task_id: activeRun.taskId,
                 state: 'running',
                 reason: 'provider_issue_rehydrated_active_run',
@@ -4813,6 +4903,10 @@ export function createProviderIssueHandoffService(
                 claim.reason === 'provider_issue_rehydrated_active_run'
                   ? {}
                   : { review_promotion: null, merge_closeout: null };
+              const launchProvenance = await resolveRehydratedActiveRunLaunchProvenance({
+                claim,
+                activeRun
+              });
               const transitioned = hasProviderClaimTransitioned(claim, {
                 ...trackedIssueFields,
                 state: 'running',
@@ -4821,6 +4915,7 @@ export function createProviderIssueHandoffService(
                 run_id: activeRun.runId,
                 run_manifest_path: activeRun.manifestPath,
                 worker_host: workerHost,
+                ...launchProvenance,
                 ...buildActiveRunRetryFields(claim),
                 ...reactivatedMergeCloseoutReset
               });
@@ -4828,8 +4923,7 @@ export function createProviderIssueHandoffService(
               upsertProviderIntakeClaim(options.state, {
                 ...claim,
                 ...trackedIssueFields,
-                launch_source: undefined,
-                launch_token: undefined,
+                ...launchProvenance,
                 task_id: activeRun.taskId,
                 state: 'running',
                 reason: 'provider_issue_rehydrated_active_run',
@@ -4963,6 +5057,10 @@ export function createProviderIssueHandoffService(
               claim.reason === 'provider_issue_rehydrated_active_run'
                 ? {}
                 : { review_promotion: null, merge_closeout: null };
+            const launchProvenance = await resolveRehydratedActiveRunLaunchProvenance({
+              claim,
+              activeRun
+            });
             const transitioned = hasProviderClaimTransitioned(claim, {
               ...trackedIssueFields,
               state: 'running',
@@ -4971,6 +5069,7 @@ export function createProviderIssueHandoffService(
               run_id: activeRun.runId,
               run_manifest_path: activeRun.manifestPath,
               worker_host: workerHost,
+              ...launchProvenance,
               ...buildActiveRunRetryFields(claim),
               ...reactivatedMergeCloseoutReset
             });
@@ -4978,8 +5077,7 @@ export function createProviderIssueHandoffService(
             upsertProviderIntakeClaim(options.state, {
               ...claim,
               ...trackedIssueFields,
-              launch_source: undefined,
-              launch_token: undefined,
+              ...launchProvenance,
               task_id: activeRun.taskId,
               state: 'running',
               reason: 'provider_issue_rehydrated_active_run',
@@ -6917,6 +7015,20 @@ async function resolveProviderCleanupWorkspacePath(
   return explicitWorkspacePath ?? resolveProviderWorkspacePath(repoRoot, taskId);
 }
 
+function resolveControlHostRunLocatorFromRunDir(runDir: string): ProviderControlHostRunLocator | null {
+  const resolvedRunDir = resolve(runDir);
+  const runId = basename(resolvedRunDir);
+  const cliDir = dirname(resolvedRunDir);
+  if (basename(cliDir) !== 'cli') {
+    return null;
+  }
+  const taskId = basename(dirname(cliDir));
+  if (!taskId || !runId) {
+    return null;
+  }
+  return { taskId, runId };
+}
+
 async function readManifestRecord(manifestPath: string | null): Promise<Record<string, unknown> | null> {
   if (!manifestPath) {
     return null;
@@ -7048,6 +7160,7 @@ async function discoverProviderIssueRunSnapshot(
         taskId: readStringValue(manifest, 'task_id') ?? taskEntry,
         runId: readStringValue(manifest, 'run_id') ?? runEntry,
         manifestPath,
+        manifest,
         pipelineId,
         status: resolveProviderIssueRunStatus(manifest, proof, isProcessAlive),
         hasDeadLocalInProgressProof,
@@ -8065,7 +8178,9 @@ function hasProviderClaimTransitioned(
           >
         >
     )
-  ) & Partial<Pick<ProviderIntakeClaimRecord, 'review_promotion' | 'merge_closeout'>>
+  ) & Partial<
+    Pick<ProviderIntakeClaimRecord, 'launch_source' | 'launch_token' | 'review_promotion' | 'merge_closeout'>
+  >
 ): boolean {
   return (
     (
@@ -8124,6 +8239,14 @@ function hasProviderClaimTransitioned(
     (
       next.worker_host !== undefined &&
       (claim.worker_host ?? null) !== (next.worker_host ?? null)
+    ) ||
+    (
+      next.launch_source !== undefined &&
+      (claim.launch_source ?? null) !== (next.launch_source ?? null)
+    ) ||
+    (
+      next.launch_token !== undefined &&
+      (claim.launch_token ?? null) !== (next.launch_token ?? null)
     ) ||
     (claim.retry_queued ?? null) !== (next.retry_queued ?? null) ||
     (claim.retry_attempt ?? null) !== (next.retry_attempt ?? null) ||
@@ -8263,6 +8386,7 @@ function resolveProviderReleaseRun(
       taskId: claim.task_id,
       runId: claim.run_id ?? claim.task_id,
       manifestPath: claim.run_manifest_path,
+      manifest: {},
       pipelineId: null,
       status: null,
       hasDeadLocalInProgressProof: false,
