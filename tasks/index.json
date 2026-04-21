@@ -1790,11 +1790,7 @@
         "spec": "tasks/specs/linear-a2949fd4-2319-4cd0-acd1-68e6404766f3.md",
         "task": "tasks/tasks-linear-a2949fd4-2319-4cd0-acd1-68e6404766f3.md",
         "agent_task": ".agent/task/linear-a2949fd4-2319-4cd0-acd1-68e6404766f3.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-a2949fd4-2319-4cd0-acd1-68e6404766f3.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-a2949fd4-2319-4cd0-acd1-68e6404766f3.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-a2949fd4-2319-4cd0-acd1-68e6404766f3.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-a2949fd4-2319-4cd0-acd1-68e6404766f3.md"
       }
     },
     {
