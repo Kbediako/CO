@@ -249,6 +249,8 @@ function npmBin(): string {
 }
 
 function extractWorkflowStepRun(workflow: string, stepName: string): string | undefined {
+  // extractWorkflowStepRun is intentionally limited to this contract's single-line - name/run steps.
+  // It is not a general-purpose YAML parser.
   const lines = workflow.split(/\r?\n/);
   const stepLine = `- name: ${stepName}`;
   const start = lines.findIndex((line) => line.trim() === stepLine);
