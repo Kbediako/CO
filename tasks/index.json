@@ -39,27 +39,27 @@
           "reviewer": "parent provider worker",
           "date": "2026-04-22",
           "status": "succeeded",
-          "summary": "ProviderLinearWorkflowFacade focused tests pass after adding ownership-aware PR attachment classification; CO-244/CO-289 fixture restores PR #532 current and exposes mismatched PR #575 as conflicting while CO-289 keeps PR #575 current. CodeRabbit follow-up regressions cover foreign-prefix issue identifiers and snapshot-missing attachment-title conflicts."
+          "summary": "ProviderLinearWorkflowFacade focused tests pass after adding ownership-aware PR attachment classification; CO-244/CO-289 fixture restores PR #532 current and exposes mismatched PR #575 as conflicting while CO-289 keeps PR #575 current. Feedback regressions cover foreign-prefix issue identifiers, snapshot-missing attachment-title conflicts, lowercase branch-only identifiers, and technical-token false positives."
         },
         "validation_gates": {
           "reviewer": "parent provider worker",
           "date": "2026-04-22",
           "status": "succeeded",
-          "summary": "After merging latest origin/main and addressing CodeRabbit feedback, focused facade tests passed (224 tests), delegation guard passed with scoped provenance fallback, spec guard, build, lint, full test (347 files / 4467 tests), docs:check, docs:freshness (4361 docs / 4364 registry entries), repo:stewardship (5469 tracked files / 0 action-required), diff-budget, and pack:smoke passed. Lint only reported existing DelegationMcpHealth.test.ts warnings."
+          "summary": "After merging latest origin/main and addressing CodeRabbit/Codex feedback, focused facade tests passed (226 tests), delegation guard passed with scoped provenance fallback, spec guard, build, lint, full test (347 files / 4469 tests), docs:check, docs:freshness (4361 docs / 4364 registry entries), repo:stewardship (5469 tracked files / 0 action-required), diff-budget, and pack:smoke passed. Lint only reported existing DelegationMcpHealth.test.ts warnings."
         },
         "standalone_review": {
           "reviewer": "codex-orchestrator review",
           "date": "2026-04-22",
           "status": "succeeded",
           "telemetry": ".runs/linear-994efebc-e1e4-4e00-8046-c60143813251/cli/2026-04-21T16-19-14-539Z-9d990cf1/review/telemetry.json",
-          "summary": "Manifest-backed forced standalone review completed with status succeeded and review_outcome bounded-success after command-intent retry, including the CodeRabbit feedback patch for foreign-prefix and snapshot-missing ownership conflicts."
+          "summary": "Manifest-backed forced standalone review completed with status succeeded and review_outcome bounded-success after command-intent retry, including the CodeRabbit feedback patch and the Codex false-positive token refinement."
         },
         "elegance_review": {
           "reviewer": "parent provider worker",
           "date": "2026-04-22",
           "status": "succeeded",
           "artifact": "out/linear-994efebc-e1e4-4e00-8046-c60143813251/manual/elegance-review.md",
-          "summary": "Minimality pass kept the ownership guard local to issue-context classification, confirmed no broad abstraction or mutation-heavy repair flow was added, and recorded no source simplification needed."
+          "summary": "Minimality pass kept the ownership guard local to issue-context classification, confirmed the issue-owned-position and technical-token filters are bounded, and recorded no source simplification needed."
         }
       },
       "paths": {

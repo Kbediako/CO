@@ -1679,6 +1679,100 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it('treats lowercase branch-only issue identifiers as conflicting ownership evidence', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Completed issue with generic-titled misbound branch',
+      state: {
+        id: 'state-done',
+        name: 'Done',
+        type: 'completed'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-532', 532, 'CO-244 closeout PR'),
+        buildGitHubAttachment('attachment-pr-582', 582, 'Preserve provider rehydration provenance')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 532
+          ? {
+              state: 'MERGED',
+              mergedAt: '2026-04-10T13:11:30.000Z',
+              updatedAt: '2026-04-10T13:11:30.000Z',
+              title: 'CO-244 completed provider release',
+              headRefName: 'linear/co-244-completed-provider-release'
+            }
+          : {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:07:51.000Z',
+              title: 'Preserve provider rehydration provenance',
+              headRefName: 'linear/co-289-provider-rehydration-provenance-main'
+            }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-532'
+          },
+          historical: [],
+          conflicting: [
+            {
+              id: 'attachment-pr-582'
+            }
+          ],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it('does not treat common technical hyphen codes as foreign issue ownership evidence', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Active issue with technical-token PR title',
+      state: {
+        id: 'state-in-progress',
+        name: 'In Progress',
+        type: 'started'
+      },
+      attachments: [
+        buildGitHubAttachment(
+          'attachment-pr-581',
+          581,
+          'CO-244 support ISO-8601 GPT-5 RFC-3339 HTTP-404 Node-20 parsing'
+        )
+      ],
+      snapshotForPr: () => ({
+        state: 'OPEN',
+        mergedAt: null,
+        updatedAt: '2026-04-21T09:07:51.000Z',
+        title: 'CO-244 support ISO-8601 GPT-5 RFC-3339 HTTP-404 Node-20 parsing',
+        headRefName: 'linear/co-244-support-iso-8601-gpt-5-rfc-3339-http-404-node-20-parsing'
+      })
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-581'
+          },
+          historical: [],
+          conflicting: [],
+          unknown: []
+        }
+      }
+    });
+  });
+
   it('preserves the owning issue current PR when the PR identifier matches', async () => {
     const { result } = await readIssueContextAttachmentTruth({
       identifier: 'CO-289',

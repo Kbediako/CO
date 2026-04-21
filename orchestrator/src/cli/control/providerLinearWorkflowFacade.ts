@@ -832,6 +832,8 @@ interface IssueContextPullRequestSnapshot {
   headRefName?: string | null;
 }
 
+const NON_LINEAR_ISSUE_IDENTIFIER_PREFIXES = new Set(['GPT', 'HTTP', 'HTTPS', 'ISO', 'NODE', 'RFC']);
+
 interface GitHubJsonCommandResult {
   stdout: string;
   stderr: string;
@@ -1334,29 +1336,55 @@ function issuePullRequestEvidenceTargetsDifferentIssue(
   if (!issueIdentifier) {
     return false;
   }
-  const identifiers = extractIssueIdentifiers(values);
-  if (identifiers.length === 0) {
+  const issuePrefix = issueIdentifier.slice(0, issueIdentifier.indexOf('-'));
+  const evidence = extractIssueIdentifierEvidence(values);
+  if (evidence.length === 0) {
     return false;
   }
-  return identifiers.some((identifier) => identifier !== issueIdentifier);
+  return evidence.some((entry) => {
+    if (entry.identifier === issueIdentifier) {
+      return false;
+    }
+    if (entry.prefix === issuePrefix) {
+      return true;
+    }
+    return entry.issue_owned_position;
+  });
 }
 
-function extractIssueIdentifiers(values: readonly (string | null | undefined)[]): string[] {
-  const identifiers = new Set<string>();
-  const pattern = /\b[A-Z][A-Z0-9]*-\d+\b/gi;
+function extractIssueIdentifierEvidence(
+  values: readonly (string | null | undefined)[]
+): Array<{ identifier: string; prefix: string; issue_owned_position: boolean }> {
+  const identifiers = new Map<string, { identifier: string; prefix: string; issue_owned_position: boolean }>();
+  const pattern = /\b([A-Z][A-Z0-9]*)-\d+\b/gi;
   for (const value of values) {
     const normalized = normalizeOptionalString(value);
     if (!normalized) {
       continue;
     }
     for (const match of normalized.matchAll(pattern)) {
+      const prefix = match[0].slice(0, match[0].indexOf('-')).toUpperCase();
+      if (NON_LINEAR_ISSUE_IDENTIFIER_PREFIXES.has(prefix)) {
+        continue;
+      }
       const identifier = normalizeIssueIdentifier(match[0]);
       if (identifier) {
-        identifiers.add(identifier);
+        const existing = identifiers.get(identifier);
+        const issueOwnedPosition = isIssueOwnedIdentifierPosition(normalized, match.index ?? 0);
+        identifiers.set(identifier, {
+          identifier,
+          prefix,
+          issue_owned_position: (existing?.issue_owned_position ?? false) || issueOwnedPosition
+        });
       }
     }
   }
-  return [...identifiers];
+  return [...identifiers.values()];
+}
+
+function isIssueOwnedIdentifierPosition(value: string, index: number): boolean {
+  const previous = value[index - 1];
+  return index === 0 || previous === '/' || previous === '(' || previous === '[';
 }
 
 function normalizeIssueIdentifier(value: string | null | undefined): string | null {
