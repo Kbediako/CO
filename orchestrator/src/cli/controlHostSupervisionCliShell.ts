@@ -760,6 +760,7 @@ async function probeControlHostHealth(
   if (result.timedOut === true) {
     const diagnostic = await readControlHostSupervisionProbeTimeoutDiagnostic(config, env);
     const timeoutQuarantine = evaluateControlHostSupervisionProbeTimeoutDiagnostic(diagnostic, {
+      minPollingUpdatedAt: options.minPollingUpdatedAt ?? null,
       restartHistory: options.restartHistory ?? null
     });
     if (timeoutQuarantine) {

@@ -570,6 +570,7 @@ function resolveRepeatedActiveWorkerRestartQuarantine(input: {
 export function evaluateControlHostSupervisionProbeTimeoutDiagnostic(
   diagnostic: ControlHostSupervisionHealthDiagnostic | null,
   options: {
+    minPollingUpdatedAt?: string | null;
     restartHistory?: ControlHostSupervisionRestartRecord[] | null;
     activeWorkerRestartQuarantineMs?: number | null;
     now?: string | null;
@@ -579,6 +580,9 @@ export function evaluateControlHostSupervisionProbeTimeoutDiagnostic(
     return null;
   }
   if (!isProviderRefreshLifecycleRestartRequiredDiagnostic(diagnostic.polling)) {
+    return null;
+  }
+  if (!isCurrentControlHostSupervisionPollingDiagnostic(diagnostic.polling, options.minPollingUpdatedAt)) {
     return null;
   }
   const pollingReason = diagnostic.polling?.reason ?? diagnostic.polling?.last_error ?? null;
@@ -638,6 +642,18 @@ function isProviderRefreshLifecycleRestartRequiredDiagnostic(
     polling.reason === 'provider_refresh_lifecycle_stuck' ||
     polling.last_error === 'provider_refresh_lifecycle_stuck'
   );
+}
+
+function isCurrentControlHostSupervisionPollingDiagnostic(
+  polling: ControlHostSupervisionPollingDiagnostic | null,
+  minPollingUpdatedAt: string | null | undefined
+): boolean {
+  const minimumUpdatedAt = parseIsoTimestampToMs(minPollingUpdatedAt);
+  if (minimumUpdatedAt === null) {
+    return true;
+  }
+  const pollingUpdatedAt = parseIsoTimestampToMs(polling?.updated_at);
+  return pollingUpdatedAt !== null && pollingUpdatedAt >= minimumUpdatedAt;
 }
 
 function hasAvailableProviderWorkerCapacity(

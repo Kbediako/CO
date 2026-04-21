@@ -1873,6 +1873,53 @@ describe('controlHostSupervision shell helpers', () => {
     }
   });
 
+  it('does not quarantine timeout diagnostics from before the supervised child start', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'co-supervision-timeout-stale-'));
+    try {
+      const config = buildControlHostSupervisionConfig({
+        homeDir: '/Users/tester',
+        cwd: tempRoot,
+        repoRoot: tempRoot,
+        nodePath: '/custom/node',
+        cliEntrypoint: '/opt/codex-orchestrator.js',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        healthIntervalSeconds: 5
+      });
+      await writeProviderIntakeStateFixture(config, {});
+
+      const result = await probeControlHostHealth(
+        config,
+        {},
+        {
+          minPollingUpdatedAt: '2026-04-21T07:22:00.000Z',
+          restartHistory: [
+            {
+              requested_at: new Date().toISOString(),
+              reason: 'probe_timeout',
+              message: 'co-status probe timed out after 5s.',
+              consecutive_unhealthy_samples: 3,
+              child_pid: 4321,
+              diagnostic: buildProbeTimeoutDiagnosticFixture()
+            }
+          ]
+        },
+        async () => ({
+          exitCode: 1,
+          stdout: '',
+          stderr: 'command timed out after 5000ms',
+          timedOut: true
+        })
+      );
+
+      expect(result.healthy).toBe(false);
+      expect(result.reason).toBe('probe_timeout');
+      expect(result.diagnostic?.polling?.updated_at).toBe('2026-04-21T07:21:00.000Z');
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   it('does not quarantine repeated probe timeouts for non-lifecycle-stuck polling diagnostics', async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), 'co-supervision-timeout-non-stuck-'));
     try {
