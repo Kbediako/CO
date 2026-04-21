@@ -9,7 +9,7 @@
 - Source anchor: `ctx:sha256:7f6dd672017997283582c2d667c65a1b0ed8cab23d07c2795d2e02801d90fa46#chunk:c000001`
 
 ## Summary
-- Problem Statement: the repo front door currently presents the `main` branch README as if it were release-safe, even though the latest tagged and published package is still `0.1.38` / `v0.1.38` and `main` is ahead by `1262` commits. Post-tag README content now references surfaces that did not exist in the `v0.1.38` package, including packaged marketplace/plugin installation details and the new `docs/public/downstream-setup.md` and `docs/public/provider-onboarding.md` guides.
+- Problem Statement: the repo front door currently presents the `main` branch README as if it were release-safe, even though the latest tagged and published package is still `0.1.38` / `v0.1.38` and `main` is more than 1200 commits ahead of that tag. Post-tag README content now references surfaces that did not exist in the `v0.1.38` package, including packaged marketplace/plugin installation details and the new `docs/public/downstream-setup.md` and `docs/public/provider-onboarding.md` guides.
 - Desired Outcome: README tells readers when they are looking at source-head behavior, routes published-package users to release-safe docs, and marks install/setup guidance that relies on unreleased source-head surfaces without forcing a release, version bump, or broader docs rewrite.
 
 ## User Request Translation (Context Anchor)
@@ -104,5 +104,5 @@
 
 ## Approvals
 - Product: Codex provider worker, 2026-04-21
-- Engineering: standalone review `clean-success` recorded in `/Users/kbediako/Code/CO/.runs/linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13/cli/2026-04-21T02-11-19-447Z-184f2469/review/telemetry.json`; review handoff still blocked by inherited `docs:freshness` baseline
+- Engineering: final standalone review `bounded-success` recorded in `/Users/kbediako/Code/CO/.runs/linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13/cli/2026-04-21T07-35-34-622Z-391b3ca3/review/telemetry.json`; stale handoff-status and unrelated registry-row P2s addressed, with no actionable diff-local issues remaining before PR handoff
 - Design: N/A

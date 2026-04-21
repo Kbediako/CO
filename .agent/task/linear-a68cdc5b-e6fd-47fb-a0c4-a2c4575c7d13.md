@@ -35,23 +35,23 @@
 - [x] `npm run lint` Evidence: `out/linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13/validation/lint.log`.
 - [x] `npm run test` Evidence: `out/linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13/validation/test.log`.
 - [x] `npm run docs:check` Evidence: `out/linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13/validation/docs-check.log`.
-- [ ] `npm run docs:freshness` Blocked by inherited repo baseline, not the CO-273 packet. Evidence: `out/linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13/validation/docs-freshness.log` still reports `37` stale docs in the existing Task Packet / Task Mirror rolling cohort owned by `docs:freshness:maintain` (`CO-175` family), while Front Door and Public Guide rows are `stale=0`.
+- [x] `npm run docs:freshness` Evidence: `out/linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13/validation/docs-freshness.log` reports the post-merge freshness baseline green after current `origin/main` brought in the separate `docs:freshness:maintain` cleanup.
 - [x] `npm run repo:stewardship` Evidence: `out/linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13/validation/repo-stewardship.log`.
 - [x] `node scripts/diff-budget.mjs` Evidence: `out/linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13/validation/diff-budget.log`.
-- [x] `FORCE_CODEX_REVIEW=1 npm run review` Evidence: `/Users/kbediako/Code/CO/.runs/linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13/cli/2026-04-21T02-11-19-447Z-184f2469/review/telemetry.json` reports `status: succeeded` and `review_outcome: clean-success` after narrowing the `v0.1.38` exception wording.
+- [x] `FORCE_CODEX_REVIEW=1 npm run review` Evidence: `/Users/kbediako/Code/CO/.runs/linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13/cli/2026-04-21T07-35-34-622Z-391b3ca3/review/telemetry.json` reports `status: succeeded` and `review_outcome: bounded-success`; after addressing the stale handoff-status and unrelated registry-row P2s, the final rerun found no actionable diff-local issues.
 - [x] `npm run pack:smoke` Evidence: `out/linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13/validation/pack-smoke.log` after rerun with `PACK_SMOKE_ALLOW_MARKETPLACE_SKIP=1`; original environment-specific marketplace gap recorded in `pack-smoke-marketplace-blocked.log`.
-- [ ] PR attachment and `pr ready-review` drain before review handoff. Blocked because required validation is not fully green while the inherited `docs:freshness` baseline remains red.
+- [ ] PR attachment and `pr ready-review` drain before review handoff. Remaining workflow step after committing the refreshed packet and opening the PR.
 
 ## Progress Log
 - 2026-04-21: live Linear context showed `Ready`, no comments, no PR attachments, and no workpad; parent moved the issue to `In Progress`, created the required workpad, recorded `parallelize_now`, and launched same-issue child lane `readme-release-truth`.
 - 2026-04-21: child lane `readme-release-truth` succeeded and produced a bounded README patch, satisfying the same-turn child-lane success requirement. The accept helper invalidated the patch because the issue `updated_at` changed from `2026-04-21T02:07:42.530Z` to `2026-04-21T02:19:01.811Z`, so the parent is applying the same bounded intent manually.
-- 2026-04-21: parent evidence confirmed the issue statement directly: `package.json.version` is `0.1.38`, latest tag is `v0.1.38`, `main` is `1262` commits ahead, `docs/public/downstream-setup.md` and `docs/public/provider-onboarding.md` are new since `v0.1.38`, and current README marketplace/plugin guidance also post-dates `v0.1.38`.
+- 2026-04-21: parent evidence confirmed the issue statement directly: `package.json.version` is `0.1.38`, latest tag is `v0.1.38`, `main` remains more than 1200 commits ahead of the tag, `docs/public/downstream-setup.md` and `docs/public/provider-onboarding.md` are new since `v0.1.38`, and current README marketplace/plugin guidance also post-dates `v0.1.38`.
 - 2026-04-21: docs-review child stream `co273-docs-review` ran before handoff, but its failure was inherited repo baseline noise from the existing docs-freshness/spec-frontmatter backlog rather than a packet-local defect. Parent retained the manifest as docs-first evidence and recorded the fallback instead of widening CO-273 scope.
-- 2026-04-21: standalone review rerun finished with `clean-success` after the README wording explicitly excluded `v0.1.38` from the marketplace/public-doc exception; the clean result is recorded in `/Users/kbediako/Code/CO/.runs/linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13/cli/2026-04-21T02-11-19-447Z-184f2469/review/telemetry.json`.
+- 2026-04-21: standalone review finished with `bounded-success`; the stale handoff-status and unrelated registry-row P2s were corrected, the final rerun found no actionable diff-local issues, and PR attachment / `pr ready-review` remain the only workflow handoff steps.
 - 2026-04-21: manual elegance review kept the smallest correct solution and found no simplification patch worth landing. Evidence: `out/linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13/manual/elegance-review.md`.
 
 ## Notes
 - Keep the lane docs/release-truthfulness scoped.
 - Do not imply `docs/public/*` was present in `v0.1.38`.
 - Do not force or imply a release as part of the fix.
-- Review and PR handoff remain blocked on the inherited `docs:freshness:maintain` baseline until that separate owner clears the red gate.
+- Review handoff remains pending only on PR attachment, clean `pr ready-review` drain, and the final Linear state transition.

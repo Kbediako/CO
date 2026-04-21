@@ -70,5 +70,5 @@
   - Mitigation: update `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` in the same packet.
 
 ## Approvals
-- Reviewer: standalone review `clean-success` recorded in `/Users/kbediako/Code/CO/.runs/linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13/cli/2026-04-21T02-11-19-447Z-184f2469/review/telemetry.json`; final handoff still blocked by inherited `docs:freshness` baseline
+- Reviewer: final standalone review `bounded-success` recorded in `/Users/kbediako/Code/CO/.runs/linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13/cli/2026-04-21T07-35-34-622Z-391b3ca3/review/telemetry.json`; stale handoff-status and unrelated registry-row P2s addressed, with no actionable diff-local issues remaining before PR handoff
 - Date: 2026-04-21

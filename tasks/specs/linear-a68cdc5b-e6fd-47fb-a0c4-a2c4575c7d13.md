@@ -57,7 +57,7 @@ task_checklists:
 - Current truth:
   - `package.json.version` is `0.1.38`
   - `git describe --tags --abbrev=0` resolves to `v0.1.38`
-  - `git rev-list --count v0.1.38..HEAD` resolves to `1262`
+  - `git rev-list --count v0.1.38..HEAD` confirms the current branch remains more than 1200 commits ahead of `v0.1.38`
   - `README.md` on `main` references post-tag surfaces including `docs/public/*` and packaged marketplace/plugin flows
 - Reference truth:
   - `v0.1.38` had only the root README as the shipped front-door doc surface
@@ -79,7 +79,7 @@ task_checklists:
   - the diff changes anything beyond docs truthfulness and required mirrors
 - Pre-implementation issue-quality review evidence:
   - 2026-04-21: live issue context showed `Ready`, no comments, no workpad, and no attached PR; the issue was moved to `In Progress` before coding.
-  - 2026-04-21: current repo evidence confirms the reported mismatch: `package.json` is still `0.1.38`, latest tag is `v0.1.38`, `main` is `1262` commits ahead, and `docs/public/*` plus packaged marketplace/plugin docs are post-tag additions.
+  - 2026-04-21: current repo evidence confirms the reported mismatch: `package.json` is still `0.1.38`, latest tag is `v0.1.38`, `main` remains more than 1200 commits ahead, and `docs/public/*` plus packaged marketplace/plugin docs are post-tag additions.
   - 2026-04-21: the micro-task path is not appropriate because the lane depends on exact public wording and release-truthfulness boundaries.
 - Safeguard ownership split:
   - parent lane owns Linear state/workpad, docs packet, registry mirrors, README final wording, validation, PR lifecycle, and merge handoff
@@ -136,5 +136,5 @@ task_checklists:
 - None currently.
 
 ## Approvals
-- Reviewer: standalone review `clean-success` recorded in `/Users/kbediako/Code/CO/.runs/linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13/cli/2026-04-21T02-11-19-447Z-184f2469/review/telemetry.json`; final handoff still blocked by inherited `docs:freshness` baseline
+- Reviewer: final standalone review `bounded-success` recorded in `/Users/kbediako/Code/CO/.runs/linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13/cli/2026-04-21T07-35-34-622Z-391b3ca3/review/telemetry.json`; stale handoff-status and unrelated registry-row P2s addressed, with no actionable diff-local issues remaining before PR handoff
 - Date: 2026-04-21
