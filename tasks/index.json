@@ -74,6 +74,26 @@
       }
     },
     {
+      "id": "20260422-linear-61ddd0d1-664b-4060-949b-33eb4e7255ac",
+      "title": "CO-297 stop-hook structured sentinel contract",
+      "relates_to": "tasks/tasks-linear-61ddd0d1-664b-4060-949b-33eb4e7255ac.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-22",
+      "paths": {
+        "spec": "tasks/specs/linear-61ddd0d1-664b-4060-949b-33eb4e7255ac.md",
+        "task": "tasks/tasks-linear-61ddd0d1-664b-4060-949b-33eb4e7255ac.md",
+        "agent_task": ".agent/task/linear-61ddd0d1-664b-4060-949b-33eb4e7255ac.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-61ddd0d1-664b-4060-949b-33eb4e7255ac.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-61ddd0d1-664b-4060-949b-33eb4e7255ac.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-61ddd0d1-664b-4060-949b-33eb4e7255ac.md"
+        }
+      }
+    },
+    {
       "id": "20260421-linear-937a8e46-5f29-49b6-8272-83db7a3f1a83",
       "title": "CO-286 attach already-active provider-worker runs before capacity gating",
       "relates_to": "tasks/tasks-linear-937a8e46-5f29-49b6-8272-83db7a3f1a83.md",
