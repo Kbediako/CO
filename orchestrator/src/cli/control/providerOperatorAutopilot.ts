@@ -1244,7 +1244,7 @@ function resolveLatestTrackedActivityExternalPrHint(
 
 function classifyCurrentExternalPrBlockerText(value: string): 'blocked' | 'resolved' | null {
   const segments = value
-    .split(/[\n.;]+/u)
+    .split(/[\n;]+/u)
     .map((segment) => segment.trim())
     .filter((segment) => segment.length > 0);
   let latestHint: 'blocked' | 'resolved' | null = null;
