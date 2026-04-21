@@ -1844,6 +1844,35 @@
       }
     },
     {
+      "id": "20260421-linear-711a91d3-4a12-4c97-94b4-d4edcf3a47bf",
+      "title": "Control host: stale plain released/not_active Backlog cache still suppresses Backlog -> Ready reclaim after CO-240",
+      "relates_to": "tasks/tasks-linear-711a91d3-4a12-4c97-94b4-d4edcf3a47bf.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-21",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=stale-released-not-active-backlog-ready-reclaim-post-co240",
+      "approvals": {
+        "docs_packet_file_refresh_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-21",
+          "status": "produced",
+          "manifest": ".runs/linear-711a91d3-4a12-4c97-94b4-d4edcf3a47bf-docs-packet-file-refresh/cli/2026-04-21T05-56-35-757Z-41ecac5d/manifest.json",
+          "source_anchor": "ctx:sha256:2d92868e9c6fa9d99101ff7c39b3d0c6d5b8322632c5ec319289197d5f4bb1e8#chunk:c000001",
+          "shared_source_0_anchor": "ctx:sha256:2d92868e9c6fa9d99101ff7c39b3d0c6d5b8322632c5ec319289197d5f4bb1e8#chunk:c000001",
+          "linear_updated_at": "2026-04-21T05:54:02.627Z",
+          "summary": "Docs-first packet refresh for CO-281 after the prior docs-packet artifact became stale at accept time. The packet preserves the post-CO-240 stale plain released/not_active Backlog cache contract: operator-autopilot promotes a backlog head from Backlog -> Ready, while provider-intake-state.json still retains released/provider_issue_released:not_active with stale issue_state=Backlog, issue_state_type=backlog, stale issue_updated_at, and last_delivery_id=null; normal reclaim or fresh_discovery must refresh/reclassify and admit without manual worker start. It preserves CO-240 lineage and evidence paths .runs/local-mcp/cli/control-host/provider-intake-state.json and .runs/local-mcp/cli/control-host/provider-operator-autopilot.jsonl, and rejects CO-212 completed-blocker scope, CO-216 manual-demotion scope, pure capacity, manual worker start, and generic concurrency/capacity rewrites."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-711a91d3-4a12-4c97-94b4-d4edcf3a47bf.md",
+        "task": "tasks/tasks-linear-711a91d3-4a12-4c97-94b4-d4edcf3a47bf.md",
+        "agent_task": ".agent/task/linear-711a91d3-4a12-4c97-94b4-d4edcf3a47bf.md",
+        "docs": "docs/TECH_SPEC-linear-711a91d3-4a12-4c97-94b4-d4edcf3a47bf.md"
+      }
+    },
+    {
       "id": "20260416-linear-c101cb88-3097-4502-bcd7-723d80da7955",
       "title": "CO workflow: refresh Apr 16 docs:freshness stale cohort blocking handoffs",
       "relates_to": "tasks/tasks-linear-c101cb88-3097-4502-bcd7-723d80da7955.md",
