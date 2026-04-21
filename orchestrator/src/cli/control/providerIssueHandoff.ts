@@ -2258,9 +2258,15 @@ export function createProviderIssueHandoffService(
       return buildClearedRehydratedLaunchProvenance();
     }
 
-    const manifestLaunchSource = normalizeOptionalString(manifest.provider_launch_source);
-    const manifestTaskId = normalizeOptionalString(manifest.provider_control_host_task_id);
-    const manifestRunId = normalizeOptionalString(manifest.provider_control_host_run_id);
+    const manifestLaunchSource =
+      normalizeOptionalString(manifest.provider_launch_source) ??
+      normalizeOptionalString(manifest.providerLaunchSource);
+    const manifestTaskId =
+      normalizeOptionalString(manifest.provider_control_host_task_id) ??
+      normalizeOptionalString(manifest.providerControlHostTaskId);
+    const manifestRunId =
+      normalizeOptionalString(manifest.provider_control_host_run_id) ??
+      normalizeOptionalString(manifest.providerControlHostRunId);
     const manifestMatchesControlHostLocator =
       controlHostRunLocator !== null &&
       manifestLaunchSource === PROVIDER_LAUNCH_SOURCE &&

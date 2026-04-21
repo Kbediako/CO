@@ -1154,7 +1154,7 @@ describe('runProviderIssueHandoffRefresh', () => {
     });
   });
 
-  it('preserves control-host launch provenance when retained claim identity only has the active manifest path', async () => {
+  it('preserves control-host launch provenance when retained claim identity only has the active manifest path and camelCase manifest aliases', async () => {
     const { root, paths } = await createHostPaths();
     const childPaths = await createCo185ActiveRun(root);
     const initialManifest = JSON.parse(
@@ -1165,9 +1165,9 @@ describe('runProviderIssueHandoffRefresh', () => {
       JSON.stringify(
         {
           ...initialManifest,
-          provider_launch_source: 'control-host',
-          provider_control_host_task_id: 'local-mcp',
-          provider_control_host_run_id: 'control-host'
+          providerLaunchSource: 'control-host',
+          providerControlHostTaskId: 'local-mcp',
+          providerControlHostRunId: 'control-host'
         },
         null,
         2
@@ -1280,9 +1280,26 @@ describe('runProviderIssueHandoffRefresh', () => {
     });
   });
 
-  it('keeps released active-run rehydration fail-closed when launch provenance is absent', async () => {
+  it('keeps released active-run rehydration fail-closed when claim launch provenance is absent despite complete manifest provenance', async () => {
     const { root, paths } = await createHostPaths();
     const childPaths = await createCo185ActiveRun(root);
+    const seededManifest = JSON.parse(
+      await readFile(childPaths.manifestPath, 'utf8')
+    ) as Record<string, unknown>;
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify(
+        {
+          ...seededManifest,
+          provider_launch_source: 'control-host',
+          provider_control_host_task_id: 'local-mcp',
+          provider_control_host_run_id: 'control-host'
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
     const state = createProviderIntakeState();
     pushCo185ReleasedPendingClaim(state, childPaths.manifestPath);
 
@@ -1316,9 +1333,11 @@ describe('runProviderIssueHandoffRefresh', () => {
       launch_token: null
     });
     const manifest = JSON.parse(await readFile(childPaths.manifestPath, 'utf8')) as Record<string, unknown>;
-    expect(manifest.provider_launch_source).toBeUndefined();
-    expect(manifest.provider_control_host_task_id).toBeUndefined();
-    expect(manifest.provider_control_host_run_id).toBeUndefined();
+    expect(manifest).toMatchObject({
+      provider_launch_source: 'control-host',
+      provider_control_host_task_id: 'local-mcp',
+      provider_control_host_run_id: 'control-host'
+    });
   });
 
   it('clears stale claim launch provenance when active-run manifest provenance is mismatched', async () => {
