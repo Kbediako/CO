@@ -8,7 +8,7 @@ Replace dead `.runs/0801-dead-code-pruning/archive/...` README guidance with dur
 
 - Work only inside this child lane workspace.
 - Edit only files in the declared docs scope.
-- Do not mutate Linear, GitHub PRs, `.tmp/co272-workpad.md`, or parent-owned coordination state.
+- Do not mutate Linear, GitHub PRs, temporary workpad files, or parent-owned coordination state.
 - Do not widen beyond current tracked Task 0801 README archive-pointer residue.
 - Do not run full repo validation suites.
 - Preserve valid abetkaua mirror workflow and separate non-0801 run-manifest history.
