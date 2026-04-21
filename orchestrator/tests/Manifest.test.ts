@@ -1869,6 +1869,36 @@ describe('buildGuardrailSummary', () => {
     );
   });
 
+  it('preserves optional spec-guard outcomes when a command exists', () => {
+    const summary = stripNonApplicableGuardrailSummaryLines(
+      {
+        guardrails_required: false,
+        commands: [
+          {
+            index: 1,
+            id: 'spec-guard',
+            title: 'Spec guard',
+            command: 'node scripts/spec-guard.mjs',
+            kind: 'command',
+            status: 'failed',
+            started_at: null,
+            completed_at: null,
+            exit_code: 1,
+            summary: 'Guardrails: spec-guard failed (1/1 failed).',
+            log_path: null,
+            error_file: null,
+            sub_run_id: null
+          }
+        ]
+      },
+      "Stage 'fail once' failed with exit code 1.\nGuardrails: spec-guard failed (1/1 failed)."
+    );
+
+    expect(summary).toBe(
+      "Stage 'fail once' failed with exit code 1.\nGuardrails: spec-guard failed (1/1 failed)."
+    );
+  });
+
   it('treats explicit spec-guard skip summaries as skipped', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-guardrail-skip-'));
     const env: EnvironmentPaths = {

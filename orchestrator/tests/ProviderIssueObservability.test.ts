@@ -975,7 +975,7 @@ describe('provider issue observability', () => {
     expect(progress?.last_semantic_progress_at).toBe('2026-04-05T05:44:30.000Z');
   });
 
-  it('does not project stale missing spec-guard text from non-guardrail child lanes', () => {
+  it('does not project stale guardrail text from non-guardrail child lanes', () => {
     const progress = deriveProviderLinearWorkerProgressSnapshot({
       proof: {
         owner_phase: 'turn_running',
@@ -994,7 +994,12 @@ describe('provider issue observability', () => {
             launched_at: '2026-04-18T02:00:10.000Z',
             decision: 'pending',
             summary_recorded_at: '2026-04-18T02:00:40.000Z',
-            summary: "Child lane truth-surface-regression failed.\nGuardrails: spec-guard command not found."
+            summary:
+              "Child lane truth-surface-regression failed.\n" +
+              'Guardrails: spec-guard command not found.\n' +
+              'Guardrails: spec-guard failed (1/1 failed).\n' +
+              'Guardrail command missing; run "codex-orchestrator start diagnostics --approval-policy never --format json --no-interactive" to capture reviewer diagnostics.\n' +
+              'Guardrail command failed; re-run "codex-orchestrator start diagnostics --approval-policy never --format json --no-interactive" to gather failure artifacts.'
           }
         ],
         linear_audit: null
@@ -1004,6 +1009,9 @@ describe('provider issue observability', () => {
 
     expect(progress?.summary).toBe('Child lane truth-surface-regression failed.');
     expect(progress?.summary).not.toContain('Guardrails: spec-guard command not found.');
+    expect(progress?.summary).not.toContain('Guardrails: spec-guard failed');
+    expect(progress?.summary).not.toContain('Guardrail command missing;');
+    expect(progress?.summary).not.toContain('Guardrail command failed;');
   });
 
   it('does not rank invalidated rejected or accepted child-lane summaries over current replacement progress', () => {

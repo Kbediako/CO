@@ -10,11 +10,10 @@ import {
   normalizeProviderLinearWorkflowState
 } from './providerLinearWorkflowStates.js';
 import { normalizeProviderWorkerHostName } from './providerWorkerHosts.js';
+import { stripNonApplicableGuardrailSummaryLines } from '../run/manifest.js';
 
 const PROVIDER_SEMANTIC_STALL_THRESHOLD_MS = 15 * 60 * 1000;
 const PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID = 'provider-linear-child-lane';
-const FALSE_MISSING_SPEC_GUARD_SUMMARY = 'Guardrails: spec-guard command not found.';
-const FALSE_MISSING_SPEC_GUARD_RECOMMENDATION_PREFIX = 'Guardrail command missing;';
 
 export type ProviderIntakeClaimFreshness =
   | 'fresh'
@@ -1999,18 +1998,14 @@ function normalizeProviderChildLaneProgressSummary(childLane: ProviderIssueChild
   if (normalizeOptionalString(childLane.pipeline_id) !== PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID) {
     return summary;
   }
-  const filtered = summary
-    .split('\n')
-    .map((line) =>
-      line
-        .replace(FALSE_MISSING_SPEC_GUARD_SUMMARY, '')
-        .replace(new RegExp(`\\s*${escapeRegExp(FALSE_MISSING_SPEC_GUARD_RECOMMENDATION_PREFIX)}[^\\n]*$`), '')
-        .trim()
-    )
-    .filter((line) => line.length > 0)
-    .join('\n')
-    .trim();
-  return filtered || null;
+  return stripNonApplicableGuardrailSummaryLines(
+    {
+      pipeline_id: PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID,
+      guardrails_required: false,
+      commands: []
+    },
+    summary
+  );
 }
 
 function childLaneProgressRecordedAt(childLane: ProviderIssueChildLaneLike): string | null {
@@ -2164,8 +2159,4 @@ function normalizeOptionalString(value: unknown): string | null {
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

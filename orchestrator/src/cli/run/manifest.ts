@@ -577,9 +577,12 @@ export function stripNonApplicableGuardrailSummaryLines(
     return null;
   }
   const lines = normalized.split('\n');
+  const guardrailCommands = selectGuardrailCommands(manifest);
+  if (guardrailCommands.length > 0) {
+    return normalized;
+  }
   const canStripLegacyMixedSummary =
     isKnownNonGuardrailPipelineManifest(manifest) &&
-    selectGuardrailCommands(manifest).length === 0 &&
     lines.some((line) => !isGuardrailSummaryOrRecommendationLine(line));
   if (resolveGuardrailsRequiredForManifest(manifest) && !canStripLegacyMixedSummary) {
     return normalized;
