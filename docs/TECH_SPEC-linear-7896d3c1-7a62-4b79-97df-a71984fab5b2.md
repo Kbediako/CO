@@ -5,7 +5,7 @@ relates_to: docs/PRD-linear-7896d3c1-7a62-4b79-97df-a71984fab5b2.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-18
+last_review: 2026-04-21
 ---
 
 ## Canonical Reference
@@ -152,6 +152,23 @@ last_review: 2026-04-18
   - metrics closeout and provider-worker terminal summary preservation
   - provider issue observability and retry truth consumers
 - Ensure non-applicable runs remain silent about missing `spec-guard`, while real present-stage and required-missing outcomes remain explicit.
+
+## 2026-04-21 Implementation Update
+- Shipped contract:
+  - `bootstrapManifest(...)` now derives `guardrails_required` from an explicit pipeline override or from an actual `spec-guard` / `specGuardRunner` stage, so pipelines without that stage are non-applicable rather than missing.
+  - `provider-linear-worker` is explicitly configured with `guardrailsRequired: false` because that pipeline has no `spec-guard` stage.
+  - `resolveGuardrailsRequiredForManifest(...)` preserves explicit `guardrails_required: true` for real required-missing cases, while known stale provider-worker manifests are treated as non-applicable.
+  - `stripNonApplicableGuardrailSummaryLines(...)` removes stale `Guardrails: spec-guard command not found.` and related recommendation lines only when manifest applicability proves guardrails are not required.
+- Surface alignment:
+  - manifest summary / `guardrail_status` now stop synthesizing missing `spec-guard` truth for non-applicable runs.
+  - provider handoff, selected-run projection, child-lane shell, and provider-worker retry/proof surfaces sanitize stale non-applicable guardrail summary lines before projecting operator truth.
+  - provider issue observability has focused child-lane progress coverage proving stale non-applicable guardrail text is not surfaced as current failure truth.
+- Preservation rule:
+  - explicit required-missing and real present-stage outcomes remain visible; tests cover explicit required-missing text alongside non-guardrail summary text so the sanitizer cannot hide genuine guardrail failures.
+- Validation evidence:
+  - commit `e25e7de0d` / PR `#576`
+  - focused tests: `npm run test:orchestrator -- orchestrator/tests/Manifest.test.ts orchestrator/tests/MetricsAggregator.test.ts orchestrator/tests/ProviderIssueObservability.test.ts orchestrator/tests/ProviderIssueHandoff.test.ts tests/cli-orchestrator.spec.ts`
+  - full lane validation: `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `npm run repo:stewardship`, `node scripts/diff-budget.mjs`, and forced `npm run review -- --uncommitted` with `review_outcome=bounded-success`
 
 ## Protected Expectations
 - Preserve exact issue wording around false runtime synthesis of `Guardrails: spec-guard command not found.` when no `spec-guard` stage exists across manifest summaries, metrics closeout, provider issue observability, and retry truth.
