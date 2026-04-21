@@ -47,4 +47,4 @@
 
 ## Progress Log
 - 2026-04-21: Bounded same-issue child lane refreshed the `CO-281` docs-first packet after the prior docs-packet artifact became stale at accept time. The packet preserves `control host`, `operator-autopilot`, `Backlog -> Ready`, `provider-intake-state.json`, `released`, `provider_issue_released:not_active`, `stale Backlog cache`, `fresh_discovery`, `reclaim`, `CO-240`, `last_delivery_id=null`, and explicitly rejects `CO-212` completed-blocker scope, `CO-216` manual-demotion scope, pure capacity, manual worker start, and generic concurrency/capacity rewrites.
-- 2026-04-21: Parent implementation prioritizes operator-autopilot transitioned/noop issue IDs during the same-cycle refetch dispatch so a promoted stale Backlog row cannot lose the single available provider slot to unrelated Ready work before its cached intake row is refreshed.
+- 2026-04-21: Parent implementation prioritizes operator-autopilot transitioned/noop issue IDs during the same-cycle refetch dispatch, so a promoted stale Backlog row cannot lose the single available provider slot to unrelated Ready work before its cached intake row is refreshed.

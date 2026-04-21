@@ -19387,8 +19387,8 @@ describe('createProviderIssueHandoffService', () => {
     const refetchTrackedIssues = vi.fn(async () => ({
       kind: 'ready' as const,
       trackedIssues: [
-        promotedReadyIssue,
-        unrelatedReadyIssue
+        unrelatedReadyIssue,
+        promotedReadyIssue
       ]
     }));
     const service = createProviderIssueHandoffService({
