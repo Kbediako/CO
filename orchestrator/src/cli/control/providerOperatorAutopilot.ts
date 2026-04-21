@@ -1263,7 +1263,7 @@ function classifyCurrentExternalPrBlockerText(value: string): 'blocked' | 'resol
 }
 
 function classifyExternalPrHintSegment(segment: string): 'blocked' | 'resolved' | null {
-  if (!/\b(?:pr|pull request)\s*#?\d+\b/iu.test(segment)) {
+  if (!/\b(?:pr|pull request)\b[\s`\[\]()]*#?\d+\b/iu.test(segment)) {
     return null;
   }
   const resolvedSignals = collectExternalPrHintSignals(

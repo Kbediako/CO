@@ -295,10 +295,49 @@ describe('providerOperatorAutopilot', () => {
     expect(result.summary).toContain('found no bounded action');
   });
 
+  it('suppresses ready-to-unblock advisories when markdown-wrapped PR refs remain unmerged', async () => {
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createBlockedCo272Issue(
+          'Current operator note: PR [`#571`](https://github.com/asabeko/CO/pull/571) checks passed but is not yet merged.'
+        )
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    });
+
+    expect(result.status).toBe('noop');
+    expect(result.terminal_blocker_advisories).toEqual([]);
+    expect(result.summary).toContain('found no bounded action');
+  });
+
   it('keeps ready-to-unblock advisories when PR blocker notes are resolved', async () => {
     const result = await runProviderOperatorAutopilot({
       tracked_issues: [
         createBlockedCo272Issue('Operator note: PR #571 is no longer blocking; checks passed.')
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    });
+
+    expect(result.status).toBe('acted');
+    expect(result.terminal_blocker_advisories).toMatchObject([
+      {
+        issue_id: 'lin-issue-272',
+        issue_identifier: 'CO-272',
+        recommended_action: 'ready_to_unblock'
+      }
+    ]);
+  });
+
+  it('keeps ready-to-unblock advisories when markdown-wrapped PR refs are explicitly resolved', async () => {
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createBlockedCo272Issue(
+          'Operator note: PR `#571` is no longer blocking; checks passed.'
+        )
       ],
       claims: [],
       config: buildConfig(),
