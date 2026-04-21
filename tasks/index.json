@@ -1,6 +1,61 @@
 {
   "items": [
     {
+      "id": "20260421-linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb",
+      "title": "CO: replace remaining dead-code-pruning archive README pointers with durable guidance",
+      "relates_to": "tasks/tasks-linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md",
+      "risk": "low",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-21",
+      "approvals": {
+        "child_lane_attempt": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-21",
+          "status": "failed-closed-provenance-invalid",
+          "audit": ".runs/linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb/cli/2026-04-21T05-01-57-505Z-73d5a803/provider-linear-worker-linear-audit.jsonl",
+          "summary": "Same-issue docs child-lane launch was attempted after the required parallelize_now decision but failed closed with provider_worker_child_lane_provenance_invalid because the parent manifest lacks provider control-host provenance; parent owns docs and README implementation without fabricating child evidence."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md",
+        "task": "tasks/tasks-linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md",
+        "agent_task": ".agent/task/linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md",
+        "docs": "docs/TECH_SPEC-linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md"
+      }
+    },
+    {
+      "id": "20260421-linear-03561618-a006-41f3-808b-617e5562fe9b",
+      "title": "CO-278 stale spec-guard baseline maintenance",
+      "relates_to": "tasks/tasks-linear-03561618-a006-41f3-808b-617e5562fe9b.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-21",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-21",
+          "status": "produced",
+          "manifest": ".runs/linear-03561618-a006-41f3-808b-617e5562fe9b-docs-packet/cli/2026-04-21T04-56-51-179Z-3e98eca2/manifest.json",
+          "source_anchor": "ctx:sha256:28e32e675229fa7e7a8c27c47b1e4f350222c304df75cd53153a5fe4679b88eb#chunk:c000001",
+          "summary": "Docs-first packet created for CO-278 stale spec-guard baseline maintenance. Local source-0 payload was unavailable because this child checkout has no .runs tree. Scoped spec-guard dry-run evidence lists nine stale active task specs at last_review 2026-03-21; this child lane preserved those paths and parent-owned implementation boundaries without editing the stale specs, weakening spec-guard, or broadening into docs:freshness work."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-03561618-a006-41f3-808b-617e5562fe9b.md",
+        "task": "tasks/tasks-linear-03561618-a006-41f3-808b-617e5562fe9b.md",
+        "agent_task": ".agent/task/linear-03561618-a006-41f3-808b-617e5562fe9b.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-03561618-a006-41f3-808b-617e5562fe9b.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-03561618-a006-41f3-808b-617e5562fe9b.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-03561618-a006-41f3-808b-617e5562fe9b.md"
+        }
+      }
+    },
+    {
       "id": "20260420-linear-025f5748-bed9-4512-9fd6-53ad57dd1466",
       "title": "CO-266 blocked terminal blocker cleanup advisory",
       "relates_to": "tasks/tasks-linear-025f5748-bed9-4512-9fd6-53ad57dd1466.md",

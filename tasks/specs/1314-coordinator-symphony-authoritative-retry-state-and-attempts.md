@@ -4,7 +4,7 @@ title: Coordinator Symphony Authoritative Retry State and Attempts
 status: in_progress
 owner: Codex
 created: 2026-03-21
-last_review: 2026-03-21
+last_review: 2026-04-21
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-coordinator-symphony-authoritative-retry-state-and-attempts.md
@@ -17,6 +17,7 @@ review_notes:
   - 2026-03-21: The current branch now persists authoritative retry fields, projects retry rows from provider-intake state, and derives issue attempts from the retry ledger.
   - 2026-03-21: Strict post-worker-exit scheduler ownership/cadence parity remains outside this slice.
   - 2026-03-21: The `1314` closeout pack is now historical evidence for the earlier `1312`/`1313`/`1314` implemented-on-branch tranche; current branch truth for PR `#283` is that `1315` and `1316` are also landed on branch, but publication remains open and the `1316` closeout root is the current validation vehicle.
+  - 2026-04-21: CO-278 spec-guard freshness review re-read the retry-state contract, current-truth section, and validation plan; no scope reclassification or archive action is warranted, so this refresh is limited to the stale review baseline blocking enforced `node scripts/spec-guard.mjs`.
 ---
 
 # Technical Specification

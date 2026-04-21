@@ -4,7 +4,7 @@ title: Coordinator Symphony Full-Parity Hardening and Closure
 status: in_progress
 owner: Codex
 created: 2026-03-20
-last_review: 2026-03-21
+last_review: 2026-04-21
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-coordinator-symphony-full-parity-hardening-and-closure.md
@@ -16,6 +16,7 @@ review_notes:
   - 2026-03-20: Opened as the delivery follow-up to `1310`. The parity authority is `Symphony SPEC.md` at commit `a164593aacb3db4d6808adc5a87173d906726406`, with current Elixir reference behavior used to scope richer operational parity surfaces.
   - 2026-03-21: `1311` now remains an umbrella/historical lane rather than the current publication unit. The current branch now carries the integrated `1312`-`1316` implementation stack; the remaining work is truthful publication closeout, not another owned implementation blocker.
   - 2026-03-21: Use `out/1316-coordinator-symphony-poll-owned-discovery-and-recovery/manual/20260321T164742Z-stacked-closeout/` as the active current-head closeout pack for the integrated `1312`-`1316` stack. Older `20260321T124445Z-stacked-closeout`, `20260321T124510Z-stack-closeout`, and the earlier `1314` summary pack are stale for current-head validation. In the current `1316` closeout pack, `01`-`09` passed, `10-review-pre-fix.log` captured the earlier `3` P2 findings, `11-review-rerun.log` is terminal and not clean but its queued-retry dispatch/projection findings are addressed on the current head, and `12-pack-smoke.log` plus `14-live-proof.md` plus PR/merge artifacts remain pending while a fresh clean rerun is still required.
+  - 2026-04-21: CO-278 spec-guard freshness review re-read the umbrella/historical posture, current-truth section, and validation plan; no scope reclassification or archive action is warranted, so this refresh is limited to the stale review baseline blocking enforced `node scripts/spec-guard.mjs`.
 ---
 
 # Technical Specification

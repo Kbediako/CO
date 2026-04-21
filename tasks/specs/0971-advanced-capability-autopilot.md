@@ -5,7 +5,7 @@ relates_to: tasks/tasks-0971-advanced-capability-autopilot.md
 risk: medium
 owners:
   - Codex
-last_review: 2026-03-21
+last_review: 2026-04-21
 ---
 
 ## Summary
@@ -41,6 +41,9 @@ last_review: 2026-03-21
 
 ## Open Questions
 - None blocking.
+
+## Review Notes
+- 2026-04-21: CO-278 spec-guard freshness review re-read the summary, requirements, and validation plan; no scope reclassification or archive action is warranted, so this refresh is limited to the stale review baseline blocking enforced `node scripts/spec-guard.mjs`.
 
 ## Approvals
 - Reviewer: user
