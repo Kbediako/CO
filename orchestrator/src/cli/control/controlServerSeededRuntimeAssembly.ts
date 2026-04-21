@@ -209,6 +209,7 @@ export function createControlServerSeededRuntimeAssembly(
         if (linearAdvisoryStaleWritePending || linearAdvisoryMarkedStale) {
           await writeJsonAtomic(linearAdvisoryStatePath, linearAdvisoryState);
           linearAdvisoryStaleWritePending = false;
+          controlRuntime.publish({ source: 'linear-advisory.stale-source' });
         }
       }),
     providerIntakePolling: async (polling, updatedAt) =>
@@ -231,6 +232,7 @@ export function createControlServerSeededRuntimeAssembly(
         if (linearAdvisoryStaleWritePending || linearAdvisoryMarkedStale) {
           await writeJsonAtomic(linearAdvisoryStatePath, linearAdvisoryState);
           linearAdvisoryStaleWritePending = false;
+          controlRuntime.publish({ source: 'linear-advisory.stale-source' });
         }
       })
   } satisfies ControlRequestPersist;

@@ -415,7 +415,12 @@ describe('createControlServerSeededRuntimeAssembly', () => {
       rehydrated_at: '2026-04-21T16:00:00.000Z',
       latest_provider_key: null,
       latest_reason: null,
-      claims: []
+      claims: [
+        co272ProviderIntakeClaim({
+          issue_updated_at: '2026-04-21T16:00:00.000Z',
+          updated_at: '2026-04-21T16:00:00.000Z'
+        })
+      ]
     };
 
     try {
@@ -521,6 +526,75 @@ describe('createControlServerSeededRuntimeAssembly', () => {
       expect(assembly.requestContextShared.linearAdvisoryState.stale_source ?? null).toBeNull();
       expect(selectedSnapshot.selected?.tracked?.linear?.identifier).toBe('CO-272');
       expect(selectedSnapshot.tracked?.linear?.identifier).toBe('CO-272');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('invalidates cached runtime snapshots when provider intake marks the advisory stale', async () => {
+    const { root, env, paths } = await createRunRoot('task-294');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const seededAdvisory = advisoryState(
+      '2026-04-21T15:00:00.000Z',
+      co272TrackedIssue()
+    );
+    const seededProviderIntake: ProviderIntakeState = {
+      schema_version: 1,
+      updated_at: '2026-04-21T14:59:00.000Z',
+      rehydrated_at: null,
+      latest_provider_key: 'linear:lin-issue-272',
+      latest_reason: 'provider_issue_start_launched',
+      claims: [co272ProviderIntakeClaim()]
+    };
+
+    try {
+      const assembly = createControlServerSeededRuntimeAssembly({
+        runId: 'run-1',
+        token: 'control-token',
+        config,
+        paths,
+        sessionTtlMs: 60_000,
+        controlSeed: null,
+        confirmationsSeed: null,
+        questionsSeed: null,
+        delegationSeed: null,
+        linearAdvisorySeed: seededAdvisory,
+        providerIntakeSeed: seededProviderIntake
+      });
+
+      await seedManifest(paths, {
+        task_id: 'linear-co-272-current-advisory',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-272',
+        issue_identifier: 'CO-272',
+        summary: 'selected issue has no authoritative tracked payload',
+        updated_at: '2026-04-21T16:00:00.000Z'
+      });
+
+      const cachedSnapshot =
+        await assembly.requestContextShared.runtime.snapshot().readSelectedRunSnapshot();
+      expect(cachedSnapshot.tracked?.linear?.identifier).toBe('CO-272');
+
+      const providerIntakeState = assembly.requestContextShared.providerIntakeState!;
+      providerIntakeState.updated_at = '2026-04-21T16:30:00.000Z';
+      providerIntakeState.rehydrated_at = '2026-04-21T16:30:00.000Z';
+      providerIntakeState.claims[0] = {
+        ...providerIntakeState.claims[0]!,
+        updated_at: '2026-04-21T16:30:00.000Z',
+        issue_updated_at: '2026-04-21T16:30:00.000Z'
+      };
+
+      await assembly.requestContextShared.persist.providerIntake?.();
+
+      const refreshedSnapshot =
+        await assembly.requestContextShared.runtime.snapshot().readSelectedRunSnapshot();
+      expect(assembly.requestContextShared.linearAdvisoryState.stale_source).toMatchObject({
+        source: 'provider-intake',
+        reason: 'provider_intake_newer_than_linear_advisory',
+        provider_intake_updated_at: '2026-04-21T16:30:00.000Z',
+        advisory_updated_at: '2026-04-21T15:00:00.000Z'
+      });
+      expect(refreshedSnapshot.tracked?.linear ?? null).toBeNull();
     } finally {
       await rm(root, { recursive: true, force: true });
     }

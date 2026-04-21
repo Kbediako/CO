@@ -338,7 +338,10 @@ export function markLinearAdvisoryStateStaleFromProviderIntake(
   if (!state.tracked_issue) {
     return false;
   }
-  const providerIntakeUpdatedAt = resolveProviderIntakeTruthUpdatedAt(providerIntakeState);
+  const providerIntakeUpdatedAt = resolveProviderIntakeTruthUpdatedAt(
+    providerIntakeState,
+    state.tracked_issue
+  );
   const advisoryUpdatedAt = resolveLinearAdvisoryTrackedIssueReferenceUpdatedAt(state);
   if (!isIsoNewer(providerIntakeUpdatedAt, advisoryUpdatedAt)) {
     return false;
@@ -366,11 +369,18 @@ function resolveProviderIntakeTruthUpdatedAt(
   providerIntakeState:
     | Pick<ProviderIntakeState, 'rehydrated_at' | 'claims'>
     | null
-    | undefined
+    | undefined,
+  trackedIssue: Pick<LiveLinearTrackedIssue, 'id' | 'identifier'>
 ): string | null {
+  const matchingClaims = (providerIntakeState?.claims ?? []).filter((claim) =>
+    claim.issue_id === trackedIssue.id || claim.issue_identifier === trackedIssue.identifier
+  );
+  if (matchingClaims.length === 0) {
+    return null;
+  }
   let truthUpdatedAt =
     typeof providerIntakeState?.rehydrated_at === 'string' ? providerIntakeState.rehydrated_at : null;
-  for (const claim of providerIntakeState?.claims ?? []) {
+  for (const claim of matchingClaims) {
     truthUpdatedAt = pickLatestIsoTimestamp(
       pickLatestIsoTimestamp(truthUpdatedAt, claim.updated_at),
       claim.issue_updated_at
