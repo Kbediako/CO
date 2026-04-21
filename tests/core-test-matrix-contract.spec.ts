@@ -104,6 +104,7 @@ describe('core test matrix command contract', () => {
     const forwardedArgs = ['adapters/tests/registry.test.ts'];
 
     await runPackageScript(harness, 'test:all', forwardedArgs, {
+      VITEST_CORE_ADAPTER_NO_MATCH: '1',
       VITEST_FAIL_CORE_ADAPTER_FILTER: '1'
     });
 
@@ -117,6 +118,36 @@ describe('core test matrix command contract', () => {
         argv: ['run', '--passWithNoTests', '--config', 'vitest.config.adapters.ts', ...forwardedArgs]
       }
     ]);
+  });
+
+  it('fails test:all when forwarded filters match no delegated lane', async () => {
+    const harness = await createNpmScriptHarness(await readPackageScripts());
+    const forwardedArgs = ['missing/does-not-exist.test.ts'];
+
+    await expect(
+      runPackageScript(harness, 'test:all', forwardedArgs, {
+        VITEST_NO_MATCH_FILTER: forwardedArgs[0]
+      })
+    ).rejects.toMatchObject({ code: 1 });
+
+    expect(await readVitestInvocations(harness.logPath)).toEqual([
+      {
+        lifecycle: 'test:core',
+        argv: ['run', '--config', 'vitest.config.core.ts', '--passWithNoTests', ...forwardedArgs]
+      },
+      {
+        lifecycle: 'test:adapters',
+        argv: ['run', '--passWithNoTests', '--config', 'vitest.config.adapters.ts', ...forwardedArgs]
+      }
+    ]);
+  });
+
+  it('spawns Windows npm shims through a shell in the test:all runner', async () => {
+    const runnerSource = await readFile(join(repoRoot, 'scripts', 'run-test-all.mjs'), 'utf8');
+
+    expect(runnerSource).toContain('shell: shouldUseShellForCommand(npmCommand)');
+    expect(runnerSource).toContain("process.platform === 'win32'");
+    expect(runnerSource).toContain('/\\.(?:cmd|bat)$/i.test(command)');
   });
 
   it('keeps GitHub Core Lane pointed at the core Vitest lane', async () => {
@@ -159,6 +190,13 @@ async function createNpmScriptHarness(scripts: Record<string, string>) {
       '  process.env.VITEST_CALL_LOG,',
       "  JSON.stringify({ lifecycle, argv }) + '\\n'",
       ');',
+      "const noMatchFilter = process.env.VITEST_NO_MATCH_FILTER;",
+      "const isForcedNoMatch = noMatchFilter && argv.some((arg) => arg.includes(noMatchFilter));",
+      "const isCoreAdapterNoMatch = process.env.VITEST_CORE_ADAPTER_NO_MATCH === '1' && lifecycle === 'test:core' && argv.some((arg) => arg.startsWith('adapters/'));",
+      'if (isForcedNoMatch || isCoreAdapterNoMatch) {',
+      "  console.log('No test files found, exiting with code 0');",
+      '  process.exit(0);',
+      '}',
       "if (process.env.VITEST_FAIL_CORE_ADAPTER_FILTER === '1' && lifecycle === 'test:core' && argv.some((arg) => arg.startsWith('adapters/')) && !argv.includes('--passWithNoTests')) {",
       '  process.exit(1);',
       '}',
