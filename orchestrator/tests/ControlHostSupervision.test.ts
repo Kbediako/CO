@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { describe, expect, it, vi } from 'vitest';
 
@@ -38,6 +38,7 @@ const {
   probeControlHostHealth,
   readFormatFlag,
   readStringFlag,
+  resolveControlHostSupervisionProviderIntakeStatePath,
   resolveControlHostSupervisionQuarantineUnhealthySamples,
   readIntegerFlag,
   removeInstalledControlHostSupervisionArtifacts,
@@ -52,6 +53,120 @@ const {
   waitForProcessGroupToExitWithinTimeout,
   writeRuntimeStateWithCleanup
 } = controlHostSupervisionShellTest;
+
+function buildProbeTimeoutPollingFixture(): Record<string, unknown> {
+  return {
+    updated_at: '2026-04-21T07:21:00.000Z',
+    checking: true,
+    queued: true,
+    stuck: true,
+    restart_required: true,
+    reason: 'provider_refresh_lifecycle_stuck',
+    last_error: 'provider_refresh_lifecycle_stuck',
+    refresh_phase: 'refresh:claim_issue_by_id_reconcile',
+    refresh_request_class: 'claim_issue_by_id:running',
+    refresh_provider_keys: ['linear:issue-1'],
+    operation_elapsed_ms: 47_000,
+    stalled_after_ms: 45_000,
+    control_host_owner: null
+  };
+}
+
+function buildProbeTimeoutDiagnosticFixture() {
+  return {
+    counts: {
+      running: 1,
+      retrying: null,
+      max_allowed: null
+    },
+    polling: {
+      updated_at: '2026-04-21T07:21:00.000Z',
+      checking: true,
+      queued: true,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck',
+      last_error: 'provider_refresh_lifecycle_stuck',
+      refresh_phase: 'refresh:claim_issue_by_id_reconcile',
+      refresh_request_class: 'claim_issue_by_id:running',
+      refresh_provider_keys: ['linear:issue-1'],
+      operation_elapsed_ms: 47_000,
+      stalled_after_ms: 45_000,
+      control_host_owner: null
+    },
+    running_workers: [
+      {
+        issue_id: 'issue-1',
+        issue_identifier: 'CO-225',
+        state: 'running',
+        display_state: 'In Progress',
+        pid: null,
+        worker_host: 'host-a',
+        session_id: 'run-1',
+        started_at: '2026-04-21T07:00:00.000Z',
+        last_event_at: '2026-04-21T07:21:00.000Z'
+      }
+    ]
+  };
+}
+
+async function writeProviderIntakeStateFixture(
+  config: ReturnType<typeof buildControlHostSupervisionConfig>,
+  options: { claimState?: string; polling?: Record<string, unknown> },
+  env: NodeJS.ProcessEnv = {}
+): Promise<void> {
+  const statePath = resolveControlHostSupervisionProviderIntakeStatePath(config, env);
+  await mkdir(dirname(statePath), { recursive: true });
+  const claimState = options.claimState ?? 'running';
+  await writeFile(
+    statePath,
+    `${JSON.stringify(
+      {
+        schema_version: 1,
+        updated_at: '2026-04-21T07:21:00.000Z',
+        rehydrated_at: null,
+        latest_provider_key: 'linear:issue-1',
+        latest_reason: null,
+        polling: options.polling ?? buildProbeTimeoutPollingFixture(),
+        claims: [
+          {
+            provider: 'linear',
+            provider_key: 'linear:issue-1',
+            issue_id: 'issue-1',
+            issue_identifier: 'CO-225',
+            issue_title: 'Provider worker stays healthy',
+            issue_state: 'In Progress',
+            issue_state_type: 'started',
+            issue_updated_at: '2026-04-21T07:20:00.000Z',
+            task_id: 'linear-issue-1',
+            mapping_source: 'provider_id_fallback',
+            state: claimState,
+            reason: null,
+            accepted_at: '2026-04-21T07:00:00.000Z',
+            updated_at: '2026-04-21T07:21:00.000Z',
+            last_delivery_id: null,
+            last_event: null,
+            last_action: null,
+            last_webhook_timestamp: null,
+            run_id: 'run-1',
+            run_manifest_path: null,
+            worker_host: 'host-a',
+            launch_source: 'control-host',
+            launch_token: null,
+            launch_started_at: '2026-04-21T07:00:00.000Z',
+            retry_queued: false,
+            retry_attempt: null,
+            retry_due_at: null,
+            retry_error: null
+          }
+        ]
+      },
+      null,
+      2
+    )}\n`,
+    'utf8'
+  );
+}
 
 describe('controlHostSupervision helpers', () => {
   it('builds a configurable supervision config without host-local hard-coded paths', () => {
@@ -1595,6 +1710,322 @@ describe('controlHostSupervision shell helpers', () => {
       message: 'co-status probe timed out after 5s.',
       diagnostic: null
     });
+  });
+
+  it('retains provider-intake diagnostics when the co-status probe times out', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'co-supervision-timeout-diagnostic-'));
+    try {
+      const config = buildControlHostSupervisionConfig({
+        homeDir: '/Users/tester',
+        cwd: tempRoot,
+        repoRoot: tempRoot,
+        nodePath: '/custom/node',
+        cliEntrypoint: '/opt/codex-orchestrator.js',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        healthIntervalSeconds: 5
+      });
+      await writeProviderIntakeStateFixture(config, {});
+
+      const result = await probeControlHostHealth(
+        config,
+        {},
+        {},
+        async () => ({
+          exitCode: 1,
+          stdout: '',
+          stderr: 'command timed out after 5000ms',
+          timedOut: true
+        })
+      );
+
+      expect(result).toMatchObject({
+        healthy: false,
+        reason: 'probe_timeout',
+        message: 'co-status probe timed out after 5s.',
+        diagnostic: {
+          counts: {
+            running: 1,
+            retrying: null,
+            max_allowed: null
+          },
+          polling: {
+            checking: true,
+            queued: true,
+            stuck: true,
+            restart_required: true,
+            reason: 'provider_refresh_lifecycle_stuck',
+            refresh_phase: 'refresh:claim_issue_by_id_reconcile',
+            refresh_request_class: 'claim_issue_by_id:running',
+            refresh_provider_keys: ['linear:issue-1'],
+            operation_elapsed_ms: 47_000,
+            stalled_after_ms: 45_000
+          },
+          running_workers: [
+            {
+              issue_id: 'issue-1',
+              issue_identifier: 'CO-225',
+              state: 'running',
+              display_state: 'In Progress',
+              worker_host: 'host-a',
+              session_id: 'run-1',
+              started_at: '2026-04-21T07:00:00.000Z',
+              last_event_at: '2026-04-21T07:21:00.000Z'
+            }
+          ]
+        }
+      });
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('resolves timeout diagnostics from CODEX_ORCHESTRATOR_ROOT when co-status uses an env root', async () => {
+    const configRoot = await mkdtemp(join(tmpdir(), 'co-supervision-config-root-'));
+    const envRoot = await mkdtemp(join(tmpdir(), 'co-supervision-env-root-'));
+    try {
+      const config = buildControlHostSupervisionConfig({
+        homeDir: '/Users/tester',
+        cwd: configRoot,
+        repoRoot: configRoot,
+        nodePath: '/custom/node',
+        cliEntrypoint: '/opt/codex-orchestrator.js',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        healthIntervalSeconds: 5
+      });
+      const env = { CODEX_ORCHESTRATOR_ROOT: envRoot };
+      const statePath = resolveControlHostSupervisionProviderIntakeStatePath(config, env);
+      expect(statePath.startsWith(join(envRoot, '.runs'))).toBe(true);
+      await writeProviderIntakeStateFixture(config, {}, env);
+
+      const result = await probeControlHostHealth(
+        config,
+        env,
+        {},
+        async () => ({
+          exitCode: 1,
+          stdout: '',
+          stderr: 'command timed out after 5000ms',
+          timedOut: true
+        })
+      );
+
+      expect(result.reason).toBe('probe_timeout');
+      expect(result.diagnostic?.running_workers.map((worker) => worker.issue_identifier)).toEqual([
+        'CO-225'
+      ]);
+    } finally {
+      await rm(configRoot, { recursive: true, force: true });
+      await rm(envRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('quarantines repeated same-worker probe timeout churn after one fail-closed timeout restart', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'co-supervision-timeout-quarantine-'));
+    try {
+      const config = buildControlHostSupervisionConfig({
+        homeDir: '/Users/tester',
+        cwd: tempRoot,
+        repoRoot: tempRoot,
+        nodePath: '/custom/node',
+        cliEntrypoint: '/opt/codex-orchestrator.js',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        healthIntervalSeconds: 5
+      });
+      await writeProviderIntakeStateFixture(config, {});
+      const restartedAt = new Date().toISOString();
+
+      const result = await probeControlHostHealth(
+        config,
+        {},
+        {
+          restartHistory: [
+            {
+              requested_at: restartedAt,
+              reason: 'probe_timeout',
+              message: 'co-status probe timed out after 5s.',
+              consecutive_unhealthy_samples: 3,
+              child_pid: 4321,
+              diagnostic: buildProbeTimeoutDiagnosticFixture()
+            }
+          ]
+        },
+        async () => ({
+          exitCode: 1,
+          stdout: '',
+          stderr: 'command timed out after 5000ms',
+          timedOut: true
+        })
+      );
+
+      expect(result.healthy).toBe(true);
+      expect(result.reason).toBe('active_worker_probe_timeout_quarantine');
+      expect(result.message).toContain(
+        `same active provider worker series already restarted at ${restartedAt}`
+      );
+      expect(result.diagnostic?.running_workers.map((worker) => worker.issue_identifier)).toEqual([
+        'CO-225'
+      ]);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('does not quarantine timeout diagnostics from before the supervised child start', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'co-supervision-timeout-stale-'));
+    try {
+      const config = buildControlHostSupervisionConfig({
+        homeDir: '/Users/tester',
+        cwd: tempRoot,
+        repoRoot: tempRoot,
+        nodePath: '/custom/node',
+        cliEntrypoint: '/opt/codex-orchestrator.js',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        healthIntervalSeconds: 5
+      });
+      await writeProviderIntakeStateFixture(config, {});
+
+      const result = await probeControlHostHealth(
+        config,
+        {},
+        {
+          minPollingUpdatedAt: '2026-04-21T07:22:00.000Z',
+          restartHistory: [
+            {
+              requested_at: new Date().toISOString(),
+              reason: 'probe_timeout',
+              message: 'co-status probe timed out after 5s.',
+              consecutive_unhealthy_samples: 3,
+              child_pid: 4321,
+              diagnostic: buildProbeTimeoutDiagnosticFixture()
+            }
+          ]
+        },
+        async () => ({
+          exitCode: 1,
+          stdout: '',
+          stderr: 'command timed out after 5000ms',
+          timedOut: true
+        })
+      );
+
+      expect(result.healthy).toBe(false);
+      expect(result.reason).toBe('probe_timeout');
+      expect(result.diagnostic?.polling?.updated_at).toBe('2026-04-21T07:21:00.000Z');
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('does not quarantine repeated probe timeouts for non-lifecycle-stuck polling diagnostics', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'co-supervision-timeout-non-stuck-'));
+    try {
+      const config = buildControlHostSupervisionConfig({
+        homeDir: '/Users/tester',
+        cwd: tempRoot,
+        repoRoot: tempRoot,
+        nodePath: '/custom/node',
+        cliEntrypoint: '/opt/codex-orchestrator.js',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        healthIntervalSeconds: 5
+      });
+      const polling = {
+        ...buildProbeTimeoutPollingFixture(),
+        stuck: false,
+        restart_required: false,
+        reason: 'transient_status_probe_error',
+        last_error: 'transient_status_probe_error'
+      };
+      await writeProviderIntakeStateFixture(config, { polling });
+
+      const result = await probeControlHostHealth(
+        config,
+        {},
+        {
+          restartHistory: [
+            {
+              requested_at: new Date().toISOString(),
+              reason: 'probe_timeout',
+              message: 'co-status probe timed out after 5s.',
+              consecutive_unhealthy_samples: 3,
+              child_pid: 4321,
+              diagnostic: {
+                ...buildProbeTimeoutDiagnosticFixture(),
+                polling: {
+                  ...buildProbeTimeoutDiagnosticFixture().polling,
+                  stuck: false,
+                  restart_required: false,
+                  reason: 'transient_status_probe_error',
+                  last_error: 'transient_status_probe_error'
+                }
+              }
+            }
+          ]
+        },
+        async () => ({
+          exitCode: 1,
+          stdout: '',
+          stderr: 'command timed out after 5000ms',
+          timedOut: true
+        })
+      );
+
+      expect(result.healthy).toBe(false);
+      expect(result.reason).toBe('probe_timeout');
+      expect(result.diagnostic?.polling?.restart_required).toBe(false);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('does not treat stale terminal provider-intake claims as timeout-active workers', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'co-supervision-timeout-terminal-'));
+    try {
+      const config = buildControlHostSupervisionConfig({
+        homeDir: '/Users/tester',
+        cwd: tempRoot,
+        repoRoot: tempRoot,
+        nodePath: '/custom/node',
+        cliEntrypoint: '/opt/codex-orchestrator.js',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        healthIntervalSeconds: 5
+      });
+      await writeProviderIntakeStateFixture(config, { claimState: 'completed' });
+
+      const result = await probeControlHostHealth(
+        config,
+        {},
+        {
+          restartHistory: [
+            {
+              requested_at: new Date().toISOString(),
+              reason: 'probe_timeout',
+              message: 'co-status probe timed out after 5s.',
+              consecutive_unhealthy_samples: 3,
+              child_pid: 4321,
+              diagnostic: buildProbeTimeoutDiagnosticFixture()
+            }
+          ]
+        },
+        async () => ({
+          exitCode: 1,
+          stdout: '',
+          stderr: 'command timed out after 5000ms',
+          timedOut: true
+        })
+      );
+
+      expect(result.healthy).toBe(false);
+      expect(result.reason).toBe('probe_timeout');
+      expect(result.diagnostic?.running_workers).toEqual([]);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
   });
 
   it('bounds bootstrap env sourcing timeouts and surfaces timeout errors', async () => {
