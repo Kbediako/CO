@@ -42,7 +42,7 @@
 - [x] Child lane `git diff --check --` over the six packet files. Evidence: scoped `git diff --check -- docs/PRD-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md docs/TECH_SPEC-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md docs/ACTION_PLAN-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md tasks/specs/linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md tasks/tasks-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md .agent/task/linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md` returned clean.
 - [x] Parent focused facade regression for the `CO-301` multi-issue read shape. Evidence: `npm test -- ProviderLinearWorkflowFacade.test.ts` passed (`259` tests).
 - [x] Parent focused same-run consumer regression for issue-specific cache selection. Evidence: `npm test -- ProviderLinearWorkflowFacade.test.ts` passed (`259` tests), `npm run test` passed (`4606` tests).
-- [x] Parent docs-review and implementation review after source edits. Evidence: `../../.runs/linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3/cli/2026-04-22T15-51-03-799Z-f489fb09/review/telemetry.json` recorded `status: succeeded` and `review_outcome: clean-success`.
+- [x] Parent docs-review and implementation review after source edits. Evidence: `.runs/linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3/cli/2026-04-22T15-51-03-799Z-f489fb09/review/telemetry.json` recorded `status: succeeded` and `review_outcome: clean-success`.
 
 ## Handoff Status
 - [x] Child lane leaves the six packet files in place for patch export. Evidence: dirty working tree in this child workspace.
