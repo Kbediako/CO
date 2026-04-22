@@ -733,6 +733,15 @@ function queryShowsParentOwnedScopeDrift(query: string): boolean {
   if (/\bgithub\b/iu.test(query) || /\bpull request\b/iu.test(query)) {
     return true;
   }
+  if (
+    /\bpr\b/iu.test(query) &&
+    (/\bpr\s*#?\d+\b/iu.test(query) ||
+      /\b(?:comment|comments|review|reviews|check|checks|status|merge|merged|open|opened|close|closed)\b/iu.test(
+        query
+      ))
+  ) {
+    return true;
+  }
   return (
     /\blinear\b/iu.test(query) &&
     /\b(?:issue|issues|ticket|tickets|project|projects|comment|comments|status|state|workflow)\b/iu.test(

@@ -741,6 +741,23 @@ describe('provider linear child lane runner', () => {
     ).toEqual([]);
   });
 
+  it('treats PR shorthand tool_search queries as scope drift', () => {
+    expect(
+      childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
+        timestamp: '2026-04-22T06:12:50.000Z',
+        type: 'response_item',
+        payload: {
+          type: 'tool_search_call',
+          call_id: 'call-pr-shorthand',
+          arguments: {
+            query: 'PR #597 comments',
+            limit: 12
+          }
+        }
+      })
+    ).toEqual(['2026-04-22T06:12:50.000Z tool_search PR #597 comments']);
+  });
+
   it('treats PR lifecycle function calls without github or linear substrings as scope drift', () => {
     expect(
       childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
