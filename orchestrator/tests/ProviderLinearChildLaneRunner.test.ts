@@ -724,6 +724,26 @@ describe('provider linear child lane runner', () => {
     ]);
   });
 
+  it('ignores historical appserver drift entries that predate the current child-lane launch', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-runner-'));
+    const sessionLogPath = join(tempRoot, 'rollout-drift-windowed.jsonl');
+    await writeFile(
+      sessionLogPath,
+      [
+        '{"timestamp":"2026-04-22T05:53:31.453Z","type":"response_item","payload":{"type":"function_call","name":"exec_command","arguments":"{\\"cmd\\":\\"gh pr view 597 --comments\\",\\"workdir\\":\\"/tmp/child\\"}","call_id":"call-old"}}',
+        '{"timestamp":"2026-04-22T06:12:49.011Z","type":"response_item","payload":{"type":"tool_search_call","call_id":"call-new","arguments":{"query":"PR #597 comments","limit":12}}}'
+      ].join('\n'),
+      'utf8'
+    );
+
+    await expect(
+      childLaneRunnerTest.scanProviderLinearChildLaneSessionLogForParentScopeDrift(
+        sessionLogPath,
+        '2026-04-22T06:00:00.000Z'
+      )
+    ).resolves.toEqual(['2026-04-22T06:12:49.011Z tool_search PR #597 comments']);
+  });
+
   it('does not treat benign tool_search queries containing only the word linear as scope drift', () => {
     expect(
       childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({

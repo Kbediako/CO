@@ -852,14 +852,25 @@ function extractProviderLinearChildLaneScopeDriftEvidenceFromRecord(
 }
 
 async function scanProviderLinearChildLaneSessionLogForParentScopeDrift(
-  sessionLogPath: string
+  sessionLogPath: string,
+  startedAt: string | null = null
 ): Promise<string[]> {
   const raw = await readFile(sessionLogPath, 'utf8');
   const evidence = new Set<string>();
+  const startedAtMs = startedAt ? Date.parse(startedAt) : Number.NaN;
+  let withinLaunchWindow = !Number.isFinite(startedAtMs);
   for (const line of raw.split(/\r?\n/u)) {
     const parsed = parseProviderLinearChildLaneSessionJsonlLine(line);
     if (!parsed) {
       continue;
+    }
+    if (!withinLaunchWindow) {
+      const timestampMs =
+        typeof parsed.timestamp === 'string' ? Date.parse(parsed.timestamp) : Number.NaN;
+      if (!Number.isFinite(timestampMs) || timestampMs < startedAtMs) {
+        continue;
+      }
+      withinLaunchWindow = true;
     }
     for (const detail of extractProviderLinearChildLaneScopeDriftEvidenceFromRecord(parsed)) {
       evidence.add(detail);
@@ -883,18 +894,20 @@ function buildProviderLinearChildLaneScopeDriftMessage(input: {
 async function waitForProviderLinearChildLaneScopeDrift(input: {
   context: Pick<ProviderLinearChildLaneContext, 'issueIdentifier'>;
   sessionLogPath: string;
+  startedAt?: string;
   isExecSettled: () => boolean;
   deps: Pick<ProviderLinearChildLaneRunnerDependencies, 'sleep'>;
 }): Promise<string | null> {
   const readScopeDriftMessage = async (): Promise<string | null> => {
-    const evidence = await scanProviderLinearChildLaneSessionLogForParentScopeDrift(input.sessionLogPath).catch(
-      (error) => [
-        formatProviderLinearChildLaneScopeDriftEvidence(
-          null,
-          `drift_monitor_unreadable ${basename(input.sessionLogPath)}: ${error instanceof Error ? error.message : String(error)}`
-        )
-      ]
-    );
+    const evidence = await scanProviderLinearChildLaneSessionLogForParentScopeDrift(
+      input.sessionLogPath,
+      input.startedAt ?? null
+    ).catch((error) => [
+      formatProviderLinearChildLaneScopeDriftEvidence(
+        null,
+        `drift_monitor_unreadable ${basename(input.sessionLogPath)}: ${error instanceof Error ? error.message : String(error)}`
+      )
+    ]);
     if (evidence.length === 0) {
       return null;
     }
@@ -1552,6 +1565,7 @@ export async function runProviderLinearChildLane(
                 waitForProviderLinearChildLaneScopeDrift({
                   context,
                   sessionLogPath: startupRace.sessionLogPath,
+                  startedAt,
                   isExecSettled: () => execSettled,
                   deps
                 }).then((message) => ({ kind: 'drift' as const, message }))
