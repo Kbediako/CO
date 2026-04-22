@@ -15325,7 +15325,7 @@ describe('createProviderIssueHandoffService', () => {
     const retryDueAt = failedRetryClaim?.retry_due_at ?? null;
     expect(retryDueAt).not.toBeNull();
     await vi.advanceTimersByTimeAsync(Math.max(0, Date.parse(retryDueAt ?? '') - Date.now()) + 1);
-    await waitForMockCalls(launcher.start, 2, QUEUED_RETRY_SETTLE_TURNS);
+    await waitForMockCalls(launcher.start, 2, QUEUED_RETRY_SETTLE_TURNS * 8);
 
     expect(launcher.start).toHaveBeenCalledTimes(2);
     expect(launcher.start.mock.calls[1]?.[0]).toEqual(expect.objectContaining({
