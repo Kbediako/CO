@@ -741,6 +741,19 @@ describe('provider linear child lane runner', () => {
     ).toEqual([]);
   });
 
+  it('treats PR lifecycle function calls without github or linear substrings as scope drift', () => {
+    expect(
+      childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
+        timestamp: '2026-04-22T06:13:00.000Z',
+        type: 'response_item',
+        payload: {
+          type: 'function_call',
+          name: 'mcp__make_pr__make_pr'
+        }
+      })
+    ).toEqual(['2026-04-22T06:13:00.000Z function_call mcp__make_pr__make_pr']);
+  });
+
   it('re-checks the session log after exec settles before clearing scope drift', async () => {
     tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-runner-'));
     const sessionLogPath = join(tempRoot, 'rollout-drift-final-window.jsonl');
@@ -789,6 +802,45 @@ describe('provider linear child lane runner', () => {
         startingReflogEntryCount
       )
     ).resolves.toEqual([transientCommitSha]);
+  });
+
+  it('detects transient child-lane commits created via cherry-pick and merge before resetting to the base', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-runner-'));
+    const laneWorkspacePath = join(tempRoot, 'workspace');
+    const startingHeadSha = await initGitRepo(laneWorkspacePath);
+    const mainBranch = runGit(laneWorkspacePath, ['branch', '--show-current']);
+
+    runGit(laneWorkspacePath, ['checkout', '-b', 'feature', startingHeadSha]);
+    await writeFile(join(laneWorkspacePath, 'feature.txt'), 'feature\n', 'utf8');
+    runGit(laneWorkspacePath, ['add', 'feature.txt']);
+    runGit(laneWorkspacePath, ['commit', '-m', 'feature']);
+    const featureCommitSha = runGit(laneWorkspacePath, ['rev-parse', 'HEAD']);
+
+    runGit(laneWorkspacePath, ['checkout', '-b', 'side', startingHeadSha]);
+    await writeFile(join(laneWorkspacePath, 'side.txt'), 'side\n', 'utf8');
+    runGit(laneWorkspacePath, ['add', 'side.txt']);
+    runGit(laneWorkspacePath, ['commit', '-m', 'side']);
+
+    runGit(laneWorkspacePath, ['checkout', mainBranch]);
+    const startingReflogEntryCount = runGit(laneWorkspacePath, ['reflog', '--format=%H'])
+      .split('\n')
+      .filter(Boolean).length;
+
+    runGit(laneWorkspacePath, ['cherry-pick', featureCommitSha]);
+    const cherryPickCommitSha = runGit(laneWorkspacePath, ['rev-parse', 'HEAD']);
+    runGit(laneWorkspacePath, ['reset', '--hard', startingHeadSha]);
+
+    runGit(laneWorkspacePath, ['merge', '--no-ff', 'side', '-m', 'merge side']);
+    const mergeCommitSha = runGit(laneWorkspacePath, ['rev-parse', 'HEAD']);
+    runGit(laneWorkspacePath, ['reset', '--hard', startingHeadSha]);
+
+    await expect(
+      childLaneRunnerTest.detectProviderLinearChildLaneCreatedCommitShas(
+        laneWorkspacePath,
+        startingHeadSha,
+        startingReflogEntryCount
+      )
+    ).resolves.toEqual([mergeCommitSha, cherryPickCommitSha]);
   });
 
   it('ignores plain head movement across existing commits when no child commit was created', async () => {

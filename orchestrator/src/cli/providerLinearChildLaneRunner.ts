@@ -712,6 +712,25 @@ function queryShowsParentOwnedScopeDrift(query: string): boolean {
   );
 }
 
+function functionNameShowsParentOwnedScopeDrift(functionName: string): boolean {
+  const tokens = functionName
+    .toLowerCase()
+    .split(/[^a-z0-9]+/u)
+    .filter((token) => token.length > 0);
+  if (tokens.includes('github') || tokens.includes('linear')) {
+    return true;
+  }
+  if (tokens.includes('pull') && tokens.includes('request')) {
+    return true;
+  }
+  return (
+    tokens.includes('pr') &&
+    tokens.some((token) =>
+      ['open', 'make', 'create', 'update', 'close', 'merge', 'view', 'list', 'comment', 'review'].includes(token)
+    )
+  );
+}
+
 function formatProviderLinearChildLaneScopeDriftEvidence(
   timestamp: string | null,
   detail: string
@@ -765,7 +784,7 @@ function extractProviderLinearChildLaneScopeDriftEvidenceFromRecord(
   if (!functionName) {
     return [];
   }
-  if (functionName.includes('github') || functionName.includes('linear')) {
+  if (functionNameShowsParentOwnedScopeDrift(functionName)) {
     return [
       formatProviderLinearChildLaneScopeDriftEvidence(timestamp, `function_call ${functionName}`)
     ];
@@ -1304,7 +1323,7 @@ async function detectProviderLinearChildLaneCreatedCommitShas(
       !summary ||
       sha === startingHeadSha ||
       seen.has(sha) ||
-      !/^commit(?:\s+\([^)]*\))?:/u.test(summary)
+      !/^(?:commit(?:\s+\([^)]*\))?|cherry-pick|merge(?:\s+[^:]*)?|revert):/u.test(summary)
     ) {
       continue;
     }

@@ -624,17 +624,18 @@ async function launchChildLane(
   let execResult: ProviderLinearWorkerExecResult | null = null;
   let recoveredLaunch: ProviderLinearChildLaneLaunchRecoveryCandidate | null = null;
   let launchError: unknown = null;
+  const recoveredLaunchPromise = waitForRecoveredChildLaneLaunchCandidate({
+    reservation: launchReservation,
+    context,
+    childRunsRoot,
+    deps,
+    isExecSettled: () => execSettled,
+    now
+  });
   try {
     const launchOutcome = await Promise.race([
       execPromise.then((result) => ({ kind: 'exec' as const, result })),
-      waitForRecoveredChildLaneLaunchCandidate({
-        reservation: launchReservation,
-        context,
-        childRunsRoot,
-        deps,
-        isExecSettled: () => execSettled,
-        now
-      }).then((recovered) => ({ kind: 'recovered' as const, recovered }))
+      recoveredLaunchPromise.then((recovered) => ({ kind: 'recovered' as const, recovered }))
     ]);
     if (launchOutcome.kind === 'recovered') {
       if (launchOutcome.recovered) {
@@ -659,6 +660,9 @@ async function launchChildLane(
     }
   } catch (error) {
     launchError = error;
+  }
+  if (!recoveredLaunch) {
+    recoveredLaunch = await recoveredLaunchPromise.catch(() => null);
   }
   if (launchError && !recoveredLaunch) {
     await removeReservedChildLane(context.runDir, launchReservation, deps);
@@ -1719,20 +1723,22 @@ async function waitForRecoveredChildLaneLaunchCandidate(input: {
   isExecSettled: () => boolean;
   now: string;
 }): Promise<ProviderLinearChildLaneLaunchRecoveryCandidate | null> {
-  while (!input.isExecSettled()) {
-    const candidate = await findRecoveredChildLaneLaunchCandidate({
+  const readRecoveredCandidate = async (): Promise<ProviderLinearChildLaneLaunchRecoveryCandidate | null> =>
+    await findRecoveredChildLaneLaunchCandidate({
       reservation: input.reservation,
       context: input.context,
       childRunsRoot: input.childRunsRoot,
       deps: input.deps,
       now: input.now
     });
+  while (!input.isExecSettled()) {
+    const candidate = await readRecoveredCandidate();
     if (candidate) {
       return candidate;
     }
     await input.deps.sleep(PROVIDER_LINEAR_CHILD_LANE_LAUNCH_RECOVERY_POLL_INTERVAL_MS);
   }
-  return null;
+  return await readRecoveredCandidate();
 }
 
 async function findRecoveredChildLaneLaunchCandidate(input: {
@@ -1782,6 +1788,7 @@ async function findRecoveredChildLaneLaunchCandidate(input: {
       candidates.push(candidate);
     }
   }
+  // Fail closed when recovery is ambiguous; parent repair needs one exact child run candidate.
   return candidates.length === 1 ? candidates[0]! : null;
 }
 
