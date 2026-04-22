@@ -5,7 +5,7 @@ relates_to: docs/PRD-coordinator-live-linear-restarted-issue-intake-and-dispatch
 risk: high
 owners:
   - Codex
-last_review: 2026-03-22
+last_review: 2026-04-22
 ---
 
 ## Added by Bootstrap (refresh as needed)

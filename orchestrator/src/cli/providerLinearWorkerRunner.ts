@@ -6623,11 +6623,30 @@ export async function refreshProviderLinearWorkerProofSnapshot(
     await writeProviderWorkerSessionLogHydrationState(runDir, proofWithSessionTelemetryResult.hydrationState);
     if (
       options.emitProgressEvent &&
-      JSON.stringify(parsed.progress ?? null) !== JSON.stringify(hydrated.progress ?? null)
+      buildProviderLinearWorkerProgressSemanticSignature(parsed.progress ?? null)
+        !== buildProviderLinearWorkerProgressSemanticSignature(hydrated.progress ?? null)
     ) {
       options.emitProgressEvent(formatProviderLinearWorkerProgressEvent(hydrated));
     }
     return hydrated;
+  });
+}
+
+function buildProviderLinearWorkerProgressSemanticSignature(
+  progress: ProviderLinearWorkerProgressSnapshot | null | undefined
+): string | null {
+  if (!progress) {
+    return null;
+  }
+  // Hydration metadata changes often outnumber operator-visible state changes.
+  return JSON.stringify({
+    phase: progress.phase ?? null,
+    kind: progress.kind ?? null,
+    status: progress.status ?? null,
+    summary: progress.summary ?? null,
+    stall_classification: progress.stall_classification ?? null,
+    stall_reason: progress.stall_reason ?? null,
+    recovery_recommendation: progress.recovery_recommendation ?? null
   });
 }
 
@@ -6728,7 +6747,7 @@ export async function runProviderLinearWorker(
 
   const emitSemanticProgressIfChanged = (proof: ProviderLinearWorkerProof): void => {
     const progress = proof.progress ?? null;
-    const signature = progress ? JSON.stringify(progress) : null;
+    const signature = buildProviderLinearWorkerProgressSemanticSignature(progress);
     if (!signature || signature === lastProgressSignature) {
       return;
     }

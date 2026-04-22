@@ -89,6 +89,36 @@
       }
     },
     {
+      "id": "20260422-linear-59a75110-93e5-42f4-a2d2-31dcde884c91",
+      "title": "CO: prevent local Node OOM under concurrent provider-worker pressure and provenance-invalid retry churn",
+      "relates_to": "tasks/tasks-linear-59a75110-93e5-42f4-a2d2-31dcde884c91.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-22",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-22",
+          "status": "produced",
+          "manifest": ".runs/linear-59a75110-93e5-42f4-a2d2-31dcde884c91-docs-packet/cli/2026-04-21T22-33-33-137Z-c35c3d68/manifest.json",
+          "source_anchor": "ctx:sha256:0320d3a6b57e0f8847509632a1b1cf89ffd868f1412cbb569e67ac7eb380f394#chunk:c000001",
+          "summary": "Docs-first packet created for CO-299 local Node OOM prevention under concurrent provider-worker pressure and provenance-invalid retry churn. The prompt-supplied .runs source payload path was unavailable in this child checkout, so the packet is anchored on the parent-provided issue source anchor and live issue description. Scope preserves SIGABRT, V8 OOM, provider_worker_child_lane_provenance_invalid, provenance-invalid retry churn, provider-worker, child-lane, backpressure, host-safety, and fail closed; rejects generic refresh-stall or outage explanations; and keeps implementation, tests, docs freshness registry follow-on, Linear state, and PR lifecycle parent-owned."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-59a75110-93e5-42f4-a2d2-31dcde884c91.md",
+        "task": "tasks/tasks-linear-59a75110-93e5-42f4-a2d2-31dcde884c91.md",
+        "agent_task": ".agent/task/linear-59a75110-93e5-42f4-a2d2-31dcde884c91.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-59a75110-93e5-42f4-a2d2-31dcde884c91.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-59a75110-93e5-42f4-a2d2-31dcde884c91.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-59a75110-93e5-42f4-a2d2-31dcde884c91.md"
+        }
+      }
+    },
+    {
       "id": "20260421-linear-45363c7e-c083-4eaa-911f-8fc7873141d8",
       "title": "CO-271 MCP client command/args normalization",
       "relates_to": "tasks/tasks-linear-45363c7e-c083-4eaa-911f-8fc7873141d8.md",
