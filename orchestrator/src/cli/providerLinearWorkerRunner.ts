@@ -6632,7 +6632,7 @@ export async function refreshProviderLinearWorkerProofSnapshot(
   });
 }
 
-function buildProviderLinearWorkerProgressSemanticSignature(
+export function buildProviderLinearWorkerProgressSemanticSignature(
   progress: ProviderLinearWorkerProgressSnapshot | null | undefined
 ): string | null {
   if (!progress) {
@@ -6648,6 +6648,16 @@ function buildProviderLinearWorkerProgressSemanticSignature(
     stall_reason: progress.stall_reason ?? null,
     recovery_recommendation: progress.recovery_recommendation ?? null
   });
+}
+
+export function shouldEmitProviderLinearWorkerProgressSignatureTransition(
+  previousSignature: string | null | undefined,
+  nextSignature: string | null
+): boolean {
+  if (previousSignature === undefined && nextSignature === null) {
+    return false;
+  }
+  return previousSignature !== nextSignature;
 }
 
 function formatProviderLinearWorkerProgressEvent(proof: ProviderLinearWorkerProof): string {
@@ -6743,12 +6753,12 @@ export async function runProviderLinearWorker(
     end_reason: null,
     updated_at: attemptStartedAt
   };
-  let lastProgressSignature: string | null = null;
+  let lastProgressSignature: string | null | undefined = undefined;
 
   const emitSemanticProgressIfChanged = (proof: ProviderLinearWorkerProof): void => {
     const progress = proof.progress ?? null;
     const signature = buildProviderLinearWorkerProgressSemanticSignature(progress);
-    if (!signature || signature === lastProgressSignature) {
+    if (!shouldEmitProviderLinearWorkerProgressSignatureTransition(lastProgressSignature, signature)) {
       return;
     }
     lastProgressSignature = signature;

@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   appendProviderLinearWorkerChildLaneRecord,
   appendProviderLinearWorkerChildStreamRecord,
+  buildProviderLinearWorkerProgressSemanticSignature,
   buildProviderWorkerPrompt,
   loadProviderLinearWorkerContext,
   parseProviderLinearWorkerJsonl,
@@ -22,6 +23,7 @@ import {
   resolveProviderLinearHelperCommand,
   refreshProviderLinearWorkerProofSnapshot,
   runProviderLinearWorker,
+  shouldEmitProviderLinearWorkerProgressSignatureTransition,
   transactProviderLinearWorkerChildLanes,
   PROVIDER_LINEAR_WORKER_AUDIT_FILENAME,
   PROVIDER_LINEAR_WORKER_CHILD_LANES_FILENAME,
@@ -5004,6 +5006,28 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       event_source: 'canonical_session_log_hydration'
     });
     expect(emitProgressEvent).not.toHaveBeenCalled();
+  });
+
+  it('treats a semantic transition back to null progress as operator-visible after prior progress', () => {
+    const progressingSignature = buildProviderLinearWorkerProgressSemanticSignature({
+      phase: 'turn_running',
+      kind: 'worker',
+      status: 'progressing',
+      summary: 'Investigating provider-worker EVENT provenance.',
+      stall_classification: 'progressing',
+      stall_reason: null,
+      recovery_recommendation: 'continue_waiting'
+    });
+
+    expect(progressingSignature).not.toBeNull();
+    expect(shouldEmitProviderLinearWorkerProgressSignatureTransition(undefined, null)).toBe(false);
+    expect(
+      shouldEmitProviderLinearWorkerProgressSignatureTransition(undefined, progressingSignature)
+    ).toBe(true);
+    expect(
+      shouldEmitProviderLinearWorkerProgressSignatureTransition(progressingSignature, null)
+    ).toBe(true);
+    expect(shouldEmitProviderLinearWorkerProgressSignatureTransition(null, null)).toBe(false);
   });
 
   it('clears stale proof current-turn activity when hydration only swaps to a new thread', async () => {
