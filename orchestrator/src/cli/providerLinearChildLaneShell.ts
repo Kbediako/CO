@@ -1305,7 +1305,16 @@ async function resolveSameAttemptParentDirtyRetrySuppression(
   if (!attemptStartedAt) {
     return null;
   }
-  const audit = await summarizeProviderLinearAuditPath(auditPath);
+  let audit = null;
+  try {
+    audit = await summarizeProviderLinearAuditPath(auditPath);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn(
+      `provider linear child-lane warning: failed to summarize provider-linear audit at ${auditPath}; proceeding without same-attempt retry suppression. error=${message}`
+    );
+    return null;
+  }
   const suppression = findDeterministicProviderMutationSuppression(
     audit,
     'child-lane',

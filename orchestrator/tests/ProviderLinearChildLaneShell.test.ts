@@ -2154,6 +2154,51 @@ describe('runProviderLinearChildLaneShell', () => {
     expect(execRunner).not.toHaveBeenCalled();
   });
 
+  it('falls back to the base parent-dirty failure when audit summarization fails', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const execRunner = vi.fn();
+    const auditPath = join(tempRoot ?? '', 'provider-linear-audit.jsonl');
+    vi.spyOn(
+      await import('../src/cli/control/providerLinearWorkflowAudit.js'),
+      'summarizeProviderLinearAuditPath'
+    ).mockRejectedValue(new Error('audit read failed'));
+    await writeFile(
+      join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        attempt_started_at: '2026-03-30T07:11:00.000Z',
+        issue_id: ISSUE.issue_id
+      }),
+      'utf8'
+    );
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'launch',
+        streamName: 'docs-b',
+        purpose: 'Retry docs packet',
+        phases: ['docs'],
+        env: buildProviderWorkerEnv(manifestPath, {
+          CODEX_PROVIDER_LINEAR_AUDIT_PATH: auditPath
+        })
+      },
+      {
+        execRunner: execRunner as never,
+        readParentDirtyPaths: vi.fn(async () => ['.tmp/notes.md']) as never
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'launch',
+      error: {
+        code: 'provider_worker_child_lane_parent_dirty',
+        status: 409
+      }
+    });
+    expect(execRunner).not.toHaveBeenCalled();
+  });
+
   it('ignores repo-local temp workpad artifacts before phase-scoped launch', async () => {
     const { manifestPath } = await createProviderWorkerManifest();
     const childRunDir = join(tempRoot ?? '', '.runs', `${TASK_ID}-docs-a`, 'cli', 'child-run-1');

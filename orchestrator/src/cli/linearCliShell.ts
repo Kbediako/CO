@@ -692,7 +692,7 @@ async function resolveCreateFollowUpRetrySuppression(input: {
   env: NodeJS.ProcessEnv;
   dependencies: Pick<
     LinearCliShellDependencies,
-    'loadProviderLinearWorkerContext' | 'readTextFile'
+    'loadProviderLinearWorkerContext' | 'readTextFile' | 'warn'
   >;
 }): Promise<ProviderLinearCreateFollowUpResult | null> {
   if (!input.parityLane || (input.parityMatrix?.trim().length ?? 0) > 0) {
@@ -710,7 +710,16 @@ async function resolveCreateFollowUpRetrySuppression(input: {
   if (!attemptStartedAt) {
     return null;
   }
-  const audit = await summarizeProviderLinearAuditPath(auditPath);
+  let audit = null;
+  try {
+    audit = await summarizeProviderLinearAuditPath(auditPath);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    input.dependencies.warn(
+      `linear create-follow-up warning: failed to summarize provider-linear audit at ${auditPath}; proceeding without retry suppression. error=${message}`
+    );
+    return null;
+  }
   const suppression = findDeterministicProviderMutationSuppression(
     audit,
     'create-follow-up',

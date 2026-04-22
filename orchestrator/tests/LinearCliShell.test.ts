@@ -1666,6 +1666,92 @@ describe('runLinearCliShell', () => {
     });
   });
 
+  it('falls back to the normal parity-matrix path when audit summarization fails', async () => {
+    const log = vi.fn();
+    const warn = vi.fn();
+    const appendAuditEntry = vi.fn();
+    const setExitCode = vi.fn();
+    const createProviderLinearFollowUpIssueMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').createProviderLinearFollowUpIssue>()
+        .mockResolvedValue({
+          ok: false,
+          operation: 'create-follow-up',
+          error: {
+            code: 'linear_follow_up_parity_matrix_missing',
+            message: 'Parity/alignment follow-up issues require a parity matrix.',
+            status: 422
+          }
+        } as never);
+    const loadProviderLinearWorkerContextMock =
+      vi.fn<typeof import('../src/cli/providerLinearWorkerRunner.js').loadProviderLinearWorkerContext>();
+    const tempDir = await mkdtemp(join(tmpdir(), 'linear-cli-follow-up-audit-fallback-'));
+    tempDirs.push(tempDir);
+    const auditPath = join(tempDir, 'provider-linear-audit.jsonl');
+    vi.spyOn(
+      await import('../src/cli/control/providerLinearWorkflowAudit.js'),
+      'summarizeProviderLinearAuditPath'
+    ).mockRejectedValue(new Error('audit read failed'));
+    await writeFile(
+      join(tempDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        attempt_started_at: '2026-04-22T08:00:00.000Z'
+      }),
+      'utf8'
+    );
+    loadProviderLinearWorkerContextMock.mockResolvedValue({
+      pipelineId: 'provider-linear-worker',
+      issueId: 'lin-issue-1',
+      issueIdentifier: 'CO-1',
+      runDir: tempDir
+    } as never);
+
+    await runLinearCliShell(
+      {
+        positionals: ['create-follow-up'],
+        flags: {
+          format: 'json',
+          'issue-id': 'lin-issue-1',
+          title: 'Parity follow-up',
+          description: 'Close the remaining parity gap.',
+          'intent-checksum': '- Preserve exact `CO STATUS` wording.',
+          'non-goals': '- [ ] Do not reopen the browser surface.',
+          'not-done-if': '- [ ] The issue still allows browser-first parity.',
+          'acceptance-criteria': '- [ ] Captured',
+          'parity-lane': true
+        },
+        printHelp: vi.fn()
+      },
+      {
+        createProviderLinearFollowUpIssue: createProviderLinearFollowUpIssueMock,
+        loadProviderLinearWorkerContext: loadProviderLinearWorkerContextMock,
+        getEnv: () => ({
+          CO_LINEAR_API_TOKEN: 'lin-api-token',
+          CODEX_PROVIDER_LINEAR_AUDIT_PATH: auditPath
+        }),
+        now: () => '2026-04-22T08:06:00.000Z',
+        appendAuditEntry,
+        log,
+        setExitCode,
+        warn
+      }
+    );
+
+    expect(createProviderLinearFollowUpIssueMock).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('failed to summarize provider-linear audit')
+    );
+    expect(setExitCode).toHaveBeenCalledWith(1);
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual({
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_follow_up_parity_matrix_missing',
+        message: 'Parity/alignment follow-up issues require a parity matrix.',
+        status: 422
+      }
+    });
+  });
+
   it('records only the explicitly requested scope for failed audit entries', async () => {
     const log = vi.fn();
     const setExitCode = vi.fn();
