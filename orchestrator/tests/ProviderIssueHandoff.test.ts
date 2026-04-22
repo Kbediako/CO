@@ -952,7 +952,7 @@ describe('createProviderIssueHandoffService', () => {
       review_promotion: null,
       merge_closeout: null
     });
-    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const { getPersistedState, persist } = createPersistSnapshotSpy(state);
     const launcher = {
       start: vi.fn(async () => null),
       resume: vi.fn(async () => undefined)
@@ -1088,7 +1088,7 @@ describe('createProviderIssueHandoffService', () => {
       review_promotion: null,
       merge_closeout: null
     });
-    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const { getPersistedState, persist } = createPersistSnapshotSpy(state);
     const launcher = {
       start: vi.fn(async () => null),
       resume: vi.fn(async () => undefined)
@@ -7717,7 +7717,7 @@ describe('createProviderIssueHandoffService', () => {
     const state = createProviderIntakeState();
     await seedOccupiedRunningProviderWorkers(root, state);
 
-    const { getPersistedState, persist } = createPersistSnapshotSpy(state);
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
     const launcher = {
       start: vi.fn(async () => null),
       resume: vi.fn(async () => undefined)
@@ -7983,7 +7983,7 @@ describe('createProviderIssueHandoffService', () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
 
-    const { getPersistedState, persist } = createPersistSnapshotSpy(state);
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
     const launcher = {
       start: vi.fn(async () => null),
       resume: vi.fn(async () => undefined)
@@ -15324,7 +15324,7 @@ describe('createProviderIssueHandoffService', () => {
       retry_due_at: '2026-03-19T04:30:05.000Z',
       retry_error: null
     } satisfies ProviderIntakeState['claims'][number]);
-    const { getPersistedState, persist } = createPersistSnapshotSpy(state);
+    const { persist } = createPersistSnapshotSpy(state);
     let currentSnapshot = {
       status: 'ready' as const,
       pipeline_id: 'provider-linear-worker',
@@ -15344,7 +15344,6 @@ describe('createProviderIssueHandoffService', () => {
       getLaunchConfigPath: vi.fn(),
       recordTerminalCleanupResult: vi.fn()
     };
-    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
     const launcher = {
       start: vi
         .fn(async () => null)
@@ -30642,7 +30641,7 @@ describe('createProviderIssueHandoffService', () => {
       launch_token: null
     });
 
-    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const { persist } = createPersistSnapshotSpy(state);
     const launcher = {
       start: vi.fn(async () => null),
       resume: vi.fn(async () => undefined)
