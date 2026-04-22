@@ -590,13 +590,45 @@ async function readIssueContextAttachmentTruth(options: {
   attachments: Record<string, unknown>[];
   snapshotForPr: (prNumber: number) => unknown | Promise<unknown>;
 }) {
+  const identifier = options.identifier ?? 'CO-220';
+  const teamKey = identifier.split('-', 1)[0] || 'CO';
   const fetchImpl: typeof fetch = vi.fn(async () =>
     jsonResponse(
       buildIssueContextBody({
-        identifier: options.identifier ?? 'CO-220',
+        identifier,
         title: options.title,
+        url: `https://linear.app/example/issue/${identifier}`,
         updatedAt: '2026-04-17T13:12:00.000Z',
         state: options.state,
+        team: {
+          id: 'lin-team-1',
+          key: teamKey,
+          name: teamKey === 'CO' ? 'Codex Orchestrator' : teamKey,
+          states: {
+            nodes: [
+              {
+                id: 'state-backlog',
+                name: 'Backlog',
+                type: 'unstarted'
+              },
+              {
+                id: 'state-in-progress',
+                name: 'In Progress',
+                type: 'started'
+              },
+              {
+                id: 'state-human-review',
+                name: 'Human Review',
+                type: 'started'
+              },
+              {
+                id: 'state-done',
+                name: 'Done',
+                type: 'completed'
+              }
+            ]
+          }
+        },
         attachments: { nodes: options.attachments }
       })
     )
@@ -2686,6 +2718,72 @@ describe('providerLinearWorkflowFacade', () => {
             },
             {
               id: 'attachment-pr-591'
+            }
+          ],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it.each([
+    {
+      label: 'completed',
+      state: {
+        id: 'state-done',
+        name: 'Done',
+        type: 'completed'
+      }
+    },
+    {
+      label: 'merging',
+      state: {
+        id: 'state-merging',
+        name: 'Merging',
+        type: 'started'
+      }
+    }
+  ])('preserves ambiguity for $label issues when foreign and generic active PRs coexist', async ({ state }) => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Issue with foreign and generic live PRs',
+      state,
+      attachments: [
+        buildGitHubAttachment('attachment-pr-592', 592, 'Refactor provider rehydration'),
+        buildGitHubAttachment('attachment-pr-593', 593, 'ABC-123 foreign provider lane')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 592
+          ? {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:07:51.000Z',
+              title: 'Refactor provider rehydration',
+              headRefName: 'feature/refactor-provider-rehydration'
+            }
+          : {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:08:11.000Z',
+              title: 'ABC-123 foreign provider lane',
+              headRefName: 'linear/abc-123-foreign-provider-lane'
+            }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: null,
+          historical: [],
+          conflicting: [
+            {
+              id: 'attachment-pr-592'
+            },
+            {
+              id: 'attachment-pr-593'
             }
           ],
           unknown: []

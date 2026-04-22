@@ -1306,24 +1306,12 @@ function classifyIssuePullRequestAttachments(
       unknown: unknownAttachments
     };
   }
-  if (
-    !workflowState.isTerminal &&
-    workflowState.normalizedState !== 'merging' &&
-    activeOwned.length === 0
-  ) {
+  if (activeOwned.length === 0) {
     const carriedUnknownAttachments = appendUniqueIssuePullRequestAttachments(
       unknown,
       terminalUnknownCandidates.map((candidate) => candidate.attachment)
     );
-    if (activeUnknown.length === 1 && activeConflicting.length === 0) {
-      return {
-        current: activeUnknown[0]!.attachment,
-        historical: terminalOwned.map((candidate) => candidate.attachment),
-        conflicting: appendUniqueIssuePullRequestAttachments([], ownershipConflictingAttachments),
-        unknown: carriedUnknownAttachments
-      };
-    }
-    if (activeUnknown.length + activeConflicting.length > 0) {
+    if (activeUnknown.length > 0 && activeConflicting.length > 0) {
       return {
         current: null,
         historical: terminalOwned.map((candidate) => candidate.attachment),
@@ -1331,6 +1319,18 @@ function classifyIssuePullRequestAttachments(
           activeUnknown.map((candidate) => candidate.attachment),
           ownershipConflictingAttachments
         ),
+        unknown: carriedUnknownAttachments
+      };
+    }
+    if (
+      !workflowState.isTerminal &&
+      workflowState.normalizedState !== 'merging' &&
+      activeUnknown.length === 1
+    ) {
+      return {
+        current: activeUnknown[0]!.attachment,
+        historical: terminalOwned.map((candidate) => candidate.attachment),
+        conflicting: appendUniqueIssuePullRequestAttachments([], ownershipConflictingAttachments),
         unknown: carriedUnknownAttachments
       };
     }
