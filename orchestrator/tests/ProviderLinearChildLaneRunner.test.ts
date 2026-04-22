@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, mkdir, readFile, rm, utimes, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, mkdir, readFile, rm, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -1272,6 +1272,179 @@ describe('provider linear child lane runner', () => {
     expect(patchContent).toContain('+transient');
     expect(patchContent).toContain('workspace.txt');
     expect(patchContent).toContain('+workspace');
+  });
+
+  it('structurally composes transient commit and later workspace edits for the same file', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-runner-'));
+    const laneWorkspacePath = join(tempRoot, 'workspace');
+    const applyWorkspacePath = join(tempRoot, 'apply-workspace');
+    const runDir = join(tempRoot, 'run');
+    await initGitRepo(laneWorkspacePath);
+    await mkdir(runDir, { recursive: true });
+
+    const baselineLines = [
+      'line 01',
+      'line 02',
+      'line 03',
+      'line 04',
+      'line 05',
+      'line 06',
+      'line 07',
+      'line 08',
+      'line 09',
+      'line 10',
+      'line 11',
+      'line 12'
+    ];
+    const baselineContent = `${baselineLines.join('\n')}\n`;
+    const composedLines = [...baselineLines];
+    composedLines[1] = 'line 02 transient';
+    composedLines[9] = 'line 10 workspace';
+    const composedContent = `${composedLines.join('\n')}\n`;
+
+    await writeFile(join(laneWorkspacePath, 'README.md'), baselineContent, 'utf8');
+    runGit(laneWorkspacePath, ['add', 'README.md']);
+    runGit(laneWorkspacePath, ['commit', '-m', 'baseline fixture']);
+    const startingHeadSha = runGit(laneWorkspacePath, ['rev-parse', 'HEAD']);
+
+    await writeFile(
+      join(laneWorkspacePath, 'README.md'),
+      `${baselineLines
+        .map((line, index) => (index === 1 ? 'line 02 transient' : line))
+        .join('\n')}\n`,
+      'utf8'
+    );
+    runGit(laneWorkspacePath, ['add', 'README.md']);
+    runGit(laneWorkspacePath, ['commit', '-m', 'transient child commit']);
+    const transientCommitSha = runGit(laneWorkspacePath, ['rev-parse', 'HEAD']);
+    runGit(laneWorkspacePath, ['reset', '--hard', startingHeadSha]);
+
+    await writeFile(
+      join(laneWorkspacePath, 'README.md'),
+      `${baselineLines
+        .map((line, index) => (index === 9 ? 'line 10 workspace' : line))
+        .join('\n')}\n`,
+      'utf8'
+    );
+
+    const { patchArtifactPath } = await childLaneRunnerTest.createPatchArtifact(
+      laneWorkspacePath,
+      runDir,
+      startingHeadSha,
+      transientCommitSha,
+      startingHeadSha
+    );
+
+    const patchContent = await readFile(patchArtifactPath, 'utf8');
+    expect(patchContent.match(/^diff --git a\/README\.md b\/README\.md$/gmu) ?? []).toHaveLength(1);
+    expect(patchContent).toContain('+line 02 transient');
+    expect(patchContent).toContain('+line 10 workspace');
+
+    await initGitRepo(applyWorkspacePath);
+    await writeFile(join(applyWorkspacePath, 'README.md'), baselineContent, 'utf8');
+    runGit(applyWorkspacePath, ['add', 'README.md']);
+    runGit(applyWorkspacePath, ['commit', '-m', 'apply baseline']);
+
+    runGit(applyWorkspacePath, ['apply', '--check', patchArtifactPath]);
+    runGit(applyWorkspacePath, ['apply', patchArtifactPath]);
+    await expect(readFile(join(applyWorkspacePath, 'README.md'), 'utf8')).resolves.toBe(composedContent);
+  });
+
+  it('fails closed when transient commit and workspace edits cannot be composed safely', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-runner-'));
+    const laneWorkspacePath = join(tempRoot, 'workspace');
+    const runDir = join(tempRoot, 'run');
+    await initGitRepo(laneWorkspacePath);
+    await mkdir(runDir, { recursive: true });
+
+    await writeFile(join(laneWorkspacePath, 'README.md'), 'alpha\nbravo\ncharlie\n', 'utf8');
+    runGit(laneWorkspacePath, ['add', 'README.md']);
+    runGit(laneWorkspacePath, ['commit', '-m', 'baseline fixture']);
+    const startingHeadSha = runGit(laneWorkspacePath, ['rev-parse', 'HEAD']);
+
+    await writeFile(join(laneWorkspacePath, 'README.md'), 'alpha\nbravo transient\ncharlie\n', 'utf8');
+    runGit(laneWorkspacePath, ['add', 'README.md']);
+    runGit(laneWorkspacePath, ['commit', '-m', 'transient child commit']);
+    const transientCommitSha = runGit(laneWorkspacePath, ['rev-parse', 'HEAD']);
+    runGit(laneWorkspacePath, ['reset', '--hard', startingHeadSha]);
+
+    await writeFile(join(laneWorkspacePath, 'README.md'), 'alpha\nbravo workspace\ncharlie\n', 'utf8');
+
+    await expect(
+      childLaneRunnerTest.createPatchArtifact(
+        laneWorkspacePath,
+        runDir,
+        startingHeadSha,
+        transientCommitSha,
+        startingHeadSha
+      )
+    ).rejects.toThrow(/failed closed while composing .* and live workspace changes/u);
+  });
+
+  it('bypasses git hooks while composing a temporary workspace snapshot', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-runner-'));
+    const laneWorkspacePath = join(tempRoot, 'workspace');
+    const runDir = join(tempRoot, 'run');
+    const hooksPath = join(tempRoot, 'hooks');
+    await initGitRepo(laneWorkspacePath);
+    await mkdir(runDir, { recursive: true });
+    await mkdir(hooksPath, { recursive: true });
+
+    const prepareCommitMsgHookPath = join(hooksPath, 'prepare-commit-msg');
+    await writeFile(prepareCommitMsgHookPath, '#!/bin/sh\nexit 1\n', 'utf8');
+    await chmod(prepareCommitMsgHookPath, 0o755);
+
+    const baselineLines = [
+      'line 01',
+      'line 02',
+      'line 03',
+      'line 04',
+      'line 05',
+      'line 06',
+      'line 07',
+      'line 08',
+      'line 09',
+      'line 10',
+      'line 11',
+      'line 12'
+    ];
+    await writeFile(join(laneWorkspacePath, 'README.md'), `${baselineLines.join('\n')}\n`, 'utf8');
+    runGit(laneWorkspacePath, ['add', 'README.md']);
+    runGit(laneWorkspacePath, ['commit', '-m', 'baseline fixture']);
+    const startingHeadSha = runGit(laneWorkspacePath, ['rev-parse', 'HEAD']);
+
+    await writeFile(
+      join(laneWorkspacePath, 'README.md'),
+      `${baselineLines
+        .map((line, index) => (index === 1 ? 'line 02 transient' : line))
+        .join('\n')}\n`,
+      'utf8'
+    );
+    runGit(laneWorkspacePath, ['add', 'README.md']);
+    runGit(laneWorkspacePath, ['commit', '-m', 'transient child commit']);
+    const transientCommitSha = runGit(laneWorkspacePath, ['rev-parse', 'HEAD']);
+    runGit(laneWorkspacePath, ['reset', '--hard', startingHeadSha]);
+    runGit(laneWorkspacePath, ['config', 'core.hooksPath', hooksPath]);
+
+    await writeFile(
+      join(laneWorkspacePath, 'README.md'),
+      `${baselineLines
+        .map((line, index) => (index === 9 ? 'line 10 workspace' : line))
+        .join('\n')}\n`,
+      'utf8'
+    );
+
+    const { patchArtifactPath } = await childLaneRunnerTest.createPatchArtifact(
+      laneWorkspacePath,
+      runDir,
+      startingHeadSha,
+      transientCommitSha,
+      startingHeadSha
+    );
+
+    const patchContent = await readFile(patchArtifactPath, 'utf8');
+    expect(patchContent).toContain('+line 02 transient');
+    expect(patchContent).toContain('+line 10 workspace');
   });
 
   it('ignores plain head movement across existing commits when no child commit was created', async () => {

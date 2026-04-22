@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
-import { mkdir, open, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, open, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, parse as parsePath, relative, resolve } from 'node:path';
 import process from 'node:process';
 import { promisify } from 'node:util';
@@ -1482,14 +1483,136 @@ async function createPatchArtifact(
           }
         )
       : null;
-  const diffChunks: string[] = [];
-  if (committedDiff && (currentHeadSha === baselineRef || !currentHeadSha)) {
-    diffChunks.push(committedDiff.stdout);
+  const shouldComposeCommittedAndWorkspaceDiff =
+    committedDiff !== null &&
+    committedDiff.stdout.length > 0 &&
+    workspaceDiff.stdout.length > 0 &&
+    (currentHeadSha === baselineRef || !currentHeadSha);
+  let diffOutput: string;
+  if (shouldComposeCommittedAndWorkspaceDiff) {
+    if (!targetRef) {
+      throw new Error(
+        `Child-lane patch export failed closed while composing ${baselineRef}: missing transient child commit ref`
+      );
+    }
+    const compositionRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-compose-'));
+    const compositionWorkspacePath = join(compositionRoot, 'workspace');
+    const workspacePatchPath = join(compositionRoot, 'workspace.patch');
+    let compositionWorktreeCreated = false;
+    try {
+      await execFileAsync(
+        'git',
+        ['-C', laneWorkspacePath, 'worktree', 'add', '--detach', compositionWorkspacePath, baselineRef],
+        {
+          maxBuffer: 20 * 1024 * 1024
+        }
+      );
+      compositionWorktreeCreated = true;
+      await writeFile(workspacePatchPath, workspaceDiff.stdout, 'utf8');
+      await execFileAsync(
+        'git',
+        ['-C', compositionWorkspacePath, 'apply', '--whitespace=nowarn', workspacePatchPath],
+        {
+          maxBuffer: 20 * 1024 * 1024
+        }
+      );
+      await execFileAsync('git', ['-C', compositionWorkspacePath, 'add', '-A'], {
+        maxBuffer: 20 * 1024 * 1024
+      });
+      const workspaceSnapshotTree = normalizeOptionalString(
+        (
+          await execFileAsync('git', ['-C', compositionWorkspacePath, 'write-tree'], {
+            maxBuffer: 20 * 1024 * 1024
+          })
+        ).stdout
+      );
+      if (!workspaceSnapshotTree) {
+        throw new Error('missing temporary workspace snapshot tree');
+      }
+      const workspaceSnapshotCommit = normalizeOptionalString(
+        (
+          await execFileAsync(
+            'git',
+            [
+              '-C',
+              compositionWorkspacePath,
+              'commit-tree',
+              workspaceSnapshotTree,
+              '-p',
+              baselineRef,
+              '-m',
+              'provider-linear-child-lane workspace snapshot'
+            ],
+            {
+              maxBuffer: 20 * 1024 * 1024,
+              env: {
+                ...process.env,
+                GIT_AUTHOR_NAME: 'Codex',
+                GIT_AUTHOR_EMAIL: 'codex@example.com',
+                GIT_COMMITTER_NAME: 'Codex',
+                GIT_COMMITTER_EMAIL: 'codex@example.com'
+              }
+            }
+          )
+        ).stdout
+      );
+      if (!workspaceSnapshotCommit) {
+        throw new Error('missing temporary workspace snapshot commit');
+      }
+      await execFileAsync(
+        'git',
+        ['-C', compositionWorkspacePath, 'checkout', '--detach', workspaceSnapshotCommit],
+        {
+          maxBuffer: 20 * 1024 * 1024
+        }
+      );
+      await execFileAsync(
+        'git',
+        ['-C', compositionWorkspacePath, 'merge', '--no-commit', '--no-ff', targetRef],
+        {
+          maxBuffer: 20 * 1024 * 1024
+        }
+      );
+      await execFileAsync('git', ['-C', compositionWorkspacePath, 'add', '-N', '.'], {
+        maxBuffer: 20 * 1024 * 1024
+      });
+      const composedDiff = await execFileAsync(
+        'git',
+        ['-C', compositionWorkspacePath, 'diff', '--binary', '--no-ext-diff', baselineRef, '--', '.'],
+        {
+          maxBuffer: 20 * 1024 * 1024
+        }
+      );
+      diffOutput = composedDiff.stdout;
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `Child-lane patch export failed closed while composing ${baselineRef}${
+          targetRef ? ` with transient child commit ${targetRef}` : ''
+        } and live workspace changes: ${detail}`
+      );
+    } finally {
+      if (compositionWorktreeCreated) {
+        await execFileAsync(
+          'git',
+          ['-C', laneWorkspacePath, 'worktree', 'remove', '--force', compositionWorkspacePath],
+          {
+            maxBuffer: 20 * 1024 * 1024
+          }
+        ).catch(() => undefined);
+      }
+      await rm(compositionRoot, { recursive: true, force: true }).catch(() => undefined);
+    }
+  } else {
+    const diffChunks: string[] = [];
+    if (committedDiff && (currentHeadSha === baselineRef || !currentHeadSha)) {
+      diffChunks.push(committedDiff.stdout);
+    }
+    if (workspaceDiff.stdout.length > 0 || diffChunks.length === 0) {
+      diffChunks.push(workspaceDiff.stdout);
+    }
+    diffOutput = diffChunks.join('');
   }
-  if (workspaceDiff.stdout.length > 0 || diffChunks.length === 0) {
-    diffChunks.push(workspaceDiff.stdout);
-  }
-  const diffOutput = diffChunks.join('');
   const patchArtifactPath = join(runDir, 'provider-linear-child-lane.patch');
   await writeFile(patchArtifactPath, diffOutput, 'utf8');
   return {
