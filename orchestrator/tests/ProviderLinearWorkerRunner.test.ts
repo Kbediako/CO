@@ -6553,6 +6553,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(execRunner).toHaveBeenCalledTimes(1);
     const turnEnv = execRunner.mock.calls[0]?.[0].env;
     expect(turnEnv.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH).toBeUndefined();
+    expect(turnEnv.CODEX_ORCHESTRATOR_PROVIDER_REPO_CONFIG_PATH).toBeUndefined();
     expect(turnEnv.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED).toBe('1');
   });
 
