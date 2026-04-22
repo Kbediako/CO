@@ -328,6 +328,83 @@ describe('docs freshness reporting', () => {
     );
   });
 
+  it('accepts preserved historical stubs without aging them into stale-doc debt', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-preserved-historical-stub-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+    await writeFile(join(repoRoot, 'tasks', 'tasks-linear-example.md'), '# Historical stub\n', 'utf8');
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: 'tasks/tasks-linear-example.md',
+          status: 'preserved_historical_stub',
+          last_review: '2025-01-01',
+          cadence_days: 1
+        }
+      ],
+      catalogPatterns: [
+        {
+          glob: 'tasks/**/*.md',
+          doc_class: 'task_packet'
+        }
+      ]
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(false);
+    expect(report.invalid_entries).toEqual([]);
+    expect(report.totals.stale_entries).toBe(0);
+    expect(report.totals.invalid_entries).toBe(0);
+  });
+
+  it('rejects preserved historical stub status on ordinary task packet content', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-preserved-historical-stub-invalid-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'tasks', 'tasks-linear-example.md'),
+      '# Task Checklist\n\nOrdinary packet.\n\n## Notes\n\n# Historical stub\n',
+      'utf8'
+    );
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: 'tasks/tasks-linear-example.md',
+          status: 'preserved_historical_stub',
+          last_review: '2025-01-01',
+          cadence_days: 1
+        }
+      ],
+      catalogPatterns: [
+        {
+          glob: 'tasks/**/*.md',
+          doc_class: 'task_packet'
+        }
+      ]
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.invalid_entries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'tasks/tasks-linear-example.md',
+          issues: expect.arrayContaining(['preserved_historical_stub requires a historical task continuity stub'])
+        })
+      ])
+    );
+  });
+
   it('writes a class-separated markdown summary when requested', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-summary-'));
     createdDirs.push(repoRoot);

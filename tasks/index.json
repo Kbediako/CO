@@ -1,6 +1,36 @@
 {
   "items": [
     {
+      "id": "20260422-linear-d9c8d1b2-3b38-42ef-9087-556870e2d88f",
+      "title": "CO: define preserved historical task-stub status semantics without triggering freshness or archive automation",
+      "relates_to": "tasks/tasks-linear-d9c8d1b2-3b38-42ef-9087-556870e2d88f.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-22",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-22",
+          "status": "produced",
+          "manifest": ".runs/linear-d9c8d1b2-3b38-42ef-9087-556870e2d88f-docs-packet/cli/2026-04-22T12-20-49-557Z-ce9e900e/manifest.json",
+          "source_anchor": "ctx:sha256:74b4c465c76042caa48680e8f6d1a67f1d95f056492747a6a11231781f41381a#chunk:c000001",
+          "summary": "Docs-first packet created for CO-311 preserved historical task-stub status semantics. The shared source-0 payload available to this lane contains run metadata plus issue id/identifier/updated_at only, so the packet is anchored on the live read-only CO-311 description. It preserves the `tasks/tasks-linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md` example, the canonical owner reference `docs:freshness:maintain`, and the exact non-goals / not-done-if language while explicitly rejecting CO-308 reopening and Apr 21 historical packet reconstruction."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-d9c8d1b2-3b38-42ef-9087-556870e2d88f.md",
+        "task": "tasks/tasks-linear-d9c8d1b2-3b38-42ef-9087-556870e2d88f.md",
+        "agent_task": ".agent/task/linear-d9c8d1b2-3b38-42ef-9087-556870e2d88f.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-d9c8d1b2-3b38-42ef-9087-556870e2d88f.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-d9c8d1b2-3b38-42ef-9087-556870e2d88f.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-d9c8d1b2-3b38-42ef-9087-556870e2d88f.md"
+        }
+      }
+    },
+    {
       "id": "20260422-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d",
       "title": "CO: re-enforce CO-185 provider-helper preflight guarantees in live worker attempts",
       "relates_to": "tasks/tasks-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md",
