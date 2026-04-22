@@ -30,20 +30,6 @@
 4. Parent adds focused regressions around child-lane workspace creation, `CODEX_HOME` propagation, and trust/config isolation behavior.
 5. Parent runs focused validation and review, then completes normal handoff.
 
-## Dependencies
-- Child-lane launch seam:
-  - `orchestrator/src/cli/providerLinearChildLaneRunner.ts`
-  - `orchestrator/src/cli/providerLinearChildLaneShell.ts`
-  - `orchestrator/src/cli/utils/codexPaths.ts`
-- Parent/launch env seam:
-  - `orchestrator/src/cli/providerLinearWorkerRunner.ts`
-  - `orchestrator/src/cli/controlHostCliShell.ts`
-- Focused tests:
-  - `orchestrator/tests/ProviderLinearChildLaneRunner.test.ts`
-  - `orchestrator/tests/ProviderLinearChildLaneShell.test.ts`
-  - `orchestrator/tests/ProviderLinearWorkerRunner.test.ts`
-  - `orchestrator/tests/ControlHostCliShell.test.ts`
-
 ## Validation
 - Child scoped:
   - `node -e "JSON.parse(require('node:fs').readFileSync('tasks/index.json','utf8')); console.log('json ok')"`
@@ -55,14 +41,6 @@
   - normal parent validation floor before PR handoff
 - Rollback plan:
   - revert the bounded launch/home/config change if it weakens trust or breaks required child-lane runtime behavior
-
-## Risks & Mitigations
-- Risk: a naive fix disables trust checks instead of isolating residue.
-  - Mitigation: keep "do not weaken trust boundaries" as a hard packet constraint and review gate.
-- Risk: changing `CODEX_HOME` behavior breaks session-log or runtime expectations.
-  - Mitigation: keep the change narrow and cover it with focused child-lane runner tests.
-- Risk: the issue broadens into generic global config redesign.
-  - Mitigation: keep scope anchored on ephemeral child-lane paths plus inherited `CODEX_HOME`.
 
 ## Approvals
 - Reviewer: pending parent docs-review and parent implementation validation

@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+  PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME,
   __test__ as childLaneRunnerTest,
   runProviderLinearChildLane
 } from '../src/cli/providerLinearChildLaneRunner.js';
@@ -307,8 +308,28 @@ describe('provider linear child lane runner', () => {
     ).rejects.toThrow(/maxBuffer|stdout maxBuffer length exceeded/i);
 
     const finalConfig = await readFile(configPath, 'utf8');
+    const proof = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME), 'utf8')
+    ) as {
+      status: string;
+      thread_id: string | null;
+      latest_turn_id: string | null;
+      latest_session_id: string | null;
+      latest_session_id_source: string | null;
+      last_message: string | null;
+      patch_bytes: number;
+      patch_artifact_path: string;
+    };
     expect(finalConfig).toContain(`[projects."${parentWorkspacePath}"]`);
     expect(finalConfig).not.toContain('.child-lanes/docs-child-run-1');
+    expect(proof.status).toBe('failed');
+    expect(proof.thread_id).toBe('thread-1');
+    expect(proof.latest_turn_id).toBe('turn-1');
+    expect(proof.latest_session_id).toBe('thread-1-turn-1');
+    expect(proof.latest_session_id_source).toBe('derived_from_thread_and_turn');
+    expect(proof.last_message).toMatch(/maxBuffer|stdout maxBuffer length exceeded/i);
+    expect(proof.patch_bytes).toBe(0);
+    expect(proof.patch_artifact_path).toBe(join(runDir, 'provider-linear-child-lane.patch'));
   });
 
   it('includes shared source 0 anchor lines in the child-lane prompt when present', () => {

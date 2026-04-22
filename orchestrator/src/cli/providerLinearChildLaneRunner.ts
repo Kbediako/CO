@@ -905,6 +905,47 @@ async function writeChildLaneProof(
   await writeFile(join(runDir, PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME), `${JSON.stringify(proof, null, 2)}\n`, 'utf8');
 }
 
+function buildFailedChildLaneProof(input: {
+  context: ProviderLinearChildLaneContext;
+  laneWorkspacePath: string;
+  laneBranch: string;
+  lastMessage: string;
+  updatedAt: string;
+  parsed?: ReturnType<typeof parseProviderLinearWorkerJsonl>;
+  session?: ReturnType<typeof deriveLatestTurnSessionId>;
+  patchArtifactPath?: string;
+  patchBytes?: number;
+}): ProviderLinearChildLaneProof {
+  return {
+    issue_id: input.context.issueId,
+    issue_identifier: input.context.issueIdentifier,
+    task_id: input.context.taskId,
+    run_id: input.context.runId,
+    parent_run_id: input.context.parentRunId,
+    stream: input.context.stream,
+    purpose: input.context.purpose,
+    instructions: input.context.instructions,
+    scope: input.context.scope,
+    parent_snapshot: input.context.parentSnapshot,
+    lane_workspace_path: input.laneWorkspacePath,
+    lane_branch: input.laneBranch,
+    patch_artifact_path:
+      input.patchArtifactPath ?? join(input.context.runDir, 'provider-linear-child-lane.patch'),
+    patch_bytes: input.patchBytes ?? 0,
+    thread_id: input.parsed?.threadId ?? null,
+    latest_turn_id: input.parsed?.turnId ?? null,
+    latest_session_id: input.session?.sessionId ?? null,
+    latest_session_id_source: input.session?.source ?? null,
+    last_event: input.parsed?.lastEvent ?? null,
+    last_message: input.lastMessage,
+    last_event_at: input.parsed?.lastEventAt ?? null,
+    tokens: input.parsed?.tokens ?? buildEmptyProviderLinearWorkerTokenUsage(),
+    rate_limits: input.parsed?.rateLimits ?? null,
+    status: 'failed',
+    updated_at: input.updatedAt
+  };
+}
+
 export async function runProviderLinearChildLane(
   env: NodeJS.ProcessEnv = process.env,
   dependencyOverrides: Partial<ProviderLinearChildLaneRunnerDependencies> = {}
@@ -991,33 +1032,13 @@ export async function runProviderLinearChildLane(
       if (execResult) {
         execSettled = true;
       } else {
-        const failedProof: ProviderLinearChildLaneProof = {
-          issue_id: context.issueId,
-          issue_identifier: context.issueIdentifier,
-          task_id: context.taskId,
-          run_id: context.runId,
-          parent_run_id: context.parentRunId,
-          stream: context.stream,
-          purpose: context.purpose,
-          instructions: context.instructions,
-          scope: context.scope,
-          parent_snapshot: context.parentSnapshot,
-          lane_workspace_path: laneWorkspacePath,
-          lane_branch: laneBranch,
-          patch_artifact_path: join(context.runDir, 'provider-linear-child-lane.patch'),
-          patch_bytes: 0,
-          thread_id: null,
-          latest_turn_id: null,
-          latest_session_id: null,
-          latest_session_id_source: null,
-          last_event: null,
-          last_message: normalizedError.message,
-          last_event_at: null,
-          tokens: buildEmptyProviderLinearWorkerTokenUsage(),
-          rate_limits: null,
-          status: 'failed',
-          updated_at: deps.now()
-        };
+        const failedProof = buildFailedChildLaneProof({
+          context,
+          laneWorkspacePath,
+          laneBranch,
+          lastMessage: normalizedError.message,
+          updatedAt: deps.now()
+        });
         await writeChildLaneProof(context.runDir, failedProof);
         throw normalizedError;
       }
@@ -1031,35 +1052,63 @@ export async function runProviderLinearChildLane(
       threadId: parsed.threadId,
       turnId: parsed.turnId
     });
-    const { patchArtifactPath, patchBytes } = await createPatchArtifact(laneWorkspacePath, context.runDir);
-    const proof: ProviderLinearChildLaneProof = {
-      issue_id: context.issueId,
-      issue_identifier: context.issueIdentifier,
-      task_id: context.taskId,
-      run_id: context.runId,
-      parent_run_id: context.parentRunId,
-      stream: context.stream,
-      purpose: context.purpose,
-      instructions: context.instructions,
-      scope: context.scope,
-      parent_snapshot: context.parentSnapshot,
-      lane_workspace_path: laneWorkspacePath,
-      lane_branch: laneBranch,
-      patch_artifact_path: patchArtifactPath,
-      patch_bytes: patchBytes,
-      thread_id: parsed.threadId,
-      latest_turn_id: parsed.turnId,
-      latest_session_id: session.sessionId,
-      latest_session_id_source: session.source,
-      last_event: parsed.lastEvent,
-      last_message: parsed.finalMessage,
-      last_event_at: parsed.lastEventAt,
-      tokens: parsed.tokens,
-      rate_limits: parsed.rateLimits,
-      status: execResult.exitCode === 0 ? 'succeeded' : 'failed',
-      updated_at: deps.now()
-    };
-    await writeChildLaneProof(context.runDir, proof);
+    let patchArtifactPath = join(context.runDir, 'provider-linear-child-lane.patch');
+    let patchBytes = 0;
+    let proof: ProviderLinearChildLaneProof;
+    try {
+      ({ patchArtifactPath, patchBytes } = await createPatchArtifact(laneWorkspacePath, context.runDir));
+      proof = {
+        issue_id: context.issueId,
+        issue_identifier: context.issueIdentifier,
+        task_id: context.taskId,
+        run_id: context.runId,
+        parent_run_id: context.parentRunId,
+        stream: context.stream,
+        purpose: context.purpose,
+        instructions: context.instructions,
+        scope: context.scope,
+        parent_snapshot: context.parentSnapshot,
+        lane_workspace_path: laneWorkspacePath,
+        lane_branch: laneBranch,
+        patch_artifact_path: patchArtifactPath,
+        patch_bytes: patchBytes,
+        thread_id: parsed.threadId,
+        latest_turn_id: parsed.turnId,
+        latest_session_id: session.sessionId,
+        latest_session_id_source: session.source,
+        last_event: parsed.lastEvent,
+        last_message: parsed.finalMessage,
+        last_event_at: parsed.lastEventAt,
+        tokens: parsed.tokens,
+        rate_limits: parsed.rateLimits,
+        status: execResult.exitCode === 0 ? 'succeeded' : 'failed',
+        updated_at: deps.now()
+      };
+      await writeChildLaneProof(context.runDir, proof);
+    } catch (error) {
+      const normalizedError = error instanceof Error ? error : new Error(String(error));
+      const failedProof = buildFailedChildLaneProof({
+        context,
+        laneWorkspacePath,
+        laneBranch,
+        lastMessage: normalizedError.message,
+        updatedAt: deps.now(),
+        parsed,
+        session,
+        patchArtifactPath,
+        patchBytes
+      });
+      try {
+        await writeChildLaneProof(context.runDir, failedProof);
+      } catch (proofWriteError) {
+        logger.warn(
+          `[provider-linear-child-lane-proof] failed to persist failure proof after post-exec export error: ${
+            proofWriteError instanceof Error ? proofWriteError.message : String(proofWriteError)
+          }`
+        );
+      }
+      throw normalizedError;
+    }
     if (execResult.exitCode !== 0) {
       throw new Error(`provider-linear-child-lane exited with code ${execResult.exitCode ?? 'unknown'}`);
     }
