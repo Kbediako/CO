@@ -2485,6 +2485,120 @@ describe('runProviderLinearChildLaneShell', () => {
     ]);
   });
 
+  it('recovers a failed child lane without a patch artifact when the outer launcher stays stuck', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const recoveredLane = createLaneRecord({
+      run_id: 'child-run-recovered-failed',
+      status: 'failed',
+      manifest_path: join(
+        tempRoot ?? '',
+        '.runs',
+        `${TASK_ID}-impl-a`,
+        'cli',
+        'child-run-recovered-failed',
+        'manifest.json'
+      ),
+      artifact_root: join(
+        tempRoot ?? '',
+        '.runs',
+        `${TASK_ID}-impl-a`,
+        'cli',
+        'child-run-recovered-failed'
+      ),
+      log_path: join(
+        tempRoot ?? '',
+        '.runs',
+        `${TASK_ID}-impl-a`,
+        'cli',
+        'child-run-recovered-failed',
+        'run.log'
+      ),
+      patch_artifact_path: null,
+      patch_bytes: null,
+      summary: 'child lane failed before producing a patch'
+    });
+    let abortObserved = false;
+    const execRunner = vi.fn(
+      async ({ abortSignal }: { abortSignal?: AbortSignal | null }) =>
+        await new Promise<{ exitCode: number | null; stdout: string; stderr: string }>((resolve, reject) => {
+          abortSignal?.addEventListener('abort', () => {
+            abortObserved = true;
+            reject(abortSignal.reason instanceof Error ? abortSignal.reason : new Error('aborted'));
+          });
+        })
+    );
+    let wroteRecovery = false;
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'launch',
+        streamName: 'impl-a',
+        purpose: 'Implement bounded child lane support',
+        files: ['orchestrator/src/cli/providerLinearChildStreamShell.ts'],
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        execRunner,
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: '2026-03-30T07:10:00.000Z',
+          state: 'In Progress',
+          state_type: 'started'
+        })) as never,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
+        readParentHeadSha: vi.fn(async () => 'parent-base-sha'),
+        refreshProofSnapshot: vi.fn(async () => undefined),
+        sleep: vi.fn(async () => {
+          if (wroteRecovery) {
+            return;
+          }
+          wroteRecovery = true;
+          await writeChildLaneManifest(recoveredLane, {
+            runtime_mode_requested: 'appserver',
+            runtime_mode: 'appserver',
+            runtime_provider: 'AppServerRuntimeProvider'
+          });
+          await writeChildLaneProof(recoveredLane, {
+            patch_artifact_path: null,
+            patch_bytes: null,
+            last_message: 'scope drift aborted by parent guard'
+          });
+        }) as never
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'launch',
+      error: {
+        code: 'provider_worker_child_lane_run_failed',
+        status: 502
+      },
+      child_run: {
+        run_id: 'child-run-recovered-failed',
+        status: 'failed',
+        runtime_mode: 'appserver'
+      },
+      child_lane: {
+        run_id: 'child-run-recovered-failed',
+        status: 'failed',
+        decision: 'pending',
+        patch_artifact_path: null
+      }
+    });
+    expect(abortObserved).toBe(true);
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
+      expect.objectContaining({
+        run_id: 'child-run-recovered-failed',
+        status: 'failed',
+        decision: 'pending',
+        patch_artifact_path: null
+      })
+    ]);
+  });
+
   it('ignores child-lane artifact paths when mixed file-and-phase scopes inspect parent dirtiness', async () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
     const childRunDir = join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-1');

@@ -1838,7 +1838,7 @@ async function readRecoveredChildLaneLaunchCandidate(input: {
     context: input.context,
     repoRoot: input.context.repoRoot,
     childRunsRoot: input.childRunsRoot,
-    action: 'accept'
+    action: childRun.status === 'succeeded' ? 'accept' : 'reject'
   });
   if (proofViolation) {
     return null;

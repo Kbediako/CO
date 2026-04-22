@@ -701,7 +701,15 @@ function commandShowsParentOwnedScopeDrift(command: string): boolean {
 }
 
 function queryShowsParentOwnedScopeDrift(query: string): boolean {
-  return /\b(?:github|linear)\b/iu.test(query) || /\bpull request\b/iu.test(query);
+  if (/\bgithub\b/iu.test(query) || /\bpull request\b/iu.test(query)) {
+    return true;
+  }
+  return (
+    /\blinear\b/iu.test(query) &&
+    /\b(?:issue|issues|ticket|tickets|project|projects|comment|comments|status|state|workflow)\b/iu.test(
+      query
+    )
+  );
 }
 
 function formatProviderLinearChildLaneScopeDriftEvidence(

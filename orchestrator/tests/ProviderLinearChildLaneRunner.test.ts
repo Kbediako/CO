@@ -724,6 +724,23 @@ describe('provider linear child lane runner', () => {
     ]);
   });
 
+  it('does not treat benign tool_search queries containing only the word linear as scope drift', () => {
+    expect(
+      childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
+        timestamp: '2026-04-22T06:12:49.011Z',
+        type: 'response_item',
+        payload: {
+          type: 'tool_search_call',
+          call_id: 'call-benign',
+          arguments: {
+            query: 'linear child lane patch artifact format',
+            limit: 12
+          }
+        }
+      })
+    ).toEqual([]);
+  });
+
   it('flags unauthorized child-lane commits when HEAD diverges from the parent snapshot base sha', () => {
     expect(
       childLaneRunnerTest.resolveProviderLinearChildLaneUnauthorizedCommitMessage({
