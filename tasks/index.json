@@ -80,6 +80,32 @@
       "paths": {"spec": "tasks/specs/linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md", "task": "tasks/tasks-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md", "agent_task": ".agent/task/linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md", "docs": {"PRD": "docs/PRD-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md", "TECH_SPEC": "docs/TECH_SPEC-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md", "ACTION_PLAN": "docs/ACTION_PLAN-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md"}}
     },
     {
+      "id": "20260422-linear-f9666beb-58a7-47b2-b1c8-16d309ed1689",
+      "title": "CO: released stale blocker metadata must not re-block issues after blocker issues are Done",
+      "relates_to": "tasks/tasks-linear-f9666beb-58a7-47b2-b1c8-16d309ed1689.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-22",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-22",
+          "status": "produced",
+          "manifest": ".runs/linear-f9666beb-58a7-47b2-b1c8-16d309ed1689-docs-packet/cli/2026-04-22T05-53-20-299Z-b3f6fed4/manifest.json",
+          "source_anchor": "ctx:sha256:d829d982421ba4529dabb021e70362809faafbd4fc438e1d113e8992538c858c#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-302 as a stale released blocker metadata lane: released/not-active provider-intake claim metadata from provider-intake-state.json must not re-block CO-295 from issue_blocked_by=[CO-300 Done] after the blocker is terminal. The packet rejects CO-295 PR attachment scope expansion, manual state-flip masking, provenance weakening, and broad provider lifecycle rewrite. The shared source-0 payload is metadata-only, so this lane used a read-only Linear fetch of the CO-302 issue description and performed no Linear mutations."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-f9666beb-58a7-47b2-b1c8-16d309ed1689.md",
+        "task": "tasks/tasks-linear-f9666beb-58a7-47b2-b1c8-16d309ed1689.md",
+        "agent_task": ".agent/task/linear-f9666beb-58a7-47b2-b1c8-16d309ed1689.md",
+        "docs": "docs/TECH_SPEC-linear-f9666beb-58a7-47b2-b1c8-16d309ed1689.md"
+      }
+    },
+    {
       "id": "20260422-linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a",
       "title": "Maintain docs freshness rolling baseline for Apr 22 stale cohorts and registry drift",
       "relates_to": "tasks/tasks-linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a.md",
