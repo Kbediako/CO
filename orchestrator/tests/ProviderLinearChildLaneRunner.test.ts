@@ -1205,6 +1205,25 @@ describe('provider linear child lane runner', () => {
     ).toEqual([]);
   });
 
+  it('still detects trailing commands after a quoted heredoc terminator', () => {
+    expect(
+      childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
+        timestamp: '2026-04-22T06:13:40.400Z',
+        type: 'response_item',
+        payload: {
+          type: 'function_call',
+          name: 'exec_command',
+          arguments: JSON.stringify({
+            cmd: `bash -lc "cat <<'EOF'\ngh pr view\nEOF" && git push origin HEAD`,
+            workdir: '/tmp/child'
+          })
+        }
+      })
+    ).toEqual([
+      `2026-04-22T06:13:40.400Z exec_command bash -lc "cat <<'EOF' gh pr view EOF" && git push origin HEAD`
+    ]);
+  });
+
   it('re-checks the session log after exec settles before clearing scope drift', async () => {
     tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-runner-'));
     const sessionLogPath = join(tempRoot, 'rollout-drift-final-window.jsonl');

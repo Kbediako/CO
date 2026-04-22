@@ -708,7 +708,7 @@ function stripShellCommandHeredocBodies(command: string): string {
       const active = heredocDelimiters[0];
       if (active) {
         const candidate = active.stripLeadingTabs ? line.replace(/^\t+/u, '') : line;
-        if (candidate === active.delimiter) {
+        if (lineClosesShellCommandHeredoc(candidate, active.delimiter)) {
           output.push(line);
           heredocDelimiters.shift();
         } else {
@@ -730,6 +730,17 @@ function stripShellCommandHeredocBodies(command: string): string {
     }
   }
   return output.join('\n');
+}
+
+function lineClosesShellCommandHeredoc(line: string, delimiter: string): boolean {
+  if (line === delimiter) {
+    return true;
+  }
+  if (!line.startsWith(delimiter)) {
+    return false;
+  }
+  const remainder = line.slice(delimiter.length);
+  return /^["']+(?:\s*(?:&&|\|\||[;&|]).*)?$/u.test(remainder);
 }
 
 function stripShellCommandTokenQuotes(token: string): string {
