@@ -2006,7 +2006,7 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
-  it('keeps bare-leading low-number NODE titles conflicting without owned evidence', async () => {
+  it('keeps bare-leading low-number NODE titles unknown without owned evidence', async () => {
     const { result } = await readIssueContextAttachmentTruth({
       identifier: 'NODE-244',
       title: 'Completed issue with bare-leading low-number NODE PR',
@@ -2033,12 +2033,12 @@ describe('providerLinearWorkflowFacade', () => {
         pull_request_attachments: {
           current: null,
           historical: [],
-          conflicting: [
+          conflicting: [],
+          unknown: [
             {
               id: 'attachment-pr-606'
             }
-          ],
-          unknown: []
+          ]
         }
       }
     });
@@ -2289,10 +2289,12 @@ describe('providerLinearWorkflowFacade', () => {
       issue: {
         identifier: 'NODE-244',
         pull_request_attachments: {
-          current: {
-            id: 'attachment-pr-592'
-          },
-          historical: [],
+          current: null,
+          historical: [
+            {
+              id: 'attachment-pr-592'
+            }
+          ],
           conflicting: [],
           unknown: [
             {
@@ -2566,7 +2568,7 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
-  it('does not let a generic active PR outrank explicit completed-issue ownership evidence', async () => {
+  it('does not let terminal owned history or generic active PRs claim current on completed issues', async () => {
     const { result } = await readIssueContextAttachmentTruth({
       identifier: 'CO-244',
       title: 'Completed issue with generic active PR',
@@ -2603,10 +2605,12 @@ describe('providerLinearWorkflowFacade', () => {
       issue: {
         identifier: 'CO-244',
         pull_request_attachments: {
-          current: {
-            id: 'attachment-pr-532'
-          },
-          historical: [],
+          current: null,
+          historical: [
+            {
+              id: 'attachment-pr-532'
+            }
+          ],
           conflicting: [],
           unknown: [
             {
