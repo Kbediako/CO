@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
-import { mkdir, open, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, open, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, parse as parsePath, relative, resolve } from 'node:path';
 import process from 'node:process';
 import { promisify } from 'node:util';
@@ -35,6 +36,7 @@ const execFileAsync = promisify(execFile);
 const require = createRequire(import.meta.url);
 const PROVIDER_LINEAR_CHILD_LANE_APPSERVER_STARTUP_TIMEOUT_MS = 90 * 1000;
 const PROVIDER_LINEAR_CHILD_LANE_APPSERVER_STARTUP_POLL_INTERVAL_MS = 250;
+const PROVIDER_LINEAR_CHILD_LANE_SCOPE_DRIFT_POLL_INTERVAL_MS = 250;
 const PROVIDER_LINEAR_CHILD_LANE_SESSION_LOG_DISCOVERY_WINDOW_MS = 10 * 60 * 1000;
 const PROVIDER_LINEAR_CHILD_LANE_SESSION_LOG_HEADER_BYTES = 256 * 1024;
 const PROVIDER_LINEAR_CHILD_LANE_SESSION_LOG_MTIME_SKEW_MS = 1000;
@@ -691,6 +693,590 @@ function parseProviderLinearChildLaneSessionJsonlLine(line: string): Record<stri
   }
 }
 
+function tokenizeShellCommandForScopeDrift(command: string): string[] {
+  const normalized = stripShellCommandHeredocBodies(command);
+  return normalized.match(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\n|&&|\|\||[;&|]|[^\s;&|]+/gu) ?? [];
+}
+
+function stripShellCommandHeredocBodies(command: string): string {
+  const normalized = command.replace(/\r\n/gu, '\n');
+  const lines = normalized.split('\n');
+  const heredocDelimiters: Array<{ delimiter: string; stripLeadingTabs: boolean }> = [];
+  const output: string[] = [];
+  for (const line of lines) {
+    if (heredocDelimiters.length > 0) {
+      const active = heredocDelimiters[0];
+      if (active) {
+        const candidate = active.stripLeadingTabs ? line.replace(/^\t+/u, '') : line;
+        if (lineClosesShellCommandHeredoc(candidate, active.delimiter)) {
+          output.push(line);
+          heredocDelimiters.shift();
+        } else {
+          output.push('');
+        }
+        continue;
+      }
+    }
+    output.push(line);
+    for (const match of line.matchAll(/<<(-)?\s*(?:(['"])(.*?)\2|([^\s<>&|;]+))/gu)) {
+      const delimiter = match[3] ?? match[4];
+      if (!delimiter) {
+        continue;
+      }
+      heredocDelimiters.push({
+        delimiter,
+        stripLeadingTabs: match[1] === '-'
+      });
+    }
+  }
+  return output.join('\n');
+}
+
+function lineClosesShellCommandHeredoc(line: string, delimiter: string): boolean {
+  if (line === delimiter) {
+    return true;
+  }
+  if (!line.startsWith(delimiter)) {
+    return false;
+  }
+  const remainder = line.slice(delimiter.length);
+  return /^["']+(?:\s*(?:&&|\|\||[;&|]).*)?$/u.test(remainder);
+}
+
+function stripShellCommandTokenQuotes(token: string): string {
+  return token.replace(/^['"]|['"]$/gu, '');
+}
+
+function shellOptionConsumesNextValue(token: string, optionsWithValues: ReadonlySet<string>): boolean {
+  return optionsWithValues.has(token) && !token.includes('=');
+}
+
+function advancePastShellCommandEnvWrappers(
+  tokens: string[],
+  segmentStart: number,
+  segmentEnd: number
+): number {
+  const envAssignmentPattern = /^[A-Za-z_][A-Za-z0-9_]*=.*/u;
+  const envOptionsWithValues = new Set([
+    '-u',
+    '--unset',
+    '-C',
+    '--chdir',
+    '-S',
+    '--split-string',
+    '--default-signal',
+    '--ignore-signal',
+    '--block-signal'
+  ]);
+  let index = segmentStart;
+  while (index < segmentEnd) {
+    const token = stripShellCommandTokenQuotes(tokens[index] ?? '');
+    if (!token) {
+      index += 1;
+      continue;
+    }
+    if (envAssignmentPattern.test(token)) {
+      index += 1;
+      continue;
+    }
+    if (basename(token) === 'env') {
+      index += 1;
+      while (index < segmentEnd) {
+        const envToken = stripShellCommandTokenQuotes(tokens[index] ?? '');
+        if (!envToken) {
+          index += 1;
+          continue;
+        }
+        if (envToken === '--') {
+          index += 1;
+          break;
+        }
+        if (envAssignmentPattern.test(envToken)) {
+          index += 1;
+          continue;
+        }
+        if (envToken.startsWith('-')) {
+          if (shellOptionConsumesNextValue(envToken, envOptionsWithValues)) {
+            index += 1;
+          }
+          index += 1;
+          continue;
+        }
+        break;
+      }
+      continue;
+    }
+    break;
+  }
+  return index;
+}
+
+function advancePastShellCommandExecutionWrappers(
+  tokens: string[],
+  segmentStart: number,
+  segmentEnd: number
+): number {
+  let index = advancePastShellCommandEnvWrappers(tokens, segmentStart, segmentEnd);
+  while (index < segmentEnd) {
+    const token = stripShellCommandTokenQuotes(tokens[index] ?? '');
+    if (!token) {
+      index += 1;
+      continue;
+    }
+    if (basename(token) !== 'command') {
+      break;
+    }
+    index += 1;
+    while (index < segmentEnd) {
+      const commandToken = stripShellCommandTokenQuotes(tokens[index] ?? '');
+      if (!commandToken) {
+        index += 1;
+        continue;
+      }
+      if (commandToken === '--') {
+        index += 1;
+        break;
+      }
+      if (commandToken === '-p') {
+        index += 1;
+        continue;
+      }
+      if (commandToken.startsWith('-')) {
+        return segmentEnd;
+      }
+      break;
+    }
+  }
+  return index;
+}
+
+function findShellCommandSegmentEnd(tokens: string[], segmentStart: number, commandSeparators: Set<string>): number {
+  let index = segmentStart;
+  while (index < tokens.length) {
+    const token = stripShellCommandTokenQuotes(tokens[index] ?? '');
+    if (token && commandSeparators.has(token)) {
+      break;
+    }
+    index += 1;
+  }
+  return index;
+}
+
+function segmentShowsParentOwnedOrchestratorScopeDrift(tokens: string[], start: number, end: number): boolean {
+  for (let index = start; index < end; index += 1) {
+    const token = stripShellCommandTokenQuotes(tokens[index] ?? '');
+    if (!token) {
+      continue;
+    }
+    if (token === 'linear' || token === 'pr' || token === 'review' || token.startsWith('provider-linear-')) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function tokenInvokesCodexOrchestrator(token: string): boolean {
+  return /^(?:codex-orchestrator(?:\.js)?|codex-orchestrator@.+)$/u.test(basename(token));
+}
+
+function packageExecSegmentShowsParentOwnedScopeDrift(
+  tokens: string[],
+  commandStart: number,
+  segmentEnd: number
+): boolean {
+  const packageExecOptionsWithValues = new Set(['-c', '--call', '-p', '--package', '--shell', '--node-options']);
+  for (let index = commandStart; index < segmentEnd; index += 1) {
+    const token = stripShellCommandTokenQuotes(tokens[index] ?? '');
+    if (!token) {
+      continue;
+    }
+    if (token === '--') {
+      continue;
+    }
+    if (token === '-c' || token === '--call') {
+      const nestedCommand = stripShellCommandTokenQuotes(tokens[index + 1] ?? '');
+      return nestedCommand ? commandShowsParentOwnedScopeDrift(nestedCommand) : false;
+    }
+    if (token.startsWith('-')) {
+      if (shellOptionConsumesNextValue(token, packageExecOptionsWithValues)) {
+        index += 1;
+      }
+      continue;
+    }
+    if (!tokenInvokesCodexOrchestrator(token)) {
+      return false;
+    }
+    return segmentShowsParentOwnedOrchestratorScopeDrift(tokens, index + 1, segmentEnd);
+  }
+  return false;
+}
+
+function npmExecSegmentShowsParentOwnedScopeDrift(tokens: string[], commandStart: number, segmentEnd: number): boolean {
+  const npmOptionsWithValues = new Set(['-C', '--prefix', '-w', '--workspace', '--userconfig', '--cache', '--loglevel']);
+  for (let index = commandStart; index < segmentEnd; index += 1) {
+    const token = stripShellCommandTokenQuotes(tokens[index] ?? '');
+    if (!token) {
+      continue;
+    }
+    if (token === '--') {
+      continue;
+    }
+    if (token === 'exec' || token === 'x') {
+      return packageExecSegmentShowsParentOwnedScopeDrift(tokens, index + 1, segmentEnd);
+    }
+    if (token.startsWith('-')) {
+      if (shellOptionConsumesNextValue(token, npmOptionsWithValues)) {
+        index += 1;
+      }
+      continue;
+    }
+    return false;
+  }
+  return false;
+}
+
+function commandSegmentShowsParentOwnedScopeDrift(
+  tokens: string[],
+  segmentStart: number,
+  segmentEnd: number
+): boolean {
+  const shellCommandWrappers = new Set(['bash', 'sh', 'zsh']);
+  const gitOptionsWithValues = new Set([
+    '-c',
+    '-C',
+    '--exec-path',
+    '--git-dir',
+    '--work-tree',
+    '--namespace',
+    '--super-prefix',
+    '--config-env'
+  ]);
+  const commandIndex = advancePastShellCommandExecutionWrappers(tokens, segmentStart, segmentEnd);
+  if (commandIndex >= segmentEnd) {
+    return false;
+  }
+  const commandToken = stripShellCommandTokenQuotes(tokens[commandIndex] ?? '');
+  const commandBase = basename(commandToken);
+  if (commandBase === 'eval') {
+    const nestedCommandTokens: string[] = [];
+    for (let index = commandIndex + 1; index < segmentEnd; index += 1) {
+      const token = stripShellCommandTokenQuotes(tokens[index] ?? '');
+      if (!token) {
+        continue;
+      }
+      if (nestedCommandTokens.length === 0 && token === '--') {
+        continue;
+      }
+      nestedCommandTokens.push(token);
+    }
+    return nestedCommandTokens.length > 0 ? commandShowsParentOwnedScopeDrift(nestedCommandTokens.join(' ')) : false;
+  }
+  if (shellCommandWrappers.has(commandBase)) {
+    const shellOptionsWithValues = new Set(['-o', '-O', '--rcfile', '--init-file']);
+    for (let index = commandIndex + 1; index < segmentEnd; index += 1) {
+      const token = stripShellCommandTokenQuotes(tokens[index] ?? '');
+      if (!token) {
+        continue;
+      }
+      if (/^-[^-]*c[^-]*$/u.test(token) || token === '-c') {
+        const nestedCommand = stripShellCommandTokenQuotes(tokens[index + 1] ?? '');
+        return nestedCommand ? commandShowsParentOwnedScopeDrift(nestedCommand) : false;
+      }
+      if (shellOptionConsumesNextValue(token, shellOptionsWithValues)) {
+        index += 1;
+        continue;
+      }
+      if (!token.startsWith('-')) {
+        return false;
+      }
+    }
+    return false;
+  }
+  if (commandBase === 'gh') {
+    return true;
+  }
+  if (commandBase === 'npx') {
+    return packageExecSegmentShowsParentOwnedScopeDrift(tokens, commandIndex + 1, segmentEnd);
+  }
+  if (commandBase === 'npm') {
+    return npmExecSegmentShowsParentOwnedScopeDrift(tokens, commandIndex + 1, segmentEnd);
+  }
+  if (tokenInvokesCodexOrchestrator(commandToken)) {
+    return segmentShowsParentOwnedOrchestratorScopeDrift(tokens, commandIndex + 1, segmentEnd);
+  }
+  if (commandBase === 'node' || commandBase === 'bun') {
+    const runtimeOptionsWithValues = new Set([
+      '-r',
+      '--require',
+      '--import',
+      '--loader',
+      '--experimental-loader',
+      '--conditions'
+    ]);
+    for (let index = commandIndex + 1; index < segmentEnd; index += 1) {
+      const token = stripShellCommandTokenQuotes(tokens[index] ?? '');
+      if (!token) {
+        continue;
+      }
+      if (token.startsWith('-')) {
+        if (shellOptionConsumesNextValue(token, runtimeOptionsWithValues)) {
+          index += 1;
+        }
+        continue;
+      }
+      if (!tokenInvokesCodexOrchestrator(token)) {
+        return false;
+      }
+      return segmentShowsParentOwnedOrchestratorScopeDrift(tokens, index + 1, segmentEnd);
+    }
+    return false;
+  }
+  if (commandBase !== 'git') {
+    return false;
+  }
+  for (let index = commandIndex + 1; index < segmentEnd; index += 1) {
+    const token = stripShellCommandTokenQuotes(tokens[index] ?? '');
+    if (!token) {
+      continue;
+    }
+    if (token === 'commit' || token === 'push') {
+      return true;
+    }
+    if (!token.startsWith('-')) {
+      return false;
+    }
+    if (shellOptionConsumesNextValue(token, gitOptionsWithValues)) {
+      index += 1;
+    }
+  }
+  return false;
+}
+
+function commandShowsParentOwnedScopeDrift(command: string): boolean {
+  const tokens = tokenizeShellCommandForScopeDrift(command);
+  const commandSeparators = new Set(['\n', '&&', '||', ';', '|', '&']);
+  let segmentStart = 0;
+  while (segmentStart < tokens.length) {
+    const segmentEnd = findShellCommandSegmentEnd(tokens, segmentStart, commandSeparators);
+    if (commandSegmentShowsParentOwnedScopeDrift(tokens, segmentStart, segmentEnd)) {
+      return true;
+    }
+    segmentStart = segmentEnd + 1;
+  }
+  return false;
+}
+
+function queryShowsParentOwnedScopeDrift(query: string): boolean {
+  if (
+    /\bpull requests?\b/iu.test(query) &&
+    /\b(?:open|opened|close|closed|merge|merged|comment|comments|review|reviews|check|checks|status|list|view|repo|repository)\b/iu.test(
+      query
+    )
+  ) {
+    return true;
+  }
+  if (
+    /\bgithub\b/iu.test(query) &&
+    /\b(?:prs?\b|issue|issues|comment|comments|review|reviews|check|checks|status|merge|merged|open|opened|close|closed)\b/iu.test(
+      query
+    )
+  ) {
+    return true;
+  }
+  if (
+    /\bprs?\b/iu.test(query) &&
+    (/\bpr\s*#?\d+\b/iu.test(query) ||
+      /\b(?:comment|comments|review|reviews|check|checks|status|merge|merged|open|opened|close|closed)\b/iu.test(
+        query
+      ))
+  ) {
+    return true;
+  }
+  return (
+    /\blinear\b/iu.test(query) &&
+    /\b(?:issue|issues|ticket|tickets|project|projects|comment|comments|status|state|workflow)\b/iu.test(
+      query
+    )
+  );
+}
+
+function functionNameShowsParentOwnedScopeDrift(functionName: string): boolean {
+  const tokens = functionName
+    .toLowerCase()
+    .split(/[^a-z0-9]+/u)
+    .filter((token) => token.length > 0);
+  if (tokens.includes('github') || tokens.includes('linear')) {
+    return true;
+  }
+  if (tokens.includes('pull') && tokens.includes('request')) {
+    return true;
+  }
+  return (
+    tokens.includes('pr') &&
+    tokens.some((token) =>
+      ['open', 'make', 'create', 'update', 'close', 'merge', 'view', 'list', 'comment', 'review'].includes(token)
+    )
+  );
+}
+
+function formatProviderLinearChildLaneScopeDriftEvidence(
+  timestamp: string | null,
+  detail: string
+): string {
+  return timestamp ? `${timestamp} ${detail}` : detail;
+}
+
+function truncateProviderLinearChildLaneScopeDriftText(value: string, maxLength = 140): string {
+  const normalized = value.replace(/\s+/gu, ' ').trim();
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+  return `${normalized.slice(0, Math.max(0, maxLength - 1)).trimEnd()}...`;
+}
+
+function extractProviderLinearChildLaneScopeDriftEvidenceFromRecord(
+  record: Record<string, unknown>
+): string[] {
+  const timestamp = normalizeOptionalString(record.timestamp);
+  if (normalizeOptionalString(record.type) !== 'response_item') {
+    return [];
+  }
+  const payload =
+    typeof record.payload === 'object' && record.payload !== null
+      ? (record.payload as Record<string, unknown>)
+      : null;
+  if (!payload) {
+    return [];
+  }
+  const payloadType = normalizeOptionalString(payload.type);
+  if (payloadType === 'tool_search_call') {
+    const argumentsValue =
+      typeof payload.arguments === 'object' && payload.arguments !== null
+        ? (payload.arguments as Record<string, unknown>)
+        : null;
+    const query = normalizeOptionalString(argumentsValue?.query);
+    if (query && queryShowsParentOwnedScopeDrift(query)) {
+      return [
+        formatProviderLinearChildLaneScopeDriftEvidence(
+          timestamp,
+          `tool_search ${truncateProviderLinearChildLaneScopeDriftText(query)}`
+        )
+      ];
+    }
+    return [];
+  }
+  if (payloadType !== 'function_call') {
+    return [];
+  }
+  const functionName = normalizeOptionalString(payload.name);
+  if (!functionName) {
+    return [];
+  }
+  if (functionNameShowsParentOwnedScopeDrift(functionName)) {
+    return [
+      formatProviderLinearChildLaneScopeDriftEvidence(timestamp, `function_call ${functionName}`)
+    ];
+  }
+  if (functionName !== 'exec_command') {
+    return [];
+  }
+  const rawArguments = normalizeOptionalString(payload.arguments);
+  if (!rawArguments) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(rawArguments) as Record<string, unknown>;
+    const command = normalizeOptionalString(parsed.cmd);
+    if (!command || !commandShowsParentOwnedScopeDrift(command)) {
+      return [];
+    }
+    return [
+      formatProviderLinearChildLaneScopeDriftEvidence(
+        timestamp,
+        `exec_command ${truncateProviderLinearChildLaneScopeDriftText(command)}`
+      )
+    ];
+  } catch {
+    return [];
+  }
+}
+
+async function scanProviderLinearChildLaneSessionLogForParentScopeDrift(
+  sessionLogPath: string,
+  startedAt: string | null = null
+): Promise<string[]> {
+  const raw = await readFile(sessionLogPath, 'utf8');
+  const evidence = new Set<string>();
+  const startedAtMs = startedAt ? Date.parse(startedAt) : Number.NaN;
+  let withinLaunchWindow = !Number.isFinite(startedAtMs);
+  for (const line of raw.split(/\r?\n/u)) {
+    const parsed = parseProviderLinearChildLaneSessionJsonlLine(line);
+    if (!parsed) {
+      continue;
+    }
+    if (!withinLaunchWindow) {
+      const timestampMs =
+        typeof parsed.timestamp === 'string' ? Date.parse(parsed.timestamp) : Number.NaN;
+      if (!Number.isFinite(timestampMs) || timestampMs < startedAtMs) {
+        continue;
+      }
+      withinLaunchWindow = true;
+    }
+    for (const detail of extractProviderLinearChildLaneScopeDriftEvidenceFromRecord(parsed)) {
+      evidence.add(detail);
+      if (evidence.size >= 3) {
+        return [...evidence];
+      }
+    }
+  }
+  return [...evidence];
+}
+
+function buildProviderLinearChildLaneScopeDriftMessage(input: {
+  context: Pick<ProviderLinearChildLaneContext, 'issueIdentifier'>;
+  sessionLogPath: string;
+  evidence: readonly string[];
+}): string {
+  const renderedEvidence = input.evidence.map((entry) => `"${entry}"`).join('; ');
+  return `Appserver child lane drifted into parent-owned GitHub/Linear/PR lifecycle work for ${input.context.issueIdentifier}. Session log ${basename(input.sessionLogPath)} captured ${renderedEvidence}. Invalidate the lane and relaunch with tighter bounded scope; parent-owned Linear/GitHub/PR handling must stay in the provider worker.`;
+}
+
+async function waitForProviderLinearChildLaneScopeDrift(input: {
+  context: Pick<ProviderLinearChildLaneContext, 'issueIdentifier'>;
+  sessionLogPath: string;
+  startedAt?: string;
+  isExecSettled: () => boolean;
+  deps: Pick<ProviderLinearChildLaneRunnerDependencies, 'sleep'>;
+}): Promise<string | null> {
+  const readScopeDriftMessage = async (): Promise<string | null> => {
+    const evidence = await scanProviderLinearChildLaneSessionLogForParentScopeDrift(
+      input.sessionLogPath,
+      input.startedAt ?? null
+    ).catch((error) => [
+      formatProviderLinearChildLaneScopeDriftEvidence(
+        null,
+        `drift_monitor_unreadable ${basename(input.sessionLogPath)}: ${error instanceof Error ? error.message : String(error)}`
+      )
+    ]);
+    if (evidence.length === 0) {
+      return null;
+    }
+    return buildProviderLinearChildLaneScopeDriftMessage({
+      context: input.context,
+      sessionLogPath: input.sessionLogPath,
+      evidence
+    });
+  };
+  while (!input.isExecSettled()) {
+    const driftMessage = await readScopeDriftMessage();
+    if (driftMessage) {
+      return driftMessage;
+    }
+    await input.deps.sleep(PROVIDER_LINEAR_CHILD_LANE_SCOPE_DRIFT_POLL_INTERVAL_MS);
+  }
+  return await readScopeDriftMessage();
+}
+
 function valueContainsProviderLinearChildLaneSessionNeedle(value: unknown, needle: string): boolean {
   if (typeof value === 'string') {
     return value.includes(needle);
@@ -1059,23 +1645,267 @@ async function prepareLaneWorkspace(
   const baseSha = context.parentSnapshot.base_sha ?? 'HEAD';
   await execFileAsync('git', ['-C', laneWorkspacePath, 'checkout', '--detach', baseSha]);
   await execFileAsync('git', ['-C', laneWorkspacePath, 'switch', '-c', laneBranch]);
+  const remotes = (
+    await execFileAsync('git', ['-C', laneWorkspacePath, 'remote'], {
+      maxBuffer: 1024 * 1024
+    })
+  ).stdout
+    .split(/\r?\n/u)
+    .map((entry) => normalizeOptionalString(entry))
+    .filter((entry): entry is string => entry !== null);
+  for (const remote of remotes) {
+    await execFileAsync('git', [
+      '-C',
+      laneWorkspacePath,
+      'remote',
+      'set-url',
+      '--push',
+      remote,
+      'no_push://provider-linear-child-lane'
+    ]);
+  }
   return { laneWorkspacePath, laneBranch };
 }
 
 async function createPatchArtifact(
   laneWorkspacePath: string,
-  runDir: string
+  runDir: string,
+  baselineRef = 'HEAD',
+  targetRef: string | null = null,
+  currentHeadSha: string | null = null
 ): Promise<{ patchArtifactPath: string; patchBytes: number }> {
   await execFileAsync('git', ['-C', laneWorkspacePath, 'add', '-N', '.']);
-  const diff = await execFileAsync('git', ['-C', laneWorkspacePath, 'diff', '--binary', '--no-ext-diff', 'HEAD', '--', '.'], {
-    maxBuffer: 20 * 1024 * 1024
-  });
+  const workspaceDiff = await execFileAsync(
+    'git',
+    ['-C', laneWorkspacePath, 'diff', '--binary', '--no-ext-diff', baselineRef, '--', '.'],
+    {
+      maxBuffer: 20 * 1024 * 1024
+    }
+  );
+  const committedDiff =
+    targetRef !== null
+      ? await execFileAsync(
+          'git',
+          ['-C', laneWorkspacePath, 'diff', '--binary', '--no-ext-diff', baselineRef, targetRef, '--', '.'],
+          {
+            maxBuffer: 20 * 1024 * 1024
+          }
+        )
+      : null;
+  const shouldComposeCommittedAndWorkspaceDiff =
+    committedDiff !== null &&
+    committedDiff.stdout.length > 0 &&
+    workspaceDiff.stdout.length > 0 &&
+    (currentHeadSha === baselineRef || !currentHeadSha);
+  let diffOutput: string;
+  if (shouldComposeCommittedAndWorkspaceDiff) {
+    if (!targetRef) {
+      throw new Error(
+        `Child-lane patch export failed closed while composing ${baselineRef}: missing transient child commit ref`
+      );
+    }
+    const compositionRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-compose-'));
+    const compositionWorkspacePath = join(compositionRoot, 'workspace');
+    const workspacePatchPath = join(compositionRoot, 'workspace.patch');
+    let compositionWorktreeCreated = false;
+    try {
+      await execFileAsync(
+        'git',
+        ['-C', laneWorkspacePath, 'worktree', 'add', '--detach', compositionWorkspacePath, baselineRef],
+        {
+          maxBuffer: 20 * 1024 * 1024
+        }
+      );
+      compositionWorktreeCreated = true;
+      await writeFile(workspacePatchPath, workspaceDiff.stdout, 'utf8');
+      await execFileAsync(
+        'git',
+        ['-C', compositionWorkspacePath, 'apply', '--whitespace=nowarn', workspacePatchPath],
+        {
+          maxBuffer: 20 * 1024 * 1024
+        }
+      );
+      await execFileAsync('git', ['-C', compositionWorkspacePath, 'add', '-A'], {
+        maxBuffer: 20 * 1024 * 1024
+      });
+      const workspaceSnapshotTree = normalizeOptionalString(
+        (
+          await execFileAsync('git', ['-C', compositionWorkspacePath, 'write-tree'], {
+            maxBuffer: 20 * 1024 * 1024
+          })
+        ).stdout
+      );
+      if (!workspaceSnapshotTree) {
+        throw new Error('missing temporary workspace snapshot tree');
+      }
+      const workspaceSnapshotCommit = normalizeOptionalString(
+        (
+          await execFileAsync(
+            'git',
+            [
+              '-C',
+              compositionWorkspacePath,
+              'commit-tree',
+              workspaceSnapshotTree,
+              '-p',
+              baselineRef,
+              '-m',
+              'provider-linear-child-lane workspace snapshot'
+            ],
+            {
+              maxBuffer: 20 * 1024 * 1024,
+              env: {
+                ...process.env,
+                GIT_AUTHOR_NAME: 'Codex',
+                GIT_AUTHOR_EMAIL: 'codex@example.com',
+                GIT_COMMITTER_NAME: 'Codex',
+                GIT_COMMITTER_EMAIL: 'codex@example.com'
+              }
+            }
+          )
+        ).stdout
+      );
+      if (!workspaceSnapshotCommit) {
+        throw new Error('missing temporary workspace snapshot commit');
+      }
+      await execFileAsync(
+        'git',
+        ['-C', compositionWorkspacePath, 'checkout', '--detach', workspaceSnapshotCommit],
+        {
+          maxBuffer: 20 * 1024 * 1024
+        }
+      );
+      await execFileAsync(
+        'git',
+        ['-C', compositionWorkspacePath, 'merge', '--no-commit', '--no-ff', targetRef],
+        {
+          maxBuffer: 20 * 1024 * 1024
+        }
+      );
+      await execFileAsync('git', ['-C', compositionWorkspacePath, 'add', '-N', '.'], {
+        maxBuffer: 20 * 1024 * 1024
+      });
+      const composedDiff = await execFileAsync(
+        'git',
+        ['-C', compositionWorkspacePath, 'diff', '--binary', '--no-ext-diff', baselineRef, '--', '.'],
+        {
+          maxBuffer: 20 * 1024 * 1024
+        }
+      );
+      diffOutput = composedDiff.stdout;
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `Child-lane patch export failed closed while composing ${baselineRef}${
+          targetRef ? ` with transient child commit ${targetRef}` : ''
+        } and live workspace changes: ${detail}`
+      );
+    } finally {
+      if (compositionWorktreeCreated) {
+        await execFileAsync(
+          'git',
+          ['-C', laneWorkspacePath, 'worktree', 'remove', '--force', compositionWorkspacePath],
+          {
+            maxBuffer: 20 * 1024 * 1024
+          }
+        ).catch(() => undefined);
+      }
+      await rm(compositionRoot, { recursive: true, force: true }).catch(() => undefined);
+    }
+  } else {
+    const diffChunks: string[] = [];
+    if (committedDiff && (currentHeadSha === baselineRef || !currentHeadSha)) {
+      diffChunks.push(committedDiff.stdout);
+    }
+    if (workspaceDiff.stdout.length > 0 || diffChunks.length === 0) {
+      diffChunks.push(workspaceDiff.stdout);
+    }
+    diffOutput = diffChunks.join('');
+  }
   const patchArtifactPath = join(runDir, 'provider-linear-child-lane.patch');
-  await writeFile(patchArtifactPath, diff.stdout, 'utf8');
+  await writeFile(patchArtifactPath, diffOutput, 'utf8');
   return {
     patchArtifactPath,
-    patchBytes: Buffer.byteLength(diff.stdout, 'utf8')
+    patchBytes: Buffer.byteLength(diffOutput, 'utf8')
   };
+}
+
+async function readProviderLinearChildLaneHeadSha(laneWorkspacePath: string): Promise<string | null> {
+  const result = await execFileAsync('git', ['-C', laneWorkspacePath, 'rev-parse', 'HEAD'], {
+    maxBuffer: 1024 * 1024
+  });
+  return normalizeOptionalString(result.stdout);
+}
+
+async function countProviderLinearChildLaneReflogEntries(laneWorkspacePath: string): Promise<number> {
+  const result = await execFileAsync('git', ['-C', laneWorkspacePath, 'reflog', '--format=%H'], {
+    maxBuffer: 1024 * 1024
+  });
+  return result.stdout
+    .split(/\r?\n/u)
+    .map((line) => normalizeOptionalString(line))
+    .filter((line): line is string => line !== null).length;
+}
+
+async function detectProviderLinearChildLaneCreatedCommitShas(
+  laneWorkspacePath: string,
+  startingHeadSha: string | null,
+  startingReflogEntryCount = 0
+): Promise<string[]> {
+  if (!startingHeadSha) {
+    return [];
+  }
+  const result = await execFileAsync('git', ['-C', laneWorkspacePath, 'reflog', '--format=%H%x09%gs'], {
+    maxBuffer: 1024 * 1024
+  });
+  const reflogEntries = result.stdout.split(/\r?\n/u).filter((line) => line.trim().length > 0);
+  const newEntryCount = Math.max(0, reflogEntries.length - Math.max(0, startingReflogEntryCount));
+  const createdCommitShas: string[] = [];
+  const seen = new Set<string>();
+  for (const line of reflogEntries.slice(0, newEntryCount)) {
+    const [rawSha, rawSummary = ''] = line.split('\t', 2);
+    const sha = normalizeOptionalString(rawSha);
+    const summary = normalizeOptionalString(rawSummary);
+    if (
+      !sha ||
+      !summary ||
+      sha === startingHeadSha ||
+      seen.has(sha) ||
+      !/^(?:am|commit(?:\s+\([^)]*\))?|cherry-pick|merge(?:\s+[^:]*)?|revert|rebase(?:\s+-i)?\s+\((?:pick|reword|edit|squash|fixup|continue|finish)\)):/u.test(
+        summary
+      )
+    ) {
+      continue;
+    }
+    seen.add(sha);
+    createdCommitShas.push(sha);
+  }
+  return createdCommitShas;
+}
+
+function resolveProviderLinearChildLaneUnauthorizedCommitMessage(input: {
+  context: Pick<ProviderLinearChildLaneContext, 'issueIdentifier'>;
+  expectedBaseSha: string | null;
+  currentHeadSha: string | null;
+  createdCommitShas: readonly string[];
+}): string | null {
+  if (input.createdCommitShas.length === 0) {
+    if (!input.expectedBaseSha || !input.currentHeadSha || input.expectedBaseSha === input.currentHeadSha) {
+      return null;
+    }
+    return `Child lane created commit ${input.currentHeadSha} from parent base ${input.expectedBaseSha} for ${input.context.issueIdentifier} instead of returning an uncommitted patch artifact. Invalidate the lane and relaunch; parent acceptance owns integration and branch updates.`;
+  }
+  const renderedCreatedCommitShas = input.createdCommitShas.slice(0, 3).join(', ');
+  const currentHeadSuffix =
+    input.expectedBaseSha && input.currentHeadSha === input.expectedBaseSha
+      ? ' and reset HEAD back to the parent base'
+      : input.currentHeadSha
+        ? ` and left HEAD at ${input.currentHeadSha}`
+        : '';
+  if (!input.expectedBaseSha) {
+    return `Child lane created commit(s) ${renderedCreatedCommitShas} for ${input.context.issueIdentifier} instead of returning an uncommitted patch artifact${currentHeadSuffix}. Invalidate the lane and relaunch; parent acceptance owns integration and branch updates.`;
+  }
+  return `Child lane created commit(s) ${renderedCreatedCommitShas} from parent base ${input.expectedBaseSha} for ${input.context.issueIdentifier} instead of returning an uncommitted patch artifact${currentHeadSuffix}. Invalidate the lane and relaunch; parent acceptance owns integration and branch updates.`;
 }
 
 async function writeChildLaneProof(
@@ -1143,6 +1973,10 @@ export async function runProviderLinearChildLane(
   };
   const context = await loadProviderLinearChildLaneContext(env);
   const { laneWorkspacePath, laneBranch } = await prepareLaneWorkspace(context);
+  const startingHeadSha = await readProviderLinearChildLaneHeadSha(laneWorkspacePath).catch(() => null);
+  const startingReflogEntryCount = await countProviderLinearChildLaneReflogEntries(laneWorkspacePath).catch(
+    () => 0
+  );
   try {
     const runtimeContext = await resolveChildLaneRuntimeContext(env, laneWorkspacePath, context.runId);
     logger.info(`[provider-linear-child-lane-runtime] ${formatRuntimeSelectionSummary(runtimeContext.runtime)}`);
@@ -1157,6 +1991,7 @@ export async function runProviderLinearChildLane(
     const execAbortController = new AbortController();
     let execSettled = false;
     let execPromise: ReturnType<typeof deps.execRunner> | null = null;
+    let scopeDriftMessage: string | null = null;
 
     let execResult: ProviderLinearChildLaneExecResult | null = null;
     try {
@@ -1196,7 +2031,36 @@ export async function runProviderLinearChildLane(
               `[provider-linear-child-lane-runtime] appserver startup observed via session log ${basename(startupRace.sessionLogPath)}`
             );
           }
-          execResult = await execPromise;
+          const execOrDriftRace = startupRace.sessionLogPath
+            ? await Promise.race([
+                execPromise.then((result) => ({ kind: 'exec' as const, result })),
+                waitForProviderLinearChildLaneScopeDrift({
+                  context,
+                  sessionLogPath: startupRace.sessionLogPath,
+                  startedAt,
+                  isExecSettled: () => execSettled,
+                  deps
+                }).then((message) => ({ kind: 'drift' as const, message }))
+              ])
+            : ({ kind: 'exec' as const, result: await execPromise });
+          if (execOrDriftRace.kind === 'exec') {
+            execResult = execOrDriftRace.result;
+          } else {
+            scopeDriftMessage = execOrDriftRace.message;
+            if (scopeDriftMessage) {
+              execResult = await recoverProviderLinearChildLaneExecResultAfterAbort({
+                abortController: execAbortController,
+                error: new Error(scopeDriftMessage),
+                execPromise,
+                execSettled
+              });
+              if (!execResult) {
+                throw new Error(scopeDriftMessage);
+              }
+            } else {
+              execResult = await execPromise;
+            }
+          }
         }
       } else {
         execResult = await execPromise;
@@ -1232,11 +2096,36 @@ export async function runProviderLinearChildLane(
       threadId: parsed.threadId,
       turnId: parsed.turnId
     });
+    const currentHeadSha = await readProviderLinearChildLaneHeadSha(laneWorkspacePath).catch(() => null);
+    const createdCommitShas = await detectProviderLinearChildLaneCreatedCommitShas(
+      laneWorkspacePath,
+      startingHeadSha,
+      startingReflogEntryCount
+    ).catch(() => []);
+    const unauthorizedCommitMessage = resolveProviderLinearChildLaneUnauthorizedCommitMessage({
+      context,
+      expectedBaseSha: context.parentSnapshot.base_sha,
+      currentHeadSha,
+      createdCommitShas
+    });
+    const patchTargetRef = createdCommitShas[0] ?? null;
+    const patchBaselineRef =
+      context.parentSnapshot.base_sha &&
+      (patchTargetRef !== null || (currentHeadSha !== null && context.parentSnapshot.base_sha !== currentHeadSha))
+        ? context.parentSnapshot.base_sha
+        : 'HEAD';
+    const forcedFailureMessage = scopeDriftMessage ?? unauthorizedCommitMessage;
     let patchArtifactPath = join(context.runDir, 'provider-linear-child-lane.patch');
     let patchBytes = 0;
     let proof: ProviderLinearChildLaneProof;
     try {
-      ({ patchArtifactPath, patchBytes } = await createPatchArtifact(laneWorkspacePath, context.runDir));
+      ({ patchArtifactPath, patchBytes } = await createPatchArtifact(
+        laneWorkspacePath,
+        context.runDir,
+        patchBaselineRef,
+        patchTargetRef,
+        currentHeadSha
+      ));
       proof = {
         issue_id: context.issueId,
         issue_identifier: context.issueIdentifier,
@@ -1257,11 +2146,11 @@ export async function runProviderLinearChildLane(
         latest_session_id: session.sessionId,
         latest_session_id_source: session.source,
         last_event: parsed.lastEvent,
-        last_message: parsed.finalMessage,
+        last_message: forcedFailureMessage ?? parsed.finalMessage,
         last_event_at: parsed.lastEventAt,
         tokens: parsed.tokens,
         rate_limits: parsed.rateLimits,
-        status: execResult.exitCode === 0 ? 'succeeded' : 'failed',
+        status: execResult.exitCode === 0 && !forcedFailureMessage ? 'succeeded' : 'failed',
         updated_at: deps.now()
       };
       await writeChildLaneProof(context.runDir, proof);
@@ -1289,8 +2178,10 @@ export async function runProviderLinearChildLane(
       }
       throw normalizedError;
     }
-    if (execResult.exitCode !== 0) {
-      throw new Error(`provider-linear-child-lane exited with code ${execResult.exitCode ?? 'unknown'}`);
+    if (proof.status !== 'succeeded') {
+      throw new Error(
+        proof.last_message ?? `provider-linear-child-lane exited with code ${execResult.exitCode ?? 'unknown'}`
+      );
     }
     return proof;
   } finally {
@@ -1317,8 +2208,14 @@ if (entry && entry === self) {
 export const __test__ = {
   buildChildLanePrompt,
   buildProviderLinearChildLaneAppserverStartupTimeoutMessage,
+  createPatchArtifact,
+  detectProviderLinearChildLaneCreatedCommitShas,
   discoverProviderLinearChildLaneSessionLogPath,
   planTrustedProjectCleanup,
+  extractProviderLinearChildLaneScopeDriftEvidenceFromRecord,
   recoverProviderLinearChildLaneExecResultAfterAbort,
-  waitForProviderLinearChildLaneAppserverStartup
+  resolveProviderLinearChildLaneUnauthorizedCommitMessage,
+  scanProviderLinearChildLaneSessionLogForParentScopeDrift,
+  waitForProviderLinearChildLaneAppserverStartup,
+  waitForProviderLinearChildLaneScopeDrift
 };
