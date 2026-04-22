@@ -996,6 +996,21 @@ describe('provider linear child lane runner', () => {
         }
       })
     ).toEqual([]);
+
+    expect(
+      childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
+        timestamp: '2026-04-22T06:13:40.000Z',
+        type: 'response_item',
+        payload: {
+          type: 'function_call',
+          name: 'exec_command',
+          arguments: JSON.stringify({
+            cmd: 'bash -lc "echo gh pr view"',
+            workdir: '/tmp/child'
+          })
+        }
+      })
+    ).toEqual([]);
   });
 
   it('re-checks the session log after exec settles before clearing scope drift', async () => {
@@ -1174,6 +1189,38 @@ describe('provider linear child lane runner', () => {
         startingReflogEntryCount
       )
     ).resolves.toEqual([rebaseCommitSha]);
+  });
+
+  it('detects transient child-lane commits created via git am before resetting to the base', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-runner-'));
+    const laneWorkspacePath = join(tempRoot, 'workspace');
+    const startingHeadSha = await initGitRepo(laneWorkspacePath);
+    const mainBranch = runGit(laneWorkspacePath, ['branch', '--show-current']);
+
+    runGit(laneWorkspacePath, ['checkout', '-b', 'mail-source', startingHeadSha]);
+    await writeFile(join(laneWorkspacePath, 'mail.txt'), 'mail patch\n', 'utf8');
+    runGit(laneWorkspacePath, ['add', 'mail.txt']);
+    runGit(laneWorkspacePath, ['commit', '-m', 'mail patch']);
+    const patch = runGit(laneWorkspacePath, ['format-patch', '-1', '--stdout', 'HEAD']);
+
+    runGit(laneWorkspacePath, ['checkout', mainBranch]);
+    const patchPath = join(tempRoot, 'mail.patch');
+    await writeFile(patchPath, patch, 'utf8');
+    const startingReflogEntryCount = runGit(laneWorkspacePath, ['reflog', '--format=%H'])
+      .split('\n')
+      .filter(Boolean).length;
+
+    runGit(laneWorkspacePath, ['am', patchPath]);
+    const amCommitSha = runGit(laneWorkspacePath, ['rev-parse', 'HEAD']);
+    runGit(laneWorkspacePath, ['reset', '--hard', startingHeadSha]);
+
+    await expect(
+      childLaneRunnerTest.detectProviderLinearChildLaneCreatedCommitShas(
+        laneWorkspacePath,
+        startingHeadSha,
+        startingReflogEntryCount
+      )
+    ).resolves.toEqual([amCommitSha]);
   });
 
   it('exports the unauthorized commit patch from the newest created commit after a reset to base', async () => {
