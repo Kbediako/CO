@@ -772,6 +772,76 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it.each([
+    {
+      label: 'issue id mismatch',
+      requestedIssueId: 'lin-issue-1',
+      cachedIssue: buildCachedIssueContext({ id: 'lin-issue-2', identifier: 'CO-2' }),
+      cachedSourceSetup: null,
+      requestedSourceSetup: undefined
+    },
+    {
+      label: 'source setup mismatch',
+      requestedIssueId: 'lin-issue-1',
+      cachedIssue: buildCachedIssueContext(),
+      cachedSourceSetup: {
+        ...scopedSourceSetup,
+        project_id: 'lin-project-other'
+      },
+      requestedSourceSetup: scopedSourceSetup
+    }
+  ])(
+    'does not reuse the legacy singleton cache on $label',
+    async ({ requestedIssueId, cachedIssue, cachedSourceSetup, requestedSourceSetup }) => {
+      const env = await createBudgetedRunScopedEnv();
+      const resetAt = String(Date.now() + 60_000);
+
+      await writeCachedIssueContext(env, cachedIssue, {
+        recordedAt: new Date(Date.now() - 45_000).toISOString(),
+        sourceSetup: cachedSourceSetup,
+        legacyPath: true
+      });
+      await recordLinearBudgetHeadersObservation({
+        env,
+        source: 'provider-linear:issue-context',
+        headers: {
+          'x-ratelimit-requests-limit': '100',
+          'x-ratelimit-requests-remaining': '5',
+          'x-ratelimit-requests-reset': resetAt
+        }
+      });
+
+      const fetchImpl: typeof fetch = vi.fn(async () =>
+        jsonResponse(
+          buildIssueContextBody({
+            id: 'lin-issue-1',
+            identifier: 'CO-1',
+            title: 'Fetched issue context'
+          })
+        )
+      );
+
+      const result = await getProviderLinearIssueContext({
+        issueId: requestedIssueId,
+        sourceSetup: requestedSourceSetup,
+        env,
+        allowReadOnlyCacheReuse: true,
+        fetchImpl
+      });
+
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(result).toMatchObject({
+        ok: true,
+        operation: 'issue-context',
+        issue: {
+          identifier: 'CO-1',
+          title: 'Fetched issue context'
+        }
+      });
+      expect(result).not.toHaveProperty('cache_fallback_used');
+    }
+  );
+
   it('keeps issue-keyed cache artifacts separate across cross-issue reads in one run', async () => {
     const env = await createBudgetedRunScopedEnv();
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
@@ -819,6 +889,7 @@ describe('providerLinearWorkflowFacade', () => {
         title: 'Parent issue context'
       }
     });
+    expect(parentResult).not.toHaveProperty('cache_fallback_used');
     expect(crossIssueResult).toMatchObject({
       ok: true,
       issue: {
@@ -826,6 +897,7 @@ describe('providerLinearWorkflowFacade', () => {
         title: 'Cross issue context'
       }
     });
+    expect(crossIssueResult).not.toHaveProperty('cache_fallback_used');
 
     const parentCachePath = resolveIssueContextCachePathForTest(env, 'lin-issue-1');
     const crossIssueCachePath = resolveIssueContextCachePathForTest(env, 'lin-issue-2');
