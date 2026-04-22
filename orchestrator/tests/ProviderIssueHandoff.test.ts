@@ -15414,6 +15414,7 @@ describe('createProviderIssueHandoffService', () => {
       getEarliestScheduledTimeoutByDelayRange(setTimeoutSpy, 4_999, 5_000);
     expect(retryDelayMs).toBeGreaterThanOrEqual(4_999);
     expect(retryDelayMs).toBeLessThanOrEqual(5_000);
+    vi.setSystemTime(new Date(Date.parse(retryDueAt ?? '') + 1));
     retryCallback();
     await flushAsyncWork();
     await waitForMockCalls(providerWorkflowConfigStore.refresh, 2, 1_024);
