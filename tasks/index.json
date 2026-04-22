@@ -13583,6 +13583,38 @@
         "agent_task": ".agent/task/linear-8bbdd424-d77e-4312-b4b7-2a82c3df2749.md",
         "docs": "docs/TECH_SPEC-linear-8bbdd424-d77e-4312-b4b7-2a82c3df2749.md"
       }
+    },
+    {
+      "id": "20260422-linear-cb221338-8cdc-41ad-880b-3bcfae49d4a8",
+      "title": "CO-304 co-status degraded-read fallback when `/ui/data.json` times out but supervisor truth stays fresh after `CO-296`",
+      "relates_to": "tasks/tasks-linear-cb221338-8cdc-41ad-880b-3bcfae49d4a8.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-22",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-22",
+          "status": "produced",
+          "manifest": ".runs/linear-cb221338-8cdc-41ad-880b-3bcfae49d4a8-docs-packet/cli/2026-04-22T09-12-53-248Z-15113023/manifest.json",
+          "source_anchor": "ctx:sha256:76ba3f055c3147136a183eb8c1b65b40e881d8c91dd0453e5a39d11444a819e1#chunk:c000001",
+          "summary": "Docs-first packet preserves `co-status --format json`, `/ui/data.json`, `provider-intake-state.json`, `CO-296`, `supervisor truth`, `degraded-read fallback`, and `fail-closed freshness` while explicitly rejecting UI layout, dashboard visual redesign, and unrelated control-host feature drift."
+        },
+        "preimplementation_issue_quality": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-22",
+          "status": "approved",
+          "summary": "The lane stays narrowly scoped to direct JSON read degradation after CO-296: same-endpoint `/ui/data.json` timeouts may fall back to fresh local provider-intake truth, but stale truth must still fail closed and the issue does not widen into dashboard redesign or generic control-host recovery."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-cb221338-8cdc-41ad-880b-3bcfae49d4a8.md",
+        "task": "tasks/tasks-linear-cb221338-8cdc-41ad-880b-3bcfae49d4a8.md",
+        "agent_task": ".agent/task/linear-cb221338-8cdc-41ad-880b-3bcfae49d4a8.md",
+        "docs": "docs/TECH_SPEC-linear-cb221338-8cdc-41ad-880b-3bcfae49d4a8.md"
+      }
     }
   ]
 }

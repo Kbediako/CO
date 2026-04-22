@@ -213,6 +213,233 @@ describe('runCoStatusCliShell', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
+  it('falls back to fresh supervisor truth after repeated direct json current-endpoint timeouts', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    await writeControlEndpointArtifacts(runDir, 'http://127.0.0.1:65535');
+    await writeProviderIntakeState(runDir, {
+      claimState: 'running',
+      updatedAtMsAgo: 1_000
+    });
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(buildAbortError())
+      .mockRejectedValueOnce(buildAbortError());
+
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await runCoStatusCliShell({
+      flags: {
+        format: 'json',
+        'run-dir': runDir
+      },
+      printHelp: vi.fn()
+    });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(fetchSpy.mock.calls.map((call) => call[0])).toEqual([
+      'http://127.0.0.1:65535/ui/data.json',
+      'http://127.0.0.1:65535/ui/data.json'
+    ]);
+    expect(log).toHaveBeenCalledTimes(1);
+    const rawPayload = String(log.mock.calls[0]?.[0]);
+    expect(rawPayload).not.toMatch(/control_endpoint\.json has not rotated/u);
+    const payload = JSON.parse(rawPayload) as {
+      selected_issue_identifier?: unknown;
+      selected?: {
+        issue_identifier?: unknown;
+        task_id?: unknown;
+        run_id?: unknown;
+        raw_status?: unknown;
+        display_status?: unknown;
+        status_reason?: unknown;
+      };
+      counts?: {
+        running?: unknown;
+        issues?: unknown;
+      };
+      running?: Array<{
+        issue_identifier?: unknown;
+        task_id?: unknown;
+        run_id?: unknown;
+        last_event?: unknown;
+      }>;
+      issues?: Array<{
+        issue_identifier?: unknown;
+        status?: unknown;
+        display_status?: unknown;
+        is_selected?: unknown;
+      }>;
+      degraded_read?: {
+        reason?: unknown;
+        source?: unknown;
+        freshness_verdict?: unknown;
+        artifact_root?: unknown;
+        finding_codes?: unknown;
+      };
+      provider_intake?: {
+        selected_claim?: {
+          issue_identifier?: unknown;
+          freshness?: unknown;
+        };
+      };
+    };
+    expect(payload.degraded_read).toMatchObject({
+      reason: 'ui_request_timeout',
+      source: 'local_seeded_runtime',
+      freshness_verdict: 'unknown',
+      finding_codes: ['active_worker_proof_missing']
+    });
+    expect(payload.selected_issue_identifier).toBe('CO-296');
+    expect(payload.selected).toMatchObject({
+      issue_identifier: 'CO-296',
+      task_id: 'local-mcp',
+      run_id: 'provider-run-1',
+      raw_status: 'in_progress',
+      display_status: 'running',
+      status_reason: 'provider intake advanced after ui timeout'
+    });
+    expect(payload.counts).toMatchObject({
+      running: 1,
+      issues: 1
+    });
+    expect(payload.running).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'CO-296',
+        task_id: 'local-mcp',
+        run_id: 'provider-run-1',
+        last_event: 'provider_intake_refresh'
+      })
+    ]);
+    expect(payload.issues).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'CO-296',
+        status: 'running',
+        display_status: 'running',
+        is_selected: true
+      })
+    ]);
+    expect(String(payload.degraded_read?.artifact_root ?? '')).toMatch(/\/\.runs\/local-mcp\/cli\/control-host$/u);
+    expect(payload.provider_intake?.selected_claim).toMatchObject({
+      issue_identifier: 'CO-296',
+      freshness: 'fresh'
+    });
+  });
+
+  it('surfaces every fresh running intake claim during degraded json fallback', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    await writeControlEndpointArtifacts(runDir, 'http://127.0.0.1:65535');
+    await writeProviderIntakeState(runDir, {
+      claims: [
+        {
+          issueIdentifier: 'CO-295',
+          issueId: 'lin-issue-1',
+          issueTitle: 'First operator issue',
+          runId: 'provider-run-1',
+          updatedAtMsAgo: 3_000
+        },
+        {
+          issueIdentifier: 'CO-299',
+          issueId: 'lin-issue-2',
+          issueTitle: 'Second operator issue',
+          runId: 'provider-run-2',
+          updatedAtMsAgo: 2_000
+        },
+        {
+          issueIdentifier: 'CO-302',
+          issueId: 'lin-issue-3',
+          issueTitle: 'Third operator issue',
+          runId: 'provider-run-3',
+          updatedAtMsAgo: 1_000
+        }
+      ]
+    });
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(buildAbortError())
+      .mockRejectedValueOnce(buildAbortError());
+
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await runCoStatusCliShell({
+      flags: {
+        format: 'json',
+        'run-dir': runDir
+      },
+      printHelp: vi.fn()
+    });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    const payload = JSON.parse(String(log.mock.calls[0]?.[0])) as {
+      selected_issue_identifier?: unknown;
+      counts?: {
+        running?: unknown;
+        issues?: unknown;
+      };
+      running?: Array<{
+        issue_identifier?: unknown;
+      }>;
+      issues?: Array<{
+        issue_identifier?: unknown;
+      }>;
+      provider_intake?: {
+        running_claim_count?: unknown;
+      };
+    };
+
+    expect(payload.selected_issue_identifier).toBe('CO-302');
+    expect(payload.counts).toMatchObject({
+      running: 3,
+      issues: 3
+    });
+    expect(payload.provider_intake?.running_claim_count).toBe(3);
+    expect(payload.running?.map((entry) => entry.issue_identifier)).toEqual(['CO-302', 'CO-299', 'CO-295']);
+    expect(payload.issues?.map((entry) => entry.issue_identifier)).toEqual(['CO-302', 'CO-299', 'CO-295']);
+  });
+
+  it('fails closed when supervisor truth is stale after repeated direct json current-endpoint timeouts', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    await writeControlEndpointArtifacts(runDir, 'http://127.0.0.1:65535');
+    await writeProviderIntakeState(runDir, {
+      claimState: 'stale',
+      updatedAtMsAgo: 86_400_000
+    });
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(buildAbortError())
+      .mockRejectedValueOnce(buildAbortError());
+
+    let thrown: unknown;
+    try {
+      await runCoStatusCliShell({
+        flags: {
+          format: 'json',
+          'run-dir': runDir
+        },
+        printHelp: vi.fn()
+      });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect((thrown as Error)?.message ?? String(thrown)).toMatch(
+      /current resolved \/ui\/data\.json endpoint .* timed out again after endpoint re-resolution returned the same endpoint\/token/u
+    );
+    expect((thrown as Error)?.message ?? String(thrown)).not.toMatch(/control_endpoint\.json has not rotated/u);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
   it('fails with stale-endpoint guidance when direct json mode hits a dead endpoint that does not rotate', async () => {
     const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
     tempDirs.push(root);
@@ -657,6 +884,20 @@ async function writeControlEndpointArtifacts(
   );
 }
 
+async function writeProviderIntakeState(
+  runDir: string,
+  options: {
+    claimState?: 'running' | 'stale';
+    updatedAtMsAgo?: number;
+  } = {}
+): Promise<void> {
+  await writeFile(
+    join(runDir, 'provider-intake-state.json'),
+    JSON.stringify(buildProviderIntakeState(options)),
+    'utf8'
+  );
+}
+
 async function closeServer(server: http.Server): Promise<void> {
   await new Promise<void>((resolve) => {
     try {
@@ -709,6 +950,80 @@ function buildUiPayload(overrides: Record<string, unknown> = {}): Record<string,
     retrying: [],
     issues: [],
     ...overrides
+  };
+}
+
+function buildProviderIntakeState(options: {
+  claimState?: 'running' | 'stale';
+  updatedAtMsAgo?: number;
+  claims?: Array<{
+    issueIdentifier: string;
+    issueId: string;
+    issueTitle: string;
+    runId: string;
+    claimState?: 'running' | 'stale';
+    updatedAtMsAgo?: number;
+  }>;
+} = {}): Record<string, unknown> {
+  const updatedAtMsAgo = options.updatedAtMsAgo ?? 1_000;
+  const updatedAt = new Date(Date.now() - updatedAtMsAgo).toISOString();
+  const claimState = options.claimState ?? 'running';
+  const claims = options.claims ?? [
+    {
+      issueIdentifier: 'CO-296',
+      issueId: 'lin-issue-1',
+      issueTitle: 'Current operator issue',
+      runId: 'provider-run-1',
+      claimState,
+      updatedAtMsAgo
+    }
+  ];
+  return {
+    schema_version: 1,
+    updated_at: updatedAt,
+    rehydrated_at: null,
+    latest_provider_key: `linear:${claims[0]?.issueId ?? 'lin-issue-1'}`,
+    latest_reason:
+      claimState === 'stale' ? 'supervisor truth stale after ui timeout' : 'provider intake advanced after ui timeout',
+    polling: {
+      source: 'provider-intake-state.json',
+      last_requested_at: updatedAt,
+      last_completed_at: updatedAt,
+      last_success_at: updatedAt,
+      last_error_at: null,
+      last_error: null
+    },
+    claims: claims.map((claim, index) => {
+      const claimUpdatedAtMsAgo = claim.updatedAtMsAgo ?? updatedAtMsAgo;
+      const claimUpdatedAt = new Date(Date.now() - claimUpdatedAtMsAgo).toISOString();
+      return {
+        provider: 'linear',
+        provider_key: `linear:${claim.issueId}`,
+        issue_id: claim.issueId,
+        issue_identifier: claim.issueIdentifier,
+        issue_title: claim.issueTitle,
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: new Date(Date.now() - claimUpdatedAtMsAgo - 5_000).toISOString(),
+        task_id: 'local-mcp',
+        mapping_source: 'provider_id_fallback',
+        state: claim.claimState ?? claimState,
+        reason:
+          (claim.claimState ?? claimState) === 'stale'
+            ? 'supervisor truth stale after ui timeout'
+            : 'provider intake advanced after ui timeout',
+        accepted_at: new Date(Date.now() - claimUpdatedAtMsAgo - 60_000).toISOString(),
+        updated_at: claimUpdatedAt,
+        last_delivery_id: `delivery-${index + 1}`,
+        last_event: 'provider_intake_refresh',
+        last_action: 'poll',
+        last_webhook_timestamp: null,
+        run_id: claim.runId,
+        run_manifest_path: null,
+        launch_source: 'control-host',
+        launch_token: null
+      };
+    })
   };
 }
 

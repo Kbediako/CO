@@ -287,12 +287,14 @@ export async function readUiDatasetWithEndpointRecovery(input: {
   getTarget: () => CoStatusAttachTarget;
   setTarget: (target: CoStatusAttachTarget) => void;
   signal?: AbortSignal;
+  requestTimeoutMs?: number;
   recoverSameEndpointTimeout?: boolean;
 }): Promise<OperatorDashboardDataset> {
   const previousTarget = input.getTarget();
   try {
     return await fetchUiDataset(previousTarget.baseUrl, previousTarget.token, {
-      signal: input.signal
+      signal: input.signal,
+      requestTimeoutMs: input.requestTimeoutMs
     });
   } catch (error) {
     if (isCancelledAttachRequestError(error)) {
@@ -312,7 +314,8 @@ export async function readUiDatasetWithEndpointRecovery(input: {
       input.setTarget(resolvedTarget);
       try {
         return await fetchUiDataset(resolvedTarget.baseUrl, resolvedTarget.token, {
-          signal: input.signal
+          signal: input.signal,
+          requestTimeoutMs: input.requestTimeoutMs
         });
       } catch (retryError) {
         if (isCancelledAttachRequestError(retryError)) {
@@ -326,7 +329,8 @@ export async function readUiDatasetWithEndpointRecovery(input: {
     if (input.recoverSameEndpointTimeout === true && isTimeoutAttachRequestError(error)) {
       try {
         return await fetchUiDataset(previousTarget.baseUrl, previousTarget.token, {
-          signal: input.signal
+          signal: input.signal,
+          requestTimeoutMs: input.requestTimeoutMs
         });
       } catch (retryError) {
         if (isCancelledAttachRequestError(retryError)) {
