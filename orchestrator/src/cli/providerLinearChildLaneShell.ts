@@ -1732,18 +1732,28 @@ async function waitForRecoveredChildLaneLaunchCandidate(input: {
     'issueId' | 'issueIdentifier' | 'taskId' | 'runId' | 'repoRoot'
   >;
   childRunsRoot: string;
-  deps: Pick<ProviderLinearChildLaneShellDependencies, 'readChildLaneProof' | 'readDir' | 'sleep'>;
+  deps: Pick<ProviderLinearChildLaneShellDependencies, 'readChildLaneProof' | 'readDir' | 'sleep' | 'warn'>;
   isExecSettled: () => boolean;
   now: string;
 }): Promise<ProviderLinearChildLaneLaunchRecoveryCandidate | null> {
-  const readRecoveredCandidate = async (): Promise<ProviderLinearChildLaneLaunchRecoveryCandidate | null> =>
-    await findRecoveredChildLaneLaunchCandidate({
-      reservation: input.reservation,
-      context: input.context,
-      childRunsRoot: input.childRunsRoot,
-      deps: input.deps,
-      now: input.now
-    });
+  const readRecoveredCandidate = async (): Promise<ProviderLinearChildLaneLaunchRecoveryCandidate | null> => {
+    try {
+      return await findRecoveredChildLaneLaunchCandidate({
+        reservation: input.reservation,
+        context: input.context,
+        childRunsRoot: input.childRunsRoot,
+        deps: input.deps,
+        now: input.now
+      });
+    } catch (error) {
+      input.deps.warn(
+        `provider-linear-child-lane warning: failed to scan for recovered child-lane launch candidate: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      return null;
+    }
+  };
   while (!input.isExecSettled()) {
     const candidate = await readRecoveredCandidate();
     if (candidate) {

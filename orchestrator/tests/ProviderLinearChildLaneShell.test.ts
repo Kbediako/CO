@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -2886,11 +2886,142 @@ describe('runProviderLinearChildLaneShell', () => {
       }
     });
     expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('ignored launch-recovery scan failure while awaiting exec result: transient readdir failure')
+      expect.stringContaining('failed to scan for recovered child-lane launch candidate: transient readdir failure')
     );
     expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
       expect.objectContaining({
         run_id: launchedLane.run_id,
+        status: 'succeeded',
+        decision: 'pending'
+      })
+    ]);
+  });
+
+  it('keeps polling for recovered child launches after a transient recovery-scan failure', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const recoveredLane = createLaneRecord({
+      run_id: 'child-run-recovered-after-scan-retry',
+      manifest_path: join(
+        tempRoot ?? '',
+        '.runs',
+        `${TASK_ID}-impl-a`,
+        'cli',
+        'child-run-recovered-after-scan-retry',
+        'manifest.json'
+      ),
+      artifact_root: join(
+        tempRoot ?? '',
+        '.runs',
+        `${TASK_ID}-impl-a`,
+        'cli',
+        'child-run-recovered-after-scan-retry'
+      ),
+      log_path: join(
+        tempRoot ?? '',
+        '.runs',
+        `${TASK_ID}-impl-a`,
+        'cli',
+        'child-run-recovered-after-scan-retry',
+        'run.log'
+      ),
+      patch_artifact_path: join(
+        tempRoot ?? '',
+        '.runs',
+        `${TASK_ID}-impl-a`,
+        'cli',
+        'child-run-recovered-after-scan-retry',
+        'provider-linear-child-lane.patch'
+      )
+    });
+    const warn = vi.fn();
+    let readDirCalls = 0;
+    let wroteRecovery = false;
+    let abortObserved = false;
+    const execRunner = vi.fn(
+      async ({ abortSignal }: { abortSignal?: AbortSignal | null }) =>
+        await new Promise<{ exitCode: number | null; stdout: string; stderr: string }>((_resolve, reject) => {
+          abortSignal?.addEventListener('abort', () => {
+            abortObserved = true;
+            reject(abortSignal.reason instanceof Error ? abortSignal.reason : new Error('aborted'));
+          });
+        })
+    );
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'launch',
+        streamName: 'impl-a',
+        purpose: 'Implement bounded child lane support',
+        files: ['orchestrator/src/cli/providerLinearChildStreamShell.ts'],
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        execRunner,
+        readDir: vi.fn(async (path: string) => {
+          readDirCalls += 1;
+          if (readDirCalls === 1) {
+            const error = new Error('transient readdir failure') as NodeJS.ErrnoException;
+            error.code = 'EIO';
+            throw error;
+          }
+          return await readdir(path, { withFileTypes: true });
+        }),
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: '2026-03-30T07:10:00.000Z',
+          state: 'In Progress',
+          state_type: 'started'
+        })) as never,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
+        readParentHeadSha: vi.fn(async () => 'parent-base-sha'),
+        refreshProofSnapshot: vi.fn(async () => undefined),
+        sleep: vi.fn(async () => {
+          if (wroteRecovery) {
+            return;
+          }
+          wroteRecovery = true;
+          await writePatchArtifact(
+            recoveredLane.patch_artifact_path ?? join(recoveredLane.artifact_root, 'provider-linear-child-lane.patch'),
+            'orchestrator/src/cli/providerLinearChildStreamShell.ts'
+          );
+          await writeChildLaneManifest(recoveredLane, {
+            runtime_mode_requested: 'appserver',
+            runtime_mode: 'appserver',
+            runtime_provider: 'AppServerRuntimeProvider'
+          });
+          await writeChildLaneProof(recoveredLane, {
+            updated_at: '2099-01-01T00:00:00.000Z',
+            last_event_at: '2099-01-01T00:00:00.000Z'
+          });
+        }) as never,
+        warn
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'child-lane',
+      action: 'launched',
+      child_run: {
+        run_id: recoveredLane.run_id,
+        status: 'succeeded',
+        runtime_mode: 'appserver'
+      },
+      child_lane: {
+        run_id: recoveredLane.run_id,
+        status: 'succeeded',
+        decision: 'pending'
+      }
+    });
+    expect(abortObserved).toBe(true);
+    expect(readDirCalls).toBeGreaterThanOrEqual(2);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('failed to scan for recovered child-lane launch candidate: transient readdir failure')
+    );
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
+      expect.objectContaining({
+        run_id: recoveredLane.run_id,
         status: 'succeeded',
         decision: 'pending'
       })
