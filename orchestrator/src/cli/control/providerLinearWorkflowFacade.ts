@@ -1289,6 +1289,8 @@ function classifyIssuePullRequestAttachments(
   const activeConflicting = ownershipConflicting.filter(
     (candidate) => !isIssuePullRequestSnapshotTerminal(candidate.snapshot)
   );
+  const hasAmbiguousConflictingEvidence =
+    preclassifiedConflicting.length > 0 || activeConflicting.length > 0;
   const selectionCandidates = activeOwned.length > 0 ? ownershipOwned : [...ownershipOwned, ...ownershipUnknown];
   const ownershipConflictingAttachments = appendUniqueIssuePullRequestAttachments(
     preclassifiedConflicting,
@@ -1311,7 +1313,7 @@ function classifyIssuePullRequestAttachments(
     };
   }
   if (activeOwned.length === 0) {
-    if (activeUnknown.length > 0 && activeConflicting.length > 0) {
+    if (activeUnknown.length > 0 && hasAmbiguousConflictingEvidence) {
       return {
         current: null,
         historical: terminalOwned.map((candidate) => candidate.attachment),

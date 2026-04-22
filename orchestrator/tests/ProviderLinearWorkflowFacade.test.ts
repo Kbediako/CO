@@ -2915,6 +2915,53 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it('preserves ambiguity when a foreign title fails hydration beside a generic active PR', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Active issue with generic PR and unhydrated foreign title',
+      state: {
+        id: 'state-in-progress',
+        name: 'In Progress',
+        type: 'started'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-580', 580, 'ABC-123 active provider PR'),
+        buildGitHubAttachment('attachment-pr-581', 581, 'Provider stabilization')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 580
+          ? {}
+          : {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:07:51.000Z',
+              title: 'Provider stabilization',
+              headRefName: 'provider-stabilization'
+            }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: null,
+          historical: [],
+          conflicting: [
+            {
+              id: 'attachment-pr-581'
+            },
+            {
+              id: 'attachment-pr-580'
+            }
+          ],
+          unknown: []
+        }
+      }
+    });
+  });
+
   it('classifies unrecognized PR snapshot payloads as unknown attachments', async () => {
     const { result } = await readIssueContextAttachmentTruth({
       title: 'Unknown PR snapshot',
