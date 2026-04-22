@@ -1369,7 +1369,7 @@ async function detectProviderLinearChildLaneCreatedCommitShas(
       !summary ||
       sha === startingHeadSha ||
       seen.has(sha) ||
-      !/^(?:commit(?:\s+\([^)]*\))?|cherry-pick|merge(?:\s+[^:]*)?|revert|rebase(?:\s+-i)?\s+\((?:pick|reword|edit|squash|fixup)\)):/u.test(
+      !/^(?:commit(?:\s+\([^)]*\))?|cherry-pick|merge(?:\s+[^:]*)?|revert|rebase(?:\s+-i)?\s+\((?:pick|reword|edit|squash|fixup|continue|finish)\)):/u.test(
         summary
       )
     ) {

@@ -961,6 +961,43 @@ describe('provider linear child lane runner', () => {
     ).resolves.toEqual([rebaseCommitSha]);
   });
 
+  it('detects transient child-lane commits created via rebase continue before resetting to the base', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-runner-'));
+    const laneWorkspacePath = join(tempRoot, 'workspace');
+    await initGitRepo(laneWorkspacePath);
+    const mainBranch = runGit(laneWorkspacePath, ['branch', '--show-current']);
+
+    runGit(laneWorkspacePath, ['checkout', '-b', 'feature']);
+    await writeFile(join(laneWorkspacePath, 'conflict.txt'), 'feature\n', 'utf8');
+    runGit(laneWorkspacePath, ['add', 'conflict.txt']);
+    runGit(laneWorkspacePath, ['commit', '-m', 'feature']);
+
+    runGit(laneWorkspacePath, ['checkout', mainBranch]);
+    await writeFile(join(laneWorkspacePath, 'conflict.txt'), 'main\n', 'utf8');
+    runGit(laneWorkspacePath, ['add', 'conflict.txt']);
+    runGit(laneWorkspacePath, ['commit', '-m', 'main']);
+    const startingHeadSha = runGit(laneWorkspacePath, ['rev-parse', 'HEAD']);
+    const startingReflogEntryCount = runGit(laneWorkspacePath, ['reflog', '--format=%H'])
+      .split('\n')
+      .filter(Boolean).length;
+
+    runGit(laneWorkspacePath, ['checkout', 'feature']);
+    expect(() => runGit(laneWorkspacePath, ['rebase', mainBranch])).toThrow();
+    await writeFile(join(laneWorkspacePath, 'conflict.txt'), 'main\nfeature\n', 'utf8');
+    runGit(laneWorkspacePath, ['add', 'conflict.txt']);
+    runGit(laneWorkspacePath, ['-c', 'core.editor=true', 'rebase', '--continue']);
+    const rebaseCommitSha = runGit(laneWorkspacePath, ['rev-parse', 'HEAD']);
+    runGit(laneWorkspacePath, ['reset', '--hard', startingHeadSha]);
+
+    await expect(
+      childLaneRunnerTest.detectProviderLinearChildLaneCreatedCommitShas(
+        laneWorkspacePath,
+        startingHeadSha,
+        startingReflogEntryCount
+      )
+    ).resolves.toEqual([rebaseCommitSha]);
+  });
+
   it('exports the unauthorized commit patch from the newest created commit after a reset to base', async () => {
     tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-runner-'));
     const laneWorkspacePath = join(tempRoot, 'workspace');
