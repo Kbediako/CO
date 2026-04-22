@@ -15412,8 +15412,9 @@ describe('createProviderIssueHandoffService', () => {
     expect(retryDueAt).not.toBeNull();
     const retryDelayUntilDueMs = Math.max(Date.parse(retryDueAt ?? '') - Date.now(), 0);
     const matchingRetryTimers = setTimeoutSpy.mock.calls.flatMap((call, index) => {
-      const [, delayMs] = call ?? [];
+      const [callback, delayMs] = call ?? [];
       if (
+        typeof callback !== 'function' ||
         typeof delayMs !== 'number' ||
         delayMs < Math.max(retryDelayUntilDueMs - 1, 0) ||
         delayMs > retryDelayUntilDueMs
@@ -15421,16 +15422,69 @@ describe('createProviderIssueHandoffService', () => {
         return [];
       }
       return [{
+        callback: callback as () => void,
         delayMs,
         index
       }];
     });
     expect(matchingRetryTimers.length).toBeGreaterThan(0);
-    const retryDelayMs = matchingRetryTimers[0]?.delayMs ?? null;
+    const retryTimer = matchingRetryTimers[0];
+    const retryDelayMs = retryTimer?.delayMs ?? null;
     expect(retryDelayMs).not.toBeNull();
     expect(retryDelayMs).toBeGreaterThanOrEqual(Math.max(retryDelayUntilDueMs - 1, 0));
     expect(retryDelayMs).toBeLessThanOrEqual(retryDelayUntilDueMs);
-    await vi.advanceTimersByTimeAsync(retryDelayUntilDueMs + 1);
+    const scheduledTimeoutCountBeforeRetryDispatch = setTimeoutSpy.mock.calls.length;
+    vi.setSystemTime(new Date(Date.parse(retryDueAt ?? '') + 1));
+    const scheduledHandle =
+      retryTimer !== undefined ? setTimeoutSpy.mock.results[retryTimer.index]?.value : undefined;
+    if (scheduledHandle !== undefined) {
+      clearTimeout(scheduledHandle as ReturnType<typeof setTimeout>);
+    }
+    retryTimer?.callback();
+    await flushAsyncWork();
+    await waitForCondition(
+      () =>
+        launcher.start.mock.calls.length >= 2 ||
+        setTimeoutSpy.mock.calls.some((call, index) => {
+          if (index < scheduledTimeoutCountBeforeRetryDispatch) {
+            return false;
+          }
+          const [, delayMs] = call ?? [];
+          return typeof delayMs === 'number' && delayMs >= 999 && delayMs <= 1_000;
+        }),
+      QUEUED_RETRY_SETTLE_TURNS
+    );
+    if (launcher.start.mock.calls.length < 2) {
+      const followUpRehydrateTimers = setTimeoutSpy.mock.calls.flatMap((call, index) => {
+        if (index < scheduledTimeoutCountBeforeRetryDispatch) {
+          return [];
+        }
+        const [callback, delayMs] = call ?? [];
+        if (
+          typeof callback !== 'function' ||
+          typeof delayMs !== 'number' ||
+          delayMs < 999 ||
+          delayMs > 1_000
+        ) {
+          return [];
+        }
+        return [{
+          callback: callback as () => void,
+          index
+        }];
+      });
+      expect(followUpRehydrateTimers.length).toBeGreaterThan(0);
+      const followUpRehydrateTimer = followUpRehydrateTimers[0];
+      const scheduledHandle =
+        followUpRehydrateTimer !== undefined
+          ? setTimeoutSpy.mock.results[followUpRehydrateTimer.index]?.value
+          : undefined;
+      if (scheduledHandle !== undefined) {
+        clearTimeout(scheduledHandle as ReturnType<typeof setTimeout>);
+      }
+      followUpRehydrateTimer?.callback();
+      await flushAsyncWork();
+    }
     await waitForMockCalls(launcher.start, 2, 1_024);
     const relaunchedStartArgs = await relaunchedStart;
     await flushAsyncWork();
