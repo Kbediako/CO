@@ -741,6 +741,33 @@ describe('provider linear child lane runner', () => {
     ).toEqual([]);
   });
 
+  it('re-checks the session log after exec settles before clearing scope drift', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-runner-'));
+    const sessionLogPath = join(tempRoot, 'rollout-drift-final-window.jsonl');
+    await writeFile(sessionLogPath, '', 'utf8');
+    let execSettled = false;
+
+    await expect(
+      childLaneRunnerTest.waitForProviderLinearChildLaneScopeDrift({
+        context: {
+          issueIdentifier: 'CO-303'
+        },
+        sessionLogPath,
+        isExecSettled: () => execSettled,
+        deps: {
+          sleep: async () => {
+            execSettled = true;
+            await writeFile(
+              sessionLogPath,
+              '{"timestamp":"2026-04-22T06:12:49.011Z","type":"response_item","payload":{"type":"function_call","name":"exec_command","arguments":"{\\"cmd\\":\\"gh pr view 597 --comments\\",\\"workdir\\":\\"/tmp/child\\"}","call_id":"call-final-window"}}\n',
+              'utf8'
+            );
+          }
+        }
+      })
+    ).resolves.toContain('Appserver child lane drifted into parent-owned GitHub/Linear/PR lifecycle work for CO-303.');
+  });
+
   it('detects transient child-lane commits that reset back to the starting head', async () => {
     tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-runner-'));
     const laneWorkspacePath = join(tempRoot, 'workspace');

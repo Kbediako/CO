@@ -829,20 +829,27 @@ async function waitForProviderLinearChildLaneScopeDrift(input: {
   isExecSettled: () => boolean;
   deps: Pick<ProviderLinearChildLaneRunnerDependencies, 'sleep'>;
 }): Promise<string | null> {
-  while (!input.isExecSettled()) {
+  const readScopeDriftMessage = async (): Promise<string | null> => {
     const evidence = await scanProviderLinearChildLaneSessionLogForParentScopeDrift(input.sessionLogPath).catch(
       () => []
     );
-    if (evidence.length > 0) {
-      return buildProviderLinearChildLaneScopeDriftMessage({
-        context: input.context,
-        sessionLogPath: input.sessionLogPath,
-        evidence
-      });
+    if (evidence.length === 0) {
+      return null;
+    }
+    return buildProviderLinearChildLaneScopeDriftMessage({
+      context: input.context,
+      sessionLogPath: input.sessionLogPath,
+      evidence
+    });
+  };
+  while (!input.isExecSettled()) {
+    const driftMessage = await readScopeDriftMessage();
+    if (driftMessage) {
+      return driftMessage;
     }
     await input.deps.sleep(PROVIDER_LINEAR_CHILD_LANE_SCOPE_DRIFT_POLL_INTERVAL_MS);
   }
-  return null;
+  return await readScopeDriftMessage();
 }
 
 function valueContainsProviderLinearChildLaneSessionNeedle(value: unknown, needle: string): boolean {
@@ -1634,5 +1641,6 @@ export const __test__ = {
   recoverProviderLinearChildLaneExecResultAfterAbort,
   resolveProviderLinearChildLaneUnauthorizedCommitMessage,
   scanProviderLinearChildLaneSessionLogForParentScopeDrift,
-  waitForProviderLinearChildLaneAppserverStartup
+  waitForProviderLinearChildLaneAppserverStartup,
+  waitForProviderLinearChildLaneScopeDrift
 };
