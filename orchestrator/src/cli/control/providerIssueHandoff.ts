@@ -3079,7 +3079,7 @@ export function createProviderIssueHandoffService(
 
   const canRefreshRetainedReleasedNotActiveClaimMetadataOnly = (input: {
     claim: ProviderIntakeClaimRecord;
-    trackedIssue: Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at'>;
+    trackedIssue: Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at' | 'blocked_by'>;
   }): boolean => {
     if (
       input.claim.state !== 'released' ||
@@ -3092,27 +3092,110 @@ export function createProviderIssueHandoffService(
       state_type: input.trackedIssue.state_type
     });
     return (
-      trackedIssueWorkflowState.normalizedStateType === 'started' &&
+      (
+        trackedIssueWorkflowState.normalizedStateType === 'started' ||
+        isProviderLinearTrackedIssueEligibleForExecution(input.trackedIssue)
+      ) &&
       isTrackedIssueFreshEnoughForClaim(input.claim, input.trackedIssue)
+    );
+  };
+
+  const shouldPromoteRetainedReleasedNotActiveClaimPendingReopen = (input: {
+    claim: Pick<
+      ProviderIntakeClaimRecord,
+      | 'state'
+      | 'reason'
+      | 'issue_state'
+      | 'issue_state_type'
+      | 'issue_updated_at'
+      | 'issue_blocked_by'
+      | 'merge_closeout'
+    >;
+    releaseRun: ProviderIssueRunRecord | null;
+    trackedIssue: Pick<
+      LiveLinearTrackedIssue,
+      | 'updated_at'
+      | 'state'
+      | 'state_type'
+      | 'archived_at'
+      | 'trashed'
+      | 'viewer_id'
+      | 'assignee_id'
+      | 'blocked_by'
+    >;
+  }): boolean => {
+    if (!isProviderLinearTrackedIssueEligibleForExecution(input.trackedIssue)) {
+      return false;
+    }
+    const latestReleasedIssueUpdatedAt = selectMostRecentTrackedIssueUpdatedAt(
+      input.claim.issue_updated_at ?? null,
+      resolveReleasedRunIssueUpdatedAtForReclaim(input.claim, input.releaseRun)
+    );
+    const updatedAtComparison = compareTrackedIssueUpdatedAt({
+      existingIssueUpdatedAt: latestReleasedIssueUpdatedAt,
+      nextIssueUpdatedAt: input.trackedIssue.updated_at
+    });
+    return (
+      updatedAtComparison === 'newer' ||
+      (
+        updatedAtComparison === 'equal' &&
+        shouldReopenReleasedClaimAtCurrentTimestamp({
+          claim: input.claim,
+          trackedIssue: input.trackedIssue
+        })
+      )
     );
   };
 
   const refreshRetainedReleasedNotActiveClaimMetadata = async (input: {
     claim: ProviderIntakeClaimRecord;
-    trackedIssue: Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at'>;
+    releaseRun: ProviderIssueRunRecord | null;
+    trackedIssue: Pick<
+      LiveLinearTrackedIssue,
+      | 'updated_at'
+      | 'state'
+      | 'state_type'
+      | 'blocked_by'
+      | 'archived_at'
+      | 'trashed'
+      | 'viewer_id'
+      | 'assignee_id'
+    >;
   }): Promise<ProviderIntakeClaimRecord> => {
     if (!canRefreshRetainedReleasedNotActiveClaimMetadataOnly(input)) {
       return input.claim;
     }
-    const trackedIssueFields = {
+    const nextReason =
+      shouldPromoteRetainedReleasedNotActiveClaimPendingReopen({
+        claim: input.claim,
+        releaseRun: input.releaseRun,
+        trackedIssue: input.trackedIssue
+      })
+        ? markProviderIssueReleasedPendingReopen(input.claim.reason ?? null)
+        : input.claim.reason;
+    const trackedIssueFields: Partial<
+      Pick<
+        ProviderIntakeClaimRecord,
+        'issue_state' | 'issue_state_type' | 'issue_updated_at' | 'issue_blocked_by'
+      >
+    > = {
       issue_state: input.trackedIssue.state,
       issue_state_type: input.trackedIssue.state_type,
       issue_updated_at: input.trackedIssue.updated_at
     };
+    if (
+      isPlainReleasedBlockedByCompletedOnlyClaim(input.claim) &&
+      input.trackedIssue.blocked_by !== undefined
+    ) {
+      const nonTerminalBlockers = filterNonTerminalProviderIssueBlockers(
+        input.trackedIssue.blocked_by
+      );
+      trackedIssueFields.issue_blocked_by = nonTerminalBlockers;
+    }
     const transitioned = hasProviderClaimTransitioned(input.claim, {
       ...trackedIssueFields,
       state: 'released',
-      reason: input.claim.reason,
+      reason: nextReason,
       task_id: input.claim.task_id,
       run_id: input.claim.run_id,
       run_manifest_path: input.claim.run_manifest_path
@@ -3127,7 +3210,7 @@ export function createProviderIssueHandoffService(
       launch_token: undefined,
       task_id: input.claim.task_id,
       state: 'released',
-      reason: input.claim.reason,
+      reason: nextReason,
       run_id: input.claim.run_id,
       run_manifest_path: input.claim.run_manifest_path
     });
@@ -3488,6 +3571,13 @@ export function createProviderIssueHandoffService(
             )
           );
         const preserveReleasedIssueMetadata = replayBlockedByReleasedMetadata;
+        const refreshTerminalBlockerStaleReleasedMetadata =
+          replayBlockedByReleasedMetadata &&
+          shouldRefreshTerminalBlockerStaleReleasedMetadata({
+            claim: existing,
+            trackedIssue: input.trackedIssue,
+            releasedWebhookTiming
+          });
         const reopenBlockedByReleaseDrain =
           releaseCancelPending &&
           (
@@ -3510,26 +3600,29 @@ export function createProviderIssueHandoffService(
                     ? mergeReleasedTrackedIssueMutability(existing, claimBase)
                     : resolveProviderClaimMutabilityTruth(existing)
                 )
-              : {
-                  issue_archived_at: claimBase.issue_archived_at,
-                  issue_trashed: claimBase.issue_trashed
-                };
+            : {
+                issue_archived_at: claimBase.issue_archived_at,
+                issue_trashed: claimBase.issue_trashed
+              };
+        const releasedIssueMetadata =
+          reopenBlockedByReleaseDrain
+            ? claimBase
+            : refreshTerminalBlockerStaleReleasedMetadata
+              ? {
+                  ...existing,
+                  issue_state: claimBase.issue_state,
+                  issue_state_type: claimBase.issue_state_type,
+                  issue_updated_at: claimBase.issue_updated_at
+                }
+              : preserveReleasedIssueMetadata
+                ? existing
+                : claimBase;
         if (
           releaseCancelPending ||
           replayBlockedByReleasedMetadata
         ) {
-          const nextReleasedIssueState =
-            reopenBlockedByReleaseDrain
-              ? claimBase.issue_state
-              : preserveReleasedIssueMetadata
-                ? existing.issue_state
-                : claimBase.issue_state;
-          const nextReleasedIssueStateType =
-            reopenBlockedByReleaseDrain
-              ? claimBase.issue_state_type
-              : preserveReleasedIssueMetadata
-                ? existing.issue_state_type
-                : claimBase.issue_state_type;
+          const nextReleasedIssueState = releasedIssueMetadata.issue_state;
+          const nextReleasedIssueStateType = releasedIssueMetadata.issue_state_type;
           const canUseWebhookTruthForRetainedIdentity =
             releasedWebhookTiming === 'newer' ||
             releasedWebhookTiming === 'equal';
@@ -3549,66 +3642,33 @@ export function createProviderIssueHandoffService(
           });
           const claim = await upsertProviderClaimAndPersist({
             ...claimBase,
-            issue_identifier:
-              reopenBlockedByReleaseDrain
-                ? claimBase.issue_identifier
-                : preserveReleasedIssueMetadata
-                  ? existing.issue_identifier
-                  : claimBase.issue_identifier,
-            issue_title:
-              reopenBlockedByReleaseDrain
-                ? claimBase.issue_title
-                : preserveReleasedIssueMetadata
-                  ? existing.issue_title
-                  : claimBase.issue_title,
-            issue_state:
-              nextReleasedIssueState,
-            issue_state_type:
-              nextReleasedIssueStateType,
-            issue_updated_at:
-              reopenBlockedByReleaseDrain
-                ? claimBase.issue_updated_at
-                : preserveReleasedIssueMetadata
-                  ? existing.issue_updated_at
-                  : claimBase.issue_updated_at,
+            issue_identifier: releasedIssueMetadata.issue_identifier,
+            issue_title: releasedIssueMetadata.issue_title,
+            issue_state: releasedIssueMetadata.issue_state,
+            issue_state_type: releasedIssueMetadata.issue_state_type,
+            issue_updated_at: releasedIssueMetadata.issue_updated_at,
             issue_archived_at: releasedMutabilityTruth.issue_archived_at,
             issue_trashed: releasedMutabilityTruth.issue_trashed,
             issue_viewer_id:
-              reopenBlockedByReleaseDrain
-                ? claimBase.issue_viewer_id
-                : preserveReleasedIssueMetadata
-                  ? existing.issue_viewer_id ?? null
-                  : claimBase.issue_viewer_id,
+              releasedIssueMetadata.issue_viewer_id ?? null,
             issue_viewer_auth_fingerprint:
-              reopenBlockedByReleaseDrain
-                ? claimBase.issue_viewer_auth_fingerprint
-                : preserveReleasedIssueMetadata
-                  ? existing.issue_viewer_auth_fingerprint ?? null
-                  : claimBase.issue_viewer_auth_fingerprint,
+              releasedIssueMetadata.issue_viewer_auth_fingerprint ?? null,
             issue_assignee_id:
-              reopenBlockedByReleaseDrain
-                ? claimBase.issue_assignee_id
-                : preserveReleasedIssueMetadata
-                  ? existing.issue_assignee_id ?? null
-                  : claimBase.issue_assignee_id,
+              releasedIssueMetadata.issue_assignee_id ?? null,
             issue_assignee_name:
-              reopenBlockedByReleaseDrain
-                ? claimBase.issue_assignee_name
-                : preserveReleasedIssueMetadata
-                  ? existing.issue_assignee_name ?? null
-                  : claimBase.issue_assignee_name,
+              releasedIssueMetadata.issue_assignee_name ?? null,
             issue_blocked_by:
-              reopenBlockedByReleaseDrain
-                ? claimBase.issue_blocked_by
-                : preserveReleasedIssueMetadata
-                  ? existing.issue_blocked_by
-                  : claimBase.issue_blocked_by,
+              refreshTerminalBlockerStaleReleasedMetadata
+                ? filterNonTerminalProviderIssueBlockers(claimBase.issue_blocked_by)
+                : releasedIssueMetadata.issue_blocked_by,
             ...retainedRunIdentity,
             mapping_source: existing.mapping_source,
             state: 'released',
             reason:
               reopenBlockedByReleaseDrain
                 ? markProviderIssueReleasedPendingReopen(existing.reason ?? null)
+                : refreshTerminalBlockerStaleReleasedMetadata && pendingReleasedReopen
+                  ? markProviderIssueReleasedPendingReopen(existing.reason ?? null)
                 : existing.reason ?? 'provider_issue_released',
           });
           return { kind: 'ignored', reason: claim.reason ?? 'provider_issue_released', claim };
@@ -4849,6 +4909,7 @@ export function createProviderIssueHandoffService(
             ) {
               await refreshRetainedReleasedNotActiveClaimMetadata({
                 claim,
+                releaseRun,
                 trackedIssue: resolution.trackedIssue
               });
               const releaseRunForCancel = releaseRun ?? activeRun;
@@ -5035,6 +5096,7 @@ export function createProviderIssueHandoffService(
             })) {
               await refreshRetainedReleasedNotActiveClaimMetadata({
                 claim,
+                releaseRun,
                 trackedIssue: resolution.trackedIssue
               });
               continue;
@@ -5055,6 +5117,7 @@ export function createProviderIssueHandoffService(
             ) {
               await refreshRetainedReleasedNotActiveClaimMetadata({
                 claim,
+                releaseRun,
                 trackedIssue: resolution.trackedIssue
               });
               if (!canFreshDiscoverReleasedMissingRetainedRun) {
@@ -5065,6 +5128,7 @@ export function createProviderIssueHandoffService(
             if (shouldBlockPendingReopenFreshDiscovery) {
               await refreshRetainedReleasedNotActiveClaimMetadata({
                 claim,
+                releaseRun,
                 trackedIssue: resolution.trackedIssue
               });
               deferredClaimFreshDiscoveryBlockedProviderKeys.add(claimProviderKey);
@@ -5081,6 +5145,7 @@ export function createProviderIssueHandoffService(
             ) {
               await refreshRetainedReleasedNotActiveClaimMetadata({
                 claim,
+                releaseRun,
                 trackedIssue: resolution.trackedIssue
               });
               if (
@@ -5685,6 +5750,7 @@ export function createProviderIssueHandoffService(
                 ) {
                   const refreshedClaim = await refreshRetainedReleasedNotActiveClaimMetadata({
                     claim,
+                    releaseRun,
                     trackedIssue: directResolution.trackedIssue
                   });
                   claimByProviderKey.set(refreshedClaim.provider_key, refreshedClaim);
@@ -6212,9 +6278,6 @@ function shouldReopenReleasedClaimOnRefresh(input: {
     'updated_at' | 'state' | 'state_type' | 'archived_at' | 'trashed' | 'viewer_id' | 'assignee_id' | 'blocked_by'
   >;
 }): boolean {
-  if (isProviderIssueReleasedPendingReopen(input.claim.reason ?? null)) {
-    return true;
-  }
   const latestReleasedIssueUpdatedAt = selectMostRecentTrackedIssueUpdatedAt(
     input.claim.issue_updated_at ?? null,
     resolveReleasedRunIssueUpdatedAtForReclaim(input.claim, input.releaseRun)
@@ -6223,6 +6286,12 @@ function shouldReopenReleasedClaimOnRefresh(input: {
     existingIssueUpdatedAt: latestReleasedIssueUpdatedAt,
     nextIssueUpdatedAt: input.trackedIssue.updated_at
   });
+  if (updatedAtComparison === 'older') {
+    return false;
+  }
+  if (isProviderIssueReleasedPendingReopen(input.claim.reason ?? null)) {
+    return true;
+  }
   return (
     updatedAtComparison === 'newer' ||
     (
@@ -6275,6 +6344,34 @@ function isPlainReleasedBlockedByCompletedOnlyClaim(
     Array.isArray(claim.issue_blocked_by) &&
     claim.issue_blocked_by.length > 0 &&
     !providerLinearTodoBlockedByNonTerminal(claim.issue_blocked_by)
+  );
+}
+
+function shouldRefreshTerminalBlockerStaleReleasedMetadata(input: {
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'state' | 'reason' | 'issue_state' | 'issue_state_type' | 'issue_blocked_by'
+  >;
+  trackedIssue: Pick<
+    LiveLinearTrackedIssue,
+    'state' | 'state_type' | 'archived_at' | 'trashed' | 'viewer_id' | 'assignee_id' | 'blocked_by'
+  >;
+  releasedWebhookTiming: 'older' | 'equal' | 'newer' | 'unknown';
+}): boolean {
+  if (input.releasedWebhookTiming === 'older') {
+    return false;
+  }
+  return (
+    isPlainReleasedBlockedByCompletedOnlyClaim(input.claim) &&
+    isProviderLinearTrackedIssueEligibleForExecution(input.trackedIssue)
+  );
+}
+
+function filterNonTerminalProviderIssueBlockers(
+  blockers: LiveLinearTrackedIssue['blocked_by'] | null | undefined
+): LiveLinearTrackedBlocker[] {
+  return (blockers ?? []).filter((blocker) =>
+    providerLinearTodoBlockedByNonTerminal([blocker])
   );
 }
 
