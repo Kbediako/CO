@@ -16,6 +16,8 @@ import {
   resolveDefaultControlHostSupervisionEntrypoint
 } from '../src/cli/control/controlHostSupervision.js';
 import { __test__ as controlHostSupervisionShellTest } from '../src/cli/controlHostSupervisionCliShell.js';
+import type { ProviderControlHostFreshnessGaugeReport } from '../src/cli/control/providerControlHostFreshnessGauge.js';
+import { sanitizeProviderOverrideEnv } from '../src/cli/utils/providerOverrideEnv.js';
 
 const {
   assertControlHostSupervisionInstallPaths,
@@ -30,6 +32,8 @@ const {
   ensureTrackedProcessTreeExited,
   extractLaunchctlServicePid,
   formatControlHostSupervisionStatus,
+  hasHealthyLiveProviderControlHostFreshness,
+  inspectControlHostSupervisionLiveHealth,
   inspectControlHostSupervisionLaunchAgent,
   isIgnorableLaunchctlBootoutFailure,
   isRetryableLaunchctlBootstrapError,
@@ -38,6 +42,7 @@ const {
   probeControlHostHealth,
   readFormatFlag,
   readStringFlag,
+  resolveEffectiveControlHostSupervisionState,
   resolveControlHostSupervisionProviderIntakeStatePath,
   resolveControlHostSupervisionQuarantineUnhealthySamples,
   readIntegerFlag,
@@ -1118,6 +1123,280 @@ describe('controlHostSupervision shell helpers', () => {
     expect(rendered).toContain('Supervised child pid: none recorded');
     expect(rendered).toContain('Last restart reason: restart_required');
     expect(rendered).toContain(`launchctl: ${serviceTarget} = {`);
+  });
+
+  it('reconciles stale launchctl and persisted restart-required state against healthy live host truth', () => {
+    const config = buildControlHostSupervisionConfig({
+      homeDir: '/Users/tester',
+      cwd: '/repo/workspace',
+      label: 'com.example.control-host',
+      repoRoot: '/repo/CO',
+      nodePath: '/custom/node',
+      cliEntrypoint: '/opt/codex-orchestrator.js'
+    });
+    const serviceTarget = resolveControlHostSupervisionServiceTarget(config.label);
+    const persistedState = {
+      version: 1 as const,
+      status: 'restart_required',
+      updated_at: '2026-04-22T07:31:39.652Z',
+      label: config.label,
+      repo_root: config.repoRoot,
+      service_target: serviceTarget,
+      child_pid: 4321,
+      last_started_at: '2026-04-22T07:20:00.000Z',
+      last_exit_at: '2026-04-22T07:31:39.652Z',
+      last_exit_code: 75,
+      last_signal: null,
+      last_health_check_at: '2026-04-22T07:31:39.652Z',
+      last_health_status: 'probe_timeout',
+      consecutive_unhealthy_samples: 3,
+      restart_count: 2,
+      unhealthy_threshold: 3,
+      health_interval_seconds: 30,
+      last_restart_reason: 'probe_timeout',
+      last_restart_requested_at: '2026-04-22T07:31:39.652Z',
+      message: 'co-status probe timed out after 5s.'
+    };
+    const liveHost = {
+      checked_at: '2026-04-22T07:38:13.527Z',
+      healthy: true,
+      source: 'co_status' as const,
+      reason: 'ok',
+      message: 'co-status reported a healthy polling state.',
+      stale_launchctl_metadata: false,
+      stale_persisted_state: false,
+      co_status: {
+        healthy: true,
+        reason: 'ok',
+        message: 'co-status reported a healthy polling state.',
+        diagnostic: null
+      },
+      freshness_gauge: null
+    };
+
+    expect(resolveEffectiveControlHostSupervisionState(persistedState, liveHost)).toMatchObject({
+      status: 'healthy',
+      last_health_status: 'ok',
+      consecutive_unhealthy_samples: 0
+    });
+
+    const payload = buildControlHostSupervisionStatusPayload({
+      resolved: {
+        label: config.label,
+        paths: config.paths,
+        config
+      },
+      serviceTarget,
+      state: persistedState,
+      launchctl: {
+        exitCode: 113,
+        stdout: '',
+        stderr: 'Bad request'
+      },
+      launchAgent: {
+        exists: true,
+        program_arguments: [
+          config.nodePath,
+          config.cliEntrypoint,
+          'control-host',
+          'supervise',
+          'run',
+          '--config',
+          config.paths.configPath
+        ],
+        working_directory: config.repoRoot,
+        detected_program: config.nodePath,
+        classification: 'managed_supervision'
+      },
+      liveHost
+    });
+
+    expect(payload.service).toMatchObject({
+      loaded: true,
+      loaded_source: 'live_host',
+      launchctl_loaded: false,
+      stale_launchctl_metadata: true
+    });
+    expect(payload.state).toMatchObject({
+      status: 'healthy',
+      last_health_status: 'ok',
+      consecutive_unhealthy_samples: 0
+    });
+    expect(payload.persisted_state).toMatchObject({
+      status: 'restart_required',
+      last_health_status: 'probe_timeout'
+    });
+    expect(payload.live_host).toMatchObject({
+      healthy: true,
+      stale_launchctl_metadata: true,
+      stale_persisted_state: true
+    });
+    expect(payload.rollout).toEqual({
+      mode: 'managed_supervision',
+      migration_required: false,
+      summary:
+        'LaunchAgent matches the stored managed supervision config; launchctl metadata appears stale because live host evidence remains healthy.'
+    });
+
+    const rendered = formatControlHostSupervisionStatus(payload);
+    expect(rendered).toContain('Service loaded: yes');
+    expect(rendered).toContain(
+      'launchctl loaded: no (stale metadata; live host evidence is healthier)'
+    );
+    expect(rendered).toContain('State status: healthy');
+    expect(rendered).toContain('Persisted state status: restart_required');
+    expect(rendered).toContain('Persisted last health: probe_timeout (3/3)');
+    expect(rendered).toContain('Live host: healthy via co-status');
+  });
+
+  it('keeps probe-timeout quarantine live health mapped to quarantined', () => {
+    const persistedState = {
+      version: 1 as const,
+      status: 'quarantined',
+      updated_at: '2026-04-22T07:31:39.652Z',
+      label: 'com.example.control-host',
+      repo_root: '/repo/CO',
+      service_target: 'gui/501/com.example.control-host',
+      child_pid: 4321,
+      last_started_at: '2026-04-22T07:20:00.000Z',
+      last_exit_at: null,
+      last_exit_code: null,
+      last_signal: null,
+      last_health_check_at: '2026-04-22T07:31:39.652Z',
+      last_health_status: 'active_worker_probe_timeout_quarantine',
+      consecutive_unhealthy_samples: 3,
+      restart_count: 2,
+      unhealthy_threshold: 3,
+      health_interval_seconds: 30,
+      last_restart_reason: 'probe_timeout',
+      last_restart_requested_at: '2026-04-22T07:31:39.652Z',
+      message: 'The active worker still appears healthy despite probe timeout.'
+    };
+    const liveHost = {
+      checked_at: '2026-04-22T07:38:13.527Z',
+      healthy: true,
+      source: 'co_status' as const,
+      reason: 'active_worker_probe_timeout_quarantine',
+      message: 'The active worker still appears healthy despite probe timeout.',
+      stale_launchctl_metadata: false,
+      stale_persisted_state: false,
+      co_status: {
+        healthy: true,
+        reason: 'active_worker_probe_timeout_quarantine',
+        message: 'The active worker still appears healthy despite probe timeout.',
+        diagnostic: null
+      },
+      freshness_gauge: null
+    };
+
+    expect(resolveEffectiveControlHostSupervisionState(persistedState, liveHost)).toMatchObject({
+      status: 'quarantined',
+      last_health_status: 'active_worker_probe_timeout_quarantine',
+      consecutive_unhealthy_samples: 3
+    });
+  });
+
+  it('strips workspace-scoped orchestrator roots from provider override environments when requested', () => {
+    const sanitized = sanitizeProviderOverrideEnv(
+      {
+        CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: 'control-host',
+        CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: 'local-mcp',
+        CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID: 'control-host',
+        CODEX_ORCHESTRATOR_ROOT: '/Users/tester/Code/CO/.workspaces/linear-issue',
+        CODEX_ORCHESTRATOR_RUNS_DIR: '/Users/tester/Code/CO/.workspaces/linear-issue/.runs',
+        CODEX_ORCHESTRATOR_OUT_DIR: '/Users/tester/Code/CO/.workspaces/linear-issue/out',
+        CODEX_ORCHESTRATOR_PACKAGE_ROOT: '/Users/tester/Code/CO',
+        CODEX_ORCHESTRATOR_PROVIDER_PACKAGE_ROOT: '/Users/tester/Code/CO'
+      },
+      {
+        stripWorkspaceArtifactEnv: true
+      }
+    );
+
+    expect(sanitized.CODEX_ORCHESTRATOR_ROOT).toBeUndefined();
+    expect(sanitized.CODEX_ORCHESTRATOR_RUNS_DIR).toBeUndefined();
+    expect(sanitized.CODEX_ORCHESTRATOR_OUT_DIR).toBeUndefined();
+    expect(sanitized.CODEX_ORCHESTRATOR_PACKAGE_ROOT).toBeUndefined();
+  });
+
+  it('falls back to healthy freshness artifacts when the co-status probe cannot execute cleanly', async () => {
+    const config = buildControlHostSupervisionConfig({
+      homeDir: '/Users/tester',
+      cwd: '/repo/workspace',
+      label: 'com.example.control-host',
+      repoRoot: '/repo/CO',
+      nodePath: '/custom/node',
+      cliEntrypoint: '/opt/codex-orchestrator.js'
+    });
+    const serviceTarget = resolveControlHostSupervisionServiceTarget(config.label);
+    const expectedArtifactRoot = dirname(
+      resolveControlHostSupervisionProviderIntakeStatePath(config, {})
+    );
+    const persistedState = {
+      version: 1 as const,
+      status: 'restart_required',
+      updated_at: '2026-04-22T07:31:39.652Z',
+      label: config.label,
+      repo_root: config.repoRoot,
+      service_target: serviceTarget,
+      child_pid: 4321,
+      last_started_at: '2026-04-22T07:20:00.000Z',
+      last_exit_at: '2026-04-22T07:31:39.652Z',
+      last_exit_code: 75,
+      last_signal: null,
+      last_health_check_at: '2026-04-22T07:31:39.652Z',
+      last_health_status: 'probe_timeout',
+      consecutive_unhealthy_samples: 3,
+      restart_count: 2,
+      unhealthy_threshold: 3,
+      health_interval_seconds: 30,
+      last_restart_reason: 'probe_timeout',
+      last_restart_requested_at: '2026-04-22T07:31:39.652Z',
+      message: 'co-status probe timed out after 5s.'
+    };
+    const freshnessReport = {
+      verdict: 'degraded',
+      metrics: {
+        last_successful_refresh_age_ms: { verdict: 'healthy' },
+        active_heartbeat_age_ms: { verdict: 'healthy' },
+        polling_health: { verdict: 'healthy', value: 'ok' }
+      }
+    } as unknown as ProviderControlHostFreshnessGaugeReport;
+
+    expect(hasHealthyLiveProviderControlHostFreshness(freshnessReport)).toBe(true);
+
+    const liveHealth = await inspectControlHostSupervisionLiveHealth(config, persistedState, {
+      loadBootstrapEnvironment: async () => ({
+        HOME: '/Users/tester',
+        CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: 'control-host',
+        CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: 'local-mcp',
+        CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID: 'control-host',
+        CODEX_ORCHESTRATOR_ROOT: '/Users/tester/Code/CO/.workspaces/linear-issue',
+        CODEX_ORCHESTRATOR_RUNS_DIR: '/Users/tester/Code/CO/.workspaces/linear-issue/.runs',
+        CODEX_ORCHESTRATOR_OUT_DIR: '/Users/tester/Code/CO/.workspaces/linear-issue/out'
+      }),
+      probeControlHostHealth: async (_config, env) => {
+        expect(env.CODEX_ORCHESTRATOR_ROOT).toBeUndefined();
+        expect(env.CODEX_ORCHESTRATOR_RUNS_DIR).toBeUndefined();
+        expect(env.CODEX_ORCHESTRATOR_OUT_DIR).toBeUndefined();
+        return {
+          healthy: false,
+          reason: 'probe_failed',
+          message: 'ENOENT: no such file or directory',
+          diagnostic: null
+        };
+      },
+      evaluateFreshnessGauge: async ({ artifactRoot }) => {
+        expect(artifactRoot).toBe(expectedArtifactRoot);
+        return freshnessReport;
+      }
+    });
+
+    expect(liveHealth).toMatchObject({
+      healthy: true,
+      source: 'co_status+freshness_gauge',
+      reason: 'fresh_artifacts'
+    });
   });
 
   it('detects the legacy shim LaunchAgent and marks migration as required', () => {
