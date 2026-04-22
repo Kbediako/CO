@@ -26691,6 +26691,14 @@ describe('createProviderIssueHandoffService', () => {
         state_type: 'completed'
       }
     ];
+    const liveBlockers = [
+      {
+        id: 'lin-live-blocker',
+        identifier: 'CO-LIVE',
+        state: 'In Progress',
+        state_type: 'started'
+      }
+    ];
     const state = createProviderIntakeState();
     state.claims.push(createCo202ReleasedClaim({
       issue_id: 'lin-co-276',
@@ -26720,14 +26728,7 @@ describe('createProviderIssueHandoffService', () => {
         state: 'Waiting',
         state_type: 'started',
         updated_at: '2026-04-21T08:06:27.460Z',
-        blocked_by: [
-          {
-            id: 'lin-live-blocker',
-            identifier: 'CO-LIVE',
-            state: 'In Progress',
-            state_type: 'started'
-          }
-        ]
+        blocked_by: liveBlockers
       })
     }));
 
@@ -26773,7 +26774,7 @@ describe('createProviderIssueHandoffService', () => {
       run_manifest_path: '/tmp/provider-run/co-276-retained-manifest.json'
     });
     expect(state.claims[0]?.issue_title).toBe('Cached retained row source issue');
-    expect(state.claims[0]?.issue_blocked_by).toEqual(retainedBlockers);
+    expect(state.claims[0]?.issue_blocked_by).toEqual(liveBlockers);
     expect(persist).toHaveBeenCalled();
     expect(publishRuntime).toHaveBeenCalledWith('provider-intake.refresh');
   });
@@ -26817,6 +26818,14 @@ describe('createProviderIssueHandoffService', () => {
         state_type: 'completed'
       }
     ];
+    const liveBlockers = [
+      {
+        id: 'lin-live-blocker',
+        identifier: 'CO-LIVE',
+        state: 'In Progress',
+        state_type: 'started'
+      }
+    ];
     const state = createProviderIntakeState();
     state.claims.push(createCo202ReleasedClaim({
       issue_id: 'lin-co-276',
@@ -26849,14 +26858,7 @@ describe('createProviderIssueHandoffService', () => {
         state: 'Waiting',
         state_type: 'started',
         updated_at: '2026-04-21T08:06:27.460Z',
-        blocked_by: [
-          {
-            id: 'lin-live-blocker',
-            identifier: 'CO-LIVE',
-            state: 'In Progress',
-            state_type: 'started'
-          }
-        ]
+        blocked_by: liveBlockers
       })
     }));
 
@@ -26911,7 +26913,7 @@ describe('createProviderIssueHandoffService', () => {
       run_manifest_path: childPaths.manifestPath
     });
     expect(state.claims[0]?.issue_title).toBe('Cached retained row source issue');
-    expect(state.claims[0]?.issue_blocked_by).toEqual(retainedBlockers);
+    expect(state.claims[0]?.issue_blocked_by).toEqual(liveBlockers);
     expect(persist).toHaveBeenCalled();
     expect(publishRuntime).toHaveBeenCalledWith('provider-intake.refresh');
   });

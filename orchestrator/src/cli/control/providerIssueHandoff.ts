@@ -3125,9 +3125,7 @@ export function createProviderIssueHandoffService(
       const nonTerminalBlockers = filterNonTerminalProviderIssueBlockers(
         input.trackedIssue.blocked_by
       );
-      if (nonTerminalBlockers.length === 0) {
-        trackedIssueFields.issue_blocked_by = nonTerminalBlockers;
-      }
+      trackedIssueFields.issue_blocked_by = nonTerminalBlockers;
     }
     const transitioned = hasProviderClaimTransitioned(input.claim, {
       ...trackedIssueFields,
