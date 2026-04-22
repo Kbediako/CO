@@ -1311,7 +1311,8 @@ async function resolveSameAttemptParentDirtyRetrySuppression(
     'child-lane',
     {
       recordedAtNotBefore: attemptStartedAt,
-      action: 'launch'
+      action: 'launch',
+      issueId: typeof parsedProof.issue_id === 'string' ? parsedProof.issue_id : null
     }
   );
   return suppression && isChildLaneParentDirtySuppressionCode(suppression.error_code)

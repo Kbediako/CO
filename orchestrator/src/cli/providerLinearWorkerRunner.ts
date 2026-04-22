@@ -1489,7 +1489,11 @@ function applyProviderLinearWorkerContextEnv(
       env[REPO_CONFIG_PATH_ENV_KEY] = preservedRepoConfigPath;
     } else {
       delete env[REPO_CONFIG_PATH_ENV_KEY];
-      if (inheritedRepoConfigPath) {
+      if (
+        inheritedRepoConfigPath &&
+        (!isProviderLinearWorkerWorkspaceRoot(context.repoRoot) ||
+          !existsSync(join(context.repoRoot, 'codex.orchestrator.json')))
+      ) {
         delete env[REPO_CONFIG_REQUIRED_ENV_KEY];
       }
     }
@@ -1805,10 +1809,12 @@ function buildParallelizationGuidance(helperCommand: string, issueId: string): s
 
 function buildDeterministicMutationSuppressionSection(
   audit: ProviderLinearAuditSummary | null,
-  attemptStartedAt: string | null
+  attemptStartedAt: string | null,
+  issueId: string
 ): string[] {
   const suppressions = deriveDeterministicProviderMutationSuppressions(audit, {
-    recordedAtNotBefore: attemptStartedAt
+    recordedAtNotBefore: attemptStartedAt,
+    issueId
   });
   if (suppressions.length === 0) {
     return [];
@@ -1835,7 +1841,8 @@ export function buildProviderWorkerPrompt(
 ): string {
   const deterministicMutationSuppressions = buildDeterministicMutationSuppressionSection(
     attemptContext.linearAudit ?? null,
-    attemptContext.attemptStartedAt ?? null
+    attemptContext.attemptStartedAt ?? null,
+    issue.id
   );
   const runMemoryPromptLines = buildRunMemoryPromptLines(
     selectRunMemoryForRole({

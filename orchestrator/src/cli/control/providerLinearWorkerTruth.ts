@@ -135,6 +135,7 @@ export function deriveDeterministicProviderMutationSuppressions(
   audit: ProviderLinearAuditSummary | null | undefined,
   options: {
     recordedAtNotBefore?: string | null;
+    issueId?: string | null;
   } = {}
 ): ProviderLinearMutationSuppression[] {
   if (!audit) {
@@ -153,8 +154,10 @@ export function deriveDeterministicProviderMutationSuppressions(
   if (!Number.isFinite(recordedAtNotBeforeMs)) {
     return [];
   }
+  const issueId = normalizeOptionalString(options.issueId);
   const entries = selectProviderLinearMutationEntries(audit, latestByOperation)
     .filter((entry): entry is ProviderLinearAuditEntry => Boolean(entry))
+    .filter((entry) => !issueId || entry.issue_id === issueId)
     .filter((entry) =>
       readTimestampMs(entry as unknown as Record<string, unknown>, 'recorded_at') >= recordedAtNotBeforeMs
     )
@@ -180,6 +183,7 @@ export function findDeterministicProviderMutationSuppression(
   options: {
     recordedAtNotBefore?: string | null;
     action?: string | null;
+    issueId?: string | null;
   } = {}
 ): ProviderLinearMutationSuppression | null {
   const requestedAction = normalizeAuditAction(options.action);

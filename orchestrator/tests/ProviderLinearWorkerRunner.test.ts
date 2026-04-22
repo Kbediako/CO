@@ -1484,6 +1484,44 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     );
   });
 
+  it('ignores deterministic suppressions logged for a different issue id', () => {
+    const issue = createTrackedIssue();
+    const continuationPrompt = buildProviderWorkerPrompt(issue, 2, 5, SOURCE_HELPER_COMMAND, '/tmp/co', {
+      linearAudit: {
+        path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+        attempted_count: 1,
+        success_count: 0,
+        failure_count: 1,
+        latest_recorded_at: '2026-03-21T09:00:00.000Z',
+        parallelization_entries: [],
+        latest_by_operation: {},
+        entries: [{
+          recorded_at: '2026-03-21T09:00:00.000Z',
+          operation: 'create-follow-up',
+          ok: false,
+          issue_id: 'lin-other-issue',
+          issue_identifier: 'CO-999',
+          source_setup: null,
+          action: null,
+          via: null,
+          state: null,
+          follow_up_issue_id: null,
+          follow_up_issue_identifier: null,
+          failed_relation_type: null,
+          comment_id: null,
+          attachment_id: null,
+          error_code: 'linear_follow_up_parity_matrix_missing',
+          error_message: 'Parity/alignment follow-up issues require a parity matrix.'
+        }]
+      },
+      attemptStartedAt: '2026-03-21T08:59:59.000Z'
+    });
+
+    expect(continuationPrompt).not.toContain(
+      'Same-attempt deterministic provider mutation suppressions are in effect'
+    );
+  });
+
   it('ignores deterministic mutation suppressions that predate the current attempt', () => {
     const issue = createTrackedIssue();
     const helperCommand = SOURCE_HELPER_COMMAND;
@@ -6490,7 +6528,18 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     const manualRunId = 'manual-run-1';
     const manualRunDir = join(workspaceRoot, '.runs', manualTaskId, 'cli', manualRunId);
     const manualManifestPath = join(manualRunDir, 'manifest.json');
+    const inheritedProviderRepoConfigPath = join(
+      tempRoot,
+      '.runs',
+      'local-mcp',
+      'cli',
+      'control-host',
+      'provider-workflow.last-known-good.json'
+    );
     await mkdir(manualRunDir, { recursive: true });
+    await writeFile(join(workspaceRoot, 'codex.orchestrator.json'), '{}\n', 'utf8');
+    vi.stubEnv('CODEX_ORCHESTRATOR_REPO_CONFIG_PATH', inheritedProviderRepoConfigPath);
+    vi.stubEnv('CODEX_ORCHESTRATOR_PROVIDER_REPO_CONFIG_PATH', inheritedProviderRepoConfigPath);
     await writeFile(
       manualManifestPath,
       JSON.stringify({

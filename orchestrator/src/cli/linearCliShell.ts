@@ -715,7 +715,8 @@ async function resolveCreateFollowUpRetrySuppression(input: {
     audit,
     'create-follow-up',
     {
-      recordedAtNotBefore: attemptStartedAt
+      recordedAtNotBefore: attemptStartedAt,
+      issueId: input.issueId
     }
   );
   if (!suppression || !isFollowUpParityMatrixSuppressionCode(suppression.error_code)) {
