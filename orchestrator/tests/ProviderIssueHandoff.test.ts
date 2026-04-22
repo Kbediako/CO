@@ -310,6 +310,23 @@ async function waitForCondition(
   throw new Error(`Condition not met after ${turns} timer turns.`);
 }
 
+async function waitForConditionAdvancingToNextTimer(
+  predicate: () => boolean,
+  turns = 256
+): Promise<void> {
+  for (let index = 0; index < turns; index += 1) {
+    if (predicate()) {
+      return;
+    }
+    if (vi.getTimerCount() > 0) {
+      await vi.advanceTimersToNextTimerAsync();
+    }
+    await flushAsyncWork();
+    await waitForRealEventLoopTurn();
+  }
+  throw new Error(`Condition not met after ${turns} timer turns.`);
+}
+
 const QUEUED_RETRY_SETTLE_TURNS = 1_024;
 
 async function waitForMockCalls(
@@ -15434,15 +15451,9 @@ describe('createProviderIssueHandoffService', () => {
     expect(retryDelayMs).toBeGreaterThanOrEqual(Math.max(retryDelayUntilDueMs - 1, 0));
     expect(retryDelayMs).toBeLessThanOrEqual(retryDelayUntilDueMs);
     const scheduledTimeoutCountBeforeRetryDispatch = setTimeoutSpy.mock.calls.length;
-    vi.setSystemTime(new Date(Date.parse(retryDueAt ?? '') + 1));
-    const scheduledHandle =
-      retryTimer !== undefined ? setTimeoutSpy.mock.results[retryTimer.index]?.value : undefined;
-    if (scheduledHandle !== undefined) {
-      clearTimeout(scheduledHandle as ReturnType<typeof setTimeout>);
-    }
-    retryTimer?.callback();
+    await vi.advanceTimersByTimeAsync((retryDelayMs ?? 0) + 1);
     await flushAsyncWork();
-    await waitForCondition(
+    await waitForConditionAdvancingToNextTimer(
       () =>
         launcher.start.mock.calls.length >= 2 ||
         setTimeoutSpy.mock.calls.some((call, index) => {
@@ -15455,35 +15466,7 @@ describe('createProviderIssueHandoffService', () => {
       QUEUED_RETRY_SETTLE_TURNS
     );
     if (launcher.start.mock.calls.length < 2) {
-      const followUpRehydrateTimers = setTimeoutSpy.mock.calls.flatMap((call, index) => {
-        if (index < scheduledTimeoutCountBeforeRetryDispatch) {
-          return [];
-        }
-        const [callback, delayMs] = call ?? [];
-        if (
-          typeof callback !== 'function' ||
-          typeof delayMs !== 'number' ||
-          delayMs < 999 ||
-          delayMs > 1_000
-        ) {
-          return [];
-        }
-        return [{
-          callback: callback as () => void,
-          index
-        }];
-      });
-      expect(followUpRehydrateTimers.length).toBeGreaterThan(0);
-      const followUpRehydrateTimer =
-        followUpRehydrateTimers[followUpRehydrateTimers.length - 1];
-      const scheduledHandle =
-        followUpRehydrateTimer !== undefined
-          ? setTimeoutSpy.mock.results[followUpRehydrateTimer.index]?.value
-          : undefined;
-      if (scheduledHandle !== undefined) {
-        clearTimeout(scheduledHandle as ReturnType<typeof setTimeout>);
-      }
-      followUpRehydrateTimer?.callback();
+      await vi.advanceTimersByTimeAsync(1_000);
       await flushAsyncWork();
     }
     await waitForMockCalls(launcher.start, 2, 1_024);
