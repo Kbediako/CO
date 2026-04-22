@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260422-linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a",
+      "title": "Maintain docs freshness rolling baseline for Apr 22 stale cohorts and registry drift",
+      "relates_to": "tasks/tasks-linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-22",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
+      "paths": {
+        "spec": "tasks/specs/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a.md",
+        "task": "tasks/tasks-linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a.md",
+        "agent_task": ".agent/task/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a.md",
+        "docs": "docs/TECH_SPEC-linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a.md"
+      }
+    },
+    {
       "id": "20260422-linear-20102af9-9eb4-44d1-8988-c5de7869d990",
       "title": "CO-298 stale control-host supervision status truth versus healthy live host truth",
       "relates_to": "tasks/tasks-linear-20102af9-9eb4-44d1-8988-c5de7869d990.md",
@@ -526,7 +543,6 @@
         "Codex"
       ],
       "last_review": "2026-04-21",
-      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
       "approvals": {
         "baseline_reproduction": {
           "reviewer": "parent provider worker plus same-issue child lane",

@@ -10,7 +10,8 @@ The machine-readable policy lives in `docs/docs-catalog.json` under `policies.ro
 
 Current CO policy:
 
-- Owner issue: `CO-175`
+- Owner issue: `CO-300`
+- Historical owner lineage: `CO-175` established the Apr 14 baseline and `CO-267` owned the Apr 20/21 maintenance refreshes; both are now terminal evidence only and must not remain the live maintenance owner.
 - Window: `7` days after the normal freshness cadence expires
 - Maximum active rolling cohorts: `2`
 - Maximum rolling rows: `300`
@@ -47,6 +48,8 @@ The maintenance report is the machine-readable decision future workers should ci
 - sample paths for changed blockers, candidate rows, and hard stale rows
 
 Provider-worker gates use this decision in `docs-review` and `implementation-gate`. They may pass with `pass_with_owned_rolling_debt` only when the debt is in an eligible historical class, the policy owner issue is present, the rows are still inside the rolling window and caps, `spec-guard` is clean, and the current diff/task packet has no blocking freshness paths. The underlying `docs:freshness` JSON still preserves the raw stale and rolling row evidence.
+
+When the configured owner issue is terminal, `docs:freshness:maintain` must fail closed. Terminal owner metadata is evidence only; the helper must require a new live same-project owner issue instead of reusing a `Done`, `Duplicate`, or `Canceled` owner path.
 
 Blocking decisions are fail-closed:
 
@@ -199,3 +202,21 @@ After PR #566 had already merged, CO-267 rework reproduced the Apr 21 current-ma
 
 ### Post-refresh Disposition
 The Apr 21 blocking set was reviewed in `docs/findings/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4-docs-freshness-classification.md` and refreshed without changing freshness policy, rolling caps, or CO-266 scope. The live set is historical Task Packet and Task Mirror evidence for `0954` and the `1311`-`1316` Symphony publication lineage, so CO-267 updates the reviewed stale registry rows to `last_review=2026-04-21`; `tasks/specs/0954-rlm-orchestrator-validation.md` frontmatter is refreshed for consistency, while `1311`-`1316` spec frontmatter was already current on main.
+
+## Apr 22 Owner Reset and Reviewed Refresh
+
+### Reproduction / Baseline Findings
+CO-300 reproduced the Apr 22 current-main baseline failure in `out/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a/before/docs-freshness.json` and `out/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a/before/docs-freshness-maintenance.json`:
+
+- `16` stale entries
+- `0` rolling cohort entries
+- `0` missing registry rows
+- `0` missing-on-disk rows
+- `0` invalid registry entries
+- `0` uncatalogued docs
+- live debt consisted of the Mar 22 `1317` / `1318` packet-and-mirror cohort, adjacent parity packet docs, and hard-stale `docs/codex-orchestrator-issues.md`
+- the earlier issue-packet snapshot with `6` missing-on-disk rows did not reproduce on current `main`
+- `docs:freshness:maintain` still reported `blocking_changed_paths=[]`, verified configured owner `CO-175` as terminal, and required a new live owner path instead of reusing terminal metadata
+
+### Post-refresh Disposition
+CO-300 re-homed the rolling-freshness owner metadata to live issue `CO-300`, refreshed the reviewed Mar 22 packet/spec rows plus the hard-stale issues guide, and added fail-closed regression coverage so terminal owners cannot be reused as the live maintenance path. Post-fix validation at `out/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a/after/docs-freshness.json` and `out/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a/after/docs-freshness-maintenance.json` returns `docs:freshness OK` with `0` stale rows and `docs:freshness:maintain=clean`, with owner verification resolved to live `CO-300`.
