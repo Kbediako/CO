@@ -788,6 +788,19 @@ function segmentContainsToken(tokens: string[], start: number, end: number, expe
   return false;
 }
 
+function segmentShowsParentOwnedOrchestratorScopeDrift(tokens: string[], start: number, end: number): boolean {
+  for (let index = start; index < end; index += 1) {
+    const token = stripShellCommandTokenQuotes(tokens[index] ?? '');
+    if (!token) {
+      continue;
+    }
+    if (token === 'linear' || token === 'pr' || token === 'review' || token.startsWith('provider-linear-')) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function commandSegmentShowsParentOwnedScopeDrift(
   tokens: string[],
   segmentStart: number,
@@ -835,7 +848,7 @@ function commandSegmentShowsParentOwnedScopeDrift(
     return true;
   }
   if (commandBase === 'codex-orchestrator' || commandBase === 'codex-orchestrator.js') {
-    return segmentContainsToken(tokens, commandIndex + 1, segmentEnd, 'linear');
+    return segmentShowsParentOwnedOrchestratorScopeDrift(tokens, commandIndex + 1, segmentEnd);
   }
   if (commandBase === 'node' || commandBase === 'bun') {
     const runtimeOptionsWithValues = new Set([
@@ -861,7 +874,7 @@ function commandSegmentShowsParentOwnedScopeDrift(
       if (scriptBase !== 'codex-orchestrator' && scriptBase !== 'codex-orchestrator.js') {
         return false;
       }
-      return segmentContainsToken(tokens, index + 1, segmentEnd, 'linear');
+      return segmentShowsParentOwnedOrchestratorScopeDrift(tokens, index + 1, segmentEnd);
     }
     return false;
   }
