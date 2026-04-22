@@ -3104,6 +3104,10 @@ export function createProviderIssueHandoffService(
     if (!canRefreshRetainedReleasedNotActiveClaimMetadataOnly(input)) {
       return input.claim;
     }
+    const nextReason =
+      isProviderLinearTrackedIssueEligibleForExecution(input.trackedIssue)
+        ? markProviderIssueReleasedPendingReopen(input.claim.reason ?? null)
+        : input.claim.reason;
     const trackedIssueFields: Partial<
       Pick<
         ProviderIntakeClaimRecord,
@@ -3128,7 +3132,7 @@ export function createProviderIssueHandoffService(
     const transitioned = hasProviderClaimTransitioned(input.claim, {
       ...trackedIssueFields,
       state: 'released',
-      reason: input.claim.reason,
+      reason: nextReason,
       task_id: input.claim.task_id,
       run_id: input.claim.run_id,
       run_manifest_path: input.claim.run_manifest_path
@@ -3143,7 +3147,7 @@ export function createProviderIssueHandoffService(
       launch_token: undefined,
       task_id: input.claim.task_id,
       state: 'released',
-      reason: input.claim.reason,
+      reason: nextReason,
       run_id: input.claim.run_id,
       run_manifest_path: input.claim.run_manifest_path
     });
@@ -3600,6 +3604,8 @@ export function createProviderIssueHandoffService(
             reason:
               reopenBlockedByReleaseDrain
                 ? markProviderIssueReleasedPendingReopen(existing.reason ?? null)
+                : refreshTerminalBlockerStaleReleasedMetadata && pendingReleasedReopen
+                  ? markProviderIssueReleasedPendingReopen(existing.reason ?? null)
                 : existing.reason ?? 'provider_issue_released',
           });
           return { kind: 'ignored', reason: claim.reason ?? 'provider_issue_released', claim };
