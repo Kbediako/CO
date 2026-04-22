@@ -15403,12 +15403,12 @@ describe('createProviderIssueHandoffService', () => {
 
     const retryDueAt = failedRetryClaim?.retry_due_at ?? null;
     expect(retryDueAt).not.toBeNull();
-    const { callback: retryTimerCallback, delayMs: retryDelayMs } =
+    const { delayMs: retryDelayMs } =
       getEarliestScheduledTimeoutByDelayRange(setTimeoutSpy, 4_999, 5_000);
     expect(retryDelayMs).toBeGreaterThanOrEqual(4_999);
     expect(retryDelayMs).toBeLessThanOrEqual(5_000);
-    vi.setSystemTime(new Date(Math.max(Date.parse(retryDueAt ?? ''), Date.now()) + 1));
-    retryTimerCallback();
+    const retryDelayUntilDueMs = Math.max(Date.parse(retryDueAt ?? '') - Date.now(), 0) + 1;
+    await vi.advanceTimersByTimeAsync(retryDelayUntilDueMs);
     await flushAsyncWork();
     await waitForMockCalls(launcher.start, 2, QUEUED_RETRY_SETTLE_TURNS * 8);
 
