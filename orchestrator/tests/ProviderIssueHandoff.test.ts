@@ -26127,7 +26127,7 @@ describe('createProviderIssueHandoffService', () => {
     }
   });
 
-  it('does not launch a Ready plain released not-active refresh with unresolved retained run identity', async () => {
+  it('does not launch a Ready released refresh with unresolved retained run identity', async () => {
     const { root, paths } = await createHostPaths();
     const missingManifestPath = join(
       root,
@@ -26173,7 +26173,10 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.start).not.toHaveBeenCalled();
     expect(state.claims[0]).toMatchObject({
       state: 'released',
-      reason: 'provider_issue_released:not_active',
+      reason: 'provider_issue_released_pending_reopen:provider_issue_released:not_active',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-15T15:00:00.000Z',
       run_id: 'run-ready-not-active-refresh-missing',
       run_manifest_path: missingManifestPath
     });

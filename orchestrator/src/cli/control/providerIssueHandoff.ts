@@ -3079,7 +3079,7 @@ export function createProviderIssueHandoffService(
 
   const canRefreshRetainedReleasedNotActiveClaimMetadataOnly = (input: {
     claim: ProviderIntakeClaimRecord;
-    trackedIssue: Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at'>;
+    trackedIssue: Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at' | 'blocked_by'>;
   }): boolean => {
     if (
       input.claim.state !== 'released' ||
@@ -3092,7 +3092,10 @@ export function createProviderIssueHandoffService(
       state_type: input.trackedIssue.state_type
     });
     return (
-      trackedIssueWorkflowState.normalizedStateType === 'started' &&
+      (
+        trackedIssueWorkflowState.normalizedStateType === 'started' ||
+        isProviderLinearTrackedIssueEligibleForExecution(input.trackedIssue)
+      ) &&
       isTrackedIssueFreshEnoughForClaim(input.claim, input.trackedIssue)
     );
   };
