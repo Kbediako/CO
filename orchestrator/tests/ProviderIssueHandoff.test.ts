@@ -24163,6 +24163,105 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('does not reopen pending stale-blocker metadata when recovered retained run truth is newer', async () => {
+    const { root, paths } = await createHostPaths();
+    const recoveredEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-295'
+    };
+    const recoveredPaths = resolveRunPaths(recoveredEnv, 'run-co-295-released');
+
+    await mkdir(recoveredPaths.runDir, { recursive: true });
+    await writeFile(
+      recoveredPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-co-295-released',
+        task_id: 'linear-lin-issue-295',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-295',
+        issue_identifier: 'CO-295',
+        issue_updated_at: '2026-04-22T05:02:00.000Z',
+        updated_at: '2026-04-22T05:03:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-295',
+      issue_id: 'lin-issue-295',
+      issue_identifier: 'CO-295',
+      issue_title: 'Persisted released title',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-22T05:01:21.766Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-issue-295',
+      mapping_source: 'provider_id_fallback',
+      state: 'released',
+      reason: 'provider_issue_released_pending_reopen:provider_issue_released:not_active',
+      accepted_at: '2026-04-22T04:58:34.614Z',
+      updated_at: '2026-04-22T05:01:21.766Z',
+      last_delivery_id: 'delivery-co-295-reclaimed',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_745_295_682_000,
+      run_id: 'run-co-295-released',
+      run_manifest_path: recoveredPaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-co-295-should-not-start',
+        manifestPath: '/tmp/provider-run/co-295-should-not-start.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'diagnostics'
+    });
+
+    const replayResult = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-295',
+        identifier: 'CO-295',
+        title: 'Incoming replay title',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-04-22T05:01:21.766Z',
+        blocked_by: []
+      }),
+      deliveryId: 'delivery-co-295-replay-stale',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_745_295_683_000
+    });
+
+    expect(replayResult.kind).toBe('ignored');
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released_pending_reopen:provider_issue_released:not_active',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-22T05:01:21.766Z',
+      run_id: 'run-co-295-released',
+      run_manifest_path: recoveredPaths.manifestPath
+    });
+  });
+
   it('preserves released assignee metadata when an equal-timestamp replay arrives with a different assignee', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();

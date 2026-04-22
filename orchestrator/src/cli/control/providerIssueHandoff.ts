@@ -6278,9 +6278,6 @@ function shouldReopenReleasedClaimOnRefresh(input: {
     'updated_at' | 'state' | 'state_type' | 'archived_at' | 'trashed' | 'viewer_id' | 'assignee_id' | 'blocked_by'
   >;
 }): boolean {
-  if (isProviderIssueReleasedPendingReopen(input.claim.reason ?? null)) {
-    return true;
-  }
   const latestReleasedIssueUpdatedAt = selectMostRecentTrackedIssueUpdatedAt(
     input.claim.issue_updated_at ?? null,
     resolveReleasedRunIssueUpdatedAtForReclaim(input.claim, input.releaseRun)
@@ -6289,6 +6286,12 @@ function shouldReopenReleasedClaimOnRefresh(input: {
     existingIssueUpdatedAt: latestReleasedIssueUpdatedAt,
     nextIssueUpdatedAt: input.trackedIssue.updated_at
   });
+  if (updatedAtComparison === 'older') {
+    return false;
+  }
+  if (isProviderIssueReleasedPendingReopen(input.claim.reason ?? null)) {
+    return true;
+  }
   return (
     updatedAtComparison === 'newer' ||
     (
