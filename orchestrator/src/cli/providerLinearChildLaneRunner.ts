@@ -791,6 +791,63 @@ function segmentShowsParentOwnedOrchestratorScopeDrift(tokens: string[], start: 
   return false;
 }
 
+function packageExecSegmentShowsParentOwnedScopeDrift(
+  tokens: string[],
+  commandStart: number,
+  segmentEnd: number
+): boolean {
+  const packageExecOptionsWithValues = new Set(['-c', '--call', '-p', '--package', '--shell', '--node-options']);
+  for (let index = commandStart; index < segmentEnd; index += 1) {
+    const token = stripShellCommandTokenQuotes(tokens[index] ?? '');
+    if (!token) {
+      continue;
+    }
+    if (token === '--') {
+      continue;
+    }
+    if (token === '-c' || token === '--call') {
+      const nestedCommand = stripShellCommandTokenQuotes(tokens[index + 1] ?? '');
+      return nestedCommand ? commandShowsParentOwnedScopeDrift(nestedCommand) : false;
+    }
+    if (token.startsWith('-')) {
+      if (shellOptionConsumesNextValue(token, packageExecOptionsWithValues)) {
+        index += 1;
+      }
+      continue;
+    }
+    const executableBase = basename(token);
+    if (executableBase !== 'codex-orchestrator' && executableBase !== 'codex-orchestrator.js') {
+      return false;
+    }
+    return segmentShowsParentOwnedOrchestratorScopeDrift(tokens, index + 1, segmentEnd);
+  }
+  return false;
+}
+
+function npmExecSegmentShowsParentOwnedScopeDrift(tokens: string[], commandStart: number, segmentEnd: number): boolean {
+  const npmOptionsWithValues = new Set(['-C', '--prefix', '-w', '--workspace', '--userconfig', '--cache', '--loglevel']);
+  for (let index = commandStart; index < segmentEnd; index += 1) {
+    const token = stripShellCommandTokenQuotes(tokens[index] ?? '');
+    if (!token) {
+      continue;
+    }
+    if (token === '--') {
+      continue;
+    }
+    if (token === 'exec' || token === 'x') {
+      return packageExecSegmentShowsParentOwnedScopeDrift(tokens, index + 1, segmentEnd);
+    }
+    if (token.startsWith('-')) {
+      if (shellOptionConsumesNextValue(token, npmOptionsWithValues)) {
+        index += 1;
+      }
+      continue;
+    }
+    return false;
+  }
+  return false;
+}
+
 function commandSegmentShowsParentOwnedScopeDrift(
   tokens: string[],
   segmentStart: number,
@@ -836,6 +893,12 @@ function commandSegmentShowsParentOwnedScopeDrift(
   }
   if (commandBase === 'gh') {
     return true;
+  }
+  if (commandBase === 'npx') {
+    return packageExecSegmentShowsParentOwnedScopeDrift(tokens, commandIndex + 1, segmentEnd);
+  }
+  if (commandBase === 'npm') {
+    return npmExecSegmentShowsParentOwnedScopeDrift(tokens, commandIndex + 1, segmentEnd);
   }
   if (commandBase === 'codex-orchestrator' || commandBase === 'codex-orchestrator.js') {
     return segmentShowsParentOwnedOrchestratorScopeDrift(tokens, commandIndex + 1, segmentEnd);
