@@ -15411,17 +15411,26 @@ describe('createProviderIssueHandoffService', () => {
     const retryDueAt = failedRetryClaim?.retry_due_at ?? null;
     expect(retryDueAt).not.toBeNull();
     const retryDelayUntilDueMs = Math.max(Date.parse(retryDueAt ?? '') - Date.now(), 0);
-    const { callback: retryCallback, delayMs: retryDelayMs } =
-      getEarliestScheduledTimeoutByDelayRange(
-        setTimeoutSpy,
-        Math.max(retryDelayUntilDueMs - 1, 0),
-        retryDelayUntilDueMs
-      );
+    const matchingRetryTimers = setTimeoutSpy.mock.calls.flatMap((call, index) => {
+      const [, delayMs] = call ?? [];
+      if (
+        typeof delayMs !== 'number' ||
+        delayMs < Math.max(retryDelayUntilDueMs - 1, 0) ||
+        delayMs > retryDelayUntilDueMs
+      ) {
+        return [];
+      }
+      return [{
+        delayMs,
+        index
+      }];
+    });
+    expect(matchingRetryTimers.length).toBeGreaterThan(0);
+    const retryDelayMs = matchingRetryTimers[0]?.delayMs ?? null;
+    expect(retryDelayMs).not.toBeNull();
     expect(retryDelayMs).toBeGreaterThanOrEqual(Math.max(retryDelayUntilDueMs - 1, 0));
     expect(retryDelayMs).toBeLessThanOrEqual(retryDelayUntilDueMs);
-    vi.setSystemTime(new Date(Date.parse(retryDueAt ?? '') + 1));
-    retryCallback();
-    await flushAsyncWork();
+    await vi.advanceTimersByTimeAsync(retryDelayUntilDueMs + 1);
     await waitForMockCalls(launcher.start, 2, 1_024);
     const relaunchedStartArgs = await relaunchedStart;
     await flushAsyncWork();
