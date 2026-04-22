@@ -2962,6 +2962,181 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it('preserves ambiguity when only terminal foreign evidence conflicts with a generic terminal PR', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Completed issue with generic merged PR and foreign merged PR',
+      state: {
+        id: 'state-done',
+        name: 'Done',
+        type: 'completed'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-580', 580, 'ABC-123 foreign merged provider PR'),
+        buildGitHubAttachment('attachment-pr-581', 581, 'Provider stabilization')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 580
+          ? {
+              state: 'MERGED',
+              mergedAt: '2026-04-21T09:07:51.000Z',
+              updatedAt: '2026-04-21T09:07:51.000Z',
+              title: 'ABC-123 foreign merged provider PR',
+              headRefName: 'linear/abc-123-foreign-provider-pr'
+            }
+          : {
+              state: 'MERGED',
+              mergedAt: '2026-04-21T09:08:51.000Z',
+              updatedAt: '2026-04-21T09:08:51.000Z',
+              title: 'Provider stabilization',
+              headRefName: 'provider-stabilization'
+            }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: null,
+          historical: [],
+          conflicting: [
+            {
+              id: 'attachment-pr-580'
+            }
+          ],
+          unknown: [
+            {
+              id: 'attachment-pr-581'
+            }
+          ]
+        }
+      }
+    });
+  });
+
+  it('does not duplicate a selected generic merged PR in unknown when owned history exists', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Completed issue with owned historical PR and generic merged PR',
+      state: {
+        id: 'state-done',
+        name: 'Done',
+        type: 'completed'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-532', 532, 'CO-244 previous provider fix'),
+        buildGitHubAttachment('attachment-pr-581', 581, 'Provider stabilization')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 532
+          ? {
+              state: 'MERGED',
+              mergedAt: '2026-04-20T09:07:51.000Z',
+              updatedAt: '2026-04-20T09:07:51.000Z',
+              title: 'CO-244 previous provider fix',
+              headRefName: 'linear/co-244-previous-provider-fix'
+            }
+          : {
+              state: 'MERGED',
+              mergedAt: '2026-04-21T09:08:51.000Z',
+              updatedAt: '2026-04-21T09:08:51.000Z',
+              title: 'Provider stabilization',
+              headRefName: 'provider-stabilization'
+            }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-581'
+          },
+          historical: [
+            {
+              id: 'attachment-pr-532'
+            }
+          ],
+          conflicting: [],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it('does not duplicate selected generic active PRs in unknown when owned history exists', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Active issue with owned historical PR and two generic active PRs',
+      state: {
+        id: 'state-in-progress',
+        name: 'In Progress',
+        type: 'started'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-532', 532, 'CO-244 previous provider fix'),
+        buildGitHubAttachment('attachment-pr-581', 581, 'Provider stabilization'),
+        buildGitHubAttachment('attachment-pr-582', 582, 'Provider cleanup')
+      ],
+      snapshotForPr: (prNumber) => {
+        if (prNumber === 532) {
+          return {
+            state: 'MERGED',
+            mergedAt: '2026-04-20T09:07:51.000Z',
+            updatedAt: '2026-04-20T09:07:51.000Z',
+            title: 'CO-244 previous provider fix',
+            headRefName: 'linear/co-244-previous-provider-fix'
+          };
+        }
+        if (prNumber === 581) {
+          return {
+            state: 'OPEN',
+            mergedAt: null,
+            updatedAt: '2026-04-21T09:08:51.000Z',
+            title: 'Provider stabilization',
+            headRefName: 'provider-stabilization'
+          };
+        }
+        return {
+          state: 'OPEN',
+          mergedAt: null,
+          updatedAt: '2026-04-21T09:09:51.000Z',
+          title: 'Provider cleanup',
+          headRefName: 'provider-cleanup'
+        };
+      }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: null,
+          historical: [
+            {
+              id: 'attachment-pr-532'
+            }
+          ],
+          conflicting: [
+            {
+              id: 'attachment-pr-581'
+            },
+            {
+              id: 'attachment-pr-582'
+            }
+          ],
+          unknown: []
+        }
+      }
+    });
+  });
+
   it('classifies unrecognized PR snapshot payloads as unknown attachments', async () => {
     const { result } = await readIssueContextAttachmentTruth({
       title: 'Unknown PR snapshot',

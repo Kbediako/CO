@@ -1286,16 +1286,12 @@ function classifyIssuePullRequestAttachments(
   const activeUnknown = ownershipUnknown.filter(
     (candidate) => !isIssuePullRequestSnapshotTerminal(candidate.snapshot)
   );
-  const activeConflicting = ownershipConflicting.filter(
-    (candidate) => !isIssuePullRequestSnapshotTerminal(candidate.snapshot)
-  );
-  const hasAmbiguousConflictingEvidence =
-    preclassifiedConflicting.length > 0 || activeConflicting.length > 0;
   const selectionCandidates = activeOwned.length > 0 ? ownershipOwned : [...ownershipOwned, ...ownershipUnknown];
   const ownershipConflictingAttachments = appendUniqueIssuePullRequestAttachments(
     preclassifiedConflicting,
     ownershipConflicting.map((candidate) => candidate.attachment)
   );
+  const hasConflictingOwnershipEvidence = ownershipConflictingAttachments.length > 0;
   const unknownAttachments = appendUniqueIssuePullRequestAttachments(
     unknown,
     ownershipOwned.length > 0 ? ownershipUnknown.map((candidate) => candidate.attachment) : []
@@ -1313,7 +1309,7 @@ function classifyIssuePullRequestAttachments(
     };
   }
   if (activeOwned.length === 0) {
-    if (activeUnknown.length > 0 && hasAmbiguousConflictingEvidence) {
+    if (ownershipUnknown.length > 0 && hasConflictingOwnershipEvidence) {
       return {
         current: null,
         historical: terminalOwned.map((candidate) => candidate.attachment),
@@ -1373,13 +1369,11 @@ function classifyIssuePullRequestAttachments(
   if (workflowState.normalizedState === 'merging') {
     const mergingSelection = selectCurrentMergingPullRequestAttachment(selectionCandidates);
     if (mergingSelection) {
-      const mergingSelectionAttachmentIds = new Set(
-        [
-          mergingSelection.current,
-          ...mergingSelection.historical,
-          ...mergingSelection.conflicting
-        ].map((candidate) => candidate.attachment.id)
-      );
+      const mergingSelectionAttachments = [
+        mergingSelection.current,
+        ...mergingSelection.historical,
+        ...mergingSelection.conflicting
+      ].map((candidate) => candidate.attachment);
       return {
         current: mergingSelection.current.attachment,
         historical: mergingSelection.historical.map((candidate) => candidate.attachment),
@@ -1387,24 +1381,34 @@ function classifyIssuePullRequestAttachments(
           mergingSelection.conflicting.map((candidate) => candidate.attachment),
           ownershipConflictingAttachments
         ),
-        unknown: (activeOwned.length === 0 ? carriedUnknownAttachments : unknownAttachments).filter(
-          (attachment) => !mergingSelectionAttachmentIds.has(attachment.id)
+        unknown: excludeIssuePullRequestAttachments(
+          activeOwned.length === 0 ? carriedUnknownAttachments : unknownAttachments,
+          mergingSelectionAttachments
         )
       };
     }
   }
   if (workflowState.normalizedState !== 'merging' && active.length === 1) {
+    const historicalAttachments = terminal.map((candidate) => candidate.attachment);
     return {
       current: active[0]!.attachment,
-      historical: terminal.map((candidate) => candidate.attachment),
+      historical: historicalAttachments,
       conflicting: appendUniqueIssuePullRequestAttachments([], ownershipConflictingAttachments),
-      unknown: unknownAttachments
+      unknown: excludeIssuePullRequestAttachments(unknownAttachments, [
+        active[0]!.attachment,
+        ...historicalAttachments
+      ])
     };
   }
   if (active.length === 0) {
     if (workflowState.normalizedState !== 'rework') {
       const terminalSelection = selectCurrentMergingPullRequestAttachment(selectionCandidates);
       if (terminalSelection) {
+        const selectedAttachments = [
+          terminalSelection.current.attachment,
+          ...terminalSelection.historical.map((candidate) => candidate.attachment),
+          ...terminalSelection.conflicting.map((candidate) => candidate.attachment)
+        ];
         return {
           current: terminalSelection.current.attachment,
           historical: terminalSelection.historical.map((candidate) => candidate.attachment),
@@ -1412,25 +1416,31 @@ function classifyIssuePullRequestAttachments(
             terminalSelection.conflicting.map((candidate) => candidate.attachment),
             ownershipConflictingAttachments
           ),
-          unknown: unknownAttachments
+          unknown: excludeIssuePullRequestAttachments(unknownAttachments, selectedAttachments)
         };
       }
     }
+    const historicalAttachments = terminal.map((candidate) => candidate.attachment);
     return {
       current: null,
-      historical: terminal.map((candidate) => candidate.attachment),
+      historical: historicalAttachments,
       conflicting: appendUniqueIssuePullRequestAttachments([], ownershipConflictingAttachments),
-      unknown: unknownAttachments
+      unknown: excludeIssuePullRequestAttachments(unknownAttachments, historicalAttachments)
     };
   }
+  const historicalAttachments = terminal.map((candidate) => candidate.attachment);
+  const conflictingAttachments = appendUniqueIssuePullRequestAttachments(
+    active.map((candidate) => candidate.attachment),
+    ownershipConflictingAttachments
+  );
   return {
     current: null,
-    historical: terminal.map((candidate) => candidate.attachment),
-    conflicting: appendUniqueIssuePullRequestAttachments(
-      active.map((candidate) => candidate.attachment),
-      ownershipConflictingAttachments
-    ),
-    unknown: unknownAttachments
+    historical: historicalAttachments,
+    conflicting: conflictingAttachments,
+    unknown: excludeIssuePullRequestAttachments(unknownAttachments, [
+      ...historicalAttachments,
+      ...conflictingAttachments
+    ])
   };
 }
 
@@ -1603,6 +1613,17 @@ function appendUniqueIssuePullRequestAttachments(
     combined.push(attachment);
   }
   return combined;
+}
+
+function excludeIssuePullRequestAttachments(
+  attachments: ProviderLinearWorkflowAttachment[],
+  excluded: ProviderLinearWorkflowAttachment[]
+): ProviderLinearWorkflowAttachment[] {
+  if (attachments.length === 0 || excluded.length === 0) {
+    return [...attachments];
+  }
+  const excludedIds = new Set(excluded.map((attachment) => attachment.id));
+  return attachments.filter((attachment) => !excludedIds.has(attachment.id));
 }
 
 function selectCurrentMergingPullRequestAttachment(
