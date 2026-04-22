@@ -161,18 +161,20 @@ export function deriveDeterministicProviderMutationSuppressions(
     .filter((entry) =>
       readTimestampMs(entry as unknown as Record<string, unknown>, 'recorded_at') >= recordedAtNotBeforeMs
     )
+    .filter((entry) => entry.ok === false && isDeterministicProviderMutationFailure(entry))
     .reduce<Map<string, ProviderLinearAuditEntry>>((latestByOperationAndAction, entry) => {
       latestByOperationAndAction.set(buildProviderLinearMutationEntryKey(entry), entry);
       return latestByOperationAndAction;
     }, new Map<string, ProviderLinearAuditEntry>());
   return Array.from(entries.values())
-    .filter((entry) => entry.ok === false && isDeterministicProviderMutationFailure(entry))
     .sort((left, right) => {
       const operationOrder = left.operation.localeCompare(right.operation);
       if (operationOrder !== 0) {
         return operationOrder;
       }
-      return normalizeAuditAction(left.action)?.localeCompare(normalizeAuditAction(right.action) ?? '') ?? 0;
+      const leftAction = normalizeAuditAction(left.action) ?? '';
+      const rightAction = normalizeAuditAction(right.action) ?? '';
+      return leftAction.localeCompare(rightAction);
     })
     .map((entry) => buildDeterministicProviderMutationSuppression(entry));
 }

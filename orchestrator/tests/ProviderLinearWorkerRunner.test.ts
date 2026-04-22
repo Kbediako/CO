@@ -1522,6 +1522,87 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     );
   });
 
+  it('preserves deterministic launch suppression after a later successful sibling launch', () => {
+    const issue = createTrackedIssue();
+    const continuationPrompt = buildProviderWorkerPrompt(issue, 2, 5, SOURCE_HELPER_COMMAND, '/tmp/co', {
+      linearAudit: {
+        path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+        attempted_count: 2,
+        success_count: 1,
+        failure_count: 1,
+        latest_recorded_at: '2026-03-21T09:01:00.000Z',
+        parallelization_entries: [],
+        latest_by_operation: {
+          'child-lane': {
+            recorded_at: '2026-03-21T09:01:00.000Z',
+            operation: 'child-lane',
+            ok: true,
+            issue_id: issue.id,
+            issue_identifier: issue.identifier,
+            source_setup: null,
+            action: 'launch',
+            via: null,
+            state: null,
+            follow_up_issue_id: null,
+            follow_up_issue_identifier: null,
+            failed_relation_type: null,
+            comment_id: null,
+            attachment_id: null,
+            error_code: null,
+            error_message: null
+          }
+        },
+        entries: [
+          {
+            recorded_at: '2026-03-21T09:00:00.000Z',
+            operation: 'child-lane',
+            ok: false,
+            issue_id: issue.id,
+            issue_identifier: issue.identifier,
+            source_setup: null,
+            action: 'launch',
+            via: null,
+            state: null,
+            follow_up_issue_id: null,
+            follow_up_issue_identifier: null,
+            failed_relation_type: null,
+            comment_id: null,
+            attachment_id: null,
+            error_code: 'provider_worker_child_lane_parent_dirty',
+            error_message:
+              'Parent workspace has in-scope pending changes: .tmp/notes.md. Revert, commit, or move scratch workpad/temp artifacts outside the repo before launching a child lane.'
+          },
+          {
+            recorded_at: '2026-03-21T09:01:00.000Z',
+            operation: 'child-lane',
+            ok: true,
+            issue_id: issue.id,
+            issue_identifier: issue.identifier,
+            source_setup: null,
+            action: 'launch',
+            via: null,
+            state: null,
+            follow_up_issue_id: null,
+            follow_up_issue_identifier: null,
+            failed_relation_type: null,
+            comment_id: null,
+            attachment_id: null,
+            error_code: null,
+            error_message: null
+          }
+        ]
+      },
+      attemptStartedAt: '2026-03-21T08:59:59.000Z'
+    });
+
+    expect(continuationPrompt).toContain(
+      'Same-attempt deterministic provider mutation suppressions are in effect'
+    );
+    expect(continuationPrompt).toContain(
+      'Do not retry `child-lane --action launch` in this attempt while the parent workspace still has in-scope dirty files.'
+    );
+  });
+
   it('ignores deterministic mutation suppressions that predate the current attempt', () => {
     const issue = createTrackedIssue();
     const helperCommand = SOURCE_HELPER_COMMAND;
