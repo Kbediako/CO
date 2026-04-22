@@ -18,6 +18,30 @@
       }
     },
     {
+      "id": "20260422-linear-994efebc-e1e4-4e00-8046-c60143813251",
+      "title": "CO-295 Linear PR attachment ownership truth",
+      "relates_to": "tasks/tasks-linear-994efebc-e1e4-4e00-8046-c60143813251.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-22",
+      "approvals": {
+        "rework_reset": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-22",
+          "status": "in_progress",
+          "summary": "Live issue-context moved CO-295 to Rework at 2026-04-22T05:14:49.427Z; PR #594 and the prior workpad were closed/reset, and the replacement branch is being rebuilt from origin/main before the new review handoff."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-994efebc-e1e4-4e00-8046-c60143813251.md",
+        "task": "tasks/tasks-linear-994efebc-e1e4-4e00-8046-c60143813251.md",
+        "agent_task": ".agent/task/linear-994efebc-e1e4-4e00-8046-c60143813251.md",
+        "docs": "docs/TECH_SPEC-linear-994efebc-e1e4-4e00-8046-c60143813251.md"
+      }
+    },
+    {
       "id": "20260422-linear-b2763227-e57b-497e-aae9-f40766a8a70c",
       "title": "CO: stabilize `tests/cli-source-bootstrap.spec.ts` signal-forwarding CI flake",
       "relates_to": "tasks/tasks-linear-b2763227-e57b-497e-aae9-f40766a8a70c.md",
