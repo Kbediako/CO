@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "id": "20260422-linear-b7838857-953c-48d1-97fd-ef75aaf31221",
+      "title": "CO: stop child-lane paths from polluting trusted-project state in global ~/.codex/config.toml",
+      "relates_to": "tasks/tasks-linear-b7838857-953c-48d1-97fd-ef75aaf31221.md", "risk": "high", "owners": ["Codex"], "last_review": "2026-04-22",
+      "approvals": {
+        "docs_packet_child_lane": {"reviewer": "bounded same-issue docs child lane", "date": "2026-04-22", "status": "produced", "manifest": ".runs/linear-b7838857-953c-48d1-97fd-ef75aaf31221-docs-packet/cli/2026-04-22T10-39-35-018Z-9f277b0c/manifest.json", "source_anchor": "ctx:sha256:5592e921272085385fb1db3d450715f2978bddf72fb4d9e61f25ea945e79bafd#chunk:c000001", "summary": "Docs-first packet created for CO-307 child-lane trust/config isolation. Local source-0 payload was unavailable because this child checkout has no .runs tree, so the packet is anchored on the parent-provided issue description plus in-repo child-lane launch evidence: child lanes clone under `.child-lanes/<stream>-<run>`, inherit `CODEX_HOME`, and therefore expose the bounded seam behind `trusted-project pollution`, `child-lane paths`, and `global ~/.codex/config.toml growth`. The packet preserves the exact requirement to not weaken trust boundaries; parent owns implementation, validation, and any launch/home/config change."}
+      },
+      "paths": {"docs": "docs/TECH_SPEC-linear-b7838857-953c-48d1-97fd-ef75aaf31221.md"}
+    },
+    {
       "id": "20260422-linear-d9c8d1b2-3b38-42ef-9087-556870e2d88f",
       "title": "CO: define preserved historical task-stub status semantics without triggering freshness or archive automation",
       "relates_to": "tasks/tasks-linear-d9c8d1b2-3b38-42ef-9087-556870e2d88f.md",
