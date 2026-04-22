@@ -526,8 +526,10 @@ async function writeCachedIssueContext(
     legacyPath?: boolean;
   }
 ): Promise<void> {
-  const issueId =
-    typeof issue.id === 'string' && issue.id.trim().length > 0 ? issue.id : 'lin-issue-1';
+  const issueId = typeof issue.id === 'string' ? issue.id.trim() : '';
+  if (!issueId) {
+    return;
+  }
   await writeFile(
     options?.legacyPath === true
       ? resolveLegacyIssueContextCachePathForTest(env)
