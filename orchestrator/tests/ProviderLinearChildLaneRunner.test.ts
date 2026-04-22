@@ -71,8 +71,8 @@ describe('provider linear child lane runner', () => {
       '[projects."/Users/kbediako/Code/CO/.workspaces/linear-123/.child-lanes/tests-c"]',
       'trust_level = "untrusted"',
       '',
-      '[projects."/Users/kbediako/Code/other"]',
-      'trust_level = "trusted"',
+      '[[profiles]]',
+      'name = "default"',
       ''
     ].join('\n');
 
@@ -89,7 +89,7 @@ describe('provider linear child lane runner', () => {
     expect(plan.nextConfig).toContain('[projects."/Users/kbediako/Code/CO/.workspaces/linear-123/.child-lanes/tests-b"]');
     expect(plan.nextConfig).toContain('[projects."/Users/kbediako/Code/CO/.workspaces/linear-123"]');
     expect(plan.nextConfig).toContain('[projects."/Users/kbediako/Code/CO/.workspaces/linear-123/.child-lanes/tests-c"]');
-    expect(plan.nextConfig).toContain('[projects."/Users/kbediako/Code/other"]');
+    expect(plan.nextConfig).toContain('[[profiles]]');
   });
 
   it('does not remove child-lane trust entries when no separate trusted ancestor exists', () => {

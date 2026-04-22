@@ -198,7 +198,7 @@ function parseProjectTableHeader(line: string): string | null {
 }
 
 function isTomlTableHeader(line: string): boolean {
-  return /^\s*\[[^\]]+\]\s*(?:#.*)?$/u.test(line);
+  return /^\s*(?:\[\[[^\]]+\]\]|\[[^\]]+\])\s*(?:#.*)?$/u.test(line);
 }
 
 function findTrustedAncestorProject(
