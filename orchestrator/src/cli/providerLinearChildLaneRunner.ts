@@ -957,6 +957,20 @@ function commandSegmentShowsParentOwnedScopeDrift(
   }
   const commandToken = stripShellCommandTokenQuotes(tokens[commandIndex] ?? '');
   const commandBase = basename(commandToken);
+  if (commandBase === 'eval') {
+    const nestedCommandTokens: string[] = [];
+    for (let index = commandIndex + 1; index < segmentEnd; index += 1) {
+      const token = stripShellCommandTokenQuotes(tokens[index] ?? '');
+      if (!token) {
+        continue;
+      }
+      if (nestedCommandTokens.length === 0 && token === '--') {
+        continue;
+      }
+      nestedCommandTokens.push(token);
+    }
+    return nestedCommandTokens.length > 0 ? commandShowsParentOwnedScopeDrift(nestedCommandTokens.join(' ')) : false;
+  }
   if (shellCommandWrappers.has(commandBase)) {
     const shellOptionsWithValues = new Set(['-o', '-O', '--rcfile', '--init-file']);
     for (let index = commandIndex + 1; index < segmentEnd; index += 1) {

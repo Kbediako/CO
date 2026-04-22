@@ -939,6 +939,36 @@ describe('provider linear child lane runner', () => {
 
     expect(
       childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
+        timestamp: '2026-04-22T06:13:32.750Z',
+        type: 'response_item',
+        payload: {
+          type: 'function_call',
+          name: 'exec_command',
+          arguments: JSON.stringify({
+            cmd: 'eval "git push origin HEAD"',
+            workdir: '/tmp/child'
+          })
+        }
+      })
+    ).toEqual(['2026-04-22T06:13:32.750Z exec_command eval "git push origin HEAD"']);
+
+    expect(
+      childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
+        timestamp: '2026-04-22T06:13:32.875Z',
+        type: 'response_item',
+        payload: {
+          type: 'function_call',
+          name: 'exec_command',
+          arguments: JSON.stringify({
+            cmd: 'eval "gh pr view 123"',
+            workdir: '/tmp/child'
+          })
+        }
+      })
+    ).toEqual(['2026-04-22T06:13:32.875Z exec_command eval "gh pr view 123"']);
+
+    expect(
+      childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
         timestamp: '2026-04-22T06:13:33.000Z',
         type: 'response_item',
         payload: {
