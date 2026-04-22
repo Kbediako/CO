@@ -791,6 +791,10 @@ function segmentShowsParentOwnedOrchestratorScopeDrift(tokens: string[], start: 
   return false;
 }
 
+function tokenInvokesCodexOrchestrator(token: string): boolean {
+  return /^(?:codex-orchestrator(?:\.js)?|codex-orchestrator@.+)$/u.test(basename(token));
+}
+
 function packageExecSegmentShowsParentOwnedScopeDrift(
   tokens: string[],
   commandStart: number,
@@ -815,8 +819,7 @@ function packageExecSegmentShowsParentOwnedScopeDrift(
       }
       continue;
     }
-    const executableBase = basename(token);
-    if (executableBase !== 'codex-orchestrator' && executableBase !== 'codex-orchestrator.js') {
+    if (!tokenInvokesCodexOrchestrator(token)) {
       return false;
     }
     return segmentShowsParentOwnedOrchestratorScopeDrift(tokens, index + 1, segmentEnd);
@@ -900,7 +903,7 @@ function commandSegmentShowsParentOwnedScopeDrift(
   if (commandBase === 'npm') {
     return npmExecSegmentShowsParentOwnedScopeDrift(tokens, commandIndex + 1, segmentEnd);
   }
-  if (commandBase === 'codex-orchestrator' || commandBase === 'codex-orchestrator.js') {
+  if (tokenInvokesCodexOrchestrator(commandToken)) {
     return segmentShowsParentOwnedOrchestratorScopeDrift(tokens, commandIndex + 1, segmentEnd);
   }
   if (commandBase === 'node' || commandBase === 'bun') {
@@ -923,8 +926,7 @@ function commandSegmentShowsParentOwnedScopeDrift(
         }
         continue;
       }
-      const scriptBase = basename(token);
-      if (scriptBase !== 'codex-orchestrator' && scriptBase !== 'codex-orchestrator.js') {
+      if (!tokenInvokesCodexOrchestrator(token)) {
         return false;
       }
       return segmentShowsParentOwnedOrchestratorScopeDrift(tokens, index + 1, segmentEnd);

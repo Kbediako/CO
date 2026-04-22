@@ -1092,6 +1092,40 @@ describe('provider linear child lane runner', () => {
     ).toEqual([
       '2026-04-22T06:13:38.050Z exec_command npm exec -- codex-orchestrator linear transition --issue-id 123'
     ]);
+
+    expect(
+      childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
+        timestamp: '2026-04-22T06:13:38.075Z',
+        type: 'response_item',
+        payload: {
+          type: 'function_call',
+          name: 'exec_command',
+          arguments: JSON.stringify({
+            cmd: 'npx codex-orchestrator@latest start provider-linear-worker --issue-id 123',
+            workdir: '/tmp/child'
+          })
+        }
+      })
+    ).toEqual([
+      '2026-04-22T06:13:38.075Z exec_command npx codex-orchestrator@latest start provider-linear-worker --issue-id 123'
+    ]);
+
+    expect(
+      childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
+        timestamp: '2026-04-22T06:13:38.100Z',
+        type: 'response_item',
+        payload: {
+          type: 'function_call',
+          name: 'exec_command',
+          arguments: JSON.stringify({
+            cmd: 'npm exec -- codex-orchestrator@latest linear transition --issue-id 123',
+            workdir: '/tmp/child'
+          })
+        }
+      })
+    ).toEqual([
+      '2026-04-22T06:13:38.100Z exec_command npm exec -- codex-orchestrator@latest linear transition --issue-id 123'
+    ]);
   });
 
   it('does not treat shell-wrapped heredoc or echoed git text as scope drift', () => {
