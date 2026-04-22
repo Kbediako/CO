@@ -864,7 +864,7 @@ async function launchChildLane(
     env: params.env,
     warningContext: `after recording child lane ${stream}`
   });
-  const launchExitedNonZero = execResult ? execResult.exitCode !== 0 : false;
+  const launchExitedNonZero = recoveredLaunch ? false : execResult ? execResult.exitCode !== 0 : false;
   if (launchExitedNonZero || childRun.status !== 'succeeded') {
     const childFailureDetail =
       normalizeOptionalString(childProof?.last_message) ??

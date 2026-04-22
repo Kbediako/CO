@@ -781,6 +781,24 @@ describe('provider linear child lane runner', () => {
     ).resolves.toContain('Appserver child lane drifted into parent-owned GitHub/Linear/PR lifecycle work for CO-303.');
   });
 
+  it('fails closed when a discovered session log becomes unreadable mid-monitor', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-runner-'));
+    const sessionLogPath = join(tempRoot, 'missing-session-log.jsonl');
+
+    await expect(
+      childLaneRunnerTest.waitForProviderLinearChildLaneScopeDrift({
+        context: {
+          issueIdentifier: 'CO-303'
+        },
+        sessionLogPath,
+        isExecSettled: () => false,
+        deps: {
+          sleep: async () => undefined
+        }
+      })
+    ).resolves.toContain('drift_monitor_unreadable missing-session-log.jsonl');
+  });
+
   it('detects transient child-lane commits that reset back to the starting head', async () => {
     tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-runner-'));
     const laneWorkspacePath = join(tempRoot, 'workspace');
@@ -841,6 +859,29 @@ describe('provider linear child lane runner', () => {
         startingReflogEntryCount
       )
     ).resolves.toEqual([mergeCommitSha, cherryPickCommitSha]);
+  });
+
+  it('exports the unauthorized commit patch from the newest created commit after a reset to base', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-runner-'));
+    const laneWorkspacePath = join(tempRoot, 'workspace');
+    const runDir = join(tempRoot, 'run');
+    const startingHeadSha = await initGitRepo(laneWorkspacePath);
+    await mkdir(runDir, { recursive: true });
+
+    await writeFile(join(laneWorkspacePath, 'README.md'), 'initial\ntransient\n', 'utf8');
+    runGit(laneWorkspacePath, ['add', 'README.md']);
+    runGit(laneWorkspacePath, ['commit', '-m', 'transient child commit']);
+    const transientCommitSha = runGit(laneWorkspacePath, ['rev-parse', 'HEAD']);
+    runGit(laneWorkspacePath, ['reset', '--hard', startingHeadSha]);
+
+    const { patchArtifactPath } = await childLaneRunnerTest.createPatchArtifact(
+      laneWorkspacePath,
+      runDir,
+      startingHeadSha,
+      transientCommitSha
+    );
+
+    await expect(readFile(patchArtifactPath, 'utf8')).resolves.toContain('+transient');
   });
 
   it('ignores plain head movement across existing commits when no child commit was created', async () => {

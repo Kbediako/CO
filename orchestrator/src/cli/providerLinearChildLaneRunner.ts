@@ -850,7 +850,12 @@ async function waitForProviderLinearChildLaneScopeDrift(input: {
 }): Promise<string | null> {
   const readScopeDriftMessage = async (): Promise<string | null> => {
     const evidence = await scanProviderLinearChildLaneSessionLogForParentScopeDrift(input.sessionLogPath).catch(
-      () => []
+      (error) => [
+        formatProviderLinearChildLaneScopeDriftEvidence(
+          null,
+          `drift_monitor_unreadable ${basename(input.sessionLogPath)}: ${error instanceof Error ? error.message : String(error)}`
+        )
+      ]
     );
     if (evidence.length === 0) {
       return null;
@@ -1264,12 +1269,15 @@ async function prepareLaneWorkspace(
 async function createPatchArtifact(
   laneWorkspacePath: string,
   runDir: string,
-  baselineRef = 'HEAD'
+  baselineRef = 'HEAD',
+  targetRef: string | null = null
 ): Promise<{ patchArtifactPath: string; patchBytes: number }> {
   await execFileAsync('git', ['-C', laneWorkspacePath, 'add', '-N', '.']);
   const diff = await execFileAsync(
     'git',
-    ['-C', laneWorkspacePath, 'diff', '--binary', '--no-ext-diff', baselineRef, '--', '.'],
+    targetRef
+      ? ['-C', laneWorkspacePath, 'diff', '--binary', '--no-ext-diff', baselineRef, targetRef, '--', '.']
+      : ['-C', laneWorkspacePath, 'diff', '--binary', '--no-ext-diff', baselineRef, '--', '.'],
     {
       maxBuffer: 20 * 1024 * 1024
     }
@@ -1557,8 +1565,10 @@ export async function runProviderLinearChildLane(
       currentHeadSha,
       createdCommitShas
     });
+    const patchTargetRef = createdCommitShas[0] ?? null;
     const patchBaselineRef =
-      context.parentSnapshot.base_sha && currentHeadSha && context.parentSnapshot.base_sha !== currentHeadSha
+      context.parentSnapshot.base_sha &&
+      (patchTargetRef !== null || (currentHeadSha !== null && context.parentSnapshot.base_sha !== currentHeadSha))
         ? context.parentSnapshot.base_sha
         : 'HEAD';
     const forcedFailureMessage = scopeDriftMessage ?? unauthorizedCommitMessage;
@@ -1569,7 +1579,8 @@ export async function runProviderLinearChildLane(
       ({ patchArtifactPath, patchBytes } = await createPatchArtifact(
         laneWorkspacePath,
         context.runDir,
-        patchBaselineRef
+        patchBaselineRef,
+        patchTargetRef
       ));
       proof = {
         issue_id: context.issueId,
@@ -1653,6 +1664,7 @@ if (entry && entry === self) {
 export const __test__ = {
   buildChildLanePrompt,
   buildProviderLinearChildLaneAppserverStartupTimeoutMessage,
+  createPatchArtifact,
   detectProviderLinearChildLaneCreatedCommitShas,
   discoverProviderLinearChildLaneSessionLogPath,
   planTrustedProjectCleanup,

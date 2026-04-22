@@ -2572,7 +2572,7 @@ describe('runProviderLinearChildLaneShell', () => {
           }
           wroteRecovery = true;
           resolveExec?.({
-            exitCode: 0,
+            exitCode: 1,
             stdout: 'not-json',
             stderr: ''
           });
