@@ -20,8 +20,8 @@ const LINEAR_ISSUE_CONTEXT_TIMEOUT_MS = 60_000;
 const PASSING_DECISIONS = new Set(['clean', 'pass_with_owned_rolling_debt']);
 const CANONICAL_OWNER_MARKER_PREFIX = 'codex-orchestrator:canonical-owner-key=';
 const CANONICAL_OWNER_KEY_MAX_LENGTH = 512;
-const TERMINAL_WORKFLOW_STATE_TYPES = new Set(['completed', 'canceled', 'cancelled']);
-const TERMINAL_WORKFLOW_STATES = new Set(['done', 'completed', 'canceled', 'cancelled']);
+const TERMINAL_WORKFLOW_STATE_TYPES = new Set(['completed', 'canceled', 'cancelled', 'duplicate']);
+const TERMINAL_WORKFLOW_STATES = new Set(['done', 'completed', 'canceled', 'cancelled', 'duplicate']);
 
 function showUsage() {
   console.log(`Usage: node scripts/docs-freshness-maintain.mjs [options]
@@ -791,12 +791,18 @@ export async function runDocsFreshnessMaintain(
     outRoot,
     taskId
   });
+  const hasOwnerRelevantDebt =
+    (Array.isArray(freshnessResult.report?.stale_entries) && freshnessResult.report.stale_entries.length > 0) ||
+    (Array.isArray(freshnessResult.report?.rolling_cohort_entries) &&
+      freshnessResult.report.rolling_cohort_entries.length > 0);
   const [diffResult, specGuard, ownerIssueVerification] = await Promise.all([
     Array.isArray(changedPaths)
       ? Promise.resolve({ base_ref: baseRef, status: 'provided', paths: changedPaths })
       : collectChangedPaths(repoRoot, { baseRef }),
     runSpecGuard(repoRoot, { skip: skipSpecGuard }),
-    verifyOwnerIssueContext(repoRoot, freshnessResult.report?.rolling_freshness_policy?.owner_issue ?? null)
+    hasOwnerRelevantDebt
+      ? verifyOwnerIssueContext(repoRoot, freshnessResult.report?.rolling_freshness_policy?.owner_issue ?? null)
+      : Promise.resolve(null)
   ]);
   const decision = buildDocsFreshnessMaintenanceDecision(freshnessResult.report, {
     changedPaths: diffResult.paths,
