@@ -1274,6 +1274,21 @@ function classifyIssuePullRequestAttachments(
   const ownershipUnknown = resolved.filter(
     (candidate) => classifyIssuePullRequestCandidateOwnership(issue, candidate) === 'unknown'
   );
+  const terminalOwned = ownershipOwned.filter((candidate) =>
+    isIssuePullRequestSnapshotTerminal(candidate.snapshot)
+  );
+  const activeOwned = ownershipOwned.filter(
+    (candidate) => !isIssuePullRequestSnapshotTerminal(candidate.snapshot)
+  );
+  const terminalUnknownCandidates = ownershipUnknown.filter((candidate) =>
+    isIssuePullRequestSnapshotTerminal(candidate.snapshot)
+  );
+  const activeUnknown = ownershipUnknown.filter(
+    (candidate) => !isIssuePullRequestSnapshotTerminal(candidate.snapshot)
+  );
+  const activeConflicting = ownershipConflicting.filter(
+    (candidate) => !isIssuePullRequestSnapshotTerminal(candidate.snapshot)
+  );
   const selectionCandidates = ownershipOwned.length > 0 ? ownershipOwned : ownershipUnknown;
   const ownershipConflictingAttachments = appendUniqueIssuePullRequestAttachments(
     preclassifiedConflicting,
@@ -1290,6 +1305,35 @@ function classifyIssuePullRequestAttachments(
       conflicting: appendUniqueIssuePullRequestAttachments([], ownershipConflictingAttachments),
       unknown: unknownAttachments
     };
+  }
+  if (
+    !workflowState.isTerminal &&
+    workflowState.normalizedState !== 'merging' &&
+    activeOwned.length === 0
+  ) {
+    const carriedUnknownAttachments = appendUniqueIssuePullRequestAttachments(
+      unknown,
+      terminalUnknownCandidates.map((candidate) => candidate.attachment)
+    );
+    if (activeUnknown.length === 1 && activeConflicting.length === 0) {
+      return {
+        current: activeUnknown[0]!.attachment,
+        historical: terminalOwned.map((candidate) => candidate.attachment),
+        conflicting: appendUniqueIssuePullRequestAttachments([], ownershipConflictingAttachments),
+        unknown: carriedUnknownAttachments
+      };
+    }
+    if (activeUnknown.length + activeConflicting.length > 0) {
+      return {
+        current: null,
+        historical: terminalOwned.map((candidate) => candidate.attachment),
+        conflicting: appendUniqueIssuePullRequestAttachments(
+          activeUnknown.map((candidate) => candidate.attachment),
+          ownershipConflictingAttachments
+        ),
+        unknown: carriedUnknownAttachments
+      };
+    }
   }
   const terminal = selectionCandidates.filter((candidate) =>
     isIssuePullRequestSnapshotTerminal(candidate.snapshot)

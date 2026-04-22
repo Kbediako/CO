@@ -2589,6 +2589,111 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it('keeps a single generic active PR current on active issues even when owned history exists', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Active issue with owned history and one generic live PR',
+      state: {
+        id: 'state-in-progress',
+        name: 'In Progress',
+        type: 'started'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-532', 532, 'CO-244 closeout PR'),
+        buildGitHubAttachment('attachment-pr-589', 589, 'Refactor provider rehydration')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 532
+          ? {
+              state: 'MERGED',
+              mergedAt: '2026-04-10T13:11:30.000Z',
+              updatedAt: '2026-04-10T13:11:30.000Z',
+              title: 'CO-244 completed provider release',
+              headRefName: 'linear/co-244-completed-provider-release'
+            }
+          : {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:07:51.000Z',
+              title: 'Refactor provider rehydration',
+              headRefName: 'feature/refactor-provider-rehydration'
+            }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-589'
+          },
+          historical: [
+            {
+              id: 'attachment-pr-532'
+            }
+          ],
+          conflicting: [],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it('preserves ambiguity when foreign and generic active PRs coexist without owned evidence', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Active issue with foreign and generic live PRs',
+      state: {
+        id: 'state-in-progress',
+        name: 'In Progress',
+        type: 'started'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-590', 590, 'Refactor provider rehydration'),
+        buildGitHubAttachment('attachment-pr-591', 591, 'ABC-123 foreign provider lane')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 590
+          ? {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:07:51.000Z',
+              title: 'Refactor provider rehydration',
+              headRefName: 'feature/refactor-provider-rehydration'
+            }
+          : {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:08:11.000Z',
+              title: 'ABC-123 foreign provider lane',
+              headRefName: 'linear/abc-123-foreign-provider-lane'
+            }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: null,
+          historical: [],
+          conflicting: [
+            {
+              id: 'attachment-pr-590'
+            },
+            {
+              id: 'attachment-pr-591'
+            }
+          ],
+          unknown: []
+        }
+      }
+    });
+  });
+
   it('preserves the owning issue current PR when the PR identifier matches', async () => {
     const { result } = await readIssueContextAttachmentTruth({
       identifier: 'CO-289',
