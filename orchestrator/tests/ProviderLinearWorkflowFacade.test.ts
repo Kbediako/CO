@@ -25,6 +25,28 @@ const scopedSourceSetup = {
   project_id: 'lin-project-1'
 };
 const tempDirs: string[] = [];
+const TEAM_STATES_NODES = [
+  {
+    id: 'state-backlog',
+    name: 'Backlog',
+    type: 'unstarted'
+  },
+  {
+    id: 'state-in-progress',
+    name: 'In Progress',
+    type: 'started'
+  },
+  {
+    id: 'state-human-review',
+    name: 'Human Review',
+    type: 'started'
+  },
+  {
+    id: 'state-done',
+    name: 'Done',
+    type: 'completed'
+  }
+];
 
 afterEach(async () => {
   await Promise.all(
@@ -71,28 +93,7 @@ function buildIssueContextBody(overrides: Record<string, unknown> = {}): unknown
           key: 'CO',
           name: 'Codex Orchestrator',
           states: {
-            nodes: [
-              {
-                id: 'state-backlog',
-                name: 'Backlog',
-                type: 'unstarted'
-              },
-              {
-                id: 'state-in-progress',
-                name: 'In Progress',
-                type: 'started'
-              },
-              {
-                id: 'state-human-review',
-                name: 'Human Review',
-                type: 'started'
-              },
-              {
-                id: 'state-done',
-                name: 'Done',
-                type: 'completed'
-              }
-            ]
+            nodes: TEAM_STATES_NODES
           }
         },
         project: {
@@ -605,28 +606,7 @@ async function readIssueContextAttachmentTruth(options: {
           key: teamKey,
           name: teamKey === 'CO' ? 'Codex Orchestrator' : teamKey,
           states: {
-            nodes: [
-              {
-                id: 'state-backlog',
-                name: 'Backlog',
-                type: 'unstarted'
-              },
-              {
-                id: 'state-in-progress',
-                name: 'In Progress',
-                type: 'started'
-              },
-              {
-                id: 'state-human-review',
-                name: 'Human Review',
-                type: 'started'
-              },
-              {
-                id: 'state-done',
-                name: 'Done',
-                type: 'completed'
-              }
-            ]
+            nodes: TEAM_STATES_NODES
           }
         },
         attachments: { nodes: options.attachments }
@@ -2616,6 +2596,58 @@ describe('providerLinearWorkflowFacade', () => {
               id: 'attachment-pr-589'
             }
           ]
+        }
+      }
+    });
+  });
+
+  it('keeps a single generic active PR current on merging issues even when owned history exists', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Merging issue with owned history and generic active PR',
+      state: {
+        id: 'state-merging',
+        name: 'Merging',
+        type: 'started'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-532', 532, 'CO-244 closeout PR'),
+        buildGitHubAttachment('attachment-pr-589', 589, 'Refactor provider rehydration')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 532
+          ? {
+              state: 'MERGED',
+              mergedAt: '2026-04-10T13:11:30.000Z',
+              updatedAt: '2026-04-10T13:11:30.000Z',
+              title: 'CO-244 completed provider release',
+              headRefName: 'linear/co-244-completed-provider-release'
+            }
+          : {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:07:51.000Z',
+              title: 'Refactor provider rehydration',
+              headRefName: 'feature/refactor-provider-rehydration'
+            }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-589'
+          },
+          historical: [
+            {
+              id: 'attachment-pr-532'
+            }
+          ],
+          conflicting: [],
+          unknown: []
         }
       }
     });

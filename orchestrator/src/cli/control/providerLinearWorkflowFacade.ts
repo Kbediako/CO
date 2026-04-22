@@ -1289,7 +1289,7 @@ function classifyIssuePullRequestAttachments(
   const activeConflicting = ownershipConflicting.filter(
     (candidate) => !isIssuePullRequestSnapshotTerminal(candidate.snapshot)
   );
-  const selectionCandidates = ownershipOwned.length > 0 ? ownershipOwned : ownershipUnknown;
+  const selectionCandidates = activeOwned.length > 0 ? ownershipOwned : [...ownershipOwned, ...ownershipUnknown];
   const ownershipConflictingAttachments = appendUniqueIssuePullRequestAttachments(
     preclassifiedConflicting,
     ownershipConflicting.map((candidate) => candidate.attachment)
@@ -1297,6 +1297,10 @@ function classifyIssuePullRequestAttachments(
   const unknownAttachments = appendUniqueIssuePullRequestAttachments(
     unknown,
     ownershipOwned.length > 0 ? ownershipUnknown.map((candidate) => candidate.attachment) : []
+  );
+  const carriedUnknownAttachments = appendUniqueIssuePullRequestAttachments(
+    unknown,
+    terminalUnknownCandidates.map((candidate) => candidate.attachment)
   );
   if (selectionCandidates.length === 0) {
     return {
@@ -1307,10 +1311,6 @@ function classifyIssuePullRequestAttachments(
     };
   }
   if (activeOwned.length === 0) {
-    const carriedUnknownAttachments = appendUniqueIssuePullRequestAttachments(
-      unknown,
-      terminalUnknownCandidates.map((candidate) => candidate.attachment)
-    );
     if (activeUnknown.length > 0 && activeConflicting.length > 0) {
       return {
         current: null,
@@ -1334,6 +1334,32 @@ function classifyIssuePullRequestAttachments(
         unknown: carriedUnknownAttachments
       };
     }
+    if (workflowState.isTerminal && activeUnknown.length > 0) {
+      const terminalSelection = selectCurrentMergingPullRequestAttachment(terminalOwned);
+      if (terminalSelection) {
+        return {
+          current: terminalSelection.current.attachment,
+          historical: terminalSelection.historical.map((candidate) => candidate.attachment),
+          conflicting: appendUniqueIssuePullRequestAttachments(
+            terminalSelection.conflicting.map((candidate) => candidate.attachment),
+            ownershipConflictingAttachments
+          ),
+          unknown: appendUniqueIssuePullRequestAttachments(
+            carriedUnknownAttachments,
+            ownershipUnknown.map((candidate) => candidate.attachment)
+          )
+        };
+      }
+      return {
+        current: null,
+        historical: [],
+        conflicting: appendUniqueIssuePullRequestAttachments([], ownershipConflictingAttachments),
+        unknown: appendUniqueIssuePullRequestAttachments(
+          carriedUnknownAttachments,
+          ownershipUnknown.map((candidate) => candidate.attachment)
+        )
+      };
+    }
   }
   const terminal = selectionCandidates.filter((candidate) =>
     isIssuePullRequestSnapshotTerminal(candidate.snapshot)
@@ -1342,6 +1368,13 @@ function classifyIssuePullRequestAttachments(
   if (workflowState.normalizedState === 'merging') {
     const mergingSelection = selectCurrentMergingPullRequestAttachment(selectionCandidates);
     if (mergingSelection) {
+      const mergingSelectionAttachmentIds = new Set(
+        [
+          mergingSelection.current,
+          ...mergingSelection.historical,
+          ...mergingSelection.conflicting
+        ].map((candidate) => candidate.attachment.id)
+      );
       return {
         current: mergingSelection.current.attachment,
         historical: mergingSelection.historical.map((candidate) => candidate.attachment),
@@ -1349,7 +1382,9 @@ function classifyIssuePullRequestAttachments(
           mergingSelection.conflicting.map((candidate) => candidate.attachment),
           ownershipConflictingAttachments
         ),
-        unknown: unknownAttachments
+        unknown: (activeOwned.length === 0 ? carriedUnknownAttachments : unknownAttachments).filter(
+          (attachment) => !mergingSelectionAttachmentIds.has(attachment.id)
+        )
       };
     }
   }
