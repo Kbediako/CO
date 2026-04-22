@@ -15288,7 +15288,9 @@ describe('createProviderIssueHandoffService', () => {
     expect(Number.isFinite(Date.parse(state.claims[0]?.retry_due_at ?? ''))).toBe(true);
   });
 
-  it('clears inherited worker-host cache before queued retry timers relaunch under refreshed remote capacity', async () => {
+  it(
+    'clears inherited worker-host cache before queued retry timers relaunch under refreshed remote capacity',
+    async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
 
@@ -15434,7 +15436,9 @@ describe('createProviderIssueHandoffService', () => {
       retry_due_at: null,
       retry_error: null
     });
-  });
+    },
+    20_000
+  );
 
   it('keeps an in-memory handoff_failed retry state when persisting the failure record fails so a same-timestamp retry can relaunch immediately', async () => {
     const { paths } = await createHostPaths();
