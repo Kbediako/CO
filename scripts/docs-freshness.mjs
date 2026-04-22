@@ -20,7 +20,10 @@ import {
 import { resolveEnvironmentPaths } from './lib/run-manifests.js';
 
 const DEFAULT_REGISTRY_PATH = 'docs/docs-freshness-registry.json';
-const STATUS_VALUES = new Set(['active', 'archived', 'deprecated']);
+const PRESERVED_HISTORICAL_STUB_STATUS = 'preserved_historical_stub';
+const STATUS_VALUES = new Set(['active', 'archived', 'deprecated', PRESERVED_HISTORICAL_STUB_STATUS]);
+const OWNER_REQUIRED_STATUSES = new Set(['active', 'deprecated']);
+const STALE_ELIGIBLE_STATUSES = new Set(['active', 'deprecated']);
 const OWNER_PLACEHOLDERS = new Set(['tbd', 'unassigned', 'owner']);
 
 function showUsage() {
@@ -571,7 +574,7 @@ export async function runDocsFreshness(
       issues.push('invalid last_review');
     }
 
-    if (status === 'active' || status === 'deprecated') {
+    if (OWNER_REQUIRED_STATUSES.has(status)) {
       if (!owner || OWNER_PLACEHOLDERS.has(owner.toLowerCase())) {
         issues.push('missing owner');
       }
@@ -591,7 +594,7 @@ export async function runDocsFreshness(
     }
 
     if (reviewDate && Number.isInteger(cadenceDays) && cadenceDays > 0) {
-      if (status === 'active' || status === 'deprecated') {
+      if (STALE_ELIGIBLE_STATUSES.has(status)) {
         const ageDays = computeAgeInDays(reviewDate, today);
         if (ageDays > cadenceDays) {
           rawStaleEntries.push({
