@@ -861,6 +861,40 @@ describe('provider linear child lane runner', () => {
     ).resolves.toEqual([mergeCommitSha, cherryPickCommitSha]);
   });
 
+  it('detects transient child-lane commits created via rebase before resetting to the base', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-runner-'));
+    const laneWorkspacePath = join(tempRoot, 'workspace');
+    await initGitRepo(laneWorkspacePath);
+    const mainBranch = runGit(laneWorkspacePath, ['branch', '--show-current']);
+
+    runGit(laneWorkspacePath, ['checkout', '-b', 'feature']);
+    await writeFile(join(laneWorkspacePath, 'feature.txt'), 'feature\n', 'utf8');
+    runGit(laneWorkspacePath, ['add', 'feature.txt']);
+    runGit(laneWorkspacePath, ['commit', '-m', 'feature']);
+
+    runGit(laneWorkspacePath, ['checkout', mainBranch]);
+    await writeFile(join(laneWorkspacePath, 'base.txt'), 'base advance\n', 'utf8');
+    runGit(laneWorkspacePath, ['add', 'base.txt']);
+    runGit(laneWorkspacePath, ['commit', '-m', 'base advance']);
+    const startingHeadSha = runGit(laneWorkspacePath, ['rev-parse', 'HEAD']);
+    const startingReflogEntryCount = runGit(laneWorkspacePath, ['reflog', '--format=%H'])
+      .split('\n')
+      .filter(Boolean).length;
+
+    runGit(laneWorkspacePath, ['checkout', 'feature']);
+    runGit(laneWorkspacePath, ['rebase', mainBranch]);
+    const rebaseCommitSha = runGit(laneWorkspacePath, ['rev-parse', 'HEAD']);
+    runGit(laneWorkspacePath, ['reset', '--hard', startingHeadSha]);
+
+    await expect(
+      childLaneRunnerTest.detectProviderLinearChildLaneCreatedCommitShas(
+        laneWorkspacePath,
+        startingHeadSha,
+        startingReflogEntryCount
+      )
+    ).resolves.toEqual([rebaseCommitSha]);
+  });
+
   it('exports the unauthorized commit patch from the newest created commit after a reset to base', async () => {
     tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-runner-'));
     const laneWorkspacePath = join(tempRoot, 'workspace');
