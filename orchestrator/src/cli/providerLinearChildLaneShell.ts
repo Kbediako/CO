@@ -19,6 +19,7 @@ import {
 import { sanitizeRunId } from '../persistence/sanitizeRunId.js';
 import { logger } from '../logger.js';
 import {
+  PROVIDER_LINEAR_WORKER_PROOF_FILENAME,
   defaultExecRunner,
   loadProviderLinearWorkerContext,
   refreshProviderLinearWorkerProofSnapshot,
@@ -30,6 +31,15 @@ import {
   type ProviderLinearWorkerExecRequest,
   type ProviderLinearWorkerExecResult
 } from './providerLinearWorkerRunner.js';
+import {
+  isChildLaneParentDirtySuppressionCode,
+  findDeterministicProviderMutationSuppression,
+  resolveProviderLinearWorkerAttemptStartedAt
+} from './control/providerLinearWorkerTruth.js';
+import {
+  resolveProviderLinearAuditPath,
+  summarizeProviderLinearAuditPath
+} from './control/providerLinearWorkflowAudit.js';
 import {
   PROVIDER_LINEAR_CHILD_LANE_FILES_ENV,
   PROVIDER_LINEAR_CHILD_LANE_INSTRUCTIONS_ENV,
@@ -431,6 +441,24 @@ async function launchChildLane(
     });
   }
   if (dirtyScopeConflict) {
+    const retrySuppression = await resolveSameAttemptParentDirtyRetrySuppression(
+      context.runDir,
+      params.env
+    );
+    if (retrySuppression) {
+      return failureResult({
+        action: 'launch',
+        issueId: context.issueId,
+        issueIdentifier: context.issueIdentifier,
+        sourceSetup,
+        stream,
+        childRun: null,
+        childLane: null,
+        code: 'provider_worker_child_lane_parent_dirty_retry_suppressed',
+        message: `${dirtyScopeConflict} Same-attempt retry suppression is in effect: ${retrySuppression.instruction}`,
+        status: 409
+      });
+    }
     return failureResult({
       action: 'launch',
       issueId: context.issueId,
@@ -1251,6 +1279,44 @@ function childLaneDecisionFailureResult(input: {
     message: `Pending child lane ${input.stream} is still launching and cannot be ${input.action === 'accept' ? 'accepted' : input.action === 'reject' ? 'rejected' : 'invalidated'} yet.`,
     status: 409
   });
+}
+
+async function resolveSameAttemptParentDirtyRetrySuppression(
+  runDir: string,
+  env: NodeJS.ProcessEnv
+): Promise<ReturnType<typeof findDeterministicProviderMutationSuppression>> {
+  const auditPath = resolveProviderLinearAuditPath(env);
+  if (!auditPath) {
+    return null;
+  }
+  let rawProof: string;
+  try {
+    rawProof = await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8');
+  } catch {
+    return null;
+  }
+  let parsedProof: Record<string, unknown>;
+  try {
+    parsedProof = JSON.parse(rawProof) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  const attemptStartedAt = resolveProviderLinearWorkerAttemptStartedAt(parsedProof);
+  if (!attemptStartedAt) {
+    return null;
+  }
+  const audit = await summarizeProviderLinearAuditPath(auditPath);
+  const suppression = findDeterministicProviderMutationSuppression(
+    audit,
+    'child-lane',
+    {
+      recordedAtNotBefore: attemptStartedAt,
+      action: 'launch'
+    }
+  );
+  return suppression && isChildLaneParentDirtySuppressionCode(suppression.error_code)
+    ? suppression
+    : null;
 }
 
 async function finalizePendingChildLaneDecision(input: {

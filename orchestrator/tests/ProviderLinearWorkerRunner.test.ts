@@ -1337,6 +1337,153 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     );
   });
 
+  it('includes child-lane parent-dirty suppression guidance in continuation prompts for the same attempt', () => {
+    const issue = createTrackedIssue();
+    const helperCommand = SOURCE_HELPER_COMMAND;
+    const audit: ProviderLinearAuditSummary = {
+      path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+      attempted_count: 1,
+      success_count: 0,
+      failure_count: 1,
+      latest_recorded_at: '2026-03-21T09:00:00.000Z',
+      parallelization_entries: [],
+      latest_by_operation: {
+        'child-lane': {
+          recorded_at: '2026-03-21T09:00:00.000Z',
+          operation: 'child-lane',
+          ok: false,
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          source_setup: null,
+          action: 'launch',
+          via: null,
+          state: null,
+          follow_up_issue_id: null,
+          follow_up_issue_identifier: null,
+          failed_relation_type: null,
+          comment_id: null,
+          attachment_id: null,
+          error_code: 'provider_worker_child_lane_parent_dirty',
+          error_message:
+            'Parent workspace has in-scope pending changes: .tmp/notes.md. Revert, commit, or move scratch workpad/temp artifacts outside the repo before launching a child lane.'
+        }
+      }
+    };
+
+    const continuationPrompt = buildProviderWorkerPrompt(issue, 2, 5, helperCommand, '/tmp/co', {
+      linearAudit: audit,
+      attemptStartedAt: '2026-03-21T08:59:59.000Z'
+    });
+
+    expect(continuationPrompt).toContain(
+      'Same-attempt deterministic provider mutation suppressions are in effect'
+    );
+    expect(continuationPrompt).toContain(
+      'Do not retry `child-lane --action launch` in this attempt while the parent workspace still has in-scope dirty files.'
+    );
+  });
+
+  it('includes action-specific child-lane accept parent-dirty guidance in continuation prompts', () => {
+    const issue = createTrackedIssue();
+    const helperCommand = SOURCE_HELPER_COMMAND;
+    const audit: ProviderLinearAuditSummary = {
+      path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+      attempted_count: 1,
+      success_count: 0,
+      failure_count: 1,
+      latest_recorded_at: '2026-03-21T09:00:00.000Z',
+      parallelization_entries: [],
+      latest_by_operation: {
+        'child-lane': {
+          recorded_at: '2026-03-21T09:00:00.000Z',
+          operation: 'child-lane',
+          ok: false,
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          source_setup: null,
+          action: 'accept:docs-a',
+          via: null,
+          state: null,
+          follow_up_issue_id: null,
+          follow_up_issue_identifier: null,
+          failed_relation_type: null,
+          comment_id: null,
+          attachment_id: null,
+          error_code: 'provider_worker_child_lane_parent_dirty',
+          error_message:
+            'Parent workspace has in-scope pending changes: orchestrator/src/cli/providerLinearChildStreamShell.ts. Revert, commit, or move scratch workpad/temp artifacts outside the repo before accepting the child lane.'
+        }
+      }
+    };
+
+    const continuationPrompt = buildProviderWorkerPrompt(issue, 2, 5, helperCommand, '/tmp/co', {
+      linearAudit: audit,
+      attemptStartedAt: '2026-03-21T08:59:59.000Z'
+    });
+
+    expect(continuationPrompt).toContain(
+      'Do not retry `child-lane --action accept` in this attempt while the parent workspace still has in-scope dirty files.'
+    );
+    expect(continuationPrompt).not.toContain(
+      'Do not retry `child-lane --action launch` in this attempt while the parent workspace still has in-scope dirty files.'
+    );
+  });
+
+  it('preserves launch suppression guidance when later same-attempt child-lane audit entries target accept', () => {
+    const issue = createTrackedIssue();
+    const helperCommand = SOURCE_HELPER_COMMAND;
+    const launchEntry = {
+      recorded_at: '2026-03-21T09:00:00.000Z',
+      operation: 'child-lane' as const,
+      ok: false,
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      source_setup: null,
+      action: 'launch',
+      via: null,
+      state: null,
+      follow_up_issue_id: null,
+      follow_up_issue_identifier: null,
+      failed_relation_type: null,
+      comment_id: null,
+      attachment_id: null,
+      error_code: 'provider_worker_child_lane_parent_dirty',
+      error_message:
+        'Parent workspace has in-scope pending changes: .tmp/notes.md. Revert, commit, or move scratch workpad/temp artifacts outside the repo before launching a child lane.'
+    };
+    const acceptEntry = {
+      ...launchEntry,
+      recorded_at: '2026-03-21T09:01:00.000Z',
+      action: 'accept:docs-a',
+      error_message:
+        'Parent workspace has in-scope pending changes: .tmp/notes.md. Revert, commit, or move scratch workpad/temp artifacts outside the repo before accepting the child lane.'
+    };
+    const audit: ProviderLinearAuditSummary = {
+      path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+      attempted_count: 2,
+      success_count: 0,
+      failure_count: 2,
+      latest_recorded_at: '2026-03-21T09:01:00.000Z',
+      latest_by_operation: {
+        'child-lane': acceptEntry
+      },
+      parallelization_entries: [],
+      entries: [launchEntry, acceptEntry]
+    };
+
+    const continuationPrompt = buildProviderWorkerPrompt(issue, 2, 5, helperCommand, '/tmp/co', {
+      linearAudit: audit,
+      attemptStartedAt: '2026-03-21T08:59:59.000Z'
+    });
+
+    expect(continuationPrompt).toContain(
+      'Do not retry `child-lane --action launch` in this attempt while the parent workspace still has in-scope dirty files.'
+    );
+    expect(continuationPrompt).toContain(
+      'Do not retry `child-lane --action accept` in this attempt while the parent workspace still has in-scope dirty files.'
+    );
+  });
+
   it('ignores deterministic mutation suppressions that predate the current attempt', () => {
     const issue = createTrackedIssue();
     const helperCommand = SOURCE_HELPER_COMMAND;

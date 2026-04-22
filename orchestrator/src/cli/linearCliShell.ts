@@ -28,10 +28,16 @@ import {
   isProviderLinearParallelizationReason,
   isProviderLinearParallelizationReasonAllowed,
   resolveProviderLinearAuditPath,
+  summarizeProviderLinearAuditPath,
   type ProviderLinearParallelizationDecision,
   type ProviderLinearParallelizationReason,
   type ProviderLinearAuditEntry
 } from './control/providerLinearWorkflowAudit.js';
+import {
+  findDeterministicProviderMutationSuppression,
+  isFollowUpParityMatrixSuppressionCode,
+  resolveProviderLinearWorkerAttemptStartedAt
+} from './control/providerLinearWorkerTruth.js';
 import {
   resolveProviderLinearRuntimeProof,
   type ProviderLinearRuntimeProofKind,
@@ -52,6 +58,7 @@ import {
   type ProviderLinearChildLaneResult
 } from './providerLinearChildLaneShell.js';
 import {
+  PROVIDER_LINEAR_WORKER_PROOF_FILENAME,
   loadProviderLinearWorkerContext,
   refreshProviderLinearWorkerProofSnapshot
 } from './providerLinearWorkerRunner.js';
@@ -411,46 +418,65 @@ export async function runLinearCliShell(
           'canonical-owner-key-file',
           'blocked-by-source'
         ]);
+        const description = await resolveRequiredText(
+          params.flags,
+          dependencies.readTextFile,
+          'description',
+          'description-file'
+        );
+        const intentChecksum = await resolveRequiredText(
+          params.flags,
+          dependencies.readTextFile,
+          'intent-checksum',
+          'intent-checksum-file'
+        );
+        const nonGoals = await resolveRequiredText(
+          params.flags,
+          dependencies.readTextFile,
+          'non-goals',
+          'non-goals-file'
+        );
+        const notDoneIf = await resolveRequiredText(
+          params.flags,
+          dependencies.readTextFile,
+          'not-done-if',
+          'not-done-if-file'
+        );
+        const acceptanceCriteria = await resolveRequiredText(
+          params.flags,
+          dependencies.readTextFile,
+          'acceptance-criteria',
+          'acceptance-criteria-file'
+        );
+        const parityLane = readBooleanFlag(params.flags, 'parity-lane');
+        const parityMatrix = await resolveOptionalText(
+          params.flags,
+          dependencies.readTextFile,
+          'parity-matrix',
+          'parity-matrix-file'
+        );
+        const retrySuppressed = await resolveCreateFollowUpRetrySuppression({
+          issueId: requireFlag(params.flags, 'issue-id'),
+          parityLane,
+          parityMatrix,
+          env,
+          dependencies
+        });
+        if (retrySuppressed) {
+          await recordAuditResult(retrySuppressed, params.flags, env, dependencies);
+          emitJsonResult(retrySuppressed, dependencies);
+          return;
+        }
         const result = await dependencies.createProviderLinearFollowUpIssue({
           issueId: requireFlag(params.flags, 'issue-id'),
           title: requireFlag(params.flags, 'title'),
-          description: await resolveRequiredText(
-            params.flags,
-            dependencies.readTextFile,
-            'description',
-            'description-file'
-          ),
-          intentChecksum: await resolveRequiredText(
-            params.flags,
-            dependencies.readTextFile,
-            'intent-checksum',
-            'intent-checksum-file'
-          ),
-          nonGoals: await resolveRequiredText(
-            params.flags,
-            dependencies.readTextFile,
-            'non-goals',
-            'non-goals-file'
-          ),
-          notDoneIf: await resolveRequiredText(
-            params.flags,
-            dependencies.readTextFile,
-            'not-done-if',
-            'not-done-if-file'
-          ),
-          acceptanceCriteria: await resolveRequiredText(
-            params.flags,
-            dependencies.readTextFile,
-            'acceptance-criteria',
-            'acceptance-criteria-file'
-          ),
-          parityLane: readBooleanFlag(params.flags, 'parity-lane'),
-          parityMatrix: await resolveOptionalText(
-            params.flags,
-            dependencies.readTextFile,
-            'parity-matrix',
-            'parity-matrix-file'
-          ),
+          description,
+          intentChecksum,
+          nonGoals,
+          notDoneIf,
+          acceptanceCriteria,
+          parityLane,
+          parityMatrix,
           canonicalOwnerKey: await resolveOptionalText(
             params.flags,
             dependencies.readTextFile,
@@ -634,6 +660,76 @@ async function resolveParallelizationProofRefreshContext(
   } catch {
     return null;
   }
+}
+
+async function resolveProviderLinearWorkerAttemptStartedAtForIssue(
+  issueId: string,
+  env: NodeJS.ProcessEnv,
+  dependencies: Pick<
+    LinearCliShellDependencies,
+    'loadProviderLinearWorkerContext' | 'readTextFile'
+  >
+): Promise<string | null> {
+  const context = await resolveParallelizationProofRefreshContext(issueId, env, dependencies);
+  if (!context) {
+    return null;
+  }
+  try {
+    const raw = await dependencies.readTextFile(
+      join(context.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME)
+    );
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    return resolveProviderLinearWorkerAttemptStartedAt(parsed);
+  } catch {
+    return null;
+  }
+}
+
+async function resolveCreateFollowUpRetrySuppression(input: {
+  issueId: string;
+  parityLane: boolean;
+  parityMatrix: string | null;
+  env: NodeJS.ProcessEnv;
+  dependencies: Pick<
+    LinearCliShellDependencies,
+    'loadProviderLinearWorkerContext' | 'readTextFile'
+  >;
+}): Promise<ProviderLinearCreateFollowUpResult | null> {
+  if (!input.parityLane || (input.parityMatrix?.trim().length ?? 0) > 0) {
+    return null;
+  }
+  const auditPath = resolveProviderLinearAuditPath(input.env);
+  if (!auditPath) {
+    return null;
+  }
+  const attemptStartedAt = await resolveProviderLinearWorkerAttemptStartedAtForIssue(
+    input.issueId,
+    input.env,
+    input.dependencies
+  );
+  if (!attemptStartedAt) {
+    return null;
+  }
+  const audit = await summarizeProviderLinearAuditPath(auditPath);
+  const suppression = findDeterministicProviderMutationSuppression(
+    audit,
+    'create-follow-up',
+    {
+      recordedAtNotBefore: attemptStartedAt
+    }
+  );
+  if (!suppression || !isFollowUpParityMatrixSuppressionCode(suppression.error_code)) {
+    return null;
+  }
+  return {
+    ok: false,
+    operation: 'create-follow-up',
+    error: {
+      code: 'linear_follow_up_parity_matrix_retry_suppressed',
+      message: `Same-attempt retry suppressed: ${suppression.instruction}`,
+      status: 409
+    }
+  };
 }
 
 async function refreshParallelizationProofSnapshotBestEffort(

@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { runLinearCliShell } from '../src/cli/linearCliShell.js';
+import { PROVIDER_LINEAR_WORKER_PROOF_FILENAME } from '../src/cli/providerLinearWorkerRunner.js';
 
 const tempDirs: string[] = [];
 
@@ -1439,6 +1440,228 @@ describe('runLinearCliShell', () => {
         code: 'linear_follow_up_parity_matrix_missing',
         message: 'Parity/alignment follow-up issues require a parity matrix.',
         status: 422
+      }
+    });
+  });
+
+  it('suppresses same-attempt parity follow-up retries when the inputs remain unchanged', async () => {
+    const log = vi.fn();
+    const appendAuditEntry = vi.fn();
+    const setExitCode = vi.fn();
+    const createProviderLinearFollowUpIssueMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').createProviderLinearFollowUpIssue>();
+    const loadProviderLinearWorkerContextMock =
+      vi.fn<typeof import('../src/cli/providerLinearWorkerRunner.js').loadProviderLinearWorkerContext>();
+    const tempDir = await mkdtemp(join(tmpdir(), 'linear-cli-follow-up-retry-'));
+    tempDirs.push(tempDir);
+    const auditPath = join(tempDir, 'provider-linear-audit.jsonl');
+    await writeFile(
+      auditPath,
+      `${JSON.stringify({
+        recorded_at: '2026-04-22T08:05:00.000Z',
+        operation: 'create-follow-up',
+        ok: false,
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-1',
+        source_setup: null,
+        action: null,
+        via: null,
+        state: null,
+        follow_up_issue_id: null,
+        follow_up_issue_identifier: null,
+        failed_relation_type: null,
+        comment_id: null,
+        attachment_id: null,
+        error_code: 'linear_follow_up_parity_matrix_missing',
+        error_message: 'Parity/alignment follow-up issues require a parity matrix.'
+      })}\n`,
+      'utf8'
+    );
+    await writeFile(
+      join(tempDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        attempt_started_at: '2026-04-22T08:00:00.000Z'
+      }),
+      'utf8'
+    );
+    loadProviderLinearWorkerContextMock.mockResolvedValue({
+      pipelineId: 'provider-linear-worker',
+      issueId: 'lin-issue-1',
+      issueIdentifier: 'CO-1',
+      runDir: tempDir
+    } as never);
+
+    await runLinearCliShell(
+      {
+        positionals: ['create-follow-up'],
+        flags: {
+          format: 'json',
+          'issue-id': 'lin-issue-1',
+          title: 'Parity follow-up',
+          description: 'Close the remaining parity gap.',
+          'intent-checksum': '- Preserve exact `CO STATUS` wording.',
+          'non-goals': '- [ ] Do not reopen the browser surface.',
+          'not-done-if': '- [ ] The issue still allows browser-first parity.',
+          'acceptance-criteria': '- [ ] Captured',
+          'parity-lane': true
+        },
+        printHelp: vi.fn()
+      },
+      {
+        createProviderLinearFollowUpIssue: createProviderLinearFollowUpIssueMock,
+        loadProviderLinearWorkerContext: loadProviderLinearWorkerContextMock,
+        getEnv: () => ({
+          CO_LINEAR_API_TOKEN: 'lin-api-token',
+          CODEX_PROVIDER_LINEAR_AUDIT_PATH: auditPath
+        }),
+        now: () => '2026-04-22T08:06:00.000Z',
+        appendAuditEntry,
+        log,
+        setExitCode
+      }
+    );
+
+    expect(createProviderLinearFollowUpIssueMock).not.toHaveBeenCalled();
+    expect(setExitCode).toHaveBeenCalledWith(1);
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual({
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_follow_up_parity_matrix_retry_suppressed',
+        message:
+          'Same-attempt retry suppressed: Do not retry `create-follow-up` in this attempt unless you first add the required parity matrix or explicitly reclassify the follow-up as non-parity/alignment and omit `--parity-lane`.',
+        status: 409
+      }
+    });
+    expect(appendAuditEntry).toHaveBeenCalledWith(auditPath, {
+      recorded_at: '2026-04-22T08:06:00.000Z',
+      operation: 'create-follow-up',
+      ok: false,
+      issue_id: 'lin-issue-1',
+      issue_identifier: null,
+      source_setup: null,
+      action: null,
+      via: null,
+      state: null,
+      follow_up_issue_id: null,
+      follow_up_issue_identifier: null,
+      failed_relation_type: null,
+      comment_id: null,
+      attachment_id: null,
+      error_code: 'linear_follow_up_parity_matrix_retry_suppressed',
+      error_message:
+        'Same-attempt retry suppressed: Do not retry `create-follow-up` in this attempt unless you first add the required parity matrix or explicitly reclassify the follow-up as non-parity/alignment and omit `--parity-lane`.'
+    });
+  });
+
+  it('allows a same-attempt parity follow-up retry once the parity matrix is supplied', async () => {
+    const log = vi.fn();
+    const appendAuditEntry = vi.fn();
+    const createProviderLinearFollowUpIssueMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').createProviderLinearFollowUpIssue>()
+        .mockResolvedValue({
+          ok: true,
+          operation: 'create-follow-up',
+          action: 'created',
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-1'
+          },
+          follow_up_issue: {
+            id: 'lin-issue-2',
+            identifier: 'CO-2',
+            title: 'Parity follow-up',
+            description: 'Close the remaining parity gap.',
+            url: 'https://linear.app/example/issue/CO-2',
+            state: null,
+            team: null,
+            project: null
+          },
+          canonical_owner: null,
+          relations: {
+            related: true,
+            blocked_by_source: false
+          },
+          source_setup: null
+        } as never);
+    const loadProviderLinearWorkerContextMock =
+      vi.fn<typeof import('../src/cli/providerLinearWorkerRunner.js').loadProviderLinearWorkerContext>();
+    const tempDir = await mkdtemp(join(tmpdir(), 'linear-cli-follow-up-parity-'));
+    tempDirs.push(tempDir);
+    const auditPath = join(tempDir, 'provider-linear-audit.jsonl');
+    await writeFile(
+      auditPath,
+      `${JSON.stringify({
+        recorded_at: '2026-04-22T08:05:00.000Z',
+        operation: 'create-follow-up',
+        ok: false,
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-1',
+        source_setup: null,
+        action: null,
+        via: null,
+        state: null,
+        follow_up_issue_id: null,
+        follow_up_issue_identifier: null,
+        failed_relation_type: null,
+        comment_id: null,
+        attachment_id: null,
+        error_code: 'linear_follow_up_parity_matrix_missing',
+        error_message: 'Parity/alignment follow-up issues require a parity matrix.'
+      })}\n`,
+      'utf8'
+    );
+    await writeFile(
+      join(tempDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        attempt_started_at: '2026-04-22T08:00:00.000Z'
+      }),
+      'utf8'
+    );
+    loadProviderLinearWorkerContextMock.mockResolvedValue({
+      pipelineId: 'provider-linear-worker',
+      issueId: 'lin-issue-1',
+      issueIdentifier: 'CO-1',
+      runDir: tempDir
+    } as never);
+
+    await runLinearCliShell(
+      {
+        positionals: ['create-follow-up'],
+        flags: {
+          format: 'json',
+          'issue-id': 'lin-issue-1',
+          title: 'Parity follow-up',
+          description: 'Close the remaining parity gap.',
+          'intent-checksum': '- Preserve exact `CO STATUS` wording.',
+          'non-goals': '- [ ] Do not reopen the browser surface.',
+          'not-done-if': '- [ ] The issue still allows browser-first parity.',
+          'acceptance-criteria': '- [ ] Captured',
+          'parity-lane': true,
+          'parity-matrix': '| Current | Reference | Target |'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        createProviderLinearFollowUpIssue: createProviderLinearFollowUpIssueMock,
+        loadProviderLinearWorkerContext: loadProviderLinearWorkerContextMock,
+        getEnv: () => ({
+          CO_LINEAR_API_TOKEN: 'lin-api-token',
+          CODEX_PROVIDER_LINEAR_AUDIT_PATH: auditPath
+        }),
+        now: () => '2026-04-22T08:06:00.000Z',
+        appendAuditEntry,
+        log
+      }
+    );
+
+    expect(createProviderLinearFollowUpIssueMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
+      ok: true,
+      operation: 'create-follow-up',
+      action: 'created',
+      follow_up_issue: {
+        identifier: 'CO-2'
       }
     });
   });

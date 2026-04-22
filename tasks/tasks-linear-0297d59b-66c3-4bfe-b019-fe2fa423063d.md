@@ -1,0 +1,42 @@
+# Task Checklist - linear-0297d59b-66c3-4bfe-b019-fe2fa423063d
+
+- Linear Issue: `CO-306` / `0297d59b-66c3-4bfe-b019-fe2fa423063d`
+- MCP Task ID: `linear-0297d59b-66c3-4bfe-b019-fe2fa423063d`
+- Canonical registry id: `20260422-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d`
+- Primary PRD: `docs/PRD-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md`
+- TECH_SPEC mirror: `docs/TECH_SPEC-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md`
+- Canonical TECH_SPEC: `tasks/specs/linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md`
+
+## Docs
+- [x] Docs-first PRD authored from the live `CO-306` issue body, the current worker prompt source-0 anchor, and the `CO-185` docs packet as the bounded reference contract.
+- [x] TECH_SPEC mirror created and points to the canonical task spec.
+- [x] Canonical task spec created with issue-shaping contract, parity matrix, readiness gate, target surfaces, and validation plan.
+- [x] ACTION_PLAN created with parent-owned sequencing and scoped validation plan.
+- [x] `.agent/task` mirror created for parent/import continuity.
+- [x] Parent updates registry mirrors: `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json`.
+- [x] Parent runs docs-review or records a parent-owned review fallback before implementation.
+
+## Implementation
+- [ ] Apr 22 live failure shapes from `CO-295`, `CO-299`, and `CO-302` are reproduced from current audit evidence and the reason `CO-185` did not hold is isolated.
+- [ ] Same-attempt provider truth or prompting suppresses duplicate `linear_follow_up_parity_matrix_missing` retries unless inputs materially change.
+- [ ] Parent-dirty child-lane launch feedback provides deterministic recovery or sequencing so repeated `provider_worker_child_lane_parent_dirty` failures do not recur in the same attempt.
+- [ ] The current live provider-worker path actually leverages the restored `CO-185` helper-preflight truth after the first deterministic failure.
+- [ ] Fail-closed parity-matrix enforcement and clean-parent checks remain intact while retry churn is reduced.
+
+## Validation
+- [ ] Focused live-path reproduction or replay covers the Apr 22 `CO-295` / `CO-299` / `CO-302` failure shapes.
+- [ ] Focused provider-worker truth/prompting tests cover same-attempt suppression after `linear_follow_up_parity_matrix_missing`.
+- [ ] Focused child-lane guidance tests cover deterministic recovery or sequencing for `provider_worker_child_lane_parent_dirty`.
+- [ ] Focused regression coverage proves both guarantees hold in the current provider-worker path without weakening the fail-closed contracts.
+- [x] Child-lane docs validation: `git diff --check -- <owned files>` exited 0 and the no-index whitespace check over the six owned files produced no output.
+
+## Handoff
+- [x] Parent imported the stale-invalidated `co306-docs-packet` child-lane output into the authoritative issue workspace and preserved the manifest path for evidence.
+- [ ] Parent attaches implementation PR/workpad traces after code changes.
+- [ ] Unresolved actionable review threads are `0` or explicitly waived with evidence before final issue handoff.
+
+## Notes
+- The docs child lane succeeded at producing the packet, but `linear child-lane --action accept` failed closed with `provider_worker_child_lane_stale` after the issue `updated_at` drifted during parent progress updates. The parent packet therefore uses the child artifact as source material and records the authoritative import path locally.
+- Pre-implementation `docs-review` failed only on unrelated `docs/TASKS.md` missing-path debt for `linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb`, already called out as unrelated `CO-282` debt; fallback is recorded at `out/linear-0297d59b-66c3-4bfe-b019-fe2fa423063d/manual/20260422T083251Z-docs-review-fallback.md`.
+- This task remains scoped to restoring the live `CO-185` helper-preflight guarantees; it does not broaden into full `CO-295`, `CO-299`, or `CO-302` remediation.
