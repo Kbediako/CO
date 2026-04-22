@@ -15428,7 +15428,7 @@ describe('createProviderIssueHandoffService', () => {
       }];
     });
     expect(matchingRetryTimers.length).toBeGreaterThan(0);
-    const retryTimer = matchingRetryTimers[0];
+    const retryTimer = matchingRetryTimers[matchingRetryTimers.length - 1];
     const retryDelayMs = retryTimer?.delayMs ?? null;
     expect(retryDelayMs).not.toBeNull();
     expect(retryDelayMs).toBeGreaterThanOrEqual(Math.max(retryDelayUntilDueMs - 1, 0));
@@ -15474,7 +15474,8 @@ describe('createProviderIssueHandoffService', () => {
         }];
       });
       expect(followUpRehydrateTimers.length).toBeGreaterThan(0);
-      const followUpRehydrateTimer = followUpRehydrateTimers[0];
+      const followUpRehydrateTimer =
+        followUpRehydrateTimers[followUpRehydrateTimers.length - 1];
       const scheduledHandle =
         followUpRehydrateTimer !== undefined
           ? setTimeoutSpy.mock.results[followUpRehydrateTimer.index]?.value
