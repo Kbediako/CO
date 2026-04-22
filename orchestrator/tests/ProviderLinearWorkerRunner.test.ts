@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   appendProviderLinearWorkerChildLaneRecord,
   appendProviderLinearWorkerChildStreamRecord,
+  buildProviderLinearWorkerProgressSemanticSignature,
   buildProviderWorkerPrompt,
   loadProviderLinearWorkerContext,
   parseProviderLinearWorkerJsonl,
@@ -22,6 +23,7 @@ import {
   resolveProviderLinearHelperCommand,
   refreshProviderLinearWorkerProofSnapshot,
   runProviderLinearWorker,
+  shouldEmitProviderLinearWorkerProgressSignatureTransition,
   transactProviderLinearWorkerChildLanes,
   PROVIDER_LINEAR_WORKER_AUDIT_FILENAME,
   PROVIDER_LINEAR_WORKER_CHILD_LANES_FILENAME,
@@ -1685,6 +1687,89 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(continuationPrompt).toContain(
       'Do not retry `upsert-workpad` in this attempt until the Linear issue is restored to a mutable active state.'
     );
+  });
+
+  it('suppresses provenance-invalid child-lane launches within the same attempt', () => {
+    const issue = createTrackedIssue();
+    const helperCommand = SOURCE_HELPER_COMMAND;
+    const audit: ProviderLinearAuditSummary = {
+      path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+      attempted_count: 1,
+      success_count: 0,
+      failure_count: 1,
+      latest_recorded_at: '2026-03-21T09:00:00.000Z',
+      parallelization_entries: [],
+      latest_by_operation: {
+        'child-lane': {
+          recorded_at: '2026-03-21T09:00:00.000Z',
+          operation: 'child-lane',
+          ok: false,
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          source_setup: null,
+          action: null,
+          via: null,
+          state: null,
+          follow_up_issue_id: null,
+          follow_up_issue_identifier: null,
+          failed_relation_type: null,
+          comment_id: null,
+          attachment_id: null,
+          error_code: 'provider_worker_child_lane_provenance_invalid',
+          error_message: 'linear child-lane requires provider control-host provenance recorded on the parent provider-worker manifest and matching active environment.'
+        }
+      }
+    };
+
+    const continuationPrompt = buildProviderWorkerPrompt(issue, 2, 5, helperCommand, '/tmp/co', {
+      linearAudit: audit,
+      attemptStartedAt: '2026-03-21T08:59:59.000Z'
+    });
+
+    expect(continuationPrompt).toContain('Same-attempt deterministic provider mutation suppressions are in effect');
+    expect(continuationPrompt).toContain('Do not retry `child-lane` until you first confirm the parent provider-worker run now has matching control-host provenance recorded in the manifest and active environment; if that provenance has already been repaired since the failed audit entry, you may retry once without restarting the attempt. Preserve the fail-closed provenance contract instead of forcing the launch.');
+  });
+
+  it('keeps non-launch child-lane provenance suppressions generic within the same attempt', () => {
+    const issue = createTrackedIssue();
+    const helperCommand = SOURCE_HELPER_COMMAND;
+    const audit: ProviderLinearAuditSummary = {
+      path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+      attempted_count: 1,
+      success_count: 0,
+      failure_count: 1,
+      latest_recorded_at: '2026-03-21T09:00:00.000Z',
+      parallelization_entries: [],
+      latest_by_operation: {
+        'child-lane': {
+          recorded_at: '2026-03-21T09:00:00.000Z',
+          operation: 'child-lane',
+          ok: false,
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          source_setup: null,
+          action: 'accept',
+          via: null,
+          state: null,
+          follow_up_issue_id: null,
+          follow_up_issue_identifier: null,
+          failed_relation_type: null,
+          comment_id: null,
+          attachment_id: null,
+          error_code: 'provider_worker_child_lane_provenance_invalid',
+          error_message: 'Pending child lane docs-packet must stay bound to task linear-issue-1-docs-packet; recorded task was linear-issue-1-other-stream.'
+        }
+      }
+    };
+
+    const continuationPrompt = buildProviderWorkerPrompt(issue, 2, 5, helperCommand, '/tmp/co', {
+      linearAudit: audit,
+      attemptStartedAt: '2026-03-21T08:59:59.000Z'
+    });
+
+    expect(continuationPrompt).toContain('Same-attempt deterministic provider mutation suppressions are in effect');
+    expect(continuationPrompt).toContain('Do not retry `child-lane` until you first confirm the pending child-lane record now matches the expected parent-owned pipeline, task, and issue binding; if that binding has already been repaired since the failed audit entry, you may retry once without restarting the attempt. Preserve the fail-closed provenance contract instead of forcing the decision.');
+    expect(continuationPrompt).not.toContain('matching control-host provenance recorded in the manifest and active environment');
   });
 
   it('ignores malformed audit summaries when deriving continuation suppressions', () => {
@@ -5018,6 +5103,104 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     });
   });
 
+  it('does not emit refresh progress events when only hydration metadata changes', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          last_message: 'Investigating provider-worker EVENT provenance.',
+          last_event_at: '2026-03-21T09:00:00.100Z',
+          progress: {
+            phase: 'turn_running',
+            kind: 'worker',
+            status: 'progressing',
+            summary: 'Investigating provider-worker EVENT provenance.',
+            summary_recorded_at: null,
+            message_recorded_at: null,
+            source_updated_at: '2026-03-21T09:00:00.100Z',
+            selected_event: 'item.completed',
+            event_source: 'legacy_proof_last_message',
+            event_candidates: [{
+              source: 'legacy_proof_last_message',
+              event: 'item.completed',
+              summary: 'Investigating provider-worker EVENT provenance.',
+              message_recorded_at: null,
+              source_updated_at: '2026-03-21T09:00:00.100Z',
+              derived: false,
+              accepted: true,
+              rejection_reason: null
+            }],
+            last_semantic_progress_at: '2026-03-21T09:00:00.100Z',
+            stall_classification: 'progressing',
+            stall_reason: null,
+            recovery_recommendation: 'continue_waiting'
+          }
+        }),
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
+    await mkdir(sessionDir, { recursive: true });
+    const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-1.jsonl');
+    await writeFile(
+      sessionLogPath,
+      [
+        JSON.stringify({ timestamp: '2026-03-21T09:00:00.000Z', type: 'session_meta', payload: { id: 'thread-1', cwd: tempRoot, initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title' } }),
+        JSON.stringify({ timestamp: '2026-03-21T09:00:00.050Z', type: 'turn_context', payload: { turn_id: 'turn-1' } }),
+        JSON.stringify({ timestamp: '2026-03-21T09:00:00.200Z', type: 'event_msg', payload: { type: 'agent_message', message: 'Investigating provider-worker EVENT provenance.' } })
+      ].join('\n'),
+      'utf8'
+    );
+
+    const emitProgressEvent = vi.fn();
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:00:10.000Z',
+      undefined,
+      {
+        CODEX_HOME: tempRoot!
+      },
+      {
+        emitProgressEvent
+      }
+    );
+
+    expect(refreshed?.progress).toMatchObject({
+      summary: 'Investigating provider-worker EVENT provenance.',
+      selected_event: 'agent_message',
+      event_source: 'canonical_session_log_hydration'
+    });
+    expect(emitProgressEvent).not.toHaveBeenCalled();
+  });
+
+  it('treats a semantic transition back to null progress as operator-visible after prior progress', () => {
+    const progressingSignature = buildProviderLinearWorkerProgressSemanticSignature({
+      phase: 'turn_running',
+      kind: 'worker',
+      status: 'progressing',
+      summary: 'Investigating provider-worker EVENT provenance.',
+      stall_classification: 'progressing',
+      stall_reason: null,
+      recovery_recommendation: 'continue_waiting'
+    });
+
+    expect(progressingSignature).not.toBeNull();
+    expect(shouldEmitProviderLinearWorkerProgressSignatureTransition(undefined, null)).toBe(false);
+    expect(
+      shouldEmitProviderLinearWorkerProgressSignatureTransition(undefined, progressingSignature)
+    ).toBe(true);
+    expect(
+      shouldEmitProviderLinearWorkerProgressSignatureTransition(progressingSignature, null)
+    ).toBe(true);
+    expect(shouldEmitProviderLinearWorkerProgressSignatureTransition(null, null)).toBe(false);
+  });
+
   it('clears stale proof current-turn activity when hydration only swaps to a new thread', async () => {
     const { runDir } = await createManifestRoot();
     const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
@@ -6556,6 +6739,8 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       {
         CODEX_ORCHESTRATOR_MANIFEST_PATH: manualManifestPath,
         CODEX_ORCHESTRATOR_ROOT: workspaceRoot,
+        CODEX_ORCHESTRATOR_REPO_CONFIG_PATH: '',
+        CODEX_ORCHESTRATOR_PROVIDER_REPO_CONFIG_PATH: '',
         CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: '1',
         CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
       },
@@ -6574,6 +6759,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(execRunner).toHaveBeenCalledTimes(1);
     const turnEnv = execRunner.mock.calls[0]?.[0].env;
     expect(turnEnv.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH).toBeUndefined();
+    expect(turnEnv.CODEX_ORCHESTRATOR_PROVIDER_REPO_CONFIG_PATH).toBeUndefined();
     expect(turnEnv.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED).toBe('1');
   });
 

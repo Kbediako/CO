@@ -251,8 +251,12 @@ function createControlRuntimeSnapshot(
         selected,
         running,
         retrying,
-        maxConcurrentAgents: resolveProviderPollDispatchLimits(context.controlStore.snapshot().feature_toggles)
-          .maxConcurrentAgents,
+        maxConcurrentAgents: resolveProviderPollDispatchLimits(
+          context.controlStore.snapshot().feature_toggles,
+          {
+            localWorkerOnly: (providerWorkflow?.worker_hosts?.length ?? 0) === 0
+          }
+        ).maxConcurrentAgents,
         codexTotals,
         rateLimits,
         dispatchPilot: dispatchPilotSummary.configured ? dispatchPilotSummary : null,
