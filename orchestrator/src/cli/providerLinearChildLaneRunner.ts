@@ -694,8 +694,42 @@ function parseProviderLinearChildLaneSessionJsonlLine(line: string): Record<stri
 }
 
 function tokenizeShellCommandForScopeDrift(command: string): string[] {
-  const normalized = command.replace(/\r\n/gu, '\n');
+  const normalized = stripShellCommandHeredocBodies(command);
   return normalized.match(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\n|&&|\|\||[;&|]|[^\s;&|]+/gu) ?? [];
+}
+
+function stripShellCommandHeredocBodies(command: string): string {
+  const normalized = command.replace(/\r\n/gu, '\n');
+  const lines = normalized.split('\n');
+  const heredocDelimiters: Array<{ delimiter: string; stripLeadingTabs: boolean }> = [];
+  const output: string[] = [];
+  for (const line of lines) {
+    if (heredocDelimiters.length > 0) {
+      const active = heredocDelimiters[0];
+      if (active) {
+        const candidate = active.stripLeadingTabs ? line.replace(/^\t+/u, '') : line;
+        if (candidate === active.delimiter) {
+          output.push(line);
+          heredocDelimiters.shift();
+        } else {
+          output.push('');
+        }
+        continue;
+      }
+    }
+    output.push(line);
+    for (const match of line.matchAll(/<<(-)?\s*(?:(['"])(.*?)\2|([^\s<>&|;]+))/gu)) {
+      const delimiter = match[3] ?? match[4];
+      if (!delimiter) {
+        continue;
+      }
+      heredocDelimiters.push({
+        delimiter,
+        stripLeadingTabs: match[1] === '-'
+      });
+    }
+  }
+  return output.join('\n');
 }
 
 function stripShellCommandTokenQuotes(token: string): string {

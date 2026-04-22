@@ -1173,6 +1173,36 @@ describe('provider linear child lane runner', () => {
         }
       })
     ).toEqual([]);
+
+    expect(
+      childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
+        timestamp: '2026-04-22T06:13:40.200Z',
+        type: 'response_item',
+        payload: {
+          type: 'function_call',
+          name: 'exec_command',
+          arguments: JSON.stringify({
+            cmd: "cat <<'EOF'\ngh pr view\nEOF",
+            workdir: '/tmp/child'
+          })
+        }
+      })
+    ).toEqual([]);
+
+    expect(
+      childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
+        timestamp: '2026-04-22T06:13:40.300Z',
+        type: 'response_item',
+        payload: {
+          type: 'function_call',
+          name: 'exec_command',
+          arguments: JSON.stringify({
+            cmd: 'cat <<-EOF\n\tgit push origin HEAD\nEOF',
+            workdir: '/tmp/child'
+          })
+        }
+      })
+    ).toEqual([]);
   });
 
   it('re-checks the session log after exec settles before clearing scope drift', async () => {
