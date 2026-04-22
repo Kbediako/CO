@@ -15342,6 +15342,7 @@ describe('createProviderIssueHandoffService', () => {
       getLaunchConfigPath: vi.fn(),
       recordTerminalCleanupResult: vi.fn()
     };
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
     const launcher = {
       start: vi
         .fn(async () => null)
@@ -15400,7 +15401,9 @@ describe('createProviderIssueHandoffService', () => {
 
     const retryDueAt = failedRetryClaim?.retry_due_at ?? null;
     expect(retryDueAt).not.toBeNull();
-    await vi.advanceTimersByTimeAsync(Math.max(0, Date.parse(retryDueAt ?? '') - Date.now()) + 1);
+    vi.setSystemTime(new Date(Math.max(Date.parse(retryDueAt ?? ''), Date.now()) + 1));
+    getLatestScheduledTimeoutCallback(setTimeoutSpy)();
+    await flushAsyncWork();
     await waitForMockCalls(launcher.start, 2, QUEUED_RETRY_SETTLE_TURNS * 8);
 
     expect(launcher.start).toHaveBeenCalledTimes(2);
