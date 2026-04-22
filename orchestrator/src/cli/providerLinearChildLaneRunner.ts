@@ -702,12 +702,27 @@ function stripShellCommandTokenQuotes(token: string): string {
   return token.replace(/^['"]|['"]$/gu, '');
 }
 
+function shellOptionConsumesNextValue(token: string, optionsWithValues: ReadonlySet<string>): boolean {
+  return optionsWithValues.has(token) && !token.includes('=');
+}
+
 function advancePastShellCommandEnvWrappers(
   tokens: string[],
   segmentStart: number,
   segmentEnd: number
 ): number {
   const envAssignmentPattern = /^[A-Za-z_][A-Za-z0-9_]*=.*/u;
+  const envOptionsWithValues = new Set([
+    '-u',
+    '--unset',
+    '-C',
+    '--chdir',
+    '-S',
+    '--split-string',
+    '--default-signal',
+    '--ignore-signal',
+    '--block-signal'
+  ]);
   let index = segmentStart;
   while (index < segmentEnd) {
     const token = stripShellCommandTokenQuotes(tokens[index] ?? '');
@@ -731,7 +746,14 @@ function advancePastShellCommandEnvWrappers(
           index += 1;
           break;
         }
-        if (envToken.startsWith('-') || envAssignmentPattern.test(envToken)) {
+        if (envAssignmentPattern.test(envToken)) {
+          index += 1;
+          continue;
+        }
+        if (envToken.startsWith('-')) {
+          if (shellOptionConsumesNextValue(envToken, envOptionsWithValues)) {
+            index += 1;
+          }
           index += 1;
           continue;
         }
@@ -789,6 +811,7 @@ function commandSegmentShowsParentOwnedScopeDrift(
   const commandToken = stripShellCommandTokenQuotes(tokens[commandIndex] ?? '');
   const commandBase = basename(commandToken);
   if (shellCommandWrappers.has(commandBase)) {
+    const shellOptionsWithValues = new Set(['-o', '-O', '--rcfile', '--init-file']);
     for (let index = commandIndex + 1; index < segmentEnd; index += 1) {
       const token = stripShellCommandTokenQuotes(tokens[index] ?? '');
       if (!token) {
@@ -797,6 +820,10 @@ function commandSegmentShowsParentOwnedScopeDrift(
       if (/^-[^-]*c[^-]*$/u.test(token) || token === '-c') {
         const nestedCommand = stripShellCommandTokenQuotes(tokens[index + 1] ?? '');
         return nestedCommand ? commandShowsParentOwnedScopeDrift(nestedCommand) : false;
+      }
+      if (shellOptionConsumesNextValue(token, shellOptionsWithValues)) {
+        index += 1;
+        continue;
       }
       if (!token.startsWith('-')) {
         return false;
@@ -825,7 +852,7 @@ function commandSegmentShowsParentOwnedScopeDrift(
         continue;
       }
       if (token.startsWith('-')) {
-        if (runtimeOptionsWithValues.has(token) && !token.includes('=')) {
+        if (shellOptionConsumesNextValue(token, runtimeOptionsWithValues)) {
           index += 1;
         }
         continue;
@@ -852,7 +879,7 @@ function commandSegmentShowsParentOwnedScopeDrift(
     if (!token.startsWith('-')) {
       return false;
     }
-    if (gitOptionsWithValues.has(token) && !token.includes('=')) {
+    if (shellOptionConsumesNextValue(token, gitOptionsWithValues)) {
       index += 1;
     }
   }
