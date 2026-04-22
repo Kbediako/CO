@@ -250,6 +250,24 @@ function buildDeterministicProviderMutationSuppression(
             : buildGenericSuppressionSummary(entry.operation, errorCode, errorMessage)
       };
     case 'child-lane':
+      if (errorCode === 'provider_worker_child_lane_provenance_invalid') {
+        const launchTimeControlHostProvenanceFailure =
+          action === 'launch' || errorMessage?.includes('control-host provenance') === true;
+        return {
+          operation: entry.operation,
+          action,
+          error_code: errorCode,
+          error_message: errorMessage,
+          instruction:
+            launchTimeControlHostProvenanceFailure
+              ? `Do not retry \`${entry.operation}\` until you first confirm the parent provider-worker run now has matching control-host provenance recorded in the manifest and active environment; if that provenance has already been repaired since the failed audit entry, you may retry once without restarting the attempt. Preserve the fail-closed provenance contract instead of forcing the launch.`
+              : 'Do not retry `child-lane` until you first confirm the pending child-lane record now matches the expected parent-owned pipeline, task, and issue binding; if that binding has already been repaired since the failed audit entry, you may retry once without restarting the attempt. Preserve the fail-closed provenance contract instead of forcing the decision.',
+          summary:
+            launchTimeControlHostProvenanceFailure
+              ? `deterministic provider mutation suppressed: ${entry.operation} fail-closed provenance mismatch must be repaired before retry`
+              : 'deterministic provider mutation suppressed: child-lane fail-closed provenance mismatch must be reconciled before retry'
+        };
+      }
       return {
         operation: entry.operation,
         action,
@@ -283,38 +301,24 @@ function buildDeterministicProviderMutationSuppression(
         summary: buildGenericSuppressionSummary(entry.operation, errorCode, errorMessage)
       };
     case 'child-stream':
-    case 'child-lane': {
-      const provenanceErrorCode =
-        entry.operation === 'child-lane'
-          ? 'provider_worker_child_lane_provenance_invalid'
-          : 'provider_worker_child_stream_provenance_invalid';
-      if (errorCode === provenanceErrorCode) {
-        const launchTimeControlHostProvenanceFailure =
-          entry.operation === 'child-stream'
-          || normalizeOptionalString(entry.action) === 'launch'
-          || errorMessage?.includes('control-host provenance') === true;
-          return {
-            operation: entry.operation,
-            error_code: errorCode,
-            error_message: errorMessage,
-            instruction:
-              launchTimeControlHostProvenanceFailure
-              ? `Do not retry \`${entry.operation}\` until you first confirm the parent provider-worker run now has matching control-host provenance recorded in the manifest and active environment; if that provenance has already been repaired since the failed audit entry, you may retry once without restarting the attempt. Preserve the fail-closed provenance contract instead of forcing the launch.`
-              : 'Do not retry `child-lane` until you first confirm the pending child-lane record now matches the expected parent-owned pipeline, task, and issue binding; if that binding has already been repaired since the failed audit entry, you may retry once without restarting the attempt. Preserve the fail-closed provenance contract instead of forcing the decision.',
-            summary:
-              launchTimeControlHostProvenanceFailure
-              ? `deterministic provider mutation suppressed: ${entry.operation} fail-closed provenance mismatch must be repaired before retry`
-              : 'deterministic provider mutation suppressed: child-lane fail-closed provenance mismatch must be reconciled before retry'
+      if (errorCode === 'provider_worker_child_stream_provenance_invalid') {
+        return {
+          operation: entry.operation,
+          action,
+          error_code: errorCode,
+          error_message: errorMessage,
+          instruction: `Do not retry \`${entry.operation}\` until you first confirm the parent provider-worker run now has matching control-host provenance recorded in the manifest and active environment; if that provenance has already been repaired since the failed audit entry, you may retry once without restarting the attempt. Preserve the fail-closed provenance contract instead of forcing the launch.`,
+          summary: `deterministic provider mutation suppressed: ${entry.operation} fail-closed provenance mismatch must be repaired before retry`
         };
       }
       return {
         operation: entry.operation,
+        action,
         error_code: errorCode,
         error_message: errorMessage,
         instruction: buildGenericSuppressionInstruction(entry.operation, errorCode, errorMessage),
         summary: buildGenericSuppressionSummary(entry.operation, errorCode, errorMessage)
       };
-    }
     default:
       return {
         operation: entry.operation,
