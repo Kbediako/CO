@@ -27238,10 +27238,10 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.start).not.toHaveBeenCalled();
     expect(state.claims[0]).toMatchObject({
       state: 'released',
-      reason: 'provider_issue_released:not_active',
-      issue_state: 'Done',
-      issue_state_type: 'completed',
-      issue_updated_at: '2026-04-14T01:14:59.466Z',
+      reason: 'provider_issue_released_pending_reopen:provider_issue_released:not_active',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-18T02:21:31.169Z',
       run_id: 'run-co-175-refresh-missing',
       run_manifest_path: missingManifestPath
     });
