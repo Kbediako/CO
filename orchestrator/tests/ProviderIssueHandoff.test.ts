@@ -15406,19 +15406,24 @@ describe('createProviderIssueHandoffService', () => {
     await vi.advanceTimersByTimeAsync(retryDelayUntilDueMs);
     await flushAsyncWork();
     await waitForCondition(() => {
-      const relaunchedClaim = state.claims.find(
-        (claim) => claim.provider_key === 'linear:lin-issue-1'
-      );
       return (
         providerWorkflowConfigStore.refresh.mock.calls.length >= 2 &&
-        relaunchedClaim?.state === 'starting' &&
-        relaunchedClaim?.reason === 'provider_issue_retry_start_launched' &&
-        relaunchedClaim?.worker_host === 'worker-host-04' &&
-        relaunchedClaim?.retry_queued === null &&
-        relaunchedClaim?.retry_due_at === null
+        launcher.start.mock.calls.length >= 2
       );
-    }, QUEUED_RETRY_SETTLE_TURNS * 8);
+    }, QUEUED_RETRY_SETTLE_TURNS * 32);
+    await flushAsyncWork();
 
+    expect(launcher.start).toHaveBeenCalledTimes(2);
+    expect(launcher.start.mock.calls[1]?.[0]).toEqual(expect.objectContaining({
+      taskId: 'linear-lin-issue-1',
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-issue-1',
+      issueIdentifier: 'CO-2',
+      issueUpdatedAt: '2026-03-19T04:21:00.000Z',
+      workerHost: 'worker-host-04',
+      launchToken: expect.any(String)
+    }));
     expect(launcher.resume).not.toHaveBeenCalled();
     expect(providerWorkflowConfigStore.refresh).toHaveBeenCalledTimes(2);
     expect(state.claims.find((claim) => claim.provider_key === 'linear:lin-issue-1')).toMatchObject({
