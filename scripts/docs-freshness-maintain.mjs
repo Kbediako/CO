@@ -2,7 +2,7 @@
 
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { access, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
@@ -16,9 +16,12 @@ const execFileAsync = promisify(execFile);
 
 const DEFAULT_REGISTRY_PATH = 'docs/docs-freshness-registry.json';
 const GIT_COMMAND_TIMEOUT_MS = 60_000;
+const LINEAR_ISSUE_CONTEXT_TIMEOUT_MS = 60_000;
 const PASSING_DECISIONS = new Set(['clean', 'pass_with_owned_rolling_debt']);
 const CANONICAL_OWNER_MARKER_PREFIX = 'codex-orchestrator:canonical-owner-key=';
 const CANONICAL_OWNER_KEY_MAX_LENGTH = 512;
+const TERMINAL_WORKFLOW_STATE_TYPES = new Set(['completed', 'canceled', 'cancelled']);
+const TERMINAL_WORKFLOW_STATES = new Set(['done', 'completed', 'canceled', 'cancelled']);
 
 function showUsage() {
   console.log(`Usage: node scripts/docs-freshness-maintain.mjs [options]
@@ -89,6 +92,116 @@ function sampleLines(value, limit = 20) {
     .slice(0, limit);
 }
 
+function normalizeOptionalString(value) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeOptionalBoolean(value) {
+  return typeof value === 'boolean' ? value : null;
+}
+
+function isTerminalWorkflowState({ state = null, stateType = null, isTerminal = null } = {}) {
+  if (typeof isTerminal === 'boolean') {
+    return isTerminal;
+  }
+  const normalizedType = normalizeOptionalString(stateType)?.toLowerCase() ?? null;
+  if (normalizedType && TERMINAL_WORKFLOW_STATE_TYPES.has(normalizedType)) {
+    return true;
+  }
+  const normalizedState = normalizeOptionalString(state)?.toLowerCase() ?? null;
+  return Boolean(normalizedState && TERMINAL_WORKFLOW_STATES.has(normalizedState));
+}
+
+function deriveOwnerIssueVerification(policy, explicitVerification = null) {
+  if (explicitVerification && typeof explicitVerification === 'object') {
+    return explicitVerification;
+  }
+  const issue = normalizeOptionalString(policy?.owner_issue);
+  const state = normalizeOptionalString(policy?.owner_issue_state);
+  const stateType = normalizeOptionalString(policy?.owner_issue_state_type);
+  const isTerminal = normalizeOptionalBoolean(policy?.owner_issue_is_terminal);
+  if (!issue || (!state && !stateType && isTerminal === null)) {
+    return null;
+  }
+  const terminal = isTerminalWorkflowState({ state, stateType, isTerminal });
+  return {
+    issue,
+    issue_id: null,
+    state,
+    state_type: stateType,
+    is_terminal: terminal,
+    usable: !terminal,
+    verification_status: 'policy_metadata',
+    checked_at: null,
+    source: 'rolling_freshness_policy',
+    error: null
+  };
+}
+
+function buildOwnerIssueAction(policy, ownerIssueVerification = null) {
+  const configuredIssue = normalizeOptionalString(policy?.owner_issue);
+  const verification = deriveOwnerIssueVerification(policy, ownerIssueVerification);
+  if (!configuredIssue) {
+    return {
+      mode: 'create_required',
+      issue: null,
+      existing_issue: null,
+      duplicate_policy: 'one_owner_issue_per_historical_batch',
+      policy_doc: policy?.policy_doc ?? null,
+      reason: 'missing_owner_issue'
+    };
+  }
+  if (verification?.usable === false) {
+    return {
+      mode: 'create_required',
+      issue: null,
+      existing_issue: configuredIssue,
+      duplicate_policy: 'one_owner_issue_per_historical_batch',
+      policy_doc: policy?.policy_doc ?? null,
+      reason: 'configured_owner_terminal',
+      issue_state: verification.state ?? null,
+      issue_state_type: verification.state_type ?? null
+    };
+  }
+  if (verification?.verification_status === 'failed' && verification.usable !== true) {
+    return {
+      mode: 'create_required',
+      issue: null,
+      existing_issue: configuredIssue,
+      duplicate_policy: 'one_owner_issue_per_historical_batch',
+      policy_doc: policy?.policy_doc ?? null,
+      reason: 'owner_verification_failed',
+      verification_status: verification.verification_status ?? null,
+      verification_error: verification.error ?? null
+    };
+  }
+  return {
+    mode: 'update_existing',
+    issue: configuredIssue,
+    existing_issue: null,
+    duplicate_policy: 'one_owner_issue_per_historical_batch',
+    policy_doc: policy?.policy_doc ?? null,
+    reason: verification?.verification_status ?? null
+  };
+}
+
+function describeOwnerIssuePath(ownerIssueAction) {
+  if (ownerIssueAction?.mode === 'update_existing' && ownerIssueAction.issue) {
+    return `owner issue ${ownerIssueAction.issue}`;
+  }
+  if (ownerIssueAction?.reason === 'configured_owner_terminal' && ownerIssueAction.existing_issue) {
+    return `a new live same-project owner issue; configured owner ${ownerIssueAction.existing_issue} is terminal`;
+  }
+  if (ownerIssueAction?.reason === 'owner_verification_failed' && ownerIssueAction.existing_issue) {
+    return `a verified live same-project owner issue; current owner ${ownerIssueAction.existing_issue} could not be verified`;
+  }
+  return 'a live same-project owner issue';
+}
+
 function isTaskNumberInRange(taskNumber, range) {
   return Boolean(
     taskNumber &&
@@ -120,7 +233,11 @@ function findMatchingBaselineCohort(entry, policy) {
   );
 }
 
-function isPolicyUsable(policy) {
+function isPolicyUsable(policy, ownerIssueVerification = null) {
+  const verification = deriveOwnerIssueVerification(policy, ownerIssueVerification);
+  if (verification?.usable === false || (verification?.verification_status === 'failed' && verification.usable !== true)) {
+    return false;
+  }
   return Boolean(policy?.enabled && policy?.is_valid && policy?.owner_issue);
 }
 
@@ -262,7 +379,8 @@ function collectReportFailurePaths(report) {
   ]);
 }
 
-function summarizePolicyCapacity(candidateEntries, policy) {
+function summarizePolicyCapacity(candidateEntries, policy, ownerIssueVerification = null) {
+  const verification = deriveOwnerIssueVerification(policy, ownerIssueVerification);
   if (!policy?.enabled) {
     return {
       status: 'policy_missing',
@@ -272,7 +390,12 @@ function summarizePolicyCapacity(candidateEntries, policy) {
       max_cohorts: policy?.max_cohorts ?? 0
     };
   }
-  if (!policy.is_valid || !policy.owner_issue) {
+  if (
+    !policy.is_valid ||
+    !policy.owner_issue ||
+    verification?.usable === false ||
+    (verification?.verification_status === 'failed' && verification.usable !== true)
+  ) {
     return {
       status: 'invalid_policy',
       current_entries: candidateEntries.length,
@@ -313,12 +436,12 @@ function hasProvenDiffStatus(diffStatus) {
   return diffStatus === 'ok' || diffStatus === 'provided';
 }
 
-function buildRecommendedAction(decision, { policy, expiresAfter, diffStatus }) {
+function buildRecommendedAction(decision, { policy, expiresAfter, diffStatus, ownerIssueAction }) {
   if (decision === 'clean') {
     return 'No docs freshness maintenance action is required.';
   }
   if (decision === 'pass_with_owned_rolling_debt') {
-    return `Proceed only for unrelated clean diffs; cite owner issue ${policy.owner_issue} and refresh/archive/reclassify the cohort before ${expiresAfter ?? 'the rolling window expires'}.`;
+    return `Proceed only for unrelated clean diffs; cite ${describeOwnerIssuePath(ownerIssueAction)} and refresh/archive/reclassify the cohort before ${expiresAfter ?? 'the rolling window expires'}.`;
   }
   if (decision === 'block_diff_local') {
     if (!hasProvenDiffStatus(diffStatus)) {
@@ -330,12 +453,96 @@ function buildRecommendedAction(decision, { policy, expiresAfter, diffStatus }) 
     return 'Fix missing registry rows, missing-on-disk registry references, invalid registry metadata, or uncatalogued docs before any deferral.';
   }
   if (decision === 'block_policy_expired') {
-    return `Refresh, archive, or reclassify the expired historical cohort through owner issue ${policy.owner_issue ?? '<missing owner>'}; do not defer it further.`;
+    return `Refresh, archive, or reclassify the expired historical cohort through ${describeOwnerIssuePath(ownerIssueAction)}; do not defer it further.`;
   }
   if (decision === 'block_policy_over_budget') {
-    return `Open or update the single owner path ${policy.owner_issue ?? '<missing owner>'} with refresh/archive action evidence; do not expand rolling caps to pass an unrelated lane.`;
+    return `Open or update the single owner path through ${describeOwnerIssuePath(ownerIssueAction)} with refresh/archive action evidence; do not expand rolling caps to pass an unrelated lane.`;
+  }
+  if (ownerIssueAction?.reason === 'configured_owner_terminal' && ownerIssueAction.existing_issue) {
+    return `Open a new live same-project owner issue for the historical batch; configured owner ${ownerIssueAction.existing_issue} is terminal, so do not reuse it as the live owner path.`;
+  }
+  if (ownerIssueAction?.reason === 'owner_verification_failed' && ownerIssueAction.existing_issue) {
+    return `Verify or replace the owner issue for the historical batch; current owner ${ownerIssueAction.existing_issue} could not be verified, so do not reuse it blindly.`;
   }
   return `Open or update one baseline owner issue for the historical batch, or fix stale public/active guidance directly before gates pass.`;
+}
+
+async function verifyOwnerIssueContext(repoRoot, ownerIssue) {
+  const issue = normalizeOptionalString(ownerIssue);
+  if (!issue) {
+    return null;
+  }
+
+  const helperPath = path.join(repoRoot, 'bin', 'codex-orchestrator.js');
+  try {
+    await access(helperPath);
+  } catch {
+    return {
+      issue,
+      issue_id: null,
+      state: null,
+      state_type: null,
+      is_terminal: null,
+      usable: null,
+      verification_status: 'unavailable',
+      checked_at: new Date().toISOString(),
+      source: 'linear issue-context',
+      error: 'helper_missing'
+    };
+  }
+
+  try {
+    const { stdout } = await execFileAsync(
+      process.execPath,
+      [helperPath, 'linear', 'issue-context', '--issue-id', issue, '--format', 'json'],
+      {
+        cwd: repoRoot,
+        maxBuffer: 64 * 1024 * 1024,
+        timeout: LINEAR_ISSUE_CONTEXT_TIMEOUT_MS
+      }
+    );
+    const parsed = JSON.parse(stdout);
+    const issueContext = parsed?.issue ?? {};
+    const workflowState = issueContext?.state && typeof issueContext.state === 'object' ? issueContext.state : null;
+    const state = normalizeOptionalString(workflowState?.name ?? issueContext?.state);
+    const stateType = normalizeOptionalString(workflowState?.type ?? issueContext?.state_type ?? issueContext?.stateType);
+    const isTerminal = isTerminalWorkflowState({
+      state,
+      stateType,
+      isTerminal: normalizeOptionalBoolean(
+        workflowState?.is_terminal ?? workflowState?.isTerminal ?? issueContext?.is_terminal ?? issueContext?.isTerminal
+      )
+    });
+    return {
+      issue,
+      issue_id: normalizeOptionalString(issueContext?.id),
+      state,
+      state_type: stateType,
+      is_terminal: isTerminal,
+      usable: !isTerminal,
+      verification_status: 'succeeded',
+      checked_at: new Date().toISOString(),
+      source: 'linear issue-context',
+      error: null
+    };
+  } catch (error) {
+    const detail =
+      sampleLines(
+        [error?.stdout, error?.stderr, error instanceof Error ? error.message : String(error)].filter(Boolean).join('\n')
+      )[0] ?? (error instanceof Error ? error.message : String(error));
+    return {
+      issue,
+      issue_id: null,
+      state: null,
+      state_type: null,
+      is_terminal: null,
+      usable: null,
+      verification_status: 'failed',
+      checked_at: new Date().toISOString(),
+      source: 'linear issue-context',
+      error: detail
+    };
+  }
 }
 
 export function buildDocsFreshnessMaintenanceDecision(
@@ -346,10 +553,13 @@ export function buildDocsFreshnessMaintenanceDecision(
     specGuard = { status: 'skipped' },
     diffStatus = 'ok',
     diffBaseRef = null,
-    generatedAt = new Date().toISOString()
+    generatedAt = new Date().toISOString(),
+    ownerIssueVerification = null
   } = {}
 ) {
   const policy = report.rolling_freshness_policy ?? {};
+  const resolvedOwnerIssueVerification = deriveOwnerIssueVerification(policy, ownerIssueVerification);
+  const ownerIssueAction = buildOwnerIssueAction(policy, resolvedOwnerIssueVerification);
   const staleEntries = Array.isArray(report.stale_entries) ? report.stale_entries : [];
   const rollingEntries = Array.isArray(report.rolling_cohort_entries) ? report.rolling_cohort_entries : [];
   const blockingCandidateEntries = staleEntries
@@ -366,7 +576,7 @@ export function buildDocsFreshnessMaintenanceDecision(
     .filter((entry) => !blockingCandidatePaths.has(normalizeDocPath(entry.path)))
     .map((entry) => normalizeCandidateEntry(entry, policy, 'hard_stale'));
   const candidateCohorts = summarizeCandidateCohorts(candidateEntries, policy);
-  const policyCapacityStatus = summarizePolicyCapacity(candidateEntries, policy);
+  const policyCapacityStatus = summarizePolicyCapacity(candidateEntries, policy, resolvedOwnerIssueVerification);
   const expiresAfterCandidates = uniqueSorted(candidateCohorts.map((cohort) => cohort.expires_after).filter(Boolean));
   const expiresAfter = expiresAfterCandidates[0] ?? null;
 
@@ -389,7 +599,7 @@ export function buildDocsFreshnessMaintenanceDecision(
     freshnessDecision = 'block_missing_or_invalid_registry';
   } else if (!hasProvenDiffStatus(diffStatus) || blockingChangedPaths.length > 0 || specGuard.status === 'failed') {
     freshnessDecision = 'block_diff_local';
-  } else if ((candidateEntries.length > 0 || staleEntries.length > 0) && !isPolicyUsable(policy)) {
+  } else if ((candidateEntries.length > 0 || staleEntries.length > 0) && !isPolicyUsable(policy, resolvedOwnerIssueVerification)) {
     freshnessDecision = 'block_unowned_repo_debt';
   } else if (policyCapacityStatus.status === 'expired') {
     freshnessDecision = 'block_policy_expired';
@@ -407,19 +617,20 @@ export function buildDocsFreshnessMaintenanceDecision(
     task_id: taskId,
     freshness_decision: freshnessDecision,
     owner_issue: policy.owner_issue ?? null,
-    owner_issue_action: {
-      mode: policy.owner_issue ? 'update_existing' : 'create_required',
-      issue: policy.owner_issue ?? null,
-      duplicate_policy: 'one_owner_issue_per_historical_batch',
-      policy_doc: policy.policy_doc ?? null
-    },
+    owner_issue_action: ownerIssueAction,
+    owner_issue_verification: resolvedOwnerIssueVerification,
     candidate_cohorts: candidateCohorts,
     blocking_changed_paths: blockingChangedPaths,
     diff_status: diffStatus,
     diff_base_ref: diffBaseRef,
     policy_capacity_status: policyCapacityStatus,
     expires_after: expiresAfter,
-    recommended_action: buildRecommendedAction(freshnessDecision, { policy, expiresAfter, diffStatus }),
+    recommended_action: buildRecommendedAction(freshnessDecision, {
+      policy,
+      expiresAfter,
+      diffStatus,
+      ownerIssueAction
+    }),
     sample_paths: {
       changed_paths: normalizedChangedPaths.slice(0, 10),
       blocking_changed_paths: blockingChangedPaths.slice(0, 10),
@@ -580,18 +791,20 @@ export async function runDocsFreshnessMaintain(
     outRoot,
     taskId
   });
-  const [diffResult, specGuard] = await Promise.all([
+  const [diffResult, specGuard, ownerIssueVerification] = await Promise.all([
     Array.isArray(changedPaths)
       ? Promise.resolve({ base_ref: baseRef, status: 'provided', paths: changedPaths })
       : collectChangedPaths(repoRoot, { baseRef }),
-    runSpecGuard(repoRoot, { skip: skipSpecGuard })
+    runSpecGuard(repoRoot, { skip: skipSpecGuard }),
+    verifyOwnerIssueContext(repoRoot, freshnessResult.report?.rolling_freshness_policy?.owner_issue ?? null)
   ]);
   const decision = buildDocsFreshnessMaintenanceDecision(freshnessResult.report, {
     changedPaths: diffResult.paths,
     taskId,
     specGuard,
     diffStatus: diffResult.status,
-    diffBaseRef: diffResult.base_ref
+    diffBaseRef: diffResult.base_ref,
+    ownerIssueVerification
   });
   decision.diff = diffResult;
 

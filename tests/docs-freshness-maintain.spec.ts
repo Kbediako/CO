@@ -236,6 +236,147 @@ describe('docs freshness maintenance decisions', () => {
     expect(decision.recommended_action).toContain('--base');
   });
 
+  it('fails closed when the configured owner issue is terminal', () => {
+    const lastReview = reviewDateDaysAgo(31);
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        rolling_freshness_policy: rollingFreshnessPolicy({
+          is_valid: true,
+          owner_issue_state: 'Done',
+          owner_issue_state_type: 'completed',
+          owner_issue_is_terminal: true
+        }),
+        stale_entries: [
+          {
+            path: 'tasks/tasks-2001-historical.md',
+            doc_class: 'task_packet',
+            doc_class_label: 'Task Packet',
+            path_family: 'tasks/tasks-*',
+            task_number: '2001',
+            last_review: lastReview,
+            cadence_days: 30,
+            age_days: 31,
+            overdue_days: 1
+          }
+        ],
+        rolling_cohort_entries: [],
+        totals: {
+          docs_scanned: 1,
+          registry_entries: 1,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          stale_entries: 1,
+          rolling_cohort_entries: 0,
+          uncatalogued_docs: 0
+        }
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        specGuard: { status: 'succeeded' },
+        diffStatus: 'ok',
+        diffBaseRef: 'origin/main'
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_unowned_repo_debt');
+    expect(decision.owner_issue).toBe('CO-175');
+    expect(decision.owner_issue_action).toEqual(
+      expect.objectContaining({
+        mode: 'create_required',
+        existing_issue: 'CO-175',
+        reason: 'configured_owner_terminal',
+        issue_state: 'Done',
+        issue_state_type: 'completed'
+      })
+    );
+    expect(decision.owner_issue_verification).toEqual(
+      expect.objectContaining({
+        issue: 'CO-175',
+        state: 'Done',
+        state_type: 'completed',
+        is_terminal: true,
+        usable: false,
+        verification_status: 'policy_metadata',
+        source: 'rolling_freshness_policy'
+      })
+    );
+    expect(decision.policy_capacity_status).toEqual(expect.objectContaining({ status: 'invalid_policy' }));
+    expect(decision.recommended_action).toContain('configured owner CO-175 is terminal');
+    expect(decision.recommended_action).toContain('do not reuse it as the live owner path');
+    expect(decision.recommended_action).not.toContain('update_existing');
+  });
+
+  it('fails closed when owner issue verification cannot confirm the configured owner', () => {
+    const lastReview = reviewDateDaysAgo(31);
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        rolling_freshness_policy: rollingFreshnessPolicy({
+          is_valid: true,
+          owner_issue: 'CO-300'
+        }),
+        stale_entries: [
+          {
+            path: 'tasks/tasks-2001-historical.md',
+            doc_class: 'task_packet',
+            doc_class_label: 'Task Packet',
+            path_family: 'tasks/tasks-*',
+            task_number: '2001',
+            last_review: lastReview,
+            cadence_days: 30,
+            age_days: 31,
+            overdue_days: 1
+          }
+        ],
+        rolling_cohort_entries: [],
+        totals: {
+          docs_scanned: 1,
+          registry_entries: 1,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          stale_entries: 1,
+          rolling_cohort_entries: 0,
+          uncatalogued_docs: 0
+        }
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        specGuard: { status: 'succeeded' },
+        diffStatus: 'ok',
+        diffBaseRef: 'origin/main',
+        ownerIssueVerification: {
+          issue: 'CO-300',
+          issue_id: null,
+          state: null,
+          state_type: null,
+          is_terminal: null,
+          usable: null,
+          verification_status: 'failed',
+          checked_at: null,
+          source: 'linear issue-context',
+          error: 'timeout'
+        }
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_unowned_repo_debt');
+    expect(decision.owner_issue_action).toEqual(
+      expect.objectContaining({
+        mode: 'create_required',
+        existing_issue: 'CO-300',
+        reason: 'owner_verification_failed',
+        verification_status: 'failed',
+        verification_error: 'timeout'
+      })
+    );
+    expect(decision.policy_capacity_status).toEqual(expect.objectContaining({ status: 'invalid_policy' }));
+    expect(decision.recommended_action).toContain('could not be verified');
+    expect(decision.recommended_action).not.toContain('update_existing');
+  });
+
   it('keeps undeclared historical candidates blocking until owner action declares or refreshes them', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-maintain-undeclared-'));
     createdDirs.push(repoRoot);
