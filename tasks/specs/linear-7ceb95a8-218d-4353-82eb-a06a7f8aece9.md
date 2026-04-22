@@ -22,8 +22,8 @@ last_review: 2026-04-22
 - Source payload: `.runs/linear-7ceb95a8-218d-4353-82eb-a06a7f8aece9-docs-packet/cli/2026-04-22T08-13-01-356Z-cfe6c9a3/memory/source-0/source.txt`
 - Source payload note: this payload is run provenance only; authoritative issue wording came from read-only `linear issue-context` output for `CO-303` and `CO-295`.
 - Read-only issue-context evidence:
-  - `node /Users/kbediako/Code/CO/dist/bin/codex-orchestrator.js linear issue-context --issue-id CO-303 --format json`
-  - `node /Users/kbediako/Code/CO/dist/bin/codex-orchestrator.js linear issue-context --issue-id CO-295 --format json`
+  - `node dist/bin/codex-orchestrator.js linear issue-context --issue-id CO-303 --format json`
+  - `node dist/bin/codex-orchestrator.js linear issue-context --issue-id CO-295 --format json`
 - CO-295 evidence manifests:
   - `.runs/linear-994efebc-e1e4-4e00-8046-c60143813251-review-docs-nitpicks/cli/2026-04-22T05-53-20-840Z-5177eb47/manifest.json`
   - `.runs/linear-994efebc-e1e4-4e00-8046-c60143813251-review-tests-validation/cli/2026-04-22T06-12-29-447Z-4d1c90c4/manifest.json`

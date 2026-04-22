@@ -741,21 +741,87 @@ describe('provider linear child lane runner', () => {
     ).toEqual([]);
   });
 
+  it('detects transient child-lane commits that reset back to the starting head', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-runner-'));
+    const laneWorkspacePath = join(tempRoot, 'workspace');
+    const startingHeadSha = await initGitRepo(laneWorkspacePath);
+    const startingReflogEntryCount = runGit(laneWorkspacePath, ['reflog', '--format=%H'])
+      .split('\n')
+      .filter(Boolean).length;
+
+    await writeFile(join(laneWorkspacePath, 'README.md'), 'transient\n', 'utf8');
+    runGit(laneWorkspacePath, ['add', 'README.md']);
+    runGit(laneWorkspacePath, ['commit', '-m', 'transient child commit']);
+    const transientCommitSha = runGit(laneWorkspacePath, ['rev-parse', 'HEAD']);
+    runGit(laneWorkspacePath, ['reset', '--hard', startingHeadSha]);
+
+    await expect(
+      childLaneRunnerTest.detectProviderLinearChildLaneCreatedCommitShas(
+        laneWorkspacePath,
+        startingHeadSha,
+        startingReflogEntryCount
+      )
+    ).resolves.toEqual([transientCommitSha]);
+  });
+
+  it('ignores plain head movement across existing commits when no child commit was created', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-runner-'));
+    const laneWorkspacePath = join(tempRoot, 'workspace');
+    const initialHeadSha = await initGitRepo(laneWorkspacePath);
+
+    await writeFile(join(laneWorkspacePath, 'README.md'), 'existing history\n', 'utf8');
+    runGit(laneWorkspacePath, ['add', 'README.md']);
+    runGit(laneWorkspacePath, ['commit', '-m', 'existing repo commit']);
+    const startingHeadSha = runGit(laneWorkspacePath, ['rev-parse', 'HEAD']);
+    const startingReflogEntryCount = runGit(laneWorkspacePath, ['reflog', '--format=%H'])
+      .split('\n')
+      .filter(Boolean).length;
+
+    runGit(laneWorkspacePath, ['checkout', initialHeadSha]);
+    runGit(laneWorkspacePath, ['checkout', startingHeadSha]);
+
+    await expect(
+      childLaneRunnerTest.detectProviderLinearChildLaneCreatedCommitShas(
+        laneWorkspacePath,
+        startingHeadSha,
+        startingReflogEntryCount
+      )
+    ).resolves.toEqual([]);
+  });
+
   it('flags unauthorized child-lane commits when HEAD diverges from the parent snapshot base sha', () => {
     expect(
       childLaneRunnerTest.resolveProviderLinearChildLaneUnauthorizedCommitMessage({
         context: { issueIdentifier: 'CO-303' },
         expectedBaseSha: 'base-sha-1',
-        currentHeadSha: 'child-commit-1'
+        currentHeadSha: 'child-commit-1',
+        createdCommitShas: ['child-commit-1']
       })
-    ).toContain('Child lane created commit child-commit-1 from parent base base-sha-1 for CO-303');
+    ).toContain('Child lane created commit(s) child-commit-1 from parent base base-sha-1 for CO-303');
     expect(
       childLaneRunnerTest.resolveProviderLinearChildLaneUnauthorizedCommitMessage({
         context: { issueIdentifier: 'CO-303' },
         expectedBaseSha: 'base-sha-1',
-        currentHeadSha: 'base-sha-1'
+        currentHeadSha: 'child-commit-1',
+        createdCommitShas: ['child-commit-1']
+      })
+    ).toContain('and left HEAD at child-commit-1');
+    expect(
+      childLaneRunnerTest.resolveProviderLinearChildLaneUnauthorizedCommitMessage({
+        context: { issueIdentifier: 'CO-303' },
+        expectedBaseSha: 'base-sha-1',
+        currentHeadSha: 'base-sha-1',
+        createdCommitShas: []
       })
     ).toBeNull();
+    expect(
+      childLaneRunnerTest.resolveProviderLinearChildLaneUnauthorizedCommitMessage({
+        context: { issueIdentifier: 'CO-303' },
+        expectedBaseSha: 'base-sha-1',
+        currentHeadSha: 'base-sha-1',
+        createdCommitShas: ['child-commit-1']
+      })
+    ).toContain('and reset HEAD back to the parent base');
   });
 
   it('preserves a successful exec result when abort fires after exit but before close settles', async () => {

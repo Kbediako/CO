@@ -2063,6 +2063,27 @@ function buildRepairedChildLaneRecord(input: {
   };
 }
 
+function resolveChildLaneReservationRecoveryTimingViolation(input: {
+  reservation: ProviderLinearWorkerChildLaneRecord;
+  proof: ProviderLinearChildLaneProof;
+}): string | null {
+  const reservationLaunchedAt = normalizeOptionalString(input.reservation.launched_at);
+  const proofCompletedAt =
+    normalizeOptionalString(input.proof.updated_at) ?? normalizeOptionalString(input.proof.last_event_at);
+  if (!reservationLaunchedAt || !proofCompletedAt) {
+    return 'Child lane proof timing is missing; cannot repair or recover a launching reservation safely.';
+  }
+  const reservationLaunchedMs = Date.parse(reservationLaunchedAt);
+  const proofCompletedMs = Date.parse(proofCompletedAt);
+  if (!Number.isFinite(reservationLaunchedMs) || !Number.isFinite(proofCompletedMs)) {
+    return 'Child lane proof timing is invalid; cannot repair or recover a launching reservation safely.';
+  }
+  if (proofCompletedMs < reservationLaunchedMs) {
+    return 'Child lane proof completion predates the pending launching reservation.';
+  }
+  return null;
+}
+
 function resolveChildLaneReservationRepairProofViolation(input: {
   reservation: ProviderLinearWorkerChildLaneRecord;
   childRun: ProviderLinearChildLaneRunResult;
@@ -2087,6 +2108,13 @@ function resolveChildLaneReservationRepairProofViolation(input: {
   }
   if (normalizeOptionalString(input.proof.status) !== input.childRun.status) {
     return 'Child lane proof status does not match the child manifest status.';
+  }
+  const recoveryTimingViolation = resolveChildLaneReservationRecoveryTimingViolation({
+    reservation: input.reservation,
+    proof: input.proof
+  });
+  if (recoveryTimingViolation) {
+    return recoveryTimingViolation;
   }
   const artifactRoot = resolveAcceptedChildLaneArtifactRoot(
     input.repoRoot,

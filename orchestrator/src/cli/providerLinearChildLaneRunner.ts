@@ -1263,15 +1263,73 @@ async function readProviderLinearChildLaneHeadSha(laneWorkspacePath: string): Pr
   return normalizeOptionalString(result.stdout);
 }
 
+async function countProviderLinearChildLaneReflogEntries(laneWorkspacePath: string): Promise<number> {
+  const result = await execFileAsync('git', ['-C', laneWorkspacePath, 'reflog', '--format=%H'], {
+    maxBuffer: 1024 * 1024
+  });
+  return result.stdout
+    .split(/\r?\n/u)
+    .map((line) => normalizeOptionalString(line))
+    .filter((line): line is string => line !== null).length;
+}
+
+async function detectProviderLinearChildLaneCreatedCommitShas(
+  laneWorkspacePath: string,
+  startingHeadSha: string | null,
+  startingReflogEntryCount = 0
+): Promise<string[]> {
+  if (!startingHeadSha) {
+    return [];
+  }
+  const result = await execFileAsync('git', ['-C', laneWorkspacePath, 'reflog', '--format=%H%x09%gs'], {
+    maxBuffer: 1024 * 1024
+  });
+  const reflogEntries = result.stdout.split(/\r?\n/u).filter((line) => line.trim().length > 0);
+  const newEntryCount = Math.max(0, reflogEntries.length - Math.max(0, startingReflogEntryCount));
+  const createdCommitShas: string[] = [];
+  const seen = new Set<string>();
+  for (const line of reflogEntries.slice(0, newEntryCount)) {
+    const [rawSha, rawSummary = ''] = line.split('\t', 2);
+    const sha = normalizeOptionalString(rawSha);
+    const summary = normalizeOptionalString(rawSummary);
+    if (
+      !sha ||
+      !summary ||
+      sha === startingHeadSha ||
+      seen.has(sha) ||
+      !/^commit(?:\s+\([^)]*\))?:/u.test(summary)
+    ) {
+      continue;
+    }
+    seen.add(sha);
+    createdCommitShas.push(sha);
+  }
+  return createdCommitShas;
+}
+
 function resolveProviderLinearChildLaneUnauthorizedCommitMessage(input: {
   context: Pick<ProviderLinearChildLaneContext, 'issueIdentifier'>;
   expectedBaseSha: string | null;
   currentHeadSha: string | null;
+  createdCommitShas: readonly string[];
 }): string | null {
-  if (!input.expectedBaseSha || !input.currentHeadSha || input.expectedBaseSha === input.currentHeadSha) {
-    return null;
+  if (input.createdCommitShas.length === 0) {
+    if (!input.expectedBaseSha || !input.currentHeadSha || input.expectedBaseSha === input.currentHeadSha) {
+      return null;
+    }
+    return `Child lane created commit ${input.currentHeadSha} from parent base ${input.expectedBaseSha} for ${input.context.issueIdentifier} instead of returning an uncommitted patch artifact. Invalidate the lane and relaunch; parent acceptance owns integration and branch updates.`;
   }
-  return `Child lane created commit ${input.currentHeadSha} from parent base ${input.expectedBaseSha} for ${input.context.issueIdentifier} instead of returning an uncommitted patch artifact. Invalidate the lane and relaunch; parent acceptance owns integration and branch updates.`;
+  const renderedCreatedCommitShas = input.createdCommitShas.slice(0, 3).join(', ');
+  const currentHeadSuffix =
+    input.expectedBaseSha && input.currentHeadSha === input.expectedBaseSha
+      ? ' and reset HEAD back to the parent base'
+      : input.currentHeadSha
+        ? ` and left HEAD at ${input.currentHeadSha}`
+        : '';
+  if (!input.expectedBaseSha) {
+    return `Child lane created commit(s) ${renderedCreatedCommitShas} for ${input.context.issueIdentifier} instead of returning an uncommitted patch artifact${currentHeadSuffix}. Invalidate the lane and relaunch; parent acceptance owns integration and branch updates.`;
+  }
+  return `Child lane created commit(s) ${renderedCreatedCommitShas} from parent base ${input.expectedBaseSha} for ${input.context.issueIdentifier} instead of returning an uncommitted patch artifact${currentHeadSuffix}. Invalidate the lane and relaunch; parent acceptance owns integration and branch updates.`;
 }
 
 async function writeChildLaneProof(
@@ -1339,6 +1397,10 @@ export async function runProviderLinearChildLane(
   };
   const context = await loadProviderLinearChildLaneContext(env);
   const { laneWorkspacePath, laneBranch } = await prepareLaneWorkspace(context);
+  const startingHeadSha = await readProviderLinearChildLaneHeadSha(laneWorkspacePath).catch(() => null);
+  const startingReflogEntryCount = await countProviderLinearChildLaneReflogEntries(laneWorkspacePath).catch(
+    () => 0
+  );
   try {
     const runtimeContext = await resolveChildLaneRuntimeContext(env, laneWorkspacePath, context.runId);
     logger.info(`[provider-linear-child-lane-runtime] ${formatRuntimeSelectionSummary(runtimeContext.runtime)}`);
@@ -1458,10 +1520,16 @@ export async function runProviderLinearChildLane(
       turnId: parsed.turnId
     });
     const currentHeadSha = await readProviderLinearChildLaneHeadSha(laneWorkspacePath).catch(() => null);
+    const createdCommitShas = await detectProviderLinearChildLaneCreatedCommitShas(
+      laneWorkspacePath,
+      startingHeadSha,
+      startingReflogEntryCount
+    ).catch(() => []);
     const unauthorizedCommitMessage = resolveProviderLinearChildLaneUnauthorizedCommitMessage({
       context,
       expectedBaseSha: context.parentSnapshot.base_sha,
-      currentHeadSha
+      currentHeadSha,
+      createdCommitShas
     });
     const patchBaselineRef =
       context.parentSnapshot.base_sha && currentHeadSha && context.parentSnapshot.base_sha !== currentHeadSha
@@ -1559,6 +1627,7 @@ if (entry && entry === self) {
 export const __test__ = {
   buildChildLanePrompt,
   buildProviderLinearChildLaneAppserverStartupTimeoutMessage,
+  detectProviderLinearChildLaneCreatedCommitShas,
   discoverProviderLinearChildLaneSessionLogPath,
   planTrustedProjectCleanup,
   extractProviderLinearChildLaneScopeDriftEvidenceFromRecord,
