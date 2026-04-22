@@ -51,6 +51,17 @@ Provider-worker gates use this decision in `docs-review` and `implementation-gat
 
 When the configured owner issue is terminal, `docs:freshness:maintain` must fail closed. Terminal owner metadata is evidence only; the helper must require a new live same-project owner issue instead of reusing a `Done`, `Duplicate`, or `Canceled` owner path.
 
+## Preserved Historical Stub Status
+Some historical task-key stubs remain authoritative because current repo tooling still resolves their canonical task key from that path even after the rest of the historical packet is gone. Those rows should use docs-freshness registry status `preserved_historical_stub`.
+
+Use `preserved_historical_stub` only for intentionally minimal continuity surfaces under `tasks/tasks-*.md` and `.agent/task/*.md`, such as a preserved `tasks/tasks-linear-...md` stub and its matching mirror while that stub is still the authoritative canonical task key surface. The file itself should be an explicit historical continuity stub rather than a full packet, for example with heading `# Historical stub`. While a row is `preserved_historical_stub`:
+
+- `docs:freshness` still validates path and registry metadata, but it does not age the row into ordinary active stale-doc debt.
+- `implementation-docs-archive` must not auto-archive the row through registry-status, retention-age, or line-threshold triggers.
+- the row stays non-archive-eligible until current repo tooling no longer depends on the stub as the authoritative canonical task key surface.
+
+When the stub stops being authoritative, reclassify it to `archived` and let the normal archive flow manage it. Do not use `preserved_historical_stub` for full active packets, ordinary historical docs debt, or as a generic escape hatch from freshness review.
+
 Blocking decisions are fail-closed:
 
 - `block_missing_or_invalid_registry`: missing registry rows, registry references to missing files, invalid registry metadata, or uncatalogued docs.
