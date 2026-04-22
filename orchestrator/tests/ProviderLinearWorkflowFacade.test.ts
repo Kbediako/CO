@@ -249,28 +249,7 @@ function buildCachedIssueContext(overrides: Record<string, unknown> = {}): Recor
       id: 'lin-team-1',
       key: 'CO',
       name: 'Codex Orchestrator',
-      states: [
-        {
-          id: 'state-backlog',
-          name: 'Backlog',
-          type: 'unstarted'
-        },
-        {
-          id: 'state-in-progress',
-          name: 'In Progress',
-          type: 'started'
-        },
-        {
-          id: 'state-human-review',
-          name: 'Human Review',
-          type: 'started'
-        },
-        {
-          id: 'state-done',
-          name: 'Done',
-          type: 'completed'
-        }
-      ]
+      states: TEAM_STATES_NODES.map((state) => ({ ...state }))
     },
     project: {
       id: 'lin-project-1',
@@ -2019,6 +1998,44 @@ describe('providerLinearWorkflowFacade', () => {
           conflicting: [
             {
               id: 'attachment-pr-600'
+            }
+          ],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it('keeps bare-leading low-number NODE titles conflicting without owned evidence', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'NODE-244',
+      title: 'Completed issue with bare-leading low-number NODE PR',
+      state: {
+        id: 'state-done',
+        name: 'Done',
+        type: 'completed'
+      },
+      attachments: [buildGitHubAttachment('attachment-pr-606', 606, 'NODE-20 runtime upgrade')],
+      snapshotForPr: () => ({
+        state: 'OPEN',
+        mergedAt: null,
+        updatedAt: '2026-04-21T09:07:51.000Z',
+        title: 'NODE-20 runtime upgrade',
+        headRefName: 'feature/runtime-upgrade'
+      })
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'NODE-244',
+        pull_request_attachments: {
+          current: null,
+          historical: [],
+          conflicting: [
+            {
+              id: 'attachment-pr-606'
             }
           ],
           unknown: []

@@ -998,6 +998,7 @@ interface ProviderLinearIssueIdentifierEvidence {
   prefix: string;
   issue_owned_position: boolean;
   strong_issue_owned_position: boolean;
+  bare_title_position: boolean;
   title_prefix_position: boolean;
 }
 
@@ -1493,6 +1494,8 @@ function extractIssueIdentifierEvidence(
             (existing?.issue_owned_position ?? false) || positionFlags.issue_owned_position,
           strong_issue_owned_position:
             (existing?.strong_issue_owned_position ?? false) || positionFlags.strong_issue_owned_position,
+          bare_title_position:
+            (existing?.bare_title_position ?? false) || positionFlags.bare_title_position,
           title_prefix_position:
             (existing?.title_prefix_position ?? false) || positionFlags.title_prefix_position
         });
@@ -1508,7 +1511,11 @@ function shouldRetainTechnicalForeignEvidence(
   entry: ProviderLinearIssueIdentifierEvidence
 ): boolean {
   const issuePrefix = issueIdentifier.slice(0, issueIdentifier.indexOf('-'));
-  if (entry.prefix !== 'NODE' || issuePrefix !== entry.prefix || !entry.title_prefix_position) {
+  if (
+    entry.prefix !== 'NODE' ||
+    issuePrefix !== entry.prefix ||
+    (!entry.title_prefix_position && !entry.bare_title_position)
+  ) {
     return false;
   }
   return !rawEvidence.some((candidate) => candidate.identifier === issueIdentifier && candidate.prefix === entry.prefix);
@@ -1521,6 +1528,7 @@ function resolveIssueOwnedIdentifierPositionFlags(
 ): {
   issue_owned_position: boolean;
   strong_issue_owned_position: boolean;
+  bare_title_position: boolean;
   title_prefix_position: boolean;
 } {
   const previous = value[index - 1];
@@ -1529,6 +1537,7 @@ function resolveIssueOwnedIdentifierPositionFlags(
     return {
       issue_owned_position: true,
       strong_issue_owned_position: strongIssueOwnedPosition,
+      bare_title_position: index === 0,
       title_prefix_position: false
     };
   }
@@ -1539,6 +1548,7 @@ function resolveIssueOwnedIdentifierPositionFlags(
     return {
       issue_owned_position: issueOwnedPosition,
       strong_issue_owned_position: issueOwnedPosition,
+      bare_title_position: false,
       title_prefix_position: false
     };
   }
@@ -1546,6 +1556,7 @@ function resolveIssueOwnedIdentifierPositionFlags(
   return {
     issue_owned_position: titlePrefixPosition,
     strong_issue_owned_position: false,
+    bare_title_position: false,
     title_prefix_position: titlePrefixPosition
   };
 }
