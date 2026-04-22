@@ -187,12 +187,16 @@ function decodeTomlQuotedString(raw: string): string {
   return raw.slice(1, -1);
 }
 
+function isProjectsTableKeyPath(keyPath: string | null): boolean {
+  return keyPath === 'projects' || keyPath === '"projects"' || keyPath === '\'projects\'';
+}
+
 function parseProjectTableHeader(line: string): string | null {
   const keyPath = parseTomlTableKeyPath(line);
   if (!keyPath) {
     return null;
   }
-  const match = keyPath.match(/^projects\s*\.\s*("(?:[^"\\]|\\.)*"|'[^']*')\s*$/u);
+  const match = keyPath.match(/^(?:"projects"|'projects'|projects)\s*\.\s*("(?:[^"\\]|\\.)*"|'[^']*')\s*$/u);
   if (!match) {
     return null;
   }
@@ -211,7 +215,7 @@ function parseProjectNamespaceHeader(line: string): string | null {
   if (!keyPath) {
     return null;
   }
-  const match = keyPath.match(/^projects\s*\.\s*("(?:[^"\\]|\\.)*"|'[^']*')(?:\s*\.\s*|$)/u);
+  const match = keyPath.match(/^(?:"projects"|'projects'|projects)\s*\.\s*("(?:[^"\\]|\\.)*"|'[^']*')(?:\s*\.\s*|$)/u);
   if (!match) {
     return null;
   }
@@ -225,9 +229,9 @@ function parseInlineProjectEntry(
   const trimmed = line.trim();
   const inlineKeyPattern = /^("(?:[^"\\]|\\.)*"|'[^']*')\s*=\s*\{.*\}\s*(?:#.*)?$/u;
   const dottedInlineKeyPattern =
-    /^projects\s*\.\s*("(?:[^"\\]|\\.)*"|'[^']*')\s*=\s*\{.*\}\s*(?:#.*)?$/u;
+    /^(?:"projects"|'projects'|projects)\s*\.\s*("(?:[^"\\]|\\.)*"|'[^']*')\s*=\s*\{.*\}\s*(?:#.*)?$/u;
   const inlineMatch =
-    currentTableKeyPath === 'projects'
+    isProjectsTableKeyPath(currentTableKeyPath)
       ? trimmed.match(inlineKeyPattern)
       : currentTableKeyPath === null
         ? trimmed.match(dottedInlineKeyPattern)
@@ -239,9 +243,9 @@ function parseInlineProjectEntry(
   const dottedAssignmentPattern =
     /^("(?:[^"\\]|\\.)*"|'[^']*')\s*\.\s*.+?=\s*(.+)$/u;
   const topLevelDottedAssignmentPattern =
-    /^projects\s*\.\s*("(?:[^"\\]|\\.)*"|'[^']*')\s*\.\s*.+?=\s*(.+)$/u;
+    /^(?:"projects"|'projects'|projects)\s*\.\s*("(?:[^"\\]|\\.)*"|'[^']*')\s*\.\s*.+?=\s*(.+)$/u;
   const dottedMatch =
-    currentTableKeyPath === 'projects'
+    isProjectsTableKeyPath(currentTableKeyPath)
       ? trimmed.match(dottedAssignmentPattern)
       : currentTableKeyPath === null
         ? trimmed.match(topLevelDottedAssignmentPattern)
