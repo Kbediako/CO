@@ -23952,7 +23952,7 @@ describe('createProviderIssueHandoffService', () => {
       provider_key: 'linear:lin-issue-295',
       issue_id: 'lin-issue-295',
       issue_identifier: 'CO-295',
-      issue_title: 'Linear PR attachment ownership truth',
+      issue_title: 'Persisted released title',
       issue_state: 'Blocked',
       issue_state_type: 'started',
       issue_updated_at: '2026-04-22T05:01:21.766Z',
@@ -23990,7 +23990,7 @@ describe('createProviderIssueHandoffService', () => {
       trackedIssue: createTrackedIssue({
         id: 'lin-issue-295',
         identifier: 'CO-295',
-        title: 'Linear PR attachment ownership truth',
+        title: 'Incoming replay title',
         state: 'In Progress',
         state_type: 'started',
         updated_at: '2026-04-22T05:01:21.766Z',
@@ -24007,6 +24007,7 @@ describe('createProviderIssueHandoffService', () => {
       state: 'released',
       reason: 'provider_issue_released:not_active',
       issue_identifier: 'CO-295',
+      issue_title: 'Persisted released title',
       issue_state: 'In Progress',
       issue_state_type: 'started',
       issue_updated_at: '2026-04-22T05:01:21.766Z'

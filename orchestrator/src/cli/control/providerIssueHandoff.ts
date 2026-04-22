@@ -3538,11 +3538,18 @@ export function createProviderIssueHandoffService(
                 issue_trashed: claimBase.issue_trashed
               };
         const releasedIssueMetadata =
-          reopenBlockedByReleaseDrain || refreshTerminalBlockerStaleReleasedMetadata
+          reopenBlockedByReleaseDrain
             ? claimBase
-            : preserveReleasedIssueMetadata
-              ? existing
-              : claimBase;
+            : refreshTerminalBlockerStaleReleasedMetadata
+              ? {
+                  ...existing,
+                  issue_state: claimBase.issue_state,
+                  issue_state_type: claimBase.issue_state_type,
+                  issue_updated_at: claimBase.issue_updated_at
+                }
+              : preserveReleasedIssueMetadata
+                ? existing
+                : claimBase;
         if (
           releaseCancelPending ||
           replayBlockedByReleasedMetadata
