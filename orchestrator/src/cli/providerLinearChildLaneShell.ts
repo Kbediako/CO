@@ -443,6 +443,7 @@ async function launchChildLane(
   if (dirtyScopeConflict) {
     const retrySuppression = await resolveSameAttemptParentDirtyRetrySuppression(
       context.runDir,
+      context.issueId,
       params.env
     );
     if (retrySuppression) {
@@ -1283,6 +1284,7 @@ function childLaneDecisionFailureResult(input: {
 
 async function resolveSameAttemptParentDirtyRetrySuppression(
   runDir: string,
+  issueId: string,
   env: NodeJS.ProcessEnv
 ): Promise<ReturnType<typeof findDeterministicProviderMutationSuppression>> {
   const auditPath = resolveProviderLinearAuditPath(env);
@@ -1321,7 +1323,7 @@ async function resolveSameAttemptParentDirtyRetrySuppression(
     {
       recordedAtNotBefore: attemptStartedAt,
       action: 'launch',
-      issueId: typeof parsedProof.issue_id === 'string' ? parsedProof.issue_id : null
+      issueId
     }
   );
   return suppression && isChildLaneParentDirtySuppressionCode(suppression.error_code)

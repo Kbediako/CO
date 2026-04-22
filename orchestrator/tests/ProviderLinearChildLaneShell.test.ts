@@ -2061,16 +2061,20 @@ describe('runProviderLinearChildLaneShell', () => {
     expect(execRunner).not.toHaveBeenCalled();
   });
 
-  it('does not treat same-attempt accept parent-dirty failures as launch retry suppression', async () => {
+  it('does not treat same-attempt accept or other-issue parent-dirty failures as launch retry suppression when proof omits issue id', async () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
     const execRunner = vi.fn();
     const auditPath = join(tempRoot ?? '', 'provider-linear-audit.jsonl');
     await seedParentDirtyAttempt(runDir, auditPath, [
       buildParentDirtyAuditEntry({
+        issue_id: 'lin-issue-2',
+        issue_identifier: 'CO-99'
+      }),
+      buildParentDirtyAuditEntry({
         action: 'accept:docs-b',
         error_message: PARENT_DIRTY_LAUNCH_MESSAGE
       })
-    ]);
+    ], {});
 
     const result = await runProviderLinearChildLaneShell(
       buildChildLaneLaunchRequest(manifestPath, auditPath),
