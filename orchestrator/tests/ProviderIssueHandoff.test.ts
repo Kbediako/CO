@@ -26182,6 +26182,87 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('does not arm pending reopen from stale retained-run refresh metadata', async () => {
+    const { root, paths } = await createHostPaths();
+    const recoveredEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const recoveredPaths = resolveRunPaths(recoveredEnv, 'run-ready-not-active-refresh-recovered');
+    const terminalBlocker = {
+      id: 'lin-blocker-300',
+      identifier: 'CO-300',
+      state: 'Done',
+      state_type: 'completed'
+    };
+
+    await mkdir(recoveredPaths.runDir, { recursive: true });
+    await writeFile(
+      recoveredPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-ready-not-active-refresh-recovered',
+        task_id: 'linear-lin-issue-1',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-191',
+        issue_updated_at: '2026-04-15T15:10:00.000Z',
+        started_at: '2026-04-15T15:10:00.000Z',
+        updated_at: '2026-04-15T15:11:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      issue_blocked_by: [terminalBlocker],
+      run_id: 'run-ready-not-active-refresh-recovered',
+      run_manifest_path: recoveredPaths.manifestPath
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = createCo202Launcher(
+      'run-ready-not-active-refresh-reclaimed',
+      '/tmp/provider-run/ready-not-active-refresh-reclaimed-manifest.json'
+    );
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createCo202ReadyIssue({
+        updated_at: '2026-04-15T15:05:00.000Z',
+        blocked_by: [terminalBlocker]
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    await service.refresh();
+    await service.refresh();
+
+    expect(resolveTrackedIssue).toHaveBeenCalledTimes(2);
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-15T15:05:00.000Z',
+      issue_blocked_by: [],
+      run_id: 'run-ready-not-active-refresh-recovered',
+      run_manifest_path: recoveredPaths.manifestPath
+    });
+    expect(persist).toHaveBeenCalled();
+  });
+
   it('clears stale completed blockers during retained released refresh when unresolved run identity prevents relaunch', async () => {
     const { root, paths } = await createHostPaths();
     const missingManifestPath = join(

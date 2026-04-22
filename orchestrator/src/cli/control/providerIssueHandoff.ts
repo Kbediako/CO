@@ -3100,15 +3100,77 @@ export function createProviderIssueHandoffService(
     );
   };
 
+  const shouldPromoteRetainedReleasedNotActiveClaimPendingReopen = (input: {
+    claim: Pick<
+      ProviderIntakeClaimRecord,
+      | 'state'
+      | 'reason'
+      | 'issue_state'
+      | 'issue_state_type'
+      | 'issue_updated_at'
+      | 'issue_blocked_by'
+      | 'merge_closeout'
+    >;
+    releaseRun: ProviderIssueRunRecord | null;
+    trackedIssue: Pick<
+      LiveLinearTrackedIssue,
+      | 'updated_at'
+      | 'state'
+      | 'state_type'
+      | 'archived_at'
+      | 'trashed'
+      | 'viewer_id'
+      | 'assignee_id'
+      | 'blocked_by'
+    >;
+  }): boolean => {
+    if (!isProviderLinearTrackedIssueEligibleForExecution(input.trackedIssue)) {
+      return false;
+    }
+    const latestReleasedIssueUpdatedAt = selectMostRecentTrackedIssueUpdatedAt(
+      input.claim.issue_updated_at ?? null,
+      resolveReleasedRunIssueUpdatedAtForReclaim(input.claim, input.releaseRun)
+    );
+    const updatedAtComparison = compareTrackedIssueUpdatedAt({
+      existingIssueUpdatedAt: latestReleasedIssueUpdatedAt,
+      nextIssueUpdatedAt: input.trackedIssue.updated_at
+    });
+    return (
+      updatedAtComparison === 'newer' ||
+      (
+        updatedAtComparison === 'equal' &&
+        shouldReopenReleasedClaimAtCurrentTimestamp({
+          claim: input.claim,
+          trackedIssue: input.trackedIssue
+        })
+      )
+    );
+  };
+
   const refreshRetainedReleasedNotActiveClaimMetadata = async (input: {
     claim: ProviderIntakeClaimRecord;
-    trackedIssue: Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at' | 'blocked_by'>;
+    releaseRun: ProviderIssueRunRecord | null;
+    trackedIssue: Pick<
+      LiveLinearTrackedIssue,
+      | 'updated_at'
+      | 'state'
+      | 'state_type'
+      | 'blocked_by'
+      | 'archived_at'
+      | 'trashed'
+      | 'viewer_id'
+      | 'assignee_id'
+    >;
   }): Promise<ProviderIntakeClaimRecord> => {
     if (!canRefreshRetainedReleasedNotActiveClaimMetadataOnly(input)) {
       return input.claim;
     }
     const nextReason =
-      isProviderLinearTrackedIssueEligibleForExecution(input.trackedIssue)
+      shouldPromoteRetainedReleasedNotActiveClaimPendingReopen({
+        claim: input.claim,
+        releaseRun: input.releaseRun,
+        trackedIssue: input.trackedIssue
+      })
         ? markProviderIssueReleasedPendingReopen(input.claim.reason ?? null)
         : input.claim.reason;
     const trackedIssueFields: Partial<
@@ -4847,6 +4909,7 @@ export function createProviderIssueHandoffService(
             ) {
               await refreshRetainedReleasedNotActiveClaimMetadata({
                 claim,
+                releaseRun,
                 trackedIssue: resolution.trackedIssue
               });
               const releaseRunForCancel = releaseRun ?? activeRun;
@@ -5033,6 +5096,7 @@ export function createProviderIssueHandoffService(
             })) {
               await refreshRetainedReleasedNotActiveClaimMetadata({
                 claim,
+                releaseRun,
                 trackedIssue: resolution.trackedIssue
               });
               continue;
@@ -5053,6 +5117,7 @@ export function createProviderIssueHandoffService(
             ) {
               await refreshRetainedReleasedNotActiveClaimMetadata({
                 claim,
+                releaseRun,
                 trackedIssue: resolution.trackedIssue
               });
               if (!canFreshDiscoverReleasedMissingRetainedRun) {
@@ -5063,6 +5128,7 @@ export function createProviderIssueHandoffService(
             if (shouldBlockPendingReopenFreshDiscovery) {
               await refreshRetainedReleasedNotActiveClaimMetadata({
                 claim,
+                releaseRun,
                 trackedIssue: resolution.trackedIssue
               });
               deferredClaimFreshDiscoveryBlockedProviderKeys.add(claimProviderKey);
@@ -5079,6 +5145,7 @@ export function createProviderIssueHandoffService(
             ) {
               await refreshRetainedReleasedNotActiveClaimMetadata({
                 claim,
+                releaseRun,
                 trackedIssue: resolution.trackedIssue
               });
               if (
@@ -5683,6 +5750,7 @@ export function createProviderIssueHandoffService(
                 ) {
                   const refreshedClaim = await refreshRetainedReleasedNotActiveClaimMetadata({
                     claim,
+                    releaseRun,
                     trackedIssue: directResolution.trackedIssue
                   });
                   claimByProviderKey.set(refreshedClaim.provider_key, refreshedClaim);
