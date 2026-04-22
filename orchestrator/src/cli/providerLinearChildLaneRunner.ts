@@ -218,6 +218,26 @@ function parseProjectNamespaceHeader(line: string): string | null {
   return normalizeProjectPath(decodeTomlQuotedString(match[1]));
 }
 
+function parseInlineProjectEntry(
+  line: string,
+  currentTableKeyPath: string | null
+): string | null {
+  const trimmed = line.trim();
+  const inlineKeyPattern = /^("(?:[^"\\]|\\.)*"|'[^']*')\s*=\s*\{.*\}\s*(?:#.*)?$/u;
+  const dottedInlineKeyPattern =
+    /^projects\s*\.\s*("(?:[^"\\]|\\.)*"|'[^']*')\s*=\s*\{.*\}\s*(?:#.*)?$/u;
+  const match =
+    currentTableKeyPath === 'projects'
+      ? trimmed.match(inlineKeyPattern)
+      : currentTableKeyPath === null
+        ? trimmed.match(dottedInlineKeyPattern)
+        : null;
+  if (!match) {
+    return null;
+  }
+  return normalizeProjectPath(decodeTomlQuotedString(match[1]));
+}
+
 type TomlMultilineStringState = 'basic' | 'literal' | null;
 
 function isBackslashEscaped(line: string, index: number): boolean {
@@ -319,6 +339,7 @@ function removeProjectTablesFromRawConfig(rawConfig: string, removableProjects: 
   const lines = rawConfig.split(/\r?\n/u);
   const keptLines: string[] = [];
   let skippingProjectTable: string | null = null;
+  let currentTableKeyPath: string | null = null;
   let multilineStringState: TomlMultilineStringState = null;
 
   for (const line of lines) {
@@ -338,8 +359,20 @@ function removeProjectTablesFromRawConfig(rawConfig: string, removableProjects: 
       continue;
     }
 
+    const inlineProjectPath =
+      tableHeaderPath || multilineStringState
+        ? null
+        : parseInlineProjectEntry(line, currentTableKeyPath);
+    if (inlineProjectPath && removableProjects.has(inlineProjectPath)) {
+      multilineStringState = advanceTomlMultilineStringState(line, multilineStringState);
+      continue;
+    }
+
     keptLines.push(line);
     multilineStringState = advanceTomlMultilineStringState(line, multilineStringState);
+    if (tableHeaderPath) {
+      currentTableKeyPath = tableHeaderPath.trim();
+    }
   }
 
   const nextConfig = keptLines.join('\n');

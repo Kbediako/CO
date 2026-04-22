@@ -150,6 +150,36 @@ describe('provider linear child lane runner', () => {
     expect(plan.nextConfig).toContain('[[profiles]]');
   });
 
+  it('removes redundant inline project entries under the top-level projects table', () => {
+    const parentWorkspacePath = '/Users/kbediako/Code/CO';
+    const laneWorkspacePath = '/Users/kbediako/Code/CO/.workspaces/linear-123/.child-lanes/docs-a';
+    const siblingWorkspacePath = '/Users/kbediako/Code/CO/.workspaces/linear-123/.child-lanes/tests-b';
+    const rawConfig = [
+      '[projects]',
+      `"/Users/kbediako/Code/CO" = { trust_level = "trusted" }`,
+      `"${laneWorkspacePath}" = { trust_level = "trusted", note = "remove me" }`,
+      `"${siblingWorkspacePath}" = { trust_level = "trusted" }`,
+      '',
+      '[[profiles]]',
+      'name = "default"',
+      ''
+    ].join('\n');
+
+    const plan = childLaneRunnerTest.planTrustedProjectCleanup({
+      rawConfig,
+      laneWorkspacePath,
+      configPath: '/Users/kbediako/.codex/config.toml'
+    });
+
+    expect(plan.anchorProject).toBe(parentWorkspacePath);
+    expect(plan.removedProjects).toEqual([laneWorkspacePath]);
+    expect(plan.changed).toBe(true);
+    expect(plan.nextConfig).toContain(`"${parentWorkspacePath}" = { trust_level = "trusted" }`);
+    expect(plan.nextConfig).not.toContain(`"${laneWorkspacePath}" = { trust_level = "trusted", note = "remove me" }`);
+    expect(plan.nextConfig).toContain(`"${siblingWorkspacePath}" = { trust_level = "trusted" }`);
+    expect(plan.nextConfig).toContain('[[profiles]]');
+  });
+
   it('does not remove child-lane trust entries when no separate trusted ancestor exists', () => {
     const rawConfig = [
       '[projects]',
