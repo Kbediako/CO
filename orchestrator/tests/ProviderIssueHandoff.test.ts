@@ -8205,6 +8205,7 @@ describe('createProviderIssueHandoffService', () => {
       JSON.stringify({
         run_id: 'run-released-queued-drain',
         task_id: 'task-released-queued-drain',
+        pipeline_id: 'provider-linear-worker',
         status: 'queued',
         issue_provider: 'linear',
         issue_id: 'lin-issue-released-drain',
