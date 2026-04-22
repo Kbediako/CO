@@ -15344,13 +15344,21 @@ describe('createProviderIssueHandoffService', () => {
       getLaunchConfigPath: vi.fn(),
       recordTerminalCleanupResult: vi.fn()
     };
+    let resolveRelaunchedStart: ((args: unknown) => void) | null = null;
+    const relaunchedStart = new Promise<unknown>((resolve) => {
+      resolveRelaunchedStart = resolve;
+    });
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
     const launcher = {
       start: vi
         .fn(async () => null)
         .mockRejectedValueOnce(new Error('transient launch failure'))
-        .mockResolvedValueOnce({
-          runId: 'run-remote-retry',
-          manifestPath: '/tmp/provider-run/remote-retry-manifest.json'
+        .mockImplementationOnce(async (args) => {
+          resolveRelaunchedStart?.(args);
+          return {
+            runId: 'run-remote-retry',
+            manifestPath: '/tmp/provider-run/remote-retry-manifest.json'
+          };
         }),
       resume: vi.fn(async () => undefined)
     };
@@ -15402,19 +15410,18 @@ describe('createProviderIssueHandoffService', () => {
 
     const retryDueAt = failedRetryClaim?.retry_due_at ?? null;
     expect(retryDueAt).not.toBeNull();
-    const retryDelayUntilDueMs = Math.max(Date.parse(retryDueAt ?? '') - Date.now(), 0) + 1;
-    await vi.advanceTimersByTimeAsync(retryDelayUntilDueMs);
+    const { callback: retryCallback, delayMs: retryDelayMs } =
+      getEarliestScheduledTimeoutByDelayRange(setTimeoutSpy, 4_999, 5_000);
+    expect(retryDelayMs).toBeGreaterThanOrEqual(4_999);
+    expect(retryDelayMs).toBeLessThanOrEqual(5_000);
+    retryCallback();
     await flushAsyncWork();
-    await waitForCondition(() => {
-      return (
-        providerWorkflowConfigStore.refresh.mock.calls.length >= 2 &&
-        launcher.start.mock.calls.length >= 2
-      );
-    }, QUEUED_RETRY_SETTLE_TURNS * 32);
+    await waitForMockCalls(providerWorkflowConfigStore.refresh, 2, 1_024);
+    const relaunchedStartArgs = await relaunchedStart;
     await flushAsyncWork();
 
     expect(launcher.start).toHaveBeenCalledTimes(2);
-    expect(launcher.start.mock.calls[1]?.[0]).toEqual(expect.objectContaining({
+    expect(relaunchedStartArgs).toEqual(expect.objectContaining({
       taskId: 'linear-lin-issue-1',
       pipelineId: 'diagnostics',
       provider: 'linear',
