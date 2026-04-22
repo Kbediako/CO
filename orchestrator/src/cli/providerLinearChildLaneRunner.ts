@@ -188,17 +188,104 @@ function decodeTomlQuotedString(raw: string): string {
 }
 
 function parseProjectTableHeader(line: string): string | null {
-  const match = line
-    .trim()
-    .match(/^\[projects\.("(?:[^"\\]|\\.)*"|'[^']*')\]\s*(?:#.*)?$/u);
+  const keyPath = parseTomlTableKeyPath(line);
+  if (!keyPath) {
+    return null;
+  }
+  const match = keyPath.match(/^projects\s*\.\s*("(?:[^"\\]|\\.)*"|'[^']*')\s*$/u);
   if (!match) {
     return null;
   }
   return normalizeProjectPath(decodeTomlQuotedString(match[1]));
 }
 
-function isTomlTableHeader(line: string): boolean {
-  return /^\s*(?:\[\[(?:[^"'\\\]]+|"(?:[^"\\]|\\.)*"|'[^']*')+\]\]|\[(?:[^"'\\\]]+|"(?:[^"\\]|\\.)*"|'[^']*')+\])\s*(?:#.*)?$/u.test(line);
+function parseTomlTableKeyPath(line: string): string | null {
+  const match = line
+    .trim()
+    .match(/^(?:\[\[((?:[^"'\\\]]+|"(?:[^"\\]|\\.)*"|'[^']*')+)\]\]|\[((?:[^"'\\\]]+|"(?:[^"\\]|\\.)*"|'[^']*')+)\])\s*(?:#.*)?$/u);
+  return match?.[1] ?? match?.[2] ?? null;
+}
+
+function parseProjectNamespaceHeader(line: string): string | null {
+  const keyPath = parseTomlTableKeyPath(line);
+  if (!keyPath) {
+    return null;
+  }
+  const match = keyPath.match(/^projects\s*\.\s*("(?:[^"\\]|\\.)*"|'[^']*')(?:\s*\.\s*|$)/u);
+  if (!match) {
+    return null;
+  }
+  return normalizeProjectPath(decodeTomlQuotedString(match[1]));
+}
+
+type TomlMultilineStringState = 'basic' | 'literal' | null;
+
+function isBackslashEscaped(line: string, index: number): boolean {
+  let backslashCount = 0;
+  for (let cursor = index - 1; cursor >= 0 && line[cursor] === '\\'; cursor -= 1) {
+    backslashCount += 1;
+  }
+  return backslashCount % 2 === 1;
+}
+
+function advanceTomlMultilineStringState(line: string, state: TomlMultilineStringState): TomlMultilineStringState {
+  let nextState = state;
+  let index = 0;
+  while (index < line.length) {
+    if (nextState === 'basic') {
+      if (line.startsWith('"""', index) && !isBackslashEscaped(line, index)) {
+        nextState = null;
+        index += 3;
+        continue;
+      }
+      index += line[index] === '\\' ? 2 : 1;
+      continue;
+    }
+    if (nextState === 'literal') {
+      if (line.startsWith("'''", index)) {
+        nextState = null;
+        index += 3;
+        continue;
+      }
+      index += 1;
+      continue;
+    }
+    if (line[index] === '#') {
+      break;
+    }
+    if (line.startsWith('"""', index) && !isBackslashEscaped(line, index)) {
+      nextState = 'basic';
+      index += 3;
+      continue;
+    }
+    if (line.startsWith("'''", index)) {
+      nextState = 'literal';
+      index += 3;
+      continue;
+    }
+    if (line[index] === '"' && !isBackslashEscaped(line, index)) {
+      index += 1;
+      while (index < line.length) {
+        if (line[index] === '\\') {
+          index += 2;
+          continue;
+        }
+        if (line[index] === '"') {
+          index += 1;
+          break;
+        }
+        index += 1;
+      }
+      continue;
+    }
+    if (line[index] === '\'') {
+      const literalEnd = line.indexOf('\'', index + 1);
+      index = literalEnd === -1 ? line.length : literalEnd + 1;
+      continue;
+    }
+    index += 1;
+  }
+  return nextState;
 }
 
 function findTrustedAncestorProject(
@@ -231,24 +318,28 @@ function hasTrustedProjectEntry(
 function removeProjectTablesFromRawConfig(rawConfig: string, removableProjects: ReadonlySet<string>): string {
   const lines = rawConfig.split(/\r?\n/u);
   const keptLines: string[] = [];
-  let skippingProjectTable = false;
+  let skippingProjectTable: string | null = null;
+  let multilineStringState: TomlMultilineStringState = null;
 
   for (const line of lines) {
-    const tableHeader = isTomlTableHeader(line);
-    if (skippingProjectTable && !tableHeader) {
-      continue;
-    }
-    if (skippingProjectTable && tableHeader) {
-      skippingProjectTable = false;
+    const tableHeaderPath = multilineStringState ? null : parseTomlTableKeyPath(line);
+    if (skippingProjectTable) {
+      if (!tableHeaderPath || parseProjectNamespaceHeader(line) === skippingProjectTable) {
+        multilineStringState = advanceTomlMultilineStringState(line, multilineStringState);
+        continue;
+      }
+      skippingProjectTable = null;
     }
 
-    const projectHeaderPath = parseProjectTableHeader(line);
+    const projectHeaderPath = tableHeaderPath ? parseProjectTableHeader(line) : null;
     if (projectHeaderPath && removableProjects.has(projectHeaderPath)) {
-      skippingProjectTable = true;
+      skippingProjectTable = projectHeaderPath;
+      multilineStringState = advanceTomlMultilineStringState(line, multilineStringState);
       continue;
     }
 
     keptLines.push(line);
+    multilineStringState = advanceTomlMultilineStringState(line, multilineStringState);
   }
 
   const nextConfig = keptLines.join('\n');

@@ -97,6 +97,59 @@ describe('provider linear child lane runner', () => {
     expect(plan.nextConfig).toContain('[[profiles]]');
   });
 
+  it('removes nested tables and ignores multiline header-like content inside the removed project block', () => {
+    const laneWorkspacePath = '/Users/kbediako/Code/CO/.workspaces/linear-123/.child-lanes/docs-a';
+    const siblingWorkspacePath = '/Users/kbediako/Code/CO/.workspaces/linear-keep';
+    const rawConfig = [
+      '[projects]',
+      '[projects."/Users/kbediako/Code/CO"]',
+      'trust_level = "trusted"',
+      '',
+      `[projects."${siblingWorkspacePath}"]`,
+      'trust_level = "trusted"',
+      'notes = """',
+      `[projects . "${laneWorkspacePath}"]`,
+      '"""',
+      'keep_flag = "still-here"',
+      '',
+      `[projects . "${laneWorkspacePath}"]`,
+      'trust_level = "trusted"',
+      'notes = """',
+      '[foo]',
+      '"""',
+      '',
+      `[projects . "${laneWorkspacePath}" . metadata]`,
+      'owner = "codex"',
+      '',
+      `[[projects . "${laneWorkspacePath}" . metadata . links]]`,
+      'target = "proof"',
+      '',
+      '[projects."/Users/kbediako/Code/CO/.workspaces/linear-123/.child-lanes/tests-b"]',
+      'trust_level = "trusted"',
+      '',
+      '[[profiles]]',
+      'name = "default"',
+      ''
+    ].join('\n');
+
+    const plan = childLaneRunnerTest.planTrustedProjectCleanup({
+      rawConfig,
+      laneWorkspacePath,
+      configPath: '/Users/kbediako/.codex/config.toml'
+    });
+
+    expect(plan.removedProjects).toEqual([laneWorkspacePath]);
+    expect(plan.nextConfig).toContain(`[projects."${siblingWorkspacePath}"]`);
+    expect(plan.nextConfig).toContain(`notes = """\n[projects . "${laneWorkspacePath}"]\n"""`);
+    expect(plan.nextConfig).toContain('keep_flag = "still-here"');
+    expect(plan.nextConfig).not.toContain(`[projects . "${laneWorkspacePath}"]\ntrust_level = "trusted"`);
+    expect(plan.nextConfig).not.toContain(`[projects . "${laneWorkspacePath}" . metadata]`);
+    expect(plan.nextConfig).not.toContain(`[[projects . "${laneWorkspacePath}" . metadata . links]]`);
+    expect(plan.nextConfig).not.toContain('[foo]');
+    expect(plan.nextConfig).toContain('[projects."/Users/kbediako/Code/CO/.workspaces/linear-123/.child-lanes/tests-b"]');
+    expect(plan.nextConfig).toContain('[[profiles]]');
+  });
+
   it('does not remove child-lane trust entries when no separate trusted ancestor exists', () => {
     const rawConfig = [
       '[projects]',
