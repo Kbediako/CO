@@ -5,9 +5,7 @@
       "title": "CO: re-enforce CO-185 provider-helper preflight guarantees in live worker attempts",
       "relates_to": "tasks/tasks-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md",
       "risk": "high",
-      "owners": [
-        "Codex"
-      ],
+      "owners": ["Codex"],
       "last_review": "2026-04-22",
       "approvals": {
         "docs_packet_child_lane": {
@@ -26,16 +24,7 @@
           "summary": "Pre-implementation docs-review failed only on unrelated docs:check baseline debt: docs/TASKS still references six missing linear-1c101 packet files already called out as unrelated CO-282 debt. The CO-306 packet and registry mirrors were present, so the parent recorded truthful fallback evidence at out/linear-0297d59b-66c3-4bfe-b019-fe2fa423063d/manual/20260422T083251Z-docs-review-fallback.md and continued without expanding scope."
         }
       },
-      "paths": {
-        "spec": "tasks/specs/linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md",
-        "task": "tasks/tasks-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md",
-        "agent_task": ".agent/task/linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md"
-        }
-      }
+      "paths": {"spec": "tasks/specs/linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md", "task": "tasks/tasks-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md", "agent_task": ".agent/task/linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md", "docs": {"PRD": "docs/PRD-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md", "TECH_SPEC": "docs/TECH_SPEC-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md", "ACTION_PLAN": "docs/ACTION_PLAN-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md"}}
     },
     {
       "id": "20260422-linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a",
