@@ -59,5 +59,5 @@
   - Mitigation: keep parent out of `tests/cli-source-bootstrap.spec.ts` until the child lane completes or is invalidated.
 
 ## Approvals
-- Reviewer: Docs-review pending.
+- Reviewer: Current-main validation rerun completed; no remaining docs-review blocker is open for this packet.
 - Date: 2026-04-22

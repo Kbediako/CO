@@ -116,8 +116,8 @@ last_review: 2026-04-22
   - preserve workpad and task evidence that the root cause was readiness-ordering, not only slow filesystem visibility
 
 ## Open Questions
-- After the readiness-order fix lands, is there any remaining evidence that `bin/codex-orchestrator.js` itself needs hardening?
+- Resolved 2026-04-22: no fresh evidence requires `bin/codex-orchestrator.js` changes after the readiness-order fix. The current-main branch passes 20 focused reruns, the full bootstrap test file, and the full repo test suite with the fix isolated to the test fixture.
 
 ## Approvals
-- Reviewer: Pre-implementation review captured in this packet; docs-review pending.
+- Reviewer: Pre-implementation review captured in this packet. Current-main validation and review are green for the packet after rebasing onto `origin/main`.
 - Date: 2026-04-22
