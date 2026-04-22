@@ -538,6 +538,70 @@ describe('implementation-docs-archive script', () => {
     ).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
+  it('does not let ordinary task packets bypass archiving via preserved historical stub status', async () => {
+    const repo = await initRepository({
+      policyOverrides: {
+        doc_patterns: ['tasks/tasks-*.md'],
+        retain_days: 0,
+        max_lines: 1
+      },
+      registry: {
+        generated_at: '2025-01-01',
+        entries: [
+          {
+            path: 'tasks/tasks-9999-archive-test.md',
+            status: 'preserved_historical_stub',
+            last_review: '2025-01-01',
+            cadence_days: 30
+          }
+        ]
+      },
+      taskOverrides: {
+        paths: {
+          task: 'tasks/tasks-9999-archive-test.md'
+        }
+      }
+    });
+
+    const taskPath = join(repo, 'tasks', 'tasks-9999-archive-test.md');
+    await writeFile(taskPath, '# Task Checklist\n\nOrdinary packet content.\n');
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const report = JSON.parse(
+      await readFile(
+        join(repo, 'out', 'implementation-docs-archive-automation', 'docs-archive-report.json'),
+        'utf8'
+      )
+    );
+
+    expect(report.archived).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'tasks/tasks-9999-archive-test.md'
+        })
+      ])
+    );
+    expect(report.skipped).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'tasks/tasks-9999-archive-test.md',
+          reason: 'preserved_historical_stub'
+        })
+      ])
+    );
+    const stubContent = await readFile(taskPath, 'utf8');
+    expect(stubContent).toContain('<!-- docs-archive:stub -->');
+  });
+
   it('archives linked PRD, TECH_SPEC, and ACTION_PLAN docs for plain star patterns', async () => {
     const repo = await initRepository({
       policyOverrides: {

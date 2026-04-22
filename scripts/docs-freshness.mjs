@@ -25,6 +25,8 @@ const STATUS_VALUES = new Set(['active', 'archived', 'deprecated', PRESERVED_HIS
 const OWNER_REQUIRED_STATUSES = new Set(['active', 'deprecated']);
 const STALE_ELIGIBLE_STATUSES = new Set(['active', 'deprecated']);
 const OWNER_PLACEHOLDERS = new Set(['tbd', 'unassigned', 'owner']);
+const PRESERVED_HISTORICAL_STUB_PATH_PATTERNS = [/^tasks\/tasks-[^/]+\.md$/, /^\.agent\/task\/[^/]+\.md$/];
+const PRESERVED_HISTORICAL_STUB_HEADING_PATTERN = /^#\s+Historical stub\b/im;
 
 function showUsage() {
   console.log(`Usage: node scripts/docs-freshness.mjs [options]
@@ -60,6 +62,15 @@ function normalizeDocPath(value) {
   const withoutDotPrefix = trimmed.replace(/^\.\//, '');
   const normalized = path.posix.normalize(withoutDotPrefix);
   return normalized === '.' ? '' : normalized.replace(/^\.\//, '');
+}
+
+function isApprovedPreservedHistoricalStubPath(docPath) {
+  const normalizedPath = normalizeDocPath(docPath);
+  return PRESERVED_HISTORICAL_STUB_PATH_PATTERNS.some((pattern) => pattern.test(normalizedPath));
+}
+
+function hasPreservedHistoricalStubHeading(content) {
+  return typeof content === 'string' && PRESERVED_HISTORICAL_STUB_HEADING_PATTERN.test(content);
 }
 
 async function loadRegistry(registryPath) {
@@ -580,17 +591,27 @@ export async function runDocsFreshness(
       }
     }
 
-    if (issues.length > 0) {
-      invalidEntries.push({ path: entryPath || '<missing>', issues });
-      metricsByClass.push({ doc_class: docClass, metric: 'invalid_entries' });
-    }
-
+    let entryContent = null;
     if (entryPath) {
       const abs = path.resolve(repoRoot, entryPath);
       if (!(await pathExists(abs))) {
         missingOnDisk.push(entryPath);
         metricsByClass.push({ doc_class: docClass, metric: 'missing_on_disk' });
+      } else {
+        entryContent = await readFile(abs, 'utf8');
       }
+    }
+
+    if (
+      status === PRESERVED_HISTORICAL_STUB_STATUS &&
+      (!isApprovedPreservedHistoricalStubPath(entryPath) || !hasPreservedHistoricalStubHeading(entryContent))
+    ) {
+      issues.push('preserved_historical_stub requires a historical task continuity stub');
+    }
+
+    if (issues.length > 0) {
+      invalidEntries.push({ path: entryPath || '<missing>', issues });
+      metricsByClass.push({ doc_class: docClass, metric: 'invalid_entries' });
     }
 
     if (reviewDate && Number.isInteger(cadenceDays) && cadenceDays > 0) {

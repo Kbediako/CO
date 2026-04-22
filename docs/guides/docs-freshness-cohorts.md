@@ -54,7 +54,7 @@ When the configured owner issue is terminal, `docs:freshness:maintain` must fail
 ## Preserved Historical Stub Status
 Some historical task-key stubs remain authoritative because current repo tooling still resolves their canonical task key from that path even after the rest of the historical packet is gone. Those rows should use docs-freshness registry status `preserved_historical_stub`.
 
-Use `preserved_historical_stub` only for intentionally minimal continuity surfaces such as a preserved `tasks/tasks-linear-...md` stub and its matching mirror while that stub is still the authoritative canonical task key surface. While a row is `preserved_historical_stub`:
+Use `preserved_historical_stub` only for intentionally minimal continuity surfaces under `tasks/tasks-*.md` and `.agent/task/*.md`, such as a preserved `tasks/tasks-linear-...md` stub and its matching mirror while that stub is still the authoritative canonical task key surface. The file itself should be an explicit historical continuity stub rather than a full packet, for example with heading `# Historical stub`. While a row is `preserved_historical_stub`:
 
 - `docs:freshness` still validates path and registry metadata, but it does not age the row into ordinary active stale-doc debt.
 - `implementation-docs-archive` must not auto-archive the row through registry-status, retention-age, or line-threshold triggers.
