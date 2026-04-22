@@ -143,6 +143,18 @@ function normalizeNonNegativeInteger(value, fallback) {
   return Number.isInteger(value) && value >= 0 ? value : fallback;
 }
 
+function normalizeOptionalString(value) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeOptionalBoolean(value) {
+  return typeof value === 'boolean' ? value : null;
+}
+
 function normalizeTaskNumberRange(value) {
   if (!value || typeof value !== 'object') {
     return null;
@@ -201,6 +213,9 @@ function normalizeRollingFreshnessPolicy(rawPolicy) {
       enabled: false,
       is_valid: false,
       owner_issue: null,
+      owner_issue_state: null,
+      owner_issue_state_type: null,
+      owner_issue_is_terminal: null,
       policy_doc: null,
       window_days: 0,
       max_cohorts: 0,
@@ -231,6 +246,9 @@ function normalizeRollingFreshnessPolicy(rawPolicy) {
         baselineCohorts.isValid
     ),
     owner_issue: ownerIssue,
+    owner_issue_state: normalizeOptionalString(rawPolicy.owner_issue_state),
+    owner_issue_state_type: normalizeOptionalString(rawPolicy.owner_issue_state_type),
+    owner_issue_is_terminal: normalizeOptionalBoolean(rawPolicy.owner_issue_is_terminal),
     policy_doc: policyDoc,
     window_days: normalizeNonNegativeInteger(rawPolicy.window_days, 0),
     max_cohorts: normalizePositiveInteger(rawPolicy.max_cohorts, 0),
