@@ -964,6 +964,36 @@ describe('provider linear child lane runner', () => {
         }
       })
     ).toEqual(['2026-04-22T06:13:37.000Z exec_command env GIT_TRACE=1 git push origin HEAD']);
+
+    expect(
+      childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
+        timestamp: '2026-04-22T06:13:37.500Z',
+        type: 'response_item',
+        payload: {
+          type: 'function_call',
+          name: 'exec_command',
+          arguments: JSON.stringify({
+            cmd: 'GIT_TRACE=1 GIT_SSH_COMMAND=ssh git push origin HEAD',
+            workdir: '/tmp/child'
+          })
+        }
+      })
+    ).toEqual(['2026-04-22T06:13:37.500Z exec_command GIT_TRACE=1 GIT_SSH_COMMAND=ssh git push origin HEAD']);
+
+    expect(
+      childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
+        timestamp: '2026-04-22T06:13:37.750Z',
+        type: 'response_item',
+        payload: {
+          type: 'function_call',
+          name: 'exec_command',
+          arguments: JSON.stringify({
+            cmd: 'git status\ngit push origin HEAD',
+            workdir: '/tmp/child'
+          })
+        }
+      })
+    ).toEqual(['2026-04-22T06:13:37.750Z exec_command git status git push origin HEAD']);
   });
 
   it('does not treat shell-wrapped heredoc or echoed git text as scope drift', () => {

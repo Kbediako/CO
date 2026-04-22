@@ -694,7 +694,8 @@ function parseProviderLinearChildLaneSessionJsonlLine(line: string): Record<stri
 }
 
 function tokenizeShellCommandForScopeDrift(command: string): string[] {
-  return command.match(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|&&|\|\||[;&|]|[^\s;&|]+/gu) ?? [];
+  const normalized = command.replace(/\r\n/gu, '\n');
+  return normalized.match(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\n|&&|\|\||[;&|]|[^\s;&|]+/gu) ?? [];
 }
 
 function stripShellCommandTokenQuotes(token: string): string {
@@ -711,6 +712,10 @@ function advancePastShellCommandEnvWrappers(
   while (index < segmentEnd) {
     const token = stripShellCommandTokenQuotes(tokens[index] ?? '');
     if (!token) {
+      index += 1;
+      continue;
+    }
+    if (envAssignmentPattern.test(token)) {
       index += 1;
       continue;
     }
@@ -845,7 +850,7 @@ function commandSegmentShowsParentOwnedScopeDrift(
 
 function commandShowsParentOwnedScopeDrift(command: string): boolean {
   const tokens = tokenizeShellCommandForScopeDrift(command);
-  const commandSeparators = new Set(['&&', '||', ';', '|', '&']);
+  const commandSeparators = new Set(['\n', '&&', '||', ';', '|', '&']);
   let segmentStart = 0;
   while (segmentStart < tokens.length) {
     const segmentEnd = findShellCommandSegmentEnd(tokens, segmentStart, commandSeparators);
