@@ -42,7 +42,7 @@
 - [x] Child lane `git diff --check --` over the six packet files. Evidence: scoped `git diff --check -- docs/PRD-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md docs/TECH_SPEC-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md docs/ACTION_PLAN-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md tasks/specs/linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md tasks/tasks-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md .agent/task/linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md` returned clean.
 - [x] Parent focused facade regression for the `CO-301` multi-issue read shape. Evidence: `npm test -- ProviderLinearWorkflowFacade.test.ts` passed (`259` tests).
 - [x] Parent focused same-run consumer regression for issue-specific cache selection. Evidence: `npm test -- ProviderLinearWorkflowFacade.test.ts` passed (`259` tests), `npm run test` passed (`4606` tests).
-- [x] Parent docs-review and implementation review after source edits. Evidence: `.runs/linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3/cli/2026-04-22T15-51-03-799Z-f489fb09/review/telemetry.json` recorded `status: succeeded` and `review_outcome: clean-success`.
+- [x] Parent docs-review and implementation review after source edits. Evidence: `.runs/linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3/cli/2026-04-22T15-51-03-799Z-f489fb09/review/telemetry.json` now records `status: failed`, `review_outcome: failed-boundary`, and `termination_boundary.kind: startup-anchor`; manual fallback review `out/linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3/manual/20260423T025339Z-review-fallback.md` plus elegance note `out/linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3/manual/20260423T025339Z-elegance-review.md` found no actionable issues in the final docs-path diff.
 
 ## Handoff Status
 - [x] Child lane leaves the six packet files in place for patch export. Evidence: dirty working tree in this child workspace.
@@ -56,6 +56,7 @@
 - 2026-04-22: Completed scoped child-lane validation only: protected-term coverage, whitespace/diff sanity, and final scoped file-status verification.
 - 2026-04-23: Replayed the branch onto `origin/main`, kept only the CO-305 packet/runtime/test diff, added the negative legacy-fallback regression, and reran focused/full validation.
 - 2026-04-23: `npm run review` returned clean success and the explicit elegance pass kept the diff unchanged.
+- 2026-04-23: The final docs-path-only `npm run review -- --commit 9638a5975` rerun hit a `startup-anchor` boundary, so a manual fallback review and explicit elegance pass were recorded instead of treating the wrapper boundary as a code blocker.
 
 ## Relevant Files
 - `docs/PRD-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md`
