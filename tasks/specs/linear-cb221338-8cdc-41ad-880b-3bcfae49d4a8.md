@@ -16,9 +16,9 @@ last_review: 2026-04-22
 ## Requirements
 1. Preserve the direct-read seam: timed-out `/ui/data.json` versus still-fresh `provider-intake-state.json`.
 2. Add degraded JSON output only when freshness proves the supervisor truth is still current.
-3. Keep stale or missing supervisor truth on the hard-failure path.
-4. Keep the output explicit that the result is degraded, not a normal UI-backed read.
-5. Keep UI layout work, dashboard redesign, and unrelated control-host features out of scope.
+3. Ensure stale or missing supervisor truth stays on the hard-failure path.
+4. Preserve an explicit degraded marker instead of presenting the result as a normal UI-backed read.
+5. Leave UI layout work, dashboard redesign, and unrelated control-host features out of scope.
 
 ## Protected Terms
 - `co-status --format json`
@@ -36,6 +36,7 @@ last_review: 2026-04-22
 - Expand the fix into UI layout or dashboard work.
 
 ## Parity Matrix
+
 | Surface | Current | Target |
 | --- | --- | --- |
 | Direct JSON read | `co-status --format json` times out on `/ui/data.json` | direct JSON can emit bounded degraded output |
