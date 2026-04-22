@@ -468,7 +468,8 @@ function buildProjectionContextFromParts(
                   deriveDeterministicProviderMutationSuppressions(
                     parts.providerLinearWorkerProof?.linear_audit ?? null,
                     {
-                      recordedAtNotBefore: proofAttemptStartedAt
+                      recordedAtNotBefore: proofAttemptStartedAt,
+                      issueId: parts.providerLinearWorkerProof?.issue_id ?? null
                     }
                   )
                 )

@@ -49,6 +49,8 @@ let extraTempRoots: string[] = [];
 const providerLinearWorkerRunnerTestTimeoutMs = 60_000;
 const SOURCE_HELPER_COMMAND = 'node "/tmp/co/bin/codex-orchestrator.js" linear';
 const TEST_AUTH_PROVENANCE_FINGERPRINT_KEY = 'provider-linear-worker-test-fingerprint-key';
+const CHILD_LANE_PARENT_DIRTY_LAUNCH_MESSAGE =
+  'Parent workspace has in-scope pending changes: .tmp/notes.md. Revert, commit, or move scratch workpad/temp artifacts outside the repo before launching a child lane.';
 let originalAuthProvenanceFingerprintKey: string | undefined;
 
 function testFingerprint(value: string): string {
@@ -56,6 +58,46 @@ function testFingerprint(value: string): string {
     .update(value)
     .digest('hex')
     .slice(0, 16)}`;
+}
+
+function buildChildLaneParentDirtyAuditEntry(overrides: Record<string, unknown> = {}) {
+  return {
+    recorded_at: '2026-03-21T09:00:00.000Z',
+    operation: 'child-lane',
+    ok: false,
+    issue_id: 'lin-issue-1',
+    issue_identifier: 'CO-2',
+    source_setup: null,
+    action: 'launch',
+    via: null,
+    state: null,
+    follow_up_issue_id: null,
+    follow_up_issue_identifier: null,
+    failed_relation_type: null,
+    comment_id: null,
+    attachment_id: null,
+    error_code: 'provider_worker_child_lane_parent_dirty',
+    error_message: CHILD_LANE_PARENT_DIRTY_LAUNCH_MESSAGE,
+    ...overrides
+  };
+}
+
+function buildSingleEntryAuditSummary(
+  entry: Record<string, unknown>,
+  overrides: Partial<ProviderLinearAuditSummary> = {}
+): ProviderLinearAuditSummary {
+  return {
+    path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+    attempted_count: 1,
+    success_count: entry.ok === true ? 1 : 0,
+    failure_count: entry.ok === false ? 1 : 0,
+    latest_recorded_at: typeof entry.recorded_at === 'string' ? entry.recorded_at : null,
+    parallelization_entries: [],
+    latest_by_operation: {
+      [String(entry.operation)]: entry
+    },
+    ...overrides
+  } as ProviderLinearAuditSummary;
 }
 
 beforeEach(() => {
@@ -1336,6 +1378,135 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     );
     expect(continuationPrompt).toContain(
       'Do not retry `create-follow-up` in this attempt unless you first add the required parity matrix or explicitly reclassify the follow-up as non-parity/alignment and omit `--parity-lane`.'
+    );
+  });
+
+  it('includes child-lane parent-dirty suppression guidance in continuation prompts for the same attempt', () => {
+    const issue = createTrackedIssue();
+    const helperCommand = SOURCE_HELPER_COMMAND;
+    const audit = buildSingleEntryAuditSummary(buildChildLaneParentDirtyAuditEntry());
+
+    const continuationPrompt = buildProviderWorkerPrompt(issue, 2, 5, helperCommand, '/tmp/co', {
+      linearAudit: audit,
+      attemptStartedAt: '2026-03-21T08:59:59.000Z'
+    });
+
+    expect(continuationPrompt).toContain(
+      'Same-attempt deterministic provider mutation suppressions are in effect'
+    );
+    expect(continuationPrompt).toContain(
+      'Do not retry `child-lane --action launch` in this attempt while the parent workspace still has in-scope dirty files.'
+    );
+  });
+
+  it('preserves launch suppression guidance when later same-attempt child-lane audit entries target accept', () => {
+    const issue = createTrackedIssue();
+    const helperCommand = SOURCE_HELPER_COMMAND;
+    const launchEntry = buildChildLaneParentDirtyAuditEntry();
+    const acceptEntry = {
+      ...launchEntry,
+      recorded_at: '2026-03-21T09:01:00.000Z',
+      action: 'accept:docs-a',
+      error_message:
+        'Parent workspace has in-scope pending changes: .tmp/notes.md. Revert, commit, or move scratch workpad/temp artifacts outside the repo before accepting the child lane.'
+    };
+    const audit: ProviderLinearAuditSummary = {
+      path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+      attempted_count: 2,
+      success_count: 0,
+      failure_count: 2,
+      latest_recorded_at: '2026-03-21T09:01:00.000Z',
+      latest_by_operation: {
+        'child-lane': acceptEntry
+      },
+      parallelization_entries: [],
+      entries: [launchEntry, acceptEntry]
+    };
+
+    const continuationPrompt = buildProviderWorkerPrompt(issue, 2, 5, helperCommand, '/tmp/co', {
+      linearAudit: audit,
+      attemptStartedAt: '2026-03-21T08:59:59.000Z'
+    });
+
+    expect(continuationPrompt).toContain(
+      'Do not retry `child-lane --action launch` in this attempt while the parent workspace still has in-scope dirty files.'
+    );
+    expect(continuationPrompt).toContain(
+      'Do not retry `child-lane --action accept` in this attempt while the parent workspace still has in-scope dirty files.'
+    );
+  });
+
+  it('ignores deterministic suppressions logged for a different issue id', () => {
+    const issue = createTrackedIssue();
+    const continuationPrompt = buildProviderWorkerPrompt(issue, 2, 5, SOURCE_HELPER_COMMAND, '/tmp/co', {
+      linearAudit: {
+        path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+        attempted_count: 1,
+        success_count: 0,
+        failure_count: 1,
+        latest_recorded_at: '2026-03-21T09:00:00.000Z',
+        parallelization_entries: [],
+        latest_by_operation: {},
+        entries: [{
+          recorded_at: '2026-03-21T09:00:00.000Z',
+          operation: 'create-follow-up',
+          ok: false,
+          issue_id: 'lin-other-issue',
+          issue_identifier: 'CO-999',
+          source_setup: null,
+          action: null,
+          via: null,
+          state: null,
+          follow_up_issue_id: null,
+          follow_up_issue_identifier: null,
+          failed_relation_type: null,
+          comment_id: null,
+          attachment_id: null,
+          error_code: 'linear_follow_up_parity_matrix_missing',
+          error_message: 'Parity/alignment follow-up issues require a parity matrix.'
+        }]
+      },
+      attemptStartedAt: '2026-03-21T08:59:59.000Z'
+    });
+
+    expect(continuationPrompt).not.toContain(
+      'Same-attempt deterministic provider mutation suppressions are in effect'
+    );
+  });
+
+  it('preserves deterministic launch suppression after a later successful sibling launch', () => {
+    const issue = createTrackedIssue();
+    const launchFailure = buildChildLaneParentDirtyAuditEntry({
+      issue_id: issue.id,
+      issue_identifier: issue.identifier
+    });
+    const laterSuccess = {
+      ...launchFailure,
+      recorded_at: '2026-03-21T09:01:00.000Z',
+      ok: true,
+      error_code: null,
+      error_message: null
+    };
+    const continuationPrompt = buildProviderWorkerPrompt(issue, 2, 5, SOURCE_HELPER_COMMAND, '/tmp/co', {
+      linearAudit: {
+        attempted_count: 2,
+        success_count: 1,
+        failure_count: 1,
+        latest_recorded_at: '2026-03-21T09:01:00.000Z',
+        parallelization_entries: [],
+        latest_by_operation: {
+          'child-lane': laterSuccess
+        },
+        entries: [launchFailure, laterSuccess]
+      } as ProviderLinearAuditSummary,
+      attemptStartedAt: '2026-03-21T08:59:59.000Z'
+    });
+
+    expect(continuationPrompt).toContain(
+      'Same-attempt deterministic provider mutation suppressions are in effect'
+    );
+    expect(continuationPrompt).toContain(
+      'Do not retry `child-lane --action launch` in this attempt while the parent workspace still has in-scope dirty files.'
     );
   });
 
@@ -6526,7 +6697,18 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     const manualRunId = 'manual-run-1';
     const manualRunDir = join(workspaceRoot, '.runs', manualTaskId, 'cli', manualRunId);
     const manualManifestPath = join(manualRunDir, 'manifest.json');
+    const inheritedProviderRepoConfigPath = join(
+      tempRoot,
+      '.runs',
+      'local-mcp',
+      'cli',
+      'control-host',
+      'provider-workflow.last-known-good.json'
+    );
     await mkdir(manualRunDir, { recursive: true });
+    await writeFile(join(workspaceRoot, 'codex.orchestrator.json'), '{}\n', 'utf8');
+    vi.stubEnv('CODEX_ORCHESTRATOR_REPO_CONFIG_PATH', inheritedProviderRepoConfigPath);
+    vi.stubEnv('CODEX_ORCHESTRATOR_PROVIDER_REPO_CONFIG_PATH', inheritedProviderRepoConfigPath);
     await writeFile(
       manualManifestPath,
       JSON.stringify({

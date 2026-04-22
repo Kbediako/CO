@@ -21,6 +21,7 @@ import {
 import {
   appendProviderLinearWorkerChildLaneRecord,
   readProviderLinearWorkerChildLanes,
+  PROVIDER_LINEAR_WORKER_PROOF_FILENAME,
   type ProviderLinearWorkerChildLaneRecord
 } from '../src/cli/providerLinearWorkerRunner.js';
 import { resolveProviderLinearChildLaneScopeContract } from '../src/cli/providerLinearChildLanePhaseContract.js';
@@ -33,6 +34,10 @@ const TASK_ID = 'linear-lin-issue-1';
 const CONTROL_HOST_TASK_ID = 'local-mcp';
 const CONTROL_HOST_RUN_ID = 'control-host-run-1';
 const ISSUE = { issue_id: 'lin-issue-1', issue_identifier: 'CO-35' };
+const PARENT_DIRTY_LAUNCH_MESSAGE =
+  'Parent workspace has in-scope pending changes: .tmp/notes.md. Revert, commit, or move scratch workpad/temp artifacts outside the repo before launching a child lane.';
+const PARENT_DIRTY_ACCEPT_MESSAGE =
+  'Parent workspace has in-scope pending changes: .tmp/notes.md. Revert, commit, or move scratch workpad/temp artifacts outside the repo before accepting the child lane.';
 
 afterEach(async () => {
   if (tempRoot) {
@@ -84,6 +89,63 @@ function buildProviderWorkerEnv(
     CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID: CONTROL_HOST_RUN_ID,
     ...overrides
   };
+}
+
+function buildChildLaneLaunchRequest(manifestPath: string, auditPath: string) {
+  return {
+    action: 'launch' as const,
+    streamName: 'docs-b',
+    purpose: 'Retry docs packet',
+    phases: ['docs'],
+    env: buildProviderWorkerEnv(manifestPath, {
+      CODEX_PROVIDER_LINEAR_AUDIT_PATH: auditPath
+    })
+  };
+}
+
+function buildParentDirtyAuditEntry(overrides: Record<string, unknown> = {}) {
+  return {
+    recorded_at: '2026-03-30T07:12:00.000Z',
+    operation: 'child-lane',
+    ok: false,
+    issue_id: ISSUE.issue_id,
+    issue_identifier: ISSUE.issue_identifier,
+    source_setup: null,
+    action: 'launch',
+    via: null,
+    state: null,
+    follow_up_issue_id: null,
+    follow_up_issue_identifier: null,
+    failed_relation_type: null,
+    comment_id: null,
+    attachment_id: null,
+    error_code: 'provider_worker_child_lane_parent_dirty',
+    error_message: PARENT_DIRTY_LAUNCH_MESSAGE,
+    ...overrides
+  };
+}
+
+async function seedParentDirtyAttempt(
+  runDir: string,
+  auditPath: string,
+  auditEntries: Record<string, unknown>[] = [buildParentDirtyAuditEntry()],
+  proof: Record<string, unknown> = {}
+) {
+  await writeFile(
+    join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+    JSON.stringify({
+      attempt_started_at: '2026-03-30T07:11:00.000Z',
+      ...proof
+    }),
+    'utf8'
+  );
+  if (auditEntries.length > 0) {
+    await writeFile(
+      auditPath,
+      `${auditEntries.map((entry) => JSON.stringify(entry)).join('\n')}\n`,
+      'utf8'
+    );
+  }
 }
 
 function createLaneRecord(overrides: Partial<ProviderLinearWorkerChildLaneRecord> = {}): ProviderLinearWorkerChildLaneRecord {
@@ -1925,6 +1987,114 @@ describe('runProviderLinearChildLaneShell', () => {
     });
     if (!result.ok) {
       expect(result.error?.message).toContain('move scratch workpad/temp artifacts outside the repo');
+    }
+    expect(execRunner).not.toHaveBeenCalled();
+  });
+
+  it('suppresses repeated same-attempt parent-dirty launches once the first failure is already recorded', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const execRunner = vi.fn();
+    const auditPath = join(tempRoot ?? '', 'provider-linear-audit.jsonl');
+    await seedParentDirtyAttempt(runDir, auditPath);
+
+    const result = await runProviderLinearChildLaneShell(
+      buildChildLaneLaunchRequest(manifestPath, auditPath),
+      {
+        execRunner: execRunner as never,
+        readParentDirtyPaths: vi.fn(async () => ['.tmp/notes.md']) as never
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'launch',
+      error: {
+        code: 'provider_worker_child_lane_parent_dirty_retry_suppressed',
+        status: 409
+      }
+    });
+    if (!result.ok) {
+      expect(result.error?.message).toContain('Same-attempt retry suppression is in effect');
+      expect(result.error?.message).toContain(
+        'Do not retry `child-lane --action launch` in this attempt while the parent workspace still has in-scope dirty files.'
+      );
+    }
+    expect(execRunner).not.toHaveBeenCalled();
+  });
+
+  it('preserves launch retry suppression when later same-attempt child-lane audit entries target accept', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const execRunner = vi.fn();
+    const auditPath = join(tempRoot ?? '', 'provider-linear-audit.jsonl');
+    await seedParentDirtyAttempt(runDir, auditPath, [
+      buildParentDirtyAuditEntry(),
+      buildParentDirtyAuditEntry({
+        recorded_at: '2026-03-30T07:13:00.000Z',
+        action: 'accept:docs-b',
+        error_message: PARENT_DIRTY_ACCEPT_MESSAGE
+      })
+    ]);
+
+    const result = await runProviderLinearChildLaneShell(
+      buildChildLaneLaunchRequest(manifestPath, auditPath),
+      {
+        execRunner: execRunner as never,
+        readParentDirtyPaths: vi.fn(async () => ['.tmp/notes.md']) as never
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'launch',
+      error: {
+        code: 'provider_worker_child_lane_parent_dirty_retry_suppressed',
+        status: 409
+      }
+    });
+    if (!result.ok) {
+      expect(result.error?.message).toContain(
+        'Do not retry `child-lane --action launch` in this attempt while the parent workspace still has in-scope dirty files.'
+      );
+    }
+    expect(execRunner).not.toHaveBeenCalled();
+  });
+
+  it('does not treat same-attempt accept or other-issue parent-dirty failures as launch retry suppression when proof omits issue id', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const execRunner = vi.fn();
+    const auditPath = join(tempRoot ?? '', 'provider-linear-audit.jsonl');
+    await seedParentDirtyAttempt(runDir, auditPath, [
+      buildParentDirtyAuditEntry({
+        issue_id: 'lin-issue-2',
+        issue_identifier: 'CO-99'
+      }),
+      buildParentDirtyAuditEntry({
+        action: 'accept:docs-b',
+        error_message: PARENT_DIRTY_LAUNCH_MESSAGE
+      })
+    ], {});
+
+    const result = await runProviderLinearChildLaneShell(
+      buildChildLaneLaunchRequest(manifestPath, auditPath),
+      {
+        execRunner: execRunner as never,
+        readParentDirtyPaths: vi.fn(async () => ['.tmp/notes.md']) as never
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'launch',
+      error: {
+        code: 'provider_worker_child_lane_parent_dirty',
+        status: 409
+      }
+    });
+    if (!result.ok) {
+      expect(result.error?.message).not.toContain('Same-attempt retry suppression is in effect');
     }
     expect(execRunner).not.toHaveBeenCalled();
   });
