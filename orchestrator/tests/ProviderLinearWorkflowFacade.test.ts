@@ -497,24 +497,47 @@ async function createBudgetedRunScopedEnv(): Promise<NodeJS.ProcessEnv> {
   };
 }
 
+function resolveIssueContextCachePathForTest(
+  env: NodeJS.ProcessEnv,
+  issueId = 'lin-issue-1'
+): string {
+  const auditPath = env.CODEX_PROVIDER_LINEAR_AUDIT_PATH;
+  if (!auditPath) {
+    throw new Error('Missing CODEX_PROVIDER_LINEAR_AUDIT_PATH for cache-path test setup.');
+  }
+  const safeIssueId = issueId.replace(/[^A-Za-z0-9._-]/gu, '_');
+  return join(dirname(auditPath), `provider-linear-issue-context-cache-${safeIssueId}.json`);
+}
+
+function resolveLegacyIssueContextCachePathForTest(env: NodeJS.ProcessEnv): string {
+  const auditPath = env.CODEX_PROVIDER_LINEAR_AUDIT_PATH;
+  if (!auditPath) {
+    throw new Error('Missing CODEX_PROVIDER_LINEAR_AUDIT_PATH for cache-path test setup.');
+  }
+  return join(dirname(auditPath), 'provider-linear-issue-context-cache.json');
+}
+
 async function writeCachedIssueContext(
   env: NodeJS.ProcessEnv,
   issue: Record<string, unknown>,
   options?: {
     recordedAt?: string;
     sourceSetup?: Record<string, unknown> | null;
+    legacyPath?: boolean;
   }
 ): Promise<void> {
-  const auditPath = env.CODEX_PROVIDER_LINEAR_AUDIT_PATH;
-  if (!auditPath) {
-    throw new Error('Missing CODEX_PROVIDER_LINEAR_AUDIT_PATH for cached issue-context test setup.');
+  const issueId = typeof issue.id === 'string' ? issue.id.trim() : '';
+  if (!issueId) {
+    return;
   }
   await writeFile(
-    join(dirname(auditPath), 'provider-linear-issue-context-cache.json'),
+    options?.legacyPath === true
+      ? resolveLegacyIssueContextCachePathForTest(env)
+      : resolveIssueContextCachePathForTest(env, issueId),
     JSON.stringify(
       {
         schema_version: 1,
-        issue_id: 'lin-issue-1',
+        issue_id: issueId,
         recorded_at: options?.recordedAt ?? '2026-03-22T10:00:00.000Z',
         source_setup: options?.sourceSetup ?? null,
         issue
@@ -700,6 +723,246 @@ describe('providerLinearWorkflowFacade', () => {
         workpad_comment: {
           id: 'comment-workpad'
         }
+      }
+    });
+  });
+
+  it('falls back to the legacy singleton cache path when no issue-keyed cache exists yet', async () => {
+    const env = await createBudgetedRunScopedEnv();
+    const resetAt = String(Date.now() + 60_000);
+
+    await writeCachedIssueContext(
+      env,
+      buildCachedIssueContext({
+        title: 'Legacy cached issue context'
+      }),
+      {
+        recordedAt: new Date(Date.now() - 45_000).toISOString(),
+        legacyPath: true
+      }
+    );
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'provider-linear:issue-context',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '5',
+        'x-ratelimit-requests-reset': resetAt
+      }
+    });
+
+    const fetchImpl: typeof fetch = vi.fn(async () => {
+      throw new Error('legacy cache fallback should resolve before fetch');
+    });
+
+    const result = await getProviderLinearIssueContext({
+      issueId: 'lin-issue-1',
+      env,
+      allowReadOnlyCacheReuse: true,
+      fetchImpl
+    });
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      cache_fallback_used: true,
+      issue: {
+        identifier: 'CO-1',
+        title: 'Legacy cached issue context'
+      }
+    });
+  });
+
+  it.each([
+    {
+      label: 'issue id mismatch',
+      requestedIssueId: 'lin-issue-1',
+      cachedIssue: buildCachedIssueContext({ id: 'lin-issue-2', identifier: 'CO-2' }),
+      cachedSourceSetup: null,
+      requestedSourceSetup: undefined
+    },
+    {
+      label: 'source setup mismatch',
+      requestedIssueId: 'lin-issue-1',
+      cachedIssue: buildCachedIssueContext(),
+      cachedSourceSetup: {
+        ...scopedSourceSetup,
+        project_id: 'lin-project-other'
+      },
+      requestedSourceSetup: scopedSourceSetup
+    }
+  ])(
+    'does not reuse the legacy singleton cache on $label',
+    async ({ requestedIssueId, cachedIssue, cachedSourceSetup, requestedSourceSetup }) => {
+      const env = await createBudgetedRunScopedEnv();
+      const resetAt = String(Date.now() + 60_000);
+
+      await writeCachedIssueContext(env, cachedIssue, {
+        recordedAt: new Date(Date.now() - 45_000).toISOString(),
+        sourceSetup: cachedSourceSetup,
+        legacyPath: true
+      });
+      await recordLinearBudgetHeadersObservation({
+        env,
+        source: 'provider-linear:issue-context',
+        headers: {
+          'x-ratelimit-requests-limit': '100',
+          'x-ratelimit-requests-remaining': '5',
+          'x-ratelimit-requests-reset': resetAt
+        }
+      });
+
+      const fetchImpl: typeof fetch = vi.fn(async () =>
+        jsonResponse(
+          buildIssueContextBody({
+            id: 'lin-issue-1',
+            identifier: 'CO-1',
+            title: 'Fetched issue context'
+          })
+        )
+      );
+
+      const result = await getProviderLinearIssueContext({
+        issueId: requestedIssueId,
+        sourceSetup: requestedSourceSetup,
+        env,
+        allowReadOnlyCacheReuse: true,
+        fetchImpl
+      });
+
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(result).toMatchObject({
+        ok: true,
+        operation: 'issue-context',
+        issue: {
+          identifier: 'CO-1',
+          title: 'Fetched issue context'
+        }
+      });
+      expect(result).not.toHaveProperty('cache_fallback_used');
+    }
+  );
+
+  it('keeps issue-keyed cache artifacts separate across cross-issue reads in one run', async () => {
+    const env = await createBudgetedRunScopedEnv();
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        variables?: { issueId?: string };
+      };
+      if (body.variables?.issueId === 'lin-issue-1') {
+        return jsonResponse(
+          buildIssueContextBody({
+            id: 'lin-issue-1',
+            identifier: 'CO-1',
+            title: 'Parent issue context',
+            updatedAt: '2026-04-22T08:00:00.000Z'
+          })
+        );
+      }
+      if (body.variables?.issueId === 'lin-issue-2') {
+        return jsonResponse(
+          buildIssueContextBody({
+            id: 'lin-issue-2',
+            identifier: 'CO-2',
+            title: 'Cross issue context',
+            updatedAt: '2026-04-22T08:05:00.000Z'
+          })
+        );
+      }
+      throw new Error(`Unexpected issueId: ${body.variables?.issueId ?? 'missing'}`);
+    });
+
+    const parentResult = await getProviderLinearIssueContext({
+      issueId: 'lin-issue-1',
+      env,
+      fetchImpl
+    });
+    const crossIssueResult = await getProviderLinearIssueContext({
+      issueId: 'lin-issue-2',
+      env,
+      fetchImpl
+    });
+
+    expect(parentResult).toMatchObject({
+      ok: true,
+      issue: {
+        identifier: 'CO-1',
+        title: 'Parent issue context'
+      }
+    });
+    expect(parentResult).not.toHaveProperty('cache_fallback_used');
+    expect(crossIssueResult).toMatchObject({
+      ok: true,
+      issue: {
+        identifier: 'CO-2',
+        title: 'Cross issue context'
+      }
+    });
+    expect(crossIssueResult).not.toHaveProperty('cache_fallback_used');
+
+    const parentCachePath = resolveIssueContextCachePathForTest(env, 'lin-issue-1');
+    const crossIssueCachePath = resolveIssueContextCachePathForTest(env, 'lin-issue-2');
+    const parentCacheRecord = JSON.parse(await readFile(parentCachePath, 'utf8')) as {
+      issue_id: string;
+      issue: {
+        identifier: string;
+        title: string;
+      };
+    };
+    const crossIssueCacheRecord = JSON.parse(await readFile(crossIssueCachePath, 'utf8')) as {
+      issue_id: string;
+      issue: {
+        identifier: string;
+        title: string;
+      };
+    };
+
+    expect(parentCachePath).not.toBe(crossIssueCachePath);
+    expect(parentCacheRecord).toMatchObject({
+      issue_id: 'lin-issue-1',
+      issue: {
+        identifier: 'CO-1',
+        title: 'Parent issue context'
+      }
+    });
+    expect(crossIssueCacheRecord).toMatchObject({
+      issue_id: 'lin-issue-2',
+      issue: {
+        identifier: 'CO-2',
+        title: 'Cross issue context'
+      }
+    });
+    await expect(
+      readFile(resolveLegacyIssueContextCachePathForTest(env), 'utf8')
+    ).rejects.toThrow();
+
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'provider-linear:issue-context',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '0',
+        'x-ratelimit-requests-reset': String(Date.now() + 60_000)
+      }
+    });
+
+    const cachedParentResult = await getProviderLinearIssueContext({
+      issueId: 'lin-issue-1',
+      env,
+      fallbackToCacheOnFailure: true,
+      fetchImpl: vi.fn(async () => {
+        throw new Error('issue-keyed cache fallback should resolve before fetch');
+      })
+    });
+
+    expect(cachedParentResult).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      cache_fallback_used: true,
+      issue: {
+        identifier: 'CO-1',
+        title: 'Parent issue context'
       }
     });
   });
@@ -987,7 +1250,7 @@ describe('providerLinearWorkflowFacade', () => {
     const auditPath = env.CODEX_PROVIDER_LINEAR_AUDIT_PATH;
     expect(auditPath).toBeTruthy();
     const cachedRecord = JSON.parse(
-      await readFile(join(dirname(auditPath as string), 'provider-linear-issue-context-cache.json'), 'utf8')
+      await readFile(resolveIssueContextCachePathForTest(env), 'utf8')
     ) as {
       recorded_at: string;
       issue: {
@@ -11193,8 +11456,7 @@ describe('providerLinearWorkflowFacade', () => {
       fetchImpl
     });
 
-    const auditPath = env.CODEX_PROVIDER_LINEAR_AUDIT_PATH!;
-    const cachePath = join(dirname(auditPath), 'provider-linear-issue-context-cache.json');
+    const cachePath = resolveIssueContextCachePathForTest(env);
     const cacheRecord = JSON.parse(await readFile(cachePath, 'utf8')) as {
       issue: {
         updated_at: string | null;

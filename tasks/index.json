@@ -1,13 +1,57 @@
 {
   "items": [
     {
+      "id": "20260422-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3",
+      "title": "CO: key issue-context cache artifacts by issue id so cross-issue reads cannot overwrite run evidence",
+      "relates_to": "tasks/tasks-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-22",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-22",
+          "status": "accepted",
+          "manifest": ".runs/linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3-docs-packet/cli/2026-04-22T08-59-19-453Z-a315ce06/manifest.json",
+          "source_anchor": "ctx:sha256:ab4c3060e772d502014ab440b9e34d0ee916242ea9a6e6b3656566dfc21366f1#chunk:c000001",
+          "summary": "Docs-first packet for CO-305 was produced and accepted for the singleton issue-context cache truth lane. The packet keeps scope on `provider-linear-issue-context-cache.json`, `issue-context`, run-scoped artifact truth, cross-issue reads, parent issue evidence, focused CO-301 regression framing, and issue-specific traceability; the child checkout preserved the issue body contract from the parent-owned live issue-context read because its local source payload was provenance-only."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md",
+        "task": "tasks/tasks-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md",
+        "agent_task": ".agent/task/linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md"
+        }
+      }
+    },
+    {
       "id": "20260422-linear-b7838857-953c-48d1-97fd-ef75aaf31221",
       "title": "CO: stop child-lane paths from polluting trusted-project state in global ~/.codex/config.toml",
-      "relates_to": "tasks/tasks-linear-b7838857-953c-48d1-97fd-ef75aaf31221.md", "risk": "high", "owners": ["Codex"], "last_review": "2026-04-22",
+      "relates_to": "tasks/tasks-linear-b7838857-953c-48d1-97fd-ef75aaf31221.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-22",
       "approvals": {
-        "docs_packet_child_lane": {"reviewer": "bounded same-issue docs child lane", "date": "2026-04-22", "status": "produced", "manifest": ".runs/linear-b7838857-953c-48d1-97fd-ef75aaf31221-docs-packet/cli/2026-04-22T10-39-35-018Z-9f277b0c/manifest.json", "source_anchor": "ctx:sha256:5592e921272085385fb1db3d450715f2978bddf72fb4d9e61f25ea945e79bafd#chunk:c000001", "summary": "Docs-first packet created for CO-307 child-lane trust/config isolation. Local source-0 payload was unavailable because this child checkout has no .runs tree, so the packet is anchored on the parent-provided issue description plus in-repo child-lane launch evidence: child lanes clone under `.child-lanes/<stream>-<run>`, inherit `CODEX_HOME`, and therefore expose the bounded seam behind `trusted-project pollution`, `child-lane paths`, and `global ~/.codex/config.toml growth`. The packet preserves the exact requirement to not weaken trust boundaries; parent owns implementation, validation, and any launch/home/config change."}
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-22",
+          "status": "produced",
+          "manifest": ".runs/linear-b7838857-953c-48d1-97fd-ef75aaf31221-docs-packet/cli/2026-04-22T10-39-35-018Z-9f277b0c/manifest.json",
+          "source_anchor": "ctx:sha256:5592e921272085385fb1db3d450715f2978bddf72fb4d9e61f25ea945e79bafd#chunk:c000001",
+          "summary": "Docs-first packet created for CO-307 child-lane trust/config isolation. Local source-0 payload was unavailable because this child checkout has no .runs tree, so the packet is anchored on the parent-provided issue description plus in-repo child-lane launch evidence: child lanes clone under `.child-lanes/<stream>-<run>`, inherit `CODEX_HOME`, and therefore expose the bounded seam behind `trusted-project pollution`, `child-lane paths`, and `global ~/.codex/config.toml growth`. The packet preserves the exact requirement to not weaken trust boundaries; parent owns implementation, validation, and any launch/home/config change."
+        }
       },
-      "paths": {"docs": "docs/TECH_SPEC-linear-b7838857-953c-48d1-97fd-ef75aaf31221.md"}
+      "paths": {
+        "docs": "docs/TECH_SPEC-linear-b7838857-953c-48d1-97fd-ef75aaf31221.md"
+      }
     },
     {
       "id": "20260422-linear-d9c8d1b2-3b38-42ef-9087-556870e2d88f",
@@ -44,7 +88,9 @@
       "title": "CO: re-enforce CO-185 provider-helper preflight guarantees in live worker attempts",
       "relates_to": "tasks/tasks-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md",
       "risk": "high",
-      "owners": ["Codex"],
+      "owners": [
+        "Codex"
+      ],
       "last_review": "2026-04-22",
       "approvals": {
         "docs_packet_child_lane": {
@@ -63,7 +109,16 @@
           "summary": "Pre-implementation docs-review failed only on unrelated docs:check baseline debt: docs/TASKS still references six missing linear-1c101 packet files already called out as unrelated CO-282 debt. The CO-306 packet and registry mirrors were present, so the parent recorded truthful fallback evidence at out/linear-0297d59b-66c3-4bfe-b019-fe2fa423063d/manual/20260422T083251Z-docs-review-fallback.md and continued without expanding scope."
         }
       },
-      "paths": {"spec": "tasks/specs/linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md", "task": "tasks/tasks-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md", "agent_task": ".agent/task/linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md", "docs": {"PRD": "docs/PRD-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md", "TECH_SPEC": "docs/TECH_SPEC-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md", "ACTION_PLAN": "docs/ACTION_PLAN-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md"}}
+      "paths": {
+        "spec": "tasks/specs/linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md",
+        "task": "tasks/tasks-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md",
+        "agent_task": ".agent/task/linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md"
+        }
+      }
     },
     {
       "id": "20260422-linear-f9666beb-58a7-47b2-b1c8-16d309ed1689",
