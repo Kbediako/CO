@@ -240,6 +240,7 @@ const LINEAR_WORKFLOW_COMMENT_LIMIT = 50;
 const LINEAR_WORKFLOW_STATE_LIMIT = 50;
 const LINEAR_WORKFLOW_ATTACHMENT_LIMIT = 20;
 const ISSUE_CONTEXT_PULL_REQUEST_HYDRATION_CONCURRENCY = 4;
+const PROVIDER_LINEAR_ISSUE_CONTEXT_CACHE_FILENAME_STEM = 'provider-linear-issue-context-cache';
 const PROVIDER_LINEAR_ISSUE_CONTEXT_CACHE_FILENAME = 'provider-linear-issue-context-cache.json';
 const PROVIDER_LINEAR_DIRECT_MUTATION_CACHE_MAX_AGE_MS = 10_000;
 const PROVIDER_LINEAR_LOW_HEADROOM_READ_CACHE_MAX_AGE_MS = 60_000;
@@ -4504,12 +4505,51 @@ function issueHasMutabilityBlock(
   return Boolean(issue.archived_at) || issue.trashed === true;
 }
 
-function resolveIssueContextCachePath(env: NodeJS.ProcessEnv | undefined): string | null {
+function resolveIssueContextCacheDirectory(env: NodeJS.ProcessEnv | undefined): string | null {
   const auditPath = resolveProviderLinearAuditPath(env ?? process.env);
   if (!auditPath) {
     return null;
   }
-  return join(dirname(auditPath), PROVIDER_LINEAR_ISSUE_CONTEXT_CACHE_FILENAME);
+  return dirname(auditPath);
+}
+
+function sanitizeIssueContextCacheArtifactKey(issueId: string): string {
+  return issueId.replace(/[^A-Za-z0-9._-]/gu, '_');
+}
+
+function resolveLegacyIssueContextCachePath(env: NodeJS.ProcessEnv | undefined): string | null {
+  const cacheDirectory = resolveIssueContextCacheDirectory(env);
+  if (!cacheDirectory) {
+    return null;
+  }
+  return join(cacheDirectory, PROVIDER_LINEAR_ISSUE_CONTEXT_CACHE_FILENAME);
+}
+
+function resolveIssueContextCachePath(
+  env: NodeJS.ProcessEnv | undefined,
+  issueId: string
+): string | null {
+  const cacheDirectory = resolveIssueContextCacheDirectory(env);
+  const normalizedIssueId = normalizeRequiredString(issueId);
+  if (!cacheDirectory || !normalizedIssueId) {
+    return null;
+  }
+  const cacheArtifactKey = sanitizeIssueContextCacheArtifactKey(normalizedIssueId);
+  return join(
+    cacheDirectory,
+    `${PROVIDER_LINEAR_ISSUE_CONTEXT_CACHE_FILENAME_STEM}-${cacheArtifactKey}.json`
+  );
+}
+
+async function readIssueContextCacheRecordAtPath(
+  cachePath: string
+): Promise<ProviderLinearIssueContextCacheRecord | null> {
+  try {
+    const parsed = JSON.parse(await readFile(cachePath, 'utf8')) as unknown;
+    return parseIssueContextCacheRecord(parsed);
+  } catch {
+    return null;
+  }
 }
 
 async function readCachedIssueContextRecord(
@@ -4517,20 +4557,24 @@ async function readCachedIssueContextRecord(
   issueId: string,
   sourceSetup: DispatchPilotSourceSetup | null
 ): Promise<ProviderLinearIssueContextCacheRecord | null> {
-  const cachePath = resolveIssueContextCachePath(env);
-  if (!cachePath) {
-    return null;
-  }
-  try {
-    const parsed = JSON.parse(await readFile(cachePath, 'utf8')) as unknown;
-    const record = parseIssueContextCacheRecord(parsed);
-    if (!record || record.issue_id !== issueId || !sameResolvedSourceSetup(record.source_setup, sourceSetup)) {
-      return null;
+  const cachePaths = [
+    resolveIssueContextCachePath(env, issueId),
+    resolveLegacyIssueContextCachePath(env)
+  ].filter(
+    (cachePath, index, paths): cachePath is string =>
+      Boolean(cachePath) && paths.indexOf(cachePath) === index
+  );
+  for (const cachePath of cachePaths) {
+    const record = await readIssueContextCacheRecordAtPath(cachePath);
+    if (
+      record &&
+      record.issue_id === issueId &&
+      sameResolvedSourceSetup(record.source_setup, sourceSetup)
+    ) {
+      return record;
     }
-    return record;
-  } catch {
-    return null;
   }
+  return null;
 }
 
 function isIssueContextCacheRecordFresh(
@@ -4686,7 +4730,7 @@ async function writeCachedIssueContextRecord(
     preserveRecordedAtWhenAttachmentTruthUnchanged?: boolean;
   }
 ): Promise<void> {
-  const cachePath = resolveIssueContextCachePath(env);
+  const cachePath = resolveIssueContextCachePath(env, issue.id);
   if (!cachePath) {
     return;
   }
