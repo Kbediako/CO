@@ -16,7 +16,7 @@
 - [x] ACTION_PLAN drafted for parent implementation and validation only. Evidence: `docs/ACTION_PLAN-linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a.md`.
 - [x] Checklist mirrored to `.agent/task/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a.md`. Evidence: `.agent/task/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a.md`.
 - [x] Parent registered the CO-300 packet in `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` on the current branch. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
-- [ ] Parent docs-review evidence captured before implementation. Evidence: pending parent lane.
+- [x] Parent docs-review evidence captured before implementation. Evidence: `.runs/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a-co300-docs-review-r2/cli/2026-04-22T03-29-19-182Z-a978d6e2/manifest.json` (`docs:check` green; remaining failure was the expected pre-fix repo-baseline blocker).
 
 ## Source / Assumptions
 - [x] Shared source anchor recorded. Evidence: `ctx:sha256:e6e7135ed5c5dcc34ca04950403e7a9a88a5902d59c65a6241a8aba0924f7392#chunk:c000001`.
@@ -30,28 +30,28 @@
 - [x] Packet registration preserves the canonical owner transition without widening `CO-295`. Evidence: packet docs and `tasks/index.json`.
 
 ## Parent Implementation
-- [ ] Reproduce the Apr 22 baseline and save before artifacts under `out/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a/before/`. Evidence: pending parent lane.
-- [ ] Preserve the earlier six missing-on-disk registry references as non-repro current-main evidence and resolve hard-stale `docs/codex-orchestrator-issues.md` with reviewed evidence. Evidence: pending parent lane.
-- [ ] Classify and process the Mar 21/22 historical stale cohorts, including `1317` / `1318`. Evidence: pending parent lane.
-- [ ] Re-home canonical owner metadata from terminal `CO-175` / `CO-267` to live `CO-300` across remaining policy, catalog, and maintenance surfaces. Evidence: pending parent lane.
-- [ ] Add or update focused regression coverage so terminal owner issues cannot remain the live maintenance recommendation. Evidence: pending parent lane.
-- [ ] Unblock `CO-295` without widening its scope once the repo-wide owner lane is complete. Evidence: pending parent lane.
+- [x] Reproduce the Apr 22 baseline and save before artifacts under `out/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a/before/`. Evidence: `out/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a/before/docs-freshness.json`, `out/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a/before/docs-freshness-maintenance.json`.
+- [x] Preserve the earlier six missing-on-disk registry references as non-repro current-main evidence and resolve hard-stale `docs/codex-orchestrator-issues.md` with reviewed evidence. Evidence: `docs/findings/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a-docs-freshness-classification.md`, `out/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a/after/docs-freshness.json`.
+- [x] Classify and process the Mar 21/22 historical stale cohorts, including `1317` / `1318`. Evidence: `docs/findings/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a-docs-freshness-classification.md`, `out/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a/after/docs-freshness.json`.
+- [x] Re-home canonical owner metadata from terminal `CO-175` / `CO-267` to live `CO-300` across remaining policy, catalog, and maintenance surfaces. Evidence: `docs/docs-catalog.json`, `docs/guides/docs-freshness-cohorts.md`, `tasks/index.json`, `out/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a/after/docs-freshness-maintenance.json`.
+- [x] Add or update focused regression coverage so terminal owner issues cannot remain the live maintenance recommendation. Evidence: `tests/docs-freshness-maintain.spec.ts`, `out/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a/validation/05c-test-r3.log`.
+- [x] Unblock `CO-295` without widening its scope once the repo-wide owner lane is complete. Evidence: `out/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a/validation/docs-freshness-maintenance-r3.json` (`clean`, `blocking_changed_paths=[]`, `owner_issue=CO-300`).
 
 ## Validation
 - [x] Packet protected-term check over the docs and mirrors. Evidence: `rg -n "docs:freshness|docs:freshness:maintain|canonical owner|CO-175|CO-267|terminal owner metadata|blocking_changed_paths=\\[\\]|docs/codex-orchestrator-issues.md|missing-on-disk registry references|Mar 21/22 historical cohorts|1317|1318|current main" docs/PRD-linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a.md docs/TECH_SPEC-linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a.md docs/ACTION_PLAN-linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a.md tasks/specs/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a.md tasks/tasks-linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a.md .agent/task/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a.md docs/TASKS.md`.
 - [x] Packet whitespace and diff check over the touched files. Evidence: `git diff --check -- docs/PRD-linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a.md docs/TECH_SPEC-linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a.md docs/ACTION_PLAN-linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a.md tasks/specs/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a.md tasks/tasks-linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a.md .agent/task/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a.md tasks/index.json docs/TASKS.md docs/docs-freshness-registry.json`.
 - [x] Packet JSON parse checks passed for the touched mirrors. Evidence: `python3 - <<'PY'` parse check for `tasks/index.json` and `docs/docs-freshness-registry.json`.
-- [ ] Parent `npm run docs:freshness` before/after recorded. Evidence: pending parent lane.
-- [ ] Parent `npm run docs:freshness:maintain` before/after recorded. Evidence: pending parent lane.
-- [ ] Parent focused regression coverage for terminal owner recommendation misuse recorded. Evidence: pending parent lane.
-- [ ] Parent `npm run docs:check` and review loop recorded. Evidence: pending parent lane.
+- [x] Parent `npm run docs:freshness` before/after recorded. Evidence: `out/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a/before/docs-freshness.json`, `out/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a/validation/docs-freshness-r3.json`.
+- [x] Parent `npm run docs:freshness:maintain` before/after recorded. Evidence: `out/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a/before/docs-freshness-maintenance.json`, `out/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a/validation/docs-freshness-maintenance-r3.json`.
+- [x] Parent focused regression coverage for terminal owner recommendation misuse recorded. Evidence: `tests/docs-freshness-maintain.spec.ts`, `out/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a/validation/05c-test-r3.log`.
+- [x] Parent `npm run docs:check` and review loop recorded. Evidence: `out/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a/validation/06c-docs-check-r3.log`, `out/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a/validation/11-review-fallback.md`, `out/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a/validation/12-elegance-review.md`.
 
 ## Progress Log
 - 2026-04-22: fresh current-main reproduction on branch `linear/co-300-docs-freshness-owner` at `f6d89efc3` recorded `docs:freshness FAILED - 4390 docs, 4393 registry entries`, `16` stale docs total, `0` missing-on-disk or invalid registry rows, one hard-stale `docs/codex-orchestrator-issues.md`, and `15` candidate entries across `6` candidate cohorts.
 - 2026-04-22: the pre-fix maintenance path still proved the debt is repo-wide with `blocking_changed_paths=[]` for blocked `CO-295`, and focused owner verification confirmed terminal `CO-175` must force `owner_issue_action.mode=create_required` instead of `update_existing`.
 - 2026-04-22: an initial docs child-lane seed packet succeeded but was invalidated after the parent moved from detached `HEAD` to current `origin/main`; the parent recreated the packet on the active branch so docs state matches the refreshed baseline instead of the older issue snapshot.
 - 2026-04-22: packet registration now points the canonical owner marker at live `CO-300` while preserving `CO-267` as the previous canonical owner and `CO-175` as the original rolling owner in the narrative.
-- 2026-04-22: parent-owned implementation remains pending for hard-stale doc resolution, Mar 22 cohort processing including `1317` / `1318`, and maintenance-regression coverage.
+- 2026-04-22: parent-owned implementation completed the owner reset and reviewed refresh: `docs:freshness` and `docs:freshness:maintain` now return clean with live owner `CO-300`, and blocked `CO-295` no longer inherits repo-wide `blocking_changed_paths=[]` debt from terminal owner metadata.
 
 ## Relevant Files
 - `docs/PRD-linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a.md`
