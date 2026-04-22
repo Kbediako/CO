@@ -829,6 +829,23 @@ describe('provider linear child lane runner', () => {
     ).toEqual(['2026-04-22T06:12:51.000Z tool_search open pull requests for repo']);
   });
 
+  it('treats PR shorthand plural searches as scope drift', () => {
+    expect(
+      childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
+        timestamp: '2026-04-22T06:12:51.250Z',
+        type: 'response_item',
+        payload: {
+          type: 'tool_search_call',
+          call_id: 'call-pr-shorthand-plural',
+          arguments: {
+            query: 'open PRs for repo',
+            limit: 12
+          }
+        }
+      })
+    ).toEqual(['2026-04-22T06:12:51.250Z tool_search open PRs for repo']);
+  });
+
   it('treats PR lifecycle function calls without github or linear substrings as scope drift', () => {
     expect(
       childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
@@ -889,6 +906,36 @@ describe('provider linear child lane runner', () => {
         }
       })
     ).toEqual(['2026-04-22T06:13:32.000Z exec_command /usr/bin/git push origin HEAD']);
+
+    expect(
+      childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
+        timestamp: '2026-04-22T06:13:32.250Z',
+        type: 'response_item',
+        payload: {
+          type: 'function_call',
+          name: 'exec_command',
+          arguments: JSON.stringify({
+            cmd: 'command git push origin HEAD',
+            workdir: '/tmp/child'
+          })
+        }
+      })
+    ).toEqual(['2026-04-22T06:13:32.250Z exec_command command git push origin HEAD']);
+
+    expect(
+      childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
+        timestamp: '2026-04-22T06:13:32.500Z',
+        type: 'response_item',
+        payload: {
+          type: 'function_call',
+          name: 'exec_command',
+          arguments: JSON.stringify({
+            cmd: 'command gh pr view',
+            workdir: '/tmp/child'
+          })
+        }
+      })
+    ).toEqual(['2026-04-22T06:13:32.500Z exec_command command gh pr view']);
 
     expect(
       childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({

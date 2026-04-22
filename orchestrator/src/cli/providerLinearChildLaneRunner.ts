@@ -811,6 +811,45 @@ function advancePastShellCommandEnvWrappers(
   return index;
 }
 
+function advancePastShellCommandExecutionWrappers(
+  tokens: string[],
+  segmentStart: number,
+  segmentEnd: number
+): number {
+  let index = advancePastShellCommandEnvWrappers(tokens, segmentStart, segmentEnd);
+  while (index < segmentEnd) {
+    const token = stripShellCommandTokenQuotes(tokens[index] ?? '');
+    if (!token) {
+      index += 1;
+      continue;
+    }
+    if (basename(token) !== 'command') {
+      break;
+    }
+    index += 1;
+    while (index < segmentEnd) {
+      const commandToken = stripShellCommandTokenQuotes(tokens[index] ?? '');
+      if (!commandToken) {
+        index += 1;
+        continue;
+      }
+      if (commandToken === '--') {
+        index += 1;
+        break;
+      }
+      if (commandToken === '-p') {
+        index += 1;
+        continue;
+      }
+      if (commandToken.startsWith('-')) {
+        return segmentEnd;
+      }
+      break;
+    }
+  }
+  return index;
+}
+
 function findShellCommandSegmentEnd(tokens: string[], segmentStart: number, commandSeparators: Set<string>): number {
   let index = segmentStart;
   while (index < tokens.length) {
@@ -912,7 +951,7 @@ function commandSegmentShowsParentOwnedScopeDrift(
     '--super-prefix',
     '--config-env'
   ]);
-  const commandIndex = advancePastShellCommandEnvWrappers(tokens, segmentStart, segmentEnd);
+  const commandIndex = advancePastShellCommandExecutionWrappers(tokens, segmentStart, segmentEnd);
   if (commandIndex >= segmentEnd) {
     return false;
   }
@@ -1024,14 +1063,14 @@ function queryShowsParentOwnedScopeDrift(query: string): boolean {
   }
   if (
     /\bgithub\b/iu.test(query) &&
-    /\b(?:pr\b|issue|issues|comment|comments|review|reviews|check|checks|status|merge|merged|open|opened|close|closed)\b/iu.test(
+    /\b(?:prs?\b|issue|issues|comment|comments|review|reviews|check|checks|status|merge|merged|open|opened|close|closed)\b/iu.test(
       query
     )
   ) {
     return true;
   }
   if (
-    /\bpr\b/iu.test(query) &&
+    /\bprs?\b/iu.test(query) &&
     (/\bpr\s*#?\d+\b/iu.test(query) ||
       /\b(?:comment|comments|review|reviews|check|checks|status|merge|merged|open|opened|close|closed)\b/iu.test(
         query
