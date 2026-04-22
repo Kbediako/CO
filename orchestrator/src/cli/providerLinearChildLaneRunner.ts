@@ -811,12 +811,23 @@ function commandSegmentShowsParentOwnedScopeDrift(
     return segmentContainsToken(tokens, commandIndex + 1, segmentEnd, 'linear');
   }
   if (commandBase === 'node' || commandBase === 'bun') {
+    const runtimeOptionsWithValues = new Set([
+      '-r',
+      '--require',
+      '--import',
+      '--loader',
+      '--experimental-loader',
+      '--conditions'
+    ]);
     for (let index = commandIndex + 1; index < segmentEnd; index += 1) {
       const token = stripShellCommandTokenQuotes(tokens[index] ?? '');
       if (!token) {
         continue;
       }
       if (token.startsWith('-')) {
+        if (runtimeOptionsWithValues.has(token) && !token.includes('=')) {
+          index += 1;
+        }
         continue;
       }
       const scriptBase = basename(token);

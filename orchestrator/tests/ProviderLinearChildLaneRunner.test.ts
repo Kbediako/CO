@@ -994,6 +994,23 @@ describe('provider linear child lane runner', () => {
         }
       })
     ).toEqual(['2026-04-22T06:13:37.750Z exec_command git status git push origin HEAD']);
+
+    expect(
+      childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
+        timestamp: '2026-04-22T06:13:37.900Z',
+        type: 'response_item',
+        payload: {
+          type: 'function_call',
+          name: 'exec_command',
+          arguments: JSON.stringify({
+            cmd: 'node --require ts-node/register codex-orchestrator linear transition --issue-id 123',
+            workdir: '/tmp/child'
+          })
+        }
+      })
+    ).toEqual([
+      '2026-04-22T06:13:37.900Z exec_command node --require ts-node/register codex-orchestrator linear transition --issue-id 123'
+    ]);
   });
 
   it('does not treat shell-wrapped heredoc or echoed git text as scope drift', () => {
