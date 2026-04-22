@@ -37,14 +37,14 @@
   - 2026-04-22: the issue is not plausibly narrower than a log wording change because it requires backpressure behavior, and not broader than local provider-worker host safety because it explicitly excludes cloud/scheduler redesign and provenance bypass.
 
 ## Milestones & Sequencing
-1. Create the CO-299 docs-first packet and declared mirrors on the fresh Rework branch.
-2. Parent audits provider-worker launch/admission for local resource pressure and concurrency behavior.
-3. Parent identifies canonical local Node OOM/resource pressure signals from proof, manifest, stderr, exit code, or process signal evidence.
-4. Parent implements the smallest host-safety backpressure seam that prevents additional local provider-worker pressure while preserving normal valid launches.
-5. Parent audits child-lane and child-stream retry/progress accounting for provenance-invalid outcomes.
-6. Parent implements no-progress truth for `provider_worker_child_lane_provenance_invalid` and `provider_worker_child_stream_provenance_invalid` while preserving fail-closed behavior.
-7. Parent projects host-safety and provenance reasons into proof/status/read-model output.
-8. Parent runs focused regressions and parent-selected validation/review before PR handoff.
+- [x] Create the CO-299 docs-first packet and declared mirrors on the fresh Rework branch. Manifest: `.runs/linear-59a75110-93e5-42f4-a2d2-31dcde884c91-docs-shape-advisory/cli/2026-04-22T06-47-18-744Z-28f2a3fb/manifest.json`
+- [ ] Parent audits provider-worker launch/admission for local resource pressure and concurrency behavior.
+- [ ] Parent identifies canonical local Node OOM/resource pressure signals from proof, manifest, stderr, exit code, or process signal evidence.
+- [ ] Parent implements the smallest host-safety backpressure seam that prevents additional local provider-worker pressure while preserving normal valid launches.
+- [ ] Parent audits child-lane and child-stream retry/progress accounting for provenance-invalid outcomes.
+- [ ] Parent implements no-progress truth for `provider_worker_child_lane_provenance_invalid` and `provider_worker_child_stream_provenance_invalid` while preserving fail-closed behavior.
+- [ ] Parent projects host-safety and provenance reasons into proof/status/read-model output.
+- [ ] Parent runs focused regressions and parent-selected validation/review before PR handoff.
 
 ## Dependencies
 - Shared source anchor: `ctx:sha256:0320d3a6b57e0f8847509632a1b1cf89ffd868f1412cbb569e67ac7eb380f394#chunk:c000001`
@@ -82,6 +82,6 @@
   - Mitigation: require a regression separating failed launch attempts from real issue progress.
 
 ## Approvals
-- Docs packet: pending parent acceptance
-- Parent docs-review: pending parent lane
-- Parent implementation/review/PR lifecycle: pending parent lane
+- [x] Docs packet accepted. Manifest: `.runs/linear-59a75110-93e5-42f4-a2d2-31dcde884c91-docs-shape-advisory/cli/2026-04-22T06-47-18-744Z-28f2a3fb/manifest.json`
+- [ ] Parent docs-review completed.
+- [ ] Parent implementation/review/PR lifecycle completed.
