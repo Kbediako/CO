@@ -1021,6 +1021,34 @@ describe('provider linear child lane runner', () => {
     await expect(readFile(patchArtifactPath, 'utf8')).resolves.toContain('+transient');
   });
 
+  it('preserves later workspace edits in the patch artifact after resetting to the base', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-runner-'));
+    const laneWorkspacePath = join(tempRoot, 'workspace');
+    const runDir = join(tempRoot, 'run');
+    const startingHeadSha = await initGitRepo(laneWorkspacePath);
+    await mkdir(runDir, { recursive: true });
+
+    await writeFile(join(laneWorkspacePath, 'README.md'), 'initial\ntransient\n', 'utf8');
+    runGit(laneWorkspacePath, ['add', 'README.md']);
+    runGit(laneWorkspacePath, ['commit', '-m', 'transient child commit']);
+    const transientCommitSha = runGit(laneWorkspacePath, ['rev-parse', 'HEAD']);
+    runGit(laneWorkspacePath, ['reset', '--hard', startingHeadSha]);
+    await writeFile(join(laneWorkspacePath, 'workspace.txt'), 'workspace\n', 'utf8');
+
+    const { patchArtifactPath } = await childLaneRunnerTest.createPatchArtifact(
+      laneWorkspacePath,
+      runDir,
+      startingHeadSha,
+      transientCommitSha,
+      startingHeadSha
+    );
+
+    const patchContent = await readFile(patchArtifactPath, 'utf8');
+    expect(patchContent).toContain('+transient');
+    expect(patchContent).toContain('workspace.txt');
+    expect(patchContent).toContain('+workspace');
+  });
+
   it('ignores plain head movement across existing commits when no child commit was created', async () => {
     tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-runner-'));
     const laneWorkspacePath = join(tempRoot, 'workspace');

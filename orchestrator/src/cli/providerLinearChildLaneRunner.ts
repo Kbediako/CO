@@ -1308,23 +1308,40 @@ async function createPatchArtifact(
   laneWorkspacePath: string,
   runDir: string,
   baselineRef = 'HEAD',
-  targetRef: string | null = null
+  targetRef: string | null = null,
+  currentHeadSha: string | null = null
 ): Promise<{ patchArtifactPath: string; patchBytes: number }> {
   await execFileAsync('git', ['-C', laneWorkspacePath, 'add', '-N', '.']);
-  const diff = await execFileAsync(
+  const workspaceDiff = await execFileAsync(
     'git',
-    targetRef
-      ? ['-C', laneWorkspacePath, 'diff', '--binary', '--no-ext-diff', baselineRef, targetRef, '--', '.']
-      : ['-C', laneWorkspacePath, 'diff', '--binary', '--no-ext-diff', baselineRef, '--', '.'],
+    ['-C', laneWorkspacePath, 'diff', '--binary', '--no-ext-diff', baselineRef, '--', '.'],
     {
       maxBuffer: 20 * 1024 * 1024
     }
   );
+  const committedDiff =
+    targetRef !== null
+      ? await execFileAsync(
+          'git',
+          ['-C', laneWorkspacePath, 'diff', '--binary', '--no-ext-diff', baselineRef, targetRef, '--', '.'],
+          {
+            maxBuffer: 20 * 1024 * 1024
+          }
+        )
+      : null;
+  const diffChunks: string[] = [];
+  if (committedDiff && (currentHeadSha === baselineRef || !currentHeadSha)) {
+    diffChunks.push(committedDiff.stdout);
+  }
+  if (workspaceDiff.stdout.length > 0 || diffChunks.length === 0) {
+    diffChunks.push(workspaceDiff.stdout);
+  }
+  const diffOutput = diffChunks.join('');
   const patchArtifactPath = join(runDir, 'provider-linear-child-lane.patch');
-  await writeFile(patchArtifactPath, diff.stdout, 'utf8');
+  await writeFile(patchArtifactPath, diffOutput, 'utf8');
   return {
     patchArtifactPath,
-    patchBytes: Buffer.byteLength(diff.stdout, 'utf8')
+    patchBytes: Buffer.byteLength(diffOutput, 'utf8')
   };
 }
 
@@ -1620,7 +1637,8 @@ export async function runProviderLinearChildLane(
         laneWorkspacePath,
         context.runDir,
         patchBaselineRef,
-        patchTargetRef
+        patchTargetRef,
+        currentHeadSha
       ));
       proof = {
         issue_id: context.issueId,
