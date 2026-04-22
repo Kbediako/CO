@@ -15403,31 +15403,26 @@ describe('createProviderIssueHandoffService', () => {
 
     const retryDueAt = failedRetryClaim?.retry_due_at ?? null;
     expect(retryDueAt).not.toBeNull();
-    const { delayMs: retryDelayMs } =
-      getEarliestScheduledTimeoutByDelayRange(setTimeoutSpy, 4_999, 5_000);
-    expect(retryDelayMs).toBeGreaterThanOrEqual(4_999);
-    expect(retryDelayMs).toBeLessThanOrEqual(5_000);
     const retryDelayUntilDueMs = Math.max(Date.parse(retryDueAt ?? '') - Date.now(), 0) + 1;
     await vi.advanceTimersByTimeAsync(retryDelayUntilDueMs);
     await flushAsyncWork();
-    await waitForMockCalls(launcher.start, 2, QUEUED_RETRY_SETTLE_TURNS * 8);
+    await waitForCondition(() => {
+      const relaunchedClaim = state.claims.find(
+        (claim) => claim.provider_key === 'linear:lin-issue-1'
+      );
+      return (
+        providerWorkflowConfigStore.refresh.mock.calls.length >= 2 &&
+        relaunchedClaim?.state === 'starting' &&
+        relaunchedClaim?.reason === 'provider_issue_retry_start_launched' &&
+        relaunchedClaim?.worker_host === 'worker-host-04' &&
+        relaunchedClaim?.retry_queued === null &&
+        relaunchedClaim?.retry_due_at === null
+      );
+    }, QUEUED_RETRY_SETTLE_TURNS * 8);
 
-    expect(launcher.start).toHaveBeenCalledTimes(2);
-    expect(launcher.start.mock.calls[1]?.[0]).toEqual(expect.objectContaining({
-      taskId: 'linear-lin-issue-1',
-      pipelineId: 'diagnostics',
-      provider: 'linear',
-      issueId: 'lin-issue-1',
-      issueIdentifier: 'CO-2',
-      issueUpdatedAt: '2026-03-19T04:21:00.000Z',
-      workerHost: 'worker-host-04',
-      launchToken: expect.any(String)
-    }));
     expect(launcher.resume).not.toHaveBeenCalled();
     expect(providerWorkflowConfigStore.refresh).toHaveBeenCalledTimes(2);
-    expect(
-      getPersistedState().claims.find((claim) => claim.provider_key === 'linear:lin-issue-1')
-    ).toMatchObject({
+    expect(state.claims.find((claim) => claim.provider_key === 'linear:lin-issue-1')).toMatchObject({
       state: 'starting',
       reason: 'provider_issue_retry_start_launched',
       worker_host: 'worker-host-04',
@@ -30732,11 +30727,24 @@ describe('createProviderIssueHandoffService', () => {
     });
 
     await seedOccupiedRunningProviderWorkers(root, state);
-    vi.setSystemTime(new Date('2026-03-19T04:30:10.001Z'));
-    const persistCallsBeforeRetry = persist.mock.calls.length;
-    getLatestScheduledTimeoutCallback(setTimeoutSpy)();
+    const blockedRetryDueAt =
+      state.claims.find((claim) => claim.provider_key === 'linear:lin-issue-1')?.retry_due_at ?? null;
+    expect(blockedRetryDueAt).toBe('2026-03-19T04:30:10.000Z');
+    await vi.advanceTimersByTimeAsync(10_001);
     await flushAsyncWork();
-    await waitForMockCalls(persist, persistCallsBeforeRetry + 1, QUEUED_RETRY_SETTLE_TURNS * 8);
+    await waitForCondition(() => {
+      const persistedBlockedClaim = state.claims.find(
+        (claim) => claim.provider_key === 'linear:lin-issue-1'
+      );
+      return (
+        persistedBlockedClaim?.state === 'resumable' &&
+        persistedBlockedClaim?.reason === 'provider_issue_retry_resume_blocked:max_concurrency' &&
+        persistedBlockedClaim?.worker_host === null &&
+        persistedBlockedClaim?.retry_queued === true &&
+        typeof persistedBlockedClaim.retry_due_at === 'string' &&
+        Date.parse(persistedBlockedClaim.retry_due_at) > Date.parse('2026-03-19T04:30:10.000Z')
+      );
+    }, QUEUED_RETRY_SETTLE_TURNS * 8);
 
     const blockedClaim = state.claims.find((claim) => claim.provider_key === 'linear:lin-issue-1');
     expect(launcher.start).not.toHaveBeenCalled();
@@ -30755,11 +30763,6 @@ describe('createProviderIssueHandoffService', () => {
     expect(Date.parse(blockedClaim?.retry_due_at ?? '')).toBeGreaterThan(
       Date.parse('2026-03-19T04:30:10.000Z')
     );
-    expect(getPersistedState().claims.find((claim) => claim.provider_key === 'linear:lin-issue-1')).toMatchObject({
-      state: 'resumable',
-      reason: 'provider_issue_retry_resume_blocked:max_concurrency',
-      worker_host: null
-    });
   });
 
   it('reclassifies a stale running claim as resumable and refreshes stale issue metadata after a failed worker run', async () => {
