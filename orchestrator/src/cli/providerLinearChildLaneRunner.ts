@@ -697,10 +697,6 @@ function commandShowsParentOwnedScopeDrift(command: string): boolean {
     return true;
   }
   const tokens = command.match(/"[^"]*"|'[^']*'|\S+/gu) ?? [];
-  const gitIndex = tokens.findIndex((token) => basename(token.replace(/^['"]|['"]$/gu, '')) === 'git');
-  if (gitIndex === -1) {
-    return false;
-  }
   const gitOptionsWithValues = new Set([
     '-c',
     '-C',
@@ -711,26 +707,44 @@ function commandShowsParentOwnedScopeDrift(command: string): boolean {
     '--super-prefix',
     '--config-env'
   ]);
-  for (let index = gitIndex + 1; index < tokens.length; index += 1) {
-    const token = tokens[index]?.replace(/^['"]|['"]$/gu, '') ?? '';
-    if (!token) {
+  const commandSeparators = new Set(['&&', '||', ';', '|']);
+  for (let gitIndex = 0; gitIndex < tokens.length; gitIndex += 1) {
+    const gitToken = tokens[gitIndex]?.replace(/^['"]|['"]$/gu, '') ?? '';
+    if (basename(gitToken) !== 'git') {
       continue;
     }
-    if (token === 'commit' || token === 'push') {
-      return true;
-    }
-    if (!token.startsWith('-')) {
-      return false;
-    }
-    if (gitOptionsWithValues.has(token) && !token.includes('=')) {
-      index += 1;
+    for (let index = gitIndex + 1; index < tokens.length; index += 1) {
+      const token = tokens[index]?.replace(/^['"]|['"]$/gu, '') ?? '';
+      if (!token) {
+        continue;
+      }
+      if (commandSeparators.has(token)) {
+        break;
+      }
+      if (token === 'commit' || token === 'push') {
+        return true;
+      }
+      if (!token.startsWith('-')) {
+        break;
+      }
+      if (gitOptionsWithValues.has(token) && !token.includes('=')) {
+        index += 1;
+      }
     }
   }
   return false;
 }
 
 function queryShowsParentOwnedScopeDrift(query: string): boolean {
-  if (/\bgithub\b/iu.test(query) || /\bpull request\b/iu.test(query)) {
+  if (/\bpull request\b/iu.test(query)) {
+    return true;
+  }
+  if (
+    /\bgithub\b/iu.test(query) &&
+    /\b(?:pr\b|issue|issues|comment|comments|review|reviews|check|checks|status|merge|merged|open|opened|close|closed)\b/iu.test(
+      query
+    )
+  ) {
     return true;
   }
   if (

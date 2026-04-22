@@ -761,6 +761,23 @@ describe('provider linear child lane runner', () => {
     ).toEqual([]);
   });
 
+  it('does not treat benign GitHub technical searches as scope drift', () => {
+    expect(
+      childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
+        timestamp: '2026-04-22T06:12:49.500Z',
+        type: 'response_item',
+        payload: {
+          type: 'tool_search_call',
+          call_id: 'call-benign-github',
+          arguments: {
+            query: 'GitHub markdown docs table syntax',
+            limit: 12
+          }
+        }
+      })
+    ).toEqual([]);
+  });
+
   it('treats PR shorthand tool_search queries as scope drift', () => {
     expect(
       childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
@@ -838,6 +855,21 @@ describe('provider linear child lane runner', () => {
         }
       })
     ).toEqual(['2026-04-22T06:13:32.000Z exec_command /usr/bin/git push origin HEAD']);
+
+    expect(
+      childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
+        timestamp: '2026-04-22T06:13:33.000Z',
+        type: 'response_item',
+        payload: {
+          type: 'function_call',
+          name: 'exec_command',
+          arguments: JSON.stringify({
+            cmd: 'git status && git push origin HEAD',
+            workdir: '/tmp/child'
+          })
+        }
+      })
+    ).toEqual(['2026-04-22T06:13:33.000Z exec_command git status && git push origin HEAD']);
   });
 
   it('re-checks the session log after exec settles before clearing scope drift', async () => {
