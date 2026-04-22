@@ -308,6 +308,45 @@ describe('docs freshness maintenance decisions', () => {
     expect(decision.recommended_action).not.toContain('update_existing');
   });
 
+  it('fails closed when helper verification is unavailable but policy metadata marks the owner terminal', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-maintain-terminal-unavailable-'));
+    createdDirs.push(repoRoot);
+    await writeFixture(repoRoot, {
+      entries: [{ path: 'tasks/tasks-1164-historical.md', daysOld: 31 }],
+      policy: rollingFreshnessPolicy({
+        owner_issue_state: 'Done',
+        owner_issue_state_type: 'completed',
+        owner_issue_is_terminal: true
+      })
+    });
+
+    const { decision, shouldBlock } = await runMaintain(repoRoot);
+
+    expect(shouldBlock).toBe(true);
+    expect(decision.freshness_decision).toBe('block_unowned_repo_debt');
+    expect(decision.owner_issue_action).toEqual(
+      expect.objectContaining({
+        mode: 'create_required',
+        existing_issue: 'CO-175',
+        reason: 'configured_owner_terminal',
+        issue_state: 'Done',
+        issue_state_type: 'completed'
+      })
+    );
+    expect(decision.owner_issue_verification).toEqual(
+      expect.objectContaining({
+        issue: 'CO-175',
+        state: 'Done',
+        state_type: 'completed',
+        is_terminal: true,
+        usable: false,
+        verification_status: 'unavailable',
+        source: 'rolling_freshness_policy',
+        error: 'helper_missing'
+      })
+    );
+  });
+
   it('treats Duplicate owner state as terminal when state_type is absent', () => {
     const lastReview = reviewDateDaysAgo(31);
     const decision = buildDocsFreshnessMaintenanceDecision(

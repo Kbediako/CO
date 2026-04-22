@@ -116,10 +116,7 @@ function isTerminalWorkflowState({ state = null, stateType = null, isTerminal = 
   return Boolean(normalizedState && TERMINAL_WORKFLOW_STATES.has(normalizedState));
 }
 
-function deriveOwnerIssueVerification(policy, explicitVerification = null) {
-  if (explicitVerification && typeof explicitVerification === 'object') {
-    return explicitVerification;
-  }
+function deriveOwnerIssueVerificationFromPolicy(policy) {
   const issue = normalizeOptionalString(policy?.owner_issue);
   const state = normalizeOptionalString(policy?.owner_issue_state);
   const stateType = normalizeOptionalString(policy?.owner_issue_state_type);
@@ -140,6 +137,26 @@ function deriveOwnerIssueVerification(policy, explicitVerification = null) {
     source: 'rolling_freshness_policy',
     error: null
   };
+}
+
+function deriveOwnerIssueVerification(policy, explicitVerification = null) {
+  const policyVerification = deriveOwnerIssueVerificationFromPolicy(policy);
+  if (explicitVerification && typeof explicitVerification === 'object') {
+    if (explicitVerification.verification_status === 'unavailable' && policyVerification) {
+      return {
+        ...explicitVerification,
+        issue: normalizeOptionalString(explicitVerification.issue) ?? policyVerification.issue,
+        state: normalizeOptionalString(explicitVerification.state) ?? policyVerification.state,
+        state_type: normalizeOptionalString(explicitVerification.state_type) ?? policyVerification.state_type,
+        is_terminal:
+          normalizeOptionalBoolean(explicitVerification.is_terminal) ?? policyVerification.is_terminal,
+        usable: normalizeOptionalBoolean(explicitVerification.usable) ?? policyVerification.usable,
+        source: policyVerification.source
+      };
+    }
+    return explicitVerification;
+  }
+  return policyVerification;
 }
 
 function buildOwnerIssueAction(policy, ownerIssueVerification = null) {
