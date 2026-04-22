@@ -778,6 +778,23 @@ describe('provider linear child lane runner', () => {
     ).toEqual([]);
   });
 
+  it('does not treat benign plural pull request technical searches as scope drift', () => {
+    expect(
+      childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
+        timestamp: '2026-04-22T06:12:49.750Z',
+        type: 'response_item',
+        payload: {
+          type: 'tool_search_call',
+          call_id: 'call-benign-pr-plural',
+          arguments: {
+            query: 'GitHub pull requests REST API docs',
+            limit: 12
+          }
+        }
+      })
+    ).toEqual([]);
+  });
+
   it('treats PR shorthand tool_search queries as scope drift', () => {
     expect(
       childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
@@ -793,6 +810,23 @@ describe('provider linear child lane runner', () => {
         }
       })
     ).toEqual(['2026-04-22T06:12:50.000Z tool_search PR #597 comments']);
+  });
+
+  it('treats plural pull request lifecycle searches as scope drift', () => {
+    expect(
+      childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
+        timestamp: '2026-04-22T06:12:51.000Z',
+        type: 'response_item',
+        payload: {
+          type: 'tool_search_call',
+          call_id: 'call-pr-plural',
+          arguments: {
+            query: 'open pull requests for repo',
+            limit: 12
+          }
+        }
+      })
+    ).toEqual(['2026-04-22T06:12:51.000Z tool_search open pull requests for repo']);
   });
 
   it('treats PR lifecycle function calls without github or linear substrings as scope drift', () => {
@@ -885,6 +919,83 @@ describe('provider linear child lane runner', () => {
         }
       })
     ).toEqual(['2026-04-22T06:13:34.000Z exec_command git status&&git push origin HEAD']);
+
+    expect(
+      childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
+        timestamp: '2026-04-22T06:13:35.000Z',
+        type: 'response_item',
+        payload: {
+          type: 'function_call',
+          name: 'exec_command',
+          arguments: JSON.stringify({
+            cmd: 'bash -lc "git push origin HEAD"',
+            workdir: '/tmp/child'
+          })
+        }
+      })
+    ).toEqual(['2026-04-22T06:13:35.000Z exec_command bash -lc "git push origin HEAD"']);
+
+    expect(
+      childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
+        timestamp: '2026-04-22T06:13:36.000Z',
+        type: 'response_item',
+        payload: {
+          type: 'function_call',
+          name: 'exec_command',
+          arguments: JSON.stringify({
+            cmd: "sh -c 'git commit -m \"child commit\"'",
+            workdir: '/tmp/child'
+          })
+        }
+      })
+    ).toEqual(['2026-04-22T06:13:36.000Z exec_command sh -c \'git commit -m "child commit"\'']);
+
+    expect(
+      childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
+        timestamp: '2026-04-22T06:13:37.000Z',
+        type: 'response_item',
+        payload: {
+          type: 'function_call',
+          name: 'exec_command',
+          arguments: JSON.stringify({
+            cmd: 'env GIT_TRACE=1 git push origin HEAD',
+            workdir: '/tmp/child'
+          })
+        }
+      })
+    ).toEqual(['2026-04-22T06:13:37.000Z exec_command env GIT_TRACE=1 git push origin HEAD']);
+  });
+
+  it('does not treat shell-wrapped heredoc or echoed git text as scope drift', () => {
+    expect(
+      childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
+        timestamp: '2026-04-22T06:13:38.000Z',
+        type: 'response_item',
+        payload: {
+          type: 'function_call',
+          name: 'exec_command',
+          arguments: JSON.stringify({
+            cmd: 'bash -lc "echo git push origin HEAD"',
+            workdir: '/tmp/child'
+          })
+        }
+      })
+    ).toEqual([]);
+
+    expect(
+      childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
+        timestamp: '2026-04-22T06:13:39.000Z',
+        type: 'response_item',
+        payload: {
+          type: 'function_call',
+          name: 'exec_command',
+          arguments: JSON.stringify({
+            cmd: `bash -lc "cat >note.txt <<'EOF'\nremember to git commit before pushing\nEOF"`,
+            workdir: '/tmp/child'
+          })
+        }
+      })
+    ).toEqual([]);
   });
 
   it('re-checks the session log after exec settles before clearing scope drift', async () => {

@@ -696,6 +696,60 @@ function tokenizeShellCommandForScopeDrift(command: string): string[] {
   return command.match(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|&&|\|\||[;&|]|[^\s;&|]+/gu) ?? [];
 }
 
+function stripShellCommandTokenQuotes(token: string): string {
+  return token.replace(/^['"]|['"]$/gu, '');
+}
+
+function findShellCommandSegmentStart(tokens: string[], index: number, commandSeparators: Set<string>): number {
+  let start = index;
+  while (start > 0) {
+    const previousToken = stripShellCommandTokenQuotes(tokens[start - 1] ?? '');
+    if (!previousToken) {
+      start -= 1;
+      continue;
+    }
+    if (commandSeparators.has(previousToken)) {
+      break;
+    }
+    start -= 1;
+  }
+  return start;
+}
+
+function tokenStartsParentOwnedGitCommand(tokens: string[], gitIndex: number, commandSeparators: Set<string>): boolean {
+  const envAssignmentPattern = /^[A-Za-z_][A-Za-z0-9_]*=.*/u;
+  let index = findShellCommandSegmentStart(tokens, gitIndex, commandSeparators);
+  while (index < gitIndex) {
+    const token = stripShellCommandTokenQuotes(tokens[index] ?? '');
+    if (!token) {
+      index += 1;
+      continue;
+    }
+    if (basename(token) === 'env') {
+      index += 1;
+      while (index < gitIndex) {
+        const envToken = stripShellCommandTokenQuotes(tokens[index] ?? '');
+        if (!envToken) {
+          index += 1;
+          continue;
+        }
+        if (envToken === '--') {
+          index += 1;
+          break;
+        }
+        if (envToken.startsWith('-') || envAssignmentPattern.test(envToken)) {
+          index += 1;
+          continue;
+        }
+        break;
+      }
+      continue;
+    }
+    return false;
+  }
+  return true;
+}
+
 function commandShowsParentOwnedScopeDrift(command: string): boolean {
   if (/\bgh\b/u.test(command) || /codex-orchestrator(?:\.js)?(?:["'\s]|$).*?\slinear\b/u.test(command)) {
     return true;
@@ -712,13 +766,36 @@ function commandShowsParentOwnedScopeDrift(command: string): boolean {
     '--config-env'
   ]);
   const commandSeparators = new Set(['&&', '||', ';', '|', '&']);
+  const shellCommandWrappers = new Set(['bash', 'sh', 'zsh']);
   for (let gitIndex = 0; gitIndex < tokens.length; gitIndex += 1) {
-    const gitToken = tokens[gitIndex]?.replace(/^['"]|['"]$/gu, '') ?? '';
-    if (basename(gitToken) !== 'git') {
+    const gitToken = stripShellCommandTokenQuotes(tokens[gitIndex] ?? '');
+    if (shellCommandWrappers.has(basename(gitToken))) {
+      for (let index = gitIndex + 1; index < tokens.length; index += 1) {
+        const token = stripShellCommandTokenQuotes(tokens[index] ?? '');
+        if (!token) {
+          continue;
+        }
+        if (commandSeparators.has(token)) {
+          break;
+        }
+        if (/^-[^-]*c[^-]*$/u.test(token) || token === '-c') {
+          const nestedCommand = stripShellCommandTokenQuotes(tokens[index + 1] ?? '');
+          if (nestedCommand && commandShowsParentOwnedScopeDrift(nestedCommand)) {
+            return true;
+          }
+          break;
+        }
+        if (!token.startsWith('-')) {
+          break;
+        }
+      }
+      continue;
+    }
+    if (basename(gitToken) !== 'git' || !tokenStartsParentOwnedGitCommand(tokens, gitIndex, commandSeparators)) {
       continue;
     }
     for (let index = gitIndex + 1; index < tokens.length; index += 1) {
-      const token = tokens[index]?.replace(/^['"]|['"]$/gu, '') ?? '';
+      const token = stripShellCommandTokenQuotes(tokens[index] ?? '');
       if (!token) {
         continue;
       }
@@ -740,7 +817,12 @@ function commandShowsParentOwnedScopeDrift(command: string): boolean {
 }
 
 function queryShowsParentOwnedScopeDrift(query: string): boolean {
-  if (/\bpull request\b/iu.test(query)) {
+  if (
+    /\bpull requests?\b/iu.test(query) &&
+    /\b(?:open|opened|close|closed|merge|merged|comment|comments|review|reviews|check|checks|status|list|view|repo|repository)\b/iu.test(
+      query
+    )
+  ) {
     return true;
   }
   if (
