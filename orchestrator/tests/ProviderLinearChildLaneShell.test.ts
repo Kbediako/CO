@@ -2619,6 +2619,166 @@ describe('runProviderLinearChildLaneShell', () => {
     ]);
   });
 
+  it('ignores malformed recovered proofs and still lets the launcher complete', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const malformedRecoveredLane = createLaneRecord({
+      run_id: 'child-run-malformed-recovery',
+      manifest_path: join(
+        tempRoot ?? '',
+        '.runs',
+        `${TASK_ID}-impl-a`,
+        'cli',
+        'child-run-malformed-recovery',
+        'manifest.json'
+      ),
+      artifact_root: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-malformed-recovery'),
+      log_path: join(
+        tempRoot ?? '',
+        '.runs',
+        `${TASK_ID}-impl-a`,
+        'cli',
+        'child-run-malformed-recovery',
+        'run.log'
+      ),
+      patch_artifact_path: join(
+        tempRoot ?? '',
+        '.runs',
+        `${TASK_ID}-impl-a`,
+        'cli',
+        'child-run-malformed-recovery',
+        'provider-linear-child-lane.patch'
+      )
+    });
+    const launchedLane = createLaneRecord({
+      run_id: 'child-run-launch-succeeds',
+      manifest_path: join(
+        tempRoot ?? '',
+        '.runs',
+        `${TASK_ID}-impl-a`,
+        'cli',
+        'child-run-launch-succeeds',
+        'manifest.json'
+      ),
+      artifact_root: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-launch-succeeds'),
+      log_path: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-launch-succeeds', 'run.log'),
+      patch_artifact_path: join(
+        tempRoot ?? '',
+        '.runs',
+        `${TASK_ID}-impl-a`,
+        'cli',
+        'child-run-launch-succeeds',
+        'provider-linear-child-lane.patch'
+      )
+    });
+    let resolveExec: ((value: { exitCode: number | null; stdout: string; stderr: string }) => void) | null = null;
+    const execRunner = vi.fn(
+      async () =>
+        await new Promise<{ exitCode: number | null; stdout: string; stderr: string }>((resolve) => {
+          resolveExec = resolve;
+        })
+    );
+    let wroteArtifacts = false;
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'launch',
+        streamName: 'impl-a',
+        purpose: 'Implement bounded child lane support',
+        files: ['orchestrator/src/cli/providerLinearChildStreamShell.ts'],
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        execRunner,
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: '2026-03-30T07:10:00.000Z',
+          state: 'In Progress',
+          state_type: 'started'
+        })) as never,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
+        readParentHeadSha: vi.fn(async () => 'parent-base-sha'),
+        refreshProofSnapshot: vi.fn(async () => undefined),
+        sleep: vi.fn(async () => {
+          if (wroteArtifacts) {
+            return;
+          }
+          wroteArtifacts = true;
+          await writeChildLaneManifest(malformedRecoveredLane, {
+            runtime_mode_requested: 'appserver',
+            runtime_mode: 'appserver',
+            runtime_provider: 'AppServerRuntimeProvider'
+          });
+          await writeFile(
+            join(malformedRecoveredLane.artifact_root, PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME),
+            JSON.stringify({
+              ...ISSUE,
+              task_id: malformedRecoveredLane.task_id,
+              run_id: malformedRecoveredLane.run_id,
+              parent_run_id: RUN_ID,
+              stream: malformedRecoveredLane.stream,
+              status: malformedRecoveredLane.status,
+              scope: {},
+              parent_snapshot: {},
+              updated_at: '2099-01-01T00:00:00.000Z',
+              last_event_at: '2099-01-01T00:00:00.000Z'
+            }),
+            'utf8'
+          );
+
+          await writePatchArtifact(
+            launchedLane.patch_artifact_path ?? join(launchedLane.artifact_root, 'provider-linear-child-lane.patch'),
+            'orchestrator/src/cli/providerLinearChildStreamShell.ts'
+          );
+          await writeChildLaneManifest(launchedLane, {
+            runtime_mode_requested: 'appserver',
+            runtime_mode: 'appserver',
+            runtime_provider: 'AppServerRuntimeProvider'
+          });
+          await writeChildLaneProof(launchedLane, {
+            updated_at: '2099-01-01T00:00:00.000Z',
+            last_event_at: '2099-01-01T00:00:00.000Z'
+          });
+          resolveExec?.({
+            exitCode: 0,
+            stdout: JSON.stringify({
+              run_id: launchedLane.run_id,
+              status: launchedLane.status,
+              artifact_root: `.runs/${TASK_ID}-impl-a/cli/${launchedLane.run_id}`,
+              manifest: `.runs/${TASK_ID}-impl-a/cli/${launchedLane.run_id}/manifest.json`,
+              log_path: `.runs/${TASK_ID}-impl-a/cli/${launchedLane.run_id}/run.log`,
+              summary: launchedLane.summary
+            }),
+            stderr: ''
+          });
+        }) as never
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'child-lane',
+      action: 'launched',
+      child_run: {
+        run_id: launchedLane.run_id,
+        status: 'succeeded'
+      },
+      child_lane: {
+        run_id: launchedLane.run_id,
+        status: 'succeeded',
+        decision: 'pending'
+      }
+    });
+    expect(execRunner).toHaveBeenCalledTimes(1);
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
+      expect.objectContaining({
+        run_id: launchedLane.run_id,
+        status: 'succeeded',
+        decision: 'pending'
+      })
+    ]);
+  });
+
   it('recovers a failed child lane without a patch artifact when the outer launcher stays stuck', async () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
     const recoveredLane = createLaneRecord({

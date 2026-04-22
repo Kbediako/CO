@@ -803,6 +803,21 @@ describe('provider linear child lane runner', () => {
     ).toEqual([
       '2026-04-22T06:13:31.000Z exec_command git -c credential.helper=store push https://example.invalid/repo.git HEAD'
     ]);
+
+    expect(
+      childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
+        timestamp: '2026-04-22T06:13:32.000Z',
+        type: 'response_item',
+        payload: {
+          type: 'function_call',
+          name: 'exec_command',
+          arguments: JSON.stringify({
+            cmd: '/usr/bin/git push origin HEAD',
+            workdir: '/tmp/child'
+          })
+        }
+      })
+    ).toEqual(['2026-04-22T06:13:32.000Z exec_command /usr/bin/git push origin HEAD']);
   });
 
   it('re-checks the session log after exec settles before clearing scope drift', async () => {

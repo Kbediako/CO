@@ -697,7 +697,7 @@ function commandShowsParentOwnedScopeDrift(command: string): boolean {
     return true;
   }
   const tokens = command.match(/"[^"]*"|'[^']*'|\S+/gu) ?? [];
-  const gitIndex = tokens.findIndex((token) => token.replace(/^['"]|['"]$/gu, '') === 'git');
+  const gitIndex = tokens.findIndex((token) => basename(token.replace(/^['"]|['"]$/gu, '')) === 'git');
   if (gitIndex === -1) {
     return false;
   }

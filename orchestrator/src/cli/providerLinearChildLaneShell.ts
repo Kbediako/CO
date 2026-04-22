@@ -1783,7 +1783,7 @@ async function findRecoveredChildLaneLaunchCandidate(input: {
       deps: input.deps,
       now: input.now,
       runId
-    });
+    }).catch(() => null);
     if (candidate) {
       candidates.push(candidate);
     }
