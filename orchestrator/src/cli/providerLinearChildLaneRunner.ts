@@ -1,11 +1,14 @@
 import { execFile } from 'node:child_process';
 import { mkdir, open, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
-import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { createRequire } from 'node:module';
+import { basename, dirname, isAbsolute, join, parse as parsePath, relative, resolve } from 'node:path';
 import process from 'node:process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 
 import { logger } from '../logger.js';
+import { acquireLockWithRetry, type LockRetryOptions } from '../persistence/lockFile.js';
+import { writeAtomicFile } from '../utils/atomicWrite.js';
 import {
   buildEmptyProviderLinearWorkerTokenUsage,
   defaultExecRunner,
@@ -29,11 +32,20 @@ import { resolveProviderLinearChildLaneScopeContract } from './providerLinearChi
 import { resolveCodexHome } from './utils/codexPaths.js';
 
 const execFileAsync = promisify(execFile);
+const require = createRequire(import.meta.url);
 const PROVIDER_LINEAR_CHILD_LANE_APPSERVER_STARTUP_TIMEOUT_MS = 90 * 1000;
 const PROVIDER_LINEAR_CHILD_LANE_APPSERVER_STARTUP_POLL_INTERVAL_MS = 250;
 const PROVIDER_LINEAR_CHILD_LANE_SESSION_LOG_DISCOVERY_WINDOW_MS = 10 * 60 * 1000;
 const PROVIDER_LINEAR_CHILD_LANE_SESSION_LOG_HEADER_BYTES = 256 * 1024;
 const PROVIDER_LINEAR_CHILD_LANE_SESSION_LOG_MTIME_SKEW_MS = 1000;
+let tomlParser: { parse: (source: string) => unknown } | null | undefined;
+const PROVIDER_LINEAR_CHILD_LANE_TRUSTED_PROJECT_CONFIG_LOCK_RETRY: LockRetryOptions = {
+  maxAttempts: 50,
+  initialDelayMs: 10,
+  backoffFactor: 1.5,
+  maxDelayMs: 250,
+  staleMs: 30_000
+};
 
 export const PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME = 'provider-linear-child-lane-proof.json';
 export const PROVIDER_LINEAR_CHILD_LANE_STREAM_ENV = 'CODEX_PROVIDER_LINEAR_CHILD_LANE_STREAM';
@@ -109,12 +121,258 @@ interface ProviderLinearChildLaneRunnerDependencies {
 
 type ProviderLinearChildLaneExecResult = Awaited<ReturnType<typeof defaultExecRunner>>;
 
+interface TrustedProjectCleanupPlan {
+  configPath: string;
+  anchorProject: string | null;
+  removedProjects: string[];
+  changed: boolean;
+  nextConfig: string | null;
+}
+
 function normalizeOptionalString(value: unknown): string | null {
   if (typeof value !== 'string') {
     return null;
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function getTomlParser(): { parse: (source: string) => unknown } {
+  if (tomlParser) {
+    return tomlParser;
+  }
+  if (tomlParser === null) {
+    throw new Error('Failed to load @iarna/toml.');
+  }
+  try {
+    tomlParser = require('@iarna/toml') as { parse: (source: string) => unknown };
+    return tomlParser;
+  } catch (error) {
+    tomlParser = null;
+    throw error;
+  }
+}
+
+function normalizeProjectPath(value: string): string {
+  const resolved = resolve(value);
+  const root = parsePath(resolved).root;
+  let normalized = resolved;
+  while (normalized.length > root.length && /[\\/]$/u.test(normalized)) {
+    normalized = normalized.slice(0, -1);
+  }
+  return normalized;
+}
+
+function isPathAncestorOf(ancestor: string, candidate: string): boolean {
+  const relativePath = relative(ancestor, candidate);
+  return relativePath === '' || (!relativePath.startsWith('..') && !isAbsolute(relativePath));
+}
+
+function pathContainsSegment(path: string, segment: string): boolean {
+  return normalizeProjectPath(path).split(/[\\/]+/u).includes(segment);
+}
+
+function isTrustedProjectEntry(value: unknown): boolean {
+  return isRecord(value) && normalizeOptionalString(value.trust_level)?.toLowerCase() === 'trusted';
+}
+
+function decodeTomlQuotedString(raw: string): string {
+  if (raw.startsWith('"') && raw.endsWith('"')) {
+    return JSON.parse(raw) as string;
+  }
+  return raw.slice(1, -1);
+}
+
+function parseProjectTableHeader(line: string): string | null {
+  const match = line
+    .trim()
+    .match(/^\[projects\.("(?:[^"\\]|\\.)*"|'[^']*')\]\s*(?:#.*)?$/u);
+  if (!match) {
+    return null;
+  }
+  return normalizeProjectPath(decodeTomlQuotedString(match[1]));
+}
+
+function isTomlTableHeader(line: string): boolean {
+  return /^\s*\[[^\]]+\]\s*(?:#.*)?$/u.test(line);
+}
+
+function findTrustedAncestorProject(
+  projects: Record<string, unknown>,
+  laneWorkspacePath: string
+): string | null {
+  const normalizedLaneWorkspacePath = normalizeProjectPath(laneWorkspacePath);
+  return Object.entries(projects)
+    .map(([path, value]) => ({ path: normalizeProjectPath(path), value }))
+    .filter(({ path, value }) =>
+      path !== normalizedLaneWorkspacePath
+      && isTrustedProjectEntry(value)
+      && !pathContainsSegment(path, '.child-lanes')
+      && isPathAncestorOf(path, normalizedLaneWorkspacePath)
+    )
+    .sort((left, right) => right.path.length - left.path.length)
+    .map(({ path }) => path)[0] ?? null;
+}
+
+function hasTrustedProjectEntry(
+  projects: Record<string, unknown>,
+  candidatePath: string
+): boolean {
+  const normalizedCandidatePath = normalizeProjectPath(candidatePath);
+  return Object.entries(projects).some(([path, value]) =>
+    normalizeProjectPath(path) === normalizedCandidatePath && isTrustedProjectEntry(value)
+  );
+}
+
+function removeProjectTablesFromRawConfig(rawConfig: string, removableProjects: ReadonlySet<string>): string {
+  const lines = rawConfig.split(/\r?\n/u);
+  const keptLines: string[] = [];
+  let skippingProjectTable = false;
+
+  for (const line of lines) {
+    const tableHeader = isTomlTableHeader(line);
+    if (skippingProjectTable && !tableHeader) {
+      continue;
+    }
+    if (skippingProjectTable && tableHeader) {
+      skippingProjectTable = false;
+    }
+
+    const projectHeaderPath = parseProjectTableHeader(line);
+    if (projectHeaderPath && removableProjects.has(projectHeaderPath)) {
+      skippingProjectTable = true;
+      continue;
+    }
+
+    keptLines.push(line);
+  }
+
+  const nextConfig = keptLines.join('\n');
+  return rawConfig.endsWith('\n') && !nextConfig.endsWith('\n') ? `${nextConfig}\n` : nextConfig;
+}
+
+function planTrustedProjectCleanup(input: {
+  rawConfig: string;
+  laneWorkspacePath: string;
+  configPath: string;
+}): TrustedProjectCleanupPlan {
+  const parsed = getTomlParser().parse(input.rawConfig);
+  if (!isRecord(parsed) || !isRecord(parsed.projects)) {
+    return {
+      configPath: input.configPath,
+      anchorProject: null,
+      removedProjects: [],
+      changed: false,
+      nextConfig: null
+    };
+  }
+
+  const projects = parsed.projects as Record<string, unknown>;
+  const anchorProject = findTrustedAncestorProject(projects, input.laneWorkspacePath);
+  if (!anchorProject) {
+    return {
+      configPath: input.configPath,
+      anchorProject: null,
+      removedProjects: [],
+      changed: false,
+      nextConfig: null
+    };
+  }
+
+  const normalizedLaneWorkspacePath = normalizeProjectPath(input.laneWorkspacePath);
+  const removedProjects = hasTrustedProjectEntry(projects, normalizedLaneWorkspacePath)
+    ? [normalizedLaneWorkspacePath]
+    : [];
+
+  if (removedProjects.length === 0) {
+    return {
+      configPath: input.configPath,
+      anchorProject,
+      removedProjects: [],
+      changed: false,
+      nextConfig: null
+    };
+  }
+
+  const nextConfig = removeProjectTablesFromRawConfig(input.rawConfig, new Set(removedProjects));
+  return {
+    configPath: input.configPath,
+    anchorProject,
+    removedProjects,
+    changed: nextConfig !== input.rawConfig,
+    nextConfig
+  };
+}
+
+async function compactRedundantTrustedChildLaneProjects(input: {
+  env: NodeJS.ProcessEnv;
+  laneWorkspacePath: string;
+}): Promise<TrustedProjectCleanupPlan> {
+  const configPath = join(resolveCodexHome(input.env), 'config.toml');
+  const lockPath = `${configPath}.lock`;
+  const lock = await acquireLockWithRetry({
+    taskId: configPath,
+    lockPath,
+    retry: PROVIDER_LINEAR_CHILD_LANE_TRUSTED_PROJECT_CONFIG_LOCK_RETRY,
+    ensureDirectory: async () => {
+      await mkdir(dirname(lockPath), { recursive: true });
+    },
+    createError: (_taskId, attempts) =>
+      new Error(
+        `Failed to acquire provider-linear-child-lane trusted-project config lock after ${attempts} attempts.`
+      )
+  });
+  try {
+    let rawConfig: string;
+    try {
+      rawConfig = await readFile(configPath, 'utf8');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return {
+          configPath,
+          anchorProject: null,
+          removedProjects: [],
+          changed: false,
+          nextConfig: null
+        };
+      }
+      throw error;
+    }
+
+    const plan = planTrustedProjectCleanup({
+      rawConfig,
+      laneWorkspacePath: input.laneWorkspacePath,
+      configPath
+    });
+    if (plan.changed && plan.nextConfig !== null) {
+      await writeAtomicFile(configPath, plan.nextConfig, { ensureDir: true, encoding: 'utf8' });
+    }
+    return plan;
+  } finally {
+    await lock.release();
+  }
+}
+
+async function compactRedundantTrustedChildLaneProjectsBestEffort(input: {
+  env: NodeJS.ProcessEnv;
+  laneWorkspacePath: string;
+}): Promise<void> {
+  try {
+    const cleanup = await compactRedundantTrustedChildLaneProjects(input);
+    if (cleanup.removedProjects.length > 0) {
+      logger.info(
+        `[provider-linear-child-lane-trust] removed ${cleanup.removedProjects.length} child-lane trusted project entr${cleanup.removedProjects.length === 1 ? 'y' : 'ies'} from ${cleanup.configPath} using ancestor ${cleanup.anchorProject}.`
+      );
+    }
+  } catch (error) {
+    logger.warn(
+      `provider-linear-child-lane warning: failed to compact redundant trusted project entries in ${join(resolveCodexHome(input.env), 'config.toml')}: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
 }
 
 function normalizeStringArrayFromEnv(value: string | undefined): string[] {
@@ -664,147 +922,154 @@ export async function runProviderLinearChildLane(
   };
   const context = await loadProviderLinearChildLaneContext(env);
   const { laneWorkspacePath, laneBranch } = await prepareLaneWorkspace(context);
-  const runtimeContext = await resolveChildLaneRuntimeContext(env, laneWorkspacePath, context.runId);
-  logger.info(`[provider-linear-child-lane-runtime] ${formatRuntimeSelectionSummary(runtimeContext.runtime)}`);
-  const childEnv: NodeJS.ProcessEnv = { ...process.env, ...env, ...runtimeContext.env };
-  childEnv.CODEX_NON_INTERACTIVE = '1';
-  childEnv.CODEX_NO_INTERACTIVE = '1';
-  childEnv.CODEX_INTERACTIVE = '0';
-  delete childEnv.CODEX_THREAD_ID;
-  const prompt = buildChildLanePrompt(context);
-  const { command, args } = resolveRuntimeCodexCommand(['exec', '--json', prompt], runtimeContext);
-  const startedAt = deps.now();
-  const execAbortController = new AbortController();
-  let execSettled = false;
-  let execPromise: ReturnType<typeof deps.execRunner> | null = null;
-
-  let execResult: ProviderLinearChildLaneExecResult | null = null;
   try {
-    execPromise = deps.execRunner({
-      command,
-      args,
-      cwd: laneWorkspacePath,
-      env: childEnv,
-      mirrorOutput: false,
-      abortSignal: execAbortController.signal
-    });
-    void execPromise.then(
-      () => {
-        execSettled = true;
-      },
-      () => {
-        execSettled = true;
-      }
-    );
-    if (runtimeContext.runtime.selected_mode === 'appserver') {
-      const startupRace = await Promise.race([
-        execPromise.then((result) => ({ kind: 'exec' as const, result })),
-        waitForProviderLinearChildLaneAppserverStartup({
-          context,
-          laneWorkspacePath,
-          env: childEnv,
-          startedAt,
-          isExecSettled: () => execSettled,
-          deps
-        }).then((sessionLogPath) => ({ kind: 'startup' as const, sessionLogPath }))
-      ]);
-      if (startupRace.kind === 'exec') {
-        execResult = startupRace.result;
-      } else {
-        if (startupRace.sessionLogPath) {
-          logger.info(
-            `[provider-linear-child-lane-runtime] appserver startup observed via session log ${basename(startupRace.sessionLogPath)}`
-          );
+    const runtimeContext = await resolveChildLaneRuntimeContext(env, laneWorkspacePath, context.runId);
+    logger.info(`[provider-linear-child-lane-runtime] ${formatRuntimeSelectionSummary(runtimeContext.runtime)}`);
+    const childEnv: NodeJS.ProcessEnv = { ...process.env, ...env, ...runtimeContext.env };
+    childEnv.CODEX_NON_INTERACTIVE = '1';
+    childEnv.CODEX_NO_INTERACTIVE = '1';
+    childEnv.CODEX_INTERACTIVE = '0';
+    delete childEnv.CODEX_THREAD_ID;
+    const prompt = buildChildLanePrompt(context);
+    const { command, args } = resolveRuntimeCodexCommand(['exec', '--json', prompt], runtimeContext);
+    const startedAt = deps.now();
+    const execAbortController = new AbortController();
+    let execSettled = false;
+    let execPromise: ReturnType<typeof deps.execRunner> | null = null;
+
+    let execResult: ProviderLinearChildLaneExecResult | null = null;
+    try {
+      execPromise = deps.execRunner({
+        command,
+        args,
+        cwd: laneWorkspacePath,
+        env: childEnv,
+        mirrorOutput: false,
+        abortSignal: execAbortController.signal
+      });
+      void execPromise.then(
+        () => {
+          execSettled = true;
+        },
+        () => {
+          execSettled = true;
         }
+      );
+      if (runtimeContext.runtime.selected_mode === 'appserver') {
+        const startupRace = await Promise.race([
+          execPromise.then((result) => ({ kind: 'exec' as const, result })),
+          waitForProviderLinearChildLaneAppserverStartup({
+            context,
+            laneWorkspacePath,
+            env: childEnv,
+            startedAt,
+            isExecSettled: () => execSettled,
+            deps
+          }).then((sessionLogPath) => ({ kind: 'startup' as const, sessionLogPath }))
+        ]);
+        if (startupRace.kind === 'exec') {
+          execResult = startupRace.result;
+        } else {
+          if (startupRace.sessionLogPath) {
+            logger.info(
+              `[provider-linear-child-lane-runtime] appserver startup observed via session log ${basename(startupRace.sessionLogPath)}`
+            );
+          }
+          execResult = await execPromise;
+        }
+      } else {
         execResult = await execPromise;
       }
-    } else {
-      execResult = await execPromise;
+    } catch (error) {
+      const normalizedError = error instanceof Error ? error : new Error(String(error));
+      execResult = await recoverProviderLinearChildLaneExecResultAfterAbort({
+        abortController: execAbortController,
+        error: normalizedError,
+        execPromise,
+        execSettled
+      });
+      if (execResult) {
+        execSettled = true;
+      } else {
+        const failedProof: ProviderLinearChildLaneProof = {
+          issue_id: context.issueId,
+          issue_identifier: context.issueIdentifier,
+          task_id: context.taskId,
+          run_id: context.runId,
+          parent_run_id: context.parentRunId,
+          stream: context.stream,
+          purpose: context.purpose,
+          instructions: context.instructions,
+          scope: context.scope,
+          parent_snapshot: context.parentSnapshot,
+          lane_workspace_path: laneWorkspacePath,
+          lane_branch: laneBranch,
+          patch_artifact_path: join(context.runDir, 'provider-linear-child-lane.patch'),
+          patch_bytes: 0,
+          thread_id: null,
+          latest_turn_id: null,
+          latest_session_id: null,
+          latest_session_id_source: null,
+          last_event: null,
+          last_message: normalizedError.message,
+          last_event_at: null,
+          tokens: buildEmptyProviderLinearWorkerTokenUsage(),
+          rate_limits: null,
+          status: 'failed',
+          updated_at: deps.now()
+        };
+        await writeChildLaneProof(context.runDir, failedProof);
+        throw normalizedError;
+      }
     }
-  } catch (error) {
-    const normalizedError = error instanceof Error ? error : new Error(String(error));
-    execResult = await recoverProviderLinearChildLaneExecResultAfterAbort({
-      abortController: execAbortController,
-      error: normalizedError,
-      execPromise,
-      execSettled
-    });
-    if (execResult) {
-      execSettled = true;
-    } else {
-      const failedProof: ProviderLinearChildLaneProof = {
-        issue_id: context.issueId,
-        issue_identifier: context.issueIdentifier,
-        task_id: context.taskId,
-        run_id: context.runId,
-        parent_run_id: context.parentRunId,
-        stream: context.stream,
-        purpose: context.purpose,
-        instructions: context.instructions,
-        scope: context.scope,
-        parent_snapshot: context.parentSnapshot,
-        lane_workspace_path: laneWorkspacePath,
-        lane_branch: laneBranch,
-        patch_artifact_path: join(context.runDir, 'provider-linear-child-lane.patch'),
-        patch_bytes: 0,
-        thread_id: null,
-        latest_turn_id: null,
-        latest_session_id: null,
-        latest_session_id_source: null,
-        last_event: null,
-        last_message: normalizedError.message,
-        last_event_at: null,
-        tokens: buildEmptyProviderLinearWorkerTokenUsage(),
-        rate_limits: null,
-        status: 'failed',
-        updated_at: deps.now()
-      };
-      await writeChildLaneProof(context.runDir, failedProof);
-      throw normalizedError;
-    }
-  }
 
-  if (!execResult) {
-    throw new Error('provider-linear-child-lane completed without an exec result');
+    if (!execResult) {
+      throw new Error('provider-linear-child-lane completed without an exec result');
+    }
+    const parsed = parseProviderLinearWorkerJsonl(execResult.stdout);
+    const session = deriveLatestTurnSessionId({
+      threadId: parsed.threadId,
+      turnId: parsed.turnId
+    });
+    const { patchArtifactPath, patchBytes } = await createPatchArtifact(laneWorkspacePath, context.runDir);
+    const proof: ProviderLinearChildLaneProof = {
+      issue_id: context.issueId,
+      issue_identifier: context.issueIdentifier,
+      task_id: context.taskId,
+      run_id: context.runId,
+      parent_run_id: context.parentRunId,
+      stream: context.stream,
+      purpose: context.purpose,
+      instructions: context.instructions,
+      scope: context.scope,
+      parent_snapshot: context.parentSnapshot,
+      lane_workspace_path: laneWorkspacePath,
+      lane_branch: laneBranch,
+      patch_artifact_path: patchArtifactPath,
+      patch_bytes: patchBytes,
+      thread_id: parsed.threadId,
+      latest_turn_id: parsed.turnId,
+      latest_session_id: session.sessionId,
+      latest_session_id_source: session.source,
+      last_event: parsed.lastEvent,
+      last_message: parsed.finalMessage,
+      last_event_at: parsed.lastEventAt,
+      tokens: parsed.tokens,
+      rate_limits: parsed.rateLimits,
+      status: execResult.exitCode === 0 ? 'succeeded' : 'failed',
+      updated_at: deps.now()
+    };
+    await writeChildLaneProof(context.runDir, proof);
+    if (execResult.exitCode !== 0) {
+      throw new Error(`provider-linear-child-lane exited with code ${execResult.exitCode ?? 'unknown'}`);
+    }
+    return proof;
+  } finally {
+    await compactRedundantTrustedChildLaneProjectsBestEffort({
+      env,
+      laneWorkspacePath
+    });
   }
-  const parsed = parseProviderLinearWorkerJsonl(execResult.stdout);
-  const session = deriveLatestTurnSessionId({
-    threadId: parsed.threadId,
-    turnId: parsed.turnId
-  });
-  const { patchArtifactPath, patchBytes } = await createPatchArtifact(laneWorkspacePath, context.runDir);
-  const proof: ProviderLinearChildLaneProof = {
-    issue_id: context.issueId,
-    issue_identifier: context.issueIdentifier,
-    task_id: context.taskId,
-    run_id: context.runId,
-    parent_run_id: context.parentRunId,
-    stream: context.stream,
-    purpose: context.purpose,
-    instructions: context.instructions,
-    scope: context.scope,
-    parent_snapshot: context.parentSnapshot,
-    lane_workspace_path: laneWorkspacePath,
-    lane_branch: laneBranch,
-    patch_artifact_path: patchArtifactPath,
-    patch_bytes: patchBytes,
-    thread_id: parsed.threadId,
-    latest_turn_id: parsed.turnId,
-    latest_session_id: session.sessionId,
-    latest_session_id_source: session.source,
-    last_event: parsed.lastEvent,
-    last_message: parsed.finalMessage,
-    last_event_at: parsed.lastEventAt,
-    tokens: parsed.tokens,
-    rate_limits: parsed.rateLimits,
-    status: execResult.exitCode === 0 ? 'succeeded' : 'failed',
-    updated_at: deps.now()
-  };
-  await writeChildLaneProof(context.runDir, proof);
-  if (execResult.exitCode !== 0) {
-    throw new Error(`provider-linear-child-lane exited with code ${execResult.exitCode ?? 'unknown'}`);
-  }
-  return proof;
 }
 
 async function main(): Promise<void> {
@@ -824,6 +1089,7 @@ export const __test__ = {
   buildChildLanePrompt,
   buildProviderLinearChildLaneAppserverStartupTimeoutMessage,
   discoverProviderLinearChildLaneSessionLogPath,
+  planTrustedProjectCleanup,
   recoverProviderLinearChildLaneExecResultAfterAbort,
   waitForProviderLinearChildLaneAppserverStartup
 };

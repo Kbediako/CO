@@ -1,10 +1,14 @@
-import { mkdtemp, mkdir, rm, utimes, writeFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { mkdtemp, mkdir, readFile, rm, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { __test__ as childLaneRunnerTest } from '../src/cli/providerLinearChildLaneRunner.js';
+import {
+  __test__ as childLaneRunnerTest,
+  runProviderLinearChildLane
+} from '../src/cli/providerLinearChildLaneRunner.js';
 
 let tempRoot: string | null = null;
 
@@ -28,7 +32,285 @@ afterEach(async () => {
   }
 });
 
+function runGit(cwd: string, args: string[]): string {
+  return execFileSync('git', args, {
+    cwd,
+    encoding: 'utf8'
+  }).trim();
+}
+
+async function initGitRepo(repoPath: string): Promise<string> {
+  await mkdir(repoPath, { recursive: true });
+  runGit(repoPath, ['init']);
+  runGit(repoPath, ['config', 'user.name', 'Codex Test']);
+  runGit(repoPath, ['config', 'user.email', 'codex@example.com']);
+  await writeFile(join(repoPath, 'README.md'), 'initial\n', 'utf8');
+  runGit(repoPath, ['add', 'README.md']);
+  runGit(repoPath, ['commit', '-m', 'initial']);
+  return runGit(repoPath, ['rev-parse', 'HEAD']);
+}
+
 describe('provider linear child lane runner', () => {
+  it('plans removal of only the current trusted child-lane entry when a trusted parent workspace already exists', () => {
+    const rawConfig = [
+      'model = "gpt-5.4"',
+      '',
+      '[projects]',
+      '[projects."/Users/kbediako/Code/CO"]',
+      'trust_level = "trusted"',
+      '',
+      '[projects."/Users/kbediako/Code/CO/.workspaces/linear-123"]',
+      'trust_level = "trusted"',
+      '',
+      '[projects."/Users/kbediako/Code/CO/.workspaces/linear-123/.child-lanes/docs-a"]',
+      'trust_level = "trusted"',
+      '',
+      '[projects."/Users/kbediako/Code/CO/.workspaces/linear-123/.child-lanes/tests-b"]',
+      'trust_level = "trusted"',
+      '',
+      '[projects."/Users/kbediako/Code/CO/.workspaces/linear-123/.child-lanes/tests-c"]',
+      'trust_level = "untrusted"',
+      '',
+      '[projects."/Users/kbediako/Code/other"]',
+      'trust_level = "trusted"',
+      ''
+    ].join('\n');
+
+    const plan = childLaneRunnerTest.planTrustedProjectCleanup({
+      rawConfig,
+      laneWorkspacePath: '/Users/kbediako/Code/CO/.workspaces/linear-123/.child-lanes/docs-a',
+      configPath: '/Users/kbediako/.codex/config.toml'
+    });
+
+    expect(plan.anchorProject).toBe('/Users/kbediako/Code/CO/.workspaces/linear-123');
+    expect(plan.removedProjects).toEqual(['/Users/kbediako/Code/CO/.workspaces/linear-123/.child-lanes/docs-a']);
+    expect(plan.changed).toBe(true);
+    expect(plan.nextConfig).not.toContain('[projects."/Users/kbediako/Code/CO/.workspaces/linear-123/.child-lanes/docs-a"]');
+    expect(plan.nextConfig).toContain('[projects."/Users/kbediako/Code/CO/.workspaces/linear-123/.child-lanes/tests-b"]');
+    expect(plan.nextConfig).toContain('[projects."/Users/kbediako/Code/CO/.workspaces/linear-123"]');
+    expect(plan.nextConfig).toContain('[projects."/Users/kbediako/Code/CO/.workspaces/linear-123/.child-lanes/tests-c"]');
+    expect(plan.nextConfig).toContain('[projects."/Users/kbediako/Code/other"]');
+  });
+
+  it('does not remove child-lane trust entries when no separate trusted ancestor exists', () => {
+    const rawConfig = [
+      '[projects]',
+      '[projects."/Users/kbediako/Code/CO/.workspaces/linear-123/.child-lanes/docs-a"]',
+      'trust_level = "trusted"',
+      ''
+    ].join('\n');
+
+    const plan = childLaneRunnerTest.planTrustedProjectCleanup({
+      rawConfig,
+      laneWorkspacePath: '/Users/kbediako/Code/CO/.workspaces/linear-123/.child-lanes/docs-a',
+      configPath: '/Users/kbediako/.codex/config.toml'
+    });
+
+    expect(plan.anchorProject).toBeNull();
+    expect(plan.removedProjects).toEqual([]);
+    expect(plan.changed).toBe(false);
+    expect(plan.nextConfig).toBeNull();
+  });
+
+  it('uses the stable repo root as the cleanup anchor but leaves sibling child lanes untouched', () => {
+    const rawConfig = [
+      '[projects]',
+      '[projects."/Users/kbediako/Code/CO"]',
+      'trust_level = "trusted"',
+      '',
+      '[projects."/Users/kbediako/Code/CO/.workspaces/linear-123/.child-lanes/docs-a"]',
+      'trust_level = "trusted"',
+      '',
+      '[projects."/Users/kbediako/Code/CO/.workspaces/linear-456/.child-lanes/tests-b"]',
+      'trust_level = "trusted"',
+      '',
+      '[projects."/Users/kbediako/Code/tower-defence"]',
+      'trust_level = "trusted"',
+      '',
+      '[projects."/Users/kbediako/Code/tower-defence/.child-lanes/other"]',
+      'trust_level = "trusted"',
+      ''
+    ].join('\n');
+
+    const plan = childLaneRunnerTest.planTrustedProjectCleanup({
+      rawConfig,
+      laneWorkspacePath: '/Users/kbediako/Code/CO/.workspaces/linear-123/.child-lanes/docs-a',
+      configPath: '/Users/kbediako/.codex/config.toml'
+    });
+
+    expect(plan.anchorProject).toBe('/Users/kbediako/Code/CO');
+    expect(plan.removedProjects).toEqual(['/Users/kbediako/Code/CO/.workspaces/linear-123/.child-lanes/docs-a']);
+    expect(plan.nextConfig).not.toContain('[projects."/Users/kbediako/Code/CO/.workspaces/linear-123/.child-lanes/docs-a"]');
+    expect(plan.nextConfig).toContain('[projects."/Users/kbediako/Code/CO/.workspaces/linear-456/.child-lanes/tests-b"]');
+    expect(plan.nextConfig).toContain('[projects."/Users/kbediako/Code/tower-defence"]');
+    expect(plan.nextConfig).toContain('[projects."/Users/kbediako/Code/tower-defence/.child-lanes/other"]');
+  });
+
+  it('compacts redundant trusted child-lane entries after a child-lane run completes', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-runner-'));
+    const parentWorkspacePath = join(tempRoot, 'workspace');
+    const parentBaseSha = await initGitRepo(parentWorkspacePath);
+    const codexHome = join(tempRoot, '.codex');
+    const configPath = join(codexHome, 'config.toml');
+    const runDir = join(tempRoot, '.runs', 'linear-lin-issue-1-docs', 'cli', 'child-run-1');
+    const manifestPath = join(runDir, 'manifest.json');
+    await mkdir(runDir, { recursive: true });
+    await mkdir(codexHome, { recursive: true });
+    await writeFile(
+      configPath,
+      [
+        '[projects]',
+        `[projects."${parentWorkspacePath}"]`,
+        'trust_level = "trusted"',
+        '',
+        `[projects."${join(parentWorkspacePath, '.child-lanes', 'tests-sibling')}"]`,
+        'trust_level = "trusted"',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'child-run-1',
+        task_id: 'linear-lin-issue-1-docs',
+        parent_run_id: 'provider-run-1',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-307'
+      }),
+      'utf8'
+    );
+
+    const proof = await runProviderLinearChildLane(
+      {
+        CODEX_HOME: codexHome,
+        CODEX_ORCHESTRATOR_ROOT: parentWorkspacePath,
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_RUNTIME_MODE: 'cli',
+        CODEX_PROVIDER_LINEAR_CHILD_LANE_STREAM: 'docs',
+        CODEX_PROVIDER_LINEAR_CHILD_LANE_PURPOSE: 'Validate trusted-project cleanup',
+        CODEX_PROVIDER_LINEAR_CHILD_LANE_FILES: JSON.stringify(['README.md']),
+        CODEX_PROVIDER_LINEAR_CHILD_LANE_PHASES: JSON.stringify(['docs']),
+        CODEX_PROVIDER_LINEAR_CHILD_LANE_PARENT_WORKSPACE_PATH: parentWorkspacePath,
+        CODEX_PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_BASE_SHA: parentBaseSha,
+        CODEX_PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_CAPTURED_AT: '2026-04-22T10:00:00.000Z',
+        CODEX_PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_UPDATED_AT: '2026-04-22T10:00:00.000Z',
+        CODEX_PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_STATE: 'In Progress',
+        CODEX_PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_STATE_TYPE: 'started'
+      },
+      {
+        execRunner: async (request) => {
+          await writeFile(
+            configPath,
+            [
+              await readFile(configPath, 'utf8'),
+              `[projects."${request.cwd}"]`,
+              'trust_level = "trusted"',
+              ''
+            ].join('\n'),
+            'utf8'
+          );
+          await writeFile(join(request.cwd, 'README.md'), 'child-lane change\n', 'utf8');
+          return {
+            exitCode: 0,
+            stdout: [
+              '{"type":"session_meta","payload":{"id":"thread-1"}}',
+              '{"type":"turn_context","payload":{"turn_id":"turn-1"}}'
+            ].join('\n'),
+            stderr: ''
+          };
+        }
+      }
+    );
+
+    const finalConfig = await readFile(configPath, 'utf8');
+    expect(proof.lane_workspace_path).toBe(join(parentWorkspacePath, '.child-lanes', 'docs-child-run-1'));
+    expect(finalConfig).toContain(`[projects."${parentWorkspacePath}"]`);
+    expect(finalConfig).not.toContain(`[projects."${proof.lane_workspace_path}"]`);
+    expect(finalConfig).toContain(`[projects."${join(parentWorkspacePath, '.child-lanes', 'tests-sibling')}"]`);
+  });
+
+  it('still compacts the current lane trust entry when post-exec patch export fails', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-runner-'));
+    const parentWorkspacePath = join(tempRoot, 'workspace');
+    const parentBaseSha = await initGitRepo(parentWorkspacePath);
+    const codexHome = join(tempRoot, '.codex');
+    const configPath = join(codexHome, 'config.toml');
+    const runDir = join(tempRoot, '.runs', 'linear-lin-issue-1-docs', 'cli', 'child-run-1');
+    const manifestPath = join(runDir, 'manifest.json');
+    await mkdir(runDir, { recursive: true });
+    await mkdir(codexHome, { recursive: true });
+    await writeFile(
+      configPath,
+      [
+        '[projects]',
+        `[projects."${parentWorkspacePath}"]`,
+        'trust_level = "trusted"',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'child-run-1',
+        task_id: 'linear-lin-issue-1-docs',
+        parent_run_id: 'provider-run-1',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-307'
+      }),
+      'utf8'
+    );
+
+    await expect(
+      runProviderLinearChildLane(
+        {
+          CODEX_HOME: codexHome,
+          CODEX_ORCHESTRATOR_ROOT: parentWorkspacePath,
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_RUNTIME_MODE: 'cli',
+          CODEX_PROVIDER_LINEAR_CHILD_LANE_STREAM: 'docs',
+          CODEX_PROVIDER_LINEAR_CHILD_LANE_PURPOSE: 'Validate trusted-project cleanup',
+          CODEX_PROVIDER_LINEAR_CHILD_LANE_FILES: JSON.stringify(['README.md']),
+          CODEX_PROVIDER_LINEAR_CHILD_LANE_PHASES: JSON.stringify(['docs']),
+          CODEX_PROVIDER_LINEAR_CHILD_LANE_PARENT_WORKSPACE_PATH: parentWorkspacePath,
+          CODEX_PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_BASE_SHA: parentBaseSha,
+          CODEX_PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_CAPTURED_AT: '2026-04-22T10:00:00.000Z',
+          CODEX_PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_UPDATED_AT: '2026-04-22T10:00:00.000Z',
+          CODEX_PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_STATE: 'In Progress',
+          CODEX_PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_STATE_TYPE: 'started'
+        },
+        {
+          execRunner: async (request) => {
+            await writeFile(
+              configPath,
+              [
+                await readFile(configPath, 'utf8'),
+                `[projects."${request.cwd}"]`,
+                'trust_level = "trusted"',
+                ''
+              ].join('\n'),
+              'utf8'
+            );
+            await writeFile(join(request.cwd, 'README.md'), `${'x'.repeat((21 * 1024 * 1024) + 1024)}\n`, 'utf8');
+            return {
+              exitCode: 0,
+              stdout: [
+                '{"type":"session_meta","payload":{"id":"thread-1"}}',
+                '{"type":"turn_context","payload":{"turn_id":"turn-1"}}'
+              ].join('\n'),
+              stderr: ''
+            };
+          }
+        }
+      )
+    ).rejects.toThrow(/maxBuffer|stdout maxBuffer length exceeded/i);
+
+    const finalConfig = await readFile(configPath, 'utf8');
+    expect(finalConfig).toContain(`[projects."${parentWorkspacePath}"]`);
+    expect(finalConfig).not.toContain('.child-lanes/docs-child-run-1');
+  });
+
   it('includes shared source 0 anchor lines in the child-lane prompt when present', () => {
     const prompt = childLaneRunnerTest.buildChildLanePrompt({
       issueIdentifier: 'CO-91',
