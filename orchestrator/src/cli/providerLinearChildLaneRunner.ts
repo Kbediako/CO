@@ -35,6 +35,7 @@ const execFileAsync = promisify(execFile);
 const require = createRequire(import.meta.url);
 const PROVIDER_LINEAR_CHILD_LANE_APPSERVER_STARTUP_TIMEOUT_MS = 90 * 1000;
 const PROVIDER_LINEAR_CHILD_LANE_APPSERVER_STARTUP_POLL_INTERVAL_MS = 250;
+const PROVIDER_LINEAR_CHILD_LANE_SCOPE_DRIFT_POLL_INTERVAL_MS = 250;
 const PROVIDER_LINEAR_CHILD_LANE_SESSION_LOG_DISCOVERY_WINDOW_MS = 10 * 60 * 1000;
 const PROVIDER_LINEAR_CHILD_LANE_SESSION_LOG_HEADER_BYTES = 256 * 1024;
 const PROVIDER_LINEAR_CHILD_LANE_SESSION_LOG_MTIME_SKEW_MS = 1000;
@@ -691,6 +692,151 @@ function parseProviderLinearChildLaneSessionJsonlLine(line: string): Record<stri
   }
 }
 
+function commandShowsParentOwnedScopeDrift(command: string): boolean {
+  return (
+    /\bgh\b/u.test(command) ||
+    /\bgit\s+(?:commit|push)\b/u.test(command) ||
+    /codex-orchestrator(?:\.js)?(?:["'\s]|$).*?\slinear\b/u.test(command)
+  );
+}
+
+function queryShowsParentOwnedScopeDrift(query: string): boolean {
+  return /\b(?:github|linear)\b/iu.test(query) || /\bpull request\b/iu.test(query);
+}
+
+function formatProviderLinearChildLaneScopeDriftEvidence(
+  timestamp: string | null,
+  detail: string
+): string {
+  return timestamp ? `${timestamp} ${detail}` : detail;
+}
+
+function truncateProviderLinearChildLaneScopeDriftText(value: string, maxLength = 140): string {
+  const normalized = value.replace(/\s+/gu, ' ').trim();
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+  return `${normalized.slice(0, Math.max(0, maxLength - 1)).trimEnd()}...`;
+}
+
+function extractProviderLinearChildLaneScopeDriftEvidenceFromRecord(
+  record: Record<string, unknown>
+): string[] {
+  const timestamp = normalizeOptionalString(record.timestamp);
+  if (normalizeOptionalString(record.type) !== 'response_item') {
+    return [];
+  }
+  const payload =
+    typeof record.payload === 'object' && record.payload !== null
+      ? (record.payload as Record<string, unknown>)
+      : null;
+  if (!payload) {
+    return [];
+  }
+  const payloadType = normalizeOptionalString(payload.type);
+  if (payloadType === 'tool_search_call') {
+    const argumentsValue =
+      typeof payload.arguments === 'object' && payload.arguments !== null
+        ? (payload.arguments as Record<string, unknown>)
+        : null;
+    const query = normalizeOptionalString(argumentsValue?.query);
+    if (query && queryShowsParentOwnedScopeDrift(query)) {
+      return [
+        formatProviderLinearChildLaneScopeDriftEvidence(
+          timestamp,
+          `tool_search ${truncateProviderLinearChildLaneScopeDriftText(query)}`
+        )
+      ];
+    }
+    return [];
+  }
+  if (payloadType !== 'function_call') {
+    return [];
+  }
+  const functionName = normalizeOptionalString(payload.name);
+  if (!functionName) {
+    return [];
+  }
+  if (functionName.includes('github') || functionName.includes('linear')) {
+    return [
+      formatProviderLinearChildLaneScopeDriftEvidence(timestamp, `function_call ${functionName}`)
+    ];
+  }
+  if (functionName !== 'exec_command') {
+    return [];
+  }
+  const rawArguments = normalizeOptionalString(payload.arguments);
+  if (!rawArguments) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(rawArguments) as Record<string, unknown>;
+    const command = normalizeOptionalString(parsed.cmd);
+    if (!command || !commandShowsParentOwnedScopeDrift(command)) {
+      return [];
+    }
+    return [
+      formatProviderLinearChildLaneScopeDriftEvidence(
+        timestamp,
+        `exec_command ${truncateProviderLinearChildLaneScopeDriftText(command)}`
+      )
+    ];
+  } catch {
+    return [];
+  }
+}
+
+async function scanProviderLinearChildLaneSessionLogForParentScopeDrift(
+  sessionLogPath: string
+): Promise<string[]> {
+  const raw = await readFile(sessionLogPath, 'utf8');
+  const evidence = new Set<string>();
+  for (const line of raw.split(/\r?\n/u)) {
+    const parsed = parseProviderLinearChildLaneSessionJsonlLine(line);
+    if (!parsed) {
+      continue;
+    }
+    for (const detail of extractProviderLinearChildLaneScopeDriftEvidenceFromRecord(parsed)) {
+      evidence.add(detail);
+      if (evidence.size >= 3) {
+        return [...evidence];
+      }
+    }
+  }
+  return [...evidence];
+}
+
+function buildProviderLinearChildLaneScopeDriftMessage(input: {
+  context: Pick<ProviderLinearChildLaneContext, 'issueIdentifier'>;
+  sessionLogPath: string;
+  evidence: readonly string[];
+}): string {
+  const renderedEvidence = input.evidence.map((entry) => `"${entry}"`).join('; ');
+  return `Appserver child lane drifted into parent-owned GitHub/Linear/PR lifecycle work for ${input.context.issueIdentifier}. Session log ${basename(input.sessionLogPath)} captured ${renderedEvidence}. Invalidate the lane and relaunch with tighter bounded scope; parent-owned Linear/GitHub/PR handling must stay in the provider worker.`;
+}
+
+async function waitForProviderLinearChildLaneScopeDrift(input: {
+  context: Pick<ProviderLinearChildLaneContext, 'issueIdentifier'>;
+  sessionLogPath: string;
+  isExecSettled: () => boolean;
+  deps: Pick<ProviderLinearChildLaneRunnerDependencies, 'sleep'>;
+}): Promise<string | null> {
+  while (!input.isExecSettled()) {
+    const evidence = await scanProviderLinearChildLaneSessionLogForParentScopeDrift(input.sessionLogPath).catch(
+      () => []
+    );
+    if (evidence.length > 0) {
+      return buildProviderLinearChildLaneScopeDriftMessage({
+        context: input.context,
+        sessionLogPath: input.sessionLogPath,
+        evidence
+      });
+    }
+    await input.deps.sleep(PROVIDER_LINEAR_CHILD_LANE_SCOPE_DRIFT_POLL_INTERVAL_MS);
+  }
+  return null;
+}
+
 function valueContainsProviderLinearChildLaneSessionNeedle(value: unknown, needle: string): boolean {
   if (typeof value === 'string') {
     return value.includes(needle);
@@ -1059,23 +1205,65 @@ async function prepareLaneWorkspace(
   const baseSha = context.parentSnapshot.base_sha ?? 'HEAD';
   await execFileAsync('git', ['-C', laneWorkspacePath, 'checkout', '--detach', baseSha]);
   await execFileAsync('git', ['-C', laneWorkspacePath, 'switch', '-c', laneBranch]);
+  const remotes = (
+    await execFileAsync('git', ['-C', laneWorkspacePath, 'remote'], {
+      maxBuffer: 1024 * 1024
+    })
+  ).stdout
+    .split(/\r?\n/u)
+    .map((entry) => normalizeOptionalString(entry))
+    .filter((entry): entry is string => entry !== null);
+  for (const remote of remotes) {
+    await execFileAsync('git', [
+      '-C',
+      laneWorkspacePath,
+      'remote',
+      'set-url',
+      '--push',
+      remote,
+      'no_push://provider-linear-child-lane'
+    ]);
+  }
   return { laneWorkspacePath, laneBranch };
 }
 
 async function createPatchArtifact(
   laneWorkspacePath: string,
-  runDir: string
+  runDir: string,
+  baselineRef = 'HEAD'
 ): Promise<{ patchArtifactPath: string; patchBytes: number }> {
   await execFileAsync('git', ['-C', laneWorkspacePath, 'add', '-N', '.']);
-  const diff = await execFileAsync('git', ['-C', laneWorkspacePath, 'diff', '--binary', '--no-ext-diff', 'HEAD', '--', '.'], {
-    maxBuffer: 20 * 1024 * 1024
-  });
+  const diff = await execFileAsync(
+    'git',
+    ['-C', laneWorkspacePath, 'diff', '--binary', '--no-ext-diff', baselineRef, '--', '.'],
+    {
+      maxBuffer: 20 * 1024 * 1024
+    }
+  );
   const patchArtifactPath = join(runDir, 'provider-linear-child-lane.patch');
   await writeFile(patchArtifactPath, diff.stdout, 'utf8');
   return {
     patchArtifactPath,
     patchBytes: Buffer.byteLength(diff.stdout, 'utf8')
   };
+}
+
+async function readProviderLinearChildLaneHeadSha(laneWorkspacePath: string): Promise<string | null> {
+  const result = await execFileAsync('git', ['-C', laneWorkspacePath, 'rev-parse', 'HEAD'], {
+    maxBuffer: 1024 * 1024
+  });
+  return normalizeOptionalString(result.stdout);
+}
+
+function resolveProviderLinearChildLaneUnauthorizedCommitMessage(input: {
+  context: Pick<ProviderLinearChildLaneContext, 'issueIdentifier'>;
+  expectedBaseSha: string | null;
+  currentHeadSha: string | null;
+}): string | null {
+  if (!input.expectedBaseSha || !input.currentHeadSha || input.expectedBaseSha === input.currentHeadSha) {
+    return null;
+  }
+  return `Child lane created commit ${input.currentHeadSha} from parent base ${input.expectedBaseSha} for ${input.context.issueIdentifier} instead of returning an uncommitted patch artifact. Invalidate the lane and relaunch; parent acceptance owns integration and branch updates.`;
 }
 
 async function writeChildLaneProof(
@@ -1157,6 +1345,7 @@ export async function runProviderLinearChildLane(
     const execAbortController = new AbortController();
     let execSettled = false;
     let execPromise: ReturnType<typeof deps.execRunner> | null = null;
+    let scopeDriftMessage: string | null = null;
 
     let execResult: ProviderLinearChildLaneExecResult | null = null;
     try {
@@ -1196,7 +1385,35 @@ export async function runProviderLinearChildLane(
               `[provider-linear-child-lane-runtime] appserver startup observed via session log ${basename(startupRace.sessionLogPath)}`
             );
           }
-          execResult = await execPromise;
+          const execOrDriftRace = startupRace.sessionLogPath
+            ? await Promise.race([
+                execPromise.then((result) => ({ kind: 'exec' as const, result })),
+                waitForProviderLinearChildLaneScopeDrift({
+                  context,
+                  sessionLogPath: startupRace.sessionLogPath,
+                  isExecSettled: () => execSettled,
+                  deps
+                }).then((message) => ({ kind: 'drift' as const, message }))
+              ])
+            : ({ kind: 'exec' as const, result: await execPromise });
+          if (execOrDriftRace.kind === 'exec') {
+            execResult = execOrDriftRace.result;
+          } else {
+            scopeDriftMessage = execOrDriftRace.message;
+            if (scopeDriftMessage) {
+              execResult = await recoverProviderLinearChildLaneExecResultAfterAbort({
+                abortController: execAbortController,
+                error: new Error(scopeDriftMessage),
+                execPromise,
+                execSettled
+              });
+              if (!execResult) {
+                throw new Error(scopeDriftMessage);
+              }
+            } else {
+              execResult = await execPromise;
+            }
+          }
         }
       } else {
         execResult = await execPromise;
@@ -1232,11 +1449,26 @@ export async function runProviderLinearChildLane(
       threadId: parsed.threadId,
       turnId: parsed.turnId
     });
+    const currentHeadSha = await readProviderLinearChildLaneHeadSha(laneWorkspacePath).catch(() => null);
+    const unauthorizedCommitMessage = resolveProviderLinearChildLaneUnauthorizedCommitMessage({
+      context,
+      expectedBaseSha: context.parentSnapshot.base_sha,
+      currentHeadSha
+    });
+    const patchBaselineRef =
+      context.parentSnapshot.base_sha && currentHeadSha && context.parentSnapshot.base_sha !== currentHeadSha
+        ? context.parentSnapshot.base_sha
+        : 'HEAD';
+    const forcedFailureMessage = scopeDriftMessage ?? unauthorizedCommitMessage;
     let patchArtifactPath = join(context.runDir, 'provider-linear-child-lane.patch');
     let patchBytes = 0;
     let proof: ProviderLinearChildLaneProof;
     try {
-      ({ patchArtifactPath, patchBytes } = await createPatchArtifact(laneWorkspacePath, context.runDir));
+      ({ patchArtifactPath, patchBytes } = await createPatchArtifact(
+        laneWorkspacePath,
+        context.runDir,
+        patchBaselineRef
+      ));
       proof = {
         issue_id: context.issueId,
         issue_identifier: context.issueIdentifier,
@@ -1257,11 +1489,11 @@ export async function runProviderLinearChildLane(
         latest_session_id: session.sessionId,
         latest_session_id_source: session.source,
         last_event: parsed.lastEvent,
-        last_message: parsed.finalMessage,
+        last_message: forcedFailureMessage ?? parsed.finalMessage,
         last_event_at: parsed.lastEventAt,
         tokens: parsed.tokens,
         rate_limits: parsed.rateLimits,
-        status: execResult.exitCode === 0 ? 'succeeded' : 'failed',
+        status: execResult.exitCode === 0 && !forcedFailureMessage ? 'succeeded' : 'failed',
         updated_at: deps.now()
       };
       await writeChildLaneProof(context.runDir, proof);
@@ -1289,8 +1521,10 @@ export async function runProviderLinearChildLane(
       }
       throw normalizedError;
     }
-    if (execResult.exitCode !== 0) {
-      throw new Error(`provider-linear-child-lane exited with code ${execResult.exitCode ?? 'unknown'}`);
+    if (proof.status !== 'succeeded') {
+      throw new Error(
+        proof.last_message ?? `provider-linear-child-lane exited with code ${execResult.exitCode ?? 'unknown'}`
+      );
     }
     return proof;
   } finally {
@@ -1319,6 +1553,9 @@ export const __test__ = {
   buildProviderLinearChildLaneAppserverStartupTimeoutMessage,
   discoverProviderLinearChildLaneSessionLogPath,
   planTrustedProjectCleanup,
+  extractProviderLinearChildLaneScopeDriftEvidenceFromRecord,
   recoverProviderLinearChildLaneExecResultAfterAbort,
+  resolveProviderLinearChildLaneUnauthorizedCommitMessage,
+  scanProviderLinearChildLaneSessionLogForParentScopeDrift,
   waitForProviderLinearChildLaneAppserverStartup
 };

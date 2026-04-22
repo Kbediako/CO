@@ -13561,6 +13561,23 @@
       }
     },
     {
+      "id": "20260422-linear-7ceb95a8-218d-4353-82eb-a06a7f8aece9",
+      "title": "Child lane launcher fail closed on appserver scope drift and stuck launching ledgers",
+      "relates_to": "tasks/tasks-linear-7ceb95a8-218d-4353-82eb-a06a7f8aece9.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-22",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-7ceb95a8-218d-4353-82eb-a06a7f8aece9.md",
+        "task": "tasks/tasks-linear-7ceb95a8-218d-4353-82eb-a06a7f8aece9.md",
+        "agent_task": ".agent/task/linear-7ceb95a8-218d-4353-82eb-a06a7f8aece9.md",
+        "docs": "docs/TECH_SPEC-linear-7ceb95a8-218d-4353-82eb-a06a7f8aece9.md"
+      }
+    },
+    {
       "id": "20260422-linear-8bbdd424-d77e-4312-b4b7-2a82c3df2749",
       "title": "Control host: reconcile released-claim run metadata, operator advisories, and advisory-state truth after issue release",
       "relates_to": "tasks/tasks-linear-8bbdd424-d77e-4312-b4b7-2a82c3df2749.md",

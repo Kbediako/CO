@@ -704,6 +704,43 @@ describe('provider linear child lane runner', () => {
     expect(sleepCalls).toEqual([250, 250]);
   });
 
+  it('extracts parent-owned GitHub and Linear drift evidence from an appserver child session log', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-runner-'));
+    const sessionLogPath = join(tempRoot, 'rollout-drift.jsonl');
+    await writeFile(
+      sessionLogPath,
+      [
+        '{"timestamp":"2026-04-22T05:53:31.453Z","type":"response_item","payload":{"type":"function_call","name":"exec_command","arguments":"{\\"cmd\\":\\"gh pr view 597 --comments\\",\\"workdir\\":\\"/tmp/child\\"}","call_id":"call-1"}}',
+        '{"timestamp":"2026-04-22T06:12:49.011Z","type":"response_item","payload":{"type":"tool_search_call","call_id":"call-2","arguments":{"query":"Linear list issues update issue GitHub pull request checks comments","limit":12}}}'
+      ].join('\n'),
+      'utf8'
+    );
+
+    await expect(
+      childLaneRunnerTest.scanProviderLinearChildLaneSessionLogForParentScopeDrift(sessionLogPath)
+    ).resolves.toEqual([
+      '2026-04-22T05:53:31.453Z exec_command gh pr view 597 --comments',
+      '2026-04-22T06:12:49.011Z tool_search Linear list issues update issue GitHub pull request checks comments'
+    ]);
+  });
+
+  it('flags unauthorized child-lane commits when HEAD diverges from the parent snapshot base sha', () => {
+    expect(
+      childLaneRunnerTest.resolveProviderLinearChildLaneUnauthorizedCommitMessage({
+        context: { issueIdentifier: 'CO-303' },
+        expectedBaseSha: 'base-sha-1',
+        currentHeadSha: 'child-commit-1'
+      })
+    ).toContain('Child lane created commit child-commit-1 from parent base base-sha-1 for CO-303');
+    expect(
+      childLaneRunnerTest.resolveProviderLinearChildLaneUnauthorizedCommitMessage({
+        context: { issueIdentifier: 'CO-303' },
+        expectedBaseSha: 'base-sha-1',
+        currentHeadSha: 'base-sha-1'
+      })
+    ).toBeNull();
+  });
+
   it('preserves a successful exec result when abort fires after exit but before close settles', async () => {
     const abortController = new AbortController();
     let resolveExec: ((value: { exitCode: number; stdout: string; stderr: string }) => void) | null = null;
