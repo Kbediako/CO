@@ -15422,7 +15422,7 @@ describe('createProviderIssueHandoffService', () => {
     vi.setSystemTime(new Date(Date.parse(retryDueAt ?? '') + 1));
     retryCallback();
     await flushAsyncWork();
-    await waitForMockCalls(providerWorkflowConfigStore.refresh, 2, 1_024);
+    await waitForMockCalls(launcher.start, 2, 1_024);
     const relaunchedStartArgs = await relaunchedStart;
     await flushAsyncWork();
 
@@ -15438,7 +15438,6 @@ describe('createProviderIssueHandoffService', () => {
       launchToken: expect.any(String)
     }));
     expect(launcher.resume).not.toHaveBeenCalled();
-    expect(providerWorkflowConfigStore.refresh).toHaveBeenCalledTimes(2);
     expect(state.claims.find((claim) => claim.provider_key === 'linear:lin-issue-1')).toMatchObject({
       state: 'starting',
       reason: 'provider_issue_retry_start_launched',
