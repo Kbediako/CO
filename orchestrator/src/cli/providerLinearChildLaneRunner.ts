@@ -692,11 +692,15 @@ function parseProviderLinearChildLaneSessionJsonlLine(line: string): Record<stri
   }
 }
 
+function tokenizeShellCommandForScopeDrift(command: string): string[] {
+  return command.match(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|&&|\|\||[;&|]|[^\s;&|]+/gu) ?? [];
+}
+
 function commandShowsParentOwnedScopeDrift(command: string): boolean {
   if (/\bgh\b/u.test(command) || /codex-orchestrator(?:\.js)?(?:["'\s]|$).*?\slinear\b/u.test(command)) {
     return true;
   }
-  const tokens = command.match(/"[^"]*"|'[^']*'|\S+/gu) ?? [];
+  const tokens = tokenizeShellCommandForScopeDrift(command);
   const gitOptionsWithValues = new Set([
     '-c',
     '-C',
@@ -707,7 +711,7 @@ function commandShowsParentOwnedScopeDrift(command: string): boolean {
     '--super-prefix',
     '--config-env'
   ]);
-  const commandSeparators = new Set(['&&', '||', ';', '|']);
+  const commandSeparators = new Set(['&&', '||', ';', '|', '&']);
   for (let gitIndex = 0; gitIndex < tokens.length; gitIndex += 1) {
     const gitToken = tokens[gitIndex]?.replace(/^['"]|['"]$/gu, '') ?? '';
     if (basename(gitToken) !== 'git') {

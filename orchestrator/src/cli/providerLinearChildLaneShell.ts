@@ -175,9 +175,15 @@ interface ParentIssueSnapshot {
   issue_state_type: string | null;
 }
 
+interface ProviderLinearChildLaneDirectoryEntry {
+  name: string;
+  isDirectory: () => boolean;
+}
+
 interface ProviderLinearChildLaneShellDependencies {
   execRunner: (request: ProviderLinearWorkerExecRequest) => Promise<ProviderLinearWorkerExecResult>;
   readParentDirtyPaths: (workspacePath: string) => Promise<string[]>;
+  readDir: (path: string) => Promise<ProviderLinearChildLaneDirectoryEntry[]>;
   transactChildLanes: <T>(
     runDir: string,
     action: (
@@ -200,6 +206,7 @@ interface ProviderLinearChildLaneShellDependencies {
 
 const DEFAULT_DEPENDENCIES: ProviderLinearChildLaneShellDependencies = {
   execRunner: defaultExecRunner,
+  readDir: async (path) => await readdir(path, { withFileTypes: true }),
   transactChildLanes: async (runDir, action) => await transactProviderLinearWorkerChildLanes(runDir, action),
   readParentDirtyPaths: async (workspacePath) => {
     const modified = await execFileAsync('git', ['-C', workspacePath, 'diff', '--name-only', '--relative', 'HEAD', '--'], {
@@ -632,10 +639,16 @@ async function launchChildLane(
     isExecSettled: () => execSettled,
     now
   });
+  const advisoryRecoveredLaunchPromise = recoveredLaunchPromise.catch((error) => {
+    deps.warn(
+      `provider-linear-child-lane warning: ignored launch-recovery scan failure while awaiting exec result: ${error instanceof Error ? error.message : String(error)}`
+    );
+    return null;
+  });
   try {
     const launchOutcome = await Promise.race([
       execPromise.then((result) => ({ kind: 'exec' as const, result })),
-      recoveredLaunchPromise.then((recovered) => ({ kind: 'recovered' as const, recovered }))
+      advisoryRecoveredLaunchPromise.then((recovered) => ({ kind: 'recovered' as const, recovered }))
     ]);
     if (launchOutcome.kind === 'recovered') {
       if (launchOutcome.recovered) {
@@ -662,7 +675,7 @@ async function launchChildLane(
     launchError = error;
   }
   if (!recoveredLaunch) {
-    recoveredLaunch = await recoveredLaunchPromise.catch(() => null);
+    recoveredLaunch = await advisoryRecoveredLaunchPromise;
   }
   if (launchError && !recoveredLaunch) {
     await removeReservedChildLane(context.runDir, launchReservation, deps);
@@ -1500,7 +1513,7 @@ async function resolvePendingChildLaneDecisionTarget(input: {
   childRunsRoot: string;
   stream: string;
   action: 'accept' | 'reject' | 'invalidate';
-  deps: Pick<ProviderLinearChildLaneShellDependencies, 'readChildLaneProof'>;
+  deps: Pick<ProviderLinearChildLaneShellDependencies, 'readChildLaneProof' | 'readDir'>;
   now: string;
 }): Promise<ResolvedPendingChildLaneDecisionTarget> {
   const target = findLatestPendingChildLane(input.records, input.stream);
@@ -1596,7 +1609,7 @@ async function repairPendingLaunchingChildLaneDecisionTarget(input: {
   >;
   childRunsRoot: string;
   action: 'accept' | 'reject' | 'invalidate';
-  deps: Pick<ProviderLinearChildLaneShellDependencies, 'readChildLaneProof'>;
+  deps: Pick<ProviderLinearChildLaneShellDependencies, 'readChildLaneProof' | 'readDir'>;
   now: string;
 }): Promise<{ records: ProviderLinearWorkerChildLaneRecord[]; target: ProviderLinearWorkerChildLaneRecord | null } | null> {
   if (input.target.status !== 'launching' || !input.target.run_id.startsWith('launching-')) {
@@ -1719,7 +1732,7 @@ async function waitForRecoveredChildLaneLaunchCandidate(input: {
     'issueId' | 'issueIdentifier' | 'taskId' | 'runId' | 'repoRoot'
   >;
   childRunsRoot: string;
-  deps: Pick<ProviderLinearChildLaneShellDependencies, 'readChildLaneProof' | 'sleep'>;
+  deps: Pick<ProviderLinearChildLaneShellDependencies, 'readChildLaneProof' | 'readDir' | 'sleep'>;
   isExecSettled: () => boolean;
   now: string;
 }): Promise<ProviderLinearChildLaneLaunchRecoveryCandidate | null> {
@@ -1748,13 +1761,13 @@ async function findRecoveredChildLaneLaunchCandidate(input: {
     'issueId' | 'issueIdentifier' | 'taskId' | 'runId' | 'repoRoot'
   >;
   childRunsRoot: string;
-  deps: Pick<ProviderLinearChildLaneShellDependencies, 'readChildLaneProof'>;
+  deps: Pick<ProviderLinearChildLaneShellDependencies, 'readChildLaneProof' | 'readDir'>;
   now: string;
 }): Promise<ProviderLinearChildLaneLaunchRecoveryCandidate | null> {
   const childTaskCliRoot = join(input.childRunsRoot, input.reservation.task_id, 'cli');
   let entries;
   try {
-    entries = await readdir(childTaskCliRoot, { withFileTypes: true });
+    entries = await input.deps.readDir(childTaskCliRoot);
   } catch (error) {
     if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
       return null;
@@ -1865,13 +1878,13 @@ async function findChildLaneReservationRepairCandidate(input: {
   >;
   childRunsRoot: string;
   action: 'accept' | 'reject' | 'invalidate';
-  deps: Pick<ProviderLinearChildLaneShellDependencies, 'readChildLaneProof'>;
+  deps: Pick<ProviderLinearChildLaneShellDependencies, 'readChildLaneProof' | 'readDir'>;
   now: string;
 }): Promise<ProviderLinearWorkerChildLaneRecord | null> {
   const childTaskCliRoot = join(input.childRunsRoot, input.reservation.task_id, 'cli');
   let entries;
   try {
-    entries = await readdir(childTaskCliRoot, { withFileTypes: true });
+    entries = await input.deps.readDir(childTaskCliRoot);
   } catch (error) {
     if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
       return null;

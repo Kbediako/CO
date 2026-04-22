@@ -870,6 +870,21 @@ describe('provider linear child lane runner', () => {
         }
       })
     ).toEqual(['2026-04-22T06:13:33.000Z exec_command git status && git push origin HEAD']);
+
+    expect(
+      childLaneRunnerTest.extractProviderLinearChildLaneScopeDriftEvidenceFromRecord({
+        timestamp: '2026-04-22T06:13:34.000Z',
+        type: 'response_item',
+        payload: {
+          type: 'function_call',
+          name: 'exec_command',
+          arguments: JSON.stringify({
+            cmd: 'git status&&git push origin HEAD',
+            workdir: '/tmp/child'
+          })
+        }
+      })
+    ).toEqual(['2026-04-22T06:13:34.000Z exec_command git status&&git push origin HEAD']);
   });
 
   it('re-checks the session log after exec settles before clearing scope drift', async () => {

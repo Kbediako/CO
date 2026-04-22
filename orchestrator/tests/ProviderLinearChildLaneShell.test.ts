@@ -2779,6 +2779,124 @@ describe('runProviderLinearChildLaneShell', () => {
     ]);
   });
 
+  it('treats launch-recovery scan failures as advisory when exec succeeds', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const launchedLane = createLaneRecord({
+      run_id: 'child-run-recovery-scan-warning',
+      manifest_path: join(
+        tempRoot ?? '',
+        '.runs',
+        `${TASK_ID}-impl-a`,
+        'cli',
+        'child-run-recovery-scan-warning',
+        'manifest.json'
+      ),
+      artifact_root: join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-recovery-scan-warning'),
+      log_path: join(
+        tempRoot ?? '',
+        '.runs',
+        `${TASK_ID}-impl-a`,
+        'cli',
+        'child-run-recovery-scan-warning',
+        'run.log'
+      ),
+      patch_artifact_path: join(
+        tempRoot ?? '',
+        '.runs',
+        `${TASK_ID}-impl-a`,
+        'cli',
+        'child-run-recovery-scan-warning',
+        'provider-linear-child-lane.patch'
+      )
+    });
+    const warn = vi.fn();
+    const execRunner = vi.fn(async () => {
+      await writePatchArtifact(
+        launchedLane.patch_artifact_path ?? join(launchedLane.artifact_root, 'provider-linear-child-lane.patch'),
+        'orchestrator/src/cli/providerLinearChildStreamShell.ts'
+      );
+      await writeChildLaneManifest(launchedLane, {
+        runtime_mode_requested: 'appserver',
+        runtime_mode: 'appserver',
+        runtime_provider: 'AppServerRuntimeProvider'
+      });
+      await writeChildLaneProof(launchedLane, {
+        updated_at: '2099-01-01T00:00:00.000Z',
+        last_event_at: '2099-01-01T00:00:00.000Z'
+      });
+      return {
+        exitCode: 0,
+        stdout: JSON.stringify({
+          run_id: launchedLane.run_id,
+          status: launchedLane.status,
+          artifact_root: `.runs/${TASK_ID}-impl-a/cli/${launchedLane.run_id}`,
+          manifest: `.runs/${TASK_ID}-impl-a/cli/${launchedLane.run_id}/manifest.json`,
+          log_path: `.runs/${TASK_ID}-impl-a/cli/${launchedLane.run_id}/run.log`,
+          summary: launchedLane.summary,
+          runtime_mode_requested: 'appserver',
+          runtime_mode: 'appserver',
+          runtime_provider: 'AppServerRuntimeProvider'
+        }),
+        stderr: ''
+      };
+    });
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'launch',
+        streamName: 'impl-a',
+        purpose: 'Implement bounded child lane support',
+        files: ['orchestrator/src/cli/providerLinearChildStreamShell.ts'],
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        execRunner,
+        readDir: vi.fn(async () => {
+          const error = new Error('transient readdir failure') as NodeJS.ErrnoException;
+          error.code = 'EIO';
+          throw error;
+        }),
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: '2026-03-30T07:10:00.000Z',
+          state: 'In Progress',
+          state_type: 'started'
+        })) as never,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
+        readParentHeadSha: vi.fn(async () => 'parent-base-sha'),
+        refreshProofSnapshot: vi.fn(async () => undefined),
+        warn
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'child-lane',
+      action: 'launched',
+      child_run: {
+        run_id: launchedLane.run_id,
+        status: 'succeeded',
+        runtime_mode: 'appserver'
+      },
+      child_lane: {
+        run_id: launchedLane.run_id,
+        status: 'succeeded',
+        decision: 'pending'
+      }
+    });
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('ignored launch-recovery scan failure while awaiting exec result: transient readdir failure')
+    );
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
+      expect.objectContaining({
+        run_id: launchedLane.run_id,
+        status: 'succeeded',
+        decision: 'pending'
+      })
+    ]);
+  });
+
   it('recovers a failed child lane without a patch artifact when the outer launcher stays stuck', async () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
     const recoveredLane = createLaneRecord({
