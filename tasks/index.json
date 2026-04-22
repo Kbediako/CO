@@ -58,6 +58,32 @@
       }
     },
     {
+      "id": "20260422-linear-59a75110-93e5-42f4-a2d2-31dcde884c91",
+      "title": "CO-299 local Node OOM backpressure and provenance-safe child-lane progress truth",
+      "relates_to": "tasks/tasks-linear-59a75110-93e5-42f4-a2d2-31dcde884c91.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-22",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "parent lane plus zero-byte docs advisory child lane",
+          "date": "2026-04-22",
+          "status": "produced_after_rework_reset",
+          "manifest": ".runs/linear-59a75110-93e5-42f4-a2d2-31dcde884c91-docs-shape-advisory/cli/2026-04-22T06-47-18-744Z-28f2a3fb/manifest.json",
+          "source_anchor": "ctx:sha256:0320d3a6b57e0f8847509632a1b1cf89ffd868f1412cbb569e67ac7eb380f394#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-299 as local Node OOM/resource pressure under concurrent provider-worker load, provenance-invalid child-lane retry/progress churn, host-safety backpressure/observability, and fail-closed provenance. The first docs-reset child lane was invalidated for host-safety recovery after out-of-scope local process pressure; the parent reviewed and imported the docs-only patch shape, then completed a successful zero-byte docs-shape advisory child lane. Scope rejects provenance bypass, cap-only concurrency increase, hidden retry suppression, fake progress after failed child-lane launches, and source/test/package/Linear/GitHub/workpad mutations in child lanes."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-59a75110-93e5-42f4-a2d2-31dcde884c91.md",
+        "task": "tasks/tasks-linear-59a75110-93e5-42f4-a2d2-31dcde884c91.md",
+        "agent_task": ".agent/task/linear-59a75110-93e5-42f4-a2d2-31dcde884c91.md",
+        "docs": "docs/TECH_SPEC-linear-59a75110-93e5-42f4-a2d2-31dcde884c91.md"
+      }
+    },
+    {
       "id": "20260422-linear-20102af9-9eb4-44d1-8988-c5de7869d990",
       "title": "CO-298 stale control-host supervision status truth versus healthy live host truth",
       "relates_to": "tasks/tasks-linear-20102af9-9eb4-44d1-8988-c5de7869d990.md",

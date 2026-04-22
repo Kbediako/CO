@@ -32,6 +32,7 @@ const {
   resolveRemoteProviderNodePath,
   resolveSpawnManifestWaitTimeoutMs,
   resolveProviderResumeLaunchSpec,
+  assertResumeLaunchSpecMatchesAdmittedWorkerHost,
   resolveProviderOverridePackageRoot,
   snapshotRunManifests,
   writeRemoteProviderScriptToSshChild
@@ -1171,6 +1172,85 @@ describe('controlHostCliShell manifest discovery', () => {
         kind: 'local'
       }
     });
+  });
+
+  it('fails closed when an admitted remote resume degrades to local at launch time', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'control-host-cli-shell-'));
+    await initializeRepo(tempRoot);
+    const env: EnvironmentPaths = {
+      repoRoot: tempRoot,
+      runsRoot: join(tempRoot, '.runs'),
+      outRoot: join(tempRoot, 'out'),
+      taskId: 'local-mcp'
+    };
+    const childPaths = resolveRunPaths(
+      {
+        ...env,
+        taskId: 'linear-lin-issue-1'
+      },
+      'run-child'
+    );
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        workspace_path: join(tempRoot, '.workspaces', 'linear-lin-issue-1')
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        worker_host: 'worker-host-01'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(tempRoot, 'codex.orchestrator.json'),
+      JSON.stringify({
+        defaultPipeline: 'provider-linear-worker',
+        pipelines: [
+          {
+            id: 'provider-linear-worker',
+            title: 'Provider worker',
+            metadata: {
+              worker_hosts: {
+                hosts: [
+                  {
+                    name: 'worker-host-02',
+                    ssh_destination: 'codex@worker-host-02',
+                    max_concurrent_agents: 1
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }),
+      'utf8'
+    );
+    const providerWorkflowConfigStore = createProviderWorkflowConfigStore({
+      env,
+      runDir: join(tempRoot, '.runs', 'local-mcp', 'cli', 'control-host'),
+      pipelineId: 'provider-linear-worker'
+    });
+    await providerWorkflowConfigStore.bootstrap();
+
+    const spec = await resolveProviderResumeLaunchSpec(
+      env,
+      'run-child',
+      providerWorkflowConfigStore,
+      'worker-host-01'
+    );
+
+    expect(spec.transport).toEqual({
+      kind: 'local'
+    });
+    expect(() => assertResumeLaunchSpecMatchesAdmittedWorkerHost('worker-host-01', spec)).toThrow(
+      'Admitted provider resume host "worker-host-01" resolved to local at launch time; retry under refreshed admission so the local safety cap is reapplied.'
+    );
   });
 
   it('ignores a stale persisted proof worker_host when resuming a newer attempt', async () => {
