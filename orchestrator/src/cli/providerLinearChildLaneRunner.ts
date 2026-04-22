@@ -778,16 +778,6 @@ function findShellCommandSegmentEnd(tokens: string[], segmentStart: number, comm
   return index;
 }
 
-function segmentContainsToken(tokens: string[], start: number, end: number, expected: string): boolean {
-  for (let index = start; index < end; index += 1) {
-    const token = stripShellCommandTokenQuotes(tokens[index] ?? '');
-    if (token === expected) {
-      return true;
-    }
-  }
-  return false;
-}
-
 function segmentShowsParentOwnedOrchestratorScopeDrift(tokens: string[], start: number, end: number): boolean {
   for (let index = start; index < end; index += 1) {
     const token = stripShellCommandTokenQuotes(tokens[index] ?? '');
