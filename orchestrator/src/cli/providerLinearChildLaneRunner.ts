@@ -226,16 +226,34 @@ function parseInlineProjectEntry(
   const inlineKeyPattern = /^("(?:[^"\\]|\\.)*"|'[^']*')\s*=\s*\{.*\}\s*(?:#.*)?$/u;
   const dottedInlineKeyPattern =
     /^projects\s*\.\s*("(?:[^"\\]|\\.)*"|'[^']*')\s*=\s*\{.*\}\s*(?:#.*)?$/u;
-  const match =
+  const inlineMatch =
     currentTableKeyPath === 'projects'
       ? trimmed.match(inlineKeyPattern)
       : currentTableKeyPath === null
         ? trimmed.match(dottedInlineKeyPattern)
         : null;
-  if (!match) {
+  if (inlineMatch) {
+    return normalizeProjectPath(decodeTomlQuotedString(inlineMatch[1]));
+  }
+
+  const dottedAssignmentPattern =
+    /^("(?:[^"\\]|\\.)*"|'[^']*')\s*\.\s*.+?=\s*(.+)$/u;
+  const topLevelDottedAssignmentPattern =
+    /^projects\s*\.\s*("(?:[^"\\]|\\.)*"|'[^']*')\s*\.\s*.+?=\s*(.+)$/u;
+  const dottedMatch =
+    currentTableKeyPath === 'projects'
+      ? trimmed.match(dottedAssignmentPattern)
+      : currentTableKeyPath === null
+        ? trimmed.match(topLevelDottedAssignmentPattern)
+        : null;
+  if (!dottedMatch) {
     return null;
   }
-  return normalizeProjectPath(decodeTomlQuotedString(match[1]));
+  const value = dottedMatch[2].trim();
+  if (advanceTomlMultilineStringState(value, null) !== null || hasUnclosedTomlArrayValue(value)) {
+    return null;
+  }
+  return normalizeProjectPath(decodeTomlQuotedString(dottedMatch[1]));
 }
 
 type TomlMultilineStringState = 'basic' | 'literal' | null;
@@ -246,6 +264,27 @@ function isBackslashEscaped(line: string, index: number): boolean {
     backslashCount += 1;
   }
   return backslashCount % 2 === 1;
+}
+
+function hasUnclosedTomlArrayValue(line: string): boolean {
+  let arrayDepth = 0;
+  let quote: '"' | '\'' | null = null;
+  for (let index = 0; index < line.length; index += 1) {
+    const character = line[index];
+    if (!quote && character === '#') break;
+    if (character === '"' && quote !== '\'' && !isBackslashEscaped(line, index)) {
+      quote = quote === '"' ? null : '"';
+      continue;
+    }
+    if (character === '\'' && quote !== '"') {
+      quote = quote === '\'' ? null : '\'';
+      continue;
+    }
+    if (quote) continue;
+    if (character === '[') arrayDepth += 1;
+    if (character === ']') arrayDepth = Math.max(0, arrayDepth - 1);
+  }
+  return arrayDepth > 0;
 }
 
 function advanceTomlMultilineStringState(line: string, state: TomlMultilineStringState): TomlMultilineStringState {
@@ -364,7 +403,6 @@ function removeProjectTablesFromRawConfig(rawConfig: string, removableProjects: 
         ? null
         : parseInlineProjectEntry(line, currentTableKeyPath);
     if (inlineProjectPath && removableProjects.has(inlineProjectPath)) {
-      multilineStringState = advanceTomlMultilineStringState(line, multilineStringState);
       continue;
     }
 

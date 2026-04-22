@@ -1,12 +1,4 @@
 # ACTION_PLAN - CO-307 child-lane trusted-project pollution
-
-## Milestones
-1. Keep the CO-307 docs packet and task registration current.
-2. Reproduce the current trusted-project residue path with bounded evidence.
-3. Land a narrow child-lane cleanup or inheritance fix that preserves trust boundaries.
-4. Add focused regressions for exact-lane cleanup, unrelated-section preservation, nested project subtables, multiline-string safety, failed-proof persistence, and current-head follow-ups.
-5. Run validation, standalone review, elegance review, and `pr ready-review` before handoff.
-
-## Validation / Constraints
-- Focused during implementation: `npm run build`, targeted `eslint`, targeted `vitest`, `node scripts/diff-budget.mjs`
-- Full before handoff: delegation/spec guards, build, lint, test, docs checks, repo stewardship, diff budget, review, `npm run pack:smoke`; keep parent ownership of child-lane lifecycle and do not weaken trust boundaries or broaden into generic global config work.
+1. Keep the CO-307 docs packet current, reproduce the trusted-project residue path, land the narrow child-lane cleanup or inheritance fix, add focused regressions, and finish with validation plus `pr ready-review`.
+2. Focused implementation checks: `npm run build`, targeted `eslint`, targeted `vitest`, `node scripts/diff-budget.mjs`.
+3. Full handoff checks: delegation/spec guards, build, lint, test, docs checks, repo stewardship, diff budget, review, and `npm run pack:smoke`; keep parent ownership of child-lane lifecycle and do not weaken trust boundaries or broaden into generic global config work.
