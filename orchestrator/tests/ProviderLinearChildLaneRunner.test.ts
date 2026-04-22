@@ -104,32 +104,25 @@ describe('provider linear child lane runner', () => {
       '[ "projects" ]',
       '[ "projects" . "/Users/kbediako/Code/CO" ]',
       'trust_level = "trusted"',
-      '',
       `[ "projects" . "${siblingWorkspacePath}" ]`,
       'trust_level = "trusted"',
       'notes = """',
       `[projects . "${laneWorkspacePath}"]`,
       '"""',
       'keep_flag = "still-here"',
-      '',
       `[ "projects" . "${laneWorkspacePath}" ]`,
       'trust_level = "trusted"',
       'notes = [',
       '  [1,2]',
       ']',
-      '',
       `[ "projects" . "${laneWorkspacePath}" . metadata ]`,
       'owner = "codex"',
-      '',
       `[[ "projects" . "${laneWorkspacePath}" . metadata . links ]]`,
       'target = "proof"',
-      '',
       '[ "projects" . "/Users/kbediako/Code/CO/.workspaces/linear-123/.child-lanes/tests-b" ]',
       'trust_level = "trusted"',
-      '',
       '[[profiles]]',
-      'name = "default"',
-      ''
+      'name = "default"'
     ].join('\n');
 
     const plan = childLaneRunnerTest.planTrustedProjectCleanup({
@@ -139,15 +132,23 @@ describe('provider linear child lane runner', () => {
     });
 
     expect(plan.removedProjects).toEqual([laneWorkspacePath]);
-    expect(plan.nextConfig).toContain(`[ "projects" . "${siblingWorkspacePath}" ]`);
-    expect(plan.nextConfig).toContain(`notes = """\n[projects . "${laneWorkspacePath}"]\n"""`);
-    expect(plan.nextConfig).toContain('keep_flag = "still-here"');
-    expect(plan.nextConfig).not.toContain(`[ "projects" . "${laneWorkspacePath}" ]\ntrust_level = "trusted"`);
-    expect(plan.nextConfig).not.toContain(`[ "projects" . "${laneWorkspacePath}" . metadata ]`);
-    expect(plan.nextConfig).not.toContain(`[[ "projects" . "${laneWorkspacePath}" . metadata . links ]]`);
-    expect(plan.nextConfig).not.toContain('  [1,2]');
-    expect(plan.nextConfig).toContain('[ "projects" . "/Users/kbediako/Code/CO/.workspaces/linear-123/.child-lanes/tests-b" ]');
-    expect(plan.nextConfig).toContain('[[profiles]]');
+    for (const expected of [
+      `[ "projects" . "${siblingWorkspacePath}" ]`,
+      `notes = """\n[projects . "${laneWorkspacePath}"]\n"""`,
+      'keep_flag = "still-here"',
+      '[ "projects" . "/Users/kbediako/Code/CO/.workspaces/linear-123/.child-lanes/tests-b" ]',
+      '[[profiles]]'
+    ]) {
+      expect(plan.nextConfig).toContain(expected);
+    }
+    for (const unexpected of [
+      `[ "projects" . "${laneWorkspacePath}" ]\ntrust_level = "trusted"`,
+      `[ "projects" . "${laneWorkspacePath}" . metadata ]`,
+      `[[ "projects" . "${laneWorkspacePath}" . metadata . links ]]`,
+      '  [1,2]'
+    ]) {
+      expect(plan.nextConfig).not.toContain(unexpected);
+    }
   });
 
   it('removes redundant inline entries and fails closed for multiline dotted project values', () => {
@@ -161,10 +162,8 @@ describe('provider linear child lane runner', () => {
       '  "remove me"',
       ']',
       `"projects"."${siblingWorkspacePath}" = { trust_level = "trusted" }`,
-      '',
       '[[profiles]]',
-      'name = "default"',
-      ''
+      'name = "default"'
     ].join('\n');
 
     const plan = childLaneRunnerTest.planTrustedProjectCleanup({
