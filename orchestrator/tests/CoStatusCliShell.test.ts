@@ -886,10 +886,7 @@ async function writeControlEndpointArtifacts(
 
 async function writeProviderIntakeState(
   runDir: string,
-  options: {
-    claimState?: 'running' | 'stale';
-    updatedAtMsAgo?: number;
-  } = {}
+  options: Parameters<typeof buildProviderIntakeState>[0] = {}
 ): Promise<void> {
   await writeFile(
     join(runDir, 'provider-intake-state.json'),
@@ -978,13 +975,22 @@ function buildProviderIntakeState(options: {
       updatedAtMsAgo
     }
   ];
+  const freshestClaim =
+    claims.reduce<typeof claims[number] | null>((best, claim) => {
+      const bestAge = best?.updatedAtMsAgo ?? updatedAtMsAgo;
+      const claimAge = claim.updatedAtMsAgo ?? updatedAtMsAgo;
+      return best === null || claimAge < bestAge ? claim : best;
+    }, null) ?? claims[0];
+  const freshestState = freshestClaim?.claimState ?? claimState;
   return {
     schema_version: 1,
     updated_at: updatedAt,
     rehydrated_at: null,
-    latest_provider_key: `linear:${claims[0]?.issueId ?? 'lin-issue-1'}`,
+    latest_provider_key: `linear:${freshestClaim?.issueId ?? 'lin-issue-1'}`,
     latest_reason:
-      claimState === 'stale' ? 'supervisor truth stale after ui timeout' : 'provider intake advanced after ui timeout',
+      freshestState === 'stale'
+        ? 'supervisor truth stale after ui timeout'
+        : 'provider intake advanced after ui timeout',
     polling: {
       source: 'provider-intake-state.json',
       last_requested_at: updatedAt,
