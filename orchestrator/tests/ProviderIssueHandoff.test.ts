@@ -234,6 +234,53 @@ function createPersistSnapshotSpy(state: ProviderIntakeState) {
   };
 }
 
+const DEFAULT_LOCAL_PROVIDER_OCCUPIED_DESCRIPTORS = [
+  { issueId: 'lin-issue-occupied-1', issueIdentifier: 'CO-1', taskId: 'task-occupied-1', runId: 'run-occupied-1', issueUpdatedAt: '2026-03-19T04:20:00.000Z', manifestUpdatedAt: '2026-03-19T04:30:00.000Z' },
+  { issueId: 'lin-issue-occupied-2', issueIdentifier: 'CO-2', taskId: 'task-occupied-2', runId: 'run-occupied-2', issueUpdatedAt: '2026-03-19T04:21:00.000Z', manifestUpdatedAt: '2026-03-19T04:31:00.000Z' },
+  { issueId: 'lin-issue-occupied-3', issueIdentifier: 'CO-3', taskId: 'task-occupied-3', runId: 'run-occupied-3', issueUpdatedAt: '2026-03-19T04:22:00.000Z', manifestUpdatedAt: '2026-03-19T04:32:00.000Z' }
+] as const;
+
+async function seedOccupiedRunningProviderWorkers(
+  root: string,
+  state: ProviderIntakeState,
+  descriptors = DEFAULT_LOCAL_PROVIDER_OCCUPIED_DESCRIPTORS
+): Promise<void> {
+  const manifestPaths: string[] = [];
+  for (const descriptor of descriptors) {
+    const occupiedPaths = resolveRunPaths({ repoRoot: root, runsRoot: join(root, '.runs'), outRoot: join(root, 'out'), taskId: descriptor.taskId }, descriptor.runId);
+    manifestPaths.push(occupiedPaths.manifestPath);
+    await mkdir(occupiedPaths.runDir, { recursive: true });
+    await writeFile(
+      occupiedPaths.manifestPath,
+      JSON.stringify({
+        run_id: descriptor.runId,
+        task_id: descriptor.taskId,
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: descriptor.issueId,
+        issue_identifier: descriptor.issueIdentifier,
+        issue_updated_at: descriptor.issueUpdatedAt,
+        updated_at: descriptor.manifestUpdatedAt
+      }),
+      'utf8'
+    );
+  }
+  state.claims.push(...descriptors.map((descriptor, index) => createProviderClaim({
+    issue_id: descriptor.issueId,
+    issue_identifier: descriptor.issueIdentifier,
+    issue_title: `Already running ${descriptor.issueIdentifier}`,
+    issue_updated_at: descriptor.issueUpdatedAt,
+    task_id: descriptor.taskId,
+    state: 'running',
+    reason: 'provider_issue_rehydrated_active_run',
+    accepted_at: descriptor.issueUpdatedAt,
+    updated_at: descriptor.manifestUpdatedAt,
+    run_id: descriptor.runId,
+    run_manifest_path: manifestPaths[index] ?? null
+  })));
+}
+
 async function flushAsyncWork(turns = 8): Promise<void> {
   for (let index = 0; index < turns; index += 1) {
     await Promise.resolve();
@@ -905,7 +952,7 @@ describe('createProviderIssueHandoffService', () => {
       review_promotion: null,
       merge_closeout: null
     });
-    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const { getPersistedState, persist } = createPersistSnapshotSpy(state);
     const launcher = {
       start: vi.fn(async () => null),
       resume: vi.fn(async () => undefined)
@@ -1041,7 +1088,7 @@ describe('createProviderIssueHandoffService', () => {
       review_promotion: null,
       merge_closeout: null
     });
-    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const { getPersistedState, persist } = createPersistSnapshotSpy(state);
     const launcher = {
       start: vi.fn(async () => null),
       resume: vi.fn(async () => undefined)
@@ -3862,7 +3909,12 @@ describe('createProviderIssueHandoffService', () => {
       state: createProviderIntakeState(),
       persist: vi.fn(async () => undefined),
       launcher,
-      startPipelineId: 'diagnostics'
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 4
+        }
+      })
     });
 
     await service.poll?.({
@@ -7607,6 +7659,400 @@ describe('createProviderIssueHandoffService', () => {
     });
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
+  it('blocks the fourth unconfigured local provider worker at the default host-global cap', async () => {
+    const { root, paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    await seedOccupiedRunningProviderWorkers(root, state);
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-fresh',
+        identifier: 'CO-4',
+        updated_at: '2026-03-19T04:33:00.000Z'
+      }),
+      deliveryId: 'delivery-default-cap-blocked',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_380_000
+    });
+
+    expect(result).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_start_blocked:max_concurrency',
+      claim: {
+        provider_key: 'linear:lin-issue-fresh',
+        state: 'accepted',
+        reason: 'provider_issue_start_blocked:max_concurrency',
+        task_id: 'linear-lin-issue-fresh',
+        run_id: null,
+        run_manifest_path: null
+      }
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(getPersistedState().claims.find((claim) => claim.provider_key === 'linear:lin-issue-fresh')).toMatchObject({
+      state: 'accepted',
+      reason: 'provider_issue_start_blocked:max_concurrency',
+      task_id: 'linear-lin-issue-fresh'
+    });
+  });
+
+  it('refreshes worker hosts before applying the local safety cap for a new admission', async () => {
+    const { root, paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    await seedOccupiedRunningProviderWorkers(root, state);
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    let currentSnapshot = {
+      status: 'ready' as const,
+      pipeline_id: 'provider-linear-worker',
+      source_path: '/repo/codex.orchestrator.json',
+      snapshot_path: '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+      last_reload_attempt_at: null,
+      last_success_at: '2026-03-19T04:00:00.000Z',
+      last_error_at: null,
+      last_error: null,
+      terminal_cleanup: null,
+      worker_hosts: [
+        {
+          name: 'worker-host-01',
+          transport: 'ssh' as const,
+          ssh_destination: 'codex@worker-host-01',
+          ssh_options: [],
+          max_concurrent_agents: 2,
+          node_path: null
+        }
+      ]
+    };
+    const providerWorkflowConfigStore = {
+      bootstrap: vi.fn(),
+      refresh: vi.fn(async () => {
+        currentSnapshot = {
+          ...currentSnapshot,
+          worker_hosts: [],
+          last_success_at: '2026-03-19T04:33:00.000Z'
+        };
+        return currentSnapshot;
+      }),
+      snapshot: () => currentSnapshot,
+      getLaunchConfigPath: vi.fn(),
+      recordTerminalCleanupResult: vi.fn()
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      providerWorkflowConfigStore
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-fresh',
+        identifier: 'CO-4',
+        updated_at: '2026-03-19T04:33:00.000Z'
+      }),
+      deliveryId: 'delivery-refreshed-local-cap-blocked',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_380_000
+    });
+
+    expect(result).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_start_blocked:max_concurrency',
+      claim: {
+        provider_key: 'linear:lin-issue-fresh',
+        state: 'accepted',
+        reason: 'provider_issue_start_blocked:max_concurrency',
+        task_id: 'linear-lin-issue-fresh',
+        run_id: null,
+        run_manifest_path: null
+      }
+    });
+    expect(providerWorkflowConfigStore.refresh).toHaveBeenCalledTimes(1);
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(getPersistedState().claims.find((claim) => claim.provider_key === 'linear:lin-issue-fresh')).toMatchObject({
+      state: 'accepted',
+      reason: 'provider_issue_start_blocked:max_concurrency',
+      task_id: 'linear-lin-issue-fresh'
+    });
+  });
+
+  it('keeps the local safety cap when only per-state limits are configured after worker-host refresh', async () => {
+    const { root, paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    await seedOccupiedRunningProviderWorkers(root, state);
+
+    const { getPersistedState, persist } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    let currentSnapshot = {
+      status: 'ready' as const,
+      pipeline_id: 'provider-linear-worker',
+      source_path: '/repo/codex.orchestrator.json',
+      snapshot_path: '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+      last_reload_attempt_at: null,
+      last_success_at: '2026-03-19T04:00:00.000Z',
+      last_error_at: null,
+      last_error: null,
+      terminal_cleanup: null,
+      worker_hosts: [
+        {
+          name: 'worker-host-01',
+          transport: 'ssh' as const,
+          ssh_destination: 'codex@worker-host-01',
+          ssh_options: [],
+          max_concurrent_agents: 2,
+          node_path: null
+        }
+      ]
+    };
+    const providerWorkflowConfigStore = {
+      bootstrap: vi.fn(),
+      refresh: vi.fn(async () => {
+        currentSnapshot = {
+          ...currentSnapshot,
+          worker_hosts: [],
+          last_success_at: '2026-03-19T04:34:00.000Z'
+        };
+        return currentSnapshot;
+      }),
+      snapshot: () => currentSnapshot,
+      getLaunchConfigPath: vi.fn(),
+      recordTerminalCleanupResult: vi.fn()
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      providerWorkflowConfigStore,
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents_by_state: {
+            'in progress': 7
+          }
+        }
+      })
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-local-state-cap',
+        identifier: 'CO-5',
+        updated_at: '2026-03-19T04:34:00.000Z'
+      }),
+      deliveryId: 'delivery-refreshed-local-state-cap-blocked',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_440_000
+    });
+
+    expect(result).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_start_blocked:max_concurrency',
+      claim: {
+        provider_key: 'linear:lin-issue-local-state-cap',
+        state: 'accepted',
+        reason: 'provider_issue_start_blocked:max_concurrency',
+        task_id: 'linear-lin-issue-local-state-cap',
+        run_id: null,
+        run_manifest_path: null
+      }
+    });
+    expect(providerWorkflowConfigStore.refresh).toHaveBeenCalledTimes(1);
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(
+      getPersistedState().claims.find((claim) => claim.provider_key === 'linear:lin-issue-local-state-cap')
+    ).toMatchObject({
+      state: 'accepted',
+      reason: 'provider_issue_start_blocked:max_concurrency',
+      task_id: 'linear-lin-issue-local-state-cap'
+    });
+  });
+
+  it('keeps the local safety cap when worker-host refresh throws before any trusted snapshot exists', async () => {
+    const { root, paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    await seedOccupiedRunningProviderWorkers(root, state);
+
+    const { getPersistedState, persist } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const providerWorkflowConfigStore = {
+      bootstrap: vi.fn(),
+      refresh: vi.fn(async () => {
+        throw new Error('provider workflow refresh failed');
+      }),
+      snapshot: () => ({
+        status: 'reload_failed' as const,
+        pipeline_id: 'provider-linear-worker',
+        source_path: '/repo/codex.orchestrator.json',
+        snapshot_path: null,
+        last_reload_attempt_at: '2026-03-19T04:35:00.000Z',
+        last_success_at: null,
+        last_error_at: '2026-03-19T04:35:00.000Z',
+        last_error: 'provider workflow refresh failed',
+        terminal_cleanup: null,
+        worker_hosts: []
+      }),
+      getLaunchConfigPath: vi.fn(),
+      recordTerminalCleanupResult: vi.fn()
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      providerWorkflowConfigStore,
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents_by_state: {
+            'in progress': 7
+          }
+        }
+      })
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-local-refresh-failed',
+        identifier: 'CO-6',
+        updated_at: '2026-03-19T04:35:00.000Z'
+      }),
+      deliveryId: 'delivery-local-refresh-failed-blocked',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_500_000
+    });
+
+    expect(result).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_start_blocked:max_concurrency',
+      claim: {
+        provider_key: 'linear:lin-issue-local-refresh-failed',
+        state: 'accepted',
+        reason: 'provider_issue_start_blocked:max_concurrency',
+        task_id: 'linear-lin-issue-local-refresh-failed',
+        run_id: null,
+        run_manifest_path: null
+      }
+    });
+    expect(providerWorkflowConfigStore.refresh).toHaveBeenCalledTimes(1);
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(
+      getPersistedState().claims.find((claim) => claim.provider_key === 'linear:lin-issue-local-refresh-failed')
+    ).toMatchObject({
+      state: 'accepted',
+      reason: 'provider_issue_start_blocked:max_concurrency',
+      task_id: 'linear-lin-issue-local-refresh-failed'
+    });
+  });
+
+  it('reuses the snapshot worker-host selection when refresh fails mid-admission', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const providerWorkflowConfigStore = {
+      bootstrap: vi.fn(),
+      refresh: vi.fn(async () => {
+        throw new Error('provider workflow refresh failed');
+      }),
+      snapshot: () => ({
+        status: 'reload_failed' as const,
+        pipeline_id: 'provider-linear-worker',
+        source_path: '/repo/codex.orchestrator.json',
+        snapshot_path: '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+        last_reload_attempt_at: '2026-03-19T04:35:00.000Z',
+        last_success_at: '2026-03-19T04:34:30.000Z',
+        last_error_at: '2026-03-19T04:35:00.000Z',
+        last_error: 'provider workflow refresh failed',
+        terminal_cleanup: null,
+        worker_hosts: [
+          {
+            name: 'worker-host-04',
+            transport: 'ssh' as const,
+            ssh_destination: 'codex@worker-host-04',
+            ssh_options: [],
+            max_concurrent_agents: 1,
+            node_path: null
+          }
+        ]
+      }),
+      getLaunchConfigPath: vi.fn(),
+      recordTerminalCleanupResult: vi.fn()
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      providerWorkflowConfigStore
+    });
+
+    await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-remote-refresh-failed',
+        identifier: 'CO-7',
+        updated_at: '2026-03-19T04:35:00.000Z'
+      }),
+      deliveryId: 'delivery-remote-refresh-failed',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_500_100
+    });
+
+    expect(providerWorkflowConfigStore.refresh).toHaveBeenCalledTimes(1);
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'lin-issue-remote-refresh-failed',
+      issueIdentifier: 'CO-7',
+      workerHost: 'worker-host-04'
+    }));
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(
+      getPersistedState().claims.find((claim) => claim.provider_key === 'linear:lin-issue-remote-refresh-failed')
+    ).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      worker_host: 'worker-host-04',
+      task_id: 'linear-lin-issue-remote-refresh-failed'
+    });
   });
 
   it('counts queued provider workers from a different start pipeline against direct admission capacity', async () => {
@@ -20385,7 +20831,13 @@ describe('createProviderIssueHandoffService', () => {
 
     expect(runOperatorAutopilot).not.toHaveBeenCalled();
     expect(recordOperatorAutopilotResult).not.toHaveBeenCalled();
-    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'lin-issue-1',
+      issueIdentifier: 'CO-2',
+      workerHost: null
+    }));
+    expect(launcher.resume).not.toHaveBeenCalled();
   });
 
   it('keeps refresh alive and records a failed operator autopilot result when evaluation throws', async () => {
@@ -29501,7 +29953,7 @@ describe('createProviderIssueHandoffService', () => {
       retry_due_at: null,
       retry_error: null
     });
-    expect(providerWorkflowConfigStore.refresh).toHaveBeenCalledTimes(1);
+    expect(providerWorkflowConfigStore.refresh).toHaveBeenCalledTimes(2);
   });
 
   it('blocks queued retry resume when real in-progress manifests already consume provider capacity', async () => {
@@ -29658,7 +30110,7 @@ describe('createProviderIssueHandoffService', () => {
     const persistCallsBeforeRetry = persist.mock.calls.length;
     getLatestScheduledTimeoutCallback(setTimeoutSpy)();
     await flushAsyncWork();
-    await waitForMockCalls(persist, persistCallsBeforeRetry + 1, 1_024);
+    await waitForMockCalls(persist, persistCallsBeforeRetry + 1, QUEUED_RETRY_SETTLE_TURNS * 8);
 
     const blockedClaim = state.claims.find((claim) => claim.provider_key === 'linear:lin-issue-1');
     expect(launcher.start).not.toHaveBeenCalled();
@@ -29821,7 +30273,7 @@ describe('createProviderIssueHandoffService', () => {
     const persistCallsBeforeRetry = persist.mock.calls.length;
     getLatestScheduledTimeoutCallback(setTimeoutSpy)();
     await flushAsyncWork();
-    await waitForMockCalls(persist, persistCallsBeforeRetry + 1, 1_024);
+    await waitForMockCalls(persist, persistCallsBeforeRetry + 1, QUEUED_RETRY_SETTLE_TURNS * 8);
 
     const blockedClaim = state.claims.find((claim) => claim.provider_key === 'linear:lin-issue-1');
     expect(launcher.start).not.toHaveBeenCalled();
@@ -29971,6 +30423,320 @@ describe('createProviderIssueHandoffService', () => {
       run_id: 'run-failed-local',
       run_manifest_path: childPaths.manifestPath,
       worker_host: null,
+      launch_source: 'control-host',
+      launch_token: expect.any(String),
+      retry_queued: false,
+      retry_attempt: 1,
+      retry_due_at: null,
+      retry_error: null
+    });
+  });
+
+  it('keeps the local safety cap for retry resume when configured remote worker hosts exist but the run must resume locally', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-failed-local'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-failed-local');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-failed-local',
+        task_id: 'task-1303-failed-local',
+        status: 'failed',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        attempt_started_at: '2026-03-19T04:29:59.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: 'task-1303-failed-local',
+      mapping_source: 'provider_id_fallback',
+      state: 'resumable',
+      reason: 'provider_issue_rehydrated_resumable_run',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-failed',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-failed-local',
+      run_manifest_path: childPaths.manifestPath,
+      worker_host: 'worker-host-02',
+      launch_source: null,
+      launch_token: null
+    });
+
+    const { persist } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const providerWorkflowConfigStore = {
+      bootstrap: vi.fn(),
+      refresh: vi.fn(async () => ({
+        status: 'ready' as const,
+        pipeline_id: 'provider-linear-worker',
+        source_path: '/repo/codex.orchestrator.json',
+        snapshot_path: '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+        last_reload_attempt_at: '2026-03-19T04:30:00.000Z',
+        last_success_at: '2026-03-19T04:30:00.000Z',
+        last_error_at: null,
+        last_error: null,
+        terminal_cleanup: null,
+        worker_hosts: [
+          {
+            name: 'worker-host-04',
+            transport: 'ssh' as const,
+            ssh_destination: 'codex@worker-host-04',
+            ssh_options: [],
+            max_concurrent_agents: 1,
+            node_path: null
+          }
+        ]
+      })),
+      snapshot: () => ({
+        status: 'ready' as const,
+        pipeline_id: 'provider-linear-worker',
+        source_path: '/repo/codex.orchestrator.json',
+        snapshot_path: '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+        last_reload_attempt_at: '2026-03-19T04:30:00.000Z',
+        last_success_at: '2026-03-19T04:30:00.000Z',
+        last_error_at: null,
+        last_error: null,
+        terminal_cleanup: null,
+        worker_hosts: [
+          {
+            name: 'worker-host-04',
+            transport: 'ssh' as const,
+            ssh_destination: 'codex@worker-host-04',
+            ssh_options: [],
+            max_concurrent_agents: 1,
+            node_path: null
+          }
+        ]
+      }),
+      getLaunchConfigPath: vi.fn(),
+      recordTerminalCleanupResult: vi.fn()
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      providerWorkflowConfigStore,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          updated_at: '2026-03-19T04:20:00.000Z'
+        })
+      })
+    });
+
+    await service.refresh();
+    await waitForMockCalls(setTimeoutSpy);
+
+    expect(state.claims.find((claim) => claim.provider_key === 'linear:lin-issue-1')).toMatchObject({
+      state: 'resumable',
+      reason: 'provider_issue_rehydrated_resumable_run',
+      task_id: 'task-1303-failed-local',
+      run_id: 'run-failed-local',
+      run_manifest_path: childPaths.manifestPath,
+      worker_host: null,
+      retry_queued: true,
+      retry_attempt: 1,
+      retry_due_at: '2026-03-19T04:30:10.000Z',
+      retry_error: null
+    });
+
+    await seedOccupiedRunningProviderWorkers(root, state);
+    const blockedRetryDueAt =
+      state.claims.find((claim) => claim.provider_key === 'linear:lin-issue-1')?.retry_due_at ?? null;
+    expect(blockedRetryDueAt).toBe('2026-03-19T04:30:10.000Z');
+    await vi.advanceTimersByTimeAsync(10_001);
+    await flushAsyncWork();
+    await waitForCondition(() => {
+      const persistedBlockedClaim = state.claims.find(
+        (claim) => claim.provider_key === 'linear:lin-issue-1'
+      );
+      return (
+        persistedBlockedClaim?.state === 'resumable' &&
+        persistedBlockedClaim?.reason === 'provider_issue_retry_resume_blocked:max_concurrency' &&
+        persistedBlockedClaim?.worker_host === null &&
+        persistedBlockedClaim?.retry_queued === true &&
+        typeof persistedBlockedClaim.retry_due_at === 'string' &&
+        Date.parse(persistedBlockedClaim.retry_due_at) > Date.parse('2026-03-19T04:30:10.000Z')
+      );
+    }, QUEUED_RETRY_SETTLE_TURNS * 8);
+
+    const blockedClaim = state.claims.find((claim) => claim.provider_key === 'linear:lin-issue-1');
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(blockedClaim).toMatchObject({
+      state: 'resumable',
+      reason: 'provider_issue_retry_resume_blocked:max_concurrency',
+      task_id: 'task-1303-failed-local',
+      run_id: 'run-failed-local',
+      run_manifest_path: childPaths.manifestPath,
+      worker_host: null,
+      retry_queued: true,
+      retry_attempt: 1,
+      retry_error: null
+    });
+    expect(Date.parse(blockedClaim?.retry_due_at ?? '')).toBeGreaterThan(
+      Date.parse('2026-03-19T04:30:10.000Z')
+    );
+  });
+
+  it('does not apply the local safety cap to retry resume when a retained remote worker host must be preserved without workflow config state', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-failed-remote-no-config'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-failed-remote-no-config');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-failed-remote-no-config',
+        task_id: 'task-1303-failed-remote-no-config',
+        status: 'failed',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        attempt_started_at: '2026-03-19T04:29:59.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z',
+        worker_host: 'worker-host-03'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: 'task-1303-failed-remote-no-config',
+      mapping_source: 'provider_id_fallback',
+      state: 'resumable',
+      reason: 'provider_issue_rehydrated_resumable_run',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-failed',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-failed-remote-no-config',
+      run_manifest_path: childPaths.manifestPath,
+      worker_host: 'worker-host-02',
+      launch_source: null,
+      launch_token: null
+    });
+
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          updated_at: '2026-03-19T04:20:00.000Z'
+        })
+      })
+    });
+
+    await service.refresh();
+    await waitForMockCalls(setTimeoutSpy);
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'resumable',
+      reason: 'provider_issue_rehydrated_resumable_run',
+      task_id: 'task-1303-failed-remote-no-config',
+      run_id: 'run-failed-remote-no-config',
+      run_manifest_path: childPaths.manifestPath,
+      worker_host: 'worker-host-03',
+      retry_queued: true,
+      retry_attempt: 1,
+      retry_due_at: '2026-03-19T04:30:10.000Z',
+      retry_error: null
+    });
+
+    await seedOccupiedRunningProviderWorkers(root, state);
+    await vi.advanceTimersByTimeAsync(10_001);
+    await flushAsyncWork();
+    await waitForMockCalls(launcher.resume, 1, 1024);
+
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume.mock.calls[0]?.[0]).toEqual({
+      runId: 'run-failed-remote-no-config',
+      actor: 'control-host',
+      reason: 'provider-retry',
+      workerHost: 'worker-host-03',
+      launchToken: expect.any(String)
+    });
+    expect(state.claims[0]).toMatchObject({
+      state: 'resuming',
+      reason: 'provider_issue_retry_resume_launched',
+      task_id: 'task-1303-failed-remote-no-config',
+      run_id: 'run-failed-remote-no-config',
+      run_manifest_path: childPaths.manifestPath,
+      worker_host: 'worker-host-03',
       launch_source: 'control-host',
       launch_token: expect.any(String),
       retry_queued: false,
