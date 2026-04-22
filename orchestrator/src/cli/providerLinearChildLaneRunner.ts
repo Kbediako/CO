@@ -250,7 +250,7 @@ function parseInlineProjectEntry(
     return null;
   }
   const value = dottedMatch[2].trim();
-  if (advanceTomlMultilineStringState(value, null) !== null || hasUnclosedTomlArrayValue(value)) {
+  if (advanceTomlMultilineStringState(value, null) !== null || advanceTomlArrayDepth(value) > 0) {
     return null;
   }
   return normalizeProjectPath(decodeTomlQuotedString(dottedMatch[1]));
@@ -266,25 +266,34 @@ function isBackslashEscaped(line: string, index: number): boolean {
   return backslashCount % 2 === 1;
 }
 
-function hasUnclosedTomlArrayValue(line: string): boolean {
-  let arrayDepth = 0;
-  let quote: '"' | '\'' | null = null;
+function advanceTomlArrayDepth(line: string, initialDepth = 0, multilineStringState: TomlMultilineStringState = null): number {
+  let arrayDepth = initialDepth;
+  let stringState = multilineStringState;
   for (let index = 0; index < line.length; index += 1) {
+    if (stringState === 'basic') {
+      if (line.startsWith('"""', index) && !isBackslashEscaped(line, index)) { stringState = null; index += 2; }
+      continue;
+    }
+    if (stringState === 'literal') {
+      if (line.startsWith("'''", index)) { stringState = null; index += 2; }
+      continue;
+    }
     const character = line[index];
-    if (!quote && character === '#') break;
-    if (character === '"' && quote !== '\'' && !isBackslashEscaped(line, index)) {
-      quote = quote === '"' ? null : '"';
+    if (character === '#') break;
+    if (line.startsWith('"""', index) && !isBackslashEscaped(line, index)) { stringState = 'basic'; index += 2; continue; }
+    if (line.startsWith("'''", index)) { stringState = 'literal'; index += 2; continue; }
+    if (character === '"' && !isBackslashEscaped(line, index)) {
+      for (index += 1; index < line.length && (line[index] !== '"' || isBackslashEscaped(line, index)); index += line[index] === '\\' ? 2 : 1);
       continue;
     }
-    if (character === '\'' && quote !== '"') {
-      quote = quote === '\'' ? null : '\'';
+    if (character === '\'') {
+      for (index += 1; index < line.length && line[index] !== '\''; index += 1);
       continue;
     }
-    if (quote) continue;
     if (character === '[') arrayDepth += 1;
     if (character === ']') arrayDepth = Math.max(0, arrayDepth - 1);
   }
-  return arrayDepth > 0;
+  return arrayDepth;
 }
 
 function advanceTomlMultilineStringState(line: string, state: TomlMultilineStringState): TomlMultilineStringState {
@@ -380,11 +389,13 @@ function removeProjectTablesFromRawConfig(rawConfig: string, removableProjects: 
   let skippingProjectTable: string | null = null;
   let currentTableKeyPath: string | null = null;
   let multilineStringState: TomlMultilineStringState = null;
+  let multilineArrayDepth = 0;
 
   for (const line of lines) {
-    const tableHeaderPath = multilineStringState ? null : parseTomlTableKeyPath(line);
+    const tableHeaderPath = multilineStringState || multilineArrayDepth > 0 ? null : parseTomlTableKeyPath(line);
     if (skippingProjectTable) {
       if (!tableHeaderPath || parseProjectNamespaceHeader(line) === skippingProjectTable) {
+        multilineArrayDepth = advanceTomlArrayDepth(line, multilineArrayDepth, multilineStringState);
         multilineStringState = advanceTomlMultilineStringState(line, multilineStringState);
         continue;
       }
@@ -403,10 +414,13 @@ function removeProjectTablesFromRawConfig(rawConfig: string, removableProjects: 
         ? null
         : parseInlineProjectEntry(line, currentTableKeyPath);
     if (inlineProjectPath && removableProjects.has(inlineProjectPath)) {
+      multilineArrayDepth = advanceTomlArrayDepth(line, multilineArrayDepth, multilineStringState);
+      multilineStringState = advanceTomlMultilineStringState(line, multilineStringState);
       continue;
     }
 
     keptLines.push(line);
+    multilineArrayDepth = advanceTomlArrayDepth(line, multilineArrayDepth, multilineStringState);
     multilineStringState = advanceTomlMultilineStringState(line, multilineStringState);
     if (tableHeaderPath) {
       currentTableKeyPath = tableHeaderPath.trim();

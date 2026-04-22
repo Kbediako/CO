@@ -114,9 +114,9 @@ describe('provider linear child lane runner', () => {
       '',
       `[ projects . "${laneWorkspacePath}" ]`,
       'trust_level = "trusted"',
-      'notes = """',
-      '[foo]',
-      '"""',
+      'notes = [',
+      '  [1,2]',
+      ']',
       '',
       `[ projects . "${laneWorkspacePath}" . metadata ]`,
       'owner = "codex"',
@@ -145,7 +145,7 @@ describe('provider linear child lane runner', () => {
     expect(plan.nextConfig).not.toContain(`[ projects . "${laneWorkspacePath}" ]\ntrust_level = "trusted"`);
     expect(plan.nextConfig).not.toContain(`[ projects . "${laneWorkspacePath}" . metadata ]`);
     expect(plan.nextConfig).not.toContain(`[[ projects . "${laneWorkspacePath}" . metadata . links ]]`);
-    expect(plan.nextConfig).not.toContain('[foo]');
+    expect(plan.nextConfig).not.toContain('  [1,2]');
     expect(plan.nextConfig).toContain('[ projects . "/Users/kbediako/Code/CO/.workspaces/linear-123/.child-lanes/tests-b" ]');
     expect(plan.nextConfig).toContain('[[profiles]]');
   });
