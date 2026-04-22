@@ -1016,22 +1016,35 @@ export function createProviderIssueHandoffService(
     };
   };
 
+  const cacheConfiguredWorkerHosts = (
+    workerHosts: ReturnType<typeof cloneProviderWorkerHostConfigs>
+  ) => {
+    const clonedWorkerHosts = cloneProviderWorkerHostConfigs(workerHosts);
+    const scope = configuredWorkerHostsScope.getStore();
+    if (scope) {
+      scope.workerHosts = clonedWorkerHosts;
+      return cloneProviderWorkerHostConfigs(scope.workerHosts);
+    }
+    return clonedWorkerHosts;
+  };
+
   const resolveConfiguredWorkerHosts = async () => {
     const scope = configuredWorkerHostsScope.getStore();
     if (scope?.workerHosts) {
       return cloneProviderWorkerHostConfigs(scope.workerHosts);
     }
     if (options.providerWorkflowConfigStore) {
-      await options.providerWorkflowConfigStore.refresh();
+      try {
+        await options.providerWorkflowConfigStore.refresh();
+      } catch {
+        return cacheConfiguredWorkerHosts(
+          options.providerWorkflowConfigStore.snapshot().worker_hosts ?? []
+        );
+      }
     }
-    const workerHosts = cloneProviderWorkerHostConfigs(
+    return cacheConfiguredWorkerHosts(
       options.providerWorkflowConfigStore?.snapshot().worker_hosts ?? []
     );
-    if (scope) {
-      scope.workerHosts = workerHosts;
-      return cloneProviderWorkerHostConfigs(scope.workerHosts);
-    }
-    return workerHosts;
   };
 
   const runWithConfiguredWorkerHostsCache = async <T>(
@@ -1490,11 +1503,14 @@ export function createProviderIssueHandoffService(
     return buildTrackedIssueClaimFields(trackedIssue);
   };
 
-  const createProviderAdmissionGate = async (): Promise<
+  const createProviderAdmissionGate = async (input: {
+    forceLocalWorkerOnly?: boolean;
+  } = {}): Promise<
     ReturnType<typeof createProviderPollDispatchBudget>
   > => {
     const gate = createProviderPollDispatchBudget(options.readFeatureToggles?.() ?? null, {
-      localWorkerOnly: await resolveLocalWorkerOnlyForCurrentOperation()
+      localWorkerOnly:
+        input.forceLocalWorkerOnly === true || await resolveLocalWorkerOnlyForCurrentOperation()
     });
     const seededOccupancyKeys = new Set<string>();
     const discoveredRuns = await discoverProviderIssueRunsForCurrentOperation();
@@ -1793,7 +1809,9 @@ export function createProviderIssueHandoffService(
     await runWithConfiguredWorkerHostsCache(async () => {
       const workerHost = resolveRehydratedActiveRunWorkerHost(input.run, input.claim);
       const resumeWorkerHost = await resolveResumeWorkerHost(workerHost);
-      const admissionGate = await createProviderAdmissionGate();
+      const admissionGate = await createProviderAdmissionGate({
+        forceLocalWorkerOnly: resumeWorkerHost === null
+      });
       if (!admissionGate.canDispatch(input.trackedIssue)) {
         await upsertProviderClaimAndPersist({
           ...input.claim,

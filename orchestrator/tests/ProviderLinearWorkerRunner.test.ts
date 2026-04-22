@@ -1554,7 +1554,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     });
 
     expect(continuationPrompt).toContain('Same-attempt deterministic provider mutation suppressions are in effect');
-    expect(continuationPrompt).toContain('Do not retry `child-lane` in this attempt until the parent provider-worker run has matching control-host provenance recorded in the manifest and active environment; preserve the fail-closed provenance contract instead of forcing the launch.');
+    expect(continuationPrompt).toContain('Do not retry `child-lane` until you first confirm the parent provider-worker run now has matching control-host provenance recorded in the manifest and active environment; if that provenance has already been repaired since the failed audit entry, you may retry once without restarting the attempt. Preserve the fail-closed provenance contract instead of forcing the launch.');
   });
 
   it('keeps non-launch child-lane provenance suppressions generic within the same attempt', () => {
@@ -1595,7 +1595,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     });
 
     expect(continuationPrompt).toContain('Same-attempt deterministic provider mutation suppressions are in effect');
-    expect(continuationPrompt).toContain('Do not retry `child-lane` in this attempt until you reconcile the pending child-lane record to the expected parent-owned pipeline, task, and issue binding; preserve the fail-closed provenance contract instead of forcing the decision.');
+    expect(continuationPrompt).toContain('Do not retry `child-lane` until you first confirm the pending child-lane record now matches the expected parent-owned pipeline, task, and issue binding; if that binding has already been repaired since the failed audit entry, you may retry once without restarting the attempt. Preserve the fail-closed provenance contract instead of forcing the decision.');
     expect(continuationPrompt).not.toContain('matching control-host provenance recorded in the manifest and active environment');
   });
 
