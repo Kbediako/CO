@@ -693,11 +693,40 @@ function parseProviderLinearChildLaneSessionJsonlLine(line: string): Record<stri
 }
 
 function commandShowsParentOwnedScopeDrift(command: string): boolean {
-  return (
-    /\bgh\b/u.test(command) ||
-    /\bgit\s+(?:commit|push)\b/u.test(command) ||
-    /codex-orchestrator(?:\.js)?(?:["'\s]|$).*?\slinear\b/u.test(command)
-  );
+  if (/\bgh\b/u.test(command) || /codex-orchestrator(?:\.js)?(?:["'\s]|$).*?\slinear\b/u.test(command)) {
+    return true;
+  }
+  const tokens = command.match(/"[^"]*"|'[^']*'|\S+/gu) ?? [];
+  const gitIndex = tokens.findIndex((token) => token.replace(/^['"]|['"]$/gu, '') === 'git');
+  if (gitIndex === -1) {
+    return false;
+  }
+  const gitOptionsWithValues = new Set([
+    '-c',
+    '-C',
+    '--exec-path',
+    '--git-dir',
+    '--work-tree',
+    '--namespace',
+    '--super-prefix',
+    '--config-env'
+  ]);
+  for (let index = gitIndex + 1; index < tokens.length; index += 1) {
+    const token = tokens[index]?.replace(/^['"]|['"]$/gu, '') ?? '';
+    if (!token) {
+      continue;
+    }
+    if (token === 'commit' || token === 'push') {
+      return true;
+    }
+    if (!token.startsWith('-')) {
+      return false;
+    }
+    if (gitOptionsWithValues.has(token) && !token.includes('=')) {
+      index += 1;
+    }
+  }
+  return false;
 }
 
 function queryShowsParentOwnedScopeDrift(query: string): boolean {
