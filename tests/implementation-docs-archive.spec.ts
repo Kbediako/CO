@@ -564,7 +564,7 @@ describe('implementation-docs-archive script', () => {
     });
 
     const taskPath = join(repo, 'tasks', 'tasks-9999-archive-test.md');
-    await writeFile(taskPath, '# Task Checklist\n\nOrdinary packet content.\n');
+    await writeFile(taskPath, '# Task Checklist\n\nOrdinary packet content.\n\n# Historical stub\n');
 
     await execFileAsync('node', [scriptPath], {
       cwd: repo,

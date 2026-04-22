@@ -26,7 +26,7 @@ const OWNER_REQUIRED_STATUSES = new Set(['active', 'deprecated']);
 const STALE_ELIGIBLE_STATUSES = new Set(['active', 'deprecated']);
 const OWNER_PLACEHOLDERS = new Set(['tbd', 'unassigned', 'owner']);
 const PRESERVED_HISTORICAL_STUB_PATH_PATTERNS = [/^tasks\/tasks-[^/]+\.md$/, /^\.agent\/task\/[^/]+\.md$/];
-const PRESERVED_HISTORICAL_STUB_HEADING_PATTERN = /^#\s+Historical stub\b/im;
+const PRESERVED_HISTORICAL_STUB_HEADING_PATTERN = /^\s*#\s+Historical stub\b/i;
 
 function showUsage() {
   console.log(`Usage: node scripts/docs-freshness.mjs [options]
@@ -597,7 +597,7 @@ export async function runDocsFreshness(
       if (!(await pathExists(abs))) {
         missingOnDisk.push(entryPath);
         metricsByClass.push({ doc_class: docClass, metric: 'missing_on_disk' });
-      } else {
+      } else if (status === PRESERVED_HISTORICAL_STUB_STATUS) {
         entryContent = await readFile(abs, 'utf8');
       }
     }

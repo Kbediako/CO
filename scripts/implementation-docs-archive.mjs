@@ -24,7 +24,7 @@ const REPORT_ONLY_FINDINGS_PATTERN = /^docs\/findings\/(\d+)-.*-deliberation\.md
 const PRESERVED_HISTORICAL_STUB_STATUS = 'preserved_historical_stub';
 const REGISTRY_STATUS_ARCHIVE_ELIGIBLE = new Set(['archived', 'deprecated']);
 const PRESERVED_HISTORICAL_STUB_PATH_PATTERNS = [/^tasks\/tasks-[^/]+\.md$/, /^\.agent\/task\/[^/]+\.md$/];
-const PRESERVED_HISTORICAL_STUB_HEADING_PATTERN = /^#\s+Historical stub\b/im;
+const PRESERVED_HISTORICAL_STUB_HEADING_PATTERN = /^\s*#\s+Historical stub\b/i;
 
 function showUsage() {
   console.log(`Usage: node scripts/implementation-docs-archive.mjs [options]

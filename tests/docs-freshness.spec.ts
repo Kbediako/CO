@@ -367,7 +367,11 @@ describe('docs freshness reporting', () => {
     createdDirs.push(repoRoot);
 
     await mkdir(join(repoRoot, 'tasks'), { recursive: true });
-    await writeFile(join(repoRoot, 'tasks', 'tasks-linear-example.md'), '# Task Checklist\n\nOrdinary packet.\n', 'utf8');
+    await writeFile(
+      join(repoRoot, 'tasks', 'tasks-linear-example.md'),
+      '# Task Checklist\n\nOrdinary packet.\n\n## Notes\n\n# Historical stub\n',
+      'utf8'
+    );
     await writeDocsFreshnessFixture(repoRoot, {
       registryEntries: [
         {
