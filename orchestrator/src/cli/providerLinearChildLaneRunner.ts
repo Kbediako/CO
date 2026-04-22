@@ -203,7 +203,7 @@ function parseTomlTableKeyPath(line: string): string | null {
   const match = line
     .trim()
     .match(/^(?:\[\[((?:[^"'\\\]]+|"(?:[^"\\]|\\.)*"|'[^']*')+)\]\]|\[((?:[^"'\\\]]+|"(?:[^"\\]|\\.)*"|'[^']*')+)\])\s*(?:#.*)?$/u);
-  return match?.[1] ?? match?.[2] ?? null;
+  return (match?.[1] ?? match?.[2] ?? null)?.trim() ?? null;
 }
 
 function parseProjectNamespaceHeader(line: string): string | null {
