@@ -1825,7 +1825,9 @@ export function createProviderIssueHandoffService(
       const resumeWorkerHost = await resolveResumeWorkerHost(workerHost);
       const admissionGate = await createProviderAdmissionGate({
         excludeClaimProviderKey:
-          input.claim.retry_queued === true ? input.claim.provider_key : null,
+          input.claim.retry_queued === true || input.claim.state === 'resumable'
+            ? input.claim.provider_key
+            : null,
         forceLocalWorkerOnly: resumeWorkerHost === null,
         preferredWorkerHost: resumeWorkerHost
       });

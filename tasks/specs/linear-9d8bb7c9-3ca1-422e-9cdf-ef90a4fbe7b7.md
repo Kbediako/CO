@@ -67,4 +67,4 @@ Restore one truthful queue contract across `Backlog`, `Ready`, `provider-intake-
 
 - Freshly created backlog follow-ups can still become `Ready` / active without deliberate sequencing.
 - Active provider claims can still exceed `max_allowed` during resumable/retry rehydration.
-- `co-status`, provider-intake state, and live Linear issue state can still disagree about which issues are truly active.
+- `co-status`, `provider-intake-state.json`, and live Linear issue state can still disagree about which issues are truly active.

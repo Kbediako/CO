@@ -26,7 +26,8 @@ Protect the control-host queue contract so helper-created follow-ups do not leav
 
 - [x] Docs-first packet created.
 - [x] Issue-quality review recorded in spec/task notes before implementation began.
-- [x] Manual standalone task/spec review approval captured in spec/task notes before implementation; manifest-backed standalone review captured before review handoff.
+- [x] Manual standalone task/spec review approval captured in spec/task notes before implementation.
+- [x] Manifest-backed standalone review captured before review handoff.
 - [x] Backlog follow-up hold implemented.
 - [x] Retry/resumable admission capacity implemented.
 - [x] Provider intake summary projection aligned.

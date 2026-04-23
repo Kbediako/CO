@@ -7889,6 +7889,8 @@ describe('createProviderIssueHandoffService', () => {
 
   it('excludes only the candidate occupancy identity when same-issue unreadable work still consumes capacity', async () => {
     vi.useFakeTimers();
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    try {
     vi.setSystemTime(new Date('2026-04-23T08:30:00.000Z'));
 
     const { root, paths } = await createHostPaths();
@@ -7946,7 +7948,6 @@ describe('createProviderIssueHandoffService', () => {
     });
 
     const { persist } = createPersistSnapshotSpy(state);
-    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
     const launcher = {
       start: vi.fn(async () => ({
         runId: 'run-should-not-start',
@@ -7995,7 +7996,10 @@ describe('createProviderIssueHandoffService', () => {
         `[provider-issue-run-discovery] skipping unreadable manifest ${brokenPaths.manifestPath}:`
       )
     );
+    } finally {
+    warnSpy.mockRestore();
     vi.useRealTimers();
+    }
   });
 
   it('counts active provider workers from a different start pipeline against host-global admission capacity', async () => {
