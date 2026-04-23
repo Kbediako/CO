@@ -201,6 +201,11 @@ function currentTaskIdCandidates() {
   return candidates;
 }
 
+function linearIssueIdFromTaskCandidate(taskId) {
+  const match = String(taskId ?? '').match(/(?:^|-)linear-([0-9a-f-]{36})(?:-|$)/i);
+  return match?.[1] ?? null;
+}
+
 function matchesCurrentIssueOrTask(entry) {
   const taskIds = currentTaskIdCandidates();
   if (taskIds.size === 0) {
@@ -213,7 +218,8 @@ function matchesCurrentIssueOrTask(entry) {
     if (entryTaskId === taskId || entryTaskId.startsWith(`${taskId}-`)) {
       return true;
     }
-    if (taskId.startsWith('linear-') && entryIssueId === taskId.slice('linear-'.length)) {
+    const issueId = linearIssueIdFromTaskCandidate(taskId);
+    if (issueId && entryIssueId === issueId) {
       return true;
     }
   }

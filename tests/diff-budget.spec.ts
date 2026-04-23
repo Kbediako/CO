@@ -370,6 +370,25 @@ describe('diff-budget script', () => {
     expect(result.stdout).toContain('files=0/0, lines=0/0');
   });
 
+  it('matches accepted child-lane evidence when the active task id has a dated canonical prefix', async () => {
+    const repo = await initRepository();
+    const laneWorkspace = join(repo, '.child-lanes', 'tests-child-run-1');
+    await mkdir(laneWorkspace, { recursive: true });
+    await writeFile(join(laneWorkspace, 'artifact.txt'), 'accepted dated task artifact\n'.repeat(10), 'utf8');
+    await writeAcceptedChildLaneEvidence(repo, laneWorkspace, {
+      taskId: 'linear-37c1035e-d319-4306-8a41-648f2ab836e6',
+      issueId: '37c1035e-d319-4306-8a41-648f2ab836e6',
+      issueIdentifier: 'CO-328'
+    });
+
+    const result = await runDiffBudget(repo, ['--base', 'HEAD', '--max-files', '0', '--max-lines', '0'], {
+      MCP_RUNNER_TASK_ID: '20260423-linear-37c1035e-d319-4306-8a41-648f2ab836e6'
+    });
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('✅ Diff budget: OK (base=HEAD');
+    expect(result.stdout).toContain('files=0/0, lines=0/0');
+  });
+
   it('still counts unrelated untracked files next to accepted child-lane workspace artifacts', async () => {
     const repo = await initRepository();
     const laneWorkspace = join(repo, '.child-lanes', 'tests-child-run-1');
