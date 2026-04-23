@@ -2,6 +2,55 @@
   "version": 1,
   "generated_at": "2026-04-23",
   "entries": [
+    {
+      "path": ".agent/task/linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-23",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-23",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-23",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-23",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-23",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-23",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/linear-3c52bf66-f805-4537-8671-ad1dec2f4623-docs-freshness-classification.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-23",
+      "cadence_days": 90
+    },
     {"path": ".agent/task/linear-d9c8d1b2-3b38-42ef-9087-556870e2d88f.md", "owner": "Codex (top-level agent), Review agent", "status": "active", "last_review": "2026-04-22", "cadence_days": 30},
     {"path": "docs/ACTION_PLAN-linear-d9c8d1b2-3b38-42ef-9087-556870e2d88f.md", "owner": "Codex (top-level agent), Review agent", "status": "active", "last_review": "2026-04-22", "cadence_days": 30},
     {"path": "docs/PRD-linear-d9c8d1b2-3b38-42ef-9087-556870e2d88f.md", "owner": "Codex (top-level agent), Review agent", "status": "active", "last_review": "2026-04-22", "cadence_days": 30},
@@ -2761,7 +2810,7 @@
       "path": "docs/guides/docs-freshness-cohorts.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-22",
+      "last_review": "2026-04-23",
       "cadence_days": 30
     },
     {
@@ -8915,28 +8964,28 @@
       "path": ".agent/task/1321-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-23",
+      "last_review": "2026-04-23",
       "cadence_days": 30
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-23",
+      "last_review": "2026-04-23",
       "cadence_days": 30
     },
     {
       "path": "docs/PRD-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-23",
+      "last_review": "2026-04-23",
       "cadence_days": 30
     },
     {
       "path": "docs/TECH_SPEC-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-23",
+      "last_review": "2026-04-23",
       "cadence_days": 30
     },
     {
@@ -8950,35 +8999,35 @@
       "path": "tasks/tasks-1321-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-23",
+      "last_review": "2026-04-23",
       "cadence_days": 30
     },
     {
       "path": ".agent/task/1320-coordinator-symphony-post-merge-retry-timer-follow-up.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-23",
+      "last_review": "2026-04-23",
       "cadence_days": 30
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-post-merge-retry-timer-follow-up.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-23",
+      "last_review": "2026-04-23",
       "cadence_days": 30
     },
     {
       "path": "docs/PRD-coordinator-symphony-post-merge-retry-timer-follow-up.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-23",
+      "last_review": "2026-04-23",
       "cadence_days": 30
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-post-merge-retry-timer-follow-up.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-23",
+      "last_review": "2026-04-23",
       "cadence_days": 30
     },
     {
@@ -8992,35 +9041,35 @@
       "path": "tasks/tasks-1320-coordinator-symphony-post-merge-retry-timer-follow-up.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-23",
+      "last_review": "2026-04-23",
       "cadence_days": 30
     },
     {
       "path": ".agent/task/1319-coordinator-symphony-end-to-end-operational-parity-remediation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-23",
+      "last_review": "2026-04-23",
       "cadence_days": 30
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-end-to-end-operational-parity-remediation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-23",
+      "last_review": "2026-04-23",
       "cadence_days": 30
     },
     {
       "path": "docs/PRD-coordinator-symphony-end-to-end-operational-parity-remediation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-23",
+      "last_review": "2026-04-23",
       "cadence_days": 30
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-end-to-end-operational-parity-remediation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-23",
+      "last_review": "2026-04-23",
       "cadence_days": 30
     },
     {
@@ -9034,7 +9083,7 @@
       "path": "tasks/tasks-1319-coordinator-symphony-end-to-end-operational-parity-remediation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-23",
+      "last_review": "2026-04-23",
       "cadence_days": 30
     },
     {
@@ -9741,7 +9790,7 @@
       "path": ".agent/task/0955-collab-orchestrator-integration.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-22",
+      "last_review": "2026-04-23",
       "cadence_days": 90
     },
     {
@@ -12240,7 +12289,7 @@
       "path": ".agent/task/linear-856c1318-524f-4db3-8d4a-b357ec51c304.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-23",
+      "last_review": "2026-04-23",
       "cadence_days": 30
     },
     {
@@ -12485,7 +12534,7 @@
       "path": "docs/ACTION_PLAN-collab-orchestrator-integration.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-22",
+      "last_review": "2026-04-23",
       "cadence_days": 90
     },
     {
@@ -14683,7 +14732,7 @@
       "path": "docs/ACTION_PLAN-linear-856c1318-524f-4db3-8d4a-b357ec51c304.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-23",
+      "last_review": "2026-04-23",
       "cadence_days": 30
     },
     {
@@ -15229,7 +15278,7 @@
       "path": "docs/findings/0955-collab-evals-2026-01-22.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-22",
+      "last_review": "2026-04-23",
       "cadence_days": 90
     },
     {
@@ -17483,14 +17532,14 @@
       "path": "docs/guides/collab-vs-mcp.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-22",
+      "last_review": "2026-04-23",
       "cadence_days": 90
     },
     {
       "path": "docs/guides/evaluation-playbook.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-22",
+      "last_review": "2026-04-23",
       "cadence_days": 90
     },
     {
@@ -17700,7 +17749,7 @@
       "path": "docs/PRD-collab-orchestrator-integration.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-22",
+      "last_review": "2026-04-23",
       "cadence_days": 90
     },
     {
@@ -19898,7 +19947,7 @@
       "path": "docs/PRD-linear-856c1318-524f-4db3-8d4a-b357ec51c304.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-23",
+      "last_review": "2026-04-23",
       "cadence_days": 30
     },
     {
@@ -20430,7 +20479,7 @@
       "path": "docs/reference/metrics-collab-context-rot.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-22",
+      "last_review": "2026-04-23",
       "cadence_days": 90
     },
     {
@@ -20444,7 +20493,7 @@
       "path": "docs/release-notes-template-addendum.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-22",
+      "last_review": "2026-04-23",
       "cadence_days": 90
     },
     {
@@ -20514,7 +20563,7 @@
       "path": "docs/TASKS.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-22",
+      "last_review": "2026-04-23",
       "cadence_days": 90
     },
     {
@@ -20675,7 +20724,7 @@
       "path": "docs/TECH_SPEC-collab-orchestrator-integration.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-22",
+      "last_review": "2026-04-23",
       "cadence_days": 90
     },
     {
@@ -22880,7 +22929,7 @@
       "path": "docs/TECH_SPEC-linear-856c1318-524f-4db3-8d4a-b357ec51c304.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-23",
+      "last_review": "2026-04-23",
       "cadence_days": 30
     },
     {
@@ -23580,7 +23629,7 @@
       "path": "tasks/index.json",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-22",
+      "last_review": "2026-04-23",
       "cadence_days": 90
     },
     {
@@ -23818,7 +23867,7 @@
       "path": "tasks/specs/0955-collab-orchestrator-integration.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-22",
+      "last_review": "2026-04-23",
       "cadence_days": 90
     },
     {
@@ -26772,7 +26821,7 @@
       "path": "tasks/tasks-0955-collab-orchestrator-integration.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-22",
+      "last_review": "2026-04-23",
       "cadence_days": 90
     },
     {
@@ -29271,7 +29320,7 @@
       "path": "tasks/tasks-linear-856c1318-524f-4db3-8d4a-b357ec51c304.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-23",
+      "last_review": "2026-04-23",
       "cadence_days": 30
     },
     {
