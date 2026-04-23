@@ -9,6 +9,8 @@ import process from 'node:process';
 const FORWARDABLE_SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP'];
 const MARKETPLACE_NAME = 'codex-orchestrator';
 const MARKETPLACE_SECTION = `[marketplaces.${MARKETPLACE_NAME}]`;
+const MARKETPLACE_ADD_HELP =
+  'Re-run codex marketplace add for Codex 0.121.0, or codex plugin marketplace add for Codex 0.122.0+.';
 const MARKETPLACE_SECTION_PATTERN = new RegExp(
   `^marketplaces\\s*\\.\\s*(?:"${escapeRegExp(MARKETPLACE_NAME)}"|'${escapeRegExp(MARKETPLACE_NAME)}'|${escapeRegExp(MARKETPLACE_NAME)})$`,
   'u'
@@ -19,7 +21,7 @@ function main() {
   const entrypoint = join(sourceRoot, 'bin', 'codex-orchestrator.js');
   if (!existsSync(entrypoint)) {
     throw new Error(
-      `Codex Orchestrator marketplace source is missing ${entrypoint}. Keep the marketplace source installed or re-run codex plugin marketplace add.`
+      `Codex Orchestrator marketplace source is missing ${entrypoint}. Keep the marketplace source installed. ${MARKETPLACE_ADD_HELP}`
     );
   }
 
@@ -59,7 +61,7 @@ function main() {
 function resolveMarketplaceSourceRoot() {
   const { codexHome, configPath } = resolveCodexPaths();
   if (!existsSync(configPath)) {
-    throw new Error(`Unable to locate Codex config at ${configPath}. Re-run codex plugin marketplace add for Codex Orchestrator.`);
+    throw new Error(`Unable to locate Codex config at ${configPath}. ${MARKETPLACE_ADD_HELP}`);
   }
 
   const raw = readFileSync(configPath, 'utf8');
@@ -68,7 +70,7 @@ function resolveMarketplaceSourceRoot() {
   const sourceType = marketplaceConfig?.sourceType;
   if (!source) {
     throw new Error(
-      `Codex config at ${configPath} is missing ${MARKETPLACE_SECTION}. Re-run codex plugin marketplace add for Codex Orchestrator.`
+      `Codex config at ${configPath} is missing ${MARKETPLACE_SECTION}. ${MARKETPLACE_ADD_HELP}`
     );
   }
   if (sourceType === 'local') {
@@ -98,7 +100,7 @@ function resolveInstalledMarketplaceSourceRoot(codexHome, source) {
     return installedMarketplaceRoot;
   }
   throw new Error(
-    `Codex marketplace source resolved to ${JSON.stringify(source)}, but ${installedMarketplaceRoot} is unavailable. Re-run codex plugin marketplace add for Codex Orchestrator.`
+    `Codex marketplace source resolved to ${JSON.stringify(source)}, but ${installedMarketplaceRoot} is unavailable. ${MARKETPLACE_ADD_HELP}`
   );
 }
 

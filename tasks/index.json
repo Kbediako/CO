@@ -29,6 +29,54 @@
       }
     },
     {
+      "id": "20260424-linear-09b7afc2-529a-40cc-975c-57c33f2bb596",
+      "title": "CO: Align docs/skills-release with post-0.121 marketplace command truth",
+      "relates_to": "tasks/tasks-linear-09b7afc2-529a-40cc-975c-57c33f2bb596.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-24",
+      "approvals": {
+        "preimplementation_issue_quality": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-24",
+          "status": "approved",
+          "summary": "Current-main review confirms CO-339 is a narrow release-guide parity lane: preserve exact 0.121.0 / 0.122.0+ marketplace command truth, current 0.123.0 workflow pins, and distinct cloud-canary wording without reopening CO-337."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-09b7afc2-529a-40cc-975c-57c33f2bb596.md",
+        "task": "tasks/tasks-linear-09b7afc2-529a-40cc-975c-57c33f2bb596.md",
+        "agent_task": ".agent/task/linear-09b7afc2-529a-40cc-975c-57c33f2bb596.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-09b7afc2-529a-40cc-975c-57c33f2bb596.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-09b7afc2-529a-40cc-975c-57c33f2bb596.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-09b7afc2-529a-40cc-975c-57c33f2bb596.md"
+        }
+      }
+    },
+    {
+      "id": "20260424-linear-dc06b7ed-89e6-4662-911c-52a2991cbf7a",
+      "title": "CO: Re-audit Codex CLI 0.123.0 posture and correct marketplace command-surface assumptions",
+      "relates_to": "tasks/tasks-linear-dc06b7ed-89e6-4662-911c-52a2991cbf7a.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-24",
+      "paths": {
+        "spec": "tasks/specs/linear-dc06b7ed-89e6-4662-911c-52a2991cbf7a.md",
+        "task": "tasks/tasks-linear-dc06b7ed-89e6-4662-911c-52a2991cbf7a.md",
+        "agent_task": ".agent/task/linear-dc06b7ed-89e6-4662-911c-52a2991cbf7a.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-dc06b7ed-89e6-4662-911c-52a2991cbf7a.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-dc06b7ed-89e6-4662-911c-52a2991cbf7a.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-dc06b7ed-89e6-4662-911c-52a2991cbf7a.md"
+        }
+      }
+    },
+    {
       "id": "20260424-linear-703362d6-afdb-42e7-852f-5dd64a314849",
       "title": "CO: prepare and ship the next release after v0.1.38 with all main-branch work since March 3, 2026",
       "relates_to": "tasks/tasks-linear-703362d6-afdb-42e7-852f-5dd64a314849.md",

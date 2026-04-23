@@ -935,7 +935,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
         codexBin: 'missing-codex',
         allowMarketplaceSkip: false,
         codexAvailable: false,
-        marketplaceCapable: false
+        marketplaceCommandArgs: null
       })
     ).toEqual({
       status: 'fail',
@@ -950,7 +950,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
         allowMarketplaceSkip: true,
         marketplaceSkipReason: '',
         codexAvailable: false,
-        marketplaceCapable: false
+        marketplaceCommandArgs: null
       })
     ).toEqual({
       status: 'fail',
@@ -965,7 +965,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
         allowMarketplaceSkip: true,
         marketplaceSkipReason: 'local docs-only validation; no marketplace coverage claimed',
         codexAvailable: false,
-        marketplaceCapable: false
+        marketplaceCommandArgs: null
       })
     ).toEqual({
       status: 'skip',
@@ -983,13 +983,13 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
         codexBin: 'codex-0.118',
         allowMarketplaceSkip: false,
         codexAvailable: true,
-        marketplaceCapable: false
+        marketplaceCommandArgs: null
       })
     ).toEqual({
       status: 'fail',
       reason: 'marketplace-unsupported',
       message:
-        'Marketplace smoke requires a Codex CLI with `plugin marketplace add` support. Set PACK_SMOKE_ALLOW_MARKETPLACE_SKIP=1 with PACK_SMOKE_MARKETPLACE_SKIP_REASON only for local-dev opt-out.'
+        'Marketplace smoke requires a Codex CLI with a supported marketplace add command (`codex plugin marketplace add` or `codex marketplace add`). Set PACK_SMOKE_ALLOW_MARKETPLACE_SKIP=1 with PACK_SMOKE_MARKETPLACE_SKIP_REASON only for local-dev opt-out.'
     });
 
     expect(
@@ -998,17 +998,34 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
         allowMarketplaceSkip: true,
         marketplaceSkipReason: 'explicit pre-0.121 compatibility lane; no release coverage claimed',
         codexAvailable: true,
-        marketplaceCapable: false
+        marketplaceCommandArgs: null
       })
     ).toEqual({
       status: 'skip',
       reason: 'marketplace-unsupported',
       message:
-        'Skipping marketplace smoke: codex-0.118 does not expose codex plugin marketplace add. Reason: explicit pre-0.121 compatibility lane; no release coverage claimed'
+        'Skipping marketplace smoke: codex-0.118 does not expose a supported marketplace add command (`codex plugin marketplace add` or `codex marketplace add`). Reason: explicit pre-0.121 compatibility lane; no release coverage claimed'
     });
   });
 
-  it('pins CI and release workflows to install marketplace-capable Codex before pack:smoke', async () => {
+  it('reports the resolved marketplace command when the CLI exposes a supported add path', async () => {
+    const { resolveMarketplaceSmokePrerequisite } = await import('../scripts/pack-smoke.mjs');
+
+    expect(
+      resolveMarketplaceSmokePrerequisite({
+        codexBin: 'codex-0.123',
+        allowMarketplaceSkip: false,
+        codexAvailable: true,
+        marketplaceCommandArgs: ['plugin', 'marketplace', 'add']
+      })
+    ).toEqual({
+      status: 'run',
+      reason: 'marketplace-supported',
+      message: 'Marketplace smoke prerequisites satisfied via codex plugin marketplace add.'
+    });
+  });
+
+  it('pins CI and release workflows to install the corrected marketplace-capable Codex before pack:smoke', async () => {
     const workflows = [
       '.github/workflows/core-lane.yml',
       '.github/workflows/pack-smoke-backstop.yml',

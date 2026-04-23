@@ -55,6 +55,7 @@ Define the current stable compatibility/adoption target for CO and keep newer CL
   - Promote: active CO compatibility/adoption target moves from `0.118.0` to `0.123.0` because CO-322 found no P0/P1 local command, marketplace, or runtime-mode regression and CO-335 completed both cloud gates cleanly.
   - Promote: release-facing downstream-smoke and `cloud-canary` workflows move to explicit `@openai/codex@0.123.0`.
   - Release ship remains out of scope for CO-335; CO-316 may proceed with the cloud-gate blocker cleared, subject to its own release prerequisites.
+- 2026-04-24: `CO-337` rechecked the marketplace command relocation truth that older notes had partially compressed. Local `codex-cli 0.123.0` still exposes `plugin` at top level, `codex plugin marketplace add --help` succeeds, and top-level `codex marketplace add --help` fails. Versioned repro confirms `0.121.0` accepts both add paths, while `0.122.0` and `0.123.0` require `codex plugin marketplace add`. This does not change the promoted `0.123.0` posture or workflow pins on current `main`; it corrects the command-surface wording used by `pack:smoke`, launcher/operator messages, and downstream setup docs.
 
 ## Required Evidence Gates
 For any change to the current `0.123.0` / `gpt-5.4` posture, or any promotion of a newer Codex build in CO:
