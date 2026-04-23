@@ -23,6 +23,7 @@ last_review: 2026-04-24
 
 ## Parity / Alignment Matrix
 - Current truth: the lane started with package version `0.1.38`, but the release-prep branch now stages `0.2.0`; release-facing workflow pins and policy already target Codex `0.123.0`; `v0.1.38..origin/main` is a large unreleased delta.
+- Current truth: the first `v0.2.0` tag workflow created the GitHub release asset successfully but the publish job failed before npm upload because the runner-side `npm install --global npm@^11.5.1` bootstrap in `.github/workflows/release.yml` threw `MODULE_NOT_FOUND: promise-retry`; the lane therefore needs a bounded workflow fix plus a manual-dispatch retry against the existing tag rather than a second release tag.
 - Reference truth: release SOP requires clean-tree validation, signed tag verification, tag-driven release workflow, and package smoke coverage.
 - Target truth / intended delta: version and notes reflect the actual released delta, PR merges cleanly, and publish completes from clean `main`.
 - Explicitly out-of-scope differences: unrelated docs-freshness maintenance, new posture promotion beyond `0.123.0`, or broad runtime redesign.
@@ -58,6 +59,7 @@ last_review: 2026-04-24
 - Architecture / design adjustments:
   - branch-phase: prepare version bump, release notes, and validation on `linear/co-316-release-prep`
   - release-phase: after merge, use clean shared-root `main` for tag and publish
+  - release-recovery phase: if the tag workflow fails before publish, keep the existing signed tag, fix the bounded workflow bug on `main`, and rerun the workflow via `workflow_dispatch` against that existing tag instead of minting a replacement tag.
 - Data model changes / migrations: release-doc and task-packet registration only; no runtime schema changes are implied by this packet.
 - External dependencies / integrations: GitHub, npm, local git signing config, current release workflow secrets and trusted-publishing posture.
 

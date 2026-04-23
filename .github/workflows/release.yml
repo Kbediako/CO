@@ -314,9 +314,9 @@ jobs:
 
       - name: Ensure npm trusted publishing prerequisites
         run: |
-          npm install --global npm@^11.5.1
           node --version
           npm --version
+          npx --yes npm@11.5.1 --version
 
       - name: Download release asset with gh (preferred)
         id: gh-download
@@ -398,10 +398,11 @@ jobs:
 
           # Prefer trusted publishing (OIDC) so releases do not depend on long-lived tokens.
           # Use a temporary token-free npmrc to avoid accidental NODE_AUTH_TOKEN-based auth.
+          PUBLISH_NPM=(npx --yes npm@11.5.1)
           OIDC_NPMRC="$(mktemp)"
           printf 'registry=https://registry.npmjs.org/\n' > "$OIDC_NPMRC"
           set +e
-          NODE_AUTH_TOKEN= NPM_CONFIG_USERCONFIG="$OIDC_NPMRC" npm publish "$TARBALL_PATH" --tag "$DIST_TAG" --provenance
+          NODE_AUTH_TOKEN= NPM_CONFIG_USERCONFIG="$OIDC_NPMRC" "${PUBLISH_NPM[@]}" publish "$TARBALL_PATH" --tag "$DIST_TAG" --provenance
           OIDC_STATUS=$?
           set -e
           rm -f "$OIDC_NPMRC"
@@ -417,7 +418,7 @@ jobs:
 
           PUBLISH_LOG="$(mktemp)"
           set +e
-          NODE_AUTH_TOKEN="$NPM_TOKEN" npm publish "$TARBALL_PATH" --tag "$DIST_TAG" 2>&1 | tee "$PUBLISH_LOG"
+          NODE_AUTH_TOKEN="$NPM_TOKEN" "${PUBLISH_NPM[@]}" publish "$TARBALL_PATH" --tag "$DIST_TAG" 2>&1 | tee "$PUBLISH_LOG"
           TOKEN_STATUS=${PIPESTATUS[0]}
           set -e
           if [[ $TOKEN_STATUS -ne 0 ]] && grep -q "npm error code EOTP" "$PUBLISH_LOG"; then
