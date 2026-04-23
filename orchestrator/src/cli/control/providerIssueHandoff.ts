@@ -1499,7 +1499,10 @@ export function createProviderIssueHandoffService(
       const providerKey = buildProviderIssueKey(run.provider, run.issueId);
       const claim = claimByProviderKey.get(providerKey) ?? null;
       const occupancyKey = run.manifestPath || run.runId;
-      if (isReleasedProviderClaimRunIdentityMatch(claim, run)) {
+      if (
+        isReleasedProviderClaimRunIdentityMatch(claim, run) ||
+        !shouldCountQueuedAdmissionOccupancyForClaim(claim, run)
+      ) {
         continue;
       }
       if (seededOccupancyKeys.has(occupancyKey)) {
@@ -1516,8 +1519,8 @@ export function createProviderIssueHandoffService(
       if (seededOccupancyKeys.has(record.manifestPath)) {
         continue;
       }
-      seededOccupancyKeys.add(record.manifestPath);
       const providerKey = buildProviderIssueKey(record.provider, record.issueId);
+      seededOccupancyKeys.add(record.manifestPath);
       gate.noteOccupied({ state: claimStateByProviderKey.get(providerKey) ?? null });
     }
 
@@ -4228,7 +4231,10 @@ export function createProviderIssueHandoffService(
           pollDispatchBudget.noteOccupied(trackedIssue);
         };
         const noteOccupiedPollDispatchSlotForRetainedClaim = (
-          claim: Pick<ProviderIntakeClaimRecord, 'state' | 'retry_queued' | 'run_id' | 'run_manifest_path'>,
+          claim: Pick<
+            ProviderIntakeClaimRecord,
+            'state' | 'retry_queued' | 'run_id' | 'run_manifest_path' | 'issue_state' | 'issue_state_type'
+          >,
           run: ProviderIssueRunRecord | null,
           providerKey: string,
           trackedIssue: Pick<LiveLinearTrackedIssue, 'state'>
@@ -4338,7 +4344,10 @@ export function createProviderIssueHandoffService(
           const providerKey = buildProviderIssueKey(run.provider, run.issueId);
           const claim = claimByProviderKey.get(providerKey) ?? null;
           const occupancyKey = resolveProviderPollRunOccupancyKey(run);
-          if (isReleasedProviderClaimRunIdentityMatch(claim, run)) {
+          if (
+            isReleasedProviderClaimRunIdentityMatch(claim, run) ||
+            !shouldCountQueuedAdmissionOccupancyForClaim(claim, run)
+          ) {
             continue;
           }
           if (seededPollOccupancyKeys.has(occupancyKey)) {
@@ -4359,8 +4368,8 @@ export function createProviderIssueHandoffService(
           if (seededPollOccupancyKeys.has(record.manifestPath)) {
             continue;
           }
-          seededPollOccupancyKeys.add(record.manifestPath);
           const providerKey = buildProviderIssueKey(record.provider, record.issueId);
+          seededPollOccupancyKeys.add(record.manifestPath);
           noteOccupiedPollDispatchSlot(
             record.manifestPath,
             providerKey,
@@ -6360,12 +6369,40 @@ function shouldProviderClaimOccupyPollDispatchSlot(
   return claim.state === 'starting' || claim.state === 'resuming' || claim.state === 'running';
 }
 
-function shouldRetainedProviderClaimOccupyPollDispatchSlot(
-  claim: Pick<ProviderIntakeClaimRecord, 'state' | 'retry_queued'>,
-  run: Pick<ProviderIssueRunRecord, 'status'> | null
+function shouldCountQueuedAdmissionOccupancyForClaim(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'state' | 'retry_queued' | 'issue_state' | 'issue_state_type' | 'run_id' | 'run_manifest_path'
+  > | null,
+  run: Pick<ProviderIssueRunRecord, 'runId' | 'manifestPath'>
 ): boolean {
-  if (run?.status === 'in_progress' || run?.status === 'queued') {
+  if (!claim) {
     return true;
+  }
+  if (!hasProviderClaimRunIdentityMatch(claim, run)) {
+    return true;
+  }
+  if (claim.state !== 'completed') {
+    return true;
+  }
+  if (claim.retry_queued === true) {
+    return true;
+  }
+  return resolveProviderClaimIssueStateForAdmission(claim, { status: 'queued' }) !== null;
+}
+
+function shouldRetainedProviderClaimOccupyPollDispatchSlot(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'state' | 'retry_queued' | 'issue_state' | 'issue_state_type' | 'run_id' | 'run_manifest_path'
+  >,
+  run: Pick<ProviderIssueRunRecord, 'status' | 'runId' | 'manifestPath'> | null
+): boolean {
+  if (run?.status === 'in_progress') {
+    return true;
+  }
+  if (run?.status === 'queued') {
+    return shouldCountQueuedAdmissionOccupancyForClaim(claim, run);
   }
   if (claim.retry_queued === true) {
     return true;
@@ -6399,6 +6436,16 @@ function isReleasedProviderClaimRunIdentityMatch(
   run: Pick<ProviderIssueRunRecord, 'runId' | 'manifestPath'>
 ): boolean {
   if (claim?.state !== 'released') {
+    return false;
+  }
+  return hasProviderClaimRunIdentityMatch(claim, run);
+}
+
+function hasProviderClaimRunIdentityMatch(
+  claim: Pick<ProviderIntakeClaimRecord, 'run_id' | 'run_manifest_path'> | null,
+  run: Pick<ProviderIssueRunRecord, 'runId' | 'manifestPath'>
+): boolean {
+  if (!claim) {
     return false;
   }
   return (

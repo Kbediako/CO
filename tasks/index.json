@@ -1,6 +1,36 @@
 {
   "items": [
     {
+      "id": "20260423-linear-e17b8d21-d5f8-4152-8c19-2991f782f830",
+      "title": "CO-317 fresh-discovery admission backfill after duplicate or terminal cleanup frees capacity",
+      "relates_to": "tasks/tasks-linear-e17b8d21-d5f8-4152-8c19-2991f782f830.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-23",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-23",
+          "status": "produced",
+          "manifest": ".runs/linear-e17b8d21-d5f8-4152-8c19-2991f782f830-docs-packet/cli/2026-04-22T23-46-10-100Z-8a0879e9/manifest.json",
+          "source_anchor": "ctx:sha256:d0b11d0fa69808305ff69c96ea1159fc9de38e49b5185f8fb9074cac443ad3c9#chunk:c000001",
+          "summary": "Docs-first packet created for CO-317 fresh-discovery admission backfill after duplicate or terminal cleanup frees capacity. The parent-provided source anchor and manifest are recorded above, but this child checkout has no local .runs tree, so the packet is anchored on the launch brief plus adjacent provider-intake, cleanup, selected-claim, and fresh-discovery docs. Scope stays on provider intake, fresh discovery, and admission-budget or selected-claim refresh after cleanup frees capacity, and explicitly rejects generic Linear queue redesign or cleanup-feature redesign."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-e17b8d21-d5f8-4152-8c19-2991f782f830.md",
+        "task": "tasks/tasks-linear-e17b8d21-d5f8-4152-8c19-2991f782f830.md",
+        "agent_task": ".agent/task/linear-e17b8d21-d5f8-4152-8c19-2991f782f830.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-e17b8d21-d5f8-4152-8c19-2991f782f830.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-e17b8d21-d5f8-4152-8c19-2991f782f830.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-e17b8d21-d5f8-4152-8c19-2991f782f830.md"
+        }
+      }
+    },
+    {
       "id": "20260421-linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb",
       "title": "CO: replace remaining dead-code-pruning archive README pointers with durable guidance",
       "relates_to": "tasks/tasks-linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md",
