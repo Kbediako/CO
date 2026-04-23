@@ -4,7 +4,7 @@ import process from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { existsSync } from 'node:fs';
-import { mkdir, open, readFile, readdir, realpath, stat } from 'node:fs/promises';
+import { mkdir, open, readFile, readdir, realpath, rm, stat } from 'node:fs/promises';
 
 import { logger } from '../logger.js';
 import {
@@ -35,7 +35,11 @@ import { readSharedLinearBudgetStatus, type LinearBudgetStatus } from './control
 import {
   classifyProviderLinearWorkerLifecycle,
 } from './control/providerLinearWorkflowStates.js';
-import { readControlHostOwnershipOperatorHint } from './control/controlHostOwnership.js';
+import {
+  readControlHostOwnershipDiagnosticSummary,
+  readControlHostOwnershipOperatorHint,
+  type ControlHostOwnershipPollingPayload
+} from './control/controlHostOwnership.js';
 import {
   PROVIDER_LINEAR_AUDIT_ENV_VAR,
   PROVIDER_LINEAR_PARALLELIZATION_REASONS,
@@ -114,6 +118,9 @@ const PROVIDER_LINEAR_WORKER_CHILD_LANES_LOCK_FILENAME = `${PROVIDER_LINEAR_WORK
 const PROVIDER_WORKER_DEFAULT_MAX_TURNS = 20;
 const PROVIDER_CONTROL_HOST_REFRESH_PATH = '/api/v1/refresh';
 const PROVIDER_CONTROL_HOST_REFRESH_TIMEOUT_MS = 15_000;
+const PROVIDER_CONTROL_HOST_REFRESH_RETRY_DELAY_MS = 250;
+const PROVIDER_CONTROL_HOST_REFRESH_FAILURE_FILENAME =
+  'provider-control-host-refresh-failure.json';
 const PROVIDER_LINEAR_TRACKED_ISSUE_RATE_LIMIT_MAX_WAIT_MS = 15_000;
 const PROVIDER_LINEAR_TRACKED_ISSUE_RATE_LIMIT_BUCKETS = [
   {
@@ -385,6 +392,25 @@ export interface ProviderLinearTrackedIssueError {
   status: number;
   retryable: boolean;
   details?: Record<string, unknown>;
+}
+
+interface ProviderControlHostRefreshFailureDiagnostic {
+  schema_version: 1;
+  reason: 'provider_control_host_refresh_failed';
+  failure_kind: 'refresh_request_timeout' | 'fetch_failed' | 'request_failed';
+  message: string;
+  issue_id: string;
+  issue_identifier: string;
+  owner_status: ProviderLinearWorkerProof['owner_status'];
+  end_reason: string | null;
+  observed_at: string;
+  control_host_run_dir: string;
+  control_host_ownership: ControlHostOwnershipPollingPayload | null;
+  retry: {
+    attempts: number;
+    retried_after_stale_owner_reclaim: boolean;
+    recovered: false;
+  };
 }
 
 export interface ProviderLinearWorkerJsonlParseResult {
@@ -6405,112 +6431,273 @@ async function requestProviderControlHostRefresh(input: {
     return;
   }
   let controlHostRunDir: string | null = null;
-  try {
-    const manifestTarget = await resolveProviderControlHostManifestPath(
-      input.currentManifestPath,
-      input.env,
-      input.manifest
-    );
-    if (!manifestTarget) {
-      return;
-    }
-    const canonicalRunsRoot = manifestTarget.currentRun.canonicalRunsRoot;
-    const canonicalRunDir = await realpathOrResolveIfMissing(dirname(manifestTarget.manifestPath));
-    controlHostRunDir = canonicalRunDir;
-    const canonicalManifestPath = await realpathOrResolveIfMissing(
-      resolve(canonicalRunDir, basename(manifestTarget.manifestPath))
-    );
-    if (
-      !isPathWithinRoot(canonicalRunDir, canonicalRunsRoot) ||
-      !isPathWithinRoot(canonicalManifestPath, canonicalRunsRoot)
-    ) {
-      throw new Error('control-host manifest path invalid');
-    }
-    const workerTaskId = resolveProviderWorkerTaskId(manifestTarget.currentRun, input.manifest);
-    if (!workerTaskId) {
-      throw new Error('provider task id unavailable');
-    }
-    const controlHostRepoRoot = await resolveProviderControlHostRepoRoot({
-      manifestPath: canonicalManifestPath,
-      workerWorkspacePath: input.repoRoot,
-      taskId: workerTaskId
-    });
-    if (!controlHostRepoRoot) {
-      throw new Error('control-host repo root unavailable');
-    }
-    const allowedBindHosts = await resolveAllowedControlHostBindHosts(controlHostRepoRoot, input.env);
-    const endpointPath = resolve(canonicalRunDir, 'control_endpoint.json');
-    const canonicalEndpointPath = await realpath(endpointPath);
-    if (!isPathWithinRoot(canonicalEndpointPath, canonicalRunDir)) {
-      throw new Error('control endpoint path invalid');
-    }
-    const endpointRaw = await readFile(canonicalEndpointPath, 'utf8');
-    const endpoint = JSON.parse(endpointRaw) as { base_url?: unknown; token_path?: unknown };
-    const baseUrl = validateControlHostBaseUrl(endpoint.base_url, allowedBindHosts);
-    const resolvedTokenPath =
-      typeof endpoint.token_path === 'string' && endpoint.token_path.trim().length > 0
-        ? resolve(canonicalRunDir, endpoint.token_path)
-        : resolve(canonicalRunDir, 'control_auth.json');
-    if (!isPathWithinRoot(resolvedTokenPath, canonicalRunDir)) {
-      throw new Error('control auth path invalid');
-    }
-    const canonicalTokenPath = await realpath(resolvedTokenPath);
-    if (!isPathWithinRoot(canonicalTokenPath, canonicalRunDir)) {
-      throw new Error('control auth path invalid');
-    }
-    const token = await readControlEndpointToken(canonicalTokenPath);
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), PROVIDER_CONTROL_HOST_REFRESH_TIMEOUT_MS);
-    const requestSignal = input.abortSignal
-      ? AbortSignal.any([controller.signal, input.abortSignal])
-      : controller.signal;
+  let attempts = 0;
+  let retriedAfterStaleOwnerReclaim = false;
+  while (attempts < 2) {
+    attempts += 1;
     try {
-      const response = await fetch(new URL(PROVIDER_CONTROL_HOST_REFRESH_PATH, baseUrl), {
-        method: 'POST',
-        redirect: 'error',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-          [CSRF_HEADER]: token
-        },
-        body: JSON.stringify({
-          action: 'refresh',
-          source: 'provider-linear-worker',
-          issue_id: input.proof.issue_id,
-          issue_identifier: input.proof.issue_identifier,
-          owner_status: input.proof.owner_status,
-          end_reason: input.proof.end_reason
-        }),
-        signal: requestSignal
+      controlHostRunDir = await requestProviderControlHostRefreshOnce({
+        currentManifestPath: input.currentManifestPath,
+        env: input.env,
+        manifest: input.manifest,
+        proof: input.proof,
+        repoRoot: input.repoRoot,
+        abortSignal: input.abortSignal
       });
-      const responseBody = await response.text();
-      if (response.status !== 202) {
-        const responseDetail = responseBody.trim();
-        throw new Error(
-          responseDetail
-            ? `refresh request failed with status ${response.status}: ${responseDetail}`
-            : `refresh request failed with status ${response.status}`
-        );
+      if (controlHostRunDir) {
+        try {
+          await rm(join(controlHostRunDir, PROVIDER_CONTROL_HOST_REFRESH_FAILURE_FILENAME), {
+            force: true
+          });
+        } catch (cleanupError) {
+          input.log.warn(
+            `provider-linear-worker could not clear stale ${PROVIDER_CONTROL_HOST_REFRESH_FAILURE_FILENAME} for ${input.proof.issue_identifier}: ${
+              (cleanupError as Error)?.message ?? String(cleanupError)
+            }`
+          );
+        }
       }
-    } finally {
-      clearTimeout(timer);
-    }
-  } catch (error) {
-    if (input.abortSignal?.aborted === true) {
+      return;
+    } catch (error) {
+      if (input.abortSignal?.aborted === true) {
+        return;
+      }
+      const message = getProviderControlHostRefreshFailureMessage(error);
+      controlHostRunDir ??= await resolveProviderControlHostRunDirForDiagnostic({
+        currentManifestPath: input.currentManifestPath,
+        env: input.env,
+        manifest: input.manifest
+      }).catch(() => null);
+      const ownershipDiagnostic = controlHostRunDir
+        ? await readControlHostOwnershipDiagnosticSummary(controlHostRunDir).catch(() => null)
+        : null;
+      if (
+        attempts === 1 &&
+        shouldRetryProviderControlHostRefreshAfterStaleOwnerReclaim(message, ownershipDiagnostic)
+      ) {
+        retriedAfterStaleOwnerReclaim = true;
+        await sleep(PROVIDER_CONTROL_HOST_REFRESH_RETRY_DELAY_MS, undefined, {
+          signal: input.abortSignal
+        }).catch(() => undefined);
+        if (input.abortSignal?.aborted) {
+          return;
+        }
+        continue;
+      }
+      if (controlHostRunDir) {
+        try {
+          await writeProviderControlHostRefreshFailureDiagnostic({
+            runDir: controlHostRunDir,
+            message,
+            issueId: input.proof.issue_id,
+            issueIdentifier: input.proof.issue_identifier,
+            ownerStatus: input.proof.owner_status,
+            endReason: input.proof.end_reason,
+            ownershipDiagnostic,
+            attempts,
+            retriedAfterStaleOwnerReclaim
+          });
+        } catch (persistError) {
+          input.log.warn(
+            `provider-linear-worker could not persist ${PROVIDER_CONTROL_HOST_REFRESH_FAILURE_FILENAME} for ${input.proof.issue_identifier}: ${
+              (persistError as Error)?.message ?? String(persistError)
+            }`
+          );
+        }
+      }
+      const ownershipHint = controlHostRunDir
+        ? await readControlHostOwnershipOperatorHint(controlHostRunDir).catch(() => null)
+        : null;
+      input.log.warn(
+        `provider-linear-worker could not request control-host refresh for ${input.proof.issue_identifier}: ${message}${
+          ownershipHint ? `; ${ownershipHint}` : ''
+        }`
+      );
       return;
     }
-    const message = (error as Error)?.name === 'AbortError'
-      ? 'refresh request timeout'
-      : (error as Error)?.message ?? String(error);
-    const ownershipHint = controlHostRunDir
-      ? await readControlHostOwnershipOperatorHint(controlHostRunDir).catch(() => null)
-      : null;
-    input.log.warn(
-      `provider-linear-worker could not request control-host refresh for ${input.proof.issue_identifier}: ${message}${
-        ownershipHint ? `; ${ownershipHint}` : ''
-      }`
-    );
   }
+}
+
+async function resolveProviderControlHostRunDirForDiagnostic(input: {
+  currentManifestPath: string;
+  env: NodeJS.ProcessEnv;
+  manifest: Record<string, unknown>;
+}): Promise<string | null> {
+  const manifestTarget = await resolveProviderControlHostManifestPath(
+    input.currentManifestPath,
+    input.env,
+    input.manifest
+  );
+  if (!manifestTarget) {
+    return null;
+  }
+  const canonicalRunDir = await realpathOrResolveIfMissing(dirname(manifestTarget.manifestPath));
+  return isPathWithinRoot(canonicalRunDir, manifestTarget.currentRun.canonicalRunsRoot)
+    ? canonicalRunDir
+    : null;
+}
+
+async function requestProviderControlHostRefreshOnce(input: {
+  currentManifestPath: string;
+  env: NodeJS.ProcessEnv;
+  manifest: Record<string, unknown>;
+  proof: ProviderLinearWorkerProof;
+  repoRoot: string;
+  abortSignal?: AbortSignal;
+}): Promise<string | null> {
+  const manifestTarget = await resolveProviderControlHostManifestPath(
+    input.currentManifestPath,
+    input.env,
+    input.manifest
+  );
+  if (!manifestTarget) {
+    return null;
+  }
+  const canonicalRunsRoot = manifestTarget.currentRun.canonicalRunsRoot;
+  const canonicalRunDir = await realpathOrResolveIfMissing(dirname(manifestTarget.manifestPath));
+  const canonicalManifestPath = await realpathOrResolveIfMissing(
+    resolve(canonicalRunDir, basename(manifestTarget.manifestPath))
+  );
+  if (
+    !isPathWithinRoot(canonicalRunDir, canonicalRunsRoot) ||
+    !isPathWithinRoot(canonicalManifestPath, canonicalRunsRoot)
+  ) {
+    throw new Error('control-host manifest path invalid');
+  }
+  const workerTaskId = resolveProviderWorkerTaskId(manifestTarget.currentRun, input.manifest);
+  if (!workerTaskId) {
+    throw new Error('provider task id unavailable');
+  }
+  const controlHostRepoRoot = await resolveProviderControlHostRepoRoot({
+    manifestPath: canonicalManifestPath,
+    workerWorkspacePath: input.repoRoot,
+    taskId: workerTaskId
+  });
+  if (!controlHostRepoRoot) {
+    throw new Error('control-host repo root unavailable');
+  }
+  const allowedBindHosts = await resolveAllowedControlHostBindHosts(controlHostRepoRoot, input.env);
+  const endpointPath = resolve(canonicalRunDir, 'control_endpoint.json');
+  const canonicalEndpointPath = await realpath(endpointPath);
+  if (!isPathWithinRoot(canonicalEndpointPath, canonicalRunDir)) {
+    throw new Error('control endpoint path invalid');
+  }
+  const endpointRaw = await readFile(canonicalEndpointPath, 'utf8');
+  const endpoint = JSON.parse(endpointRaw) as { base_url?: unknown; token_path?: unknown };
+  const baseUrl = validateControlHostBaseUrl(endpoint.base_url, allowedBindHosts);
+  const resolvedTokenPath =
+    typeof endpoint.token_path === 'string' && endpoint.token_path.trim().length > 0
+      ? resolve(canonicalRunDir, endpoint.token_path)
+      : resolve(canonicalRunDir, 'control_auth.json');
+  if (!isPathWithinRoot(resolvedTokenPath, canonicalRunDir)) {
+    throw new Error('control auth path invalid');
+  }
+  const canonicalTokenPath = await realpath(resolvedTokenPath);
+  if (!isPathWithinRoot(canonicalTokenPath, canonicalRunDir)) {
+    throw new Error('control auth path invalid');
+  }
+  const token = await readControlEndpointToken(canonicalTokenPath);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PROVIDER_CONTROL_HOST_REFRESH_TIMEOUT_MS);
+  const requestSignal = input.abortSignal
+    ? AbortSignal.any([controller.signal, input.abortSignal])
+    : controller.signal;
+  try {
+    const response = await fetch(new URL(PROVIDER_CONTROL_HOST_REFRESH_PATH, baseUrl), {
+      method: 'POST',
+      redirect: 'error',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        [CSRF_HEADER]: token
+      },
+      body: JSON.stringify({
+        action: 'refresh',
+        source: 'provider-linear-worker',
+        issue_id: input.proof.issue_id,
+        issue_identifier: input.proof.issue_identifier,
+        owner_status: input.proof.owner_status,
+        end_reason: input.proof.end_reason
+      }),
+      signal: requestSignal
+    });
+    if (response.status !== 202) {
+      const responseBody = await response.text().catch(() => '');
+      const responseDetail = responseBody.trim();
+      throw new Error(
+        responseDetail
+          ? `refresh request failed with status ${response.status}: ${responseDetail}`
+          : `refresh request failed with status ${response.status}`
+      );
+    }
+    return canonicalRunDir;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function getProviderControlHostRefreshFailureMessage(error: unknown): string {
+  return (error as Error)?.name === 'AbortError'
+    ? 'refresh request timeout'
+    : (error as Error)?.message ?? String(error);
+}
+
+function shouldRetryProviderControlHostRefreshAfterStaleOwnerReclaim(
+  message: string,
+  ownershipDiagnostic: ControlHostOwnershipPollingPayload | null
+): boolean {
+  return (
+    ownershipDiagnostic?.reason === 'stale_control_host_owner' &&
+    ownershipDiagnostic.status === 'stale_reclaimed' &&
+    (message === 'refresh request timeout' || message.includes('fetch failed'))
+  );
+}
+
+function classifyProviderControlHostRefreshFailure(
+  message: string
+): ProviderControlHostRefreshFailureDiagnostic['failure_kind'] {
+  if (message === 'refresh request timeout') {
+    return 'refresh_request_timeout';
+  }
+  if (message.includes('fetch failed')) {
+    return 'fetch_failed';
+  }
+  return 'request_failed';
+}
+
+async function writeProviderControlHostRefreshFailureDiagnostic(input: {
+  runDir: string;
+  message: string;
+  issueId: string;
+  issueIdentifier: string;
+  ownerStatus: ProviderLinearWorkerProof['owner_status'];
+  endReason: string | null;
+  ownershipDiagnostic: ControlHostOwnershipPollingPayload | null;
+  attempts: number;
+  retriedAfterStaleOwnerReclaim: boolean;
+}): Promise<void> {
+  const diagnostic: ProviderControlHostRefreshFailureDiagnostic = {
+    schema_version: 1,
+    reason: 'provider_control_host_refresh_failed',
+    failure_kind: classifyProviderControlHostRefreshFailure(input.message),
+    message: input.message,
+    issue_id: input.issueId,
+    issue_identifier: input.issueIdentifier,
+    owner_status: input.ownerStatus,
+    end_reason: input.endReason,
+    observed_at: new Date().toISOString(),
+    control_host_run_dir: input.runDir,
+    control_host_ownership: input.ownershipDiagnostic,
+    retry: {
+      attempts: input.attempts,
+      retried_after_stale_owner_reclaim: input.retriedAfterStaleOwnerReclaim,
+      recovered: false
+    }
+  };
+  await writeJsonAtomic(
+    join(input.runDir, PROVIDER_CONTROL_HOST_REFRESH_FAILURE_FILENAME),
+    diagnostic
+  );
 }
 async function writeProofSnapshot(
   deps: ProviderLinearWorkerDependencies,

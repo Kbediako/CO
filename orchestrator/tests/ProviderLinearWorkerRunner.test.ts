@@ -40,7 +40,10 @@ import {
   type ProviderLinearAuditSummary
 } from '../src/cli/control/providerLinearWorkflowAudit.js';
 import { recordLinearBudgetHeadersObservation } from '../src/cli/control/linearBudgetState.js';
-import { CONTROL_HOST_DUPLICATE_OWNER_FILE } from '../src/cli/control/controlPersistenceFiles.js';
+import {
+  CONTROL_HOST_DUPLICATE_OWNER_FILE,
+  CONTROL_HOST_STALE_OWNER_FILE
+} from '../src/cli/control/controlPersistenceFiles.js';
 import { resolveProviderLinearChildLaneScopeContract } from '../src/cli/providerLinearChildLanePhaseContract.js';
 import type { RuntimeCodexCommandContext } from '../src/cli/runtime/index.js';
 
@@ -8056,6 +8059,438 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(log.warn).toHaveBeenCalledWith(
       expect.stringContaining('duplicate_control_host_owner')
     );
+  });
+
+  it('retries control-host refresh once after stale-owner reclaim fetch failure', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const controlHostRunDir = join(tempRoot ?? '', '.runs', 'local-mcp', 'cli', 'control-host');
+    await mkdir(controlHostRunDir, { recursive: true });
+    await writeFile(
+      join(controlHostRunDir, 'control_endpoint.json'),
+      JSON.stringify({
+        base_url: 'http://127.0.0.1:43123',
+        token_path: 'control_auth.json'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(controlHostRunDir, 'control_auth.json'),
+      JSON.stringify({ token: 'control-token' }),
+      'utf8'
+    );
+    await writeFile(
+      join(controlHostRunDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: 'control-host',
+        task_id: 'local-mcp',
+        workspace_path: tempRoot
+      }),
+      'utf8'
+    );
+    const owner = {
+      schema_version: 1,
+      status: 'owned',
+      owner_token: 'stale-owner-token',
+      acquired_at: '2026-04-23T06:38:00.000Z',
+      updated_at: '2026-04-23T06:38:00.000Z',
+      released_at: null,
+      repo_root: tempRoot,
+      task_id: 'local-mcp',
+      run_id: 'control-host',
+      run_dir: controlHostRunDir,
+      pipeline_id: 'provider-linear-worker',
+      pid: 26182,
+      ppid: 1,
+      hostname: 'host.local',
+      cwd: tempRoot,
+      argv: ['codex-orchestrator', 'control-host'],
+      lock_dir: join(controlHostRunDir, 'control-host-owner.lock'),
+      lock_owner_path: join(controlHostRunDir, 'control-host-owner.lock', 'owner.json'),
+      owner_path: join(controlHostRunDir, 'control-host-owner.json')
+    };
+    await writeFile(
+      join(controlHostRunDir, CONTROL_HOST_STALE_OWNER_FILE),
+      JSON.stringify({
+        schema_version: 1,
+        reason: 'stale_control_host_owner',
+        observed_at: '2026-04-23T06:38:56.819Z',
+        run_dir: controlHostRunDir,
+        lock_dir: join(controlHostRunDir, 'control-host-owner.lock'),
+        diagnostic_path: join(controlHostRunDir, CONTROL_HOST_STALE_OWNER_FILE),
+        existing_owner: owner,
+        attempted_owner: {
+          ...owner,
+          owner_token: 'attempted-owner-token',
+          pid: 57172
+        },
+        action: 'stale_reclaimed'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: tempRoot,
+        provider_control_host_task_id: 'local-mcp',
+        provider_control_host_run_id: 'control-host'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(controlHostRunDir, 'provider-control-host-refresh-failure.json'),
+      JSON.stringify({ stale: true }),
+      'utf8'
+    );
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockRejectedValueOnce(new Error('fetch failed'))
+      .mockResolvedValue(new Response(JSON.stringify({ queued: true }), { status: 202 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '3'
+        },
+        {
+          readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+          resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+          execRunner: vi.fn(async (request) => {
+            await appendStaySerialParallelizationDecisionAuditForRequest(request);
+            return {
+              exitCode: 2,
+              stdout: [
+                '{"type":"thread.started","thread_id":"thread-1"}',
+                '{"type":"turn_context","payload":{"turn_id":"turn-1"}}'
+              ].join('\n'),
+              stderr: 'boom'
+            };
+          }),
+          now: vi
+            .fn()
+            .mockReturnValueOnce('2026-04-23T06:39:00.000Z')
+            .mockReturnValue('2026-04-23T06:39:01.000Z'),
+          log
+        }
+      )
+    ).rejects.toThrow('provider-linear-worker turn 1 failed with exit code 2');
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(log.warn).not.toHaveBeenCalledWith(
+      expect.stringContaining('provider-linear-worker could not request control-host refresh')
+    );
+    await expect(
+      readFile(join(controlHostRunDir, 'provider-control-host-refresh-failure.json'), 'utf8')
+    ).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('retries control-host refresh once after stale-owner reclaim timeout', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const controlHostRunDir = join(tempRoot ?? '', '.runs', 'local-mcp', 'cli', 'control-host');
+    await mkdir(controlHostRunDir, { recursive: true });
+    await writeFile(
+      join(controlHostRunDir, 'control_endpoint.json'),
+      JSON.stringify({
+        base_url: 'http://127.0.0.1:43123',
+        token_path: 'control_auth.json'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(controlHostRunDir, 'control_auth.json'),
+      JSON.stringify({ token: 'control-token' }),
+      'utf8'
+    );
+    await writeFile(
+      join(controlHostRunDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: 'control-host',
+        task_id: 'local-mcp',
+        workspace_path: tempRoot
+      }),
+      'utf8'
+    );
+    const owner = {
+      schema_version: 1,
+      status: 'owned',
+      owner_token: 'stale-owner-token',
+      acquired_at: '2026-04-23T06:38:00.000Z',
+      updated_at: '2026-04-23T06:38:00.000Z',
+      released_at: null,
+      repo_root: tempRoot,
+      task_id: 'local-mcp',
+      run_id: 'control-host',
+      run_dir: controlHostRunDir,
+      pipeline_id: 'provider-linear-worker',
+      pid: 26182,
+      ppid: 1,
+      hostname: 'host.local',
+      cwd: tempRoot,
+      argv: ['codex-orchestrator', 'control-host'],
+      lock_dir: join(controlHostRunDir, 'control-host-owner.lock'),
+      lock_owner_path: join(controlHostRunDir, 'control-host-owner.lock', 'owner.json'),
+      owner_path: join(controlHostRunDir, 'control-host-owner.json')
+    };
+    await writeFile(
+      join(controlHostRunDir, CONTROL_HOST_STALE_OWNER_FILE),
+      JSON.stringify({
+        schema_version: 1,
+        reason: 'stale_control_host_owner',
+        observed_at: '2026-04-23T06:38:56.819Z',
+        run_dir: controlHostRunDir,
+        lock_dir: join(controlHostRunDir, 'control-host-owner.lock'),
+        diagnostic_path: join(controlHostRunDir, CONTROL_HOST_STALE_OWNER_FILE),
+        existing_owner: owner,
+        attempted_owner: {
+          ...owner,
+          owner_token: 'attempted-owner-token',
+          pid: 57172
+        },
+        action: 'stale_reclaimed'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: tempRoot,
+        provider_control_host_task_id: 'local-mcp',
+        provider_control_host_run_id: 'control-host'
+      }),
+      'utf8'
+    );
+    const timeoutError = new Error('request aborted');
+    timeoutError.name = 'AbortError';
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockRejectedValueOnce(timeoutError)
+      .mockResolvedValue(new Response(JSON.stringify({ queued: true }), { status: 202 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '3'
+        },
+        {
+          readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+          resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+          execRunner: vi.fn(async (request) => {
+            await appendStaySerialParallelizationDecisionAuditForRequest(request);
+            return {
+              exitCode: 2,
+              stdout: [
+                '{"type":"thread.started","thread_id":"thread-1"}',
+                '{"type":"turn_context","payload":{"turn_id":"turn-1"}}'
+              ].join('\n'),
+              stderr: 'boom'
+            };
+          }),
+          now: vi
+            .fn()
+            .mockReturnValueOnce('2026-04-23T06:39:00.000Z')
+            .mockReturnValue('2026-04-23T06:39:01.000Z'),
+          log
+        }
+      )
+    ).rejects.toThrow('provider-linear-worker turn 1 failed with exit code 2');
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(log.warn).not.toHaveBeenCalledWith(
+      expect.stringContaining('provider-linear-worker could not request control-host refresh')
+    );
+    await expect(
+      readFile(join(controlHostRunDir, 'provider-control-host-refresh-failure.json'), 'utf8')
+    ).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('persists stale-owner refresh failure diagnostics when retry cannot recover', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const controlHostRunDir = join(tempRoot ?? '', '.runs', 'local-mcp', 'cli', 'control-host');
+    await mkdir(controlHostRunDir, { recursive: true });
+    await writeFile(
+      join(controlHostRunDir, 'control_endpoint.json'),
+      JSON.stringify({
+        base_url: 'http://127.0.0.1:43123',
+        token_path: 'control_auth.json'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(controlHostRunDir, 'control_auth.json'),
+      JSON.stringify({ token: 'control-token' }),
+      'utf8'
+    );
+    await writeFile(
+      join(controlHostRunDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: 'control-host',
+        task_id: 'local-mcp',
+        workspace_path: tempRoot
+      }),
+      'utf8'
+    );
+    const owner = {
+      schema_version: 1,
+      status: 'owned',
+      owner_token: 'stale-owner-token',
+      acquired_at: '2026-04-23T06:38:00.000Z',
+      updated_at: '2026-04-23T06:38:00.000Z',
+      released_at: null,
+      repo_root: tempRoot,
+      task_id: 'local-mcp',
+      run_id: 'control-host',
+      run_dir: controlHostRunDir,
+      pipeline_id: 'provider-linear-worker',
+      pid: 26182,
+      ppid: 1,
+      hostname: 'host.local',
+      cwd: tempRoot,
+      argv: ['codex-orchestrator', 'control-host'],
+      lock_dir: join(controlHostRunDir, 'control-host-owner.lock'),
+      lock_owner_path: join(controlHostRunDir, 'control-host-owner.lock', 'owner.json'),
+      owner_path: join(controlHostRunDir, 'control-host-owner.json')
+    };
+    await writeFile(
+      join(controlHostRunDir, CONTROL_HOST_STALE_OWNER_FILE),
+      JSON.stringify({
+        schema_version: 1,
+        reason: 'stale_control_host_owner',
+        observed_at: '2026-04-23T06:38:56.819Z',
+        run_dir: controlHostRunDir,
+        lock_dir: join(controlHostRunDir, 'control-host-owner.lock'),
+        diagnostic_path: join(controlHostRunDir, CONTROL_HOST_STALE_OWNER_FILE),
+        existing_owner: owner,
+        attempted_owner: {
+          ...owner,
+          owner_token: 'attempted-owner-token',
+          pid: 57172
+        },
+        action: 'stale_reclaimed'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: tempRoot,
+        provider_control_host_task_id: 'local-mcp',
+        provider_control_host_run_id: 'control-host'
+      }),
+      'utf8'
+    );
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>().mockRejectedValue(new Error('fetch failed'))
+    );
+
+    await expect(
+      runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '3'
+        },
+        {
+          readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+          resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+          execRunner: vi.fn(async (request) => {
+            await appendStaySerialParallelizationDecisionAuditForRequest(request);
+            return {
+              exitCode: 2,
+              stdout: [
+                '{"type":"thread.started","thread_id":"thread-1"}',
+                '{"type":"turn_context","payload":{"turn_id":"turn-1"}}'
+              ].join('\n'),
+              stderr: 'boom'
+            };
+          }),
+          now: vi
+            .fn()
+            .mockReturnValueOnce('2026-04-23T06:39:00.000Z')
+            .mockReturnValue('2026-04-23T06:39:01.000Z'),
+          log
+        }
+      )
+    ).rejects.toThrow('provider-linear-worker turn 1 failed with exit code 2');
+
+    expect(log.warn).toHaveBeenCalledWith(expect.stringContaining('stale_control_host_owner'));
+    const diagnostic = JSON.parse(
+      await readFile(join(controlHostRunDir, 'provider-control-host-refresh-failure.json'), 'utf8')
+    ) as Record<string, unknown>;
+    expect(diagnostic).toMatchObject({
+      reason: 'provider_control_host_refresh_failed',
+      failure_kind: 'fetch_failed',
+      message: 'fetch failed',
+      issue_identifier: 'CO-2',
+      control_host_ownership: {
+        reason: 'stale_control_host_owner',
+        status: 'stale_reclaimed',
+        lock_dir: join(controlHostRunDir, 'control-host-owner.lock'),
+        diagnostic_path: join(controlHostRunDir, CONTROL_HOST_STALE_OWNER_FILE),
+        owner: {
+          owner_token: 'stale-owner-token',
+          status: 'owned',
+          pid: 26182,
+          ppid: 1,
+          hostname: 'host.local',
+          acquired_at: '2026-04-23T06:38:00.000Z',
+          updated_at: '2026-04-23T06:38:00.000Z',
+          released_at: null,
+          repo_root: tempRoot,
+          task_id: 'local-mcp',
+          run_id: 'control-host',
+          run_dir: controlHostRunDir,
+          pipeline_id: 'provider-linear-worker',
+          lock_dir: join(controlHostRunDir, 'control-host-owner.lock'),
+          owner_path: join(controlHostRunDir, 'control-host-owner.json')
+        },
+        attempted_owner: {
+          owner_token: 'attempted-owner-token',
+          status: 'owned',
+          pid: 57172,
+          ppid: 1,
+          hostname: 'host.local',
+          acquired_at: '2026-04-23T06:38:00.000Z',
+          updated_at: '2026-04-23T06:38:00.000Z',
+          released_at: null,
+          repo_root: tempRoot,
+          task_id: 'local-mcp',
+          run_id: 'control-host',
+          run_dir: controlHostRunDir,
+          pipeline_id: 'provider-linear-worker',
+          lock_dir: join(controlHostRunDir, 'control-host-owner.lock'),
+          owner_path: join(controlHostRunDir, 'control-host-owner.json')
+        }
+      },
+      retry: {
+        attempts: 2,
+        retried_after_stale_owner_reclaim: true,
+        recovered: false
+      }
+    });
   });
 
   it('treats localhost and 127.0.0.1 as equivalent loopback control-host bind hosts', async () => {

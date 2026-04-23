@@ -1,6 +1,36 @@
 {
   "items": [
     {
+      "id": "20260423-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c",
+      "title": "CO-330 stale control-host owner reclaim and provider refresh retry recovery",
+      "relates_to": "tasks/tasks-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-23",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-23",
+          "status": "produced",
+          "manifest": ".runs/linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c-co330-docs/cli/2026-04-23T13-50-23-422Z-4c9061c1/manifest.json",
+          "source_anchor": "ctx:sha256:dd72505af8602844d9a722f7d0cac31d98fe08f25d84adb745ed3f979b6c8cf8#chunk:c000001",
+          "summary": "Docs-first packet created for CO-330 stale control-host owner reclaim and provider refresh retry recovery. The parent source-0 payload is present and records provider-worker run metadata/provenance; the packet preserves the Linear issue contract: protect stale_control_host_owner, control-host, provider-linear-worker could not request control-host refresh, refresh request timeout, fetch failed, control-host-stale-owner.json, owner reclaim, provider refresh, and retry/resumable queue behavior; reject CO-41 ownership, CO-317-only admission/backfill, generic host restart workaround, stdin bootstrap regression; reference CO-152 stale-owner ownership and CO-119 refresh-timeout recovery only as prior related context."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md",
+        "task": "tasks/tasks-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md",
+        "agent_task": ".agent/task/linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md"
+        }
+      }
+    },
+    {
       "id": "20260423-linear-9d8bb7c9-3ca1-422e-9cdf-ef90a4fbe7b7",
       "title": "CO-331 queue cap and follow-up admission truth",
       "relates_to": "tasks/tasks-linear-9d8bb7c9-3ca1-422e-9cdf-ef90a4fbe7b7.md",
