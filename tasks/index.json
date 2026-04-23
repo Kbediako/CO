@@ -31,6 +31,27 @@
       }
     },
     {
+      "id": "20260423-linear-8d010b73-9338-4f35-9494-a9a3d773d284",
+      "title": "CO-329 provider stdin bootstrap recurrence",
+      "relates_to": "tasks/tasks-linear-8d010b73-9338-4f35-9494-a9a3d773d284.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-23",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=provider-worker-stdin-bootstrap-failure",
+      "paths": {
+        "spec": "tasks/specs/linear-8d010b73-9338-4f35-9494-a9a3d773d284.md",
+        "task": "tasks/tasks-linear-8d010b73-9338-4f35-9494-a9a3d773d284.md",
+        "agent_task": ".agent/task/linear-8d010b73-9338-4f35-9494-a9a3d773d284.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-8d010b73-9338-4f35-9494-a9a3d773d284.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-8d010b73-9338-4f35-9494-a9a3d773d284.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-8d010b73-9338-4f35-9494-a9a3d773d284.md"
+        }
+      }
+    },
+    {
       "id": "20260423-linear-37c1035e-d319-4306-8a41-648f2ab836e6",
       "title": "CO-328 accepted child-lane workspace artifacts and diff-budget scope",
       "relates_to": "tasks/tasks-linear-37c1035e-d319-4306-8a41-648f2ab836e6.md",
