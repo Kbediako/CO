@@ -2776,8 +2776,8 @@ describe('runProviderIssueHandoffRefresh', () => {
     expect(state.claims[0]).toMatchObject({
       state: 'released',
       reason: 'provider_issue_released:not_active',
-      run_id: null,
-      run_manifest_path: null
+      run_id: 'run-queued',
+      run_manifest_path: queuedPaths.manifestPath
     });
 
     settleNextCancel('reject');
@@ -2804,8 +2804,8 @@ describe('runProviderIssueHandoffRefresh', () => {
     expect(state.claims[0]).toMatchObject({
       state: 'released',
       reason: 'provider_issue_released:not_active',
-      run_id: null,
-      run_manifest_path: null
+      run_id: 'run-queued',
+      run_manifest_path: queuedPaths.manifestPath
     });
 
     settleNextCancel('resolve');

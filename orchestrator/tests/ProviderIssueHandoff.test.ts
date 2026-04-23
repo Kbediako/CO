@@ -16810,8 +16810,8 @@ describe('createProviderIssueHandoffService', () => {
     expect(state.claims[0]).toMatchObject({
       state: 'released',
       reason: 'provider_issue_released:not_active',
-      run_id: null,
-      run_manifest_path: null
+      run_id: 'run-queued',
+      run_manifest_path: childPaths.manifestPath
     });
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
@@ -19211,7 +19211,7 @@ describe('createProviderIssueHandoffService', () => {
     }
   );
 
-  it('persists the release even when cancelling an inactive queued child run fails closed', async () => {
+  it('persists queued claim identity after release even when cancelling an inactive child run fails closed', async () => {
     const { root, paths } = await createHostPaths();
     const now = new Date().toISOString();
     const childEnv = {
@@ -19288,8 +19288,8 @@ describe('createProviderIssueHandoffService', () => {
     expect(state.claims[0]).toMatchObject({
       state: 'released',
       reason: 'provider_issue_released:not_active',
-      run_id: null,
-      run_manifest_path: null
+      run_id: 'run-queued',
+      run_manifest_path: childPaths.manifestPath
     });
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
@@ -23956,7 +23956,7 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
-  it('keeps terminal released provider workspaces intact during rehydrate while a queued child run still exists', async () => {
+  it('keeps terminal released provider workspaces intact during rehydrate while preserving queued claim identity', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {
       repoRoot: root,
@@ -24028,8 +24028,8 @@ describe('createProviderIssueHandoffService', () => {
     expect(state.claims[0]).toMatchObject({
       state: 'released',
       reason: 'provider_issue_released:not_active',
-      run_id: null,
-      run_manifest_path: null
+      run_id: 'run-queued',
+      run_manifest_path: childPaths.manifestPath
     });
   });
 
