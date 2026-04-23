@@ -1505,6 +1505,7 @@ export function createProviderIssueHandoffService(
   };
 
   const createProviderAdmissionGate = async (input: {
+    excludeProviderKey?: string | null;
     forceLocalWorkerOnly?: boolean;
     preferredWorkerHost?: string | null;
   } = {}): Promise<
@@ -1530,6 +1531,9 @@ export function createProviderIssueHandoffService(
 
     for (const claim of options.state.claims) {
       claimByProviderKey.set(claim.provider_key, claim);
+      if (claim.provider_key === input.excludeProviderKey) {
+        continue;
+      }
       if (!shouldProviderClaimOccupyAdmissionSlot(claim)) {
         continue;
       }
@@ -1572,10 +1576,16 @@ export function createProviderIssueHandoffService(
       }
       seededOccupancyKeys.add(occupancyKey);
       const providerKey = buildProviderIssueKey(run.provider, run.issueId);
+      if (providerKey === input.excludeProviderKey) {
+        continue;
+      }
       gate.noteOccupied({ state: claimStateByProviderKey.get(providerKey) ?? null });
     }
     for (const run of queuedDiscoveredRuns) {
       const providerKey = buildProviderIssueKey(run.provider, run.issueId);
+      if (providerKey === input.excludeProviderKey) {
+        continue;
+      }
       const claim = claimByProviderKey.get(providerKey) ?? null;
       const occupancyKey = run.manifestPath || run.runId;
       if (isReleasedProviderClaimRunIdentityMatch(claim, run)) {
@@ -1597,6 +1607,9 @@ export function createProviderIssueHandoffService(
       }
       seededOccupancyKeys.add(record.manifestPath);
       const providerKey = buildProviderIssueKey(record.provider, record.issueId);
+      if (providerKey === input.excludeProviderKey) {
+        continue;
+      }
       gate.noteOccupied({ state: claimStateByProviderKey.get(providerKey) ?? null });
     }
 
@@ -1811,6 +1824,7 @@ export function createProviderIssueHandoffService(
       const workerHost = resolveRehydratedActiveRunWorkerHost(input.run, input.claim);
       const resumeWorkerHost = await resolveResumeWorkerHost(workerHost);
       const admissionGate = await createProviderAdmissionGate({
+        excludeProviderKey: input.claim.retry_queued === true ? input.claim.provider_key : null,
         forceLocalWorkerOnly: resumeWorkerHost === null,
         preferredWorkerHost: resumeWorkerHost
       });
@@ -1919,7 +1933,10 @@ export function createProviderIssueHandoffService(
         claimWorkerHost: input.claim.worker_host ?? null,
         previousRun: input.previousRun ?? null
       });
-      const admissionGate = await createProviderAdmissionGate();
+      const admissionGate = await createProviderAdmissionGate({
+        excludeProviderKey: input.claim.retry_queued === true ? input.claim.provider_key : null,
+        preferredWorkerHost
+      });
       if (!admissionGate.canDispatch(input.trackedIssue)) {
         const claim = await upsertProviderClaimAndPersist({
           ...input.claim,
