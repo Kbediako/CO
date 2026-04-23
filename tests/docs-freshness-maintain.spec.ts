@@ -576,12 +576,18 @@ describe('docs freshness maintenance decisions', () => {
     expect(decision.policy_capacity_status).toEqual(expect.objectContaining({ status: 'invalid_policy' }));
     expect(decision.candidate_cohorts[0]).toEqual(
       expect.objectContaining({
-        owner_issue: 'CO-320',
+        owner_issue: 'CO-300',
         owner_issue_action: expect.objectContaining({
-          mode: 'update_existing',
-          duplicate_policy: 'one_owner_issue_per_canonical_owner_key'
+          duplicate_policy: 'one_owner_issue_per_historical_batch'
+        }),
+        owner_issue_resolution: expect.objectContaining({
+          mode: 'rolling_freshness_policy_owner',
+          source: 'rolling_freshness_policy.owner_issue'
         })
       })
+    );
+    expect(decision.candidate_cohorts[0].owner_issue_action).not.toEqual(
+      expect.objectContaining({ duplicate_policy: 'one_owner_issue_per_canonical_owner_key' })
     );
     expect(decision.recommended_action).not.toContain('Proceed only');
   });

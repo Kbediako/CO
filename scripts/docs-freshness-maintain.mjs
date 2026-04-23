@@ -299,6 +299,20 @@ function buildCanonicalOwnerIssueAction(ownerConfig, ownerIssueVerification = nu
 }
 
 function resolveCandidateOwner(policy, cohortKey, globalOwnerIssueAction, canonicalOwnerVerifications = []) {
+  if (policy?.is_valid !== true) {
+    return {
+      owner_issue: policy?.owner_issue ?? null,
+      configured_owner_issue: policy?.owner_issue ?? null,
+      owner_issue_action: globalOwnerIssueAction,
+      owner_issue_resolution: {
+        mode: 'rolling_freshness_policy_owner',
+        source: 'rolling_freshness_policy.owner_issue',
+        canonical_owner_key: cohortKey,
+        configured_owner_issue: policy?.owner_issue ?? null
+      }
+    };
+  }
+
   const canonicalOwners = normalizeCanonicalOwnerIssues(policy);
   const matchedOwner = canonicalOwners.find((entry) => entry.canonical_owner_key === cohortKey) ?? null;
   if (matchedOwner) {
