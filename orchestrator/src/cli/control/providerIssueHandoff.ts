@@ -6969,6 +6969,9 @@ function shouldClearReleasedClaimRunIdentity(input: {
   if (!input.run) {
     return false;
   }
+  if (input.run.status === 'queued') {
+    return false;
+  }
   return true;
 }
 
@@ -7107,16 +7110,6 @@ function shouldCountQueuedAdmissionOccupancyForClaim(
 ): boolean {
   if (!claim) {
     return true;
-  }
-  if (
-    claim.state === 'released' &&
-    claim.retry_queued !== true &&
-    isTerminalTrackedIssueState(
-      normalizeProviderLinearWorkflowState(claim.issue_state),
-      normalizeProviderLinearWorkflowState(claim.issue_state_type)
-    )
-  ) {
-    return false;
   }
   if (!hasProviderClaimRunIdentityMatch(claim, run)) {
     return true;
