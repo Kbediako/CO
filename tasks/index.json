@@ -32,6 +32,35 @@
       }
     },
     {
+      "id": "20260423-linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f",
+      "title": "CO: re-audit Codex CLI 0.123.0 posture and next-release adoption target",
+      "relates_to": "tasks/tasks-linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-23",
+      "approvals": {
+        "parent_audit": {
+          "reviewer": "provider worker",
+          "date": "2026-04-23",
+          "status": "hold_decision_recorded",
+          "manifest": ".runs/linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f-cloud-fallback-0123-current/cli/2026-04-23T04-56-47-062Z-7a811dfb/manifest.json",
+          "summary": "CO-322 records official 0.123.0 release/npm evidence, command-surface comparison, runtime-mode pass, required-cloud missing-environment blocker evidence, and a clean expected MCP fallback contract; 0.123.0 remains held and current main keeps 0.122.0 as the release-planning/smoke candidate."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f.md",
+        "task": "tasks/tasks-linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f.md",
+        "agent_task": ".agent/task/linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f.md"
+        }
+      }
+    },
+    {
       "id": "20260423-linear-7b3de1c1-f420-4203-bb8c-494dadecaa88",
       "title": "CO: recreate live owner for remaining Mar 23 docs-freshness task-checklist cohort",
       "relates_to": "tasks/tasks-linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md",
