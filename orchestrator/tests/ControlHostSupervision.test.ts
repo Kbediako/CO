@@ -1589,12 +1589,13 @@ describe('controlHostSupervision shell helpers', () => {
     );
 
     expect(observedTimeoutMs).toBe(resolveControlHostSupervisionProbeTimeoutMs(5));
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       healthy: false,
       reason: 'probe_timeout',
-      message: 'co-status probe timed out after 5s.',
+      message: 'co-status probe timed out after 35s.',
       diagnostic: null
     });
+    expect(result.probeDurationMs).toBeGreaterThanOrEqual(0);
   });
 
   it('bounds bootstrap env sourcing timeouts and surfaces timeout errors', async () => {
@@ -1632,7 +1633,7 @@ describe('controlHostSupervision shell helpers', () => {
           }
         )
       ).rejects.toThrow(
-        'Timed out while sourcing control-host supervision env/bootstrap files after 5s.'
+        'Timed out while sourcing control-host supervision env/bootstrap files after 35s.'
       );
       expect(observedTimeoutMs).toBe(resolveControlHostSupervisionProbeTimeoutMs(5));
     } finally {
@@ -1735,6 +1736,7 @@ describe('controlHostSupervision shell helpers', () => {
         last_signal: 'SIGTERM',
         last_health_check_at: '2026-04-09T08:59:30.000Z',
         last_health_status: 'restart_required',
+        last_probe_duration_ms: 10_012,
         consecutive_unhealthy_samples: 3,
         restart_count: 2,
         unhealthy_threshold: 3,
@@ -1761,6 +1763,7 @@ describe('controlHostSupervision shell helpers', () => {
     expect(nextState.last_signal).toBeNull();
     expect(nextState.last_health_check_at).toBeNull();
     expect(nextState.last_health_status).toBeNull();
+    expect(nextState.last_probe_duration_ms).toBeNull();
     expect(nextState.consecutive_unhealthy_samples).toBe(0);
     expect(nextState.last_restart_reason).toBe('restart_required');
   });

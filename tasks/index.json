@@ -12903,6 +12903,23 @@
         "agent_task": ".agent/task/linear-b1835ea5-3d28-493a-934e-1b38048270ce.md",
         "docs": "docs/TECH_SPEC-linear-b1835ea5-3d28-493a-934e-1b38048270ce.md"
       }
+    },
+    {
+      "id": "20260423-linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe",
+      "title": "Control host supervision stale co-status endpoint and probe-timeout recurrence",
+      "relates_to": "tasks/tasks-linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-23",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe.md",
+        "task": "tasks/tasks-linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe.md",
+        "agent_task": ".agent/task/linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe.md",
+        "docs": "docs/TECH_SPEC-linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe.md"
+      }
     }
   ]
 }

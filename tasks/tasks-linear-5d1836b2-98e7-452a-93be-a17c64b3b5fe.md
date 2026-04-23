@@ -1,0 +1,8 @@
+# Task Checklist - CO-336 Control Host Supervision Stale co-status Endpoint and Probe Timeout Recurrence
+
+- [x] Create docs-first packet for the bounded CO-336 implementation. Evidence: `docs/PRD-linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe.md`, `docs/TECH_SPEC-linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe.md`, `docs/ACTION_PLAN-linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe.md`, `tasks/specs/linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe.md`.
+- [x] Align supervision probe timeout with stale-endpoint recovery's two direct status read attempts while preserving fail-closed timeout behavior. Evidence: `orchestrator/src/cli/controlHostSupervisionCliShell.ts`, `orchestrator/src/cli/coStatusAttachCliShell.ts`, `tests/control-host-supervision.spec.ts`.
+- [x] Add machine-checkable probe duration diagnostics to supervision status/restart records. Evidence: `last_probe_duration_ms`, restart-history `probe_duration_ms`, `tests/control-host-supervision.spec.ts`.
+- [x] Add focused regression coverage for stale endpoint recovery and probe-timeout recurrence. Evidence: `npx vitest run --config vitest.config.core.ts tests/control-host-supervision.spec.ts` passed 4/4.
+- [x] Run scoped validation and update this checklist with evidence. Evidence: focused Vitest passed 4/4; `npm run build` passed; focused `npx eslint ...` passed.
+- [x] Complete standalone review and elegance/minimality pass before review handoff. Evidence: wrapper-led review found one P2 on the initial one-read budget, the patch was updated to two reads plus headroom, and the post-fix standalone/elegance passes found no actionable regressions.

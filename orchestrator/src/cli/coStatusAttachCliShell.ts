@@ -22,7 +22,7 @@ type ArgMap = Record<string, string | boolean>;
 type OutputFormat = 'json' | 'text';
 
 const DEFAULT_ATTACH_REFRESH_INTERVAL_MS = 1_000;
-const DEFAULT_ATTACH_REQUEST_TIMEOUT_MS = 15_000;
+export const DEFAULT_ATTACH_REQUEST_TIMEOUT_MS = 15_000;
 const CSRF_HEADER = 'x-csrf-token';
 type CoStatusAttachRequestErrorKind = 'auth' | 'cancelled' | 'http' | 'network' | 'timeout';
 
