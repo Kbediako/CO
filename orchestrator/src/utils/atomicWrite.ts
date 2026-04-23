@@ -1,4 +1,4 @@
-import { mkdir, rename, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, rename, stat, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 export interface AtomicWriteOptions {
@@ -32,6 +32,20 @@ export async function writeAtomicFile(
   if (options.ensureDir) {
     await mkdir(dirname(destination), { recursive: true });
   }
-  await writeFile(tmpPath, contents, options.encoding ?? 'utf8');
+  let existingMode: number | null = null;
+  try {
+    existingMode = (await stat(destination)).mode & 0o777;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw error;
+    }
+  }
+  await writeFile(tmpPath, contents, {
+    encoding: options.encoding ?? 'utf8',
+    mode: existingMode ?? undefined
+  });
+  if (existingMode !== null) {
+    await chmod(tmpPath, existingMode);
+  }
   await rename(tmpPath, destination);
 }

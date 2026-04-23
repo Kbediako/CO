@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 4690eb4deade8ef1073478ddb7662a24be5f6dce4a1666f6893f62f86b59a7ea -->
+<!-- codex:instruction-stamp a78ee4d7fc5ce2ba9b6861c08d8a5813223a318a6cda7a7b4ea7e3dc2d819346 -->
 # Agent Instructions (Template)
 
 ## Orchestrator-first workflow
@@ -54,8 +54,8 @@
 - Built-in roles are `default`, `explorer`, `worker`, and `awaiter`; `researcher` is user-defined.
 - `spawn_agent` defaults to `default` when `agent_type` is omitted; always set `agent_type` explicitly.
 - For symbolic collab runs, prefix spawned prompts with `[agent_type:<role>]` on line one so role intent is auditable from JSONL/manifests.
-- Current CO compatibility/adoption target is stable Codex CLI `0.118.0`.
-- Current `0.118.0` posture re-audit confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, and `codex review --help` exposing `[PROMPT]` alongside scoped review flags.
+- Current CO compatibility/adoption target is stable Codex CLI `0.123.0`.
+- Current `0.123.0` posture evidence confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, `codex review --help` exposing `[PROMPT]` alongside scoped review flags, runtime-mode canary pass, required cloud canary pass, and fallback cloud contract pass.
 - Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
 - Keep top-level defaults on the current CO target by setting `model = "gpt-5.4"` in `~/.codex/config.toml`.
 - Under ChatGPT auth, keep delegated subagent and review surfaces on `gpt-5.4` unless a fresh provider lane explicitly validates `gpt-5.4-codex`.

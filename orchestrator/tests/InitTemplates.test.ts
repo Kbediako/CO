@@ -25,7 +25,12 @@ describe('initCodexTemplates', () => {
 
     const templatePath = path.join(tempDir, 'mcp-client.json');
     const contents = await readFile(templatePath, 'utf8');
-    expect(contents).toContain('"templateVersion"');
+    const mcpClientConfig = JSON.parse(contents);
+    expect(mcpClientConfig.templateVersion).toBe(1);
+    expect(mcpClientConfig.mcpServers['codex-orchestrator']).toEqual({
+      command: 'codex-orchestrator',
+      args: ['mcp', 'serve'],
+    });
     const pipelineConfig = await readFile(path.join(tempDir, 'codex.orchestrator.json'), 'utf8');
     expect(pipelineConfig).toContain('"pipelines"');
     const codexConfig = await readFile(path.join(tempDir, '.codex', 'config.toml'), 'utf8');

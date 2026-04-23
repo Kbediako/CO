@@ -25,6 +25,28 @@ const scopedSourceSetup = {
   project_id: 'lin-project-1'
 };
 const tempDirs: string[] = [];
+const TEAM_STATES_NODES = [
+  {
+    id: 'state-backlog',
+    name: 'Backlog',
+    type: 'unstarted'
+  },
+  {
+    id: 'state-in-progress',
+    name: 'In Progress',
+    type: 'started'
+  },
+  {
+    id: 'state-human-review',
+    name: 'Human Review',
+    type: 'started'
+  },
+  {
+    id: 'state-done',
+    name: 'Done',
+    type: 'completed'
+  }
+];
 
 afterEach(async () => {
   await Promise.all(
@@ -71,28 +93,7 @@ function buildIssueContextBody(overrides: Record<string, unknown> = {}): unknown
           key: 'CO',
           name: 'Codex Orchestrator',
           states: {
-            nodes: [
-              {
-                id: 'state-backlog',
-                name: 'Backlog',
-                type: 'unstarted'
-              },
-              {
-                id: 'state-in-progress',
-                name: 'In Progress',
-                type: 'started'
-              },
-              {
-                id: 'state-human-review',
-                name: 'Human Review',
-                type: 'started'
-              },
-              {
-                id: 'state-done',
-                name: 'Done',
-                type: 'completed'
-              }
-            ]
+            nodes: TEAM_STATES_NODES
           }
         },
         project: {
@@ -248,28 +249,7 @@ function buildCachedIssueContext(overrides: Record<string, unknown> = {}): Recor
       id: 'lin-team-1',
       key: 'CO',
       name: 'Codex Orchestrator',
-      states: [
-        {
-          id: 'state-backlog',
-          name: 'Backlog',
-          type: 'unstarted'
-        },
-        {
-          id: 'state-in-progress',
-          name: 'In Progress',
-          type: 'started'
-        },
-        {
-          id: 'state-human-review',
-          name: 'Human Review',
-          type: 'started'
-        },
-        {
-          id: 'state-done',
-          name: 'Done',
-          type: 'completed'
-        }
-      ]
+      states: TEAM_STATES_NODES.map((state) => ({ ...state }))
     },
     project: {
       id: 'lin-project-1',
@@ -517,24 +497,47 @@ async function createBudgetedRunScopedEnv(): Promise<NodeJS.ProcessEnv> {
   };
 }
 
+function resolveIssueContextCachePathForTest(
+  env: NodeJS.ProcessEnv,
+  issueId = 'lin-issue-1'
+): string {
+  const auditPath = env.CODEX_PROVIDER_LINEAR_AUDIT_PATH;
+  if (!auditPath) {
+    throw new Error('Missing CODEX_PROVIDER_LINEAR_AUDIT_PATH for cache-path test setup.');
+  }
+  const safeIssueId = issueId.replace(/[^A-Za-z0-9._-]/gu, '_');
+  return join(dirname(auditPath), `provider-linear-issue-context-cache-${safeIssueId}.json`);
+}
+
+function resolveLegacyIssueContextCachePathForTest(env: NodeJS.ProcessEnv): string {
+  const auditPath = env.CODEX_PROVIDER_LINEAR_AUDIT_PATH;
+  if (!auditPath) {
+    throw new Error('Missing CODEX_PROVIDER_LINEAR_AUDIT_PATH for cache-path test setup.');
+  }
+  return join(dirname(auditPath), 'provider-linear-issue-context-cache.json');
+}
+
 async function writeCachedIssueContext(
   env: NodeJS.ProcessEnv,
   issue: Record<string, unknown>,
   options?: {
     recordedAt?: string;
     sourceSetup?: Record<string, unknown> | null;
+    legacyPath?: boolean;
   }
 ): Promise<void> {
-  const auditPath = env.CODEX_PROVIDER_LINEAR_AUDIT_PATH;
-  if (!auditPath) {
-    throw new Error('Missing CODEX_PROVIDER_LINEAR_AUDIT_PATH for cached issue-context test setup.');
+  const issueId = typeof issue.id === 'string' ? issue.id.trim() : '';
+  if (!issueId) {
+    return;
   }
   await writeFile(
-    join(dirname(auditPath), 'provider-linear-issue-context-cache.json'),
+    options?.legacyPath === true
+      ? resolveLegacyIssueContextCachePathForTest(env)
+      : resolveIssueContextCachePathForTest(env, issueId),
     JSON.stringify(
       {
         schema_version: 1,
-        issue_id: 'lin-issue-1',
+        issue_id: issueId,
         recorded_at: options?.recordedAt ?? '2026-03-22T10:00:00.000Z',
         source_setup: options?.sourceSetup ?? null,
         issue
@@ -569,6 +572,8 @@ interface IssueContextTestPullRequestSnapshot {
   state: string;
   mergedAt: string | null;
   updatedAt: string;
+  title?: string | null;
+  headRefName?: string | null;
 }
 
 function createDeferred<T>(): Deferred<T> {
@@ -582,18 +587,30 @@ function createDeferred<T>(): Deferred<T> {
 }
 
 async function readIssueContextAttachmentTruth(options: {
+  identifier?: string;
   title: string;
-  state: { id: string; name: string; type: 'started' };
+  state: { id: string; name: string; type: string | null };
   attachments: Record<string, unknown>[];
   snapshotForPr: (prNumber: number) => unknown | Promise<unknown>;
 }) {
+  const identifier = options.identifier ?? 'CO-220';
+  const teamKey = identifier.split('-', 1)[0] || 'CO';
   const fetchImpl: typeof fetch = vi.fn(async () =>
     jsonResponse(
       buildIssueContextBody({
-        identifier: 'CO-220',
+        identifier,
         title: options.title,
+        url: `https://linear.app/example/issue/${identifier}`,
         updatedAt: '2026-04-17T13:12:00.000Z',
         state: options.state,
+        team: {
+          id: 'lin-team-1',
+          key: teamKey,
+          name: teamKey === 'CO' ? 'Codex Orchestrator' : teamKey,
+          states: {
+            nodes: TEAM_STATES_NODES
+          }
+        },
         attachments: { nodes: options.attachments }
       })
     )
@@ -706,6 +723,246 @@ describe('providerLinearWorkflowFacade', () => {
         workpad_comment: {
           id: 'comment-workpad'
         }
+      }
+    });
+  });
+
+  it('falls back to the legacy singleton cache path when no issue-keyed cache exists yet', async () => {
+    const env = await createBudgetedRunScopedEnv();
+    const resetAt = String(Date.now() + 60_000);
+
+    await writeCachedIssueContext(
+      env,
+      buildCachedIssueContext({
+        title: 'Legacy cached issue context'
+      }),
+      {
+        recordedAt: new Date(Date.now() - 45_000).toISOString(),
+        legacyPath: true
+      }
+    );
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'provider-linear:issue-context',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '5',
+        'x-ratelimit-requests-reset': resetAt
+      }
+    });
+
+    const fetchImpl: typeof fetch = vi.fn(async () => {
+      throw new Error('legacy cache fallback should resolve before fetch');
+    });
+
+    const result = await getProviderLinearIssueContext({
+      issueId: 'lin-issue-1',
+      env,
+      allowReadOnlyCacheReuse: true,
+      fetchImpl
+    });
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      cache_fallback_used: true,
+      issue: {
+        identifier: 'CO-1',
+        title: 'Legacy cached issue context'
+      }
+    });
+  });
+
+  it.each([
+    {
+      label: 'issue id mismatch',
+      requestedIssueId: 'lin-issue-1',
+      cachedIssue: buildCachedIssueContext({ id: 'lin-issue-2', identifier: 'CO-2' }),
+      cachedSourceSetup: null,
+      requestedSourceSetup: undefined
+    },
+    {
+      label: 'source setup mismatch',
+      requestedIssueId: 'lin-issue-1',
+      cachedIssue: buildCachedIssueContext(),
+      cachedSourceSetup: {
+        ...scopedSourceSetup,
+        project_id: 'lin-project-other'
+      },
+      requestedSourceSetup: scopedSourceSetup
+    }
+  ])(
+    'does not reuse the legacy singleton cache on $label',
+    async ({ requestedIssueId, cachedIssue, cachedSourceSetup, requestedSourceSetup }) => {
+      const env = await createBudgetedRunScopedEnv();
+      const resetAt = String(Date.now() + 60_000);
+
+      await writeCachedIssueContext(env, cachedIssue, {
+        recordedAt: new Date(Date.now() - 45_000).toISOString(),
+        sourceSetup: cachedSourceSetup,
+        legacyPath: true
+      });
+      await recordLinearBudgetHeadersObservation({
+        env,
+        source: 'provider-linear:issue-context',
+        headers: {
+          'x-ratelimit-requests-limit': '100',
+          'x-ratelimit-requests-remaining': '5',
+          'x-ratelimit-requests-reset': resetAt
+        }
+      });
+
+      const fetchImpl: typeof fetch = vi.fn(async () =>
+        jsonResponse(
+          buildIssueContextBody({
+            id: 'lin-issue-1',
+            identifier: 'CO-1',
+            title: 'Fetched issue context'
+          })
+        )
+      );
+
+      const result = await getProviderLinearIssueContext({
+        issueId: requestedIssueId,
+        sourceSetup: requestedSourceSetup,
+        env,
+        allowReadOnlyCacheReuse: true,
+        fetchImpl
+      });
+
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(result).toMatchObject({
+        ok: true,
+        operation: 'issue-context',
+        issue: {
+          identifier: 'CO-1',
+          title: 'Fetched issue context'
+        }
+      });
+      expect(result).not.toHaveProperty('cache_fallback_used');
+    }
+  );
+
+  it('keeps issue-keyed cache artifacts separate across cross-issue reads in one run', async () => {
+    const env = await createBudgetedRunScopedEnv();
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        variables?: { issueId?: string };
+      };
+      if (body.variables?.issueId === 'lin-issue-1') {
+        return jsonResponse(
+          buildIssueContextBody({
+            id: 'lin-issue-1',
+            identifier: 'CO-1',
+            title: 'Parent issue context',
+            updatedAt: '2026-04-22T08:00:00.000Z'
+          })
+        );
+      }
+      if (body.variables?.issueId === 'lin-issue-2') {
+        return jsonResponse(
+          buildIssueContextBody({
+            id: 'lin-issue-2',
+            identifier: 'CO-2',
+            title: 'Cross issue context',
+            updatedAt: '2026-04-22T08:05:00.000Z'
+          })
+        );
+      }
+      throw new Error(`Unexpected issueId: ${body.variables?.issueId ?? 'missing'}`);
+    });
+
+    const parentResult = await getProviderLinearIssueContext({
+      issueId: 'lin-issue-1',
+      env,
+      fetchImpl
+    });
+    const crossIssueResult = await getProviderLinearIssueContext({
+      issueId: 'lin-issue-2',
+      env,
+      fetchImpl
+    });
+
+    expect(parentResult).toMatchObject({
+      ok: true,
+      issue: {
+        identifier: 'CO-1',
+        title: 'Parent issue context'
+      }
+    });
+    expect(parentResult).not.toHaveProperty('cache_fallback_used');
+    expect(crossIssueResult).toMatchObject({
+      ok: true,
+      issue: {
+        identifier: 'CO-2',
+        title: 'Cross issue context'
+      }
+    });
+    expect(crossIssueResult).not.toHaveProperty('cache_fallback_used');
+
+    const parentCachePath = resolveIssueContextCachePathForTest(env, 'lin-issue-1');
+    const crossIssueCachePath = resolveIssueContextCachePathForTest(env, 'lin-issue-2');
+    const parentCacheRecord = JSON.parse(await readFile(parentCachePath, 'utf8')) as {
+      issue_id: string;
+      issue: {
+        identifier: string;
+        title: string;
+      };
+    };
+    const crossIssueCacheRecord = JSON.parse(await readFile(crossIssueCachePath, 'utf8')) as {
+      issue_id: string;
+      issue: {
+        identifier: string;
+        title: string;
+      };
+    };
+
+    expect(parentCachePath).not.toBe(crossIssueCachePath);
+    expect(parentCacheRecord).toMatchObject({
+      issue_id: 'lin-issue-1',
+      issue: {
+        identifier: 'CO-1',
+        title: 'Parent issue context'
+      }
+    });
+    expect(crossIssueCacheRecord).toMatchObject({
+      issue_id: 'lin-issue-2',
+      issue: {
+        identifier: 'CO-2',
+        title: 'Cross issue context'
+      }
+    });
+    await expect(
+      readFile(resolveLegacyIssueContextCachePathForTest(env), 'utf8')
+    ).rejects.toThrow();
+
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'provider-linear:issue-context',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '0',
+        'x-ratelimit-requests-reset': String(Date.now() + 60_000)
+      }
+    });
+
+    const cachedParentResult = await getProviderLinearIssueContext({
+      issueId: 'lin-issue-1',
+      env,
+      fallbackToCacheOnFailure: true,
+      fetchImpl: vi.fn(async () => {
+        throw new Error('issue-keyed cache fallback should resolve before fetch');
+      })
+    });
+
+    expect(cachedParentResult).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      cache_fallback_used: true,
+      issue: {
+        identifier: 'CO-1',
+        title: 'Parent issue context'
       }
     });
   });
@@ -993,7 +1250,7 @@ describe('providerLinearWorkflowFacade', () => {
     const auditPath = env.CODEX_PROVIDER_LINEAR_AUDIT_PATH;
     expect(auditPath).toBeTruthy();
     const cachedRecord = JSON.parse(
-      await readFile(join(dirname(auditPath as string), 'provider-linear-issue-context-cache.json'), 'utf8')
+      await readFile(resolveIssueContextCachePathForTest(env), 'utf8')
     ) as {
       recorded_at: string;
       issue: {
@@ -1505,12 +1762,1641 @@ describe('providerLinearWorkflowFacade', () => {
     );
 
     expect(ghCalls).toEqual([
-      ['pr', 'view', '509', '--repo', 'asabeko/CO', '--json', 'state,mergedAt,updatedAt']
+      ['pr', 'view', '509', '--repo', 'asabeko/CO', '--json', 'state,mergedAt,updatedAt,title,headRefName']
     ]);
     expect(snapshot).toEqual({
       state: 'CLOSED',
       mergedAt: null,
-      updatedAt: '2026-04-17T13:10:30.000Z'
+      updatedAt: '2026-04-17T13:10:30.000Z',
+      title: null,
+      headRefName: null
+    });
+  });
+
+  it('keeps an unrelated active PR from becoming current on a completed issue', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Completed issue with misbound current PR',
+      state: {
+        id: 'state-done',
+        name: 'Done',
+        type: 'completed'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-532', 532, 'CO-244 closeout PR'),
+        buildGitHubAttachment('attachment-pr-575', 575, 'CO-289 preserve provider worker rehydration provenance')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 532
+          ? {
+              state: 'MERGED',
+              mergedAt: '2026-04-10T13:11:30.000Z',
+              updatedAt: '2026-04-10T13:11:30.000Z',
+              title: 'CO-244 completed provider release',
+              headRefName: 'linear/co-244-completed-provider-release'
+            }
+          : {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:07:51.000Z',
+              title: 'CO-289 preserve provider worker rehydration provenance',
+              headRefName: 'linear/co-289-provider-rehydration-provenance-main'
+            }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        state: {
+          name: 'Done',
+          type: 'completed'
+        },
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-532'
+          },
+          historical: [],
+          conflicting: [
+            {
+              id: 'attachment-pr-575'
+            }
+          ],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it('treats mixed inspected and foreign issue identifiers as conflicting ownership evidence', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Completed issue with customized misbound attachment title',
+      state: {
+        id: 'state-done',
+        name: 'Done',
+        type: 'completed'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-532', 532, 'CO-244 closeout PR'),
+        buildGitHubAttachment('attachment-pr-575', 575, 'CO-244 attachment label for CO-289 PR')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 532
+          ? {
+              state: 'MERGED',
+              mergedAt: '2026-04-10T13:11:30.000Z',
+              updatedAt: '2026-04-10T13:11:30.000Z',
+              title: 'CO-244 completed provider release',
+              headRefName: 'linear/co-244-completed-provider-release'
+            }
+          : {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:07:51.000Z',
+              title: 'CO-289 preserve provider worker rehydration provenance',
+              headRefName: 'linear/co-289-provider-rehydration-provenance-main'
+            }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-532'
+          },
+          historical: [],
+          conflicting: [
+            {
+              id: 'attachment-pr-575'
+            }
+          ],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it('treats foreign-prefix issue identifiers as conflicting ownership evidence', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Completed issue with foreign-prefix misbound attachment',
+      state: {
+        id: 'state-done',
+        name: 'Done',
+        type: 'completed'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-532', 532, 'CO-244 closeout PR'),
+        buildGitHubAttachment('attachment-pr-580', 580, 'feat: ABC-123 active provider PR')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 532
+          ? {
+              state: 'MERGED',
+              mergedAt: '2026-04-10T13:11:30.000Z',
+              updatedAt: '2026-04-10T13:11:30.000Z',
+              title: 'CO-244 completed provider release',
+              headRefName: 'linear/co-244-completed-provider-release'
+            }
+          : {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:07:51.000Z',
+              title: 'feat: ABC-123 active provider PR',
+              headRefName: 'feature/active-provider-pr'
+            }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-532'
+          },
+          historical: [],
+          conflicting: [
+            {
+              id: 'attachment-pr-580'
+            }
+          ],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it.each([
+    {
+      attachmentId: 'attachment-pr-594',
+      prNumber: 594,
+      prTitle: 'Backport ABC-123 for release'
+    },
+    {
+      attachmentId: 'attachment-pr-595',
+      prNumber: 595,
+      prTitle: 'fix: ABC-123 backport for CO-244'
+    }
+  ])(
+    'treats explicit foreign issue keys as conflicting even without branch-owner evidence',
+    async ({ attachmentId, prNumber, prTitle }) => {
+      const { result } = await readIssueContextAttachmentTruth({
+        identifier: 'CO-244',
+        title: 'Active issue with explicit foreign issue-key title',
+        state: {
+          id: 'state-in-progress',
+          name: 'In Progress',
+          type: 'started'
+        },
+        attachments: [buildGitHubAttachment(attachmentId, prNumber, prTitle)],
+        snapshotForPr: () => ({
+          state: 'OPEN',
+          mergedAt: null,
+          updatedAt: '2026-04-21T09:07:51.000Z',
+          title: prTitle,
+          headRefName: 'feature/runtime-provider-truth'
+        })
+      });
+
+      expect(result).toMatchObject({
+        ok: true,
+        operation: 'issue-context',
+        issue: {
+          identifier: 'CO-244',
+          pull_request_attachments: {
+            current: null,
+            historical: [],
+            conflicting: [
+              {
+                id: attachmentId
+              }
+            ],
+            unknown: []
+          }
+        }
+      });
+    }
+  );
+
+  it('treats lowercase branch-only issue identifiers as conflicting ownership evidence', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Completed issue with generic-titled misbound branch',
+      state: {
+        id: 'state-done',
+        name: 'Done',
+        type: 'completed'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-532', 532, 'CO-244 closeout PR'),
+        buildGitHubAttachment('attachment-pr-582', 582, 'Preserve provider rehydration provenance')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 532
+          ? {
+              state: 'MERGED',
+              mergedAt: '2026-04-10T13:11:30.000Z',
+              updatedAt: '2026-04-10T13:11:30.000Z',
+              title: 'CO-244 completed provider release',
+              headRefName: 'linear/co-244-completed-provider-release'
+            }
+          : {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:07:51.000Z',
+              title: 'Preserve provider rehydration provenance',
+              headRefName: 'linear/co-289-provider-rehydration-provenance-main'
+            }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-532'
+          },
+          historical: [],
+          conflicting: [
+            {
+              id: 'attachment-pr-582'
+            }
+          ],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it('keeps issue-owned technical-looking prefixes as conflicting ownership evidence', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Completed issue with technical-prefix misbound branch',
+      state: {
+        id: 'state-done',
+        name: 'Done',
+        type: 'completed'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-532', 532, 'CO-244 closeout PR'),
+        buildGitHubAttachment('attachment-pr-583', 583, 'chore: NODE-123 active runtime PR')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 532
+          ? {
+              state: 'MERGED',
+              mergedAt: '2026-04-10T13:11:30.000Z',
+              updatedAt: '2026-04-10T13:11:30.000Z',
+              title: 'CO-244 completed provider release',
+              headRefName: 'linear/co-244-completed-provider-release'
+            }
+          : {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:07:51.000Z',
+              title: 'chore: NODE-123 active runtime PR',
+              headRefName: 'feature/active-runtime-pr'
+            }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-532'
+          },
+          historical: [],
+          conflicting: [
+            {
+              id: 'attachment-pr-583'
+            }
+          ],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it('does not blacklist slash-position evidence for the inspected issue team prefix', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'NODE-244',
+      title: 'Completed issue with technical-looking team key',
+      state: {
+        id: 'state-done',
+        name: 'Done',
+        type: 'completed'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-532', 532, 'NODE-244 closeout PR'),
+        buildGitHubAttachment('attachment-pr-584', 584, 'Preserve runtime provider truth')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 532
+          ? {
+              state: 'MERGED',
+              mergedAt: '2026-04-10T13:11:30.000Z',
+              updatedAt: '2026-04-10T13:11:30.000Z',
+              title: 'NODE-244 completed provider release',
+              headRefName: 'linear/node-244-completed-provider-release'
+            }
+          : {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:07:51.000Z',
+              title: 'Preserve runtime provider truth',
+              headRefName: 'linear/node-289-provider-runtime-truth'
+            }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'NODE-244',
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-532'
+          },
+          historical: [],
+          conflicting: [
+            {
+              id: 'attachment-pr-584'
+            }
+          ],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it('ignores non-owner technical-token suffixes for the inspected issue team prefix', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'NODE-244',
+      title: 'Active issue with technical-looking team key and runtime suffix',
+      state: {
+        id: 'state-in-progress',
+        name: 'In Progress',
+        type: 'started'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-586', 586, 'fix: Node-20 provider upgrade for NODE-244')
+      ],
+      snapshotForPr: () => ({
+        state: 'OPEN',
+        mergedAt: null,
+        updatedAt: '2026-04-21T09:07:51.000Z',
+        title: 'fix: Node-20 provider upgrade for NODE-244',
+        headRefName: 'linear/node-244-node-20-provider-upgrade'
+      })
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'NODE-244',
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-586'
+          },
+          historical: [],
+          conflicting: [],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it('keeps low-number foreign branch evidence conflicting for technical-looking issue team keys', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'NODE-244',
+      title: 'Completed issue with low-number foreign branch evidence',
+      state: {
+        id: 'state-done',
+        name: 'Done',
+        type: 'completed'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-532', 532, 'NODE-244 closeout PR'),
+        buildGitHubAttachment('attachment-pr-590', 590, 'Preserve runtime provider truth')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 532
+          ? {
+              state: 'MERGED',
+              mergedAt: '2026-04-10T13:11:30.000Z',
+              updatedAt: '2026-04-10T13:11:30.000Z',
+              title: 'NODE-244 completed provider release',
+              headRefName: 'linear/node-244-completed-provider-release'
+            }
+          : {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:07:51.000Z',
+              title: 'Preserve runtime provider truth',
+              headRefName: 'linear/node-20-runtime-fix'
+            }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'NODE-244',
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-532'
+          },
+          historical: [],
+          conflicting: [
+            {
+              id: 'attachment-pr-590'
+            }
+          ],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it('keeps conventional-commit title-prefix low-number foreign NODE keys conflicting without owned evidence', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'NODE-244',
+      title: 'Completed issue with title-prefix foreign NODE PR',
+      state: {
+        id: 'state-done',
+        name: 'Done',
+        type: 'completed'
+      },
+      attachments: [buildGitHubAttachment('attachment-pr-600', 600, 'fix: NODE-20 runtime upgrade')],
+      snapshotForPr: () => ({
+        state: 'OPEN',
+        mergedAt: null,
+        updatedAt: '2026-04-21T09:07:51.000Z',
+        title: 'fix: NODE-20 runtime upgrade',
+        headRefName: 'feature/runtime-upgrade'
+      })
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'NODE-244',
+        pull_request_attachments: {
+          current: null,
+          historical: [],
+          conflicting: [
+            {
+              id: 'attachment-pr-600'
+            }
+          ],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it('keeps bare-leading low-number NODE titles unknown without owned evidence', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'NODE-244',
+      title: 'Completed issue with bare-leading low-number NODE PR',
+      state: {
+        id: 'state-done',
+        name: 'Done',
+        type: 'completed'
+      },
+      attachments: [buildGitHubAttachment('attachment-pr-606', 606, 'NODE-20 runtime upgrade')],
+      snapshotForPr: () => ({
+        state: 'OPEN',
+        mergedAt: null,
+        updatedAt: '2026-04-21T09:07:51.000Z',
+        title: 'NODE-20 runtime upgrade',
+        headRefName: 'feature/runtime-upgrade'
+      })
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'NODE-244',
+        pull_request_attachments: {
+          current: null,
+          historical: [],
+          conflicting: [],
+          unknown: [
+            {
+              id: 'attachment-pr-606'
+            }
+          ]
+        }
+      }
+    });
+  });
+
+  it('ignores low-number NODE title prefixes when another issue key owns the PR', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Active issue with low-number NODE title prefix and owned issue key',
+      state: {
+        id: 'state-in-progress',
+        name: 'In Progress',
+        type: 'started'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-601', 601, 'fix: NODE-20 provider upgrade for CO-244'),
+        buildGitHubAttachment('attachment-pr-603', 603, 'provider runtime cleanup')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 601
+          ? {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:07:51.000Z',
+              title: 'fix: NODE-20 provider upgrade for CO-244',
+              headRefName: 'feature/runtime-upgrade'
+            }
+          : {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:08:51.000Z',
+              title: 'provider runtime cleanup',
+              headRefName: 'feature/provider-runtime-cleanup'
+            }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-601'
+          },
+          historical: [],
+          conflicting: [],
+          unknown: [
+            {
+              id: 'attachment-pr-603'
+            }
+          ]
+        }
+      }
+    });
+  });
+
+  it('keeps bracketed low-number NODE version labels on the conservative path', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'NODE-244',
+      title: 'Active issue with bracketed low-number NODE version label',
+      state: {
+        id: 'state-in-progress',
+        name: 'In Progress',
+        type: 'started'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-602', 602, 'runtime upgrade (NODE-20)'),
+        buildGitHubAttachment('attachment-pr-604', 604, 'NODE-244 runtime reconciliation')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 602
+          ? {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:07:51.000Z',
+              title: 'runtime upgrade (NODE-20)',
+              headRefName: 'feature/runtime-upgrade'
+            }
+          : {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:08:51.000Z',
+              title: 'NODE-244 runtime reconciliation',
+              headRefName: 'linear/node-244-runtime-reconciliation'
+            }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'NODE-244',
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-604'
+          },
+          historical: [],
+          conflicting: [],
+          unknown: [
+            {
+              id: 'attachment-pr-602'
+            }
+          ]
+        }
+      }
+    });
+  });
+
+  it('keeps linear branch namespace evidence for foreign technical-looking team prefixes', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Completed issue with foreign technical-looking branch',
+      state: {
+        id: 'state-done',
+        name: 'Done',
+        type: 'completed'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-532', 532, 'CO-244 closeout PR'),
+        buildGitHubAttachment('attachment-pr-585', 585, 'Preserve runtime provider truth')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 532
+          ? {
+              state: 'MERGED',
+              mergedAt: '2026-04-10T13:11:30.000Z',
+              updatedAt: '2026-04-10T13:11:30.000Z',
+              title: 'CO-244 completed provider release',
+              headRefName: 'linear/co-244-completed-provider-release'
+            }
+          : {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:07:51.000Z',
+              title: 'Preserve runtime provider truth',
+              headRefName: 'linear/node-289-provider-runtime-truth'
+            }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-532'
+          },
+          historical: [],
+          conflicting: [
+            {
+              id: 'attachment-pr-585'
+            }
+          ],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it('keeps low-number foreign branch evidence conflicting for non-technical issue prefixes', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Completed issue with low-number foreign technical branch evidence',
+      state: {
+        id: 'state-done',
+        name: 'Done',
+        type: 'completed'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-532', 532, 'CO-244 closeout PR'),
+        buildGitHubAttachment('attachment-pr-596', 596, 'Preserve runtime provider truth')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 532
+          ? {
+              state: 'MERGED',
+              mergedAt: '2026-04-10T13:11:30.000Z',
+              updatedAt: '2026-04-10T13:11:30.000Z',
+              title: 'CO-244 completed provider release',
+              headRefName: 'linear/co-244-completed-provider-release'
+            }
+          : {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:07:51.000Z',
+              title: 'Preserve runtime provider truth',
+              headRefName: 'linear/node-20-runtime-fix'
+            }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-532'
+          },
+          historical: [],
+          conflicting: [
+            {
+              id: 'attachment-pr-596'
+            }
+          ],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it('recognizes technical-looking issue keys on non-linear owner branches', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'NODE-244',
+      title: 'Completed technical-looking issue with feature-branch owner evidence',
+      state: {
+        id: 'state-done',
+        name: 'Done',
+        type: 'completed'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-592', 592, 'Provider runtime closeout'),
+        buildGitHubAttachment('attachment-pr-593', 593, 'Preserve runtime provider truth')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 592
+          ? {
+              state: 'MERGED',
+              mergedAt: '2026-04-10T13:11:30.000Z',
+              updatedAt: '2026-04-10T13:11:30.000Z',
+              title: 'Provider runtime closeout',
+              headRefName: 'feature/node-244-completed-provider-release'
+            }
+          : {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:07:51.000Z',
+              title: 'Preserve runtime provider truth',
+              headRefName: 'feature/runtime-provider-truth'
+            }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'NODE-244',
+        pull_request_attachments: {
+          current: null,
+          historical: [
+            {
+              id: 'attachment-pr-592'
+            }
+          ],
+          conflicting: [],
+          unknown: [
+            {
+              id: 'attachment-pr-593'
+            }
+          ]
+        }
+      }
+    });
+  });
+
+  it('ignores leading technical-token titles when the inspected issue is also evidenced', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Active issue with leading technical-token PR title',
+      state: {
+        id: 'state-in-progress',
+        name: 'In Progress',
+        type: 'started'
+      },
+      attachments: [
+        buildGitHubAttachment(
+          'attachment-pr-587',
+          587,
+          'fix: HTTP-404 handling and GPT-5 support for CO-244'
+        )
+      ],
+      snapshotForPr: () => ({
+        state: 'OPEN',
+        mergedAt: null,
+        updatedAt: '2026-04-21T09:07:51.000Z',
+        title: 'fix: HTTP-404 handling and GPT-5 support for CO-244',
+        headRefName: 'linear/co-244-http-404-gpt-5-support'
+      })
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-587'
+          },
+          historical: [],
+          conflicting: [],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it('treats title-prefix technical terms as ambiguous when the inspected issue is also evidenced', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Active issue with SHA/UTF technical-token PR title',
+      state: {
+        id: 'state-in-progress',
+        name: 'In Progress',
+        type: 'started'
+      },
+      attachments: [
+        buildGitHubAttachment(
+          'attachment-pr-591',
+          591,
+          'fix: SHA-256 checksum and UTF-8 normalization for CO-244'
+        )
+      ],
+      snapshotForPr: () => ({
+        state: 'OPEN',
+        mergedAt: null,
+        updatedAt: '2026-04-21T09:07:51.000Z',
+        title: 'fix: SHA-256 checksum and UTF-8 normalization for CO-244',
+        headRefName: 'feature/runtime-truth'
+      })
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-591'
+          },
+          historical: [],
+          conflicting: [],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it('keeps generic SHA/UTF titles on the conservative path when no issue key is present', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Active issue with generic SHA/UTF PR title',
+      state: {
+        id: 'state-in-progress',
+        name: 'In Progress',
+        type: 'started'
+      },
+      attachments: [
+        buildGitHubAttachment(
+          'attachment-pr-597',
+          597,
+          'fix: SHA-256 checksum support and UTF-8 normalization'
+        )
+      ],
+      snapshotForPr: () => ({
+        state: 'OPEN',
+        mergedAt: null,
+        updatedAt: '2026-04-21T09:07:51.000Z',
+        title: 'fix: SHA-256 checksum support and UTF-8 normalization',
+        headRefName: 'feature/runtime-provider-truth'
+      })
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-597'
+          },
+          historical: [],
+          conflicting: [],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it.each([
+    {
+      attachmentId: 'attachment-pr-598',
+      prNumber: 598,
+      prTitle: 'SHA-256 checksum support',
+      headRefName: 'feature/checksum-support'
+    },
+    {
+      attachmentId: 'attachment-pr-599',
+      prNumber: 599,
+      prTitle: '[UTF-8] normalization',
+      headRefName: 'feature/text-normalization'
+    }
+  ])(
+    'keeps leading technical tokens on the conservative path without an issue key',
+    async ({ attachmentId, prNumber, prTitle, headRefName }) => {
+      const { result } = await readIssueContextAttachmentTruth({
+        identifier: 'CO-244',
+        title: 'Active issue with leading technical-token PR title',
+        state: {
+          id: 'state-in-progress',
+          name: 'In Progress',
+          type: 'started'
+        },
+        attachments: [buildGitHubAttachment(attachmentId, prNumber, prTitle)],
+        snapshotForPr: () => ({
+          state: 'OPEN',
+          mergedAt: null,
+          updatedAt: '2026-04-21T09:07:51.000Z',
+          title: prTitle,
+          headRefName
+        })
+      });
+
+      expect(result).toMatchObject({
+        ok: true,
+        operation: 'issue-context',
+        issue: {
+          identifier: 'CO-244',
+          pull_request_attachments: {
+            current: {
+              id: attachmentId
+            },
+            historical: [],
+            conflicting: [],
+            unknown: []
+          }
+        }
+      });
+    }
+  );
+
+  it('does not treat common technical hyphen codes as foreign issue ownership evidence', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Active issue with technical-token PR title',
+      state: {
+        id: 'state-in-progress',
+        name: 'In Progress',
+        type: 'started'
+      },
+      attachments: [
+        buildGitHubAttachment(
+          'attachment-pr-581',
+          581,
+          'feat: CO-244 support ISO-8601 GPT-5 RFC-3339 HTTP-404 Node-20 TLS-1.3 parsing'
+        )
+      ],
+      snapshotForPr: () => ({
+        state: 'OPEN',
+        mergedAt: null,
+        updatedAt: '2026-04-21T09:07:51.000Z',
+        title: 'feat: CO-244 support ISO-8601 GPT-5 RFC-3339 HTTP-404 Node-20 TLS-1.3 parsing',
+        headRefName: 'feature/node-20-http-404-upgrade'
+      })
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-581'
+          },
+          historical: [],
+          conflicting: [],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it('keeps a single active PR current when only technical hyphen tokens are present', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Active issue with technical-token-only PR title',
+      state: {
+        id: 'state-in-progress',
+        name: 'In Progress',
+        type: 'started'
+      },
+      attachments: [
+        buildGitHubAttachment(
+          'attachment-pr-588',
+          588,
+          'fix: HTTP-404 handling and Node-20 upgrade'
+        )
+      ],
+      snapshotForPr: () => ({
+        state: 'OPEN',
+        mergedAt: null,
+        updatedAt: '2026-04-21T09:07:51.000Z',
+        title: 'fix: HTTP-404 handling and Node-20 upgrade',
+        headRefName: 'feature/http-404-node-20-upgrade'
+      })
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-588'
+          },
+          historical: [],
+          conflicting: [],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it('does not let terminal owned history or generic active PRs claim current on completed issues', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Completed issue with generic active PR',
+      state: {
+        id: 'state-done',
+        name: 'Done',
+        type: 'completed'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-532', 532, 'CO-244 closeout PR'),
+        buildGitHubAttachment('attachment-pr-589', 589, 'Refactor provider rehydration')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 532
+          ? {
+              state: 'MERGED',
+              mergedAt: '2026-04-10T13:11:30.000Z',
+              updatedAt: '2026-04-10T13:11:30.000Z',
+              title: 'CO-244 completed provider release',
+              headRefName: 'linear/co-244-completed-provider-release'
+            }
+          : {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:07:51.000Z',
+              title: 'Refactor provider rehydration',
+              headRefName: 'feature/refactor-provider-rehydration'
+            }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: null,
+          historical: [
+            {
+              id: 'attachment-pr-532'
+            }
+          ],
+          conflicting: [],
+          unknown: [
+            {
+              id: 'attachment-pr-589'
+            }
+          ]
+        }
+      }
+    });
+  });
+
+  it('keeps a single generic active PR current on merging issues even when owned history exists', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Merging issue with owned history and generic active PR',
+      state: {
+        id: 'state-merging',
+        name: 'Merging',
+        type: 'started'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-532', 532, 'CO-244 closeout PR'),
+        buildGitHubAttachment('attachment-pr-589', 589, 'Refactor provider rehydration')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 532
+          ? {
+              state: 'MERGED',
+              mergedAt: '2026-04-10T13:11:30.000Z',
+              updatedAt: '2026-04-10T13:11:30.000Z',
+              title: 'CO-244 completed provider release',
+              headRefName: 'linear/co-244-completed-provider-release'
+            }
+          : {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:07:51.000Z',
+              title: 'Refactor provider rehydration',
+              headRefName: 'feature/refactor-provider-rehydration'
+            }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-589'
+          },
+          historical: [
+            {
+              id: 'attachment-pr-532'
+            }
+          ],
+          conflicting: [],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it('keeps a single generic active PR current on active issues even when owned history exists', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Active issue with owned history and one generic live PR',
+      state: {
+        id: 'state-in-progress',
+        name: 'In Progress',
+        type: 'started'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-532', 532, 'CO-244 closeout PR'),
+        buildGitHubAttachment('attachment-pr-589', 589, 'Refactor provider rehydration')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 532
+          ? {
+              state: 'MERGED',
+              mergedAt: '2026-04-10T13:11:30.000Z',
+              updatedAt: '2026-04-10T13:11:30.000Z',
+              title: 'CO-244 completed provider release',
+              headRefName: 'linear/co-244-completed-provider-release'
+            }
+          : {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:07:51.000Z',
+              title: 'Refactor provider rehydration',
+              headRefName: 'feature/refactor-provider-rehydration'
+            }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-589'
+          },
+          historical: [
+            {
+              id: 'attachment-pr-532'
+            }
+          ],
+          conflicting: [],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it('preserves ambiguity when foreign and generic active PRs coexist without owned evidence', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Active issue with foreign and generic live PRs',
+      state: {
+        id: 'state-in-progress',
+        name: 'In Progress',
+        type: 'started'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-590', 590, 'Refactor provider rehydration'),
+        buildGitHubAttachment('attachment-pr-591', 591, 'ABC-123 foreign provider lane')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 590
+          ? {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:07:51.000Z',
+              title: 'Refactor provider rehydration',
+              headRefName: 'feature/refactor-provider-rehydration'
+            }
+          : {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:08:11.000Z',
+              title: 'ABC-123 foreign provider lane',
+              headRefName: 'linear/abc-123-foreign-provider-lane'
+            }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: null,
+          historical: [],
+          conflicting: [
+            {
+              id: 'attachment-pr-590'
+            },
+            {
+              id: 'attachment-pr-591'
+            }
+          ],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it.each([
+    {
+      label: 'completed',
+      state: {
+        id: 'state-done',
+        name: 'Done',
+        type: 'completed'
+      }
+    },
+    {
+      label: 'merging',
+      state: {
+        id: 'state-merging',
+        name: 'Merging',
+        type: 'started'
+      }
+    }
+  ])('preserves ambiguity for $label issues when foreign and generic active PRs coexist', async ({ state }) => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Issue with foreign and generic live PRs',
+      state,
+      attachments: [
+        buildGitHubAttachment('attachment-pr-592', 592, 'Refactor provider rehydration'),
+        buildGitHubAttachment('attachment-pr-593', 593, 'ABC-123 foreign provider lane')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 592
+          ? {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:07:51.000Z',
+              title: 'Refactor provider rehydration',
+              headRefName: 'feature/refactor-provider-rehydration'
+            }
+          : {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:08:11.000Z',
+              title: 'ABC-123 foreign provider lane',
+              headRefName: 'linear/abc-123-foreign-provider-lane'
+            }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: null,
+          historical: [],
+          conflicting: [
+            {
+              id: 'attachment-pr-592'
+            },
+            {
+              id: 'attachment-pr-593'
+            }
+          ],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it('preserves the owning issue current PR when the PR identifier matches', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-289',
+      title: 'Provider worker rehydration should preserve provenance',
+      state: {
+        id: 'state-in-progress',
+        name: 'In Progress',
+        type: 'started'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-575', 575, 'CO-289 preserve provider worker rehydration provenance')
+      ],
+      snapshotForPr: () => ({
+        state: 'OPEN',
+        mergedAt: null,
+        updatedAt: '2026-04-21T09:07:51.000Z',
+        title: 'CO-289 preserve provider worker rehydration provenance',
+        headRefName: 'linear/co-289-provider-rehydration-provenance-main'
+      })
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-289',
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-575'
+          },
+          historical: [],
+          conflicting: [],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it('preserves attachment-title ownership conflicts when PR snapshots cannot be hydrated', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Snapshot unavailable for foreign-title attachment',
+      state: {
+        id: 'state-in-progress',
+        name: 'In Progress',
+        type: 'started'
+      },
+      attachments: [buildGitHubAttachment('attachment-pr-580', 580, 'ABC-123 active provider PR')],
+      snapshotForPr: () => ({})
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: null,
+          historical: [],
+          conflicting: [
+            {
+              id: 'attachment-pr-580'
+            }
+          ],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it('preserves ambiguity when a foreign title fails hydration beside a generic active PR', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Active issue with generic PR and unhydrated foreign title',
+      state: {
+        id: 'state-in-progress',
+        name: 'In Progress',
+        type: 'started'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-580', 580, 'ABC-123 active provider PR'),
+        buildGitHubAttachment('attachment-pr-581', 581, 'Provider stabilization')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 580
+          ? {}
+          : {
+              state: 'OPEN',
+              mergedAt: null,
+              updatedAt: '2026-04-21T09:07:51.000Z',
+              title: 'Provider stabilization',
+              headRefName: 'provider-stabilization'
+            }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: null,
+          historical: [],
+          conflicting: [
+            {
+              id: 'attachment-pr-581'
+            },
+            {
+              id: 'attachment-pr-580'
+            }
+          ],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it('preserves ambiguity when only terminal foreign evidence conflicts with a generic terminal PR', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Completed issue with generic merged PR and foreign merged PR',
+      state: {
+        id: 'state-done',
+        name: 'Done',
+        type: 'completed'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-580', 580, 'ABC-123 foreign merged provider PR'),
+        buildGitHubAttachment('attachment-pr-581', 581, 'Provider stabilization')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 580
+          ? {
+              state: 'MERGED',
+              mergedAt: '2026-04-21T09:07:51.000Z',
+              updatedAt: '2026-04-21T09:07:51.000Z',
+              title: 'ABC-123 foreign merged provider PR',
+              headRefName: 'linear/abc-123-foreign-provider-pr'
+            }
+          : {
+              state: 'MERGED',
+              mergedAt: '2026-04-21T09:08:51.000Z',
+              updatedAt: '2026-04-21T09:08:51.000Z',
+              title: 'Provider stabilization',
+              headRefName: 'provider-stabilization'
+            }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: null,
+          historical: [],
+          conflicting: [
+            {
+              id: 'attachment-pr-580'
+            }
+          ],
+          unknown: [
+            {
+              id: 'attachment-pr-581'
+            }
+          ]
+        }
+      }
+    });
+  });
+
+  it('does not duplicate a selected generic merged PR in unknown when owned history exists', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Completed issue with owned historical PR and generic merged PR',
+      state: {
+        id: 'state-done',
+        name: 'Done',
+        type: 'completed'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-532', 532, 'CO-244 previous provider fix'),
+        buildGitHubAttachment('attachment-pr-581', 581, 'Provider stabilization')
+      ],
+      snapshotForPr: (prNumber) =>
+        prNumber === 532
+          ? {
+              state: 'MERGED',
+              mergedAt: '2026-04-20T09:07:51.000Z',
+              updatedAt: '2026-04-20T09:07:51.000Z',
+              title: 'CO-244 previous provider fix',
+              headRefName: 'linear/co-244-previous-provider-fix'
+            }
+          : {
+              state: 'MERGED',
+              mergedAt: '2026-04-21T09:08:51.000Z',
+              updatedAt: '2026-04-21T09:08:51.000Z',
+              title: 'Provider stabilization',
+              headRefName: 'provider-stabilization'
+            }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: {
+            id: 'attachment-pr-581'
+          },
+          historical: [
+            {
+              id: 'attachment-pr-532'
+            }
+          ],
+          conflicting: [],
+          unknown: []
+        }
+      }
+    });
+  });
+
+  it('does not duplicate selected generic active PRs in unknown when owned history exists', async () => {
+    const { result } = await readIssueContextAttachmentTruth({
+      identifier: 'CO-244',
+      title: 'Active issue with owned historical PR and two generic active PRs',
+      state: {
+        id: 'state-in-progress',
+        name: 'In Progress',
+        type: 'started'
+      },
+      attachments: [
+        buildGitHubAttachment('attachment-pr-532', 532, 'CO-244 previous provider fix'),
+        buildGitHubAttachment('attachment-pr-581', 581, 'Provider stabilization'),
+        buildGitHubAttachment('attachment-pr-582', 582, 'Provider cleanup')
+      ],
+      snapshotForPr: (prNumber) => {
+        if (prNumber === 532) {
+          return {
+            state: 'MERGED',
+            mergedAt: '2026-04-20T09:07:51.000Z',
+            updatedAt: '2026-04-20T09:07:51.000Z',
+            title: 'CO-244 previous provider fix',
+            headRefName: 'linear/co-244-previous-provider-fix'
+          };
+        }
+        if (prNumber === 581) {
+          return {
+            state: 'OPEN',
+            mergedAt: null,
+            updatedAt: '2026-04-21T09:08:51.000Z',
+            title: 'Provider stabilization',
+            headRefName: 'provider-stabilization'
+          };
+        }
+        return {
+          state: 'OPEN',
+          mergedAt: null,
+          updatedAt: '2026-04-21T09:09:51.000Z',
+          title: 'Provider cleanup',
+          headRefName: 'provider-cleanup'
+        };
+      }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-244',
+        pull_request_attachments: {
+          current: null,
+          historical: [
+            {
+              id: 'attachment-pr-532'
+            }
+          ],
+          conflicting: [
+            {
+              id: 'attachment-pr-581'
+            },
+            {
+              id: 'attachment-pr-582'
+            }
+          ],
+          unknown: []
+        }
+      }
     });
   });
 
@@ -9570,8 +11456,7 @@ describe('providerLinearWorkflowFacade', () => {
       fetchImpl
     });
 
-    const auditPath = env.CODEX_PROVIDER_LINEAR_AUDIT_PATH!;
-    const cachePath = join(dirname(auditPath), 'provider-linear-issue-context-cache.json');
+    const cachePath = resolveIssueContextCachePathForTest(env);
     const cacheRecord = JSON.parse(await readFile(cachePath, 'utf8')) as {
       issue: {
         updated_at: string | null;

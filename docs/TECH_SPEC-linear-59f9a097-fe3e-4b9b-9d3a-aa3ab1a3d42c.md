@@ -5,7 +5,7 @@ relates_to: docs/PRD-linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-18
+last_review: 2026-04-21
 ---
 
 ## Canonical Reference
@@ -20,28 +20,29 @@ last_review: 2026-04-18
 - Source anchor: `ctx:sha256:d4239a4784c1cf71c95ab480b4a3821dc2c83dc3648d3b8d4a8c5387ccdfb3f8#chunk:c000001`
 - Shared source-0 metadata anchor: `ctx:sha256:737c3cf3d517b1a44673a4ef90593a10f7303f6e022a667e75cceca113e8acb8#chunk:c000001`
 - Apr 18 recurrence source anchor: `ctx:sha256:6a9427aa000f73b2f7d86bab415ae29c6ebbeb9172e159c03bc6d29ae012ff52#chunk:c000001`
+- Apr 21 Rework source anchor: `ctx:sha256:159ce815aa248f1705d76a533af179440608299883a742a504b31e83b029a294#chunk:c000001`
 - Docs packet child lane manifest: `.runs/linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c-docs-packet/cli/2026-04-17T02-07-55-950Z-cb83673c/manifest.json`
 - Apr 18 docs refresh child lane manifest: `.runs/linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c-docs-apr18-refresh/cli/2026-04-18T18-35-19-649Z-1ede381a/manifest.json`
+- Apr 21 Rework docs child lane manifest: `.runs/linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c-docs-apr21-rework/cli/2026-04-21T10-55-06-746Z-91d3806a/manifest.json` (zero-byte advisory; parent owns this refresh)
 - Merged PR #506 commit: `e98d459f4dfdb47a22d981fedbf5ba11053d3a95` (`fix(control-host): quarantine repeated refresh-stuck restart churn`)
 
 ## Summary
-- Objective: treat repeated refresh-stuck restart churn with healthy active workers as its own lifecycle bug, add durable observability, preserve worker-safety plus no-request-burn behavior, and refresh the packet for Apr 18 recurrence evidence after merged PR #506.
+- Objective: treat repeated refresh-stuck restart churn with healthy active workers as its own lifecycle bug, add durable observability, preserve worker-safety plus no-request-burn behavior, and refresh the packet for Apr 21 Rework evidence after prior PR #506 / #544 fixes did not cover the `probe_timeout` recurrence path.
 - Scope:
   - docs-first packet and registry/checklist mirrors
   - machine-checkable restart/churn evidence
   - `stalled_after_ms=45000` diagnostics for phase/request/claim context
   - bounded recovery that preserves active provider workers
   - post-recovery verification through `co-status --format json`
-  - parent-owned recurrence source fix for quarantined samples preserving fail-closed unhealthy streaks and diagnostic retention
+  - parent-owned recurrence source fix for `probe_timeout` restart records preserving fail-closed truth, diagnostic retention, and active-worker safety
 - Constraints:
   - do not change `CO-210` child-lane manifest hydration semantics
   - do not collapse the issue into attach-only recovery from `CO-179`
   - do not regress `CO-194`, `CO-163`, `CO-179`, `CO-119`, or `CO-41`
-  - do not edit parent-owned source/tests for the Apr 18 recurrence fix in this docs child lane
-  - keep this child lane docs-only
+  - Apr 21 zero-byte docs child lane is advisory evidence only; parent owns this docs refresh and implementation
 
 ## Issue-Shaping Contract
-- User-request translation carried forward: Apr 17 churn is not healthy steady-state behavior even when supervisor recovery succeeds; PR #506 landed the initial quarantine, but Apr 18 recurrence evidence requires the parent source fix to keep quarantined samples from clearing fail-closed unhealthy streaks or dropping diagnostic retention while still preserving healthy active workers and machine-checkable restart-series evidence.
+- User-request translation carried forward: Apr 17 churn is not healthy steady-state behavior even when supervisor recovery succeeds; PR #506 and PR #544 landed the initial quarantine and diagnostic-retention fixes, but Apr 21 recurrence evidence shows supervision can still churn through `probe_timeout` restarts while active workers remain healthy. The remaining fix must preserve fail-closed first-sample truth, retain a diagnostic snapshot from local provider-intake state when `co-status` times out, and quarantine only repeated timeout churn for the same active worker series.
 - Protected terms / exact artifact and surface names:
   - `provider_refresh_lifecycle_stuck`
   - `restart_required`
@@ -98,6 +99,7 @@ last_review: 2026-04-18
 - Pre-implementation issue-quality review evidence:
   - 2026-04-17: docs child lane reviewed the current issue body through the packaged read-only `linear issue-context` helper and approved the wider churn/observability framing. The issue is not plausibly narrower than the user's request because it explicitly requires restart-series evidence, `owner rotations`, `refresh phases`, `surviving provider workers`, `stalled_after_ms=45000` diagnostics, worker-preserving recovery, request-budget/no-request-burn safety, and post-recovery `co-status --format json` truth while keeping `CO-210` out of scope. The micro-task path is ineligible.
   - 2026-04-18: docs refresh child lane confirmed the supplied source-0 payload is metadata/provenance only and refreshed the packet from the parent prompt plus local git evidence that PR #506 merged as `e98d459f4dfdb47a22d981fedbf5ba11053d3a95`. The Apr 18 recurrence keeps the issue open for parent-owned source work on quarantined samples preserving fail-closed unhealthy streaks and diagnostic retention.
+  - 2026-04-21: parent Rework lane confirmed prior PRs `#506` and `#544` are merged, deleted the stale workpad, reset from `origin/main`, and launched `docs-apr21-rework` as a same-issue child lane. That child lane completed successfully with a zero-byte advisory patch, so parent owns this Apr 21 refresh and the source fix for `last_health_status=probe_timeout` recurrence under active workers.
 - Safeguard ownership split:
   - child lane owns packet files plus listed registry/checklist mirrors
   - parent lane owns source/test inspection, implementation, docs-review, validation, Linear/workpad reconciliation, PR lifecycle, and patch integration
@@ -109,7 +111,10 @@ last_review: 2026-04-18
   - include operation age, queued/checking state, and current provider keys in the stuck evidence
   - fix or quarantine the root re-entry condition so healthy active provider workers do not cause repeated restart churn
   - keep quarantined samples diagnostic-retentive: no clearing fail-closed unhealthy streaks and no loss of diagnostic retention
+  - keep timeout samples diagnostic-retentive: when `co-status` times out, preserve local persisted provider-intake polling and running-worker context in restart history instead of recording a null diagnostic
+  - quarantine repeated `probe_timeout` restart churn only when the same active worker series already triggered a fail-closed timeout restart inside the bounded quarantine window
   - preserve fail-closed truth for genuine stuck refreshes
+  - preserve fail-closed truth for first or unrelated `probe_timeout` samples
   - preserve active `provider-linear-worker` issue processes during recovery
   - preserve `CO-163` / `CO-179` no-request-burn behavior after `restart_required=true`
   - verify post-recovery health through `co-status --format json`
@@ -131,6 +136,7 @@ last_review: 2026-04-18
   - keep post-PR #506 recurrence ownership on the parent source fix, not on this docs child lane
   - record one authoritative restart/churn artifact instead of scattering evidence across transient logs
   - keep `co-status --format json` as verification rather than the only observability surface
+  - use local persisted `provider-intake-state.json` as fallback diagnostic input only when the HTTP `co-status` probe times out; do not add Linear reads or issue-by-id burn in the timeout pass
 - Required artifact fields:
   - restart series or recovery sequence id
   - timestamps or sequence order for `owner rotations`
@@ -141,6 +147,7 @@ last_review: 2026-04-18
   - current provider keys
   - `surviving provider workers`
   - stuck classification at `stalled_after_ms=45000`
+  - timeout classification when the supervising `co-status` probe itself cannot return JSON
   - post-recovery `polling.stuck` and `polling.restart_required` values
 - Data model changes / migrations:
   - additive fields in existing JSON artifacts or one new bounded artifact under the issue task path are acceptable
@@ -157,6 +164,7 @@ last_review: 2026-04-18
 - Parent-lane checks:
   - focused repeated-churn regression coverage
   - focused recurrence coverage proving quarantined samples preserve fail-closed unhealthy streaks and diagnostic retention
+  - focused `probe_timeout` recurrence coverage proving restart history retains fallback diagnostics and repeated same-series timeout churn is quarantined
   - focused no-regression coverage for `CO-194`
   - manifest-backed docs-review before implementation
   - parent-selected implementation validation after source edits
@@ -166,6 +174,7 @@ last_review: 2026-04-18
 - Which lifecycle seam should own the restart-series artifact so provider polling, supervision, and status agree?
 - What is the smallest safe parent-owned source fix if healthy active workers and repeated restart churn only intersect through one retained refresh-state re-entry path?
 - How should quarantined samples expose preserved fail-closed unhealthy streaks and diagnostic retention without triggering another active-worker restart loop?
+- How narrow should the timeout quarantine signature be: active worker series only, or active worker series plus retained polling reason from persisted provider-intake state?
 - Should the stuck-boundary artifact attach request/claim classification inline or summarize it after recovery?
 
 ## Approvals
