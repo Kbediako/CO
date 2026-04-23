@@ -13857,6 +13857,42 @@
         "agent_task": ".agent/task/linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be.md",
         "docs": "docs/TECH_SPEC-linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be.md"
       }
+    },
+    {
+      "id": "20260423-linear-e2852b4f-09d0-4220-b0ac-b763170eacb2",
+      "title": "CO-314 release notes Overview/Bug Fixes parity and prerelease docs truth",
+      "relates_to": "tasks/tasks-linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-23",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-23",
+          "status": "produced",
+          "manifest": ".runs/linear-e2852b4f-09d0-4220-b0ac-b763170eacb2-docs-packet/cli/2026-04-23T05-57-00-647Z-0bd37fd5/manifest.json",
+          "source_anchor": "ctx:sha256:02cb90d54135011ef937fd18a3991df0f28287d0192ad00e24a2f90a2d4cffb8#chunk:c000001",
+          "summary": "Docs-first packet preserves release-note surfaces `Overview`, `Bug Fixes`, and `Full Changelog`; protected files `docs/release-notes-template-addendum.md`, `.github/workflows/release.yml`, `.github/release-overview.md`, `docs/README.md`, and `.agent/SOPs/release.md`; and PR #608 review notes requiring workflow/SOP parity plus separate initial diff-budget and final review-wrapper evidence. The child checkout has no `.runs` tree, so the packet is anchored on parent-provided issue wording plus current repo release-surface audit."
+        },
+        "preimplementation_issue_quality": {
+          "reviewer": "docs child lane",
+          "date": "2026-04-23",
+          "status": "approved",
+          "summary": "The issue is a release-note/docs parity lane for CO-314: canonical Overview/Bug Fixes promotion, truthful prerelease dist-tag derivation docs, one-shot overview override behavior, and README/SOP parity. It explicitly rejects release publication, package versioning, signing policy, and broad release workflow redesign."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md",
+        "task": "tasks/tasks-linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md",
+        "agent_task": ".agent/task/linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md",
+          "TECH_SPEC": "tasks/specs/linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md"
+        }
+      }
     }
   ]
 }
