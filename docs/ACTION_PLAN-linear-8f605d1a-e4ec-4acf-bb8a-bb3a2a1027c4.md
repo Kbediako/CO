@@ -25,6 +25,7 @@
   - CO-266 remains responsible for repo-wide freshness maintenance
 - Pre-implementation issue-quality review:
   - 2026-04-20: current parent reproduction confirms the issue shape and keeps CO-266 out of scope.
+  - 2026-04-21: Rework reset confirmed PR #566 had already merged, deleted the old workpad, created `linear/co-267-docs-freshness-rolling-baseline-r2` from current `origin/main`, and reproduced the remaining Apr 21 baseline as 37 stale Task Packet / Task Mirror rows with no rolling cohort rows.
 
 ## Milestones & Sequencing
 1. Inspect Linear context, move `Ready -> In Progress`, create the single workpad, and record the current-turn parallelization decision.
@@ -42,6 +43,7 @@
    - update cohort guidance and mirrors
 7. Rerun freshness/spec/docs validation and capture after artifacts.
 8. Complete required validation floor, standalone review, elegance pass, PR attachment, ready-review drain, and Linear handoff.
+9. Rework addendum: refresh the exact Apr 21 stale `0954` and `1311`-`1316` packet/mirror rows, update the CO-267 classification/cohort guidance, rerun freshness validation, and only then proceed to review handoff.
 
 ## Dependencies
 - Linear issue `CO-267`
@@ -73,4 +75,5 @@
 
 ## Approvals
 - Docs-first packet: parent-authored after current issue-context and baseline reproduction.
-- Parent docs-review / standalone review: pending.
+- Rework packet refresh: parent-authored on 2026-04-21 after current-main reproduction.
+- Parent docs-review / standalone review: rework standalone review completed with `bounded-success`; evidence `.runs/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/cli/2026-04-21T05-34-25-740Z-9cf43116/review/telemetry.json`.

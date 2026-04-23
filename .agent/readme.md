@@ -23,8 +23,10 @@ Use explicit checkboxes (`[ ]` → `[x]`) for every task and subtask tracked in 
 
 ### Build & Test Checklist
 - [ ] `npm run lint` (always) — runs `npm run build:patterns` first.
-- [ ] `npm run test` — covers orchestrator agents, persistence, and adapter logic.
-- [ ] `npm run eval:test` — validates evaluation harness; ensure fixtures in `evaluation/fixtures/**` are in sync.
+- [ ] `npm run test:core` — runs the Core Lane matrix only; excludes `adapters/**` and `evaluation/tests/**`.
+- [ ] `npm run test` — runs the default repo validation alias to `test:core`; use `npm run test:all` when adapter coverage is required.
+- [ ] `npm run test:all` — runs the explicit broader Vitest matrix (`test:core` + `test:adapters`).
+- [ ] `npm run eval:test` — runs the opt-in evaluation-only lane (`test:evaluation`); ensure fixtures in `evaluation/fixtures/**` are in sync when this surface is in scope.
 - [ ] `node scripts/spec-guard.mjs --dry-run` — verify specs updated before review.
 
 ### External Pointers

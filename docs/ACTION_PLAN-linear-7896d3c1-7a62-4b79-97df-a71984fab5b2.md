@@ -81,5 +81,5 @@
 
 ## Approvals
 - Docs packet child lane: `.runs/linear-7896d3c1-7a62-4b79-97df-a71984fab5b2-docs-packet/cli/2026-04-17T20-05-40-785Z-50e95ea9/manifest.json`
-- Parent docs-review: pending parent acceptance
-- Parent implementation/review/PR lifecycle: pending parent lane
+- Parent docs-review: `.runs/linear-7896d3c1-7a62-4b79-97df-a71984fab5b2-co-225-docs-review-rerun/cli/2026-04-17T20-21-33-585Z-1c79ad95/manifest.json`
+- Parent implementation/review/PR lifecycle: PR `#576`; implementation commit `e25e7de0d`; forced standalone review succeeded with `review_outcome=bounded-success`; PR checks and ready-review drain remain the final handoff gate.

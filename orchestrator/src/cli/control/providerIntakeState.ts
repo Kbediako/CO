@@ -395,7 +395,7 @@ export function selectProviderIntakeClaim(
     return null;
   }
   const claims = [...state.claims].sort(compareProviderClaims);
-  const activeClaims = claims.filter((candidate) => isActiveProviderIntakeClaim(candidate.state));
+  const activeClaims = claims.filter(isActiveProviderIntakeClaim);
   return activeClaims[0] ?? claims[0] ?? null;
 }
 
@@ -404,7 +404,7 @@ export function buildProviderIntakeSummary(
 ): ProviderIntakeSummaryPayload | null {
   const normalizedState = normalizeProviderIntakeState(state);
   const claims = [...normalizedState.claims].sort(compareProviderClaims);
-  const activeClaims = claims.filter((candidate) => isActiveProviderIntakeClaim(candidate.state));
+  const activeClaims = claims.filter(isActiveProviderIntakeClaim);
   const runningClaims = claims.filter((candidate) => candidate.state === 'running');
   const claim = selectProviderIntakeClaim(normalizedState);
   if (!claim) {
@@ -662,8 +662,13 @@ function deriveProviderIntakeSummaryState(
   return claim.state;
 }
 
-function isActiveProviderIntakeClaim(state: ProviderIntakeClaimState): boolean {
-  switch (state) {
+function isActiveProviderIntakeClaim(
+  claim: Pick<ProviderIntakeClaimRecord, 'state' | 'retry_queued'>
+): boolean {
+  if (claim.retry_queued === true) {
+    return true;
+  }
+  switch (claim.state) {
     case 'accepted':
     case 'starting':
     case 'running':

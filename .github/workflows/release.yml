@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Existing release tag to publish (vX.Y.Z or vX.Y.Z-prerelease.N)'
+        description: 'Existing release tag to publish (vX.Y.Z or vX.Y.Z-<prerelease>)'
         required: false
         type: string
 
@@ -56,7 +56,7 @@ jobs:
 
           TAG="${TAG#refs/tags/}"
           if [[ ! "${TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
-            echo "::error::Invalid release tag '${TAG}'. Expected vX.Y.Z or vX.Y.Z-prerelease." >&2
+            echo "::error::Invalid release tag '${TAG}'. Expected vX.Y.Z or vX.Y.Z-<prerelease>." >&2
             exit 1
           fi
 
@@ -158,7 +158,7 @@ jobs:
       - run: npm run clean:dist
       - run: npm run build
       - run: npm run pack:audit
-      - run: npm install --global @openai/codex@0.121.0
+      - run: npm install --global @openai/codex@0.123.0
       - run: npm run pack:smoke
 
       - name: Create tarball
@@ -172,6 +172,7 @@ jobs:
       - name: Generate release notes
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.meta.outputs.tag }}
         run: |
           TAG="${{ steps.meta.outputs.tag }}"
           gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
@@ -179,6 +180,7 @@ jobs:
             -f target_commitish="${{ steps.meta.outputs.tag_sha }}" > release-notes.json
           node - <<'NODE'
           const fs = require('fs');
+          const { execFileSync } = require('node:child_process');
           const data = JSON.parse(fs.readFileSync('release-notes.json', 'utf8'));
           const body = (data.body || '').trim();
 
@@ -226,21 +228,38 @@ jobs:
             return [...lines.slice(0, start), ...lines.slice(end)].join('\n').trim();
           }
 
-          let overview = extractSection(body, 'Overview') ?? '- No labeled overview items.';
-          const overridePath = '.github/release-overview.md';
-          if (fs.existsSync(overridePath)) {
-            const override = fs.readFileSync(overridePath, 'utf8').trim();
-            if (override.length > 0) {
-              overview = override;
+          function readAnnotatedTagBody(tag) {
+            if (!tag) return null;
+            try {
+              const tagBody = execFileSync(
+                'git',
+                ['for-each-ref', `refs/tags/${tag}`, '--format=%(contents:body)'],
+                { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
+              ).trim();
+              return tagBody.length > 0 ? tagBody : null;
+            } catch {
+              return null;
             }
+          }
+
+          let overview = extractSection(body, 'Overview') ?? '- No labeled overview items.';
+          // A signed annotated tag body is release-specific, unlike a committed
+          // overview file that can accidentally persist into later releases.
+          const overviewOverride = readAnnotatedTagBody(process.env.RELEASE_TAG);
+          if (overviewOverride) {
+            overview = overviewOverride;
           }
           const bugFixes = extractSection(body, 'Bug Fixes') ?? '- No labeled bug fixes.';
           const compareLine = extractCompareLine(body);
-          let bodyWithoutOverview = stripSection(body, 'Overview');
-          if (compareLine && !bodyWithoutOverview.includes(compareLine)) {
-            bodyWithoutOverview = `${bodyWithoutOverview}\n\n${compareLine}`.trim();
+          const promotedHeadings = ['Overview', 'Bug Fixes'];
+          let fullBody = promotedHeadings.reduce(
+            (remaining, heading) => stripSection(remaining, heading),
+            body
+          ).trim();
+          if (compareLine && !fullBody.includes(compareLine)) {
+            fullBody = `${fullBody}\n\n${compareLine}`.trim();
           }
-          const full = bodyWithoutOverview.length > 0 ? `## Full Changelog\n\n${bodyWithoutOverview}` : '## Full Changelog\n\nNo changes.';
+          const full = fullBody.length > 0 ? `## Full Changelog\n\n${fullBody}` : '## Full Changelog\n\nNo changes.';
 
           const output = [
             '## Release Overview',
@@ -295,9 +314,9 @@ jobs:
 
       - name: Ensure npm trusted publishing prerequisites
         run: |
-          npm install --global npm@^11.5.1
           node --version
           npm --version
+          npx --yes npm@11.5.1 --version
 
       - name: Download release asset with gh (preferred)
         id: gh-download
@@ -379,10 +398,11 @@ jobs:
 
           # Prefer trusted publishing (OIDC) so releases do not depend on long-lived tokens.
           # Use a temporary token-free npmrc to avoid accidental NODE_AUTH_TOKEN-based auth.
+          PUBLISH_NPM=(npx --yes npm@11.5.1)
           OIDC_NPMRC="$(mktemp)"
           printf 'registry=https://registry.npmjs.org/\n' > "$OIDC_NPMRC"
           set +e
-          NODE_AUTH_TOKEN= NPM_CONFIG_USERCONFIG="$OIDC_NPMRC" npm publish "$TARBALL_PATH" --tag "$DIST_TAG" --provenance
+          NODE_AUTH_TOKEN= NPM_CONFIG_USERCONFIG="$OIDC_NPMRC" "${PUBLISH_NPM[@]}" publish "$TARBALL_PATH" --tag "$DIST_TAG" --provenance
           OIDC_STATUS=$?
           set -e
           rm -f "$OIDC_NPMRC"
@@ -398,7 +418,7 @@ jobs:
 
           PUBLISH_LOG="$(mktemp)"
           set +e
-          NODE_AUTH_TOKEN="$NPM_TOKEN" npm publish "$TARBALL_PATH" --tag "$DIST_TAG" 2>&1 | tee "$PUBLISH_LOG"
+          NODE_AUTH_TOKEN="$NPM_TOKEN" "${PUBLISH_NPM[@]}" publish "$TARBALL_PATH" --tag "$DIST_TAG" 2>&1 | tee "$PUBLISH_LOG"
           TOKEN_STATUS=${PIPESTATUS[0]}
           set -e
           if [[ $TOKEN_STATUS -ne 0 ]] && grep -q "npm error code EOTP" "$PUBLISH_LOG"; then

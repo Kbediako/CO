@@ -1,6 +1,6 @@
 # Abetka Mirror
 
-Local, tracker-free mirror of https://abetkaua.com/en/ for HiFi toolkit testing. The previous static snapshot now lives in `.runs/0801-dead-code-pruning/archive/2025-12-08T10-01-24Z/packages/abetkaua/public/`; regenerate fresh output with the mirror scripts when needed.
+Local, tracker-free mirror of https://abetkaua.com/en/ for HiFi toolkit testing. Task 0801 removed the checked-in static snapshot, so fresh checkouts should regenerate `packages/abetkaua/public/` with the mirror scripts when needed instead of expecting a durable `.runs/...` archive copy.
 
 ## Run Locally
 - Refresh the mirror (keeps per-project cache, Web Archive fallback for externals): `npm run mirror:fetch -- --project abetkaua`

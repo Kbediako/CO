@@ -1,0 +1,163 @@
+---
+id: 20260422-linear-f9666beb-58a7-47b2-b1c8-16d309ed1689
+title: CO released stale blocker metadata must not re-block issues after blocker issues are Done
+relates_to: docs/PRD-linear-f9666beb-58a7-47b2-b1c8-16d309ed1689.md
+risk: high
+owners:
+  - Codex
+last_review: 2026-04-22
+---
+
+## Canonical Reference
+- Canonical TECH_SPEC: `tasks/specs/linear-f9666beb-58a7-47b2-b1c8-16d309ed1689.md`
+- PRD: `docs/PRD-linear-f9666beb-58a7-47b2-b1c8-16d309ed1689.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-linear-f9666beb-58a7-47b2-b1c8-16d309ed1689.md`
+- Task checklist: `tasks/tasks-linear-f9666beb-58a7-47b2-b1c8-16d309ed1689.md`
+- `.agent` mirror: `.agent/task/linear-f9666beb-58a7-47b2-b1c8-16d309ed1689.md`
+
+## Traceability
+- Linear issue: `CO-302` / `f9666beb-58a7-47b2-b1c8-16d309ed1689`
+- Linear URL: https://linear.app/asabeko/issue/CO-302/co-released-stale-blocker-metadata-must-not-re-block-issues-after
+- Shared source 0 anchor: `ctx:sha256:d829d982421ba4529dabb021e70362809faafbd4fc438e1d113e8992538c858c#chunk:c000001`
+- Source object id: `sha256:d829d982421ba4529dabb021e70362809faafbd4fc438e1d113e8992538c858c`
+- Context dir: `.runs/linear-f9666beb-58a7-47b2-b1c8-16d309ed1689-docs-packet/cli/2026-04-22T05-53-20-299Z-b3f6fed4/memory/source-0`
+- Source payload: `.runs/linear-f9666beb-58a7-47b2-b1c8-16d309ed1689-docs-packet/cli/2026-04-22T05-53-20-299Z-b3f6fed4/memory/source-0/source.txt`
+- Source payload note: the shared `source-0` payload is metadata-only; the issue description was fetched read-only from Linear issue `CO-302` on 2026-04-22.
+- Docs packet child lane manifest: `.runs/linear-f9666beb-58a7-47b2-b1c8-16d309ed1689-docs-packet/cli/2026-04-22T05-53-20-299Z-b3f6fed4/manifest.json`
+
+## Summary
+- Objective: prevent stale terminal blocker metadata on a released/not-active provider-intake claim from re-blocking a live issue after the blocker is already terminal.
+- Scope:
+  - parent-owned implementation that keeps `CO-295` from being overwritten to `Blocked` by stale `issue_blocked_by=[CO-300 Done]`
+  - parent-owned focused regression for the `CO-295` / `CO-300 Done` stale-blocker overwrite shape
+  - parent-owned advisory or repair behavior when stale released blocker metadata cannot be safely auto-pruned
+  - preservation of released claim provenance and fail-closed provider behavior
+- Constraints:
+  - child lane owns only docs packet files and requested registry mirrors
+  - no implementation code or tests in this docs phase
+  - no Linear mutation helpers
+  - reject broad provider lifecycle rewrites and `CO-295` PR attachment scope expansion
+
+## Issue-Shaping Contract
+- User-request translation carried forward: the issue is the stale released blocker metadata path. A released provider-intake row for `CO-295` with `reason=provider_issue_released:not_active`, `run_id=2026-04-21T16-08-48-577Z-c085bbbf`, and `issue_blocked_by=[CO-300 Done]` can still overwrite live Linear state back to `Blocked` even though `CO-300` is terminal `Done`.
+- Protected terms / exact artifact and surface names:
+  - `provider-intake-state.json`
+  - `provider_issue_released:not_active`
+  - `issue_blocked_by`
+  - `CO-295`
+  - `CO-300`
+  - `Done`
+  - `Cancelled`
+  - `Blocked`
+  - released claim
+  - queue truth
+  - stale blocker metadata
+  - `.runs/local-mcp/cli/control-host/provider-intake-state.json`
+  - `run_id=2026-04-21T16-08-48-577Z-c085bbbf`
+  - PR `#594`
+  - merge commit `4d80fb60f`
+- Nearby wrong interpretations to reject:
+  - widening `CO-295`'s product-scope PR attachment ownership fix
+  - treating completed blocker issues as valid blockers
+  - using another manual state flip as the durable fix
+  - weakening fail-closed provider provenance behavior
+  - deleting unrelated released-claim provenance fields to hide drift
+- Explicit non-goals carried forward:
+  - no broad provider-issue lifecycle rewrite beyond stale released-blocker overwrite handling
+  - no manual deletion of unrelated released-claim provenance fields
+  - no weakening of non-terminal blocker semantics
+  - no auto-promotion of unrelated issues outside normal queue guards
+
+## Parity / Alignment Matrix
+- Current truth:
+  - `CO-295` was manually transitioned from `Ready` to `In Progress` at `2026-04-22T04:58:34.614Z`
+  - branch refresh merge commit `4d80fb60f` pushed to PR `#594`, restarting checks
+  - live Linear showed `CO-295` back in `Blocked` by `2026-04-22T05:01:21.766Z`
+  - `.runs/local-mcp/cli/control-host/provider-intake-state.json` still had a released row with `provider_issue_released:not_active`, old run id `2026-04-21T16-08-48-577Z-c085bbbf`, and `issue_blocked_by=[CO-300 Done]`
+  - `CO-300` is already terminal `Done`
+- Reference truth:
+  - completed blocker issues should not keep another issue blocked
+  - released rows should preserve audit provenance but reflect only live blockers or no blockers when driving current state
+  - reconcile should preserve truthful current state when blocker metadata is terminally stale
+  - real non-terminal blockers remain authoritative
+- Target truth / intended delta:
+  - released/not-active claim refresh or reconcile logic drops, neutralizes, or explicitly ignores terminal blocker links
+  - poll/reconcile logic no longer transitions live issues to `Blocked` from stale released-claim metadata when no non-terminal blocker remains
+  - stale terminal blockers are surfaced as explicit advisory evidence or repair-path evidence when automatic repair is not immediately safe
+  - regression coverage pins the `CO-295` / `CO-300 Done` shape
+- Explicitly out-of-scope differences:
+  - no `CO-295` PR attachment ownership expansion
+  - no unrelated issue auto-promotion outside queue guards
+  - no provenance deletion unrelated to blocker truth
+  - no review/merge guardrail weakening
+
+## Readiness Gate
+- Not done if:
+  - a released/not-active claim can still overwrite an issue to `Blocked` when every `issue_blocked_by` issue is already terminal `Done` or `Cancelled`
+  - manual reclaim of the affected issue is still unstable because the stale released row re-applies the wrong blocker state on the next reconcile
+  - Linear queue state and `provider-intake-state.json` can still disagree on blocker truth without an explicit stale-blocker advisory or repair path
+  - the lane drifts into `CO-295` PR attachment scope or broad provider lifecycle rewriting
+- Pre-implementation issue-quality review evidence:
+  - 2026-04-22: issue body confirms this is a stale released-claim blocker overwrite path, not a generic queue cleanup lane. The protected terms, non-goals, Not Done If, acceptance criteria, and parity/alignment matrix all depend on exact `provider-intake-state.json` / `issue_blocked_by` naming, so the micro-task path is ineligible.
+- Safeguard ownership split:
+  - child lane owns only packet files and requested registry/checklist mirrors
+  - parent lane owns source inspection, implementation, focused regression coverage, docs-review, validation, Linear/workpad reconciliation, PR lifecycle, and patch integration
+
+## Technical Requirements
+- Functional requirements:
+  1. Detect released/not-active claim blocker links whose referenced issues are terminal (`Done` / canceled).
+  2. Drop, neutralize, or explicitly ignore terminal blocker links before they can drive a live issue back to `Blocked`.
+  3. Preserve non-terminal `issue_blocked_by` semantics: active blockers must still block.
+  4. Preserve released-claim provenance, including `provider_issue_released:not_active`, old run id, and other unrelated audit fields.
+  5. Ensure poll/reconcile logic does not transition a live issue to `Blocked` from stale released-claim metadata when no non-terminal blocker remains.
+  6. Surface explicit stale-blocker advisory evidence if full automatic repair cannot happen in the first implementation.
+  7. Add focused regression coverage for the `CO-295` / `CO-300 Done` stale-blocker overwrite shape.
+- Non-functional requirements:
+  - fail closed around provider provenance; do not invent current truth from stale metadata
+  - keep queue truth auditable and machine-checkable
+  - keep implementation bounded to stale released-blocker overwrite handling
+  - avoid live Linear dependency in regression coverage where fixtures can model the stale row
+- Interfaces / contracts:
+  - `.runs/local-mcp/cli/control-host/provider-intake-state.json`
+  - provider-intake released-claim state and `issue_blocked_by`
+  - reconcile/poll issue-state projection
+  - stale-blocker advisory or repair-path evidence
+  - terminal Linear issue status classifier for `Done` / canceled states
+
+## Architecture & Data
+- Architecture / design adjustments:
+  - prefer using an existing terminal-state classifier rather than adding a parallel status taxonomy
+  - keep terminal-blocker filtering near the seam that converts released claim metadata into current queue state
+  - preserve stale released claim audit fields while preventing them from becoming authoritative blocker truth
+  - make any advisory output explicit enough for operators to see `issue id`, stale blocker id/status, and chosen action
+- Data model changes / migrations:
+  - prefer no migration
+  - if claim shape changes, keep it additive and backwards-compatible with existing `provider-intake-state.json`
+- External dependencies / integrations:
+  - parent-owned local control-host evidence under `.runs/local-mcp/cli/control-host/provider-intake-state.json`
+  - parent-owned focused tests or fixtures
+  - parent docs-review and ordered validation floor after source edits
+
+## Validation Plan
+- Child-lane checks:
+  - `jq empty tasks/index.json docs/docs-freshness-registry.json`
+  - protected-term grep across packet and mirror files
+  - `git diff --check --` on touched files only
+- Parent-lane checks:
+  - focused regression for `CO-295` / `CO-300 Done` stale-blocker overwrite
+  - focused test that valid non-terminal blocker metadata still blocks
+  - focused evidence that released claim provenance is preserved
+  - docs-review and ordered validation floor after implementation
+- Rollout verification:
+  - parent records proof that a released/not-active claim with only terminal blockers does not re-block the live issue
+  - parent records any advisory/repair artifact for stale terminal blockers
+  - parent records that no unrelated queue auto-promotion or provenance weakening occurred
+
+## Open Questions
+- Should terminal blocker links be pruned during released-claim refresh or ignored during reconcile projection?
+- Should stale terminal blocker evidence be persisted in `provider-intake-state.json`, emitted in an advisory/read-model surface, or both?
+- Which existing tests best host the `CO-295` / `CO-300 Done` fixture without widening into full provider lifecycle coverage?
+
+## Approvals
+- Reviewer: docs child lane self-review for packet shape and issue-shaping contract
+- Date: 2026-04-22

@@ -7,9 +7,18 @@ type TerminalStatus = 'failed' | 'succeeded';
 
 const AUXILIARY_PROOF_HARNESS_SUMMARY = 'manual live proof harness';
 const AUXILIARY_PROOF_HARNESS_RUN_ID_SUFFIX = '-manual-live-proof';
+const FOLLOW_UP_PARITY_MATRIX_SUPPRESSION_CODES = new Set([
+  'linear_follow_up_parity_matrix_missing',
+  'linear_follow_up_parity_matrix_retry_suppressed'
+]);
+const CHILD_LANE_PARENT_DIRTY_SUPPRESSION_CODES = new Set([
+  'provider_worker_child_lane_parent_dirty',
+  'provider_worker_child_lane_parent_dirty_retry_suppressed'
+]);
 
 export interface ProviderLinearMutationSuppression {
   operation: ProviderLinearAuditEntry['operation'];
+  action: string | null;
   error_code: string | null;
   error_message: string | null;
   instruction: string;
@@ -126,6 +135,7 @@ export function deriveDeterministicProviderMutationSuppressions(
   audit: ProviderLinearAuditSummary | null | undefined,
   options: {
     recordedAtNotBefore?: string | null;
+    issueId?: string | null;
   } = {}
 ): ProviderLinearMutationSuppression[] {
   if (!audit) {
@@ -144,14 +154,62 @@ export function deriveDeterministicProviderMutationSuppressions(
   if (!Number.isFinite(recordedAtNotBeforeMs)) {
     return [];
   }
-  const entries = Object.values(latestByOperation)
+  const issueId = normalizeOptionalString(options.issueId);
+  const entries = selectProviderLinearMutationEntries(audit, latestByOperation)
     .filter((entry): entry is ProviderLinearAuditEntry => Boolean(entry))
+    .filter((entry) => !issueId || entry.issue_id === issueId)
     .filter((entry) =>
       readTimestampMs(entry as unknown as Record<string, unknown>, 'recorded_at') >= recordedAtNotBeforeMs
     )
     .filter((entry) => entry.ok === false && isDeterministicProviderMutationFailure(entry))
-    .sort((left, right) => left.operation.localeCompare(right.operation));
-  return entries.map((entry) => buildDeterministicProviderMutationSuppression(entry));
+    .reduce<Map<string, ProviderLinearAuditEntry>>((latestByOperationAndAction, entry) => {
+      latestByOperationAndAction.set(buildProviderLinearMutationEntryKey(entry), entry);
+      return latestByOperationAndAction;
+    }, new Map<string, ProviderLinearAuditEntry>());
+  return Array.from(entries.values())
+    .sort((left, right) => {
+      const operationOrder = left.operation.localeCompare(right.operation);
+      if (operationOrder !== 0) {
+        return operationOrder;
+      }
+      const leftAction = normalizeAuditAction(left.action) ?? '';
+      const rightAction = normalizeAuditAction(right.action) ?? '';
+      return leftAction.localeCompare(rightAction);
+    })
+    .map((entry) => buildDeterministicProviderMutationSuppression(entry));
+}
+
+export function findDeterministicProviderMutationSuppression(
+  audit: ProviderLinearAuditSummary | null | undefined,
+  operation: ProviderLinearAuditEntry['operation'],
+  options: {
+    recordedAtNotBefore?: string | null;
+    action?: string | null;
+    issueId?: string | null;
+  } = {}
+): ProviderLinearMutationSuppression | null {
+  const requestedAction = normalizeAuditAction(options.action);
+  return (
+    deriveDeterministicProviderMutationSuppressions(audit, options).find(
+      (suppression) =>
+        suppression.operation === operation &&
+        (!requestedAction || suppression.action === requestedAction)
+    ) ?? null
+  );
+}
+
+export function isFollowUpParityMatrixSuppressionCode(
+  errorCode: string | null | undefined
+): boolean {
+  const normalized = normalizeOptionalString(errorCode);
+  return normalized ? FOLLOW_UP_PARITY_MATRIX_SUPPRESSION_CODES.has(normalized) : false;
+}
+
+export function isChildLaneParentDirtySuppressionCode(
+  errorCode: string | null | undefined
+): boolean {
+  const normalized = normalizeOptionalString(errorCode);
+  return normalized ? CHILD_LANE_PARENT_DIRTY_SUPPRESSION_CODES.has(normalized) : false;
 }
 
 export function formatDeterministicProviderMutationDegradationSummary(
@@ -172,28 +230,62 @@ export function formatDeterministicProviderMutationDegradationSummary(
 function buildDeterministicProviderMutationSuppression(
   entry: ProviderLinearAuditEntry
 ): ProviderLinearMutationSuppression {
+  const action = normalizeAuditAction(entry.action);
   const errorCode = normalizeOptionalString(entry.error_code);
   const errorMessage = normalizeOptionalString(entry.error_message);
   switch (entry.operation) {
     case 'create-follow-up':
       return {
         operation: entry.operation,
+        action,
         error_code: errorCode,
         error_message: errorMessage,
         instruction:
-          errorCode === 'linear_follow_up_parity_matrix_missing'
+          isFollowUpParityMatrixSuppressionCode(errorCode)
             ? 'Do not retry `create-follow-up` in this attempt unless you first add the required parity matrix or explicitly reclassify the follow-up as non-parity/alignment and omit `--parity-lane`.'
             : buildGenericSuppressionInstruction(entry.operation, errorCode, errorMessage),
         summary:
-          errorCode === 'linear_follow_up_parity_matrix_missing'
+          isFollowUpParityMatrixSuppressionCode(errorCode)
             ? 'deterministic provider mutation suppressed: create-follow-up retry is blocked until a parity matrix is added or the follow-up is reclassified as non-parity/alignment with --parity-lane omitted'
             : buildGenericSuppressionSummary(entry.operation, errorCode, errorMessage)
+      };
+    case 'child-lane':
+      if (errorCode === 'provider_worker_child_lane_provenance_invalid') {
+        const launchTimeControlHostProvenanceFailure =
+          action === 'launch' || errorMessage?.includes('control-host provenance') === true;
+        return {
+          operation: entry.operation,
+          action,
+          error_code: errorCode,
+          error_message: errorMessage,
+          instruction:
+            launchTimeControlHostProvenanceFailure
+              ? `Do not retry \`${entry.operation}\` until you first confirm the parent provider-worker run now has matching control-host provenance recorded in the manifest and active environment; if that provenance has already been repaired since the failed audit entry, you may retry once without restarting the attempt. Preserve the fail-closed provenance contract instead of forcing the launch.`
+              : 'Do not retry `child-lane` until you first confirm the pending child-lane record now matches the expected parent-owned pipeline, task, and issue binding; if that binding has already been repaired since the failed audit entry, you may retry once without restarting the attempt. Preserve the fail-closed provenance contract instead of forcing the decision.',
+          summary:
+            launchTimeControlHostProvenanceFailure
+              ? `deterministic provider mutation suppressed: ${entry.operation} fail-closed provenance mismatch must be repaired before retry`
+              : 'deterministic provider mutation suppressed: child-lane fail-closed provenance mismatch must be reconciled before retry'
+        };
+      }
+      return {
+        operation: entry.operation,
+        action,
+        error_code: errorCode,
+        error_message: errorMessage,
+        instruction: isChildLaneParentDirtySuppressionCode(errorCode)
+          ? buildChildLaneParentDirtySuppressionInstruction(action)
+          : buildGenericSuppressionInstruction(entry.operation, errorCode, errorMessage),
+        summary: isChildLaneParentDirtySuppressionCode(errorCode)
+          ? buildChildLaneParentDirtySuppressionSummary(action)
+          : buildGenericSuppressionSummary(entry.operation, errorCode, errorMessage)
       };
     case 'transition':
     case 'upsert-workpad':
       if (errorCode === 'linear_issue_not_mutable') {
         return {
           operation: entry.operation,
+          action,
           error_code: errorCode,
           error_message: errorMessage,
           instruction: `Do not retry \`${entry.operation}\` in this attempt until the Linear issue is restored to a mutable active state.`,
@@ -202,6 +294,26 @@ function buildDeterministicProviderMutationSuppression(
       }
       return {
         operation: entry.operation,
+        action,
+        error_code: errorCode,
+        error_message: errorMessage,
+        instruction: buildGenericSuppressionInstruction(entry.operation, errorCode, errorMessage),
+        summary: buildGenericSuppressionSummary(entry.operation, errorCode, errorMessage)
+      };
+    case 'child-stream':
+      if (errorCode === 'provider_worker_child_stream_provenance_invalid') {
+        return {
+          operation: entry.operation,
+          action,
+          error_code: errorCode,
+          error_message: errorMessage,
+          instruction: `Do not retry \`${entry.operation}\` until you first confirm the parent provider-worker run now has matching control-host provenance recorded in the manifest and active environment; if that provenance has already been repaired since the failed audit entry, you may retry once without restarting the attempt. Preserve the fail-closed provenance contract instead of forcing the launch.`,
+          summary: `deterministic provider mutation suppressed: ${entry.operation} fail-closed provenance mismatch must be repaired before retry`
+        };
+      }
+      return {
+        operation: entry.operation,
+        action,
         error_code: errorCode,
         error_message: errorMessage,
         instruction: buildGenericSuppressionInstruction(entry.operation, errorCode, errorMessage),
@@ -210,6 +322,7 @@ function buildDeterministicProviderMutationSuppression(
     default:
       return {
         operation: entry.operation,
+        action,
         error_code: errorCode,
         error_message: errorMessage,
         instruction: buildGenericSuppressionInstruction(entry.operation, errorCode, errorMessage),
@@ -240,12 +353,29 @@ function buildGenericSuppressionSummary(
     : `deterministic provider mutation suppressed: ${operation} failed validation`;
 }
 
+function buildChildLaneParentDirtySuppressionInstruction(action: string | null): string {
+  if (action === 'accept') {
+    return 'Do not retry `child-lane --action accept` in this attempt while the parent workspace still has in-scope dirty files. Reconcile those parent changes or move scratch artifacts outside the repo, then accept only after the requested patch scope is clean.';
+  }
+  return 'Do not retry `child-lane --action launch` in this attempt while the parent workspace still has in-scope dirty files. Reconcile those parent changes or move scratch artifacts outside the repo, then relaunch only after the requested scope is clean.';
+}
+
+function buildChildLaneParentDirtySuppressionSummary(action: string | null): string {
+  if (action === 'accept') {
+    return 'deterministic provider mutation suppressed: child-lane accept retry is blocked until the parent workspace is clean for the requested patch scope';
+  }
+  return 'deterministic provider mutation suppressed: child-lane launch retry is blocked until the parent workspace is clean for the requested scope';
+}
+
 function isDeterministicProviderMutationFailure(entry: ProviderLinearAuditEntry): boolean {
   const errorCode = normalizeOptionalString(entry.error_code);
   if (!errorCode) {
     return false;
   }
-  if (errorCode === 'linear_follow_up_parity_matrix_missing') {
+  if (isFollowUpParityMatrixSuppressionCode(errorCode)) {
+    return true;
+  }
+  if (isChildLaneParentDirtySuppressionCode(errorCode)) {
     return true;
   }
   if (errorCode === 'linear_workpad_comment_id_invalid') {
@@ -273,6 +403,12 @@ function isDeterministicProviderMutationFailure(entry: ProviderLinearAuditEntry)
     return true;
   }
   if (errorCode === 'linear_issue_not_mutable') {
+    return true;
+  }
+  if (errorCode === 'provider_worker_child_lane_provenance_invalid') {
+    return true;
+  }
+  if (errorCode === 'provider_worker_child_stream_provenance_invalid') {
     return true;
   }
   return /^linear_follow_up_.*_missing$/u.test(errorCode);
@@ -346,4 +482,27 @@ function normalizeOptionalString(value: unknown): string | null {
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function selectProviderLinearMutationEntries(
+  audit: ProviderLinearAuditSummary,
+  latestByOperation: NonNullable<ProviderLinearAuditSummary['latest_by_operation']>
+): ProviderLinearAuditEntry[] {
+  if (Array.isArray(audit.entries) && audit.entries.length > 0) {
+    return audit.entries.filter((entry): entry is ProviderLinearAuditEntry => Boolean(entry));
+  }
+  return Object.values(latestByOperation).filter((entry): entry is ProviderLinearAuditEntry => Boolean(entry));
+}
+
+function buildProviderLinearMutationEntryKey(entry: ProviderLinearAuditEntry): string {
+  return `${entry.operation}:${normalizeAuditAction(entry.action) ?? ''}`;
+}
+
+function normalizeAuditAction(value: string | null | undefined): string | null {
+  const normalized = normalizeOptionalString(value);
+  if (!normalized) {
+    return null;
+  }
+  const separatorIndex = normalized.indexOf(':');
+  return separatorIndex >= 0 ? normalized.slice(0, separatorIndex) : normalized;
 }

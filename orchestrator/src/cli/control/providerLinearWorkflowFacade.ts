@@ -240,6 +240,7 @@ const LINEAR_WORKFLOW_COMMENT_LIMIT = 50;
 const LINEAR_WORKFLOW_STATE_LIMIT = 50;
 const LINEAR_WORKFLOW_ATTACHMENT_LIMIT = 20;
 const ISSUE_CONTEXT_PULL_REQUEST_HYDRATION_CONCURRENCY = 4;
+const PROVIDER_LINEAR_ISSUE_CONTEXT_CACHE_FILENAME_STEM = 'provider-linear-issue-context-cache';
 const PROVIDER_LINEAR_ISSUE_CONTEXT_CACHE_FILENAME = 'provider-linear-issue-context-cache.json';
 const PROVIDER_LINEAR_DIRECT_MUTATION_CACHE_MAX_AGE_MS = 10_000;
 const PROVIDER_LINEAR_LOW_HEADROOM_READ_CACHE_MAX_AGE_MS = 60_000;
@@ -828,7 +829,24 @@ interface IssueContextPullRequestSnapshot {
   state: string | null;
   mergedAt: string | null;
   updatedAt: string | null;
+  title?: string | null;
+  headRefName?: string | null;
 }
+
+const NON_LINEAR_ISSUE_IDENTIFIER_PREFIXES = new Set([
+  'GPT',
+  'HTTP',
+  'HTTPS',
+  'ISO',
+  'NODE',
+  'RFC',
+  'SHA',
+  'TLS',
+  'UTF'
+]);
+const LINEAR_ISSUE_BRANCH_NAMESPACE_SEGMENTS = new Set(['linear']);
+const LINEAR_ISSUE_OWNER_PREFIX_PATTERN =
+  /^(?:build|chore|ci|deps|docs|feat|fix|perf|refactor|release|revert|security|style|test|tests)(?:\([^)]+\))?!?:\s*$/iu;
 
 interface GitHubJsonCommandResult {
   stdout: string;
@@ -969,7 +987,19 @@ interface ProviderLinearIssuePullRequestCandidate {
     state: string | null;
     merged_at: string | null;
     updated_at: string | null;
+    title: string | null;
+    head_ref_name: string | null;
   };
+}
+
+type ProviderLinearIssuePullRequestOwnership = 'owned' | 'foreign' | 'unknown';
+
+interface ProviderLinearIssueIdentifierEvidence {
+  identifier: string;
+  prefix: string;
+  issue_owned_position: boolean;
+  strong_issue_owned_position: boolean;
+  title_prefix_position: boolean;
 }
 
 interface ProviderLinearIssuePullRequestAttachmentCandidate {
@@ -1038,6 +1068,7 @@ async function hydrateIssuePullRequestAttachments(
 
   const resolved: ProviderLinearIssuePullRequestCandidate[] = [];
   const unknown: ProviderLinearWorkflowAttachment[] = [];
+  const conflicting: ProviderLinearWorkflowAttachment[] = [];
   const hydrationResults = await mapWithConcurrencyLimit<
     ProviderLinearIssuePullRequestAttachmentCandidate,
     ProviderLinearIssuePullRequestHydrationResult
@@ -1066,7 +1097,11 @@ async function hydrateIssuePullRequestAttachments(
   );
   for (const { candidate, snapshot } of hydrationResults) {
     if (!snapshot) {
-      unknown.push(candidate.attachment);
+      if (classifyIssuePullRequestEvidenceOwnership(issue, [candidate.attachment.title]) === 'foreign') {
+        conflicting.push(candidate.attachment);
+      } else {
+        unknown.push(candidate.attachment);
+      }
       continue;
     }
     resolved.push({
@@ -1077,7 +1112,7 @@ async function hydrateIssuePullRequestAttachments(
 
   return {
     ...issue,
-    pull_request_attachments: classifyIssuePullRequestAttachments(issue, resolved, unknown)
+    pull_request_attachments: classifyIssuePullRequestAttachments(issue, resolved, unknown, conflicting)
   };
 }
 
@@ -1101,7 +1136,7 @@ export async function fetchIssueContextPullRequestSnapshot(
     '--repo',
     `${owner}/${repo}`,
     '--json',
-    'state,mergedAt,updatedAt'
+    'state,mergedAt,updatedAt,title,headRefName'
   ]);
   if (!payload || typeof payload !== 'object') {
     throw new Error(`gh pr view ${owner}/${repo}#${prNumber} returned invalid JSON.`);
@@ -1110,7 +1145,9 @@ export async function fetchIssueContextPullRequestSnapshot(
   return {
     state: normalizeOptionalString(record.state as string | null | undefined),
     mergedAt: normalizeOptionalString(record.mergedAt as string | null | undefined),
-    updatedAt: normalizeOptionalString(record.updatedAt as string | null | undefined)
+    updatedAt: normalizeOptionalString(record.updatedAt as string | null | undefined),
+    title: normalizeOptionalString(record.title as string | null | undefined),
+    headRefName: normalizeOptionalString(record.headRefName as string | null | undefined)
   };
 }
 
@@ -1204,18 +1241,24 @@ function mapIssuePullRequestAttachmentSnapshot(
   return {
     state,
     merged_at: mergedAt,
-    updated_at: updatedAt
+    updated_at: updatedAt,
+    title: normalizeOptionalString(record.title as string | null | undefined),
+    head_ref_name: normalizeOptionalString(
+      (record.headRefName ?? record.head_ref_name) as string | null | undefined
+    )
   };
 }
 
 function classifyIssuePullRequestAttachments(
   issue: ProviderLinearIssueContext,
   resolved: ProviderLinearIssuePullRequestCandidate[],
-  unknown: ProviderLinearWorkflowAttachment[]
+  unknown: ProviderLinearWorkflowAttachment[],
+  preclassifiedConflicting: ProviderLinearWorkflowAttachment[] = []
 ): ProviderLinearIssuePullRequestAttachments {
   if (resolved.length === 0) {
     return {
       ...buildEmptyIssuePullRequestAttachments(),
+      conflicting: appendUniqueIssuePullRequestAttachments([], preclassifiedConflicting),
       unknown: [...unknown]
     };
   }
@@ -1223,52 +1266,365 @@ function classifyIssuePullRequestAttachments(
     state: issue.state?.name ?? null,
     state_type: issue.state?.type ?? null
   });
-  const terminal = resolved.filter((candidate) => isIssuePullRequestSnapshotTerminal(candidate.snapshot));
-  const active = resolved.filter((candidate) => !isIssuePullRequestSnapshotTerminal(candidate.snapshot));
+  const ownershipOwned = resolved.filter(
+    (candidate) => classifyIssuePullRequestCandidateOwnership(issue, candidate) === 'owned'
+  );
+  const ownershipConflicting = resolved.filter(
+    (candidate) => classifyIssuePullRequestCandidateOwnership(issue, candidate) === 'foreign'
+  );
+  const ownershipUnknown = resolved.filter(
+    (candidate) => classifyIssuePullRequestCandidateOwnership(issue, candidate) === 'unknown'
+  );
+  const terminalOwned = ownershipOwned.filter((candidate) =>
+    isIssuePullRequestSnapshotTerminal(candidate.snapshot)
+  );
+  const activeOwned = ownershipOwned.filter(
+    (candidate) => !isIssuePullRequestSnapshotTerminal(candidate.snapshot)
+  );
+  const terminalUnknownCandidates = ownershipUnknown.filter((candidate) =>
+    isIssuePullRequestSnapshotTerminal(candidate.snapshot)
+  );
+  const activeUnknown = ownershipUnknown.filter(
+    (candidate) => !isIssuePullRequestSnapshotTerminal(candidate.snapshot)
+  );
+  const selectionCandidates = activeOwned.length > 0 ? ownershipOwned : [...ownershipOwned, ...ownershipUnknown];
+  const ownershipConflictingAttachments = appendUniqueIssuePullRequestAttachments(
+    preclassifiedConflicting,
+    ownershipConflicting.map((candidate) => candidate.attachment)
+  );
+  const hasConflictingOwnershipEvidence = ownershipConflictingAttachments.length > 0;
+  const unknownAttachments = appendUniqueIssuePullRequestAttachments(
+    unknown,
+    ownershipOwned.length > 0 ? ownershipUnknown.map((candidate) => candidate.attachment) : []
+  );
+  const carriedUnknownAttachments = appendUniqueIssuePullRequestAttachments(
+    unknown,
+    terminalUnknownCandidates.map((candidate) => candidate.attachment)
+  );
+  if (selectionCandidates.length === 0) {
+    return {
+      current: null,
+      historical: [],
+      conflicting: appendUniqueIssuePullRequestAttachments([], ownershipConflictingAttachments),
+      unknown: unknownAttachments
+    };
+  }
+  if (activeOwned.length === 0) {
+    if (ownershipUnknown.length > 0 && hasConflictingOwnershipEvidence) {
+      return {
+        current: null,
+        historical: terminalOwned.map((candidate) => candidate.attachment),
+        conflicting: appendUniqueIssuePullRequestAttachments(
+          activeUnknown.map((candidate) => candidate.attachment),
+          ownershipConflictingAttachments
+        ),
+        unknown: carriedUnknownAttachments
+      };
+    }
+    if (
+      !workflowState.isTerminal &&
+      workflowState.normalizedState !== 'merging' &&
+      activeUnknown.length === 1
+    ) {
+      return {
+        current: activeUnknown[0]!.attachment,
+        historical: terminalOwned.map((candidate) => candidate.attachment),
+        conflicting: appendUniqueIssuePullRequestAttachments([], ownershipConflictingAttachments),
+        unknown: carriedUnknownAttachments
+      };
+    }
+    if (workflowState.isTerminal && activeUnknown.length > 0) {
+      const terminalSelection = selectCurrentMergingPullRequestAttachment(terminalOwned);
+      if (terminalSelection) {
+        return {
+          current: null,
+          historical: [
+            terminalSelection.current,
+            ...terminalSelection.historical
+          ].map((candidate) => candidate.attachment),
+          conflicting: appendUniqueIssuePullRequestAttachments(
+            terminalSelection.conflicting.map((candidate) => candidate.attachment),
+            ownershipConflictingAttachments
+          ),
+          unknown: appendUniqueIssuePullRequestAttachments(
+            carriedUnknownAttachments,
+            ownershipUnknown.map((candidate) => candidate.attachment)
+          )
+        };
+      }
+      return {
+        current: null,
+        historical: [],
+        conflicting: appendUniqueIssuePullRequestAttachments([], ownershipConflictingAttachments),
+        unknown: appendUniqueIssuePullRequestAttachments(
+          carriedUnknownAttachments,
+          ownershipUnknown.map((candidate) => candidate.attachment)
+        )
+      };
+    }
+  }
+  const terminal = selectionCandidates.filter((candidate) =>
+    isIssuePullRequestSnapshotTerminal(candidate.snapshot)
+  );
+  const active = selectionCandidates.filter((candidate) => !isIssuePullRequestSnapshotTerminal(candidate.snapshot));
   if (workflowState.normalizedState === 'merging') {
-    const mergingSelection = selectCurrentMergingPullRequestAttachment(resolved);
+    const mergingSelection = selectCurrentMergingPullRequestAttachment(selectionCandidates);
     if (mergingSelection) {
+      const mergingSelectionAttachments = [
+        mergingSelection.current,
+        ...mergingSelection.historical,
+        ...mergingSelection.conflicting
+      ].map((candidate) => candidate.attachment);
       return {
         current: mergingSelection.current.attachment,
         historical: mergingSelection.historical.map((candidate) => candidate.attachment),
-        conflicting: mergingSelection.conflicting.map((candidate) => candidate.attachment),
-        unknown: [...unknown]
+        conflicting: appendUniqueIssuePullRequestAttachments(
+          mergingSelection.conflicting.map((candidate) => candidate.attachment),
+          ownershipConflictingAttachments
+        ),
+        unknown: excludeIssuePullRequestAttachments(
+          activeOwned.length === 0 ? carriedUnknownAttachments : unknownAttachments,
+          mergingSelectionAttachments
+        )
       };
     }
   }
   if (workflowState.normalizedState !== 'merging' && active.length === 1) {
+    const historicalAttachments = terminal.map((candidate) => candidate.attachment);
     return {
       current: active[0]!.attachment,
-      historical: terminal.map((candidate) => candidate.attachment),
-      conflicting: [],
-      unknown: [...unknown]
+      historical: historicalAttachments,
+      conflicting: appendUniqueIssuePullRequestAttachments([], ownershipConflictingAttachments),
+      unknown: excludeIssuePullRequestAttachments(unknownAttachments, [
+        active[0]!.attachment,
+        ...historicalAttachments
+      ])
     };
   }
   if (active.length === 0) {
     if (workflowState.normalizedState !== 'rework') {
-      const terminalSelection = selectCurrentMergingPullRequestAttachment(resolved);
+      const terminalSelection = selectCurrentMergingPullRequestAttachment(selectionCandidates);
       if (terminalSelection) {
+        const selectedAttachments = [
+          terminalSelection.current.attachment,
+          ...terminalSelection.historical.map((candidate) => candidate.attachment),
+          ...terminalSelection.conflicting.map((candidate) => candidate.attachment)
+        ];
         return {
           current: terminalSelection.current.attachment,
           historical: terminalSelection.historical.map((candidate) => candidate.attachment),
-          conflicting: terminalSelection.conflicting.map((candidate) => candidate.attachment),
-          unknown: [...unknown]
+          conflicting: appendUniqueIssuePullRequestAttachments(
+            terminalSelection.conflicting.map((candidate) => candidate.attachment),
+            ownershipConflictingAttachments
+          ),
+          unknown: excludeIssuePullRequestAttachments(unknownAttachments, selectedAttachments)
         };
       }
     }
+    const historicalAttachments = terminal.map((candidate) => candidate.attachment);
     return {
       current: null,
-      historical: terminal.map((candidate) => candidate.attachment),
-      conflicting: [],
-      unknown: [...unknown]
+      historical: historicalAttachments,
+      conflicting: appendUniqueIssuePullRequestAttachments([], ownershipConflictingAttachments),
+      unknown: excludeIssuePullRequestAttachments(unknownAttachments, historicalAttachments)
     };
   }
+  const historicalAttachments = terminal.map((candidate) => candidate.attachment);
+  const conflictingAttachments = appendUniqueIssuePullRequestAttachments(
+    active.map((candidate) => candidate.attachment),
+    ownershipConflictingAttachments
+  );
   return {
     current: null,
-    historical: terminal.map((candidate) => candidate.attachment),
-    conflicting: active.map((candidate) => candidate.attachment),
-    unknown: [...unknown]
+    historical: historicalAttachments,
+    conflicting: conflictingAttachments,
+    unknown: excludeIssuePullRequestAttachments(unknownAttachments, [
+      ...historicalAttachments,
+      ...conflictingAttachments
+    ])
   };
+}
+
+function classifyIssuePullRequestCandidateOwnership(
+  issue: ProviderLinearIssueContext,
+  candidate: ProviderLinearIssuePullRequestCandidate
+): ProviderLinearIssuePullRequestOwnership {
+  return classifyIssuePullRequestEvidenceOwnership(issue, [
+    candidate.attachment.title,
+    candidate.snapshot.title,
+    candidate.snapshot.head_ref_name
+  ]);
+}
+
+function classifyIssuePullRequestEvidenceOwnership(
+  issue: Pick<ProviderLinearIssueContext, 'identifier'>,
+  values: readonly (string | null | undefined)[]
+): ProviderLinearIssuePullRequestOwnership {
+  const issueIdentifier = normalizeIssueIdentifier(issue.identifier);
+  if (!issueIdentifier) {
+    return 'unknown';
+  }
+  const rawEvidence = extractIssueIdentifierEvidence(values);
+  const evidence = rawEvidence.filter((entry) => {
+    if (entry.identifier === issueIdentifier || !isCommonTechnicalIdentifierToken(entry.identifier, entry.prefix)) {
+      return true;
+    }
+    if (entry.strong_issue_owned_position) {
+      return true;
+    }
+    return shouldRetainTechnicalForeignEvidence(issueIdentifier, rawEvidence, entry);
+  });
+  if (evidence.length === 0) {
+    return 'unknown';
+  }
+  if (evidence.some((entry) => entry.identifier !== issueIdentifier)) {
+    return 'foreign';
+  }
+  if (evidence.some((entry) => entry.identifier === issueIdentifier)) {
+    return 'owned';
+  }
+  return 'unknown';
+}
+
+function extractIssueIdentifierEvidence(
+  values: readonly (string | null | undefined)[]
+): ProviderLinearIssueIdentifierEvidence[] {
+  const identifiers = new Map<string, ProviderLinearIssueIdentifierEvidence>();
+  const pattern = /\b([A-Z][A-Z0-9]*)-\d+\b(?!\.\d)/gi;
+  for (const value of values) {
+    const normalized = normalizeOptionalString(value);
+    if (!normalized) {
+      continue;
+    }
+    for (const match of normalized.matchAll(pattern)) {
+      const prefix = match[0].slice(0, match[0].indexOf('-')).toUpperCase();
+      const positionFlags = resolveIssueOwnedIdentifierPositionFlags(normalized, match.index ?? 0, prefix);
+      const identifier = normalizeIssueIdentifier(match[0]);
+      if (identifier) {
+        const existing = identifiers.get(identifier);
+        identifiers.set(identifier, {
+          identifier,
+          prefix,
+          issue_owned_position:
+            (existing?.issue_owned_position ?? false) || positionFlags.issue_owned_position,
+          strong_issue_owned_position:
+            (existing?.strong_issue_owned_position ?? false) || positionFlags.strong_issue_owned_position,
+          title_prefix_position:
+            (existing?.title_prefix_position ?? false) || positionFlags.title_prefix_position
+        });
+      }
+    }
+  }
+  return [...identifiers.values()];
+}
+
+function shouldRetainTechnicalForeignEvidence(
+  issueIdentifier: string,
+  rawEvidence: readonly ProviderLinearIssueIdentifierEvidence[],
+  entry: ProviderLinearIssueIdentifierEvidence
+): boolean {
+  const issuePrefix = issueIdentifier.slice(0, issueIdentifier.indexOf('-'));
+  if (entry.prefix !== 'NODE' || issuePrefix !== entry.prefix || !entry.title_prefix_position) {
+    return false;
+  }
+  return !rawEvidence.some((candidate) => candidate.identifier === issueIdentifier && candidate.prefix === entry.prefix);
+}
+
+function resolveIssueOwnedIdentifierPositionFlags(
+  value: string,
+  index: number,
+  prefix: string
+): {
+  issue_owned_position: boolean;
+  strong_issue_owned_position: boolean;
+  title_prefix_position: boolean;
+} {
+  const previous = value[index - 1];
+  if (index === 0 || previous === '(' || previous === '[') {
+    const strongIssueOwnedPosition = !NON_LINEAR_ISSUE_IDENTIFIER_PREFIXES.has(prefix);
+    return {
+      issue_owned_position: true,
+      strong_issue_owned_position: strongIssueOwnedPosition,
+      title_prefix_position: false
+    };
+  }
+  if (previous === '/') {
+    const issueOwnedPosition =
+      LINEAR_ISSUE_BRANCH_NAMESPACE_SEGMENTS.has(resolvePreviousPathSegment(value, index)) ||
+      !NON_LINEAR_ISSUE_IDENTIFIER_PREFIXES.has(prefix);
+    return {
+      issue_owned_position: issueOwnedPosition,
+      strong_issue_owned_position: issueOwnedPosition,
+      title_prefix_position: false
+    };
+  }
+  const titlePrefixPosition = LINEAR_ISSUE_OWNER_PREFIX_PATTERN.test(value.slice(0, index));
+  return {
+    issue_owned_position: titlePrefixPosition,
+    strong_issue_owned_position: false,
+    title_prefix_position: titlePrefixPosition
+  };
+}
+
+function resolvePreviousPathSegment(value: string, index: number): string {
+  const segmentEnd = Math.max(0, index - 1);
+  const previousSlash = value.lastIndexOf('/', segmentEnd - 1);
+  return value.slice(previousSlash + 1, segmentEnd).trim().toLowerCase();
+}
+
+function isCommonTechnicalIdentifierToken(identifier: string, prefix: string): boolean {
+  const suffix = Number(identifier.slice(identifier.indexOf('-') + 1));
+  if (!Number.isInteger(suffix) || suffix < 0) {
+    return false;
+  }
+  switch (prefix) {
+    case 'GPT':
+    case 'ISO':
+    case 'RFC':
+    case 'SHA':
+    case 'TLS':
+    case 'UTF':
+      return true;
+    case 'HTTP':
+    case 'HTTPS':
+      return suffix >= 100 && suffix <= 599;
+    case 'NODE':
+      return suffix <= 40;
+    default:
+      return false;
+  }
+}
+
+function normalizeIssueIdentifier(value: string | null | undefined): string | null {
+  const normalized = normalizeOptionalString(value)?.toUpperCase() ?? null;
+  return normalized && /^[A-Z][A-Z0-9]*-\d+$/.test(normalized) ? normalized : null;
+}
+
+function appendUniqueIssuePullRequestAttachments(
+  left: ProviderLinearWorkflowAttachment[],
+  right: ProviderLinearWorkflowAttachment[]
+): ProviderLinearWorkflowAttachment[] {
+  const seen = new Set<string>();
+  const combined: ProviderLinearWorkflowAttachment[] = [];
+  for (const attachment of [...left, ...right]) {
+    if (seen.has(attachment.id)) {
+      continue;
+    }
+    seen.add(attachment.id);
+    combined.push(attachment);
+  }
+  return combined;
+}
+
+function excludeIssuePullRequestAttachments(
+  attachments: ProviderLinearWorkflowAttachment[],
+  excluded: ProviderLinearWorkflowAttachment[]
+): ProviderLinearWorkflowAttachment[] {
+  if (attachments.length === 0 || excluded.length === 0) {
+    return [...attachments];
+  }
+  const excludedIds = new Set(excluded.map((attachment) => attachment.id));
+  return attachments.filter((attachment) => !excludedIds.has(attachment.id));
 }
 
 function selectCurrentMergingPullRequestAttachment(
@@ -4149,12 +4505,51 @@ function issueHasMutabilityBlock(
   return Boolean(issue.archived_at) || issue.trashed === true;
 }
 
-function resolveIssueContextCachePath(env: NodeJS.ProcessEnv | undefined): string | null {
+function resolveIssueContextCacheDirectory(env: NodeJS.ProcessEnv | undefined): string | null {
   const auditPath = resolveProviderLinearAuditPath(env ?? process.env);
   if (!auditPath) {
     return null;
   }
-  return join(dirname(auditPath), PROVIDER_LINEAR_ISSUE_CONTEXT_CACHE_FILENAME);
+  return dirname(auditPath);
+}
+
+function sanitizeIssueContextCacheArtifactKey(issueId: string): string {
+  return issueId.replace(/[^A-Za-z0-9._-]/gu, '_');
+}
+
+function resolveLegacyIssueContextCachePath(env: NodeJS.ProcessEnv | undefined): string | null {
+  const cacheDirectory = resolveIssueContextCacheDirectory(env);
+  if (!cacheDirectory) {
+    return null;
+  }
+  return join(cacheDirectory, PROVIDER_LINEAR_ISSUE_CONTEXT_CACHE_FILENAME);
+}
+
+function resolveIssueContextCachePath(
+  env: NodeJS.ProcessEnv | undefined,
+  issueId: string
+): string | null {
+  const cacheDirectory = resolveIssueContextCacheDirectory(env);
+  const normalizedIssueId = normalizeRequiredString(issueId);
+  if (!cacheDirectory || !normalizedIssueId) {
+    return null;
+  }
+  const cacheArtifactKey = sanitizeIssueContextCacheArtifactKey(normalizedIssueId);
+  return join(
+    cacheDirectory,
+    `${PROVIDER_LINEAR_ISSUE_CONTEXT_CACHE_FILENAME_STEM}-${cacheArtifactKey}.json`
+  );
+}
+
+async function readIssueContextCacheRecordAtPath(
+  cachePath: string
+): Promise<ProviderLinearIssueContextCacheRecord | null> {
+  try {
+    const parsed = JSON.parse(await readFile(cachePath, 'utf8')) as unknown;
+    return parseIssueContextCacheRecord(parsed);
+  } catch {
+    return null;
+  }
 }
 
 async function readCachedIssueContextRecord(
@@ -4162,20 +4557,24 @@ async function readCachedIssueContextRecord(
   issueId: string,
   sourceSetup: DispatchPilotSourceSetup | null
 ): Promise<ProviderLinearIssueContextCacheRecord | null> {
-  const cachePath = resolveIssueContextCachePath(env);
-  if (!cachePath) {
-    return null;
-  }
-  try {
-    const parsed = JSON.parse(await readFile(cachePath, 'utf8')) as unknown;
-    const record = parseIssueContextCacheRecord(parsed);
-    if (!record || record.issue_id !== issueId || !sameResolvedSourceSetup(record.source_setup, sourceSetup)) {
-      return null;
+  const cachePaths = [
+    resolveIssueContextCachePath(env, issueId),
+    resolveLegacyIssueContextCachePath(env)
+  ].filter(
+    (cachePath, index, paths): cachePath is string =>
+      Boolean(cachePath) && paths.indexOf(cachePath) === index
+  );
+  for (const cachePath of cachePaths) {
+    const record = await readIssueContextCacheRecordAtPath(cachePath);
+    if (
+      record &&
+      record.issue_id === issueId &&
+      sameResolvedSourceSetup(record.source_setup, sourceSetup)
+    ) {
+      return record;
     }
-    return record;
-  } catch {
-    return null;
   }
+  return null;
 }
 
 function isIssueContextCacheRecordFresh(
@@ -4331,7 +4730,7 @@ async function writeCachedIssueContextRecord(
     preserveRecordedAtWhenAttachmentTruthUnchanged?: boolean;
   }
 ): Promise<void> {
-  const cachePath = resolveIssueContextCachePath(env);
+  const cachePath = resolveIssueContextCachePath(env, issue.id);
   if (!cachePath) {
     return;
   }

@@ -22,7 +22,7 @@ Codex Orchestrator is the coordination layer that glues together Codex-driven ag
 - Codex CLI sync strategy: `docs/guides/upstream-codex-cli-sync.md`.
 
 ## Current Posture
-- Current CO compatibility/adoption target: Codex CLI `0.118.0`.
+- Current CO compatibility/adoption target: Codex CLI `0.123.0`.
 - Newer Codex CLI candidates stay evidence-gated in `docs/guides/codex-version-policy.md`.
 - Current model posture: `gpt-5.4` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
 - Local default runtime is `appserver`; keep `--runtime-mode cli` as break-glass.
@@ -30,7 +30,8 @@ Codex Orchestrator is the coordination layer that glues together Codex-driven ag
 
 ## Release Notes
 - Shipped skills note: `docs/release-notes-template-addendum.md`.
-- Optional overview override: add and commit a release overview file at .github/release-overview.md before tagging; the release workflow uses it when present.
+- Canonical promoted sections: generated `Overview` and `Bug Fixes` become top-level release-note sections; generated `Documentation` remains under `Full Changelog`.
+- Optional one-shot overview override: put release-specific narrative text in the signed annotated tag body before pushing the tag. The workflow reads the tag body for that release only and does not read .github/release-overview.md.
 
 ## How It Works
 - **Planner → Builder → Tester → Reviewer:** The core `TaskManager` (see `orchestrator/src/manager.ts`) wires together agent interfaces that decide *what* to run (planner), execute the selected pipeline stage (builder), verify results (tester), and give a final decision (reviewer).
@@ -126,11 +127,11 @@ Use `npx @kbediako/codex-orchestrator resume --run <run-id>` to continue interru
 ## Publishing (npm)
 - Pack audit: `npm run pack:audit` (validates the tarball file list; run `npm run clean:dist && npm run build` first if `dist/` contains non-runtime artifacts).
 - Pack smoke: `npm run pack:smoke` (installs the tarball in a temp mock repo, runs CLI behavior checks including `review` artifacts and `long-poll-wait` skill install, and validates delegate-server JSONL; uses network). Treat this as a spot-check gate; use `npm run pack:audit` for full tarball inventory validation.
-- Release tags: `vX.Y.Z` or `vX.Y.Z-alpha.N` must match `package.json` version.
-- Dist-tags: stable publishes to `latest`; alpha publishes to `alpha` and uses a GitHub prerelease.
+- Release tags: `vX.Y.Z` or `vX.Y.Z-<prerelease>` must match `package.json` version, for example `vX.Y.Z-alpha.N`, `vX.Y.Z-beta.N`, or `vX.Y.Z-rc.N`.
+- Dist-tags: stable releases publish to `latest`; prereleases publish with a dist-tag derived from the leading prerelease label before the first `.` or `-`, lowercased and sanitized. Examples: `alpha.1` -> `alpha`, `beta.1` -> `beta`, `rc.1` -> `rc`; empty or numeric-leading labels fall back to `next`. Prerelease tags create a GitHub prerelease.
 - Publishing auth: workflow attempts OIDC trusted publishing first (`id-token: write` + `--provenance`), then falls back to `secrets.NPM_TOKEN` when OIDC is unavailable. `secrets.NPM_TOKEN` must be an npm automation token (not a token that requires OTP).
 - Trusted publisher config: npm expects workflow filename `release.yml` (the file must exist at `.github/workflows/release.yml` on the default branch). Leave environment blank unless the publish job sets `environment: ...`.
-- OIDC runtime prereqs: npm trusted publishing currently requires Node.js `22.14.0+` and npm `11.5.1+`; the publish job installs npm `^11.5.1` before publishing.
+- OIDC runtime prereqs: npm trusted publishing currently requires Node.js `22.14.0+` and npm `11.5.1+`; the publish job logs the runner versions, then runs the publish commands through `npx --yes npm@11.5.1` instead of mutating the runner-global npm install.
 
 ## Parallel Runs (Meta-Orchestration)
 The orchestrator executes a single pipeline serially. “Parallelism” comes from running multiple orchestrator runs at the same time, ideally in separate git worktrees so builds/tests don’t contend for the same working tree outputs.
@@ -220,8 +221,10 @@ Note: the commands below assume a source checkout; `scripts/` helpers are not in
 | --- | --- |
 | `npm run build` | Compiles TypeScript to `dist/` (required for packaging and running the CLI from `dist/`). |
 | `npm run lint` | Lints orchestrator, adapters, shared packages. Auto-runs `node scripts/build-patterns-if-needed.mjs` so codemods compile when missing/outdated. |
-| `npm run test` | Vitest suite covering orchestration core, CLI services, and patterns. |
-| `npm run eval:test` | Optional evaluation harness (enable when `evaluation/fixtures/**` is populated). |
+| `npm run test:core` | Narrow Core Lane matrix via `vitest.config.core.ts`; excludes `adapters/**` and `evaluation/tests/**`. |
+| `npm run test` | Default repo validation alias; runs `test:core` so the historical core-only surface stays explicit. |
+| `npm run test:all` | Explicit broader Vitest matrix (`test:core` + `test:adapters`) without implicitly enabling the opt-in evaluation lane. |
+| `npm run eval:test` | Optional evaluation-only harness lane; alias to `npm run test:evaluation` when `evaluation/fixtures/**` or evaluation scope is in play. |
 | `npm run docs:check` | Deterministically validates scripts/pipelines/paths referenced in agent-facing docs, current posture locks, bundled-skill roster parity, and the README front-door budget. |
 | `npm run docs:freshness` | Validates docs registry coverage plus catalog class coverage and writes a class-separated report to `out/<task-id>/docs-freshness.json`. |
 | `npm run repo:stewardship` | Audits every tracked file via `git ls-files`, classifies each tracked surface as `validate`, `update`, `delete`, or `retain_with_rationale`, and writes `out/<task-id>/repo-stewardship.json`. |

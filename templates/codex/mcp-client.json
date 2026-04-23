@@ -2,7 +2,11 @@
   "templateVersion": 1,
   "mcpServers": {
     "codex-orchestrator": {
-      "command": "codex-orchestrator mcp serve"
+      "command": "codex-orchestrator",
+      "args": [
+        "mcp",
+        "serve"
+      ]
     }
   }
 }

@@ -19,7 +19,6 @@ const diagnosticsConfig = {
     {
       id: 'simple',
       title: 'Simple pipeline',
-      guardrailsRequired: false,
       stages: [
         {
           kind: 'command',
@@ -32,7 +31,6 @@ const diagnosticsConfig = {
     {
       id: 'failable',
       title: 'Fail once pipeline',
-      guardrailsRequired: false,
       stages: [
         {
           kind: 'command',
