@@ -4,11 +4,11 @@
 Define the current stable compatibility/adoption target for CO and keep newer CLI/model moves evidence-gated.
 
 ## Current Posture
-- Current CO compatibility/adoption target remains stable Codex CLI `0.118.0` for the current upstream-aligned main baseline.
-- Latest held release-planning candidate remains Codex CLI `0.122.0`; CO-322 does not promote `0.123.0` because the fresh required cloud canary failed before task submission when environment `6999395fcc448191b865917084f21c6f` was not found. The fallback canary passed only the expected local MCP fallback contract for missing environment metadata, which is not sufficient promotion evidence.
-- Release-facing downstream-smoke workflows (`core-lane`, `release`, and `pack-smoke-backstop`) pin `@openai/codex@0.122.0` after `CO-268` rebaselined `pack:smoke` from `codex marketplace add` to `codex plugin marketplace add`; this keeps marketplace smoke reproducible on the current stable command surface without promoting the active CO compatibility target.
-- `cloud-canary` stays pinned to `@openai/codex@0.122.0` as the last release-planning candidate with an explicit canary pin; CO-322 intentionally does not move that pin to `0.123.0` because the required cloud gate did not complete cleanly.
-- The `0.118.0` posture keeps the previously recorded runtime/cloud evidence gates and adds a current local CLI help re-audit for onboarding-sensitive surfaces: `codex exec` now accepts a prompt argument plus piped stdin (stdin appends as a `<stdin>` block), `codex login --device-auth` is available, and `codex review --help` exposes `[PROMPT]` alongside `--uncommitted` / `--base` / `--commit`.
+- Current CO compatibility/adoption target is stable Codex CLI `0.123.0` after CO-335 completed the missing post-rotation required/fallback cloud gates for the CO-322 candidate audit.
+- Latest release-planning candidate is Codex CLI `0.123.0`; CO-335 supersedes the stale CO-322 HOLD that was caused by missing environment `6999395fcc448191b865917084f21c6f`. Fresh required cloud evidence now passed against non-secret environment label `Kbediako/CO`, and the fallback canary passed the expected local MCP fallback contract for missing environment metadata.
+- Release-facing downstream-smoke workflows (`core-lane`, `release`, and `pack-smoke-backstop`) pin `@openai/codex@0.123.0` after CO-322 found no marketplace-smoke regression versus the `codex plugin marketplace add` baseline and CO-335 supplied clean cloud-gate evidence.
+- `cloud-canary` pins `@openai/codex@0.123.0` as the current promoted release-planning candidate with explicit canary evidence.
+- The `0.123.0` posture keeps the previously recorded onboarding-sensitive help guarantees: `codex exec` accepts a prompt argument plus piped stdin (stdin appends as a `<stdin>` block), `codex login --device-auth` is available, and `codex review --help` exposes `[PROMPT]` alongside `--uncommitted` / `--base` / `--commit`.
 - Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.
 - Keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only.
 - When authenticating through ChatGPT, keep delegated and review surfaces on `gpt-5.4` unless a fresh provider lane explicitly validates `gpt-5.4-codex`.
@@ -18,7 +18,7 @@ Define the current stable compatibility/adoption target for CO and keep newer CL
 - Treat `thread/shellCommand` as a sensitive unsandboxed surface; it is not part of the default provider-worker authority model.
 - Manual Codex re-review requests are quota-aware: send at most one `@codex` ping per PR head SHA, then wait for a new head before re-requesting.
 - Codex review quota exhaustion is an operational availability event, not an adoption/promotion signal; if it blocks review, use the merge-waiver path documented in `AGENTS.md` and `docs/AGENTS.md` (checks green, unresolved actionable threads = `0`, waiver evidence recorded).
-- Do not newly promote, re-promote, or carry forward the `0.118.0` string after baseline drift unless the candidate posture has recorded results for `node scripts/runtime-mode-canary.mjs`, `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 npm run ci:cloud-canary`, and `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 CLOUD_CANARY_EXPECT_FALLBACK=1 npm run ci:cloud-canary`.
+- Do not newly promote, re-promote, or carry forward a newer Codex CLI target after baseline drift unless the candidate posture has recorded results for `node scripts/runtime-mode-canary.mjs`, `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 npm run ci:cloud-canary`, and `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 CLOUD_CANARY_EXPECT_FALLBACK=1 npm run ci:cloud-canary`.
 
 ## Candidate Audit Notes
 - 2026-04-14: `CO-180` audited local `codex-cli 0.120.0` after baseline drift. The command-surface audit found no P0/P1 regression for `codex exec`, `codex exec resume`, `codex review`, or `codex login --device-auth`; raw logs are under `out/linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d/manual/codex-0120-audit/` and `.runs/linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d/manual/codex-0120-audit/`.
@@ -50,9 +50,14 @@ Define the current stable compatibility/adoption target for CO and keep newer CL
   - Hold: keep `0.122.0` as the held release-planning candidate and keep `.github/workflows/cloud-canary.yml` pinned to explicit `@openai/codex@0.122.0` until a future `0.123.0` lane has clean cloud gates.
   - Hold: release-facing downstream-smoke workflows remain on `@openai/codex@0.122.0` because current main already rebaselined smoke to `codex plugin marketplace add`, and 0.123.0 promotion is cloud-gate blocked rather than marketplace-surface blocked.
   - No-op for current CO posture: Amazon Bedrock provider, `/mcp verbose`, broader `.mcp.json` plugin loading shapes, realtime handoff improvements, `remote_sandbox_config`, and refreshed model metadata because this lane found no CO-specific required workflow change without clean cloud-gate evidence.
+- 2026-04-23: `CO-335` reran the `0.123.0` cloud gates after cloud env/auth rotation and supersedes the CO-322 cloud HOLD. Required cloud canary passed with `cloud_execution.status=ready`, environment `Kbediako/CO`, task `task_e_69e9ef5628408327b88b1fcd0ab14b24`, `poll_count=24`, and manifest `.runs/linear-919ecdfa-9be9-4d93-995b-7f8e4a784e6f-cloud-required-0123-current/cli/2026-04-23T10-07-13-661Z-02403ae9/manifest.json`. Fallback cloud contract passed with `cloud_fallback.mode_requested=cloud`, `cloud_fallback.mode_used=mcp`, and issue `missing_environment` at `.runs/linear-919ecdfa-9be9-4d93-995b-7f8e4a784e6f-cloud-fallback-0123-current/cli/2026-04-23T10-11-43-645Z-48d460ec/manifest.json`.
+- 2026-04-23: `CO-335` promotion decision:
+  - Promote: active CO compatibility/adoption target moves from `0.118.0` to `0.123.0` because CO-322 found no P0/P1 local command, marketplace, or runtime-mode regression and CO-335 completed both cloud gates cleanly.
+  - Promote: release-facing downstream-smoke and `cloud-canary` workflows move to explicit `@openai/codex@0.123.0`.
+  - Release ship remains out of scope for CO-335; CO-316 may proceed with the cloud-gate blocker cleared, subject to its own release prerequisites.
 
 ## Required Evidence Gates
-For any change to the current `0.118.0` / `gpt-5.4` posture, or any promotion of a newer Codex build in CO:
+For any change to the current `0.123.0` / `gpt-5.4` posture, or any promotion of a newer Codex build in CO:
 1. Local appserver path passes on the candidate Codex CLI + model posture.
 2. Delegated/review surfaces are verified on the actual auth provider in use; for ChatGPT auth, keep `gpt-5.4` unless new compatibility evidence exists for `gpt-5.4-codex`.
 3. Runtime-mode canary passes (`node scripts/runtime-mode-canary.mjs`).
