@@ -8,15 +8,15 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-23",
+      "last_review": "2026-04-24",
       "approvals": {
         "docs_packet_child_lane": {
           "reviewer": "bounded same-issue docs child lane",
-          "date": "2026-04-23",
+          "date": "2026-04-24",
           "status": "produced",
-          "manifest": ".runs/linear-e17b8d21-d5f8-4152-8c19-2991f782f830-docs-packet/cli/2026-04-22T23-46-10-100Z-8a0879e9/manifest.json",
-          "source_anchor": "ctx:sha256:d0b11d0fa69808305ff69c96ea1159fc9de38e49b5185f8fb9074cac443ad3c9#chunk:c000001",
-          "summary": "Docs-first packet created for CO-317 fresh-discovery admission backfill after duplicate or terminal cleanup frees capacity. The parent-provided source anchor and manifest are recorded above, but this child checkout has no local .runs tree, so the packet is anchored on the launch brief plus adjacent provider-intake, cleanup, selected-claim, and fresh-discovery docs. Scope stays on provider intake, fresh discovery, and admission-budget or selected-claim refresh after cleanup frees capacity, and explicitly rejects generic Linear queue redesign or cleanup-feature redesign."
+          "manifest": ".runs/linear-e17b8d21-d5f8-4152-8c19-2991f782f830-docs-regression/cli/2026-04-23T15-44-53-118Z-47a35258/manifest.json",
+          "source_anchor": "ctx:sha256:31636a7360560a3f876e35ad4984470e39e99576c5039c3b2f52b24fa1634eda#chunk:c000001",
+          "summary": "Current-main docs re-check kept the CO-317 packet on the same narrow provider-intake, fresh-discovery, and admission-budget or selected-claim refresh seam after cleanup frees capacity. This child checkout still lacks the referenced .runs payload, so the packet remains anchored on the parent brief checksum plus adjacent provider-intake, cleanup, selected-claim, and fresh-discovery docs. Parent rerun evidence on 2026-04-24 still shows unrelated review blockers: docs:check fails on missing CO-276 packet paths referenced from docs/TASKS.md, docs:freshness fails on repo-wide stale-doc debt (registry references missing files: 6, stale docs: 88), and the earlier standalone-review timeout remains unresolved."
         }
       },
       "paths": {
