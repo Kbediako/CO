@@ -368,8 +368,28 @@ async function commandSucceeds(command, args, options = {}) {
   });
 }
 
-async function codexSupportsMarketplace(command, options = {}) {
-  return await commandSucceeds(command, ['plugin', 'marketplace', 'add', '--help'], options);
+const MARKETPLACE_ADD_COMMAND_CANDIDATES = [
+  ['plugin', 'marketplace', 'add'],
+  ['marketplace', 'add']
+];
+
+function formatMarketplaceAddCommand(commandArgs) {
+  return `codex ${commandArgs.join(' ')}`;
+}
+
+function formatSupportedMarketplaceAddCommands() {
+  return MARKETPLACE_ADD_COMMAND_CANDIDATES.map((commandArgs) => `\`${formatMarketplaceAddCommand(commandArgs)}\``).join(
+    ' or '
+  );
+}
+
+async function resolveMarketplaceAddCommand(command, options = {}) {
+  for (const commandArgs of MARKETPLACE_ADD_COMMAND_CANDIDATES) {
+    if (await commandSucceeds(command, [...commandArgs, '--help'], options)) {
+      return commandArgs;
+    }
+  }
+  return null;
 }
 
 export function resolveMarketplaceSmokePrerequisite({
@@ -377,7 +397,7 @@ export function resolveMarketplaceSmokePrerequisite({
   allowMarketplaceSkip = false,
   marketplaceSkipReason = '',
   codexAvailable,
-  marketplaceCapable
+  marketplaceCommandArgs
 }) {
   const skipReason = String(marketplaceSkipReason ?? '').trim();
   if (!codexAvailable) {
@@ -404,13 +424,13 @@ export function resolveMarketplaceSmokePrerequisite({
     };
   }
 
-  if (!marketplaceCapable) {
+  if (!marketplaceCommandArgs) {
     if (allowMarketplaceSkip && skipReason.length > 0) {
       return {
         status: 'skip',
         reason: 'marketplace-unsupported',
         message:
-          `Skipping marketplace smoke: ${codexBin} does not expose codex plugin marketplace add. Reason: ${skipReason}`
+          `Skipping marketplace smoke: ${codexBin} does not expose a supported marketplace add command (${formatSupportedMarketplaceAddCommands()}). Reason: ${skipReason}`
       };
     }
     if (allowMarketplaceSkip) {
@@ -425,14 +445,14 @@ export function resolveMarketplaceSmokePrerequisite({
       status: 'fail',
       reason: 'marketplace-unsupported',
       message:
-        'Marketplace smoke requires a Codex CLI with `plugin marketplace add` support. Set PACK_SMOKE_ALLOW_MARKETPLACE_SKIP=1 with PACK_SMOKE_MARKETPLACE_SKIP_REASON only for local-dev opt-out.'
+        `Marketplace smoke requires a Codex CLI with a supported marketplace add command (${formatSupportedMarketplaceAddCommands()}). Set PACK_SMOKE_ALLOW_MARKETPLACE_SKIP=1 with PACK_SMOKE_MARKETPLACE_SKIP_REASON only for local-dev opt-out.`
     };
   }
 
   return {
     status: 'run',
     reason: 'marketplace-supported',
-    message: 'Marketplace smoke prerequisites satisfied.'
+    message: `Marketplace smoke prerequisites satisfied via ${formatMarketplaceAddCommand(marketplaceCommandArgs)}.`
   };
 }
 
@@ -722,6 +742,7 @@ async function installMarketplacePlugin(codexBin, env, pluginVersion, label) {
 async function runMarketplaceInstallScenario({
   label,
   codexBin,
+  marketplaceCommandArgs,
   tempDir,
   pluginVersion,
   addArgs,
@@ -741,7 +762,7 @@ async function runMarketplaceInstallScenario({
       CODEX_HOME: codexHome
     };
 
-    await runCommand(codexBin, ['plugin', 'marketplace', 'add', ...addArgs], {
+    await runCommand(codexBin, [...marketplaceCommandArgs, ...addArgs], {
       cwd: tempDir,
       env: marketplaceEnv
     });
@@ -808,13 +829,13 @@ async function runMarketplacePluginSmoke(packageRoot, tempDir) {
   const allowMarketplaceSkip = process.env.PACK_SMOKE_ALLOW_MARKETPLACE_SKIP === '1';
   const marketplaceSkipReason = process.env.PACK_SMOKE_MARKETPLACE_SKIP_REASON ?? '';
   const codexAvailable = await commandSucceeds(codexBin, ['--version']);
-  const marketplaceCapable = codexAvailable ? await codexSupportsMarketplace(codexBin) : false;
+  const marketplaceCommandArgs = codexAvailable ? await resolveMarketplaceAddCommand(codexBin) : null;
   const prerequisite = resolveMarketplaceSmokePrerequisite({
     codexBin,
     allowMarketplaceSkip,
     marketplaceSkipReason,
     codexAvailable,
-    marketplaceCapable
+    marketplaceCommandArgs
   });
   if (prerequisite.status === 'skip') {
     console.warn(prerequisite.message);
@@ -852,6 +873,7 @@ async function runMarketplacePluginSmoke(packageRoot, tempDir) {
   await runMarketplaceInstallScenario({
     label: 'local-marketplace',
     codexBin,
+    marketplaceCommandArgs,
     tempDir,
     pluginVersion: pluginManifest.version,
     addArgs: [marketplaceRoot],
@@ -871,6 +893,7 @@ async function runMarketplacePluginSmoke(packageRoot, tempDir) {
     await runMarketplaceInstallScenario({
       label: 'git-marketplace',
       codexBin,
+      marketplaceCommandArgs,
       tempDir,
       pluginVersion: pluginManifest.version,
       addArgs: [marketplaceUrl],

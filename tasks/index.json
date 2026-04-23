@@ -1,6 +1,26 @@
 {
   "items": [
     {
+      "id": "20260424-linear-dc06b7ed-89e6-4662-911c-52a2991cbf7a",
+      "title": "CO: Re-audit Codex CLI 0.123.0 posture and correct marketplace command-surface assumptions",
+      "relates_to": "tasks/tasks-linear-dc06b7ed-89e6-4662-911c-52a2991cbf7a.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-24",
+      "paths": {
+        "spec": "tasks/specs/linear-dc06b7ed-89e6-4662-911c-52a2991cbf7a.md",
+        "task": "tasks/tasks-linear-dc06b7ed-89e6-4662-911c-52a2991cbf7a.md",
+        "agent_task": ".agent/task/linear-dc06b7ed-89e6-4662-911c-52a2991cbf7a.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-dc06b7ed-89e6-4662-911c-52a2991cbf7a.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-dc06b7ed-89e6-4662-911c-52a2991cbf7a.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-dc06b7ed-89e6-4662-911c-52a2991cbf7a.md"
+        }
+      }
+    },
+    {
       "id": "20260424-linear-703362d6-afdb-42e7-852f-5dd64a314849",
       "title": "CO: prepare and ship the next release after v0.1.38 with all main-branch work since March 3, 2026",
       "relates_to": "tasks/tasks-linear-703362d6-afdb-42e7-852f-5dd64a314849.md",
