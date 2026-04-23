@@ -2022,7 +2022,7 @@ describe('controlHostSupervision shell helpers', () => {
       expect(result).toMatchObject({
         healthy: false,
         reason: 'probe_timeout',
-        message: 'co-status probe timed out after 5s.',
+        message: 'co-status probe timed out after 35s.',
         diagnostic: {
           counts: {
             running: 1,
