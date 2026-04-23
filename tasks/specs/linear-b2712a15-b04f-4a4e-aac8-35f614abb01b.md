@@ -183,6 +183,8 @@ last_review: 2026-04-23
   - child lane: docs-only `git diff --check`
   - parent lane: focused docs-hygiene coverage for release parity drift
   - parent lane: `npm run docs:check`
+  - parent lane: `npm run docs:freshness`
+  - parent lane: `npm run repo:stewardship`
   - parent lane: `node scripts/spec-guard.mjs --dry-run`
   - parent lane: docs-review and required review/elegance gates before PR handoff
 - Rollout verification:
