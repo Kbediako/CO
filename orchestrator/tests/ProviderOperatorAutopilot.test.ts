@@ -309,6 +309,357 @@ describe('providerOperatorAutopilot', () => {
     expect(result.summary).toContain('0 duplicate-cleanup, 1 ready-to-unblock');
   });
 
+  it('suppresses ready-to-unblock advisories when the issue records a live PR blocker', async () => {
+    const transitionIssueState = createReadOnlyTerminalBlockerTransition();
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createBlockedCo272Issue(
+          'Current operator note:\nPR #571\n- draft, dirty\n- checks pending'
+        )
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    }, {
+      transition_issue_state: transitionIssueState
+    });
+
+    expect(transitionIssueState).not.toHaveBeenCalled();
+    expect(result.status).toBe('noop');
+    expect(result.terminal_blocker_advisories).toEqual([]);
+    expect(result.summary).toContain('found no bounded action');
+  });
+
+  it('suppresses ready-to-unblock advisories when the current PR note remains unmerged', async () => {
+    const transitionIssueState = createReadOnlyTerminalBlockerTransition();
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createBlockedCo272Issue(
+          'Current operator note: PR #571 checks passed but is not yet merged.'
+        )
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    }, {
+      transition_issue_state: transitionIssueState
+    });
+
+    expect(transitionIssueState).not.toHaveBeenCalled();
+    expect(result.status).toBe('noop');
+    expect(result.terminal_blocker_advisories).toEqual([]);
+    expect(result.summary).toContain('found no bounded action');
+  });
+
+  it('suppresses ready-to-unblock advisories when unresolved merge status appears before passed checks', async () => {
+    const transitionIssueState = createReadOnlyTerminalBlockerTransition();
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createBlockedCo272Issue(
+          'Current operator note: PR #571 is not yet merged, checks passed.'
+        )
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    }, {
+      transition_issue_state: transitionIssueState
+    });
+
+    expect(transitionIssueState).not.toHaveBeenCalled();
+    expect(result.status).toBe('noop');
+    expect(result.terminal_blocker_advisories).toEqual([]);
+    expect(result.summary).toContain('found no bounded action');
+  });
+
+  it('suppresses ready-to-unblock advisories when markdown-wrapped PR refs remain unmerged', async () => {
+    const transitionIssueState = createReadOnlyTerminalBlockerTransition();
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createBlockedCo272Issue(
+          'Current operator note: PR [`#571`](https://github.com/asabeko/CO/pull/571) checks passed but is not yet merged.'
+        )
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    }, {
+      transition_issue_state: transitionIssueState
+    });
+
+    expect(transitionIssueState).not.toHaveBeenCalled();
+    expect(result.status).toBe('noop');
+    expect(result.terminal_blocker_advisories).toEqual([]);
+    expect(result.summary).toContain('found no bounded action');
+  });
+
+  it('suppresses ready-to-unblock advisories when markdown PR links keep the status in a later clause', async () => {
+    const transitionIssueState = createReadOnlyTerminalBlockerTransition();
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createBlockedCo272Issue(
+          'Current operator note: PR [`#571`](https://github.com/asabeko/CO/pull/571); not yet merged.'
+        )
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    }, {
+      transition_issue_state: transitionIssueState
+    });
+
+    expect(transitionIssueState).not.toHaveBeenCalled();
+    expect(result.status).toBe('noop');
+    expect(result.terminal_blocker_advisories).toEqual([]);
+    expect(result.summary).toContain('found no bounded action');
+  });
+
+  it('suppresses ready-to-unblock advisories when a mixed same-sentence note still has a blocked PR', async () => {
+    const transitionIssueState = createReadOnlyTerminalBlockerTransition();
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createBlockedCo272Issue(
+          'Current operator note: PR #571 still has failing checks, but PR #572 is no longer blocking.'
+        )
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    }, {
+      transition_issue_state: transitionIssueState
+    });
+
+    expect(transitionIssueState).not.toHaveBeenCalled();
+    expect(result.status).toBe('noop');
+    expect(result.terminal_blocker_advisories).toEqual([]);
+    expect(result.summary).toContain('found no bounded action');
+  });
+
+  it('suppresses ready-to-unblock advisories when leading clause context keeps the first PR blocked', async () => {
+    const transitionIssueState = createReadOnlyTerminalBlockerTransition();
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createBlockedCo272Issue(
+          'Current operator note: Waiting on PR #571, PR #572 is no longer blocking.'
+        )
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    }, {
+      transition_issue_state: transitionIssueState
+    });
+
+    expect(transitionIssueState).not.toHaveBeenCalled();
+    expect(result.status).toBe('noop');
+    expect(result.terminal_blocker_advisories).toEqual([]);
+    expect(result.summary).toContain('found no bounded action');
+  });
+
+  it('keeps ready-to-unblock advisories when PR blocker notes are resolved', async () => {
+    const transitionIssueState = createReadOnlyTerminalBlockerTransition();
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createBlockedCo272Issue('Operator note: PR #571 is no longer blocking; checks passed.')
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    }, {
+      transition_issue_state: transitionIssueState
+    });
+
+    expect(transitionIssueState).not.toHaveBeenCalled();
+    expect(result.status).toBe('acted');
+    expect(result.terminal_blocker_advisories).toMatchObject([
+      {
+        issue_id: 'lin-issue-272',
+        issue_identifier: 'CO-272',
+        recommended_action: 'ready_to_unblock'
+      }
+    ]);
+  });
+
+  it('keeps ready-to-unblock advisories when markdown-wrapped PR refs are explicitly resolved', async () => {
+    const transitionIssueState = createReadOnlyTerminalBlockerTransition();
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createBlockedCo272Issue(
+          'Operator note: PR [`#571`](https://github.com/asabeko/CO/pull/571) is no longer blocking; checks passed.'
+        )
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    }, {
+      transition_issue_state: transitionIssueState
+    });
+
+    expect(transitionIssueState).not.toHaveBeenCalled();
+    expect(result.status).toBe('acted');
+    expect(result.terminal_blocker_advisories).toMatchObject([
+      {
+        issue_id: 'lin-issue-272',
+        issue_identifier: 'CO-272',
+        recommended_action: 'ready_to_unblock'
+      }
+    ]);
+  });
+
+  it('suppresses ready-to-unblock advisories when PR notes say closed unmerged', async () => {
+    const transitionIssueState = createReadOnlyTerminalBlockerTransition();
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createBlockedCo272Issue(
+          'Current operator note: PR #571 closed unmerged.'
+        )
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    }, {
+      transition_issue_state: transitionIssueState
+    });
+
+    expect(transitionIssueState).not.toHaveBeenCalled();
+    expect(result.status).toBe('noop');
+    expect(result.terminal_blocker_advisories).toEqual([]);
+    expect(result.summary).toContain('found no bounded action');
+  });
+
+  it('keeps ready-to-unblock advisories when latest PR blocker notes supersede historical blockers', async () => {
+    const transitionIssueState = createReadOnlyTerminalBlockerTransition();
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createBlockedCo272Issue(
+          'Earlier operator note: PR #571 was draft and failing.\nCurrent operator note: PR #571 is no longer blocking; checks passed.'
+        )
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    }, {
+      transition_issue_state: transitionIssueState
+    });
+
+    expect(transitionIssueState).not.toHaveBeenCalled();
+    expect(result.status).toBe('acted');
+    expect(result.terminal_blocker_advisories).toMatchObject([
+      {
+        issue_id: 'lin-issue-272',
+        issue_identifier: 'CO-272',
+        recommended_action: 'ready_to_unblock'
+      }
+    ]);
+  });
+
+  it('keeps ready-to-unblock advisories when the current description note supersedes stale blocked activity', async () => {
+    const transitionIssueState = createReadOnlyTerminalBlockerTransition();
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createBlockedCo272Issue(
+          'Current operator note: PR #571 is no longer blocking; checks passed.',
+          {
+            recent_activity: [
+              {
+                id: 'co-272-old-pr-blocker',
+                created_at: '2026-04-21T10:00:00.000Z',
+                actor_name: 'Codex Operator',
+                summary: 'PR #571 still has failing checks.'
+              },
+              {
+                id: 'co-272-current-pr-clear',
+                created_at: '2026-04-21T11:00:00.000Z',
+                actor_name: 'Codex Operator',
+                summary: 'PR #571 is no longer blocking; checks passed.'
+              }
+            ]
+          }
+        )
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    }, {
+      transition_issue_state: transitionIssueState
+    });
+
+    expect(transitionIssueState).not.toHaveBeenCalled();
+    expect(result.status).toBe('acted');
+    expect(result.terminal_blocker_advisories).toMatchObject([
+      {
+        issue_id: 'lin-issue-272',
+        issue_identifier: 'CO-272',
+        recommended_action: 'ready_to_unblock'
+      }
+    ]);
+  });
+
+  it('keeps ready-to-unblock advisories when multiline PR notes end with resolved status lines', async () => {
+    const transitionIssueState = createReadOnlyTerminalBlockerTransition();
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createBlockedCo272Issue(
+          'Current operator note:\nPR #571\n- draft, dirty\n- checks pending\n- checks passed\n- no longer blocking'
+        )
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    }, {
+      transition_issue_state: transitionIssueState
+    });
+
+    expect(transitionIssueState).not.toHaveBeenCalled();
+    expect(result.status).toBe('acted');
+    expect(result.terminal_blocker_advisories).toMatchObject([
+      {
+        issue_id: 'lin-issue-272',
+        issue_identifier: 'CO-272',
+        recommended_action: 'ready_to_unblock'
+      }
+    ]);
+  });
+
+  it('keeps ready-to-unblock advisories when latest activity resolves the PR blocker and description has no PR hint', async () => {
+    const transitionIssueState = createReadOnlyTerminalBlockerTransition();
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [
+        createBlockedCo272Issue('Current operator note: waiting on the latest operator update.', {
+          recent_activity: [
+            {
+              id: 'co-272-old-pr-blocker',
+              created_at: '2026-04-21T10:00:00.000Z',
+              actor_name: 'Codex Operator',
+              summary: 'PR #571 still has failing checks.'
+            },
+            {
+              id: 'co-272-current-pr-clear',
+              created_at: '2026-04-21T11:00:00.000Z',
+              actor_name: 'Codex Operator',
+              summary: 'PR #571 is no longer blocking; checks passed.'
+            }
+          ]
+        })
+      ],
+      claims: [],
+      config: buildConfig(),
+      previous_result: null
+    }, {
+      transition_issue_state: transitionIssueState
+    });
+
+    expect(transitionIssueState).not.toHaveBeenCalled();
+    expect(result.status).toBe('acted');
+    expect(result.terminal_blocker_advisories).toMatchObject([
+      {
+        issue_id: 'lin-issue-272',
+        issue_identifier: 'CO-272',
+        recommended_action: 'ready_to_unblock'
+      }
+    ]);
+  });
+
   it('ignores unrelated canonical-owner markers as duplicate-cleanup evidence', async () => {
     const result = await runProviderOperatorAutopilot({
       tracked_issues: [
@@ -5065,6 +5416,12 @@ async function appendExecutionAttemptNoop(): Promise<void> {}
 
 async function appendLifecycleRecordNoop(): Promise<void> {}
 
+function createReadOnlyTerminalBlockerTransition() {
+  return vi.fn(async () => {
+    throw new Error('read-only terminal-blocker advisories must not transition issues');
+  });
+}
+
 function makeNowSequence(values: string[]): () => string {
   let index = 0;
   return () => values[Math.min(index++, values.length - 1)]!;
@@ -5102,6 +5459,23 @@ function createTrackedIssue(
     relations_truncated: overrides.relations_truncated ?? false,
     recent_activity: overrides.recent_activity ?? []
   };
+}
+
+function createBlockedCo272Issue(
+  description: string,
+  overrides: Partial<LiveLinearTrackedIssue> = {}
+): LiveLinearTrackedIssue {
+  return createTrackedIssue({
+    id: 'lin-issue-272',
+    identifier: 'CO-272',
+    state: 'Blocked',
+    state_type: 'started',
+    description,
+    blocked_by: [
+      { id: 'lin-issue-278', identifier: 'CO-278', state: 'Done', state_type: 'completed' }
+    ],
+    ...overrides
+  });
 }
 
 function createClaim(

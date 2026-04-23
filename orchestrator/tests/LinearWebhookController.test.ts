@@ -4,8 +4,10 @@ import { createHmac } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { ControlState } from '../src/cli/control/controlState.js';
+import type { ProviderIntakeClaimRecord } from '../src/cli/control/providerIntakeState.js';
 import {
   handleLinearWebhookRequest,
+  markLinearAdvisoryStateStaleFromProviderIntake,
   normalizeLinearAdvisoryState
 } from '../src/cli/control/linearWebhookController.js';
 
@@ -64,12 +66,210 @@ function createDispatchPilotFeatureToggles(): ControlState['feature_toggles'] {
   };
 }
 
+function createProviderIntakeClaim(
+  overrides: Partial<ProviderIntakeClaimRecord> = {}
+): ProviderIntakeClaimRecord {
+  const issueId = overrides.issue_id ?? 'lin-issue-272';
+  return {
+    provider: 'linear',
+    provider_key: overrides.provider_key ?? `linear:${issueId}`,
+    issue_id: issueId,
+    issue_identifier: overrides.issue_identifier ?? 'CO-272',
+    issue_title: overrides.issue_title ?? 'Replace dead archive guidance',
+    issue_state: overrides.issue_state ?? 'Blocked',
+    issue_state_type: overrides.issue_state_type ?? 'started',
+    issue_updated_at: overrides.issue_updated_at ?? '2026-04-21T16:00:00.000Z',
+    task_id: overrides.task_id ?? 'linear-lin-issue-272',
+    mapping_source: 'provider_id_fallback',
+    state: overrides.state ?? 'released',
+    reason: overrides.reason ?? 'provider_issue_released:not_active',
+    accepted_at: overrides.accepted_at ?? '2026-04-21T15:00:00.000Z',
+    updated_at: overrides.updated_at ?? '2026-04-21T16:00:00.000Z',
+    last_delivery_id: overrides.last_delivery_id ?? null,
+    last_event: overrides.last_event ?? null,
+    last_action: overrides.last_action ?? null,
+    last_webhook_timestamp: overrides.last_webhook_timestamp ?? null,
+    run_id: overrides.run_id ?? null,
+    run_manifest_path: overrides.run_manifest_path ?? null,
+    launch_source: overrides.launch_source ?? null,
+    launch_token: overrides.launch_token ?? null
+  };
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
 });
 
 describe('LinearWebhookController', () => {
+  it('marks stale advisory state against the last accepted tracked issue instead of later ignored deliveries', () => {
+    const advisoryState = normalizeLinearAdvisoryState({
+      schema_version: 1,
+      updated_at: '2026-04-21T17:00:00.000Z',
+      latest_delivery_id: 'delivery-ignored',
+      latest_result: 'ignored',
+      latest_reason: 'dispatch_source_issue_not_found',
+      latest_event: {
+        delivery_id: 'delivery-ignored',
+        event: 'Issue',
+        action: 'update',
+        issue_id: 'lin-issue-other',
+        webhook_timestamp: 1_777_001_000_000,
+        processed_at: '2026-04-21T17:00:00.000Z'
+      },
+      latest_accepted_at: '2026-04-21T15:00:00.000Z',
+      tracked_issue: {
+        provider: 'linear',
+        id: 'lin-issue-272',
+        identifier: 'CO-272',
+        title: 'Replace dead archive guidance',
+        description: null,
+        url: null,
+        state: 'Blocked',
+        state_type: 'started',
+        archived_at: null,
+        trashed: false,
+        viewer_id: 'viewer-1',
+        assignee_id: 'viewer-1',
+        assignee_name: 'Codex',
+        workspace_id: 'workspace-1',
+        team_id: 'team-1',
+        team_key: 'CO',
+        team_name: 'CO',
+        project_id: 'project-1',
+        project_name: 'CO',
+        updated_at: '2026-04-21T15:00:00.000Z',
+        blocked_by: [],
+        recent_activity: []
+      },
+      seen_deliveries: []
+    });
+
+    const marked = markLinearAdvisoryStateStaleFromProviderIntake(advisoryState, {
+      rehydrated_at: '2026-04-21T16:00:00.000Z',
+      claims: [
+        createProviderIntakeClaim({
+          issue_id: 'lin-issue-272',
+          issue_identifier: 'CO-272',
+          issue_updated_at: '2026-04-21T16:00:00.000Z',
+          updated_at: '2026-04-21T16:00:00.000Z'
+        })
+      ]
+    });
+
+    expect(marked).toBe(true);
+    expect(advisoryState.stale_source).toMatchObject({
+      source: 'provider-intake',
+      reason: 'provider_intake_newer_than_linear_advisory',
+      provider_intake_updated_at: '2026-04-21T16:00:00.000Z',
+      advisory_updated_at: '2026-04-21T15:00:00.000Z'
+    });
+  });
+
+  it('does not mark advisory state stale from unrelated provider-intake claims', () => {
+    const advisoryState = normalizeLinearAdvisoryState({
+      schema_version: 1,
+      updated_at: '2026-04-21T15:00:00.000Z',
+      latest_delivery_id: 'delivery-accepted',
+      latest_result: 'accepted',
+      latest_reason: 'linear_delivery_accepted',
+      latest_event: null,
+      latest_accepted_at: '2026-04-21T15:00:00.000Z',
+      tracked_issue: {
+        provider: 'linear',
+        id: 'lin-issue-272',
+        identifier: 'CO-272',
+        title: 'Replace dead archive guidance',
+        description: null,
+        url: null,
+        state: 'Blocked',
+        state_type: 'started',
+        archived_at: null,
+        trashed: false,
+        viewer_id: 'viewer-1',
+        assignee_id: 'viewer-1',
+        assignee_name: 'Codex',
+        workspace_id: 'workspace-1',
+        team_id: 'team-1',
+        team_key: 'CO',
+        team_name: 'CO',
+        project_id: 'project-1',
+        project_name: 'CO',
+        updated_at: '2026-04-21T15:00:00.000Z',
+        blocked_by: [],
+        recent_activity: []
+      },
+      seen_deliveries: []
+    });
+
+    const marked = markLinearAdvisoryStateStaleFromProviderIntake(advisoryState, {
+      rehydrated_at: '2026-04-21T17:00:00.000Z',
+      claims: [
+        createProviderIntakeClaim({
+          issue_id: 'lin-issue-other',
+          issue_identifier: 'CO-999',
+          issue_updated_at: '2026-04-21T17:00:00.000Z',
+          updated_at: '2026-04-21T17:00:00.000Z'
+        })
+      ]
+    });
+
+    expect(marked).toBe(false);
+    expect(advisoryState.stale_source).toBeUndefined();
+  });
+
+  it('does not mark advisory state stale when only global rehydrate time is newer', () => {
+    const advisoryState = normalizeLinearAdvisoryState({
+      schema_version: 1,
+      updated_at: '2026-04-21T15:00:00.000Z',
+      latest_delivery_id: 'delivery-accepted',
+      latest_result: 'accepted',
+      latest_reason: 'linear_delivery_accepted',
+      latest_event: null,
+      latest_accepted_at: '2026-04-21T15:00:00.000Z',
+      tracked_issue: {
+        provider: 'linear',
+        id: 'lin-issue-272',
+        identifier: 'CO-272',
+        title: 'Replace dead archive guidance',
+        description: null,
+        url: null,
+        state: 'Blocked',
+        state_type: 'started',
+        archived_at: null,
+        trashed: false,
+        viewer_id: 'viewer-1',
+        assignee_id: 'viewer-1',
+        assignee_name: 'Codex',
+        workspace_id: 'workspace-1',
+        team_id: 'team-1',
+        team_key: 'CO',
+        team_name: 'CO',
+        project_id: 'project-1',
+        project_name: 'CO',
+        updated_at: '2026-04-21T15:00:00.000Z',
+        blocked_by: [],
+        recent_activity: []
+      },
+      seen_deliveries: []
+    });
+
+    const marked = markLinearAdvisoryStateStaleFromProviderIntake(advisoryState, {
+      rehydrated_at: '2026-04-21T17:00:00.000Z',
+      claims: [
+        createProviderIntakeClaim({
+          issue_id: 'lin-issue-272',
+          issue_identifier: 'CO-272',
+          issue_updated_at: '2026-04-21T14:00:00.000Z',
+          updated_at: '2026-04-21T14:30:00.000Z'
+        })
+      ]
+    });
+
+    expect(marked).toBe(false);
+    expect(advisoryState.stale_source).toBeUndefined();
+  });
+
   it('returns false for non-webhook pathnames without invoking the webhook controller path', async () => {
     const { res, state } = createResponseRecorder();
     const advisoryState = normalizeLinearAdvisoryState(null);

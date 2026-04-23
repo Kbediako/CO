@@ -369,7 +369,7 @@ async function commandSucceeds(command, args, options = {}) {
 }
 
 async function codexSupportsMarketplace(command, options = {}) {
-  return await commandSucceeds(command, ['marketplace', 'add', '--help'], options);
+  return await commandSucceeds(command, ['plugin', 'marketplace', 'add', '--help'], options);
 }
 
 export function resolveMarketplaceSmokePrerequisite({
@@ -410,7 +410,7 @@ export function resolveMarketplaceSmokePrerequisite({
         status: 'skip',
         reason: 'marketplace-unsupported',
         message:
-          `Skipping marketplace smoke: ${codexBin} does not expose codex marketplace add. Reason: ${skipReason}`
+          `Skipping marketplace smoke: ${codexBin} does not expose codex plugin marketplace add. Reason: ${skipReason}`
       };
     }
     if (allowMarketplaceSkip) {
@@ -425,7 +425,7 @@ export function resolveMarketplaceSmokePrerequisite({
       status: 'fail',
       reason: 'marketplace-unsupported',
       message:
-        'Marketplace smoke requires a Codex CLI with `marketplace add` support. Set PACK_SMOKE_ALLOW_MARKETPLACE_SKIP=1 with PACK_SMOKE_MARKETPLACE_SKIP_REASON only for local-dev opt-out.'
+        'Marketplace smoke requires a Codex CLI with `plugin marketplace add` support. Set PACK_SMOKE_ALLOW_MARKETPLACE_SKIP=1 with PACK_SMOKE_MARKETPLACE_SKIP_REASON only for local-dev opt-out.'
     };
   }
 
@@ -741,7 +741,7 @@ async function runMarketplaceInstallScenario({
       CODEX_HOME: codexHome
     };
 
-    await runCommand(codexBin, ['marketplace', 'add', ...addArgs], {
+    await runCommand(codexBin, ['plugin', 'marketplace', 'add', ...addArgs], {
       cwd: tempDir,
       env: marketplaceEnv
     });

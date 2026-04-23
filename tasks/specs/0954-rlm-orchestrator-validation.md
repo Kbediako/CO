@@ -5,7 +5,7 @@ relates_to: tasks/tasks-0954-rlm-orchestrator-validation.md
 risk: medium
 owners:
   - Codex
-last_review: 2026-03-23
+last_review: 2026-04-21
 ---
 
 ## Added by Bootstrap (refresh as needed)
@@ -14,6 +14,9 @@ last_review: 2026-03-23
 - Objective: Define a deterministic RLM test matrix for correctness, determinism, and scalability (iterative + symbolic modes), including OOLONG + OOLONG-Pairs long-context aggregation benchmarks.
 - Scope: Unit tests, integration tests, and evaluation/benchmark scenarios using stubbed agents/planners and offline fixtures plus external OOLONG dataset fetch helpers.
 - Constraints: No live model calls; symbolic RLM + delegation assumed available.
+
+## Review Notes - 2026-04-21
+- CO-267 Rework reviewed this historical RLM validation packet as part of the docs:freshness rolling baseline reset. The packet remains an active historical test-plan reference; no archive or content rewrite is required, so the correct disposition is a reviewed freshness refresh.
 
 ## Technical Requirements
 - Functional requirements:

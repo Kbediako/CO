@@ -112,7 +112,7 @@
     },
     "rolling_freshness_cohorts": {
       "enabled": true,
-      "owner_issue": "CO-175",
+      "owner_issue": "CO-324",
       "policy_doc": "docs/guides/docs-freshness-cohorts.md",
       "window_days": 7,
       "max_cohorts": 2,
@@ -145,6 +145,12 @@
             "start": "1164",
             "end": "1195"
           }
+        }
+      ],
+      "canonical_owner_issues": [
+        {
+          "canonical_owner_key": "docs_freshness_candidate|doc_class:task_packet|path_family:tasks/tasks-*|last_review:2026-03-23|cadence_days:30",
+          "owner_issue": "CO-320"
         }
       ],
       "action_after_window": "refresh, archive, reclassify, or file a new same-project baseline owner before feature-lane review handoff"

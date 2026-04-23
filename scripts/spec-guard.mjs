@@ -161,6 +161,14 @@ function normalizeStringArray(value) {
   return value.map((item) => (typeof item === 'string' ? item.trim() : '')).filter(Boolean);
 }
 
+function normalizeOptionalString(value) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 function normalizeTaskNumberRange(value) {
   if (!value || typeof value !== 'object') {
     return null;
@@ -218,6 +226,37 @@ function normalizeBaselineCohorts(value) {
   return { cohorts, isValid: cohorts.length > 0 };
 }
 
+function normalizeCanonicalOwnerIssues(value) {
+  if (value === undefined || value === null) {
+    return { owners: [], isValid: true };
+  }
+  if (!Array.isArray(value)) {
+    return { owners: [], isValid: false };
+  }
+
+  const owners = value.map((item) => {
+    if (!item || typeof item !== 'object') {
+      return null;
+    }
+    const canonicalOwnerKey = normalizeOptionalString(item.canonical_owner_key);
+    const ownerIssue = normalizeOptionalString(item.owner_issue);
+    if (!canonicalOwnerKey || !ownerIssue) {
+      return null;
+    }
+    return {
+      canonical_owner_key: canonicalOwnerKey,
+      owner_issue: ownerIssue
+    };
+  });
+
+  const validOwners = owners.filter(Boolean);
+  const ownerKeys = new Set(validOwners.map((item) => item.canonical_owner_key));
+  if (owners.some((item) => item === null) || ownerKeys.size !== validOwners.length) {
+    return { owners: validOwners, isValid: false };
+  }
+  return { owners: validOwners, isValid: true };
+}
+
 function normalizeRollingFreshnessPolicy(rawPolicy) {
   if (!rawPolicy || typeof rawPolicy !== 'object' || rawPolicy.enabled !== true) {
     return {
@@ -229,7 +268,8 @@ function normalizeRollingFreshnessPolicy(rawPolicy) {
       max_cohorts: 0,
       max_entries: 0,
       eligible_doc_classes: [],
-      baseline_cohorts: []
+      baseline_cohorts: [],
+      canonical_owner_issues: []
     };
   }
 
@@ -240,6 +280,7 @@ function normalizeRollingFreshnessPolicy(rawPolicy) {
   const maxEntries = Number.isInteger(rawPolicy.max_entries) && rawPolicy.max_entries > 0 ? rawPolicy.max_entries : null;
   const eligibleDocClasses = normalizeStringArray(rawPolicy.eligible_doc_classes);
   const baselineCohorts = normalizeBaselineCohorts(rawPolicy.baseline_cohorts);
+  const canonicalOwnerIssues = normalizeCanonicalOwnerIssues(rawPolicy.canonical_owner_issues);
 
   return {
     enabled: true,
@@ -250,7 +291,8 @@ function normalizeRollingFreshnessPolicy(rawPolicy) {
         maxCohorts !== null &&
         maxEntries !== null &&
         eligibleDocClasses.length > 0 &&
-        baselineCohorts.isValid
+        baselineCohorts.isValid &&
+        canonicalOwnerIssues.isValid
     ),
     owner_issue: ownerIssue,
     policy_doc: policyDoc,
@@ -258,7 +300,8 @@ function normalizeRollingFreshnessPolicy(rawPolicy) {
     max_cohorts: maxCohorts ?? 0,
     max_entries: maxEntries ?? 0,
     eligible_doc_classes: eligibleDocClasses,
-    baseline_cohorts: baselineCohorts.cohorts
+    baseline_cohorts: baselineCohorts.cohorts,
+    canonical_owner_issues: canonicalOwnerIssues.owners
   };
 }
 
