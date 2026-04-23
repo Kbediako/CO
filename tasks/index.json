@@ -13913,6 +13913,77 @@
         "agent_task": ".agent/task/linear-80d4473e-e9c7-4d4d-9340-bc1193103a7d.md",
         "docs": "docs/TECH_SPEC-linear-80d4473e-e9c7-4d4d-9340-bc1193103a7d.md"
       }
+    },
+    {
+      "id": "20260423-linear-e2852b4f-09d0-4220-b0ac-b763170eacb2",
+      "title": "CO-314 release notes Overview/Bug Fixes parity and prerelease docs truth",
+      "relates_to": "tasks/tasks-linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-23",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-23",
+          "status": "produced",
+          "manifest": ".runs/linear-e2852b4f-09d0-4220-b0ac-b763170eacb2-docs-packet/cli/2026-04-23T05-57-00-647Z-0bd37fd5/manifest.json",
+          "source_anchor": "ctx:sha256:02cb90d54135011ef937fd18a3991df0f28287d0192ad00e24a2f90a2d4cffb8#chunk:c000001",
+          "summary": "Docs-first packet preserves release-note surfaces `Overview`, `Bug Fixes`, and `Full Changelog`; protected files `docs/release-notes-template-addendum.md`, `.github/workflows/release.yml`, `.github/release-overview.md`, `docs/README.md`, and `.agent/SOPs/release.md`; and PR #608 review notes requiring workflow/SOP parity plus separate initial diff-budget and final review-wrapper evidence. The child checkout has no `.runs` tree, so the packet is anchored on parent-provided issue wording plus current repo release-surface audit."
+        },
+        "preimplementation_issue_quality": {
+          "reviewer": "docs child lane",
+          "date": "2026-04-23",
+          "status": "approved",
+          "summary": "The issue is a release-note/docs parity lane for CO-314: canonical Overview/Bug Fixes promotion, truthful prerelease dist-tag derivation docs, one-shot overview override behavior, and README/SOP parity. It explicitly rejects release publication, package versioning, signing policy, and broad release workflow redesign."
+        },
+        "docs_review_preimplementation": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-23",
+          "status": "succeeded",
+          "manifest": ".runs/linear-e2852b4f-09d0-4220-b0ac-b763170eacb2-docs-review/cli/2026-04-23T06-15-40-797Z-b963f1c2/manifest.json",
+          "summary": "Docs-review rerun passed after the parent removed the docs/TASKS.md append because docs:check reported zero headroom; canonical registration remained in tasks/index.json and docs/docs-freshness-registry.json."
+        },
+        "implementation_validation": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-23",
+          "status": "passed",
+          "summary": "After merging latest origin/main, delegation guard, spec guard, build, lint, full test, docs:check, docs:freshness, repo:stewardship, and diff-budget passed. Lint had only existing DelegationMcpHealth.test.ts warnings; test covered 349 files / 4655 tests."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-23",
+          "status": "succeeded",
+          "review_outcome": "bounded-success",
+          "telemetry": ".runs/linear-e2852b4f-09d0-4220-b0ac-b763170eacb2/cli/2026-04-23T05-51-56-323Z-c85885e3/review/telemetry.json",
+          "summary": "Forced manifest-backed standalone review completed as bounded-success after command-intent retry; saved output reported no actionable regressions in the release workflow, release docs, task registration, or focused contract test."
+        },
+        "elegance_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-23",
+          "status": "completed",
+          "summary": "Manual minimality pass kept the branch scoped to the release workflow, release-facing docs, docs-first mirrors/registry, and one focused contract spec; no extra dependency, publication behavior change, package-versioning change, or broad release refactor was introduced."
+        },
+        "pr_feedback_coderabbit": {
+          "reviewer": "CodeRabbit",
+          "date": "2026-04-23",
+          "status": "addressed",
+          "pr": "https://github.com/Kbediako/CO/pull/616",
+          "thread": "PRRT_kwDOQE1BPc59Al8M",
+          "summary": "Addressed the requested-change thread by changing .agent/SOPs/release.md verify/push examples from hardcoded vX.Y.Z to the resolved <tag> placeholder and adding focused contract assertions. `npm run test -- tests/release-workflow-contract.spec.ts`, `npm run docs:check`, and scoped `git diff --check` passed."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md",
+        "task": "tasks/tasks-linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md",
+        "agent_task": ".agent/task/linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md",
+          "TECH_SPEC": "tasks/specs/linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md"
+        }
+      }
     }
   ]
 }
