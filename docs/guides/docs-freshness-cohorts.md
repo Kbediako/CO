@@ -10,8 +10,8 @@ The machine-readable policy lives in `docs/docs-catalog.json` under `policies.ro
 
 Current CO policy:
 
-- Owner issue: `CO-300`
-- Historical owner lineage: `CO-175` established the Apr 14 baseline and `CO-267` owned the Apr 20/21 maintenance refreshes; both are now terminal evidence only and must not remain the live maintenance owner.
+- Owner issue: `CO-320`
+- Historical owner lineage: `CO-175` established the Apr 14 baseline, `CO-267` owned the Apr 20/21 maintenance refreshes, and `CO-300` handled the Apr 22 owner reset plus reviewed refresh; those issues are now terminal evidence only and must not remain the live maintenance owner.
 - Window: `7` days after the normal freshness cadence expires
 - Maximum active rolling cohorts: `2`
 - Maximum rolling rows: `300`
