@@ -4494,6 +4494,7 @@ function compareIsoTimestamp(left: string | null | undefined, right: string | nu
 
 function resolveProviderLinearWorkerParallelizationFailure(input: {
   proof: ProviderLinearWorkerProof;
+  parallelizationDecisionCountBeforeTurn: number;
 }): {
   endReason:
     | 'parallelization_decision_missing'
@@ -4502,16 +4503,15 @@ function resolveProviderLinearWorkerParallelizationFailure(input: {
     | 'parallelization_serial_conflict';
   message: string;
 } | null {
-  const currentTurnBoundary =
-    normalizeOptionalString(input.proof.current_turn_started_at) ??
-    normalizeOptionalString(input.proof.attempt_started_at);
   const currentTurnParallelizationDecisions = readProviderLinearParallelizationSnapshots(
     input.proof.linear_audit,
     {
-      issueId: input.proof.issue_id,
-      recordedAtNotBefore: currentTurnBoundary
+      issueId: input.proof.issue_id
     }
-  );
+  ).slice(input.parallelizationDecisionCountBeforeTurn);
+  const currentTurnBoundary =
+    normalizeOptionalString(input.proof.current_turn_started_at) ??
+    normalizeOptionalString(input.proof.attempt_started_at);
   if (currentTurnParallelizationDecisions.length === 0) {
     return {
       endReason: 'parallelization_decision_missing',
@@ -7161,6 +7161,12 @@ export async function runProviderLinearWorker(
         buildProviderLinearWorkerTurnBootstrapProof(finalProof, turnNumber, turnStartedAt),
         childEnv
       );
+      const parallelizationDecisionCountBeforeTurn = readProviderLinearParallelizationSnapshots(
+        finalProof.linear_audit,
+        {
+          issueId: finalProof.issue_id
+        }
+      ).length;
       emitSemanticProgressIfChanged(finalProof);
       const liveSessionTailState: ProviderWorkerSessionLogTailState | null =
         runtimeContext.runtime.selected_mode === 'appserver'
@@ -7397,7 +7403,8 @@ export async function runProviderLinearWorker(
       }
 
       const parallelizationFailure = resolveProviderLinearWorkerParallelizationFailure({
-        proof: finalProof
+        proof: finalProof,
+        parallelizationDecisionCountBeforeTurn
       });
       if (parallelizationFailure) {
         finalProof = {
