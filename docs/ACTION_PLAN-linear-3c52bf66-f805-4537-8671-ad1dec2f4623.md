@@ -37,5 +37,5 @@
 - Risk: CO-321 scope drift. Mitigation: keep CO-321 surfaces out of the edited file set except for historical mention in docs.
 
 ## Approvals
-- Reviewer: standalone review clean-success plus explicit elegance review
+- Reviewer: standalone review clean-success via `.runs/linear-3c52bf66-f805-4537-8671-ad1dec2f4623/cli/2026-04-23T03-33-24-344Z-7775baca/review/telemetry.json`; explicit elegance review via `out/linear-3c52bf66-f805-4537-8671-ad1dec2f4623/manual/elegance-review.md`
 - Date: 2026-04-23
