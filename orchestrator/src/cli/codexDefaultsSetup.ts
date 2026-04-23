@@ -66,6 +66,15 @@ const ROLE_DEFINITIONS: readonly RoleDefinition[] = [
   }
 ];
 
+const LEGACY_MANAGED_TEMPLATE_TEXT: Partial<Record<RoleDefinition['key'], readonly [string, string][]>> = {
+  awaiter: [
+    [
+      '# with CO portable override to use gpt-5.4 at high reasoning.',
+      '# with CO override to use gpt-5.4 at high reasoning.'
+    ]
+  ]
+};
+
 interface LoadedRoleDefinition extends RoleDefinition {
   content: string;
   managedContents: readonly string[];
@@ -420,13 +429,30 @@ async function loadRoleDefinitions(authScope: CodexDefaultsAuthScope): Promise<L
     loaded.push({
       ...definition,
       content: scopeRoleTemplateContent(definition, content, authScope),
-      managedContents: uniqueStrings([
-        scopeRoleTemplateContent(definition, content, 'portable'),
-        scopeRoleTemplateContent(definition, content, 'chatgpt')
-      ])
+      managedContents: buildManagedRoleContents(definition, content)
     });
   }
   return loaded;
+}
+
+function buildManagedRoleContents(definition: RoleDefinition, content: string): string[] {
+  const contents = [
+    scopeRoleTemplateContent(definition, content, 'portable'),
+    scopeRoleTemplateContent(definition, content, 'chatgpt')
+  ];
+
+  for (const [currentText, legacyText] of LEGACY_MANAGED_TEMPLATE_TEXT[definition.key] ?? []) {
+    if (!content.includes(currentText)) {
+      continue;
+    }
+    const legacyContent = content.replace(currentText, legacyText);
+    contents.push(
+      scopeRoleTemplateContent(definition, legacyContent, 'portable'),
+      scopeRoleTemplateContent(definition, legacyContent, 'chatgpt')
+    );
+  }
+
+  return uniqueStrings(contents);
 }
 
 function resolveBaselineModels(authScope: CodexDefaultsAuthScope): { model: string; reviewModel: string } {

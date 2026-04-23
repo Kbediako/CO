@@ -215,6 +215,39 @@ describe('runCodexDefaultsSetup', () => {
     }
   });
 
+  it('updates legacy CO-managed awaiter role files when changing auth scope', async () => {
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-chatgpt-legacy-awaiter-'));
+    const env = { CODEX_HOME: tempHome } as NodeJS.ProcessEnv;
+    const awaiterPath = join(tempHome, 'agents', 'awaiter-high.toml');
+    try {
+      await runCodexDefaultsSetup({ apply: true, env });
+      const generatedAwaiter = await readFile(awaiterPath, 'utf8');
+      await writeFile(
+        awaiterPath,
+        generatedAwaiter.replace(
+          '# with CO portable override to use gpt-5.4 at high reasoning.',
+          '# with CO override to use gpt-5.4 at high reasoning.'
+        ),
+        'utf8'
+      );
+
+      const result = await runCodexDefaultsSetup({
+        apply: true,
+        authScope: 'chatgpt',
+        env
+      });
+
+      expect(result.changes).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ target: 'role_file', name: 'awaiter', status: 'updated' })
+        ])
+      );
+      expect(await readFile(awaiterPath, 'utf8')).toContain('model = "gpt-5.5"');
+    } finally {
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
   it('does not seed agent depth caps when the source config omits them', async () => {
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-no-depth-'));
     const configPath = join(tempHome, 'config.toml');
