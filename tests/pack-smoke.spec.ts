@@ -1105,6 +1105,10 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     expect(workflowText).toContain("core.setOutput('asset_id', '')");
     expect(workflowText).toContain("steps.asset.outputs.asset_id == ''");
     expect(workflowText).toContain('npm publish "$TARBALL_PATH" --tag "$DIST_TAG" --provenance');
+    expect(workflowText).toContain('TARBALL_PATH="release-assets/${TARBALL_NAME}"');
+    expect(workflowText).toContain('Expected release asset ${TARBALL_NAME} was not downloaded for ${TAG}.');
+    expect(workflowText).toContain('Expected tarball ${TARBALL_NAME} was not found to publish.');
+    expect(workflowText).not.toContain('ls release-assets/*.tgz | head -n 1');
 
     const workflow = await readWorkflow('.github/workflows/release.yml');
     const publishJob = workflow.jobs?.publish;

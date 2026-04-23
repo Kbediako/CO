@@ -21,11 +21,7 @@
       },
       "paths": {
         "task": "tasks/tasks-linear-0549b4a2-56b1-4164-b65a-73fd2ba7d9e8.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-0549b4a2-release-publish-workflow-fix.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-0549b4a2-release-publish-workflow-fix.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-0549b4a2-release-publish-workflow-fix.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-0549b4a2-release-publish-workflow-fix.md"
       }
     },
     {

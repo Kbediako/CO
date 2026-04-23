@@ -443,8 +443,10 @@ jobs:
       - name: Verify release tarball availability
         run: |
           set -euo pipefail
-          if ! ls release-assets/*.tgz >/dev/null 2>&1; then
-            echo "::error::Release asset download did not produce a .tgz tarball for ${TAG}."
+          TARBALL_PATH="release-assets/${TARBALL_NAME}"
+          if [[ ! -f "${TARBALL_PATH}" ]]; then
+            echo "::error::Expected release asset ${TARBALL_NAME} was not downloaded for ${TAG}."
+            find release-assets -maxdepth 1 -type f -print
             echo "::error::Check release asset upload/download steps before publish."
             exit 1
           fi
@@ -454,9 +456,9 @@ jobs:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
-          TARBALL_PATH=$(ls release-assets/*.tgz | head -n 1)
-          if [[ -z "$TARBALL_PATH" ]]; then
-            echo "No tarball found to publish." >&2
+          TARBALL_PATH="release-assets/${TARBALL_NAME}"
+          if [[ ! -f "$TARBALL_PATH" ]]; then
+            echo "Expected tarball ${TARBALL_NAME} was not found to publish." >&2
             exit 1
           fi
           if [[ "$TARBALL_PATH" != /* ]]; then
@@ -484,7 +486,7 @@ jobs:
 
           PUBLISH_LOG="$(mktemp)"
           set +e
-          NODE_AUTH_TOKEN="$NPM_TOKEN" npm publish "$TARBALL_PATH" --tag "$DIST_TAG" 2>&1 | tee "$PUBLISH_LOG"
+          NODE_AUTH_TOKEN="$NPM_TOKEN" npm publish "$TARBALL_PATH" --tag "$DIST_TAG" --provenance 2>&1 | tee "$PUBLISH_LOG"
           TOKEN_STATUS=${PIPESTATUS[0]}
           set -e
           if [[ $TOKEN_STATUS -ne 0 ]] && grep -q "npm error code EOTP" "$PUBLISH_LOG"; then
