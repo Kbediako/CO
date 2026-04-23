@@ -19,7 +19,7 @@
 - [x] Exactly one same-turn parallelization decision recorded. Evidence: packaged `linear parallelization --decision parallelize_now --reason independent_scope_available`.
 - [x] Same-issue child lane `source-evidence` completed successfully before turn end. Evidence: `.runs/linear-4a684a5e-64b0-47fb-835a-d792eba29071-source-evidence/cli/2026-04-23T19-09-21-468Z-48bafb2b/manifest.json`; zero-byte patch rejected as advisory.
 - [x] Exactly one persistent `## Codex Workpad` comment is kept current. Evidence: Linear comment `7d6443c6-706b-4485-85ad-b737192f8e59`.
-- [x] Shared root left untouched because it is dirty on `linear/co-278-refresh-spec-guard-baseline`. Evidence: `git -C /Users/kbediako/Code/CO status --short --branch`.
+- [x] Shared root left untouched because it is dirty on `linear/co-278-refresh-spec-guard-baseline`. Evidence: read-only shared-root `git status --short --branch` reported `## linear/co-278-refresh-spec-guard-baseline`.
 - [x] CO in-progress cap checked. Evidence: root `co-status --format json` reported `running=3`, `issues=3`, `max_allowed=3`, active `CO-338`, `CO-341`, `CO-339`.
 
 ## Source And Local Audit
