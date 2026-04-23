@@ -118,9 +118,9 @@ export const DEFAULT_ALIGNMENT_POLICY: AlignmentPolicy = {
     mandatory_turn_window: 20
   },
   route: {
-    sentinel_model: 'gpt-5.4',
-    high_reasoning_model: 'gpt-5.4',
-    arbitration_model: 'gpt-5.4',
+    sentinel_model: 'gpt-5.5',
+    high_reasoning_model: 'gpt-5.5',
+    arbitration_model: 'gpt-5.5',
     high_reasoning_available: true
   }
 };

@@ -4,14 +4,19 @@
 Define the current stable compatibility/adoption target for CO and keep newer CLI/model moves evidence-gated.
 
 ## Current Posture
-- Current CO compatibility/adoption target is stable Codex CLI `0.123.0` after CO-335 completed the missing post-rotation required/fallback cloud gates for the CO-322 candidate audit.
-- Latest release-planning candidate is Codex CLI `0.123.0`; CO-335 supersedes the stale CO-322 HOLD that was caused by missing environment `6999395fcc448191b865917084f21c6f`. Fresh required cloud evidence now passed against non-secret environment label `Kbediako/CO`, and the fallback canary passed the expected local MCP fallback contract for missing environment metadata.
-- Release-facing downstream-smoke workflows (`core-lane`, `release`, and `pack-smoke-backstop`) pin `@openai/codex@0.123.0` after CO-322 found no marketplace-smoke regression versus the `codex plugin marketplace add` baseline and CO-335 supplied clean cloud-gate evidence.
-- `cloud-canary` pins `@openai/codex@0.123.0` as the current promoted release-planning candidate with explicit canary evidence.
-- The `0.123.0` posture keeps the previously recorded onboarding-sensitive help guarantees: `codex exec` accepts a prompt argument plus piped stdin (stdin appends as a `<stdin>` block), `codex login --device-auth` is available, and `codex review --help` exposes `[PROMPT]` alongside `--uncommitted` / `--base` / `--commit`.
-- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.
+- Current CO compatibility/adoption target is stable Codex CLI `0.124.0` after CO-341 re-audited the local command, app-server model, and downstream smoke surfaces from the `0.123.0` baseline.
+- Latest release-planning candidate is Codex CLI `0.124.0`; CO-341 supersedes the `0.123.0` posture for repo docs, downstream-smoke pins, and cloud-canary pins while keeping the normal evidence gates below.
+- Release-facing downstream-smoke workflows (`core-lane`, `release`, and `pack-smoke-backstop`) pin `@openai/codex@0.124.0` after CO-341 found no marketplace-smoke reason to stay on the `0.123.0` `codex plugin marketplace add` baseline.
+- `cloud-canary` pins `@openai/codex@0.124.0` as the explicit release-planning candidate.
+- The `0.124.0` CO-local posture keeps the previously recorded onboarding-sensitive help guarantees: `codex exec` accepts a prompt argument plus piped stdin (stdin appends as a `<stdin>` block), `codex login --device-auth` is available, and `codex review --help` exposes `[PROMPT]` alongside `--uncommitted` / `--base` / `--commit`.
+- Current model posture is `gpt-5.5` with `model_reasoning_effort = "xhigh"` for top-level, delegated subagent, and review surfaces (CO-local explicit configuration).
+- This is a CO explicit configuration decision based on live app-server/model smoke evidence, not a claim that public OpenAI docs have changed the documented Codex default model.
 - Keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only.
-- When authenticating through ChatGPT, keep delegated and review surfaces on `gpt-5.4` unless a fresh provider lane explicitly validates `gpt-5.4-codex`.
+- When authenticating through ChatGPT, keep delegated and review surfaces on `gpt-5.5` unless a fresh provider lane explicitly validates a Codex-suffixed model variant.
+- App-server `model/list` still reports `gpt-5.4` as `isDefault=true`; CO chooses `gpt-5.5` explicitly and has live app-server `model/list` plus `codex exec` evidence that `gpt-5.5` supports `xhigh`.
+- The bundled debug model catalog may lag the live app-server catalog; use live app-server `model/list` and live exec evidence as the source of truth for model availability decisions.
+- Residual plugin warnings seen during CO-341 came from local temporary plugin cache state, not CO-owned plugin manifests.
+- CO-341 reran `node scripts/runtime-mode-canary.mjs` after `npm run build`; all four scenario checks passed `20/20` and `ready_for_default_flip=true` in `out/linear-co-341-codex-0124-gpt55-posture/manual/runtime-mode-canary-post-build/runtime-canary-summary.json`.
 - Newer stable/prerelease Codex builds may run only in task-scoped lanes with captured evidence.
 - Local appserver remains the expected default runtime path after the `CO-22` canary.
 - Provider workers should keep the current `codex exec` / `codex exec resume` supervision seam for now; app-server is promoted to a richer control-substrate candidate, not an immediate supervision replacement.
@@ -56,11 +61,12 @@ Define the current stable compatibility/adoption target for CO and keep newer CL
   - Promote: release-facing downstream-smoke and `cloud-canary` workflows move to explicit `@openai/codex@0.123.0`.
   - Release ship remains out of scope for CO-335; CO-316 may proceed with the cloud-gate blocker cleared, subject to its own release prerequisites.
 - 2026-04-24: `CO-337` rechecked the marketplace command relocation truth that older notes had partially compressed. Local `codex-cli 0.123.0` still exposes `plugin` at top level, `codex plugin marketplace add --help` succeeds, and top-level `codex marketplace add --help` fails. Versioned repro confirms `0.121.0` accepts both add paths, while `0.122.0` and `0.123.0` require `codex plugin marketplace add`. This does not change the promoted `0.123.0` posture or workflow pins on current `main`; it corrects the command-surface wording used by `pack:smoke`, launcher/operator messages, and downstream setup docs.
+- 2026-04-24: `CO-341` audited `rust-v0.124.0` / npm `@openai/codex@0.124.0` and aligns the repo posture to `0.124.0` with explicit CO-local `gpt-5.5` `xhigh` configuration. Local `codex-cli 0.124.0`, `codex exec`, `codex review --help`, and `codex login --help` keep the required prompt/device-auth surfaces. Live app-server `model/list` shows `gpt-5.5` supports `xhigh` while `gpt-5.4` remains the app-server catalog default; the bundled debug model catalog may lag. Residual plugin warnings are local temporary plugin cache warnings, not CO-owned plugin manifests. Post-build runtime-mode canary evidence passes all four scenario checks `20/20` with `ready_for_default_flip=true`. Evidence: `out/linear-co-341-codex-0124-gpt55-posture/manual/command-surface/`, `out/linear-co-341-codex-0124-gpt55-posture/manual/command-surface/codex-login-help.txt`, `out/linear-co-341-codex-0124-gpt55-posture/manual/runtime-mode-canary-post-build/runtime-canary-summary.json`, and `tests/pack-smoke.spec.ts`.
 
 ## Required Evidence Gates
-For any change to the current `0.123.0` / `gpt-5.4` posture, or any promotion of a newer Codex build in CO:
+For any change to the current `0.124.0` / CO-local `gpt-5.5` `xhigh` posture, or any promotion of a newer Codex build in CO:
 1. Local appserver path passes on the candidate Codex CLI + model posture.
-2. Delegated/review surfaces are verified on the actual auth provider in use; for ChatGPT auth, keep `gpt-5.4` unless new compatibility evidence exists for `gpt-5.4-codex`.
+2. Delegated/review surfaces are verified on the actual auth provider in use; for ChatGPT auth, keep `gpt-5.5` unless new compatibility evidence exists for a Codex-suffixed model variant.
 3. Runtime-mode canary passes (`node scripts/runtime-mode-canary.mjs`).
 4. Cloud canary required contract passes (`CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 npm run ci:cloud-canary`).
 5. Cloud fallback contract behavior remains correct (`CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 CLOUD_CANARY_EXPECT_FALLBACK=1 npm run ci:cloud-canary`).

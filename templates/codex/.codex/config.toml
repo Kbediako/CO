@@ -1,5 +1,5 @@
-model = "gpt-5.4"
-review_model = "gpt-5.4"
+model = "gpt-5.5"
+review_model = "gpt-5.5"
 model_reasoning_effort = "xhigh"
 
 [agents]
@@ -14,5 +14,5 @@ description = "Complex implementation role."
 config_file = "./agents/worker-complex.toml"
 
 [agents.awaiter]
-description = "Awaiter override (keeps awaiter behavior with latest codex/high reasoning)."
+description = "Awaiter override (keeps awaiter behavior with latest codex/xhigh reasoning)."
 config_file = "./agents/awaiter-high.toml"

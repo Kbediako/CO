@@ -6,7 +6,8 @@ This guide is the downstream-safe setup path shipped in the npm package.
 
 - Once per machine: install Codex CLI, authenticate, install bundled skills, and register delegation or DevTools wiring.
 - Once per repo: seed the CO templates, review the generated config, and start using task-scoped runs.
-- CO currently targets Codex CLI `0.123.0`; newer candidates stay evidence-gated in the version policy.
+- CO currently targets Codex CLI `0.124.0` with `gpt-5.5` / `xhigh` as the CO-local posture; newer candidates stay evidence-gated in the version policy.
+- Under ChatGPT auth, app-server model/list evidence shows `gpt-5.5` with `xhigh` available even though `gpt-5.4` may remain the app-server `isDefault`.
 - CO-196 posture lineage remains unchanged: npm is the supported baseline because it is the simplest supported CLI install path, and marketplace packaging is an additive registration path for newer Codex releases. `0.121.0` accepts both `codex marketplace add` and `codex plugin marketplace add`; `0.122.0+` require `codex plugin marketplace add`.
 
 ## Once per machine
@@ -56,6 +57,7 @@ The shipped marketplace files are:
 - Local-directory add: Run the version-appropriate add command against the repository root that contains those files instead of the npm install directory. `0.121.0` accepts either `codex marketplace add <repository-root>` or `codex plugin marketplace add <repository-root>`; `0.122.0+` require `codex plugin marketplace add <repository-root>`.
 - Git-backed add: Pass a Git identifier or URL such as `owner/repo[@ref]`, an HTTPS Git URL, or an SSH Git URL rather than a local path.
 - When to re-run add: Re-run the same version-appropriate add command if you move or replace a local-directory source, or if you remove Codex's installed marketplace checkout and want to restore the Git-backed install. `0.121.0` documents the add flow under both marketplace paths; `0.122.0+` document local directories plus Git-backed sources under `codex plugin marketplace add --help`.
+- Debug caveats: The bundled debug catalog can lag runtime posture briefly, and residual plugin warnings are local temporary plugin cache warnings rather than CO posture failures.
 
 ## Rollback and removal
 

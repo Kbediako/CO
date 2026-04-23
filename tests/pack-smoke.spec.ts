@@ -26,8 +26,8 @@ type WorkflowFile = {
 };
 
 const marketplaceSkipToken = 'PACK_SMOKE_ALLOW_MARKETPLACE_SKIP';
-const marketplaceCodexInstallCommand = 'npm install --global @openai/codex@0.123.0';
-const cloudCanaryCodexInstallCommand = 'npm install --global @openai/codex@0.123.0';
+const marketplaceCodexInstallCommand = 'npm install --global @openai/codex@0.124.0';
+const cloudCanaryCodexInstallCommand = 'npm install --global @openai/codex@0.124.0';
 const dedicatedCodexInstallCommands = new Set([
   marketplaceCodexInstallCommand,
   cloudCanaryCodexInstallCommand
@@ -1052,7 +1052,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
             ).toBe(false);
             expect(
               isDedicatedCodexInstallRun(run),
-              `${workflow} job ${jobName} step ${stepIndex + 1} must use a dedicated Codex 0.123.0 install step`
+              `${workflow} job ${jobName} step ${stepIndex + 1} must use a dedicated Codex 0.124.0 install step`
             ).toBe(true);
             codexInstallConditions.push(effectiveStepCondition);
           }
@@ -1078,7 +1078,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
               codexInstallConditions.some((installCondition) =>
                 installConditionCoversSmokeStep(installCondition, effectiveStepCondition)
               ),
-              `${workflow} job ${jobName} step ${stepIndex + 1} must install Codex 0.123.0 before pack:smoke with matching if condition`
+              `${workflow} job ${jobName} step ${stepIndex + 1} must install Codex 0.124.0 before pack:smoke with matching if condition`
             ).toBe(true);
           }
         }
@@ -1103,7 +1103,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
         if (hasCommandText(run, cloudCanaryCodexInstallCommand)) {
           expect(
             isDedicatedCodexInstallRun(run),
-            `.github/workflows/cloud-canary.yml job ${jobName} step ${stepIndex + 1} must use a dedicated Codex 0.123.0 install step`
+            `.github/workflows/cloud-canary.yml job ${jobName} step ${stepIndex + 1} must use a dedicated Codex 0.124.0 install step`
           ).toBe(true);
           codexInstallConditions.push(effectiveStepCondition);
           installStepCount += 1;
@@ -1115,7 +1115,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
             codexInstallConditions.some((installCondition) =>
               installConditionCoversSmokeStep(installCondition, effectiveStepCondition)
             ),
-            `.github/workflows/cloud-canary.yml job ${jobName} step ${stepIndex + 1} must install Codex 0.123.0 before running ci:cloud-canary`
+            `.github/workflows/cloud-canary.yml job ${jobName} step ${stepIndex + 1} must install Codex 0.124.0 before running ci:cloud-canary`
           ).toBe(true);
         }
       }

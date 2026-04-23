@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 4dacb857f3104076404058bb2a7c75cd262d11374fe3360d07453979a0220626 -->
+<!-- codex:instruction-stamp 7f1e3e3521f137fed2ab798e9a41c6cd134077b07eb640d1c00ae0f2cfbf74ee -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -29,23 +29,25 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - `spawn_agent` defaults to `default` when `agent_type` is omitted; always set `agent_type` explicitly.
 - For symbolic collab runs, prefix spawned prompts with `[agent_type:<role>]` on line one so role intent is auditable from JSONL/manifests.
 - For spawned subagents, default to bounded prompts without inherited context; use `fork_context=true` only when a stream explicitly needs prior thread history to avoid prompt bloat/redundancy.
-- Keep top-level defaults on the current CO target by setting `model = "gpt-5.4"` in `~/.codex/config.toml`.
-- Under ChatGPT auth, keep delegated subagent and review surfaces on `gpt-5.4` unless a fresh provider lane explicitly validates `gpt-5.4-codex`.
+- Keep top-level defaults on the current CO target by setting `model = "gpt-5.5"` and `model_reasoning_effort = "xhigh"` in `~/.codex/config.toml`.
+- Under ChatGPT auth, keep delegated subagent and review surfaces on `gpt-5.5` unless a fresh provider lane explicitly validates a Codex-suffixed model variant.
 - Set `model_reasoning_effort` to at least `high` (CO default: `xhigh`) so spawned agents inherit high-reasoning behavior unless role overrides change it.
 - Built-in `explorer` now inherits top-level model defaults unless you attach a custom `config_file`; keep an explicit `agents.explorer` entry only when you want a custom description/override, and keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only.
 - Caveat: spark roles are file/codebase search only; use non-spark roles when image inputs are required.
 - Prefer built-ins-first for RLM/collab flows; add custom specialist roles only with a measured benefit, explicit owner, and validation evidence.
 - Set `[agents] max_threads = 12` as the seeded baseline. Keep explicit `max_depth = 4` only when your local Codex parser accepts it; do not treat `max_spawn_depth` as a current CO baseline recommendation.
 - Fallback policy is contingency-only (not routine): use `max_threads = 8` and `max_depth = 2` for constrained/high-risk lanes; use legacy `6/1/1` only as a break-glass profile when an older local parser/runtime still consumes spawn-depth caps.
-- Use an explicit `worker_complex` role (for example `gpt-5.4`, `xhigh`) for high-risk implementation streams.
+- Use an explicit `worker_complex` role (for example `gpt-5.5`, `xhigh`) for high-risk implementation streams.
 - Use `codex-orchestrator doctor` as an advisory drift check for Codex defaults (model/reasoning/agent baseline); remediation is additive via `codex-orchestrator codex defaults --yes`.
 
 ## Codex Version Policy (CO Scope)
-- Current CO compatibility/adoption target is stable Codex CLI `0.123.0`.
-- Current `0.123.0` posture evidence confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, `codex review --help` exposing `[PROMPT]` alongside scoped review flags, runtime-mode canary pass, required cloud canary pass, and fallback cloud contract pass.
+- Current CO compatibility/adoption target is stable Codex CLI `0.124.0`.
+- Current `0.124.0` CO-local posture evidence confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, `codex review --help` exposing `[PROMPT]` alongside scoped review flags, live `gpt-5.5` `xhigh` availability, and a post-build runtime-mode canary pass (`20/20` per scenario, `ready_for_default_flip=true`).
 - Release-facing downstream-smoke workflows and `cloud-canary` pin the explicit promoted candidate recorded in `docs/guides/codex-version-policy.md`.
-- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
-- In ChatGPT-auth sessions, keep delegated/review surfaces on `gpt-5.4` unless a fresh provider lane explicitly validates `gpt-5.4-codex`.
+- Current model posture is `gpt-5.5` with `model_reasoning_effort = "xhigh"` for top-level, delegated subagent, and review surfaces (CO-local explicit configuration); keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
+- In ChatGPT-auth sessions, keep delegated/review surfaces on `gpt-5.5` unless a fresh provider lane explicitly validates a Codex-suffixed model variant.
+- Caveat: app-server `model/list` still reports `gpt-5.4` as `isDefault=true`; CO chooses `gpt-5.5` explicitly, live app-server `model/list` and live `codex exec` show `gpt-5.5` supports `xhigh`, and the bundled debug model catalog may lag the live catalog.
+- Treat residual plugin warnings from CO-341 as local temporary plugin cache warnings unless evidence maps them to CO-owned plugin manifests.
 - Evaluate newer stable/prerelease Codex builds only in explicit, task-scoped CO lanes where evidence is captured under `.runs/<task-id>/` and `out/<task-id>/manual/`.
 - Newer-version adoption remains evidence-gated: no P0/P1 regressions, runtime-mode canary pass, and required cloud canary contract pass.
 - If any required lane fails (or provider/model compatibility regresses), hold/revert and record the decision in `docs/TASKS.md`, `tasks/index.json`, and task checklists.
@@ -107,7 +109,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - In non-interactive/CI runs (stdin is not a TTY, or `CODEX_REVIEW_NON_INTERACTIVE=1` / `CODEX_NON_INTERACTIVE=1` / `CODEX_NO_INTERACTIVE=1`), `codex-orchestrator review` prints the handoff prompt and exits unless `FORCE_CODEX_REVIEW=1` is set.
 - Non-interactive lane policy: direct/manual wrapper runs stay handoff-only unless `FORCE_CODEX_REVIEW=1`; `docs-review` and `implementation-gate` explicitly force review execution; `docs-relevance-advisory` explicitly clears `FORCE_CODEX_REVIEW` and remains prompt-only/advisory; the `provider-linear-worker` pipeline exports `CODEX_REVIEW_NON_INTERACTIVE=1` and `FORCE_CODEX_REVIEW=1`, so its pre-handoff standalone review executes before `Human Review` / `In Review`.
 - Scoped wrapper policy: explicit `npm run review -- --uncommitted|--base|--commit` runs keep the full prompt/context in `review/prompt.txt` and carry reviewer-visible scoped context via `--title` (user-provided when present, otherwise synthesized from `NOTES` + `--surface`).
-- Wrapper truthfulness: `codex review --help` in `0.123.0` exposes `[PROMPT]` with scoped review flags, but CO continues to rely on saved prompt artifacts plus bounded `--title` transport for deterministic scoped runs; if Codex rejects a synthesized scoped `--title`, the wrapper retries the same explicit scope without `--title` and falls back to artifact-only reviewer-visible context.
+- Wrapper truthfulness: `codex review --help` in `0.124.0` exposes `[PROMPT]` with scoped review flags, but CO continues to rely on saved prompt artifacts plus bounded `--title` transport for deterministic scoped runs; if Codex rejects a synthesized scoped `--title`, the wrapper retries the same explicit scope without `--title` and falls back to artifact-only reviewer-visible context.
 - Scoped surface limit: explicit `--uncommitted|--base|--commit` wrapper runs support only the default `diff` surface at the actual Codex layer; `--surface audit|architecture` requires an unscoped prompt-capable review.
 - When you need manifest-backed review evidence, run `TASK=<task-id> NOTES="Goal: ... | Summary: ... | Risks: ..." MANIFEST=<path> codex-orchestrator review --manifest <path>` (`npm run review -- --manifest <path>` is equivalent in this repo). `NOTES` is strongly recommended; the wrapper auto-generates fallback notes when omitted.
 - See `docs/standalone-review-guide.md` for the canonical workflow.

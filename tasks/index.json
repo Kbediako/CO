@@ -1,6 +1,34 @@
 {
   "items": [
     {
+      "id": "20260424-linear-co-341-codex-0124-gpt55-posture",
+      "title": "CO: Re-audit Codex CLI 0.124.0 posture and GPT-5.5 hook/config alignment",
+      "relates_to": "tasks/tasks-linear-co-341-codex-0124-gpt55-posture.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-24",
+      "approvals": {
+        "preimplementation_issue_quality": {
+          "reviewer": "parent Orchestrator with subagent validation",
+          "date": "2026-04-24",
+          "status": "approved",
+          "summary": "CO-341 is the canonical posture lane for Codex CLI 0.124.0, gpt-5.5 xhigh validation, and hook/config drift. It preserves CO-338 as the separate release publish blocker and keeps active CO issue count at the configured cap of four."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-co-341-codex-0124-gpt55-posture.md",
+        "task": "tasks/tasks-linear-co-341-codex-0124-gpt55-posture.md",
+        "agent_task": ".agent/task/linear-co-341-codex-0124-gpt55-posture.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-co-341-codex-0124-gpt55-posture.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-co-341-codex-0124-gpt55-posture.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-co-341-codex-0124-gpt55-posture.md"
+        }
+      }
+    },
+    {
       "id": "20260424-linear-dc06b7ed-89e6-4662-911c-52a2991cbf7a",
       "title": "CO: Re-audit Codex CLI 0.123.0 posture and correct marketplace command-surface assumptions",
       "relates_to": "tasks/tasks-linear-dc06b7ed-89e6-4662-911c-52a2991cbf7a.md",

@@ -17,7 +17,7 @@ let tomlLibrary:
   | null
   | undefined;
 
-export const BASELINE_MODEL = 'gpt-5.4';
+export const BASELINE_MODEL = 'gpt-5.5';
 export const BASELINE_REVIEW_MODEL = BASELINE_MODEL;
 export const BASELINE_REASONING = 'xhigh';
 export const BASELINE_REASONING_MINIMUM = 'high';
@@ -32,6 +32,9 @@ interface RoleDefinition {
   fileName: 'explorer-fast.toml' | 'worker-complex.toml' | 'awaiter-high.toml';
   configFile: string;
   templatePath: string;
+  model?: string;
+  modelReasoningEffort?: string;
+  managedMigrationReasoningEfforts?: readonly ManagedMigrationReasoningEffort[];
 }
 
 const ROLE_DEFINITIONS: readonly RoleDefinition[] = [
@@ -47,19 +50,29 @@ const ROLE_DEFINITIONS: readonly RoleDefinition[] = [
     description: 'Complex implementation role.',
     fileName: 'worker-complex.toml',
     configFile: './agents/worker-complex.toml',
-    templatePath: join('templates', 'codex', '.codex', 'agents', 'worker-complex.toml')
+    templatePath: join('templates', 'codex', '.codex', 'agents', 'worker-complex.toml'),
+    model: BASELINE_MODEL,
+    modelReasoningEffort: BASELINE_REASONING,
+    managedMigrationReasoningEfforts: ['xhigh']
   },
   {
     key: 'awaiter',
-    description: 'Awaiter override (keeps awaiter behavior with latest codex/high reasoning).',
+    description: 'Awaiter override (keeps awaiter behavior with latest codex/xhigh reasoning).',
     fileName: 'awaiter-high.toml',
     configFile: './agents/awaiter-high.toml',
-    templatePath: join('templates', 'codex', '.codex', 'agents', 'awaiter-high.toml')
+    templatePath: join('templates', 'codex', '.codex', 'agents', 'awaiter-high.toml'),
+    model: BASELINE_MODEL,
+    modelReasoningEffort: BASELINE_REASONING,
+    managedMigrationReasoningEfforts: ['high']
   }
 ];
 
+const MANAGED_MIGRATION_MODEL = 'gpt-5.4';
+type ManagedMigrationReasoningEffort = 'high' | 'xhigh';
+
 interface LoadedRoleDefinition extends RoleDefinition {
   content: string;
+  managedMigrationContents: readonly string[];
 }
 
 type SetupStatus = 'planned' | 'applied';
@@ -99,6 +112,7 @@ interface PlannedRoleChange {
   existingContent: string | null;
   currentStatus: ChangeStatus;
   detail: string;
+  writeReason: 'create' | 'force' | 'managed_migration' | null;
 }
 
 export async function runCodexDefaultsSetup(
@@ -156,10 +170,7 @@ export async function runCodexDefaultsSetup(
   await mkdir(plan.agentsDir, { recursive: true });
 
   for (const roleChange of roleChanges) {
-    const shouldWrite =
-      roleChange.existingContent === null
-      || (force && roleChange.existingContent !== roleChange.definition.content);
-    if (shouldWrite) {
+    if (roleChange.writeReason) {
       await writeAtomicFile(roleChange.path, roleChange.definition.content, {
         ensureDir: true,
         encoding: 'utf8'
@@ -169,10 +180,7 @@ export async function runCodexDefaultsSetup(
         name: roleChange.definition.key,
         path: roleChange.path,
         status: roleChange.existingContent === null ? 'created' : 'updated',
-        detail:
-          roleChange.existingContent === null
-            ? `Created ${roleChange.definition.fileName}.`
-            : `Overwrote ${roleChange.definition.fileName} because --force was set.`
+        detail: formatAppliedRoleWriteDetail(roleChange)
       });
       continue;
     }
@@ -326,7 +334,8 @@ async function planRoleChanges(
         path,
         existingContent: null,
         currentStatus: 'pending',
-        detail: `Will create ${definition.fileName}.`
+        detail: `Will create ${definition.fileName}.`,
+        writeReason: 'create'
       });
       continue;
     }
@@ -338,7 +347,20 @@ async function planRoleChanges(
         path,
         existingContent: current,
         currentStatus: 'unchanged',
-        detail: `${definition.fileName} already matches CO baseline defaults.`
+        detail: `${definition.fileName} already matches CO baseline defaults.`,
+        writeReason: null
+      });
+      continue;
+    }
+
+    if (definition.managedMigrationContents.includes(current)) {
+      changes.push({
+        definition,
+        path,
+        existingContent: current,
+        currentStatus: 'pending',
+        detail: `Will update ${definition.fileName} from a prior CO-managed gpt-5.4 baseline.`,
+        writeReason: 'managed_migration'
       });
       continue;
     }
@@ -349,7 +371,8 @@ async function planRoleChanges(
         path,
         existingContent: current,
         currentStatus: 'pending',
-        detail: `Will overwrite ${definition.fileName} because --force is set.`
+        detail: `Will overwrite ${definition.fileName} because --force is set.`,
+        writeReason: 'force'
       });
       continue;
     }
@@ -359,7 +382,8 @@ async function planRoleChanges(
       path,
       existingContent: current,
       currentStatus: 'preserved',
-      detail: `${definition.fileName} already exists; preserving without --force.`
+      detail: `${definition.fileName} already exists; preserving without --force.`,
+      writeReason: null
     });
   }
 
@@ -378,9 +402,81 @@ async function loadRoleDefinitions(): Promise<LoadedRoleDefinition[]> {
       const reason = (error as Error)?.message ?? String(error);
       throw new Error(`Unable to read role template ${templateFile}: ${reason}`);
     }
-    loaded.push({ ...definition, content });
+    const currentContent = applyRoleBaselineOverrides(content, definition);
+    loaded.push({
+      ...definition,
+      content: currentContent,
+      managedMigrationContents: buildManagedMigrationContents(content, definition, currentContent)
+    });
   }
   return loaded;
+}
+
+function buildManagedMigrationContents(
+  content: string,
+  definition: RoleDefinition,
+  currentContent: string
+): readonly string[] {
+  if (!definition.model || !definition.modelReasoningEffort) {
+    return [];
+  }
+
+  const migrationContents = (definition.managedMigrationReasoningEfforts ?? []).map((modelReasoningEffort) =>
+    applyRoleBaselineOverrides(content, {
+      ...definition,
+      model: MANAGED_MIGRATION_MODEL,
+      modelReasoningEffort
+    })
+  );
+  return [...new Set(migrationContents)].filter((migrationContent) => migrationContent !== currentContent);
+}
+
+function formatAppliedRoleWriteDetail(roleChange: PlannedRoleChange): string {
+  switch (roleChange.writeReason) {
+    case 'create':
+      return `Created ${roleChange.definition.fileName}.`;
+    case 'force':
+      return `Overwrote ${roleChange.definition.fileName} because --force was set.`;
+    case 'managed_migration':
+      return `Updated ${roleChange.definition.fileName} from a prior CO-managed gpt-5.4 baseline.`;
+    case null:
+      return roleChange.detail;
+  }
+}
+
+function applyRoleBaselineOverrides(content: string, definition: RoleDefinition): string {
+  let next = content;
+  if (definition.model) {
+    next = replaceRoleTomlString(next, 'model', definition.model, definition.fileName);
+  }
+  if (definition.modelReasoningEffort) {
+    next = replaceRoleTomlString(
+      next,
+      'model_reasoning_effort',
+      definition.modelReasoningEffort,
+      definition.fileName
+    );
+  }
+  if (definition.model && definition.modelReasoningEffort) {
+    next = next.replace(
+      /^# with CO override to use .+ at .+ reasoning\.$/m,
+      `# with CO override to use ${definition.model} at ${definition.modelReasoningEffort} reasoning.`
+    );
+  }
+  return next;
+}
+
+function replaceRoleTomlString(
+  content: string,
+  key: string,
+  value: string,
+  fileName: string
+): string {
+  const pattern = new RegExp(`^(${key}\\s*=\\s*)"[^"]*"$`, 'm');
+  if (!pattern.test(content)) {
+    throw new Error(`Role template ${fileName} is missing a ${key} assignment.`);
+  }
+  return content.replace(pattern, (_match, prefix: string) => `${prefix}"${value}"`);
 }
 
 function buildPlannedChanges(params: {

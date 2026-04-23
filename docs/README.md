@@ -22,9 +22,10 @@ Codex Orchestrator is the coordination layer that glues together Codex-driven ag
 - Codex CLI sync strategy: `docs/guides/upstream-codex-cli-sync.md`.
 
 ## Current Posture
-- Current CO compatibility/adoption target: Codex CLI `0.123.0`.
+- Current CO compatibility/adoption target: Codex CLI `0.124.0`.
 - Newer Codex CLI candidates stay evidence-gated in `docs/guides/codex-version-policy.md`.
-- Current model posture: `gpt-5.4` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
+- Current model posture is `gpt-5.5` with `model_reasoning_effort = "xhigh"` for top-level, delegated subagent, and review surfaces (CO-local explicit configuration); keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
+- App-server `model/list` still reports `gpt-5.4` as the catalog default; CO selects `gpt-5.5` explicitly where configured, and CO-341 recorded a post-build runtime-mode canary pass (`20/20` per scenario, `ready_for_default_flip=true`).
 - Local default runtime is `appserver`; keep `--runtime-mode cli` as break-glass.
 - Full posture and promotion gates live in `docs/guides/codex-version-policy.md`.
 

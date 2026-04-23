@@ -37,6 +37,27 @@ describe('initCodexTemplates', () => {
     expect(codexConfig).toContain('max_threads = 12');
     expect(codexConfig).not.toContain('max_depth = 4');
     expect(codexConfig).not.toContain('max_spawn_depth = 4');
+    const workerRole = await readFile(
+      path.join(tempDir, '.codex', 'agents', 'worker-complex.toml'),
+      'utf8'
+    );
+    expect(workerRole).toContain('model = "gpt-5.5"');
+    expect(workerRole).toContain('model_reasoning_effort = "xhigh"');
+    expect(workerRole).not.toContain('gpt-5.4');
+    const awaiterRole = await readFile(
+      path.join(tempDir, '.codex', 'agents', 'awaiter-high.toml'),
+      'utf8'
+    );
+    expect(awaiterRole).toContain('# with CO override to use gpt-5.5 at xhigh reasoning.');
+    expect(awaiterRole).toContain('model = "gpt-5.5"');
+    expect(awaiterRole).toContain('model_reasoning_effort = "xhigh"');
+    expect(awaiterRole).not.toContain('gpt-5.4');
+    const explorerFastRole = await readFile(
+      path.join(tempDir, '.codex', 'agents', 'explorer-fast.toml'),
+      'utf8'
+    );
+    expect(explorerFastRole).toContain('model = "gpt-5.3-codex-spark"');
+    expect(explorerFastRole).not.toContain('gpt-5.5');
 
     const second = await initCodexTemplates({ template: 'codex', cwd: tempDir, force: false });
     expect(second.written).toHaveLength(0);
