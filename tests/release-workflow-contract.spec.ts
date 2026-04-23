@@ -80,6 +80,9 @@ describe('release workflow contract', () => {
     expect(sop).toContain('`.github/workflows/release.yml`');
     expect(sop).toContain('`git tag -v <tag>`');
     expect(sop).toContain('`git push origin <tag>`');
+    expect(sop).toContain('Escalation: if signing verification, packaging, or npm publish fails');
+    expect(sop).toContain('GitHub Actions workflow run URL');
+    expect(sop).toContain('`.runs/<task-id>/.../manifest.json`');
     expect(sop).not.toContain('If .github/release.yml exists');
   });
 });

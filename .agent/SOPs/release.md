@@ -39,6 +39,8 @@
    - Confirm GitHub shows Verified for the tag/commit.
    - In `.github/workflows/release.yml`, verify generated `Overview` and `Bug Fixes` sections render once as top-level release-note sections and remaining generated sections stay under `Full Changelog`.
    - The workflow reads an optional one-shot overview override from the signed annotated tag body. It does not read .github/release-overview.md, so stale committed overview text cannot shape a later release.
+   - Escalation: if signing verification, packaging, or npm publish fails after one retry, stop re-tagging and escalate in the active Linear release task to the release maintainer named there plus the repo owner before retrying publication.
+   - Evidence location: record the GitHub Actions workflow run URL, failing job name, release tag, and any `.runs/<task-id>/.../manifest.json` path in `/tasks` and the mirrored release checklist before re-tagging.
 7. Record release status, workflow links, and any follow-ups in `/tasks` and docs checklists.
 
 If the release workflow fails, fix the issue and re-tag after updating metadata; do not publish from non-release artifacts.
