@@ -13736,11 +13736,7 @@
         "spec": "tasks/specs/linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be.md",
         "task": "tasks/tasks-linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be.md",
         "agent_task": ".agent/task/linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be.md"
       }
     }
   ]
