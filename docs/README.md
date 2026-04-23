@@ -30,7 +30,8 @@ Codex Orchestrator is the coordination layer that glues together Codex-driven ag
 
 ## Release Notes
 - Shipped skills note: `docs/release-notes-template-addendum.md`.
-- Optional overview override: add and commit a release overview file at .github/release-overview.md before tagging; the release workflow uses it when present.
+- Canonical promoted sections: generated `Overview` and `Bug Fixes` become top-level release-note sections; generated `Documentation` remains under `Full Changelog`.
+- Optional one-shot overview override: put release-specific narrative text in the signed annotated tag body before pushing the tag. The workflow reads the tag body for that release only and does not read .github/release-overview.md.
 
 ## How It Works
 - **Planner → Builder → Tester → Reviewer:** The core `TaskManager` (see `orchestrator/src/manager.ts`) wires together agent interfaces that decide *what* to run (planner), execute the selected pipeline stage (builder), verify results (tester), and give a final decision (reviewer).
@@ -126,8 +127,8 @@ Use `npx @kbediako/codex-orchestrator resume --run <run-id>` to continue interru
 ## Publishing (npm)
 - Pack audit: `npm run pack:audit` (validates the tarball file list; run `npm run clean:dist && npm run build` first if `dist/` contains non-runtime artifacts).
 - Pack smoke: `npm run pack:smoke` (installs the tarball in a temp mock repo, runs CLI behavior checks including `review` artifacts and `long-poll-wait` skill install, and validates delegate-server JSONL; uses network). Treat this as a spot-check gate; use `npm run pack:audit` for full tarball inventory validation.
-- Release tags: `vX.Y.Z` or `vX.Y.Z-alpha.N` must match `package.json` version.
-- Dist-tags: stable publishes to `latest`; alpha publishes to `alpha` and uses a GitHub prerelease.
+- Release tags: `vX.Y.Z` or `vX.Y.Z-<prerelease>` must match `package.json` version, for example `vX.Y.Z-alpha.N`, `vX.Y.Z-beta.N`, or `vX.Y.Z-rc.N`.
+- Dist-tags: stable releases publish to `latest`; prereleases publish with a dist-tag derived from the leading prerelease label before the first `.` or `-`, lowercased and sanitized. Examples: `alpha.1` -> `alpha`, `beta.1` -> `beta`, `rc.1` -> `rc`; empty or numeric-leading labels fall back to `next`. Prerelease tags create a GitHub prerelease.
 - Publishing auth: workflow attempts OIDC trusted publishing first (`id-token: write` + `--provenance`), then falls back to `secrets.NPM_TOKEN` when OIDC is unavailable. `secrets.NPM_TOKEN` must be an npm automation token (not a token that requires OTP).
 - Trusted publisher config: npm expects workflow filename `release.yml` (the file must exist at `.github/workflows/release.yml` on the default branch). Leave environment blank unless the publish job sets `environment: ...`.
 - OIDC runtime prereqs: npm trusted publishing currently requires Node.js `22.14.0+` and npm `11.5.1+`; the publish job installs npm `^11.5.1` before publishing.
