@@ -21,7 +21,7 @@
 - [x] `npm run docs:freshness` passed on current main after replay.
 - [x] `npm run repo:stewardship` passed. Evidence: 5592 tracked files, 0 action-required.
 - [x] `node scripts/diff-budget.mjs` passed. Evidence: working-tree scope remained within budget.
-- [x] Manifest-backed standalone review and elegance pass completed. Evidence: `../../.runs/linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f/cli/2026-04-23T04-43-28-829Z-33dc3a7f/review/telemetry.json` reports `status=succeeded` / `review_outcome=bounded-success` via `command-intent` boundary with no actionable findings; elegance artifact `out/linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f/manual/elegance-review.md`.
+- [x] Manifest-backed standalone review and elegance pass completed. Evidence: `.runs/linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f/cli/2026-04-23T04-43-28-829Z-33dc3a7f/review/telemetry.json` reports `status=succeeded` / `review_outcome=bounded-success` via `command-intent` boundary with no actionable findings; elegance artifact `out/linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f/manual/elegance-review.md`.
 - [ ] PR attached and `pr ready-review` drain clean before In Review.
 
 ## Notes

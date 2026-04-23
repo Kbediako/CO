@@ -20,6 +20,7 @@ last_review: 2026-04-23
 - Explicit non-goals carried forward: no release notes parity, no release-skill/docs-check parity, no release ship, no marketplace redesign, and no unrelated docs-check baseline repair.
 
 ## Parity / Alignment Matrix
+
 | Surface | Current | Reference | Target |
 | --- | --- | --- | --- |
 | Active target | `0.118.0` | Promotion requires all gates | Remain `0.118.0` |

@@ -20,6 +20,7 @@ last_review: 2026-04-23
 - Explicit non-goals carried forward: no release shipping, release notes parity, skills/docs-check parity, marketplace contract redesign, provider-worker app-server migration, or unrelated baseline cleanup.
 
 ## Parity / Alignment Matrix
+
 | Surface | Current truth | Reference truth | Target truth / intended delta |
 | --- | --- | --- | --- |
 | Active compatibility target | CO policy targets `0.118.0`. | Newer builds need runtime/cloud gates. | Remain `0.118.0` because 0.123.0 cloud gates did not pass. |

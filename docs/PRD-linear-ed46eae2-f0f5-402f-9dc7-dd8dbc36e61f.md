@@ -15,6 +15,7 @@
 - Nearby wrong interpretations to reject: blind latest-version bump, treating runtime canary success as sufficient without cloud canaries, treating absent top-level marketplace help as a current smoke regression after main rebaselined to `codex plugin marketplace add`, using CO-314/CO-315/CO-316 to avoid a CO-322 decision, or repairing unrelated docs-check baseline debt inside this audit.
 
 ## Parity / Alignment Matrix
+
 | Surface | Current truth | Reference truth | Target truth / intended delta |
 | --- | --- | --- | --- |
 | Active CO target | `0.118.0` remains the active compatibility/adoption target. | Promotion requires runtime-mode, required cloud, and fallback cloud evidence. | Stay at `0.118.0` unless all gates pass. |
