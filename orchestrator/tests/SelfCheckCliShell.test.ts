@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { runSelfCheckCliShell } from '../src/cli/selfCheckCliShell.js';
 
+const MOCK_VERSION = '9.9.9-test';
+
 describe('runSelfCheckCliShell', () => {
   it('emits text output in the expected field order', async () => {
     const log = vi.fn();
@@ -11,7 +13,7 @@ describe('runSelfCheckCliShell', () => {
       buildResult: () => ({
         status: 'ok',
         name: '@kbediako/codex-orchestrator',
-        version: '0.1.38',
+        version: MOCK_VERSION,
         node: 'v22.0.0',
         timestamp: '2026-03-17T13:29:19.000Z'
       }),
@@ -21,7 +23,7 @@ describe('runSelfCheckCliShell', () => {
     expect(log.mock.calls).toEqual([
       ['Status: ok'],
       ['Name: @kbediako/codex-orchestrator'],
-      ['Version: 0.1.38'],
+      [`Version: ${MOCK_VERSION}`],
       ['Node: v22.0.0'],
       ['Timestamp: 2026-03-17T13:29:19.000Z']
     ]);
@@ -35,7 +37,7 @@ describe('runSelfCheckCliShell', () => {
       buildResult: () => ({
         status: 'ok',
         name: '@kbediako/codex-orchestrator',
-        version: '0.1.38',
+        version: MOCK_VERSION,
         node: 'v22.0.0',
         timestamp: '2026-03-17T13:29:19.000Z'
       }),
@@ -45,7 +47,7 @@ describe('runSelfCheckCliShell', () => {
     expect(log).toHaveBeenCalledWith(`{
   "status": "ok",
   "name": "@kbediako/codex-orchestrator",
-  "version": "0.1.38",
+  "version": "${MOCK_VERSION}",
   "node": "v22.0.0",
   "timestamp": "2026-03-17T13:29:19.000Z"
 }`);
