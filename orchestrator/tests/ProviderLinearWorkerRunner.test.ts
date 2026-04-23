@@ -3234,7 +3234,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       issue_identifier: 'CO-2',
       workspace_path: tempRoot,
       source_setup: null,
-      launched_at: '2026-03-21T09:00:00.075Z',
+      launched_at: '2026-03-21T08:59:59.900Z',
       purpose: 'Implement bounded same-issue child lanes',
       instructions: null,
       scope: childLaneScope,
@@ -3243,7 +3243,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         issue_updated_at: '2026-03-21T09:00:00.000Z',
         issue_state: 'In Progress',
         issue_state_type: 'started',
-        captured_at: '2026-03-21T09:00:00.075Z'
+        captured_at: '2026-03-21T08:59:59.900Z'
       },
       lane_workspace_path: join(tempRoot ?? '', '.child-lanes', 'impl-a-child-run-1'),
       patch_artifact_path: join(tempRoot ?? '', '.runs', 'linear-lin-issue-1-impl-a', 'cli', 'child-run-1', 'provider-linear-child-lane.patch'),
@@ -3252,6 +3252,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       decision_at: null,
       decision_reason: null
     };
+    let currentNow = '2026-03-21T09:00:00.000Z';
     const execRunner = vi
       .fn<
         (request: {
@@ -3306,8 +3307,9 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         });
         await appendStaySerialParallelizationDecisionAuditForRequest(request, {
           turnIndex: 1,
-          recordedAt: '2026-03-21T09:00:01.050Z'
+          recordedAt: '2026-03-21T09:00:00.250Z'
         });
+        currentNow = '2026-03-21T09:00:01.000Z';
         return {
           exitCode: 0,
           stdout: [
@@ -3400,10 +3402,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
           })
         ),
         execRunner,
-        now: vi
-          .fn()
-          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
-          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        now: vi.fn(() => currentNow),
         log
       }
     );
@@ -9589,6 +9588,75 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
             state: 'single_bounded_change'
           })
         ])
+      }
+    });
+  });
+
+  it('ignores earlier-turn parallelization decisions when enforcing the current turn', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    await appendStaySerialParallelizationDecisionAudit(runDir, {
+      turnIndex: 1,
+      recordedAt: '2026-03-21T08:58:00.000Z'
+    });
+    await appendStaySerialParallelizationDecisionAudit(runDir, {
+      turnIndex: 2,
+      recordedAt: '2026-03-21T08:59:00.000Z'
+    });
+
+    const readTrackedIssue = vi
+      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+      .mockResolvedValueOnce(createTrackedIssue())
+      .mockResolvedValueOnce(createTrackedIssue({
+        state: 'Done',
+        state_type: 'completed'
+      }));
+    const execRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request, {
+        turnIndex: 3,
+        recordedAt: '2026-03-21T09:00:03.100Z'
+      });
+      return {
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-1"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+          '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1","timestamp":"2026-03-21T09:00:03.500Z"}}'
+        ].join('\n'),
+        stderr: ''
+      };
+    });
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+      },
+      {
+        readTrackedIssue,
+        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+        execRunner,
+        now: vi.fn(() => '2026-03-21T09:00:00.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(proof).toMatchObject({
+      owner_phase: 'ended',
+      owner_status: 'succeeded',
+      end_reason: 'issue_inactive',
+      parallelization: {
+        decision: 'stay_serial',
+        reason: 'single_bounded_change',
+        recorded_at: '2026-03-21T09:00:03.100Z'
+      },
+      linear_audit: {
+        parallelization_entries: [
+          expect.objectContaining({ recorded_at: '2026-03-21T08:58:00.000Z' }),
+          expect.objectContaining({ recorded_at: '2026-03-21T08:59:00.000Z' }),
+          expect.objectContaining({ recorded_at: '2026-03-21T09:00:03.100Z' })
+        ]
       }
     });
   });
