@@ -4509,6 +4509,9 @@ function resolveProviderLinearWorkerParallelizationFailure(input: {
       issueId: input.proof.issue_id
     }
   ).slice(input.parallelizationDecisionCountBeforeTurn);
+  const currentTurnBoundary =
+    normalizeOptionalString(input.proof.current_turn_started_at) ??
+    normalizeOptionalString(input.proof.attempt_started_at);
   if (currentTurnParallelizationDecisions.length === 0) {
     return {
       endReason: 'parallelization_decision_missing',
@@ -4527,7 +4530,7 @@ function resolveProviderLinearWorkerParallelizationFailure(input: {
   if (parallelization.decision !== 'parallelize_now') {
     if (!hasCurrentTurnChildLaneLaunch(
       input.proof.child_lanes,
-      input.proof.current_turn_started_at
+      currentTurnBoundary
     )) {
       return null;
     }
@@ -4539,7 +4542,7 @@ function resolveProviderLinearWorkerParallelizationFailure(input: {
   }
   if (hasCurrentTurnSuccessfulChildLaneLaunch(
     input.proof.child_lanes,
-    input.proof.current_turn_started_at
+    currentTurnBoundary
   )) {
     return null;
   }
@@ -7151,12 +7154,6 @@ export async function runProviderLinearWorker(
       };
       const previousTurnProof = finalProof;
       const turnStartedAt = deps.now();
-      const parallelizationDecisionCountBeforeTurn = readProviderLinearParallelizationSnapshots(
-        finalProof.linear_audit,
-        {
-          issueId: finalProof.issue_id
-        }
-      ).length;
       finalProof = await writeProofSnapshot(
         deps,
         context.runDir,
@@ -7164,6 +7161,12 @@ export async function runProviderLinearWorker(
         buildProviderLinearWorkerTurnBootstrapProof(finalProof, turnNumber, turnStartedAt),
         childEnv
       );
+      const parallelizationDecisionCountBeforeTurn = readProviderLinearParallelizationSnapshots(
+        finalProof.linear_audit,
+        {
+          issueId: finalProof.issue_id
+        }
+      ).length;
       emitSemanticProgressIfChanged(finalProof);
       const liveSessionTailState: ProviderWorkerSessionLogTailState | null =
         runtimeContext.runtime.selected_mode === 'appserver'
