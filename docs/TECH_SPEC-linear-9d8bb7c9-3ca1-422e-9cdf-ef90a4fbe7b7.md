@@ -78,3 +78,8 @@ last_review: 2026-04-23
 - `npm run repo:stewardship`.
 - `node scripts/diff-budget.mjs`.
 - Manifest-backed standalone review and explicit elegance pass before review handoff.
+
+## Review Notes
+
+- 2026-04-23: Lightweight issue-quality review approved this spec against the full user request: follow-up issue admission, retry/resumable occupancy, provider intake state, `co-status`, and `max_allowed` must remain aligned.
+- 2026-04-23: Manifest-backed standalone review completed with `status: succeeded` and `review_outcome: bounded-success` after command-intent retry; explicit elegance/minimality pass found no avoidable abstraction or unrelated branch scope.

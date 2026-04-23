@@ -7693,6 +7693,118 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('counts a same-issue queued worker before direct webhook admission retry exclusion', async () => {
+    const { root, paths } = await createHostPaths();
+    const queuedEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-queued-retry'
+    };
+    const queuedPaths = resolveRunPaths(queuedEnv, 'run-queued-retry');
+    await mkdir(queuedPaths.runDir, { recursive: true });
+    await writeFile(
+      queuedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-queued-retry',
+        task_id: 'task-queued-retry',
+        pipeline_id: 'provider-linear-worker',
+        status: 'queued',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-retry',
+        issue_identifier: 'CO-329',
+        issue_updated_at: '2026-04-23T08:07:41.709Z',
+        updated_at: '2026-04-23T08:10:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-retry',
+      issue_id: 'lin-issue-retry',
+      issue_identifier: 'CO-329',
+      issue_title: 'Queued retry capacity',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-23T08:07:41.709Z',
+      task_id: 'task-queued-retry',
+      mapping_source: 'provider_id_fallback',
+      state: 'completed',
+      reason: 'provider_issue_retry_queued',
+      accepted_at: '2026-04-23T08:04:00.000Z',
+      updated_at: '2026-04-23T08:04:25.936Z',
+      last_delivery_id: null,
+      last_event: null,
+      last_action: null,
+      last_webhook_timestamp: null,
+      run_id: 'run-queued-retry',
+      run_manifest_path: queuedPaths.manifestPath,
+      launch_source: null,
+      launch_token: null,
+      retry_queued: true,
+      retry_attempt: 2,
+      retry_due_at: '2026-04-24T08:14:25.936Z',
+      retry_error: 'retry worker is already queued'
+    });
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async ({ issueId }: { issueId: string }) => ({
+        runId: `run-${issueId}`,
+        manifestPath: `/tmp/provider-run/${issueId}.json`
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-retry',
+        identifier: 'CO-329',
+        updated_at: '2026-04-23T08:09:33.742Z'
+      }),
+      deliveryId: 'delivery-retry-queued-overlap',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_745_396_973_742
+    });
+
+    expect(result).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_start_blocked:max_concurrency',
+      claim: {
+        provider_key: 'linear:lin-issue-retry',
+        state: 'accepted',
+        reason: 'provider_issue_start_blocked:max_concurrency',
+        run_id: 'run-queued-retry',
+        run_manifest_path: queuedPaths.manifestPath,
+        retry_queued: true
+      }
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(getPersistedState().claims.find((claim) => claim.provider_key === 'linear:lin-issue-retry')).toMatchObject({
+      state: 'accepted',
+      reason: 'provider_issue_start_blocked:max_concurrency',
+      run_id: 'run-queued-retry',
+      run_manifest_path: queuedPaths.manifestPath,
+      retry_queued: true
+    });
+  });
+
   it('does not let a direct webhook candidate self-count its resumable claim against max_allowed', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
@@ -7773,6 +7885,116 @@ describe('createProviderIssueHandoffService', () => {
     expect(getPersistedState().claims.find((claim) => claim.provider_key === 'linear:lin-issue-resumable')).toMatchObject({
       state: 'starting'
     });
+  });
+
+  it('excludes only the candidate occupancy identity when same-issue unreadable work still consumes capacity', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-23T08:30:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const brokenEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-same-issue-unreadable'
+    };
+    const brokenPaths = resolveRunPaths(brokenEnv, 'run-same-issue-unreadable');
+    await mkdir(brokenPaths.runDir, { recursive: true });
+    await writeFile(brokenPaths.manifestPath, '{"run_id":"run-same-issue-unreadable"', 'utf8');
+    await writeFile(
+      join(brokenPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        issue_id: 'lin-issue-resumable',
+        issue_identifier: 'CO-330',
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        worker_host: 'worker-host-01',
+        attempt_started_at: new Date(Date.now() - 120_000).toISOString(),
+        updated_at: new Date(Date.now() - 60_000).toISOString()
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-resumable',
+      issue_id: 'lin-issue-resumable',
+      issue_identifier: 'CO-330',
+      issue_title: 'Resumable self-count with same issue worker',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-23T08:07:41.709Z',
+      task_id: 'linear-lin-issue-resumable',
+      mapping_source: 'provider_id_fallback',
+      state: 'resumable',
+      reason: 'provider_issue_rehydrated_resumable_run',
+      accepted_at: '2026-04-23T08:04:00.000Z',
+      updated_at: '2026-04-23T08:04:25.936Z',
+      last_delivery_id: null,
+      last_event: null,
+      last_action: null,
+      last_webhook_timestamp: null,
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: null,
+      launch_token: null,
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
+    });
+
+    const { persist } = createPersistSnapshotSpy(state);
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-should-not-start',
+        manifestPath: '/tmp/provider-run/should-not-start.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-resumable',
+        identifier: 'CO-330',
+        updated_at: '2026-04-23T08:31:00.000Z'
+      }),
+      deliveryId: 'delivery-resumable-same-issue-unreadable',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_745_398_260_000
+    });
+
+    expect(result).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_start_blocked:max_concurrency',
+      claim: {
+        provider_key: 'linear:lin-issue-resumable',
+        state: 'accepted',
+        reason: 'provider_issue_start_blocked:max_concurrency'
+      }
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        `[provider-issue-run-discovery] skipping unreadable manifest ${brokenPaths.manifestPath}:`
+      )
+    );
   });
 
   it('counts active provider workers from a different start pipeline against host-global admission capacity', async () => {

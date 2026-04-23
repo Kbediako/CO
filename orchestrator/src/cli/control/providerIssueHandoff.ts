@@ -1504,8 +1504,23 @@ export function createProviderIssueHandoffService(
     return buildTrackedIssueClaimFields(trackedIssue);
   };
 
+  const resolveProviderClaimAdmissionOccupancyKey = (
+    claim: ProviderIntakeClaimRecord,
+    run: ProviderIssueRunRecord | null = null
+  ): string | null =>
+    run?.manifestPath ??
+    run?.runId ??
+    (
+      claim.state === 'running'
+        ? null
+        : claim.run_manifest_path ??
+          claim.run_id ??
+          `claim:${claim.provider_key}:${claim.state}`
+    );
+
   const createProviderAdmissionGate = async (input: {
-    excludeProviderKey?: string | null;
+    excludeClaimProviderKey?: string | null;
+    excludeOccupancyKey?: string | null;
     forceLocalWorkerOnly?: boolean;
     preferredWorkerHost?: string | null;
   } = {}): Promise<
@@ -1531,7 +1546,7 @@ export function createProviderIssueHandoffService(
 
     for (const claim of options.state.claims) {
       claimByProviderKey.set(claim.provider_key, claim);
-      if (claim.provider_key === input.excludeProviderKey) {
+      if (claim.provider_key === input.excludeClaimProviderKey) {
         continue;
       }
       if (!shouldProviderClaimOccupyAdmissionSlot(claim)) {
@@ -1544,17 +1559,11 @@ export function createProviderIssueHandoffService(
         ) ??
         occupyingRunsByProviderIssue.get(claim.provider_key)?.[0] ??
         null;
-      const occupancyKey =
-        occupyingClaimRun?.manifestPath ??
-        occupyingClaimRun?.runId ??
-        (
-          claim.state === 'running'
-            ? null
-            : claim.run_manifest_path ??
-              claim.run_id ??
-              `claim:${claim.provider_key}:${claim.state}`
-        );
+      const occupancyKey = resolveProviderClaimAdmissionOccupancyKey(claim, occupyingClaimRun);
       if (!occupancyKey) {
+        continue;
+      }
+      if (occupancyKey === input.excludeOccupancyKey) {
         continue;
       }
       if (seededOccupancyKeys.has(occupancyKey)) {
@@ -1571,23 +1580,23 @@ export function createProviderIssueHandoffService(
 
     for (const run of activeDiscoveredRuns) {
       const occupancyKey = run.manifestPath || run.runId;
+      if (occupancyKey === input.excludeOccupancyKey) {
+        continue;
+      }
       if (seededOccupancyKeys.has(occupancyKey)) {
         continue;
       }
       seededOccupancyKeys.add(occupancyKey);
       const providerKey = buildProviderIssueKey(run.provider, run.issueId);
-      if (providerKey === input.excludeProviderKey) {
-        continue;
-      }
       gate.noteOccupied({ state: claimStateByProviderKey.get(providerKey) ?? null });
     }
     for (const run of queuedDiscoveredRuns) {
       const providerKey = buildProviderIssueKey(run.provider, run.issueId);
-      if (providerKey === input.excludeProviderKey) {
-        continue;
-      }
       const claim = claimByProviderKey.get(providerKey) ?? null;
       const occupancyKey = run.manifestPath || run.runId;
+      if (occupancyKey === input.excludeOccupancyKey) {
+        continue;
+      }
       if (isReleasedProviderClaimRunIdentityMatch(claim, run)) {
         continue;
       }
@@ -1602,14 +1611,14 @@ export function createProviderIssueHandoffService(
     const unreadableAdmissionOccupancy =
       await discoverUnreadableProviderAdmissionOccupancyForCurrentOperation();
     for (const record of unreadableAdmissionOccupancy) {
+      if (record.manifestPath === input.excludeOccupancyKey) {
+        continue;
+      }
       if (seededOccupancyKeys.has(record.manifestPath)) {
         continue;
       }
       seededOccupancyKeys.add(record.manifestPath);
       const providerKey = buildProviderIssueKey(record.provider, record.issueId);
-      if (providerKey === input.excludeProviderKey) {
-        continue;
-      }
       gate.noteOccupied({ state: claimStateByProviderKey.get(providerKey) ?? null });
     }
 
@@ -1824,7 +1833,8 @@ export function createProviderIssueHandoffService(
       const workerHost = resolveRehydratedActiveRunWorkerHost(input.run, input.claim);
       const resumeWorkerHost = await resolveResumeWorkerHost(workerHost);
       const admissionGate = await createProviderAdmissionGate({
-        excludeProviderKey: input.claim.retry_queued === true ? input.claim.provider_key : null,
+        excludeClaimProviderKey:
+          input.claim.retry_queued === true ? input.claim.provider_key : null,
         forceLocalWorkerOnly: resumeWorkerHost === null,
         preferredWorkerHost: resumeWorkerHost
       });
@@ -1934,8 +1944,8 @@ export function createProviderIssueHandoffService(
         previousRun: input.previousRun ?? null
       });
       const admissionGate = await createProviderAdmissionGate({
-        excludeProviderKey: input.claim.retry_queued === true ? input.claim.provider_key : null,
-        preferredWorkerHost
+        excludeClaimProviderKey:
+          input.claim.retry_queued === true ? input.claim.provider_key : null
       });
       if (!admissionGate.canDispatch(input.trackedIssue)) {
         const claim = await upsertProviderClaimAndPersist({
@@ -4233,11 +4243,10 @@ export function createProviderIssueHandoffService(
           }
 
           const admissionGate = await createProviderAdmissionGate({
-            excludeProviderKey:
+            excludeClaimProviderKey:
               lockedExisting?.retry_queued === true || lockedExisting?.state === 'resumable'
-                ? providerKey
-                : null,
-            preferredWorkerHost: lockedPreferredWorkerHost
+                ? lockedExisting.provider_key
+                : null
           });
           if (!admissionGate.canDispatch(input.trackedIssue)) {
             const blockedReason = deriveProviderCapacityBlockedReason('provider_issue_start_launched');

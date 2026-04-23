@@ -41,13 +41,18 @@ Restore one truthful queue contract across `Backlog`, `Ready`, `provider-intake-
 
 ## Implementation Checklist
 
-- [ ] Add traceability-pending follow-up detection to backlog promotion.
-- [ ] Hold matching follow-up issues in `Backlog` with operator-visible evidence.
-- [ ] Count resumable claims against direct admission capacity.
-- [ ] Count queued retry claims against direct admission capacity.
-- [ ] Align provider intake active summary projection with queued retry occupancy.
-- [ ] Add focused regressions for autopilot, admission, and summary projection.
-- [ ] Run required validation and review gates before handoff.
+- [x] Add traceability-pending follow-up detection to backlog promotion.
+- [x] Hold matching follow-up issues in `Backlog` with operator-visible evidence.
+- [x] Count resumable claims against direct admission capacity.
+- [x] Count queued retry claims against direct admission capacity.
+- [x] Align provider intake active summary projection with queued retry occupancy.
+- [x] Add focused regressions for autopilot, admission, and summary projection.
+- [x] Run required validation and review gates before handoff.
+
+## Review Notes
+
+- 2026-04-23: Issue-quality review approved this scope as covering the full CO-331 request, including `Backlog` follow-up admission, retry/resumable occupancy, provider intake state, `co-status`, and `max_allowed` alignment.
+- 2026-04-23: Manifest-backed standalone review completed with `status: succeeded` and `review_outcome: clean-success`; post-review elegance/minimality pass found no avoidable abstraction or unrelated branch scope.
 
 ## Not Done If
 

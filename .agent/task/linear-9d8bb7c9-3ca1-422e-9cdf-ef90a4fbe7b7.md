@@ -25,14 +25,21 @@ Protect the control-host queue contract so helper-created follow-ups do not leav
 ## Checklist
 
 - [x] Docs-first packet created.
-- [ ] Backlog follow-up hold implemented.
-- [ ] Retry/resumable admission capacity implemented.
-- [ ] Provider intake summary projection aligned.
-- [ ] Focused regressions added.
-- [ ] Full validation and review gates completed.
+- [x] Issue-quality review recorded in spec/task notes before implementation began.
+- [x] Standalone review approval captured in spec/task notes before review handoff.
+- [x] Backlog follow-up hold implemented.
+- [x] Retry/resumable admission capacity implemented.
+- [x] Provider intake summary projection aligned.
+- [x] Focused regressions added.
+- [x] Full validation and review gates completed.
 
 ## Guardrails
 
 - Do not weaken admission caps.
 - Do not use manual state moves or host restarts as the primary fix.
 - Do not conflate this lane with `CO-317`, `CO-329`, or `CO-330`.
+
+## Review Notes
+
+- 2026-04-23: Issue-quality review confirmed the lane covers both required drift modes: helper-created follow-ups leaving `Backlog` and retry/resumable claims exceeding `max_allowed`.
+- 2026-04-23: Manifest-backed standalone review completed with `review_outcome: bounded-success` after command-intent retry; explicit elegance/minimality pass found no avoidable complexity after the final main merge.
