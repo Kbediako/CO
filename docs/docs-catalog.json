@@ -338,6 +338,73 @@
       "truth_checks": []
     },
     {
+      "path": "docs/release-notes-template-addendum.md",
+      "status": "active",
+      "tier": 1,
+      "doc_class": "active_guide",
+      "audience": "release maintainers",
+      "source_of_truth": [
+        ".github/workflows/release.yml",
+        "docs/skills-release.md",
+        "skills/release/SKILL.md"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "release workflow changes",
+        "bundled skill release-note policy changes",
+        "overview override behavior changes"
+      ],
+      "truth_checks": [
+        "release-runbook"
+      ]
+    },
+    {
+      "path": ".agent/SOPs/release.md",
+      "status": "active",
+      "tier": 1,
+      "doc_class": "active_guide",
+      "audience": "release maintainers",
+      "source_of_truth": [
+        ".github/workflows/release.yml",
+        "skills/release/SKILL.md",
+        "docs/skills-release.md"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "release validation floor changes",
+        "release workflow changes",
+        "npm publish posture changes"
+      ],
+      "truth_checks": [
+        "release-runbook"
+      ]
+    },
+    {
+      "path": "skills/release/SKILL.md",
+      "status": "active",
+      "tier": 1,
+      "doc_class": "shipped_skill",
+      "audience": "downstream Codex users",
+      "source_of_truth": [
+        ".agent/SOPs/release.md",
+        ".github/workflows/release.yml",
+        "docs/skills-release.md",
+        "docs/release-notes-template-addendum.md"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "release validation floor changes",
+        "release workflow changes",
+        "npm publish posture changes"
+      ],
+      "truth_checks": [
+        "release-runbook"
+      ]
+    },
+    {
       "path": "skills/delegation-usage/SKILL.md",
       "status": "active",
       "tier": 1,
