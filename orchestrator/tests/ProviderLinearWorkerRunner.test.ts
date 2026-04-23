@@ -7319,7 +7319,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     }
   });
 
-  it('classifies stdin bootstrap stderr exits before retrying a failed provider turn', async () => {
+  it('classifies stdin bootstrap stderr exits in failed proof sidecars', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
     await writeFile(
       manifestPath,
