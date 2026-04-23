@@ -4,7 +4,7 @@ title: Coordinator Live Linear Unassigned Active-Claim Alignment and Recovery
 status: in_progress
 owner: Codex
 created: 2026-03-23
-last_review: 2026-03-23
+last_review: 2026-04-23
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery.md
