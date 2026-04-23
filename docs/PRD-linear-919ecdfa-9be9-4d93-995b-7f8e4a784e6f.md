@@ -11,7 +11,7 @@
 
 ## Intent Checksum
 - Exact user wording / phrases to preserve: `CO-335`, `CO-322`, Codex CLI `0.123.0`, `CODEX_CLOUD_ENV_ID=<valid> CODEX_CLOUD_CANARY_REQUIRED=1 npm run ci:cloud-canary`, `CLOUD_CANARY_EXPECT_FALLBACK=1`, `docs/guides/codex-version-policy.md`, `CO-316`.
-- Protected terms / exact artifact and surface names: `Kbediako/CO`, `.runs/linear-919ecdfa-9be9-4d93-995b-7f8e4a784e6f-cloud-required-0123-current/cli/2026-04-23T10-07-13-661Z-02403ae9/manifest.json`, `.runs/linear-919ecdfa-9be9-4d93-995b-7f8e4a784e6f-cloud-fallback-0123-current/cli/2026-04-23T10-11-43-645Z-48d460ec/manifest.json`, `.github/workflows/cloud-canary.yml`, release-facing downstream-smoke workflows.
+- Protected terms / exact artifact and surface names: `Kbediako/CO`, `reference/linear-919ecdfa-9be9-4d93-995b-7f8e4a784e6f/cloud-gates/required-manifest.json`, `reference/linear-919ecdfa-9be9-4d93-995b-7f8e4a784e6f/cloud-gates/fallback-manifest.json`, `.github/workflows/cloud-canary.yml`, release-facing downstream-smoke workflows.
 - Nearby wrong interpretations to reject: reusing the old missing environment blocker as current truth, treating fallback success as a replacement for required cloud execution, widening into actual release publication, or moving pins without manifest-backed evidence.
 
 ## Parity / Alignment Matrix

@@ -85,7 +85,7 @@ The shipped marketplace files are:
    codex-orchestrator flow --task <task-id>
    ```
 
-## 0.118-specific notes
+## Version-Specific Notes
 
 - `codex exec` now accepts both a prompt argument and piped stdin; piped stdin is appended as a `<stdin>` block.
 - `codex login --device-auth` is available for environments where browser sign-in is not practical.

@@ -22,6 +22,7 @@ last_review: 2026-04-23
 - Explicit non-goals carried forward: release publication, release notes parity, release-skill parity, provider migration, and unrelated docs cleanup.
 
 ## Parity / Alignment Matrix
+
 | Surface | Current truth | Reference truth | Target truth / intended delta |
 | --- | --- | --- | --- |
 | Required cloud gate | CO-322 failed before submission on stale env id. | Promotion requires cloud execution. | CO-335 required run passes with task `task_e_69e9ef5628408327b88b1fcd0ab14b24`. |

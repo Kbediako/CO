@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 4690eb4deade8ef1073478ddb7662a24be5f6dce4a1666f6893f62f86b59a7ea -->
+<!-- codex:instruction-stamp a78ee4d7fc5ce2ba9b6861c08d8a5813223a318a6cda7a7b4ea7e3dc2d819346 -->
 # Agent Instructions (Template)
 
 ## Orchestrator-first workflow
