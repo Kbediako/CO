@@ -78,6 +78,8 @@ describe('release workflow contract', () => {
       expect(doc).toContain('leading prerelease label');
     }
     expect(sop).toContain('`.github/workflows/release.yml`');
+    expect(sop).toContain('`git tag -v <tag>`');
+    expect(sop).toContain('`git push origin <tag>`');
     expect(sop).not.toContain('If .github/release.yml exists');
   });
 });

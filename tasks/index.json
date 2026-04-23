@@ -13934,6 +13934,14 @@
           "date": "2026-04-23",
           "status": "completed",
           "summary": "Manual minimality pass kept the branch scoped to the release workflow, release-facing docs, docs-first mirrors/registry, and one focused contract spec; no extra dependency, publication behavior change, package-versioning change, or broad release refactor was introduced."
+        },
+        "pr_feedback_coderabbit": {
+          "reviewer": "CodeRabbit",
+          "date": "2026-04-23",
+          "status": "addressed",
+          "pr": "https://github.com/Kbediako/CO/pull/616",
+          "thread": "PRRT_kwDOQE1BPc59Al8M",
+          "summary": "Addressed the requested-change thread by changing .agent/SOPs/release.md verify/push examples from hardcoded vX.Y.Z to the resolved <tag> placeholder and adding focused contract assertions. `npm run test -- tests/release-workflow-contract.spec.ts`, `npm run docs:check`, and scoped `git diff --check` passed."
         }
       },
       "paths": {

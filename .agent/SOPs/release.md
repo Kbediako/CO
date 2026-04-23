@@ -27,8 +27,8 @@
 5. Create and verify the signed release tag:
    - `git tag -s vX.Y.Z -m "vX.Y.Z"` (or `vX.Y.Z-<prerelease>`)
    - Optional one-shot release overview override: include the release-specific narrative in the signed annotated tag body, for example `git tag -s vX.Y.Z -m "vX.Y.Z" -m "Release overview text..."`. For a file-based tag message, ensure the first line is the tag name, followed by a blank line and the overview body.
-   - `git tag -v vX.Y.Z`
-   - `git push origin vX.Y.Z`
+   - `git tag -v <tag>`
+   - `git push origin <tag>`
 5.1. If using `gh release create` manually, require a pre-existing signed tag and pass `--verify-tag` to prevent auto-created unsigned tags.
 6. Monitor the tag-driven workflow in `.github/workflows/release.yml`:
    - Confirms tag/version match, builds, runs pack audit/smoke, creates GitHub Release, and publishes to npm.
