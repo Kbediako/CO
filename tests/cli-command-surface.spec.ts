@@ -615,6 +615,7 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('Usage: codex-orchestrator <command> [options]');
     expect(stdout).toContain('review [options]');
     expect(stdout).toContain('codex defaults');
+    expect(stdout).toContain('--auth-scope <portable|chatgpt>');
     expect(stdout).toContain('Quickstart (agent-first):');
     expect(stdout).toContain('codex-orchestrator flow --task <task-id>');
     expect(stdout).toContain('NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --task <task-id>');
@@ -862,11 +863,12 @@ describe('codex-orchestrator command surface', () => {
     const { stdout } = await runCli(['codex', 'defaults', '--format', 'json'], env, CLI_BOOT_TIMEOUT);
     const payload = JSON.parse(stdout) as {
       status?: string;
-      plan?: { configPath?: string };
+      plan?: { configPath?: string; authScope?: string };
       changes?: Array<{ target?: string; status?: string }>;
     };
     expect(payload.status).toBe('planned');
     expect(payload.plan?.configPath).toBe(join(tempDir, 'config.toml'));
+    expect(payload.plan?.authScope).toBe('portable');
     expect(payload.changes).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ target: 'config', status: 'pending' })

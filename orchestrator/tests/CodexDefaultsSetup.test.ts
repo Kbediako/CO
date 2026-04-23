@@ -144,6 +144,77 @@ describe('runCodexDefaultsSetup', () => {
     }
   });
 
+  it('scopes gpt-5.5 defaults to explicit ChatGPT-auth setup', async () => {
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-chatgpt-'));
+    const configPath = join(tempHome, 'config.toml');
+    const workerPath = join(tempHome, 'agents', 'worker-complex.toml');
+    const awaiterPath = join(tempHome, 'agents', 'awaiter-high.toml');
+    try {
+      const result = await runCodexDefaultsSetup({
+        apply: true,
+        authScope: 'chatgpt',
+        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+      });
+
+      expect(result.status).toBe('applied');
+      expect(result.plan.authScope).toBe('chatgpt');
+
+      const parsed = toml.parse(await readFile(configPath, 'utf8')) as {
+        model?: string;
+        review_model?: string;
+        model_reasoning_effort?: string;
+      };
+
+      expect(parsed.model).toBe('gpt-5.5');
+      expect(parsed.review_model).toBe('gpt-5.5');
+      expect(parsed.model_reasoning_effort).toBe('xhigh');
+      expect(await readFile(workerPath, 'utf8')).toContain('model = "gpt-5.5"');
+      expect(await readFile(awaiterPath, 'utf8')).toContain('model = "gpt-5.5"');
+    } finally {
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('updates CO-managed role files when changing auth scope', async () => {
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-chatgpt-upgrade-'));
+    const env = { CODEX_HOME: tempHome } as NodeJS.ProcessEnv;
+    const configPath = join(tempHome, 'config.toml');
+    const workerPath = join(tempHome, 'agents', 'worker-complex.toml');
+    const awaiterPath = join(tempHome, 'agents', 'awaiter-high.toml');
+    const explorerPath = join(tempHome, 'agents', 'explorer-fast.toml');
+    try {
+      await runCodexDefaultsSetup({ apply: true, env });
+
+      const result = await runCodexDefaultsSetup({
+        apply: true,
+        authScope: 'chatgpt',
+        env
+      });
+
+      expect(result.status).toBe('applied');
+      expect(result.changes).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ target: 'config', status: 'updated' }),
+          expect.objectContaining({ target: 'role_file', name: 'explorer_fast', status: 'unchanged' }),
+          expect.objectContaining({ target: 'role_file', name: 'worker_complex', status: 'updated' }),
+          expect.objectContaining({ target: 'role_file', name: 'awaiter', status: 'updated' })
+        ])
+      );
+
+      const parsed = toml.parse(await readFile(configPath, 'utf8')) as {
+        model?: string;
+        review_model?: string;
+      };
+      expect(parsed.model).toBe('gpt-5.5');
+      expect(parsed.review_model).toBe('gpt-5.5');
+      expect(await readFile(workerPath, 'utf8')).toContain('model = "gpt-5.5"');
+      expect(await readFile(awaiterPath, 'utf8')).toContain('model = "gpt-5.5"');
+      expect(await readFile(explorerPath, 'utf8')).toContain('model = "gpt-5.3-codex-spark"');
+    } finally {
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
   it('does not seed agent depth caps when the source config omits them', async () => {
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-no-depth-'));
     const configPath = join(tempHome, 'config.toml');

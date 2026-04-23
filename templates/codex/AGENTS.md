@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp a78ee4d7fc5ce2ba9b6861c08d8a5813223a318a6cda7a7b4ea7e3dc2d819346 -->
+<!-- codex:instruction-stamp 9fdd612cf7717f2b38dfd87c75cfb4859913c2193c48e29f9f4682236ffbee7b -->
 # Agent Instructions (Template)
 
 ## Orchestrator-first workflow
@@ -54,19 +54,19 @@
 - Built-in roles are `default`, `explorer`, `worker`, and `awaiter`; `researcher` is user-defined.
 - `spawn_agent` defaults to `default` when `agent_type` is omitted; always set `agent_type` explicitly.
 - For symbolic collab runs, prefix spawned prompts with `[agent_type:<role>]` on line one so role intent is auditable from JSONL/manifests.
-- Current CO compatibility/adoption target is stable Codex CLI `0.123.0`.
-- Current `0.123.0` posture evidence confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, `codex review --help` exposing `[PROMPT]` alongside scoped review flags, runtime-mode canary pass, required cloud canary pass, and fallback cloud contract pass.
-- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
-- Keep top-level defaults on the current CO target by setting `model = "gpt-5.4"` in `~/.codex/config.toml`.
-- Under ChatGPT auth, keep delegated subagent and review surfaces on `gpt-5.4` unless a fresh provider lane explicitly validates `gpt-5.4-codex`.
+- Current CO compatibility/adoption target is stable Codex CLI `0.124.0`.
+- Current `0.124.0` posture evidence confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, `codex review --help` exposing `[PROMPT]` alongside scoped review flags, runtime-mode canary pass, required cloud canary pass, and fallback cloud contract pass.
+- Current model posture is `gpt-5.5` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
+- In ChatGPT-auth local lanes, keep top-level defaults on the current CO target by setting `model = "gpt-5.5"` in `~/.codex/config.toml`; this packaged template keeps `.codex/config.toml` portable at `gpt-5.4` until that auth scope is explicitly validated.
+- Under ChatGPT auth, keep delegated subagent and review surfaces on `gpt-5.5`; do not treat that as proof for Codex Cloud, API-key auth, or provider-specific model variants unless a fresh provider lane validates them.
 - Set `model_reasoning_effort` to at least `high` (CO default: `xhigh`) so spawned agents inherit high reasoning unless role overrides change it.
 - Built-in `explorer` inherits top-level model defaults unless you attach a `config_file`; keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only.
 - Spark caveat: `gpt-5.3-codex-spark` is file/codebase search only.
 - Keep RLM/collab built-ins-first by default; add custom specialist roles only when there is measured value, clear ownership, and validation evidence.
 - Use `[agents] max_threads = 12` as the seeded baseline. Keep explicit `max_depth = 4` only when your local Codex parser accepts it, and treat `max_spawn_depth` as a legacy local override rather than current baseline guidance; preserve any intentional constrained caps instead of resetting them.
 - Keep fallback usage explicit and rare: `8/2` for constrained/high-risk lanes, legacy `6/1/1` only as break-glass when an older parser/runtime still consumes spawn-depth caps.
-- Add an explicit `worker_complex` role (`gpt-5.4`, `xhigh`) for high-risk implementation streams.
-- Use `codex-orchestrator doctor` as an advisory drift check for Codex defaults; remediate additively via `codex-orchestrator codex defaults --yes`.
+- Add an explicit `worker_complex` role (`gpt-5.5`, `xhigh`) for validated ChatGPT-auth high-risk implementation streams; the shipped portable role template remains `gpt-5.4`.
+- Use `codex-orchestrator doctor` as an advisory drift check for Codex defaults; remediate additively via `codex-orchestrator codex defaults --yes`, or `codex-orchestrator codex defaults --auth-scope chatgpt --yes` only for validated ChatGPT-auth lanes.
 
 ## Completion discipline (patience-first)
 - Wait/poll for terminal state on long-running operations (CI checks, reviews, cloud jobs, orchestrator runs) before reporting completion.

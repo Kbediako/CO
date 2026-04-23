@@ -54,7 +54,7 @@ async function initGitRepo(repoPath: string): Promise<string> {
 describe('provider linear child lane runner', () => {
   it('plans removal of only the current trusted child-lane entry when a trusted parent workspace already exists', () => {
     const rawConfig = [
-      'model = "gpt-5.4"',
+      'model = "gpt-5.5"',
       '',
       '[projects]',
       '[projects."/Users/kbediako/Code/CO"]',

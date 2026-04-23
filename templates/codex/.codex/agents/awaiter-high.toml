@@ -1,5 +1,5 @@
 # Synced from codex-rs/core/src/agent/builtins/awaiter.toml (0.105.0)
-# with CO override to use gpt-5.4 at high reasoning.
+# with CO portable override to use gpt-5.4 at high reasoning.
 background_terminal_max_timeout = 3600000
 model = "gpt-5.4"
 model_reasoning_effort = "high"

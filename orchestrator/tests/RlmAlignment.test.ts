@@ -116,7 +116,7 @@ describe('alignment persistence', () => {
       intent_version: '1.0.1',
       payload: { turn: 1 },
       score_metadata: { action: 'pass', score: 92, confidence: 0.98 },
-      provenance: { source: 'test', route_strategy: 'sentinel', route_model: 'gpt-5.4' },
+      provenance: { source: 'test', route_strategy: 'sentinel', route_model: 'gpt-5.5' },
       idempotency_key: 'event:1'
     });
     const duplicate = await writer.append({
@@ -128,7 +128,7 @@ describe('alignment persistence', () => {
       intent_version: '1.0.1',
       payload: { turn: 1 },
       score_metadata: { action: 'pass', score: 92, confidence: 0.98 },
-      provenance: { source: 'test', route_strategy: 'sentinel', route_model: 'gpt-5.4' },
+      provenance: { source: 'test', route_strategy: 'sentinel', route_model: 'gpt-5.5' },
       idempotency_key: 'event:1'
     });
     const second = await writer.append({
@@ -140,7 +140,7 @@ describe('alignment persistence', () => {
       intent_version: '1.0.2',
       payload: { turn: 2 },
       score_metadata: { action: 'replan', score: 63, confidence: 0.82 },
-      provenance: { source: 'test', route_strategy: 'deep_audit', route_model: 'gpt-5.4' },
+      provenance: { source: 'test', route_strategy: 'deep_audit', route_model: 'gpt-5.5' },
       idempotency_key: 'event:2'
     });
 
@@ -189,7 +189,7 @@ describe('alignment persistence', () => {
         intent_version: '1.0.1',
         payload: { turn: 1 },
         score_metadata: { action: 'pass', score: 90, confidence: 0.9 },
-        provenance: { source: 'test', route_strategy: 'sentinel', route_model: 'gpt-5.4' },
+        provenance: { source: 'test', route_strategy: 'sentinel', route_model: 'gpt-5.5' },
         idempotency_key: 'event:valid'
       })
     ).resolves.toBeTruthy();

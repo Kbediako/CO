@@ -105,8 +105,8 @@ For runner + delegation coordination (short `--task` flow), see `docs/delegation
 
 ### 0a) Version guard (JSONL handshake)
 
-- Delegation MCP uses JSONL; keep `codex-orchestrator` aligned with the current CO compatibility or adoption target (`codex-cli 0.123.0`).
-- Current `0.123.0` posture confirms two onboarding-relevant behaviors: `codex exec` accepts a prompt argument plus piped stdin, and `codex login --device-auth` is available for non-browser sign-in fallback.
+- Delegation MCP uses JSONL; keep `codex-orchestrator` aligned with the current CO compatibility or adoption target (`codex-cli 0.124.0`).
+- Current `0.124.0` posture confirms two onboarding-relevant behaviors: `codex exec` accepts a prompt argument plus piped stdin, and `codex login --device-auth` is available for non-browser sign-in fallback.
   - Check installed version: `codex-orchestrator --version`
   - Preferred update path: `npm i -g @kbediako/codex-orchestrator@latest`
   - Deterministic pin path (for reproducible environments): `npx -y @kbediako/codex-orchestrator@<version> delegate-server`
@@ -123,8 +123,8 @@ For runner + delegation coordination (short `--task` flow), see `docs/delegation
 - `spawn_agent` omission defaults to `default`; require explicit `agent_type` for every spawn.
 - For symbolic collab runs, include a first-line role tag in spawned prompts: `[agent_type:<role>]`.
 - Multi-turn subagent loops are supported (`spawn_agent` -> `send_input` -> `wait`/`resume_agent` -> `close_agent`).
-- In Codex CLI `0.123.0`, built-in `explorer` continues to inherit top-level model defaults unless a role `config_file` overrides it.
-- Recommended baseline in `~/.codex/config.toml`:
+- In Codex CLI `0.124.0`, built-in `explorer` continues to inherit top-level model defaults unless a role `config_file` overrides it.
+- Recommended portable baseline in `~/.codex/config.toml`:
   - `model = "gpt-5.4"`
   - `review_model = "gpt-5.4"`
   - `model_reasoning_effort = "xhigh"`
@@ -133,7 +133,7 @@ For runner + delegation coordination (short `--task` flow), see `docs/delegation
   - Optional `[agents.explorer_fast]` -> `~/.codex/agents/explorer-fast.toml` (`gpt-5.3-codex-spark`, file/codebase search only)
   - Optional `[agents.awaiter]` override -> `~/.codex/agents/awaiter-high.toml` when you want awaiter at `gpt-5.4` + `high` while preserving awaiter instructions
   - `[agents.worker_complex]` -> `~/.codex/agents/worker-complex.toml` (`gpt-5.4`, `xhigh`)
-- Keep delegated subagent and review surfaces on `gpt-5.4` under ChatGPT auth unless a fresh provider lane explicitly validates `gpt-5.4-codex`.
+- Keep delegated subagent and review surfaces on `gpt-5.5` under ChatGPT auth; use `codex-orchestrator codex defaults --auth-scope chatgpt --yes` only after that local access is validated, and do not treat that as proof for Codex Cloud, API-key auth, or provider-specific model variants unless a fresh provider lane validates them.
 - Fallback posture is contingency-only: `8/2` for constrained/high-risk lanes, legacy `6/1/1` as break-glass when an older parser/runtime still consumes spawn-depth caps.
 - Downstream users should converge on this baseline via `codex-orchestrator init codex`.
 - If native `codex` startup fails with `invalid type: integer ... expected struct AgentRoleToml` under `[agents]`, remove only the live `max_depth` and `max_spawn_depth` keys from `~/.codex/config.toml` and leave the role subtables unchanged.

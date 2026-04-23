@@ -11,7 +11,7 @@
 - [x] PRD, TECH_SPEC, ACTION_PLAN, task spec, task checklist, and `.agent` mirror drafted. Evidence: docs packet paths above.
 - [x] Pre-implementation issue-quality review notes captured before implementation. Evidence: `tasks/specs/linear-4a684a5e-64b0-47fb-835a-d792eba29071.md`.
 - [x] `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` mirror this packet. Evidence: registry updates for `20260424-linear-4a684a5e-64b0-47fb-835a-d792eba29071`.
-- [ ] Docs-review evidence captured before implementation. Evidence: pending child stream.
+- [x] Docs-review evidence captured before implementation. Evidence: `.runs/linear-4a684a5e-64b0-47fb-835a-d792eba29071-docs-review/cli/2026-04-23T19-37-18-897Z-ce3ffc5e/manifest.json` after merging current `origin/main`.
 
 ## Workflow
 - [x] `linear issue-context` inspected live team states before active work. Evidence: packaged `linear issue-context --issue-id 4a684a5e-64b0-47fb-835a-d792eba29071`.
@@ -36,35 +36,35 @@
 
 ## Runtime And Cloud Gates
 - [x] App-server/local runtime surface recorded for current provider worker. Evidence: provider manifest runtime `appserver` / `AppServerRuntimeProvider`.
-- [ ] Provider-worker `codex exec` / `codex exec resume` seam probed or blocked. Evidence: pending final decision note.
+- [x] Provider-worker `codex exec` / `codex exec resume` seam probed or blocked. Evidence: current provider-worker manifest shows `pipeline_id=provider-linear-worker`, `runtime_mode=appserver`, `runtime_provider=AppServerRuntimeProvider`, and a resume token; launching a second same-issue CLI provider-worker seam would collide with the active appserver lane, so direct `codex exec resume` provider supervision remains held for a separate control-seam lane.
 - [x] Runtime-mode canary pre-build blocker captured. Evidence: `out/linear-4a684a5e-64b0-47fb-835a-d792eba29071/manual/runtime-mode-canary/runtime-mode-canary.log` shows missing packaged `dist/bin/codex-orchestrator.js`.
-- [ ] Runtime-mode canary rerun after build. Evidence: pending.
+- [x] Runtime-mode canary rerun after build. Evidence: `out/linear-4a684a5e-64b0-47fb-835a-d792eba29071/manual/runtime-mode-canary/post-build/runtime-mode-canary.log` with all four scenarios passing 1/1.
 - [x] Required cloud canary pre-build blocker captured. Evidence: `out/linear-4a684a5e-64b0-47fb-835a-d792eba29071/manual/cloud-canary-required/cloud-canary-required.log` shows missing packaged `dist/bin/codex-orchestrator.js`.
-- [ ] Required cloud canary rerun after build or exact blocker. Evidence: pending.
-- [ ] Cloud fallback contract rerun after build or exact blocker. Evidence: pending.
+- [x] Required cloud canary rerun after build or exact blocker. Evidence: `.runs/linear-4a684a5e-64b0-47fb-835a-d792eba29071/cli/2026-04-23T19-44-14-410Z-2e596753/manifest.json`, cloud task `task_e_69ea7692ad4883278500bffae6cc2591`, status `ready`.
+- [x] Cloud fallback contract rerun after build or exact blocker. Evidence: `.runs/linear-4a684a5e-64b0-47fb-835a-d792eba29071/cli/2026-04-23T19-49-46-024Z-0d81d04d/manifest.json`, `cloud_fallback.mode_used=mcp`, issue `missing_environment`.
 
 ## Implementation
-- [ ] Final hold/promote/no-op bucket decision recorded. Evidence: pending.
-- [ ] Active docs/tests/configuration updated consistently with the final posture. Evidence: pending.
-- [ ] Marketplace/pack-smoke command surface aligned if adopting `0.124.0`. Evidence: pending.
-- [ ] CO-337 and CO-340 contradiction/supersession status handled or tracked. Evidence: pending.
+- [x] Final hold/promote/no-op bucket decision recorded. Evidence: `docs/guides/codex-version-policy.md` CO-341 notes promote `0.124.0` and ChatGPT-auth `gpt-5.5` / `xhigh`, hold Cloud/API direct model choice, and classify hooks/app-server/Fast tier/permission/`wait_agent`/MCP cwd/unknown-feature deltas.
+- [x] Active docs/tests/configuration updated consistently with the final posture. Evidence: implementation diff updates active version/model posture docs, `codex defaults`, doctor, RLM defaults, workflow pins, shipped skills/templates, docs-hygiene tests, defaults tests, doctor tests, RLM tests, CLI command-surface tests, and pack-smoke tests.
+- [x] Marketplace/pack-smoke command surface aligned if adopting `0.124.0`. Evidence: `tests/pack-smoke.spec.ts`, `tests/cli-command-surface.spec.ts`, local `codex plugin marketplace` help logs under `out/linear-4a684a5e-64b0-47fb-835a-d792eba29071/manual/local-probes/`, and passed `npm run pack:smoke`.
+- [x] CO-337 and CO-340 contradiction/supersession status handled or tracked. Evidence: live `linear issue-context --issue-id CO-337` shows `Done`; live `linear issue-context --issue-id CO-340` shows `Blocked` with workpad notes that CO-341 is the canonical active `0.124.0` / GPT-5.5 posture lane.
 
 ## Validation
-- [ ] `node scripts/delegation-guard.mjs`. Evidence: pending.
-- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: pending.
-- [ ] `npm run build`. Evidence: pending.
-- [ ] `npm run lint`. Evidence: pending.
-- [ ] `npm run test`. Evidence: pending.
-- [ ] `npm run docs:check`. Evidence: pending.
-- [ ] `npm run docs:freshness`. Evidence: pending.
-- [ ] `npm run repo:stewardship`. Evidence: pending.
-- [ ] `node scripts/diff-budget.mjs`. Evidence: pending.
-- [ ] Manifest-backed standalone review. Evidence: pending.
-- [ ] Elegance review. Evidence: pending.
-- [ ] `npm run pack:smoke` if downstream package/smoke surfaces change. Evidence: pending.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: passed with `OK (3 subagent manifest(s) found)`.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: passed.
+- [x] `npm run build`. Evidence: passed.
+- [x] `npm run lint`. Evidence: passed with existing `DelegationMcpHealth.test.ts` `no-explicit-any` warnings only.
+- [x] `npm run test`. Evidence: passed (`350` files, `4695` tests).
+- [x] `npm run docs:check`. Evidence: passed with `MCP_RUNNER_TASK_ID=linear-4a684a5e-64b0-47fb-835a-d792eba29071`.
+- [x] `npm run docs:freshness`. Evidence: passed with `4583` docs and `4586` registry entries.
+- [x] `npm run repo:stewardship`. Evidence: passed with `5697` tracked files and `0` action-required.
+- [x] `node scripts/diff-budget.mjs`. Evidence: passed with `DIFF_BUDGET_OVERRIDE_REASON` because CO-341 synchronizes posture docs, defaults, workflow pins, shipped skill docs, templates, and tests in one lane.
+- [x] Manifest-backed standalone review. Evidence: final wrapper-led review telemetry `.runs/linear-4a684a5e-64b0-47fb-835a-d792eba29071/cli/2026-04-23T20-03-58-124Z-2aa39d48/review/telemetry.json` reports `status=succeeded`, `review_outcome=bounded-success`, boundary `relevant-reinspection-dwell`, and no concrete findings emitted before boundary; prior findings were addressed.
+- [x] Elegance review. Evidence: `out/linear-4a684a5e-64b0-47fb-835a-d792eba29071/manual/20260423T210413Z-final-elegance-review.md`.
+- [x] `npm run pack:smoke` if downstream package/smoke surfaces change. Evidence: passed after `0.124.0` workflow/package surface updates.
 
 ## Handoff
-- [ ] Workpad refreshed after docs-first, implementation, validation, and immediately before review handoff. Evidence: pending.
+- [x] Workpad refreshed after docs-first, implementation, validation, and final review/elegance. Evidence: Linear workpad comment `7d6443c6-706b-4485-85ad-b737192f8e59`; final handoff refresh still pending after PR drain.
 - [ ] PR attached to Linear issue before review-state transition. Evidence: pending.
 - [ ] Actionable PR feedback handled or explicitly pushed back. Evidence: pending.
 - [ ] Latest `origin/main` merged, PR checks green, and `pr ready-review` drains cleanly before `In Review`. Evidence: pending.

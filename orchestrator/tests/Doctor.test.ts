@@ -171,8 +171,8 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
       await writeFile(
         join(tempHome, 'config.toml'),
         [
-          'model = "gpt-5.4"',
-          'review_model = "gpt-5.4"',
+          'model = "gpt-5.5"',
+          'review_model = "gpt-5.5"',
           'model_reasoning_effort = "xhigh"',
           '',
           '[agents]',
@@ -226,8 +226,8 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
       await writeFile(
         join(tempHome, 'config.toml'),
         [
-          'model = "gpt-5.4"',
-          'review_model = "gpt-5.4"',
+          'model = "gpt-5.5"',
+          'review_model = "gpt-5.5"',
           'model_reasoning_effort = "xhigh"',
           '',
           '[agents]',
@@ -391,8 +391,8 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
       await writeFile(
         join(tempHome, 'config.toml'),
         [
-          'model = "gpt-5.4"',
-          'review_model = "gpt-5.4"',
+          'model = "gpt-5.5"',
+          'review_model = "gpt-5.5"',
           'model_reasoning_effort = "xhigh"',
           '',
           '[agents]',
@@ -483,8 +483,8 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
         await writeFile(
           join(tempHome, 'config.toml'),
           [
-            'model = "gpt-5.4"',
-            'review_model = "gpt-5.4"',
+            'model = "gpt-5.5"',
+            'review_model = "gpt-5.5"',
             'model_reasoning_effort = "xhigh"',
             '',
             '[agents]',
@@ -1118,7 +1118,7 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
       await writeFile(
         join(tempHome, 'config.toml'),
         [
-          'model = "gpt-5.4"',
+          'model = "gpt-5.5"',
           'review_model = "gpt-5.3-codex"',
           'model_reasoning_effort = "xhigh"',
           '',
@@ -1134,7 +1134,46 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
       expect(result.codex_defaults.checks.review_model.status).toBe('advisory');
       expect(result.codex_defaults.checks.review_model.actual).toBe('gpt-5.3-codex');
       expect(formatDoctorSummary(result).join('\n')).toContain(
-        'review_model: advisory (actual: gpt-5.3-codex, expected: gpt-5.4)'
+        'review_model: advisory (actual: gpt-5.3-codex, expected: gpt-5.4/gpt-5.4 portable or gpt-5.5/gpt-5.5 ChatGPT-auth)'
+      );
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('flags mixed portable and ChatGPT-auth model pairs', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
+    process.env.CODEX_HOME = tempHome;
+    try {
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        [
+          'model = "gpt-5.4"',
+          'review_model = "gpt-5.5"',
+          'model_reasoning_effort = "xhigh"',
+          '',
+          '[agents]',
+          'max_threads = 12'
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = runDoctor(process.cwd());
+      expect(result.codex_defaults.status).toBe('advisory');
+      expect(result.codex_defaults.checks.model.status).toBe('advisory');
+      expect(result.codex_defaults.checks.review_model.status).toBe('advisory');
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain(
+        'model: advisory (actual: gpt-5.4, expected: gpt-5.4/gpt-5.4 portable or gpt-5.5/gpt-5.5 ChatGPT-auth)'
+      );
+      expect(summary).toContain(
+        'review_model: advisory (actual: gpt-5.5, expected: gpt-5.4/gpt-5.4 portable or gpt-5.5/gpt-5.5 ChatGPT-auth)'
       );
     } finally {
       if (originalCodexHome === undefined) {

@@ -98,12 +98,39 @@ describe('runCodexCliShell', () => {
 
     expect(runCodexDefaultsSetupMock).toHaveBeenCalledWith({
       apply: false,
-      force: true
+      force: true,
+      authScope: undefined
     });
     expect(log.mock.calls.map(([line]) => line)).toEqual([
       'Codex defaults setup: planned',
       'Run with --yes to apply this setup.'
     ]);
+  });
+
+  it('passes explicit ChatGPT auth scope to defaults setup', async () => {
+    const runCodexDefaultsSetupMock =
+      vi.fn<typeof import('../src/cli/codexDefaultsSetup.ts').runCodexDefaultsSetup>().mockResolvedValue({
+        status: 'planned'
+      } as never);
+
+    await runCodexCliShell(
+      {
+        positionals: ['defaults'],
+        flags: { yes: true, 'auth-scope': 'chatgpt' },
+        printHelp: vi.fn()
+      },
+      {
+        runCodexDefaultsSetup: runCodexDefaultsSetupMock,
+        formatCodexDefaultsSetupSummary: vi.fn().mockReturnValue([]),
+        log: vi.fn()
+      }
+    );
+
+    expect(runCodexDefaultsSetupMock).toHaveBeenCalledWith({
+      apply: true,
+      force: false,
+      authScope: 'chatgpt'
+    });
   });
 
   it('rejects unknown codex subcommands', async () => {

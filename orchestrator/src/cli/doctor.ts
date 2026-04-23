@@ -44,9 +44,11 @@ import {
 } from './control/linearDispatchSource.js';
 import { normalizeDispatchSourceProvider } from './control/trackerDispatchPilot.js';
 import {
+  ACCEPTED_BASELINE_MODELS,
+  ACCEPTED_BASELINE_MODEL_PAIRS_LABEL,
   BASELINE_AGENTS,
-  BASELINE_MODEL,
-  BASELINE_REVIEW_MODEL,
+  CHATGPT_AUTH_BASELINE_MODEL,
+  PORTABLE_BASELINE_MODEL,
   BASELINE_REASONING_MINIMUM
 } from './codexDefaultsSetup.js';
 import { CommandPlanner } from './adapters/CommandPlanner.js';
@@ -1052,15 +1054,15 @@ function inspectProviderReadiness(
 function inspectCodexDefaultsAdvisory(env: NodeJS.ProcessEnv = process.env): DoctorCodexDefaultsAdvisory {
   const configPath = join(resolveCodexHome(env), 'config.toml');
   const checks: DoctorCodexDefaultsAdvisory['checks'] = {
-    model: { status: 'advisory', expected: BASELINE_MODEL, actual: null },
-    review_model: { status: 'advisory', expected: BASELINE_REVIEW_MODEL, actual: null },
+    model: { status: 'advisory', expected: ACCEPTED_BASELINE_MODEL_PAIRS_LABEL, actual: null },
+    review_model: { status: 'advisory', expected: ACCEPTED_BASELINE_MODEL_PAIRS_LABEL, actual: null },
     model_reasoning_effort: { status: 'advisory', expected_minimum: BASELINE_REASONING_MINIMUM, actual: null },
     max_threads: { status: 'advisory', expected_minimum: BASELINE_AGENTS.max_threads, actual: null },
     max_depth: { status: 'advisory', expected_minimum: BASELINE_AGENTS.max_depth, actual: null }
   };
   let legacyMaxSpawnDepth: DoctorCodexDefaultsAdvisory['legacy_max_spawn_depth'] = null;
   const guidance: string[] = [
-    'Run `codex-orchestrator codex defaults --yes` to apply additive baseline defaults.',
+    'Run `codex-orchestrator codex defaults --yes` for portable additive defaults; use `--auth-scope chatgpt` only after ChatGPT-auth gpt-5.5 access is validated locally.',
     'Additive policy: unrelated config keys are preserved; existing role files stay untouched unless `--force` is set.',
     'Current CO baseline no longer seeds or expects `agents.max_spawn_depth`; keep it only as a legacy local override when an older parser/runtime still honors it.',
     'Leaving `agents.max_depth` unset remains accepted when local parser/runtime constraints require it.'
@@ -1101,11 +1103,17 @@ function inspectCodexDefaultsAdvisory(env: NodeJS.ProcessEnv = process.env): Doc
 
   const model = normalizeOptionalString(readStringValue(parsed.model));
   checks.model.actual = model;
-  checks.model.status = model === BASELINE_MODEL ? 'ok' : 'advisory';
 
   const reviewModel = normalizeOptionalString(readStringValue(parsed.review_model));
   checks.review_model.actual = reviewModel;
-  checks.review_model.status = reviewModel === BASELINE_REVIEW_MODEL ? 'ok' : 'advisory';
+
+  const mixedAcceptedBaselinePair =
+    isAcceptedBaselineModel(model) &&
+    isAcceptedBaselineModel(reviewModel) &&
+    !isAcceptedBaselinePair(model, reviewModel);
+  checks.model.status = isAcceptedBaselineModel(model) && !mixedAcceptedBaselinePair ? 'ok' : 'advisory';
+  checks.review_model.status =
+    isAcceptedBaselineModel(reviewModel) && !mixedAcceptedBaselinePair ? 'ok' : 'advisory';
 
   const reasoning = normalizeOptionalString(readStringValue(parsed.model_reasoning_effort));
   checks.model_reasoning_effort.actual = reasoning;
@@ -1388,6 +1396,17 @@ function normalizeOptionalString(value: string | null | undefined): string | nul
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function isAcceptedBaselineModel(value: string | null): boolean {
+  return value !== null && (ACCEPTED_BASELINE_MODELS as readonly string[]).includes(value);
+}
+
+function isAcceptedBaselinePair(model: string | null, reviewModel: string | null): boolean {
+  return (
+    (model === PORTABLE_BASELINE_MODEL && reviewModel === PORTABLE_BASELINE_MODEL) ||
+    (model === CHATGPT_AUTH_BASELINE_MODEL && reviewModel === CHATGPT_AUTH_BASELINE_MODEL)
+  );
 }
 
 function resolveCloudFallbackPolicy(env: NodeJS.ProcessEnv = process.env): 'allow' | 'deny' {

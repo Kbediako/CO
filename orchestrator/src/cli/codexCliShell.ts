@@ -1,7 +1,11 @@
 /* eslint-disable patterns/prefer-logger-over-console */
 
 import { formatCodexCliSetupSummary, runCodexCliSetup } from './codexCliSetup.js';
-import { formatCodexDefaultsSetupSummary, runCodexDefaultsSetup } from './codexDefaultsSetup.js';
+import {
+  formatCodexDefaultsSetupSummary,
+  runCodexDefaultsSetup,
+  type CodexDefaultsAuthScope
+} from './codexDefaultsSetup.js';
 
 type OutputFormat = 'json' | 'text';
 type ArgMap = Record<string, string | boolean>;
@@ -75,9 +79,11 @@ export async function runCodexCliShell(
     const format = resolveOutputFormat(params.flags);
     const apply = Boolean(params.flags['yes']);
     const force = Boolean(params.flags['force']);
+    const authScope = readAuthScopeFlag(params.flags);
     const result = await dependencies.runCodexDefaultsSetup({
       apply,
-      force
+      force,
+      authScope
     });
     if (format === 'json') {
       dependencies.log(JSON.stringify(result, null, 2));
@@ -99,4 +105,18 @@ function resolveOutputFormat(flags: ArgMap): OutputFormat {
 function readStringFlag(flags: ArgMap, key: string): string | undefined {
   const value = flags[key];
   return typeof value === 'string' ? value : undefined;
+}
+
+function readAuthScopeFlag(flags: ArgMap): CodexDefaultsAuthScope | undefined {
+  if (flags['chatgpt-auth'] === true) {
+    return 'chatgpt';
+  }
+  const value = readStringFlag(flags, 'auth-scope');
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === 'portable' || value === 'chatgpt') {
+    return value;
+  }
+  throw new Error(`Invalid codex defaults auth scope: ${value}`);
 }

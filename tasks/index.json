@@ -16,6 +16,48 @@
           "status": "succeeded-no-output-advisory",
           "manifest": ".runs/linear-4a684a5e-64b0-47fb-835a-d792eba29071-source-evidence/cli/2026-04-23T19-09-21-468Z-48bafb2b/manifest.json",
           "summary": "Same-issue source-evidence child lane completed successfully before turn end but produced a zero-byte patch artifact, so parent rejected it as advisory and owns the final source evidence file plus docs packet."
+        },
+        "docs_review": {
+          "reviewer": "linear child-stream docs-review",
+          "date": "2026-04-24",
+          "status": "passed",
+          "manifest": ".runs/linear-4a684a5e-64b0-47fb-835a-d792eba29071-docs-review/cli/2026-04-23T19-37-18-897Z-ce3ffc5e/manifest.json",
+          "summary": "Docs-review passed after merging current origin/main so the CO-341 packet and active main docs baseline were reviewed together before implementation edits."
+        },
+        "runtime_and_cloud_gates": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-24",
+          "status": "passed-with-held-cloud-model-choice",
+          "manifest": ".runs/linear-4a684a5e-64b0-47fb-835a-d792eba29071/cli/2026-04-23T19-44-14-410Z-2e596753/manifest.json",
+          "fallback_manifest": ".runs/linear-4a684a5e-64b0-47fb-835a-d792eba29071/cli/2026-04-23T19-49-46-024Z-0d81d04d/manifest.json",
+          "summary": "Post-build runtime canary passed, required cloud canary reached ready task task_e_69ea7692ad4883278500bffae6cc2591, and fallback cloud contract used mcp with missing_environment. Cloud/API direct gpt-5.5 model choice remains held by official availability docs."
+        },
+        "validation_floor": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-24",
+          "status": "passed",
+          "summary": "Delegation guard, spec guard, build, lint, full test, docs:check, docs:freshness, repo:stewardship, diff-budget with explicit CO-341 scope override, and pack:smoke passed after implementing the 0.124.0 and ChatGPT-auth gpt-5.5 posture update."
+        },
+        "related_issue_status": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-24",
+          "status": "tracked",
+          "summary": "Live Linear issue-context shows CO-337 is Done and CO-340 is Blocked behind CO-341 with workpad supersession notes, so no contradictory active 0.123/pre-availability posture issue remains untracked."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-24",
+          "status": "bounded-success",
+          "manifest": ".runs/linear-4a684a5e-64b0-47fb-835a-d792eba29071/cli/2026-04-23T20-03-58-124Z-2aa39d48/manifest.json",
+          "telemetry": ".runs/linear-4a684a5e-64b0-47fb-835a-d792eba29071/cli/2026-04-23T20-03-58-124Z-2aa39d48/review/telemetry.json",
+          "summary": "Final forced standalone review completed with review_outcome=bounded-success and termination_boundary.kind=relevant-reinspection-dwell; no concrete findings were emitted before boundary."
+        },
+        "elegance_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-24",
+          "status": "passed",
+          "artifact": "out/linear-4a684a5e-64b0-47fb-835a-d792eba29071/manual/20260423T210413Z-final-elegance-review.md",
+          "summary": "No further simplification patch needed; auth-scope split, managed role migration, doctor pair checks, workflow pins, docs, and tests are the smallest coherent posture update."
         }
       },
       "paths": {

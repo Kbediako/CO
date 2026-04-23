@@ -1519,6 +1519,7 @@ Commands:
   codex defaults
     --yes                  Apply setup (otherwise dry-run plan only).
     --force                Allow overwriting existing role files in ~/.codex/agents.
+    --auth-scope <portable|chatgpt>  Select portable defaults or validated ChatGPT-auth gpt-5.5 defaults.
     --format json          Emit machine-readable output.
   devtools setup          Print DevTools MCP setup instructions.
     --yes                 Apply setup by running "codex mcp add ...".

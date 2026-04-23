@@ -21,7 +21,7 @@ codex-orchestrator --version
 
 Node.js `>=20` is required.
 
-CO currently targets Codex CLI `0.123.0`; newer candidates stay evidence-gated in `docs/guides/codex-version-policy.md`.
+CO currently targets Codex CLI `0.124.0`; newer candidates stay evidence-gated in `docs/guides/codex-version-policy.md`.
 The source-head marketplace/plugin guidance keeps the CO-196 packaging boundary: npm remains the release-safe baseline, while Codex plugin marketplace registration is an additive path for newer Codex CLI command surfaces.
 
 ### Source-head marketplace/plugin setup
@@ -112,8 +112,9 @@ Bundled skills:
 
 ## Public posture
 
-- Current Codex CLI target: `0.123.0`
-- Current model posture: `gpt-5.4`
+- Current Codex CLI target: `0.124.0`
+- Current model posture: `gpt-5.5`
+- Portable downstream setup defaults remain on `gpt-5.4`; use `codex-orchestrator codex defaults --auth-scope chatgpt --yes` only after local ChatGPT-auth `gpt-5.5` access is validated
 - `explorer_fast` remains the explicit `gpt-5.3-codex-spark` file/codebase search-only exception
 - Local default runtime: `appserver`
 - `executionMode=cloud` with explicit `runtimeMode=appserver` remains unsupported

@@ -6,7 +6,8 @@ This guide is the downstream-safe setup path shipped in the npm package.
 
 - Once per machine: install Codex CLI, authenticate, install bundled skills, and register delegation or DevTools wiring.
 - Once per repo: seed the CO templates, review the generated config, and start using task-scoped runs.
-- CO currently targets Codex CLI `0.123.0`; newer candidates stay evidence-gated in the version policy.
+- CO currently targets Codex CLI `0.124.0`; newer candidates stay evidence-gated in the version policy.
+- The packaged setup path keeps portable model defaults at `gpt-5.4`; switch to `gpt-5.5` only for validated ChatGPT-auth local lanes.
 - CO-196 posture lineage remains unchanged: npm is the supported baseline because it is the simplest supported CLI install path, and marketplace packaging is an additive registration path for newer Codex releases. `0.121.0` accepts both `codex marketplace add` and `codex plugin marketplace add`; `0.122.0+` require `codex plugin marketplace add`.
 
 ## Once per machine

@@ -20,7 +20,7 @@ last_review: 2026-04-24
 - Explicit non-goals carried forward: no shared-root mutation, no unrelated release lane work, no broad app-server control rewrite, and no user config mutation.
 
 ## Parity / Alignment Matrix
-- Current truth: `docs/guides/codex-version-policy.md` carries active target `0.118.0`, latest candidate `0.122.0`, model posture `gpt-5.4`, marketplace smoke `0.121.0`, and cloud-canary `0.122.0`.
+- Current truth: `docs/guides/codex-version-policy.md` carries active target `0.123.0`, model posture `gpt-5.4`, release-facing smoke and cloud-canary `0.123.0`, and the `codex plugin marketplace add` marketplace smoke contract.
 - Reference truth: OpenAI Codex docs recommend `gpt-5.5` when available; official `rust-v0.124.0` release facts add hooks, plugin marketplace, app-server, Fast tier, permission, `wait_agent`, MCP cwd, and unknown-feature/cloud-requirements changes.
 - Target truth / intended delta: promote local ChatGPT-auth model surfaces that pass; promote CLI/workflow pins only after runtime/cloud/marketplace proof; hold Codex Cloud model choice with blocker evidence because Cloud cannot select `gpt-5.5` directly.
 - Explicitly out-of-scope differences: CO-282, CO-278 baseline dirt, CO-338 npm publish recovery, and historical CO-337/CO-340 cleanup beyond superseding notes.
@@ -50,9 +50,9 @@ last_review: 2026-04-24
 - Monitoring / alerts: Cloud canary and pack-smoke workflow pins keep future evidence reproducible.
 
 ## Open Questions
-- Whether post-build required cloud canary can reach the configured `CODEX_CLOUD_ENV_ID` or remains blocked by environment/connector availability.
-- Whether `0.124.0` marketplace replacement behavior fully satisfies the local `pack:smoke` install scenarios after replacing `marketplace add` with `plugin marketplace add`.
+- PR attachment, checks, latest `origin/main`, and `pr ready-review` drain remain before Linear review handoff.
+- Cloud/API direct `gpt-5.5` model choice remains held by official availability docs; local ChatGPT-auth top-level/delegated/review surfaces are promoted by current smoke evidence.
 
 ## Approvals
-- Reviewer: pending docs-review child stream.
+- Reviewer: docs-review child stream passed; final forced standalone review completed as bounded success; explicit elegance review completed.
 - Date: 2026-04-24

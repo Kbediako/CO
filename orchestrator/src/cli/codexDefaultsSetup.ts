@@ -17,8 +17,16 @@ let tomlLibrary:
   | null
   | undefined;
 
-export const BASELINE_MODEL = 'gpt-5.4';
+export type CodexDefaultsAuthScope = 'portable' | 'chatgpt';
+
+export const PORTABLE_BASELINE_MODEL = 'gpt-5.4';
+export const CHATGPT_AUTH_BASELINE_MODEL = 'gpt-5.5';
+export const BASELINE_MODEL = PORTABLE_BASELINE_MODEL;
 export const BASELINE_REVIEW_MODEL = BASELINE_MODEL;
+export const ACCEPTED_BASELINE_MODELS = [PORTABLE_BASELINE_MODEL, CHATGPT_AUTH_BASELINE_MODEL] as const;
+export const ACCEPTED_BASELINE_MODEL_PAIRS_LABEL =
+  `${PORTABLE_BASELINE_MODEL}/${PORTABLE_BASELINE_MODEL} portable or ` +
+  `${CHATGPT_AUTH_BASELINE_MODEL}/${CHATGPT_AUTH_BASELINE_MODEL} ChatGPT-auth`;
 export const BASELINE_REASONING = 'xhigh';
 export const BASELINE_REASONING_MINIMUM = 'high';
 export const BASELINE_AGENTS = {
@@ -60,6 +68,7 @@ const ROLE_DEFINITIONS: readonly RoleDefinition[] = [
 
 interface LoadedRoleDefinition extends RoleDefinition {
   content: string;
+  managedContents: readonly string[];
 }
 
 type SetupStatus = 'planned' | 'applied';
@@ -69,6 +78,7 @@ type ChangeTarget = 'config' | 'role_file';
 export interface CodexDefaultsSetupOptions {
   apply?: boolean;
   force?: boolean;
+  authScope?: CodexDefaultsAuthScope;
   env?: NodeJS.ProcessEnv;
 }
 
@@ -77,6 +87,7 @@ export interface CodexDefaultsSetupPlan {
   configPath: string;
   agentsDir: string;
   force: boolean;
+  authScope: CodexDefaultsAuthScope;
 }
 
 export interface CodexDefaultsSetupChange {
@@ -99,6 +110,8 @@ interface PlannedRoleChange {
   existingContent: string | null;
   currentStatus: ChangeStatus;
   detail: string;
+  shouldWrite: boolean;
+  applyDetail?: string;
 }
 
 export async function runCodexDefaultsSetup(
@@ -107,10 +120,12 @@ export async function runCodexDefaultsSetup(
   const env = options.env ?? process.env;
   const force = Boolean(options.force);
   const apply = Boolean(options.apply);
-  const plan = buildPlan(env, force);
-  const roleDefinitions = await loadRoleDefinitions();
+  const authScope = options.authScope ?? 'portable';
+  const plan = buildPlan(env, force, authScope);
+  const baselineModels = resolveBaselineModels(authScope);
+  const roleDefinitions = await loadRoleDefinitions(authScope);
   const configState = await loadConfigState(plan.configPath);
-  const nextConfig = mergeBaselineDefaults(configState.parsed, roleDefinitions);
+  const nextConfig = mergeBaselineDefaults(configState.parsed, roleDefinitions, baselineModels);
   const configChanged =
     canonicalizeConfigValue(configState.parsed) !== canonicalizeConfigValue(nextConfig);
   const roleChanges = await planRoleChanges(plan.agentsDir, force, roleDefinitions);
@@ -156,10 +171,7 @@ export async function runCodexDefaultsSetup(
   await mkdir(plan.agentsDir, { recursive: true });
 
   for (const roleChange of roleChanges) {
-    const shouldWrite =
-      roleChange.existingContent === null
-      || (force && roleChange.existingContent !== roleChange.definition.content);
-    if (shouldWrite) {
+    if (roleChange.shouldWrite) {
       await writeAtomicFile(roleChange.path, roleChange.definition.content, {
         ensureDir: true,
         encoding: 'utf8'
@@ -170,9 +182,10 @@ export async function runCodexDefaultsSetup(
         path: roleChange.path,
         status: roleChange.existingContent === null ? 'created' : 'updated',
         detail:
-          roleChange.existingContent === null
+          roleChange.applyDetail
+          ?? (roleChange.existingContent === null
             ? `Created ${roleChange.definition.fileName}.`
-            : `Overwrote ${roleChange.definition.fileName} because --force was set.`
+            : `Overwrote ${roleChange.definition.fileName} because --force was set.`)
       });
       continue;
     }
@@ -200,6 +213,7 @@ export function formatCodexDefaultsSetupSummary(result: CodexDefaultsSetupResult
   lines.push(`- Config: ${result.plan.configPath}`);
   lines.push(`- Agents dir: ${result.plan.agentsDir}`);
   lines.push(`- Force overwrite: ${result.plan.force ? 'yes' : 'no'}`);
+  lines.push(`- Auth scope: ${result.plan.authScope}`);
   lines.push('- Changes:');
   for (const change of result.changes) {
     lines.push(`  - ${change.target}:${change.name} -> ${change.status} (${change.path})`);
@@ -211,13 +225,18 @@ export function formatCodexDefaultsSetupSummary(result: CodexDefaultsSetupResult
   return lines;
 }
 
-function buildPlan(env: NodeJS.ProcessEnv, force: boolean): CodexDefaultsSetupPlan {
+function buildPlan(
+  env: NodeJS.ProcessEnv,
+  force: boolean,
+  authScope: CodexDefaultsAuthScope
+): CodexDefaultsSetupPlan {
   const codexHome = resolveCodexHome(env);
   return {
     codexHome,
     configPath: join(codexHome, 'config.toml'),
     agentsDir: join(codexHome, 'agents'),
-    force
+    force,
+    authScope
   };
 }
 
@@ -288,11 +307,12 @@ function canonicalizeConfigValue(value: unknown): string | undefined {
 
 function mergeBaselineDefaults(
   existing: Record<string, unknown>,
-  roleDefinitions: readonly LoadedRoleDefinition[]
+  roleDefinitions: readonly LoadedRoleDefinition[],
+  baselineModels: { model: string; reviewModel: string }
 ): Record<string, unknown> {
   const next = structuredClone(existing);
-  next.model = BASELINE_MODEL;
-  next.review_model = BASELINE_REVIEW_MODEL;
+  next.model = baselineModels.model;
+  next.review_model = baselineModels.reviewModel;
   next.model_reasoning_effort = BASELINE_REASONING;
 
   const agents = isRecord(next.agents) ? structuredClone(next.agents as Record<string, unknown>) : {};
@@ -326,7 +346,9 @@ async function planRoleChanges(
         path,
         existingContent: null,
         currentStatus: 'pending',
-        detail: `Will create ${definition.fileName}.`
+        detail: `Will create ${definition.fileName}.`,
+        shouldWrite: true,
+        applyDetail: `Created ${definition.fileName}.`
       });
       continue;
     }
@@ -338,7 +360,21 @@ async function planRoleChanges(
         path,
         existingContent: current,
         currentStatus: 'unchanged',
-        detail: `${definition.fileName} already matches CO baseline defaults.`
+        detail: `${definition.fileName} already matches CO baseline defaults.`,
+        shouldWrite: false
+      });
+      continue;
+    }
+
+    if (definition.managedContents.includes(current)) {
+      changes.push({
+        definition,
+        path,
+        existingContent: current,
+        currentStatus: 'pending',
+        detail: `Will update ${definition.fileName} because it matches a CO-managed baseline for a different auth scope.`,
+        shouldWrite: true,
+        applyDetail: `Updated ${definition.fileName} to match the selected auth scope because the existing file matched a CO-managed baseline.`
       });
       continue;
     }
@@ -349,7 +385,9 @@ async function planRoleChanges(
         path,
         existingContent: current,
         currentStatus: 'pending',
-        detail: `Will overwrite ${definition.fileName} because --force is set.`
+        detail: `Will overwrite ${definition.fileName} because --force is set.`,
+        shouldWrite: true,
+        applyDetail: `Overwrote ${definition.fileName} because --force was set.`
       });
       continue;
     }
@@ -359,14 +397,15 @@ async function planRoleChanges(
       path,
       existingContent: current,
       currentStatus: 'preserved',
-      detail: `${definition.fileName} already exists; preserving without --force.`
+      detail: `${definition.fileName} already exists; preserving without --force.`,
+      shouldWrite: false
     });
   }
 
   return changes;
 }
 
-async function loadRoleDefinitions(): Promise<LoadedRoleDefinition[]> {
+async function loadRoleDefinitions(authScope: CodexDefaultsAuthScope): Promise<LoadedRoleDefinition[]> {
   const packageRoot = findPackageRoot();
   const loaded: LoadedRoleDefinition[] = [];
   for (const definition of ROLE_DEFINITIONS) {
@@ -378,9 +417,45 @@ async function loadRoleDefinitions(): Promise<LoadedRoleDefinition[]> {
       const reason = (error as Error)?.message ?? String(error);
       throw new Error(`Unable to read role template ${templateFile}: ${reason}`);
     }
-    loaded.push({ ...definition, content });
+    loaded.push({
+      ...definition,
+      content: scopeRoleTemplateContent(definition, content, authScope),
+      managedContents: uniqueStrings([
+        scopeRoleTemplateContent(definition, content, 'portable'),
+        scopeRoleTemplateContent(definition, content, 'chatgpt')
+      ])
+    });
   }
   return loaded;
+}
+
+function resolveBaselineModels(authScope: CodexDefaultsAuthScope): { model: string; reviewModel: string } {
+  if (authScope === 'chatgpt') {
+    return {
+      model: CHATGPT_AUTH_BASELINE_MODEL,
+      reviewModel: CHATGPT_AUTH_BASELINE_MODEL
+    };
+  }
+  return {
+    model: PORTABLE_BASELINE_MODEL,
+    reviewModel: PORTABLE_BASELINE_MODEL
+  };
+}
+
+function scopeRoleTemplateContent(
+  definition: RoleDefinition,
+  content: string,
+  authScope: CodexDefaultsAuthScope
+): string {
+  if (definition.key === 'explorer_fast') {
+    return content;
+  }
+  const { model } = resolveBaselineModels(authScope);
+  return content.replace(/^model = "gpt-[^"]+"/m, `model = "${model}"`);
+}
+
+function uniqueStrings(values: readonly string[]): string[] {
+  return [...new Set(values)];
 }
 
 function buildPlannedChanges(params: {
