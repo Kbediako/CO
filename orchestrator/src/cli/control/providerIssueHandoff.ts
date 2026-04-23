@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomBytes } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import process from 'node:process';
 
 import { logger } from '../../logger.js';
@@ -14,6 +14,7 @@ import {
 } from '../providerLinearWorkerRunner.js';
 import { isoTimestamp } from '../utils/time.js';
 import type { RunPaths } from '../run/runPaths.js';
+import { stripNonApplicableGuardrailSummaryLines } from '../run/manifest.js';
 import {
   cleanupProviderWorkspace,
   resolveExplicitProviderWorkspacePathWithinRoot,
@@ -59,6 +60,7 @@ import {
 } from './providerPollingHealth.js';
 import type { ProviderWorkflowConfigStore } from './providerWorkflowConfigStore.js';
 import {
+  cloneProviderWorkerHostConfigs,
   findProviderWorkerHost,
   normalizeProviderWorkerHostName,
   selectProviderWorkerHost
@@ -154,13 +156,14 @@ interface ProviderIssueRunRecord {
   taskId: string;
   runId: string;
   manifestPath: string;
+  manifest: Record<string, unknown>;
   pipelineId: string | null;
   status: string | null;
   hasDeadLocalInProgressProof: boolean;
   proofTerminalStatus: 'failed' | 'succeeded' | null;
   hasStaleInProgressProof: boolean;
   summary: string | null;
-  failureDiagnosis?: ProviderIssueRunFailureDiagnosisRecord | null;
+  failureDiagnosis: ProviderIssueRunFailureDiagnosisRecord | null;
   issueUpdatedAt: string | null;
   startedAt: string | null;
   updatedAt: string | null;
@@ -174,6 +177,7 @@ interface ProviderIssueRunRecord {
 interface ProviderIssueRunFailureDiagnosisRecord {
   diagnosticCategory: string | null;
   signal: string | null;
+  guidance: string | null;
 }
 
 interface ProviderUnreadableManifestAdmissionOccupancyRecord {
@@ -198,10 +202,10 @@ interface ProviderLinearWorkerProofRecord {
   owner_phase?: unknown;
   owner_status?: unknown;
   end_reason?: unknown;
+  failure_diagnosis?: unknown;
   updated_at?: unknown;
   worker_host?: unknown;
   resident_session?: unknown;
-  failure_diagnosis?: unknown;
 }
 
 const PROVIDER_UNREADABLE_MANIFEST_LIVE_PROOF_TTL_MS =
@@ -329,6 +333,11 @@ const PROVIDER_RETRY_START_FAILED_REASON = 'provider_issue_retry_start_failed';
 const PROVIDER_CONTINUATION_RETRY_DELAY_MS = 1_000;
 const PROVIDER_FAILURE_RETRY_BASE_MS = 10_000;
 const PROVIDER_FAILURE_RETRY_MAX_BACKOFF_MS = 300_000;
+type ProviderControlHostRunLocator = { taskId: string; runId: string };
+type ProviderRehydratedLaunchProvenanceFields = {
+  launch_source?: ProviderLaunchSource | null;
+  launch_token?: string | null;
+};
 type ProviderTrackedIssueEligibility =
   | {
       eligible: true;
@@ -387,6 +396,7 @@ export function createProviderIssueHandoffService(
   const runOperatorAutopilot = options.runOperatorAutopilot ?? runProviderOperatorAutopilot;
   const appendOperatorAutopilotAuditResult =
     options.appendOperatorAutopilotAuditResult ?? appendProviderOperatorAutopilotAuditResult;
+  const controlHostRunLocator = resolveControlHostRunLocatorFromRunDir(options.paths.runDir);
   const retryQueue = createProviderIssueRetryQueue();
   const releaseCancelInFlight = new Map<
     string,
@@ -406,6 +416,9 @@ export function createProviderIssueHandoffService(
   const providerIssueRunDiscoveryScope = new AsyncLocalStorage<{
     snapshot: Promise<ProviderIssueRunDiscoverySnapshot> | null;
   }>();
+  const configuredWorkerHostsScope = new AsyncLocalStorage<{
+    workerHosts: ReturnType<typeof cloneProviderWorkerHostConfigs> | null;
+  } | null>();
   const serviceCreatedAtMs = Date.now();
   let providerIssueHandoffService: ProviderIssueHandoffService | null = null;
   let concurrentRestartRequiredSnapshotCutoff:
@@ -1003,11 +1016,65 @@ export function createProviderIssueHandoffService(
     };
   };
 
-  const resolveConfiguredWorkerHosts = async () => {
-    if (options.providerWorkflowConfigStore) {
-      await options.providerWorkflowConfigStore.refresh();
+  const cacheConfiguredWorkerHosts = (
+    workerHosts: ReturnType<typeof cloneProviderWorkerHostConfigs>
+  ) => {
+    const clonedWorkerHosts = cloneProviderWorkerHostConfigs(workerHosts);
+    const scope = configuredWorkerHostsScope.getStore();
+    if (scope) {
+      scope.workerHosts = clonedWorkerHosts;
+      return cloneProviderWorkerHostConfigs(scope.workerHosts);
     }
-    return options.providerWorkflowConfigStore?.snapshot().worker_hosts ?? [];
+    return clonedWorkerHosts;
+  };
+
+  const resolveConfiguredWorkerHosts = async () => {
+    const scope = configuredWorkerHostsScope.getStore();
+    if (scope?.workerHosts) {
+      return cloneProviderWorkerHostConfigs(scope.workerHosts);
+    }
+    if (options.providerWorkflowConfigStore) {
+      try {
+        await options.providerWorkflowConfigStore.refresh();
+      } catch {
+        return cacheConfiguredWorkerHosts(
+          options.providerWorkflowConfigStore.snapshot().worker_hosts ?? []
+        );
+      }
+    }
+    return cacheConfiguredWorkerHosts(
+      options.providerWorkflowConfigStore?.snapshot().worker_hosts ?? []
+    );
+  };
+
+  const runWithConfiguredWorkerHostsCache = async <T>(
+    operation: () => Promise<T>
+  ): Promise<T> => {
+    if (configuredWorkerHostsScope.getStore()) {
+      return await operation();
+    }
+    return await configuredWorkerHostsScope.run({ workerHosts: null }, operation);
+  };
+  const runOutsideConfiguredWorkerHostsScope = async <T>(
+    operation: () => Promise<T>
+  ): Promise<T> => await configuredWorkerHostsScope.run(null, operation);
+
+  const resolveLocalWorkerOnlyForCurrentOperation = async (input: {
+    preferredWorkerHost?: string | null;
+  } = {}): Promise<boolean> => {
+    if (normalizeProviderWorkerHostName(input.preferredWorkerHost ?? null)) {
+      return false;
+    }
+    if (!options.providerWorkflowConfigStore) {
+      return true;
+    }
+    try {
+      return (await resolveConfiguredWorkerHosts()).length === 0;
+    } catch {
+      return cloneProviderWorkerHostConfigs(
+        options.providerWorkflowConfigStore.snapshot().worker_hosts ?? []
+      ).length === 0;
+    }
   };
 
   const resolveResumeWorkerHost = async (preferredWorkerHost: string | null): Promise<string | null> => {
@@ -1288,9 +1355,13 @@ export function createProviderIssueHandoffService(
     }
     bestEffortRehydrateTimer = globalThis.setTimeout(() => {
       bestEffortRehydrateTimer = null;
-      void runOutsideRefreshLifecycleScope(() =>
-        runWithFreshProviderIssueRunDiscoveryCache(() =>
-          runWithRefreshLifecycleLock(() => rehydrateNow({ refreshTrackedIssueMetadata: true }))
+      // Detached rehydrate work must not inherit the worker-host cache from the
+      // start/resume operation that scheduled this timer.
+      void runOutsideConfiguredWorkerHostsScope(() =>
+        runOutsideRefreshLifecycleScope(() =>
+          runWithFreshProviderIssueRunDiscoveryCache(() =>
+            runWithRefreshLifecycleLock(() => rehydrateNow({ refreshTrackedIssueMetadata: true }))
+          )
         )
       )
         .then((result) => {
@@ -1437,10 +1508,19 @@ export function createProviderIssueHandoffService(
     return buildTrackedIssueClaimFields(trackedIssue);
   };
 
-  const createProviderAdmissionGate = async (): Promise<
+  const createProviderAdmissionGate = async (input: {
+    forceLocalWorkerOnly?: boolean;
+    preferredWorkerHost?: string | null;
+  } = {}): Promise<
     ReturnType<typeof createProviderPollDispatchBudget>
   > => {
-    const gate = createProviderPollDispatchBudget(options.readFeatureToggles?.() ?? null);
+    const gate = createProviderPollDispatchBudget(options.readFeatureToggles?.() ?? null, {
+      localWorkerOnly:
+        input.forceLocalWorkerOnly === true ||
+        await resolveLocalWorkerOnlyForCurrentOperation({
+          preferredWorkerHost: input.preferredWorkerHost ?? null
+        })
+    });
     const seededOccupancyKeys = new Set<string>();
     const discoveredRuns = await discoverProviderIssueRunsForCurrentOperation();
     // Host-global admission must count every live or queued provider worker, even when
@@ -1735,78 +1815,47 @@ export function createProviderIssueHandoffService(
     launcherReason?: string;
     seedRetryAttemptFromPreviousRun?: boolean;
   }): Promise<void> => {
-    const workerHost = resolveRehydratedActiveRunWorkerHost(input.run, input.claim);
-    const resumeWorkerHost = await resolveResumeWorkerHost(workerHost);
-    const admissionGate = await createProviderAdmissionGate();
-    if (!admissionGate.canDispatch(input.trackedIssue)) {
-      await upsertProviderClaimAndPersist({
-        ...input.claim,
-        ...buildTrackedIssueClaimFields(input.trackedIssue),
-        task_id: input.run.taskId,
-        state: 'resumable',
-        reason: deriveProviderCapacityBlockedReason(input.reason),
-        run_id: input.run.runId,
-        run_manifest_path: input.run.manifestPath,
-        worker_host: resumeWorkerHost,
-        launch_source: null,
-        launch_token: null,
-        review_promotion: null,
-        merge_closeout: null,
-        ...buildQueuedProviderRetryFields({
-          claim: input.claim,
-          previousRun: input.run,
-          error: input.claim.retry_error ?? resolveProviderRetryErrorFromRun(input.run),
-          preserveCurrentAttempt: true,
-          delayType: resolveProviderRetryDelayType({
+    await runWithConfiguredWorkerHostsCache(async () => {
+      const workerHost = resolveRehydratedActiveRunWorkerHost(input.run, input.claim);
+      const resumeWorkerHost = await resolveResumeWorkerHost(workerHost);
+      const admissionGate = await createProviderAdmissionGate({
+        forceLocalWorkerOnly: resumeWorkerHost === null,
+        preferredWorkerHost: resumeWorkerHost
+      });
+      if (!admissionGate.canDispatch(input.trackedIssue)) {
+        await upsertProviderClaimAndPersist({
+          ...input.claim,
+          ...buildTrackedIssueClaimFields(input.trackedIssue),
+          task_id: input.run.taskId,
+          state: 'resumable',
+          reason: deriveProviderCapacityBlockedReason(input.reason),
+          run_id: input.run.runId,
+          run_manifest_path: input.run.manifestPath,
+          worker_host: resumeWorkerHost,
+          launch_source: null,
+          launch_token: null,
+          review_promotion: null,
+          merge_closeout: null,
+          ...buildQueuedProviderRetryFields({
             claim: input.claim,
-            previousRun: input.run
+            previousRun: input.run,
+            error: input.claim.retry_error ?? resolveProviderRetryErrorFromRun(input.run),
+            preserveCurrentAttempt: true,
+            delayType: resolveProviderRetryDelayType({
+              claim: input.claim,
+              previousRun: input.run
+            })
           })
-        })
-      });
-      return;
-    }
-    const launchToken = createProviderLaunchToken();
-    await upsertProviderClaimAndPersist({
-      ...input.claim,
-      ...buildTrackedIssueClaimFields(input.trackedIssue),
-      task_id: input.run.taskId,
-      state: 'resuming',
-      reason: input.reason,
-      run_id: input.run.runId,
-      run_manifest_path: input.run.manifestPath,
-      worker_host: resumeWorkerHost,
-      launch_source: PROVIDER_LAUNCH_SOURCE,
-      launch_token: launchToken,
-      review_promotion: null,
-      merge_closeout: null,
-      ...buildProviderRetryLaunchFields({
-        claim: input.claim,
-        previousRun: input.run,
-        preserveCurrentAttempt: input.claim.retry_queued === true,
-        seedFromPreviousRun: input.seedRetryAttemptFromPreviousRun === true
-      })
-    });
-    try {
-      await resumeProviderWorkerWhenCurrent({
-        runId: input.run.runId,
-        actor: 'control-host',
-        reason: input.launcherReason ?? 'provider-refresh',
-        workerHost: resumeWorkerHost,
-        launchToken
-      });
-      resetProviderIssueRunDiscoveryCache();
-    } catch (error) {
-      if (isRefreshLifecycleStuckError(error) || isStaleRefreshLifecycleOperation()) {
-        scheduleBestEffortRehydrateWithRefreshLock();
-        throwRefreshLifecycleStuckError();
+        });
+        return;
       }
-      const failureReason = input.failureReason ?? 'provider_issue_refresh_resume_failed';
+      const launchToken = createProviderLaunchToken();
       await upsertProviderClaimAndPersist({
         ...input.claim,
         ...buildTrackedIssueClaimFields(input.trackedIssue),
         task_id: input.run.taskId,
-        state: 'handoff_failed',
-        reason: `${failureReason}:${(error as Error)?.message ?? String(error)}`,
+        state: 'resuming',
+        reason: input.reason,
         run_id: input.run.runId,
         run_manifest_path: input.run.manifestPath,
         worker_host: resumeWorkerHost,
@@ -1814,17 +1863,53 @@ export function createProviderIssueHandoffService(
         launch_token: launchToken,
         review_promotion: null,
         merge_closeout: null,
-        ...buildQueuedProviderRetryFields({
+        ...buildProviderRetryLaunchFields({
           claim: input.claim,
           previousRun: input.run,
-          error: (error as Error)?.message ?? String(error),
-          preserveCurrentAttempt: true,
-          delayType: 'failure'
+          preserveCurrentAttempt: input.claim.retry_queued === true,
+          seedFromPreviousRun: input.seedRetryAttemptFromPreviousRun === true
         })
-      }, { rollbackOnPersistFailure: false });
-      throw error;
-    }
-    scheduleBestEffortRehydrateWithRefreshLock();
+      });
+      try {
+        await resumeProviderWorkerWhenCurrent({
+          runId: input.run.runId,
+          actor: 'control-host',
+          reason: input.launcherReason ?? 'provider-refresh',
+          workerHost: resumeWorkerHost,
+          launchToken
+        });
+        resetProviderIssueRunDiscoveryCache();
+      } catch (error) {
+        if (isRefreshLifecycleStuckError(error) || isStaleRefreshLifecycleOperation()) {
+          scheduleBestEffortRehydrateWithRefreshLock();
+          throwRefreshLifecycleStuckError();
+        }
+        const failureReason = input.failureReason ?? 'provider_issue_refresh_resume_failed';
+        await upsertProviderClaimAndPersist({
+          ...input.claim,
+          ...buildTrackedIssueClaimFields(input.trackedIssue),
+          task_id: input.run.taskId,
+          state: 'handoff_failed',
+          reason: `${failureReason}:${(error as Error)?.message ?? String(error)}`,
+          run_id: input.run.runId,
+          run_manifest_path: input.run.manifestPath,
+          worker_host: resumeWorkerHost,
+          launch_source: PROVIDER_LAUNCH_SOURCE,
+          launch_token: launchToken,
+          review_promotion: null,
+          merge_closeout: null,
+          ...buildQueuedProviderRetryFields({
+            claim: input.claim,
+            previousRun: input.run,
+            error: (error as Error)?.message ?? String(error),
+            preserveCurrentAttempt: true,
+            delayType: 'failure'
+          })
+        }, { rollbackOnPersistFailure: false });
+        throw error;
+      }
+      scheduleBestEffortRehydrateWithRefreshLock();
+    });
   };
 
   const launchStartForTrackedIssue = async (input: {
@@ -1836,128 +1921,91 @@ export function createProviderIssueHandoffService(
     preserveRetryAttempt?: boolean;
     seedRetryAttemptFromPreviousRun?: boolean;
   }): Promise<ProviderIssueHandoffResult> => {
-    const taskId = buildProviderFallbackTaskId(input.trackedIssue);
-    const preferredWorkerHost = resolvePreferredStartWorkerHost({
-      claimWorkerHost: input.claim.worker_host ?? null,
-      previousRun: input.previousRun ?? null
-    });
-    const admissionGate = await createProviderAdmissionGate();
-    if (!admissionGate.canDispatch(input.trackedIssue)) {
-      const claim = await upsertProviderClaimAndPersist({
-        ...input.claim,
-        ...buildTrackedIssueClaimFields(input.trackedIssue),
-        task_id: taskId,
-        mapping_source: input.claim.mapping_source,
-        state: 'accepted',
-        reason: deriveProviderCapacityBlockedReason(input.reason),
-        run_id: input.previousRun?.runId ?? input.claim.run_id,
-        run_manifest_path: input.previousRun?.manifestPath ?? input.claim.run_manifest_path,
-        worker_host: preferredWorkerHost,
-        launch_source: null,
-        launch_token: null,
-        review_promotion: null,
-        merge_closeout: null,
-        ...(
-          input.preserveRetryAttempt === true || input.claim.retry_queued === true
-            ? buildQueuedProviderRetryFields({
-                claim: input.claim,
-                previousRun: input.previousRun ?? null,
-                error: input.claim.retry_error ?? resolveProviderRetryErrorFromRun(input.previousRun ?? null),
-                preserveCurrentAttempt: true,
-                delayType: resolveProviderRetryDelayType({
-                  claim: input.claim,
-                  previousRun: input.previousRun ?? null
-                })
-              })
-            : clearProviderRetryFields()
-        )
-      });
-      return { kind: 'ignored', reason: claim.reason ?? deriveProviderCapacityBlockedReason(input.reason), claim };
-    }
-    let workerHost: string | null = preferredWorkerHost;
-    try {
-      workerHost = await selectLaunchWorkerHost({
-        claim: input.claim,
+    return await runWithConfiguredWorkerHostsCache(async () => {
+      const taskId = buildProviderFallbackTaskId(input.trackedIssue);
+      const preferredWorkerHost = resolvePreferredStartWorkerHost({
+        claimWorkerHost: input.claim.worker_host ?? null,
         previousRun: input.previousRun ?? null
       });
-    } catch (error) {
-      const failureReason = input.failureReason ?? 'provider_issue_refresh_start_failed';
-      await upsertProviderClaimAndPersist({
-        ...input.claim,
-        ...buildTrackedIssueClaimFields(input.trackedIssue),
-        task_id: taskId,
-        mapping_source: 'provider_id_fallback',
-        state: 'handoff_failed',
-        reason: `${failureReason}:${(error as Error)?.message ?? String(error)}`,
-        run_id: null,
-        run_manifest_path: null,
-        worker_host: workerHost,
-        launch_source: PROVIDER_LAUNCH_SOURCE,
-        launch_token: null,
-        review_promotion: null,
-        merge_closeout: null,
-        ...buildQueuedProviderRetryFields({
-          claim: input.claim,
-          previousRun: input.previousRun ?? null,
-          error: (error as Error)?.message ?? String(error),
-          preserveCurrentAttempt: input.preserveRetryAttempt === true || input.claim.retry_queued === true,
-          seedInitialAttemptWithoutPreviousRun: true,
-          delayType: 'failure'
-        })
-      }, { rollbackOnPersistFailure: false });
-      throw error;
-    }
-    const launchToken = createProviderLaunchToken();
-    await upsertProviderClaimAndPersist({
-      ...input.claim,
-      ...buildTrackedIssueClaimFields(input.trackedIssue),
-      task_id: taskId,
-      mapping_source: 'provider_id_fallback',
-      state: 'starting',
-      reason: input.reason,
-      run_id: null,
-      run_manifest_path: null,
-      worker_host: workerHost,
-      launch_source: PROVIDER_LAUNCH_SOURCE,
-      launch_token: launchToken,
-      review_promotion: null,
-      merge_closeout: null,
-      ...buildProviderRetryLaunchFields({
-        claim: input.claim,
-        previousRun: input.previousRun ?? null,
-        preserveCurrentAttempt: input.preserveRetryAttempt === true || input.claim.retry_queued === true,
-        seedFromPreviousRun: input.seedRetryAttemptFromPreviousRun === true
-      })
-    });
-    let startedRun: { runId: string; manifestPath: string } | null = null;
-    try {
-      startedRun = await startProviderWorkerWhenCurrent({
-        taskId,
-        pipelineId: startPipelineId,
-        provider: 'linear',
-        issueId: input.trackedIssue.id,
-        issueIdentifier: input.trackedIssue.identifier,
-        issueUpdatedAt: input.trackedIssue.updated_at,
-        workerHost,
-        workspaceId: input.trackedIssue.workspace_id,
-        teamId: input.trackedIssue.team_id,
-        projectId: input.trackedIssue.project_id,
-        residentSessionSeed: input.previousRun?.residentSessionSeed ?? null,
-        launchToken
-      });
-    } catch (error) {
-      if (isRefreshLifecycleStuckError(error) || isStaleRefreshLifecycleOperation()) {
-        scheduleBestEffortRehydrateWithRefreshLock();
-        throwRefreshLifecycleStuckError();
+      const admissionGate = await createProviderAdmissionGate();
+      if (!admissionGate.canDispatch(input.trackedIssue)) {
+        const claim = await upsertProviderClaimAndPersist({
+          ...input.claim,
+          ...buildTrackedIssueClaimFields(input.trackedIssue),
+          task_id: taskId,
+          mapping_source: input.claim.mapping_source,
+          state: 'accepted',
+          reason: deriveProviderCapacityBlockedReason(input.reason),
+          run_id: input.previousRun?.runId ?? input.claim.run_id,
+          run_manifest_path: input.previousRun?.manifestPath ?? input.claim.run_manifest_path,
+          worker_host: preferredWorkerHost,
+          launch_source: null,
+          launch_token: null,
+          review_promotion: null,
+          merge_closeout: null,
+          ...(
+            input.preserveRetryAttempt === true || input.claim.retry_queued === true
+              ? buildQueuedProviderRetryFields({
+                  claim: input.claim,
+                  previousRun: input.previousRun ?? null,
+                  error: input.claim.retry_error ?? resolveProviderRetryErrorFromRun(input.previousRun ?? null),
+                  preserveCurrentAttempt: true,
+                  delayType: resolveProviderRetryDelayType({
+                    claim: input.claim,
+                    previousRun: input.previousRun ?? null
+                  })
+                })
+              : clearProviderRetryFields()
+          )
+        });
+        return {
+          kind: 'ignored',
+          reason: claim.reason ?? deriveProviderCapacityBlockedReason(input.reason),
+          claim
+        };
       }
-      const failureReason = input.failureReason ?? 'provider_issue_refresh_start_failed';
+      let workerHost: string | null = preferredWorkerHost;
+      try {
+        workerHost = await selectLaunchWorkerHost({
+          claim: input.claim,
+          previousRun: input.previousRun ?? null
+        });
+      } catch (error) {
+        const failureReason = input.failureReason ?? 'provider_issue_refresh_start_failed';
+        await upsertProviderClaimAndPersist({
+          ...input.claim,
+          ...buildTrackedIssueClaimFields(input.trackedIssue),
+          task_id: taskId,
+          mapping_source: 'provider_id_fallback',
+          state: 'handoff_failed',
+          reason: `${failureReason}:${(error as Error)?.message ?? String(error)}`,
+          run_id: null,
+          run_manifest_path: null,
+          worker_host: workerHost,
+          launch_source: PROVIDER_LAUNCH_SOURCE,
+          launch_token: null,
+          review_promotion: null,
+          merge_closeout: null,
+          ...buildQueuedProviderRetryFields({
+            claim: input.claim,
+            previousRun: input.previousRun ?? null,
+            error: (error as Error)?.message ?? String(error),
+            preserveCurrentAttempt:
+              input.preserveRetryAttempt === true || input.claim.retry_queued === true,
+            seedInitialAttemptWithoutPreviousRun: true,
+            delayType: 'failure'
+          })
+        }, { rollbackOnPersistFailure: false });
+        throw error;
+      }
+      const launchToken = createProviderLaunchToken();
       await upsertProviderClaimAndPersist({
         ...input.claim,
         ...buildTrackedIssueClaimFields(input.trackedIssue),
         task_id: taskId,
         mapping_source: 'provider_id_fallback',
-        state: 'handoff_failed',
-        reason: `${failureReason}:${(error as Error)?.message ?? String(error)}`,
+        state: 'starting',
+        reason: input.reason,
         run_id: null,
         run_manifest_path: null,
         worker_host: workerHost,
@@ -1965,64 +2013,111 @@ export function createProviderIssueHandoffService(
         launch_token: launchToken,
         review_promotion: null,
         merge_closeout: null,
-        ...buildQueuedProviderRetryFields({
+        ...buildProviderRetryLaunchFields({
           claim: input.claim,
           previousRun: input.previousRun ?? null,
-          error: (error as Error)?.message ?? String(error),
           preserveCurrentAttempt: input.preserveRetryAttempt === true || input.claim.retry_queued === true,
-          delayType: 'failure'
+          seedFromPreviousRun: input.seedRetryAttemptFromPreviousRun === true
         })
-      }, { rollbackOnPersistFailure: false });
-      throw error;
-    }
-    if (startedRun) {
-      resetProviderIssueRunDiscoveryCache();
-    }
-    try {
-      const startClaimSnapshot = startedRun ? captureProviderStateSnapshot() : null;
-      if (startedRun) {
-        assertRefreshLifecycleCurrent();
-      }
-      const claim = startedRun
-        ? upsertProviderIntakeClaim(options.state, {
-            ...input.claim,
-            ...buildTrackedIssueClaimFields(input.trackedIssue),
-            task_id: taskId,
-            mapping_source: 'provider_id_fallback',
-            state: 'starting',
-            reason: input.reason,
-            run_id: startedRun.runId,
-            run_manifest_path: startedRun.manifestPath,
-            worker_host: workerHost,
-            launch_source: PROVIDER_LAUNCH_SOURCE,
-            launch_token: launchToken,
-            review_promotion: null,
-            merge_closeout: null,
-            ...buildProviderRetryLaunchFields({
-              claim: input.claim,
-              previousRun: input.previousRun ?? null,
-              preserveCurrentAttempt: input.preserveRetryAttempt === true || input.claim.retry_queued === true,
-              seedFromPreviousRun: input.seedRetryAttemptFromPreviousRun === true
-            })
+      });
+      let startedRun: { runId: string; manifestPath: string } | null = null;
+      try {
+        startedRun = await startProviderWorkerWhenCurrent({
+          taskId,
+          pipelineId: startPipelineId,
+          provider: 'linear',
+          issueId: input.trackedIssue.id,
+          issueIdentifier: input.trackedIssue.identifier,
+          issueUpdatedAt: input.trackedIssue.updated_at,
+          workerHost,
+          workspaceId: input.trackedIssue.workspace_id,
+          teamId: input.trackedIssue.team_id,
+          projectId: input.trackedIssue.project_id,
+          residentSessionSeed: input.previousRun?.residentSessionSeed ?? null,
+          launchToken
+        });
+      } catch (error) {
+        if (isRefreshLifecycleStuckError(error) || isStaleRefreshLifecycleOperation()) {
+          scheduleBestEffortRehydrateWithRefreshLock();
+          throwRefreshLifecycleStuckError();
+        }
+        const failureReason = input.failureReason ?? 'provider_issue_refresh_start_failed';
+        await upsertProviderClaimAndPersist({
+          ...input.claim,
+          ...buildTrackedIssueClaimFields(input.trackedIssue),
+          task_id: taskId,
+          mapping_source: 'provider_id_fallback',
+          state: 'handoff_failed',
+          reason: `${failureReason}:${(error as Error)?.message ?? String(error)}`,
+          run_id: null,
+          run_manifest_path: null,
+          worker_host: workerHost,
+          launch_source: PROVIDER_LAUNCH_SOURCE,
+          launch_token: launchToken,
+          review_promotion: null,
+          merge_closeout: null,
+          ...buildQueuedProviderRetryFields({
+            claim: input.claim,
+            previousRun: input.previousRun ?? null,
+            error: (error as Error)?.message ?? String(error),
+            preserveCurrentAttempt:
+              input.preserveRetryAttempt === true || input.claim.retry_queued === true,
+            delayType: 'failure'
           })
-        : input.claim;
-      if (startedRun) {
-        await persistStateOrRollback(
-          startClaimSnapshot ?? captureProviderStateSnapshot(),
-          { rollbackOnPersistFailure: false }
-        );
-        options.publishRuntime?.('provider-intake.refresh');
+        }, { rollbackOnPersistFailure: false });
+        throw error;
       }
-      return { kind: 'start', reason: input.reason, claim };
-    } finally {
-      scheduleBestEffortRehydrateWithRefreshLock();
-    }
+      if (startedRun) {
+        resetProviderIssueRunDiscoveryCache();
+      }
+      try {
+        const startClaimSnapshot = startedRun ? captureProviderStateSnapshot() : null;
+        if (startedRun) {
+          assertRefreshLifecycleCurrent();
+        }
+        const claim = startedRun
+          ? upsertProviderIntakeClaim(options.state, {
+              ...input.claim,
+              ...buildTrackedIssueClaimFields(input.trackedIssue),
+              task_id: taskId,
+              mapping_source: 'provider_id_fallback',
+              state: 'starting',
+              reason: input.reason,
+              run_id: startedRun.runId,
+              run_manifest_path: startedRun.manifestPath,
+              worker_host: workerHost,
+              launch_source: PROVIDER_LAUNCH_SOURCE,
+              launch_token: launchToken,
+              review_promotion: null,
+              merge_closeout: null,
+              ...buildProviderRetryLaunchFields({
+                claim: input.claim,
+                previousRun: input.previousRun ?? null,
+                preserveCurrentAttempt:
+                  input.preserveRetryAttempt === true || input.claim.retry_queued === true,
+                seedFromPreviousRun: input.seedRetryAttemptFromPreviousRun === true
+              })
+            })
+          : input.claim;
+        if (startedRun) {
+          await persistStateOrRollback(
+            startClaimSnapshot ?? captureProviderStateSnapshot(),
+            { rollbackOnPersistFailure: false }
+          );
+          options.publishRuntime?.('provider-intake.refresh');
+        }
+        return { kind: 'start', reason: input.reason, claim };
+      } finally {
+        scheduleBestEffortRehydrateWithRefreshLock();
+      }
+    });
   };
 
   const releaseClaim = async (input: {
     claim: ProviderIntakeClaimRecord;
     nextReason: string;
     releaseRun: ProviderIssueRunRecord | null;
+    allowClearingRunIdentity?: boolean;
     trackedIssue?: Pick<
       LiveLinearTrackedIssue,
       | 'identifier'
@@ -2040,19 +2135,20 @@ export function createProviderIssueHandoffService(
     cleanupWorkspace?: boolean;
   }): Promise<void> => {
     const now = isoTimestamp();
-    const nextTaskId = input.releaseRun?.taskId ?? input.claim.task_id;
-    const nextRunId = input.releaseRun?.runId ?? input.claim.run_id;
-    const nextManifestPath = input.releaseRun?.manifestPath ?? input.claim.run_manifest_path;
     const trackedIssueFields = input.trackedIssue
       ? buildTrackedIssueClaimFields(input.trackedIssue)
       : null;
+    const retainedRunIdentity = resolveReleasedClaimRetainedRunIdentity({
+      claim: input.claim,
+      run: input.releaseRun,
+      allowClearing: input.allowClearingRunIdentity,
+      trackedIssue: input.trackedIssue ?? null
+    });
     const transitioned = hasProviderClaimTransitioned(input.claim, {
       ...(trackedIssueFields ?? {}),
       state: 'released',
       reason: input.nextReason,
-      task_id: nextTaskId,
-      run_id: nextRunId,
-      run_manifest_path: nextManifestPath,
+      ...retainedRunIdentity,
       ...clearProviderRetryFields()
     });
     await upsertProviderClaimAndPersist({
@@ -2083,11 +2179,9 @@ export function createProviderIssueHandoffService(
           ? input.trackedIssue.assignee_name
           : (input.claim.issue_assignee_name ?? null),
       issue_blocked_by: input.trackedIssue?.blocked_by ?? input.claim.issue_blocked_by ?? null,
-      task_id: nextTaskId,
+      ...retainedRunIdentity,
       state: 'released',
       reason: input.nextReason,
-      run_id: nextRunId,
-      run_manifest_path: nextManifestPath,
       ...clearProviderRetryFields(),
       updated_at: now
     });
@@ -2095,8 +2189,8 @@ export function createProviderIssueHandoffService(
     if (input.cleanupWorkspace && canCleanupReleasedProviderWorkspace(input.releaseRun)) {
       await cleanupReleasedProviderWorkspace({
         repoRoot,
-        taskId: nextTaskId,
-        manifestPath: nextManifestPath,
+        taskId: input.releaseRun?.taskId ?? input.claim.task_id,
+        manifestPath: input.releaseRun?.manifestPath ?? input.claim.run_manifest_path,
         issueId: input.claim.issue_id,
         issueIdentifier: input.claim.issue_identifier,
         providerWorkflowConfigStore: options.providerWorkflowConfigStore ?? null,
@@ -2212,6 +2306,74 @@ export function createProviderIssueHandoffService(
     await cancelState.attempt;
   };
 
+  const buildClearedRehydratedLaunchProvenance = (): ProviderRehydratedLaunchProvenanceFields => ({
+    launch_source: null,
+    launch_token: null
+  });
+
+  const claimIdentifiesActiveRun = (
+    claim: ProviderIntakeClaimRecord,
+    activeRun: ProviderIssueRunRecord
+  ): boolean => {
+    const claimRunId = normalizeOptionalString(claim.run_id);
+    const claimManifestPath = normalizeOptionalString(claim.run_manifest_path);
+    const runIdMatches = claimRunId !== null && claimRunId === activeRun.runId;
+    const manifestMatches =
+      claimManifestPath !== null &&
+      (
+        claimManifestPath === activeRun.manifestPath ||
+        resolve(claimManifestPath) === resolve(activeRun.manifestPath)
+      );
+
+    if (claimRunId && claimManifestPath) {
+      return runIdMatches && manifestMatches;
+    }
+    return runIdMatches || manifestMatches;
+  };
+
+  const resolveRehydratedActiveRunLaunchProvenance = (input: {
+    claim: ProviderIntakeClaimRecord;
+    activeRun: ProviderIssueRunRecord;
+  }): ProviderRehydratedLaunchProvenanceFields => {
+    const launchToken = normalizeOptionalString(input.claim.launch_token);
+    if (
+      input.claim.launch_source !== PROVIDER_LAUNCH_SOURCE ||
+      !launchToken ||
+      input.claim.state === 'resumable' ||
+      !claimIdentifiesActiveRun(input.claim, input.activeRun)
+    ) {
+      return buildClearedRehydratedLaunchProvenance();
+    }
+
+    const manifest = input.activeRun.manifest;
+
+    const manifestLaunchSource =
+      normalizeOptionalString(manifest.provider_launch_source) ??
+      normalizeOptionalString(manifest.providerLaunchSource);
+    const manifestTaskId =
+      normalizeOptionalString(manifest.provider_control_host_task_id) ??
+      normalizeOptionalString(manifest.providerControlHostTaskId);
+    const manifestRunId =
+      normalizeOptionalString(manifest.provider_control_host_run_id) ??
+      normalizeOptionalString(manifest.providerControlHostRunId);
+    const manifestMatchesControlHostLocator =
+      controlHostRunLocator !== null &&
+      manifestLaunchSource === PROVIDER_LAUNCH_SOURCE &&
+      manifestTaskId === controlHostRunLocator.taskId &&
+      manifestRunId === controlHostRunLocator.runId;
+    if (manifestMatchesControlHostLocator) {
+      return {
+        launch_source: PROVIDER_LAUNCH_SOURCE,
+        launch_token: launchToken
+      };
+    }
+
+    logger.warn(
+      `[provider-issue-handoff] cannot preserve rehydrated control-host launch provenance for ${input.claim.issue_identifier}: active run manifest provenance is incomplete or mismatched`
+    );
+    return buildClearedRehydratedLaunchProvenance();
+  };
+
   const rehydrateNow = async (input?: {
     refreshTrackedIssueMetadata?: boolean;
   }): Promise<{ hasPendingClaims: boolean }> => {
@@ -2302,6 +2464,10 @@ export function createProviderIssueHandoffService(
             startedWorkerIssue
           ) {
             const workerHost = resolveRehydratedActiveRunWorkerHost(activeRun, claim);
+            const launchProvenance = await resolveRehydratedActiveRunLaunchProvenance({
+              claim,
+              activeRun
+            });
             const trackedIssueFields = freshTrackedIssue.claimFields;
             const reactivatedMergeCloseoutReset =
               claim.reason === 'provider_issue_rehydrated_active_run'
@@ -2315,14 +2481,14 @@ export function createProviderIssueHandoffService(
               run_id: activeRun.runId,
               run_manifest_path: activeRun.manifestPath,
               worker_host: workerHost,
+              ...launchProvenance,
               ...buildActiveRunRetryFields(claim),
               ...reactivatedMergeCloseoutReset
             });
             upsertRehydratedProviderIntakeClaim({
               ...claim,
               ...trackedIssueFields,
-              launch_source: undefined,
-              launch_token: undefined,
+              ...launchProvenance,
               task_id: activeRun.taskId,
               state: 'running',
               reason: 'provider_issue_rehydrated_active_run',
@@ -2342,14 +2508,19 @@ export function createProviderIssueHandoffService(
           const releaseClaimFields = freshTrackedIssue.releaseClaimFields;
           const releaseReason =
             freshTrackedIssue.releaseReason ?? claim.reason ?? 'provider_issue_released';
-          const releasedRunForActiveClaim = releasedRun ?? activeRun;
+          const releasedRunForActiveClaim = releasedRun ?? activeRun ?? null;
+          const retainedRunIdentity = resolveReleasedClaimRetainedRunIdentity({
+            claim,
+            run: releasedRunForActiveClaim,
+            trackedIssue: freshTrackedIssue.trackedIssue,
+            issueState: releaseClaimFields.issue_state ?? null,
+            issueStateType: releaseClaimFields.issue_state_type ?? null
+          });
           const releasedClaimTransitioned = hasProviderClaimTransitioned(claim, {
             ...releaseClaimFields,
             state: 'released',
             reason: releaseReason,
-            task_id: releasedRunForActiveClaim?.taskId ?? claim.task_id,
-            run_id: releasedRunForActiveClaim?.runId ?? claim.run_id,
-            run_manifest_path: releasedRunForActiveClaim?.manifestPath ?? claim.run_manifest_path
+            ...retainedRunIdentity
           });
           publishRuntime ||= releasedClaimTransitioned;
           upsertRehydratedProviderIntakeClaim({
@@ -2357,11 +2528,9 @@ export function createProviderIssueHandoffService(
             ...releaseClaimFields,
             launch_source: undefined,
             launch_token: undefined,
-            task_id: releasedRunForActiveClaim?.taskId ?? claim.task_id,
+            ...retainedRunIdentity,
             state: 'released',
             reason: releaseReason,
-            run_id: releasedRunForActiveClaim?.runId ?? claim.run_id,
-            run_manifest_path: releasedRunForActiveClaim?.manifestPath ?? claim.run_manifest_path,
             updated_at: releasedClaimTransitioned ? now : claim.updated_at
           });
           if (shouldAttemptReleaseCancel(releasedRun)) {
@@ -2387,6 +2556,10 @@ export function createProviderIssueHandoffService(
         const activeRun = attachableClaimRuns.find((run) => run.status === 'in_progress');
         if (activeRun) {
           const workerHost = resolveRehydratedActiveRunWorkerHost(activeRun, claim);
+          const launchProvenance = await resolveRehydratedActiveRunLaunchProvenance({
+            claim,
+            activeRun
+          });
           const preserveMergeCloseoutClaim =
             isProviderMergeCloseoutWatchingClaim(claim) || isTerminalProviderMergeCloseoutClaim(claim);
           const freshTrackedIssue = input?.refreshTrackedIssueMetadata
@@ -2421,14 +2594,14 @@ export function createProviderIssueHandoffService(
             run_id: activeRun.runId,
             run_manifest_path: activeRun.manifestPath,
             worker_host: workerHost,
+            ...launchProvenance,
             ...buildActiveRunRetryFields(claim),
             ...reactivatedMergeCloseoutReset
           });
           upsertRehydratedProviderIntakeClaim({
             ...claim,
             ...trackedIssueFields,
-            launch_source: undefined,
-            launch_token: undefined,
+            ...launchProvenance,
             task_id: activeRun.taskId,
             state: 'running',
             reason: 'provider_issue_rehydrated_active_run',
@@ -2904,6 +3077,147 @@ export function createProviderIssueHandoffService(
     return resolution;
   };
 
+  const canRefreshRetainedReleasedNotActiveClaimMetadataOnly = (input: {
+    claim: ProviderIntakeClaimRecord;
+    trackedIssue: Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at' | 'blocked_by'>;
+  }): boolean => {
+    if (
+      input.claim.state !== 'released' ||
+      input.claim.reason !== 'provider_issue_released:not_active'
+    ) {
+      return false;
+    }
+    const trackedIssueWorkflowState = classifyProviderLinearWorkflowState({
+      state: input.trackedIssue.state,
+      state_type: input.trackedIssue.state_type
+    });
+    return (
+      (
+        trackedIssueWorkflowState.normalizedStateType === 'started' ||
+        isProviderLinearTrackedIssueEligibleForExecution(input.trackedIssue)
+      ) &&
+      isTrackedIssueFreshEnoughForClaim(input.claim, input.trackedIssue)
+    );
+  };
+
+  const shouldPromoteRetainedReleasedNotActiveClaimPendingReopen = (input: {
+    claim: Pick<
+      ProviderIntakeClaimRecord,
+      | 'state'
+      | 'reason'
+      | 'issue_state'
+      | 'issue_state_type'
+      | 'issue_updated_at'
+      | 'issue_blocked_by'
+      | 'merge_closeout'
+    >;
+    releaseRun: ProviderIssueRunRecord | null;
+    trackedIssue: Pick<
+      LiveLinearTrackedIssue,
+      | 'updated_at'
+      | 'state'
+      | 'state_type'
+      | 'archived_at'
+      | 'trashed'
+      | 'viewer_id'
+      | 'assignee_id'
+      | 'blocked_by'
+    >;
+  }): boolean => {
+    if (!isProviderLinearTrackedIssueEligibleForExecution(input.trackedIssue)) {
+      return false;
+    }
+    const latestReleasedIssueUpdatedAt = selectMostRecentTrackedIssueUpdatedAt(
+      input.claim.issue_updated_at ?? null,
+      resolveReleasedRunIssueUpdatedAtForReclaim(input.claim, input.releaseRun)
+    );
+    const updatedAtComparison = compareTrackedIssueUpdatedAt({
+      existingIssueUpdatedAt: latestReleasedIssueUpdatedAt,
+      nextIssueUpdatedAt: input.trackedIssue.updated_at
+    });
+    return (
+      updatedAtComparison === 'newer' ||
+      (
+        updatedAtComparison === 'equal' &&
+        shouldReopenReleasedClaimAtCurrentTimestamp({
+          claim: input.claim,
+          trackedIssue: input.trackedIssue
+        })
+      )
+    );
+  };
+
+  const refreshRetainedReleasedNotActiveClaimMetadata = async (input: {
+    claim: ProviderIntakeClaimRecord;
+    releaseRun: ProviderIssueRunRecord | null;
+    trackedIssue: Pick<
+      LiveLinearTrackedIssue,
+      | 'updated_at'
+      | 'state'
+      | 'state_type'
+      | 'blocked_by'
+      | 'archived_at'
+      | 'trashed'
+      | 'viewer_id'
+      | 'assignee_id'
+    >;
+  }): Promise<ProviderIntakeClaimRecord> => {
+    if (!canRefreshRetainedReleasedNotActiveClaimMetadataOnly(input)) {
+      return input.claim;
+    }
+    const nextReason =
+      shouldPromoteRetainedReleasedNotActiveClaimPendingReopen({
+        claim: input.claim,
+        releaseRun: input.releaseRun,
+        trackedIssue: input.trackedIssue
+      })
+        ? markProviderIssueReleasedPendingReopen(input.claim.reason ?? null)
+        : input.claim.reason;
+    const trackedIssueFields: Partial<
+      Pick<
+        ProviderIntakeClaimRecord,
+        'issue_state' | 'issue_state_type' | 'issue_updated_at' | 'issue_blocked_by'
+      >
+    > = {
+      issue_state: input.trackedIssue.state,
+      issue_state_type: input.trackedIssue.state_type,
+      issue_updated_at: input.trackedIssue.updated_at
+    };
+    if (
+      isPlainReleasedBlockedByCompletedOnlyClaim(input.claim) &&
+      input.trackedIssue.blocked_by !== undefined
+    ) {
+      const nonTerminalBlockers = filterNonTerminalProviderIssueBlockers(
+        input.trackedIssue.blocked_by
+      );
+      trackedIssueFields.issue_blocked_by = nonTerminalBlockers;
+    }
+    const transitioned = hasProviderClaimTransitioned(input.claim, {
+      ...trackedIssueFields,
+      state: 'released',
+      reason: nextReason,
+      task_id: input.claim.task_id,
+      run_id: input.claim.run_id,
+      run_manifest_path: input.claim.run_manifest_path
+    });
+    if (!transitioned) {
+      return input.claim;
+    }
+    const refreshedClaim = await upsertProviderClaimAndPersist({
+      ...input.claim,
+      ...trackedIssueFields,
+      launch_source: undefined,
+      launch_token: undefined,
+      task_id: input.claim.task_id,
+      state: 'released',
+      reason: nextReason,
+      run_id: input.claim.run_id,
+      run_manifest_path: input.claim.run_manifest_path
+    });
+    options.publishRuntime?.('provider-intake.refresh');
+    return refreshedClaim;
+  };
+
   const resolveRetryDispatchResolutionFromPoll = async (
     claim: ProviderIntakeClaimRecord
   ):
@@ -3007,152 +3321,154 @@ export function createProviderIssueHandoffService(
   };
 
   async function dispatchQueuedProviderRetry(providerKey: string, expectedDueAt: string): Promise<void> {
-    await runOutsideRefreshLifecycleScope(() => runWithFreshProviderIssueRunDiscoveryCache(async () => {
-      await runWithRefreshLifecycleLock(async () => {
-        const claim = readProviderIntakeClaim(options.state, providerKey);
-        if (
-          !claim ||
-          claim.retry_queued !== true ||
-          claim.retry_due_at !== expectedDueAt
-        ) {
-          return;
-        }
-        if (resolveProviderIssuePollFailClosedReason(claim)) {
-          return;
-        }
-
-        const claimRuns = await discoverProviderIssueRunsForCurrentOperation({
-          provider: claim.provider,
-          issueId: claim.issue_id
-        });
-        const attachableClaimRuns = filterProviderIssueRunsForStartPipeline(claimRuns, startPipelineId);
-        const activeRun = attachableClaimRuns.find((run) => run.status === 'in_progress') ?? null;
-        if (claim.state === 'starting' || claim.state === 'resuming' || activeRun) {
-          scheduleBestEffortRehydrateWithRefreshLock();
-          return;
-        }
-
-        const latestRun = resolveLatestKnownProviderRun(attachableClaimRuns);
-        const releaseRun = resolveProviderReleaseRun(claim, attachableClaimRuns);
-        const resolution = await resolveRetryDispatchResolution(claim);
-
-        if (resolution.kind === 'skip') {
-          if (isProviderIssuePollFailClosedReason(resolution.reason)) {
+    await runOutsideConfiguredWorkerHostsScope(async () => {
+      await runOutsideRefreshLifecycleScope(() => runWithFreshProviderIssueRunDiscoveryCache(async () => {
+        await runWithRefreshLifecycleLock(async () => {
+          const claim = readProviderIntakeClaim(options.state, providerKey);
+          if (
+            !claim ||
+            claim.retry_queued !== true ||
+            claim.retry_due_at !== expectedDueAt
+          ) {
             return;
           }
-          const retrySkipSnapshot = captureProviderStateSnapshot();
-          upsertProviderIntakeClaim(options.state, {
-            ...claim,
-            ...buildQueuedProviderRetryFields({
-              claim,
-              previousRun: latestRun,
-              error: `retry poll failed: ${resolution.reason}`,
-              preserveCurrentAttempt: true,
-              delayType: 'failure'
-            })
-          });
-          await persistStateOrRollback(retrySkipSnapshot, { rollbackOnPersistFailure: false });
-          options.publishRuntime?.('provider-intake.refresh');
-          return;
-        }
-
-        if (resolution.kind === 'release') {
-          await releaseClaim({
-            claim,
-            nextReason: `provider_issue_released:${resolution.reason}`,
-            releaseRun,
-            trackedIssue: resolution.trackedIssue,
-            cleanupWorkspace: resolution.cleanupWorkspace
-          });
-          return;
-        }
-
-        if (resolution.kind === 'owned') {
-          const reviewPromotionClaim = await maybeHandleReviewHandoffPromotion({
-            claim,
-            trackedIssue: resolution.trackedIssue,
-            latestRun
-          });
-          if (reviewPromotionClaim) {
-            options.publishRuntime?.('provider-intake.refresh');
+          if (resolveProviderIssuePollFailClosedReason(claim)) {
             return;
           }
-          const queuedRetryFields = buildQueuedProviderRetryFields({
-            claim,
-            previousRun: latestRun,
-            error: claim.retry_error ?? resolveProviderRetryErrorFromRun(latestRun),
-            preserveCurrentAttempt: true,
-            delayType: resolveProviderRetryDelayType({
-              claim,
-              previousRun: latestRun
-            })
-          });
-          const transitioned = hasProviderClaimTransitioned(claim, {
-            ...buildTrackedIssueClaimFields(resolution.trackedIssue),
-            state: claim.state,
-            reason: 'provider_issue_handoff_owned',
-            task_id: latestRun?.taskId ?? claim.task_id,
-            run_id: latestRun?.runId ?? claim.run_id,
-            run_manifest_path: latestRun?.manifestPath ?? claim.run_manifest_path,
-            ...queuedRetryFields
-          });
-          const ownedRetrySnapshot = captureProviderStateSnapshot();
-          upsertProviderIntakeClaim(options.state, {
-            ...claim,
-            ...buildTrackedIssueClaimFields(resolution.trackedIssue),
-            task_id: latestRun?.taskId ?? claim.task_id,
-            state: claim.state,
-            reason: 'provider_issue_handoff_owned',
-            run_id: latestRun?.runId ?? claim.run_id,
-            run_manifest_path: latestRun?.manifestPath ?? claim.run_manifest_path,
-            ...queuedRetryFields
-          });
-          await persistStateOrRollback(ownedRetrySnapshot);
-          if (transitioned) {
-            options.publishRuntime?.('provider-intake.refresh');
-          }
-          return;
-        }
 
-        if (latestRun && latestRun.status && RESUME_ELIGIBLE_STATUSES.has(latestRun.status)) {
-          if (hasPendingReleaseCancel(releaseRun?.manifestPath ?? latestRun.manifestPath)) {
+          const claimRuns = await discoverProviderIssueRunsForCurrentOperation({
+            provider: claim.provider,
+            issueId: claim.issue_id
+          });
+          const attachableClaimRuns = filterProviderIssueRunsForStartPipeline(claimRuns, startPipelineId);
+          const activeRun = attachableClaimRuns.find((run) => run.status === 'in_progress') ?? null;
+          if (claim.state === 'starting' || claim.state === 'resuming' || activeRun) {
             scheduleBestEffortRehydrateWithRefreshLock();
             return;
           }
-          await launchResumeForRun({
+
+          const latestRun = resolveLatestKnownProviderRun(attachableClaimRuns);
+          const releaseRun = resolveProviderReleaseRun(claim, attachableClaimRuns);
+          const resolution = await resolveRetryDispatchResolution(claim);
+
+          if (resolution.kind === 'skip') {
+            if (isProviderIssuePollFailClosedReason(resolution.reason)) {
+              return;
+            }
+            const retrySkipSnapshot = captureProviderStateSnapshot();
+            upsertProviderIntakeClaim(options.state, {
+              ...claim,
+              ...buildQueuedProviderRetryFields({
+                claim,
+                previousRun: latestRun,
+                error: `retry poll failed: ${resolution.reason}`,
+                preserveCurrentAttempt: true,
+                delayType: 'failure'
+              })
+            });
+            await persistStateOrRollback(retrySkipSnapshot, { rollbackOnPersistFailure: false });
+            options.publishRuntime?.('provider-intake.refresh');
+            return;
+          }
+
+          if (resolution.kind === 'release') {
+            await releaseClaim({
+              claim,
+              nextReason: `provider_issue_released:${resolution.reason}`,
+              releaseRun,
+              trackedIssue: resolution.trackedIssue,
+              cleanupWorkspace: resolution.cleanupWorkspace
+            });
+            return;
+          }
+
+          if (resolution.kind === 'owned') {
+            const reviewPromotionClaim = await maybeHandleReviewHandoffPromotion({
+              claim,
+              trackedIssue: resolution.trackedIssue,
+              latestRun
+            });
+            if (reviewPromotionClaim) {
+              options.publishRuntime?.('provider-intake.refresh');
+              return;
+            }
+            const queuedRetryFields = buildQueuedProviderRetryFields({
+              claim,
+              previousRun: latestRun,
+              error: claim.retry_error ?? resolveProviderRetryErrorFromRun(latestRun),
+              preserveCurrentAttempt: true,
+              delayType: resolveProviderRetryDelayType({
+                claim,
+                previousRun: latestRun
+              })
+            });
+            const transitioned = hasProviderClaimTransitioned(claim, {
+              ...buildTrackedIssueClaimFields(resolution.trackedIssue),
+              state: claim.state,
+              reason: 'provider_issue_handoff_owned',
+              task_id: latestRun?.taskId ?? claim.task_id,
+              run_id: latestRun?.runId ?? claim.run_id,
+              run_manifest_path: latestRun?.manifestPath ?? claim.run_manifest_path,
+              ...queuedRetryFields
+            });
+            const ownedRetrySnapshot = captureProviderStateSnapshot();
+            upsertProviderIntakeClaim(options.state, {
+              ...claim,
+              ...buildTrackedIssueClaimFields(resolution.trackedIssue),
+              task_id: latestRun?.taskId ?? claim.task_id,
+              state: claim.state,
+              reason: 'provider_issue_handoff_owned',
+              run_id: latestRun?.runId ?? claim.run_id,
+              run_manifest_path: latestRun?.manifestPath ?? claim.run_manifest_path,
+              ...queuedRetryFields
+            });
+            await persistStateOrRollback(ownedRetrySnapshot);
+            if (transitioned) {
+              options.publishRuntime?.('provider-intake.refresh');
+            }
+            return;
+          }
+
+          if (latestRun && latestRun.status && RESUME_ELIGIBLE_STATUSES.has(latestRun.status)) {
+            if (hasPendingReleaseCancel(releaseRun?.manifestPath ?? latestRun.manifestPath)) {
+              scheduleBestEffortRehydrateWithRefreshLock();
+              return;
+            }
+            await launchResumeForRun({
+              claim,
+              trackedIssue: resolution.trackedIssue,
+              run: latestRun,
+              reason: PROVIDER_RETRY_RESUME_LAUNCHED_REASON,
+              failureReason: PROVIDER_RETRY_RESUME_FAILED_REASON,
+              launcherReason: 'provider-retry'
+            });
+            return;
+          }
+
+          if (latestRun && latestRun.status !== 'succeeded' && latestRun.status !== null) {
+            scheduleBestEffortRehydrateWithRefreshLock();
+            return;
+          }
+
+          const startReason =
+            latestRun?.status === 'succeeded'
+              ? PROVIDER_POST_WORKER_EXIT_START_LAUNCHED_REASON
+              : PROVIDER_RETRY_START_LAUNCHED_REASON;
+          const startFailureReason =
+            latestRun?.status === 'succeeded'
+              ? PROVIDER_POST_WORKER_EXIT_START_FAILED_REASON
+              : PROVIDER_RETRY_START_FAILED_REASON;
+          await launchStartForTrackedIssue({
             claim,
             trackedIssue: resolution.trackedIssue,
-            run: latestRun,
-            reason: PROVIDER_RETRY_RESUME_LAUNCHED_REASON,
-            failureReason: PROVIDER_RETRY_RESUME_FAILED_REASON,
-            launcherReason: 'provider-retry'
+            reason: startReason,
+            failureReason: startFailureReason,
+            previousRun: latestRun,
+            preserveRetryAttempt: true
           });
-          return;
-        }
-
-        if (latestRun && latestRun.status !== 'succeeded' && latestRun.status !== null) {
-          scheduleBestEffortRehydrateWithRefreshLock();
-          return;
-        }
-
-        const startReason =
-          latestRun?.status === 'succeeded'
-            ? PROVIDER_POST_WORKER_EXIT_START_LAUNCHED_REASON
-            : PROVIDER_RETRY_START_LAUNCHED_REASON;
-        const startFailureReason =
-          latestRun?.status === 'succeeded'
-            ? PROVIDER_POST_WORKER_EXIT_START_FAILED_REASON
-            : PROVIDER_RETRY_START_FAILED_REASON;
-        await launchStartForTrackedIssue({
-          claim,
-          trackedIssue: resolution.trackedIssue,
-          reason: startReason,
-          failureReason: startFailureReason,
-          previousRun: latestRun,
-          preserveRetryAttempt: true
         });
-      });
-    }));
+      }));
+    });
   }
 
   const processTrackedIssueCandidate = async (input: {
@@ -3255,6 +3571,13 @@ export function createProviderIssueHandoffService(
             )
           );
         const preserveReleasedIssueMetadata = replayBlockedByReleasedMetadata;
+        const refreshTerminalBlockerStaleReleasedMetadata =
+          replayBlockedByReleasedMetadata &&
+          shouldRefreshTerminalBlockerStaleReleasedMetadata({
+            claim: existing,
+            trackedIssue: input.trackedIssue,
+            releasedWebhookTiming
+          });
         const reopenBlockedByReleaseDrain =
           releaseCancelPending &&
           (
@@ -3277,87 +3600,76 @@ export function createProviderIssueHandoffService(
                     ? mergeReleasedTrackedIssueMutability(existing, claimBase)
                     : resolveProviderClaimMutabilityTruth(existing)
                 )
-              : {
-                  issue_archived_at: claimBase.issue_archived_at,
-                  issue_trashed: claimBase.issue_trashed
-                };
+            : {
+                issue_archived_at: claimBase.issue_archived_at,
+                issue_trashed: claimBase.issue_trashed
+              };
+        const releasedIssueMetadata =
+          reopenBlockedByReleaseDrain
+            ? claimBase
+            : refreshTerminalBlockerStaleReleasedMetadata
+              ? {
+                  ...existing,
+                  issue_state: claimBase.issue_state,
+                  issue_state_type: claimBase.issue_state_type,
+                  issue_updated_at: claimBase.issue_updated_at
+                }
+              : preserveReleasedIssueMetadata
+                ? existing
+                : claimBase;
         if (
           releaseCancelPending ||
           replayBlockedByReleasedMetadata
         ) {
+          const nextReleasedIssueState = releasedIssueMetadata.issue_state;
+          const nextReleasedIssueStateType = releasedIssueMetadata.issue_state_type;
+          const canUseWebhookTruthForRetainedIdentity =
+            releasedWebhookTiming === 'newer' ||
+            releasedWebhookTiming === 'equal';
+          const retainedRunIdentity = resolveReleasedClaimRetainedRunIdentity({
+            claim: existing,
+            run: releasedRun,
+            allowClearing: canUseWebhookTruthForRetainedIdentity,
+            trackedIssue: canUseWebhookTruthForRetainedIdentity ? input.trackedIssue : null,
+            issueState:
+              canUseWebhookTruthForRetainedIdentity
+                ? nextReleasedIssueState
+                : existing.issue_state,
+            issueStateType:
+              canUseWebhookTruthForRetainedIdentity
+                ? nextReleasedIssueStateType
+                : existing.issue_state_type
+          });
           const claim = await upsertProviderClaimAndPersist({
             ...claimBase,
-            issue_identifier:
-              reopenBlockedByReleaseDrain
-                ? claimBase.issue_identifier
-                : preserveReleasedIssueMetadata
-                  ? existing.issue_identifier
-                  : claimBase.issue_identifier,
-            issue_title:
-              reopenBlockedByReleaseDrain
-                ? claimBase.issue_title
-                : preserveReleasedIssueMetadata
-                  ? existing.issue_title
-                  : claimBase.issue_title,
-            issue_state:
-              reopenBlockedByReleaseDrain
-                ? claimBase.issue_state
-                : preserveReleasedIssueMetadata
-                  ? existing.issue_state
-                  : claimBase.issue_state,
-            issue_state_type:
-              reopenBlockedByReleaseDrain
-                ? claimBase.issue_state_type
-                : preserveReleasedIssueMetadata
-                  ? existing.issue_state_type
-                  : claimBase.issue_state_type,
-            issue_updated_at:
-              reopenBlockedByReleaseDrain
-                ? claimBase.issue_updated_at
-                : preserveReleasedIssueMetadata
-                  ? existing.issue_updated_at
-                  : claimBase.issue_updated_at,
+            issue_identifier: releasedIssueMetadata.issue_identifier,
+            issue_title: releasedIssueMetadata.issue_title,
+            issue_state: releasedIssueMetadata.issue_state,
+            issue_state_type: releasedIssueMetadata.issue_state_type,
+            issue_updated_at: releasedIssueMetadata.issue_updated_at,
             issue_archived_at: releasedMutabilityTruth.issue_archived_at,
             issue_trashed: releasedMutabilityTruth.issue_trashed,
             issue_viewer_id:
-              reopenBlockedByReleaseDrain
-                ? claimBase.issue_viewer_id
-                : preserveReleasedIssueMetadata
-                  ? existing.issue_viewer_id ?? null
-                  : claimBase.issue_viewer_id,
+              releasedIssueMetadata.issue_viewer_id ?? null,
             issue_viewer_auth_fingerprint:
-              reopenBlockedByReleaseDrain
-                ? claimBase.issue_viewer_auth_fingerprint
-                : preserveReleasedIssueMetadata
-                  ? existing.issue_viewer_auth_fingerprint ?? null
-                  : claimBase.issue_viewer_auth_fingerprint,
+              releasedIssueMetadata.issue_viewer_auth_fingerprint ?? null,
             issue_assignee_id:
-              reopenBlockedByReleaseDrain
-                ? claimBase.issue_assignee_id
-                : preserveReleasedIssueMetadata
-                  ? existing.issue_assignee_id ?? null
-                  : claimBase.issue_assignee_id,
+              releasedIssueMetadata.issue_assignee_id ?? null,
             issue_assignee_name:
-              reopenBlockedByReleaseDrain
-                ? claimBase.issue_assignee_name
-                : preserveReleasedIssueMetadata
-                  ? existing.issue_assignee_name ?? null
-                  : claimBase.issue_assignee_name,
+              releasedIssueMetadata.issue_assignee_name ?? null,
             issue_blocked_by:
-              reopenBlockedByReleaseDrain
-                ? claimBase.issue_blocked_by
-                : preserveReleasedIssueMetadata
-                  ? existing.issue_blocked_by
-                  : claimBase.issue_blocked_by,
-            task_id: releasedRun?.taskId ?? existing.task_id,
+              refreshTerminalBlockerStaleReleasedMetadata
+                ? filterNonTerminalProviderIssueBlockers(claimBase.issue_blocked_by)
+                : releasedIssueMetadata.issue_blocked_by,
+            ...retainedRunIdentity,
             mapping_source: existing.mapping_source,
             state: 'released',
             reason:
               reopenBlockedByReleaseDrain
                 ? markProviderIssueReleasedPendingReopen(existing.reason ?? null)
+                : refreshTerminalBlockerStaleReleasedMetadata && pendingReleasedReopen
+                  ? markProviderIssueReleasedPendingReopen(existing.reason ?? null)
                 : existing.reason ?? 'provider_issue_released',
-            run_id: releasedRun?.runId ?? existing.run_id,
-            run_manifest_path: releasedRun?.manifestPath ?? existing.run_manifest_path,
           });
           return { kind: 'ignored', reason: claim.reason ?? 'provider_issue_released', claim };
         }
@@ -3422,6 +3734,7 @@ export function createProviderIssueHandoffService(
               claim: existing,
               nextReason: eligibility.releaseReason,
               releaseRun,
+              allowClearingRunIdentity: input.webhookTimestamp !== null,
               trackedIssue: input.trackedIssue,
               cleanupWorkspace: eligibility.cleanupWorkspace
             });
@@ -3516,11 +3829,14 @@ export function createProviderIssueHandoffService(
               ? {}
               : { review_promotion: null, merge_closeout: null };
           const workerHost = resolveRehydratedActiveRunWorkerHost(activeRun, existing);
+          const launchProvenance = await resolveRehydratedActiveRunLaunchProvenance({
+            claim: existing,
+            activeRun
+          });
           const claim = await upsertProviderClaimAndPersist({
             ...existing,
             ...trackedIssueFields,
-            launch_source: undefined,
-            launch_token: undefined,
+            ...launchProvenance,
             task_id: activeRun.taskId,
             state: 'running',
             reason: 'provider_issue_rehydrated_active_run',
@@ -4175,15 +4491,23 @@ export function createProviderIssueHandoffService(
             scheduleBestEffortRehydrateWithRefreshLock();
           }
 
-          const trackedIssuesByKey = pollInput ? buildTrackedIssuePollMap(pollInput.trackedIssues) : null;
-        const consumedTrackedIssueKeys = new Set<string>();
-        if (!options.resolveTrackedIssue && !trackedIssuesByKey) {
-          return;
-        }
+          const trackedIssuesByKey = pollInput
+            ? buildTrackedIssuePollMap(pollInput.trackedIssues)
+            : null;
+          let trackedIssueBlockersByKey = pollInput
+            ? buildTrackedIssuePollBlockerMap(pollInput.trackedIssues)
+            : null;
+          const deferredRetainedReleasedBlockerRefreshProviderKeys = new Set<string>();
+          const consumedTrackedIssueKeys = new Set<string>();
+          if (!options.resolveTrackedIssue && !trackedIssuesByKey) {
+            return;
+          }
 
         const discoveredRuns = await discoverProviderIssueRunsForCurrentOperation();
         const runsByProviderIssue = groupProviderIssueRuns(discoveredRuns);
-        const pollDispatchBudget = createProviderPollDispatchBudget(options.readFeatureToggles?.() ?? null);
+        const pollDispatchBudget = createProviderPollDispatchBudget(options.readFeatureToggles?.() ?? null, {
+          localWorkerOnly: await resolveLocalWorkerOnlyForCurrentOperation()
+        });
         const occupiedPollDispatchKeys = new Set<string>();
         const occupiedPollDispatchProviderKeys = new Set<string>();
         const occupiedPollDispatchStateByKey = new Map<
@@ -4454,13 +4778,31 @@ export function createProviderIssueHandoffService(
             ) &&
             !canFreshDiscoverReleasedMissingRetainedRun &&
             !canFreshDiscoverReleasedLiveWorker;
+          const retainedReleasedBlockerSnapshot =
+            trackedIssueBlockersByKey?.get(claimProviderKey) ?? null;
+          const shouldRefreshReleasedNotActiveMetadataFromBlockerSnapshot =
+            shouldUseTrackedIssueBlockerSnapshotForRetainedReleasedNotActiveMetadataRefresh({
+              claim,
+              blocker: retainedReleasedBlockerSnapshot
+            });
+          if (
+            pollInput?.deferFreshDiscovery === true &&
+            trackedIssueRefetch &&
+            retainedReleasedBlockerSnapshot === null &&
+            shouldBlockPlainReleasedWithoutConcreteRetainedRunFreshDiscovery
+          ) {
+            deferredRetainedReleasedBlockerRefreshProviderKeys.add(claimProviderKey);
+          }
           const allowDirectIssueById =
             (
               !boundPreDiscoveryIssueByIdReads ||
               activeRun !== null ||
               preDiscoveryNonActiveIssueByIdReads < preDiscoveryIssueByIdReadLimit
             ) &&
-            !shouldBlockPlainReleasedWithoutConcreteRetainedRunFreshDiscovery &&
+            (
+              !shouldBlockPlainReleasedWithoutConcreteRetainedRunFreshDiscovery ||
+              shouldRefreshReleasedNotActiveMetadataFromBlockerSnapshot
+            ) &&
             !shouldBlockPendingReopenFreshDiscovery;
           const resolution = await resolveRefreshTrackedIssueResolution({
             claim,
@@ -4469,7 +4811,8 @@ export function createProviderIssueHandoffService(
             allowPollFailClosed: pollInput?.deferFreshDiscovery === true,
             allowReleasedPollFailClosed:
               (pollInput?.allowPollFailClosed === true || pollInput?.deferFreshDiscovery === true) &&
-              !canFreshDiscoverReleasedLiveWorker,
+              !canFreshDiscoverReleasedLiveWorker &&
+              !shouldRefreshReleasedNotActiveMetadataFromBlockerSnapshot,
             allowDirectIssueById,
             onDirectIssueById: () => {
               refreshCounts.issue_by_id_reads += 1;
@@ -4555,6 +4898,38 @@ export function createProviderIssueHandoffService(
             ) {
               continue;
             }
+            if (
+              resolution.reason === 'not_active' &&
+              resolution.trackedIssue &&
+              shouldRefreshReleasedNotActiveMetadataFromBlockerSnapshot &&
+              canRefreshRetainedReleasedNotActiveClaimMetadataOnly({
+                claim,
+                trackedIssue: resolution.trackedIssue
+              })
+            ) {
+              await refreshRetainedReleasedNotActiveClaimMetadata({
+                claim,
+                releaseRun,
+                trackedIssue: resolution.trackedIssue
+              });
+              const releaseRunForCancel = releaseRun ?? activeRun;
+              if (
+                shouldAttemptReleaseCancel(releaseRunForCancel) &&
+                !isInactiveReleasedReclaimRun(claim, releaseRunForCancel)
+              ) {
+                void retryReleaseCancel({
+                  releaseRun: releaseRunForCancel,
+                  reason: claim.reason ?? 'provider_issue_released',
+                  assertCurrent: assertRefreshLifecycleCurrent
+                });
+              }
+              if (!activeRun) {
+                releaseOccupiedPollDispatchSlot(
+                  resolveClaimPollDispatchSlotKey(claimProviderKey, claim, activeRun)
+                );
+              }
+              continue;
+            }
             await releaseClaim({
               claim,
               nextReason: `provider_issue_released:${resolution.reason}`,
@@ -4587,6 +4962,10 @@ export function createProviderIssueHandoffService(
                 claim.reason === 'provider_issue_rehydrated_active_run'
                   ? {}
                   : { review_promotion: null, merge_closeout: null };
+              const launchProvenance = await resolveRehydratedActiveRunLaunchProvenance({
+                claim,
+                activeRun
+              });
               const transitioned = hasProviderClaimTransitioned(claim, {
                 ...trackedIssueFields,
                 state: 'running',
@@ -4595,6 +4974,7 @@ export function createProviderIssueHandoffService(
                 run_id: activeRun.runId,
                 run_manifest_path: activeRun.manifestPath,
                 worker_host: workerHost,
+                ...launchProvenance,
                 ...buildActiveRunRetryFields(claim),
                 ...reactivatedMergeCloseoutReset
               });
@@ -4602,8 +4982,7 @@ export function createProviderIssueHandoffService(
               upsertProviderIntakeClaim(options.state, {
                 ...claim,
                 ...trackedIssueFields,
-                launch_source: undefined,
-                launch_token: undefined,
+                ...launchProvenance,
                 task_id: activeRun.taskId,
                 state: 'running',
                 reason: 'provider_issue_rehydrated_active_run',
@@ -4635,24 +5014,25 @@ export function createProviderIssueHandoffService(
                 claim,
                 resolution.trackedIssue
               );
+              const retainedRunIdentity = resolveReleasedClaimRetainedRunIdentity({
+                claim,
+                run: releaseRun ?? activeRun,
+                trackedIssue: resolution.trackedIssue
+              });
               const transitioned = hasProviderClaimTransitioned(claim, {
                 ...trackedIssueFields,
                 state: 'released',
                 reason: claim.reason ?? 'provider_issue_released',
-                task_id: (releaseRun ?? activeRun).taskId,
-                run_id: (releaseRun ?? activeRun).runId,
-                run_manifest_path: (releaseRun ?? activeRun).manifestPath
+                ...retainedRunIdentity
               });
               await upsertProviderClaimAndPersist({
                 ...claim,
                 ...trackedIssueFields,
                 launch_source: undefined,
                 launch_token: undefined,
-                task_id: (releaseRun ?? activeRun).taskId,
+                ...retainedRunIdentity,
                 state: 'released',
-                reason: claim.reason ?? 'provider_issue_released',
-                run_id: (releaseRun ?? activeRun).runId,
-                run_manifest_path: (releaseRun ?? activeRun).manifestPath
+                reason: claim.reason ?? 'provider_issue_released'
               });
               if (transitioned) {
                 options.publishRuntime?.('provider-intake.refresh');
@@ -4714,6 +5094,11 @@ export function createProviderIssueHandoffService(
               releaseRun,
               trackedIssue: resolution.trackedIssue
             })) {
+              await refreshRetainedReleasedNotActiveClaimMetadata({
+                claim,
+                releaseRun,
+                trackedIssue: resolution.trackedIssue
+              });
               continue;
             }
             if (
@@ -4730,12 +5115,22 @@ export function createProviderIssueHandoffService(
                 )
               )
             ) {
+              await refreshRetainedReleasedNotActiveClaimMetadata({
+                claim,
+                releaseRun,
+                trackedIssue: resolution.trackedIssue
+              });
               if (!canFreshDiscoverReleasedMissingRetainedRun) {
                 deferredClaimFreshDiscoveryBlockedProviderKeys.add(claimProviderKey);
               }
               continue;
             }
             if (shouldBlockPendingReopenFreshDiscovery) {
+              await refreshRetainedReleasedNotActiveClaimMetadata({
+                claim,
+                releaseRun,
+                trackedIssue: resolution.trackedIssue
+              });
               deferredClaimFreshDiscoveryBlockedProviderKeys.add(claimProviderKey);
               continue;
             }
@@ -4748,6 +5143,11 @@ export function createProviderIssueHandoffService(
                 )
               )
             ) {
+              await refreshRetainedReleasedNotActiveClaimMetadata({
+                claim,
+                releaseRun,
+                trackedIssue: resolution.trackedIssue
+              });
               if (
                 !canFreshDiscoverReleasedReclaimClaim(
                   claim,
@@ -4820,6 +5220,10 @@ export function createProviderIssueHandoffService(
                 claim.reason === 'provider_issue_rehydrated_active_run'
                   ? {}
                   : { review_promotion: null, merge_closeout: null };
+              const launchProvenance = await resolveRehydratedActiveRunLaunchProvenance({
+                claim,
+                activeRun
+              });
               const transitioned = hasProviderClaimTransitioned(claim, {
                 ...trackedIssueFields,
                 state: 'running',
@@ -4828,6 +5232,7 @@ export function createProviderIssueHandoffService(
                 run_id: activeRun.runId,
                 run_manifest_path: activeRun.manifestPath,
                 worker_host: workerHost,
+                ...launchProvenance,
                 ...buildActiveRunRetryFields(claim),
                 ...reactivatedMergeCloseoutReset
               });
@@ -4835,8 +5240,7 @@ export function createProviderIssueHandoffService(
               upsertProviderIntakeClaim(options.state, {
                 ...claim,
                 ...trackedIssueFields,
-                launch_source: undefined,
-                launch_token: undefined,
+                ...launchProvenance,
                 task_id: activeRun.taskId,
                 state: 'running',
                 reason: 'provider_issue_rehydrated_active_run',
@@ -4970,6 +5374,10 @@ export function createProviderIssueHandoffService(
               claim.reason === 'provider_issue_rehydrated_active_run'
                 ? {}
                 : { review_promotion: null, merge_closeout: null };
+            const launchProvenance = await resolveRehydratedActiveRunLaunchProvenance({
+              claim,
+              activeRun
+            });
             const transitioned = hasProviderClaimTransitioned(claim, {
               ...trackedIssueFields,
               state: 'running',
@@ -4978,6 +5386,7 @@ export function createProviderIssueHandoffService(
               run_id: activeRun.runId,
               run_manifest_path: activeRun.manifestPath,
               worker_host: workerHost,
+              ...launchProvenance,
               ...buildActiveRunRetryFields(claim),
               ...reactivatedMergeCloseoutReset
             });
@@ -4985,8 +5394,7 @@ export function createProviderIssueHandoffService(
             upsertProviderIntakeClaim(options.state, {
               ...claim,
               ...trackedIssueFields,
-              launch_source: undefined,
-              launch_token: undefined,
+              ...launchProvenance,
               task_id: activeRun.taskId,
               state: 'running',
               reason: 'provider_issue_rehydrated_active_run',
@@ -5197,13 +5605,17 @@ export function createProviderIssueHandoffService(
           ? buildFreshDiscoveryConsumedProviderKeys(consumedTrackedIssueKeys, options.state.claims)
           : consumedTrackedIssueKeys;
         const dispatchFreshDiscoveryCandidates = async (
-          trackedIssues: LiveLinearTrackedIssue[]
+          trackedIssues: LiveLinearTrackedIssue[],
+          priorityIssueIds: readonly string[] = []
         ): Promise<void> => {
           refreshCounts.fresh_discovery_candidates += trackedIssues.length;
           recordRefreshProgress('refresh:fresh_dispatch', {
             requestClass: 'fresh_dispatch'
           });
-          for (const trackedIssue of sortLiveLinearTrackedIssuesForDispatch(trackedIssues)) {
+          for (const trackedIssue of sortProviderDispatchTrackedIssuesWithPriority(
+            trackedIssues,
+            priorityIssueIds
+          )) {
             assertRefreshCycleNotStuck();
             const providerKey = buildProviderIssueKey(trackedIssue.provider, trackedIssue.id);
             if (
@@ -5215,10 +5627,13 @@ export function createProviderIssueHandoffService(
               continue;
             }
             if (!pollDispatchBudget.canDispatch(trackedIssue)) {
-              if (!pollDispatchBudget.hasGlobalSlots()) {
-                break;
+              const attachableActiveRuns = filterProviderIssueRunsForStartPipeline(
+                runsByProviderIssue.get(providerKey) ?? [],
+                startPipelineId
+              ).filter((run) => run.status === 'in_progress');
+              if (attachableActiveRuns.length === 0) {
+                continue;
               }
-              continue;
             }
             recordRefreshProgress('refresh:fresh_dispatch', {
               requestClass: `fresh_dispatch:${trackedIssue.state ?? 'unknown'}`,
@@ -5258,8 +5673,156 @@ export function createProviderIssueHandoffService(
             }
           }
         };
+        const reconcileDeferredRetainedReleasedBlockerRefreshes = async (
+          trackedIssues: LiveLinearTrackedIssue[]
+        ): Promise<void> => {
+          if (
+            deferredRetainedReleasedBlockerRefreshProviderKeys.size === 0 ||
+            trackedIssues.length === 0 ||
+            !resolveTrackedIssueWhenNotStuck
+          ) {
+            return;
+          }
+          const refetchedBlockersByKey = buildTrackedIssuePollBlockerMap(trackedIssues);
+          if (trackedIssueBlockersByKey) {
+            for (const [refetchedProviderKey, blocker] of refetchedBlockersByKey.entries()) {
+              if (trackedIssueBlockersByKey.has(refetchedProviderKey)) {
+                continue;
+              }
+              trackedIssueBlockersByKey.set(refetchedProviderKey, blocker);
+            }
+          } else {
+            trackedIssueBlockersByKey = refetchedBlockersByKey;
+          }
+          for (const providerKey of Array.from(
+            deferredRetainedReleasedBlockerRefreshProviderKeys
+          )) {
+            try {
+              const blocker = trackedIssueBlockersByKey?.get(providerKey) ?? null;
+              if (!blocker) {
+                continue;
+              }
+              const claim = readProviderIntakeClaim(options.state, providerKey);
+              if (
+                !claim ||
+                !shouldUseTrackedIssueBlockerSnapshotForRetainedReleasedNotActiveMetadataRefresh({
+                  claim,
+                  blocker
+                })
+              ) {
+                continue;
+              }
+              const claimRuns = runsByProviderIssue.get(providerKey) ?? [];
+              const attachableClaimRuns = filterProviderIssueRunsForStartPipeline(
+                claimRuns,
+                startPipelineId
+              );
+              const activeRun =
+                attachableClaimRuns.find((run) => run.status === 'in_progress') ?? null;
+              const releaseRun = resolveProviderReleaseRun(claim, attachableClaimRuns);
+              refreshCounts.issue_by_id_reads += 1;
+              if (boundPreDiscoveryIssueByIdReads && activeRun === null) {
+                preDiscoveryNonActiveIssueByIdReads += 1;
+              }
+              recordRefreshProgress('refresh:claim_issue_by_id_reconcile', {
+                requestClass: `claim_issue_by_id:${claim.state ?? 'unknown'}`,
+                providerKeys: [providerKey]
+              });
+              const directResolution = await resolveTrackedIssueWhenNotStuck({
+                provider: claim.provider,
+                issueId: claim.issue_id
+              });
+              assertRefreshCycleNotStuck();
+              if (directResolution.kind === 'ready') {
+                const eligibility = assessProviderTrackedIssueEligibility(
+                  directResolution.trackedIssue,
+                  {
+                    hasExistingClaim: true
+                  }
+                );
+                if (
+                  canRefreshRetainedReleasedNotActiveClaimMetadataOnly({
+                    claim,
+                    trackedIssue: directResolution.trackedIssue
+                  }) &&
+                  (eligibility.eligible ||
+                    eligibility.releaseReason === 'provider_issue_released:not_active')
+                ) {
+                  const refreshedClaim = await refreshRetainedReleasedNotActiveClaimMetadata({
+                    claim,
+                    releaseRun,
+                    trackedIssue: directResolution.trackedIssue
+                  });
+                  claimByProviderKey.set(refreshedClaim.provider_key, refreshedClaim);
+                  claimStateByProviderKey.set(
+                    refreshedClaim.provider_key,
+                    resolveProviderClaimIssueStateForAdmission(refreshedClaim)
+                  );
+                  const releaseRunForCancel = releaseRun ?? activeRun;
+                  if (
+                    shouldAttemptReleaseCancel(releaseRunForCancel) &&
+                    !isInactiveReleasedReclaimRun(claim, releaseRunForCancel)
+                  ) {
+                    void retryReleaseCancel({
+                      releaseRun: releaseRunForCancel,
+                      reason: claim.reason ?? 'provider_issue_released',
+                      assertCurrent: assertRefreshLifecycleCurrent
+                    });
+                  }
+                  if (!activeRun) {
+                    releaseOccupiedPollDispatchSlot(
+                      resolveClaimPollDispatchSlotKey(providerKey, refreshedClaim)
+                    );
+                  }
+                  continue;
+                }
+                if (eligibility.eligible) {
+                  continue;
+                }
+                await releaseClaim({
+                  claim,
+                  nextReason: eligibility.releaseReason,
+                  releaseRun,
+                  trackedIssue: directResolution.trackedIssue,
+                  cleanupWorkspace: eligibility.cleanupWorkspace
+                });
+                if (!activeRun) {
+                  releaseOccupiedPollDispatchSlot(
+                    resolveClaimPollDispatchSlotKey(providerKey, claim, activeRun)
+                  );
+                }
+                continue;
+              }
+              if (directResolution.kind === 'release') {
+                await releaseClaim({
+                  claim,
+                  nextReason: `provider_issue_released:${directResolution.reason}`,
+                  releaseRun
+                });
+                if (!activeRun) {
+                  releaseOccupiedPollDispatchSlot(
+                    resolveClaimPollDispatchSlotKey(providerKey, claim, activeRun)
+                  );
+                }
+              }
+            } catch (error) {
+              if (isRefreshLifecycleStuckError(error)) {
+                throw error;
+              }
+              logger.warn(
+                `Provider issue deferred retained metadata refresh failed for ${providerKey}: ${
+                  (error as Error)?.message ?? String(error)
+                }`
+              );
+              continue;
+            }
+          }
+        };
 
-        await dispatchFreshDiscoveryCandidates(autopilotDispatch.trackedIssues);
+        await dispatchFreshDiscoveryCandidates(
+          autopilotDispatch.trackedIssues,
+          autopilotDispatch.priorityIssueIds
+        );
 
         if (
           (pollInput.deferFreshDiscovery === true || pollInput.allowPollFailClosed === true) &&
@@ -5290,6 +5853,9 @@ export function createProviderIssueHandoffService(
             ).map((providerKey) => providerKey.slice(providerKey.indexOf(':') + 1))
           });
           if (freshDiscoveryResolution.kind === 'ready') {
+            await reconcileDeferredRetainedReleasedBlockerRefreshes(
+              freshDiscoveryResolution.trackedIssues
+            );
             await dispatchFreshDiscoveryCandidates(freshDiscoveryResolution.trackedIssues);
           }
         }
@@ -5303,11 +5869,16 @@ export function createProviderIssueHandoffService(
   }): Promise<{
     trackedIssues: LiveLinearTrackedIssue[];
     allowConsumedRedispatch: boolean;
+    priorityIssueIds: string[];
   }> => {
     const fallbackTrackedIssues = input.pollInput.trackedIssues;
     const trackedIssueRefetch = wrapTrackedIssueRefetch(input.pollInput.refetchTrackedIssues);
     if (!options.providerWorkflowConfigStore || !runOperatorAutopilot) {
-      return { trackedIssues: fallbackTrackedIssues, allowConsumedRedispatch: false };
+      return {
+        trackedIssues: fallbackTrackedIssues,
+        allowConsumedRedispatch: false,
+        priorityIssueIds: []
+      };
     }
     let providerWorkflow: Awaited<ReturnType<ProviderWorkflowConfigStore['refresh']>>;
     try {
@@ -5321,11 +5892,19 @@ export function createProviderIssueHandoffService(
           (error as Error)?.message ?? String(error)
         }`
       );
-      return { trackedIssues: fallbackTrackedIssues, allowConsumedRedispatch: false };
+      return {
+        trackedIssues: fallbackTrackedIssues,
+        allowConsumedRedispatch: false,
+        priorityIssueIds: []
+      };
     }
     const autopilotConfig = resolveProviderOperatorAutopilotConfigFromPayload(providerWorkflow);
     if (!autopilotConfig) {
-      return { trackedIssues: fallbackTrackedIssues, allowConsumedRedispatch: false };
+      return {
+        trackedIssues: fallbackTrackedIssues,
+        allowConsumedRedispatch: false,
+        priorityIssueIds: []
+      };
     }
     const autopilotAuditPath = resolveProviderOperatorAutopilotAuditPathFromPayload(providerWorkflow);
     const autopilotLifecyclePath = resolveProviderOperatorAutopilotLifecyclePathFromPayload(
@@ -5484,14 +6063,20 @@ export function createProviderIssueHandoffService(
       ) ||
       !trackedIssueRefetch
     ) {
-      return { trackedIssues: fallbackTrackedIssues, allowConsumedRedispatch: false };
+      return {
+        trackedIssues: fallbackTrackedIssues,
+        allowConsumedRedispatch: false,
+        priorityIssueIds: []
+      };
     }
+    const priorityIssueIds = resolveProviderOperatorAutopilotTransitionIssueIds(nextResult);
     try {
       const resolution = await trackedIssueRefetch();
       if (resolution.kind === 'ready') {
         return {
           trackedIssues: resolution.trackedIssues,
-          allowConsumedRedispatch: true
+          allowConsumedRedispatch: true,
+          priorityIssueIds
         };
       }
       logger.warn(
@@ -5505,37 +6090,49 @@ export function createProviderIssueHandoffService(
         }`
       );
     }
-    return { trackedIssues: fallbackTrackedIssues, allowConsumedRedispatch: false };
+    return {
+      trackedIssues: fallbackTrackedIssues,
+      allowConsumedRedispatch: false,
+      priorityIssueIds: []
+    };
   };
 
   providerIssueHandoffService = {
     async handleAcceptedTrackedIssue(input): Promise<ProviderIssueHandoffResult> {
-      return await runWithProviderIssueRunDiscoveryCache(async () => {
-        return await processTrackedIssueCandidate(input);
-      });
+      return await runWithConfiguredWorkerHostsCache(async () =>
+        await runWithProviderIssueRunDiscoveryCache(async () =>
+          await processTrackedIssueCandidate(input)
+        )
+      );
     },
 
     async rehydrate(): Promise<void> {
-      await runWithProviderIssueRunDiscoveryCache(async () => {
-        await runWithRefreshLifecycleLock(async () => {
-          const result = await rehydrateNow({ refreshTrackedIssueMetadata: true });
-          if (result.hasPendingClaims) {
-            scheduleBestEffortRehydrateWithRefreshLock();
-          }
+      await runWithConfiguredWorkerHostsCache(async () => {
+        await runWithProviderIssueRunDiscoveryCache(async () => {
+          await runWithRefreshLifecycleLock(async () => {
+            const result = await rehydrateNow({ refreshTrackedIssueMetadata: true });
+            if (result.hasPendingClaims) {
+              scheduleBestEffortRehydrateWithRefreshLock();
+            }
+          });
         });
       });
     },
 
     async refresh(): Promise<void> {
-      await runWithProviderIssueRunDiscoveryCache(async () => {
-        await runWithRefreshLifecycleLock(async () => {
-          await runRefreshCycle(await resolveRefreshPollInput());
+      await runWithConfiguredWorkerHostsCache(async () => {
+        await runWithProviderIssueRunDiscoveryCache(async () => {
+          await runWithRefreshLifecycleLock(async () => {
+            await runRefreshCycle(await resolveRefreshPollInput());
+          });
         });
       });
     },
 
     async poll(input: ProviderIssueHandoffPollInput): Promise<void> {
-      await runRefreshCycle(input);
+      await runWithConfiguredWorkerHostsCache(async () => {
+        await runRefreshCycle(input);
+      });
     },
 
     resetStuckRefreshLifecycle(): void {
@@ -5681,9 +6278,6 @@ function shouldReopenReleasedClaimOnRefresh(input: {
     'updated_at' | 'state' | 'state_type' | 'archived_at' | 'trashed' | 'viewer_id' | 'assignee_id' | 'blocked_by'
   >;
 }): boolean {
-  if (isProviderIssueReleasedPendingReopen(input.claim.reason ?? null)) {
-    return true;
-  }
   const latestReleasedIssueUpdatedAt = selectMostRecentTrackedIssueUpdatedAt(
     input.claim.issue_updated_at ?? null,
     resolveReleasedRunIssueUpdatedAtForReclaim(input.claim, input.releaseRun)
@@ -5692,6 +6286,12 @@ function shouldReopenReleasedClaimOnRefresh(input: {
     existingIssueUpdatedAt: latestReleasedIssueUpdatedAt,
     nextIssueUpdatedAt: input.trackedIssue.updated_at
   });
+  if (updatedAtComparison === 'older') {
+    return false;
+  }
+  if (isProviderIssueReleasedPendingReopen(input.claim.reason ?? null)) {
+    return true;
+  }
   return (
     updatedAtComparison === 'newer' ||
     (
@@ -5744,6 +6344,34 @@ function isPlainReleasedBlockedByCompletedOnlyClaim(
     Array.isArray(claim.issue_blocked_by) &&
     claim.issue_blocked_by.length > 0 &&
     !providerLinearTodoBlockedByNonTerminal(claim.issue_blocked_by)
+  );
+}
+
+function shouldRefreshTerminalBlockerStaleReleasedMetadata(input: {
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'state' | 'reason' | 'issue_state' | 'issue_state_type' | 'issue_blocked_by'
+  >;
+  trackedIssue: Pick<
+    LiveLinearTrackedIssue,
+    'state' | 'state_type' | 'archived_at' | 'trashed' | 'viewer_id' | 'assignee_id' | 'blocked_by'
+  >;
+  releasedWebhookTiming: 'older' | 'equal' | 'newer' | 'unknown';
+}): boolean {
+  if (input.releasedWebhookTiming === 'older') {
+    return false;
+  }
+  return (
+    isPlainReleasedBlockedByCompletedOnlyClaim(input.claim) &&
+    isProviderLinearTrackedIssueEligibleForExecution(input.trackedIssue)
+  );
+}
+
+function filterNonTerminalProviderIssueBlockers(
+  blockers: LiveLinearTrackedIssue['blocked_by'] | null | undefined
+): LiveLinearTrackedBlocker[] {
+  return (blockers ?? []).filter((blocker) =>
+    providerLinearTodoBlockedByNonTerminal([blocker])
   );
 }
 
@@ -6258,7 +6886,82 @@ function shouldCleanupReleasedProviderWorkspace(claim: ProviderIntakeClaimRecord
   );
 }
 
-function createProviderPollDispatchBudget(featureToggles: Record<string, unknown> | null | undefined): {
+function resolveReleasedClaimRetainedRunIdentity(input: {
+  claim: ProviderIntakeClaimRecord;
+  run: ProviderIssueRunRecord | null;
+  allowClearing?: boolean;
+  trackedIssue?: Pick<LiveLinearTrackedIssue, 'state' | 'state_type'> | null;
+  issueState?: string | null;
+  issueStateType?: string | null;
+}): Partial<
+  Pick<
+    ProviderIntakeClaimRecord,
+    'worker_host' | 'launch_source' | 'launch_token' | 'launch_started_at'
+  >
+> &
+  Pick<ProviderIntakeClaimRecord, 'task_id' | 'run_id' | 'run_manifest_path'> {
+  const taskId = input.run?.taskId ?? input.claim.task_id;
+  if (input.allowClearing !== false && shouldClearReleasedClaimRunIdentity(input)) {
+    return {
+      task_id: taskId,
+      run_id: null,
+      run_manifest_path: null,
+      worker_host: null,
+      launch_source: null,
+      launch_token: null,
+      launch_started_at: null
+    };
+  }
+  return {
+    task_id: taskId,
+    run_id: input.run?.runId ?? input.claim.run_id,
+    run_manifest_path: input.run?.manifestPath ?? input.claim.run_manifest_path
+  };
+}
+
+function shouldClearReleasedClaimRunIdentity(input: {
+  claim: ProviderIntakeClaimRecord;
+  run: ProviderIssueRunRecord | null;
+  trackedIssue?: Pick<LiveLinearTrackedIssue, 'state' | 'state_type'> | null;
+  issueState?: string | null;
+  issueStateType?: string | null;
+}): boolean {
+  const issueState = input.issueState ?? input.trackedIssue?.state ?? input.claim.issue_state;
+  const issueStateType =
+    input.issueStateType ?? input.trackedIssue?.state_type ?? input.claim.issue_state_type;
+  if (
+    !isTerminalTrackedIssueState(
+      normalizeProviderLinearWorkflowState(issueState),
+      normalizeProviderLinearWorkflowState(issueStateType)
+    )
+  ) {
+    return false;
+  }
+  if (isTerminalProviderIssueRunOutcome(input.run)) {
+    return false;
+  }
+  if (!input.run) {
+    return false;
+  }
+  return true;
+}
+
+function isTerminalProviderIssueRunOutcome(run: ProviderIssueRunRecord | null): boolean {
+  const status = run?.proofTerminalStatus ?? run?.status ?? null;
+  return (
+    status === 'succeeded' ||
+    status === 'failed' ||
+    status === 'cancelled' ||
+    status === 'completed'
+  );
+}
+
+function createProviderPollDispatchBudget(
+  featureToggles: Record<string, unknown> | null | undefined,
+  options: {
+    localWorkerOnly?: boolean;
+  } = {}
+): {
   canDispatch(trackedIssue: Pick<LiveLinearTrackedIssue, 'state'>): boolean;
   canDispatchWhilePreservingFreshDiscoverySlot(
     trackedIssue: Pick<LiveLinearTrackedIssue, 'state'>
@@ -6269,7 +6972,9 @@ function createProviderPollDispatchBudget(featureToggles: Record<string, unknown
   remainingGlobalSlots(): number;
   remainingStateSlots(): Record<string, number>;
 } {
-  const limits = resolveProviderPollDispatchLimits(featureToggles);
+  const limits = resolveProviderPollDispatchLimits(featureToggles, {
+    localWorkerOnly: options.localWorkerOnly === true
+  });
   let occupiedGlobalSlots = 0;
   const occupiedStateSlots = new Map<string, number>();
   let occupiedUnknownStateSlots = 0;
@@ -6839,6 +7544,49 @@ function buildFreshDiscoveryConsumedProviderKeys(
   );
 }
 
+function resolveProviderOperatorAutopilotTransitionIssueIds(
+  result: ProviderOperatorAutopilotResult
+): string[] {
+  const issueIds: string[] = [];
+  const seenIssueIds = new Set<string>();
+  for (const action of result.actions) {
+    if (action.transition.status !== 'transitioned' && action.transition.status !== 'noop') {
+      continue;
+    }
+    if (seenIssueIds.has(action.issue_id)) {
+      continue;
+    }
+    seenIssueIds.add(action.issue_id);
+    issueIds.push(action.issue_id);
+  }
+  return issueIds;
+}
+
+function sortProviderDispatchTrackedIssuesWithPriority(
+  trackedIssues: readonly LiveLinearTrackedIssue[],
+  priorityIssueIds: readonly string[]
+): LiveLinearTrackedIssue[] {
+  const sortedIssues = sortLiveLinearTrackedIssuesForDispatch(trackedIssues);
+  if (priorityIssueIds.length === 0 || sortedIssues.length <= 1) {
+    return sortedIssues;
+  }
+
+  const sortedByIssueId = new Map(sortedIssues.map((trackedIssue) => [trackedIssue.id, trackedIssue]));
+  const prioritizedIssues: LiveLinearTrackedIssue[] = [];
+  for (const issueId of priorityIssueIds) {
+    const trackedIssue = sortedByIssueId.get(issueId);
+    if (!trackedIssue) {
+      continue;
+    }
+    sortedByIssueId.delete(issueId);
+    prioritizedIssues.push(trackedIssue);
+  }
+  return [
+    ...prioritizedIssues,
+    ...sortedIssues.filter((trackedIssue) => sortedByIssueId.has(trackedIssue.id))
+  ];
+}
+
 async function resolveProviderCleanupWorkspacePath(
   repoRoot: string,
   taskId: string,
@@ -6849,6 +7597,20 @@ async function resolveProviderCleanupWorkspacePath(
     ? resolveExplicitProviderWorkspacePathWithinRoot(repoRoot, taskId, manifestRecord)
     : null;
   return explicitWorkspacePath ?? resolveProviderWorkspacePath(repoRoot, taskId);
+}
+
+function resolveControlHostRunLocatorFromRunDir(runDir: string): ProviderControlHostRunLocator | null {
+  const resolvedRunDir = resolve(runDir);
+  const runId = basename(resolvedRunDir);
+  const cliDir = dirname(resolvedRunDir);
+  if (basename(cliDir) !== 'cli') {
+    return null;
+  }
+  const taskId = basename(dirname(cliDir));
+  if (!taskId || !runId) {
+    return null;
+  }
+  return { taskId, runId };
 }
 
 async function readManifestRecord(manifestPath: string | null): Promise<Record<string, unknown> | null> {
@@ -6982,6 +7744,7 @@ async function discoverProviderIssueRunSnapshot(
         taskId: readStringValue(manifest, 'task_id') ?? taskEntry,
         runId: readStringValue(manifest, 'run_id') ?? runEntry,
         manifestPath,
+        manifest,
         pipelineId,
         status: resolveProviderIssueRunStatus(manifest, proof, isProcessAlive),
         hasDeadLocalInProgressProof,
@@ -7174,7 +7937,10 @@ function resolveProviderIssueRunSummary(
   manifest: Record<string, unknown>,
   proof: ProviderLinearWorkerProofRecord | null
 ): string | null {
-  const manifestSummary = readStringValue(manifest, 'summary');
+  const manifestSummary = stripNonApplicableGuardrailSummaryLines(
+    manifest,
+    readStringValue(manifest, 'summary')
+  );
   const manifestStatus = readStringValue(manifest, 'status');
   const proofIsAuthoritative = shouldUseProviderLinearWorkerTerminalProofForSummary(manifest, proof);
   const proofTerminalStatus = proofIsAuthoritative
@@ -7201,20 +7967,19 @@ function resolveProviderIssueRunFailureDiagnosis(
     return null;
   }
   const proofRecord = (proof ?? {}) as Record<string, unknown>;
-  const diagnosis = readRecordValue(proofRecord, 'failure_diagnosis', 'failureDiagnosis');
-  if (!diagnosis) {
+  const failureDiagnosisRecord = readRecordValue(proofRecord, 'failure_diagnosis');
+  if (!failureDiagnosisRecord) {
     return null;
   }
-  const diagnosticCategory = readStringValue(
-    diagnosis,
-    'diagnostic_category',
-    'diagnosticCategory'
-  );
-  const signal = readStringValue(diagnosis, 'signal');
-  if (!diagnosticCategory && !signal) {
-    return null;
-  }
-  return { diagnosticCategory, signal };
+  return {
+    diagnosticCategory: readStringValue(
+      failureDiagnosisRecord,
+      'diagnostic_category',
+      'diagnosticCategory'
+    ),
+    signal: readStringValue(failureDiagnosisRecord, 'signal'),
+    guidance: readStringValue(failureDiagnosisRecord, 'guidance')
+  };
 }
 
 function resolveProviderIssueRunUpdatedAt(
@@ -7587,16 +8352,17 @@ function resolveProviderRetryErrorFromRun(run: ProviderIssueRunRecord | null): s
   if (run?.status !== 'failed') {
     return null;
   }
-  if (run.failureDiagnosis) {
-    const parts = [
-      run.failureDiagnosis.diagnosticCategory,
-      run.failureDiagnosis.signal
-    ].filter((value): value is string => Boolean(value));
-    if (parts.length > 0) {
-      return parts.join(': ');
-    }
+  return summarizeProviderRetryFailureDiagnosis(run.failureDiagnosis) ?? run.summary ?? null;
+}
+
+function summarizeProviderRetryFailureDiagnosis(
+  failureDiagnosis: ProviderIssueRunFailureDiagnosisRecord | null
+): string | null {
+  if (failureDiagnosis?.diagnosticCategory !== 'provider_stdin_bootstrap') {
+    return null;
   }
-  return run.summary ?? null;
+  const signal = failureDiagnosis.signal?.trim();
+  return signal ? `provider_stdin_bootstrap: ${signal}` : 'provider_stdin_bootstrap';
 }
 
 function resolveProviderReviewPromotionClaimReason(
@@ -8033,7 +8799,9 @@ function hasProviderClaimTransitioned(
           >
         >
     )
-  ) & Partial<Pick<ProviderIntakeClaimRecord, 'review_promotion' | 'merge_closeout'>>
+  ) & Partial<
+    Pick<ProviderIntakeClaimRecord, 'launch_source' | 'launch_token' | 'review_promotion' | 'merge_closeout'>
+  >
 ): boolean {
   return (
     (
@@ -8092,6 +8860,14 @@ function hasProviderClaimTransitioned(
     (
       next.worker_host !== undefined &&
       (claim.worker_host ?? null) !== (next.worker_host ?? null)
+    ) ||
+    (
+      next.launch_source !== undefined &&
+      (claim.launch_source ?? null) !== (next.launch_source ?? null)
+    ) ||
+    (
+      next.launch_token !== undefined &&
+      (claim.launch_token ?? null) !== (next.launch_token ?? null)
     ) ||
     (claim.retry_queued ?? null) !== (next.retry_queued ?? null) ||
     (claim.retry_attempt ?? null) !== (next.retry_attempt ?? null) ||
@@ -8231,12 +9007,14 @@ function resolveProviderReleaseRun(
       taskId: claim.task_id,
       runId: claim.run_id ?? claim.task_id,
       manifestPath: claim.run_manifest_path,
+      manifest: {},
       pipelineId: null,
       status: null,
       hasDeadLocalInProgressProof: false,
       proofTerminalStatus: null,
       hasStaleInProgressProof: false,
       summary: null,
+      failureDiagnosis: null,
       issueUpdatedAt: claim.issue_updated_at,
       startedAt: null,
       updatedAt: claim.updated_at,
@@ -8322,6 +9100,50 @@ function buildTrackedIssuePollMap(
     trackedIssuesByKey.set(providerKey, trackedIssue);
   }
   return trackedIssuesByKey;
+}
+
+function buildTrackedIssuePollBlockerMap(
+  trackedIssues: LiveLinearTrackedIssue[]
+): Map<string, LiveLinearTrackedBlocker> {
+  const blockersByKey = new Map<string, LiveLinearTrackedBlocker>();
+  for (const trackedIssue of trackedIssues) {
+    for (const blocker of trackedIssue.blocked_by ?? []) {
+      if (typeof blocker.id !== 'string' || blocker.id.length === 0) {
+        continue;
+      }
+      const providerKey = buildProviderIssueKey('linear', blocker.id);
+      if (blockersByKey.has(providerKey)) {
+        continue;
+      }
+      blockersByKey.set(providerKey, blocker);
+    }
+  }
+  return blockersByKey;
+}
+
+function shouldUseTrackedIssueBlockerSnapshotForRetainedReleasedNotActiveMetadataRefresh(input: {
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'state' | 'reason' | 'issue_state' | 'issue_state_type'
+  >;
+  blocker: LiveLinearTrackedBlocker | null;
+}): boolean {
+  if (
+    input.claim.state !== 'released' ||
+    input.claim.reason !== 'provider_issue_released:not_active' ||
+    !input.blocker
+  ) {
+    return false;
+  }
+  const blockerState = normalizeProviderLinearWorkflowState(input.blocker.state);
+  const blockerStateType = normalizeProviderLinearWorkflowState(input.blocker.state_type);
+  if (blockerState === null && blockerStateType === null) {
+    return false;
+  }
+  return (
+    blockerState !== normalizeProviderLinearWorkflowState(input.claim.issue_state) ||
+    blockerStateType !== normalizeProviderLinearWorkflowState(input.claim.issue_state_type)
+  );
 }
 
 function resolveTrackedIssuePollResolution(

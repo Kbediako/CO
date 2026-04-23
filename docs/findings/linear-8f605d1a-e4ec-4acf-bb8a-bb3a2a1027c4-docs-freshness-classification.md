@@ -16,6 +16,56 @@ Task: `linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4`
 - `docs:freshness:maintain`: `block_diff_local`, policy capacity `over_budget`, blocking changed paths 0.
 - `spec-guard --dry-run`: 6 stale active spec rows captured in `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/before/spec-guard.log`.
 
+## Rework Evidence - 2026-04-21
+
+- Rework state: Linear returned CO-267 to `Rework` after PR #566 had already merged, so the parent created a fresh branch from current `origin/main` (`98991b622b99b4d0f31fa39cf98425cbfdd1a1b6`) and reran the baseline.
+- Current `docs:freshness`: 37 blocking stale docs, 0 rolling cohort rows, 0 missing registry rows, 0 missing-on-disk rows, 0 invalid registry rows, 0 uncatalogued docs. Evidence: `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/rework-reset/docs-freshness.log` and `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/rework-reset/docs-freshness-baseline.json`.
+- Current `docs:freshness:maintain`: `block_policy_over_budget`, owner issue `CO-175`, policy capacity `over_budget`, blocking changed paths 0. Evidence: `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/rework-reset/docs-freshness-maintain.log` and `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/rework-reset/docs-freshness-maintenance-baseline.json`.
+- Disposition: reviewed refresh to `2026-04-21` for the exact current-main stale rows below. The rows are historical task packets and task mirrors that remain useful audit evidence; no row is deleted, archived, rolled forward by policy cap/window expansion, or hidden from reporting.
+- Frontmatter note: `tasks/specs/0954-rlm-orchestrator-validation.md` had fresh-enough frontmatter but stale registry metadata; it was reviewed and refreshed directly for consistency. The `1311`-`1316` spec frontmatter rows were already current on main, and only their registry rows were stale.
+
+## Rework Stale Docs Exact Paths - 2026-04-21
+
+| Path | Class | Family | Task | Last review | Cadence | Age | Overdue |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `.agent/task/0954-rlm-orchestrator-validation.md` | Task Mirror | .agent/task | 0954 | 2026-01-20 | 90 | 91 | 1 |
+| `.agent/task/1312-coordinator-symphony-same-session-continuation-after-normal-success.md` | Task Mirror | .agent/task | 1312 | 2026-03-21 | 30 | 31 | 1 |
+| `.agent/task/1314-coordinator-symphony-authoritative-retry-state-and-attempts.md` | Task Mirror | .agent/task | 1314 | 2026-03-21 | 30 | 31 | 1 |
+| `.agent/task/1313-coordinator-symphony-authoritative-runtime-snapshot-observability.md` | Task Mirror | .agent/task | 1313 | 2026-03-21 | 30 | 31 | 1 |
+| `.agent/task/1315-coordinator-symphony-post-worker-retry-queue-ownership.md` | Task Mirror | .agent/task | 1315 | 2026-03-21 | 30 | 31 | 1 |
+| `.agent/task/1316-coordinator-symphony-poll-owned-discovery-and-recovery.md` | Task Mirror | .agent/task | 1316 | 2026-03-21 | 30 | 31 | 1 |
+| `docs/ACTION_PLAN-coordinator-symphony-same-session-continuation-after-normal-success.md` | Task Packet | docs/ACTION_PLAN-* |  | 2026-03-21 | 30 | 31 | 1 |
+| `docs/ACTION_PLAN-coordinator-symphony-authoritative-retry-state-and-attempts.md` | Task Packet | docs/ACTION_PLAN-* |  | 2026-03-21 | 30 | 31 | 1 |
+| `docs/ACTION_PLAN-coordinator-symphony-authoritative-runtime-snapshot-observability.md` | Task Packet | docs/ACTION_PLAN-* |  | 2026-03-21 | 30 | 31 | 1 |
+| `docs/ACTION_PLAN-coordinator-symphony-poll-owned-discovery-and-recovery.md` | Task Packet | docs/ACTION_PLAN-* |  | 2026-03-21 | 30 | 31 | 1 |
+| `docs/ACTION_PLAN-coordinator-symphony-post-worker-retry-queue-ownership.md` | Task Packet | docs/ACTION_PLAN-* |  | 2026-03-21 | 30 | 31 | 1 |
+| `docs/ACTION_PLAN-rlm-orchestrator-validation.md` | Task Packet | docs/ACTION_PLAN-* |  | 2026-01-20 | 90 | 91 | 1 |
+| `docs/PRD-coordinator-symphony-same-session-continuation-after-normal-success.md` | Task Packet | docs/PRD-* |  | 2026-03-21 | 30 | 31 | 1 |
+| `docs/PRD-coordinator-symphony-authoritative-retry-state-and-attempts.md` | Task Packet | docs/PRD-* |  | 2026-03-21 | 30 | 31 | 1 |
+| `docs/PRD-coordinator-symphony-authoritative-runtime-snapshot-observability.md` | Task Packet | docs/PRD-* |  | 2026-03-21 | 30 | 31 | 1 |
+| `docs/PRD-coordinator-symphony-poll-owned-discovery-and-recovery.md` | Task Packet | docs/PRD-* |  | 2026-03-21 | 30 | 31 | 1 |
+| `docs/PRD-coordinator-symphony-post-worker-retry-queue-ownership.md` | Task Packet | docs/PRD-* |  | 2026-03-21 | 30 | 31 | 1 |
+| `docs/PRD-rlm-orchestrator-validation.md` | Task Packet | docs/PRD-* |  | 2026-01-20 | 90 | 91 | 1 |
+| `docs/TECH_SPEC-coordinator-symphony-same-session-continuation-after-normal-success.md` | Task Packet | docs/TECH_SPEC-* |  | 2026-03-21 | 30 | 31 | 1 |
+| `docs/TECH_SPEC-coordinator-symphony-authoritative-retry-state-and-attempts.md` | Task Packet | docs/TECH_SPEC-* |  | 2026-03-21 | 30 | 31 | 1 |
+| `docs/TECH_SPEC-coordinator-symphony-authoritative-runtime-snapshot-observability.md` | Task Packet | docs/TECH_SPEC-* |  | 2026-03-21 | 30 | 31 | 1 |
+| `docs/TECH_SPEC-coordinator-symphony-poll-owned-discovery-and-recovery.md` | Task Packet | docs/TECH_SPEC-* |  | 2026-03-21 | 30 | 31 | 1 |
+| `docs/TECH_SPEC-rlm-orchestrator-validation.md` | Task Packet | docs/TECH_SPEC-* |  | 2026-01-20 | 90 | 91 | 1 |
+| `tasks/specs/0954-rlm-orchestrator-validation.md` | Task Packet | tasks/specs | 0954 | 2026-01-20 | 90 | 91 | 1 |
+| `tasks/specs/1311-coordinator-symphony-full-parity-hardening-and-closure.md` | Task Packet | tasks/specs | 1311 | 2026-03-21 | 30 | 31 | 1 |
+| `tasks/specs/1312-coordinator-symphony-same-session-continuation-after-normal-success.md` | Task Packet | tasks/specs | 1312 | 2026-03-21 | 30 | 31 | 1 |
+| `tasks/specs/1314-coordinator-symphony-authoritative-retry-state-and-attempts.md` | Task Packet | tasks/specs | 1314 | 2026-03-21 | 30 | 31 | 1 |
+| `tasks/specs/1313-coordinator-symphony-authoritative-runtime-snapshot-observability.md` | Task Packet | tasks/specs | 1313 | 2026-03-21 | 30 | 31 | 1 |
+| `tasks/specs/1315-coordinator-symphony-post-worker-retry-queue-ownership.md` | Task Packet | tasks/specs | 1315 | 2026-03-21 | 30 | 31 | 1 |
+| `tasks/specs/1316-coordinator-symphony-poll-owned-discovery-and-recovery.md` | Task Packet | tasks/specs | 1316 | 2026-03-21 | 30 | 31 | 1 |
+| `tasks/tasks-0954-rlm-orchestrator-validation.md` | Task Packet | tasks/tasks-* | 0954 | 2026-01-20 | 90 | 91 | 1 |
+| `tasks/tasks-1311-coordinator-symphony-full-parity-hardening-and-closure.md` | Task Packet | tasks/tasks-* | 1311 | 2026-03-21 | 30 | 31 | 1 |
+| `tasks/tasks-1312-coordinator-symphony-same-session-continuation-after-normal-success.md` | Task Packet | tasks/tasks-* | 1312 | 2026-03-21 | 30 | 31 | 1 |
+| `tasks/tasks-1314-coordinator-symphony-authoritative-retry-state-and-attempts.md` | Task Packet | tasks/tasks-* | 1314 | 2026-03-21 | 30 | 31 | 1 |
+| `tasks/tasks-1313-coordinator-symphony-authoritative-runtime-snapshot-observability.md` | Task Packet | tasks/tasks-* | 1313 | 2026-03-21 | 30 | 31 | 1 |
+| `tasks/tasks-1315-coordinator-symphony-post-worker-retry-queue-ownership.md` | Task Packet | tasks/tasks-* | 1315 | 2026-03-21 | 30 | 31 | 1 |
+| `tasks/tasks-1316-coordinator-symphony-poll-owned-discovery-and-recovery.md` | Task Packet | tasks/tasks-* | 1316 | 2026-03-21 | 30 | 31 | 1 |
+
 ## Blocking Stale Docs By Class
 
 | Class | Count |

@@ -3,7 +3,7 @@
 import { execFile, spawn } from 'node:child_process';
 import { constants as fsConstants } from 'node:fs';
 import { access, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import process from 'node:process';
 import { promisify } from 'node:util';
 
@@ -17,6 +17,7 @@ import {
   buildControlHostSupervisionPlist,
   buildInitialControlHostSupervisionState,
   evaluateControlHostSupervisionHealthPayload,
+  evaluateControlHostSupervisionProbeTimeoutDiagnostic,
   readControlHostSupervisionHealthDiagnostic,
   parseControlHostSupervisionCsv,
   resolveControlHostSupervisionPaths,
@@ -28,7 +29,22 @@ import {
   type ControlHostSupervisionRestartRecord,
   type ControlHostSupervisionState
 } from './control/controlHostSupervision.js';
+import { PROVIDER_INTAKE_STATE_FILE } from './control/controlPersistenceFiles.js';
+import {
+  normalizeProviderIntakeState,
+  type ProviderIntakeClaimRecord,
+  type ProviderIntakeState
+} from './control/providerIntakeState.js';
+import {
+  evaluateProviderControlHostFreshnessGauge,
+  type ProviderControlHostFreshnessGaugeReport,
+  type ProviderControlHostFreshnessVerdict
+} from './control/providerControlHostFreshnessGauge.js';
+import { DEFAULT_ATTACH_REQUEST_TIMEOUT_MS } from './coStatusAttachCliShell.js';
 import { findPackageRoot } from './utils/packageInfo.js';
+import { sanitizeProviderOverrideEnv } from './utils/providerOverrideEnv.js';
+import { sanitizeRunId } from '../persistence/sanitizeRunId.js';
+import { sanitizeTaskId } from '../persistence/sanitizeTaskId.js';
 
 type ArgMap = Record<string, string | boolean>;
 type OutputFormat = 'json' | 'text';
@@ -67,10 +83,15 @@ interface ControlHostSupervisionStatusPayload {
   };
   config: ControlHostSupervisionConfig | null;
   state: ControlHostSupervisionState | null;
+  persisted_state: ControlHostSupervisionState | null;
   launch_agent: ControlHostSupervisionLaunchAgentStatus;
+  live_host: ControlHostSupervisionLiveHealthStatus | null;
   rollout: ControlHostSupervisionRolloutStatus;
   service: {
     loaded: boolean;
+    loaded_source: 'launchctl' | 'live_host';
+    launchctl_loaded: boolean;
+    stale_launchctl_metadata: boolean;
     exit_code: number;
     summary: string | null;
     stderr: string | null;
@@ -95,6 +116,31 @@ interface ControlHostSupervisionRolloutStatus {
   mode: 'managed_supervision' | 'legacy_shim' | 'mixed' | 'not_installed';
   migration_required: boolean;
   summary: string;
+}
+
+interface ControlHostSupervisionCoStatusEvidence {
+  healthy: boolean;
+  reason: string;
+  message: string;
+  diagnostic: ControlHostSupervisionHealthDiagnostic | null;
+}
+
+interface ControlHostSupervisionFreshnessEvidence {
+  artifact_root: string;
+  verdict: ProviderControlHostFreshnessVerdict;
+  supporting_metrics_healthy: boolean;
+}
+
+interface ControlHostSupervisionLiveHealthStatus {
+  checked_at: string | null;
+  healthy: boolean | null;
+  source: 'co_status' | 'freshness_gauge' | 'co_status+freshness_gauge' | 'none';
+  reason: string | null;
+  message: string | null;
+  stale_launchctl_metadata: boolean;
+  stale_persisted_state: boolean;
+  co_status: ControlHostSupervisionCoStatusEvidence | null;
+  freshness_gauge: ControlHostSupervisionFreshnessEvidence | null;
 }
 
 interface ExistingControlHostSupervisionInstallSnapshot {
@@ -145,7 +191,9 @@ const REQUIRED_CONTROL_HOST_SUPERVISION_PATH_FIELDS = [
 
 const execFileAsync = promisify(execFile);
 const COMMAND_BUFFER_MAX_BYTES = 16 * 1024 * 1024;
-const CONTROL_HOST_SUPERVISION_PROBE_TIMEOUT_CAP_MS = 10_000;
+const CONTROL_HOST_SUPERVISION_PROBE_TIMEOUT_CAP_MS = 45_000;
+const CONTROL_HOST_SUPERVISION_PROBE_TIMEOUT_HEADROOM_MS = 5_000;
+const CONTROL_HOST_SUPERVISION_PROBE_ENDPOINT_READ_ATTEMPTS = 2;
 const CONTROL_HOST_SUPERVISION_PROBE_TIMEOUT_FLOOR_MS = 1_000;
 const CONTROL_HOST_SUPERVISION_LAUNCHCTL_BOOTSTRAP_RETRY_ATTEMPTS = 5;
 const CONTROL_HOST_SUPERVISION_LAUNCHCTL_BOOTSTRAP_RETRY_DELAY_MS = 1_000;
@@ -277,12 +325,18 @@ async function printControlHostSupervisionStatus(flags: ArgMap): Promise<void> {
   const launchctl = await runLaunchctl(['print', serviceTarget], { allowFailure: true });
   const state = await readJsonFileIfExists<ControlHostSupervisionState>(resolved.paths.statePath);
   const plistContents = await readTextFileIfExists(resolved.paths.plistPath);
+  const launchAgent = inspectControlHostSupervisionLaunchAgent(plistContents, resolved.config);
+  const liveHost =
+    resolved.config && launchAgent.classification === 'managed_supervision'
+      ? await inspectControlHostSupervisionLiveHealth(resolved.config, state)
+      : null;
   const payload = buildControlHostSupervisionStatusPayload({
     resolved,
     serviceTarget,
     state,
     launchctl,
-    launchAgent: inspectControlHostSupervisionLaunchAgent(plistContents, resolved.config)
+    launchAgent,
+    liveHost
   });
   emitOutput(format, payload, formatControlHostSupervisionStatus(payload));
 }
@@ -469,6 +523,7 @@ async function runControlHostSupervision(flags: ArgMap): Promise<void> {
               updated_at: checkedAt,
               last_health_check_at: checkedAt,
               last_health_status: probe.reason,
+              last_probe_duration_ms: probe.probeDurationMs,
               consecutive_unhealthy_samples: consecutiveUnhealthySamples,
               message: probe.message
             });
@@ -480,6 +535,7 @@ async function runControlHostSupervision(flags: ArgMap): Promise<void> {
             updated_at: checkedAt,
             last_health_check_at: checkedAt,
             last_health_status: probe.reason,
+            last_probe_duration_ms: probe.probeDurationMs,
             consecutive_unhealthy_samples: 0,
             message: probe.message
           });
@@ -492,6 +548,7 @@ async function runControlHostSupervision(flags: ArgMap): Promise<void> {
           updated_at: checkedAt,
           last_health_check_at: checkedAt,
           last_health_status: probe.reason,
+          last_probe_duration_ms: probe.probeDurationMs,
           consecutive_unhealthy_samples: consecutiveUnhealthySamples,
           message: probe.message
         });
@@ -507,6 +564,7 @@ async function runControlHostSupervision(flags: ArgMap): Promise<void> {
           updated_at: restartRequestedAt,
           last_health_check_at: restartRequestedAt,
           last_health_status: probe.reason,
+          last_probe_duration_ms: probe.probeDurationMs,
           consecutive_unhealthy_samples: consecutiveUnhealthySamples,
           restart_count: restartCount + 1,
           last_restart_reason: probe.reason,
@@ -519,6 +577,7 @@ async function runControlHostSupervision(flags: ArgMap): Promise<void> {
               message: restartMessage,
               consecutiveUnhealthySamples,
               childPid: child.pid ?? null,
+              probeDurationMs: probe.probeDurationMs,
               diagnostic: probe.diagnostic
             })
           ),
@@ -727,9 +786,11 @@ async function probeControlHostHealth(
   healthy: boolean;
   reason: string;
   message: string;
+  probeDurationMs: number;
   diagnostic: ControlHostSupervisionHealthDiagnostic | null;
 }> {
   const probeTimeoutMs = resolveControlHostSupervisionProbeTimeoutMs(config.healthIntervalSeconds);
+  const probeStartedAt = Date.now();
   const result = await commandRunner(
     config.nodePath,
     [
@@ -748,12 +809,28 @@ async function probeControlHostHealth(
       timeoutMs: probeTimeoutMs
     }
   );
+  const probeDurationMs = Math.max(0, Date.now() - probeStartedAt);
   if (result.timedOut === true) {
+    const diagnostic = await readControlHostSupervisionProbeTimeoutDiagnostic(config, env);
+    const timeoutQuarantine = evaluateControlHostSupervisionProbeTimeoutDiagnostic(diagnostic, {
+      minPollingUpdatedAt: options.minPollingUpdatedAt ?? null,
+      restartHistory: options.restartHistory ?? null
+    });
+    if (timeoutQuarantine) {
+      return {
+        healthy: timeoutQuarantine.healthy,
+        reason: timeoutQuarantine.reason,
+        message: timeoutQuarantine.message,
+        probeDurationMs,
+        diagnostic
+      };
+    }
     return {
       healthy: false,
       reason: 'probe_timeout',
       message: `co-status probe timed out after ${Math.round(probeTimeoutMs / 1_000)}s.`,
-      diagnostic: null
+      probeDurationMs,
+      diagnostic
     };
   }
   if (result.exitCode !== 0) {
@@ -762,6 +839,7 @@ async function probeControlHostHealth(
       healthy: false,
       reason: 'probe_failed',
       message: `co-status probe failed: ${detail}`,
+      probeDurationMs,
       diagnostic: null
     };
   }
@@ -774,6 +852,7 @@ async function probeControlHostHealth(
       healthy: false,
       reason: 'invalid_payload',
       message: `co-status probe returned invalid JSON: ${(error as Error).message}`,
+      probeDurationMs,
       diagnostic: null
     };
   }
@@ -788,8 +867,230 @@ async function probeControlHostHealth(
     healthy: evaluation.healthy,
     reason: evaluation.reason,
     message: evaluation.message,
+    probeDurationMs,
     diagnostic
   };
+}
+
+async function readControlHostSupervisionProbeTimeoutDiagnostic(
+  config: ControlHostSupervisionConfig,
+  env: NodeJS.ProcessEnv
+): Promise<ControlHostSupervisionHealthDiagnostic | null> {
+  try {
+    const statePath = resolveControlHostSupervisionProviderIntakeStatePath(config, env);
+    const persistedState = await readJsonFileIfExists<ProviderIntakeState>(statePath);
+    if (!persistedState) {
+      return null;
+    }
+    const state = normalizeProviderIntakeState(persistedState);
+    const runningClaims = state.claims.filter(isRunningProviderIntakeClaim);
+    return readControlHostSupervisionHealthDiagnostic({
+      counts: {
+        running: runningClaims.length,
+        retrying: null,
+        max_allowed: null
+      },
+      polling: state.polling ?? null,
+      running: runningClaims.map(buildControlHostSupervisionRunningClaimSnapshot)
+    });
+  } catch {
+    return null;
+  }
+}
+
+function resolveControlHostSupervisionProviderIntakeStatePath(
+  config: ControlHostSupervisionConfig,
+  env: NodeJS.ProcessEnv
+): string {
+  const effectiveRepoRoot = resolveControlHostSupervisionEffectiveRepoRoot(config, env);
+  const configuredRunsDir = env.CODEX_ORCHESTRATOR_RUNS_DIR?.trim();
+  const runsRoot =
+    configuredRunsDir && configuredRunsDir.length > 0
+      ? resolve(effectiveRepoRoot, configuredRunsDir)
+      : join(effectiveRepoRoot, '.runs');
+  return join(
+    runsRoot,
+    sanitizeTaskId(config.taskId),
+    'cli',
+    sanitizeRunId(config.runId),
+    PROVIDER_INTAKE_STATE_FILE
+  );
+}
+
+function resolveControlHostSupervisionEffectiveRepoRoot(
+  config: ControlHostSupervisionConfig,
+  env: NodeJS.ProcessEnv
+): string {
+  const envRepoRoot = env.CODEX_ORCHESTRATOR_ROOT?.trim();
+  return envRepoRoot && envRepoRoot.length > 0
+    ? resolve(config.repoRoot, envRepoRoot)
+    : config.repoRoot;
+}
+
+function isRunningProviderIntakeClaim(
+  claim: ProviderIntakeClaimRecord
+): boolean {
+  return claim.state === 'running';
+}
+
+function buildControlHostSupervisionRunningClaimSnapshot(
+  claim: ProviderIntakeClaimRecord
+): Record<string, unknown> {
+  return {
+    issue_id: claim.issue_id,
+    issue_identifier: claim.issue_identifier,
+    state: claim.state,
+    display_state: claim.issue_state,
+    pid: null,
+    worker_host: claim.worker_host ?? null,
+    session_id: claim.run_id,
+    started_at: claim.launch_started_at ?? claim.updated_at,
+    last_event_at: claim.updated_at
+  };
+}
+
+async function inspectControlHostSupervisionLiveHealth(
+  config: ControlHostSupervisionConfig,
+  state: ControlHostSupervisionState | null,
+  dependencies: {
+    loadBootstrapEnvironment?: typeof loadBootstrapEnvironment;
+    probeControlHostHealth?: typeof probeControlHostHealth;
+    evaluateFreshnessGauge?: typeof evaluateProviderControlHostFreshnessGauge;
+  } = {}
+): Promise<ControlHostSupervisionLiveHealthStatus | null> {
+  const loadBootstrapEnvironmentImpl =
+    dependencies.loadBootstrapEnvironment ?? loadBootstrapEnvironment;
+  const probeControlHostHealthImpl =
+    dependencies.probeControlHostHealth ?? probeControlHostHealth;
+  const evaluateFreshnessGaugeImpl =
+    dependencies.evaluateFreshnessGauge ?? evaluateProviderControlHostFreshnessGauge;
+  const checkedAt = new Date().toISOString();
+
+  let bootstrappedEnv: NodeJS.ProcessEnv = {};
+  let coStatus: ControlHostSupervisionCoStatusEvidence | null = null;
+  try {
+    bootstrappedEnv = sanitizeProviderOverrideEnv(
+      await loadBootstrapEnvironmentImpl(config),
+      {
+        stripWorkspaceArtifactEnv: true
+      }
+    );
+    const probe = await probeControlHostHealthImpl(config, bootstrappedEnv, {
+      minPollingUpdatedAt: state?.last_started_at ?? null,
+      restartHistory: state?.restart_history ?? null
+    });
+    coStatus = {
+      healthy: probe.healthy,
+      reason: probe.reason,
+      message: probe.message,
+      diagnostic: probe.diagnostic
+    };
+  } catch (error) {
+    coStatus = {
+      healthy: false,
+      reason: 'probe_failed',
+      message: (error as Error).message,
+      diagnostic: null
+    };
+  }
+
+  let freshnessGauge: ControlHostSupervisionFreshnessEvidence | null = null;
+  try {
+    const artifactRoot = dirname(
+      resolveControlHostSupervisionProviderIntakeStatePath(config, bootstrappedEnv)
+    );
+    const freshnessReport = await evaluateFreshnessGaugeImpl({
+      artifactRoot
+    });
+    freshnessGauge = {
+      artifact_root: artifactRoot,
+      verdict: freshnessReport.verdict,
+      supporting_metrics_healthy: hasHealthyLiveProviderControlHostFreshness(
+        freshnessReport
+      )
+    };
+  } catch {
+    freshnessGauge = null;
+  }
+
+  if (coStatus?.healthy) {
+    return {
+      checked_at: checkedAt,
+      healthy: true,
+      source: freshnessGauge ? 'co_status+freshness_gauge' : 'co_status',
+      reason: coStatus.reason,
+      message: coStatus.message,
+      stale_launchctl_metadata: false,
+      stale_persisted_state: false,
+      co_status: coStatus,
+      freshness_gauge: freshnessGauge
+    };
+  }
+
+  if (
+    freshnessGauge?.supporting_metrics_healthy === true &&
+    (coStatus === null ||
+      coStatus.reason === 'probe_failed' ||
+      coStatus.reason === 'invalid_payload')
+  ) {
+    return {
+      checked_at: checkedAt,
+      healthy: true,
+      source: coStatus ? 'co_status+freshness_gauge' : 'freshness_gauge',
+      reason: 'fresh_artifacts',
+      message:
+        'Provider/control-host freshness artifacts remain current and advancing, so live host recovery is healthier than the stale launchd or persisted supervision metadata.',
+      stale_launchctl_metadata: false,
+      stale_persisted_state: false,
+      co_status: coStatus,
+      freshness_gauge: freshnessGauge
+    };
+  }
+
+  if (coStatus !== null) {
+    return {
+      checked_at: checkedAt,
+      healthy: coStatus.healthy,
+      source: 'co_status',
+      reason: coStatus.reason,
+      message: coStatus.message,
+      stale_launchctl_metadata: false,
+      stale_persisted_state: false,
+      co_status: coStatus,
+      freshness_gauge: freshnessGauge
+    };
+  }
+
+  if (freshnessGauge !== null) {
+    return {
+      checked_at: checkedAt,
+      healthy: freshnessGauge.supporting_metrics_healthy,
+      source: 'freshness_gauge',
+      reason: freshnessGauge.supporting_metrics_healthy
+        ? 'fresh_artifacts'
+        : 'freshness_unhealthy',
+      message: freshnessGauge.supporting_metrics_healthy
+        ? 'Provider/control-host freshness artifacts remain current and advancing.'
+        : 'Provider/control-host freshness artifacts are not current enough to override stored supervision state.',
+      stale_launchctl_metadata: false,
+      stale_persisted_state: false,
+      co_status: null,
+      freshness_gauge: freshnessGauge
+    };
+  }
+
+  return null;
+}
+
+function hasHealthyLiveProviderControlHostFreshness(
+  report: ProviderControlHostFreshnessGaugeReport
+): boolean {
+  return (
+    report.metrics.last_successful_refresh_age_ms.verdict === 'healthy' &&
+    report.metrics.active_heartbeat_age_ms.verdict === 'healthy' &&
+    report.metrics.polling_health.verdict === 'healthy' &&
+    report.metrics.polling_health.value === 'ok'
+  );
 }
 
 function buildControlHostSupervisionStatusPayload(input: {
@@ -798,10 +1099,29 @@ function buildControlHostSupervisionStatusPayload(input: {
   state: ControlHostSupervisionState | null;
   launchctl: CommandResult;
   launchAgent: ControlHostSupervisionLaunchAgentStatus;
+  liveHost?: ControlHostSupervisionLiveHealthStatus | null;
 }): ControlHostSupervisionStatusPayload {
-  const serviceLoaded = input.launchctl.exitCode === 0;
+  const launchctlLoaded = input.launchctl.exitCode === 0;
+  const serviceLoaded =
+    launchctlLoaded ||
+    (input.launchAgent.classification === 'managed_supervision' &&
+      input.liveHost?.healthy === true);
+  const effectiveState = resolveEffectiveControlHostSupervisionState(
+    input.state,
+    input.liveHost ?? null
+  );
+  const stalePersistedState = hasControlHostSupervisionStateDrift(input.state, effectiveState);
+  const staleLaunchctlMetadata = serviceLoaded && !launchctlLoaded;
   const summarySource =
     input.launchctl.stdout.trim() || input.launchctl.stderr.trim() || null;
+  const liveHost =
+    input.liveHost === undefined || input.liveHost === null
+      ? null
+      : {
+          ...input.liveHost,
+          stale_launchctl_metadata: staleLaunchctlMetadata,
+          stale_persisted_state: stalePersistedState
+        };
   return {
     installed: input.resolved.config !== null,
     label: input.resolved.label,
@@ -815,15 +1135,21 @@ function buildControlHostSupervisionStatusPayload(input: {
       stderr_path: input.resolved.paths.stderrLogPath
     },
     config: input.resolved.config,
-    state: input.state,
+    state: effectiveState,
+    persisted_state: input.state,
     launch_agent: input.launchAgent,
+    live_host: liveHost,
     rollout: classifyControlHostSupervisionRollout({
       config: input.resolved.config,
       launchAgent: input.launchAgent,
-      serviceLoaded
+      serviceLoaded,
+      launchctlLoaded
     }),
     service: {
       loaded: serviceLoaded,
+      loaded_source: serviceLoaded === launchctlLoaded ? 'launchctl' : 'live_host',
+      launchctl_loaded: launchctlLoaded,
+      stale_launchctl_metadata: staleLaunchctlMetadata,
       exit_code: input.launchctl.exitCode,
       summary: summarySource ? firstNonEmptyLine(summarySource) : null,
       stderr: input.launchctl.stderr.trim().length > 0 ? input.launchctl.stderr.trim() : null
@@ -840,7 +1166,12 @@ function formatControlHostSupervisionStatus(
     `Migration required: ${payload.rollout.migration_required ? 'yes' : 'no'}`,
     `Label: ${payload.label}`,
     `Service target: ${payload.service_target}`,
-    `launchctl loaded: ${payload.service.loaded ? 'yes' : 'no'}`,
+    `Service loaded: ${payload.service.loaded ? 'yes' : 'no'}`,
+    `launchctl loaded: ${payload.service.launchctl_loaded ? 'yes' : 'no'}${
+      payload.service.stale_launchctl_metadata
+        ? ' (stale metadata; live host evidence is healthier)'
+        : ''
+    }`,
     `Config: ${payload.config_path}`,
     `Plist: ${payload.plist_path}`,
     `State: ${payload.state_path}`,
@@ -860,6 +1191,23 @@ function formatControlHostSupervisionStatus(
       `Health: interval=${payload.config.healthIntervalSeconds}s threshold=${payload.config.unhealthyThreshold}`
     );
   }
+  if (payload.live_host) {
+    lines.push(
+      `Live host: ${
+        payload.live_host.healthy === null
+          ? 'unknown'
+          : payload.live_host.healthy
+            ? 'healthy'
+            : 'unhealthy'
+      } via ${formatControlHostSupervisionLiveHealthSource(payload.live_host.source)}`
+    );
+    if (payload.live_host.reason) {
+      lines.push(`Live host reason: ${payload.live_host.reason}`);
+    }
+    if (payload.live_host.message) {
+      lines.push(`Live host detail: ${payload.live_host.message}`);
+    }
+  }
   if (payload.state) {
     lines.push(`State status: ${payload.state.status}`);
     lines.push(
@@ -874,10 +1222,85 @@ function formatControlHostSupervisionStatus(
       lines.push(`Last restart reason: ${payload.state.last_restart_reason}`);
     }
   }
+  if (payload.persisted_state && payload.live_host?.stale_persisted_state === true) {
+    lines.push(`Persisted state status: ${payload.persisted_state.status}`);
+    if (payload.persisted_state.last_health_status) {
+      lines.push(
+        `Persisted last health: ${payload.persisted_state.last_health_status} (${payload.persisted_state.consecutive_unhealthy_samples}/${payload.persisted_state.unhealthy_threshold})`
+      );
+    }
+  }
   if (payload.service.summary) {
     lines.push(`launchctl: ${payload.service.summary}`);
   }
   return lines.join('\n');
+}
+
+function formatControlHostSupervisionLiveHealthSource(
+  source: ControlHostSupervisionLiveHealthStatus['source']
+): string {
+  switch (source) {
+    case 'co_status':
+      return 'co-status';
+    case 'freshness_gauge':
+      return 'provider freshness gauge';
+    case 'co_status+freshness_gauge':
+      return 'co-status plus provider freshness gauge';
+    default:
+      return 'no live host evidence';
+  }
+}
+
+function resolveEffectiveControlHostSupervisionState(
+  persistedState: ControlHostSupervisionState | null,
+  liveHost: ControlHostSupervisionLiveHealthStatus | null
+): ControlHostSupervisionState | null {
+  if (!persistedState || liveHost?.healthy !== true) {
+    return persistedState;
+  }
+  const effectiveStatus =
+    liveHost.reason === 'active_worker_restart_quarantine' ||
+    liveHost.reason === 'active_worker_probe_timeout_quarantine'
+      ? 'quarantined'
+      : 'healthy';
+  const effectiveLastHealthStatus = liveHost.reason ?? persistedState.last_health_status;
+  const effectiveConsecutiveUnhealthySamples =
+    effectiveStatus === 'healthy' ? 0 : persistedState.consecutive_unhealthy_samples;
+  const effectiveMessage = liveHost.message ?? persistedState.message;
+  if (
+    persistedState.status === effectiveStatus &&
+    persistedState.last_health_status === effectiveLastHealthStatus &&
+    persistedState.consecutive_unhealthy_samples === effectiveConsecutiveUnhealthySamples &&
+    persistedState.message === effectiveMessage
+  ) {
+    return persistedState;
+  }
+  return {
+    ...persistedState,
+    status: effectiveStatus,
+    updated_at: liveHost.checked_at ?? persistedState.updated_at,
+    last_health_check_at: liveHost.checked_at ?? persistedState.last_health_check_at,
+    last_health_status: effectiveLastHealthStatus,
+    consecutive_unhealthy_samples: effectiveConsecutiveUnhealthySamples,
+    message: effectiveMessage
+  };
+}
+
+function hasControlHostSupervisionStateDrift(
+  persistedState: ControlHostSupervisionState | null,
+  effectiveState: ControlHostSupervisionState | null
+): boolean {
+  if (!persistedState || !effectiveState) {
+    return false;
+  }
+  return (
+    persistedState.status !== effectiveState.status ||
+    persistedState.updated_at !== effectiveState.updated_at ||
+    persistedState.last_health_check_at !== effectiveState.last_health_check_at ||
+    persistedState.last_health_status !== effectiveState.last_health_status ||
+    persistedState.consecutive_unhealthy_samples !== effectiveState.consecutive_unhealthy_samples ||
+    persistedState.message !== effectiveState.message
+  );
 }
 
 function inspectControlHostSupervisionLaunchAgent(
@@ -946,12 +1369,21 @@ function classifyControlHostSupervisionRollout(input: {
   config: ControlHostSupervisionConfig | null;
   launchAgent: ControlHostSupervisionLaunchAgentStatus;
   serviceLoaded: boolean;
+  launchctlLoaded?: boolean;
 }): ControlHostSupervisionRolloutStatus {
   if (
     input.config &&
     input.launchAgent.exists &&
     input.launchAgent.classification === 'managed_supervision'
   ) {
+    if (input.serviceLoaded && input.launchctlLoaded === false) {
+      return {
+        mode: 'managed_supervision',
+        migration_required: false,
+        summary:
+          'LaunchAgent matches the stored managed supervision config; launchctl metadata appears stale because live host evidence remains healthy.'
+      };
+    }
     if (!input.serviceLoaded) {
       return {
         mode: 'mixed',
@@ -1080,6 +1512,7 @@ function buildNextControlHostSupervisionState(input: {
           last_signal: null,
           last_health_check_at: null,
           last_health_status: null,
+          last_probe_duration_ms: null,
           consecutive_unhealthy_samples: 0
         }
       : {};
@@ -1101,6 +1534,7 @@ function buildControlHostSupervisionRestartRecord(input: {
   message: string;
   consecutiveUnhealthySamples: number;
   childPid: number | null;
+  probeDurationMs?: number | null;
   diagnostic: ControlHostSupervisionHealthDiagnostic | null;
 }): ControlHostSupervisionRestartRecord {
   return {
@@ -1109,8 +1543,16 @@ function buildControlHostSupervisionRestartRecord(input: {
     message: input.message,
     consecutive_unhealthy_samples: input.consecutiveUnhealthySamples,
     child_pid: input.childPid,
+    probe_duration_ms: normalizeProbeDurationMs(input.probeDurationMs),
     diagnostic: input.diagnostic
   };
+}
+
+function normalizeProbeDurationMs(value: number | null | undefined): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return null;
+  }
+  return Math.max(0, Math.round(value));
 }
 
 function appendControlHostSupervisionRestartRecord(
@@ -1121,7 +1563,10 @@ function appendControlHostSupervisionRestartRecord(
 }
 
 function isControlHostSupervisionQuarantineProbe(probe: { reason: string }): boolean {
-  return probe.reason === 'active_worker_restart_quarantine';
+  return (
+    probe.reason === 'active_worker_restart_quarantine' ||
+    probe.reason === 'active_worker_probe_timeout_quarantine'
+  );
 }
 
 function resolveControlHostSupervisionQuarantineUnhealthySamples(input: {
@@ -2434,9 +2879,15 @@ function escapeShellSingleQuotes(value: string): string {
 }
 
 function resolveControlHostSupervisionProbeTimeoutMs(healthIntervalSeconds: number): number {
+  const minimumStatusReadBudgetMs =
+    DEFAULT_ATTACH_REQUEST_TIMEOUT_MS * CONTROL_HOST_SUPERVISION_PROBE_ENDPOINT_READ_ATTEMPTS +
+    CONTROL_HOST_SUPERVISION_PROBE_TIMEOUT_HEADROOM_MS;
   return Math.max(
     CONTROL_HOST_SUPERVISION_PROBE_TIMEOUT_FLOOR_MS,
-    Math.min(healthIntervalSeconds * 1_000, CONTROL_HOST_SUPERVISION_PROBE_TIMEOUT_CAP_MS)
+    Math.min(
+      Math.max(healthIntervalSeconds * 1_000, minimumStatusReadBudgetMs),
+      CONTROL_HOST_SUPERVISION_PROBE_TIMEOUT_CAP_MS
+    )
   );
 }
 
@@ -2467,12 +2918,15 @@ export const __test__ = {
   assertStoredControlHostSupervisionConfig,
   bootstrapLaunchctlPlist,
   buildNextControlHostSupervisionState,
+  buildControlHostSupervisionRestartRecord,
   buildControlHostSupervisionStatusPayload,
   classifyControlHostSupervisionRollout,
   captureExistingControlHostSupervisionInstall,
   createSleepWaiter,
   createControlHostSupervisionChildEventPromises,
+  hasHealthyLiveProviderControlHostFreshness,
   formatControlHostSupervisionStatus,
+  inspectControlHostSupervisionLiveHealth,
   inspectControlHostSupervisionLaunchAgent,
   isIgnorableLaunchctlBootoutFailure,
   isRetryableLaunchctlBootstrapError,
@@ -2481,6 +2935,8 @@ export const __test__ = {
   probeControlHostHealth,
   readFormatFlag,
   readStringFlag,
+  resolveEffectiveControlHostSupervisionState,
+  resolveControlHostSupervisionProviderIntakeStatePath,
   resolveControlHostSupervisionQuarantineUnhealthySamples,
   readIntegerFlag,
   removeInstalledControlHostSupervisionArtifacts,
