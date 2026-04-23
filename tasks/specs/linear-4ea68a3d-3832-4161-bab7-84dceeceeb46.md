@@ -63,7 +63,7 @@ last_review: 2026-04-23
 
 ## Technical Requirements
 - Functional requirements:
-  - Select current-turn parallelization decisions by same issue and deterministic turn boundary.
+  - Select current-turn parallelization decisions by same issue and a refreshed audit cursor captured immediately after the current turn bootstrap proof is hydrated.
   - Reject zero current-turn decisions with the existing missing-decision failure.
   - Reject more than one current-turn decision with `parallelization_decision_multiple`.
   - Do not include prior-turn decisions in the duplicate count.
@@ -72,7 +72,7 @@ last_review: 2026-04-23
 - Non-functional requirements:
   - no new network calls
   - deterministic local artifact behavior
-  - fail closed when the current-turn boundary cannot be established
+  - fail closed when the current-turn audit cursor or child-lane launch boundary cannot be established
   - small source delta localized to provider worker proof/failure resolution and any necessary summary reader
 - Interfaces / contracts:
   - `provider-linear-worker-proof` must expose truthful `owner_status` and end reason
@@ -95,7 +95,7 @@ last_review: 2026-04-23
   - parent-selected docs-review / implementation gate
 
 ## Open Questions
-- Resolved 2026-04-23: use the persisted `current_turn_started_at` boundary, falling back to `attempt_started_at`, as the authoritative selector for current-turn decisions. Do not use a pre-turn run-wide count floor.
+- Resolved 2026-04-23: use a refreshed post-bootstrap same-issue audit cursor as the authoritative selector for current-turn decisions. Use `current_turn_started_at` with `attempt_started_at` fallback only for current-turn child-lane launch classification, not for the duplicate-decision cursor.
 - Resolved 2026-04-23: the fixed failure path is `resolveProviderLinearWorkerParallelizationFailure(...)`; proof `owner_status` / `end_reason` feed manifest and run summary surfaces, so validation should assert the proof state and rerun summary-facing gates after current-main merge.
 
 ## Approvals

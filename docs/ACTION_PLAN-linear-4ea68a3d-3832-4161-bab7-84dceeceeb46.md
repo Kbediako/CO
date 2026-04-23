@@ -65,7 +65,7 @@
 
 ## Risks & Mitigations
 - Risk: timestamp-only filtering can misclassify rows around turn startup or mixed ISO formats.
-  - Mitigation: prefer a deterministic turn boundary such as a pre-turn audit count floor, or pair timestamps with issue id and current turn metadata.
+  - Mitigation: use a post-bootstrap same-issue audit cursor for duplicate-decision invariant checks, and keep timestamp boundaries limited to child-lane launch classification.
 - Risk: summary surfaces keep reading stale failed proof state after the invariant is repaired.
   - Mitigation: add a focused end-to-end summary assertion for `provider-linear-worker-proof`, `manifest.status`, and `runs.json`.
 - Risk: true same-turn duplicates become accepted.

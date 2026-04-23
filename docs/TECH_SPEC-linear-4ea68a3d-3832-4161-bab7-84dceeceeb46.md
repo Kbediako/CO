@@ -36,7 +36,7 @@ last_review: 2026-04-23
   - A duplicate is only a duplicate when more than one valid decision belongs to the same current turn.
   - Earlier turns remain historical audit evidence and should not count against the active turn.
 - Target truth / intended delta:
-  - Proof failure resolution selects current-turn decisions by a deterministic turn boundary, such as a pre-turn audit count floor or current turn start timestamp plus issue id.
+  - Proof failure resolution selects current-turn decisions by a same-issue audit cursor captured immediately after the current turn bootstrap proof is hydrated; entries before that cursor remain historical.
   - `parallelization_decision_multiple` is emitted only for true same-turn duplicate decisions.
   - Multi-turn success leaves `provider-linear-worker-proof`, `manifest.status`, `runs.json`, and operator diagnostics in the same successful state.
   - Audit retention remains cumulative in `provider-linear-worker-linear-audit.jsonl`.
@@ -102,7 +102,7 @@ last_review: 2026-04-23
 6. Successful lane closeout no longer yields failed `owner_status`, failed `manifest.status`, or failed `runs.json` solely due to earlier-turn valid decisions.
 
 ## Open Questions
-- Resolved 2026-04-23: use the persisted `current_turn_started_at` boundary, falling back to `attempt_started_at`, as the authoritative selector for current-turn decisions. Do not use a pre-turn audit count floor.
+- Resolved 2026-04-23: use a refreshed post-bootstrap same-issue audit cursor as the authoritative selector for current-turn decisions. Use `current_turn_started_at` with `attempt_started_at` fallback only for current-turn child-lane launch classification, not for the duplicate-decision cursor.
 - Resolved 2026-04-23: the fixed failure path is `resolveProviderLinearWorkerParallelizationFailure(...)`; proof `owner_status` / `end_reason` feed manifest and run summary surfaces, so validation should assert the proof state and rerun summary-facing gates after current-main merge.
 
 ## Approvals
