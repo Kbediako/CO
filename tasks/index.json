@@ -1,6 +1,36 @@
 {
   "items": [
     {
+      "id": "20260423-linear-f667a32d-b8db-4717-8565-429409026f92",
+      "title": "CO refresh remaining Mar 23 docs-freshness task-spec cohort",
+      "relates_to": "tasks/tasks-linear-f667a32d-b8db-4717-8565-429409026f92.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-23",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs_freshness_candidate|doc_class:task_packet|path_family:tasks/specs|last_review:2026-03-23|cadence_days:30",
+      "approvals": {
+        "child_lane": {
+          "reviewer": "bounded same-issue docs child lane plus parent provider worker",
+          "date": "2026-04-23",
+          "status": "accepted-parent-refined",
+          "manifest": ".runs/linear-f667a32d-b8db-4717-8565-429409026f92-spec-cohort-refresh/cli/2026-04-23T02-45-34-117Z-e86bda22/manifest.json",
+          "summary": "Child lane refreshed the four Mar 23 tasks/specs files; parent accepted the patch and refined disposition wording while preserving the CO-321 scope split from CO-320."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-f667a32d-b8db-4717-8565-429409026f92.md",
+        "task": "tasks/tasks-linear-f667a32d-b8db-4717-8565-429409026f92.md",
+        "agent_task": ".agent/task/linear-f667a32d-b8db-4717-8565-429409026f92.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-f667a32d-b8db-4717-8565-429409026f92.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-f667a32d-b8db-4717-8565-429409026f92.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-f667a32d-b8db-4717-8565-429409026f92.md"
+        }
+      }
+    },
+    {
       "id": "20260422-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3",
       "title": "CO: key issue-context cache artifacts by issue id so cross-issue reads cannot overwrite run evidence",
       "relates_to": "tasks/tasks-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md",
@@ -6025,7 +6055,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-23",
+      "last_review": "2026-04-23",
       "paths": {
         "spec": "tasks/specs/1321-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery.md",
         "task": "tasks/tasks-1321-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery.md",
@@ -6041,7 +6071,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-23",
+      "last_review": "2026-04-23",
       "paths": {
         "spec": "tasks/specs/1320-coordinator-symphony-post-merge-retry-timer-follow-up.md",
         "task": "tasks/tasks-1320-coordinator-symphony-post-merge-retry-timer-follow-up.md",
@@ -6057,7 +6087,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-23",
+      "last_review": "2026-04-23",
       "paths": {
         "spec": "tasks/specs/1319-coordinator-symphony-end-to-end-operational-parity-remediation.md",
         "task": "tasks/tasks-1319-coordinator-symphony-end-to-end-operational-parity-remediation.md",
@@ -6073,7 +6103,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-23",
+      "last_review": "2026-04-23",
       "paths": {
         "spec": "tasks/specs/linear-856c1318-524f-4db3-8d4a-b357ec51c304.md",
         "task": "tasks/tasks-linear-856c1318-524f-4db3-8d4a-b357ec51c304.md",
