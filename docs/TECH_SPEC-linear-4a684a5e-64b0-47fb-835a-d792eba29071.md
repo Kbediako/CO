@@ -22,7 +22,7 @@ last_review: 2026-04-24
 ## Parity / Alignment Matrix
 - Current truth: `docs/guides/codex-version-policy.md` carries active target `0.123.0`, model posture `gpt-5.4`, release-facing smoke and cloud-canary `0.123.0`, and the `codex plugin marketplace add` marketplace smoke contract.
 - Reference truth: OpenAI Codex docs recommend `gpt-5.5` when available; official `rust-v0.124.0` release facts add hooks, plugin marketplace, app-server, Fast tier, permission, `wait_agent`, MCP cwd, and unknown-feature/cloud-requirements changes.
-- Target truth / intended delta: promote local ChatGPT-auth model surfaces that pass; promote CLI/workflow pins only after runtime/cloud/marketplace proof; hold Codex Cloud model choice with blocker evidence because Cloud cannot select `gpt-5.5` directly.
+- Target truth / intended delta: allow local ChatGPT-auth `gpt-5.5` / `xhigh` only as a marker-backed opt-in after current access proof; keep packaged/generated model defaults on `gpt-5.4`; promote CLI/workflow pins only after runtime/cloud/marketplace proof; hold Codex Cloud model choice with blocker evidence because Cloud cannot select `gpt-5.5` directly.
 - Explicitly out-of-scope differences: CO-282, CO-278 baseline dirt, CO-338 npm publish recovery, and historical CO-337/CO-340 cleanup beyond superseding notes.
 
 ## Readiness Gate
@@ -50,9 +50,9 @@ last_review: 2026-04-24
 - Monitoring / alerts: Cloud canary and pack-smoke workflow pins keep future evidence reproducible.
 
 ## Open Questions
-- PR attachment, checks, latest `origin/main`, and `pr ready-review` drain remain before Linear review handoff.
-- Cloud/API direct `gpt-5.5` model choice remains held by official availability docs; local ChatGPT-auth top-level/delegated/review surfaces are promoted by current smoke evidence.
+- PR `#631` is open; post-push checks, review-thread drain, merge, and Linear Done transitions remain before closeout.
+- Cloud/API direct `gpt-5.5` model choice remains held by official availability docs; local ChatGPT-auth top-level/delegated/review `gpt-5.5` use is supported only as a marker-backed local opt-in with current smoke evidence.
 
 ## Approvals
-- Reviewer: docs-review child stream passed; final forced standalone review completed as bounded success; explicit elegance review completed.
+- Reviewer: docs-review child stream passed; final forced standalone review completed as bounded success with no actionable issues at `.runs/linear-4a684a5e-64b0-47fb-835a-d792eba29071/cli/2026-04-24T00-30-02-443Z-eba4013d/review/telemetry.json`; explicit elegance review completed.
 - Date: 2026-04-24

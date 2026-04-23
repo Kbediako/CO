@@ -19,20 +19,18 @@ let tomlLibrary:
 
 export type CodexDefaultsAuthScope = 'portable' | 'chatgpt';
 
-export const PORTABLE_BASELINE_MODEL = 'gpt-5.4';
-export const CHATGPT_AUTH_BASELINE_MODEL = 'gpt-5.5';
-export const BASELINE_MODEL = PORTABLE_BASELINE_MODEL;
+export const BASELINE_MODEL = 'gpt-5.4';
 export const BASELINE_REVIEW_MODEL = BASELINE_MODEL;
-export const ACCEPTED_BASELINE_MODELS = [PORTABLE_BASELINE_MODEL, CHATGPT_AUTH_BASELINE_MODEL] as const;
-export const ACCEPTED_BASELINE_MODEL_PAIRS_LABEL =
-  `${PORTABLE_BASELINE_MODEL}/${PORTABLE_BASELINE_MODEL} portable or ` +
-  `${CHATGPT_AUTH_BASELINE_MODEL}/${CHATGPT_AUTH_BASELINE_MODEL} ChatGPT-auth`;
 export const BASELINE_REASONING = 'xhigh';
 export const BASELINE_REASONING_MINIMUM = 'high';
 export const BASELINE_AGENTS = {
   max_threads: 12,
   max_depth: 4
 } as const;
+export const LOCAL_MODEL_OPT_INS = ['gpt-5.5'] as const;
+const LOCAL_MODEL_OPT_IN_SET = new Set<string>(LOCAL_MODEL_OPT_INS);
+const CODEX_ORCHESTRATOR_CONFIG_KEY = 'codex_orchestrator';
+const LOCAL_MODEL_OPT_IN_CONFIG_KEY = 'local_model_opt_in';
 
 interface RoleDefinition {
   key: 'explorer_fast' | 'worker_complex' | 'awaiter';
@@ -40,6 +38,17 @@ interface RoleDefinition {
   fileName: 'explorer-fast.toml' | 'worker-complex.toml' | 'awaiter-high.toml';
   configFile: string;
   templatePath: string;
+  managedMigrationBaselines?: readonly ManagedMigrationBaseline[];
+  managedMigrationContentVariants?: readonly ManagedMigrationContentVariant[];
+}
+
+interface ManagedMigrationBaseline {
+  model: string;
+  modelReasoningEffort: 'high' | 'xhigh';
+}
+
+interface ManagedMigrationContentVariant extends ManagedMigrationBaseline {
+  overrideComment?: string;
 }
 
 const ROLE_DEFINITIONS: readonly RoleDefinition[] = [
@@ -55,29 +64,29 @@ const ROLE_DEFINITIONS: readonly RoleDefinition[] = [
     description: 'Complex implementation role.',
     fileName: 'worker-complex.toml',
     configFile: './agents/worker-complex.toml',
-    templatePath: join('templates', 'codex', '.codex', 'agents', 'worker-complex.toml')
+    templatePath: join('templates', 'codex', '.codex', 'agents', 'worker-complex.toml'),
+    managedMigrationBaselines: [{ model: 'gpt-5.5', modelReasoningEffort: 'xhigh' }]
   },
   {
     key: 'awaiter',
     description: 'Awaiter override (keeps awaiter behavior with latest codex/high reasoning).',
     fileName: 'awaiter-high.toml',
     configFile: './agents/awaiter-high.toml',
-    templatePath: join('templates', 'codex', '.codex', 'agents', 'awaiter-high.toml')
+    templatePath: join('templates', 'codex', '.codex', 'agents', 'awaiter-high.toml'),
+    managedMigrationBaselines: [{ model: 'gpt-5.5', modelReasoningEffort: 'xhigh' }],
+    managedMigrationContentVariants: [
+      {
+        model: 'gpt-5.5',
+        modelReasoningEffort: 'high',
+        overrideComment: '# with CO portable override to use gpt-5.4 at high reasoning.'
+      }
+    ]
   }
 ];
 
-const LEGACY_MANAGED_TEMPLATE_TEXT: Partial<Record<RoleDefinition['key'], readonly [string, string][]>> = {
-  awaiter: [
-    [
-      '# with CO portable override to use gpt-5.4 at high reasoning.',
-      '# with CO override to use gpt-5.4 at high reasoning.'
-    ]
-  ]
-};
-
 interface LoadedRoleDefinition extends RoleDefinition {
   content: string;
-  managedContents: readonly string[];
+  managedMigrationContents: readonly string[];
 }
 
 type SetupStatus = 'planned' | 'applied';
@@ -119,8 +128,7 @@ interface PlannedRoleChange {
   existingContent: string | null;
   currentStatus: ChangeStatus;
   detail: string;
-  shouldWrite: boolean;
-  applyDetail?: string;
+  writeReason: 'create' | 'force' | 'managed_migration' | null;
 }
 
 export async function runCodexDefaultsSetup(
@@ -129,15 +137,35 @@ export async function runCodexDefaultsSetup(
   const env = options.env ?? process.env;
   const force = Boolean(options.force);
   const apply = Boolean(options.apply);
-  const authScope = options.authScope ?? 'portable';
+  const configState = await loadConfigState(buildConfigPath(env));
+  const topLevelLocalModelOptIn = resolveRequestedLocalModelOptIn(
+    configState.parsed,
+    options.authScope
+  );
+  const roleAndReviewLocalModelOptIn = resolveRoleAndReviewLocalModelOptIn(
+    configState.parsed,
+    topLevelLocalModelOptIn,
+    options.authScope
+  );
+  const authScope: CodexDefaultsAuthScope = topLevelLocalModelOptIn ? 'chatgpt' : 'portable';
   const plan = buildPlan(env, force, authScope);
-  const baselineModels = resolveBaselineModels(authScope);
-  const roleDefinitions = await loadRoleDefinitions(authScope);
-  const configState = await loadConfigState(plan.configPath);
-  const nextConfig = mergeBaselineDefaults(configState.parsed, roleDefinitions, baselineModels);
+  const roleDefinitions = await loadRoleDefinitions();
+  const nextConfig = mergeBaselineDefaults(
+    configState.parsed,
+    roleDefinitions,
+    {
+      topLevelLocalModelOptIn,
+      reviewModelOptIn: roleAndReviewLocalModelOptIn,
+      requestedAuthScope: options.authScope
+    }
+  );
+  const activeRoleDefinitions = buildActiveRoleDefinitions(
+    roleDefinitions,
+    roleAndReviewLocalModelOptIn
+  );
   const configChanged =
     canonicalizeConfigValue(configState.parsed) !== canonicalizeConfigValue(nextConfig);
-  const roleChanges = await planRoleChanges(plan.agentsDir, force, roleDefinitions);
+  const roleChanges = await planRoleChanges(plan.agentsDir, force, activeRoleDefinitions);
 
   if (!apply) {
     const changes = buildPlannedChanges({
@@ -180,7 +208,7 @@ export async function runCodexDefaultsSetup(
   await mkdir(plan.agentsDir, { recursive: true });
 
   for (const roleChange of roleChanges) {
-    if (roleChange.shouldWrite) {
+    if (roleChange.writeReason) {
       await writeAtomicFile(roleChange.path, roleChange.definition.content, {
         ensureDir: true,
         encoding: 'utf8'
@@ -190,11 +218,7 @@ export async function runCodexDefaultsSetup(
         name: roleChange.definition.key,
         path: roleChange.path,
         status: roleChange.existingContent === null ? 'created' : 'updated',
-        detail:
-          roleChange.applyDetail
-          ?? (roleChange.existingContent === null
-            ? `Created ${roleChange.definition.fileName}.`
-            : `Overwrote ${roleChange.definition.fileName} because --force was set.`)
+        detail: formatAppliedRoleWriteDetail(roleChange)
       });
       continue;
     }
@@ -234,15 +258,20 @@ export function formatCodexDefaultsSetupSummary(result: CodexDefaultsSetupResult
   return lines;
 }
 
+function buildConfigPath(env: NodeJS.ProcessEnv): string {
+  return join(resolveCodexHome(env), 'config.toml');
+}
+
 function buildPlan(
   env: NodeJS.ProcessEnv,
   force: boolean,
   authScope: CodexDefaultsAuthScope
 ): CodexDefaultsSetupPlan {
+  const configPath = buildConfigPath(env);
   const codexHome = resolveCodexHome(env);
   return {
     codexHome,
-    configPath: join(codexHome, 'config.toml'),
+    configPath,
     agentsDir: join(codexHome, 'agents'),
     force,
     authScope
@@ -317,12 +346,17 @@ function canonicalizeConfigValue(value: unknown): string | undefined {
 function mergeBaselineDefaults(
   existing: Record<string, unknown>,
   roleDefinitions: readonly LoadedRoleDefinition[],
-  baselineModels: { model: string; reviewModel: string }
+  options: {
+    topLevelLocalModelOptIn: (typeof LOCAL_MODEL_OPT_INS)[number] | null;
+    reviewModelOptIn: (typeof LOCAL_MODEL_OPT_INS)[number] | null;
+    requestedAuthScope?: CodexDefaultsAuthScope;
+  }
 ): Record<string, unknown> {
   const next = structuredClone(existing);
-  next.model = baselineModels.model;
-  next.review_model = baselineModels.reviewModel;
+  next.model = resolveModelDefault(options.topLevelLocalModelOptIn, BASELINE_MODEL);
+  next.review_model = resolveModelDefault(options.reviewModelOptIn, BASELINE_REVIEW_MODEL);
   next.model_reasoning_effort = BASELINE_REASONING;
+  applyLocalModelOptInMarker(next, options.topLevelLocalModelOptIn, options.requestedAuthScope);
 
   const agents = isRecord(next.agents) ? structuredClone(next.agents as Record<string, unknown>) : {};
   agents.max_threads = BASELINE_AGENTS.max_threads;
@@ -338,6 +372,85 @@ function mergeBaselineDefaults(
 
   next.agents = agents;
   return next;
+}
+
+export function isLocalModelOptIn(value: unknown): value is (typeof LOCAL_MODEL_OPT_INS)[number] {
+  return typeof value === 'string' && LOCAL_MODEL_OPT_IN_SET.has(value);
+}
+
+export function resolveLocalModelOptIn(existing: Record<string, unknown>): (typeof LOCAL_MODEL_OPT_INS)[number] | null {
+  const localConfig = isRecord(existing[CODEX_ORCHESTRATOR_CONFIG_KEY])
+    ? (existing[CODEX_ORCHESTRATOR_CONFIG_KEY] as Record<string, unknown>)
+    : null;
+  const configuredModel = localConfig?.[LOCAL_MODEL_OPT_IN_CONFIG_KEY];
+  return isLocalModelOptIn(configuredModel) ? configuredModel : null;
+}
+
+function resolveRequestedLocalModelOptIn(
+  existing: Record<string, unknown>,
+  requestedAuthScope?: CodexDefaultsAuthScope
+): (typeof LOCAL_MODEL_OPT_INS)[number] | null {
+  if (requestedAuthScope === 'portable') {
+    return null;
+  }
+  if (requestedAuthScope === 'chatgpt') {
+    return 'gpt-5.5';
+  }
+  return resolveLocalModelOptIn(existing);
+}
+
+function resolveRoleAndReviewLocalModelOptIn(
+  existing: Record<string, unknown>,
+  topLevelLocalModelOptIn: (typeof LOCAL_MODEL_OPT_INS)[number] | null,
+  requestedAuthScope?: CodexDefaultsAuthScope
+): (typeof LOCAL_MODEL_OPT_INS)[number] | null {
+  if (requestedAuthScope === 'portable') {
+    return null;
+  }
+  const reviewModel = readOptionalString(existing.review_model);
+  const existingLocalModelOptIn = resolveLocalModelOptIn(existing);
+  return existingLocalModelOptIn === topLevelLocalModelOptIn
+    && reviewModel === topLevelLocalModelOptIn
+    && isLocalModelOptIn(reviewModel)
+    ? reviewModel
+    : null;
+}
+
+function readOptionalString(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
+function applyLocalModelOptInMarker(
+  next: Record<string, unknown>,
+  localModelOptIn: (typeof LOCAL_MODEL_OPT_INS)[number] | null,
+  requestedAuthScope?: CodexDefaultsAuthScope
+): void {
+  const existingConfig = isRecord(next[CODEX_ORCHESTRATOR_CONFIG_KEY])
+    ? structuredClone(next[CODEX_ORCHESTRATOR_CONFIG_KEY] as Record<string, unknown>)
+    : {};
+
+  if (localModelOptIn) {
+    existingConfig[LOCAL_MODEL_OPT_IN_CONFIG_KEY] = localModelOptIn;
+    next[CODEX_ORCHESTRATOR_CONFIG_KEY] = existingConfig;
+    return;
+  }
+
+  if (requestedAuthScope === 'portable' && LOCAL_MODEL_OPT_IN_CONFIG_KEY in existingConfig) {
+    delete existingConfig[LOCAL_MODEL_OPT_IN_CONFIG_KEY];
+    if (Object.keys(existingConfig).length > 0) {
+      next[CODEX_ORCHESTRATOR_CONFIG_KEY] = existingConfig;
+    } else {
+      delete next[CODEX_ORCHESTRATOR_CONFIG_KEY];
+    }
+  }
+}
+
+export function formatModelDefaultExpectation(baseline: string): string {
+  return `${baseline} (or verified local opt-in: ${LOCAL_MODEL_OPT_INS.join(', ')})`;
+}
+
+function resolveModelDefault(localModelOptIn: (typeof LOCAL_MODEL_OPT_INS)[number] | null, baseline: string): string {
+  return localModelOptIn ?? baseline;
 }
 
 async function planRoleChanges(
@@ -356,8 +469,7 @@ async function planRoleChanges(
         existingContent: null,
         currentStatus: 'pending',
         detail: `Will create ${definition.fileName}.`,
-        shouldWrite: true,
-        applyDetail: `Created ${definition.fileName}.`
+        writeReason: 'create'
       });
       continue;
     }
@@ -370,20 +482,7 @@ async function planRoleChanges(
         existingContent: current,
         currentStatus: 'unchanged',
         detail: `${definition.fileName} already matches CO baseline defaults.`,
-        shouldWrite: false
-      });
-      continue;
-    }
-
-    if (definition.managedContents.includes(current)) {
-      changes.push({
-        definition,
-        path,
-        existingContent: current,
-        currentStatus: 'pending',
-        detail: `Will update ${definition.fileName} because it matches a CO-managed baseline for a different auth scope.`,
-        shouldWrite: true,
-        applyDetail: `Updated ${definition.fileName} to match the selected auth scope because the existing file matched a CO-managed baseline.`
+        writeReason: null
       });
       continue;
     }
@@ -395,8 +494,19 @@ async function planRoleChanges(
         existingContent: current,
         currentStatus: 'pending',
         detail: `Will overwrite ${definition.fileName} because --force is set.`,
-        shouldWrite: true,
-        applyDetail: `Overwrote ${definition.fileName} because --force was set.`
+        writeReason: 'force'
+      });
+      continue;
+    }
+
+    if (definition.managedMigrationContents.includes(current)) {
+      changes.push({
+        definition,
+        path,
+        existingContent: current,
+        currentStatus: 'pending',
+        detail: `Will update ${definition.fileName} from a prior CO-managed model baseline.`,
+        writeReason: 'managed_migration'
       });
       continue;
     }
@@ -407,14 +517,14 @@ async function planRoleChanges(
       existingContent: current,
       currentStatus: 'preserved',
       detail: `${definition.fileName} already exists; preserving without --force.`,
-      shouldWrite: false
+      writeReason: null
     });
   }
 
   return changes;
 }
 
-async function loadRoleDefinitions(authScope: CodexDefaultsAuthScope): Promise<LoadedRoleDefinition[]> {
+async function loadRoleDefinitions(): Promise<LoadedRoleDefinition[]> {
   const packageRoot = findPackageRoot();
   const loaded: LoadedRoleDefinition[] = [];
   for (const definition of ROLE_DEFINITIONS) {
@@ -428,60 +538,103 @@ async function loadRoleDefinitions(authScope: CodexDefaultsAuthScope): Promise<L
     }
     loaded.push({
       ...definition,
-      content: scopeRoleTemplateContent(definition, content, authScope),
-      managedContents: buildManagedRoleContents(definition, content)
+      content,
+      managedMigrationContents: buildManagedMigrationContents(content, definition)
     });
   }
   return loaded;
 }
 
-function buildManagedRoleContents(definition: RoleDefinition, content: string): string[] {
-  const contents = [
-    scopeRoleTemplateContent(definition, content, 'portable'),
-    scopeRoleTemplateContent(definition, content, 'chatgpt')
-  ];
+function buildActiveRoleDefinitions(
+  roleDefinitions: readonly LoadedRoleDefinition[],
+  localModelOptIn: (typeof LOCAL_MODEL_OPT_INS)[number] | null
+): LoadedRoleDefinition[] {
+  if (!localModelOptIn) {
+    return [...roleDefinitions];
+  }
 
-  for (const [currentText, legacyText] of LEGACY_MANAGED_TEMPLATE_TEXT[definition.key] ?? []) {
-    if (!content.includes(currentText)) {
-      continue;
-    }
-    const legacyContent = content.replace(currentText, legacyText);
-    contents.push(
-      scopeRoleTemplateContent(definition, legacyContent, 'portable'),
-      scopeRoleTemplateContent(definition, legacyContent, 'chatgpt')
+  return roleDefinitions.map((definition) => {
+    const matchingOptInBaseline = definition.managedMigrationBaselines?.find(
+      (baseline) => baseline.model === localModelOptIn
     );
-  }
+    if (!matchingOptInBaseline) {
+      return definition;
+    }
 
-  return uniqueStrings(contents);
-}
-
-function resolveBaselineModels(authScope: CodexDefaultsAuthScope): { model: string; reviewModel: string } {
-  if (authScope === 'chatgpt') {
+    const optInContent = applyRoleBaselineOverrides(
+      definition.content,
+      definition.fileName,
+      matchingOptInBaseline
+    );
     return {
-      model: CHATGPT_AUTH_BASELINE_MODEL,
-      reviewModel: CHATGPT_AUTH_BASELINE_MODEL
+      ...definition,
+      content: optInContent,
+      managedMigrationContents: uniqueRoleContents([
+        definition.content,
+        ...definition.managedMigrationContents
+      ]).filter((migrationContent) => migrationContent !== optInContent)
     };
-  }
-  return {
-    model: PORTABLE_BASELINE_MODEL,
-    reviewModel: PORTABLE_BASELINE_MODEL
-  };
+  });
 }
 
-function scopeRoleTemplateContent(
-  definition: RoleDefinition,
+function buildManagedMigrationContents(
   content: string,
-  authScope: CodexDefaultsAuthScope
-): string {
-  if (definition.key === 'explorer_fast') {
-    return content;
-  }
-  const { model } = resolveBaselineModels(authScope);
-  return content.replace(/^model = "gpt-[^"]+"/m, `model = "${model}"`);
+  definition: RoleDefinition
+): readonly string[] {
+  const migrationContents = [
+    ...(definition.managedMigrationBaselines ?? []),
+    ...(definition.managedMigrationContentVariants ?? [])
+  ].map((baseline) => applyRoleBaselineOverrides(content, definition.fileName, baseline));
+  return uniqueRoleContents(migrationContents).filter((migrationContent) => migrationContent !== content);
 }
 
-function uniqueStrings(values: readonly string[]): string[] {
-  return [...new Set(values)];
+function uniqueRoleContents(contents: readonly string[]): string[] {
+  return [...new Set(contents)];
+}
+
+function formatAppliedRoleWriteDetail(roleChange: PlannedRoleChange): string {
+  switch (roleChange.writeReason) {
+    case 'create':
+      return `Created ${roleChange.definition.fileName}.`;
+    case 'force':
+      return `Overwrote ${roleChange.definition.fileName} because --force was set.`;
+    case 'managed_migration':
+      return `Updated ${roleChange.definition.fileName} from a prior CO-managed model baseline.`;
+    case null:
+      return roleChange.detail;
+  }
+}
+
+function applyRoleBaselineOverrides(
+  content: string,
+  fileName: RoleDefinition['fileName'],
+  baseline: ManagedMigrationContentVariant
+): string {
+  let next = replaceRoleTomlString(content, 'model', baseline.model, fileName);
+  next = replaceRoleTomlString(
+    next,
+    'model_reasoning_effort',
+    baseline.modelReasoningEffort,
+    fileName
+  );
+  return next.replace(
+    /^# with CO override to use .+ at .+ reasoning\.$/m,
+    baseline.overrideComment
+      ?? `# with CO override to use ${baseline.model} at ${baseline.modelReasoningEffort} reasoning.`
+  );
+}
+
+function replaceRoleTomlString(
+  content: string,
+  key: string,
+  value: string,
+  fileName: RoleDefinition['fileName']
+): string {
+  const pattern = new RegExp(`^(${key}\\s*=\\s*)"[^"]*"$`, 'm');
+  if (!pattern.test(content)) {
+    throw new Error(`Role template ${fileName} is missing a ${key} assignment.`);
+  }
+  return content.replace(pattern, (_match, prefix: string) => `${prefix}"${value}"`);
 }
 
 function buildPlannedChanges(params: {

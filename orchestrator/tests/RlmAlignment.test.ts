@@ -26,15 +26,6 @@ afterEach(async () => {
 });
 
 describe('alignment scoring', () => {
-  it('keeps default route models on the portable baseline', () => {
-    expect(DEFAULT_ALIGNMENT_POLICY.route).toMatchObject({
-      sentinel_model: 'gpt-5.4',
-      high_reasoning_model: 'gpt-5.4',
-      arbitration_model: 'gpt-5.4',
-      high_reasoning_available: true
-    });
-  });
-
   it('maps strong and weak signals to expected policy bands', () => {
     const strong = scoreAlignment({
       contradictions: 0,
@@ -107,6 +98,14 @@ describe('alignment scoring', () => {
     expect(minor).toEqual({ major: 1, minor: 3, patch: 0, label: '1.3.0' });
     expect(major).toEqual({ major: 2, minor: 0, patch: 0, label: '2.0.0' });
   });
+
+  it('keeps route models aligned with the current CO model posture', () => {
+    expect(DEFAULT_ALIGNMENT_POLICY.route).toMatchObject({
+      sentinel_model: 'gpt-5.4',
+      high_reasoning_model: 'gpt-5.4',
+      arbitration_model: 'gpt-5.4'
+    });
+  });
 });
 
 describe('alignment persistence', () => {
@@ -126,7 +125,7 @@ describe('alignment persistence', () => {
       intent_version: '1.0.1',
       payload: { turn: 1 },
       score_metadata: { action: 'pass', score: 92, confidence: 0.98 },
-      provenance: { source: 'test', route_strategy: 'sentinel', route_model: 'gpt-5.5' },
+      provenance: { source: 'test', route_strategy: 'sentinel', route_model: 'gpt-5.4' },
       idempotency_key: 'event:1'
     });
     const duplicate = await writer.append({
@@ -138,7 +137,7 @@ describe('alignment persistence', () => {
       intent_version: '1.0.1',
       payload: { turn: 1 },
       score_metadata: { action: 'pass', score: 92, confidence: 0.98 },
-      provenance: { source: 'test', route_strategy: 'sentinel', route_model: 'gpt-5.5' },
+      provenance: { source: 'test', route_strategy: 'sentinel', route_model: 'gpt-5.4' },
       idempotency_key: 'event:1'
     });
     const second = await writer.append({
@@ -150,7 +149,7 @@ describe('alignment persistence', () => {
       intent_version: '1.0.2',
       payload: { turn: 2 },
       score_metadata: { action: 'replan', score: 63, confidence: 0.82 },
-      provenance: { source: 'test', route_strategy: 'deep_audit', route_model: 'gpt-5.5' },
+      provenance: { source: 'test', route_strategy: 'deep_audit', route_model: 'gpt-5.4' },
       idempotency_key: 'event:2'
     });
 
@@ -199,7 +198,7 @@ describe('alignment persistence', () => {
         intent_version: '1.0.1',
         payload: { turn: 1 },
         score_metadata: { action: 'pass', score: 90, confidence: 0.9 },
-        provenance: { source: 'test', route_strategy: 'sentinel', route_model: 'gpt-5.5' },
+        provenance: { source: 'test', route_strategy: 'sentinel', route_model: 'gpt-5.4' },
         idempotency_key: 'event:valid'
       })
     ).resolves.toBeTruthy();

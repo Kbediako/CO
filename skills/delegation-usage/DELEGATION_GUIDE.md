@@ -135,9 +135,11 @@ If you need delegation to respect a repo’s `.codex/orchestrator.toml` (e.g., s
 
 Delegation MCP expects JSONL. Keep `codex-orchestrator` aligned with the current CO compatibility or adoption target (`codex-cli 0.124.0`) unless a task-scoped canary is explicitly evaluating something newer.
 
-Current `0.124.0` posture also confirms that:
+Current `0.124.0` CO-local posture also confirms that:
 - `codex exec` accepts a prompt argument plus piped stdin, with stdin appended as a `<stdin>` block.
 - `codex login --device-auth` is available for non-browser sign-in fallback.
+- App-server model/list evidence under ChatGPT auth can vary by account; keep `gpt-5.4` as the packaged default because it may still appear as the app-server `isDefault`.
+- The bundled debug catalog can lag runtime posture briefly, and residual plugin warnings are local temporary plugin cache warnings rather than CO posture failures.
 
 - Check: `codex-orchestrator --version`
 - Update global: `npm i -g @kbediako/codex-orchestrator@latest`
@@ -156,7 +158,8 @@ Current `0.124.0` posture also confirms that:
 - For symbolic collab runs, include a first-line role tag in spawned prompts: `[agent_type:<role>]`.
 - Multi-turn subagent loops are supported (`spawn_agent` -> `send_input` -> `wait`/`resume_agent` -> `close_agent`).
 - In Codex CLI `0.124.0`, built-in `explorer` continues to inherit top-level defaults unless overridden in `~/.codex/config.toml`.
-- Recommended portable baseline:
+- Current model posture is `gpt-5.4` for packaged top-level, delegated subagent, and review surfaces; newer local model opt-ins require access smoke.
+- Recommended packaged baseline:
   - `model = "gpt-5.4"`
   - `review_model = "gpt-5.4"`
   - `model_reasoning_effort = "xhigh"`
@@ -164,9 +167,9 @@ Current `0.124.0` posture also confirms that:
   - Leave `[agents.explorer]` undefined unless you intentionally want to override built-in explorer behavior.
   - Add optional `[agents.explorer_fast]` for `gpt-5.3-codex-spark` (file/codebase search only).
   - Add optional `[agents.awaiter]` override for `gpt-5.4` + `high` while preserving awaiter instructions.
-  - Add `[agents.worker_complex]` for high-risk edits with the validated auth scope: portable remains `gpt-5.4` + `xhigh`.
-  - Keep delegated subagent and review surfaces on `gpt-5.5` only for validated ChatGPT-auth lanes; portable worker_complex and downstream templates remain on the portable baseline.
-  - Use `codex-orchestrator codex defaults --auth-scope chatgpt --yes` only after ChatGPT-auth `gpt-5.5` access is validated, and do not treat that as proof for Codex Cloud, API-key auth, or provider-specific model variants unless a fresh provider lane validates them.
+  - Add `[agents.worker_complex]` for high-risk edits (`gpt-5.4`, `xhigh`).
+  - Keep delegated subagent and review defaults on `gpt-5.4` under ChatGPT auth. Use newer local models only after access smoke.
+  - Caveat: app-server `isDefault` may still report `gpt-5.4` even when newer local models are available.
   - Fallback posture is contingency-only: `8/2` (constrained/high-risk), legacy `6/1/1` break-glass when an older parser/runtime still consumes spawn-depth caps.
   - If native `codex` startup fails with `invalid type: integer ... expected struct AgentRoleToml` under `[agents]`, remove only the live `max_depth` and `max_spawn_depth` keys from `~/.codex/config.toml` and leave the role subtables unchanged.
 

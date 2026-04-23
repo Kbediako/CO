@@ -10,9 +10,9 @@ The machine-readable policy lives in `docs/docs-catalog.json` under `policies.ro
 
 Current CO policy:
 
-- Owner issue: `CO-324`
+- Owner issue: `CO-343`
 - Exact canonical owner overrides: `canonical_owner_issues[]` may map one `canonical_owner_key` to one live owner issue, such as `CO-320` for `docs_freshness_candidate|doc_class:task_packet|path_family:tasks/tasks-*|last_review:2026-03-23|cadence_days:30`
-- Historical owner lineage: `CO-175` established the Apr 14 baseline, `CO-267` owned the Apr 20/21 maintenance refreshes, and `CO-300` owned the Apr 22 reset; these are now terminal evidence only and must not remain the live maintenance owner after they reach terminal states.
+- Historical owner lineage: `CO-175` established the Apr 14 baseline, `CO-267` owned the Apr 20/21 maintenance refreshes, `CO-300` owned the Apr 22 reset, and `CO-324` owned the Apr 23 reset; these are now terminal evidence only and must not remain the live maintenance owner after they reach terminal states.
 - Window: `7` days after the normal freshness cadence expires
 - Maximum active rolling cohorts: `2`
 - Maximum rolling rows: `300`
@@ -252,3 +252,16 @@ CO-324 reproduced the Apr 23 current-main baseline failure in `out/linear-3c52bf
 
 ### Post-refresh Disposition
 CO-324 re-homes the rolling-freshness owner metadata to live issue `CO-324`, preserves `CO-300` as historical terminal-owner evidence only, and reviews the current Apr 23 stale set directly instead of increasing rolling caps or weakening freshness gates. The reviewed disposition is recorded in `docs/findings/linear-3c52bf66-f805-4537-8671-ad1dec2f4623-docs-freshness-classification.md`; the stale rows are refreshed to `last_review=2026-04-23`. CO-321 remains out of scope and its refreshed `tasks/specs` cohort is not modified.
+
+## Apr 24 Terminal Owner Reset and Reviewed Refresh
+
+### Reproduction / Baseline Findings
+CO-343 reproduced the Apr 24 current-main blocker during CO-341 validation:
+
+- `node scripts/spec-guard.mjs --dry-run` printed five stale active-spec failures with `last_review=2026-03-24` while exiting zero.
+- `node scripts/spec-guard.mjs` exited non-zero on the same five specs.
+- `npm run docs:freshness` reported `24` stale task packet/mirror rows and no missing registry, missing-on-disk, invalid, or uncatalogued rows.
+- `docs:freshness:maintain` verified configured owner `CO-324` as terminal `Done` and required a new live owner path.
+
+### Post-refresh Disposition
+CO-343 re-homes the rolling-freshness owner metadata to live issue `CO-343`, preserves `CO-324` as historical terminal-owner evidence only, and reviews the Apr 24 stale rows directly instead of changing rolling policy. The reviewed disposition is recorded in `docs/findings/co-343-apr-24-docs-freshness-classification.md`; the exact stale spec frontmatters and registry rows are refreshed to `last_review=2026-04-24`.

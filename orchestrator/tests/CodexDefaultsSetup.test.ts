@@ -1,7 +1,8 @@
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
@@ -11,6 +12,66 @@ const require = createRequire(import.meta.url);
 const toml = require('@iarna/toml') as {
   parse: (source: string) => Record<string, unknown>;
 };
+
+const TEST_DIR = dirname(fileURLToPath(import.meta.url));
+const PACKAGE_ROOT = resolve(TEST_DIR, '..', '..');
+const ROLE_TEMPLATE_DIR = join(PACKAGE_ROOT, 'templates', 'codex', '.codex', 'agents');
+
+async function buildPriorManagedRole(
+  fileName: 'worker-complex.toml' | 'awaiter-high.toml'
+): Promise<string> {
+  const template = await readFile(join(ROLE_TEMPLATE_DIR, fileName), 'utf8');
+  return template
+    .replace(/gpt-5\.4/g, 'gpt-5.5')
+    .replace(
+      /^model_reasoning_effort\s*=\s*"[^"]*"$/m,
+      'model_reasoning_effort = "xhigh"'
+    )
+    .replace(
+      /^# with CO override to use .+ at .+ reasoning\.$/m,
+      '# with CO override to use gpt-5.5 at xhigh reasoning.'
+    );
+}
+
+const LEGACY_CHATGPT_AUTH_AWAITER_ROLE = `# Synced from codex-rs/core/src/agent/builtins/awaiter.toml (0.105.0)
+# with CO portable override to use gpt-5.4 at high reasoning.
+background_terminal_max_timeout = 3600000
+model = "gpt-5.5"
+model_reasoning_effort = "high"
+developer_instructions="""You are an awaiter.
+Your role is to await the completion of a specific command or task and report its status only when it is finished.
+
+Behavior rules:
+
+1. When given a command or task identifier, you must:
+   - Execute or await it using the appropriate tool
+   - Continue awaiting until the task reaches a terminal state.
+
+2. You must NOT:
+   - Modify the task.
+   - Interpret or optimize the task.
+   - Perform unrelated actions.
+   - Stop awaiting unless explicitly instructed.
+
+3. Awaiting behavior:
+   - If the task is still running, continue polling using tool calls.
+   - Use repeated tool calls if necessary.
+   - Do not hallucinate completion.
+   - Use long timeouts when awaiting for something. If you need multiple awaits, increase the timeouts/yield times exponentially.
+
+4. If asked for status:
+   - Return the current known status.
+   - Immediately resume awaiting afterward.
+
+5. Termination:
+   - Only exit awaiting when:
+     - The task completes successfully, OR
+     - The task fails, OR
+     - You receive an explicit stop instruction.
+
+You must behave deterministically and conservatively.
+"""
+`;
 
 describe('runCodexDefaultsSetup', () => {
   it('returns a dry-run plan by default', async () => {
@@ -87,6 +148,7 @@ describe('runCodexDefaultsSetup', () => {
       });
 
       expect(result.status).toBe('applied');
+      expect(result.plan.authScope).toBe('portable');
       expect(result.changes).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ target: 'config', status: 'updated' }),
@@ -137,14 +199,19 @@ describe('runCodexDefaultsSetup', () => {
       expect(awaiterRole?.config_file).toBe('./agents/awaiter-high.toml');
       expect(awaiterRole?.custom).toBe('still-here');
       expect(await readFile(explorerPath, 'utf8')).toBe('MARKER\n');
-      expect(await readFile(workerPath, 'utf8')).toContain('model = "gpt-5.4"');
-      expect(await readFile(awaiterPath, 'utf8')).toContain('model = "gpt-5.4"');
+      const workerRoleFile = await readFile(workerPath, 'utf8');
+      expect(workerRoleFile).toContain('model = "gpt-5.4"');
+      expect(workerRoleFile).toContain('model_reasoning_effort = "xhigh"');
+      const awaiterRoleFile = await readFile(awaiterPath, 'utf8');
+      expect(awaiterRoleFile).toContain('# with CO override to use gpt-5.4 at high reasoning.');
+      expect(awaiterRoleFile).toContain('model = "gpt-5.4"');
+      expect(awaiterRoleFile).toContain('model_reasoning_effort = "high"');
     } finally {
       await rm(tempHome, { recursive: true, force: true });
     }
   });
 
-  it('scopes gpt-5.5 defaults to explicit ChatGPT-auth setup', async () => {
+  it('keeps delegated and review defaults on gpt-5.4 for a fresh ChatGPT-auth top-level opt-in', async () => {
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-chatgpt-'));
     const configPath = join(tempHome, 'config.toml');
     const workerPath = join(tempHome, 'agents', 'worker-complex.toml');
@@ -163,86 +230,126 @@ describe('runCodexDefaultsSetup', () => {
         model?: string;
         review_model?: string;
         model_reasoning_effort?: string;
+        codex_orchestrator?: Record<string, unknown>;
       };
 
       expect(parsed.model).toBe('gpt-5.5');
-      expect(parsed.review_model).toBe('gpt-5.5');
+      expect(parsed.review_model).toBe('gpt-5.4');
       expect(parsed.model_reasoning_effort).toBe('xhigh');
-      expect(await readFile(workerPath, 'utf8')).toContain('model = "gpt-5.5"');
-      expect(await readFile(awaiterPath, 'utf8')).toContain('model = "gpt-5.5"');
-    } finally {
-      await rm(tempHome, { recursive: true, force: true });
-    }
-  });
+      expect(parsed.codex_orchestrator?.local_model_opt_in).toBe('gpt-5.5');
 
-  it('updates CO-managed role files when changing auth scope', async () => {
-    const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-chatgpt-upgrade-'));
-    const env = { CODEX_HOME: tempHome } as NodeJS.ProcessEnv;
-    const configPath = join(tempHome, 'config.toml');
-    const workerPath = join(tempHome, 'agents', 'worker-complex.toml');
-    const awaiterPath = join(tempHome, 'agents', 'awaiter-high.toml');
-    const explorerPath = join(tempHome, 'agents', 'explorer-fast.toml');
-    try {
-      await runCodexDefaultsSetup({ apply: true, env });
+      const workerRoleFile = await readFile(workerPath, 'utf8');
+      expect(workerRoleFile).toContain('model = "gpt-5.4"');
+      expect(workerRoleFile).toContain('model_reasoning_effort = "xhigh"');
 
-      const result = await runCodexDefaultsSetup({
+      const awaiterRoleFile = await readFile(awaiterPath, 'utf8');
+      expect(awaiterRoleFile).toContain('# with CO override to use gpt-5.4 at high reasoning.');
+      expect(awaiterRoleFile).toContain('model = "gpt-5.4"');
+      expect(awaiterRoleFile).toContain('model_reasoning_effort = "high"');
+
+      const secondResult = await runCodexDefaultsSetup({
         apply: true,
         authScope: 'chatgpt',
-        env
+        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
       });
 
-      expect(result.status).toBe('applied');
-      expect(result.changes).toEqual(
+      expect(secondResult.changes).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ target: 'config', status: 'updated' }),
-          expect.objectContaining({ target: 'role_file', name: 'explorer_fast', status: 'unchanged' }),
-          expect.objectContaining({ target: 'role_file', name: 'worker_complex', status: 'updated' }),
-          expect.objectContaining({ target: 'role_file', name: 'awaiter', status: 'updated' })
+          expect.objectContaining({ target: 'config', status: 'unchanged' }),
+          expect.objectContaining({
+            target: 'role_file',
+            name: 'worker_complex',
+            status: 'unchanged'
+          }),
+          expect.objectContaining({
+            target: 'role_file',
+            name: 'awaiter',
+            status: 'unchanged'
+          })
         ])
       );
 
-      const parsed = toml.parse(await readFile(configPath, 'utf8')) as {
+      const secondParsed = toml.parse(await readFile(configPath, 'utf8')) as {
         model?: string;
         review_model?: string;
+        codex_orchestrator?: Record<string, unknown>;
       };
-      expect(parsed.model).toBe('gpt-5.5');
-      expect(parsed.review_model).toBe('gpt-5.5');
-      expect(await readFile(workerPath, 'utf8')).toContain('model = "gpt-5.5"');
-      expect(await readFile(awaiterPath, 'utf8')).toContain('model = "gpt-5.5"');
-      expect(await readFile(explorerPath, 'utf8')).toContain('model = "gpt-5.3-codex-spark"');
+      expect(secondParsed.model).toBe('gpt-5.5');
+      expect(secondParsed.review_model).toBe('gpt-5.4');
+      expect(secondParsed.codex_orchestrator?.local_model_opt_in).toBe('gpt-5.5');
+      expect(await readFile(workerPath, 'utf8')).toContain('model = "gpt-5.4"');
+      expect(await readFile(awaiterPath, 'utf8')).toContain('model = "gpt-5.4"');
+
+      const plainRerunResult = await runCodexDefaultsSetup({
+        apply: true,
+        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+      });
+
+      expect(plainRerunResult.changes).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ target: 'config', status: 'unchanged' }),
+          expect.objectContaining({
+            target: 'role_file',
+            name: 'worker_complex',
+            status: 'unchanged'
+          }),
+          expect.objectContaining({
+            target: 'role_file',
+            name: 'awaiter',
+            status: 'unchanged'
+          })
+        ])
+      );
+
+      const plainRerunParsed = toml.parse(await readFile(configPath, 'utf8')) as {
+        model?: string;
+        review_model?: string;
+        codex_orchestrator?: Record<string, unknown>;
+      };
+      expect(plainRerunParsed.model).toBe('gpt-5.5');
+      expect(plainRerunParsed.review_model).toBe('gpt-5.4');
+      expect(plainRerunParsed.codex_orchestrator?.local_model_opt_in).toBe('gpt-5.5');
+      expect(await readFile(workerPath, 'utf8')).toContain('model = "gpt-5.4"');
+      expect(await readFile(awaiterPath, 'utf8')).toContain('model = "gpt-5.4"');
     } finally {
       await rm(tempHome, { recursive: true, force: true });
     }
   });
 
-  it('updates legacy CO-managed awaiter role files when changing auth scope', async () => {
-    const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-chatgpt-legacy-awaiter-'));
-    const env = { CODEX_HOME: tempHome } as NodeJS.ProcessEnv;
-    const awaiterPath = join(tempHome, 'agents', 'awaiter-high.toml');
+  it('removes the local gpt-5.5 marker when portable scope is requested explicitly', async () => {
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-portable-scope-'));
+    const configPath = join(tempHome, 'config.toml');
     try {
-      await runCodexDefaultsSetup({ apply: true, env });
-      const generatedAwaiter = await readFile(awaiterPath, 'utf8');
       await writeFile(
-        awaiterPath,
-        generatedAwaiter.replace(
-          '# with CO portable override to use gpt-5.4 at high reasoning.',
-          '# with CO override to use gpt-5.4 at high reasoning.'
-        ),
+        configPath,
+        [
+          'model = "gpt-5.5"',
+          'review_model = "gpt-5.5"',
+          'model_reasoning_effort = "xhigh"',
+          '[codex_orchestrator]',
+          'local_model_opt_in = "gpt-5.5"',
+          ''
+        ].join('\n'),
         'utf8'
       );
 
       const result = await runCodexDefaultsSetup({
         apply: true,
-        authScope: 'chatgpt',
-        env
+        authScope: 'portable',
+        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
       });
 
-      expect(result.changes).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ target: 'role_file', name: 'awaiter', status: 'updated' })
-        ])
-      );
-      expect(await readFile(awaiterPath, 'utf8')).toContain('model = "gpt-5.5"');
+      expect(result.status).toBe('applied');
+      expect(result.plan.authScope).toBe('portable');
+
+      const parsed = toml.parse(await readFile(configPath, 'utf8')) as {
+        model?: string;
+        review_model?: string;
+        codex_orchestrator?: Record<string, unknown>;
+      };
+      expect(parsed.model).toBe('gpt-5.4');
+      expect(parsed.review_model).toBe('gpt-5.4');
+      expect(parsed.codex_orchestrator).toBeUndefined();
     } finally {
       await rm(tempHome, { recursive: true, force: true });
     }
@@ -272,6 +379,496 @@ describe('runCodexDefaultsSetup', () => {
       expect(parsed.agents?.max_threads).toBe(12);
       expect(parsed.agents?.max_depth).toBeUndefined();
       expect(parsed.agents?.max_spawn_depth).toBeUndefined();
+    } finally {
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('preserves marker-backed local gpt-5.5 config opt-ins', async () => {
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-local-opt-in-'));
+    const configPath = join(tempHome, 'config.toml');
+    const workerPath = join(tempHome, 'agents', 'worker-complex.toml');
+    const awaiterPath = join(tempHome, 'agents', 'awaiter-high.toml');
+    try {
+      await writeFile(
+        configPath,
+        [
+          'model = "gpt-5.5"',
+          'review_model = "gpt-5.5"',
+          'model_reasoning_effort = "xhigh"',
+          'custom_flag = "keep"',
+          '[codex_orchestrator]',
+          'local_model_opt_in = "gpt-5.5"',
+          '[agents]',
+          'max_threads = 2',
+          ''
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = await runCodexDefaultsSetup({
+        apply: true,
+        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+      });
+
+      expect(result.status).toBe('applied');
+
+      const parsed = toml.parse(await readFile(configPath, 'utf8')) as {
+        model?: string;
+        review_model?: string;
+        model_reasoning_effort?: string;
+        custom_flag?: string;
+        agents?: Record<string, unknown>;
+      };
+
+      expect(parsed.model).toBe('gpt-5.5');
+      expect(parsed.review_model).toBe('gpt-5.5');
+      expect(parsed.model_reasoning_effort).toBe('xhigh');
+      expect(parsed.custom_flag).toBe('keep');
+      expect(parsed.agents?.max_threads).toBe(12);
+      const workerRoleFile = await readFile(workerPath, 'utf8');
+      expect(workerRoleFile).toContain('model = "gpt-5.5"');
+      expect(workerRoleFile).toContain('model_reasoning_effort = "xhigh"');
+      const awaiterRoleFile = await readFile(awaiterPath, 'utf8');
+      expect(awaiterRoleFile).toContain('# with CO override to use gpt-5.5 at xhigh reasoning.');
+      expect(awaiterRoleFile).toContain('model = "gpt-5.5"');
+      expect(awaiterRoleFile).toContain('model_reasoning_effort = "xhigh"');
+    } finally {
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('migrates legacy unmarked gpt-5.5 defaults back to packaged gpt-5.4', async () => {
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-legacy-gpt55-'));
+    const configPath = join(tempHome, 'config.toml');
+    const agentsDir = join(tempHome, 'agents');
+    const workerPath = join(agentsDir, 'worker-complex.toml');
+    const awaiterPath = join(agentsDir, 'awaiter-high.toml');
+    try {
+      await mkdir(agentsDir, { recursive: true });
+      await writeFile(
+        configPath,
+        [
+          'model = "gpt-5.5"',
+          'review_model = "gpt-5.5"',
+          'model_reasoning_effort = "xhigh"',
+          '[agents]',
+          'max_threads = 12',
+          ''
+        ].join('\n'),
+        'utf8'
+      );
+      const priorWorker = await buildPriorManagedRole('worker-complex.toml');
+      const priorAwaiter = await buildPriorManagedRole('awaiter-high.toml');
+      await writeFile(workerPath, priorWorker, 'utf8');
+      await writeFile(awaiterPath, priorAwaiter, 'utf8');
+
+      const result = await runCodexDefaultsSetup({
+        apply: true,
+        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+      });
+
+      expect(result.changes).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ target: 'config', status: 'updated' }),
+          expect.objectContaining({
+            target: 'role_file',
+            name: 'worker_complex',
+            status: 'updated'
+          }),
+          expect.objectContaining({
+            target: 'role_file',
+            name: 'awaiter',
+            status: 'updated'
+          })
+        ])
+      );
+
+      const parsed = toml.parse(await readFile(configPath, 'utf8')) as {
+        model?: string;
+        review_model?: string;
+      };
+      expect(parsed.model).toBe('gpt-5.4');
+      expect(parsed.review_model).toBe('gpt-5.4');
+
+      const workerRoleFile = await readFile(workerPath, 'utf8');
+      expect(workerRoleFile).toContain('model = "gpt-5.4"');
+      expect(workerRoleFile).toContain('model_reasoning_effort = "xhigh"');
+      expect(workerRoleFile).not.toContain('gpt-5.5');
+
+      const awaiterRoleFile = await readFile(awaiterPath, 'utf8');
+      expect(awaiterRoleFile).toContain('# with CO override to use gpt-5.4 at high reasoning.');
+      expect(awaiterRoleFile).toContain('model = "gpt-5.4"');
+      expect(awaiterRoleFile).toContain('model_reasoning_effort = "high"');
+      expect(awaiterRoleFile).not.toContain('gpt-5.5');
+    } finally {
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('migrates legacy ChatGPT-auth awaiter role files with old portable comments', async () => {
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-legacy-awaiter-portable-'));
+    const configPath = join(tempHome, 'config.toml');
+    const agentsDir = join(tempHome, 'agents');
+    const awaiterPath = join(agentsDir, 'awaiter-high.toml');
+    try {
+      await mkdir(agentsDir, { recursive: true });
+      await writeFile(
+        configPath,
+        [
+          'model = "gpt-5.5"',
+          'review_model = "gpt-5.5"',
+          'model_reasoning_effort = "xhigh"',
+          '[agents]',
+          'max_threads = 12',
+          ''
+        ].join('\n'),
+        'utf8'
+      );
+      await writeFile(awaiterPath, LEGACY_CHATGPT_AUTH_AWAITER_ROLE, 'utf8');
+
+      const result = await runCodexDefaultsSetup({
+        apply: true,
+        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+      });
+
+      expect(result.changes).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ target: 'config', status: 'updated' }),
+          expect.objectContaining({
+            target: 'role_file',
+            name: 'awaiter',
+            status: 'updated'
+          })
+        ])
+      );
+
+      const parsed = toml.parse(await readFile(configPath, 'utf8')) as {
+        model?: string;
+        review_model?: string;
+      };
+      expect(parsed.model).toBe('gpt-5.4');
+      expect(parsed.review_model).toBe('gpt-5.4');
+
+      const awaiterRoleFile = await readFile(awaiterPath, 'utf8');
+      expect(awaiterRoleFile).not.toBe(LEGACY_CHATGPT_AUTH_AWAITER_ROLE);
+      expect(awaiterRoleFile).toContain('# with CO override to use gpt-5.4 at high reasoning.');
+      expect(awaiterRoleFile).toContain('model = "gpt-5.4"');
+      expect(awaiterRoleFile).toContain('model_reasoning_effort = "high"');
+      expect(awaiterRoleFile).not.toContain('portable override');
+      expect(awaiterRoleFile).not.toContain('gpt-5.5');
+    } finally {
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps exact prior gpt-5.5 role files when config opts into gpt-5.5', async () => {
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-local-role-opt-in-'));
+    const configPath = join(tempHome, 'config.toml');
+    const agentsDir = join(tempHome, 'agents');
+    const workerPath = join(agentsDir, 'worker-complex.toml');
+    const awaiterPath = join(agentsDir, 'awaiter-high.toml');
+    try {
+      await mkdir(agentsDir, { recursive: true });
+      await writeFile(
+        configPath,
+        [
+          'model = "gpt-5.5"',
+          'review_model = "gpt-5.5"',
+          'model_reasoning_effort = "xhigh"',
+          '[codex_orchestrator]',
+          'local_model_opt_in = "gpt-5.5"',
+          '[agents]',
+          'max_threads = 12',
+          ''
+        ].join('\n'),
+        'utf8'
+      );
+      const priorWorker = await buildPriorManagedRole('worker-complex.toml');
+      const priorAwaiter = await buildPriorManagedRole('awaiter-high.toml');
+      await writeFile(workerPath, priorWorker, 'utf8');
+      await writeFile(awaiterPath, priorAwaiter, 'utf8');
+
+      const result = await runCodexDefaultsSetup({
+        apply: true,
+        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+      });
+
+      expect(result.changes).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            target: 'role_file',
+            name: 'worker_complex',
+            status: 'unchanged'
+          }),
+          expect.objectContaining({
+            target: 'role_file',
+            name: 'awaiter',
+            status: 'unchanged'
+          })
+        ])
+      );
+      expect(await readFile(workerPath, 'utf8')).toBe(priorWorker);
+      expect(await readFile(awaiterPath, 'utf8')).toBe(priorAwaiter);
+
+      const explicitChatGptRerun = await runCodexDefaultsSetup({
+        apply: true,
+        authScope: 'chatgpt',
+        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+      });
+
+      expect(explicitChatGptRerun.changes).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ target: 'config', status: 'unchanged' }),
+          expect.objectContaining({
+            target: 'role_file',
+            name: 'worker_complex',
+            status: 'unchanged'
+          }),
+          expect.objectContaining({
+            target: 'role_file',
+            name: 'awaiter',
+            status: 'unchanged'
+          })
+        ])
+      );
+      expect(await readFile(workerPath, 'utf8')).toBe(priorWorker);
+      expect(await readFile(awaiterPath, 'utf8')).toBe(priorAwaiter);
+    } finally {
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('updates managed gpt-5.4 role files when config opts into gpt-5.5', async () => {
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-local-role-migration-'));
+    const configPath = join(tempHome, 'config.toml');
+    const agentsDir = join(tempHome, 'agents');
+    const workerPath = join(agentsDir, 'worker-complex.toml');
+    const awaiterPath = join(agentsDir, 'awaiter-high.toml');
+    try {
+      await mkdir(agentsDir, { recursive: true });
+      await writeFile(
+        configPath,
+        [
+          'model = "gpt-5.5"',
+          'review_model = "gpt-5.5"',
+          'model_reasoning_effort = "xhigh"',
+          '[codex_orchestrator]',
+          'local_model_opt_in = "gpt-5.5"',
+          '[agents]',
+          'max_threads = 12',
+          ''
+        ].join('\n'),
+        'utf8'
+      );
+      const packagedWorker = await readFile(join(ROLE_TEMPLATE_DIR, 'worker-complex.toml'), 'utf8');
+      const packagedAwaiter = await readFile(join(ROLE_TEMPLATE_DIR, 'awaiter-high.toml'), 'utf8');
+      await writeFile(workerPath, packagedWorker, 'utf8');
+      await writeFile(awaiterPath, packagedAwaiter, 'utf8');
+
+      const result = await runCodexDefaultsSetup({
+        apply: true,
+        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+      });
+
+      expect(result.changes).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            target: 'role_file',
+            name: 'worker_complex',
+            status: 'updated'
+          }),
+          expect.objectContaining({
+            target: 'role_file',
+            name: 'awaiter',
+            status: 'updated'
+          })
+        ])
+      );
+
+      const workerRoleFile = await readFile(workerPath, 'utf8');
+      expect(workerRoleFile).not.toBe(packagedWorker);
+      expect(workerRoleFile).toContain('model = "gpt-5.5"');
+      expect(workerRoleFile).toContain('model_reasoning_effort = "xhigh"');
+
+      const awaiterRoleFile = await readFile(awaiterPath, 'utf8');
+      expect(awaiterRoleFile).not.toBe(packagedAwaiter);
+      expect(awaiterRoleFile).toContain('# with CO override to use gpt-5.5 at xhigh reasoning.');
+      expect(awaiterRoleFile).toContain('model = "gpt-5.5"');
+      expect(awaiterRoleFile).toContain('model_reasoning_effort = "xhigh"');
+    } finally {
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('force-overwrites role files to the active gpt-5.5 opt-in posture', async () => {
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-local-role-force-'));
+    const configPath = join(tempHome, 'config.toml');
+    const agentsDir = join(tempHome, 'agents');
+    const workerPath = join(agentsDir, 'worker-complex.toml');
+    const awaiterPath = join(agentsDir, 'awaiter-high.toml');
+    try {
+      await mkdir(agentsDir, { recursive: true });
+      await writeFile(
+        configPath,
+        [
+          'model = "gpt-5.5"',
+          'review_model = "gpt-5.5"',
+          'model_reasoning_effort = "xhigh"',
+          '[codex_orchestrator]',
+          'local_model_opt_in = "gpt-5.5"',
+          '[agents]',
+          'max_threads = 12',
+          ''
+        ].join('\n'),
+        'utf8'
+      );
+      await writeFile(workerPath, '# custom worker\nmodel = "custom-model"\nmodel_reasoning_effort = "low"\n', 'utf8');
+      await writeFile(
+        awaiterPath,
+        '# custom awaiter\nmodel = "custom-model"\nmodel_reasoning_effort = "low"\n',
+        'utf8'
+      );
+
+      const result = await runCodexDefaultsSetup({
+        apply: true,
+        force: true,
+        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+      });
+
+      expect(result.changes).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            target: 'role_file',
+            name: 'worker_complex',
+            status: 'updated'
+          }),
+          expect.objectContaining({
+            target: 'role_file',
+            name: 'awaiter',
+            status: 'updated'
+          })
+        ])
+      );
+
+      const workerRoleFile = await readFile(workerPath, 'utf8');
+      expect(workerRoleFile).not.toContain('custom-model');
+      expect(workerRoleFile).toContain('model = "gpt-5.5"');
+      expect(workerRoleFile).toContain('model_reasoning_effort = "xhigh"');
+
+      const awaiterRoleFile = await readFile(awaiterPath, 'utf8');
+      expect(awaiterRoleFile).not.toContain('custom-model');
+      expect(awaiterRoleFile).toContain('# with CO override to use gpt-5.5 at xhigh reasoning.');
+      expect(awaiterRoleFile).toContain('model = "gpt-5.5"');
+      expect(awaiterRoleFile).toContain('model_reasoning_effort = "xhigh"');
+    } finally {
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps explorer_fast on spark when creating role files', async () => {
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-explorer-fast-'));
+    const explorerPath = join(tempHome, 'agents', 'explorer-fast.toml');
+    try {
+      const result = await runCodexDefaultsSetup({
+        apply: true,
+        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+      });
+
+      expect(result.status).toBe('applied');
+      const explorerFastRoleFile = await readFile(explorerPath, 'utf8');
+      expect(explorerFastRoleFile).toContain('model = "gpt-5.3-codex-spark"');
+      expect(explorerFastRoleFile).not.toContain('gpt-5.5');
+    } finally {
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('migrates prior CO-managed gpt-5.5 role files without --force', async () => {
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-managed-migration-'));
+    const agentsDir = join(tempHome, 'agents');
+    const workerPath = join(agentsDir, 'worker-complex.toml');
+    const awaiterPath = join(agentsDir, 'awaiter-high.toml');
+    try {
+      await mkdir(agentsDir, { recursive: true });
+      const priorWorker = await buildPriorManagedRole('worker-complex.toml');
+      const priorAwaiter = await buildPriorManagedRole('awaiter-high.toml');
+      await writeFile(workerPath, priorWorker, 'utf8');
+      await writeFile(awaiterPath, priorAwaiter, 'utf8');
+
+      const result = await runCodexDefaultsSetup({
+        apply: true,
+        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+      });
+
+      expect(result.changes).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            target: 'role_file',
+            name: 'worker_complex',
+            status: 'updated'
+          }),
+          expect.objectContaining({
+            target: 'role_file',
+            name: 'awaiter',
+            status: 'updated'
+          })
+        ])
+      );
+
+      const workerRoleFile = await readFile(workerPath, 'utf8');
+      expect(workerRoleFile).not.toBe(priorWorker);
+      expect(workerRoleFile).toContain('model = "gpt-5.4"');
+      expect(workerRoleFile).toContain('model_reasoning_effort = "xhigh"');
+      expect(workerRoleFile).not.toContain('gpt-5.5');
+
+      const awaiterRoleFile = await readFile(awaiterPath, 'utf8');
+      expect(awaiterRoleFile).not.toBe(priorAwaiter);
+      expect(awaiterRoleFile).toContain('# with CO override to use gpt-5.4 at high reasoning.');
+      expect(awaiterRoleFile).toContain('model = "gpt-5.4"');
+      expect(awaiterRoleFile).toContain('model_reasoning_effort = "high"');
+      expect(awaiterRoleFile).not.toContain('gpt-5.5');
+    } finally {
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('preserves customized gpt-5.5 role files without --force', async () => {
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-custom-role-'));
+    const agentsDir = join(tempHome, 'agents');
+    const workerPath = join(agentsDir, 'worker-complex.toml');
+    const awaiterPath = join(agentsDir, 'awaiter-high.toml');
+    try {
+      await mkdir(agentsDir, { recursive: true });
+      const customizedWorker = `${await buildPriorManagedRole('worker-complex.toml')}# local override\n`;
+      const customizedAwaiter = LEGACY_CHATGPT_AUTH_AWAITER_ROLE.replace(
+        'background_terminal_max_timeout = 3600000',
+        'background_terminal_max_timeout = 7200000'
+      );
+      await writeFile(workerPath, customizedWorker, 'utf8');
+      await writeFile(awaiterPath, customizedAwaiter, 'utf8');
+
+      const result = await runCodexDefaultsSetup({
+        apply: true,
+        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+      });
+
+      expect(result.changes).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            target: 'role_file',
+            name: 'worker_complex',
+            status: 'preserved'
+          }),
+          expect.objectContaining({
+            target: 'role_file',
+            name: 'awaiter',
+            status: 'preserved'
+          })
+        ])
+      );
+      expect(await readFile(workerPath, 'utf8')).toBe(customizedWorker);
+      expect(await readFile(awaiterPath, 'utf8')).toBe(customizedAwaiter);
     } finally {
       await rm(tempHome, { recursive: true, force: true });
     }

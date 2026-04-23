@@ -1,6 +1,30 @@
 {
   "items": [
     {
+      "id": "20260424-co-343-apr-24-spec-freshness-dry-run-accounting",
+      "title": "CO-343 Apr 24 Spec Freshness and Dry-Run Accounting",
+      "relates_to": "tasks/tasks-co-343-apr-24-spec-freshness-dry-run-accounting.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-24",
+      "approvals": {
+        "freshness_classification": {
+          "reviewer": "parent orchestrator plus read-only subagent validator",
+          "date": "2026-04-24",
+          "status": "approved",
+          "summary": "Classified five stale active specs plus 24 docs-freshness rows and refreshed only active historical/operator surfaces."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/co-343-apr-24-spec-freshness-dry-run-accounting.md",
+        "task": "tasks/tasks-co-343-apr-24-spec-freshness-dry-run-accounting.md",
+        "agent_task": ".agent/task/co-343-apr-24-spec-freshness-dry-run-accounting.md",
+        "docs": "docs/TECH_SPEC-co-343-apr-24-spec-freshness-dry-run-accounting.md"
+      }
+    },
+    {
       "id": "20260424-linear-4a684a5e-64b0-47fb-835a-d792eba29071",
       "title": "CO Codex CLI 0.124.0 and GPT-5.5 Posture",
       "relates_to": "tasks/tasks-linear-4a684a5e-64b0-47fb-835a-d792eba29071.md",

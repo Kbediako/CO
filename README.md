@@ -113,9 +113,10 @@ Bundled skills:
 ## Public posture
 
 - Current Codex CLI target: `0.124.0`
-- Current model posture: `gpt-5.5`
-- Portable downstream setup defaults remain on `gpt-5.4`; use `codex-orchestrator codex defaults --auth-scope chatgpt --yes` only after local ChatGPT-auth `gpt-5.5` access is validated
+- Current model posture: `gpt-5.4` with `model_reasoning_effort = "xhigh"` for packaged/generated defaults
 - `explorer_fast` remains the explicit `gpt-5.3-codex-spark` file/codebase search-only exception
+- CO-local operators may opt into explicit `gpt-5.5` / `xhigh` after local access smoke plus `[codex_orchestrator] local_model_opt_in = "gpt-5.5"`; CO-341 validated that on this host, but app-server `model/list` still reports `gpt-5.4` as the catalog default
+- Runtime-mode canary evidence for CO-341 passed after `npm run build` (`20/20` per scenario, `ready_for_default_flip=true`)
 - Local default runtime: `appserver`
 - `executionMode=cloud` with explicit `runtimeMode=appserver` remains unsupported
 

@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 320bd5b6f88d785bed1940961deeb9c0ff3c62599ac30bdd7595081d1a61fa36 -->
+<!-- codex:instruction-stamp c52faa3bdf0f0f739a148dc7b118f0adabe8dc40a2d0fb88b7d635a81b69d323 -->
 # Repository Agent Guidance
 
 Task-specific historical project blocks were removed from this file in `CO-88`. Use the active task packet under `.agent/task/**` for lane-scoped instructions instead of treating old project ids as repo-wide defaults.
@@ -43,11 +43,13 @@ Task-specific historical project blocks were removed from this file in `CO-88`. 
 
 ## Codex Version Policy (Execution)
 - Current CO compatibility/adoption target is stable Codex CLI (`0.124.0`).
-- Current `0.124.0` posture evidence confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, `codex review --help` exposing `[PROMPT]` alongside scoped review flags, runtime-mode canary pass, required cloud canary pass, and fallback cloud contract pass.
+- Current `0.124.0` CO-local posture evidence confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, `codex review --help` exposing `[PROMPT]` alongside scoped review flags, live `gpt-5.5` `xhigh` availability, and a post-build runtime-mode canary pass (`20/20` per scenario, `ready_for_default_flip=true`).
 - Release-facing downstream-smoke workflows and `cloud-canary` pin the explicit promoted candidate recorded in `docs/guides/codex-version-policy.md`.
-- Current model posture is `gpt-5.5` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
-- On ChatGPT-auth sessions, keep delegated/review surfaces on `gpt-5.5`; do not treat that as proof for Codex Cloud, API-key auth, or provider-specific model variants unless a fresh provider lane validates them.
-- Portable downstream setup defaults remain on `gpt-5.4`; use `codex-orchestrator codex defaults --auth-scope chatgpt --yes` only after local ChatGPT-auth `gpt-5.5` access is validated.
+- Current model posture is `gpt-5.4` with `model_reasoning_effort = "xhigh"` for packaged/generated top-level, delegated subagent, and review defaults; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
+- On ChatGPT-auth sessions, keep packaged delegated/review defaults on `gpt-5.4`; CO-local explicit `gpt-5.5` is allowed only after live access smoke plus `[codex_orchestrator] local_model_opt_in = "gpt-5.5"` unless a fresh provider lane validates a Codex-suffixed model variant.
+- `codex-orchestrator doctor` accepts the marker-backed local `gpt-5.5` opt-in as non-drift only when `codex debug models` verifies current model access, and `codex-orchestrator codex defaults --yes` preserves exact prior `gpt-5.5` role files when the top-level config is explicitly opted in.
+- Caveat: app-server `model/list` still reports `gpt-5.4` as `isDefault=true`; CO-341 live app-server `model/list` and live `codex exec` show `gpt-5.5` supports `xhigh` for explicit local configuration, and the bundled debug model catalog may lag the live catalog.
+- Treat residual plugin warnings from CO-341 as local temporary plugin cache warnings unless evidence maps them to CO-owned plugin manifests.
 - CO may run newer stable/prerelease Codex builds in explicit task-scoped canary lanes only; do not treat them as automatic global defaults.
 - App-server remains the normal local runtime path, but provider workers still stay on `codex exec` / `codex exec resume` supervision until a separate app-server control seam lands with explicit authority guardrails.
 - Required policy checks for newer-version lanes:

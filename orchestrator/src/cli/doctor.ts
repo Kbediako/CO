@@ -44,12 +44,13 @@ import {
 } from './control/linearDispatchSource.js';
 import { normalizeDispatchSourceProvider } from './control/trackerDispatchPilot.js';
 import {
-  ACCEPTED_BASELINE_MODELS,
-  ACCEPTED_BASELINE_MODEL_PAIRS_LABEL,
   BASELINE_AGENTS,
-  CHATGPT_AUTH_BASELINE_MODEL,
-  PORTABLE_BASELINE_MODEL,
-  BASELINE_REASONING_MINIMUM
+  BASELINE_MODEL,
+  BASELINE_REVIEW_MODEL,
+  BASELINE_REASONING_MINIMUM,
+  formatModelDefaultExpectation,
+  isLocalModelOptIn,
+  resolveLocalModelOptIn
 } from './codexDefaultsSetup.js';
 import { CommandPlanner } from './adapters/CommandPlanner.js';
 import { PipelineResolver } from './services/pipelineResolver.js';
@@ -71,6 +72,13 @@ const OPTIONAL_DEPENDENCIES = [
 ];
 
 const PROVIDER_ROOT_RELATIVE_PATH = '.codex/providers';
+const CODEX_DEBUG_MODELS_JSON_ENV = 'CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON';
+
+interface DoctorCodexModelAccess {
+  status: 'ok' | 'unavailable';
+  models: ReadonlySet<string>;
+  detail: string;
+}
 
 export interface DoctorDependencyStatus {
   name: string;
@@ -360,11 +368,10 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
   if (readiness.config.status !== 'ok') {
     missing.push(`${DEVTOOLS_SKILL_NAME}-config`);
   }
-  const codexDefaults = inspectCodexDefaultsAdvisory(process.env);
-
   const codexBin = resolveCodexCliBin(process.env);
   const managedOptIn = isManagedCodexCliEnabled(process.env);
   const managedCodex = resolveCodexCliReadiness(process.env);
+  const codexDefaults = inspectCodexDefaultsAdvisory(process.env, codexBin);
 
   const features = readCodexFeatureFlags(codexBin);
   const collabFeatureKey: DoctorResult['collab']['feature_key'] =
@@ -1051,19 +1058,26 @@ function inspectProviderReadiness(
   };
 }
 
-function inspectCodexDefaultsAdvisory(env: NodeJS.ProcessEnv = process.env): DoctorCodexDefaultsAdvisory {
+function inspectCodexDefaultsAdvisory(
+  env: NodeJS.ProcessEnv = process.env,
+  codexBin: string = resolveCodexCliBin(env)
+): DoctorCodexDefaultsAdvisory {
   const configPath = join(resolveCodexHome(env), 'config.toml');
   const checks: DoctorCodexDefaultsAdvisory['checks'] = {
-    model: { status: 'advisory', expected: ACCEPTED_BASELINE_MODEL_PAIRS_LABEL, actual: null },
-    review_model: { status: 'advisory', expected: ACCEPTED_BASELINE_MODEL_PAIRS_LABEL, actual: null },
+    model: { status: 'advisory', expected: formatModelDefaultExpectation(BASELINE_MODEL), actual: null },
+    review_model: {
+      status: 'advisory',
+      expected: formatModelDefaultExpectation(BASELINE_REVIEW_MODEL),
+      actual: null
+    },
     model_reasoning_effort: { status: 'advisory', expected_minimum: BASELINE_REASONING_MINIMUM, actual: null },
     max_threads: { status: 'advisory', expected_minimum: BASELINE_AGENTS.max_threads, actual: null },
     max_depth: { status: 'advisory', expected_minimum: BASELINE_AGENTS.max_depth, actual: null }
   };
   let legacyMaxSpawnDepth: DoctorCodexDefaultsAdvisory['legacy_max_spawn_depth'] = null;
   const guidance: string[] = [
-    'Run `codex-orchestrator codex defaults --yes` for portable additive defaults; use `--auth-scope chatgpt` only after ChatGPT-auth gpt-5.5 access is validated locally.',
-    'Additive policy: unrelated config keys are preserved; existing role files stay untouched unless `--force` is set.',
+    'Run `codex-orchestrator codex defaults --yes` to apply additive baseline defaults.',
+    'Additive policy: unrelated config keys are preserved; existing role files stay untouched unless `--force` is set or they exactly match a prior CO-managed model baseline.',
     'Current CO baseline no longer seeds or expects `agents.max_spawn_depth`; keep it only as a legacy local override when an older parser/runtime still honors it.',
     'Leaving `agents.max_depth` unset remains accepted when local parser/runtime constraints require it.'
   ];
@@ -1101,19 +1115,44 @@ function inspectCodexDefaultsAdvisory(env: NodeJS.ProcessEnv = process.env): Doc
     };
   }
 
+  const localModelOptIn = resolveLocalModelOptIn(parsed);
+  const modelAccess =
+    localModelOptIn === null
+      ? {
+          status: 'unavailable',
+          models: new Set<string>(),
+          detail: 'model access was not checked because no explicit local model opt-in is configured'
+        } satisfies DoctorCodexModelAccess
+      : inspectCodexModelAccess(codexBin, env);
+  const localModelOptInVerified =
+    localModelOptIn !== null && modelAccess.status === 'ok' && modelAccess.models.has(localModelOptIn);
+  if (localModelOptIn !== null && !localModelOptInVerified) {
+    guidance.push(
+      `Configured local model opt-in ${localModelOptIn} is not verified by \`codex debug models\`; rerun local access smoke or remove the opt-in marker before relying on it.`
+    );
+  }
+
   const model = normalizeOptionalString(readStringValue(parsed.model));
   checks.model.actual = model;
+  checks.model.status =
+    model === BASELINE_MODEL || (model === localModelOptIn && localModelOptInVerified) ? 'ok' : 'advisory';
+  if (isLocalModelOptIn(model) && model !== localModelOptIn) {
+    guidance.push(
+      `Config model ${model} looks like a legacy CO-managed default, not a verified local opt-in; rerun \`codex-orchestrator codex defaults --yes\` to migrate it or add the explicit opt-in marker after smoke evidence.`
+    );
+  }
 
   const reviewModel = normalizeOptionalString(readStringValue(parsed.review_model));
   checks.review_model.actual = reviewModel;
-
-  const mixedAcceptedBaselinePair =
-    isAcceptedBaselineModel(model) &&
-    isAcceptedBaselineModel(reviewModel) &&
-    !isAcceptedBaselinePair(model, reviewModel);
-  checks.model.status = isAcceptedBaselineModel(model) && !mixedAcceptedBaselinePair ? 'ok' : 'advisory';
   checks.review_model.status =
-    isAcceptedBaselineModel(reviewModel) && !mixedAcceptedBaselinePair ? 'ok' : 'advisory';
+    reviewModel === BASELINE_REVIEW_MODEL || (reviewModel === localModelOptIn && localModelOptInVerified)
+      ? 'ok'
+      : 'advisory';
+  if (isLocalModelOptIn(reviewModel) && reviewModel !== localModelOptIn) {
+    guidance.push(
+      `Config review_model ${reviewModel} looks like a legacy CO-managed default, not a verified local opt-in; rerun \`codex-orchestrator codex defaults --yes\` to migrate it or add the explicit opt-in marker after smoke evidence.`
+    );
+  }
 
   const reasoning = normalizeOptionalString(readStringValue(parsed.model_reasoning_effort));
   checks.model_reasoning_effort.actual = reasoning;
@@ -1154,6 +1193,72 @@ function inspectCodexDefaultsAdvisory(env: NodeJS.ProcessEnv = process.env): Doc
     legacy_max_spawn_depth: legacyMaxSpawnDepth,
     guidance
   };
+}
+
+function inspectCodexModelAccess(codexBin: string, env: NodeJS.ProcessEnv): DoctorCodexModelAccess {
+  const overrideJson = env[CODEX_DEBUG_MODELS_JSON_ENV];
+  if (typeof overrideJson === 'string' && overrideJson.trim().length > 0) {
+    return parseCodexDebugModels(overrideJson, `${CODEX_DEBUG_MODELS_JSON_ENV} override`);
+  }
+
+  const result = spawnSync(codexBin, ['debug', 'models'], {
+    encoding: 'utf8',
+    env,
+    timeout: 5000,
+    maxBuffer: 5 * 1024 * 1024
+  });
+  if (result.error) {
+    return {
+      status: 'unavailable',
+      models: new Set<string>(),
+      detail: result.error.message
+    };
+  }
+  if (result.status !== 0) {
+    const stderr = typeof result.stderr === 'string' ? result.stderr.trim() : '';
+    return {
+      status: 'unavailable',
+      models: new Set<string>(),
+      detail: stderr || `codex debug models exited ${result.status ?? 'without a status'}`
+    };
+  }
+  return parseCodexDebugModels(result.stdout, '`codex debug models`');
+}
+
+function parseCodexDebugModels(source: unknown, detailPrefix: string): DoctorCodexModelAccess {
+  if (typeof source !== 'string' || source.trim().length === 0) {
+    return {
+      status: 'unavailable',
+      models: new Set<string>(),
+      detail: `${detailPrefix} produced no model catalog output`
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(source);
+    const models = new Set<string>();
+    const entries = isRecord(parsed) && Array.isArray(parsed.models) ? parsed.models : [];
+    for (const entry of entries) {
+      if (!isRecord(entry)) {
+        continue;
+      }
+      const slug = readStringValue(entry.slug);
+      if (slug) {
+        models.add(slug);
+      }
+    }
+    return {
+      status: models.size > 0 ? 'ok' : 'unavailable',
+      models,
+      detail: `${detailPrefix} reported ${models.size} model(s)`
+    };
+  } catch (error) {
+    return {
+      status: 'unavailable',
+      models: new Set<string>(),
+      detail: error instanceof Error ? error.message : String(error)
+    };
+  }
 }
 
 function getTomlParser(): { parse: (source: string) => unknown } {
@@ -1396,17 +1501,6 @@ function normalizeOptionalString(value: string | null | undefined): string | nul
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
-}
-
-function isAcceptedBaselineModel(value: string | null): boolean {
-  return value !== null && (ACCEPTED_BASELINE_MODELS as readonly string[]).includes(value);
-}
-
-function isAcceptedBaselinePair(model: string | null, reviewModel: string | null): boolean {
-  return (
-    (model === PORTABLE_BASELINE_MODEL && reviewModel === PORTABLE_BASELINE_MODEL) ||
-    (model === CHATGPT_AUTH_BASELINE_MODEL && reviewModel === CHATGPT_AUTH_BASELINE_MODEL)
-  );
 }
 
 function resolveCloudFallbackPolicy(env: NodeJS.ProcessEnv = process.env): 'allow' | 'deny' {

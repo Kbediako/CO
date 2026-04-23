@@ -44,24 +44,24 @@
 - [x] Cloud fallback contract rerun after build or exact blocker. Evidence: `.runs/linear-4a684a5e-64b0-47fb-835a-d792eba29071/cli/2026-04-23T19-49-46-024Z-0d81d04d/manifest.json`, `cloud_fallback.mode_used=mcp`, issue `missing_environment`.
 
 ## Implementation
-- [x] Final hold/promote/no-op bucket decision recorded. Evidence: `docs/guides/codex-version-policy.md` CO-341 notes promote `0.124.0` and ChatGPT-auth `gpt-5.5` / `xhigh`, hold Cloud/API direct model choice, and classify hooks/app-server/Fast tier/permission/`wait_agent`/MCP cwd/unknown-feature deltas.
+- [x] Final hold/promote/no-op bucket decision recorded. Evidence: `docs/guides/codex-version-policy.md` CO-341 notes promote `0.124.0`, keep packaged/generated model defaults on `gpt-5.4` / `xhigh`, allow marker-backed local ChatGPT-auth `gpt-5.5` opt-ins after smoke/debug-model proof, hold Cloud/API direct model choice, and classify hooks/app-server/Fast tier/permission/`wait_agent`/MCP cwd/unknown-feature deltas.
 - [x] Active docs/tests/configuration updated consistently with the final posture. Evidence: implementation diff updates active version/model posture docs, `codex defaults`, doctor, RLM defaults, workflow pins, shipped skills/templates, docs-hygiene tests, defaults tests, doctor tests, RLM tests, CLI command-surface tests, and pack-smoke tests.
 - [x] Marketplace/pack-smoke command surface aligned if adopting `0.124.0`. Evidence: `tests/pack-smoke.spec.ts`, `tests/cli-command-surface.spec.ts`, local `codex plugin marketplace` help logs under `out/linear-4a684a5e-64b0-47fb-835a-d792eba29071/manual/local-probes/`, and passed `npm run pack:smoke`.
 - [x] CO-337 and CO-340 contradiction/supersession status handled or tracked. Evidence: live `linear issue-context --issue-id CO-337` shows `Done`; live `linear issue-context --issue-id CO-340` shows `Blocked` with workpad notes that CO-341 is the canonical active `0.124.0` / GPT-5.5 posture lane.
 
 ## Validation
 - [x] `node scripts/delegation-guard.mjs`. Evidence: passed with `OK (3 subagent manifest(s) found)`.
-- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: passed.
+- [x] `node scripts/spec-guard.mjs --dry-run` / non-dry-run spec guard. Evidence: the first Apr 24 dry-run printed five stale active-spec failures while exiting zero, so it was not counted as clean validation evidence; CO-343 was created, the exact stale rows were refreshed, and both `node scripts/spec-guard.mjs` plus `node scripts/spec-guard.mjs --dry-run` now print `Spec guard: OK`.
 - [x] `npm run build`. Evidence: passed.
 - [x] `npm run lint`. Evidence: passed with existing `DelegationMcpHealth.test.ts` `no-explicit-any` warnings only.
-- [x] `npm run test`. Evidence: passed (`350` files, `4695` tests).
+- [x] `npm run test`. Evidence: passed after the latest P2 fixes (`350` files, `4726` tests).
 - [x] `npm run docs:check`. Evidence: passed with `MCP_RUNNER_TASK_ID=linear-4a684a5e-64b0-47fb-835a-d792eba29071`.
-- [x] `npm run docs:freshness`. Evidence: passed with `4583` docs and `4586` registry entries.
-- [x] `npm run repo:stewardship`. Evidence: passed with `5697` tracked files and `0` action-required.
-- [x] `node scripts/diff-budget.mjs`. Evidence: passed with `DIFF_BUDGET_OVERRIDE_REASON` because CO-341 synchronizes posture docs, defaults, workflow pins, shipped skill docs, templates, and tests in one lane.
-- [x] Manifest-backed standalone review. Evidence: final wrapper-led review telemetry `.runs/linear-4a684a5e-64b0-47fb-835a-d792eba29071/cli/2026-04-23T20-03-58-124Z-2aa39d48/review/telemetry.json` reports `status=succeeded`, `review_outcome=bounded-success`, boundary `relevant-reinspection-dwell`, and no concrete findings emitted before boundary; prior findings were addressed.
+- [x] `npm run docs:freshness`. Evidence: passed after the CO-343 Apr 24 freshness repair with `4600` docs and `4603` registry entries.
+- [x] `npm run repo:stewardship`. Evidence: passed with `5707` tracked files and `0` action-required.
+- [x] `node scripts/diff-budget.mjs`. Evidence: passed after CO-343 freshness repair and both P2 fixes; final post-fix working tree scope was `24/25` files and `696/1200` lines, with broader stacked aggregate advisory `49/25` files and `2519/1200` lines.
+- [x] Manifest-backed standalone review. Evidence: final wrapper-led review telemetry `.runs/linear-4a684a5e-64b0-47fb-835a-d792eba29071/cli/2026-04-24T00-30-02-443Z-eba4013d/review/telemetry.json` reports `status=succeeded`, `review_outcome=bounded-success`, boundary `command-intent`, and no actionable issues after the two earlier P2 rerun-idempotence findings were fixed and revalidated.
 - [x] Elegance review. Evidence: `out/linear-4a684a5e-64b0-47fb-835a-d792eba29071/manual/20260423T210413Z-final-elegance-review.md`.
-- [x] `npm run pack:smoke` if downstream package/smoke surfaces change. Evidence: passed after `0.124.0` workflow/package surface updates.
+- [x] `npm run pack:smoke` if downstream package/smoke surfaces change. Evidence: passed after `0.124.0` workflow/package surface updates and the final P2 rerun-idempotence fix.
 
 ## Handoff
 - [x] Workpad refreshed after docs-first, implementation, validation, and final review/elegance. Evidence: Linear workpad comment `7d6443c6-706b-4485-85ad-b737192f8e59`.
