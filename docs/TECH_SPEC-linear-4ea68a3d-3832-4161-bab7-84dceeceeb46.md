@@ -77,7 +77,7 @@ last_review: 2026-04-23
   - scoped implementation in provider worker proof/failure resolution
 - Interfaces / contracts:
   - proof finalization must report `owner_status` and `end_reason` from current-turn invariant results
-  - `manifest.status` must not be forced to failed by prior-turn valid decisions
+  - `manifest.status` must not be set to `failed` by prior-turn valid decisions
   - summary surfaces must preserve enough evidence to explain which current-turn decision was evaluated
 
 ## Validation Plan
