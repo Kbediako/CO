@@ -8874,7 +8874,7 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.resume).not.toHaveBeenCalled();
   });
 
-  it('treats terminal claim state for a foreign queued run as unknown when enforcing per-state admission caps', async () => {
+  it('does not let a completed terminal foreign queued run keep consuming global admission capacity', async () => {
     const { root, paths } = await createHostPaths();
     const foreignEnv = {
       repoRoot: root,
@@ -8915,7 +8915,10 @@ describe('createProviderIssueHandoffService', () => {
       run_manifest_path: foreignPaths.manifestPath
     }));
     const launcher = {
-      start: vi.fn(async () => null),
+      start: vi.fn(async () => ({
+        runId: 'run-fresh-started',
+        manifestPath: '/tmp/provider-run/fresh-started.json'
+      })),
       resume: vi.fn(async () => undefined)
     };
 
@@ -8944,6 +8947,194 @@ describe('createProviderIssueHandoffService', () => {
         updated_at: '2026-03-19T04:32:00.000Z'
       }),
       deliveryId: 'delivery-foreign-queued-state-cap-blocked',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_320_000
+    });
+
+    expect(result).toMatchObject({
+      kind: 'start',
+      reason: 'provider_issue_start_launched',
+      claim: {
+        provider_key: 'linear:lin-issue-fresh',
+        state: 'starting',
+        reason: 'provider_issue_start_launched',
+        task_id: 'linear-lin-issue-fresh',
+        run_id: 'run-fresh-started',
+        run_manifest_path: '/tmp/provider-run/fresh-started.json',
+        launch_source: 'control-host',
+        launch_token: expect.any(String)
+      }
+    });
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-issue-fresh',
+      provider: 'linear',
+      issueId: 'lin-issue-fresh',
+      issueIdentifier: 'CO-2',
+      issueUpdatedAt: '2026-03-19T04:32:00.000Z',
+      launchToken: expect.any(String)
+    }));
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
+  it('keeps ignored terminal same-run queued occupancy blocking global admission capacity', async () => {
+    const { root, paths } = await createHostPaths();
+    const queuedEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-ignored-terminal-queued'
+    };
+    const queuedPaths = resolveRunPaths(queuedEnv, 'run-ignored-terminal-queued');
+    await mkdir(queuedPaths.runDir, { recursive: true });
+    await writeFile(
+      queuedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-ignored-terminal-queued',
+        task_id: 'task-ignored-terminal-queued',
+        pipeline_id: 'provider-linear-worker',
+        status: 'queued',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-ignored-terminal-queued',
+        issue_identifier: 'CO-1R',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-ignored-terminal-queued',
+      issue_identifier: 'CO-1R',
+      issue_title: 'Ignored terminal queued claim',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: 'task-ignored-terminal-queued',
+      state: 'ignored',
+      reason: 'provider_issue_not_eligible:duplicate',
+      run_id: 'run-ignored-terminal-queued',
+      run_manifest_path: queuedPaths.manifestPath
+    }));
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-fresh-started',
+        manifestPath: '/tmp/provider-run/fresh-started.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-fresh',
+        identifier: 'CO-2',
+        updated_at: '2026-03-19T04:32:00.000Z'
+      }),
+      deliveryId: 'delivery-ignored-terminal-queued-capacity-blocked',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_320_000
+    });
+
+    expect(result).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_start_blocked:max_concurrency',
+      claim: {
+        provider_key: 'linear:lin-issue-fresh',
+        state: 'accepted',
+        reason: 'provider_issue_start_blocked:max_concurrency'
+      }
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
+  it('keeps completed queued continuation retries occupying global admission capacity', async () => {
+    const { root, paths } = await createHostPaths();
+    const queuedEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-completed-queued-retry'
+    };
+    const queuedPaths = resolveRunPaths(queuedEnv, 'run-completed-queued-retry');
+    await mkdir(queuedPaths.runDir, { recursive: true });
+    await writeFile(
+      queuedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-completed-queued-retry',
+        task_id: 'task-completed-queued-retry',
+        pipeline_id: 'provider-linear-worker',
+        status: 'queued',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-completed-queued-retry',
+        issue_identifier: 'CO-1S',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-completed-queued-retry',
+      issue_identifier: 'CO-1S',
+      issue_title: 'Completed queued continuation retry',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: 'task-completed-queued-retry',
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      run_id: 'run-completed-queued-retry',
+      run_manifest_path: queuedPaths.manifestPath,
+      retry_queued: true,
+      retry_attempt: 1,
+      retry_due_at: '2026-03-19T04:31:00.000Z',
+      retry_error: null
+    }));
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-fresh-started',
+        manifestPath: '/tmp/provider-run/fresh-started.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-fresh',
+        identifier: 'CO-2',
+        updated_at: '2026-03-19T04:32:00.000Z'
+      }),
+      deliveryId: 'delivery-completed-queued-retry-capacity-blocked',
       event: 'Issue',
       action: 'update',
       webhookTimestamp: 1_742_360_320_000
@@ -9134,6 +9325,188 @@ describe('createProviderIssueHandoffService', () => {
     }));
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
+  it('fresh discovery backfills a remaining Ready issue after completed queued terminal claims stop consuming hidden capacity', async () => {
+    const { root, paths } = await createHostPaths();
+    const activeEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-active-running'
+    };
+    const activePaths = resolveRunPaths(activeEnv, 'run-active-running');
+    await mkdir(activePaths.runDir, { recursive: true });
+    await writeFile(
+      activePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-active-running',
+        task_id: 'task-active-running',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        started_at: '2026-04-22T23:34:00.000Z',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-active',
+        issue_identifier: 'CO-314',
+        issue_updated_at: '2026-04-22T23:35:00.000Z',
+        updated_at: '2026-04-22T23:40:00.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(activePaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        attempt_started_at: '2026-04-22T23:34:00.000Z',
+        owner_status: 'in_progress',
+        updated_at: '2026-04-22T23:40:00.000Z',
+        worker_host: 'worker-host-01'
+      }),
+      'utf8'
+    );
+
+    const completedQueuedEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-terminal-queued'
+    };
+    const completedQueuedPaths = resolveRunPaths(completedQueuedEnv, 'run-terminal-queued');
+    await mkdir(completedQueuedPaths.runDir, { recursive: true });
+    await writeFile(
+      completedQueuedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-terminal-queued',
+        task_id: 'task-terminal-queued',
+        pipeline_id: 'provider-linear-worker',
+        status: 'queued',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-terminal',
+        issue_identifier: 'CO-312',
+        issue_updated_at: '2026-04-22T23:37:00.000Z',
+        updated_at: '2026-04-22T23:39:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-active',
+      issue_identifier: 'CO-314',
+      issue_title: 'Active provider worker',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-22T23:35:00.000Z',
+      task_id: 'task-active-running',
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: 'run-active-running',
+      run_manifest_path: activePaths.manifestPath
+    }));
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-terminal',
+      issue_identifier: 'CO-312',
+      issue_title: 'Duplicate cleanup terminal claim',
+      issue_state: 'Cancelled',
+      issue_state_type: 'canceled',
+      issue_updated_at: '2026-04-22T23:37:00.000Z',
+      task_id: 'task-terminal-queued',
+      state: 'completed',
+      reason: 'provider_issue_run_already_completed',
+      run_id: 'run-terminal-queued',
+      run_manifest_path: completedQueuedPaths.manifestPath
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = createCo202Launcher(
+      'run-ready-backfill',
+      '/tmp/provider-run/ready-backfill.json'
+    );
+    const trackedIssues = [
+      createTrackedIssue({
+        id: 'lin-issue-active',
+        identifier: 'CO-314',
+        title: 'Active provider worker',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-04-22T23:35:00.000Z'
+      }),
+      createTrackedIssue({
+        id: 'lin-issue-terminal',
+        identifier: 'CO-312',
+        title: 'Duplicate cleanup terminal claim',
+        state: 'Cancelled',
+        state_type: 'canceled',
+        updated_at: '2026-04-22T23:37:00.000Z'
+      })
+    ];
+    const refetchTrackedIssues = vi.fn(async (input?: {
+      eligibleTargetCount?: number;
+      excludedIssueIds?: string[];
+    }) => {
+      expect(input?.eligibleTargetCount).toBe(1);
+      expect(input?.excludedIssueIds ?? []).toContain('lin-issue-active');
+      expect(input?.excludedIssueIds ?? []).not.toContain('lin-issue-terminal');
+      return {
+        kind: 'ready' as const,
+        trackedIssues: [
+          createTrackedIssue({
+            id: 'lin-issue-ready',
+            identifier: 'CO-315',
+            title: 'Remaining ready issue',
+            state: 'Ready',
+            state_type: 'unstarted',
+            updated_at: '2026-04-22T23:41:00.000Z'
+          })
+        ]
+      };
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'provider-linear-worker',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 2
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues,
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-issue-ready',
+      pipelineId: 'provider-linear-worker',
+      provider: 'linear',
+      issueId: 'lin-issue-ready',
+      issueIdentifier: 'CO-315',
+      issueUpdatedAt: '2026-04-22T23:41:00.000Z',
+      launchToken: expect.any(String)
+    }));
+    expect(state.claims).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        provider_key: 'linear:lin-issue-ready',
+        state: 'starting',
+        reason: 'provider_issue_start_launched',
+        issue_state: 'Ready',
+        issue_state_type: 'unstarted',
+        issue_updated_at: '2026-04-22T23:41:00.000Z',
+        task_id: 'linear-lin-issue-ready',
+        run_id: 'run-ready-backfill',
+        run_manifest_path: '/tmp/provider-run/ready-backfill.json',
+        launch_source: 'control-host',
+        launch_token: expect.any(String)
+      })
+    ]));
+    expect(persist).toHaveBeenCalled();
   });
 
   it('serializes concurrent direct webhook admissions so only one launch can consume the remaining slot', async () => {
@@ -9351,6 +9724,104 @@ describe('createProviderIssueHandoffService', () => {
         updated_at: '2026-03-19T04:32:00.000Z'
       }),
       deliveryId: 'delivery-fresh-after-live-unreadable-manifest',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_320_000
+    });
+
+    expect(result).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_start_blocked:max_concurrency',
+      claim: {
+        provider_key: 'linear:lin-issue-fresh',
+        state: 'accepted',
+        reason: 'provider_issue_start_blocked:max_concurrency'
+      }
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        `[provider-issue-run-discovery] skipping unreadable manifest ${brokenPaths.manifestPath}:`
+      )
+    );
+  });
+
+  it('blocks direct webhook admission when a completed terminal claim matches an unreadable live proof', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const brokenEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-bad-live-manifest-completed-terminal'
+    };
+    const brokenPaths = resolveRunPaths(brokenEnv, 'run-bad-live-manifest-completed-terminal');
+    await mkdir(brokenPaths.runDir, { recursive: true });
+    await writeFile(
+      brokenPaths.manifestPath,
+      '{"run_id":"run-bad-live-manifest-completed-terminal"',
+      'utf8'
+    );
+    await writeFile(
+      join(brokenPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        issue_id: 'lin-issue-occupied',
+        issue_identifier: 'CO-9',
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        worker_host: 'worker-host-01',
+        attempt_started_at: new Date(Date.now() - 120_000).toISOString(),
+        updated_at: new Date(Date.now() - 60_000).toISOString()
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-occupied',
+      issue_identifier: 'CO-9',
+      issue_title: 'Completed terminal unreadable claim',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: 'task-bad-live-manifest-completed-terminal',
+      state: 'completed',
+      reason: 'provider_issue_run_already_completed',
+      run_id: 'run-bad-live-manifest-completed-terminal',
+      run_manifest_path: brokenPaths.manifestPath
+    }));
+
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-fresh',
+        manifestPath: '/tmp/provider-run/fresh.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-fresh',
+        identifier: 'CO-3',
+        updated_at: '2026-03-19T04:32:00.000Z'
+      }),
+      deliveryId: 'delivery-fresh-after-terminal-live-unreadable-manifest',
       event: 'Issue',
       action: 'update',
       webhookTimestamp: 1_742_360_320_000
@@ -16339,8 +16810,8 @@ describe('createProviderIssueHandoffService', () => {
     expect(state.claims[0]).toMatchObject({
       state: 'released',
       reason: 'provider_issue_released:not_active',
-      run_id: null,
-      run_manifest_path: null
+      run_id: 'run-queued',
+      run_manifest_path: childPaths.manifestPath
     });
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
@@ -18740,7 +19211,7 @@ describe('createProviderIssueHandoffService', () => {
     }
   );
 
-  it('persists the release even when cancelling an inactive queued child run fails closed', async () => {
+  it('persists queued claim identity after release even when cancelling an inactive child run fails closed', async () => {
     const { root, paths } = await createHostPaths();
     const now = new Date().toISOString();
     const childEnv = {
@@ -18817,8 +19288,8 @@ describe('createProviderIssueHandoffService', () => {
     expect(state.claims[0]).toMatchObject({
       state: 'released',
       reason: 'provider_issue_released:not_active',
-      run_id: null,
-      run_manifest_path: null
+      run_id: 'run-queued',
+      run_manifest_path: childPaths.manifestPath
     });
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
@@ -23485,7 +23956,7 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
-  it('keeps terminal released provider workspaces intact during rehydrate while a queued child run still exists', async () => {
+  it('keeps terminal released provider workspaces intact during rehydrate while preserving queued claim identity', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {
       repoRoot: root,
@@ -23557,8 +24028,8 @@ describe('createProviderIssueHandoffService', () => {
     expect(state.claims[0]).toMatchObject({
       state: 'released',
       reason: 'provider_issue_released:not_active',
-      run_id: null,
-      run_manifest_path: null
+      run_id: 'run-queued',
+      run_manifest_path: childPaths.manifestPath
     });
   });
 
