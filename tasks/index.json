@@ -31,6 +31,37 @@
       }
     },
     {
+      "id": "20260423-linear-3c52bf66-f805-4537-8671-ad1dec2f4623",
+      "title": "CO: maintain docs freshness after terminal CO-300 owner",
+      "relates_to": "tasks/tasks-linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-23",
+      "approvals": {
+        "freshness_baseline_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-23",
+          "status": "succeeded_advisory",
+          "manifest": ".runs/linear-3c52bf66-f805-4537-8671-ad1dec2f4623-freshness-baseline/cli/2026-04-23T03-37-54-576Z-8c07866a/manifest.json",
+          "summary": "Child lane `freshness-baseline` captured advisory docs freshness evidence; parent owns the authoritative owner reset, stale-row classification, registry refresh, validation, and workpad closeout."
+        }
+      },
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
+      "paths": {
+        "spec": "tasks/specs/linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md",
+        "task": "tasks/tasks-linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md",
+        "agent_task": ".agent/task/linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md"
+        },
+        "findings": "docs/findings/linear-3c52bf66-f805-4537-8671-ad1dec2f4623-docs-freshness-classification.md"
+      }
+    },
+    {
       "id": "20260423-linear-7b3de1c1-f420-4203-bb8c-494dadecaa88",
       "title": "CO: recreate live owner for remaining Mar 23 docs-freshness task-checklist cohort",
       "relates_to": "tasks/tasks-linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md",
