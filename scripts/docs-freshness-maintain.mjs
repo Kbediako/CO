@@ -81,6 +81,14 @@ function sortedObject(map) {
   return Object.fromEntries([...map.entries()].sort(([left], [right]) => String(left).localeCompare(String(right))));
 }
 
+function formatHumanList(values) {
+  const normalized = uniqueSorted(values);
+  if (normalized.length <= 2) {
+    return normalized.join(' and ');
+  }
+  return `${normalized.slice(0, -1).join(', ')}, and ${normalized.at(-1)}`;
+}
+
 function sampleLines(value, limit = 20) {
   if (typeof value !== 'string') {
     return [];
@@ -206,7 +214,96 @@ function buildOwnerIssueAction(policy, ownerIssueVerification = null) {
   };
 }
 
+function normalizeCanonicalOwnerIssues(policy) {
+  if (!Array.isArray(policy?.canonical_owner_issues)) {
+    return [];
+  }
+  return policy.canonical_owner_issues
+    .map((entry) => {
+      if (!entry || typeof entry !== 'object') {
+        return null;
+      }
+      const canonicalOwnerKey = normalizeOptionalString(entry.canonical_owner_key);
+      const ownerIssue = normalizeOptionalString(entry.owner_issue);
+      if (!canonicalOwnerKey || !ownerIssue) {
+        return null;
+      }
+      return {
+        canonical_owner_key: canonicalOwnerKey,
+        owner_issue: ownerIssue,
+        owner_issue_state: normalizeOptionalString(entry.owner_issue_state),
+        owner_issue_state_type: normalizeOptionalString(entry.owner_issue_state_type),
+        owner_issue_is_terminal: normalizeOptionalBoolean(entry.owner_issue_is_terminal),
+        policy_doc: policy?.policy_doc ?? null
+      };
+    })
+    .filter(Boolean);
+}
+
+function canonicalOwnerVerificationLookup(verifications) {
+  const lookup = new Map();
+  for (const verification of Array.isArray(verifications) ? verifications : []) {
+    const issue = normalizeOptionalString(verification?.issue);
+    if (issue && !lookup.has(issue)) {
+      lookup.set(issue, verification);
+    }
+  }
+  return lookup;
+}
+
+function buildCanonicalOwnerIssueAction(ownerConfig, ownerIssueVerification = null) {
+  const baseAction = buildOwnerIssueAction(ownerConfig, ownerIssueVerification);
+  return {
+    ...baseAction,
+    duplicate_policy: 'one_owner_issue_per_canonical_owner_key',
+    canonical_owner_key: ownerConfig?.canonical_owner_key ?? null,
+    reason:
+      baseAction.mode === 'update_existing'
+        ? ownerIssueVerification?.verification_status ?? 'canonical_owner_key_match'
+        : baseAction.reason
+  };
+}
+
+function resolveCandidateOwner(policy, cohortKey, globalOwnerIssueAction, canonicalOwnerVerifications = []) {
+  const canonicalOwners = normalizeCanonicalOwnerIssues(policy);
+  const matchedOwner = canonicalOwners.find((entry) => entry.canonical_owner_key === cohortKey) ?? null;
+  if (matchedOwner) {
+    const verification = canonicalOwnerVerificationLookup(canonicalOwnerVerifications).get(matchedOwner.owner_issue) ?? null;
+    const action = buildCanonicalOwnerIssueAction(matchedOwner, verification);
+    return {
+      owner_issue: action.issue ?? action.existing_issue ?? matchedOwner.owner_issue,
+      configured_owner_issue: policy?.owner_issue ?? null,
+      owner_issue_action: action,
+      owner_issue_resolution: {
+        mode: 'canonical_owner_key_match',
+        source: 'rolling_freshness_policy.canonical_owner_issues',
+        canonical_owner_key: cohortKey,
+        configured_owner_issue: policy?.owner_issue ?? null
+      }
+    };
+  }
+
+  return {
+    owner_issue: policy?.owner_issue ?? null,
+    configured_owner_issue: policy?.owner_issue ?? null,
+    owner_issue_action: globalOwnerIssueAction,
+    owner_issue_resolution: {
+      mode: 'rolling_freshness_policy_owner',
+      source: 'rolling_freshness_policy.owner_issue',
+      canonical_owner_key: cohortKey,
+      configured_owner_issue: policy?.owner_issue ?? null
+    }
+  };
+}
+
 function describeOwnerIssuePath(ownerIssueAction) {
+  if (
+    ownerIssueAction?.mode === 'update_existing_multiple' &&
+    Array.isArray(ownerIssueAction.issues) &&
+    ownerIssueAction.issues.length > 0
+  ) {
+    return `owner issues ${formatHumanList(ownerIssueAction.issues)}`;
+  }
   if (ownerIssueAction?.mode === 'update_existing' && ownerIssueAction.issue) {
     return `owner issue ${ownerIssueAction.issue}`;
   }
@@ -248,14 +345,6 @@ function findMatchingBaselineCohort(entry, policy) {
         matchesDeclaredPath(entry, cohort)
     ) ?? null
   );
-}
-
-function isPolicyUsable(policy, ownerIssueVerification = null) {
-  const verification = deriveOwnerIssueVerification(policy, ownerIssueVerification);
-  if (verification?.usable === false || (verification?.verification_status === 'failed' && verification.usable !== true)) {
-    return false;
-  }
-  return Boolean(policy?.enabled && policy?.is_valid && policy?.owner_issue);
 }
 
 function isEligibleHistoricalEntry(entry, policy) {
@@ -329,7 +418,7 @@ function canonicalOwnerMarkerForKey(key) {
   return `${CANONICAL_OWNER_MARKER_PREFIX}${key}`;
 }
 
-function summarizeCandidateCohorts(entries, policy) {
+function summarizeCandidateCohorts(entries, policy, ownerIssueAction, canonicalOwnerIssueVerifications = []) {
   const byKey = new Map();
   for (const entry of entries) {
     const key = candidateCohortKey(entry);
@@ -353,6 +442,12 @@ function summarizeCandidateCohorts(entries, policy) {
       const baselineIds = uniqueSorted(cohortEntries.map((entry) => entry.baseline_cohort_id).filter(Boolean));
       const expiresAfter = addDaysToIsoDate(first.last_review, first.cadence_days + policy.window_days);
       const cohortKey = candidateCohortKey(first);
+      const ownerResolution = resolveCandidateOwner(
+        policy,
+        cohortKey,
+        ownerIssueAction,
+        canonicalOwnerIssueVerifications
+      );
       return {
         id:
           baselineIds.length === 1 && cohortEntries.every((entry) => entry.baseline_cohort_id === baselineIds[0])
@@ -360,7 +455,10 @@ function summarizeCandidateCohorts(entries, policy) {
             : `candidate-${first.last_review}-cadence-${first.cadence_days}-age-${first.age_days}`,
         canonical_owner_key: cohortKey,
         canonical_owner_marker: canonicalOwnerMarkerForKey(cohortKey),
-        owner_issue: policy.owner_issue ?? null,
+        owner_issue: ownerResolution.owner_issue,
+        configured_owner_issue: ownerResolution.configured_owner_issue,
+        owner_issue_action: ownerResolution.owner_issue_action,
+        owner_issue_resolution: ownerResolution.owner_issue_resolution,
         status: cohortEntries.some((entry) => entry.overdue_days > policy.window_days)
           ? 'expired_candidate'
           : 'eligible_historical_candidate',
@@ -396,8 +494,19 @@ function collectReportFailurePaths(report) {
   ]);
 }
 
-function summarizePolicyCapacity(candidateEntries, policy, ownerIssueVerification = null) {
-  const verification = deriveOwnerIssueVerification(policy, ownerIssueVerification);
+function hasUsableCohortOwner(candidateCohorts) {
+  return (Array.isArray(candidateCohorts) ? candidateCohorts : []).some(isCohortOwnerResolved);
+}
+
+function isCohortOwnerResolved(cohort) {
+  return Boolean(
+    cohort?.owner_issue_action?.mode === 'update_existing' &&
+      (cohort?.owner_issue_resolution?.mode === 'canonical_owner_key_match' ||
+        (Array.isArray(cohort?.declared_baseline_ids) && cohort.declared_baseline_ids.length > 0))
+  );
+}
+
+function summarizePolicyCapacity(candidateEntries, policy, { hasUsableOwnerPath = false, hasPolicyOwnerUsable = false } = {}) {
   if (!policy?.enabled) {
     return {
       status: 'policy_missing',
@@ -410,8 +519,7 @@ function summarizePolicyCapacity(candidateEntries, policy, ownerIssueVerificatio
   if (
     !policy.is_valid ||
     !policy.owner_issue ||
-    verification?.usable === false ||
-    (verification?.verification_status === 'failed' && verification.usable !== true)
+    (candidateEntries.length > 0 && !hasUsableOwnerPath && !hasPolicyOwnerUsable)
   ) {
     return {
       status: 'invalid_policy',
@@ -473,6 +581,9 @@ function buildRecommendedAction(decision, { policy, expiresAfter, diffStatus, ow
     return `Refresh, archive, or reclassify the expired historical cohort through ${describeOwnerIssuePath(ownerIssueAction)}; do not defer it further.`;
   }
   if (decision === 'block_policy_over_budget') {
+    if (ownerIssueAction?.mode === 'update_existing_multiple') {
+      return `Open or update the resolved owner paths through ${describeOwnerIssuePath(ownerIssueAction)} with refresh/archive action evidence; do not expand rolling caps to pass an unrelated lane.`;
+    }
     return `Open or update the single owner path through ${describeOwnerIssuePath(ownerIssueAction)} with refresh/archive action evidence; do not expand rolling caps to pass an unrelated lane.`;
   }
   if (ownerIssueAction?.reason === 'configured_owner_terminal' && ownerIssueAction.existing_issue) {
@@ -482,6 +593,44 @@ function buildRecommendedAction(decision, { policy, expiresAfter, diffStatus, ow
     return `Verify or replace the owner issue for the historical batch; current owner ${ownerIssueAction.existing_issue} could not be verified, so do not reuse it blindly.`;
   }
   return `Open or update one baseline owner issue for the historical batch, or fix stale public/active guidance directly before gates pass.`;
+}
+
+function selectRecommendedOwnerIssueAction(ownerIssueAction, candidateCohorts) {
+  const cohorts = Array.isArray(candidateCohorts) ? candidateCohorts : [];
+  if (cohorts.length === 0 || !cohorts.every(isCohortOwnerResolved)) {
+    return ownerIssueAction;
+  }
+  const ownedIssues = uniqueSorted(
+    cohorts
+      .filter(isCohortOwnerResolved)
+      .map((cohort) => cohort.owner_issue_action.issue)
+      .filter(Boolean)
+  );
+  if (ownedIssues.length === 1) {
+    return {
+      mode: 'update_existing',
+      issue: ownedIssues[0],
+      existing_issue: null,
+      duplicate_policy: 'one_owner_issue_per_canonical_owner_key',
+      policy_doc: ownerIssueAction?.policy_doc ?? null,
+      reason: 'canonical_owner_key_match'
+    };
+  }
+  return {
+    mode: 'update_existing_multiple',
+    issue: null,
+    issues: ownedIssues,
+    existing_issue: null,
+    duplicate_policy: 'one_owner_issue_per_canonical_owner_key',
+    policy_doc: ownerIssueAction?.policy_doc ?? null,
+    reason: 'canonical_owner_key_match_multiple',
+    canonical_owner_keys: uniqueSorted(
+      cohorts
+        .filter(isCohortOwnerResolved)
+        .map((cohort) => cohort.owner_issue_action.canonical_owner_key)
+        .filter(Boolean)
+    )
+  };
 }
 
 async function verifyOwnerIssueContext(repoRoot, ownerIssue) {
@@ -562,6 +711,14 @@ async function verifyOwnerIssueContext(repoRoot, ownerIssue) {
   }
 }
 
+async function verifyCanonicalOwnerIssues(repoRoot, policy) {
+  const ownerIssues = uniqueSorted(normalizeCanonicalOwnerIssues(policy).map((entry) => entry.owner_issue));
+  if (ownerIssues.length === 0) {
+    return [];
+  }
+  return Promise.all(ownerIssues.map((ownerIssue) => verifyOwnerIssueContext(repoRoot, ownerIssue)));
+}
+
 export function buildDocsFreshnessMaintenanceDecision(
   report,
   {
@@ -571,7 +728,8 @@ export function buildDocsFreshnessMaintenanceDecision(
     diffStatus = 'ok',
     diffBaseRef = null,
     generatedAt = new Date().toISOString(),
-    ownerIssueVerification = null
+    ownerIssueVerification = null,
+    canonicalOwnerIssueVerifications = []
   } = {}
 ) {
   const policy = report.rolling_freshness_policy ?? {};
@@ -586,14 +744,27 @@ export function buildDocsFreshnessMaintenanceDecision(
     .filter((entry) => isEligibleHistoricalEntry(entry, policy))
     .map((entry) => normalizeCandidateEntry(entry, policy, 'rolling_window'));
   const candidateEntries = [...blockingCandidateEntries, ...ownedRollingEntries];
-  const passableOwnedRollingEntries = ownedRollingEntries.filter((entry) => entry.baseline_cohort_id);
   const blockingCandidatePaths = new Set(blockingCandidateEntries.map((entry) => entry.path));
   const candidatePaths = new Set(candidateEntries.map((entry) => entry.path));
   const nonCandidateStaleEntries = staleEntries
     .filter((entry) => !blockingCandidatePaths.has(normalizeDocPath(entry.path)))
     .map((entry) => normalizeCandidateEntry(entry, policy, 'hard_stale'));
-  const candidateCohorts = summarizeCandidateCohorts(candidateEntries, policy);
-  const policyCapacityStatus = summarizePolicyCapacity(candidateEntries, policy, resolvedOwnerIssueVerification);
+  const candidateCohorts = summarizeCandidateCohorts(
+    candidateEntries,
+    policy,
+    ownerIssueAction,
+    canonicalOwnerIssueVerifications
+  );
+  const unownedCandidateCohorts = candidateCohorts.filter(
+    (cohort) => !isCohortOwnerResolved(cohort)
+  );
+  const ownedCandidateEntries = candidateCohorts
+    .filter(isCohortOwnerResolved)
+    .reduce((total, cohort) => total + Number(cohort?.stale_entries ?? 0), 0);
+  const policyCapacityStatus = summarizePolicyCapacity(candidateEntries, policy, {
+    hasUsableOwnerPath: hasUsableCohortOwner(candidateCohorts),
+    hasPolicyOwnerUsable: ownerIssueAction.mode === 'update_existing'
+  });
   const expiresAfterCandidates = uniqueSorted(candidateCohorts.map((cohort) => cohort.expires_after).filter(Boolean));
   const expiresAfter = expiresAfterCandidates[0] ?? null;
 
@@ -610,21 +781,25 @@ export function buildDocsFreshnessMaintenanceDecision(
     Number(report.totals?.missing_on_disk ?? 0) +
     Number(report.totals?.invalid_entries ?? 0) +
     Number(report.totals?.uncatalogued_docs ?? 0);
+  const hasOwnerRelevantDebt = candidateEntries.length > 0 || staleEntries.length > 0;
 
   let freshnessDecision = 'clean';
   if (registryBlockerCount > 0) {
     freshnessDecision = 'block_missing_or_invalid_registry';
   } else if (!hasProvenDiffStatus(diffStatus) || blockingChangedPaths.length > 0 || specGuard.status === 'failed') {
     freshnessDecision = 'block_diff_local';
-  } else if ((candidateEntries.length > 0 || staleEntries.length > 0) && !isPolicyUsable(policy, resolvedOwnerIssueVerification)) {
+  } else if (
+    hasOwnerRelevantDebt &&
+    (policyCapacityStatus.status === 'invalid_policy' || policyCapacityStatus.status === 'policy_missing')
+  ) {
     freshnessDecision = 'block_unowned_repo_debt';
   } else if (policyCapacityStatus.status === 'expired') {
     freshnessDecision = 'block_policy_expired';
   } else if (policyCapacityStatus.status === 'over_budget') {
     freshnessDecision = 'block_policy_over_budget';
-  } else if (blockingCandidateEntries.length > 0 || nonCandidateStaleEntries.length > 0) {
+  } else if (unownedCandidateCohorts.length > 0 || nonCandidateStaleEntries.length > 0) {
     freshnessDecision = 'block_unowned_repo_debt';
-  } else if (passableOwnedRollingEntries.length > 0) {
+  } else if (candidateEntries.length > 0 && ownedCandidateEntries > 0) {
     freshnessDecision = 'pass_with_owned_rolling_debt';
   }
 
@@ -636,6 +811,7 @@ export function buildDocsFreshnessMaintenanceDecision(
     owner_issue: policy.owner_issue ?? null,
     owner_issue_action: ownerIssueAction,
     owner_issue_verification: resolvedOwnerIssueVerification,
+    canonical_owner_issue_verifications: canonicalOwnerIssueVerifications,
     candidate_cohorts: candidateCohorts,
     blocking_changed_paths: blockingChangedPaths,
     diff_status: diffStatus,
@@ -646,7 +822,7 @@ export function buildDocsFreshnessMaintenanceDecision(
       policy,
       expiresAfter,
       diffStatus,
-      ownerIssueAction
+      ownerIssueAction: selectRecommendedOwnerIssueAction(ownerIssueAction, candidateCohorts)
     }),
     sample_paths: {
       changed_paths: normalizedChangedPaths.slice(0, 10),
@@ -665,6 +841,8 @@ export function buildDocsFreshnessMaintenanceDecision(
       candidate_entries: candidateEntries.length,
       blocking_candidate_entries: blockingCandidateEntries.length,
       owned_rolling_entries: ownedRollingEntries.length,
+      owned_candidate_entries: ownedCandidateEntries,
+      unowned_candidate_cohorts: unownedCandidateCohorts.length,
       hard_stale_entries: nonCandidateStaleEntries.length,
       missing_in_registry: report.totals?.missing_in_registry ?? 0,
       missing_on_disk: report.totals?.missing_on_disk ?? 0,
@@ -812,14 +990,17 @@ export async function runDocsFreshnessMaintain(
     (Array.isArray(freshnessResult.report?.stale_entries) && freshnessResult.report.stale_entries.length > 0) ||
     (Array.isArray(freshnessResult.report?.rolling_cohort_entries) &&
       freshnessResult.report.rolling_cohort_entries.length > 0);
-  const [diffResult, specGuard, ownerIssueVerification] = await Promise.all([
+  const [diffResult, specGuard, ownerIssueVerification, canonicalOwnerIssueVerifications] = await Promise.all([
     Array.isArray(changedPaths)
       ? Promise.resolve({ base_ref: baseRef, status: 'provided', paths: changedPaths })
       : collectChangedPaths(repoRoot, { baseRef }),
     runSpecGuard(repoRoot, { skip: skipSpecGuard }),
     hasOwnerRelevantDebt
       ? verifyOwnerIssueContext(repoRoot, freshnessResult.report?.rolling_freshness_policy?.owner_issue ?? null)
-      : Promise.resolve(null)
+      : Promise.resolve(null),
+    hasOwnerRelevantDebt
+      ? verifyCanonicalOwnerIssues(repoRoot, freshnessResult.report?.rolling_freshness_policy ?? {})
+      : Promise.resolve([])
   ]);
   const decision = buildDocsFreshnessMaintenanceDecision(freshnessResult.report, {
     changedPaths: diffResult.paths,
@@ -827,7 +1008,8 @@ export async function runDocsFreshnessMaintain(
     specGuard,
     diffStatus: diffResult.status,
     diffBaseRef: diffResult.base_ref,
-    ownerIssueVerification
+    ownerIssueVerification,
+    canonicalOwnerIssueVerifications
   });
   decision.diff = diffResult;
 

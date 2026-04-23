@@ -147,6 +147,12 @@
           }
         }
       ],
+      "canonical_owner_issues": [
+        {
+          "canonical_owner_key": "docs_freshness_candidate|doc_class:task_packet|path_family:tasks/tasks-*|last_review:2026-03-23|cadence_days:30",
+          "owner_issue": "CO-320"
+        }
+      ],
       "action_after_window": "refresh, archive, reclassify, or file a new same-project baseline owner before feature-lane review handoff"
     }
   },
