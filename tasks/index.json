@@ -72,6 +72,30 @@
       }
     },
     {
+      "id": "linear-0549b4a2-56b1-4164-b65a-73fd2ba7d9e8",
+      "title": "CO-338 release publish workflow fix",
+      "relates_to": "tasks/tasks-linear-0549b4a2-56b1-4164-b65a-73fd2ba7d9e8.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-23",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-23",
+          "status": "produced_parent_applied_after_stale_accept",
+          "manifest": ".runs/linear-0549b4a2-56b1-4164-b65a-73fd2ba7d9e8-docs-packet/cli/2026-04-23T18-52-23-912Z-060c3757/manifest.json",
+          "source_anchor": "ctx:sha256:f3219348160765aa3ff9c69d862bb95a512a169bc4c1a4e5a794a8754b5f7c19#chunk:c000001",
+          "summary": "Docs-first child lane succeeded and exported a reviewed patch; helper accept failed closed because Linear updated_at moved during the run, so the parent applied the reviewed packet. The packet preserves CO-338 as the release publish workflow failure from GitHub Actions run 24850552467 / job 72749842900, with root cause missing npm promise-retry during npm install --global npm@^11.5.1. Parent owns the workflow fix, v0.2.0 recovery execution, npm publication verification, and keeping CO-316 blocked until publication completes."
+        }
+      },
+      "paths": {
+        "task": "tasks/tasks-linear-0549b4a2-56b1-4164-b65a-73fd2ba7d9e8.md",
+        "docs": "docs/TECH_SPEC-linear-0549b4a2-release-publish-workflow-fix.md"
+      }
+    },
+    {
       "id": "20260424-linear-09b7afc2-529a-40cc-975c-57c33f2bb596",
       "title": "CO: Align docs/skills-release with post-0.121 marketplace command truth",
       "relates_to": "tasks/tasks-linear-09b7afc2-529a-40cc-975c-57c33f2bb596.md",
