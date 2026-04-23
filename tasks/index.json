@@ -13716,6 +13716,57 @@
         "agent_task": ".agent/task/linear-cb221338-8cdc-41ad-880b-3bcfae49d4a8.md",
         "docs": "docs/TECH_SPEC-linear-cb221338-8cdc-41ad-880b-3bcfae49d4a8.md"
       }
+    },
+    {
+      "id": "20260423-linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be",
+      "title": "CO: refresh stale task specs blocking Core Lane spec guard",
+      "relates_to": "tasks/tasks-linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-23",
+      "approvals": {
+        "baseline_evidence_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-23",
+          "status": "accepted",
+          "manifest": ".runs/linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be-co318-baseline-note/cli/2026-04-23T00-50-56-747Z-05f99f52/manifest.json",
+          "summary": "Accepted a one-file child-lane evidence note that confirms the exact six current-main stale specs and records detached-HEAD false extras `0954`, `1317`, and `1318` as out-of-scope comparison noise from an outdated workspace."
+        },
+        "preimplementation_issue_quality": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-23",
+          "status": "approved",
+          "summary": "The lane stays narrowly scoped to the exact six current-main stale task specs already named in CO-318, preserves `spec-guard` enforcement, and explicitly rejects CO-314 release-workflow changes plus broad docs-freshness cleanup."
+        },
+        "docs_review_preimplementation_fallback": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-23",
+          "status": "bounded_fallback_recorded",
+          "manifest": ".runs/linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be-docs-review/cli/2026-04-23T01-02-51-949Z-949cc108/manifest.json",
+          "summary": "The authoritative docs-review rerun passed `docs:check` and then stopped at `docs:freshness:maintain` on the same six stale specs this lane owns plus older historical docs-freshness baseline debt. Packet shape was valid, so the fallback was recorded and the lane continued without widening scope."
+        },
+        "standalone_review_post_fix": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-23",
+          "status": "bounded_success_resolved_finding",
+          "manifest": ".runs/linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be/cli/2026-04-23T00-30-19-373Z-4ed7c4a2/manifest.json",
+          "summary": "Review telemetry recorded `status=succeeded` with `review_outcome=bounded-success`; the only actionable finding was removal of untracked `.child-lanes` runtime clones from the working tree before handoff."
+        },
+        "elegance_review_post_fix": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-23",
+          "status": "approved",
+          "summary": "Kept the fix at the smallest correct scope: six target task-spec freshness updates plus required docs-first packet mirrors and no guard or policy changes."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be.md",
+        "task": "tasks/tasks-linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be.md",
+        "agent_task": ".agent/task/linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be.md",
+        "docs": "docs/TECH_SPEC-linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be.md"
+      }
     }
   ]
 }
