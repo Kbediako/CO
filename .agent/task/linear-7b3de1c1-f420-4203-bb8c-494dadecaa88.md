@@ -17,3 +17,10 @@ Canonical checklist: `tasks/tasks-linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md
 - Do not weaken `docs:freshness` or `docs:freshness:maintain`.
 - Do not broaden CO-318 into the historical refresh itself.
 - Keep parent changes out of the child lane's delegated packet-core files until accept/reject/invalidate.
+
+## Escalation Path
+- Escalate to the CO product owner for scope/acceptance conflicts, the on-call orchestrator maintainer for workflow or CI breakage, and the parent provider worker as fallback owner for same-turn lane-control decisions.
+- Trigger escalation when canonical owner evidence drifts across `tasks/tasks-*`, `docs/TASKS.md`, `tasks/index.json`, or `docs/docs-freshness-registry.json`; when any change would reopen `CO-300` or weaken `docs:freshness`; or when PR/review automation blocks truthful handoff.
+- Response policy: pause further branch mutation, record the blocker in the active Linear workpad, capture the relevant run evidence path, and wait for an explicit accept/reject/invalidate or scope decision before proceeding.
+- Run evidence for this lane lives under `.runs/linear-7b3de1c1-f420-4203-bb8c-494dadecaa88/` and `out/linear-7b3de1c1-f420-4203-bb8c-494dadecaa88/manual/`.
+- Example flow: if a proposed fix would broaden the Mar 23 task-packet canonical owner/marker or change the preserved `CO-300` / `CO-318` constraints, stop, log the conflict in the CO-319 workpad, attach the relevant `.runs/...` or `out/...` evidence, and escalate before another commit or review-state transition.

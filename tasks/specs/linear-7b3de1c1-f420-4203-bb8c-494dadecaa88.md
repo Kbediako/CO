@@ -26,7 +26,7 @@ follow_up_issue: CO-320
 - ACTION_PLAN: `docs/ACTION_PLAN-linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md`
 - Task checklist: `tasks/tasks-linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md`
 - Source anchor: `ctx:sha256:7d7386914637615a5543ddd2dbada438fcc7d994a895460fbe20a0ba2401a0b7#chunk:c000001`
-- Preserved maintenance report: `/Users/kbediako/Code/CO/.workspaces/linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be/out/linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be/docs-freshness-maintenance.json`
+- Preserved maintenance report excerpt: `out/linear-7b3de1c1-f420-4203-bb8c-494dadecaa88/manual/co318-preserved-docs-freshness-maintenance-excerpt.json`
 
 ## Summary
 - Objective: recreate the live same-project owner for the remaining Mar 23 historical task-packet docs-freshness cohort and register that recreated path in the current issue packet/mirrors.
@@ -95,7 +95,7 @@ follow_up_issue: CO-320
 - Pre-implementation issue-quality review evidence:
   - 2026-04-23: live issue context confirmed `Ready`, `In Progress` exists as the live started state, no attached PR, and no existing workpad.
   - 2026-04-23: parent created `CO-320` via the `Backlog` path using the exact canonical owner key and marker; current live issue state later advanced to `In Progress`.
-  - 2026-04-23: child lane `docs-packet-core` completed successfully, satisfying the parallelization contract, but its patch was invalidated due concrete evidence mismatch.
+  - 2026-04-23: child lane `docs-packet-core` completed successfully, satisfying the parallelization contract, but its patch was invalidated due to concrete evidence mismatch.
 - Safeguard ownership split:
   - the invalidated child lane is evidence only
   - parent owns the authoritative packet docs, follow-up mutation, registry/task mirrors, and final validation
