@@ -4232,7 +4232,13 @@ export function createProviderIssueHandoffService(
             };
           }
 
-          const admissionGate = await createProviderAdmissionGate();
+          const admissionGate = await createProviderAdmissionGate({
+            excludeProviderKey:
+              lockedExisting?.retry_queued === true || lockedExisting?.state === 'resumable'
+                ? providerKey
+                : null,
+            preferredWorkerHost: lockedPreferredWorkerHost
+          });
           if (!admissionGate.canDispatch(input.trackedIssue)) {
             const blockedReason = deriveProviderCapacityBlockedReason('provider_issue_start_launched');
             const claim = await upsertProviderClaimAndPersist({

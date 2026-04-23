@@ -7609,7 +7609,7 @@ describe('createProviderIssueHandoffService', () => {
         launch_token: null,
         retry_queued: true,
         retry_attempt: 2,
-        retry_due_at: '2026-04-23T08:14:25.936Z',
+        retry_due_at: '2026-04-24T08:14:25.936Z',
         retry_error: 'retry still occupies capacity'
       },
       {
@@ -7690,6 +7690,88 @@ describe('createProviderIssueHandoffService', () => {
     expect(getPersistedState().claims.find((claim) => claim.provider_key === 'linear:lin-issue-resumable')).toMatchObject({
       state: 'resumable',
       run_id: 'run-resumable'
+    });
+  });
+
+  it('does not let a direct webhook candidate self-count its resumable claim against max_allowed', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-resumable',
+      issue_id: 'lin-issue-resumable',
+      issue_identifier: 'CO-330',
+      issue_title: 'Resumable self-count',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-23T08:07:41.709Z',
+      task_id: 'linear-lin-issue-resumable',
+      mapping_source: 'provider_id_fallback',
+      state: 'resumable',
+      reason: 'provider_issue_rehydrated_resumable_run',
+      accepted_at: '2026-04-23T08:04:00.000Z',
+      updated_at: '2026-04-23T08:04:25.936Z',
+      last_delivery_id: null,
+      last_event: null,
+      last_action: null,
+      last_webhook_timestamp: null,
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: null,
+      launch_token: null,
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
+    });
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async ({ issueId }: { issueId: string }) => ({
+        runId: `run-${issueId}`,
+        manifestPath: `/tmp/provider-run/${issueId}.json`
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-resumable',
+        identifier: 'CO-330',
+        updated_at: '2026-04-23T08:09:33.742Z'
+      }),
+      deliveryId: 'delivery-resumable-self-count',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_745_396_973_742
+    });
+
+    expect(result).toMatchObject({
+      kind: 'start',
+      claim: {
+        provider_key: 'linear:lin-issue-resumable',
+        state: 'starting',
+        reason: 'provider_issue_start_launched',
+        run_id: 'run-lin-issue-resumable',
+        run_manifest_path: '/tmp/provider-run/lin-issue-resumable.json'
+      }
+    });
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(getPersistedState().claims.find((claim) => claim.provider_key === 'linear:lin-issue-resumable')).toMatchObject({
+      state: 'starting'
     });
   });
 
