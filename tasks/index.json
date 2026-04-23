@@ -1,6 +1,36 @@
 {
   "items": [
     {
+      "id": "20260423-linear-9d8bb7c9-3ca1-422e-9cdf-ef90a4fbe7b7",
+      "title": "CO-331 queue cap and follow-up admission truth",
+      "relates_to": "tasks/tasks-linear-9d8bb7c9-3ca1-422e-9cdf-ef90a4fbe7b7.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-23",
+      "approvals": {
+        "parent_docs_first": {
+          "reviewer": "provider worker",
+          "date": "2026-04-23",
+          "status": "created",
+          "source_anchor": "ctx:sha256:baea476992e02ddae2d101831f55c08787b93c5aefb8b73b992a2ac1d788fabd#chunk:c000001",
+          "manifest": ".runs/linear-9d8bb7c9-3ca1-422e-9cdf-ef90a4fbe7b7/cli/2026-04-23T08-13-32-404Z-6a3dbcd8/manifest.json",
+          "summary": "Docs-first packet preserves CO-331 as the queue truth lane for Backlog follow-up issue admission and max_allowed enforcement under resumable claims and queued retry claims. The packet rejects manual state moves, cap weakening, and conflation with CO-317, CO-329, or CO-330 runtime failures."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-9d8bb7c9-3ca1-422e-9cdf-ef90a4fbe7b7.md",
+        "task": "tasks/tasks-linear-9d8bb7c9-3ca1-422e-9cdf-ef90a4fbe7b7.md",
+        "agent_task": ".agent/task/linear-9d8bb7c9-3ca1-422e-9cdf-ef90a4fbe7b7.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-9d8bb7c9-3ca1-422e-9cdf-ef90a4fbe7b7.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-9d8bb7c9-3ca1-422e-9cdf-ef90a4fbe7b7.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-9d8bb7c9-3ca1-422e-9cdf-ef90a4fbe7b7.md"
+        }
+      }
+    },
+    {
       "id": "20260423-linear-8d010b73-9338-4f35-9494-a9a3d773d284",
       "title": "CO-329 provider stdin bootstrap recurrence",
       "relates_to": "tasks/tasks-linear-8d010b73-9338-4f35-9494-a9a3d773d284.md",

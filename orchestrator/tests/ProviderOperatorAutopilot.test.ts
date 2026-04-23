@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -140,6 +140,142 @@ describe('providerOperatorAutopilot', () => {
         }
       ]
     });
+  });
+
+  it('holds helper-created follow-up issues in Backlog until traceability setup is complete', async () => {
+    const transitionIssueState = vi.fn(async () => {
+      throw new Error('transition should not run for traceability-pending follow-ups');
+    });
+
+    const result = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [
+          createTrackedIssue({
+            id: 'lin-issue-follow-up',
+            identifier: 'CO-331',
+            state: 'Backlog',
+            state_type: 'backlog',
+            description: [
+              '## Immediate Traceability',
+              '',
+              '- Follow-up packet prefix: `linear-lin-issue-follow-up`',
+              '- Create before active work: docs/PRD, docs/TECH_SPEC, docs/ACTION_PLAN, tasks/specs, tasks/tasks, .agent/task',
+              '- Update registry mirrors before the issue leaves `Backlog`: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`'
+            ].join('\n')
+          })
+        ],
+        claims: [],
+        config: buildConfig(),
+        previous_result: null
+      },
+      {
+        now: () => '2026-04-23T09:00:00.000Z',
+        transition_issue_state: transitionIssueState
+      }
+    );
+
+    expect(transitionIssueState).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      status: 'noop',
+      holds: [
+        {
+          kind: 'backlog_promotion',
+          issue_identifier: 'CO-331',
+          issue_state: 'Backlog',
+          issue_state_type: 'backlog',
+          reason: 'backlog_head_follow_up_traceability_pending'
+        }
+      ]
+    });
+    expect(result.summary).toContain('follow-up traceability requires packet');
+  });
+
+  it('promotes helper-created follow-up issues once traceability packet and mirrors exist', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'operator-autopilot-follow-up-ready-'));
+    const followUpTaskId = 'linear-lin-issue-follow-up-ready';
+    try {
+      await mkdir(join(repoRoot, 'docs'), { recursive: true });
+      await mkdir(join(repoRoot, 'tasks/specs'), { recursive: true });
+      await mkdir(join(repoRoot, '.agent/task'), { recursive: true });
+      await writeFile(join(repoRoot, `docs/PRD-${followUpTaskId}.md`), followUpTaskId, 'utf8');
+      await writeFile(join(repoRoot, `docs/TECH_SPEC-${followUpTaskId}.md`), followUpTaskId, 'utf8');
+      await writeFile(join(repoRoot, `docs/ACTION_PLAN-${followUpTaskId}.md`), followUpTaskId, 'utf8');
+      await writeFile(join(repoRoot, `tasks/specs/${followUpTaskId}.md`), followUpTaskId, 'utf8');
+      await writeFile(join(repoRoot, `tasks/tasks-${followUpTaskId}.md`), followUpTaskId, 'utf8');
+      await writeFile(join(repoRoot, `.agent/task/${followUpTaskId}.md`), followUpTaskId, 'utf8');
+      await writeFile(join(repoRoot, 'tasks/index.json'), JSON.stringify({ id: followUpTaskId }), 'utf8');
+      await writeFile(join(repoRoot, 'docs/TASKS.md'), followUpTaskId, 'utf8');
+      await writeFile(
+        join(repoRoot, 'docs/docs-freshness-registry.json'),
+        JSON.stringify([{ path: `docs/PRD-${followUpTaskId}.md` }]),
+        'utf8'
+      );
+
+      const transitionIssueState = vi.fn(async () => ({
+        ok: true as const,
+        operation: 'transition' as const,
+        action: 'updated' as const,
+        issue: {
+          id: 'lin-issue-follow-up-ready',
+          identifier: 'CO-332',
+          state: { id: 'ready', name: 'Ready', type: 'unstarted' },
+          updated_at: '2026-04-23T09:01:00.000Z'
+        },
+        previous_state: { id: 'backlog', name: 'Backlog', type: 'backlog' },
+        target_state: { id: 'ready', name: 'Ready', type: 'unstarted' },
+        actor_id: 'actor',
+        actor_source: 'test',
+        transport: 'graphql',
+        transport_principal: 'test-principal'
+      }));
+
+      const result = await runProviderOperatorAutopilot(
+        {
+          tracked_issues: [
+            createTrackedIssue({
+              id: 'lin-issue-follow-up-ready',
+              identifier: 'CO-332',
+              state: 'Backlog',
+              state_type: 'backlog',
+              description: [
+                '## Immediate Traceability',
+                '',
+                `- Follow-up packet prefix: \`${followUpTaskId}\``,
+                '- Create before active work: docs/PRD, docs/TECH_SPEC, docs/ACTION_PLAN, tasks/specs, tasks/tasks, .agent/task',
+                '- Update registry mirrors before the issue leaves `Backlog`: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`'
+              ].join('\n')
+            })
+          ],
+          claims: [],
+          config: buildConfig(),
+          previous_result: null,
+          repo_root: repoRoot
+        },
+        {
+          now: () => '2026-04-23T09:00:00.000Z',
+          transition_issue_state: transitionIssueState
+        }
+      );
+
+      expect(transitionIssueState).toHaveBeenCalledTimes(1);
+      expect(result).toMatchObject({
+        status: 'acted',
+        actions: [
+          {
+            kind: 'backlog_promotion',
+            issue_identifier: 'CO-332',
+            reason: 'backlog_head_promoted',
+            transition: {
+              status: 'transitioned',
+              target_state: 'Ready'
+            }
+          }
+        ],
+        holds: []
+      });
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
   });
 
   it('surfaces Blocked issues with only terminal blockers as duplicate-cleanup candidates when duplicate or canonical-owner evidence exists', async () => {
