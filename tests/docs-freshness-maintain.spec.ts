@@ -844,6 +844,170 @@ describe('docs freshness maintenance decisions', () => {
     );
   });
 
+  it('does not resolve an exact canonical owner when helper verification is unavailable without policy metadata', () => {
+    const canonicalOwnerKey =
+      'docs_freshness_candidate|doc_class:task_packet|path_family:tasks/tasks-*|last_review:2026-03-23|cadence_days:30';
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        rolling_freshness_policy: rollingFreshnessPolicy({
+          owner_issue: 'CO-300',
+          canonical_owner_issues: [
+            {
+              canonical_owner_key: canonicalOwnerKey,
+              owner_issue: 'CO-320'
+            }
+          ]
+        }),
+        stale_entries: [
+          {
+            path: 'tasks/tasks-1321-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery.md',
+            doc_class: 'task_packet',
+            doc_class_label: 'Task Packet',
+            path_family: 'tasks/tasks-*',
+            task_number: '1321',
+            last_review: '2026-03-23',
+            cadence_days: 30,
+            age_days: 31,
+            overdue_days: 1
+          }
+        ],
+        rolling_cohort_entries: [],
+        totals: {
+          docs_scanned: 1,
+          registry_entries: 1,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          stale_entries: 1,
+          rolling_cohort_entries: 0,
+          uncatalogued_docs: 0
+        }
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        specGuard: { status: 'succeeded' },
+        diffStatus: 'ok',
+        diffBaseRef: 'origin/main',
+        canonicalOwnerIssueVerifications: [
+          {
+            issue: 'CO-320',
+            issue_id: null,
+            state: null,
+            state_type: null,
+            is_terminal: null,
+            usable: null,
+            verification_status: 'unavailable',
+            checked_at: null,
+            source: 'linear issue-context',
+            error: 'helper_missing'
+          }
+        ]
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_unowned_repo_debt');
+    expect(decision.candidate_cohorts[0]).toEqual(
+      expect.objectContaining({
+        owner_issue: 'CO-320',
+        owner_issue_action: expect.objectContaining({
+          mode: 'create_required',
+          existing_issue: 'CO-320',
+          reason: 'owner_verification_unavailable',
+          verification_status: 'unavailable',
+          verification_error: 'helper_missing',
+          duplicate_policy: 'one_owner_issue_per_canonical_owner_key',
+          canonical_owner_key: canonicalOwnerKey
+        })
+      })
+    );
+    expect(decision.recommended_action).not.toContain('owner issue CO-320');
+  });
+
+  it('allows an exact canonical owner when unavailable helper verification has explicit non-terminal policy metadata', () => {
+    const canonicalOwnerKey =
+      'docs_freshness_candidate|doc_class:task_packet|path_family:tasks/tasks-*|last_review:2026-03-23|cadence_days:30';
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        rolling_freshness_policy: rollingFreshnessPolicy({
+          owner_issue: 'CO-300',
+          owner_issue_state: 'Done',
+          owner_issue_state_type: 'completed',
+          owner_issue_is_terminal: true,
+          canonical_owner_issues: [
+            {
+              canonical_owner_key: canonicalOwnerKey,
+              owner_issue: 'CO-320',
+              owner_issue_state: 'In Progress',
+              owner_issue_state_type: 'started',
+              owner_issue_is_terminal: false
+            }
+          ]
+        }),
+        stale_entries: [
+          {
+            path: 'tasks/tasks-1321-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery.md',
+            doc_class: 'task_packet',
+            doc_class_label: 'Task Packet',
+            path_family: 'tasks/tasks-*',
+            task_number: '1321',
+            last_review: '2026-03-23',
+            cadence_days: 30,
+            age_days: 31,
+            overdue_days: 1
+          }
+        ],
+        rolling_cohort_entries: [],
+        totals: {
+          docs_scanned: 1,
+          registry_entries: 1,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          stale_entries: 1,
+          rolling_cohort_entries: 0,
+          uncatalogued_docs: 0
+        }
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        specGuard: { status: 'succeeded' },
+        diffStatus: 'ok',
+        diffBaseRef: 'origin/main',
+        canonicalOwnerIssueVerifications: [
+          {
+            issue: 'CO-320',
+            issue_id: null,
+            state: null,
+            state_type: null,
+            is_terminal: null,
+            usable: null,
+            verification_status: 'unavailable',
+            checked_at: null,
+            source: 'linear issue-context',
+            error: 'helper_missing'
+          }
+        ]
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('pass_with_owned_rolling_debt');
+    expect(decision.candidate_cohorts[0]).toEqual(
+      expect.objectContaining({
+        owner_issue: 'CO-320',
+        owner_issue_action: expect.objectContaining({
+          mode: 'update_existing',
+          issue: 'CO-320',
+          reason: 'policy_metadata',
+          duplicate_policy: 'one_owner_issue_per_canonical_owner_key',
+          canonical_owner_key: canonicalOwnerKey
+        })
+      })
+    );
+    expect(decision.recommended_action).toContain('owner issue CO-320');
+  });
+
   it('fails closed when helper verification is unavailable but policy metadata marks the owner terminal', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-maintain-terminal-unavailable-'));
     createdDirs.push(repoRoot);

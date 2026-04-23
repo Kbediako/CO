@@ -214,6 +214,31 @@ function buildOwnerIssueAction(policy, ownerIssueVerification = null) {
   };
 }
 
+function doesVerificationConfirmLiveOwner(verification) {
+  return (
+    normalizeOptionalString(verification?.verification_status) === 'succeeded' &&
+    normalizeOptionalBoolean(verification?.usable) === true
+  );
+}
+
+function buildUnresolvedCanonicalOwnerAction(ownerConfig, verification) {
+  const verificationStatus = normalizeOptionalString(verification?.verification_status);
+  return {
+    mode: 'create_required',
+    issue: null,
+    existing_issue: normalizeOptionalString(ownerConfig?.owner_issue),
+    duplicate_policy: 'one_owner_issue_per_canonical_owner_key',
+    canonical_owner_key: ownerConfig?.canonical_owner_key ?? null,
+    policy_doc: ownerConfig?.policy_doc ?? null,
+    reason:
+      verificationStatus === 'failed'
+        ? 'owner_verification_failed'
+        : 'owner_verification_unavailable',
+    verification_status: verificationStatus,
+    verification_error: verification?.error ?? null
+  };
+}
+
 function normalizeCanonicalOwnerIssues(policy) {
   if (!Array.isArray(policy?.canonical_owner_issues)) {
     return [];
@@ -252,14 +277,23 @@ function canonicalOwnerVerificationLookup(verifications) {
 }
 
 function buildCanonicalOwnerIssueAction(ownerConfig, ownerIssueVerification = null) {
-  const baseAction = buildOwnerIssueAction(ownerConfig, ownerIssueVerification);
+  const resolvedVerification = deriveOwnerIssueVerification(ownerConfig, ownerIssueVerification);
+  const baseAction = buildOwnerIssueAction(ownerConfig, resolvedVerification);
+  const policyVerification = deriveOwnerIssueVerificationFromPolicy(ownerConfig);
+  const verifiedLiveOwner = doesVerificationConfirmLiveOwner(ownerIssueVerification);
+  const metadataConfirmsLiveOwner = policyVerification?.usable === true;
+  if (baseAction.mode === 'update_existing' && !verifiedLiveOwner && !metadataConfirmsLiveOwner) {
+    return buildUnresolvedCanonicalOwnerAction(ownerConfig, resolvedVerification);
+  }
   return {
     ...baseAction,
     duplicate_policy: 'one_owner_issue_per_canonical_owner_key',
     canonical_owner_key: ownerConfig?.canonical_owner_key ?? null,
     reason:
       baseAction.mode === 'update_existing'
-        ? ownerIssueVerification?.verification_status ?? 'canonical_owner_key_match'
+        ? verifiedLiveOwner
+          ? ownerIssueVerification.verification_status
+          : policyVerification?.verification_status ?? 'canonical_owner_key_match'
         : baseAction.reason
   };
 }
