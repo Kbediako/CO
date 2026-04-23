@@ -57,8 +57,8 @@
 - Current CO compatibility/adoption target is stable Codex CLI `0.124.0`.
 - Current `0.124.0` posture evidence confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, `codex review --help` exposing `[PROMPT]` alongside scoped review flags, runtime-mode canary pass, required cloud canary pass, and fallback cloud contract pass.
 - Current model posture is `gpt-5.5` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
-- In ChatGPT-auth local lanes, keep top-level defaults on the current CO target by setting `model = "gpt-5.5"` in `~/.codex/config.toml`; this packaged template keeps `.codex/config.toml` portable at `gpt-5.4` until that auth scope is explicitly validated.
-- Under ChatGPT auth, keep delegated subagent and review surfaces on `gpt-5.5`; do not treat that as proof for Codex Cloud, API-key auth, or provider-specific model variants unless a fresh provider lane validates them.
+- For ChatGPT-auth local lanes, keep top-level defaults on the current CO target by setting `model = "gpt-5.5"` in `~/.codex/config.toml`; this packaged template keeps `.codex/config.toml` portable at `gpt-5.4` until that auth scope is explicitly validated.
+- When using ChatGPT auth, keep delegated subagent and review surfaces on `gpt-5.5`; do not treat that as proof for Codex Cloud, API-key auth, or provider-specific model variants unless a fresh provider lane validates them.
 - Set `model_reasoning_effort` to at least `high` (CO default: `xhigh`) so spawned agents inherit high reasoning unless role overrides change it.
 - Built-in `explorer` inherits top-level model defaults unless you attach a `config_file`; keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only.
 - Spark caveat: `gpt-5.3-codex-spark` is file/codebase search only.

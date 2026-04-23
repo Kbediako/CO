@@ -73,7 +73,7 @@ For any change to the current `0.124.0` / `gpt-5.5` posture, or any promotion of
 2. Delegated/review surfaces are verified on the actual auth provider in use; for ChatGPT auth, keep `gpt-5.5` and do not promote Cloud/API/provider-specific variants without fresh evidence.
 3. Runtime-mode canary passes (`node scripts/runtime-mode-canary.mjs`).
 4. Cloud canary required contract passes (`CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 npm run ci:cloud-canary`).
-5. Cloud fallback contract behavior remains correct (`CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 CLOUD_CANARY_EXPECT_FALLBACK=1 npm run ci:cloud-canary`).
+5. Cloud fallback contract behavior remains correct for missing environment metadata (`CODEX_CLOUD_ENV_ID="" CODEX_CLOUD_CANARY_REQUIRED=1 CLOUD_CANARY_EXPECT_FALLBACK=1 npm run ci:cloud-canary`) and records the expected `missing_environment` fallback issue.
 6. No P0/P1 regression versus the current stable baseline.
 
 ## Cadence

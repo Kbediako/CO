@@ -64,7 +64,8 @@
 - [x] `npm run pack:smoke` if downstream package/smoke surfaces change. Evidence: passed after `0.124.0` workflow/package surface updates.
 
 ## Handoff
-- [x] Workpad refreshed after docs-first, implementation, validation, and final review/elegance. Evidence: Linear workpad comment `7d6443c6-706b-4485-85ad-b737192f8e59`; final handoff refresh still pending after PR drain.
+- [x] Workpad refreshed after docs-first, implementation, validation, and final review/elegance. Evidence: Linear workpad comment `7d6443c6-706b-4485-85ad-b737192f8e59`.
+- [ ] Final handoff workpad refresh after PR drain. Evidence: pending.
 - [ ] PR attached to Linear issue before review-state transition. Evidence: pending.
 - [ ] Actionable PR feedback handled or explicitly pushed back. Evidence: pending.
 - [ ] Latest `origin/main` merged, PR checks green, and `pr ready-review` drains cleanly before `In Review`. Evidence: pending.

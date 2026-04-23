@@ -218,6 +218,44 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
     }
   }, 15000);
 
+  it('accepts portable gpt-5.4 defaults as a green-path posture', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
+    process.env.CODEX_HOME = tempHome;
+    try {
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        [
+          'model = "gpt-5.4"',
+          'review_model = "gpt-5.4"',
+          'model_reasoning_effort = "xhigh"',
+          '',
+          '[agents]',
+          'max_threads = 12'
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = runDoctor(process.cwd());
+      expect(result.codex_defaults.status).toBe('ok');
+      expect(result.codex_defaults.checks.model.status).toBe('ok');
+      expect(result.codex_defaults.checks.review_model.status).toBe('ok');
+      expect(result.codex_defaults.checks.model_reasoning_effort.status).toBe('ok');
+      expect(result.codex_defaults.checks.max_threads.status).toBe('ok');
+
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain('model: ok');
+      expect(summary).toContain('review_model: ok');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  }, RUN_DOCTOR_TEST_TIMEOUT_MS);
+
   it('flags legacy max_spawn_depth when it still constrains older runtimes', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));

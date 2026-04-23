@@ -108,15 +108,18 @@ function readStringFlag(flags: ArgMap, key: string): string | undefined {
 }
 
 function readAuthScopeFlag(flags: ArgMap): CodexDefaultsAuthScope | undefined {
-  if (flags['chatgpt-auth'] === true) {
-    return 'chatgpt';
-  }
   if (!Object.prototype.hasOwnProperty.call(flags, 'auth-scope')) {
+    if (flags['chatgpt-auth'] === true) {
+      return 'chatgpt';
+    }
     return undefined;
   }
   const value = readStringFlag(flags, 'auth-scope');
   if (value === undefined) {
     throw new Error('Missing value for codex defaults auth scope: expected portable or chatgpt.');
+  }
+  if (flags['chatgpt-auth'] === true && value !== 'chatgpt') {
+    throw new Error('Conflicting codex defaults auth scope: --chatgpt-auth requires --auth-scope chatgpt.');
   }
   if (value === 'portable' || value === 'chatgpt') {
     return value;

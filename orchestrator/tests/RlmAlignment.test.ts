@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   AlignmentChecker,
   AlignmentLedgerWriter,
+  DEFAULT_ALIGNMENT_POLICY,
   __test__ as alignmentTest,
   evaluateConsensus,
   scoreAlignment,
@@ -25,6 +26,15 @@ afterEach(async () => {
 });
 
 describe('alignment scoring', () => {
+  it('keeps default route models on the portable baseline', () => {
+    expect(DEFAULT_ALIGNMENT_POLICY.route).toMatchObject({
+      sentinel_model: 'gpt-5.4',
+      high_reasoning_model: 'gpt-5.4',
+      arbitration_model: 'gpt-5.4',
+      high_reasoning_available: true
+    });
+  });
+
   it('maps strong and weak signals to expected policy bands', () => {
     const strong = scoreAlignment({
       contradictions: 0,

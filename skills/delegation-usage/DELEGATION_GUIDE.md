@@ -164,8 +164,9 @@ Current `0.124.0` posture also confirms that:
   - Leave `[agents.explorer]` undefined unless you intentionally want to override built-in explorer behavior.
   - Add optional `[agents.explorer_fast]` for `gpt-5.3-codex-spark` (file/codebase search only).
   - Add optional `[agents.awaiter]` override for `gpt-5.4` + `high` while preserving awaiter instructions.
-  - Add `[agents.worker_complex]` for high-risk edits (`gpt-5.4`, `xhigh`).
-  - Keep delegated subagent and review surfaces on `gpt-5.5` under ChatGPT auth; use `codex-orchestrator codex defaults --auth-scope chatgpt --yes` only after that local access is validated, and do not treat that as proof for Codex Cloud, API-key auth, or provider-specific model variants unless a fresh provider lane validates them.
+  - Add `[agents.worker_complex]` for high-risk edits with the validated auth scope: portable remains `gpt-5.4` + `xhigh`.
+  - Keep delegated subagent and review surfaces on `gpt-5.5` only for validated ChatGPT-auth lanes; portable worker_complex and downstream templates remain on the portable baseline.
+  - Use `codex-orchestrator codex defaults --auth-scope chatgpt --yes` only after ChatGPT-auth `gpt-5.5` access is validated, and do not treat that as proof for Codex Cloud, API-key auth, or provider-specific model variants unless a fresh provider lane validates them.
   - Fallback posture is contingency-only: `8/2` (constrained/high-risk), legacy `6/1/1` break-glass when an older parser/runtime still consumes spawn-depth caps.
   - If native `codex` startup fails with `invalid type: integer ... expected struct AgentRoleToml` under `[agents]`, remove only the live `max_depth` and `max_spawn_depth` keys from `~/.codex/config.toml` and leave the role subtables unchanged.
 

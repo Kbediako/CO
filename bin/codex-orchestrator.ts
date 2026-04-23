@@ -1752,6 +1752,7 @@ Subcommands:
   defaults                 Plan/apply additive global Codex defaults in ~/.codex/config.toml.
     --yes                  Apply setup (otherwise dry-run plan only).
     --force                Overwrite existing role files in ~/.codex/agents.
+    --auth-scope <portable|chatgpt>  Select portable defaults or validated ChatGPT-auth gpt-5.5 defaults.
     --format json          Emit machine-readable output.
 `);
 }
