@@ -115,11 +115,13 @@ last_review: 2026-04-23
     - `npm run test`
     - `npm run docs:check`
     - `npm run docs:freshness`
+    - `npm run repo:stewardship`
     - `node scripts/diff-budget.mjs`
     - `NOTES=\"Goal: ... | Summary: ... | Risks: ... | Questions (optional): ...\" npm run review`
-    - `npm run clean:dist && npm run build`
     - `npm run pack:audit`
     - `npm run pack:smoke`
+  - package artifact validation must remain explicit and separate from the validation floor:
+    - `npm run clean:dist && npm run build`
   - release surfaces must document signing posture accurately:
     - release commits/tags remain cryptographically signed on the release machine
     - CI tag verification requires exactly one of `RELEASE_SIGNING_PUBLIC_KEYS` or `RELEASE_SIGNING_ALLOWED_SIGNERS`

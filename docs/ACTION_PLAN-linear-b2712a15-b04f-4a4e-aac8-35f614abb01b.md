@@ -57,6 +57,7 @@
   - child lane: scoped packet review only
   - parent lane: focused docs-hygiene/release-parity coverage
   - parent lane: `npm run docs:check`
+  - parent lane: `npm run docs:freshness`
   - parent lane: `node scripts/spec-guard.mjs --dry-run`
   - parent lane: docs-review and required review/elegance gates before PR handoff
 - Rollback plan:

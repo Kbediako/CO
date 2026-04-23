@@ -1514,6 +1514,49 @@ describe('docs hygiene tooling', () => {
     expect(releaseError?.reference).not.toContain('package artifact clean-dist validation');
   });
 
+  it('flags release-runbook drift when the release SOP omits protected posture', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-release-sop-'));
+    createdDirs.push(repoRoot);
+
+    await writeReleaseRunbookFixtureRepo(repoRoot, {
+      entries: [releaseRunbookCatalogEntry('.agent/SOPs/release.md')],
+      sopContent: ['# Release SOP', '', '- `npm run build`', '- Publish the package.', ''].join('\n')
+    });
+
+    const errors = await runDocsCheck(repoRoot);
+    const releaseError = errors.find(
+      (error) => error.file === '.agent/SOPs/release.md' && error.rule === 'release-runbook-stale'
+    );
+
+    expect(releaseError).toBeDefined();
+    expect(releaseError?.reference).toContain('exactly-one signer secret posture');
+    expect(releaseError?.reference).toContain('manual-dispatch inputs.tag semantics');
+    expect(releaseError?.reference).toContain('OIDC or trusted publishing posture');
+    expect(releaseError?.reference).toContain('NPM_TOKEN fallback');
+  });
+
+  it('flags release-runbook drift when the addendum omits overview and install guidance', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-release-addendum-'));
+    createdDirs.push(repoRoot);
+
+    await writeReleaseRunbookFixtureRepo(repoRoot, {
+      entries: [releaseRunbookCatalogEntry('docs/release-notes-template-addendum.md')],
+      addendumContent: ['# Release Notes Addendum', '', 'Mention shipped skill changes in release notes.', ''].join('\n')
+    });
+
+    const errors = await runDocsCheck(repoRoot);
+    const releaseError = errors.find(
+      (error) =>
+        error.file === 'docs/release-notes-template-addendum.md' && error.rule === 'release-runbook-stale'
+    );
+
+    expect(releaseError).toBeDefined();
+    expect(releaseError?.reference).toContain('release notes placement under Overview');
+    expect(releaseError?.reference).toContain('signed annotated tag body overview override note');
+    expect(releaseError?.reference).toContain('codex-orchestrator skills install --force');
+    expect(releaseError?.reference).toContain('docs/skills-release.md link');
+  });
+
   it('passes release-runbook truth checks when the release docs match the workflow contract', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-release-pass-'));
     createdDirs.push(repoRoot);
