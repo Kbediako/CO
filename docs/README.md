@@ -131,7 +131,7 @@ Use `npx @kbediako/codex-orchestrator resume --run <run-id>` to continue interru
 - Dist-tags: stable releases publish to `latest`; prereleases publish with a dist-tag derived from the leading prerelease label before the first `.` or `-`, lowercased and sanitized. Examples: `alpha.1` -> `alpha`, `beta.1` -> `beta`, `rc.1` -> `rc`; empty or numeric-leading labels fall back to `next`. Prerelease tags create a GitHub prerelease.
 - Publishing auth: workflow attempts OIDC trusted publishing first (`id-token: write` + `--provenance`), then falls back to `secrets.NPM_TOKEN` when OIDC is unavailable. `secrets.NPM_TOKEN` must be an npm automation token (not a token that requires OTP).
 - Trusted publisher config: npm expects workflow filename `release.yml` (the file must exist at `.github/workflows/release.yml` on the default branch). Leave environment blank unless the publish job sets `environment: ...`.
-- OIDC runtime prereqs: npm trusted publishing currently requires Node.js `22.14.0+` and npm `11.5.1+`; the publish job verifies the runner versions, then runs the publish commands through `npx --yes npm@11.5.1` instead of mutating the runner-global npm install.
+- OIDC runtime prereqs: npm trusted publishing currently requires Node.js `22.14.0+` and npm `11.5.1+`; the publish job logs the runner versions, then runs the publish commands through `npx --yes npm@11.5.1` instead of mutating the runner-global npm install.
 
 ## Parallel Runs (Meta-Orchestration)
 The orchestrator executes a single pipeline serially. “Parallelism” comes from running multiple orchestrator runs at the same time, ideally in separate git worktrees so builds/tests don’t contend for the same working tree outputs.
