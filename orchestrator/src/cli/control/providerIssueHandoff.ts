@@ -1046,11 +1046,7 @@ export function createProviderIssueHandoffService(
     const activeRunsByProviderIssue = groupProviderIssueRuns(activeDiscoveredRuns);
 
     for (const claim of options.state.claims) {
-      if (
-        claim.state !== 'starting' &&
-        claim.state !== 'resuming' &&
-        claim.state !== 'running'
-      ) {
+      if (!shouldProviderClaimOccupyPollDispatchSlot(claim)) {
         continue;
       }
       const activeClaimRun =
@@ -1447,11 +1443,7 @@ export function createProviderIssueHandoffService(
 
     for (const claim of options.state.claims) {
       claimByProviderKey.set(claim.provider_key, claim);
-      if (
-        claim.state !== 'starting' &&
-        claim.state !== 'resuming' &&
-        claim.state !== 'running'
-      ) {
+      if (!shouldProviderClaimOccupyAdmissionSlot(claim)) {
         continue;
       }
       const occupyingClaimRun =
@@ -6358,6 +6350,18 @@ function shouldProviderClaimOccupyPollDispatchSlot(
   claim: Pick<ProviderIntakeClaimRecord, 'state'>
 ): boolean {
   return claim.state === 'starting' || claim.state === 'resuming' || claim.state === 'running';
+}
+
+function shouldProviderClaimOccupyAdmissionSlot(
+  claim: Pick<ProviderIntakeClaimRecord, 'state' | 'retry_queued'>
+): boolean {
+  return (
+    claim.retry_queued === true ||
+    claim.state === 'starting' ||
+    claim.state === 'resuming' ||
+    claim.state === 'running' ||
+    claim.state === 'resumable'
+  );
 }
 
 function shouldRetainedProviderClaimOccupyPollDispatchSlot(

@@ -142,6 +142,54 @@ describe('providerOperatorAutopilot', () => {
     });
   });
 
+  it('holds helper-created follow-up issues in Backlog until traceability setup is complete', async () => {
+    const transitionIssueState = vi.fn(async () => {
+      throw new Error('transition should not run for traceability-pending follow-ups');
+    });
+
+    const result = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [
+          createTrackedIssue({
+            id: 'lin-issue-follow-up',
+            identifier: 'CO-331',
+            state: 'Backlog',
+            state_type: 'backlog',
+            description: [
+              '## Immediate Traceability',
+              '',
+              '- Follow-up packet prefix: `linear-lin-issue-follow-up`',
+              '- Create before active work: docs/PRD, docs/TECH_SPEC, docs/ACTION_PLAN, tasks/specs, tasks/tasks, .agent/task',
+              '- Update registry mirrors before the issue leaves `Backlog`: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`'
+            ].join('\n')
+          })
+        ],
+        claims: [],
+        config: buildConfig(),
+        previous_result: null
+      },
+      {
+        now: () => '2026-04-23T09:00:00.000Z',
+        transition_issue_state: transitionIssueState
+      }
+    );
+
+    expect(transitionIssueState).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      status: 'noop',
+      holds: [
+        {
+          kind: 'backlog_promotion',
+          issue_identifier: 'CO-331',
+          issue_state: 'Backlog',
+          issue_state_type: 'backlog',
+          reason: 'backlog_head_follow_up_traceability_pending'
+        }
+      ]
+    });
+    expect(result.summary).toContain('follow-up traceability requires packet');
+  });
+
   it('surfaces Blocked issues with only terminal blockers as duplicate-cleanup candidates when duplicate or canonical-owner evidence exists', async () => {
     const transitionIssueState = vi.fn(async () => {
       throw new Error('read-only terminal-blocker advisories must not transition issues');

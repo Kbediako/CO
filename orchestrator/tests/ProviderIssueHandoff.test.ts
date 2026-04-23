@@ -6454,16 +6454,7 @@ describe('createProviderIssueHandoffService', () => {
         excludedIssueIds: expect.arrayContaining(['lin-retry-primer', 'lin-retry-deferred'])
       })
     );
-    expect(launcher.start).toHaveBeenCalledTimes(1);
-    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
-      taskId: 'linear-lin-unrelated-ready',
-      pipelineId: 'diagnostics',
-      provider: 'linear',
-      issueId: 'lin-unrelated-ready',
-      issueIdentifier: 'CO-181F',
-      issueUpdatedAt: '2026-04-14T10:06:01.000Z',
-      launchToken: expect.any(String)
-    }));
+    expect(launcher.start).not.toHaveBeenCalled();
     expect(state.claims.find((claim) => claim.issue_id === 'lin-retry-deferred')).toMatchObject({
       state: 'handoff_failed',
       reason: 'provider_issue_start_failed:worker host at capacity',
@@ -6472,10 +6463,10 @@ describe('createProviderIssueHandoffService', () => {
       retry_due_at: '2026-04-14T10:30:00.000Z'
     });
     expect(state.claims.find((claim) => claim.issue_id === 'lin-unrelated-ready')).toMatchObject({
-      state: 'starting',
-      reason: 'provider_issue_start_launched',
-      run_id: 'run-unrelated-ready',
-      run_manifest_path: '/tmp/provider-run/unrelated-ready-manifest.json'
+      state: 'accepted',
+      reason: 'provider_issue_start_blocked:max_concurrency',
+      run_id: null,
+      run_manifest_path: null
     });
   });
 
@@ -7358,6 +7349,119 @@ describe('createProviderIssueHandoffService', () => {
       state: 'accepted',
       reason: 'provider_issue_start_blocked:max_concurrency',
       task_id: 'linear-lin-issue-fresh'
+    });
+  });
+
+  it('blocks direct webhook admission when queued retry and resumable claims fill max_allowed', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(
+      {
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-retry',
+        issue_id: 'lin-issue-retry',
+        issue_identifier: 'CO-329',
+        issue_title: 'Queued retry capacity',
+        issue_state: 'Ready',
+        issue_state_type: 'unstarted',
+        issue_updated_at: '2026-04-23T08:07:41.709Z',
+        task_id: 'linear-lin-issue-retry',
+        mapping_source: 'provider_id_fallback',
+        state: 'completed',
+        reason: 'provider_issue_retry_queued',
+        accepted_at: '2026-04-23T08:04:00.000Z',
+        updated_at: '2026-04-23T08:04:25.936Z',
+        last_delivery_id: null,
+        last_event: null,
+        last_action: null,
+        last_webhook_timestamp: null,
+        run_id: null,
+        run_manifest_path: null,
+        launch_source: null,
+        launch_token: null,
+        retry_queued: true,
+        retry_attempt: 2,
+        retry_due_at: '2026-04-23T08:14:25.936Z',
+        retry_error: 'retry still occupies capacity'
+      },
+      {
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-resumable',
+        issue_id: 'lin-issue-resumable',
+        issue_identifier: 'CO-330',
+        issue_title: 'Resumable capacity',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-23T08:07:49.413Z',
+        task_id: 'linear-lin-issue-resumable',
+        mapping_source: 'provider_id_fallback',
+        state: 'resumable',
+        reason: 'provider_issue_rehydrated_resumable_run',
+        accepted_at: '2026-04-23T08:05:00.000Z',
+        updated_at: '2026-04-23T08:05:25.936Z',
+        last_delivery_id: null,
+        last_event: null,
+        last_action: null,
+        last_webhook_timestamp: null,
+        run_id: 'run-resumable',
+        run_manifest_path: null,
+        launch_source: null,
+        launch_token: null,
+        retry_queued: null,
+        retry_attempt: null,
+        retry_due_at: null,
+        retry_error: null
+      }
+    );
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 2
+        }
+      })
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-fresh',
+        identifier: 'CO-331',
+        updated_at: '2026-04-23T08:09:33.742Z'
+      }),
+      deliveryId: 'delivery-fresh-over-cap',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_745_396_973_742
+    });
+
+    expect(result).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_start_blocked:max_concurrency',
+      claim: {
+        provider_key: 'linear:lin-issue-fresh',
+        state: 'accepted',
+        reason: 'provider_issue_start_blocked:max_concurrency',
+        task_id: 'linear-lin-issue-fresh'
+      }
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(getPersistedState().claims.find((claim) => claim.provider_key === 'linear:lin-issue-retry')).toMatchObject({
+      retry_queued: true
+    });
+    expect(getPersistedState().claims.find((claim) => claim.provider_key === 'linear:lin-issue-resumable')).toMatchObject({
+      state: 'resumable',
+      run_id: 'run-resumable'
     });
   });
 

@@ -692,6 +692,21 @@ async function maybeRunBacklogPromotion(input: {
       error: null
     };
   }
+  if (isTraceabilityPendingFollowUpIssue(candidate)) {
+    return {
+      action: null,
+      hold: buildAutopilotHoldRecord({
+        kind: 'backlog_promotion',
+        issue: candidate,
+        reason: 'backlog_head_follow_up_traceability_pending',
+        summary: `Backlog head ${candidate.identifier} remains parked because follow-up traceability requires packet and registry mirror setup before leaving Backlog.`,
+        actionRequiredReasons: []
+      }),
+      failed: false,
+      summary: '',
+      error: null
+    };
+  }
   const previousBacklogPromotion = resolvePreviousBacklogPromotionSnapshot({
     previousResult: input.previousResult,
     issueId: candidate.id,
@@ -1951,6 +1966,18 @@ function formatReasonList(reasons: string[]): string {
 
 function isBacklogPromotionBlockedByExistingClaimState(state: string | null | undefined): boolean {
   return typeof state === 'string' && BACKLOG_PROMOTION_BLOCKING_CLAIM_STATES.has(state);
+}
+
+function isTraceabilityPendingFollowUpIssue(
+  issue: Pick<LiveLinearTrackedIssue, 'description'>
+): boolean {
+  const description = typeof issue.description === 'string' ? issue.description : '';
+  return (
+    description.includes('## Immediate Traceability') &&
+    description.includes('Follow-up packet prefix') &&
+    description.includes('Create before active work:') &&
+    description.includes('Update registry mirrors before the issue leaves `Backlog`')
+  );
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
