@@ -13887,6 +13887,32 @@
         "agent_task": ".agent/task/linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be.md",
         "docs": "docs/TECH_SPEC-linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be.md"
       }
+    },
+    {
+      "id": "20260423-linear-80d4473e-e9c7-4d4d-9340-bc1193103a7d",
+      "title": "CO: route docs-freshness owner reuse by canonical cohort without broadening CO-320",
+      "relates_to": "tasks/tasks-linear-80d4473e-e9c7-4d4d-9340-bc1193103a7d.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-23",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-23",
+          "status": "produced",
+          "manifest": ".runs/linear-80d4473e-e9c7-4d4d-9340-bc1193103a7d-docs-packet/cli/2026-04-23T03-23-44-517Z-9d825dee/manifest.json",
+          "source_anchor": "ctx:sha256:6ac09dabeeaf032143a1979732d6482c8b15295f84f26bdd31105334dccb8dcf#chunk:c000001",
+          "summary": "Docs-first packet preserves the CO-323 owner-routing seam: do not repoint `policies.rolling_freshness_cohorts.owner_issue` to `CO-320`; route live stamped owners by exact `canonical_owner_key`; keep `CO-320` limited to the exact Mar 23 `tasks/tasks-*` cohort; and keep terminal `CO-300` evidence-only. The child checkout did not contain the source payload path, so the lane used a read-only Linear fetch of `CO-323` and performed no Linear mutations."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-80d4473e-e9c7-4d4d-9340-bc1193103a7d.md",
+        "task": "tasks/tasks-linear-80d4473e-e9c7-4d4d-9340-bc1193103a7d.md",
+        "agent_task": ".agent/task/linear-80d4473e-e9c7-4d4d-9340-bc1193103a7d.md",
+        "docs": "docs/TECH_SPEC-linear-80d4473e-e9c7-4d4d-9340-bc1193103a7d.md"
+      }
     }
   ]
 }
