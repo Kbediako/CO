@@ -29,5 +29,5 @@
 - Risk: diagnostics schema drift. Mitigation: additive optional fields only.
 
 ## Approvals
-- Reviewer: pending.
+- Reviewer: wrapper-led standalone review found one P2 on the initial one-read budget; final post-merge review found no actionable regressions.
 - Date: 2026-04-23
