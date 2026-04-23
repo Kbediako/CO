@@ -1,6 +1,36 @@
 {
   "items": [
     {
+      "id": "20260423-linear-4ea68a3d-3832-4161-bab7-84dceeceeb46",
+      "title": "CO: scope provider-linear parallelization proof invariants to the current turn",
+      "relates_to": "tasks/tasks-linear-4ea68a3d-3832-4161-bab7-84dceeceeb46.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-23",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-23",
+          "status": "accepted",
+          "manifest": ".runs/linear-4ea68a3d-3832-4161-bab7-84dceeceeb46-docs-packet/cli/2026-04-23T03-59-42-098Z-c11737dd/manifest.json",
+          "source_anchor": "ctx:sha256:b6dfe577e25cc512757f1fba35bab57fb685d968fa340ea712648248f38b1fd5#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-326 as a current-turn provider-linear parallelization proof invariant bug: valid same-issue parallelization decisions across different turns must remain cumulative audit history without being reclassified as same-turn parallelization_decision_multiple, while true missing or duplicate current-turn decisions still fail closed."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-4ea68a3d-3832-4161-bab7-84dceeceeb46.md",
+        "task": "tasks/tasks-linear-4ea68a3d-3832-4161-bab7-84dceeceeb46.md",
+        "agent_task": ".agent/task/linear-4ea68a3d-3832-4161-bab7-84dceeceeb46.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-4ea68a3d-3832-4161-bab7-84dceeceeb46.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-4ea68a3d-3832-4161-bab7-84dceeceeb46.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-4ea68a3d-3832-4161-bab7-84dceeceeb46.md"
+        }
+      }
+    },
+    {
       "id": "20260423-linear-3c52bf66-f805-4537-8671-ad1dec2f4623",
       "title": "CO: maintain docs freshness after terminal CO-300 owner",
       "relates_to": "tasks/tasks-linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md",
