@@ -9,7 +9,7 @@ Canonical checklist: `tasks/tasks-linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md
 - [x] Parent checklist/mirror scaffolding exists for CO-319.
 - [x] Canonical owner follow-up issue `CO-320` is created via the `Backlog` path with the exact cohort key and marker, and current live issue-context now shows it in `In Progress`.
 - [x] Packet docs and registry mirrors are updated with the returned owner evidence.
-- [x] Docs-review plus truthful validation/review evidence are recorded; no handoff was attempted because there is still no PR and the remaining docs failures are unrelated repo-baseline debt. Evidence: `out/linear-7b3de1c1-f420-4203-bb8c-494dadecaa88/manual/docs-review-fallback.md`, `out/linear-7b3de1c1-f420-4203-bb8c-494dadecaa88/manual/standalone-review-fallback.md`, `out/linear-7b3de1c1-f420-4203-bb8c-494dadecaa88/manual/elegance-review.md`.
+- [x] Docs-review plus truthful validation/review evidence are recorded, and draft PR `#610` is attached on the restacked head. Review handoff is still pending because the PR remains draft and GitHub checks plus `pr ready-review` have not drained cleanly yet. Evidence: `https://github.com/Kbediako/CO/pull/610`, `.runs/linear-7b3de1c1-f420-4203-bb8c-494dadecaa88/cli/2026-04-23T01-27-41-396Z-fb6749c4/review/telemetry.json`, `out/linear-7b3de1c1-f420-4203-bb8c-494dadecaa88/manual/docs-review-fallback.md`, and `out/linear-7b3de1c1-f420-4203-bb8c-494dadecaa88/manual/elegance-review.md`.
 
 ## Guardrails
 - Preserve the exact canonical owner key and marker for the Mar 23 task-packet cohort.
