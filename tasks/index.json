@@ -1,6 +1,34 @@
 {
   "items": [
     {
+      "id": "20260424-linear-703362d6-afdb-42e7-852f-5dd64a314849",
+      "title": "CO: prepare and ship the next release after v0.1.38 with all main-branch work since March 3, 2026",
+      "relates_to": "tasks/tasks-linear-703362d6-afdb-42e7-852f-5dd64a314849.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-24",
+      "approvals": {
+        "preimplementation_issue_quality": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-24",
+          "status": "approved",
+          "summary": "Current-main review confirms CO-316 is the full release ship lane for a large post-v0.1.38 delta with already-promoted 0.123.0 posture truth. The lane must stay two-phase: prepare on a branch, then tag and publish only from clean shared-root main."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-703362d6-afdb-42e7-852f-5dd64a314849.md",
+        "task": "tasks/tasks-linear-703362d6-afdb-42e7-852f-5dd64a314849.md",
+        "agent_task": ".agent/task/linear-703362d6-afdb-42e7-852f-5dd64a314849.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-703362d6-afdb-42e7-852f-5dd64a314849.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-703362d6-afdb-42e7-852f-5dd64a314849.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-703362d6-afdb-42e7-852f-5dd64a314849.md"
+        }
+      }
+    },
+    {
       "id": "20260423-linear-e17b8d21-d5f8-4152-8c19-2991f782f830",
       "title": "CO-317 fresh-discovery admission backfill after duplicate or terminal cleanup frees capacity",
       "relates_to": "tasks/tasks-linear-e17b8d21-d5f8-4152-8c19-2991f782f830.md",
