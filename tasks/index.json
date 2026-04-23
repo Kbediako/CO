@@ -14102,6 +14102,36 @@
           "ACTION_PLAN": "docs/ACTION_PLAN-linear-d469c73d-a540-427c-9088-5d4791c6f8ca.md"
         }
       }
+    },
+    {
+      "id": "20260423-linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe",
+      "title": "Control host supervision stale co-status endpoint and probe-timeout recurrence",
+      "relates_to": "tasks/tasks-linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-23",
+      "approvals": {
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-23",
+          "status": "succeeded",
+          "review_outcome": "bounded-success",
+          "telemetry": ".runs/linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe/cli/2026-04-23T10-15-31-978Z-3b9ae081/review/telemetry.json",
+          "summary": "Initial wrapper-led review found the one-read probe budget too narrow for stale endpoint recovery; post-fix review and elegance pass found no actionable regressions."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe.md",
+        "task": "tasks/tasks-linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe.md",
+        "agent_task": ".agent/task/linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe.md"
+        }
+      }
     }
   ]
 }

@@ -82,6 +82,7 @@ export interface ControlHostSupervisionState {
   last_signal: string | null;
   last_health_check_at: string | null;
   last_health_status: string | null;
+  last_probe_duration_ms?: number | null;
   consecutive_unhealthy_samples: number;
   restart_count: number;
   unhealthy_threshold: number;
@@ -136,6 +137,7 @@ export interface ControlHostSupervisionRestartRecord {
   message: string;
   consecutive_unhealthy_samples: number;
   child_pid: number | null;
+  probe_duration_ms?: number | null;
   diagnostic: ControlHostSupervisionHealthDiagnostic | null;
 }
 
@@ -356,6 +358,7 @@ export function buildInitialControlHostSupervisionState(input: {
     last_signal: null,
     last_health_check_at: null,
     last_health_status: null,
+    last_probe_duration_ms: null,
     consecutive_unhealthy_samples: 0,
     restart_count: input.restartCount ?? 0,
     unhealthy_threshold: input.config.unhealthyThreshold,
@@ -740,6 +743,7 @@ function normalizeControlHostSupervisionRestartRecord(
     message: readNonEmptyString(value.message) ?? '',
     consecutive_unhealthy_samples: readFiniteNumber(value.consecutive_unhealthy_samples) ?? 0,
     child_pid: readFiniteNumber(value.child_pid),
+    probe_duration_ms: readFiniteNumber(value.probe_duration_ms),
     diagnostic: normalizeStoredControlHostSupervisionHealthDiagnostic(value.diagnostic)
   };
 }
