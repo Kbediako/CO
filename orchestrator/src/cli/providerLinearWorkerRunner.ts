@@ -287,6 +287,7 @@ export type ProviderLinearWorkerDiagnosticCategory =
   | 'cloud_denial'
   | 'guardian_timeout'
   | 'guardian_policy_denial'
+  | 'provider_stdin_bootstrap'
   | 'provider_runtime'
   | 'unknown';
 
@@ -3359,6 +3360,10 @@ function hasProviderWorkerQuotaFailureSignal(
   return statusValues.some((value) => quotaFailureStatuses.has(value));
 }
 
+function hasProviderWorkerStdinBootstrapSignal(normalizedSignal: string): boolean {
+  return /\breading\s+additional\s+input\s+from\s+stdin\b/u.test(normalizedSignal);
+}
+
 function classifyProviderWorkerFailureDiagnosis(
   input: Record<string, unknown>,
   source: ProviderLinearWorkerCurrentTurnActivitySource
@@ -3382,7 +3387,7 @@ function classifyProviderWorkerFailureDiagnosis(
     observed_at: timestamp
   });
   const structuredCategory = classifyProviderWorkerStructuredDiagnosticCategory(input);
-  if (structuredCategory) {
+  if (structuredCategory && structuredCategory !== 'provider_runtime') {
     return build(structuredCategory, providerWorkerDiagnosticGuidance(structuredCategory));
   }
   const guardianTimeoutSignal =
@@ -3459,6 +3464,15 @@ function classifyProviderWorkerFailureDiagnosis(
       'Codex Cloud environment configuration is missing or invalid; set CODEX_CLOUD_ENV_ID or task metadata.'
     );
   }
+  if (hasProviderWorkerStdinBootstrapSignal(normalizedClassification)) {
+    return build(
+      'provider_stdin_bootstrap',
+      'Codex exited during stdin bootstrap before issue execution; inspect the control-host to provider-linear-worker Codex exec stdin/prompt handoff, not issue-specific content.'
+    );
+  }
+  if (structuredCategory) {
+    return build(structuredCategory, providerWorkerDiagnosticGuidance(structuredCategory));
+  }
   if (
     /\b(appserver|provider runtime|runtime parity|codex exec|enoent|websocket|rpc)\b/u.test(
       normalizedClassification
@@ -3490,6 +3504,8 @@ function providerWorkerDiagnosticGuidance(
       return 'Codex Cloud environment configuration is missing or invalid; set CODEX_CLOUD_ENV_ID or task metadata.';
     case 'auth_mismatch':
       return 'The active Codex account/auth profile appears mismatched or unavailable; verify the selected profile/account.';
+    case 'provider_stdin_bootstrap':
+      return 'Codex exited during stdin bootstrap before issue execution; inspect the control-host to provider-linear-worker Codex exec stdin/prompt handoff, not issue-specific content.';
     case 'provider_runtime':
       return 'Provider/runtime execution is implicated; inspect runtime selection and provider command logs.';
     default:
@@ -3573,6 +3589,20 @@ function classifyProviderWorkerStructuredDiagnosticValue(
     ].includes(normalized)
   ) {
     return 'env_config';
+  }
+  if (
+    [
+      'provider_stdin_bootstrap',
+      'provider_worker_stdin_bootstrap',
+      'codex_stdin_bootstrap',
+      'stdin_bootstrap',
+      'stdin_bootstrap_failure',
+      'reading_additional_input_from_stdin',
+      'reading_additional_input_stdin',
+      'additional_input_from_stdin'
+    ].includes(normalized)
+  ) {
+    return 'provider_stdin_bootstrap';
   }
   if (
     [

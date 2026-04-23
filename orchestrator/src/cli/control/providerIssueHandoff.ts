@@ -160,6 +160,7 @@ interface ProviderIssueRunRecord {
   proofTerminalStatus: 'failed' | 'succeeded' | null;
   hasStaleInProgressProof: boolean;
   summary: string | null;
+  failureDiagnosis?: ProviderIssueRunFailureDiagnosisRecord | null;
   issueUpdatedAt: string | null;
   startedAt: string | null;
   updatedAt: string | null;
@@ -168,6 +169,11 @@ interface ProviderIssueRunRecord {
   workerHostProofUpdatedAt: string | null;
   workerHost: string | null;
   residentSessionSeed: ProviderLinearResidentSessionSeed | null;
+}
+
+interface ProviderIssueRunFailureDiagnosisRecord {
+  diagnosticCategory: string | null;
+  signal: string | null;
 }
 
 interface ProviderUnreadableManifestAdmissionOccupancyRecord {
@@ -195,6 +201,7 @@ interface ProviderLinearWorkerProofRecord {
   updated_at?: unknown;
   worker_host?: unknown;
   resident_session?: unknown;
+  failure_diagnosis?: unknown;
 }
 
 const PROVIDER_UNREADABLE_MANIFEST_LIVE_PROOF_TTL_MS =
@@ -6984,6 +6991,7 @@ async function discoverProviderIssueRunSnapshot(
         ),
         hasStaleInProgressProof,
         summary: resolveProviderIssueRunSummary(manifest, proof),
+        failureDiagnosis: resolveProviderIssueRunFailureDiagnosis(manifest, proof),
         issueUpdatedAt: readStringValue(manifest, 'issue_updated_at'),
         startedAt: manifestStartedAt,
         updatedAt: resolveProviderIssueRunUpdatedAt(manifest, proof),
@@ -7183,6 +7191,30 @@ function resolveProviderIssueRunSummary(
     return proofTerminalReason;
   }
   return manifestSummary ?? proofTerminalReason;
+}
+
+function resolveProviderIssueRunFailureDiagnosis(
+  manifest: Record<string, unknown>,
+  proof: ProviderLinearWorkerProofRecord | null
+): ProviderIssueRunFailureDiagnosisRecord | null {
+  if (!shouldUseProviderLinearWorkerTerminalProofForSummary(manifest, proof)) {
+    return null;
+  }
+  const proofRecord = (proof ?? {}) as Record<string, unknown>;
+  const diagnosis = readRecordValue(proofRecord, 'failure_diagnosis', 'failureDiagnosis');
+  if (!diagnosis) {
+    return null;
+  }
+  const diagnosticCategory = readStringValue(
+    diagnosis,
+    'diagnostic_category',
+    'diagnosticCategory'
+  );
+  const signal = readStringValue(diagnosis, 'signal');
+  if (!diagnosticCategory && !signal) {
+    return null;
+  }
+  return { diagnosticCategory, signal };
 }
 
 function resolveProviderIssueRunUpdatedAt(
@@ -7554,6 +7586,15 @@ function resolveNextProviderRetryAttempt(
 function resolveProviderRetryErrorFromRun(run: ProviderIssueRunRecord | null): string | null {
   if (run?.status !== 'failed') {
     return null;
+  }
+  if (run.failureDiagnosis) {
+    const parts = [
+      run.failureDiagnosis.diagnosticCategory,
+      run.failureDiagnosis.signal
+    ].filter((value): value is string => Boolean(value));
+    if (parts.length > 0) {
+      return parts.join(': ');
+    }
   }
   return run.summary ?? null;
 }
