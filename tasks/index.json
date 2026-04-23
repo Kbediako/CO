@@ -14068,7 +14068,7 @@
         "agent_task": ".agent/task/linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe.md",
         "docs": {
           "PRD": "docs/PRD-linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe.md",
-          "TECH_SPEC": "tasks/specs/linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe.md",
           "ACTION_PLAN": "docs/ACTION_PLAN-linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe.md"
         }
       }

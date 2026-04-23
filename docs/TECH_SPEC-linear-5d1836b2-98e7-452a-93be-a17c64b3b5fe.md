@@ -20,7 +20,7 @@ last_review: 2026-04-23
 - Explicit non-goals carried forward: no CO STATUS redesign, no weakening stuck/restart-required alarms, no provider-worker kill/restart, no queue policy expansion.
 
 ## Parity / Alignment Matrix
-- Current truth: direct JSON status uses endpoint recovery, but supervision can timeout the whole `co-status` subprocess after 10s while the status read path itself waits up to 15s for `/ui/data.json`.
+- Current truth: direct JSON status uses endpoint recovery, but supervision can time out the whole `co-status` subprocess after 10s while the status read path itself waits up to 15s for `/ui/data.json`.
 - Reference truth: the supervision probe should let the status read contract complete or classify the failure before counting an unhealthy sample.
 - Target truth / intended delta: default supervision probe budget covers stale-endpoint recovery's two direct status read windows plus bounded headroom, while preserving a finite cap; restart records expose probe duration; tests prove slow healthy reads are accepted and true command timeouts still fail closed.
 - Explicitly out-of-scope differences: queue/admission, stale-owner reclaim, stdin bootstrap, and broad status UI behavior.

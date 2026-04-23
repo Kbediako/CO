@@ -6,3 +6,4 @@
 - [x] Add focused regression coverage for stale endpoint recovery and probe-timeout recurrence. Evidence: `npx vitest run --config vitest.config.core.ts tests/control-host-supervision.spec.ts` passed 4/4.
 - [x] Run scoped validation and update this checklist with evidence. Evidence: focused Vitest passed 84/84; delegation guard, spec guard, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `npm run repo:stewardship`, `node scripts/diff-budget.mjs`, and `npm run pack:smoke` passed.
 - [x] Complete standalone review and elegance/minimality pass before review handoff. Evidence: wrapper-led review found one P2 on the initial one-read budget, the patch was updated to two reads plus headroom, and the post-fix standalone/elegance/final post-merge passes found no actionable regressions.
+- [ ] Refresh Linear workpad for review handoff.
