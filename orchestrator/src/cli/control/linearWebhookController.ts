@@ -9,6 +9,7 @@ import {
   type LiveLinearTrackedIssue
 } from './linearDispatchSource.js';
 import type { ProviderIssueHandoffService } from './providerIssueHandoff.js';
+import type { ProviderIntakeState } from './providerIntakeState.js';
 
 const LINEAR_WEBHOOK_MAX_AGE_MS = 5 * 60 * 1000;
 const LINEAR_ADVISORY_SEEN_DELIVERY_LIMIT = 100;
@@ -44,7 +45,16 @@ export interface LinearAdvisoryState {
   latest_event: LinearAdvisoryLatestEvent | null;
   latest_accepted_at: string | null;
   tracked_issue: LiveLinearTrackedIssue | null;
+  stale_source?: LinearAdvisoryStaleSource | null;
   seen_deliveries: LinearAdvisoryDeliveryRecord[];
+}
+
+export interface LinearAdvisoryStaleSource {
+  source: 'provider-intake';
+  reason: 'provider_intake_newer_than_linear_advisory';
+  marked_at: string;
+  provider_intake_updated_at: string | null;
+  advisory_updated_at: string | null;
 }
 
 export interface LinearWebhookAuditEventInput {
@@ -291,6 +301,7 @@ export function normalizeLinearAdvisoryState(input: LinearAdvisoryState | null):
     tracked_issue: null,
     seen_deliveries: []
   };
+  const staleSource = normalizeLinearAdvisoryStaleSource(state.stale_source);
   return {
     schema_version: 1,
     updated_at:
@@ -311,8 +322,87 @@ export function normalizeLinearAdvisoryState(input: LinearAdvisoryState | null):
     tracked_issue: state.tracked_issue ?? null,
     seen_deliveries: Array.isArray(state.seen_deliveries)
       ? state.seen_deliveries.slice(-LINEAR_ADVISORY_SEEN_DELIVERY_LIMIT)
-      : []
+      : [],
+    ...(staleSource ? { stale_source: staleSource } : {})
   };
+}
+
+export function markLinearAdvisoryStateStaleFromProviderIntake(
+  state: LinearAdvisoryState,
+  providerIntakeState:
+    | Pick<ProviderIntakeState, 'rehydrated_at' | 'claims'>
+    | null
+    | undefined,
+  options: { now?: () => string } = {}
+): boolean {
+  if (!state.tracked_issue) {
+    return false;
+  }
+  const providerIntakeUpdatedAt = resolveProviderIntakeTruthUpdatedAt(
+    providerIntakeState,
+    state.tracked_issue
+  );
+  const advisoryUpdatedAt = resolveLinearAdvisoryTrackedIssueReferenceUpdatedAt(state);
+  if (!isIsoNewer(providerIntakeUpdatedAt, advisoryUpdatedAt)) {
+    return false;
+  }
+  const nextStaleSource: LinearAdvisoryStaleSource = {
+    source: 'provider-intake',
+    reason: 'provider_intake_newer_than_linear_advisory',
+    marked_at: options.now?.() ?? isoTimestamp(),
+    provider_intake_updated_at: providerIntakeUpdatedAt,
+    advisory_updated_at: advisoryUpdatedAt
+  };
+  if (
+    state.stale_source?.source === nextStaleSource.source &&
+    state.stale_source.reason === nextStaleSource.reason &&
+    state.stale_source.provider_intake_updated_at === nextStaleSource.provider_intake_updated_at &&
+    state.stale_source.advisory_updated_at === nextStaleSource.advisory_updated_at
+  ) {
+    return false;
+  }
+  state.stale_source = nextStaleSource;
+  return true;
+}
+
+function resolveProviderIntakeTruthUpdatedAt(
+  providerIntakeState:
+    | Pick<ProviderIntakeState, 'rehydrated_at' | 'claims'>
+    | null
+    | undefined,
+  trackedIssue: Pick<LiveLinearTrackedIssue, 'id' | 'identifier'>
+): string | null {
+  const matchingClaims = (providerIntakeState?.claims ?? []).filter((claim) =>
+    claim.issue_id === trackedIssue.id || claim.issue_identifier === trackedIssue.identifier
+  );
+  if (matchingClaims.length === 0) {
+    return null;
+  }
+  let truthUpdatedAt: string | null = null;
+  for (const claim of matchingClaims) {
+    truthUpdatedAt = pickLatestIsoTimestamp(
+      pickLatestIsoTimestamp(truthUpdatedAt, claim.updated_at),
+      claim.issue_updated_at
+    );
+  }
+  return truthUpdatedAt;
+}
+
+function resolveLinearAdvisoryTrackedIssueReferenceUpdatedAt(state: LinearAdvisoryState): string | null {
+  return pickLatestIsoTimestamp(
+    typeof state.latest_accepted_at === 'string' ? state.latest_accepted_at : null,
+    state.tracked_issue?.updated_at
+  );
+}
+
+function pickLatestIsoTimestamp(left: string | null, right: string | null | undefined): string | null {
+  if (typeof right !== 'string' || right.trim().length === 0) {
+    return left;
+  }
+  if (isIsoNewer(right, left)) {
+    return right;
+  }
+  return left;
 }
 
 async function recordAndPersistLinearAdvisoryOutcome(
@@ -499,7 +589,44 @@ function recordLinearAdvisoryOutcome(
   if (input.outcome === 'accepted' && input.trackedIssue) {
     state.latest_accepted_at = processedAt;
     state.tracked_issue = input.trackedIssue;
+    delete state.stale_source;
   }
+}
+
+function normalizeLinearAdvisoryStaleSource(value: unknown): LinearAdvisoryStaleSource | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  if (
+    record.source !== 'provider-intake' ||
+    record.reason !== 'provider_intake_newer_than_linear_advisory'
+  ) {
+    return null;
+  }
+  return {
+    source: 'provider-intake',
+    reason: 'provider_intake_newer_than_linear_advisory',
+    marked_at: typeof record.marked_at === 'string' ? record.marked_at : new Date(0).toISOString(),
+    provider_intake_updated_at:
+      typeof record.provider_intake_updated_at === 'string'
+        ? record.provider_intake_updated_at
+        : null,
+    advisory_updated_at:
+      typeof record.advisory_updated_at === 'string' ? record.advisory_updated_at : null
+  };
+}
+
+function isIsoNewer(candidateIso: string | null, currentIso: string | null): boolean {
+  const candidateMs = Date.parse(candidateIso ?? '');
+  const currentMs = Date.parse(currentIso ?? '');
+  if (!Number.isFinite(candidateMs)) {
+    return false;
+  }
+  if (!Number.isFinite(currentMs)) {
+    return true;
+  }
+  return candidateMs > currentMs;
 }
 
 function safeTokenCompare(left: string, right: string): boolean {

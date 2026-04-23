@@ -108,13 +108,13 @@ describe('checked-in CLI bootstrap', () => {
       sourceBody: [
         "import { writeFile } from 'node:fs/promises';",
         'const keepAlive = setInterval(() => {}, 1_000);',
-        "process.stdout.write('ready\\n');",
         "process.once('SIGTERM', () => {",
         '  clearInterval(keepAlive);',
         "  void writeFile(new URL('../child-signal.txt', import.meta.url), 'SIGTERM\\n', 'utf8').then(() => {",
         '    process.exit(0);',
         '  });',
-        '});'
+        '});',
+        "process.stdout.write('ready\\n');"
       ].join('\n'),
       distBody: 'console.log("dist-runner");\n',
       withTsNodeLoader: true

@@ -57,6 +57,12 @@ import {
   resolveProviderWorkspacePath
 } from './run/workspacePath.js';
 import {
+  countGuardrailCommands,
+  resolveGuardrailsRequiredForManifest,
+  resolveGuardrailsRequiredSourceForManifest,
+  stripNonApplicableGuardrailSummaryLines
+} from './run/manifest.js';
+import {
   buildRunMemoryPromptLines,
   selectRunMemoryForRole
 } from './run/runMemoryController.js';
@@ -259,6 +265,9 @@ export interface ProviderLinearWorkerChildLaneRecord {
   artifact_root: string;
   log_path: string | null;
   summary: string | null;
+  guardrails_required?: boolean | null;
+  guardrails_required_source?: string | null;
+  guardrail_command_count?: number | null;
   issue_id: string;
   issue_identifier: string;
   workspace_path: string | null;
@@ -287,6 +296,7 @@ export type ProviderLinearWorkerDiagnosticCategory =
   | 'cloud_denial'
   | 'guardian_timeout'
   | 'guardian_policy_denial'
+  | 'provider_stdin_bootstrap'
   | 'provider_runtime'
   | 'unknown';
 
@@ -617,6 +627,10 @@ function normalizeOptionalString(value: unknown): string | null {
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeGuardrailsRequiredSource(value: unknown): string | null {
+  return value === 'explicit' || value === 'stage_detection' ? value : null;
 }
 
 function backfillProviderWorkerManifestControlHostProvenance(
@@ -1475,7 +1489,11 @@ function applyProviderLinearWorkerContextEnv(
       env[REPO_CONFIG_PATH_ENV_KEY] = preservedRepoConfigPath;
     } else {
       delete env[REPO_CONFIG_PATH_ENV_KEY];
-      if (inheritedRepoConfigPath) {
+      if (
+        inheritedRepoConfigPath &&
+        (!isProviderLinearWorkerWorkspaceRoot(context.repoRoot) ||
+          !existsSync(join(context.repoRoot, 'codex.orchestrator.json')))
+      ) {
         delete env[REPO_CONFIG_REQUIRED_ENV_KEY];
       }
     }
@@ -1791,10 +1809,12 @@ function buildParallelizationGuidance(helperCommand: string, issueId: string): s
 
 function buildDeterministicMutationSuppressionSection(
   audit: ProviderLinearAuditSummary | null,
-  attemptStartedAt: string | null
+  attemptStartedAt: string | null,
+  issueId: string
 ): string[] {
   const suppressions = deriveDeterministicProviderMutationSuppressions(audit, {
-    recordedAtNotBefore: attemptStartedAt
+    recordedAtNotBefore: attemptStartedAt,
+    issueId
   });
   if (suppressions.length === 0) {
     return [];
@@ -1821,7 +1841,8 @@ export function buildProviderWorkerPrompt(
 ): string {
   const deterministicMutationSuppressions = buildDeterministicMutationSuppressionSection(
     attemptContext.linearAudit ?? null,
-    attemptContext.attemptStartedAt ?? null
+    attemptContext.attemptStartedAt ?? null,
+    issue.id
   );
   const runMemoryPromptLines = buildRunMemoryPromptLines(
     selectRunMemoryForRole({
@@ -3359,6 +3380,29 @@ function hasProviderWorkerQuotaFailureSignal(
   return statusValues.some((value) => quotaFailureStatuses.has(value));
 }
 
+function hasProviderWorkerStdinBootstrapSignal(normalizedSignal: string): boolean {
+  return /\breading\s+additional\s+input\s+from\s+stdin\b/u.test(normalizedSignal);
+}
+
+const PROVIDER_WORKER_STDIN_BOOTSTRAP_DIAGNOSTIC_VALUES = new Set([
+  'provider_stdin_bootstrap',
+  'provider_worker_stdin_bootstrap',
+  'codex_stdin_bootstrap',
+  'stdin_bootstrap',
+  'stdin_bootstrap_failure',
+  'reading_additional_input_from_stdin',
+  'reading_additional_input_stdin',
+  'additional_input_from_stdin'
+]);
+
+const PROVIDER_WORKER_RUNTIME_DIAGNOSTIC_VALUES = new Set([
+  ...PROVIDER_WORKER_STDIN_BOOTSTRAP_DIAGNOSTIC_VALUES,
+  'provider_runtime',
+  'runtime_parity_command_unavailable',
+  'appserver_runtime_error',
+  'codex_exec_error'
+]);
+
 function classifyProviderWorkerFailureDiagnosis(
   input: Record<string, unknown>,
   source: ProviderLinearWorkerCurrentTurnActivitySource
@@ -3382,7 +3426,8 @@ function classifyProviderWorkerFailureDiagnosis(
     observed_at: timestamp
   });
   const structuredCategory = classifyProviderWorkerStructuredDiagnosticCategory(input);
-  if (structuredCategory) {
+  const hasStdinBootstrapSignal = hasProviderWorkerStdinBootstrapSignal(normalizedClassification);
+  if (structuredCategory && structuredCategory !== 'provider_runtime') {
     return build(structuredCategory, providerWorkerDiagnosticGuidance(structuredCategory));
   }
   const guardianTimeoutSignal =
@@ -3459,6 +3504,15 @@ function classifyProviderWorkerFailureDiagnosis(
       'Codex Cloud environment configuration is missing or invalid; set CODEX_CLOUD_ENV_ID or task metadata.'
     );
   }
+  if (hasStdinBootstrapSignal) {
+    return build(
+      'provider_stdin_bootstrap',
+      providerWorkerDiagnosticGuidance('provider_stdin_bootstrap')
+    );
+  }
+  if (structuredCategory) {
+    return build(structuredCategory, providerWorkerDiagnosticGuidance(structuredCategory));
+  }
   if (
     /\b(appserver|provider runtime|runtime parity|codex exec|enoent|websocket|rpc)\b/u.test(
       normalizedClassification
@@ -3490,6 +3544,8 @@ function providerWorkerDiagnosticGuidance(
       return 'Codex Cloud environment configuration is missing or invalid; set CODEX_CLOUD_ENV_ID or task metadata.';
     case 'auth_mismatch':
       return 'The active Codex account/auth profile appears mismatched or unavailable; verify the selected profile/account.';
+    case 'provider_stdin_bootstrap':
+      return 'Codex exited during stdin bootstrap before issue execution; inspect the control-host to provider-linear-worker Codex exec stdin/prompt handoff, not issue-specific content.';
     case 'provider_runtime':
       return 'Provider/runtime execution is implicated; inspect runtime selection and provider command logs.';
     default:
@@ -3574,14 +3630,10 @@ function classifyProviderWorkerStructuredDiagnosticValue(
   ) {
     return 'env_config';
   }
-  if (
-    [
-      'provider_runtime',
-      'runtime_parity_command_unavailable',
-      'appserver_runtime_error',
-      'codex_exec_error'
-    ].includes(normalized)
-  ) {
+  if (PROVIDER_WORKER_RUNTIME_DIAGNOSTIC_VALUES.has(normalized)) {
+    if (PROVIDER_WORKER_STDIN_BOOTSTRAP_DIAGNOSTIC_VALUES.has(normalized)) {
+      return 'provider_stdin_bootstrap';
+    }
     return 'provider_runtime';
   }
   return null;
@@ -4457,6 +4509,9 @@ function resolveProviderLinearWorkerParallelizationFailure(input: {
       issueId: input.proof.issue_id
     }
   ).slice(input.parallelizationDecisionCountBeforeTurn);
+  const currentTurnBoundary =
+    normalizeOptionalString(input.proof.current_turn_started_at) ??
+    normalizeOptionalString(input.proof.attempt_started_at);
   if (currentTurnParallelizationDecisions.length === 0) {
     return {
       endReason: 'parallelization_decision_missing',
@@ -4475,7 +4530,7 @@ function resolveProviderLinearWorkerParallelizationFailure(input: {
   if (parallelization.decision !== 'parallelize_now') {
     if (!hasCurrentTurnChildLaneLaunch(
       input.proof.child_lanes,
-      input.proof.current_turn_started_at
+      currentTurnBoundary
     )) {
       return null;
     }
@@ -4487,7 +4542,7 @@ function resolveProviderLinearWorkerParallelizationFailure(input: {
   }
   if (hasCurrentTurnSuccessfulChildLaneLaunch(
     input.proof.child_lanes,
-    input.proof.current_turn_started_at
+    currentTurnBoundary
   )) {
     return null;
   }
@@ -5102,6 +5157,9 @@ interface ProviderLinearWorkerChildLaneManifestHydrationCandidate {
   laneWorkspacePath: string | null;
   patchArtifactPath: string | null;
   patchBytes: number | null;
+  guardrailsRequired: boolean | null;
+  guardrailsRequiredSource: string | null;
+  guardrailCommandCount: number | null;
   summaryRecordedAt: string | null;
 }
 
@@ -5286,6 +5344,9 @@ async function hydrateProviderLinearWorkerChildLaneFromActiveManifest(
     log_path: candidate.logPath,
     summary,
     summary_recorded_at: summaryRecordedAt,
+    guardrails_required: candidate.guardrailsRequired,
+    guardrails_required_source: candidate.guardrailsRequiredSource,
+    guardrail_command_count: candidate.guardrailCommandCount,
     lane_workspace_path: candidate.laneWorkspacePath ?? childLane.lane_workspace_path,
     patch_artifact_path: candidate.patchArtifactPath ?? childLane.patch_artifact_path,
     patch_bytes: candidate.patchBytes ?? childLane.patch_bytes
@@ -5604,12 +5665,16 @@ async function readProviderLinearWorkerChildLaneManifestCandidate(
       ? patchBytes === 0
         ? 'Child lane completed without patch output; waiting for parent ledger decision.'
         : 'Child lane completed; waiting for patch proof metadata.'
-      : normalizeOptionalString(parsed.summary) ?? normalizeOptionalString(parsed.status_detail),
+      : stripNonApplicableGuardrailSummaryLines(parsed, normalizeOptionalString(parsed.summary)) ??
+        normalizeOptionalString(parsed.status_detail),
     startedAt,
     updatedAt: manifestTimestamp,
     laneWorkspacePath: proofMetadata?.laneWorkspacePath ?? null,
     patchArtifactPath: proofMetadata?.patchArtifactPath ?? null,
     patchBytes: proofMetadata?.patchBytes ?? null,
+    guardrailsRequired: resolveGuardrailsRequiredForManifest(parsed),
+    guardrailsRequiredSource: resolveGuardrailsRequiredSourceForManifest(parsed),
+    guardrailCommandCount: countGuardrailCommands(parsed),
     summaryRecordedAt
   };
 }
@@ -5974,6 +6039,9 @@ function normalizeProviderLinearWorkerChildLaneRecord(
     artifact_root: artifactRoot,
     log_path: normalizeOptionalString(value.log_path),
     summary: normalizeOptionalString(value.summary),
+    guardrails_required: typeof value.guardrails_required === 'boolean' ? value.guardrails_required : null,
+    guardrails_required_source: normalizeGuardrailsRequiredSource(value.guardrails_required_source),
+    guardrail_command_count: normalizeOptionalInteger(value.guardrail_command_count),
     issue_id: issueId,
     issue_identifier: issueIdentifier,
     workspace_path: normalizeOptionalString(value.workspace_path),
@@ -6565,12 +6633,41 @@ export async function refreshProviderLinearWorkerProofSnapshot(
     await writeProviderWorkerSessionLogHydrationState(runDir, proofWithSessionTelemetryResult.hydrationState);
     if (
       options.emitProgressEvent &&
-      JSON.stringify(parsed.progress ?? null) !== JSON.stringify(hydrated.progress ?? null)
+      buildProviderLinearWorkerProgressSemanticSignature(parsed.progress ?? null)
+        !== buildProviderLinearWorkerProgressSemanticSignature(hydrated.progress ?? null)
     ) {
       options.emitProgressEvent(formatProviderLinearWorkerProgressEvent(hydrated));
     }
     return hydrated;
   });
+}
+
+export function buildProviderLinearWorkerProgressSemanticSignature(
+  progress: ProviderLinearWorkerProgressSnapshot | null | undefined
+): string | null {
+  if (!progress) {
+    return null;
+  }
+  // Hydration metadata changes often outnumber operator-visible state changes.
+  return JSON.stringify({
+    phase: progress.phase ?? null,
+    kind: progress.kind ?? null,
+    status: progress.status ?? null,
+    summary: progress.summary ?? null,
+    stall_classification: progress.stall_classification ?? null,
+    stall_reason: progress.stall_reason ?? null,
+    recovery_recommendation: progress.recovery_recommendation ?? null
+  });
+}
+
+export function shouldEmitProviderLinearWorkerProgressSignatureTransition(
+  previousSignature: string | null | undefined,
+  nextSignature: string | null
+): boolean {
+  if (previousSignature === undefined && nextSignature === null) {
+    return false;
+  }
+  return previousSignature !== nextSignature;
 }
 
 function formatProviderLinearWorkerProgressEvent(proof: ProviderLinearWorkerProof): string {
@@ -6666,12 +6763,12 @@ export async function runProviderLinearWorker(
     end_reason: null,
     updated_at: attemptStartedAt
   };
-  let lastProgressSignature: string | null = null;
+  let lastProgressSignature: string | null | undefined = undefined;
 
   const emitSemanticProgressIfChanged = (proof: ProviderLinearWorkerProof): void => {
     const progress = proof.progress ?? null;
-    const signature = progress ? JSON.stringify(progress) : null;
-    if (!signature || signature === lastProgressSignature) {
+    const signature = buildProviderLinearWorkerProgressSemanticSignature(progress);
+    if (!shouldEmitProviderLinearWorkerProgressSignatureTransition(lastProgressSignature, signature)) {
       return;
     }
     lastProgressSignature = signature;
@@ -7057,12 +7154,6 @@ export async function runProviderLinearWorker(
       };
       const previousTurnProof = finalProof;
       const turnStartedAt = deps.now();
-      const parallelizationDecisionCountBeforeTurn = readProviderLinearParallelizationSnapshots(
-        finalProof.linear_audit,
-        {
-          issueId: finalProof.issue_id
-        }
-      ).length;
       finalProof = await writeProofSnapshot(
         deps,
         context.runDir,
@@ -7070,6 +7161,12 @@ export async function runProviderLinearWorker(
         buildProviderLinearWorkerTurnBootstrapProof(finalProof, turnNumber, turnStartedAt),
         childEnv
       );
+      const parallelizationDecisionCountBeforeTurn = readProviderLinearParallelizationSnapshots(
+        finalProof.linear_audit,
+        {
+          issueId: finalProof.issue_id
+        }
+      ).length;
       emitSemanticProgressIfChanged(finalProof);
       const liveSessionTailState: ProviderWorkerSessionLogTailState | null =
         runtimeContext.runtime.selected_mode === 'appserver'

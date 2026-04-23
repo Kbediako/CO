@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -467,8 +467,8 @@ describe('runProviderIssueHandoffRefresh', () => {
       state: 'released',
       reason: 'provider_issue_released:not_mutable',
       task_id: 'task-1303-active',
-      run_id: 'run-active',
-      run_manifest_path: childPaths.manifestPath
+      run_id: null,
+      run_manifest_path: null
     });
   });
 
@@ -635,8 +635,8 @@ describe('runProviderIssueHandoffRefresh', () => {
       state: 'released',
       reason: 'provider_issue_released:not_mutable',
       task_id: 'task-1303-active',
-      run_id: 'run-active',
-      run_manifest_path: childPaths.manifestPath
+      run_id: null,
+      run_manifest_path: null
     });
   });
 
@@ -797,8 +797,8 @@ describe('runProviderIssueHandoffRefresh', () => {
       state: 'released',
       reason: 'provider_issue_released:not_mutable',
       task_id: 'task-1303-active',
-      run_id: 'run-active',
-      run_manifest_path: childPaths.manifestPath
+      run_id: null,
+      run_manifest_path: null
     });
   });
 
@@ -924,8 +924,8 @@ describe('runProviderIssueHandoffRefresh', () => {
     expect(state.claims[0]).toMatchObject({
       state: 'released',
       reason: 'provider_issue_released:not_mutable',
-      run_id: 'run-active',
-      run_manifest_path: childPaths.manifestPath
+      run_id: null,
+      run_manifest_path: null
     });
   });
 
@@ -1085,6 +1085,409 @@ describe('runProviderIssueHandoffRefresh', () => {
     expect(state.latest_reason).toBe('provider_issue_rehydrated_active_run');
   });
 
+  it('preserves control-host launch provenance during released active-run rehydration when manifest provenance is complete', async () => {
+    const { root, paths } = await createHostPaths();
+    const childPaths = await createCo185ActiveRun(root);
+    const initialManifest = JSON.parse(
+      await readFile(childPaths.manifestPath, 'utf8')
+    ) as Record<string, unknown>;
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify(
+        {
+          ...initialManifest,
+          provider_launch_source: 'control-host',
+          provider_control_host_task_id: 'local-mcp',
+          provider_control_host_run_id: 'control-host'
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    const state = createProviderIntakeState();
+    pushCo185ReleasedPendingClaim(state, childPaths.manifestPath, {
+      launch_source: 'control-host',
+      launch_token: 'launch-token-co-289'
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue: vi.fn(async () => ({
+        kind: 'ready' as const,
+        trackedIssue: createTrackedIssue({
+          id: 'lin-issue-185',
+          identifier: 'CO-185',
+          title: 'Provider helper constraints',
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-04-15T01:18:56.003Z'
+        })
+      }))
+    });
+
+    await service.rehydrate();
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: 'run-active',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: 'control-host',
+      launch_token: 'launch-token-co-289'
+    });
+    const manifest = JSON.parse(await readFile(childPaths.manifestPath, 'utf8')) as Record<
+      string,
+      unknown
+    >;
+    expect(manifest).toMatchObject({
+      provider_launch_source: 'control-host',
+      provider_control_host_task_id: 'local-mcp',
+      provider_control_host_run_id: 'control-host'
+    });
+  });
+
+  it('preserves control-host launch provenance from the discovery snapshot when the manifest changes before provenance resolution', async () => {
+    const { root, paths } = await createHostPaths();
+    const childPaths = await createCo185ActiveRun(root);
+    const initialManifest = JSON.parse(
+      await readFile(childPaths.manifestPath, 'utf8')
+    ) as Record<string, unknown>;
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify(
+        {
+          ...initialManifest,
+          provider_launch_source: 'control-host',
+          provider_control_host_task_id: 'local-mcp',
+          provider_control_host_run_id: 'control-host'
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    const state = createProviderIntakeState();
+    pushCo185ReleasedPendingClaim(state, childPaths.manifestPath, {
+      launch_source: 'control-host',
+      launch_token: 'launch-token-snapshot'
+    });
+    const resolveTrackedIssue = vi.fn(async () => {
+      await writeFile(
+        childPaths.manifestPath,
+        JSON.stringify(
+          {
+            ...initialManifest,
+            provider_launch_source: null,
+            provider_control_host_task_id: null,
+            provider_control_host_run_id: null
+          },
+          null,
+          2
+        ),
+        'utf8'
+      );
+      return {
+        kind: 'ready' as const,
+        trackedIssue: createTrackedIssue({
+          id: 'lin-issue-185',
+          identifier: 'CO-185',
+          title: 'Provider helper constraints',
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-04-15T01:18:56.003Z'
+        })
+      };
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue
+    });
+
+    await service.rehydrate();
+
+    expect(resolveTrackedIssue).toHaveBeenCalledTimes(1);
+    expect(state.claims[0]).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: 'run-active',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: 'control-host',
+      launch_token: 'launch-token-snapshot'
+    });
+    const manifest = JSON.parse(await readFile(childPaths.manifestPath, 'utf8')) as Record<
+      string,
+      unknown
+    >;
+    expect(manifest).toMatchObject({
+      provider_launch_source: null,
+      provider_control_host_task_id: null,
+      provider_control_host_run_id: null
+    });
+  });
+
+  it('preserves control-host launch provenance when retained claim identity only has the active manifest path and camelCase manifest aliases', async () => {
+    const { root, paths } = await createHostPaths();
+    const childPaths = await createCo185ActiveRun(root);
+    const initialManifest = JSON.parse(
+      await readFile(childPaths.manifestPath, 'utf8')
+    ) as Record<string, unknown>;
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify(
+        {
+          ...initialManifest,
+          providerLaunchSource: 'control-host',
+          providerControlHostTaskId: 'local-mcp',
+          providerControlHostRunId: 'control-host'
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    const state = createProviderIntakeState();
+    pushCo185ReleasedPendingClaim(state, childPaths.manifestPath, {
+      run_id: null,
+      launch_source: 'control-host',
+      launch_token: 'launch-token-manifest-only'
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue: vi.fn(async () => ({
+        kind: 'ready' as const,
+        trackedIssue: createTrackedIssue({
+          id: 'lin-issue-185',
+          identifier: 'CO-185',
+          title: 'Provider helper constraints',
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-04-15T01:18:56.003Z'
+        })
+      }))
+    });
+
+    await service.rehydrate();
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: 'run-active',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: 'control-host',
+      launch_token: 'launch-token-manifest-only'
+    });
+  });
+
+  it('clears stale claim launch provenance when the claim no longer identifies the active run', async () => {
+    const { root, paths } = await createHostPaths();
+    const childPaths = await createCo185ActiveRun(root);
+    const manifest = JSON.parse(await readFile(childPaths.manifestPath, 'utf8')) as Record<
+      string,
+      unknown
+    >;
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify(
+        {
+          ...manifest,
+          provider_launch_source: 'control-host',
+          provider_control_host_task_id: 'local-mcp',
+          provider_control_host_run_id: 'control-host'
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    const state = createProviderIntakeState();
+    pushCo185ReleasedPendingClaim(
+      state,
+      join(root, '.runs', co185TaskId, 'cli', 'old-run', 'manifest.json'),
+      {
+        run_id: 'old-run',
+        launch_source: 'control-host',
+        launch_token: 'stale-launch-token'
+      }
+    );
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue: vi.fn(async () => ({
+        kind: 'ready' as const,
+        trackedIssue: createTrackedIssue({
+          id: 'lin-issue-185',
+          identifier: 'CO-185',
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-04-15T01:18:56.003Z'
+        })
+      }))
+    });
+
+    await service.rehydrate();
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: 'run-active',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+  });
+
+  it('keeps released active-run rehydration fail-closed when claim launch provenance is absent despite complete manifest provenance', async () => {
+    const { root, paths } = await createHostPaths();
+    const childPaths = await createCo185ActiveRun(root);
+    const seededManifest = JSON.parse(
+      await readFile(childPaths.manifestPath, 'utf8')
+    ) as Record<string, unknown>;
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify(
+        {
+          ...seededManifest,
+          provider_launch_source: 'control-host',
+          provider_control_host_task_id: 'local-mcp',
+          provider_control_host_run_id: 'control-host'
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    const state = createProviderIntakeState();
+    pushCo185ReleasedPendingClaim(state, childPaths.manifestPath);
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue: vi.fn(async () => ({
+        kind: 'ready' as const,
+        trackedIssue: createTrackedIssue({
+          id: 'lin-issue-185',
+          identifier: 'CO-185',
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-04-15T01:18:56.003Z'
+        })
+      }))
+    });
+
+    await service.rehydrate();
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      launch_source: null,
+      launch_token: null
+    });
+    const manifest = JSON.parse(await readFile(childPaths.manifestPath, 'utf8')) as Record<string, unknown>;
+    expect(manifest).toMatchObject({
+      provider_launch_source: 'control-host',
+      provider_control_host_task_id: 'local-mcp',
+      provider_control_host_run_id: 'control-host'
+    });
+  });
+
+  it('clears stale claim launch provenance when active-run manifest provenance is mismatched', async () => {
+    const { root, paths } = await createHostPaths();
+    const childPaths = await createCo185ActiveRun(root);
+    const manifest = JSON.parse(await readFile(childPaths.manifestPath, 'utf8')) as Record<string, unknown>;
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify(
+        {
+          ...manifest,
+          provider_launch_source: 'control-host',
+          provider_control_host_task_id: 'other-control-host-task',
+          provider_control_host_run_id: 'control-host'
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    const state = createProviderIntakeState();
+    pushCo185ReleasedPendingClaim(state, childPaths.manifestPath, {
+      launch_source: 'control-host',
+      launch_token: 'stale-launch-token'
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue: vi.fn(async () => ({
+        kind: 'ready' as const,
+        trackedIssue: createTrackedIssue({
+          id: 'lin-issue-185',
+          identifier: 'CO-185',
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-04-15T01:18:56.003Z'
+        })
+      }))
+    });
+
+    await service.rehydrate();
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      launch_source: null,
+      launch_token: null
+    });
+    const persistedManifest = JSON.parse(await readFile(childPaths.manifestPath, 'utf8')) as Record<string, unknown>;
+    expect(persistedManifest).toMatchObject({
+      provider_launch_source: 'control-host',
+      provider_control_host_task_id: 'other-control-host-task',
+      provider_control_host_run_id: 'control-host'
+    });
+  });
+
   it('does not rehydrate a released active-run claim after fresh non-runnable issue truth', async () => {
     const { root, paths } = await createHostPaths();
     const childPaths = await createCo185ActiveRun(root);
@@ -1130,8 +1533,8 @@ describe('runProviderIssueHandoffRefresh', () => {
       issue_state: 'Done',
       issue_state_type: 'completed',
       issue_updated_at: '2026-04-15T01:30:00.000Z',
-      run_id: 'run-active',
-      run_manifest_path: childPaths.manifestPath
+      run_id: null,
+      run_manifest_path: null
     });
     expect(state.latest_reason).toBe('provider_issue_released:not_active');
   });
@@ -1322,8 +1725,8 @@ describe('runProviderIssueHandoffRefresh', () => {
       issue_state: 'Done',
       issue_state_type: 'completed',
       issue_updated_at: '2026-04-15T16:38:07.274Z',
-      run_id: 'run-dead-merging',
-      run_manifest_path: stalePaths.manifestPath
+      run_id: null,
+      run_manifest_path: null
     });
     expect(state.claims[1]).toMatchObject({
       state: 'running',
@@ -2100,8 +2503,8 @@ describe('runProviderIssueHandoffRefresh', () => {
       issue_state: 'Done',
       issue_state_type: 'completed',
       issue_updated_at: '2026-04-15T01:10:00.000Z',
-      run_id: 'run-missing-co-185',
-      run_manifest_path: `${paths.runDir}/missing-co-185-manifest.json`
+      run_id: 'run-retained-missing-manifest',
+      run_manifest_path: ''
     });
 
     const launcher = {
@@ -2159,8 +2562,8 @@ describe('runProviderIssueHandoffRefresh', () => {
       issue_state: 'Done',
       issue_state_type: 'completed',
       issue_updated_at: '2026-04-15T01:10:00.000Z',
-      run_id: 'run-missing-co-185',
-      run_manifest_path: `${paths.runDir}/missing-co-185-manifest.json`
+      run_id: 'run-retained-missing-manifest',
+      run_manifest_path: ''
     });
   });
 
@@ -2373,8 +2776,8 @@ describe('runProviderIssueHandoffRefresh', () => {
     expect(state.claims[0]).toMatchObject({
       state: 'released',
       reason: 'provider_issue_released:not_active',
-      run_id: 'run-queued',
-      run_manifest_path: queuedPaths.manifestPath
+      run_id: null,
+      run_manifest_path: null
     });
 
     settleNextCancel('reject');
@@ -2401,8 +2804,8 @@ describe('runProviderIssueHandoffRefresh', () => {
     expect(state.claims[0]).toMatchObject({
       state: 'released',
       reason: 'provider_issue_released:not_active',
-      run_id: 'run-queued',
-      run_manifest_path: queuedPaths.manifestPath
+      run_id: null,
+      run_manifest_path: null
     });
 
     settleNextCancel('resolve');

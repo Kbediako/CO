@@ -330,6 +330,7 @@ export async function runControlHostCliShell(
               providerWorkflowConfigStore,
               input.workerHost
             );
+            assertResumeLaunchSpecMatchesAdmittedWorkerHost(input.workerHost, launchSpec);
             await spawnBackgroundCli(launchSpec, cliEntrypoint, [
               'resume',
               '--run',
@@ -820,6 +821,26 @@ async function resolveProviderResumeLaunchSpec(
   };
 }
 
+function assertResumeLaunchSpecMatchesAdmittedWorkerHost(
+  preferredWorkerHost: string | null | undefined,
+  launchSpec: ProviderLaunchSpec
+): void {
+  const normalizedPreferredWorkerHost = normalizeProviderWorkerHostName(preferredWorkerHost);
+  if (!normalizedPreferredWorkerHost) {
+    return;
+  }
+  if (launchSpec.transport.kind === 'local') {
+    throw new Error(
+      `Admitted provider resume host "${normalizedPreferredWorkerHost}" resolved to local at launch time; retry under refreshed admission so the local safety cap is reapplied.`
+    );
+  }
+  if (launchSpec.transport.host.name !== normalizedPreferredWorkerHost) {
+    throw new Error(
+      `Admitted provider resume host "${normalizedPreferredWorkerHost}" drifted to "${launchSpec.transport.host.name}" at launch time; retry under refreshed admission.`
+    );
+  }
+}
+
 async function resolveProviderLaunchConfigPath(
   env: EnvironmentPaths,
   providerWorkflowConfigStore?: ProviderWorkflowConfigStore
@@ -1001,6 +1022,7 @@ export const __test__ = {
   resolveRemoteProviderNodePath,
   resolveSpawnManifestWaitTimeoutMs,
   resolveProviderResumeLaunchSpec,
+  assertResumeLaunchSpecMatchesAdmittedWorkerHost,
   resolveProviderResumeTaskId,
   resolveProviderOverridePackageRoot,
   snapshotRunManifests,

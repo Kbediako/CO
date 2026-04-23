@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp e6006f8251657330357325c429f2a7b0605aff4af574f13bbacb4dcccb297a51 -->
+<!-- codex:instruction-stamp c26346ab9f20b38e17499986bcc053f049c2ec9a3f72983ec1a44d0ec2bbda02 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -210,12 +210,14 @@ Implementation work is not “complete” until you run (in order):
 | `node scripts/spec-guard.mjs --dry-run` | Spec/codepath guard | Fails when tracked implementation paths change without a spec update, or when any spec under `tasks/specs/**` / `docs/design/specs/**` has `last_review` older than 30 days. |
 | `npm run build` | Build output | Compiles TypeScript to `dist/` (required by `docs:check`, `review`, and other wrappers). |
 | `npm run lint` | Pre-commit / review gates | Executes `npm run build:patterns` first so codemods compile. |
-| `npm run test` | Unit + integration checks | Vitest harness covering orchestrator + patterns. |
+| `npm run test:core` | Core Lane / narrow core matrix | Runs `vitest.config.core.ts`; excludes `adapters/**` and `evaluation/tests/**`. |
+| `npm run test` | Default repo validation alias | Alias to `test:core`; keeps the core-only validation surface explicit while broader adapter coverage stays under `npm run test:all`. |
+| `npm run test:all` | Explicit broader matrix | Runs `test:core` plus `test:adapters` without silently pulling the opt-in evaluation lane into the default path. |
 | `npm run docs:check` | Docs hygiene gate | Deterministically validates scripts/pipelines/paths referenced in agent-facing docs, current posture locks, bundled-skill roster parity, and the README front-door budget. |
 | `npm run docs:freshness` | Docs freshness gate | Validates registry coverage plus docs-catalog class coverage and emits a class-separated `out/<task-id>/docs-freshness.json`. |
 | `npm run repo:stewardship` | Repo stewardship audit | Inventories tracked files via `git ls-files`, classifies each surface as `validate`, `update`, `delete`, or `retain_with_rationale`, and emits `out/<task-id>/repo-stewardship.json`. |
 | `node scripts/diff-budget.mjs` | Review scope guard | Fails when diffs exceed the configured budget unless `DIFF_BUDGET_OVERRIDE_REASON` is set. |
-| `npm run eval:test` | Evaluation harness smoke tests | Requires fixtures in `evaluation/fixtures/**`; optional, enable when evaluation scope exists. |
+| `npm run eval:test` | Evaluation-only harness lane | Alias to `npm run test:evaluation`; optional, enable when `evaluation/fixtures/**` exists or evaluation scope is touched. |
 | `codex-orchestrator review` (`npm run review` alias) | Reviewer hand-off | Writes task/PRD context plus manifest evidence into the saved review prompt artifact. Unscoped launches pass that prompt inline to `codex review`. Explicit `--uncommitted` / `--base` / `--commit` launches keep the full prompt in `review/prompt.txt` and carry reviewer-visible scoped context via `--title` (user-provided when present, otherwise synthesized from `NOTES` + `--surface`) so scoped runs stay deterministic across current Codex review behavior. Explicit scoped launches still support only the default `diff` surface at the actual Codex layer; `--surface audit` / `--surface architecture` must fail fast and be rerun without the explicit scope. In non-interactive/CI runs (stdin not TTY or `CODEX_REVIEW_NON_INTERACTIVE=1` / `CODEX_NON_INTERACTIVE=1` / `CODEX_NO_INTERACTIVE=1`) it prints the handoff prompt and exits unless `FORCE_CODEX_REVIEW=1`; `docs-review` / `implementation-gate` and the `provider-linear-worker` pipeline set the forcing env for executed unattended review, while `docs-relevance-advisory` keeps it cleared for prompt-only advisory behavior; `NOTES` is recommended (`<goal + summary + risks>` plus optional questions) and the wrapper auto-generates fallback notes when omitted. |
 | `npm run pack:smoke` | Downstream simulation gate | Packs + installs tarball in a temp mock repo, validates CLI behavior (`review` artifacts + delegate-server JSONL), and checks bundled skill install output. Core lane enforces it on downstream-facing diffs; `.github/workflows/pack-smoke-backstop.yml` runs a weekly main-branch backstop. |
 
