@@ -287,11 +287,14 @@ export async function readUiDatasetWithEndpointRecovery(input: {
   getTarget: () => CoStatusAttachTarget;
   setTarget: (target: CoStatusAttachTarget) => void;
   signal?: AbortSignal;
+  requestTimeoutMs?: number;
+  recoverSameEndpointTimeout?: boolean;
 }): Promise<OperatorDashboardDataset> {
   const previousTarget = input.getTarget();
   try {
     return await fetchUiDataset(previousTarget.baseUrl, previousTarget.token, {
-      signal: input.signal
+      signal: input.signal,
+      requestTimeoutMs: input.requestTimeoutMs
     });
   } catch (error) {
     if (isCancelledAttachRequestError(error)) {
@@ -311,7 +314,8 @@ export async function readUiDatasetWithEndpointRecovery(input: {
       input.setTarget(resolvedTarget);
       try {
         return await fetchUiDataset(resolvedTarget.baseUrl, resolvedTarget.token, {
-          signal: input.signal
+          signal: input.signal,
+          requestTimeoutMs: input.requestTimeoutMs
         });
       } catch (retryError) {
         if (isCancelledAttachRequestError(retryError)) {
@@ -320,6 +324,22 @@ export async function readUiDatasetWithEndpointRecovery(input: {
         throw new Error(
           `control-host endpoint rotated from ${previousTarget.baseUrl.toString()} to ${resolvedTarget.baseUrl.toString()}, but the refreshed endpoint is not readable. ${formatAttachRequestFailure(retryError, resolvedTarget, { endpointAlreadyRotated: true })}`
         );
+      }
+    }
+    if (input.recoverSameEndpointTimeout === true && isTimeoutAttachRequestError(error)) {
+      try {
+        return await fetchUiDataset(previousTarget.baseUrl, previousTarget.token, {
+          signal: input.signal,
+          requestTimeoutMs: input.requestTimeoutMs
+        });
+      } catch (retryError) {
+        if (isCancelledAttachRequestError(retryError)) {
+          throw retryError;
+        }
+        if (isTimeoutAttachRequestError(retryError)) {
+          throw new Error(formatSameEndpointTimeoutFailure(retryError, previousTarget));
+        }
+        throw new Error(formatAttachRequestFailure(retryError, previousTarget));
       }
     }
     throw new Error(formatAttachRequestFailure(error, previousTarget));
@@ -335,6 +355,21 @@ function isAttachTargetEndpointEquivalent(
 
 function isCancelledAttachRequestError(error: unknown): boolean {
   return error instanceof CoStatusAttachRequestError && error.kind === 'cancelled';
+}
+
+function isTimeoutAttachRequestError(error: unknown): error is CoStatusAttachRequestError {
+  return error instanceof CoStatusAttachRequestError && error.kind === 'timeout';
+}
+
+function formatSameEndpointTimeoutFailure(
+  error: CoStatusAttachRequestError,
+  target: CoStatusAttachTarget
+): string {
+  return [
+    `${error.message}.`,
+    `The current resolved /ui/data.json endpoint at ${target.baseUrl.toString()} timed out again after endpoint re-resolution returned the same endpoint/token; this is a same-endpoint current-endpoint timeout, not stale/dead endpoint ECONNREFUSED recovery or attach restart/rotation.`,
+    'Inspect local control-host polling.stuck, polling.restart_required, and running claim evidence before treating the host as unhealthy.'
+  ].join(' ');
 }
 
 function formatAttachRequestFailure(

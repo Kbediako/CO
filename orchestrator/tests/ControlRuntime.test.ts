@@ -3793,6 +3793,52 @@ describe('ControlRuntime', () => {
     expect((uiDataset as { tracked?: { linear?: unknown } }).tracked?.linear ?? null).toBeNull();
   });
 
+  it('fails closed on advisory fallback when provider intake has marked the advisory state stale', async () => {
+    const fixture = await createFixture({
+      taskId: 'linear-co-294-stale-advisory-state',
+      linearAdvisoryState: {
+        tracked_issue: createTrackedIssue({
+          id: 'lin-issue-294',
+          identifier: 'CO-294',
+          title: 'Stale advisory issue',
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-03-22T04:01:03.255Z'
+        }),
+        stale_source: {
+          source: 'provider-intake',
+          reason: 'provider_intake_newer_than_linear_advisory',
+          marked_at: '2026-04-21T16:00:00.000Z',
+          provider_intake_updated_at: '2026-04-21T16:00:00.000Z',
+          advisory_updated_at: '2026-03-22T04:01:03.255Z'
+        }
+      }
+    });
+    await seedManifest(fixture.paths, {
+      task_id: 'linear-co-294-stale-advisory-state',
+      issue_provider: 'linear',
+      issue_id: 'lin-issue-294',
+      issue_identifier: 'CO-294',
+      summary: 'selected issue has no authoritative tracked payload',
+      updated_at: '2026-04-21T16:00:00.000Z'
+    });
+
+    const snapshot = fixture.runtime.snapshot();
+    const selectedSnapshot = await snapshot.readSelectedRunSnapshot();
+    const compatibilityProjection = await snapshot.readCompatibilityProjection();
+    const uiDataset = buildUiDataset({
+      projection: compatibilityProjection,
+      generatedAt: '2026-04-21T16:00:00.000Z'
+    });
+
+    expect(selectedSnapshot.selected?.issueIdentifier).toBe('CO-294');
+    expect(selectedSnapshot.selected?.tracked?.linear ?? null).toBeNull();
+    expect(selectedSnapshot.tracked?.linear ?? null).toBeNull();
+    expect(compatibilityProjection.selected?.tracked?.linear ?? null).toBeNull();
+    expect(compatibilityProjection.tracked?.linear ?? null).toBeNull();
+    expect((uiDataset as { tracked?: { linear?: unknown } }).tracked?.linear ?? null).toBeNull();
+  });
+
   it('ignores stale advisory fallback that matches only a non-authoritative selected alias', async () => {
     const fixture = await createFixture({
       taskId: 'local-mcp',

@@ -484,7 +484,8 @@ export async function runCommandStage(
       const mutationSuppressions = deriveDeterministicProviderMutationSuppressions(
         providerLinearWorkerProof?.linear_audit ?? null,
         {
-          recordedAtNotBefore: proofAttemptStartedAt
+          recordedAtNotBefore: proofAttemptStartedAt,
+          issueId: providerLinearWorkerProof?.issue_id ?? null
         }
       );
       const degradationSummary = formatDeterministicProviderMutationDegradationSummary(mutationSuppressions);
