@@ -40,6 +40,7 @@ import {
   type ProviderControlHostFreshnessGaugeReport,
   type ProviderControlHostFreshnessVerdict
 } from './control/providerControlHostFreshnessGauge.js';
+import { DEFAULT_ATTACH_REQUEST_TIMEOUT_MS } from './coStatusAttachCliShell.js';
 import { findPackageRoot } from './utils/packageInfo.js';
 import { sanitizeProviderOverrideEnv } from './utils/providerOverrideEnv.js';
 import { sanitizeRunId } from '../persistence/sanitizeRunId.js';
@@ -190,7 +191,9 @@ const REQUIRED_CONTROL_HOST_SUPERVISION_PATH_FIELDS = [
 
 const execFileAsync = promisify(execFile);
 const COMMAND_BUFFER_MAX_BYTES = 16 * 1024 * 1024;
-const CONTROL_HOST_SUPERVISION_PROBE_TIMEOUT_CAP_MS = 10_000;
+const CONTROL_HOST_SUPERVISION_PROBE_TIMEOUT_CAP_MS = 45_000;
+const CONTROL_HOST_SUPERVISION_PROBE_TIMEOUT_HEADROOM_MS = 5_000;
+const CONTROL_HOST_SUPERVISION_PROBE_ENDPOINT_READ_ATTEMPTS = 2;
 const CONTROL_HOST_SUPERVISION_PROBE_TIMEOUT_FLOOR_MS = 1_000;
 const CONTROL_HOST_SUPERVISION_LAUNCHCTL_BOOTSTRAP_RETRY_ATTEMPTS = 5;
 const CONTROL_HOST_SUPERVISION_LAUNCHCTL_BOOTSTRAP_RETRY_DELAY_MS = 1_000;
@@ -520,6 +523,7 @@ async function runControlHostSupervision(flags: ArgMap): Promise<void> {
               updated_at: checkedAt,
               last_health_check_at: checkedAt,
               last_health_status: probe.reason,
+              last_probe_duration_ms: probe.probeDurationMs,
               consecutive_unhealthy_samples: consecutiveUnhealthySamples,
               message: probe.message
             });
@@ -531,6 +535,7 @@ async function runControlHostSupervision(flags: ArgMap): Promise<void> {
             updated_at: checkedAt,
             last_health_check_at: checkedAt,
             last_health_status: probe.reason,
+            last_probe_duration_ms: probe.probeDurationMs,
             consecutive_unhealthy_samples: 0,
             message: probe.message
           });
@@ -543,6 +548,7 @@ async function runControlHostSupervision(flags: ArgMap): Promise<void> {
           updated_at: checkedAt,
           last_health_check_at: checkedAt,
           last_health_status: probe.reason,
+          last_probe_duration_ms: probe.probeDurationMs,
           consecutive_unhealthy_samples: consecutiveUnhealthySamples,
           message: probe.message
         });
@@ -558,6 +564,7 @@ async function runControlHostSupervision(flags: ArgMap): Promise<void> {
           updated_at: restartRequestedAt,
           last_health_check_at: restartRequestedAt,
           last_health_status: probe.reason,
+          last_probe_duration_ms: probe.probeDurationMs,
           consecutive_unhealthy_samples: consecutiveUnhealthySamples,
           restart_count: restartCount + 1,
           last_restart_reason: probe.reason,
@@ -570,6 +577,7 @@ async function runControlHostSupervision(flags: ArgMap): Promise<void> {
               message: restartMessage,
               consecutiveUnhealthySamples,
               childPid: child.pid ?? null,
+              probeDurationMs: probe.probeDurationMs,
               diagnostic: probe.diagnostic
             })
           ),
@@ -778,9 +786,11 @@ async function probeControlHostHealth(
   healthy: boolean;
   reason: string;
   message: string;
+  probeDurationMs: number;
   diagnostic: ControlHostSupervisionHealthDiagnostic | null;
 }> {
   const probeTimeoutMs = resolveControlHostSupervisionProbeTimeoutMs(config.healthIntervalSeconds);
+  const probeStartedAt = Date.now();
   const result = await commandRunner(
     config.nodePath,
     [
@@ -799,6 +809,7 @@ async function probeControlHostHealth(
       timeoutMs: probeTimeoutMs
     }
   );
+  const probeDurationMs = Math.max(0, Date.now() - probeStartedAt);
   if (result.timedOut === true) {
     const diagnostic = await readControlHostSupervisionProbeTimeoutDiagnostic(config, env);
     const timeoutQuarantine = evaluateControlHostSupervisionProbeTimeoutDiagnostic(diagnostic, {
@@ -810,6 +821,7 @@ async function probeControlHostHealth(
         healthy: timeoutQuarantine.healthy,
         reason: timeoutQuarantine.reason,
         message: timeoutQuarantine.message,
+        probeDurationMs,
         diagnostic
       };
     }
@@ -817,6 +829,7 @@ async function probeControlHostHealth(
       healthy: false,
       reason: 'probe_timeout',
       message: `co-status probe timed out after ${Math.round(probeTimeoutMs / 1_000)}s.`,
+      probeDurationMs,
       diagnostic
     };
   }
@@ -826,6 +839,7 @@ async function probeControlHostHealth(
       healthy: false,
       reason: 'probe_failed',
       message: `co-status probe failed: ${detail}`,
+      probeDurationMs,
       diagnostic: null
     };
   }
@@ -838,6 +852,7 @@ async function probeControlHostHealth(
       healthy: false,
       reason: 'invalid_payload',
       message: `co-status probe returned invalid JSON: ${(error as Error).message}`,
+      probeDurationMs,
       diagnostic: null
     };
   }
@@ -852,6 +867,7 @@ async function probeControlHostHealth(
     healthy: evaluation.healthy,
     reason: evaluation.reason,
     message: evaluation.message,
+    probeDurationMs,
     diagnostic
   };
 }
@@ -1496,6 +1512,7 @@ function buildNextControlHostSupervisionState(input: {
           last_signal: null,
           last_health_check_at: null,
           last_health_status: null,
+          last_probe_duration_ms: null,
           consecutive_unhealthy_samples: 0
         }
       : {};
@@ -1517,6 +1534,7 @@ function buildControlHostSupervisionRestartRecord(input: {
   message: string;
   consecutiveUnhealthySamples: number;
   childPid: number | null;
+  probeDurationMs?: number | null;
   diagnostic: ControlHostSupervisionHealthDiagnostic | null;
 }): ControlHostSupervisionRestartRecord {
   return {
@@ -1525,8 +1543,16 @@ function buildControlHostSupervisionRestartRecord(input: {
     message: input.message,
     consecutive_unhealthy_samples: input.consecutiveUnhealthySamples,
     child_pid: input.childPid,
+    probe_duration_ms: normalizeProbeDurationMs(input.probeDurationMs),
     diagnostic: input.diagnostic
   };
+}
+
+function normalizeProbeDurationMs(value: number | null | undefined): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return null;
+  }
+  return Math.max(0, Math.round(value));
 }
 
 function appendControlHostSupervisionRestartRecord(
@@ -2853,9 +2879,15 @@ function escapeShellSingleQuotes(value: string): string {
 }
 
 function resolveControlHostSupervisionProbeTimeoutMs(healthIntervalSeconds: number): number {
+  const minimumStatusReadBudgetMs =
+    DEFAULT_ATTACH_REQUEST_TIMEOUT_MS * CONTROL_HOST_SUPERVISION_PROBE_ENDPOINT_READ_ATTEMPTS +
+    CONTROL_HOST_SUPERVISION_PROBE_TIMEOUT_HEADROOM_MS;
   return Math.max(
     CONTROL_HOST_SUPERVISION_PROBE_TIMEOUT_FLOOR_MS,
-    Math.min(healthIntervalSeconds * 1_000, CONTROL_HOST_SUPERVISION_PROBE_TIMEOUT_CAP_MS)
+    Math.min(
+      Math.max(healthIntervalSeconds * 1_000, minimumStatusReadBudgetMs),
+      CONTROL_HOST_SUPERVISION_PROBE_TIMEOUT_CAP_MS
+    )
   );
 }
 
@@ -2886,6 +2918,7 @@ export const __test__ = {
   assertStoredControlHostSupervisionConfig,
   bootstrapLaunchctlPlist,
   buildNextControlHostSupervisionState,
+  buildControlHostSupervisionRestartRecord,
   buildControlHostSupervisionStatusPayload,
   classifyControlHostSupervisionRollout,
   captureExistingControlHostSupervisionInstall,
