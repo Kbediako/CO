@@ -975,6 +975,153 @@ describe('provider issue observability', () => {
     expect(progress?.last_semantic_progress_at).toBe('2026-04-05T05:44:30.000Z');
   });
 
+  it('does not project stale guardrail text from non-guardrail child lanes', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
+      proof: {
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        last_event: 'turn_started',
+        last_message: 'Provider worker turn is active.',
+        last_event_at: '2026-04-18T02:00:00.000Z',
+        updated_at: '2026-04-18T02:01:00.000Z',
+        child_lanes: [
+          {
+            stream: 'truth-surface-regression',
+            pipeline_id: 'provider-linear-child-lane',
+            task_id: 'linear-co-225-truth-surface-regression',
+            run_id: 'run-lane-225',
+            status: 'failed',
+            launched_at: '2026-04-18T02:00:10.000Z',
+            decision: 'pending',
+            summary_recorded_at: '2026-04-18T02:00:40.000Z',
+            guardrails_required: false,
+            guardrails_required_source: 'stage_detection',
+            guardrail_command_count: 0,
+            summary:
+              "Child lane truth-surface-regression failed.\n" +
+              'Guardrails: spec-guard command not found.\n' +
+              'Guardrails: spec-guard failed (1/1 failed).\n' +
+              'Guardrail command missing; run "codex-orchestrator start diagnostics --approval-policy never --format json --no-interactive" to capture reviewer diagnostics.\n' +
+              'Guardrail command failed; re-run "codex-orchestrator start diagnostics --approval-policy never --format json --no-interactive" to gather failure artifacts.'
+          }
+        ],
+        linear_audit: null
+      },
+      now: () => '2026-04-18T02:01:00.000Z'
+    });
+
+    expect(progress?.summary).toBe('Child lane truth-surface-regression failed.');
+    expect(progress?.summary).not.toContain('Guardrails: spec-guard command not found.');
+    expect(progress?.summary).not.toContain('Guardrails: spec-guard failed');
+    expect(progress?.summary).not.toContain('Guardrail command missing;');
+    expect(progress?.summary).not.toContain('Guardrail command failed;');
+  });
+
+  it('preserves child-lane guardrail stdout when guardrail metadata is unknown', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
+      proof: {
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        last_event: 'turn_started',
+        last_message: 'Provider worker turn is active.',
+        last_event_at: '2026-04-18T02:00:00.000Z',
+        updated_at: '2026-04-18T02:01:00.000Z',
+        child_lanes: [
+          {
+            stream: 'manifest-parse-fallback',
+            pipeline_id: 'provider-linear-child-lane',
+            task_id: 'linear-co-225-manifest-parse-fallback',
+            run_id: 'run-lane-manifest-parse-fallback-225',
+            status: 'failed',
+            launched_at: '2026-04-18T02:00:10.000Z',
+            decision: 'pending',
+            summary_recorded_at: '2026-04-18T02:00:40.000Z',
+            summary:
+              'Child lane manifest-parse-fallback failed.\n' +
+              'Guardrails: spec-guard failed (1/1 failed).'
+          }
+        ],
+        linear_audit: null
+      },
+      now: () => '2026-04-18T02:01:00.000Z'
+    });
+
+    expect(progress?.summary).toBe(
+      'Child lane manifest-parse-fallback failed.\nGuardrails: spec-guard failed (1/1 failed).'
+    );
+  });
+
+  it('preserves child-lane guardrail text when manifest metadata proves a real guardrail command existed', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
+      proof: {
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        last_event: 'turn_started',
+        last_message: 'Provider worker turn is active.',
+        last_event_at: '2026-04-18T02:00:00.000Z',
+        updated_at: '2026-04-18T02:01:00.000Z',
+        child_lanes: [
+          {
+            stream: 'optional-guardrail-regression',
+            pipeline_id: 'provider-linear-child-lane',
+            task_id: 'linear-co-225-optional-guardrail',
+            run_id: 'run-lane-guardrail-225',
+            status: 'failed',
+            launched_at: '2026-04-18T02:00:10.000Z',
+            decision: 'pending',
+            summary_recorded_at: '2026-04-18T02:00:40.000Z',
+            guardrails_required: false,
+            guardrail_command_count: 1,
+            summary: 'Child lane optional-guardrail-regression failed.\nGuardrails: spec-guard failed (1/1 failed).'
+          }
+        ],
+        linear_audit: null
+      },
+      now: () => '2026-04-18T02:01:00.000Z'
+    });
+
+    expect(progress?.summary).toBe(
+      'Child lane optional-guardrail-regression failed.\nGuardrails: spec-guard failed (1/1 failed).'
+    );
+  });
+
+  it('preserves child-lane required-missing guardrail text when manifest metadata proves explicit opt-in', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
+      proof: {
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        last_event: 'turn_started',
+        last_message: 'Provider worker turn is active.',
+        last_event_at: '2026-04-18T02:00:00.000Z',
+        updated_at: '2026-04-18T02:01:00.000Z',
+        child_lanes: [
+          {
+            stream: 'explicit-required-guardrail',
+            pipeline_id: 'provider-linear-child-lane',
+            task_id: 'linear-co-225-explicit-required',
+            run_id: 'run-lane-explicit-required-225',
+            status: 'failed',
+            launched_at: '2026-04-18T02:00:10.000Z',
+            decision: 'pending',
+            summary_recorded_at: '2026-04-18T02:00:40.000Z',
+            guardrails_required: true,
+            guardrails_required_source: 'explicit',
+            guardrail_command_count: 0,
+            summary:
+              'Child lane explicit-required-guardrail failed.\n' +
+              'Guardrails: spec-guard command not found.'
+          }
+        ],
+        linear_audit: null
+      },
+      now: () => '2026-04-18T02:01:00.000Z'
+    });
+
+    expect(progress?.summary).toBe(
+      'Child lane explicit-required-guardrail failed.\nGuardrails: spec-guard command not found.'
+    );
+  });
+
   it('does not rank invalidated rejected or accepted child-lane summaries over current replacement progress', () => {
     const progress = deriveProviderLinearWorkerProgressSnapshot({
       proof: {

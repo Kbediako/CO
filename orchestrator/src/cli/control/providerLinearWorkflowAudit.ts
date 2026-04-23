@@ -92,6 +92,7 @@ export interface ProviderLinearAuditSummary {
   latest_recorded_at: string | null;
   latest_by_operation: Partial<Record<ProviderLinearAuditOperation, ProviderLinearAuditEntry>>;
   parallelization_entries: ProviderLinearAuditEntry[];
+  entries?: ProviderLinearAuditEntry[];
 }
 
 export function isProviderLinearParallelizationDecision(
@@ -218,6 +219,7 @@ export async function summarizeProviderLinearAuditPath(
     } else {
       summary.failure_count += 1;
     }
+    summary.entries?.push(entry);
     summary.latest_by_operation[entry.operation] = entry;
     if (entry.operation === 'parallelization') {
       summary.parallelization_entries.push(entry);
@@ -236,7 +238,8 @@ function buildEmptyProviderLinearAuditSummary(auditPath: string): ProviderLinear
     failure_count: 0,
     latest_recorded_at: null,
     latest_by_operation: {},
-    parallelization_entries: []
+    parallelization_entries: [],
+    entries: []
   };
 }
 

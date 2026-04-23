@@ -3,6 +3,7 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 
 import type { RunPaths } from '../run/runPaths.js';
 import type { CliManifest } from '../types.js';
+import { stripNonApplicableGuardrailSummaryLines } from '../run/manifest.js';
 import type { ControlAction, ControlState } from './controlState.js';
 import { LINEAR_ADVISORY_STATE_FILE } from './controlPersistenceFiles.js';
 import {
@@ -88,6 +89,7 @@ export interface SelectedRunProjectionContext {
   paths: Pick<RunPaths, 'manifestPath' | 'runDir'>;
   linearAdvisoryState: {
     tracked_issue: LiveLinearTrackedIssue | null;
+    stale_source?: unknown;
   };
   providerIntakeState?: ProviderIntakeState;
 }
@@ -166,6 +168,19 @@ interface ResolvedCompatibilityState {
 
 interface LinearAdvisoryStateSnapshot {
   tracked_issue?: LiveLinearTrackedIssue | null;
+  stale_source?: unknown;
+}
+
+function selectFreshLinearAdvisoryTrackedIssue(
+  advisoryState:
+    | { tracked_issue?: LiveLinearTrackedIssue | null; stale_source?: unknown }
+    | null
+    | undefined
+): LiveLinearTrackedIssue | null {
+  if (!advisoryState || advisoryState.stale_source) {
+    return null;
+  }
+  return advisoryState.tracked_issue ?? null;
 }
 
 export function createSelectedRunProjectionReader(
@@ -434,7 +449,10 @@ function buildProjectionContextFromParts(
       : manifestUpdatedAt;
   const manifestCompletedAt = readStringValue(manifestRecord, 'completed_at', 'completedAt');
   const completedAt = manifestCompletedAt ?? (isTerminalRunStatus(rawStatus) ? proofUpdatedAt ?? updatedAt : null);
-  const manifestSummary = readStringValue(manifestRecord, 'summary') ?? null;
+  const manifestSummary = stripNonApplicableGuardrailSummaryLines(
+    manifestRecord,
+    readStringValue(manifestRecord, 'summary')
+  );
   const proofAttemptStartedAt = useScopedTerminalProof
     ? resolveProviderLinearWorkerAttemptStartedAt(providerProofRecord)
     : null;
@@ -450,7 +468,8 @@ function buildProjectionContextFromParts(
                   deriveDeterministicProviderMutationSuppressions(
                     parts.providerLinearWorkerProof?.linear_audit ?? null,
                     {
-                      recordedAtNotBefore: proofAttemptStartedAt
+                      recordedAtNotBefore: proofAttemptStartedAt,
+                      issueId: parts.providerLinearWorkerProof?.issue_id ?? null
                     }
                   )
                 )
@@ -1254,7 +1273,7 @@ async function resolveProjectionContextParts(
       control: context.controlStore.snapshot(),
       questions: context.questionQueue.list(),
       runDir: context.paths.runDir,
-      trackedIssue: context.linearAdvisoryState.tracked_issue,
+      trackedIssue: selectFreshLinearAdvisoryTrackedIssue(context.linearAdvisoryState),
       providerLinearWorkerProof: await readProviderLinearWorkerProofForProjection(context.paths.runDir)
     };
   }
@@ -1273,7 +1292,7 @@ async function resolveProjectionContextParts(
     control,
     questions: Array.isArray(questionSnapshot?.questions) ? questionSnapshot.questions : [],
     runDir: snapshot.runDir,
-    trackedIssue: advisoryState?.tracked_issue ?? null,
+    trackedIssue: selectFreshLinearAdvisoryTrackedIssue(advisoryState),
     providerLinearWorkerProof: await readProviderLinearWorkerProofForProjection(snapshot.runDir)
   };
 }
@@ -1373,7 +1392,7 @@ async function readTaskCompatibilityContexts(
         control,
         questions: Array.isArray(questionSnapshot?.questions) ? questionSnapshot.questions : [],
         runDir,
-        trackedIssue: advisoryState?.tracked_issue ?? null,
+        trackedIssue: selectFreshLinearAdvisoryTrackedIssue(advisoryState),
         providerLinearWorkerProof
       },
       resolveRunsRootFromRunDir(runDir),
