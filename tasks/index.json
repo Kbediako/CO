@@ -1,31 +1,31 @@
 {
   "items": [
     {
-      "id": "20260423-linear-d469c73d-a540-427c-9088-5d4791c6f8ca",
-      "title": "CO-332 restore missing docs-check packet references for linear-1c101",
-      "relates_to": "tasks/tasks-linear-d469c73d-a540-427c-9088-5d4791c6f8ca.md",
-      "risk": "low",
+      "id": "20260423-linear-37c1035e-d319-4306-8a41-648f2ab836e6",
+      "title": "CO-328 accepted child-lane workspace artifacts and diff-budget scope",
+      "relates_to": "tasks/tasks-linear-37c1035e-d319-4306-8a41-648f2ab836e6.md",
+      "risk": "medium",
       "owners": [
         "Codex"
       ],
       "last_review": "2026-04-23",
       "approvals": {
-        "historical_packet_restore": {
-          "reviewer": "parent provider worker",
+        "tests_child_lane": {
+          "reviewer": "bounded same-issue tests child lane",
           "date": "2026-04-23",
-          "status": "restored-from-git-history",
-          "source_commit": "aa653f550e4a632a03546993193290783e60ef23",
-          "summary": "Restored the six missing linear-1c101 CO-276 docs-first packet files because docs/TASKS.md, tasks/index.json, and docs/docs-freshness-registry.json intentionally referenced that historical packet and git history proved the files existed."
+          "status": "accepted",
+          "manifest": ".runs/linear-37c1035e-d319-4306-8a41-648f2ab836e6-tests-child-lane-artifacts/cli/2026-04-23T09-15-16-094Z-6af4ff0f/manifest.json",
+          "summary": "Child lane added focused diff-budget regressions for accepted .child-lanes workspace artifacts, unrelated untracked files, and missing durable acceptance evidence."
         }
       },
       "paths": {
-        "spec": "tasks/specs/linear-d469c73d-a540-427c-9088-5d4791c6f8ca.md",
-        "task": "tasks/tasks-linear-d469c73d-a540-427c-9088-5d4791c6f8ca.md",
-        "agent_task": ".agent/task/linear-d469c73d-a540-427c-9088-5d4791c6f8ca.md",
+        "spec": "tasks/specs/linear-37c1035e-d319-4306-8a41-648f2ab836e6.md",
+        "task": "tasks/tasks-linear-37c1035e-d319-4306-8a41-648f2ab836e6.md",
+        "agent_task": ".agent/task/linear-37c1035e-d319-4306-8a41-648f2ab836e6.md",
         "docs": {
-          "PRD": "docs/PRD-linear-d469c73d-a540-427c-9088-5d4791c6f8ca.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-d469c73d-a540-427c-9088-5d4791c6f8ca.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-d469c73d-a540-427c-9088-5d4791c6f8ca.md"
+          "PRD": "docs/PRD-linear-37c1035e-d319-4306-8a41-648f2ab836e6.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-37c1035e-d319-4306-8a41-648f2ab836e6.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-37c1035e-d319-4306-8a41-648f2ab836e6.md"
         }
       }
     },
@@ -14011,6 +14011,35 @@
           "PRD": "docs/PRD-linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md",
           "TECH_SPEC": "tasks/specs/linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md",
           "ACTION_PLAN": "docs/ACTION_PLAN-linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md"
+        }
+      }
+    },
+    {
+      "id": "20260423-linear-d469c73d-a540-427c-9088-5d4791c6f8ca",
+      "title": "CO-332 restore missing docs-check packet references for linear-1c101",
+      "relates_to": "tasks/tasks-linear-d469c73d-a540-427c-9088-5d4791c6f8ca.md",
+      "risk": "low",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-23",
+      "approvals": {
+        "historical_packet_restore": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-23",
+          "status": "restored-from-git-history",
+          "source_commit": "aa653f550e4a632a03546993193290783e60ef23",
+          "summary": "Restored the six missing linear-1c101 CO-276 docs-first packet files because docs/TASKS.md, tasks/index.json, and docs/docs-freshness-registry.json intentionally referenced that historical packet and git history proved the files existed."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-d469c73d-a540-427c-9088-5d4791c6f8ca.md",
+        "task": "tasks/tasks-linear-d469c73d-a540-427c-9088-5d4791c6f8ca.md",
+        "agent_task": ".agent/task/linear-d469c73d-a540-427c-9088-5d4791c6f8ca.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-d469c73d-a540-427c-9088-5d4791c6f8ca.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-d469c73d-a540-427c-9088-5d4791c6f8ca.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-d469c73d-a540-427c-9088-5d4791c6f8ca.md"
         }
       }
     }
