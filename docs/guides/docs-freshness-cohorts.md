@@ -10,8 +10,8 @@ The machine-readable policy lives in `docs/docs-catalog.json` under `policies.ro
 
 Current CO policy:
 
-- Owner issue: `CO-300`
-- Historical owner lineage: `CO-175` established the Apr 14 baseline and `CO-267` owned the Apr 20/21 maintenance refreshes; both are now terminal evidence only and must not remain the live maintenance owner.
+- Owner issue: `CO-324`
+- Historical owner lineage: `CO-175` established the Apr 14 baseline, `CO-267` owned the Apr 20/21 maintenance refreshes, and `CO-300` owned the Apr 22 reset; these are now terminal evidence only and must not remain the live maintenance owner after they reach terminal states.
 - Window: `7` days after the normal freshness cadence expires
 - Maximum active rolling cohorts: `2`
 - Maximum rolling rows: `300`
@@ -230,4 +230,22 @@ CO-300 reproduced the Apr 22 current-main baseline failure in `out/linear-47c4ff
 - `docs:freshness:maintain` still reported `blocking_changed_paths=[]`, verified configured owner `CO-175` as terminal, and required a new live owner path instead of reusing terminal metadata
 
 ### Post-refresh Disposition
-CO-300 re-homed the rolling-freshness owner metadata to live issue `CO-300`, refreshed the reviewed Mar 22 packet/spec rows plus the hard-stale issues guide, and added fail-closed regression coverage so terminal owners cannot be reused as the live maintenance path. Post-fix validation at `out/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a/after/docs-freshness.json` and `out/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a/after/docs-freshness-maintenance.json` returns `docs:freshness OK` with `0` stale rows and `docs:freshness:maintain=clean`, with owner verification resolved to live `CO-300`.
+CO-300 re-homed the rolling-freshness owner metadata to live issue `CO-300`, refreshed the reviewed Mar 22 packet/spec rows plus the hard-stale issues guide, and added fail-closed regression coverage so terminal owners cannot be reused as the live maintenance path. Post-fix validation at `out/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a/after/docs-freshness.json` and `out/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a/after/docs-freshness-maintenance.json` returned `docs:freshness OK` with `0` stale rows and `docs:freshness:maintain=clean`, with owner verification resolved to live `CO-300` while that issue was active.
+
+## Apr 23 Terminal Owner Reset and Reviewed Refresh
+
+### Reproduction / Baseline Findings
+CO-324 reproduced the Apr 23 current-main baseline failure in `out/linear-3c52bf66-f805-4537-8671-ad1dec2f4623/docs-freshness-baseline.json` and `out/linear-3c52bf66-f805-4537-8671-ad1dec2f4623/docs-freshness-maintenance-baseline.json`:
+
+- `31` stale entries
+- `0` rolling cohort entries
+- `0` missing registry rows
+- `0` missing-on-disk rows
+- `0` invalid registry entries
+- `0` uncatalogued docs
+- `27` eligible historical task/report rows from the adjacent `0955`, `1319`-`1321`, and `linear-856c1318-524f-4db3-8d4a-b357ec51c304` families
+- `4` hard-stale Active Guide/reference rows: `docs/guides/collab-vs-mcp.md`, `docs/guides/evaluation-playbook.md`, `docs/reference/metrics-collab-context-rot.md`, and `docs/release-notes-template-addendum.md`
+- `docs:freshness:maintain` reported `blocking_changed_paths=[]`, verified configured owner `CO-300` as terminal `Done`, and required a new live owner path instead of reusing terminal metadata
+
+### Post-refresh Disposition
+CO-324 re-homes the rolling-freshness owner metadata to live issue `CO-324`, preserves `CO-300` as historical terminal-owner evidence only, and reviews the current Apr 23 stale set directly instead of increasing rolling caps or weakening freshness gates. The reviewed disposition is recorded in `docs/findings/linear-3c52bf66-f805-4537-8671-ad1dec2f4623-docs-freshness-classification.md`; the stale rows are refreshed to `last_review=2026-04-23`. CO-321 remains out of scope and its refreshed `tasks/specs` cohort is not modified.

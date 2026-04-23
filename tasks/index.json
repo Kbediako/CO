@@ -1,6 +1,96 @@
 {
   "items": [
     {
+      "id": "20260423-linear-4ea68a3d-3832-4161-bab7-84dceeceeb46",
+      "title": "CO: scope provider-linear parallelization proof invariants to the current turn",
+      "relates_to": "tasks/tasks-linear-4ea68a3d-3832-4161-bab7-84dceeceeb46.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-23",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-23",
+          "status": "accepted",
+          "manifest": ".runs/linear-4ea68a3d-3832-4161-bab7-84dceeceeb46-docs-packet/cli/2026-04-23T03-59-42-098Z-c11737dd/manifest.json",
+          "source_anchor": "ctx:sha256:b6dfe577e25cc512757f1fba35bab57fb685d968fa340ea712648248f38b1fd5#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-326 as a current-turn provider-linear parallelization proof invariant bug: valid same-issue parallelization decisions across different turns must remain cumulative audit history without being reclassified as same-turn parallelization_decision_multiple, while true missing or duplicate current-turn decisions still fail closed."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-4ea68a3d-3832-4161-bab7-84dceeceeb46.md",
+        "task": "tasks/tasks-linear-4ea68a3d-3832-4161-bab7-84dceeceeb46.md",
+        "agent_task": ".agent/task/linear-4ea68a3d-3832-4161-bab7-84dceeceeb46.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-4ea68a3d-3832-4161-bab7-84dceeceeb46.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-4ea68a3d-3832-4161-bab7-84dceeceeb46.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-4ea68a3d-3832-4161-bab7-84dceeceeb46.md"
+        }
+      }
+    },
+    {
+      "id": "20260423-linear-3c52bf66-f805-4537-8671-ad1dec2f4623",
+      "title": "CO: maintain docs freshness after terminal CO-300 owner",
+      "relates_to": "tasks/tasks-linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-23",
+      "approvals": {
+        "freshness_baseline_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-23",
+          "status": "succeeded_advisory",
+          "manifest": ".runs/linear-3c52bf66-f805-4537-8671-ad1dec2f4623-freshness-baseline/cli/2026-04-23T03-37-54-576Z-8c07866a/manifest.json",
+          "summary": "Child lane `freshness-baseline` captured advisory docs freshness evidence; parent owns the authoritative owner reset, stale-row classification, registry refresh, validation, and workpad closeout."
+        }
+      },
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
+      "paths": {
+        "spec": "tasks/specs/linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md",
+        "task": "tasks/tasks-linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md",
+        "agent_task": ".agent/task/linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md"
+        },
+        "findings": "docs/findings/linear-3c52bf66-f805-4537-8671-ad1dec2f4623-docs-freshness-classification.md"
+      }
+    },
+    {
+      "id": "20260423-linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f",
+      "title": "CO: re-audit Codex CLI 0.123.0 posture and next-release adoption target",
+      "relates_to": "tasks/tasks-linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-23",
+      "approvals": {
+        "parent_audit": {
+          "reviewer": "provider worker",
+          "date": "2026-04-23",
+          "status": "hold_decision_recorded",
+          "manifest": ".runs/linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f-cloud-fallback-0123-current/cli/2026-04-23T04-56-47-062Z-7a811dfb/manifest.json",
+          "summary": "CO-322 records official 0.123.0 release/npm evidence, command-surface comparison, runtime-mode pass, required-cloud missing-environment blocker evidence, and a clean expected MCP fallback contract; 0.123.0 remains held and current main keeps 0.122.0 as the release-planning/smoke candidate."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f.md",
+        "task": "tasks/tasks-linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f.md",
+        "agent_task": ".agent/task/linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f.md"
+        }
+      }
+    },
+    {
       "id": "20260423-linear-f667a32d-b8db-4717-8565-429409026f92",
       "title": "CO refresh remaining Mar 23 docs-freshness task-spec cohort",
       "relates_to": "tasks/tasks-linear-f667a32d-b8db-4717-8565-429409026f92.md",
@@ -27,6 +117,35 @@
           "PRD": "docs/PRD-linear-f667a32d-b8db-4717-8565-429409026f92.md",
           "TECH_SPEC": "docs/TECH_SPEC-linear-f667a32d-b8db-4717-8565-429409026f92.md",
           "ACTION_PLAN": "docs/ACTION_PLAN-linear-f667a32d-b8db-4717-8565-429409026f92.md"
+        }
+      }
+    },
+    {
+      "id": "20260423-linear-7b3de1c1-f420-4203-bb8c-494dadecaa88",
+      "title": "CO: recreate live owner for remaining Mar 23 docs-freshness task-checklist cohort",
+      "relates_to": "tasks/tasks-linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-23",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-23",
+          "status": "invalidated_after_success",
+          "manifest": ".runs/linear-7b3de1c1-f420-4203-bb8c-494dadecaa88-docs-packet-core/cli/2026-04-23T01-32-43-084Z-6b522b42/manifest.json",
+          "summary": "Child lane `docs-packet-core` completed successfully and satisfied the required parallelization contract, but the parent invalidated its patch because it preserved the wrong fallback evidence (`docs:freshness:maintain`, `66`, `221`, `1303-1311`, `1164-1195`) instead of the authoritative CO-319 canonical key and lineage `1319-1321`."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md",
+        "task": "tasks/tasks-linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md",
+        "agent_task": ".agent/task/linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md"
         }
       }
     },
@@ -6055,7 +6174,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-23",
+      "last_review": "2026-03-23",
       "paths": {
         "spec": "tasks/specs/1321-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery.md",
         "task": "tasks/tasks-1321-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery.md",
@@ -6071,7 +6190,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-23",
+      "last_review": "2026-03-23",
       "paths": {
         "spec": "tasks/specs/1320-coordinator-symphony-post-merge-retry-timer-follow-up.md",
         "task": "tasks/tasks-1320-coordinator-symphony-post-merge-retry-timer-follow-up.md",
@@ -6087,7 +6206,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-23",
+      "last_review": "2026-03-23",
       "paths": {
         "spec": "tasks/specs/1319-coordinator-symphony-end-to-end-operational-parity-remediation.md",
         "task": "tasks/tasks-1319-coordinator-symphony-end-to-end-operational-parity-remediation.md",
@@ -6103,7 +6222,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-23",
+      "last_review": "2026-03-23",
       "paths": {
         "spec": "tasks/specs/linear-856c1318-524f-4db3-8d4a-b357ec51c304.md",
         "task": "tasks/tasks-linear-856c1318-524f-4db3-8d4a-b357ec51c304.md",
