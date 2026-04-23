@@ -1,6 +1,35 @@
 {
   "items": [
     {
+      "id": "20260423-linear-7b3de1c1-f420-4203-bb8c-494dadecaa88",
+      "title": "CO: recreate live owner for remaining Mar 23 docs-freshness task-checklist cohort",
+      "relates_to": "tasks/tasks-linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-23",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-23",
+          "status": "invalidated_after_success",
+          "manifest": ".runs/linear-7b3de1c1-f420-4203-bb8c-494dadecaa88-docs-packet-core/cli/2026-04-23T01-32-43-084Z-6b522b42/manifest.json",
+          "summary": "Child lane `docs-packet-core` completed successfully and satisfied the required parallelization contract, but the parent invalidated its patch because it preserved the wrong fallback evidence (`docs:freshness:maintain`, `66`, `221`, `1303-1311`, `1164-1195`) instead of the authoritative CO-319 canonical key and lineage `1319-1321`."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md",
+        "task": "tasks/tasks-linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md",
+        "agent_task": ".agent/task/linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md"
+        }
+      }
+    },
+    {
       "id": "20260422-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3",
       "title": "CO: key issue-context cache artifacts by issue id so cross-issue reads cannot overwrite run evidence",
       "relates_to": "tasks/tasks-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md",
