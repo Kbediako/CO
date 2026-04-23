@@ -19,6 +19,7 @@ review_notes:
   - 2026-03-23: Current CO audit confirmed two separate live gaps at lane open: review handoff was not yet supported by the repo-local workflow contract beyond `In Review`, and `/api/v1/dispatch` could still leak stale `traceability.issue_identifier` after no issue remained dispatchable.
   - 2026-03-23: Live Linear issue-context evidence initially showed the CO team exposed `In Review` but not `Merging` or `Rework`; the team was updated the same day to add `Rework` and `Merging` while keeping `In Review` as the only review-handoff alias.
   - 2026-03-23: Follow-up parity audit found three narrower remaining deltas: CO still accepted arbitrary non-review `state_type: started` states for execution eligibility, the live team still uses `Ready` instead of Symphony's queued `Todo`, and the repo-local `Rework` contract still reused the old PR/workpad instead of resetting.
+  - 2026-04-23: CO-321 freshness review retained this as an active historical parity remediation spec. The related checklist records active-state routing, `Ready` queue aliasing, review/rework/merge/done lifecycle parity, exact `Rework` reset semantics, stale dispatch traceability cleanup, validation floor, and zero unresolved actionable PR threads; live retest and final PR/merge closeout remain open.
 ---
 
 # Technical Specification
@@ -80,3 +81,9 @@ review_notes:
   - full validation floor
   - live Linear proof showing lifecycle progression through review handoff, rework or merge re-entry, and done
   - live `/api/v1/dispatch` proof showing no stale traceability leakage when nothing is dispatchable
+
+## 2026-04-23 Freshness Review Disposition
+
+- Disposition: refresh and retain. This spec remains active historical owner evidence for the widened Symphony parity remediation; archive/reclassification would hide still-open delivery evidence.
+- Reviewed current truth against `tasks/tasks-1319-coordinator-symphony-end-to-end-operational-parity-remediation.md` and `docs/TASKS.md`.
+- Remaining open items are bounded to live retest plus PR/merge closeout, not new docs/spec requirements.

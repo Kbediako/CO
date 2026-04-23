@@ -15,6 +15,7 @@ review_notes:
   - 2026-03-23: Opened after post-merge `main` run `23425656167` failed in `Core Lane` `Test` on a single `ProviderIssueHandoff` retry-timer case.
   - 2026-03-23: The merge-triggering diff did not touch `ProviderIssueHandoff` runtime files, and local repeated targeted runs pass, so the leading diagnosis is CI-only test brittleness rather than a fresh runtime parity gap.
   - 2026-03-23: No additional live Linear workflow status is required for this follow-up; the issue, if created, should use the existing CO team workflow.
+  - 2026-04-23: CO-321 freshness review retained this as an active historical stabilization spec. The related checklist records the GitHub failure capture, local stress pass, follow-up issue creation, test-only stabilization, runtime untouched, and validation floor as complete; separate delivery closeout checkboxes remain in the task mirror and stay outside this tasks/specs-only refresh.
 ---
 
 # Technical Specification
@@ -34,11 +35,11 @@ review_notes:
 
 ## Current Truth
 
-- Failing test: `createProviderIssueHandoffService > cancels and replaces queued retry ownership when a newer persisted due_at supersedes an older timer`
-- File: `orchestrator/tests/ProviderIssueHandoff.test.ts`
-- Failure mode: `Condition not met after 256 timer turns.`
-- Local targeted runs pass, including repeated stress.
-- No new live Linear status creation is required.
+- The original post-merge failure was captured from GitHub Actions run `23425656167` / job `68139836805` for `orchestrator/tests/ProviderIssueHandoff.test.ts`.
+- Local targeted reproduction and stress validation passed before the patch, supporting the test-brittleness diagnosis rather than a runtime parity regression.
+- The implemented disposition is a test-only retry-timer stabilization; the related checklist records runtime files as untouched.
+- The validation floor is recorded as complete in the related checklist, including `npm run test` passing `290/290` files and `2220/2220` tests.
+- Separate delivery closeout checkboxes remain in `tasks/tasks-1320-coordinator-symphony-post-merge-retry-timer-follow-up.md`; this CO-321 refresh does not broaden into the already refreshed `tasks/tasks-*` cohort.
 
 ## Validation Plan
 
