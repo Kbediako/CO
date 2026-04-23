@@ -13687,6 +13687,30 @@
         "agent_task": ".agent/task/linear-cb221338-8cdc-41ad-880b-3bcfae49d4a8.md",
         "docs": "docs/TECH_SPEC-linear-cb221338-8cdc-41ad-880b-3bcfae49d4a8.md"
       }
+    },
+    {
+      "id": "20260423-linear-e2852b4f-09d0-4220-b0ac-b763170eacb2",
+      "title": "CO: align release notes, prerelease policy, and overview override behavior with the actual release workflow",
+      "relates_to": "tasks/tasks-linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-23",
+      "approvals": {
+        "preimplementation_issue_quality": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-23",
+          "status": "approved",
+          "summary": "This lane is the release-truth parity fix only: align promoted sections, generic prerelease dist-tag docs, and the overview override source without widening into a broader release redesign."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md",
+        "task": "tasks/tasks-linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md",
+        "agent_task": ".agent/task/linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md",
+        "docs": "docs/TECH_SPEC-linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md"
+      }
     }
   ]
 }

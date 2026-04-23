@@ -1,6 +1,6 @@
 # Release Notes Addendum — Shipped Skills
 
-When a release adds or updates bundled skills, include a short bullet list under **Overview** or **Documentation** in the release notes.
+Use **Overview** as the canonical top-section home for shipped-skill highlights. The workflow elevates only **Overview** and **Bug Fixes** into the top release sections; items labeled only as **Documentation** stay in **Full Changelog**.
 
 Example:
 - Shipped new bundled skills: `collab-evals`, `collab-deliberation`, `delegate-early`.

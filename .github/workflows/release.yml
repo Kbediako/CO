@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Existing release tag to publish (vX.Y.Z or vX.Y.Z-prerelease.N)'
+        description: 'Existing release tag to publish (vX.Y.Z or vX.Y.Z-<prerelease>)'
         required: false
         type: string
 
@@ -56,7 +56,7 @@ jobs:
 
           TAG="${TAG#refs/tags/}"
           if [[ ! "${TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
-            echo "::error::Invalid release tag '${TAG}'. Expected vX.Y.Z or vX.Y.Z-prerelease." >&2
+            echo "::error::Invalid release tag '${TAG}'. Expected vX.Y.Z or vX.Y.Z-<prerelease>." >&2
             exit 1
           fi
 
@@ -172,12 +172,14 @@ jobs:
       - name: Generate release notes
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.meta.outputs.tag }}
         run: |
           TAG="${{ steps.meta.outputs.tag }}"
           gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
             -f tag_name="$TAG" \
             -f target_commitish="${{ steps.meta.outputs.tag_sha }}" > release-notes.json
           node - <<'NODE'
+          const { execFileSync } = require('node:child_process');
           const fs = require('fs');
           const data = JSON.parse(fs.readFileSync('release-notes.json', 'utf8'));
           const body = (data.body || '').trim();
@@ -227,12 +229,13 @@ jobs:
           }
 
           let overview = extractSection(body, 'Overview') ?? '- No labeled overview items.';
-          const overridePath = '.github/release-overview.md';
-          if (fs.existsSync(overridePath)) {
-            const override = fs.readFileSync(overridePath, 'utf8').trim();
-            if (override.length > 0) {
-              overview = override;
-            }
+          const tagBodyOverride = execFileSync(
+            'git',
+            ['for-each-ref', `refs/tags/${process.env.RELEASE_TAG}`, '--format=%(contents:body)'],
+            { encoding: 'utf8' }
+          ).trim();
+          if (tagBodyOverride.length > 0) {
+            overview = tagBodyOverride;
           }
           const bugFixes = extractSection(body, 'Bug Fixes') ?? '- No labeled bug fixes.';
           const compareLine = extractCompareLine(body);

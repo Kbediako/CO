@@ -3,7 +3,7 @@
 ## Added by RLM Orchestrator release 2026-01-05
 
 1. Ensure the working tree is clean and `main` is up to date.
-2. Decide the release tag (`vX.Y.Z` stable or `vX.Y.Z-alpha.N`) and confirm it matches `package.json` version.
+2. Decide the release tag (`vX.Y.Z` stable or `vX.Y.Z-<prerelease>` such as `vX.Y.Z-beta`, `vX.Y.Z-beta.1`, or `vX.Y.Z-rc.2`) and confirm it matches `package.json` version.
 2.1. Confirm signing is configured for release commits and tags (GPG or SSH):
    - Prefer `git config commit.gpgsign true` and `git config tag.gpgSign true`.
    - Alternatively use `git commit -S` and `git tag -s` per release.
@@ -25,19 +25,21 @@
    - `npm run pack:audit`
    - `npm run pack:smoke`
 5. Create and verify the signed release tag:
-   - `git tag -s vX.Y.Z -m "vX.Y.Z"` (or `vX.Y.Z-alpha.N`)
-   - `git tag -v vX.Y.Z`
-   - `git push origin vX.Y.Z`
+   - `git tag -s <tag> -m "<tag>"` for the default generated overview.
+   - `git tag -s <tag> -m "<tag>" -m "<release overview override>"` when you need a one-shot overview override in the signed annotated tag body.
+   - `git tag -s <tag> -F /tmp/tag-message.txt` only when that file starts with `<tag>`, then a blank line, then the overview override text so the override lands in the annotated tag body instead of the tag subject.
+   - `git tag -v <tag>`
+   - `git push origin <tag>`
+   - Do not commit the former .github/release-overview.md override file; the workflow now reads only the signed annotated tag body for manual overview overrides, not the tag subject.
 5.1. If using `gh release create` manually, require a pre-existing signed tag and pass `--verify-tag` to prevent auto-created unsigned tags.
 6. Monitor the tag-driven workflow in `.github/workflows/release.yml`:
    - Confirms tag/version match, builds, runs pack audit/smoke, creates GitHub Release, and publishes to npm.
    - For manual dispatch, pass `inputs.tag=vX.Y.Z` (or prerelease tag) so workflow metadata resolves against a real tag.
-   - Stable tags publish to `latest`; alpha tags publish to `alpha` and create a prerelease.
+   - Stable tags publish to `latest`; prerelease tags publish to the leading prerelease label (`alpha`, `beta`, `rc`, etc.) after lowercasing/sanitization, and fall back to `next` when that derived label is empty or starts with a digit. Any prerelease tag creates a prerelease.
    - Repository secrets must provide signer verification material for CI tag checks: `RELEASE_SIGNING_PUBLIC_KEYS` (GPG) or `RELEASE_SIGNING_ALLOWED_SIGNERS` (SSH).
    - Workflow blocks lightweight/unsigned tags before packaging/publish.
    - Confirm GitHub shows Verified for the tag/commit.
-   - If .github/release.yml exists, verify Overview/Bug Fixes sections render as expected.
-   - Optional: before tagging, add and commit a release overview override file at .github/release-overview.md with a short narrative summary (remove after release).
+   - If `.github/release.yml` exists, verify only `Overview` and `Bug Fixes` are elevated into the top release sections; other categories remain in `Full Changelog`.
 7. Record release status, workflow links, and any follow-ups in `/tasks` and docs checklists.
 
 If the release workflow fails, fix the issue and re-tag after updating metadata; do not publish from non-release artifacts.

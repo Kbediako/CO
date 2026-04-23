@@ -30,7 +30,8 @@ Codex Orchestrator is the coordination layer that glues together Codex-driven ag
 
 ## Release Notes
 - Shipped skills note: `docs/release-notes-template-addendum.md`.
-- Optional overview override: add and commit a release overview file at .github/release-overview.md before tagging; the release workflow uses it when present.
+- The release workflow elevates only `Overview` and `Bug Fixes` into the top GitHub release sections; other labeled categories remain in `Full Changelog`.
+- Optional one-shot overview override: put it in the signed annotated tag body when creating the release tag instead of committing the former .github/release-overview.md override file. If you use `git tag -F`, keep `<tag>` on the first line and the override text after a blank line so it lands in the body instead of the subject.
 
 ## How It Works
 - **Planner → Builder → Tester → Reviewer:** The core `TaskManager` (see `orchestrator/src/manager.ts`) wires together agent interfaces that decide *what* to run (planner), execute the selected pipeline stage (builder), verify results (tester), and give a final decision (reviewer).
@@ -126,8 +127,8 @@ Use `npx @kbediako/codex-orchestrator resume --run <run-id>` to continue interru
 ## Publishing (npm)
 - Pack audit: `npm run pack:audit` (validates the tarball file list; run `npm run clean:dist && npm run build` first if `dist/` contains non-runtime artifacts).
 - Pack smoke: `npm run pack:smoke` (installs the tarball in a temp mock repo, runs CLI behavior checks including `review` artifacts and `long-poll-wait` skill install, and validates delegate-server JSONL; uses network). Treat this as a spot-check gate; use `npm run pack:audit` for full tarball inventory validation.
-- Release tags: `vX.Y.Z` or `vX.Y.Z-alpha.N` must match `package.json` version.
-- Dist-tags: stable publishes to `latest`; alpha publishes to `alpha` and uses a GitHub prerelease.
+- Release tags: `vX.Y.Z` or `vX.Y.Z-<prerelease>` (for example `vX.Y.Z-beta`, `vX.Y.Z-beta.1`, or `vX.Y.Z-rc.2`) must match `package.json` version.
+- Dist-tags: stable publishes to `latest`; prereleases publish to the leading prerelease label (`alpha`, `beta`, `rc`, etc.) after lowercasing/sanitization, and fall back to `next` when that derived label is empty or starts with a digit. Any prerelease tag still creates a GitHub prerelease.
 - Publishing auth: workflow attempts OIDC trusted publishing first (`id-token: write` + `--provenance`), then falls back to `secrets.NPM_TOKEN` when OIDC is unavailable. `secrets.NPM_TOKEN` must be an npm automation token (not a token that requires OTP).
 - Trusted publisher config: npm expects workflow filename `release.yml` (the file must exist at `.github/workflows/release.yml` on the default branch). Leave environment blank unless the publish job sets `environment: ...`.
 - OIDC runtime prereqs: npm trusted publishing currently requires Node.js `22.14.0+` and npm `11.5.1+`; the publish job installs npm `^11.5.1` before publishing.
