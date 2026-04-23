@@ -26,7 +26,7 @@ Protect the control-host queue contract so helper-created follow-ups do not leav
 
 - [x] Docs-first packet created.
 - [x] Issue-quality review recorded in spec/task notes before implementation began.
-- [x] Standalone review approval captured in spec/task notes before review handoff.
+- [x] Manual standalone task/spec review approval captured in spec/task notes before implementation; manifest-backed standalone review captured before review handoff.
 - [x] Backlog follow-up hold implemented.
 - [x] Retry/resumable admission capacity implemented.
 - [x] Provider intake summary projection aligned.
@@ -42,4 +42,5 @@ Protect the control-host queue contract so helper-created follow-ups do not leav
 ## Review Notes
 
 - 2026-04-23: Issue-quality review confirmed the lane covers both required drift modes: helper-created follow-ups leaving `Backlog` and retry/resumable claims exceeding `max_allowed`.
+- 2026-04-23: Before implementation, the parent worker performed a standalone task/spec review of the docs packet against the Linear issue intent and approved the scope for implementation; this review is captured here and mirrored in the task spec notes.
 - 2026-04-23: Manifest-backed standalone review completed with `review_outcome: bounded-success` after command-intent retry; explicit elegance/minimality pass found no avoidable complexity after the final main merge.

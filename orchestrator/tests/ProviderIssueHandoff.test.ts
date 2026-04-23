@@ -7995,6 +7995,7 @@ describe('createProviderIssueHandoffService', () => {
         `[provider-issue-run-discovery] skipping unreadable manifest ${brokenPaths.manifestPath}:`
       )
     );
+    vi.useRealTimers();
   });
 
   it('counts active provider workers from a different start pipeline against host-global admission capacity', async () => {

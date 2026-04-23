@@ -21,6 +21,14 @@ Restore one truthful queue contract across `Backlog`, `Ready`, `provider-intake-
 - `provider-intake-state.json` and `co-status` expose the same active issue identifiers used by admission.
 - Queue-cap or promotion drift is visible through concrete hold/block evidence.
 
+## Current / Reference / Target Parity Matrix
+
+| Surface | Current Drift | Authoritative Reference | Target State |
+| --- | --- | --- | --- |
+| `Backlog` / `Ready` follow-up issue admission | Helper-created follow-ups can appear in `Ready` immediately after being explicitly created or reset to `Backlog`. | Linear state remains authoritative for user-visible queue position, but helper follow-up descriptions define the traceability packet required before leaving `Backlog`. | Follow-ups with pending traceability packets stay in `Backlog` with hold evidence until deliberate sequencing or packet completion allows promotion to `Ready`. |
+| `provider-intake-state.json` | Active claim projection can miss resumable claims or queued retry claims and therefore understate admission pressure. | Persisted provider claims plus discovered run identities are the canonical admission inputs for `max_allowed`. | Resumable claims and queued retry claims consume admission capacity, keyed by claim/run occupancy identity, and active issue identifiers reflect that pressure. |
+| `co-status` | Operator status can show active issue identifiers above `max_allowed` while intake and Linear disagree about what is active. | `co-status` should render the same active issue identifiers derived from provider intake/admission truth. | `co-status`, `provider-intake-state.json`, and live Linear state agree on which issues are active, held in `Backlog`, or blocked by queue capacity. |
+
 ## Protected Terms
 
 - `Backlog`
@@ -52,6 +60,7 @@ Restore one truthful queue contract across `Backlog`, `Ready`, `provider-intake-
 ## Review Notes
 
 - 2026-04-23: Issue-quality review approved this scope as covering the full CO-331 request, including `Backlog` follow-up admission, retry/resumable occupancy, provider intake state, `co-status`, and `max_allowed` alignment.
+- 2026-04-23: Before implementation, the parent worker completed a standalone task/spec review against the Linear issue intent and approved the docs packet as sufficient for implementation.
 - 2026-04-23: Manifest-backed standalone review completed with `status: succeeded` and `review_outcome: clean-success`; post-review elegance/minimality pass found no avoidable abstraction or unrelated branch scope.
 
 ## Not Done If

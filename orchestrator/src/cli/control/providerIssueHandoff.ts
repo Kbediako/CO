@@ -1130,16 +1130,7 @@ export function createProviderIssueHandoffService(
         ) ??
         activeRunsByProviderIssue.get(claim.provider_key)?.[0] ??
         null;
-      const occupancyKey =
-        activeClaimRun?.manifestPath ??
-        activeClaimRun?.runId ??
-        (
-          claim.state === 'running'
-            ? null
-            : claim.run_manifest_path ??
-              claim.run_id ??
-              `claim:${claim.provider_key}:${claim.state}`
-        );
+      const occupancyKey = resolveProviderClaimAdmissionOccupancyKey(claim, activeClaimRun);
       if (!occupancyKey) {
         continue;
       }
