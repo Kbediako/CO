@@ -10,7 +10,10 @@ type WorkflowStep = {
   'continue-on-error'?: unknown;
   env?: unknown;
   if?: unknown;
+  name?: unknown;
   run?: unknown;
+  uses?: unknown;
+  with?: unknown;
 };
 
 type WorkflowJob = {
@@ -1085,6 +1088,41 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
       }
       expect(smokeStepCount, `${workflow} must run pack:smoke`).toBeGreaterThan(0);
     }
+  });
+
+  it('keeps the release publish job on a trusted-publishing runtime without npm self-upgrade', async () => {
+    const workflowText = await readText('.github/workflows/release.yml');
+    expect(workflowText).not.toContain('npm install --global npm@^11.5.1');
+    expect(workflowText).not.toContain('npx --yes npm@11.5.1');
+    expect(workflowText).toContain('Release asset ${TARBALL} already exists; preserving existing release tarball.');
+    expect(workflowText).toContain('gh release upload "$TAG" "$TARBALL"');
+    expect(workflowText).not.toContain('--clobber');
+    expect(workflowText).toContain('--draft=false');
+    expect(workflowText).toContain('--prerelease=false');
+    expect(workflowText).toContain('gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$TARBALL_NAME"');
+    expect(workflowText).toContain('release.data.assets.find(item => item.name === assetName)');
+    expect(workflowText).toContain('core.warning(`No release asset named ${assetName} found; falling back to the build artifact.`)');
+    expect(workflowText).toContain("core.setOutput('asset_id', '')");
+    expect(workflowText).toContain("steps.asset.outputs.asset_id == ''");
+    expect(workflowText).toContain('npm publish "$TARBALL_PATH" --tag "$DIST_TAG" --provenance');
+    expect(workflowText).toContain('TARBALL_PATH="release-assets/${TARBALL_NAME}"');
+    expect(workflowText).toContain('Expected release asset ${TARBALL_NAME} was not downloaded for ${TAG}.');
+    expect(workflowText).toContain('Expected tarball ${TARBALL_NAME} was not found to publish.');
+    expect(workflowText).not.toContain('ls release-assets/*.tgz | head -n 1');
+
+    const workflow = await readWorkflow('.github/workflows/release.yml');
+    const publishJob = workflow.jobs?.publish;
+    expect(publishJob, 'release workflow must define a publish job').toBeDefined();
+    const steps = getWorkflowSteps(publishJob as WorkflowJob);
+    const setupNodeStep = steps.find((step) => step.uses === 'actions/setup-node@v4');
+    const setupNodeWith = setupNodeStep?.with as Record<string, unknown> | undefined;
+    expect(String(setupNodeWith?.['node-version']), 'publish job must pin a Node 24 build with npm 11.5.1+').toBe('24.5.0');
+
+    const runtimeStep = steps.find((step) => step.name === 'Verify npm trusted publishing runtime');
+    const runtimeRun = typeof runtimeStep?.run === 'string' ? runtimeStep.run : '';
+    expect(runtimeRun).toContain('[22, 14, 0]');
+    expect(runtimeRun).toContain('[11, 5, 1]');
+    expect(runtimeRun).not.toContain('npm install');
   });
 
   it('pins cloud-canary to the explicit audited Codex candidate before running canaries', async () => {
