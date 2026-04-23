@@ -48,6 +48,9 @@ last_review: 2026-04-21
 - Removal of local aliases requires a dedicated follow-up task, explicit release-note migration guidance, and downstream smoke validation.
 - `manifest.collab_tool_calls` remains unchanged until a schema-versioned migration is approved.
 
+## Review Notes
+- 2026-04-21: CO-278 spec-guard freshness review re-read the canonical terminology contract, compatibility constraints, and validation plan; no scope reclassification or archive action is warranted, so this refresh is limited to the stale review baseline blocking enforced `node scripts/spec-guard.mjs`.
+
 ## Approvals
 - Reviewer: user
 - Date: 2026-02-18

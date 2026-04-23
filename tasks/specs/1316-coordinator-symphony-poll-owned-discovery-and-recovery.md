@@ -17,6 +17,7 @@ review_notes:
   - 2026-03-21: Current branch truth is that the earlier `1316` discovery/recovery and observability API normalization work are already landed here, and the former final gap of full active-candidate pagination plus fresh poll dispatch ordering and slot budgeting is now implemented on this branch.
   - 2026-03-21: Final Linear default-contract alignment is also landed locally: candidate paging now uses `page size 50` and request timeout `30000 ms`.
   - 2026-03-21: Current publication root is `out/1316-coordinator-symphony-poll-owned-discovery-and-recovery/manual/20260321T211653Z-current-head-closeout/`; it records the current-head review-tool waiver, fresh `pack:smoke`, and the explicit no-fresh-live-proof publication decision while GitHub checks, thread closure, and merge remain open.
+  - 2026-04-21: CO-278 spec-guard freshness review re-read the poll-owned discovery/recovery contract, current-truth section, and validation plan; no scope reclassification or archive action is warranted, so this refresh is limited to the stale review baseline blocking enforced `node scripts/spec-guard.mjs`.
 ---
 
 # Technical Specification

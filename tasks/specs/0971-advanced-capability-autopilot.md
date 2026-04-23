@@ -42,6 +42,9 @@ last_review: 2026-04-21
 ## Open Questions
 - None blocking.
 
+## Review Notes
+- 2026-04-21: CO-278 spec-guard freshness review re-read the summary, requirements, and validation plan; no scope reclassification or archive action is warranted, so this refresh is limited to the stale review baseline blocking enforced `node scripts/spec-guard.mjs`.
+
 ## Approvals
 - Reviewer: user
 - Date: 2026-02-18
