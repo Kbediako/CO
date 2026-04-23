@@ -2617,6 +2617,83 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(parsed.failureDiagnosis?.diagnostic_category).not.toBe('provider_runtime');
   });
 
+  it('classifies provider stdin bootstrap exits separately from generic runtime failures', () => {
+    const cases: Record<string, unknown>[] = [
+      {
+        type: 'error',
+        message: 'stderr | Reading additional input from stdin...',
+        timestamp: '2026-04-23T07:46:11.000Z'
+      },
+      {
+        type: 'event_msg',
+        payload: {
+          type: 'diagnostic',
+          diagnostic_category: 'provider_runtime',
+          message: 'stderr | Reading    additional\ninput from stdin...'
+        },
+        timestamp: '2026-04-23T07:46:12.000Z'
+      },
+      {
+        type: 'diagnostic',
+        diagnostic_category: 'reading_additional_input_from_stdin',
+        status: 'failed',
+        timestamp: '2026-04-23T07:46:13.000Z'
+      }
+    ];
+
+    for (const event of cases) {
+      const parsed = parseProviderLinearWorkerJsonl(JSON.stringify(event));
+      expect(parsed.failureDiagnosis).toMatchObject({
+        diagnostic_category: 'provider_stdin_bootstrap',
+        source: 'stdout_jsonl',
+        guidance: expect.stringContaining('stdin bootstrap')
+      });
+      expect(parsed.failureDiagnosis?.signal.toLowerCase()).toContain('stdin');
+      expect(parsed.failureDiagnosis?.diagnostic_category).not.toBe('provider_runtime');
+    }
+  });
+
+  it('preserves stronger root-cause diagnostics over stdin bootstrap preamble text', () => {
+    const cases: Array<[Record<string, unknown>, string]> = [
+      [
+        {
+          type: 'error',
+          message: 'Unauthorized active account mismatch after Reading additional input from stdin...'
+        },
+        'auth_mismatch'
+      ],
+      [
+        {
+          type: 'error',
+          message: 'HTTP 429 too many requests after Reading additional input from stdin...'
+        },
+        'quota_rate_limit'
+      ],
+      [
+        {
+          type: 'error',
+          message: 'Cloud execution denied after Reading additional input from stdin...'
+        },
+        'cloud_denial'
+      ],
+      [
+        {
+          type: 'diagnostic',
+          diagnostic_category: 'env_config',
+          message: 'Reading additional input from stdin...'
+        },
+        'env_config'
+      ]
+    ];
+
+    for (const [event, expected] of cases) {
+      const parsed = parseProviderLinearWorkerJsonl(
+        JSON.stringify({ timestamp: '2026-04-23T07:46:14.000Z', ...event })
+      );
+      expect(parsed.failureDiagnosis?.diagnostic_category).toBe(expected);
+    }
+  });
+
   it('classifies machine-readable provider diagnostic events before prose', () => {
     const cases: Array<[Record<string, unknown>, string]> = [
       [{ type: 'auth_mismatch', status: 'failed' }, 'auth_mismatch'],
@@ -7240,6 +7317,67 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     } finally {
       await controlServer.close();
     }
+  });
+
+  it('classifies stdin bootstrap stderr exits in failed proof sidecars', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: tempRoot
+      }),
+      'utf8'
+    );
+
+    await expect(
+      runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+        },
+        {
+          readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+          resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+          execRunner: vi.fn(async (request) => {
+            await appendStaySerialParallelizationDecisionAuditForRequest(request);
+            return {
+              exitCode: 1,
+              stdout: [
+                '{"type":"thread.started","thread_id":"thread-1"}',
+                '{"type":"turn_context","payload":{"turn_id":"turn-1"}}'
+              ].join('\n'),
+              stderr: 'stderr | Reading additional input from stdin...'
+            };
+          }),
+          now: vi
+            .fn()
+            .mockReturnValueOnce('2026-04-23T07:46:11.000Z')
+            .mockReturnValue('2026-04-23T07:46:12.000Z'),
+          log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+        }
+      )
+    ).rejects.toThrow('provider-linear-worker turn 1 failed with exit code 1');
+
+    const written = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      owner_status: 'failed',
+      end_reason: 'codex_exit_1',
+      failure_diagnosis: {
+        diagnostic_category: 'provider_stdin_bootstrap',
+        signal: expect.stringContaining('Reading additional input from stdin'),
+        guidance: expect.stringContaining('stdin bootstrap'),
+        source: 'stderr',
+        observed_at: '2026-04-23T07:46:12.000Z'
+      }
+    });
   });
 
   it('persists the first proof snapshot and runtime diagnosis when the manifest cannot be reread later', async () => {

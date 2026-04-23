@@ -31444,6 +31444,127 @@ describe('createProviderIssueHandoffService', () => {
     expect(getPersistedState().claims[0]).toMatchObject(expectedClaim);
   });
 
+  it('carries provider proof failure diagnosis into resumable retry evidence', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-23T07:50:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-stdin-bootstrap'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-stdin-bootstrap');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-stdin-bootstrap',
+        task_id: 'task-stdin-bootstrap',
+        status: 'in_progress',
+        summary: 'worker still running',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-04-23T07:45:00.000Z',
+        updated_at: '2026-04-23T07:49:00.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        owner_phase: 'ended',
+        owner_status: 'failed',
+        end_reason: 'codex_exit_1',
+        failure_diagnosis: {
+          diagnostic_category: 'provider_stdin_bootstrap',
+          signal: 'stderr | Reading additional input from stdin...',
+          guidance:
+            'Codex exited during stdin bootstrap before issue execution; inspect the control-host to provider-linear-worker Codex exec stdin/prompt handoff, not issue-specific content.',
+          source: 'stderr',
+          observed_at: '2026-04-23T07:46:12.000Z'
+        },
+        linear_audit: {
+          attempted_count: 0
+        },
+        updated_at: '2026-04-23T07:50:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-23T07:45:00.000Z',
+      task_id: 'task-stdin-bootstrap',
+      mapping_source: 'provider_id_fallback',
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      accepted_at: '2026-04-23T07:45:05.000Z',
+      updated_at: '2026-04-23T07:45:10.000Z',
+      last_delivery_id: 'delivery-stdin-bootstrap',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_745_392_710_000,
+      run_id: 'run-stdin-bootstrap',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-04-23T07:49:30.000Z'
+        })
+      })
+    });
+
+    await service.refresh();
+    await waitForMockCalls(setTimeoutSpy);
+
+    const expectedRetryError =
+      'provider_stdin_bootstrap: stderr | Reading additional input from stdin...';
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'resumable',
+      reason: 'provider_issue_rehydrated_resumable_run',
+      retry_queued: true,
+      retry_attempt: 1,
+      retry_due_at: '2026-04-23T07:50:10.000Z',
+      retry_error: expectedRetryError
+    });
+    expect(persist).toHaveBeenCalled();
+    expect(getPersistedState().claims[0]).toMatchObject({
+      retry_error: expectedRetryError
+    });
+  });
+
   it('relaunches a stale running claim when the only in-progress proof sidecar predates the manifest start', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
