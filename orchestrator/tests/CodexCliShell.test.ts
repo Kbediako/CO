@@ -133,6 +133,29 @@ describe('runCodexCliShell', () => {
     });
   });
 
+  it('rejects auth scope flags without a value', async () => {
+    const runCodexDefaultsSetupMock =
+      vi.fn<typeof import('../src/cli/codexDefaultsSetup.ts').runCodexDefaultsSetup>().mockResolvedValue({
+        status: 'planned'
+      } as never);
+
+    await expect(
+      runCodexCliShell(
+        {
+          positionals: ['defaults'],
+          flags: { yes: true, 'auth-scope': true },
+          printHelp: vi.fn()
+        },
+        {
+          runCodexDefaultsSetup: runCodexDefaultsSetupMock,
+          formatCodexDefaultsSetupSummary: vi.fn().mockReturnValue([]),
+          log: vi.fn()
+        }
+      )
+    ).rejects.toThrow('Missing value for codex defaults auth scope');
+    expect(runCodexDefaultsSetupMock).not.toHaveBeenCalled();
+  });
+
   it('rejects unknown codex subcommands', async () => {
     await expect(
       runCodexCliShell({

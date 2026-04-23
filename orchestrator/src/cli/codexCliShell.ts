@@ -111,9 +111,12 @@ function readAuthScopeFlag(flags: ArgMap): CodexDefaultsAuthScope | undefined {
   if (flags['chatgpt-auth'] === true) {
     return 'chatgpt';
   }
+  if (!Object.prototype.hasOwnProperty.call(flags, 'auth-scope')) {
+    return undefined;
+  }
   const value = readStringFlag(flags, 'auth-scope');
   if (value === undefined) {
-    return undefined;
+    throw new Error('Missing value for codex defaults auth scope: expected portable or chatgpt.');
   }
   if (value === 'portable' || value === 'chatgpt') {
     return value;
