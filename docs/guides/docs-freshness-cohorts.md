@@ -11,6 +11,7 @@ The machine-readable policy lives in `docs/docs-catalog.json` under `policies.ro
 Current CO policy:
 
 - Owner issue: `CO-324`
+- Exact canonical owner overrides: `canonical_owner_issues[]` may map one `canonical_owner_key` to one live owner issue, such as `CO-320` for `docs_freshness_candidate|doc_class:task_packet|path_family:tasks/tasks-*|last_review:2026-03-23|cadence_days:30`
 - Historical owner lineage: `CO-175` established the Apr 14 baseline, `CO-267` owned the Apr 20/21 maintenance refreshes, and `CO-300` owned the Apr 22 reset; these are now terminal evidence only and must not remain the live maintenance owner after they reach terminal states.
 - Window: `7` days after the normal freshness cadence expires
 - Maximum active rolling cohorts: `2`
@@ -50,6 +51,8 @@ The maintenance report is the machine-readable decision future workers should ci
 Provider-worker gates use this decision in `docs-review` and `implementation-gate`. They may pass with `pass_with_owned_rolling_debt` only when the debt is in an eligible historical class, the policy owner issue is present, the rows are still inside the rolling window and caps, `spec-guard` is clean, and the current diff/task packet has no blocking freshness paths. The underlying `docs:freshness` JSON still preserves the raw stale and rolling row evidence.
 
 When the configured owner issue is terminal, `docs:freshness:maintain` must fail closed. Terminal owner metadata is evidence only; the helper must require a new live same-project owner issue instead of reusing a `Done`, `Duplicate`, or `Canceled` owner path.
+
+Exact canonical owner overrides are narrower than the global owner issue. `docs:freshness:maintain` may surface a mapped live owner only when a candidate cohort's `canonical_owner_key` exactly matches an entry in `canonical_owner_issues[]`; unrelated candidate cohorts must keep the configured global owner evidence and remain blocked or independently owned. This keeps duplicate prevention keyed to `codex-orchestrator:canonical-owner-key=...` without broadening a cohort-specific owner into a repo-wide freshness owner.
 
 ## Preserved Historical Stub Status
 Some historical task-key stubs remain authoritative because current repo tooling still resolves their canonical task key from that path even after the rest of the historical packet is gone. Those rows should use docs-freshness registry status `preserved_historical_stub`.
