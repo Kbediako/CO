@@ -775,6 +775,62 @@ describe('buildProviderIntakeSummary', () => {
     });
   });
 
+  it('counts queued retry claims as active issue identifiers even after terminal run state', () => {
+    const summary = buildProviderIntakeSummary({
+      schema_version: 1,
+      updated_at: '2026-04-23T08:09:33.742Z',
+      rehydrated_at: null,
+      latest_provider_key: 'linear:lin-issue-329',
+      latest_reason: 'provider_issue_retry_queued',
+      claims: [
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-329',
+          issue_id: 'lin-issue-329',
+          issue_identifier: 'CO-329',
+          issue_title: 'Retry queued follow-up',
+          issue_state: 'Ready',
+          issue_state_type: 'unstarted',
+          issue_updated_at: '2026-04-23T08:07:41.709Z',
+          task_id: 'linear-lin-issue-329',
+          mapping_source: 'provider_id_fallback',
+          state: 'completed',
+          reason: 'provider_issue_retry_queued',
+          accepted_at: '2026-04-23T08:04:00.000Z',
+          updated_at: '2026-04-23T08:04:25.936Z',
+          last_delivery_id: null,
+          last_event: null,
+          last_action: null,
+          last_webhook_timestamp: null,
+          run_id: null,
+          run_manifest_path: null,
+          retry_queued: true,
+          retry_attempt: 2,
+          retry_due_at: '2026-04-23T08:14:25.936Z',
+          retry_error: 'queued retry still occupies capacity',
+          launch_source: null,
+          launch_token: null
+        }
+      ]
+    });
+
+    expect(summary).toMatchObject({
+      active_claim_count: 1,
+      running_claim_count: 0,
+      active_issue_identifiers: ['CO-329'],
+      running_issue_identifiers: [],
+      selected_claim: {
+        issue_identifier: 'CO-329',
+        state: 'completed',
+        retry: {
+          active: true,
+          attempt: 2,
+          due_at: '2026-04-23T08:14:25.936Z'
+        }
+      }
+    });
+  });
+
   it('prefers an active claim over inactive released history when multiple active claims remain', () => {
     const state = {
       schema_version: 1,

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { appendFile, mkdir } from 'node:fs/promises';
+import { access, appendFile, mkdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import process from 'node:process';
 
@@ -69,6 +69,7 @@ const BACKLOG_PROMOTION_BLOCKING_CLAIM_STATES = new Set([
   'resuming',
   'resumable'
 ]);
+const FOLLOW_UP_PACKET_PREFIX_PATTERN = /Follow-up packet prefix:\s*`?(linear-[a-z0-9-]+)/iu;
 const REVIEW_HANDOFF_REWORK_ELIGIBLE_CLAIM_STATES = new Set(['handoff_failed']);
 
 export interface ProviderOperatorAutopilotConfig {
@@ -473,6 +474,7 @@ export async function runProviderOperatorAutopilot(
       previousResult: input.previous_result ?? null,
       sourceSetup: input.source_setup ?? null,
       env: input.env ?? process.env,
+      repoRoot: input.repo_root ?? process.cwd(),
       transitionIssueState
     });
     if (backlogOutcome.failed) {
@@ -599,6 +601,7 @@ async function maybeRunBacklogPromotion(input: {
   previousResult: ProviderOperatorAutopilotResult | null;
   sourceSetup: DispatchPilotSourceSetup | null;
   env: NodeJS.ProcessEnv;
+  repoRoot: string;
   transitionIssueState: typeof transitionProviderLinearIssueState;
 }): Promise<{
   action: ProviderOperatorAutopilotActionRecord | null;
@@ -685,6 +688,21 @@ async function maybeRunBacklogPromotion(input: {
         issue: candidate,
         reason: 'backlog_head_blocked_by_non_terminal',
         summary: `Backlog head ${candidate.identifier} remains parked because it is blocked by non-terminal work: ${formatBlockedBy(candidate.blocked_by)}.`,
+        actionRequiredReasons: []
+      }),
+      failed: false,
+      summary: '',
+      error: null
+    };
+  }
+  if (await isTraceabilityPendingFollowUpIssue(candidate, input.repoRoot)) {
+    return {
+      action: null,
+      hold: buildAutopilotHoldRecord({
+        kind: 'backlog_promotion',
+        issue: candidate,
+        reason: 'backlog_head_follow_up_traceability_pending',
+        summary: `Backlog head ${candidate.identifier} remains parked because follow-up traceability requires packet and registry mirror setup before leaving Backlog.`,
         actionRequiredReasons: []
       }),
       failed: false,
@@ -2133,8 +2151,61 @@ function isBacklogPromotionBlockedByExistingClaimState(state: string | null | un
   return typeof state === 'string' && BACKLOG_PROMOTION_BLOCKING_CLAIM_STATES.has(state);
 }
 
+async function isTraceabilityPendingFollowUpIssue(
+  issue: Pick<LiveLinearTrackedIssue, 'description'>,
+  repoRoot: string
+): Promise<boolean> {
+  const description = typeof issue.description === 'string' ? issue.description : '';
+  const followUpTaskId = description.match(FOLLOW_UP_PACKET_PREFIX_PATTERN)?.[1] ?? null;
+  if (!followUpTaskId) {
+    return false;
+  }
+  const packetPaths = [
+    `docs/PRD-${followUpTaskId}.md`,
+    `docs/TECH_SPEC-${followUpTaskId}.md`,
+    `docs/ACTION_PLAN-${followUpTaskId}.md`,
+    `tasks/specs/${followUpTaskId}.md`,
+    `tasks/tasks-${followUpTaskId}.md`,
+    `.agent/task/${followUpTaskId}.md`
+  ];
+  for (const path of packetPaths) {
+    if (!await fileExists(join(repoRoot, path))) {
+      return true;
+    }
+  }
+  const registryMirrorPaths = [
+    'tasks/index.json',
+    'docs/TASKS.md',
+    'docs/docs-freshness-registry.json'
+  ];
+  for (const path of registryMirrorPaths) {
+    const content = await readTextFileIfPresent(join(repoRoot, path));
+    if (!content?.includes(followUpTaskId)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' ? (value as Record<string, unknown>) : null;
+}
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function readTextFileIfPresent(path: string): Promise<string | null> {
+  try {
+    return await readFile(path, 'utf8');
+  } catch {
+    return null;
+  }
 }
 
 function readBoolean(
