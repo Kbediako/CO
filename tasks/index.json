@@ -14153,6 +14153,36 @@
           "ACTION_PLAN": "docs/ACTION_PLAN-linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe.md"
         }
       }
+    },
+    {
+      "id": "20260423-linear-b2712a15-b04f-4a4e-aac8-35f614abb01b",
+      "title": "CO-315 release-runbook parity and docs:check truth coverage",
+      "relates_to": "tasks/tasks-linear-b2712a15-b04f-4a4e-aac8-35f614abb01b.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-23",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-23",
+          "status": "produced",
+          "manifest": ".runs/linear-b2712a15-b04f-4a4e-aac8-35f614abb01b-docs-packet/cli/2026-04-23T00-51-01-276Z-b894da73/manifest.json",
+          "source_anchor": "ctx:sha256:08ac8534528c20e15c4bf7265a363da0a47f727b08fa91807f76e42ad0030574#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-315 as release-runbook parity plus docs:check truth coverage for the release validation floor, signer-secret posture, manual-dispatch tag semantics, overview override behavior, and OIDC-vs-NPM_TOKEN publish posture. Parent owns implementation, validation, Linear/workpad state, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-b2712a15-b04f-4a4e-aac8-35f614abb01b.md",
+        "task": "tasks/tasks-linear-b2712a15-b04f-4a4e-aac8-35f614abb01b.md",
+        "agent_task": ".agent/task/linear-b2712a15-b04f-4a4e-aac8-35f614abb01b.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-b2712a15-b04f-4a4e-aac8-35f614abb01b.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-b2712a15-b04f-4a4e-aac8-35f614abb01b.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-b2712a15-b04f-4a4e-aac8-35f614abb01b.md"
+        }
+      }
     }
   ]
 }

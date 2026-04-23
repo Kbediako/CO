@@ -136,6 +136,93 @@ async function writeSparkPolicyFixtureRepo(repoRoot: string, fixture: SparkPolic
   await writeFile(join(repoRoot, fixture.document_path), `${fixture.content_lines.join('\n')}\n`, 'utf8');
 }
 
+const releaseWorkflowFixture = [
+  'name: release',
+  '',
+  'on:',
+  '  workflow_dispatch:',
+  '    inputs:',
+  '      tag:',
+  '        description: Existing release tag',
+  '        required: false',
+  '        type: string',
+  '',
+  'jobs:',
+  '  build-release:',
+  '    steps:',
+  '      - name: Configure tag verification keys',
+  '        env:',
+  '          RELEASE_SIGNING_PUBLIC_KEYS: ${{ secrets.RELEASE_SIGNING_PUBLIC_KEYS }}',
+  '          RELEASE_SIGNING_ALLOWED_SIGNERS: ${{ secrets.RELEASE_SIGNING_ALLOWED_SIGNERS }}',
+  '      - name: Generate release notes',
+  "        run: echo 'git for-each-ref refs/tags/$TAG --format=%(contents:body); readAnnotatedTagBody'",
+  '      - name: Resolve release metadata',
+  '        run: |',
+  '          echo "dist_tag=latest" >> "$GITHUB_OUTPUT"',
+  '          echo "prerelease=true" >> "$GITHUB_OUTPUT"',
+  '      - run: npm run clean:dist',
+  '      - run: npm run build',
+  '  publish:',
+  '    steps:',
+  '      - name: Publish to npm',
+  '        env:',
+  '          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}',
+  '        run: |',
+  '          NODE_AUTH_TOKEN= NPM_CONFIG_USERCONFIG="$OIDC_NPMRC" npm publish "$TARBALL_PATH" --tag "$DIST_TAG" --provenance',
+  '          echo "OIDC publish failed (exit ${OIDC_STATUS}); falling back to NPM_TOKEN if available."',
+  ''
+].join('\n');
+
+const releaseRunbookCatalogEntry = (path: string) => ({
+  path,
+  doc_class: 'repo_guide',
+  truth_checks: ['release-runbook']
+});
+
+async function writeReleaseRunbookFixtureRepo(
+  repoRoot: string,
+  {
+    entries,
+    skillContent = null,
+    sopContent = null,
+    addendumContent = null
+  }: {
+    entries: Array<Record<string, unknown>>;
+    skillContent?: string | null;
+    sopContent?: string | null;
+    addendumContent?: string | null;
+  }
+) {
+  await mkdir(join(repoRoot, '.agent', 'SOPs'), { recursive: true });
+  await mkdir(join(repoRoot, '.github', 'workflows'), { recursive: true });
+  await mkdir(join(repoRoot, 'docs'), { recursive: true });
+  await mkdir(join(repoRoot, 'skills', 'release'), { recursive: true });
+
+  await writeFile(
+    join(repoRoot, 'package.json'),
+    JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+    'utf8'
+  );
+  await writeFile(
+    join(repoRoot, 'codex.orchestrator.json'),
+    JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+    'utf8'
+  );
+  await writeDocsCatalogFixture(repoRoot, { entries });
+  await writeFile(join(repoRoot, '.github', 'workflows', 'release.yml'), releaseWorkflowFixture, 'utf8');
+  await writeFile(join(repoRoot, 'docs', 'skills-release.md'), '# Skills release\n', 'utf8');
+
+  if (skillContent !== null) {
+    await writeFile(join(repoRoot, 'skills', 'release', 'SKILL.md'), skillContent, 'utf8');
+  }
+  if (sopContent !== null) {
+    await writeFile(join(repoRoot, '.agent', 'SOPs', 'release.md'), sopContent, 'utf8');
+  }
+  if (addendumContent !== null) {
+    await writeFile(join(repoRoot, 'docs', 'release-notes-template-addendum.md'), addendumContent, 'utf8');
+  }
+}
+
 describe('docs hygiene tooling', () => {
   it('fails closed when the docs catalog is missing', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-missing-catalog-'));
@@ -1370,6 +1457,149 @@ describe('docs hygiene tooling', () => {
         reference: 'lines=7/4 h2=2/1'
       })
     );
+  });
+
+  it('flags release-runbook drift when the bundled release skill omits the current release posture', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-release-skill-'));
+    createdDirs.push(repoRoot);
+
+    await writeReleaseRunbookFixtureRepo(repoRoot, {
+      entries: [releaseRunbookCatalogEntry('skills/release/SKILL.md')],
+      skillContent: ['# Release', '', '- `npm run build:all`', '- `npm run test:adapters`', ''].join('\n')
+    });
+
+    const errors = await runDocsCheck(repoRoot);
+    const releaseError = errors.find(
+      (error) => error.file === 'skills/release/SKILL.md' && error.rule === 'release-runbook-stale'
+    );
+
+    expect(releaseError).toBeDefined();
+    expect(releaseError?.reference).toContain('validation command npm run build');
+    expect(releaseError?.reference).toContain('validation command npm run test');
+    expect(releaseError?.reference).toContain('npm run repo:stewardship');
+    expect(releaseError?.reference).toContain('package artifact clean-dist validation');
+    expect(releaseError?.reference).toContain('local signing gate');
+    expect(releaseError?.reference).toContain('exactly-one signer secret posture');
+    expect(releaseError?.reference).toContain('manual-dispatch inputs.tag semantics');
+    expect(releaseError?.reference).toContain('signed annotated tag body overview override');
+    expect(releaseError?.reference).toContain('NPM_TOKEN fallback');
+  });
+
+  it('keeps release validation-floor commands distinct from package artifact commands', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-release-validation-floor-'));
+    createdDirs.push(repoRoot);
+
+    await writeReleaseRunbookFixtureRepo(repoRoot, {
+      entries: [releaseRunbookCatalogEntry('skills/release/SKILL.md')],
+      skillContent: [
+        '# Release',
+        '',
+        'Run the full release validation floor before tagging:',
+        '- `npm run lint`',
+        '',
+        'Validate the package artifact with `npm run clean:dist && npm run build`, `npm run pack:audit`, and `npm run pack:smoke`.',
+        ''
+      ].join('\n')
+    });
+
+    const errors = await runDocsCheck(repoRoot);
+    const releaseError = errors.find(
+      (error) => error.file === 'skills/release/SKILL.md' && error.rule === 'release-runbook-stale'
+    );
+
+    expect(releaseError).toBeDefined();
+    expect(releaseError?.reference).toContain('validation command npm run build');
+    expect(releaseError?.reference).toContain('validation command npm run pack:audit');
+    expect(releaseError?.reference).toContain('validation command npm run pack:smoke');
+    expect(releaseError?.reference).not.toContain('package artifact clean-dist validation');
+  });
+
+  it('flags release-runbook drift when the release SOP omits protected posture', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-release-sop-'));
+    createdDirs.push(repoRoot);
+    await writeReleaseRunbookFixtureRepo(repoRoot, {
+      entries: [releaseRunbookCatalogEntry('.agent/SOPs/release.md')],
+      sopContent: ['# Release SOP', '', '- `npm run build`', '- Publish the package.', ''].join('\n')
+    });
+    const errors = await runDocsCheck(repoRoot);
+    const releaseError = errors.find((error) => error.file === '.agent/SOPs/release.md' && error.rule === 'release-runbook-stale');
+    expect(releaseError).toBeDefined();
+    expect(releaseError?.reference).toMatch(/exactly-one signer secret posture.*manual-dispatch inputs\.tag semantics.*OIDC or trusted publishing posture.*NPM_TOKEN fallback/);
+  });
+
+  it('flags release-runbook drift when the addendum omits overview and install guidance', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-release-addendum-'));
+    createdDirs.push(repoRoot);
+    await writeReleaseRunbookFixtureRepo(repoRoot, {
+      entries: [releaseRunbookCatalogEntry('docs/release-notes-template-addendum.md')],
+      addendumContent: ['# Release Notes Addendum', '', 'Mention shipped skill changes in release notes.', ''].join('\n')
+    });
+    const errors = await runDocsCheck(repoRoot);
+    const releaseError = errors.find((error) => error.file === 'docs/release-notes-template-addendum.md' && error.rule === 'release-runbook-stale');
+    expect(releaseError).toBeDefined();
+    expect(releaseError?.reference).toMatch(/release notes placement under Overview.*signed annotated tag body overview override note.*codex-orchestrator skills install --force.*docs\/skills-release\.md link/);
+  });
+
+  it('passes release-runbook truth checks when the release docs match the workflow contract', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-release-pass-'));
+    createdDirs.push(repoRoot);
+
+    const releaseDocContent = [
+      '# Release',
+      '',
+      '- `node scripts/delegation-guard.mjs`',
+      '- `node scripts/spec-guard.mjs --dry-run`',
+      '- `npm run build`',
+      '- `npm run lint`',
+      '- `npm run test`',
+      '- `npm run docs:check`',
+      '- `npm run docs:freshness`',
+      '- `npm run repo:stewardship`',
+      '- `node scripts/diff-budget.mjs`',
+      '- `npm run review`',
+      '- `npm run pack:audit`',
+      '- `npm run pack:smoke`',
+      '- `npm run build:all`',
+      '- `npm run test:adapters`',
+      '- `npm run test:evaluation`',
+      '- `npm run eval:test`',
+      '- Release is blocked unless commit/tag signing is configured on the release machine.',
+      '- Preflight checks `git config commit.gpgsign` and `git config tag.gpgSign`.',
+      '- Release tags stay signed annotated tags via `git tag -s`.',
+      '- Validate the package artifact from a clean dist with `npm run clean:dist && npm run build` before pack smoke.',
+      '- CI tag checks require exactly one signer secret: `RELEASE_SIGNING_PUBLIC_KEYS` or `RELEASE_SIGNING_ALLOWED_SIGNERS`.',
+      '- Manual reruns use `workflow_dispatch` with `inputs.tag=v0.1.2`.',
+      '- Optional overview override lives in the signed annotated tag body.',
+      '- Stable releases publish to `latest`; prerelease releases keep a prerelease dist-tag.',
+      '- Publish prefers OIDC trusted publishing with provenance and falls back to `NPM_TOKEN` only when needed.',
+      '- `NPM_TOKEN` fallback must use an npm automation token.',
+      ''
+    ].join('\n');
+
+    const addendumContent = [
+      '# Release Notes Addendum — Shipped Skills',
+      '',
+      'Keep the bundled-skill bullets under **Overview**.',
+      'If a one-shot override is needed, keep it in the signed annotated tag body.',
+      '- Install/refresh command: `codex-orchestrator skills install --force`.',
+      '- Include the docs link: `docs/skills-release.md`.',
+      ''
+    ].join('\n');
+
+    await writeReleaseRunbookFixtureRepo(repoRoot, {
+      entries: [
+        releaseRunbookCatalogEntry('.agent/SOPs/release.md'),
+        releaseRunbookCatalogEntry('skills/release/SKILL.md'),
+        releaseRunbookCatalogEntry('docs/release-notes-template-addendum.md')
+      ],
+      skillContent: releaseDocContent,
+      sopContent: releaseDocContent,
+      addendumContent
+    });
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors.filter((error) => error.rule === 'release-runbook-stale')).toEqual([]);
   });
 
   it('syncs mirrors for an active task idempotently', async () => {
