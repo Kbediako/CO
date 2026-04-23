@@ -1,6 +1,35 @@
 {
   "items": [
     {
+      "id": "20260423-linear-37c1035e-d319-4306-8a41-648f2ab836e6",
+      "title": "CO-328 accepted child-lane workspace artifacts and diff-budget scope",
+      "relates_to": "tasks/tasks-linear-37c1035e-d319-4306-8a41-648f2ab836e6.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-23",
+      "approvals": {
+        "tests_child_lane": {
+          "reviewer": "bounded same-issue tests child lane",
+          "date": "2026-04-23",
+          "status": "accepted",
+          "manifest": ".runs/linear-37c1035e-d319-4306-8a41-648f2ab836e6-tests-child-lane-artifacts/cli/2026-04-23T09-15-16-094Z-6af4ff0f/manifest.json",
+          "summary": "Child lane added focused diff-budget regressions for accepted .child-lanes workspace artifacts, unrelated untracked files, and missing durable acceptance evidence."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-37c1035e-d319-4306-8a41-648f2ab836e6.md",
+        "task": "tasks/tasks-linear-37c1035e-d319-4306-8a41-648f2ab836e6.md",
+        "agent_task": ".agent/task/linear-37c1035e-d319-4306-8a41-648f2ab836e6.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-37c1035e-d319-4306-8a41-648f2ab836e6.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-37c1035e-d319-4306-8a41-648f2ab836e6.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-37c1035e-d319-4306-8a41-648f2ab836e6.md"
+        }
+      }
+    },
+    {
       "id": "20260423-linear-4ea68a3d-3832-4161-bab7-84dceeceeb46",
       "title": "CO: scope provider-linear parallelization proof invariants to the current turn",
       "relates_to": "tasks/tasks-linear-4ea68a3d-3832-4161-bab7-84dceeceeb46.md",

@@ -45,6 +45,69 @@ async function setOriginMainRef(repo: string, ref: string): Promise<void> {
   await execFileAsync('git', ['update-ref', 'refs/remotes/origin/main', ref], { cwd: repo });
 }
 
+async function writeAcceptedChildLaneEvidence(
+  repo: string,
+  laneWorkspace: string,
+  options: { taskId?: string; issueId?: string; issueIdentifier?: string } = {}
+): Promise<void> {
+  const taskId = options.taskId ?? 'linear-test-child-lane-artifacts';
+  const issueId = options.issueId ?? 'test-child-lane-artifacts';
+  const issueIdentifier = options.issueIdentifier ?? 'CO-328';
+  const parentRunId = 'parent-run-1';
+  const childRunId = 'child-run-1';
+  const artifactRoot = join(repo, '.runs', `${taskId}-tests`, 'cli', childRunId);
+  const patchArtifactPath = join(artifactRoot, 'provider-linear-child-lane.patch');
+  const runDir = join(repo, '.runs', taskId, 'cli', parentRunId);
+  const scope = { files: ['tests/diff-budget.spec.ts'], phases: ['tests'] };
+
+  await mkdir(artifactRoot, { recursive: true });
+  await mkdir(runDir, { recursive: true });
+  await writeFile(patchArtifactPath, 'diff --git a/tests/diff-budget.spec.ts b/tests/diff-budget.spec.ts\n', 'utf8');
+  await writeFile(
+    join(artifactRoot, 'provider-linear-child-lane-proof.json'),
+    JSON.stringify({
+      issue_id: issueId,
+      issue_identifier: issueIdentifier,
+      task_id: `${taskId}-tests`,
+      run_id: childRunId,
+      parent_run_id: parentRunId,
+      stream: 'tests',
+      scope,
+      lane_workspace_path: laneWorkspace,
+      patch_artifact_path: patchArtifactPath,
+      patch_bytes: 128,
+      status: 'succeeded',
+      updated_at: '2026-04-23T09:15:16.094Z'
+    }),
+    'utf8'
+  );
+  await writeFile(
+    join(runDir, 'provider-linear-worker-child-lanes.json'),
+    JSON.stringify([
+      {
+        stream: 'tests',
+        pipeline_id: 'provider-linear-child-lane',
+        task_id: `${taskId}-tests`,
+        run_id: childRunId,
+        status: 'succeeded',
+        artifact_root: artifactRoot,
+        patch_artifact_path: patchArtifactPath,
+        patch_bytes: 128,
+        issue_id: issueId,
+        issue_identifier: issueIdentifier,
+        workspace_path: repo,
+        lane_workspace_path: laneWorkspace,
+        scope,
+        decision: 'accepted',
+        decision_at: '2026-04-23T09:20:00.000Z',
+        decision_reason: 'Parent accepted the bounded child-lane patch.',
+        in_flight_started_at: null
+      }
+    ]),
+    'utf8'
+  );
+}
+
 async function runDiffBudget(
   repo: string,
   args: string[],
@@ -60,6 +123,15 @@ async function runDiffBudget(
     }
     if (!('DIFF_BUDGET_BASE' in env)) {
       delete mergedEnv.DIFF_BUDGET_BASE;
+    }
+    if (!('MCP_RUNNER_TASK_ID' in env)) {
+      delete mergedEnv.MCP_RUNNER_TASK_ID;
+    }
+    if (!('CODEX_ORCHESTRATOR_TASK_ID' in env)) {
+      delete mergedEnv.CODEX_ORCHESTRATOR_TASK_ID;
+    }
+    if (!('TASK' in env)) {
+      delete mergedEnv.TASK;
     }
     const { stdout, stderr } = await execFileAsync('node', [scriptPath, ...args], {
       cwd: repo,
@@ -86,6 +158,8 @@ afterEach(async () => {
 });
 
 describe('diff-budget script', () => {
+  const childLaneTaskEnv = { MCP_RUNNER_TASK_ID: 'linear-test-child-lane-artifacts' };
+
   it('uses the working tree as the default hard gate and reports stacked aggregate scope as advisory', async () => {
     const repo = await initRepository();
     const initialCommit = await git(repo, ['rev-parse', 'HEAD']);
@@ -278,9 +352,105 @@ describe('diff-budget script', () => {
     await writeFile(join(repo, 'package-lock.json'), 'y\n'.repeat(2000), 'utf8');
     await writeFile(join(repo, 'tasks', 'tasks-ignored.md'), 'q\n'.repeat(2000), 'utf8');
 
-    const result = await runDiffBudget(repo, ['--base', 'HEAD', '--max-files', '0', '--max-lines', '0']);
+    const result = await runDiffBudget(repo, ['--base', 'HEAD', '--max-files', '0', '--max-lines', '0'], childLaneTaskEnv);
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain('✅ Diff budget: OK (base=HEAD');
+  });
+
+  it('ignores accepted same-issue child-lane workspace artifacts with durable acceptance evidence', async () => {
+    const repo = await initRepository();
+    const laneWorkspace = join(repo, '.child-lanes', 'tests-child-run-1');
+    await mkdir(laneWorkspace, { recursive: true });
+    await writeFile(join(laneWorkspace, 'artifact.txt'), 'accepted child artifact\n'.repeat(10), 'utf8');
+    await writeAcceptedChildLaneEvidence(repo, laneWorkspace);
+
+    const result = await runDiffBudget(repo, ['--base', 'HEAD', '--max-files', '0', '--max-lines', '0'], childLaneTaskEnv);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('✅ Diff budget: OK (base=HEAD');
+    expect(result.stdout).toContain('files=0/0, lines=0/0');
+  });
+
+  it('still counts unrelated untracked files next to accepted child-lane workspace artifacts', async () => {
+    const repo = await initRepository();
+    const laneWorkspace = join(repo, '.child-lanes', 'tests-child-run-1');
+    await mkdir(laneWorkspace, { recursive: true });
+    await writeFile(join(laneWorkspace, 'artifact.txt'), 'accepted child artifact\n'.repeat(10), 'utf8');
+    await writeAcceptedChildLaneEvidence(repo, laneWorkspace);
+    await writeFile(join(repo, 'unrelated.txt'), 'still counted\n', 'utf8');
+
+    const result = await runDiffBudget(repo, ['--base', 'HEAD', '--max-lines', '0'], childLaneTaskEnv);
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toContain('❌ Diff budget exceeded (base=HEAD)');
+    expect(result.stdout).toContain('total lines changed 1 > 0');
+    expect(result.stdout).toContain('unrelated.txt: 1');
+    expect(result.stdout).not.toContain('.child-lanes/tests-child-run-1/artifact.txt');
+  });
+
+  it('counts child-lane workspace artifacts when durable acceptance evidence is missing', async () => {
+    const repo = await initRepository();
+    const laneWorkspace = join(repo, '.child-lanes', 'tests-child-run-1');
+    await mkdir(laneWorkspace, { recursive: true });
+    await writeFile(join(laneWorkspace, 'artifact.txt'), 'unaccepted child artifact\n'.repeat(2), 'utf8');
+
+    const result = await runDiffBudget(repo, ['--base', 'HEAD', '--max-lines', '0']);
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toContain('❌ Diff budget exceeded (base=HEAD)');
+    expect(result.stdout).toContain('total lines changed 2 > 0');
+    expect(result.stdout).toContain('.child-lanes/tests-child-run-1/artifact.txt: 2');
+  });
+
+  it('counts child-lane workspace artifacts when acceptance evidence belongs to another task', async () => {
+    const repo = await initRepository();
+    const laneWorkspace = join(repo, '.child-lanes', 'tests-child-run-1');
+    await mkdir(laneWorkspace, { recursive: true });
+    await writeFile(join(laneWorkspace, 'artifact.txt'), 'other task artifact\n'.repeat(2), 'utf8');
+    await writeAcceptedChildLaneEvidence(repo, laneWorkspace, {
+      taskId: 'linear-other-issue',
+      issueId: 'other-issue',
+      issueIdentifier: 'CO-999'
+    });
+
+    const result = await runDiffBudget(repo, ['--base', 'HEAD', '--max-lines', '0'], childLaneTaskEnv);
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toContain('❌ Diff budget exceeded (base=HEAD)');
+    expect(result.stdout).toContain('total lines changed 2 > 0');
+    expect(result.stdout).toContain('.child-lanes/tests-child-run-1/artifact.txt: 2');
+  });
+
+  it('counts child-lane workspace artifacts when acceptance evidence belongs to another workspace', async () => {
+    const repo = await initRepository();
+    const otherRepo = await initRepository();
+    const workspaceName = 'tests-child-run-1';
+    const laneWorkspace = join(repo, '.child-lanes', workspaceName);
+    const otherLaneWorkspace = join(otherRepo, '.child-lanes', workspaceName);
+    await mkdir(laneWorkspace, { recursive: true });
+    await mkdir(otherLaneWorkspace, { recursive: true });
+    await writeFile(join(laneWorkspace, 'artifact.txt'), 'current workspace artifact\n'.repeat(2), 'utf8');
+    await writeAcceptedChildLaneEvidence(otherRepo, otherLaneWorkspace);
+
+    const result = await runDiffBudget(repo, ['--base', 'HEAD', '--max-lines', '0'], {
+      ...childLaneTaskEnv,
+      CODEX_ORCHESTRATOR_RUNS_DIR: join(otherRepo, '.runs')
+    });
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toContain('❌ Diff budget exceeded (base=HEAD)');
+    expect(result.stdout).toContain('total lines changed 2 > 0');
+    expect(result.stdout).toContain('.child-lanes/tests-child-run-1/artifact.txt: 2');
+  });
+
+  it('counts staged child-lane workspace content even with durable acceptance evidence', async () => {
+    const repo = await initRepository();
+    const laneWorkspace = join(repo, '.child-lanes', 'tests-child-run-1');
+    await mkdir(laneWorkspace, { recursive: true });
+    await writeFile(join(laneWorkspace, 'artifact.txt'), 'staged child artifact\n'.repeat(2), 'utf8');
+    await writeAcceptedChildLaneEvidence(repo, laneWorkspace);
+    await execFileAsync('git', ['add', join('.child-lanes', 'tests-child-run-1', 'artifact.txt')], { cwd: repo });
+
+    const result = await runDiffBudget(repo, ['--base', 'HEAD', '--max-lines', '0'], childLaneTaskEnv);
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toContain('❌ Diff budget exceeded (base=HEAD)');
+    expect(result.stdout).toContain('total lines changed 2 > 0');
+    expect(result.stdout).toContain('.child-lanes/tests-child-run-1/artifact.txt: 2');
   });
 
   it('accepts a diff budget override reason', async () => {
