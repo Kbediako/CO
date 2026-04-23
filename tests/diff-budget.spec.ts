@@ -133,6 +133,9 @@ async function runDiffBudget(
     if (!('TASK' in env)) {
       delete mergedEnv.TASK;
     }
+    if (!('CODEX_ORCHESTRATOR_RUNS_DIR' in env)) {
+      delete mergedEnv.CODEX_ORCHESTRATOR_RUNS_DIR;
+    }
     const { stdout, stderr } = await execFileAsync('node', [scriptPath, ...args], {
       cwd: repo,
       env: mergedEnv
