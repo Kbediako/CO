@@ -755,4 +755,30 @@ describe('docs freshness reporting', () => {
     expect(report.totals.stale_entries).toBe(1);
     expect(report.totals.rolling_cohort_entries).toBe(0);
   });
+
+  it('keeps stale docs blocking when canonical owner overrides are malformed', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-rolling-invalid-canonical-owners-'));
+    createdDirs.push(repoRoot);
+
+    await writeRollingDocsFixture(repoRoot, {
+      policy: rollingFreshnessPolicy({
+        canonical_owner_issues: {
+          canonical_owner_key: 'docs_freshness_candidate|doc_class:task_packet|path_family:tasks/tasks-*',
+          owner_issue: 'CO-320'
+        }
+      })
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.rolling_freshness_policy).toEqual(
+      expect.objectContaining({ enabled: true, is_valid: false, canonical_owner_issues: [] })
+    );
+    expect(report.totals.stale_entries).toBe(1);
+    expect(report.totals.rolling_cohort_entries).toBe(0);
+  });
 });
