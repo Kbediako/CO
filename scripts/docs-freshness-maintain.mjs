@@ -405,6 +405,19 @@ function isEligibleHistoricalEntry(entry, policy) {
   );
 }
 
+function shouldVerifyCanonicalOwnerIssues(report) {
+  const policy = report?.rolling_freshness_policy ?? {};
+  if (policy?.is_valid !== true) {
+    return false;
+  }
+
+  const ownerCandidateEntries = [
+    ...(Array.isArray(report?.stale_entries) ? report.stale_entries : []),
+    ...(Array.isArray(report?.rolling_cohort_entries) ? report.rolling_cohort_entries : [])
+  ];
+  return ownerCandidateEntries.some((entry) => isEligibleHistoricalEntry(entry, policy));
+}
+
 function normalizeCandidateEntry(entry, policy, source) {
   const baselineCohort = entry.baseline_cohort_id
     ? { id: entry.baseline_cohort_id }
@@ -1038,6 +1051,7 @@ export async function runDocsFreshnessMaintain(
     (Array.isArray(freshnessResult.report?.stale_entries) && freshnessResult.report.stale_entries.length > 0) ||
     (Array.isArray(freshnessResult.report?.rolling_cohort_entries) &&
       freshnessResult.report.rolling_cohort_entries.length > 0);
+  const shouldVerifyCanonicalOwners = shouldVerifyCanonicalOwnerIssues(freshnessResult.report);
   const [diffResult, specGuard, ownerIssueVerification, canonicalOwnerIssueVerifications] = await Promise.all([
     Array.isArray(changedPaths)
       ? Promise.resolve({ base_ref: baseRef, status: 'provided', paths: changedPaths })
@@ -1046,7 +1060,7 @@ export async function runDocsFreshnessMaintain(
     hasOwnerRelevantDebt
       ? verifyOwnerIssueContext(repoRoot, freshnessResult.report?.rolling_freshness_policy?.owner_issue ?? null)
       : Promise.resolve(null),
-    hasOwnerRelevantDebt
+    shouldVerifyCanonicalOwners
       ? verifyCanonicalOwnerIssues(repoRoot, freshnessResult.report?.rolling_freshness_policy ?? {})
       : Promise.resolve([])
   ]);

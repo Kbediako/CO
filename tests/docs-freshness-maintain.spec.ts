@@ -405,6 +405,77 @@ describe('docs freshness maintenance decisions', () => {
     expect(decision.recommended_action).toContain('owner issue CO-320');
   });
 
+  it('skips canonical owner verification when the rolling policy is invalid', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-maintain-invalid-owner-'));
+    createdDirs.push(repoRoot);
+    const lastReview = reviewDateDaysAgo(31);
+    const canonicalOwnerKey = `docs_freshness_candidate|doc_class:task_packet|path_family:tasks/tasks-*|last_review:${lastReview}|cadence_days:30`;
+    await writeFixture(repoRoot, {
+      entries: [{ path: 'tasks/tasks-1321-historical.md', lastReview }],
+      policy: rollingFreshnessPolicy({
+        max_cohorts: 0,
+        owner_issue: 'CO-300',
+        owner_issue_state: 'Done',
+        owner_issue_state_type: 'completed',
+        owner_issue_is_terminal: true,
+        canonical_owner_issues: [
+          {
+            canonical_owner_key: canonicalOwnerKey,
+            owner_issue: 'CO-320'
+          }
+        ]
+      })
+    });
+
+    const { decision, shouldBlock } = await runMaintain(repoRoot);
+
+    expect(shouldBlock).toBe(true);
+    expect(decision.freshness_decision).toBe('block_unowned_repo_debt');
+    expect(decision.canonical_owner_issue_verifications).toEqual([]);
+    expect(decision.candidate_cohorts).toHaveLength(1);
+    expect(decision.candidate_cohorts[0]).toEqual(
+      expect.objectContaining({
+        canonical_owner_key: canonicalOwnerKey,
+        owner_issue: 'CO-300',
+        configured_owner_issue: 'CO-300',
+        owner_issue_action: expect.objectContaining({
+          mode: 'create_required',
+          existing_issue: 'CO-300',
+          reason: 'configured_owner_terminal'
+        }),
+        owner_issue_resolution: expect.objectContaining({
+          mode: 'rolling_freshness_policy_owner'
+        })
+      })
+    );
+  });
+
+  it('skips canonical owner verification when only hard-stale non-candidates exist', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-maintain-hard-stale-owner-'));
+    createdDirs.push(repoRoot);
+    await writeFixture(repoRoot, {
+      entries: [{ path: 'docs/guide.md', daysOld: 31 }],
+      policy: rollingFreshnessPolicy({
+        canonical_owner_issues: [
+          {
+            canonical_owner_key:
+              'docs_freshness_candidate|doc_class:task_packet|path_family:tasks/tasks-*|last_review:2026-03-23|cadence_days:30',
+            owner_issue: 'CO-320'
+          }
+        ]
+      })
+    });
+
+    const { decision, shouldBlock } = await runMaintain(repoRoot);
+
+    expect(shouldBlock).toBe(true);
+    expect(decision.freshness_decision).toBe('block_unowned_repo_debt');
+    expect(decision.canonical_owner_issue_verifications).toEqual([]);
+    expect(decision.candidate_cohorts).toEqual([]);
+    expect(decision.totals.hard_stale_entries).toBe(1);
+    expect(decision.sample_paths.hard_stale_paths).toEqual(['docs/guide.md']);
+  });
+
   it('preserves multiple resolved canonical owners in passing guidance', () => {
     const tasksCanonicalOwnerKey =
       'docs_freshness_candidate|doc_class:task_packet|path_family:tasks/tasks-*|last_review:2026-03-23|cadence_days:30';
