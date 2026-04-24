@@ -8,26 +8,22 @@ CO has adopted Codex CLI `0.124.0` as the current repo compatibility target on `
 
 That adoption is intentionally narrow. The repo promotes `0.124.0` after CO-341 runtime, cloud, pack-smoke, and review evidence, while keeping packaged/generated model defaults on portable `gpt-5.4` with `model_reasoning_effort = "xhigh"`. Local ChatGPT-auth `gpt-5.5` / `xhigh` is supported only as a marker-backed local opt-in after live smoke; it is not the generic shipped default.
 
-## Shared Source Anchor
+## Evidence Boundary
 
-The parent provided this shared source pointer:
-
-`ctx:sha256:3a4ed07f97e8bc9dcb0c31c8110df44f9ab48d6d1652faa667b21e642c8589b9#chunk:c000001`
-
-The parent run source file exists in the workspace-scoped `.runs` tree and records the provider-worker run metadata, artifact root, Linear issue id, and instruction hashes. This page uses that anchor plus current repo, local CLI, official-doc evidence, and the merged CO-341 posture notes now present on `origin/main`.
+Host-specific absolute paths and local account state stay in the CO-345 task packet, Linear workpad, and run artifacts. This shipped page records the portable adoption decision and the evidence classes without exposing operator-local paths.
 
 ## Current Evidence Snapshot
 
-Commands were run from this workspace or from the active host during CO-345/CO-341 evidence gathering.
+Commands were run from the issue workspace or the active operator environment during CO-345/CO-341 evidence gathering.
 
 | Evidence | Observation |
 | --- | --- |
-| `which codex` | Active executable is `/opt/homebrew/bin/codex`. |
+| `which codex` | The active executable was identified before posture checks. |
 | `codex --version` | Active executable reports `codex-cli 0.124.0`. |
-| `codex login status` | Local CLI is logged in using ChatGPT. |
+| `codex login status` | Local CLI auth state was checked before model/posture conclusions. |
 | `codex debug models` | Live model catalog includes `gpt-5.4`, `gpt-5.5`, and `gpt-5.3-codex-spark`; `gpt-5.4` and `gpt-5.5` expose `low/medium/high/xhigh` reasoning levels. |
 | `codex debug models --bundled` | Bundled catalog filtering found `gpt-5.4`; local `gpt-5.5` is not treated as a portable bundled default. |
-| `/Users/kbediako/.codex/config.toml` | This host sets local `model = "gpt-5.5"`, `review_model = "gpt-5.5"`, `model_reasoning_effort = "xhigh"`, `features.multi_agent = true`, and `features.codex_hooks = true`. |
+| User-level Codex config | The inspected operator environment has an explicit local `gpt-5.5` / `xhigh` opt-in; this is not a packaged/generated default. |
 | `codex features list` | Local feature list reports `multi_agent`, `plugins`, `apps`, `tool_search`, and `codex_hooks` as stable/enabled; `js_repl` and `memories` are experimental/enabled. |
 | `codex exec --help` | Supports `[PROMPT]`, stdin appending, `resume`, `review`, `--output-schema`, `--json`, `--ignore-user-config`, and feature toggles. |
 | `codex review --help` | Supports `[PROMPT]`, `--uncommitted`, `--base`, `--commit`, `--title`, and feature toggles. |

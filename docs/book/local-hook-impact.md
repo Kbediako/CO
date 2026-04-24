@@ -8,17 +8,13 @@ Scope: docs-only child lane for CO-345. This page covers local Codex hook impact
 
 Local hooks are an ambient host-level input, not a repo-shipped CO behavior in this child lane.
 
-The checked-out lane contains no repo-level Codex hook config at the repo .codex/hooks.json path and no repo .codex/hooks scripts. It does contain the tracked utility script `scripts/hooks/continue_co_orchestration.py`, but no repo config wires that script into Codex hooks in this lane. The active host has user-level hook configuration under `/Users/kbediako/.codex/hooks/`, and `codex features list` on the active `codex-cli 0.124.0` install reports `codex_hooks` as enabled.
+The checked-out lane contains no repo-level Codex hooks config file and no repo-local Codex hook scripts. It does contain the tracked utility script `scripts/hooks/continue_co_orchestration.py`, but no repo config wires that script into Codex hooks in this lane. The inspected operator environment has user-level hook configuration under `${CODEX_HOME:-~/.codex}/hooks/`, and `codex features list` on the active `codex-cli 0.124.0` install reports `codex_hooks` as enabled.
 
-Current conclusion: `/Users/kbediako/.codex/hooks/continue_co_orchestration.py` does not directly affect spawned subagents or Linear/provider agents under the inspected state because the hook only emits a blocking auto-continue prompt when all of these are true: hooks are enabled, the event `cwd` is inside `/Users/kbediako/Code/CO`, no stop sentinel is present, and the event `session_id` matches the configured `root_session_id`. The inspected state has `root_session_id` set, so other Codex sessions, subagent sessions, and provider-worker sessions with different ids fall through with `{"continue": true}`. If `root_session_id` is cleared later, the same hook would become broader for any hook-enabled Codex event inside the CO repo tree.
+Current conclusion: the inspected user-level `continue_co_orchestration.py` hook does not directly affect spawned subagents or Linear/provider agents under the inspected state because the hook only emits a blocking auto-continue prompt when hooks are enabled, the event `cwd` is inside the local CO checkout, no stop sentinel is present, and the event `session_id` matches the configured `root_session_id`. The inspected state has `root_session_id` set, so other Codex sessions, subagent sessions, and provider-worker sessions with different ids fall through with `{"continue": true}`. If `root_session_id` is cleared later, the same hook would become broader for any hook-enabled Codex event inside the CO repo tree.
 
-## Shared Source Anchor
+## Evidence Boundary
 
-The parent provided this shared source pointer:
-
-`ctx:sha256:3a4ed07f97e8bc9dcb0c31c8110df44f9ab48d6d1652faa667b21e642c8589b9#chunk:c000001`
-
-The parent run source file exists in the workspace-scoped `.runs` tree and records the provider-worker run metadata, artifact root, Linear issue id, and instruction hashes. This page uses that anchor plus inspected repo, local hook, and local CLI evidence.
+Host-specific absolute paths and local state values stay in the CO-345 task packet, Linear workpad, and run artifacts. This shipped page records the portable conclusion and the evidence classes without exposing operator-local paths.
 
 ## Official Codex Hook Semantics
 
@@ -37,7 +33,7 @@ Important limits from the same docs:
 
 ## Lane Evidence
 
-Commands were run from this child workspace only unless noted.
+Commands were run from the issue workspace only, unless noted.
 
 | Evidence | Observation |
 | --- | --- |
@@ -46,9 +42,9 @@ Commands were run from this child workspace only unless noted.
 | `find . -maxdepth 4 -path '*hooks.json' -o -path '*/.codex/hooks/*' -o -path '*/hooks/*'` | No repo Codex hook config was found under `.codex`; `scripts/hooks/continue_co_orchestration.py` exists as a tracked utility/script surface and is not wired by repo config in this lane. |
 | `find .codex -maxdepth 3 -type f -print` | `.codex/orchestrator.toml` exists and contains `[sandbox] network = true`; no repo hook config was present. |
 | `codex features list` | Local `codex-cli 0.124.0` reports `codex_hooks` as `stable true`. |
-| `/Users/kbediako/.codex/config.toml` | `codex_hooks = true`, `multi_agent = true`, local `model = "gpt-5.5"`, `review_model = "gpt-5.5"`, and `model_reasoning_effort = "xhigh"` are configured for this host. |
-| `/Users/kbediako/.codex/hooks/continue_co_orchestration.py` | The installed user-level hook is the operative local hook; it differs from the tracked utility script and adds `root_session_id` scoping plus memory-citation handling. It checks repo containment, allows exact stop sentinels, and otherwise emits the auto-continue orchestration prompt. Exceptions fail open with `{"continue": true}`. |
-| `/Users/kbediako/.codex/hooks/co_orchestration_autocontinue.json` | Current state is enabled, `repo_root` is `/Users/kbediako/Code/CO`, `max_in_progress` is `4`, and `root_session_id` is non-empty. |
+| User-level Codex config | `codex_hooks` and `multi_agent` are enabled in the inspected operator environment. |
+| User-level hook script | The installed user-level hook is the operative local hook; it differs from the tracked utility script and adds `root_session_id` scoping plus memory-citation handling. It checks repo containment, allows exact stop sentinels, and otherwise emits the auto-continue orchestration prompt. Exceptions fail open with `{"continue": true}`. |
+| User-level hook state | Current state is enabled for the local CO checkout, and `root_session_id` is non-empty. |
 
 ## Risk Posture
 
