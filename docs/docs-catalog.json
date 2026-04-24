@@ -291,7 +291,7 @@
       "path": "docs/book/local-hook-impact.md",
       "status": "active",
       "tier": 2,
-      "doc_class": "active_guide",
+      "doc_class": "public_guide",
       "audience": "maintainers and reviewers",
       "source_of_truth": [
         "local hook configuration",
@@ -309,7 +309,7 @@
       "path": "docs/book/codex-cli-0124-adoption.md",
       "status": "active",
       "tier": 2,
-      "doc_class": "active_guide",
+      "doc_class": "public_guide",
       "audience": "maintainers and reviewers",
       "source_of_truth": [
         "docs/guides/codex-version-policy.md",

@@ -20,7 +20,7 @@ codex-orchestrator --version
 
 Use `codex login --device-auth` when browser auth is not practical.
 
-Run repo-bound `setup --yes --repo /path/to/repo` after bootstrapping the downstream repository so delegation is registered with the repo root while bundled skills are installed and DevTools wiring is applied at the machine level.
+Run repo-bound `codex-orchestrator setup --yes --repo /path/to/repo` after bootstrapping the downstream repository so delegation is registered with the repo root while bundled skills are installed and DevTools wiring is applied at the machine level.
 
 ## Codex Marketplace / Plugin Install
 
@@ -51,7 +51,7 @@ The plugin launcher reads the `codex-orchestrator` marketplace entry in `${CODEX
 
 Re-run the version-appropriate marketplace add command after moving a local-directory source, replacing it, or removing Codex's installed marketplace checkout.
 
-CO currently targets Codex CLI `0.124.0` with `gpt-5.5` / `xhigh` as the ChatGPT-auth posture when available. Portable packaged/generated defaults still seed `gpt-5.4` / `xhigh` when `gpt-5.5`, API, or cloud portability is unavailable.
+CO currently targets Codex CLI `0.124.0` with portable packaged/generated defaults on `gpt-5.4` / `xhigh`. Local ChatGPT-auth `gpt-5.5` / `xhigh` remains marker-backed opt-in only after live model access is verified.
 
 ## Rollback / Removal
 
