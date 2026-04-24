@@ -1126,7 +1126,8 @@ function inspectCodexDefaultsAdvisory(
       : inspectCodexModelAccess(codexBin, env);
   const localModelOptInVerified =
     localModelOptIn !== null && modelAccess.status === 'ok' && modelAccess.models.has(localModelOptIn);
-  if (localModelOptIn !== null && !localModelOptInVerified) {
+  const localModelOptInUnverified = localModelOptIn !== null && !localModelOptInVerified;
+  if (localModelOptInUnverified) {
     guidance.push(
       `Configured local model opt-in ${localModelOptIn} is not verified by \`codex debug models\`; rerun local access smoke or remove the opt-in marker before relying on it.`
     );
@@ -1185,6 +1186,7 @@ function inspectCodexDefaultsAdvisory(
 
   const allChecksOk =
     Object.values(checks).every((check) => check.status === 'ok')
+    && !localModelOptInUnverified
     && legacyMaxSpawnDepth?.status !== 'advisory';
   return {
     status: allChecksOk ? 'ok' : 'advisory',

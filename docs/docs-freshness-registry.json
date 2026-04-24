@@ -3,6 +3,48 @@
   "generated_at": "2026-04-24",
   "entries": [
     {
+      "path": "tasks/tasks-co-344-doctor-local-optin-advisory.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-24",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/co-344-doctor-local-optin-advisory.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-24",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-co-344-doctor-local-optin-advisory.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-24",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-co-344-doctor-local-optin-advisory.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-24",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-co-344-doctor-local-optin-advisory.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-24",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/co-344-doctor-local-optin-advisory.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-24",
+      "cadence_days": 30
+    },
+    {
       "path": "tasks/tasks-co-343-apr-24-spec-freshness-dry-run-accounting.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",

@@ -50,7 +50,7 @@ last_review: 2026-04-24
 - Monitoring / alerts: Cloud canary and pack-smoke workflow pins keep future evidence reproducible.
 
 ## Open Questions
-- PR `#631` is open; post-push checks, review-thread drain, merge, and Linear Done transitions remain before closeout.
+- PR `#631` merged at `7537d978e910036d69980047de7a395ef0f771e2`; Linear Done transitions remain before closeout.
 - Cloud/API direct `gpt-5.5` model choice remains held by official availability docs; local ChatGPT-auth top-level/delegated/review `gpt-5.5` use is supported only as a marker-backed local opt-in with current smoke evidence.
 
 ## Approvals
