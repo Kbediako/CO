@@ -6,7 +6,7 @@ This guide is the downstream-safe setup path shipped in the npm package.
 
 - Once per machine: install Codex CLI and authenticate.
 - Once per repo: seed the CO templates, run setup with the repo root so delegation is repo-scoped while bundled skills are installed and DevTools wiring is applied at the machine level, review the generated config, and start using task-scoped runs.
-- CO currently targets Codex CLI `0.124.0`; newer candidates stay evidence-gated in the version policy.
+- CO currently targets Codex CLI `0.124.0`; CO-352 evaluated `0.125.0` model-catalog posture and held promotion/default changes, so newer candidates stay evidence-gated in the version policy.
 - Portable generated downstream defaults stay on `gpt-5.4` / `xhigh` because API/cloud portability is not proven and app-server model/list still reports it as `isDefault`.
 - Local ChatGPT-auth `gpt-5.5` / `xhigh` remains marker-backed opt-in only after `codex debug models` verifies current model access.
 - `codex-orchestrator doctor` accepts the marker-backed local `gpt-5.5` opt-in as non-drift only when `codex debug models` verifies current model access, and additive defaults preserve matching prior `gpt-5.5` role files when the top-level config is explicitly opted in.

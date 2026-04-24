@@ -1,9 +1,9 @@
 {
   "items": [
     {
-      "id": "20260424-linear-267f73e1-6347-496d-ad78-2f4177bfe450",
-      "title": "CO-351 Codex CLI 0.125.0 app-server control seam validation",
-      "relates_to": "tasks/tasks-linear-267f73e1-6347-496d-ad78-2f4177bfe450.md",
+      "id": "20260424-linear-f4469614-cfdf-49a6-a7ff-366f58229816",
+      "title": "CO-352 Codex 0.125 Model-Catalog Posture",
+      "relates_to": "tasks/specs/CO-352-codex-0125-model-catalog-posture.md",
       "risk": "high",
       "owners": [
         "Codex"
@@ -13,61 +13,20 @@
         "docs_packet_child_lane": {
           "reviewer": "bounded same-issue docs child lane",
           "date": "2026-04-24",
-          "status": "produced",
-          "manifest": ".runs/linear-267f73e1-6347-496d-ad78-2f4177bfe450-docs-packet/cli/2026-04-24T20-46-46-959Z-a7f3b702/manifest.json",
-          "source_anchor": "ctx:sha256:57e3788049ac55221b4dd437196096c5dd036790ab40746609e075f7b776202f#chunk:c000001",
-          "summary": "Docs-first packet created for CO-351 Codex CLI 0.125.0 app-server control seam validation. Parent reconciled the source pointer, accepted the child patch, and owns canary execution, version-policy edits, findings docs, validation, review, PR lifecycle, Linear/workpad state, and the final adoption-boundary decision."
-        },
-        "parent_canary_decision": {
-          "reviewer": "parent provider worker",
-          "date": "2026-04-24",
-          "status": "bounded_adoption",
-          "summary": "Codex CLI 0.125.0 app-server control seam is adopted for explicit control-host/proof usage. Local transport, schema, proxy, permission-profile, explicit untrusted config, synthetic resume/fork metadata, and WebSocket burst checks passed; sticky environments, real turn-backed pagination, runtime-mode evidence, and cloud gates still require a configured follow-up before provider runtime or provider-supervision fallback can change.",
-          "evidence": [
-            "out/linear-267f73e1-6347-496d-ad78-2f4177bfe450/manual/codex-0125-appserver-canary/runtime-canary-summary.json",
-            "docs/findings/linear-267f73e1-6347-496d-ad78-2f4177bfe450-codex-0125-appserver-control-seam.md",
-            "docs/guides/codex-version-policy.md"
-          ]
-        },
-        "docs_review_child_stream": {
-          "reviewer": "codex-orchestrator docs-review child stream",
-          "date": "2026-04-24",
-          "status": "clean-success-after-current-main-reconciliation",
-          "manifest": ".runs/linear-267f73e1-6347-496d-ad78-2f4177bfe450-docs-review/cli/2026-04-24T21-41-26-157Z-b91030b3/manifest.json",
-          "telemetry": ".runs/linear-267f73e1-6347-496d-ad78-2f4177bfe450-docs-review/cli/2026-04-24T21-41-26-157Z-b91030b3/review/telemetry.json",
-          "previous_manifest": ".runs/linear-267f73e1-6347-496d-ad78-2f4177bfe450-docs-review/cli/2026-04-24T21-12-43-683Z-42e96f4e/manifest.json",
-          "summary": "Initial docs-review failed on stale-workspace docs/TASKS.md backticked-path-missing references for linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb. After rebasing onto current origin/main and registering the CO-351 packet in docs freshness, docs-review reran successfully with review_outcome=clean-success."
-        },
-        "validation_floor": {
-          "reviewer": "parent provider worker",
-          "date": "2026-04-24",
-          "status": "passed-with-post-correction-docs-gates",
-          "summary": "Delegation guard, spec guard, build, lint, full test, docs:check, docs:freshness, repo:stewardship, and diff budget passed before the later bounded-adoption correction. After the evidence-boundary fixes, spec guard, docs:check, docs:freshness, repo:stewardship, and diff budget reran cleanly. Lint emitted only the pre-existing DelegationMcpHealth.test.ts no-explicit-any warnings."
-        },
-        "standalone_review": {
-          "reviewer": "codex-orchestrator review",
-          "date": "2026-04-24",
-          "status": "bounded-success-command-intent",
-          "manifest": ".runs/linear-267f73e1-6347-496d-ad78-2f4177bfe450/cli/2026-04-24T20-42-05-147Z-c64686a5/manifest.json",
-          "telemetry": ".runs/linear-267f73e1-6347-496d-ad78-2f4177bfe450/cli/2026-04-24T20-42-05-147Z-c64686a5/review/telemetry.json",
-          "summary": "Final forced standalone review after the provider-runtime boundary fix completed with status=succeeded and review_outcome=bounded-success; the wrapper bounded a validation-command attempt and retried read-only, and the reviewer found no actionable issues."
-        },
-        "elegance_review": {
-          "reviewer": "parent provider worker",
-          "date": "2026-04-24",
-          "status": "passed-post-correction",
-          "artifact": "out/linear-267f73e1-6347-496d-ad78-2f4177bfe450/manual/elegance-review.md",
-          "summary": "No simplification patch needed after the evidence-boundary fixes; the docs-only packet keeps the 0.125 app-server decision limited to explicit control-host/proof use and preserves provider runtime promotion gates."
+          "status": "prepared-for-parent-reconciliation",
+          "source_anchor": "ctx:sha256:3cf28c7e9319e4f963d4249bf02c3325281966ef0e16dd3c1954bb03cce49ca2#chunk:c000001",
+          "manifest": ".runs/linear-f4469614-cfdf-49a6-a7ff-366f58229816-docs-packet/cli/2026-04-24T20-45-55-787Z-73fa9234/manifest.json",
+          "summary": "Docs-first packet preserves CO-352 as a Codex CLI 0.125 model-catalog posture validation lane. It rejects shipped/default promotion from `codex debug models` alone and requires top-level, delegated/provider-worker, standalone review, cloud/fallback, and downstream/no-network `explorer_fast` evidence before any default-change recommendation."
         }
       },
       "paths": {
-        "spec": "tasks/specs/linear-267f73e1-6347-496d-ad78-2f4177bfe450-codex-0125-appserver-control-seam.md",
-        "task": "tasks/tasks-linear-267f73e1-6347-496d-ad78-2f4177bfe450.md",
-        "agent_task": ".agent/task/linear-267f73e1-6347-496d-ad78-2f4177bfe450.md",
+        "spec": "tasks/specs/CO-352-codex-0125-model-catalog-posture.md",
+        "task": "tasks/tasks-linear-f4469614-cfdf-49a6-a7ff-366f58229816.md",
+        "agent_task": ".agent/task/linear-f4469614-cfdf-49a6-a7ff-366f58229816.md",
         "docs": {
-          "PRD": "docs/PRD-linear-267f73e1-6347-496d-ad78-2f4177bfe450.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-267f73e1-6347-496d-ad78-2f4177bfe450.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-267f73e1-6347-496d-ad78-2f4177bfe450.md"
+          "PRD": "docs/PRD-codex-0125-model-catalog-posture.md",
+          "TECH_SPEC": "tasks/specs/CO-352-codex-0125-model-catalog-posture.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-codex-0125-model-catalog-posture.md"
         }
       }
     },
