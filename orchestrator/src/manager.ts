@@ -389,7 +389,6 @@ export class TaskManager {
     const stagePathToken = failureStage.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     const stageArtifact = build?.artifacts.find((candidate) => {
       const normalizedPath = candidate.path.replace(/\\/g, '/').toLowerCase();
-      const normalizedDescription = candidate.description.toLowerCase();
       const isErrorArtifact =
         normalizedPath.startsWith('errors/') ||
         normalizedPath.includes('/errors/') ||
@@ -397,14 +396,40 @@ export class TaskManager {
       if (!isErrorArtifact) {
         return false;
       }
-      return (
-        normalizedDescription.includes(`(${failureStage})`) ||
-        normalizedDescription.includes(failureStage) ||
-        normalizedPath.includes(failureStage) ||
-        (stagePathToken.length > 0 && normalizedPath.includes(stagePathToken))
-      );
+      return this.artifactMatchesFailedStage(candidate, failureStage, stagePathToken);
     });
     return stageArtifact?.path ?? null;
+  }
+
+  private artifactMatchesFailedStage(
+    candidate: BuildResult['artifacts'][number],
+    failureStage: string,
+    stagePathToken: string
+  ): boolean {
+    const normalizedDescription = candidate.description.toLowerCase();
+    const parentheticalStages = [...normalizedDescription.matchAll(/\(([^)]+)\)/g)]
+      .map((match) => match[1]?.trim() ?? '')
+      .filter(Boolean);
+    if (parentheticalStages.some((stage) => this.stageTokenMatches(stage, failureStage, stagePathToken))) {
+      return true;
+    }
+
+    const normalizedPath = candidate.path.replace(/\\/g, '/').toLowerCase();
+    return normalizedPath
+      .split('/')
+      .map((segment) => segment.replace(/\.[^.]+$/, '').replace(/^\d+-/, ''))
+      .some((segment) => this.stageTokenMatches(segment, failureStage, stagePathToken));
+  }
+
+  private stageTokenMatches(candidate: string, failureStage: string, stagePathToken: string): boolean {
+    if (candidate === failureStage) {
+      return true;
+    }
+    if (!stagePathToken) {
+      return false;
+    }
+    const candidatePathToken = candidate.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    return candidatePathToken === stagePathToken;
   }
 
   private async executePlanner(

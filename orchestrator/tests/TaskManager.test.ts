@@ -224,7 +224,11 @@ describe('TaskManager', () => {
       builder: new FunctionalBuilderAgent(async () => ({
         subtaskId: 'docs-review:delegation-guard',
         artifacts: [
-          { path: '.runs/task/run/errors/01-spec-guard.json', description: 'Command error artifact (spec-guard)' }
+          { path: '.runs/task/run/errors/01-spec-guard.json', description: 'Command error artifact (spec-guard)' },
+          {
+            path: '.runs/task/run/errors/02-pre-delegation-guard.json',
+            description: 'Command error artifact (pre-delegation-guard)'
+          }
         ],
         mode: 'mcp' as const,
         success: false,
@@ -246,6 +250,7 @@ describe('TaskManager', () => {
     expect(result.review.decision.approved).toBe(false);
     expect(result.review.decision.feedback).toBe('Prerequisite stage `delegation-guard` failed; review skipped.');
     expect(result.review.decision.feedback).not.toContain('.runs/task/run/errors/01-spec-guard.json');
+    expect(result.review.decision.feedback).not.toContain('.runs/task/run/errors/02-pre-delegation-guard.json');
   });
 
   it('does not attach non-error stage artifacts as failed-stage evidence', async () => {
@@ -308,6 +313,39 @@ describe('TaskManager', () => {
     expect(result.build.subtaskId).toBe('implementation-gate:review');
     expect(result.review.summary).toBe('Review skipped: build stage failed.');
     expect(result.review.decision.feedback).toBe('Build stage failed; review skipped.');
+  });
+
+  it('does not attach overlapping stage-name artifacts for generic review stage failures', async () => {
+    const plan: PlanResult = {
+      items: [{ id: 'implementation-gate:review', description: 'Run review target' }]
+    };
+
+    const manager = new TaskManager({
+      planner: new FunctionalPlannerAgent(async () => plan),
+      builder: new FunctionalBuilderAgent(async () => ({
+        subtaskId: 'implementation-gate:review',
+        artifacts: [
+          { path: '.runs/task/run/errors/02-docs-review.json', description: 'Command error artifact (docs-review)' }
+        ],
+        mode: 'mcp' as const,
+        success: false,
+        failureStage: 'review',
+        runId: 'ignored'
+      } satisfies BuildResult)),
+      tester: new FunctionalTesterAgent(async () => {
+        throw new Error('tester should not run when build fails');
+      }),
+      reviewer: new FunctionalReviewerAgent(async () => {
+        throw new Error('reviewer should not run when build fails');
+      }),
+      runIdFactory: () => 'run-failed-review-stage-overlap'
+    });
+
+    const result = await manager.execute(baseTask);
+
+    expect(result.review.summary).toBe('Review skipped: build stage failed.');
+    expect(result.review.decision.feedback).toBe('Build stage failed; review skipped.');
+    expect(result.review.decision.feedback).not.toContain('.runs/task/run/errors/02-docs-review.json');
   });
 
   it('does not attach generic error artifacts when no failed stage is known', async () => {
