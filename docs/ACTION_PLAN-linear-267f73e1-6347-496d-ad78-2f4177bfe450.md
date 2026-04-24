@@ -3,19 +3,19 @@
 ## Added by Bootstrap 2026-04-24
 
 ## Summary
-- Goal: create the docs-first packet and mirrors for CO-351 so the parent lane can validate Codex CLI 0.125.0 app-server control seam behavior using CO-relevant canaries and record a hold/adopt decision.
+- Goal: create the docs-first packet and mirrors for CO-351 so the parent lane can validate Codex CLI 0.125.0 app-server control seam behavior using CO-relevant canaries and record an adoption-boundary decision.
 - Scope: docs packet, canonical task spec, registry entry, task checklist, `.agent` mirror, and `docs/TASKS.md` snapshot only.
 - Assumptions: the parent-provided source anchor and protected terms are authoritative; the docs child lane created the initial packet, and the parent lane owns source reconciliation, canary execution, and downstream state changes.
 
 ## Issue Readiness Gate
 - Intent checksum / protected terms carried forward: Codex CLI 0.125.0, app-server control seam, `codex app-server --listen unix://...`, `app-server proxy --sock`, schema generation, remote thread store/config, sticky environments, resume/fork pagination, permission-profile round-trip, explicit untrusted project config, bursty WebSocket tool-output handling, `codex exec / codex exec resume`, official-doc/local-help mismatch for unix://.
-- Not done if: the packet can be satisfied by release-note summarization; any protected surface is missing; parent-owned canaries or hold/adopt decision are optional; or this child lane edits implementation, version policy, findings docs, validation artifacts, Linear/workpad state, or PR state.
+- Not done if: the packet can be satisfied by release-note summarization; any protected surface is missing; parent-owned canaries or adoption-boundary decision are optional; or this child lane edits implementation, version policy, findings docs, validation artifacts, Linear/workpad state, or PR state.
 - Pre-implementation issue-quality review: self-approved for docs-only packet work. The issue is not eligible for a micro-task shortcut because correctness depends on exact wording, exact control surfaces, and an explicit current/reference/target parity matrix.
 
 ## Milestones & Sequencing
 1. Create the CO-351 PRD, docs TECH_SPEC, canonical task spec, ACTION_PLAN, task checklist, and `.agent` mirror.
 2. Register the canonical task spec in `tasks/index.json` under `items[]` and add the CO-351 `docs/TASKS.md` snapshot.
-3. Self-review the packet for protected terms, current/reference/target parity, wrong interpretations, non-goals, Not Done If, and parent-owned canary/hold-adopt criteria.
+3. Self-review the packet for protected terms, current/reference/target parity, wrong interpretations, non-goals, Not Done If, and parent-owned canary/adoption-boundary criteria.
 4. Leave parent-owned work pending: canary execution, version-policy edits, findings docs, validation, review, PR lifecycle, Linear state, and workpad updates.
 
 ## Dependencies
@@ -42,19 +42,19 @@
   - explicit untrusted project config canary
   - bursty WebSocket tool-output handling canary
   - `codex exec / codex exec resume` fallback comparison
-  - final hold/adopt decision with evidence paths
+  - final adoption-boundary decision with evidence paths
 - Parent canary result:
-  - hold the provider/control adoption decision because the 0.125 app-server canary is not clean: sticky environment use is blocked by missing worker environment configuration, and resume/fork turn pagination is blocked by the isolated canary's lack of a resumable turn-backed rollout.
+  - adopt the 0.125 app-server seam for explicit control-host/proof usage because socket/proxy/schema/config/permission/synthetic resume-fork/WebSocket checks passed; keep provider-supervision and provider-runtime fallback constraints because sticky environment use is blocked by missing worker environment configuration, real turn-backed pagination is still unproven, and normal promotion gates have not been completed for `0.125.0`.
   - evidence: `out/linear-267f73e1-6347-496d-ad78-2f4177bfe450/manual/codex-0125-appserver-canary/runtime-canary-summary.json`, `docs/findings/linear-267f73e1-6347-496d-ad78-2f4177bfe450-codex-0125-appserver-control-seam.md`, and `docs/guides/codex-version-policy.md`.
-- Rollback plan: parent can discard this packet or hold CO-351 if the canary scope proves too broad; no runtime state is changed by this child lane.
+- Rollback plan: parent can discard this packet or narrow CO-351 if the canary scope proves too broad; no runtime state is changed by this child lane.
 
 ## Risks & Mitigations
 - Risk: release-note prose is mistaken for adoption evidence.
-  - Mitigation: every acceptance surface requires a parent-owned canary and hold/adopt decision.
+  - Mitigation: every acceptance surface requires a parent-owned canary and adoption-boundary decision.
 - Risk: `unix://` behavior is assumed from either docs or local help alone.
   - Mitigation: packet requires explicit reconciliation of the official-doc/local-help mismatch for unix://.
-- Risk: app-server exploration weakens the current provider-worker path.
-  - Mitigation: packet keeps `codex exec / codex exec resume` fallback as current truth until parent adoption evidence says otherwise.
+- Risk: app-server adoption weakens the current provider-worker path.
+  - Mitigation: packet keeps `codex exec / codex exec resume` fallback as current truth until sticky environment and real turn-backed pagination evidence says otherwise.
 - Risk: child lane accidentally widens into implementation or validation.
   - Mitigation: action plan and checklists mark those items as parent-owned pending work.
 

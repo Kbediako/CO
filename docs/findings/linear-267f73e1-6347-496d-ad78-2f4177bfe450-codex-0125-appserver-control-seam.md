@@ -2,12 +2,12 @@
 
 ## Decision
 
-Hold. Codex CLI `0.125.0` exposes useful app-server control surfaces, and the local canary passed transport, schema, permission-profile, explicit untrusted config, proxy, and bursty WebSocket output checks. It is still not clean enough to adopt as a CO provider/control workflow seam because the worker canary did not prove sticky environments or resume/fork turn pagination.
+Adopt the Codex CLI `0.125.0` app-server seam for explicit control-host/proof usage where CO only needs the surfaces proven in this lane: Unix socket launch, `app-server proxy --sock`, schema generation, config/read under explicit untrusted project setup, permission-profile disabled thread start, explicit untrusted config preservation, resume/fork metadata loading after synthetic history injection, and bursty WebSocket command output.
 
-Provider workers should keep the existing `codex exec` / `codex exec resume` supervision path until a configured follow-up canary proves:
+This is not a blanket provider-worker supervision replacement, provider runtime promotion, or local runtime adoption. Provider workers must keep the existing `codex exec` / `codex exec resume` fallback and must not use the 0.125 app-server seam for provider runtime work until the configured follow-up evidence and normal promotion gates pass. Provider-worker supervision must not remove the exec/resume fallback or depend on sticky environments and turn-backed pagination until a configured follow-up canary proves:
 
 1. sticky environment use with a real configured environment id; and
-2. resume/fork plus `thread/turns/list` pagination against a persisted, turn-backed rollout.
+2. resume/fork plus `thread/turns/list` pagination against a persisted rollout with real turns.
 
 ## Release And Documentation Facts
 
@@ -34,7 +34,7 @@ Artifacts:
 - Generated JSON Schema: `out/linear-267f73e1-6347-496d-ad78-2f4177bfe450/manual/codex-0125-appserver-canary/generated-json-schema/`
 - Local help captures: `app-server-help.txt` and `app-server-proxy-help.txt` in the same artifact directory.
 
-The runtime summary status is `blocked`, not `passed`, because required CO adoption checks are incomplete.
+The runtime summary status is `blocked` because the configured sticky-environment proof is incomplete. That blocker narrows the adoption boundary; it does not invalidate the socket/proxy/schema/config/permission/WebSocket surfaces that passed and are now approved for explicit CO control-host/proof usage.
 
 | Check | Result | CO interpretation |
 | --- | --- | --- |
@@ -48,33 +48,35 @@ The runtime summary status is `blocked`, not `passed`, because required CO adopt
 | `sticky-environment-explicit-id` | blocked | `thread/start` rejected unknown environment id `co351-local-env`; this worker lacks a configured environment to prove sticky environment behavior. |
 | `thread-start-permission-profile-env-disabled` | passed | `thread/start` accepted disabled permission profile and returned a thread id/path. |
 | `explicit-untrusted-project-config-preserved` | passed | The project config preserved explicit untrusted state and did not silently become trusted. |
-| `resume-fork-path-exclude-turns` | blocked | `thread/resume` reported no rollout for the no-turn thread id, so resume/fork continuity was not proven. |
-| `thread-turns-pagination-limit-one` | blocked | Turn pagination depends on a resumable turn-backed rollout and remains unproven. |
+| `thread-inject-items-synthetic-history` | passed | Synthetic history injection succeeded and provided a resumable thread path without requiring a model turn. |
+| `resume-fork-path-exclude-turns` | passed | `thread/resume` and `thread/fork` worked after synthetic history injection with `excludeTurns: true`; this proves metadata loading, not real-turn continuity. |
+| `thread-turns-pagination-limit-one` | passed with limitation | `thread/turns/list` returned a paginated response shape, but the synthetic-history lane had `0` persisted turns; real turn-backed cursor depth remains unproven. |
 | `app-server-proxy-sock` | passed | Proxy path returned auth status over WebSocket-framed proxy transport. |
 | `websocket-burst-command-output` | passed | WebSocket command output streamed 13 deltas, 3200 decoded bytes, exit code 0, and the final marker was present. |
 
 ## Adoption Boundary
 
-The app-server seam is a candidate control substrate only. The 0.125 canary is strong enough to keep investigating:
+The app-server seam is adopted as a guarded CO control-host/proof substrate for the surfaces this lane proved:
 
 - Unix socket/proxy transport is locally real.
 - Generated protocol schemas expose the expected CO-relevant methods and fields.
 - Permission-profile and explicit untrusted config behavior are visible.
+- Resume/fork metadata loading works after synthetic history injection.
 - Bursty WebSocket command output did not lose final output in this local stress.
 
-It is not strong enough to replace provider supervision:
+It is not yet strong enough to replace provider supervision or claim full sticky/resume parity:
 
 - Sticky environments were not proven with a configured environment.
-- Resume/fork and turn pagination were not proven with a persisted rollout that contains turns.
+- Turn pagination was not proven with a persisted rollout that contains real turns.
 - Official hosted docs and local/upstream help still diverge on `unix://` wording, so reviewer-facing docs must avoid assuming hosted docs alone describe the socket path.
 
 ## Follow-Up Criteria
 
-A future adoption lane can reconsider the hold only if it captures manifest-backed evidence for:
+A future provider-supervision migration lane can remove the remaining fallback constraints only if it captures manifest-backed evidence for:
 
 - `codex app-server --listen unix://PATH` plus `app-server proxy --sock` against a configured worker environment.
 - `thread/start` with a real sticky environment id.
 - `thread/resume`, `thread/fork`, and `thread/turns/list` pagination on a persisted rollout with at least enough turns to exercise cursoring.
 - Permission-profile round-trip and explicit untrusted project config preserved across the same thread lifecycle.
 - WebSocket burst behavior under the same configured lane, not just the isolated local command-output canary.
-- A rollback path that keeps `codex exec` / `codex exec resume` available if app-server control fails closed.
+- A rollback path that keeps `codex exec` / `codex exec resume` available if app-server provider supervision fails closed.
