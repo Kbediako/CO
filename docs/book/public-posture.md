@@ -2,15 +2,15 @@
 
 ## Current Compatibility Target
 
-CO currently targets Codex CLI `0.124.0` as the stable compatibility/adoption baseline.
+CO currently targets Codex CLI `0.125.0` for validated local ChatGPT-auth/appserver posture.
 
 Newer stable and prerelease Codex CLI builds remain evidence-gated. The canonical policy is [docs/guides/codex-version-policy.md](../guides/codex-version-policy.md).
 
 ## Current Model / Runtime Posture
 
 - Current model posture: `gpt-5.5` / `xhigh` when available in ChatGPT-auth Codex sessions.
-- Portable packaged/generated defaults still seed `gpt-5.4` / `xhigh`; use them when `gpt-5.5`, API, or cloud portability is unavailable.
-- Marker-backed local `gpt-5.5` use still requires live access smoke plus `[codex_orchestrator] local_model_opt_in = "gpt-5.5"`.
+- Portable packaged/generated defaults keep `gpt-5.4` / `xhigh` as fallback values when `gpt-5.5`, API, or cloud portability is unavailable.
+- Marker-backed local `gpt-5.5` use is the preferred CO posture after live access smoke plus `[codex_orchestrator] local_model_opt_in = "gpt-5.5"`.
 - `explorer_fast` remains the explicit `gpt-5.3-codex-spark` exception for file/codebase search only.
 - Local appserver remains the expected default runtime path.
 - Provider workers keep the current `codex exec` / `codex exec resume` supervision seam until a separate governed lane promotes a replacement.

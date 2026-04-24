@@ -105,9 +105,9 @@ For runner + delegation coordination (short `--task` flow), see `docs/delegation
 
 ### 0a) Version guard (JSONL handshake)
 
-- Delegation MCP uses JSONL; keep `codex-orchestrator` aligned with the current CO compatibility or adoption target (`codex-cli 0.124.0`).
-- Current `0.124.0` CO-local posture confirms two onboarding-relevant behaviors: `codex exec` accepts a prompt argument plus piped stdin, and `codex login --device-auth` is available for non-browser sign-in fallback.
-- App-server model/list evidence under ChatGPT auth can vary by account; keep `gpt-5.4` as the packaged default because it may still appear as the app-server `isDefault`.
+- Delegation MCP uses JSONL; keep `codex-orchestrator` aligned with the current CO compatibility or adoption target (`codex-cli 0.125.0` for local ChatGPT-auth/appserver posture).
+- Current `0.125.0` CO-local posture keeps the onboarding-relevant behaviors from `0.124.0`: `codex exec` accepts a prompt argument plus piped stdin, and `codex login --device-auth` is available for non-browser sign-in fallback.
+- App-server model/list evidence under ChatGPT auth can vary by account; keep `gpt-5.4` only as the fallback packaged default because it may still appear as the app-server `isDefault`.
 - The bundled debug catalog can lag runtime posture briefly, and residual plugin warnings are local temporary plugin cache warnings rather than CO posture failures.
   - Check installed version: `codex-orchestrator --version`
   - Preferred update path: `npm i -g @kbediako/codex-orchestrator@latest`
@@ -125,9 +125,9 @@ For runner + delegation coordination (short `--task` flow), see `docs/delegation
 - `spawn_agent` omission defaults to `default`; require explicit `agent_type` for every spawn.
 - For symbolic collab runs, include a first-line role tag in spawned prompts: `[agent_type:<role>]`.
 - Multi-turn subagent loops are supported (`spawn_agent` -> `send_input` -> `wait`/`resume_agent` -> `close_agent`).
-- In Codex CLI `0.124.0`, built-in `explorer` continues to inherit top-level model defaults unless a role `config_file` overrides it.
+- In Codex CLI `0.125.0`, built-in `explorer` continues to inherit top-level model defaults unless a role `config_file` overrides it.
 - Current model posture is `gpt-5.5` / `xhigh` when available in ChatGPT-auth Codex sessions.
-- Portable generated config still seeds `gpt-5.4` / `xhigh`.
+- Portable generated config keeps `gpt-5.4` / `xhigh` as fallback values.
 - Recommended packaged baseline in `~/.codex/config.toml`:
   - `model = "gpt-5.4"`
   - `review_model = "gpt-5.4"`
@@ -137,7 +137,7 @@ For runner + delegation coordination (short `--task` flow), see `docs/delegation
   - Optional `[agents.explorer_fast]` -> `~/.codex/agents/explorer-fast.toml` (`gpt-5.3-codex-spark`, file/codebase search only)
   - Optional `[agents.awaiter]` override -> `~/.codex/agents/awaiter-high.toml` when you want awaiter at `gpt-5.4` + `high` while preserving awaiter instructions
   - `[agents.worker_complex]` -> `~/.codex/agents/worker-complex.toml` (`gpt-5.4`, `xhigh`)
-- Use `gpt-5.5` for delegated/review surfaces only when access smoke plus the `[codex_orchestrator] local_model_opt_in = "gpt-5.5"` marker validates the local opt-in; otherwise use the portable `gpt-5.4` defaults.
+- Use `gpt-5.5` for delegated/review surfaces when access smoke plus the `[codex_orchestrator] local_model_opt_in = "gpt-5.5"` marker validates the local posture; otherwise use the portable `gpt-5.4` fallback defaults.
 - Caveat: app-server `isDefault` may still report `gpt-5.4` even when newer local models are available.
 - Fallback posture is contingency-only: `8/2` for constrained/high-risk lanes, legacy `6/1/1` as break-glass when an older parser/runtime still consumes spawn-depth caps.
 - Downstream users should converge on this baseline via `codex-orchestrator init codex`.
