@@ -6,6 +6,7 @@ Hold shipped/default posture after the Codex CLI `0.125.0` model-catalog audit.
 CO-local ChatGPT-auth `gpt-5.5` remains usable as an explicit, marker-backed local opt-in when current access smoke passes. Portable packaged/generated defaults stay on `gpt-5.4` / `xhigh`, release-facing pins stay on the last promoted `0.124.0` posture, and `explorer_fast` remains the only `gpt-5.3-codex-spark` file/codebase-search exception.
 
 ## Evidence Summary
+
 | Surface | 0.125 evidence | Result | Decision impact |
 | --- | --- | --- | --- |
 | Package/release truth | `/opt/homebrew/bin/codex --version` = `codex-cli 0.125.0`; `npm view @openai/codex version dist-tags --json` reports `latest=0.125.0`; GitHub release `rust-v0.125.0` was published `2026-04-24T18:00:38Z` and notes refreshed `models.json` / fixtures. | Passed source-truth check. | Valid candidate to evaluate, not sufficient for promotion. |
@@ -18,7 +19,8 @@ CO-local ChatGPT-auth `gpt-5.5` remains usable as an explicit, marker-backed loc
 | Standalone review | Fallback docs-review manifest ran forced `npm run review` after MCP fallback and recorded a clean review outcome; the required cloud review path failed before task submission because the configured environment was not found. | Local fallback review passed; required cloud review failed. | Review wrapper health does not clear the required cloud gate or justify model/default promotion. |
 | Runtime-mode canary | `node scripts/runtime-mode-canary.mjs --task-id linear-f4469614-cfdf-49a6-a7ff-366f58229816-runtime-mode` passed `20/20` for default appserver, appserver success, forced fallback, and unsupported combo. | Passed. | Local runtime posture remains healthy. |
 | Required cloud canary | `CODEX_CLOUD_CANARY_REQUIRED=1 npm run ci:cloud-canary` failed with `environment '6999395fcc448191b865917084f21c6f' not found`. | Failed required gate. | Blocks 0.125 promotion and any broad model/default change. |
-| Fallback cloud canary | `CODEX_CLOUD_CANARY_REQUIRED=1 CLOUD_CANARY_EXPECT_FALLBACK=1 npm run ci:cloud-canary` passed with `cloud_fallback.mode_used=mcp` and `missing_environment`. | Passed fallback contract. | Fallback behavior is healthy but does not replace required cloud execution. |
+| Fallback cloud canary | `CODEX_CLOUD_ENV_ID="" CODEX_CLOUD_CANARY_REQUIRED=1 CLOUD_CANARY_EXPECT_FALLBACK=1 npm run ci:cloud-canary` passed with `cloud_fallback.mode_used=mcp` and `missing_environment`. | Passed fallback contract. | Fallback behavior is healthy but does not replace required cloud execution. |
+
 
 ## Evidence Paths
 - Catalog and model canaries: `out/linear-f4469614-cfdf-49a6-a7ff-366f58229816/manual/0.125-model-posture/`
