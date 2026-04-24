@@ -56,9 +56,15 @@ interface ManifestFailure {
 }
 
 function resolveManifestFailure(manifest: PipelineRunExecutionResult['manifest']): ManifestFailure {
-  const stage = extractStageFromStatusDetail(manifest.status_detail) ?? firstFailedCommand(manifest.commands)?.id ?? null;
-  const artifactPath = stage ? findFailedCommandErrorArtifact(manifest.commands, stage) : (firstFailedCommand(manifest.commands)?.error_file ?? null);
+  const statusDetailStage = extractStageFromStatusDetail(manifest.status_detail);
+  const fallbackFailedCommand = hasStatusDetail(manifest.status_detail) ? null : firstFailedCommand(manifest.commands);
+  const stage = statusDetailStage ?? fallbackFailedCommand?.id ?? null;
+  const artifactPath = stage ? findFailedCommandErrorArtifact(manifest.commands, stage) : null;
   return { stage, artifactPath };
+}
+
+function hasStatusDetail(statusDetail: string | null): boolean {
+  return statusDetail != null && statusDetail.trim().length > 0;
 }
 
 function extractStageFromStatusDetail(statusDetail: string | null): string | null {

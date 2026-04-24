@@ -383,21 +383,22 @@ export class TaskManager {
       return build.failureArtifactPath;
     }
     const failureStage = build?.failureStage?.trim().toLowerCase();
-    if (failureStage) {
-      const stagePathToken = failureStage.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-      const stageArtifact = build?.artifacts.find((candidate) => {
-        const normalizedPath = candidate.path.replace(/\\/g, '/').toLowerCase();
-        const normalizedDescription = candidate.description.toLowerCase();
-        return (
-          normalizedDescription.includes(`(${failureStage})`) ||
-          normalizedDescription.includes(failureStage) ||
-          normalizedPath.includes(failureStage) ||
-          (stagePathToken.length > 0 && normalizedPath.includes(stagePathToken))
-        );
-      });
-      if (stageArtifact) {
-        return stageArtifact.path;
-      }
+    if (!failureStage) {
+      return null;
+    }
+    const stagePathToken = failureStage.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const stageArtifact = build?.artifacts.find((candidate) => {
+      const normalizedPath = candidate.path.replace(/\\/g, '/').toLowerCase();
+      const normalizedDescription = candidate.description.toLowerCase();
+      return (
+        normalizedDescription.includes(`(${failureStage})`) ||
+        normalizedDescription.includes(failureStage) ||
+        normalizedPath.includes(failureStage) ||
+        (stagePathToken.length > 0 && normalizedPath.includes(stagePathToken))
+      );
+    });
+    if (stageArtifact) {
+      return stageArtifact.path;
     }
     const artifact = build?.artifacts.find((candidate) => {
       const normalizedPath = candidate.path.replace(/\\/g, '/');

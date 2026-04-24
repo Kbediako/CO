@@ -141,6 +141,41 @@ describe('CommandBuilder', () => {
     expect(result.failureArtifactPath).toBeNull();
   });
 
+  it('does not derive a failed stage from non-stage status details', async () => {
+    const builder = new CommandBuilder(async () => ({
+      success: false,
+      notes: ['Cloud environment is not configured'],
+      manifestPath: '.runs/task/run/manifest.json',
+      logPath: '.runs/task/run/runner.ndjson',
+      manifest: {
+        cloud_execution: null,
+        status_detail: 'cloud-env-missing',
+        commands: [
+          {
+            id: 'implementation-gate:review',
+            status: 'failed',
+            error_file: '.runs/task/run/errors/01-cloud-env-missing.json'
+          }
+        ]
+      } as unknown as CliManifest
+    }));
+
+    const result = await builder.build({
+      task: { id: 'task', title: 'Task', metadata: {} },
+      plan: { items: [{ id: 'implementation-gate:review', description: 'Run review target' }] },
+      target: { id: 'implementation-gate:review', description: 'Run review target' },
+      mode: 'cloud',
+      runId: 'run'
+    });
+
+    expect(result.failureStage).toBeNull();
+    expect(result.failureArtifactPath).toBeNull();
+    expect(result.artifacts).toContainEqual({
+      path: '.runs/task/run/errors/01-cloud-env-missing.json',
+      description: 'Command error artifact (implementation-gate:review)'
+    });
+  });
+
   it('does not derive a failed stage from allow-failure skipped command artifacts', async () => {
     const builder = new CommandBuilder(async () => ({
       success: false,

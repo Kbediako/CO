@@ -239,6 +239,36 @@ describe('TaskManager', () => {
     expect(result.review.decision.feedback).toBe('Build stage failed; review skipped.');
   });
 
+  it('does not attach generic error artifacts when no failed stage is known', async () => {
+    const plan: PlanResult = {
+      items: [{ id: 'implementation-gate:review', description: 'Run review target' }]
+    };
+
+    const manager = new TaskManager({
+      planner: new FunctionalPlannerAgent(async () => plan),
+      builder: new FunctionalBuilderAgent(async () => ({
+        subtaskId: 'implementation-gate:review',
+        artifacts: [{ path: '.runs/task/run/errors/01-advisory.json', description: 'Command error artifact (advisory)' }],
+        mode: 'mcp' as const,
+        success: false,
+        runId: 'ignored'
+      } satisfies BuildResult)),
+      tester: new FunctionalTesterAgent(async () => {
+        throw new Error('tester should not run when build fails');
+      }),
+      reviewer: new FunctionalReviewerAgent(async () => {
+        throw new Error('reviewer should not run when build fails');
+      }),
+      runIdFactory: () => 'run-failed-without-stage'
+    });
+
+    const result = await manager.execute(baseTask);
+
+    expect(result.review.summary).toBe('Review skipped: build stage failed.');
+    expect(result.review.decision.feedback).toBe('Build stage failed; review skipped.');
+    expect(result.review.decision.feedback).not.toContain('.runs/task/run/errors/01-advisory.json');
+  });
+
   it('keeps generic build wording and artifact context for explicit review-stage failures', async () => {
     const plan: PlanResult = {
       items: [{ id: 'implementation-gate:review', description: 'Run review target' }]
