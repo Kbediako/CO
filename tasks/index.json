@@ -51,7 +51,7 @@
         "task": "tasks/tasks-linear-5d882b0c-d553-4d63-8d62-6f973090a13c.md",
         "agent_task": ".agent/task/linear-5d882b0c-d553-4d63-8d62-6f973090a13c.md",
         "prd": "docs/PRD-linear-5d882b0c-d553-4d63-8d62-6f973090a13c.md",
-        "tech_spec": "docs/TECH_SPEC-linear-5d882b0c-d553-4d63-8d62-6f973090a13c.md",
+        "docs": "docs/TECH_SPEC-linear-5d882b0c-d553-4d63-8d62-6f973090a13c.md",
         "action_plan": "docs/ACTION_PLAN-linear-5d882b0c-d553-4d63-8d62-6f973090a13c.md"
       }
     },
