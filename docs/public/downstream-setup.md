@@ -5,9 +5,9 @@ This guide is the downstream-safe setup path shipped in the npm package.
 ## Contract
 
 - Once per machine: install Codex CLI and authenticate.
-- Once per repo: seed the CO templates, run setup with the repo root so delegation is repo-scoped while bundled skills and DevTools wiring are applied by the setup flow, review the generated config, and start using task-scoped runs.
-- CO currently targets Codex CLI `0.124.0` with `gpt-5.4` / `xhigh` as the packaged default posture; newer candidates stay evidence-gated in the version policy.
-- Under ChatGPT auth, CO-341 host evidence shows explicit `gpt-5.5` with `xhigh` can work after local smoke plus `[codex_orchestrator] local_model_opt_in = "gpt-5.5"`, but generated downstream defaults stay on `gpt-5.4` because app-server model/list still reports it as `isDefault`.
+- Once per repo: seed the CO templates, run setup with the repo root so delegation is repo-scoped while bundled skills are installed and DevTools wiring is applied at the machine level, review the generated config, and start using task-scoped runs.
+- CO currently targets Codex CLI `0.124.0` with `gpt-5.5` / `xhigh` as the ChatGPT-auth posture when available; newer candidates stay evidence-gated in the version policy.
+- Portable generated downstream defaults stay on `gpt-5.4` / `xhigh` because API/cloud portability is not proven and app-server model/list still reports it as `isDefault`.
 - `codex-orchestrator doctor` accepts the marker-backed local `gpt-5.5` opt-in as non-drift only when `codex debug models` verifies current model access, and additive defaults preserve matching prior `gpt-5.5` role files when the top-level config is explicitly opted in.
 - CO-196 posture lineage remains unchanged: npm is the supported baseline because it is the simplest supported CLI install path, and marketplace packaging is an additive registration path for newer Codex releases. `0.121.0` accepts both `codex marketplace add` and `codex plugin marketplace add`; `0.122.0+` require `codex plugin marketplace add`.
 
