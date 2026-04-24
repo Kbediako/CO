@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp c52faa3bdf0f0f739a148dc7b118f0adabe8dc40a2d0fb88b7d635a81b69d323 -->
+<!-- codex:instruction-stamp 16efdd06e2c9935fd4d0737f8b06063269054b39f9a28ae3e305483ec806b61c -->
 # Repository Agent Guidance
 
 Task-specific historical project blocks were removed from this file in `CO-88`. Use the active task packet under `.agent/task/**` for lane-scoped instructions instead of treating old project ids as repo-wide defaults.
