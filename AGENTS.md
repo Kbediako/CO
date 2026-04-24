@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 9b88d6ec64a18e1f562e18ec8b332d26c20c31d635d8ed06c1b0ead2f294ced3 -->
+<!-- codex:instruction-stamp e0c980595496068562e971fa8f0b1194e7e7532118a60d2b4e60f7a5dd111df7 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -32,6 +32,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Use `gpt-5.5` / `xhigh` as the current operator posture when available in ChatGPT-auth Codex sessions.
 - Portable packaged/generated config still seeds `model = "gpt-5.4"` and `model_reasoning_effort = "xhigh"`; use that path when `gpt-5.5`, API, or cloud portability is unavailable.
 - CO-local `gpt-5.5` use is explicit, marker-backed, and evidence-gated unless a fresh provider lane validates a Codex-suffixed model variant.
+- CO-352 evaluated the `0.125.0` model-catalog posture and held shipped/default changes because required cloud execution failed and bundled/no-network catalog evidence did not justify changing `explorer_fast`.
 - Set `model_reasoning_effort` to at least `high` (CO default: `xhigh`) so spawned agents inherit high-reasoning behavior unless role overrides change it.
 - Built-in `explorer` now inherits top-level model defaults unless you attach a custom `config_file`; keep an explicit `agents.explorer` entry only when you want a custom description/override, and keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only.
 - Caveat: spark roles are file/codebase search only; use non-spark roles when image inputs are required.
@@ -42,8 +43,9 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Use `codex-orchestrator doctor` as an advisory drift check for Codex defaults (model/reasoning/agent baseline); remediation is additive via `codex-orchestrator codex defaults --yes`, with only exact prior CO-managed role baselines auto-migrated unless the top-level config already carries a supported, access-verified local model opt-in.
 
 ## Codex Version Policy (CO Scope)
-- Current CO compatibility/adoption target is stable Codex CLI `0.124.0`.
+- Current CO compatibility/adoption target is stable Codex CLI `0.124.0`; CO-352 evaluated the `0.125.0` model-catalog posture and held promotion/default changes because the required cloud canary failed.
 - Current `0.124.0` CO-local posture evidence confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, `codex review --help` exposing `[PROMPT]` alongside scoped review flags, live `gpt-5.5` `xhigh` availability, and a post-build runtime-mode canary pass (`20/20` per scenario, `ready_for_default_flip=true`).
+- CO-352 `0.125.0` model-catalog audit held promotion/default changes: local `gpt-5.5` top-level and delegated smokes passed, but required cloud execution failed with the configured environment id not found, and bundled/no-network catalog evidence did not justify changing `explorer_fast`.
 - Release-facing downstream-smoke workflows and `cloud-canary` pin the explicit promoted candidate recorded in `docs/guides/codex-version-policy.md`.
 - Current model posture is `gpt-5.5` / `xhigh` when available in ChatGPT-auth Codex sessions; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
 - Portable packaged/generated config still seeds `gpt-5.4` / `xhigh`; use `gpt-5.5` for delegated/review surfaces only after live access smoke plus `[codex_orchestrator] local_model_opt_in = "gpt-5.5"` unless a fresh provider lane validates a Codex-suffixed model variant.

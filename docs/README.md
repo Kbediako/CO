@@ -23,9 +23,9 @@ Codex Orchestrator is the coordination layer that glues together Codex-driven ag
 
 ## Current Posture
 - Current CO compatibility/adoption target: Codex CLI `0.124.0`.
-- Newer Codex CLI candidates stay evidence-gated in `docs/guides/codex-version-policy.md`.
+- The `0.125.0` model-catalog posture was evaluated in CO-352 and held from promotion/default changes; newer candidates stay evidence-gated in `docs/guides/codex-version-policy.md`.
 - Current model posture is `gpt-5.5` / `xhigh` when available in ChatGPT-auth Codex sessions; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
-- Portable packaged/generated defaults still seed `gpt-5.4` / `xhigh`; CO-341 validated `gpt-5.5` on this host, while app-server `model/list` still reports `gpt-5.4` as the catalog default and recorded a post-build runtime-mode canary pass (`20/20` per scenario, `ready_for_default_flip=true`).
+- Portable packaged/generated defaults still seed `gpt-5.4` / `xhigh`; CO-341 validated `gpt-5.5` on this host, while app-server `model/list` still reports `gpt-5.4` as the catalog default and CO-352 found `0.125.0` cloud/no-network catalog blockers that keep defaults unchanged.
 - The marker-backed local `gpt-5.5` opt-in is non-drift for `codex-orchestrator doctor` only when `codex debug models` verifies current model access, and additive defaults preserve matching prior `gpt-5.5` role files when the top-level config carries that explicit opt-in.
 - Local default runtime is `appserver`; keep `--runtime-mode cli` as break-glass.
 - Full posture and promotion gates live in `docs/guides/codex-version-policy.md`.

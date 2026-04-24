@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp d279303f908ab6985704b241e3905b6447ab23fe423a9d2e836d01b7eeaa35ba -->
+<!-- codex:instruction-stamp f4ea1538be46bd743dddcf74ed4f9cbbd487f3cb03e24da0bbe519f71ba1b2fa -->
 # Agent Instructions (Template)
 
 ## Orchestrator-first workflow
@@ -54,12 +54,13 @@
 - Built-in roles are `default`, `explorer`, `worker`, and `awaiter`; `researcher` is user-defined.
 - `spawn_agent` defaults to `default` when `agent_type` is omitted; always set `agent_type` explicitly.
 - For symbolic collab runs, prefix spawned prompts with `[agent_type:<role>]` on line one so role intent is auditable from JSONL/manifests.
-- Current CO compatibility/adoption target is stable Codex CLI `0.124.0`.
+- Current CO compatibility/adoption target is stable Codex CLI `0.124.0`; CO-352 evaluated the `0.125.0` model-catalog posture and held promotion/default changes because the required cloud canary failed.
 - Current `0.124.0` CO posture evidence confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, `codex review --help` exposing `[PROMPT]` alongside scoped review flags, packaged `gpt-5.4` `xhigh` defaults, and a post-build runtime-mode canary pass.
 - Current model posture is `gpt-5.5` / `xhigh` when available in ChatGPT-auth Codex sessions; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
 - Portable generated defaults still seed `model = "gpt-5.4"` and `model_reasoning_effort = "xhigh"` in `~/.codex/config.toml`; operators may explicitly opt into newer local models after access smoke.
 - Use `gpt-5.5` for delegated/review surfaces only after access smoke validates the local opt-in.
 - Caveat: local model availability can vary by account; keep `gpt-5.4` as the generated default because it remains the app-server `isDefault`.
+- CO-352 catalog caveat: local `0.125.0` live catalog lists `gpt-5.3-codex-spark`, but bundled `0.125.0` catalog does not, so downstream/no-network `explorer_fast` file/codebase-search-only posture remains unchanged.
 - Set `model_reasoning_effort` to at least `high` (CO default: `xhigh`) so spawned agents inherit high reasoning unless role overrides change it.
 - Built-in `explorer` inherits top-level model defaults unless you attach a `config_file`; keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only.
 - Spark caveat: `gpt-5.3-codex-spark` is file/codebase search only.
