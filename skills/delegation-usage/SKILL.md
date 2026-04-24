@@ -137,7 +137,7 @@ For runner + delegation coordination (short `--task` flow), see `docs/delegation
   - Optional `[agents.explorer_fast]` -> `~/.codex/agents/explorer-fast.toml` (`gpt-5.3-codex-spark`, file/codebase search only)
   - Optional `[agents.awaiter]` override -> `~/.codex/agents/awaiter-high.toml` when you want awaiter at `gpt-5.4` + `high` while preserving awaiter instructions
   - `[agents.worker_complex]` -> `~/.codex/agents/worker-complex.toml` (`gpt-5.4`, `xhigh`)
-- Use `gpt-5.5` for delegated/review surfaces only when access smoke plus the `[codex_orchestrator] local_model_opt_in = "gpt-5.5"` marker validates the local opt-in; otherwise use the portable `gpt-5.4` defaults.
+- Use `gpt-5.5` for delegated/review surfaces when access smoke validates current ChatGPT-auth/appserver availability; otherwise use the portable `gpt-5.4` fallback defaults.
 - Caveat: app-server `isDefault` may still report `gpt-5.4` even when newer local models are available.
 - Fallback posture is contingency-only: `8/2` for constrained/high-risk lanes, legacy `6/1/1` as break-glass when an older parser/runtime still consumes spawn-depth caps.
 - Downstream users should converge on this baseline via `codex-orchestrator init codex`.
