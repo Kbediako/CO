@@ -19,7 +19,7 @@ review_notes:
 # Technical Specification
 
 ## Context
-CO-352 validates Codex CLI `0.125` model-catalog posture before any model default, template, generated-config, or downstream package posture change. CO-341 is the controlling baseline: local ChatGPT-auth `gpt-5.5` can be valid when explicitly access-verified and marker-backed, but portable packaged/generated defaults stay on `gpt-5.4` / `xhigh` until broader provider, review, cloud, and downstream evidence proves otherwise.
+CO-352 validates Codex CLI `0.125` model-catalog posture and adopts `gpt-5.5` / `xhigh` as the current CO-local ChatGPT-auth/appserver posture where the evidence passed. CO-341 remains the boundary baseline for unproven surfaces: cloud execution, release-facing pins, API portability, and downstream/no-network catalog behavior still need their own evidence before moving.
 
 The parent source anchor for this docs packet is `ctx:sha256:3cf28c7e9319e4f963d4249bf02c3325281966ef0e16dd3c1954bb03cce49ca2#chunk:c000001`, with manifest `.runs/linear-f4469614-cfdf-49a6-a7ff-366f58229816-docs-packet/cli/2026-04-24T20-45-55-787Z-73fa9234/manifest.json`.
 
@@ -28,10 +28,10 @@ The parent source anchor for this docs packet is `ctx:sha256:3cf28c7e9319e4f963d
 2. Capture local top-level posture with `which codex`, `codex --version`, `codex login status`, `codex debug models`, `codex debug models --bundled`, and an explicit `codex exec` model/reasoning smoke where safe.
 3. Compare model-catalog surfaces instead of collapsing them: live debug catalog, bundled debug catalog, app-server `model/list`, generated template/default config, package smoke install, and downstream no-network behavior.
 4. Probe or record blockers for delegated/provider-worker execution, including `provider-linear-worker`, `codex exec`, `codex exec resume`, app-server/runtime mode, and any resumability impact.
-5. Probe standalone review posture, including `codex review`, review wrapper model selection, `review_model`, and whether review evidence requires a model hold or marker-backed opt-in.
+5. Probe standalone review posture, including `codex review`, review wrapper model selection, `review_model`, and whether review evidence supports `gpt-5.5` or requires fallback.
 6. Run cloud canary when environment is available; otherwise record exact fallback evidence such as `missing_environment` without treating the fallback as cloud model support.
 7. Verify downstream/no-network `explorer_fast` behavior remains valid and file/codebase-search-only; do not replace `gpt-5.3-codex-spark` without targeted no-network package evidence.
-8. Keep shipped/generated defaults on `gpt-5.4` / `xhigh` unless every required evidence class passes and the parent explicitly records a default-change decision.
+8. Adopt `gpt-5.5` / `xhigh` for validated CO-local ChatGPT-auth top-level, delegated, review, and appserver surfaces; keep `gpt-5.4` / `xhigh` only as an explicit fallback when access, provider, cloud, or downstream evidence is missing.
 
 ## Issue-Shaping Contract
 - User-request translation carried forward: validate `0.125` model-catalog posture before changing defaults; debug catalog visibility alone is not adoption proof.
@@ -42,14 +42,15 @@ The parent source anchor for this docs packet is `ctx:sha256:3cf28c7e9319e4f963d
 ## Parity / Alignment Matrix
 - Current truth: CO-341 promoted `0.124.0` command/workflow surfaces with evidence, kept packaged/generated defaults on `gpt-5.4` / `xhigh`, allowed marker-backed local ChatGPT-auth `gpt-5.5` opt-ins, and held Cloud/API direct model choice.
 - Reference truth: parent CO-352 canaries must establish exact `0.125` source, live catalog, bundled catalog, app-server, provider, review, cloud/fallback, and downstream/no-network facts.
-- Target truth: classify every model-catalog surface as promote, hold, blocker, or no-op with dated artifact evidence; only then decide whether any default or opt-in posture changes.
+- Target truth: classify every model-catalog surface as adopt, fallback, blocker, or no-op with dated artifact evidence; adopt `gpt-5.5` / `xhigh` for validated CO-local surfaces and keep blockers scoped to the surfaces they actually affect.
 - Explicitly out-of-scope differences: release publication, broad plugin marketplace redesign, user-level Codex config mutation, unrelated active issue cleanup, and role-policy changes beyond `explorer_fast` validation.
 
 ## Readiness Gate
 - Not done if:
-  - `gpt-5.5` is recommended as a shipped default solely because `codex debug models` lists it.
+  - `gpt-5.5` is recommended solely because `codex debug models` lists it, without top-level/delegated/review/runtime evidence.
   - Any required evidence class is missing or hidden behind narrative summary.
   - Cloud fallback evidence is worded as cloud model support.
+  - The exact cloud environment blocker is used as generic caution against local ChatGPT-auth/appserver `gpt-5.5` posture.
   - Downstream/no-network `explorer_fast` behavior is untested or weakened.
   - `tasks/index.json` does not register this TECH_SPEC through `items[]`.
 - Pre-implementation issue-quality review evidence: this PRD, TECH_SPEC, ACTION_PLAN, and registry row preserve protected terms, wrong interpretations, non-goals, Not Done If, and the current/reference/target parity matrix before implementation.
@@ -58,8 +59,8 @@ The parent source anchor for this docs packet is `ctx:sha256:3cf28c7e9319e4f963d
 ## Technical Requirements
 - Functional requirements:
   - Build a model-catalog comparison table from parent evidence.
-  - Preserve the CO-341 local-vs-portable default split until evidence proves a safer delta.
-  - Require explicit artifact paths for every pass, hold, and blocker.
+  - Adopt the CO-local `gpt-5.5` / `xhigh` posture where evidence passed, while preserving CO-341 fallback behavior for unproven cloud/API/downstream surfaces.
+  - Require explicit artifact paths for every pass, fallback, and blocker.
   - Keep `explorer_fast` constrained to file/codebase search unless a separate validated issue changes that policy.
 - Non-functional requirements:
   - Evidence must be dated, reproducible, and tied to the exact CLI/package candidate.
@@ -71,7 +72,7 @@ The parent source anchor for this docs packet is `ctx:sha256:3cf28c7e9319e4f963d
   - Role policy: `explorer_fast` / `gpt-5.3-codex-spark` remains file/codebase-search-only.
 
 ## Architecture & Data
-- Architecture / design adjustments: no architecture change is required for the docs packet. Implementation must be evidence-led and can be a no-op if all `0.125` deltas remain hold/blocker.
+- Architecture / design adjustments: no architecture change is required for the docs packet. Implementation must be evidence-led and can be a no-op for surfaces that remain fallback/blocker.
 - Data model changes / migrations: none planned.
 - External dependencies / integrations: Codex CLI, OpenAI Codex official docs or release sources, npm package metadata, app-server model list, Codex Cloud environment, provider-linear-worker, downstream package smoke.
 
@@ -85,8 +86,8 @@ The parent source anchor for this docs packet is `ctx:sha256:3cf28c7e9319e4f963d
   - Provider-worker, standalone-review, cloud/fallback, and downstream/no-network smoke artifacts.
   - Full validation floor and `pack:smoke` if downstream package, CLI, review-wrapper, skills, defaults, or template surfaces change.
 - Rollout verification:
-  - Parent records promote/hold/no-op buckets with manifest paths before PR handoff.
-  - If any required gate fails, hold defaults and record the blocker instead of partially promoting.
+  - Parent records adopt/fallback/no-op buckets with manifest paths before PR handoff.
+  - If a required gate fails, hold only that surface and record the blocker instead of downgrading validated local posture.
 - Monitoring / alerts:
   - Follow-up issue required for live-vs-bundled catalog disagreement, stale local opt-in marker behavior, or no-network downstream regressions not fixed in CO-352.
 
