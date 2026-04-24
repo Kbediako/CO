@@ -4,8 +4,8 @@ This guide is the downstream-safe setup path shipped in the npm package.
 
 ## Contract
 
-- Once per machine: install Codex CLI, authenticate, install bundled skills, and register delegation or DevTools wiring.
-- Once per repo: seed the CO templates, review the generated config, and start using task-scoped runs.
+- Once per machine: install Codex CLI and authenticate.
+- Once per repo: seed the CO templates, install bundled skills, register delegation or DevTools wiring with the repo root, review the generated config, and start using task-scoped runs.
 - CO currently targets Codex CLI `0.124.0` with `gpt-5.4` / `xhigh` as the packaged default posture; newer candidates stay evidence-gated in the version policy.
 - Under ChatGPT auth, CO-341 host evidence shows explicit `gpt-5.5` with `xhigh` can work after local smoke plus `[codex_orchestrator] local_model_opt_in = "gpt-5.5"`, but generated downstream defaults stay on `gpt-5.4` because app-server model/list still reports it as `isDefault`.
 - `codex-orchestrator doctor` accepts the marker-backed local `gpt-5.5` opt-in as non-drift only when `codex debug models` verifies current model access, and additive defaults preserve matching prior `gpt-5.5` role files when the top-level config is explicitly opted in.
@@ -23,11 +23,7 @@ This guide is the downstream-safe setup path shipped in the npm package.
    # If browser auth is unavailable:
    codex login --device-auth
    ```
-3. Install bundled skills and register delegation or DevTools wiring:
-   ```bash
-   codex-orchestrator setup --yes
-   ```
-4. Check readiness:
+3. Check readiness:
    ```bash
    codex-orchestrator doctor --format json
    ```
@@ -78,6 +74,8 @@ The shipped marketplace files are:
 1. Seed the repo:
    ```bash
    codex-orchestrator init codex --cwd /path/to/repo
+   cd /path/to/repo
+   codex-orchestrator setup --yes --repo /path/to/repo
    ```
 2. Review the generated files:
    - `AGENTS.md`
@@ -102,6 +100,7 @@ The shipped marketplace files are:
 Use these before asking a reviewer to trust a new repo:
 
 ```bash
+cd /path/to/repo
 codex-orchestrator doctor --format json
 codex-orchestrator flow --task <task-id>
 NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --task <task-id>

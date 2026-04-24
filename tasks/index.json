@@ -1,6 +1,61 @@
 {
   "items": [
     {
+      "id": "20260424-linear-5d882b0c-d553-4d63-8d62-6f973090a13c",
+      "title": "CO-345 README front door and book-style docs",
+      "relates_to": "tasks/tasks-linear-5d882b0c-d553-4d63-8d62-6f973090a13c.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-24",
+      "approvals": {
+        "docs_first_packet": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-24",
+          "status": "approved",
+          "summary": "Docs-first packet preserves CO-345 as a README concision and book-style docs lane with hook-impact and Codex CLI 0.124.0 audit requirements; no runtime/model/default changes."
+        },
+        "child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-24",
+          "status": "succeeded-parent-applied-after-stale-accept",
+          "manifest": ".runs/linear-5d882b0c-d553-4d63-8d62-6f973090a13c-evidence-book-audit/cli/2026-04-24T02-57-07-541Z-0962c9df/manifest.json",
+          "summary": "Child lane produced the hook-impact and Codex 0.124 adoption evidence docs; accept invalidated due Linear updated_at drift, so parent reviewed and applied the scoped patch."
+        },
+        "docs_review": {
+          "reviewer": "linear child-stream docs-review",
+          "date": "2026-04-24",
+          "status": "passed",
+          "manifest": ".runs/linear-5d882b0c-d553-4d63-8d62-6f973090a13c-docs-review/cli/2026-04-24T03-35-09-379Z-78c5b86b/manifest.json",
+          "summary": "Docs-review passed after the README/book implementation and current-main rebase."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-24",
+          "status": "clean-success",
+          "manifest": ".runs/linear-5d882b0c-d553-4d63-8d62-6f973090a13c/cli/2026-04-24T02-54-49-668Z-81349a69/manifest.json",
+          "telemetry": ".runs/linear-5d882b0c-d553-4d63-8d62-6f973090a13c/cli/2026-04-24T02-54-49-668Z-81349a69/review/telemetry.json",
+          "summary": "Final forced standalone review completed with status=succeeded and review_outcome=clean-success on the post-budget-trim diff."
+        },
+        "elegance_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-24",
+          "status": "passed",
+          "artifact": "out/linear-5d882b0c-d553-4d63-8d62-6f973090a13c/manual/elegance-review.md",
+          "summary": "No simplification patch needed; README stays concise, detailed guidance stays in book/public docs, package docs allowlist is narrow, and no runtime/model/hook defaults changed."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-5d882b0c-d553-4d63-8d62-6f973090a13c.md",
+        "task": "tasks/tasks-linear-5d882b0c-d553-4d63-8d62-6f973090a13c.md",
+        "agent_task": ".agent/task/linear-5d882b0c-d553-4d63-8d62-6f973090a13c.md",
+        "prd": "docs/PRD-linear-5d882b0c-d553-4d63-8d62-6f973090a13c.md",
+        "tech_spec": "docs/TECH_SPEC-linear-5d882b0c-d553-4d63-8d62-6f973090a13c.md",
+        "action_plan": "docs/ACTION_PLAN-linear-5d882b0c-d553-4d63-8d62-6f973090a13c.md"
+      }
+    },
+    {
       "id": "20260424-co-344-doctor-local-optin-advisory",
       "title": "CO-344 Doctor Local Opt-In Advisory",
       "relates_to": "tasks/tasks-co-344-doctor-local-optin-advisory.md",

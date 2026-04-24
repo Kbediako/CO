@@ -1,0 +1,102 @@
+# Setup
+
+## Baseline Install
+
+CO is shipped as the scoped npm package `@kbediako/codex-orchestrator`.
+
+```bash
+npm i -g @kbediako/codex-orchestrator
+codex-orchestrator --version
+```
+
+Node.js `>=20` is required. npm remains the supported baseline because it gives downstream operators the CLI directly without requiring Codex plugin support.
+
+## Machine Setup
+
+```bash
+codex login
+codex-orchestrator doctor --format json
+```
+
+Use `codex login --device-auth` when browser auth is not practical.
+
+Run repo-bound `setup --yes --repo /path/to/repo` after bootstrapping the downstream repository so optional delegation and DevTools wiring are registered against the repo that will use them.
+
+## Codex Marketplace / Plugin Install
+
+Use this path only on Codex releases that expose the marketplace/plugin flow. The npm install remains the baseline CLI path.
+
+Packaged npm source:
+
+```bash
+# Codex 0.121.0 accepts either command.
+codex marketplace add "$(npm root -g)/@kbediako/codex-orchestrator"
+
+# Codex 0.122.0+ uses the plugin command.
+codex plugin marketplace add "$(npm root -g)/@kbediako/codex-orchestrator"
+```
+
+Local checkout source:
+
+```bash
+# Codex 0.121.0 accepts either command.
+codex marketplace add /path/to/CO
+
+# Codex 0.122.0+ uses the plugin command.
+codex plugin marketplace add /path/to/CO
+```
+
+Git-backed source:
+
+```bash
+# Codex 0.121.0 accepts either command.
+codex marketplace add owner/repo[@ref]
+
+# Codex 0.122.0+ uses the plugin command.
+codex plugin marketplace add owner/repo[@ref]
+```
+
+Then open `/plugins` in Codex, install `Codex Orchestrator`, and restart Codex if the plugin does not appear immediately.
+
+The shipped marketplace files are:
+
+- `.agents/plugins/marketplace.json`
+- `plugins/codex-orchestrator/.codex-plugin/plugin.json`
+- `plugins/codex-orchestrator/.mcp.json`
+- `plugins/codex-orchestrator/launcher.mjs`
+
+The plugin launcher reads the `codex-orchestrator` marketplace entry in `${CODEX_HOME:-~/.codex}/config.toml` and resolves the recorded source checkout before starting the packaged CO CLI with `node`. Local-directory sources run from the recorded path. Git-backed sources run from Codex's installed marketplace checkout under `${CODEX_HOME:-~/.codex}/.tmp/marketplaces/codex-orchestrator`.
+
+Re-run the version-appropriate marketplace add command after moving a local-directory source, replacing it, or removing Codex's installed marketplace checkout.
+
+CO currently targets Codex CLI `0.124.0`, while packaged and generated defaults stay on portable `gpt-5.4` with `model_reasoning_effort = "xhigh"`. Marker-backed local `gpt-5.5` opt-in remains local-only until the operator records live access smoke plus `[codex_orchestrator] local_model_opt_in = "gpt-5.5"`.
+
+## Rollback / Removal
+
+- Uninstall `Codex Orchestrator` from the Codex plugin browser to remove the plugin.
+- Set the plugin entry in `${CODEX_HOME:-~/.codex}/config.toml` to `enabled = false` to disable without uninstalling.
+- Remove the marketplace registration with `codex plugin marketplace remove codex-orchestrator`, or remove the `[marketplaces.codex-orchestrator]` block from `${CODEX_HOME:-~/.codex}/config.toml` if you need a manual fallback.
+- Remove the standalone CLI with:
+  ```bash
+  npm uninstall -g @kbediako/codex-orchestrator
+  ```
+
+## Repository Bootstrap
+
+```bash
+codex-orchestrator init codex --cwd /path/to/repo
+cd /path/to/repo
+codex-orchestrator setup --yes --repo /path/to/repo
+codex-orchestrator flow --task <task-id>
+```
+
+`init codex` seeds:
+
+- `AGENTS.md`
+- `.codex/config.toml`
+- `.codex/providers/README.md`
+- `.codex/providers/provider.env.example`
+- `.codex/providers/control.example.json`
+- `codex.orchestrator.json`
+
+Provider-specific setup continues in [docs/public/provider-onboarding.md](../public/provider-onboarding.md).
