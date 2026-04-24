@@ -1,6 +1,48 @@
 {
   "items": [
     {
+      "id": "20260424-linear-a68c30f0-27ea-4571-a587-3090d3873e99",
+      "title": "CO: restore missing docs/TASKS packet references for linear-1c101",
+      "relates_to": "tasks/tasks-linear-a68c30f0-27ea-4571-a587-3090d3873e99.md",
+      "risk": "low",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-24",
+      "approvals": {
+        "pre_fix_reproduction": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-24",
+          "status": "reproduced-on-stale-base",
+          "artifact": "out/linear-a68c30f0-27ea-4571-a587-3090d3873e99/docs-check-before.log",
+          "summary": "Fresh npm run docs:check reproduced the six docs/TASKS.md backticked-path-missing errors for the linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb packet paths before rebasing onto current origin/main."
+        },
+        "current_main_reconciliation": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-24",
+          "status": "resolved-by-current-main-plus-co350-packet",
+          "summary": "After rebasing the issue workspace onto current origin/main, the historical linear-1c101 packet files and registry rows are already present from the newer CO-332 restoration; CO-350 adds this packet as the auditable follow-up closeout."
+        },
+        "child_lane_restore": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-24",
+          "status": "accepted-before-current-main-rebase",
+          "manifest": ".runs/linear-a68c30f0-27ea-4571-a587-3090d3873e99-restore-linear-1c101-packet/cli/2026-04-24T06-44-02-660Z-7f433793/manifest.json",
+          "summary": "Same-issue child lane restored the six missing linear-1c101 packet files on the stale workspace base; after current-main rebase those files are supplied by upstream CO-332, so the final diff does not duplicate them."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-a68c30f0-27ea-4571-a587-3090d3873e99.md",
+        "task": "tasks/tasks-linear-a68c30f0-27ea-4571-a587-3090d3873e99.md",
+        "agent_task": ".agent/task/linear-a68c30f0-27ea-4571-a587-3090d3873e99.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-a68c30f0-27ea-4571-a587-3090d3873e99.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-a68c30f0-27ea-4571-a587-3090d3873e99.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-a68c30f0-27ea-4571-a587-3090d3873e99.md"
+        }
+      }
+    },
+    {
       "id": "20260424-linear-5d882b0c-d553-4d63-8d62-6f973090a13c",
       "title": "CO-345 README front door and book-style docs",
       "relates_to": "tasks/tasks-linear-5d882b0c-d553-4d63-8d62-6f973090a13c.md",
