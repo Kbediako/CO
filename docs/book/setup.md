@@ -15,7 +15,7 @@ Node.js `>=20` is required. npm remains the supported baseline because it gives 
 
 ```bash
 codex login
-codex-orchestrator doctor --format json
+codex-orchestrator --version
 ```
 
 Use `codex login --device-auth` when browser auth is not practical.
@@ -36,25 +36,7 @@ codex marketplace add "$(npm root -g)/@kbediako/codex-orchestrator"
 codex plugin marketplace add "$(npm root -g)/@kbediako/codex-orchestrator"
 ```
 
-Local checkout source:
-
-```bash
-# Codex 0.121.0 accepts either command.
-codex marketplace add /path/to/CO
-
-# Codex 0.122.0+ uses the plugin command.
-codex plugin marketplace add /path/to/CO
-```
-
-Git-backed source:
-
-```bash
-# Codex 0.121.0 accepts either command.
-codex marketplace add owner/repo[@ref]
-
-# Codex 0.122.0+ uses the plugin command.
-codex plugin marketplace add owner/repo[@ref]
-```
+For a local checkout, pass the repository root instead of the npm install path. For a Git-backed source, pass `owner/repo[@ref]`, an HTTPS Git URL, or an SSH Git URL. Use `codex marketplace add ...` only on Codex `0.121.0`; use `codex plugin marketplace add ...` on `0.122.0+`.
 
 Then open `/plugins` in Codex, install `Codex Orchestrator`, and restart Codex if the plugin does not appear immediately.
 
@@ -87,6 +69,7 @@ CO currently targets Codex CLI `0.124.0`, while packaged and generated defaults 
 codex-orchestrator init codex --cwd /path/to/repo
 cd /path/to/repo
 codex-orchestrator setup --yes --repo /path/to/repo
+codex-orchestrator doctor --format json
 codex-orchestrator flow --task <task-id>
 ```
 

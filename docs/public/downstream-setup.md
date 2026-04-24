@@ -23,11 +23,6 @@ This guide is the downstream-safe setup path shipped in the npm package.
    # If browser auth is unavailable:
    codex login --device-auth
    ```
-3. Check readiness:
-   ```bash
-   codex-orchestrator doctor --format json
-   ```
-
 ## Codex plugin marketplace install
 
 Use this when you want Codex to discover and enable CO from the plugin browser, while keeping npm available as the baseline CLI install path.
@@ -77,14 +72,18 @@ The shipped marketplace files are:
    cd /path/to/repo
    codex-orchestrator setup --yes --repo "$(pwd)"
    ```
-2. Review the generated files:
+2. Check readiness:
+   ```bash
+   codex-orchestrator doctor --format json
+   ```
+3. Review the generated files:
    - `AGENTS.md`
    - `.codex/config.toml`
    - `.codex/providers/README.md`
    - `.codex/providers/provider.env.example`
    - `.codex/providers/control.example.json`
    - `codex.orchestrator.json`
-3. Start with a task-scoped flow:
+4. Start with a task-scoped flow:
    ```bash
    codex-orchestrator flow --task <task-id>
    ```
