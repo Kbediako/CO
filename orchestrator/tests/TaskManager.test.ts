@@ -250,7 +250,7 @@ describe('TaskManager', () => {
         artifacts: [{ path: '.runs/task/run/errors/01-review.json', description: 'Command error artifact (review)' }],
         mode: 'mcp' as const,
         success: false,
-        failureStage: 'review',
+        failureStage: 'Review',
         failureArtifactPath: '.runs/task/run/errors/01-review.json',
         runId: 'ignored'
       } satisfies BuildResult)),

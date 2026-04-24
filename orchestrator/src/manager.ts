@@ -371,7 +371,8 @@ export class TaskManager {
 
   private extractFailedPrerequisiteStage(build?: BuildResult): string | null {
     const stage = build?.failureStage?.trim();
-    if (!stage || ['build', 'test', 'review'].includes(stage)) {
+    const canonicalStage = stage?.toLowerCase();
+    if (!stage || (canonicalStage != null && ['build', 'test', 'review'].includes(canonicalStage))) {
       return null;
     }
     return stage;
