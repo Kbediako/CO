@@ -386,6 +386,9 @@ export class TaskManager {
     if (!failureStage) {
       return null;
     }
+    if (['build', 'test', 'review'].includes(failureStage)) {
+      return null;
+    }
     const stagePathToken = failureStage.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     const stageArtifact = build?.artifacts.find((candidate) => {
       const normalizedPath = candidate.path.replace(/\\/g, '/').toLowerCase();

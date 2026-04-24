@@ -32,8 +32,8 @@
           "reviewer": "codex-orchestrator review",
           "date": "2026-04-24",
           "status": "bounded-success-command-intent",
-          "manifest": ".runs/linear-a66fa065-3c6c-4063-b2ba-1121bf71f74f/cli/2026-04-24T07-49-58-421Z-12326f32/manifest.json",
-          "telemetry": ".runs/linear-a66fa065-3c6c-4063-b2ba-1121bf71f74f/cli/2026-04-24T07-49-58-421Z-12326f32/review/telemetry.json",
+          "manifest": ".runs/linear-a66fa065-3c6c-4063-b2ba-1121bf71f74f/cli/2026-04-24T09-43-00-650Z-90a71ad8/manifest.json",
+          "telemetry": ".runs/linear-a66fa065-3c6c-4063-b2ba-1121bf71f74f/cli/2026-04-24T09-43-00-650Z-90a71ad8/review/telemetry.json",
           "summary": "Forced standalone review completed with status=succeeded and review_outcome=bounded-success after the wrapper retried a blocked validation-command attempt as read-only bounded review; no actionable findings were reported."
         },
         "elegance_review": {

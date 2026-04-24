@@ -56,23 +56,25 @@
 - Keep the diff focused on builder failure diagnostics, skipped-review wording, docs packet, and focused tests.
 
 ## Non-Goals
-- No pipeline redesign.
-- No change to command execution or guard semantics.
-- No cleanup of stale historical run artifacts.
-- No broad provider closeout or review-wrapper telemetry work.
+- Pipeline design remains unchanged.
+- Command execution and guard semantics stay unchanged.
+- Stale historical run artifacts remain untouched.
+- Provider closeout and review-wrapper telemetry stay out of scope.
 
 ## Validation
+- `MCP_RUNNER_TASK_ID=linear-a66fa065-3c6c-4063-b2ba-1121bf71f74f node scripts/delegation-guard.mjs`
 - `node scripts/spec-guard.mjs --dry-run`
-- `npm run test -- orchestrator/tests/CommandBuilder.test.ts orchestrator/tests/TaskManager.test.ts`
-- `npm run test:core -- orchestrator/tests/ProviderIssueHandoff.test.ts -t "blocks direct webhook admission when queued retry and resumable claims fill max_allowed"`
 - `npm run build`
 - `npm run lint`
+- `npm run test -- orchestrator/tests/CommandBuilder.test.ts orchestrator/tests/TaskManager.test.ts`
+- `npm run test:core -- orchestrator/tests/ProviderIssueHandoff.test.ts -t "blocks direct webhook admission when queued retry and resumable claims fill max_allowed"`
 - `npm run test`
 - `npm run docs:check`
 - `npm run docs:freshness`
 - `npm run repo:stewardship`
 - `node scripts/diff-budget.mjs`
-- manifest-backed standalone review and explicit elegance review
+- `npm run pack:smoke`
+- `TASK=linear-a66fa065-3c6c-4063-b2ba-1121bf71f74f NOTES="Goal: verify CO-346 skipped-review prerequisite-stage truth fix after exact artifact-stage matching | Summary: BuildResult carries failed-stage diagnostics, CommandBuilder derives explicit failed-stage evidence, TaskManager reports known prerequisite stages and only attaches explicit or exact stage-matched error artifacts, and tests cover false positives | Risks: skipped review wording and artifact attribution" FORCE_CODEX_REVIEW=1 CODEX_REVIEW_NON_INTERACTIVE=1 npm run review -- --manifest .runs/linear-a66fa065-3c6c-4063-b2ba-1121bf71f74f/cli/2026-04-24T09-43-00-650Z-90a71ad8/manifest.json --base origin/main --task linear-a66fa065-3c6c-4063-b2ba-1121bf71f74f --non-interactive`
 
 ## Approvals
 - Product: Linear CO-346
