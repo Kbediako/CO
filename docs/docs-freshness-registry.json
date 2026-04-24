@@ -3,6 +3,104 @@
   "generated_at": "2026-04-24",
   "entries": [
     {
+      "path": "docs/book/README.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-24",
+      "cadence_days": 14
+    },
+    {
+      "path": "docs/book/setup.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-24",
+      "cadence_days": 14
+    },
+    {
+      "path": "docs/book/operations.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-24",
+      "cadence_days": 14
+    },
+    {
+      "path": "docs/book/skills.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-24",
+      "cadence_days": 14
+    },
+    {
+      "path": "skills/README.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-24",
+      "cadence_days": 14
+    },
+    {
+      "path": "docs/book/public-posture.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-24",
+      "cadence_days": 14
+    },
+    {
+      "path": "docs/book/local-hook-impact.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-24",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/book/codex-cli-0124-adoption.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-24",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/linear-5d882b0c-d553-4d63-8d62-6f973090a13c.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-24",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-5d882b0c-d553-4d63-8d62-6f973090a13c.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-24",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-linear-5d882b0c-d553-4d63-8d62-6f973090a13c.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-24",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-5d882b0c-d553-4d63-8d62-6f973090a13c.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-24",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/linear-5d882b0c-d553-4d63-8d62-6f973090a13c.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-24",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-linear-5d882b0c-d553-4d63-8d62-6f973090a13c.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-24",
+      "cadence_days": 30
+    },
+    {
       "path": "tasks/tasks-co-344-doctor-local-optin-advisory.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -24108,7 +24206,7 @@
       "path": "README.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-21",
+      "last_review": "2026-04-24",
       "cadence_days": 90
     },
     {

@@ -4,10 +4,11 @@ This guide is the downstream-safe setup path shipped in the npm package.
 
 ## Contract
 
-- Once per machine: install Codex CLI, authenticate, install bundled skills, and register delegation or DevTools wiring.
-- Once per repo: seed the CO templates, review the generated config, and start using task-scoped runs.
-- CO currently targets Codex CLI `0.124.0` with `gpt-5.4` / `xhigh` as the packaged default posture; newer candidates stay evidence-gated in the version policy.
-- Under ChatGPT auth, CO-341 host evidence shows explicit `gpt-5.5` with `xhigh` can work after local smoke plus `[codex_orchestrator] local_model_opt_in = "gpt-5.5"`, but generated downstream defaults stay on `gpt-5.4` because app-server model/list still reports it as `isDefault`.
+- Once per machine: install Codex CLI and authenticate.
+- Once per repo: seed the CO templates, run setup with the repo root so delegation is repo-scoped while bundled skills are installed and DevTools wiring is applied at the machine level, review the generated config, and start using task-scoped runs.
+- CO currently targets Codex CLI `0.124.0`; newer candidates stay evidence-gated in the version policy.
+- Portable generated downstream defaults stay on `gpt-5.4` / `xhigh` because API/cloud portability is not proven and app-server model/list still reports it as `isDefault`.
+- Local ChatGPT-auth `gpt-5.5` / `xhigh` remains marker-backed opt-in only after `codex debug models` verifies current model access.
 - `codex-orchestrator doctor` accepts the marker-backed local `gpt-5.5` opt-in as non-drift only when `codex debug models` verifies current model access, and additive defaults preserve matching prior `gpt-5.5` role files when the top-level config is explicitly opted in.
 - CO-196 posture lineage remains unchanged: npm is the supported baseline because it is the simplest supported CLI install path, and marketplace packaging is an additive registration path for newer Codex releases. `0.121.0` accepts both `codex marketplace add` and `codex plugin marketplace add`; `0.122.0+` require `codex plugin marketplace add`.
 
@@ -23,15 +24,6 @@ This guide is the downstream-safe setup path shipped in the npm package.
    # If browser auth is unavailable:
    codex login --device-auth
    ```
-3. Install bundled skills and register delegation or DevTools wiring:
-   ```bash
-   codex-orchestrator setup --yes
-   ```
-4. Check readiness:
-   ```bash
-   codex-orchestrator doctor --format json
-   ```
-
 ## Codex plugin marketplace install
 
 Use this when you want Codex to discover and enable CO from the plugin browser, while keeping npm available as the baseline CLI install path.
@@ -78,15 +70,21 @@ The shipped marketplace files are:
 1. Seed the repo:
    ```bash
    codex-orchestrator init codex --cwd /path/to/repo
+   cd /path/to/repo
+   codex-orchestrator setup --yes --repo "$(pwd)"
    ```
-2. Review the generated files:
+2. Check readiness:
+   ```bash
+   codex-orchestrator doctor --format json
+   ```
+3. Review the generated files:
    - `AGENTS.md`
    - `.codex/config.toml`
    - `.codex/providers/README.md`
    - `.codex/providers/provider.env.example`
    - `.codex/providers/control.example.json`
    - `codex.orchestrator.json`
-3. Start with a task-scoped flow:
+4. Start with a task-scoped flow:
    ```bash
    codex-orchestrator flow --task <task-id>
    ```
@@ -102,6 +100,7 @@ The shipped marketplace files are:
 Use these before asking a reviewer to trust a new repo:
 
 ```bash
+cd /path/to/repo
 codex-orchestrator doctor --format json
 codex-orchestrator flow --task <task-id>
 NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --task <task-id>

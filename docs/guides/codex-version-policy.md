@@ -9,11 +9,12 @@ Define the current stable compatibility/adoption target for CO and keep newer CL
 - Release-facing downstream-smoke workflows (`core-lane`, `release`, and `pack-smoke-backstop`) pin `@openai/codex@0.124.0` after CO-341 found no marketplace-smoke reason to stay on the `0.123.0` `codex plugin marketplace add` baseline.
 - `cloud-canary` pins `@openai/codex@0.124.0` as the explicit release-planning candidate.
 - The `0.124.0` CO-local posture keeps the previously recorded onboarding-sensitive help guarantees: `codex exec` accepts a prompt argument plus piped stdin (stdin appends as a `<stdin>` block), `codex login --device-auth` is available, and `codex review --help` exposes `[PROMPT]` alongside `--uncommitted` / `--base` / `--commit`.
-- Current model posture is `gpt-5.4` with `model_reasoning_effort = "xhigh"` for packaged/generated top-level, delegated subagent, and review defaults.
-- CO-local explicit `gpt-5.5` / `xhigh` configuration is allowed after live app-server/model smoke evidence plus `[codex_orchestrator] local_model_opt_in = "gpt-5.5"`; this is not a packaged default and not a claim that public OpenAI docs have changed the documented Codex default model.
+- Current model posture is `gpt-5.5` / `xhigh` when available in ChatGPT-auth Codex sessions.
+- Portable packaged/generated defaults still seed `gpt-5.4` / `xhigh`; use them when `gpt-5.5`, API, or cloud portability is unavailable.
+- CO-local explicit `gpt-5.5` / `xhigh` configuration is allowed after live app-server/model smoke evidence plus `[codex_orchestrator] local_model_opt_in = "gpt-5.5"`; this is not a claim that every auth provider or cloud surface can select `gpt-5.5`.
 - `codex-orchestrator doctor` treats the marker-backed local `gpt-5.5` opt-in as non-drift only when `codex debug models` verifies current model access, and additive defaults preserve exact prior `gpt-5.5` role files when the top-level config is explicitly opted in.
 - Keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only.
-- When authenticating through ChatGPT, keep packaged delegated and review defaults on `gpt-5.4`; do not target delegated/review surfaces at `gpt-5.5` unless a local smoke plus the CO opt-in marker or fresh provider lane validates that access.
+- For delegated/review surfaces, use `gpt-5.5` only after local smoke plus the CO opt-in marker or fresh provider-lane evidence validates that access.
 - App-server `model/list` still reports `gpt-5.4` as `isDefault=true`; CO-341 has live app-server `model/list` plus `codex exec` evidence that explicit local `gpt-5.5` supports `xhigh`.
 - The bundled debug model catalog may lag the live app-server catalog; use live app-server `model/list` and live exec evidence as the source of truth for model availability decisions.
 - Residual plugin warnings seen during CO-341 came from local temporary plugin cache state, not CO-owned plugin manifests.
@@ -65,9 +66,9 @@ Define the current stable compatibility/adoption target for CO and keep newer CL
 - 2026-04-24: `CO-341` audited `rust-v0.124.0` / npm `@openai/codex@0.124.0` and aligns the repo CLI posture to `0.124.0` while keeping packaged/generated model defaults on `gpt-5.4` / `xhigh`. Local `codex-cli 0.124.0`, `codex exec`, `codex review --help`, and `codex login --help` keep the required prompt/device-auth surfaces. Live app-server `model/list` shows explicit local `gpt-5.5` supports `xhigh` while `gpt-5.4` remains the app-server catalog default; the bundled debug model catalog may lag. Residual plugin warnings are local temporary plugin cache warnings, not CO-owned plugin manifests. Runtime-mode canary, required cloud canary, fallback cloud contract, and pack-smoke evidence passed for the CO-341 branch. Evidence: `out/linear-4a684a5e-64b0-47fb-835a-d792eba29071/manual/local-probes/`, `out/linear-4a684a5e-64b0-47fb-835a-d792eba29071/manual/runtime-mode-canary/post-build/runtime-mode-canary.log`, `.runs/linear-4a684a5e-64b0-47fb-835a-d792eba29071/cli/2026-04-23T19-44-14-410Z-2e596753/manifest.json`, `.runs/linear-4a684a5e-64b0-47fb-835a-d792eba29071/cli/2026-04-23T19-49-46-024Z-0d81d04d/manifest.json`, and `tests/pack-smoke.spec.ts`.
 
 ## Required Evidence Gates
-For any change to the current `0.124.0` / packaged `gpt-5.4` `xhigh` posture, any local opt-in to `gpt-5.5`, or any promotion of a newer Codex build in CO:
+For any change to the current `0.124.0` / `gpt-5.5` `xhigh` operator posture, portable `gpt-5.4` defaults, or any promotion of a newer Codex build in CO:
 1. Local appserver path passes on the candidate Codex CLI + model posture.
-2. Delegated/review surfaces are verified on the actual auth provider in use; for ChatGPT auth, keep packaged defaults on `gpt-5.4` unless explicit local smoke plus the CO opt-in marker validates `gpt-5.5` or new compatibility evidence exists for a Codex-suffixed model variant.
+2. Delegated/review surfaces are verified on the actual auth provider in use; for ChatGPT auth, require explicit local smoke plus the CO opt-in marker before using `gpt-5.5`, otherwise stay on the portable `gpt-5.4` defaults.
 3. Runtime-mode canary passes (`node scripts/runtime-mode-canary.mjs`).
 4. Cloud canary required contract passes (`CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 npm run ci:cloud-canary`).
 5. Cloud fallback contract behavior remains correct (`CODEX_CLOUD_ENV_ID="" CODEX_CLOUD_CANARY_REQUIRED=1 CLOUD_CANARY_EXPECT_FALLBACK=1 npm run ci:cloud-canary`).
