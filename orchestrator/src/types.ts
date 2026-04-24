@@ -72,6 +72,8 @@ export interface BuildResult {
   runId: string;
   success: boolean;
   notes?: string;
+  failureStage?: string | null;
+  failureArtifactPath?: string | null;
   cloudExecution?: CloudExecutionSummary | null;
 }
 
