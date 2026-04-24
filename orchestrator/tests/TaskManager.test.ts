@@ -248,11 +248,11 @@ describe('TaskManager', () => {
       planner: new FunctionalPlannerAgent(async () => plan),
       builder: new FunctionalBuilderAgent(async () => ({
         subtaskId: 'implementation-gate:review',
-        artifacts: [{ path: '.runs/task/run/errors/01-review.json', description: 'Command error artifact (review)' }],
+        artifacts: [{ path: '.runs/task/run/errors/01-review-stage-match.json', description: 'Command error artifact (review)' }],
         mode: 'mcp' as const,
         success: false,
         failureStage: 'Review',
-        failureArtifactPath: '.runs/task/run/errors/01-review.json',
+        failureArtifactPath: '.runs/task/run/errors/02-explicit-review.json',
         runId: 'ignored'
       } satisfies BuildResult)),
       tester: new FunctionalTesterAgent(async () => {
@@ -268,7 +268,8 @@ describe('TaskManager', () => {
 
     expect(result.review.summary).toBe('Review skipped: build stage failed.');
     expect(result.review.decision.feedback).toContain('Build stage failed; review skipped.');
-    expect(result.review.decision.feedback).toContain('.runs/task/run/errors/01-review.json');
+    expect(result.review.decision.feedback).toContain('.runs/task/run/errors/02-explicit-review.json');
+    expect(result.review.decision.feedback).not.toContain('.runs/task/run/errors/01-review-stage-match.json');
   });
 
   it('skips reviewer when tests fail', async () => {
