@@ -464,16 +464,23 @@ export async function runDocsCheck(repoRoot: string): Promise<DocsCheckError[]> 
         });
       } else {
         const versionMentions = extractCodexCliVersionMentions(content);
+        const allowedVersionMentions = new Set([
+          codexPosture.cli_version,
+          ...(codexPosture.cli_compatibility_versions ?? [])
+        ]);
         const hasCurrentMention = versionMentions.includes(codexPosture.cli_version);
-        const staleMentions = versionMentions.filter((version: string) => version !== codexPosture.cli_version);
+        const staleMentions = versionMentions.filter((version: string) => !allowedVersionMentions.has(version));
         if (!hasCurrentMention || staleMentions.length > 0) {
+          const reference =
+            versionMentions.length === 0
+              ? `missing Codex CLI version ${codexPosture.cli_version}`
+              : staleMentions.length === 0
+                ? `missing current Codex CLI version ${codexPosture.cli_version}; mentioned compatibility version(s) ${versionMentions.join(', ')}`
+                : `Codex CLI version(s) ${staleMentions.join(', ')} != current policy ${codexPosture.cli_version}`;
           errors.push({
             file,
             rule: 'doc-posture-stale',
-            reference:
-              versionMentions.length === 0
-                ? `missing Codex CLI version ${codexPosture.cli_version}`
-                : `Codex CLI version(s) ${staleMentions.join(', ')} != current policy ${codexPosture.cli_version}`
+            reference
           });
         }
       }

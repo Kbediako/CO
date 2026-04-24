@@ -368,9 +368,24 @@ async function commandSucceeds(command, args, options = {}) {
   });
 }
 
-const MARKETPLACE_ADD_COMMAND_CANDIDATES = [
-  ['plugin', 'marketplace', 'add'],
-  ['marketplace', 'add']
+const MARKETPLACE_COMMAND_CANDIDATES = [
+  {
+    surface: 'plugin-marketplace',
+    displayName: 'codex plugin marketplace add',
+    addArgs: ['plugin', 'marketplace', 'add'],
+    helpArgs: ['plugin', 'marketplace', 'add', '--help'],
+    requiredHelpArgs: [
+      ['plugin', 'marketplace', 'upgrade', '--help'],
+      ['plugin', 'marketplace', 'remove', '--help']
+    ]
+  },
+  {
+    surface: 'legacy-marketplace',
+    displayName: 'codex marketplace add',
+    addArgs: ['marketplace', 'add'],
+    helpArgs: ['marketplace', 'add', '--help'],
+    requiredHelpArgs: []
+  }
 ];
 
 function formatMarketplaceAddCommand(commandArgs) {
@@ -378,18 +393,42 @@ function formatMarketplaceAddCommand(commandArgs) {
 }
 
 function formatSupportedMarketplaceAddCommands() {
-  return MARKETPLACE_ADD_COMMAND_CANDIDATES.map((commandArgs) => `\`${formatMarketplaceAddCommand(commandArgs)}\``).join(
-    ' or '
-  );
+  return MARKETPLACE_COMMAND_CANDIDATES.map(
+    (candidate) => `\`${formatMarketplaceAddCommand(candidate.addArgs)}\``
+  ).join(' or ');
 }
 
-async function resolveMarketplaceAddCommand(command, options = {}) {
-  for (const commandArgs of MARKETPLACE_ADD_COMMAND_CANDIDATES) {
-    if (await commandSucceeds(command, [...commandArgs, '--help'], options)) {
-      return commandArgs;
+function formatHelpCommand(command, args) {
+  return `${command} ${args.join(' ')}`;
+}
+
+export async function resolveMarketplaceCommandSupport(command, options = {}, probe = commandSucceeds) {
+  let incompletePluginSupport = null;
+  for (const candidate of MARKETPLACE_COMMAND_CANDIDATES) {
+    if (!(await probe(command, candidate.helpArgs, options))) {
+      continue;
+    }
+    const missingHelpCommands = [];
+    for (const requiredArgs of candidate.requiredHelpArgs) {
+      if (!(await probe(command, requiredArgs, options))) {
+        missingHelpCommands.push(formatHelpCommand(command, requiredArgs));
+      }
+    }
+    const support = {
+      surface: candidate.surface,
+      displayName: candidate.displayName,
+      addArgs: [...candidate.addArgs],
+      helpArgs: [...candidate.helpArgs],
+      missingHelpCommands
+    };
+    if (missingHelpCommands.length === 0) {
+      return support;
+    }
+    if (candidate.surface === 'plugin-marketplace') {
+      incompletePluginSupport = support;
     }
   }
-  return null;
+  return incompletePluginSupport;
 }
 
 export function resolveMarketplaceSmokePrerequisite({
@@ -397,9 +436,22 @@ export function resolveMarketplaceSmokePrerequisite({
   allowMarketplaceSkip = false,
   marketplaceSkipReason = '',
   codexAvailable,
-  marketplaceCommandArgs
+  marketplaceCommand = null,
+  marketplaceCommandArgs = null
 }) {
   const skipReason = String(marketplaceSkipReason ?? '').trim();
+  const resolvedMarketplaceCommand =
+    marketplaceCommand ??
+    (Array.isArray(marketplaceCommandArgs)
+      ? {
+          addArgs: marketplaceCommandArgs,
+          displayName: formatMarketplaceAddCommand(marketplaceCommandArgs),
+          missingHelpCommands: []
+        }
+      : null);
+  const missingHelpCommands = Array.isArray(resolvedMarketplaceCommand?.missingHelpCommands)
+    ? resolvedMarketplaceCommand.missingHelpCommands
+    : [];
   if (!codexAvailable) {
     if (allowMarketplaceSkip && skipReason.length > 0) {
       return {
@@ -424,7 +476,7 @@ export function resolveMarketplaceSmokePrerequisite({
     };
   }
 
-  if (!marketplaceCommandArgs) {
+  if (!resolvedMarketplaceCommand) {
     if (allowMarketplaceSkip && skipReason.length > 0) {
       return {
         status: 'skip',
@@ -449,10 +501,35 @@ export function resolveMarketplaceSmokePrerequisite({
     };
   }
 
+  if (missingHelpCommands.length > 0) {
+    if (allowMarketplaceSkip && skipReason.length > 0) {
+      return {
+        status: 'skip',
+        reason: 'marketplace-help-incomplete',
+        message:
+          `Skipping marketplace smoke: ${codexBin} has incomplete plugin marketplace help. Missing: ${missingHelpCommands.join(', ')}. Reason: ${skipReason}`
+      };
+    }
+    if (allowMarketplaceSkip) {
+      return {
+        status: 'fail',
+        reason: 'missing-skip-reason',
+        message:
+          'PACK_SMOKE_MARKETPLACE_SKIP_REASON is required when PACK_SMOKE_ALLOW_MARKETPLACE_SKIP=1 skips marketplace coverage.'
+      };
+    }
+    return {
+      status: 'fail',
+      reason: 'marketplace-help-incomplete',
+      message:
+        `Marketplace smoke requires plugin marketplace upgrade/remove help detection to pass. Missing: ${missingHelpCommands.join(', ')}.`
+    };
+  }
+
   return {
     status: 'run',
     reason: 'marketplace-supported',
-    message: `Marketplace smoke prerequisites satisfied via ${formatMarketplaceAddCommand(marketplaceCommandArgs)}.`
+    message: `Marketplace smoke prerequisites satisfied via ${formatMarketplaceAddCommand(resolvedMarketplaceCommand.addArgs)}.`
   };
 }
 
@@ -829,13 +906,13 @@ async function runMarketplacePluginSmoke(packageRoot, tempDir) {
   const allowMarketplaceSkip = process.env.PACK_SMOKE_ALLOW_MARKETPLACE_SKIP === '1';
   const marketplaceSkipReason = process.env.PACK_SMOKE_MARKETPLACE_SKIP_REASON ?? '';
   const codexAvailable = await commandSucceeds(codexBin, ['--version']);
-  const marketplaceCommandArgs = codexAvailable ? await resolveMarketplaceAddCommand(codexBin) : null;
+  const marketplaceCommand = codexAvailable ? await resolveMarketplaceCommandSupport(codexBin) : null;
   const prerequisite = resolveMarketplaceSmokePrerequisite({
     codexBin,
     allowMarketplaceSkip,
     marketplaceSkipReason,
     codexAvailable,
-    marketplaceCommandArgs
+    marketplaceCommand
   });
   if (prerequisite.status === 'skip') {
     console.warn(prerequisite.message);
@@ -873,7 +950,7 @@ async function runMarketplacePluginSmoke(packageRoot, tempDir) {
   await runMarketplaceInstallScenario({
     label: 'local-marketplace',
     codexBin,
-    marketplaceCommandArgs,
+    marketplaceCommandArgs: marketplaceCommand.addArgs,
     tempDir,
     pluginVersion: pluginManifest.version,
     addArgs: [marketplaceRoot],
@@ -893,7 +970,7 @@ async function runMarketplacePluginSmoke(packageRoot, tempDir) {
     await runMarketplaceInstallScenario({
       label: 'git-marketplace',
       codexBin,
-      marketplaceCommandArgs,
+      marketplaceCommandArgs: marketplaceCommand.addArgs,
       tempDir,
       pluginVersion: pluginManifest.version,
       addArgs: [marketplaceUrl],

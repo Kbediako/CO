@@ -1,0 +1,50 @@
+# Task Checklist - linear-4c2e0c11-d512-4171-abd4-359cd5957ac6
+
+- Linear Issue: `CO-355` / `4c2e0c11-d512-4171-abd4-359cd5957ac6`
+- MCP Task ID: `linear-4c2e0c11-d512-4171-abd4-359cd5957ac6`
+- Primary PRD: `docs/PRD-linear-4c2e0c11-d512-4171-abd4-359cd5957ac6.md`
+- TECH_SPEC: `docs/TECH_SPEC-linear-4c2e0c11-d512-4171-abd4-359cd5957ac6.md`
+- Task spec: `tasks/specs/linear-4c2e0c11-d512-4171-abd4-359cd5957ac6.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-linear-4c2e0c11-d512-4171-abd4-359cd5957ac6.md`
+
+## Docs-First
+- [x] PRD drafted for the CO-355 Codex `0.125.0` marketplace rebaseline lane. Evidence: `docs/PRD-linear-4c2e0c11-d512-4171-abd4-359cd5957ac6.md`.
+- [x] TECH_SPEC drafted with protected command surfaces, parity matrix, Not Done If, and validation plan. Evidence: `docs/TECH_SPEC-linear-4c2e0c11-d512-4171-abd4-359cd5957ac6.md`, `tasks/specs/linear-4c2e0c11-d512-4171-abd4-359cd5957ac6.md`.
+- [x] ACTION_PLAN drafted for docs/policy, pack-smoke, canary, review, and PR handoff sequencing. Evidence: `docs/ACTION_PLAN-linear-4c2e0c11-d512-4171-abd4-359cd5957ac6.md`.
+- [x] Registry mirrors updated in `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json`. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
+- [x] Docs-review child stream completed or a truthful fallback is recorded before implementation acceptance. Evidence: `.runs/linear-4c2e0c11-d512-4171-abd4-359cd5957ac6-docs-review-r2/cli/2026-04-24T20-56-37-009Z-e14cc65a/manifest.json` passed delegation guard and `docs:check`; it failed on unrelated stale spec / docs-freshness-maintenance baseline, so parent continued with focused docs hygiene validation.
+
+## Source / Assumptions
+- [x] Authoritative CO-355 issue body and live workflow states were read via `linear issue-context`. Evidence: packaged `linear issue-context --issue-id 4c2e0c11-d512-4171-abd4-359cd5957ac6`.
+- [x] Current CLI/npm evidence was started before implementation. Evidence: local `/opt/homebrew/bin/codex` help output and `npm view @openai/codex dist-tags.latest version --json`.
+- [x] Required parallelization decision was recorded and same-issue child lane launched. Evidence: Linear parallelization event and child lane `pack-smoke-marketplace-0125`.
+
+## Implementation
+- [x] Public docs use `codex plugin marketplace add` for current Codex and describe upgrade/remove lifecycle. Evidence: `README.md`, `docs/public/downstream-setup.md`, `docs/book/setup.md`, and `docs/skills-release.md`.
+- [x] Pack-smoke detects and uses the `plugin marketplace` command family with legacy fallback. Evidence: `scripts/pack-smoke.mjs`.
+- [x] Focused tests cover current plugin marketplace support and legacy top-level fallback. Evidence: `tests/pack-smoke.spec.ts`, `tests/docs-hygiene.spec.ts`.
+- [x] Version policy records the `0.125.0` marketplace decision and release-facing smoke pin outcome. Evidence: `docs/guides/codex-version-policy.md`.
+
+## Validation
+- [x] `codex plugin marketplace add --help`, `upgrade --help`, and `remove --help` captured.
+- [x] `codex marketplace add --help` captured as expected failure on `0.125.0`.
+- [x] npm latest check captured (`@openai/codex` `0.125.0`).
+- [x] Focused pack-smoke / marketplace tests. Evidence: `npx vitest run tests/pack-smoke.spec.ts tests/docs-hygiene.spec.ts` passed 50 tests after CodeRabbit feedback fixes.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: OK with 4 subagent manifests.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `Spec guard: OK`.
+- [x] `npm run build`. Evidence: TypeScript build passed.
+- [x] `npm run lint`. Evidence: passed with the existing three `no-explicit-any` warnings in `orchestrator/tests/DelegationMcpHealth.test.ts`.
+- [x] `npm run test`. Evidence: 351 files / 4747 tests passed after CodeRabbit feedback fixes.
+- [x] `npm run docs:check`. Evidence: `docs:check: OK`.
+- [x] `npm run docs:freshness`. Evidence: 4638 docs / 4641 registry entries, all stale counts zero.
+- [x] `npm run repo:stewardship`. Evidence: 5753 tracked files, 0 action-required.
+- [x] `node scripts/diff-budget.mjs`. Evidence: working-tree 4 files / 113 lines, stacked aggregate 21 files / 776 lines, both within budget.
+- [x] Manifest-backed `FORCE_CODEX_REVIEW=1 npm run review`. Evidence: review telemetry `status=succeeded`, `review_outcome=bounded-success`, command-intent boundary classified as non-blocking; final review reported no actionable findings.
+- [x] Explicit elegance/minimality pass. Evidence: `git diff --check` passed; no simplification patch needed after review fixes.
+- [x] `npm run pack:smoke`. Evidence: passed with `PACK_SMOKE_CODEX_BIN` pointing to an npm-installed `@openai/codex@0.125.0` binary.
+- [ ] PR attached and `codex-orchestrator pr ready-review` drain clean before review handoff.
+
+## Handoff Status
+- [ ] Workpad refreshed with final implementation, validation, and review status.
+- [ ] PR opened/updated and attached to CO-355.
+- [ ] Linear state moved to `In Review` only after validation, PR checks, feedback drain, and workpad refresh are complete.

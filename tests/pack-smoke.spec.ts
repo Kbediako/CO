@@ -29,7 +29,7 @@ type WorkflowFile = {
 };
 
 const marketplaceSkipToken = 'PACK_SMOKE_ALLOW_MARKETPLACE_SKIP';
-const marketplaceCodexInstallCommand = 'npm install --global @openai/codex@0.124.0';
+const marketplaceCodexInstallCommand = 'npm install --global @openai/codex@0.125.0';
 const cloudCanaryCodexInstallCommand = 'npm install --global @openai/codex@0.124.0';
 const dedicatedCodexInstallCommands = new Set([
   marketplaceCodexInstallCommand,
@@ -1042,6 +1042,105 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     });
   });
 
+  it('prefers plugin marketplace add while preserving the legacy marketplace fallback', async () => {
+    const { resolveMarketplaceCommandSupport } = await import('../scripts/pack-smoke.mjs');
+
+    const pluginProbeCalls: string[] = [];
+    const pluginSupport = await resolveMarketplaceCommandSupport(
+      'codex',
+      {},
+      async (_command: string, args: string[]) => {
+        pluginProbeCalls.push(args.join(' '));
+        return true;
+      }
+    );
+
+    expect(pluginSupport).toMatchObject({
+      surface: 'plugin-marketplace',
+      displayName: 'codex plugin marketplace add',
+      addArgs: ['plugin', 'marketplace', 'add'],
+      missingHelpCommands: []
+    });
+    expect(pluginProbeCalls).toEqual([
+      'plugin marketplace add --help',
+      'plugin marketplace upgrade --help',
+      'plugin marketplace remove --help'
+    ]);
+
+    const legacyProbeCalls: string[] = [];
+    const legacySupport = await resolveMarketplaceCommandSupport(
+      'codex',
+      {},
+      async (_command: string, args: string[]) => {
+        legacyProbeCalls.push(args.join(' '));
+        return args.join(' ') === 'marketplace add --help';
+      }
+    );
+
+    expect(legacySupport).toMatchObject({
+      surface: 'legacy-marketplace',
+      displayName: 'codex marketplace add',
+      addArgs: ['marketplace', 'add'],
+      missingHelpCommands: []
+    });
+    expect(legacyProbeCalls).toEqual([
+      'plugin marketplace add --help',
+      'marketplace add --help'
+    ]);
+
+    const partialPluginProbeCalls: string[] = [];
+    const partialPluginLegacySupport = await resolveMarketplaceCommandSupport(
+      'codex-0.121',
+      {},
+      async (_command: string, args: string[]) => {
+        partialPluginProbeCalls.push(args.join(' '));
+        return args.join(' ') === 'plugin marketplace add --help' || args.join(' ') === 'marketplace add --help';
+      }
+    );
+
+    expect(partialPluginLegacySupport).toMatchObject({
+      surface: 'legacy-marketplace',
+      displayName: 'codex marketplace add',
+      addArgs: ['marketplace', 'add'],
+      missingHelpCommands: []
+    });
+    expect(partialPluginProbeCalls).toEqual([
+      'plugin marketplace add --help',
+      'plugin marketplace upgrade --help',
+      'plugin marketplace remove --help',
+      'marketplace add --help'
+    ]);
+  });
+
+  it('fails closed when plugin marketplace upgrade/remove help is missing', async () => {
+    const { resolveMarketplaceCommandSupport, resolveMarketplaceSmokePrerequisite } = await import(
+      '../scripts/pack-smoke.mjs'
+    );
+    const marketplaceCommand = await resolveMarketplaceCommandSupport(
+      'codex-0.125',
+      {},
+      async (_command: string, args: string[]) => args.join(' ') === 'plugin marketplace add --help'
+    );
+
+    expect(marketplaceCommand?.missingHelpCommands).toEqual([
+      'codex-0.125 plugin marketplace upgrade --help',
+      'codex-0.125 plugin marketplace remove --help'
+    ]);
+    expect(
+      resolveMarketplaceSmokePrerequisite({
+        codexBin: 'codex-0.125',
+        allowMarketplaceSkip: false,
+        codexAvailable: true,
+        marketplaceCommand
+      })
+    ).toEqual({
+      status: 'fail',
+      reason: 'marketplace-help-incomplete',
+      message:
+        'Marketplace smoke requires plugin marketplace upgrade/remove help detection to pass. Missing: codex-0.125 plugin marketplace upgrade --help, codex-0.125 plugin marketplace remove --help.'
+    });
+  });
+
   it('pins CI and release workflows to install the corrected marketplace-capable Codex before pack:smoke', async () => {
     const workflows = [
       '.github/workflows/core-lane.yml',
@@ -1072,7 +1171,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
             ).toBe(false);
             expect(
               isDedicatedCodexInstallRun(run),
-              `${workflow} job ${jobName} step ${stepIndex + 1} must use a dedicated Codex 0.124.0 install step`
+              `${workflow} job ${jobName} step ${stepIndex + 1} must use a dedicated Codex 0.125.0 install step`
             ).toBe(true);
             codexInstallConditions.push(effectiveStepCondition);
           }
@@ -1098,7 +1197,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
               codexInstallConditions.some((installCondition) =>
                 installConditionCoversSmokeStep(installCondition, effectiveStepCondition)
               ),
-              `${workflow} job ${jobName} step ${stepIndex + 1} must install Codex 0.124.0 before pack:smoke with matching if condition`
+              `${workflow} job ${jobName} step ${stepIndex + 1} must install Codex 0.125.0 before pack:smoke with matching if condition`
             ).toBe(true);
           }
         }

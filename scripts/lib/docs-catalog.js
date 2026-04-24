@@ -295,6 +295,7 @@ export async function readCurrentCodexPosture(repoRoot, policy = {}) {
     return {
       source_path: '',
       cli_version: null,
+      cli_compatibility_versions: [],
       model: null,
       default_runtime: null,
       explorer_fast_model: null,
@@ -309,15 +310,55 @@ export async function readCurrentCodexPosture(repoRoot, policy = {}) {
     /delegated subagent and review surfaces on [^;\n]*; `([^`]+)` is currently unsupported there/i.exec(content)?.[1] ??
     /delegated(?: subagent)?(?: and|\/) review surfaces on [^\n]* validates `([^`]+)`/i.exec(content)?.[1] ??
     null;
+  const cliVersion = /Codex CLI\s+\(?`?([0-9]+\.[0-9]+\.[0-9]+)`?\)?/.exec(content)?.[1] ?? null;
   return {
     source_path: sourcePath,
-    cli_version: /Codex CLI\s+\(?`?([0-9]+\.[0-9]+\.[0-9]+)`?\)?/.exec(content)?.[1] ?? null,
+    cli_version: cliVersion,
+    cli_compatibility_versions: extractAllowedCliCompatibilityVersions(content, cliVersion),
     model: /Current model posture(?: is|:)\s*`([^`]+)`/i.exec(content)?.[1] ?? null,
     default_runtime:
       /Local ([A-Za-z0-9_-]+) remains the expected default runtime path/.exec(content)?.[1] ?? null,
     explorer_fast_model: /explorer_fast[^\n]*`(gpt-[^`]+)`/i.exec(content)?.[1] ?? null,
     unsupported_review_model: unsupportedReviewModel
   };
+}
+
+function extractAllowedCliCompatibilityVersions(content, currentCliVersion) {
+  const versions = new Set();
+  const scanContent = extractCurrentPostureContent(content);
+  for (const line of scanContent.split(/\r?\n/)) {
+    if (
+      !/compatibility/i.test(line) ||
+      !/(separately\s+rebaselined|downstream-smoke|release-facing)/i.test(line)
+    ) {
+      continue;
+    }
+
+    for (const version of extractCodexCliVersionMentions(line)) {
+      if (version !== currentCliVersion) {
+        versions.add(version);
+      }
+    }
+  }
+
+  return [...versions].sort();
+}
+
+function extractCurrentPostureContent(content) {
+  const lines = content.split(/\r?\n/);
+  const startIndex = lines.findIndex((line) => /^##\s+Current Posture\b/i.test(line.trim()));
+  if (startIndex === -1) {
+    return '';
+  }
+
+  const sectionLines = [];
+  for (const line of lines.slice(startIndex + 1)) {
+    if (/^##\s+/.test(line.trim())) {
+      break;
+    }
+    sectionLines.push(line);
+  }
+  return sectionLines.join('\n');
 }
 
 export function extractCodexCliVersionMentions(content) {
