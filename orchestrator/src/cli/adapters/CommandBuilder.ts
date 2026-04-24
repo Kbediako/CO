@@ -57,7 +57,7 @@ interface ManifestFailure {
 
 function resolveManifestFailure(manifest: PipelineRunExecutionResult['manifest']): ManifestFailure {
   const stage = extractStageFromStatusDetail(manifest.status_detail) ?? firstFailedCommand(manifest.commands)?.id ?? null;
-  const artifactPath = stage ? findCommandErrorArtifact(manifest.commands, stage) : (firstFailedCommand(manifest.commands)?.error_file ?? null);
+  const artifactPath = stage ? findFailedCommandErrorArtifact(manifest.commands, stage) : (firstFailedCommand(manifest.commands)?.error_file ?? null);
   return { stage, artifactPath };
 }
 
@@ -69,14 +69,14 @@ function extractStageFromStatusDetail(statusDetail: string | null): string | nul
 function firstFailedCommand(
   commands: PipelineRunExecutionResult['manifest']['commands']
 ): PipelineRunExecutionResult['manifest']['commands'][number] | null {
-  return commands.find((command) => command.status === 'failed') ?? commands.find((command) => command.error_file) ?? null;
+  return commands.find((command) => command.status === 'failed') ?? null;
 }
 
-function findCommandErrorArtifact(
+function findFailedCommandErrorArtifact(
   commands: PipelineRunExecutionResult['manifest']['commands'],
   stage: string
 ): string | null {
-  const matching = commands.find((command) => command.id === stage && command.error_file);
+  const matching = commands.find((command) => command.status === 'failed' && command.id === stage && command.error_file);
   return matching?.error_file ?? firstFailedCommand(commands)?.error_file ?? null;
 }
 

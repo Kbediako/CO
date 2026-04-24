@@ -140,4 +140,39 @@ describe('CommandBuilder', () => {
     expect(result.failureStage).toBeNull();
     expect(result.failureArtifactPath).toBeNull();
   });
+
+  it('does not derive a failed stage from allow-failure skipped command artifacts', async () => {
+    const builder = new CommandBuilder(async () => ({
+      success: false,
+      notes: ['Run cancelled after optional advisory failed'],
+      manifestPath: '.runs/task/run/manifest.json',
+      logPath: '.runs/task/run/runner.ndjson',
+      manifest: {
+        cloud_execution: null,
+        status_detail: 'run-canceled',
+        commands: [
+          {
+            id: 'docs-relevance-advisory',
+            status: 'skipped',
+            error_file: '.runs/task/run/errors/04-docs-relevance-advisory.json'
+          }
+        ]
+      } as unknown as CliManifest
+    }));
+
+    const result = await builder.build({
+      task: { id: 'task', title: 'Task', metadata: {} },
+      plan: { items: [{ id: 'implementation-gate:review', description: 'Run review target' }] },
+      target: { id: 'implementation-gate:review', description: 'Run review target' },
+      mode: 'mcp',
+      runId: 'run'
+    });
+
+    expect(result.failureStage).toBeNull();
+    expect(result.failureArtifactPath).toBeNull();
+    expect(result.artifacts).toContainEqual({
+      path: '.runs/task/run/errors/04-docs-relevance-advisory.json',
+      description: 'Command error artifact (docs-relevance-advisory)'
+    });
+  });
 });
