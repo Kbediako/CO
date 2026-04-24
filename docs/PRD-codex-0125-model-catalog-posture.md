@@ -47,6 +47,7 @@ Codex CLI `0.125` exposes updated model-catalog behavior, and CO-352 validates i
   - Weakening `explorer_fast` / `gpt-5.3-codex-spark` file/codebase-search-only posture.
 
 ## Parity / Alignment Matrix
+
 | Surface | Current truth | Reference truth to capture | Target truth / intended delta | Explicitly out of scope |
 | --- | --- | --- | --- | --- |
 | CO-local model posture | CO-341 allowed marker-backed local ChatGPT-auth `gpt-5.5` opt-ins while many docs still presented `gpt-5.4` as the conservative posture. | `0.125` `which codex`, `codex --version`, auth state, `codex debug models`, `codex debug models --bundled`, top-level `codex exec`, delegated `codex exec`, appserver/runtime canary, and review-wrapper fallback evidence. | Adopt `gpt-5.5` / `xhigh` as the current CO-local ChatGPT-auth/appserver posture; keep `gpt-5.4` as fallback only when access or provider evidence is missing. | Blind default bumps from catalog listing alone or user-level config mutation in this lane. |
