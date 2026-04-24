@@ -2,7 +2,7 @@
 
 ## Current Compatibility Target
 
-CO currently targets Codex CLI `0.125.0` for validated local ChatGPT-auth/appserver posture.
+CO currently uses Codex CLI `0.125.0` for validated local ChatGPT-auth/appserver posture. Cloud execution and release-facing pins remain separately gated by the canonical version policy.
 
 Newer stable and prerelease Codex CLI builds remain evidence-gated. The canonical policy is [docs/guides/codex-version-policy.md](../guides/codex-version-policy.md).
 
@@ -17,14 +17,17 @@ Newer stable and prerelease Codex CLI builds remain evidence-gated. The canonica
 
 ## Evidence Gates
 
-Any posture promotion must record:
+Local model-posture updates must record:
 
 1. Local appserver path success on the candidate Codex CLI and model posture.
 2. Delegated/review surface verification under the actual auth provider.
 3. `node scripts/runtime-mode-canary.mjs` success.
-4. Required cloud canary success with configured cloud env.
-5. Cloud fallback contract success.
-6. No P0/P1 regression versus the current stable baseline.
+4. No P0/P1 regression versus the current stable baseline.
+
+Cloud execution or release-facing promotion additionally requires:
+
+1. Required cloud canary success with configured cloud env.
+2. Cloud fallback contract success.
 
 ## Marketplace Split
 
