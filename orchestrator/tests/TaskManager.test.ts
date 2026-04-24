@@ -179,13 +179,13 @@ describe('TaskManager', () => {
       subtaskId: 'docs-review:delegation-guard',
       artifacts: [
         { path: '.runs/task/run/manifest.json', description: 'CLI run manifest' },
-        { path: '.runs/task/run/errors/01-delegation-guard.json', description: 'Command error artifact (delegation-guard)' }
+        { path: '.runs/task/run/errors/01-spec-guard.json', description: 'Command error artifact (spec-guard)' },
+        { path: '.runs/task/run/errors/02-delegation-guard.json', description: 'Command error artifact (delegation-guard)' }
       ],
       mode: 'mcp' as const,
       success: false,
       notes: 'Run delegation guard: Exited with code 1',
       failureStage: 'delegation-guard',
-      failureArtifactPath: '.runs/task/run/errors/01-delegation-guard.json',
       runId: 'ignored'
     } satisfies BuildResult));
     const testerFn = vi.fn(async () => {
@@ -209,7 +209,8 @@ describe('TaskManager', () => {
     expect(reviewerFn).not.toHaveBeenCalled();
     expect(result.review.summary).toBe('Review skipped: prerequisite stage `delegation-guard` failed.');
     expect(result.review.decision.feedback).toContain('Prerequisite stage `delegation-guard` failed; review skipped.');
-    expect(result.review.decision.feedback).toContain('.runs/task/run/errors/01-delegation-guard.json');
+    expect(result.review.decision.feedback).toContain('.runs/task/run/errors/02-delegation-guard.json');
+    expect(result.review.decision.feedback).not.toContain('.runs/task/run/errors/01-spec-guard.json');
   });
 
   it('keeps generic build wording when a colon-scoped target lacks a manifest failure stage', async () => {
