@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp a78ee4d7fc5ce2ba9b6861c08d8a5813223a318a6cda7a7b4ea7e3dc2d819346 -->
+<!-- codex:instruction-stamp d279303f908ab6985704b241e3905b6447ab23fe423a9d2e836d01b7eeaa35ba -->
 # Agent Instructions (Template)
 
 ## Orchestrator-first workflow
@@ -54,19 +54,20 @@
 - Built-in roles are `default`, `explorer`, `worker`, and `awaiter`; `researcher` is user-defined.
 - `spawn_agent` defaults to `default` when `agent_type` is omitted; always set `agent_type` explicitly.
 - For symbolic collab runs, prefix spawned prompts with `[agent_type:<role>]` on line one so role intent is auditable from JSONL/manifests.
-- Current CO compatibility/adoption target is stable Codex CLI `0.123.0`.
-- Current `0.123.0` posture evidence confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, `codex review --help` exposing `[PROMPT]` alongside scoped review flags, runtime-mode canary pass, required cloud canary pass, and fallback cloud contract pass.
-- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
-- Keep top-level defaults on the current CO target by setting `model = "gpt-5.4"` in `~/.codex/config.toml`.
-- Under ChatGPT auth, keep delegated subagent and review surfaces on `gpt-5.4` unless a fresh provider lane explicitly validates `gpt-5.4-codex`.
+- Current CO compatibility/adoption target is stable Codex CLI `0.124.0`.
+- Current `0.124.0` CO posture evidence confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, `codex review --help` exposing `[PROMPT]` alongside scoped review flags, packaged `gpt-5.4` `xhigh` defaults, and a post-build runtime-mode canary pass.
+- Current model posture is `gpt-5.4` with `xhigh` reasoning for packaged/generated top-level, delegated subagent, and review defaults; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
+- Keep generated defaults on the current CO target by setting `model = "gpt-5.4"` and `model_reasoning_effort = "xhigh"` in `~/.codex/config.toml`; operators may explicitly opt into newer local models after access smoke.
+- Under ChatGPT auth, keep packaged delegated subagent and review defaults on `gpt-5.4`.
+- Caveat: local model availability can vary by account; keep `gpt-5.4` as the generated default because it remains the app-server `isDefault`.
 - Set `model_reasoning_effort` to at least `high` (CO default: `xhigh`) so spawned agents inherit high reasoning unless role overrides change it.
 - Built-in `explorer` inherits top-level model defaults unless you attach a `config_file`; keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only.
 - Spark caveat: `gpt-5.3-codex-spark` is file/codebase search only.
 - Keep RLM/collab built-ins-first by default; add custom specialist roles only when there is measured value, clear ownership, and validation evidence.
 - Use `[agents] max_threads = 12` as the seeded baseline. Keep explicit `max_depth = 4` only when your local Codex parser accepts it, and treat `max_spawn_depth` as a legacy local override rather than current baseline guidance; preserve any intentional constrained caps instead of resetting them.
 - Keep fallback usage explicit and rare: `8/2` for constrained/high-risk lanes, legacy `6/1/1` only as break-glass when an older parser/runtime still consumes spawn-depth caps.
-- Add an explicit `worker_complex` role (`gpt-5.4`, `xhigh`) for high-risk implementation streams.
-- Use `codex-orchestrator doctor` as an advisory drift check for Codex defaults; remediate additively via `codex-orchestrator codex defaults --yes`.
+- Add an explicit `worker_complex` role (packaged default `gpt-5.4`, `xhigh`; newer local model opt-ins only after marker-backed smoke evidence) for high-risk implementation streams.
+- Use `codex-orchestrator doctor` as an advisory drift check for Codex defaults; remediate additively via `codex-orchestrator codex defaults --yes`, with only exact prior CO-managed role baselines auto-migrated unless the top-level config already carries a supported, access-verified local model opt-in.
 
 ## Completion discipline (patience-first)
 - Wait/poll for terminal state on long-running operations (CI checks, reviews, cloud jobs, orchestrator runs) before reporting completion.

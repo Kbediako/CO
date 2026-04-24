@@ -22,9 +22,11 @@ Codex Orchestrator is the coordination layer that glues together Codex-driven ag
 - Codex CLI sync strategy: `docs/guides/upstream-codex-cli-sync.md`.
 
 ## Current Posture
-- Current CO compatibility/adoption target: Codex CLI `0.123.0`.
+- Current CO compatibility/adoption target: Codex CLI `0.124.0`.
 - Newer Codex CLI candidates stay evidence-gated in `docs/guides/codex-version-policy.md`.
-- Current model posture: `gpt-5.4` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
+- Current model posture is `gpt-5.4` with `model_reasoning_effort = "xhigh"` for packaged/generated top-level, delegated subagent, and review defaults; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
+- CO-local explicit `gpt-5.5` / `xhigh` configuration is allowed after access smoke plus `[codex_orchestrator] local_model_opt_in = "gpt-5.5"`; CO-341 validated it on this host, while app-server `model/list` still reports `gpt-5.4` as the catalog default and recorded a post-build runtime-mode canary pass (`20/20` per scenario, `ready_for_default_flip=true`).
+- The marker-backed local `gpt-5.5` opt-in is non-drift for `codex-orchestrator doctor` only when `codex debug models` verifies current model access, and additive defaults preserve matching prior `gpt-5.5` role files when the top-level config carries that explicit opt-in.
 - Local default runtime is `appserver`; keep `--runtime-mode cli` as break-glass.
 - Full posture and promotion gates live in `docs/guides/codex-version-policy.md`.
 
@@ -131,7 +133,7 @@ Use `npx @kbediako/codex-orchestrator resume --run <run-id>` to continue interru
 - Dist-tags: stable releases publish to `latest`; prereleases publish with a dist-tag derived from the leading prerelease label before the first `.` or `-`, lowercased and sanitized. Examples: `alpha.1` -> `alpha`, `beta.1` -> `beta`, `rc.1` -> `rc`; empty or numeric-leading labels fall back to `next`. Prerelease tags create a GitHub prerelease.
 - Publishing auth: workflow attempts OIDC trusted publishing first (`id-token: write` + `--provenance`), then falls back to `secrets.NPM_TOKEN` when OIDC is unavailable. `secrets.NPM_TOKEN` must be an npm automation token (not a token that requires OTP).
 - Trusted publisher config: npm expects workflow filename `release.yml` (the file must exist at `.github/workflows/release.yml` on the default branch). Leave environment blank unless the publish job sets `environment: ...`.
-- OIDC runtime prereqs: npm trusted publishing currently requires Node.js `22.14.0+` and npm `11.5.1+`; the publish job pins Node.js `24.5.0`, verifies the bundled npm runtime, and runs `npm publish` directly instead of mutating the runner-global npm install.
+- OIDC runtime prereqs: npm trusted publishing currently requires Node.js `22.14.0+` and npm `11.5.1+`; the publish job logs the runner versions, then runs the publish commands through `npx --yes npm@11.5.1` instead of mutating the runner-global npm install.
 
 ## Parallel Runs (Meta-Orchestration)
 The orchestrator executes a single pipeline serially. “Parallelism” comes from running multiple orchestrator runs at the same time, ideally in separate git worktrees so builds/tests don’t contend for the same working tree outputs.

@@ -218,6 +218,158 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
     }
   }, 15000);
 
+  it('accepts smoke-backed local gpt-5.5 model opt-ins', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalDebugModelsJson = process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
+    process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON = JSON.stringify({
+      models: [{ slug: 'gpt-5.4' }, { slug: 'gpt-5.5' }]
+    });
+    try {
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        [
+          'model = "gpt-5.5"',
+          'review_model = "gpt-5.5"',
+          'model_reasoning_effort = "xhigh"',
+          '',
+          '[codex_orchestrator]',
+          'local_model_opt_in = "gpt-5.5"',
+          '',
+          '[agents]',
+          'max_threads = 12'
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = runDoctor(process.cwd());
+      expect(result.codex_defaults.status).toBe('ok');
+      expect(result.codex_defaults.checks.model.status).toBe('ok');
+      expect(result.codex_defaults.checks.review_model.status).toBe('ok');
+      expect(result.codex_defaults.checks.model.actual).toBe('gpt-5.5');
+      expect(result.codex_defaults.checks.review_model.actual).toBe('gpt-5.5');
+
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain(
+        'model: ok (actual: gpt-5.5, expected: gpt-5.4 (or verified local opt-in: gpt-5.5))'
+      );
+      expect(summary).toContain(
+        'review_model: ok (actual: gpt-5.5, expected: gpt-5.4 (or verified local opt-in: gpt-5.5))'
+      );
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalDebugModelsJson === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON = originalDebugModelsJson;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  it('flags legacy unmarked gpt-5.5 defaults as advisory', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalDebugModelsJson = process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
+    process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON = JSON.stringify({
+      models: [{ slug: 'gpt-5.5' }]
+    });
+    try {
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        [
+          'model = "gpt-5.5"',
+          'review_model = "gpt-5.5"',
+          'model_reasoning_effort = "xhigh"',
+          '',
+          '[agents]',
+          'max_threads = 12'
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = runDoctor(process.cwd());
+      expect(result.codex_defaults.status).toBe('advisory');
+      expect(result.codex_defaults.checks.model.status).toBe('advisory');
+      expect(result.codex_defaults.checks.review_model.status).toBe('advisory');
+
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain(
+        'model: advisory (actual: gpt-5.5, expected: gpt-5.4 (or verified local opt-in: gpt-5.5))'
+      );
+      expect(summary).toContain(
+        'Config model gpt-5.5 looks like a legacy CO-managed default, not a verified local opt-in'
+      );
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalDebugModelsJson === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON = originalDebugModelsJson;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  it('flags marked gpt-5.5 opt-ins when model access evidence is missing', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalDebugModelsJson = process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
+    process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON = JSON.stringify({
+      models: [{ slug: 'gpt-5.4' }]
+    });
+    try {
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        [
+          'model = "gpt-5.5"',
+          'review_model = "gpt-5.5"',
+          'model_reasoning_effort = "xhigh"',
+          '',
+          '[codex_orchestrator]',
+          'local_model_opt_in = "gpt-5.5"',
+          '',
+          '[agents]',
+          'max_threads = 12'
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = runDoctor(process.cwd());
+      expect(result.codex_defaults.status).toBe('advisory');
+      expect(result.codex_defaults.checks.model.status).toBe('advisory');
+      expect(result.codex_defaults.checks.review_model.status).toBe('advisory');
+
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain(
+        'Configured local model opt-in gpt-5.5 is not verified by `codex debug models`'
+      );
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalDebugModelsJson === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON = originalDebugModelsJson;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  }, 15000);
+
   it('flags legacy max_spawn_depth when it still constrains older runtimes', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
@@ -1134,7 +1286,7 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
       expect(result.codex_defaults.checks.review_model.status).toBe('advisory');
       expect(result.codex_defaults.checks.review_model.actual).toBe('gpt-5.3-codex');
       expect(formatDoctorSummary(result).join('\n')).toContain(
-        'review_model: advisory (actual: gpt-5.3-codex, expected: gpt-5.4)'
+        'review_model: advisory (actual: gpt-5.3-codex, expected: gpt-5.4 (or verified local opt-in: gpt-5.5))'
       );
     } finally {
       if (originalCodexHome === undefined) {

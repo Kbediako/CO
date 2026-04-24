@@ -21,7 +21,7 @@ codex-orchestrator --version
 
 Node.js `>=20` is required.
 
-CO currently targets Codex CLI `0.123.0`; newer candidates stay evidence-gated in `docs/guides/codex-version-policy.md`.
+CO currently targets Codex CLI `0.124.0`; newer candidates stay evidence-gated in `docs/guides/codex-version-policy.md`.
 The source-head marketplace/plugin guidance keeps the CO-196 packaging boundary: npm remains the release-safe baseline, while Codex plugin marketplace registration is an additive path for newer Codex CLI command surfaces.
 
 ### Source-head marketplace/plugin setup
@@ -112,9 +112,11 @@ Bundled skills:
 
 ## Public posture
 
-- Current Codex CLI target: `0.123.0`
-- Current model posture: `gpt-5.4`
+- Current Codex CLI target: `0.124.0`
+- Current model posture: `gpt-5.4` with `model_reasoning_effort = "xhigh"` for packaged/generated defaults
 - `explorer_fast` remains the explicit `gpt-5.3-codex-spark` file/codebase search-only exception
+- CO-local operators may opt into explicit `gpt-5.5` / `xhigh` after local access smoke plus `[codex_orchestrator] local_model_opt_in = "gpt-5.5"`; CO-341 validated that on this host, but app-server `model/list` still reports `gpt-5.4` as the catalog default
+- Runtime-mode canary evidence for CO-341 passed after `npm run build` (`20/20` per scenario, `ready_for_default_flip=true`)
 - Local default runtime: `appserver`
 - `executionMode=cloud` with explicit `runtimeMode=appserver` remains unsupported
 

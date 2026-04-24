@@ -70,9 +70,9 @@ async function writeDocsCatalogFixture(
       '# Codex Version Policy (CO)',
       '',
       '- Current CO compatibility/adoption target remains stable Codex CLI `0.117.0` for the current upstream-aligned main baseline.',
-      '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
+      '- Current model posture is `gpt-5.5` for top-level, delegated subagent, and review surfaces.',
       '- Keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only.',
-      '- When authenticating through ChatGPT, do not target delegated or review surfaces at `gpt-5.4-codex`; those runs currently fail immediately. Use `gpt-5.4` instead until provider compatibility changes.',
+      '- When authenticating through ChatGPT, do not target delegated or review surfaces at `gpt-5.5-codex`; those runs currently fail immediately. Use `gpt-5.5` instead until provider compatibility changes.',
       '- Local appserver remains the expected default runtime path after the `CO-22` canary.',
       ''
     ].join('\n'),
@@ -610,7 +610,7 @@ describe('docs hygiene tooling', () => {
         '# Codex Version Policy (CO)',
         '',
         '- Current CO compatibility/adoption target remains stable Codex CLI (`0.117.0`) for the current upstream-aligned main baseline.',
-        '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
+        '- Current model posture is `gpt-5.5` for top-level, delegated subagent, and review surfaces.',
         '- Local appserver remains the expected default runtime path after the `CO-22` canary.',
         ''
       ].join('\n'),
@@ -665,9 +665,9 @@ describe('docs hygiene tooling', () => {
         '# Codex Version Policy (CO)',
         '',
         '- Current CO compatibility/adoption target remains stable Codex CLI (`0.117.0`) for the current upstream-aligned main baseline.',
-        '- Current model posture: `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
+        '- Current model posture: `gpt-5.5` for top-level, delegated subagent, and review surfaces.',
         '- Keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only.',
-        '- When authenticating through ChatGPT, do not target delegated or review surfaces at `gpt-5.4-codex`; those runs currently fail immediately. Use `gpt-5.4` instead until provider compatibility changes.',
+        '- When authenticating through ChatGPT, do not target delegated or review surfaces at `gpt-5.5-codex`; those runs currently fail immediately. Use `gpt-5.5` instead until provider compatibility changes.',
         '- Local appserver remains the expected default runtime path after the `CO-22` canary.',
         ''
       ].join('\n'),
@@ -678,7 +678,7 @@ describe('docs hygiene tooling', () => {
       [
         '# Codex Orchestrator',
         '',
-        '- Current model posture: `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
+        '- Current model posture: `gpt-5.5` for top-level, delegated subagent, and review surfaces.',
         '- `explorer_fast` remains the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only.',
         ''
       ].join('\n'),
@@ -726,9 +726,9 @@ describe('docs hygiene tooling', () => {
         '# Codex Version Policy (CO)',
         '',
         '- Current CO compatibility/adoption target remains stable Codex CLI (`0.117.0`) for the current upstream-aligned main baseline.',
-        '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
+        '- Current model posture is `gpt-5.5` for top-level, delegated subagent, and review surfaces.',
         '- Keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only.',
-        '- When authenticating through ChatGPT, do not target delegated/review surfaces at `gpt-5.4-codex`; those runs currently fail immediately. Use `gpt-5.4` instead until provider compatibility changes.',
+        '- When authenticating through ChatGPT, do not target delegated/review surfaces at `gpt-5.5-codex`; those runs currently fail immediately. Use `gpt-5.5` instead until provider compatibility changes.',
         '- Local appserver remains the expected default runtime path after the `CO-22` canary.',
         ''
       ].join('\n'),
@@ -739,8 +739,8 @@ describe('docs hygiene tooling', () => {
       [
         '# Codex Orchestrator',
         '',
-        '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
-        '- On ChatGPT-auth sessions, do not target delegated/review surfaces at `gpt-5.4-codex`; those runs currently fail immediately. Use `gpt-5.4` until provider compatibility changes.',
+        '- Current model posture is `gpt-5.5` for top-level, delegated subagent, and review surfaces.',
+        '- On ChatGPT-auth sessions, do not target delegated/review surfaces at `gpt-5.5-codex`; those runs currently fail immediately. Use `gpt-5.5` until provider compatibility changes.',
         ''
       ].join('\n'),
       'utf8'
@@ -787,9 +787,9 @@ describe('docs hygiene tooling', () => {
         '# Codex Version Policy (CO)',
         '',
         '- Current CO compatibility/adoption target remains stable Codex CLI (`0.117.0`) for the current upstream-aligned main baseline.',
-        '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
+        '- Current model posture is `gpt-5.5` for top-level, delegated subagent, and review surfaces.',
         '- Keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only.',
-        '- Keep delegated subagent and review surfaces on `gpt-5.4` as well when using ChatGPT auth; `gpt-5.4-codex` is currently unsupported there.',
+        '- Keep delegated subagent and review surfaces on `gpt-5.5` as well when using ChatGPT auth; `gpt-5.5-codex` is currently unsupported there.',
         '- Local appserver remains the expected default runtime path after the `CO-22` canary.',
         ''
       ].join('\n'),
@@ -800,8 +800,8 @@ describe('docs hygiene tooling', () => {
       [
         '# Codex Orchestrator',
         '',
-        '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
-        '- Keep delegated subagent and review surfaces on `gpt-5.4` as well when using ChatGPT auth; `gpt-5.4-codex` is currently unsupported there.',
+        '- Current model posture is `gpt-5.5` for top-level, delegated subagent, and review surfaces.',
+        '- Keep delegated subagent and review surfaces on `gpt-5.5` as well when using ChatGPT auth; `gpt-5.5-codex` is currently unsupported there.',
         ''
       ].join('\n'),
       'utf8'
@@ -859,7 +859,7 @@ describe('docs hygiene tooling', () => {
       expect.objectContaining({
         file: 'README.md',
         rule: 'doc-posture-stale',
-        reference: 'model mention(s) gpt-5.3-codex-spark missing current policy gpt-5.4'
+        reference: 'model mention(s) gpt-5.3-codex-spark missing current policy gpt-5.5'
       })
     );
   });
@@ -894,8 +894,8 @@ describe('docs hygiene tooling', () => {
         '# Codex Orchestrator',
         '',
         '- Recommended baseline:',
-        '  - `model = "gpt-5.4"`',
-        '  - `review_model = "gpt-5.4"`',
+        '  - `model = "gpt-5.5"`',
+        '  - `review_model = "gpt-5.5"`',
         ''
       ].join('\n'),
       'utf8'
@@ -907,7 +907,7 @@ describe('docs hygiene tooling', () => {
       expect.objectContaining({
         file: 'README.md',
         rule: 'doc-posture-stale',
-        reference: 'missing model posture gpt-5.4'
+        reference: 'missing model posture gpt-5.5'
       })
     );
   });
@@ -942,7 +942,7 @@ describe('docs hygiene tooling', () => {
         '# Codex Orchestrator',
         '',
         '- Current model posture is `gpt-5.3-codex` for top-level, delegated subagent, and review surfaces.',
-        '- When authenticating through ChatGPT, do not target delegated or review surfaces at `gpt-5.4-codex`; those runs currently fail immediately. Use `gpt-5.4` instead until provider compatibility changes.',
+        '- When authenticating through ChatGPT, do not target delegated or review surfaces at `gpt-5.5-codex`; those runs currently fail immediately. Use `gpt-5.5` instead until provider compatibility changes.',
         ''
       ].join('\n'),
       'utf8'
@@ -954,7 +954,7 @@ describe('docs hygiene tooling', () => {
       expect.objectContaining({
         file: 'README.md',
         rule: 'doc-posture-stale',
-        reference: 'model mention(s) gpt-5.3-codex missing current policy gpt-5.4'
+        reference: 'model mention(s) gpt-5.3-codex missing current policy gpt-5.5'
       })
     );
   });
@@ -989,7 +989,7 @@ describe('docs hygiene tooling', () => {
         '# Codex Orchestrator',
         '',
         '- Current model posture is `gpt-5.3-codex` for top-level, delegated subagent, and review surfaces.',
-        '- Keep delegated subagent and review surfaces on `gpt-5.4` as well when using ChatGPT auth.',
+        '- Keep delegated subagent and review surfaces on `gpt-5.5` as well when using ChatGPT auth.',
         ''
       ].join('\n'),
       'utf8'
@@ -1001,7 +1001,7 @@ describe('docs hygiene tooling', () => {
       expect.objectContaining({
         file: 'README.md',
         rule: 'doc-posture-stale',
-        reference: 'model mention(s) gpt-5.3-codex missing current policy gpt-5.4'
+        reference: 'model mention(s) gpt-5.3-codex missing current policy gpt-5.5'
       })
     );
   });
@@ -1035,8 +1035,8 @@ describe('docs hygiene tooling', () => {
       [
         '# Codex Orchestrator',
         '',
-        '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
-        '- For ChatGPT auth, this means `gpt-5.4`, not `gpt-5.4-codex`, unless new compatibility evidence exists.',
+        '- Current model posture is `gpt-5.5` for top-level, delegated subagent, and review surfaces.',
+        '- For ChatGPT auth, this means `gpt-5.5`, not `gpt-5.5-codex`, unless new compatibility evidence exists.',
         ''
       ].join('\n'),
       'utf8'
@@ -1114,7 +1114,7 @@ describe('docs hygiene tooling', () => {
       [
         '# Codex Orchestrator',
         '',
-        '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
+        '- Current model posture is `gpt-5.5` for top-level, delegated subagent, and review surfaces.',
         '- `explorer_fast` remains the only explicit `gpt-5.2-codex-spark` exception.',
         ''
       ].join('\n'),
@@ -1127,7 +1127,7 @@ describe('docs hygiene tooling', () => {
       expect.objectContaining({
         file: 'README.md',
         rule: 'doc-posture-stale',
-        reference: 'model mention(s) gpt-5.2-codex-spark missing current policy gpt-5.4'
+        reference: 'model mention(s) gpt-5.2-codex-spark missing current policy gpt-5.5'
       })
     );
   });
@@ -1161,8 +1161,8 @@ describe('docs hygiene tooling', () => {
       [
         '# Codex Orchestrator',
         '',
-        '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
-        '- On ChatGPT-auth sessions, do not target delegated/review surfaces at `gpt-5.3-codex`; those runs currently fail immediately. Use `gpt-5.4` until provider compatibility changes.',
+        '- Current model posture is `gpt-5.5` for top-level, delegated subagent, and review surfaces.',
+        '- On ChatGPT-auth sessions, do not target delegated/review surfaces at `gpt-5.3-codex`; those runs currently fail immediately. Use `gpt-5.5` until provider compatibility changes.',
         ''
       ].join('\n'),
       'utf8'
@@ -1174,7 +1174,7 @@ describe('docs hygiene tooling', () => {
       expect.objectContaining({
         file: 'README.md',
         rule: 'doc-posture-stale',
-        reference: 'model mention(s) gpt-5.3-codex missing current policy gpt-5.4'
+        reference: 'model mention(s) gpt-5.3-codex missing current policy gpt-5.5'
       })
     );
   });
@@ -1208,8 +1208,8 @@ describe('docs hygiene tooling', () => {
       [
         '# Codex Orchestrator',
         '',
-        '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
-        '- For ChatGPT auth, this means `gpt-5.4`, not `gpt-5.3-codex`, unless new compatibility evidence exists.',
+        '- Current model posture is `gpt-5.5` for top-level, delegated subagent, and review surfaces.',
+        '- For ChatGPT auth, this means `gpt-5.5`, not `gpt-5.3-codex`, unless new compatibility evidence exists.',
         ''
       ].join('\n'),
       'utf8'
@@ -1221,7 +1221,7 @@ describe('docs hygiene tooling', () => {
       expect.objectContaining({
         file: 'README.md',
         rule: 'doc-posture-stale',
-        reference: 'model mention(s) gpt-5.3-codex missing current policy gpt-5.4'
+        reference: 'model mention(s) gpt-5.3-codex missing current policy gpt-5.5'
       })
     );
   });
@@ -1255,7 +1255,7 @@ describe('docs hygiene tooling', () => {
       [
         '# Codex Orchestrator',
         '',
-        '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.2-codex-spark`.',
+        '- Current model posture is `gpt-5.5` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.2-codex-spark`.',
         ''
       ].join('\n'),
       'utf8'
@@ -1267,7 +1267,7 @@ describe('docs hygiene tooling', () => {
       expect.objectContaining({
         file: 'README.md',
         rule: 'doc-posture-stale',
-        reference: 'model mention(s) gpt-5.2-codex-spark missing current policy gpt-5.4'
+        reference: 'model mention(s) gpt-5.2-codex-spark missing current policy gpt-5.5'
       })
     );
   });
