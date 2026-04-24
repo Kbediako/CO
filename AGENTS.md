@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 9b88d6ec64a18e1f562e18ec8b332d26c20c31d635d8ed06c1b0ead2f294ced3 -->
+<!-- codex:instruction-stamp 043aaf3801cc40a4004f861f58b2688fc9b2ecb2cc80febdfd2eb1d52549809a -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -42,7 +42,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Use `codex-orchestrator doctor` as an advisory drift check for Codex defaults (model/reasoning/agent baseline); remediation is additive via `codex-orchestrator codex defaults --yes`, with only exact prior CO-managed role baselines auto-migrated unless the top-level config already carries a supported, access-verified local model opt-in.
 
 ## Codex Version Policy (CO Scope)
-- Current CO compatibility/adoption target is stable Codex CLI `0.124.0`.
+- Current CO-local ChatGPT-auth/appserver and marketplace posture is Codex CLI `0.125.0` after CO-351/CO-352/CO-355 evidence; release-facing cloud pins stay on the explicit promoted candidate recorded in `docs/guides/codex-version-policy.md`.
 - Current `0.124.0` CO-local posture evidence confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, `codex review --help` exposing `[PROMPT]` alongside scoped review flags, live `gpt-5.5` `xhigh` availability, and a post-build runtime-mode canary pass (`20/20` per scenario, `ready_for_default_flip=true`).
 - Release-facing downstream-smoke workflows and `cloud-canary` pin the explicit promoted candidate recorded in `docs/guides/codex-version-policy.md`.
 - Current model posture is `gpt-5.5` / `xhigh` when available in ChatGPT-auth Codex sessions; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.

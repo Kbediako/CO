@@ -22,7 +22,7 @@ Codex Orchestrator is the coordination layer that glues together Codex-driven ag
 - Codex CLI sync strategy: `docs/guides/upstream-codex-cli-sync.md`.
 
 ## Current Posture
-- Current CO compatibility/adoption target: Codex CLI `0.124.0`.
+- Current CO-local ChatGPT-auth/appserver and marketplace posture: Codex CLI `0.125.0`; release-facing cloud pins stay on the explicit promoted candidate in the version policy.
 - Newer Codex CLI candidates stay evidence-gated in `docs/guides/codex-version-policy.md`.
 - Current model posture is `gpt-5.5` / `xhigh` when available in ChatGPT-auth Codex sessions; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
 - Portable packaged/generated defaults still seed `gpt-5.4` / `xhigh`; CO-341 validated `gpt-5.5` on this host, while app-server `model/list` still reports `gpt-5.4` as the catalog default and recorded a post-build runtime-mode canary pass (`20/20` per scenario, `ready_for_default_flip=true`).

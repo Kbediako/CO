@@ -133,7 +133,7 @@ If you need delegation to respect a repo’s `.codex/orchestrator.toml` (e.g., s
 
 ## Version guard (JSONL handshake)
 
-Delegation MCP expects JSONL. Keep `codex-orchestrator` aligned with the current CO compatibility or adoption target (`codex-cli 0.124.0`) unless a task-scoped canary is explicitly evaluating something newer.
+Delegation MCP expects JSONL. Keep `codex-orchestrator` aligned with the current CO compatibility or adoption target (`codex-cli 0.125.0` for local ChatGPT-auth/appserver posture) unless a task-scoped canary is explicitly evaluating something newer.
 
 Current `0.124.0` CO-local posture also confirms that:
 - `codex exec` accepts a prompt argument plus piped stdin, with stdin appended as a `<stdin>` block.
@@ -157,7 +157,7 @@ Current `0.124.0` CO-local posture also confirms that:
 - `spawn_agent` omission defaults to `default`; require explicit `agent_type` for every spawn.
 - For symbolic collab runs, include a first-line role tag in spawned prompts: `[agent_type:<role>]`.
 - Multi-turn subagent loops are supported (`spawn_agent` -> `send_input` -> `wait`/`resume_agent` -> `close_agent`).
-- In Codex CLI `0.124.0`, built-in `explorer` continues to inherit top-level defaults unless overridden in `~/.codex/config.toml`.
+- In Codex CLI `0.125.0`, built-in `explorer` continues to inherit top-level defaults unless overridden in `~/.codex/config.toml`.
 - Current model posture is `gpt-5.5` / `xhigh` when available in ChatGPT-auth Codex sessions.
 - Portable generated config still seeds `gpt-5.4` / `xhigh`.
 - Recommended packaged baseline:
