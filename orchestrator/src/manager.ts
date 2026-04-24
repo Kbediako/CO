@@ -247,7 +247,7 @@ export class TaskManager {
     const build = await this.executeBuilder(task, plan, target, mode, runId);
     if (!build.success) {
       const skippedTest = this.createSkippedTestResult(build, runId);
-      const skippedReview = this.createSkippedReviewResult('build-failed');
+      const skippedReview = this.createSkippedReviewResult('build-failed', build);
       const summary = this.createRunSummary(task, mode, plan, build, skippedTest, skippedReview, runId);
       return { target, mode, build, test: skippedTest, review: skippedReview, summary };
     }
@@ -336,8 +336,20 @@ export class TaskManager {
     };
   }
 
-  private createSkippedReviewResult(reason: 'build-failed' | 'test-failed'): ReviewResult {
+  private createSkippedReviewResult(reason: 'build-failed' | 'test-failed', build?: BuildResult): ReviewResult {
     if (reason === 'build-failed') {
+      const prerequisiteStage = this.extractFailedPrerequisiteStage(build);
+      if (prerequisiteStage) {
+        const artifactPath = this.findFailedStageArtifactPath(build);
+        const artifactFeedback = artifactPath ? ` Error artifact: ${artifactPath}.` : '';
+        return {
+          summary: `Review skipped: prerequisite stage \`${prerequisiteStage}\` failed.`,
+          decision: {
+            approved: false,
+            feedback: `Prerequisite stage \`${prerequisiteStage}\` failed; review skipped.${artifactFeedback}`
+          }
+        };
+      }
       return {
         summary: 'Review skipped: build stage failed.',
         decision: {
@@ -353,6 +365,29 @@ export class TaskManager {
         feedback: 'Tests failed; review skipped.'
       }
     };
+  }
+
+  private extractFailedPrerequisiteStage(build?: BuildResult): string | null {
+    const stage = build?.failureStage?.trim();
+    if (!stage || ['build', 'test', 'review'].includes(stage)) {
+      return null;
+    }
+    return stage;
+  }
+
+  private findFailedStageArtifactPath(build?: BuildResult): string | null {
+    if (build?.failureArtifactPath) {
+      return build.failureArtifactPath;
+    }
+    const artifact = build?.artifacts.find((candidate) => {
+      const normalizedPath = candidate.path.replace(/\\/g, '/');
+      return (
+        normalizedPath.startsWith('errors/') ||
+        normalizedPath.includes('/errors/') ||
+        /\berror\b/i.test(candidate.description)
+      );
+    });
+    return artifact?.path ?? null;
   }
 
   private async executePlanner(
@@ -459,7 +494,7 @@ export class TaskManager {
     const cause = error ?? new Error('Planner stage failed without an error payload');
     const build = this.createBuilderErrorResult('planner-unavailable', mode, runId, cause);
     const skippedTest = this.createSkippedTestResult(build, runId);
-    const skippedReview = this.createSkippedReviewResult('build-failed');
+    const skippedReview = this.createSkippedReviewResult('build-failed', build);
     const summary = this.createRunSummary(task, mode, plan, build, skippedTest, skippedReview, runId);
     this.eventBus.emit({ type: 'run:completed', payload: summary });
     return summary;

@@ -1,6 +1,52 @@
 {
   "items": [
     {
+      "id": "20260424-linear-a66fa065-3c6c-4063-b2ba-1121bf71f74f",
+      "title": "CO-346 skipped review prerequisite-stage truth",
+      "relates_to": "tasks/tasks-linear-a66fa065-3c6c-4063-b2ba-1121bf71f74f.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-24",
+      "approvals": {
+        "docs_first_packet": {
+          "reviewer": "parent orchestrator",
+          "date": "2026-04-24",
+          "status": "approved",
+          "summary": "CO-346 is scoped to truthful skipped-review wording for failed prerequisite stages plus error artifact propagation; no guard behavior or telemetry taxonomy changes."
+        },
+        "issue_framing_validation": {
+          "reviewer": "subagent validator",
+          "date": "2026-04-24",
+          "status": "approved",
+          "summary": "Validator confirmed CO-346 was valid to promote/work and that stale dirty archive automation PRs warranted one separate Linear issue."
+        },
+        "validation_floor": {
+          "reviewer": "parent orchestrator",
+          "date": "2026-04-24",
+          "status": "passed",
+          "summary": "Spec guard, build, lint, focused tests, full tests, docs gates, repo stewardship, diff budget, and pack smoke passed. Lint emitted only three pre-existing warnings in DelegationMcpHealth.test.ts. Delegation guard used an explicit override because hook-level spawn_agent evidence is not emitted as CO child-lane manifests."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-24",
+          "status": "clean-success",
+          "manifest": ".runs/linear-a66fa065-3c6c-4063-b2ba-1121bf71f74f/cli/2026-04-24T06-49-48-915Z-9e41f13d/manifest.json",
+          "telemetry": ".runs/linear-a66fa065-3c6c-4063-b2ba-1121bf71f74f/cli/2026-04-24T06-49-48-915Z-9e41f13d/review/telemetry.json",
+          "summary": "Forced standalone review completed with bounded success and no actionable findings on the CO-346 diff."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-a66fa065-3c6c-4063-b2ba-1121bf71f74f.md",
+        "task": "tasks/tasks-linear-a66fa065-3c6c-4063-b2ba-1121bf71f74f.md",
+        "agent_task": ".agent/task/linear-a66fa065-3c6c-4063-b2ba-1121bf71f74f.md",
+        "prd": "docs/PRD-linear-a66fa065-3c6c-4063-b2ba-1121bf71f74f.md",
+        "docs": "docs/TECH_SPEC-linear-a66fa065-3c6c-4063-b2ba-1121bf71f74f.md",
+        "action_plan": "docs/ACTION_PLAN-linear-a66fa065-3c6c-4063-b2ba-1121bf71f74f.md"
+      }
+    },
+    {
       "id": "20260424-linear-5d882b0c-d553-4d63-8d62-6f973090a13c",
       "title": "CO-345 README front door and book-style docs",
       "relates_to": "tasks/tasks-linear-5d882b0c-d553-4d63-8d62-6f973090a13c.md",

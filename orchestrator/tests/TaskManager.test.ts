@@ -169,6 +169,106 @@ describe('TaskManager', () => {
     expect(result.review.summary).toBe('Review skipped: build stage failed.');
   });
 
+  it('names the failed prerequisite stage when review is skipped before build completion', async () => {
+    const plan: PlanResult = {
+      items: [{ id: 'docs-review:delegation-guard', description: 'Run delegation guard' }]
+    };
+
+    const plannerFn = vi.fn(async () => plan);
+    const builderFn = vi.fn(async () => ({
+      subtaskId: 'docs-review:delegation-guard',
+      artifacts: [
+        { path: '.runs/task/run/manifest.json', description: 'CLI run manifest' },
+        { path: '.runs/task/run/errors/01-delegation-guard.json', description: 'Command error artifact (delegation-guard)' }
+      ],
+      mode: 'mcp' as const,
+      success: false,
+      notes: 'Run delegation guard: Exited with code 1',
+      failureStage: 'delegation-guard',
+      failureArtifactPath: '.runs/task/run/errors/01-delegation-guard.json',
+      runId: 'ignored'
+    } satisfies BuildResult));
+    const testerFn = vi.fn(async () => {
+      throw new Error('tester should not run when prerequisite stage fails');
+    });
+    const reviewerFn = vi.fn(async () => {
+      throw new Error('reviewer should not run when prerequisite stage fails');
+    });
+
+    const manager = new TaskManager({
+      planner: new FunctionalPlannerAgent(plannerFn),
+      builder: new FunctionalBuilderAgent(builderFn),
+      tester: new FunctionalTesterAgent(testerFn),
+      reviewer: new FunctionalReviewerAgent(reviewerFn),
+      runIdFactory: () => 'run-failed-prerequisite'
+    });
+
+    const result = await manager.execute(baseTask);
+
+    expect(testerFn).not.toHaveBeenCalled();
+    expect(reviewerFn).not.toHaveBeenCalled();
+    expect(result.review.summary).toBe('Review skipped: prerequisite stage `delegation-guard` failed.');
+    expect(result.review.decision.feedback).toContain('Prerequisite stage `delegation-guard` failed; review skipped.');
+    expect(result.review.decision.feedback).toContain('.runs/task/run/errors/01-delegation-guard.json');
+  });
+
+  it('keeps generic build wording when a colon-scoped target lacks a manifest failure stage', async () => {
+    const plan: PlanResult = {
+      items: [{ id: 'implementation-gate:review', description: 'Run review target' }]
+    };
+
+    const manager = new TaskManager({
+      planner: new FunctionalPlannerAgent(async () => plan),
+      builder: new FunctionalBuilderAgent(async () => {
+        throw new Error('pipeline startup failed before a command stage was recorded');
+      }),
+      tester: new FunctionalTesterAgent(async () => {
+        throw new Error('tester should not run when build fails');
+      }),
+      reviewer: new FunctionalReviewerAgent(async () => {
+        throw new Error('reviewer should not run when build fails');
+      }),
+      runIdFactory: () => 'run-failed-before-stage'
+    });
+
+    const result = await manager.execute(baseTask);
+
+    expect(result.build.subtaskId).toBe('implementation-gate:review');
+    expect(result.review.summary).toBe('Review skipped: build stage failed.');
+    expect(result.review.decision.feedback).toBe('Build stage failed; review skipped.');
+  });
+
+  it('keeps generic build wording for explicit review-stage failures', async () => {
+    const plan: PlanResult = {
+      items: [{ id: 'implementation-gate:review', description: 'Run review target' }]
+    };
+
+    const manager = new TaskManager({
+      planner: new FunctionalPlannerAgent(async () => plan),
+      builder: new FunctionalBuilderAgent(async () => ({
+        subtaskId: 'implementation-gate:review',
+        artifacts: [{ path: '.runs/task/run/errors/01-review.json', description: 'Command error artifact (review)' }],
+        mode: 'mcp' as const,
+        success: false,
+        failureStage: 'review',
+        failureArtifactPath: '.runs/task/run/errors/01-review.json',
+        runId: 'ignored'
+      } satisfies BuildResult)),
+      tester: new FunctionalTesterAgent(async () => {
+        throw new Error('tester should not run when build fails');
+      }),
+      reviewer: new FunctionalReviewerAgent(async () => {
+        throw new Error('reviewer should not run when build fails');
+      }),
+      runIdFactory: () => 'run-failed-review-stage'
+    });
+
+    const result = await manager.execute(baseTask);
+
+    expect(result.review.summary).toBe('Review skipped: build stage failed.');
+    expect(result.review.decision.feedback).toBe('Build stage failed; review skipped.');
+  });
+
   it('skips reviewer when tests fail', async () => {
     const plan: PlanResult = {
       items: [{ id: 'subtask-tests', description: 'Fail tests' }]
