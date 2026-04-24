@@ -238,7 +238,7 @@ describe('TaskManager', () => {
     expect(result.review.decision.feedback).toBe('Build stage failed; review skipped.');
   });
 
-  it('keeps generic build wording for explicit review-stage failures', async () => {
+  it('keeps generic build wording and artifact context for explicit review-stage failures', async () => {
     const plan: PlanResult = {
       items: [{ id: 'implementation-gate:review', description: 'Run review target' }]
     };
@@ -266,7 +266,8 @@ describe('TaskManager', () => {
     const result = await manager.execute(baseTask);
 
     expect(result.review.summary).toBe('Review skipped: build stage failed.');
-    expect(result.review.decision.feedback).toBe('Build stage failed; review skipped.');
+    expect(result.review.decision.feedback).toContain('Build stage failed; review skipped.');
+    expect(result.review.decision.feedback).toContain('.runs/task/run/errors/01-review.json');
   });
 
   it('skips reviewer when tests fail', async () => {

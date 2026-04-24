@@ -350,11 +350,13 @@ export class TaskManager {
           }
         };
       }
+      const artifactPath = this.findFailedStageArtifactPath(build);
+      const artifactFeedback = artifactPath ? ` Error artifact: ${artifactPath}.` : '';
       return {
         summary: 'Review skipped: build stage failed.',
         decision: {
           approved: false,
-          feedback: 'Build stage failed; review skipped.'
+          feedback: `Build stage failed; review skipped.${artifactFeedback}`
         }
       };
     }
