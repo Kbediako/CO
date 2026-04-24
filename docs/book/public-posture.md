@@ -8,8 +8,9 @@ Newer stable and prerelease Codex CLI builds remain evidence-gated. The canonica
 
 ## Current Model / Runtime Posture
 
-- Current model posture: `gpt-5.4` with `model_reasoning_effort = "xhigh"` for packaged/generated top-level, delegated subagent, and review surfaces.
-- Marker-backed local `gpt-5.5` opt-in is allowed only after live access smoke plus `[codex_orchestrator] local_model_opt_in = "gpt-5.5"`.
+- Current model posture: `gpt-5.5` / `xhigh` when available in ChatGPT-auth Codex sessions.
+- Portable packaged/generated defaults still seed `gpt-5.4` / `xhigh`; use them when `gpt-5.5`, API, or cloud portability is unavailable.
+- Marker-backed local `gpt-5.5` use still requires live access smoke plus `[codex_orchestrator] local_model_opt_in = "gpt-5.5"`.
 - `explorer_fast` remains the explicit `gpt-5.3-codex-spark` exception for file/codebase search only.
 - Local appserver remains the expected default runtime path.
 - Provider workers keep the current `codex exec` / `codex exec resume` supervision seam until a separate governed lane promotes a replacement.

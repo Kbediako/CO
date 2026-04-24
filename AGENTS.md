@@ -29,8 +29,9 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - `spawn_agent` defaults to `default` when `agent_type` is omitted; always set `agent_type` explicitly.
 - For symbolic collab runs, prefix spawned prompts with `[agent_type:<role>]` on line one so role intent is auditable from JSONL/manifests.
 - For spawned subagents, default to bounded prompts without inherited context; use `fork_context=true` only when a stream explicitly needs prior thread history to avoid prompt bloat/redundancy.
-- Keep packaged/generated defaults on the current CO target by setting `model = "gpt-5.4"` and `model_reasoning_effort = "xhigh"` in generated config; operators may explicitly opt into `gpt-5.5` after local access smoke plus `[codex_orchestrator] local_model_opt_in = "gpt-5.5"`.
-- Under ChatGPT auth, keep packaged delegated subagent and review defaults on `gpt-5.4`; CO-local `gpt-5.5` use is explicit, marker-backed, and evidence-gated unless a fresh provider lane validates a Codex-suffixed model variant.
+- Use `gpt-5.5` / `xhigh` as the current operator posture when available in ChatGPT-auth Codex sessions.
+- Portable packaged/generated config still seeds `model = "gpt-5.4"` and `model_reasoning_effort = "xhigh"`; use that path when `gpt-5.5`, API, or cloud portability is unavailable.
+- CO-local `gpt-5.5` use is explicit, marker-backed, and evidence-gated unless a fresh provider lane validates a Codex-suffixed model variant.
 - Set `model_reasoning_effort` to at least `high` (CO default: `xhigh`) so spawned agents inherit high-reasoning behavior unless role overrides change it.
 - Built-in `explorer` now inherits top-level model defaults unless you attach a custom `config_file`; keep an explicit `agents.explorer` entry only when you want a custom description/override, and keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only.
 - Caveat: spark roles are file/codebase search only; use non-spark roles when image inputs are required.
@@ -44,8 +45,8 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Current CO compatibility/adoption target is stable Codex CLI `0.124.0`.
 - Current `0.124.0` CO-local posture evidence confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, `codex review --help` exposing `[PROMPT]` alongside scoped review flags, live `gpt-5.5` `xhigh` availability, and a post-build runtime-mode canary pass (`20/20` per scenario, `ready_for_default_flip=true`).
 - Release-facing downstream-smoke workflows and `cloud-canary` pin the explicit promoted candidate recorded in `docs/guides/codex-version-policy.md`.
-- Current model posture is `gpt-5.4` with `model_reasoning_effort = "xhigh"` for packaged/generated top-level, delegated subagent, and review defaults; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
-- In ChatGPT-auth sessions, keep packaged delegated/review defaults on `gpt-5.4`; CO-local explicit `gpt-5.5` is allowed only after live access smoke plus `[codex_orchestrator] local_model_opt_in = "gpt-5.5"` unless a fresh provider lane validates a Codex-suffixed model variant.
+- Current model posture is `gpt-5.5` / `xhigh` when available in ChatGPT-auth Codex sessions; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
+- Portable packaged/generated config still seeds `gpt-5.4` / `xhigh`; use `gpt-5.5` for delegated/review surfaces only after live access smoke plus `[codex_orchestrator] local_model_opt_in = "gpt-5.5"` unless a fresh provider lane validates a Codex-suffixed model variant.
 - Caveat: app-server `model/list` still reports `gpt-5.4` as `isDefault=true`; CO-341 live app-server `model/list` and live `codex exec` show `gpt-5.5` supports `xhigh` for explicit local configuration, and the bundled debug model catalog may lag the live catalog.
 - Treat residual plugin warnings from CO-341 as local temporary plugin cache warnings unless evidence maps them to CO-owned plugin manifests.
 - Evaluate newer stable/prerelease Codex builds only in explicit, task-scoped CO lanes where evidence is captured under `.runs/<task-id>/` and `out/<task-id>/manual/`.

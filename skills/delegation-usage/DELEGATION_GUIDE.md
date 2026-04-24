@@ -158,7 +158,8 @@ Current `0.124.0` CO-local posture also confirms that:
 - For symbolic collab runs, include a first-line role tag in spawned prompts: `[agent_type:<role>]`.
 - Multi-turn subagent loops are supported (`spawn_agent` -> `send_input` -> `wait`/`resume_agent` -> `close_agent`).
 - In Codex CLI `0.124.0`, built-in `explorer` continues to inherit top-level defaults unless overridden in `~/.codex/config.toml`.
-- Current model posture is `gpt-5.4` for packaged top-level, delegated subagent, and review surfaces; newer local model opt-ins require access smoke.
+- Current model posture is `gpt-5.5` / `xhigh` when available in ChatGPT-auth Codex sessions.
+- Portable generated config still seeds `gpt-5.4` / `xhigh`.
 - Recommended packaged baseline:
   - `model = "gpt-5.4"`
   - `review_model = "gpt-5.4"`
@@ -168,7 +169,7 @@ Current `0.124.0` CO-local posture also confirms that:
   - Add optional `[agents.explorer_fast]` for `gpt-5.3-codex-spark` (file/codebase search only).
   - Add optional `[agents.awaiter]` override for `gpt-5.4` + `high` while preserving awaiter instructions.
   - Add `[agents.worker_complex]` for high-risk edits (`gpt-5.4`, `xhigh`).
-  - Keep delegated subagent and review defaults on `gpt-5.4` under ChatGPT auth. Use newer local models only after access smoke.
+  - Use `gpt-5.5` for delegated/review surfaces only after access smoke validates the local opt-in; otherwise use the portable `gpt-5.4` defaults.
   - Caveat: app-server `isDefault` may still report `gpt-5.4` even when newer local models are available.
   - Fallback posture is contingency-only: `8/2` (constrained/high-risk), legacy `6/1/1` break-glass when an older parser/runtime still consumes spawn-depth caps.
   - If native `codex` startup fails with `invalid type: integer ... expected struct AgentRoleToml` under `[agents]`, remove only the live `max_depth` and `max_spawn_depth` keys from `~/.codex/config.toml` and leave the role subtables unchanged.

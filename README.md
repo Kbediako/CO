@@ -21,9 +21,9 @@ Node.js `>=20` is required. npm remains the supported baseline install path.
 
 ## Current Posture
 
-- Current Codex CLI `0.124.0` target
-- Current model posture: `gpt-5.4` with `model_reasoning_effort = "xhigh"` for packaged/generated defaults
-- Local `gpt-5.5` opt-in: marker-backed only after live access smoke plus `[codex_orchestrator] local_model_opt_in = "gpt-5.5"`
+- Current Codex CLI `0.124.0` compatibility target
+- Current model posture: `gpt-5.5` / `xhigh` when available in ChatGPT-auth Codex sessions
+- Portable packaged/generated defaults still seed `gpt-5.4` / `xhigh`; use them when `gpt-5.5`, API, or cloud portability is unavailable
 - Local default runtime: `appserver`
 - Unsupported combination: `executionMode=cloud` with explicit `runtimeMode=appserver`
 
@@ -71,28 +71,10 @@ Run artifacts live under `.runs/<task-id>/` and summaries under `out/<task-id>/`
 ## Downstream Setup
 
 - [Book index](docs/book/README.md): setup, operations, skills, public posture, and CO-345 evidence notes
+- [Bundled skills](skills/README.md): shipped skill roster and install behavior
 - [Downstream setup](docs/public/downstream-setup.md): install, repo bootstrap, machine setup, and first run
 - [Provider onboarding](docs/public/provider-onboarding.md): Linear and provider-worker setup
 - [Docs index](docs/README.md): repo-local documentation map
-
-## Skills (bundled)
-
-Bundled skills:
-- `agent-first-adoption-steering`
-- `chrome-devtools`
-- `codex-orchestrator`
-- `collab-deliberation`
-- `collab-evals`
-- `collab-subagents-first`
-- `delegate-early`
-- `delegation-usage`
-- `docs-first`
-- `elegance-review`
-- `land`
-- `linear`
-- `long-poll-wait`
-- `release`
-- `standalone-review`
 
 ## Contributing
 

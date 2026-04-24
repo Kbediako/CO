@@ -6,22 +6,6 @@ Install bundled skills into `$CODEX_HOME/skills`:
 codex-orchestrator skills install
 ```
 
-The shipped roster is:
+The canonical shipped roster lives in [skills/README.md](../../skills/README.md). `docs:check` uses that file as the shipped-file parity surface so the GitHub front door can stay concise.
 
-- `agent-first-adoption-steering`
-- `chrome-devtools`
-- `codex-orchestrator`
-- `collab-deliberation`
-- `collab-evals`
-- `collab-subagents-first`
-- `delegate-early`
-- `delegation-usage`
-- `docs-first`
-- `elegance-review`
-- `land`
-- `linear`
-- `long-poll-wait`
-- `release`
-- `standalone-review`
-
-The root README intentionally keeps the same roster because `docs:check` uses it as the shipped-file parity surface. This chapter carries the longer operational note: prefer globally installed skills when present, fall back to bundled `skills/<name>/SKILL.md`, and refresh skills after upgrading the npm package when you need new workflow instructions.
+Prefer globally installed skills when present, fall back to bundled `skills/<name>/SKILL.md`, and refresh skills after upgrading the npm package when you need new workflow instructions.

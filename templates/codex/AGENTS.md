@@ -56,9 +56,9 @@
 - For symbolic collab runs, prefix spawned prompts with `[agent_type:<role>]` on line one so role intent is auditable from JSONL/manifests.
 - Current CO compatibility/adoption target is stable Codex CLI `0.124.0`.
 - Current `0.124.0` CO posture evidence confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, `codex review --help` exposing `[PROMPT]` alongside scoped review flags, packaged `gpt-5.4` `xhigh` defaults, and a post-build runtime-mode canary pass.
-- Current model posture is `gpt-5.4` with `xhigh` reasoning for packaged/generated top-level, delegated subagent, and review defaults; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
-- Keep generated defaults on the current CO target by setting `model = "gpt-5.4"` and `model_reasoning_effort = "xhigh"` in `~/.codex/config.toml`; operators may explicitly opt into newer local models after access smoke.
-- Under ChatGPT auth, keep packaged delegated subagent and review defaults on `gpt-5.4`.
+- Current model posture is `gpt-5.5` / `xhigh` when available in ChatGPT-auth Codex sessions; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
+- Portable generated defaults still seed `model = "gpt-5.4"` and `model_reasoning_effort = "xhigh"` in `~/.codex/config.toml`; operators may explicitly opt into newer local models after access smoke.
+- Use `gpt-5.5` for delegated/review surfaces only after access smoke validates the local opt-in.
 - Caveat: local model availability can vary by account; keep `gpt-5.4` as the generated default because it remains the app-server `isDefault`.
 - Set `model_reasoning_effort` to at least `high` (CO default: `xhigh`) so spawned agents inherit high reasoning unless role overrides change it.
 - Built-in `explorer` inherits top-level model defaults unless you attach a `config_file`; keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only.

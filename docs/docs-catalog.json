@@ -60,8 +60,8 @@
       "max_h2_sections": 9
     },
     "bundled_skills_roster": {
-      "doc_path": "README.md",
-      "section_heading": "## Skills (bundled)",
+      "doc_path": "skills/README.md",
+      "section_heading": "# Bundled Skills",
       "list_intro": "Bundled skills"
     },
     "release_surface_paths": {
@@ -165,7 +165,7 @@
       "audience": "downstream users",
       "source_of_truth": [
         "docs/guides/codex-version-policy.md",
-        "skills/*/SKILL.md",
+        "skills/README.md",
         "docs/public/downstream-setup.md",
         "docs/public/provider-onboarding.md"
       ],
@@ -174,15 +174,32 @@
       "update_triggers": [
         "Codex compatibility posture changes",
         "default runtime posture changes",
-        "bundled skill roster changes",
         "front-door command-surface changes"
       ],
       "truth_checks": [
         "codex-cli-version",
         "model-posture",
         "default-runtime",
-        "bundled-skills-roster",
         "front-door-budget"
+      ]
+    },
+    {
+      "path": "skills/README.md",
+      "status": "active",
+      "tier": 1,
+      "doc_class": "shipped_companion",
+      "audience": "downstream Codex users",
+      "source_of_truth": [
+        "skills/*/SKILL.md"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 14,
+      "update_triggers": [
+        "bundled skill roster changes",
+        "skills install command changes"
+      ],
+      "truth_checks": [
+        "bundled-skills-roster"
       ]
     },
     {
@@ -253,7 +270,7 @@
       "doc_class": "public_guide",
       "audience": "downstream users",
       "source_of_truth": [
-        "README.md",
+        "skills/README.md",
         "skills/*/SKILL.md"
       ],
       "owner": "Codex (top-level agent), Review agent",

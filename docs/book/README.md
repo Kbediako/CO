@@ -6,7 +6,7 @@ This folder keeps the long-form public and maintainer guidance out of the GitHub
 
 - [Setup](setup.md): npm baseline, Codex marketplace/plugin install, rollback, downstream bootstrap, and provider onboarding links
 - [Operations](operations.md): common commands, run artifacts, workflow modes, and review handoff expectations
-- [Bundled Skills](skills.md): shipped skill roster and install behavior
+- [Bundled Skills](skills.md): install behavior and pointer to the canonical roster in [skills/README.md](../../skills/README.md)
 - [Public Posture](public-posture.md): current compatibility target, model/runtime posture, and evidence gates
 - [Local Hook Impact](local-hook-impact.md): evidence for the local CO auto-continue hook and whether it affects subagents/provider agents
 - [Codex CLI 0.124.0 Adoption](codex-cli-0124-adoption.md): current adoption state against local repo evidence and official OpenAI Codex docs
