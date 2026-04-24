@@ -3,7 +3,7 @@
 ## Summary
 - Goal: fix misleading skipped-review wording for known prerequisite-stage failures without creating false prerequisite-stage attribution for non-stage failures.
 - Scope: docs-first packet, `TaskManager`, `CommandBuilder`, `BuildResult` typing, and focused tests.
-- Assumptions: failed pipeline stages are identifiable from explicit stage/subpipeline `status_detail` or failed command records, while non-stage `status_detail` values should remain generic.
+- Assumptions: failed pipeline stages are identifiable from explicit stage/subpipeline `status_detail`, from cloud target-stage detail only with matching failed-command evidence, or from failed command records when no non-empty `status_detail` exists; non-stage `status_detail` values should remain generic.
 
 ## Issue Readiness Gate
 - Intent checksum / protected terms carried forward: `Review skipped: build stage failed.`, `delegation-guard`, `errors/01-delegation-guard.json`, `cloud-env-missing`, `allowFailure`, `createSkippedReviewResult`.
@@ -29,7 +29,7 @@
 
 ## Risks & Mitigations
 - Risk: overfitting to one `delegation-guard` run.
-- Mitigation: derive stage names only from explicit stage/subpipeline status detail or failed command records when no non-stage detail is present.
+- Mitigation: derive stage names only from explicit stage/subpipeline status detail, cloud target-stage details with matching failed-command evidence, or failed command records when no non-stage detail is present.
 - Risk: misleading operators with unrelated `errors/` artifacts.
 - Mitigation: set `failureArtifactPath` only from the failed stage/command and avoid generic artifact fallback when no stage is known.
 

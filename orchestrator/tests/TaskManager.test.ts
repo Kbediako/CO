@@ -208,8 +208,79 @@ describe('TaskManager', () => {
     expect(testerFn).not.toHaveBeenCalled();
     expect(reviewerFn).not.toHaveBeenCalled();
     expect(result.review.summary).toBe('Review skipped: prerequisite stage `delegation-guard` failed.');
+    expect(result.review.decision.approved).toBe(false);
     expect(result.review.decision.feedback).toContain('Prerequisite stage `delegation-guard` failed; review skipped.');
     expect(result.review.decision.feedback).toContain('.runs/task/run/errors/02-delegation-guard.json');
+    expect(result.review.decision.feedback).not.toContain('.runs/task/run/errors/01-spec-guard.json');
+  });
+
+  it('does not attach an unrelated error artifact when the failed prerequisite stage is known', async () => {
+    const plan: PlanResult = {
+      items: [{ id: 'docs-review:delegation-guard', description: 'Run delegation guard' }]
+    };
+
+    const manager = new TaskManager({
+      planner: new FunctionalPlannerAgent(async () => plan),
+      builder: new FunctionalBuilderAgent(async () => ({
+        subtaskId: 'docs-review:delegation-guard',
+        artifacts: [
+          { path: '.runs/task/run/errors/01-spec-guard.json', description: 'Command error artifact (spec-guard)' }
+        ],
+        mode: 'mcp' as const,
+        success: false,
+        failureStage: 'delegation-guard',
+        runId: 'ignored'
+      } satisfies BuildResult)),
+      tester: new FunctionalTesterAgent(async () => {
+        throw new Error('tester should not run when prerequisite stage fails');
+      }),
+      reviewer: new FunctionalReviewerAgent(async () => {
+        throw new Error('reviewer should not run when prerequisite stage fails');
+      }),
+      runIdFactory: () => 'run-failed-prerequisite-unmatched-artifact'
+    });
+
+    const result = await manager.execute(baseTask);
+
+    expect(result.review.summary).toBe('Review skipped: prerequisite stage `delegation-guard` failed.');
+    expect(result.review.decision.approved).toBe(false);
+    expect(result.review.decision.feedback).toBe('Prerequisite stage `delegation-guard` failed; review skipped.');
+    expect(result.review.decision.feedback).not.toContain('.runs/task/run/errors/01-spec-guard.json');
+  });
+
+  it('does not attach non-error stage artifacts as failed-stage evidence', async () => {
+    const plan: PlanResult = {
+      items: [{ id: 'docs-review:delegation-guard', description: 'Run delegation guard' }]
+    };
+
+    const manager = new TaskManager({
+      planner: new FunctionalPlannerAgent(async () => plan),
+      builder: new FunctionalBuilderAgent(async () => ({
+        subtaskId: 'docs-review:delegation-guard',
+        artifacts: [
+          { path: '.runs/task/run/logs/delegation-guard.txt', description: 'Stage transcript (delegation-guard)' },
+          { path: '.runs/task/run/errors/01-spec-guard.json', description: 'Command error artifact (spec-guard)' }
+        ],
+        mode: 'mcp' as const,
+        success: false,
+        failureStage: 'delegation-guard',
+        runId: 'ignored'
+      } satisfies BuildResult)),
+      tester: new FunctionalTesterAgent(async () => {
+        throw new Error('tester should not run when prerequisite stage fails');
+      }),
+      reviewer: new FunctionalReviewerAgent(async () => {
+        throw new Error('reviewer should not run when prerequisite stage fails');
+      }),
+      runIdFactory: () => 'run-failed-prerequisite-non-error-artifact'
+    });
+
+    const result = await manager.execute(baseTask);
+
+    expect(result.review.summary).toBe('Review skipped: prerequisite stage `delegation-guard` failed.');
+    expect(result.review.decision.approved).toBe(false);
+    expect(result.review.decision.feedback).toBe('Prerequisite stage `delegation-guard` failed; review skipped.');
+    expect(result.review.decision.feedback).not.toContain('.runs/task/run/logs/delegation-guard.txt');
     expect(result.review.decision.feedback).not.toContain('.runs/task/run/errors/01-spec-guard.json');
   });
 
@@ -265,6 +336,7 @@ describe('TaskManager', () => {
     const result = await manager.execute(baseTask);
 
     expect(result.review.summary).toBe('Review skipped: build stage failed.');
+    expect(result.review.decision.approved).toBe(false);
     expect(result.review.decision.feedback).toBe('Build stage failed; review skipped.');
     expect(result.review.decision.feedback).not.toContain('.runs/task/run/errors/01-advisory.json');
   });
@@ -297,6 +369,7 @@ describe('TaskManager', () => {
     const result = await manager.execute(baseTask);
 
     expect(result.review.summary).toBe('Review skipped: build stage failed.');
+    expect(result.review.decision.approved).toBe(false);
     expect(result.review.decision.feedback).toContain('Build stage failed; review skipped.');
     expect(result.review.decision.feedback).toContain('.runs/task/run/errors/02-explicit-review.json');
     expect(result.review.decision.feedback).not.toContain('.runs/task/run/errors/01-review-stage-match.json');

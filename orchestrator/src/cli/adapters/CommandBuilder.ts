@@ -57,8 +57,11 @@ interface ManifestFailure {
 
 function resolveManifestFailure(manifest: PipelineRunExecutionResult['manifest']): ManifestFailure {
   const statusDetailStage = extractStageFromStatusDetail(manifest.status_detail);
-  const fallbackFailedCommand = hasStatusDetail(manifest.status_detail) ? null : firstFailedCommand(manifest.commands);
-  const stage = statusDetailStage ?? fallbackFailedCommand?.id ?? null;
+  const cloudStage = extractCloudStageFromStatusDetail(manifest.status_detail);
+  const fallbackFailedCommand =
+    statusDetailStage || hasStatusDetail(manifest.status_detail) ? null : firstFailedCommand(manifest.commands);
+  const cloudFailedStage = cloudStage && hasFailedCommand(manifest.commands, cloudStage) ? cloudStage : null;
+  const stage = statusDetailStage ?? cloudFailedStage ?? fallbackFailedCommand?.id ?? null;
   const artifactPath = stage ? findFailedCommandErrorArtifact(manifest.commands, stage) : null;
   return { stage, artifactPath };
 }
@@ -72,10 +75,19 @@ function extractStageFromStatusDetail(statusDetail: string | null): string | nul
   return match?.[1] ?? null;
 }
 
+function extractCloudStageFromStatusDetail(statusDetail: string | null): string | null {
+  const match = /^cloud:(.+):(?:failed|error)$/.exec(statusDetail ?? '');
+  return match?.[1] ?? null;
+}
+
 function firstFailedCommand(
   commands: PipelineRunExecutionResult['manifest']['commands']
 ): PipelineRunExecutionResult['manifest']['commands'][number] | null {
   return commands.find((command) => command.status === 'failed') ?? null;
+}
+
+function hasFailedCommand(commands: PipelineRunExecutionResult['manifest']['commands'], stage: string): boolean {
+  return commands.some((command) => command.status === 'failed' && command.id === stage);
 }
 
 function findFailedCommandErrorArtifact(

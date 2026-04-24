@@ -2,6 +2,8 @@
 id: 20260424-linear-a66fa065-3c6c-4063-b2ba-1121bf71f74f
 title: "CO-346 skipped review prerequisite-stage truth"
 relates_to: docs/PRD-linear-a66fa065-3c6c-4063-b2ba-1121bf71f74f.md
+related_prd: docs/PRD-linear-a66fa065-3c6c-4063-b2ba-1121bf71f74f.md
+related_action_plan: docs/ACTION_PLAN-linear-a66fa065-3c6c-4063-b2ba-1121bf71f74f.md
 risk: medium
 owners:
   - Codex
@@ -14,7 +16,7 @@ This mirror points to the canonical task spec at `tasks/specs/linear-a66fa065-3c
 
 ## Implementation Summary
 - Extend `BuildResult` additively with optional `failureStage` and `failureArtifactPath` diagnostics.
-- Update `CommandBuilder` to derive a failed prerequisite stage from explicit `stage:*:failed` or `subpipeline:*:failed` `status_detail`, or from failed command records only when no non-empty status detail exists.
+- Update `CommandBuilder` to derive a failed prerequisite stage from explicit `stage:*:failed` or `subpipeline:*:failed` `status_detail`, from `cloud:<target-stage>:failed` only when the same stage has failed command evidence, or from failed command records only when no non-empty status detail exists.
 - Ignore skipped/advisory `allowFailure` command artifacts when deriving failed-stage truth.
 - Include command error artifacts as build artifacts for operator evidence, while only setting `failureArtifactPath` for the actual failed stage/command.
 - Update `TaskManager` so build-stage review skips can report a known prerequisite stage instead of always saying `build stage failed`.
@@ -30,11 +32,12 @@ This mirror points to the canonical task spec at `tasks/specs/linear-a66fa065-3c
   - `cloud-env-missing` is non-stage failure detail and must not infer a prerequisite stage
   - skipped/advisory `allowFailure` command `error_file` values are artifacts, not failed-stage evidence
   - generic build skips must not attach unrelated error artifacts
+  - `cloud:<stage>:failed` target-stage details are only promoted when the matching command actually failed
 - Do not rely on reading historical `.runs` artifacts at runtime.
 
 ## Validation Contract
 - Required targeted validation:
-  - focused Vitest coverage for `CommandBuilder` and `TaskManager`
+  - focused Vitest coverage for `CommandBuilder` and `TaskManager`, including cloud target-stage and artifact false-positive regressions
   - `node scripts/spec-guard.mjs --dry-run`
   - `npm run build`
   - `npm run lint`

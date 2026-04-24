@@ -7581,6 +7581,9 @@ describe('createProviderIssueHandoffService', () => {
   });
 
   it('blocks direct webhook admission when queued retry and resumable claims fill max_allowed', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-23T08:30:00.000Z'));
+
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
     state.claims.push(

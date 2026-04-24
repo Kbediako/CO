@@ -390,6 +390,13 @@ export class TaskManager {
     const stageArtifact = build?.artifacts.find((candidate) => {
       const normalizedPath = candidate.path.replace(/\\/g, '/').toLowerCase();
       const normalizedDescription = candidate.description.toLowerCase();
+      const isErrorArtifact =
+        normalizedPath.startsWith('errors/') ||
+        normalizedPath.includes('/errors/') ||
+        /\berror\b/i.test(candidate.description);
+      if (!isErrorArtifact) {
+        return false;
+      }
       return (
         normalizedDescription.includes(`(${failureStage})`) ||
         normalizedDescription.includes(failureStage) ||
@@ -397,18 +404,7 @@ export class TaskManager {
         (stagePathToken.length > 0 && normalizedPath.includes(stagePathToken))
       );
     });
-    if (stageArtifact) {
-      return stageArtifact.path;
-    }
-    const artifact = build?.artifacts.find((candidate) => {
-      const normalizedPath = candidate.path.replace(/\\/g, '/');
-      return (
-        normalizedPath.startsWith('errors/') ||
-        normalizedPath.includes('/errors/') ||
-        /\berror\b/i.test(candidate.description)
-      );
-    });
-    return artifact?.path ?? null;
+    return stageArtifact?.path ?? null;
   }
 
   private async executePlanner(

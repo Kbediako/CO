@@ -16,6 +16,7 @@
 - Success criteria / acceptance:
   - skipped-review summaries name known failed prerequisite stages such as `delegation-guard`, `spec-guard`, `docs:check`, or `diff-budget`
   - true `build`, `test`, and `review` stage failures keep their existing generic skipped-review wording
+  - cloud target-stage details are promoted only when the matching command actually failed
   - non-stage `status_detail` values such as `cloud-env-missing` do not infer a prerequisite stage from target command ids
   - advisory or skipped `allowFailure` command `error_file` values do not become failed-stage evidence
   - skipped-review feedback includes an error artifact path only when it is tied to the failed stage or failed command
@@ -28,6 +29,7 @@
 - Protected terms / artifact names:
   - `Review skipped: build stage failed.`
   - `stage:delegation-guard:failed`
+  - `cloud:diff-budget:failed`
   - `errors/01-delegation-guard.json`
   - `cloud-env-missing`
   - `allowFailure`
@@ -61,7 +63,8 @@
 
 ## Validation
 - `node scripts/spec-guard.mjs --dry-run`
-- focused CO-346 orchestrator tests
+- `npm run test -- orchestrator/tests/CommandBuilder.test.ts orchestrator/tests/TaskManager.test.ts`
+- `npm run test:core -- orchestrator/tests/ProviderIssueHandoff.test.ts -t "blocks direct webhook admission when queued retry and resumable claims fill max_allowed"`
 - `npm run build`
 - `npm run lint`
 - `npm run test`

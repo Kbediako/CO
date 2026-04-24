@@ -176,6 +176,37 @@ describe('CommandBuilder', () => {
     expect(result.failureArtifactPath).toBeNull();
   });
 
+  it('derives cloud target failures from matching failed command evidence', async () => {
+    const builder = new CommandBuilder(async () => ({
+      success: false,
+      notes: ['Cloud target failed'],
+      manifestPath: '.runs/task/run/manifest.json',
+      logPath: '.runs/task/run/runner.ndjson',
+      manifest: {
+        cloud_execution: null,
+        status_detail: 'cloud:diff-budget:failed',
+        commands: [
+          {
+            id: 'diff-budget',
+            status: 'failed',
+            error_file: '.runs/task/run/errors/05-diff-budget.json'
+          }
+        ]
+      } as unknown as CliManifest
+    }));
+
+    const result = await builder.build({
+      task: { id: 'task', title: 'Task', metadata: {} },
+      plan: { items: [{ id: 'implementation-gate:diff-budget', description: 'Run diff budget' }] },
+      target: { id: 'implementation-gate:diff-budget', description: 'Run diff budget' },
+      mode: 'cloud',
+      runId: 'run'
+    });
+
+    expect(result.failureStage).toBe('diff-budget');
+    expect(result.failureArtifactPath).toBe('.runs/task/run/errors/05-diff-budget.json');
+  });
+
   it('does not derive a failed stage from non-stage status details', async () => {
     const builder = new CommandBuilder(async () => ({
       success: false,
