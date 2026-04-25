@@ -28,7 +28,7 @@ export const BASELINE_AGENTS = {
   max_threads: 12,
   max_depth: 4
 } as const;
-export const LOCAL_MODEL_OPT_INS = ['gpt-5.5'] as const;
+export const LOCAL_MODEL_OPT_INS = [CURRENT_CHATGPT_MODEL] as const;
 const LOCAL_MODEL_OPT_IN_SET = new Set<string>(LOCAL_MODEL_OPT_INS);
 const CODEX_ORCHESTRATOR_CONFIG_KEY = 'codex_orchestrator';
 const LOCAL_MODEL_OPT_IN_CONFIG_KEY = 'local_model_opt_in';
