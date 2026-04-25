@@ -4136,7 +4136,9 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
   }, 20_000);
 
   it('blocks appserver resident resume proof until a persisted turn is observed', async () => {
-    const { manifestPath } = await createManifestRoot();
+    const { manifestPath, runDir } = await createManifestRoot();
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
+    const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-1.jsonl');
     const readTrackedIssue = vi
       .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
       .mockResolvedValueOnce(
@@ -4163,6 +4165,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
         CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
         CODEX_CLOUD_ENV_ID: 'env-appserver-resume',
+        CODEX_HOME: tempRoot ?? undefined,
         [PROVIDER_LINEAR_RESIDENT_SESSION_SEED_ENV]: JSON.stringify({
           source_run_id: 'run-prev',
           source_updated_at: '2026-03-21T08:59:59.000Z',
@@ -4183,6 +4186,33 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
           await appendStaySerialParallelizationDecisionAuditForRequest(request, {
             turnIndex: 1
           });
+          await mkdir(sessionDir, { recursive: true });
+          await writeFile(
+            sessionLogPath,
+            [
+              JSON.stringify({
+                timestamp: '2026-03-21T09:00:00.000Z',
+                type: 'session_meta',
+                payload: {
+                  id: 'thread-1',
+                  cwd: tempRoot,
+                  initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+                }
+              }),
+              JSON.stringify({
+                timestamp: '2026-03-21T09:00:00.050Z',
+                type: 'turn_context',
+                payload: { turn_id: 'turn-prior' }
+              }),
+              JSON.stringify({
+                timestamp: '2026-03-21T09:00:00.100Z',
+                type: 'event_msg',
+                payload: { type: 'task_complete', turn_id: 'turn-prior' }
+              })
+            ].join('\n'),
+            'utf8'
+          );
+          await new Promise((resolve) => setTimeout(resolve, 20));
           return {
             exitCode: 0,
             stdout: '{"type":"thread.started","thread_id":"thread-1"}',
@@ -4204,6 +4234,32 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       appserver_supervision: {
         supervision_command: 'codex_exec_resume',
         sticky_environment_status: 'proven',
+        turn_persistence_status: 'blocked',
+        turn_persistence_blocker: 'session_log_hydration_missing',
+        resume_status: 'blocked',
+        resume_source_thread_id: 'thread-1',
+        resume_observed_thread_id: 'thread-1',
+        resume_blocker: 'resume_session_log_hydration_missing'
+      }
+    });
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:00:02.000Z',
+      undefined,
+      { CODEX_HOME: tempRoot! }
+    );
+
+    expect(refreshed).toMatchObject({
+      thread_id: 'thread-1',
+      latest_turn_id: null,
+      latest_session_id: null,
+      session_log_thread_id: 'thread-1',
+      session_log_turn_id: null,
+      session_log_session_id: null,
+      appserver_supervision: {
+        supervision_command: 'codex_exec_resume',
         turn_persistence_status: 'blocked',
         turn_persistence_blocker: 'session_log_hydration_missing',
         resume_status: 'blocked',
@@ -6791,6 +6847,117 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(typeof hydration?.proof_signature).toBe('string');
     expect(hydration?.proof_signature).not.toBe('');
     expect(hydration?.proof_signature).not.toBe('stale-proof-signature');
+  });
+
+  it('does not retain discarded newer session-log ids after proof-floor restoration', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const hydrationPath = buildSessionLogHydrationPath(runDir);
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
+    await mkdir(sessionDir, { recursive: true });
+    const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-2.jsonl');
+    const sessionLog = [
+      JSON.stringify({
+        type: 'session_meta',
+        payload: {
+          id: 'thread-2',
+          cwd: tempRoot,
+          initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+        }
+      }),
+      JSON.stringify({ type: 'turn_context', payload: { turn_id: 'turn-2' } }),
+      JSON.stringify({
+        type: 'event_msg',
+        payload: {
+          type: 'token_count',
+          info: {
+            total_token_usage: {
+              input_tokens: 4,
+              output_tokens: 3,
+              total_tokens: 7
+            }
+          }
+        }
+      })
+    ].join('\n');
+    await writeFile(sessionLogPath, sessionLog, 'utf8');
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          thread_id: 'thread-1',
+          latest_turn_id: 'turn-1',
+          latest_session_id: 'thread-1-turn-1',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          session_log_thread_id: 'thread-1',
+          session_log_turn_id: 'turn-1',
+          session_log_session_id: 'thread-1-turn-1',
+          tokens: {
+            input_tokens: 12,
+            output_tokens: 8,
+            total_tokens: 20
+          },
+          current_turn_activity: {
+            event: 'task_complete',
+            message_or_payload: null,
+            recorded_at: '2026-03-21T09:00:01.000Z',
+            source: 'session_log_hydration',
+            turn_id: 'turn-1',
+            session_id: 'thread-1-turn-1'
+          },
+          runtime: {
+            requested_mode: 'appserver',
+            selected_mode: 'appserver',
+            provider: 'AppServerRuntimeProvider',
+            runtime_session_id: 'appserver-run-child',
+            fallback: {
+              occurred: false,
+              code: null,
+              reason: null,
+              from_mode: null,
+              to_mode: null,
+              checked_at: '2026-03-21T09:00:00.000Z'
+            }
+          },
+          workspace_path: tempRoot
+        })
+      ),
+      'utf8'
+    );
+    await writeFile(
+      hydrationPath,
+      JSON.stringify({
+        path: sessionLogPath,
+        offset_bytes: 0,
+        trailing_text: '',
+        bootstrap_pending: false,
+        proof_signature: 'stale-proof-signature'
+      }),
+      'utf8'
+    );
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:00:40.000Z',
+      undefined,
+      { CODEX_HOME: tempRoot! }
+    );
+
+    expect(refreshed).toMatchObject({
+      thread_id: 'thread-1',
+      latest_turn_id: 'turn-1',
+      session_log_thread_id: 'thread-1',
+      session_log_turn_id: 'turn-1',
+      session_log_session_id: 'thread-1-turn-1',
+      tokens: {
+        input_tokens: 12,
+        output_tokens: 8,
+        total_tokens: 20
+      }
+    });
+    expect(refreshed?.session_log_thread_id).not.toBe('thread-2');
+    expect(refreshed?.session_log_turn_id).not.toBe('turn-2');
   });
 
   it('rebootstraps stale cursor parsing at the next turn boundary for bootstrap proofs', async () => {

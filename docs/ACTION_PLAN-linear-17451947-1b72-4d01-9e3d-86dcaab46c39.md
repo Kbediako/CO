@@ -35,6 +35,15 @@
   - CO-360 does not remove `codex exec` / `codex exec resume` fallback.
   - CO-360 does not remove JSONL/session-log truth surfaces before parity is proven.
   - CO-360 does not make CO-358 a blocker unless the exact canary path requires cloud preflight.
+- Supervision-proof parity matrix:
+  | Dimension | Current | Target / Reference | Pass-Fail / Blocker |
+  | --- | --- | --- | --- |
+  | Runtime truth | Provider workers default to `codex exec` / `codex exec resume` supervision. | Configured canary selects `runtime_mode=appserver` and records selected runtime. | Pass when manifest/status proof names selected runtime; otherwise retain CLI fallback reason. |
+  | Sticky environment | Configured environment id is not yet proven for provider-worker app-server runs. | Real configured sticky env id is surfaced and behavior outcome is recorded. | Pass with real id plus proven behavior; otherwise exact blocker is machine-readable. |
+  | Persisted-turn pagination/resume/fork | Provider truth comes from exec/resume JSONL/session logs. | Real persisted turns prove pagination/resume/fork outcomes under app-server supervision. | Pass with app-server thread/turn ids and outcomes; otherwise exact blocker is retained. |
+  | CLI fallback semantics | `codex exec` and `codex exec resume` remain provider-worker fallback. | Fallback stays fail-closed with machine-readable reason fields. | Pass when fallback reason fields are present and default replacement is not claimed. |
+  | Manifest/status proof | Status does not yet prove app-server provider-worker parity. | Manifests/status expose selected runtime, app-server thread/turn ids, sticky env id, and resume/fork outcomes. | Pass when all fields are present or blocked dimensions carry exact blockers. |
+  | JSONL/session-log truth | JSONL/session logs remain canonical provider-worker truth. | App-server proof is additive until parity is reviewed. | Pass when JSONL/session-log truth is preserved and not removed. |
 - Nearby wrong interpretations:
   - Wrong: CO-360 proves app-server startup and therefore replaces provider-worker supervision.
     Correct: CO-360 requires a configured provider-worker turn set plus sticky environment and persisted-turn proof or exact blockers.

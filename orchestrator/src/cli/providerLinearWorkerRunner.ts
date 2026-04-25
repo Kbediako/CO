@@ -4396,39 +4396,24 @@ function observeProviderWorkerSessionLogLines(
   };
 }
 
-function sessionLogLinesContainTurnContext(lines: readonly string[]): boolean {
-  for (const line of lines) {
-    const parsed = parseProviderWorkerSessionJsonlLine(line);
-    if (!parsed || parsed.type !== 'turn_context') {
-      continue;
-    }
-    const payload = isRecord(parsed.payload) ? parsed.payload : null;
-    if (normalizeOptionalString(payload?.turn_id)) {
-      return true;
-    }
-  }
-  return false;
-}
-
 function observeProviderWorkerSessionLogAppliedLines(input: {
   lines: readonly string[];
   linesToApply: readonly string[];
   bootstrapPending: boolean;
 }): Pick<ProviderWorkerSessionLogApplyResult, 'observed' | 'observedThreadId' | 'observedTurnId'> {
-  if (
-    !input.bootstrapPending ||
-    input.linesToApply.length === input.lines.length ||
-    sessionLogLinesContainTurnContext(input.lines)
-  ) {
-    return observeProviderWorkerSessionLogLines(input.lines);
-  }
-  return observeProviderWorkerSessionLogLines(input.linesToApply);
+  const observationLines =
+    !input.bootstrapPending || input.linesToApply.length === input.lines.length
+      ? input.lines
+      : input.linesToApply;
+  return observeProviderWorkerSessionLogLines(observationLines);
 }
 
 function selectProviderWorkerSessionBootstrapLines(
   lines: string[],
   options: {
     requireTurnContext: boolean;
+    currentTurnId?: string | null;
+    allowCompletedBootstrapTurn?: boolean;
   } = { requireTurnContext: false }
 ): string[] {
   let latestSessionMetaIndex = -1;
@@ -4465,7 +4450,19 @@ function selectProviderWorkerSessionBootstrapLines(
     return lines;
   }
   if (latestTurnCompleted) {
-    return latestSessionMetaIndex >= 0 ? [lines[latestSessionMetaIndex] ?? ''] : [];
+    const currentTurnId = normalizeOptionalString(options.currentTurnId);
+    const allowCompletedBootstrapTurn = options.allowCompletedBootstrapTurn ?? true;
+    if (!allowCompletedBootstrapTurn && currentTurnId === null) {
+      return latestSessionMetaIndex >= 0 ? [lines[latestSessionMetaIndex] ?? ''] : [];
+    }
+    if (currentTurnId !== null && latestTurnId !== null && latestTurnId !== currentTurnId) {
+      return latestSessionMetaIndex >= 0 ? [lines[latestSessionMetaIndex] ?? ''] : [];
+    }
+    const bootstrapLines =
+      latestSessionMetaIndex >= 0 && latestSessionMetaIndex < latestTurnContextIndex
+        ? [lines[latestSessionMetaIndex] ?? '']
+        : [];
+    return [...bootstrapLines, ...lines.slice(latestTurnContextIndex)];
   }
   const bootstrapLines =
     latestSessionMetaIndex >= 0 && latestSessionMetaIndex < latestTurnContextIndex
@@ -4474,11 +4471,24 @@ function selectProviderWorkerSessionBootstrapLines(
   return [...bootstrapLines, ...lines.slice(latestTurnContextIndex)];
 }
 
+function shouldAllowCompletedProviderWorkerSessionBootstrapTurn(
+  proof: ProviderLinearWorkerProof
+): boolean {
+  if (proof.latest_turn_id !== null) {
+    return true;
+  }
+  const continuityState = proof.resident_session?.continuity_state ?? null;
+  return continuityState !== 'guarded_resume_pending' && continuityState !== 'guarded_resume_active';
+}
+
 function applyProviderWorkerSessionLogDelta(
   parseState: ProviderLinearWorkerJsonlParseResult,
   tailState: ProviderWorkerSessionLogTailState,
   chunk: string,
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  options: {
+    allowCompletedBootstrapTurn?: boolean;
+  } = {}
 ): ProviderWorkerSessionLogApplyResult {
   const combined = `${tailState.trailingText}${chunk}`;
   const lines = combined.split(/\r?\n/u);
@@ -4490,7 +4500,11 @@ function applyProviderWorkerSessionLogDelta(
   const requireTurnContext = tailState.bootstrapPending && parseState.turnId === null;
   const linesToApply =
     tailState.bootstrapPending && lines.length > 0
-      ? selectProviderWorkerSessionBootstrapLines(lines, { requireTurnContext })
+      ? selectProviderWorkerSessionBootstrapLines(lines, {
+          requireTurnContext,
+          currentTurnId: parseState.turnId,
+          allowCompletedBootstrapTurn: options.allowCompletedBootstrapTurn
+        })
       : lines;
   const observation = observeProviderWorkerSessionLogAppliedLines({
     lines,
@@ -4514,7 +4528,10 @@ function applyProviderWorkerSessionLogDelta(
 function flushProviderWorkerSessionLogTail(
   parseState: ProviderLinearWorkerJsonlParseResult,
   tailState: ProviderWorkerSessionLogTailState,
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  options: {
+    allowCompletedBootstrapTurn?: boolean;
+  } = {}
 ): ProviderWorkerSessionLogApplyResult {
   const trailingLine = tailState.trailingText.trim();
   if (!trailingLine) {
@@ -4528,7 +4545,11 @@ function flushProviderWorkerSessionLogTail(
   const shouldBootstrap = tailState.bootstrapPending;
   const requireTurnContext = shouldBootstrap && parseState.turnId === null;
   const trailingLines = shouldBootstrap
-    ? selectProviderWorkerSessionBootstrapLines([trailingLine], { requireTurnContext })
+    ? selectProviderWorkerSessionBootstrapLines([trailingLine], {
+        requireTurnContext,
+        currentTurnId: parseState.turnId,
+        allowCompletedBootstrapTurn: options.allowCompletedBootstrapTurn
+      })
     : [trailingLine];
   const observation = observeProviderWorkerSessionLogAppliedLines({
     lines: [trailingLine],
@@ -4839,6 +4860,73 @@ function shouldAdvanceProviderLinearWorkerProofUpdatedAt(
   );
 }
 
+function selectProviderWorkerScopedSessionLogIds(input: {
+  sessionLogObserved: boolean;
+  observedThreadId: string | null;
+  observedTurnId: string | null;
+  proof: ProviderLinearWorkerProof;
+  liveThreadId: string | null;
+  liveTurnId: string | null;
+}): {
+  sessionLogThreadId: string | null;
+  sessionLogTurnId: string | null;
+  sessionLogSessionId: string | null;
+} {
+  const proofThreadId = input.proof.session_log_thread_id ?? null;
+  const proofTurnId = input.proof.session_log_turn_id ?? null;
+  const proofThreadMatchesLive =
+    proofThreadId !== null &&
+    input.liveThreadId !== null &&
+    proofThreadId === input.liveThreadId;
+  const proofTurnMatchesLive =
+    proofTurnId !== null && input.liveTurnId !== null && proofTurnId === input.liveTurnId;
+  const observedThreadMatchesLive =
+    input.observedThreadId !== null &&
+    input.liveThreadId !== null &&
+    input.observedThreadId === input.liveThreadId;
+  const observedTurnMatchesLive =
+    input.observedTurnId !== null &&
+    input.liveTurnId !== null &&
+    input.observedTurnId === input.liveTurnId;
+
+  let sessionLogThreadId: string | null;
+  let sessionLogTurnId: string | null;
+  if (input.sessionLogObserved) {
+    if (observedThreadMatchesLive) {
+      sessionLogThreadId = input.observedThreadId;
+      sessionLogTurnId = observedTurnMatchesLive ? input.observedTurnId : null;
+    } else if (
+      input.observedThreadId === null &&
+      observedTurnMatchesLive &&
+      input.liveThreadId !== null
+    ) {
+      sessionLogThreadId = input.liveThreadId;
+      sessionLogTurnId = input.observedTurnId;
+    } else if (proofThreadMatchesLive) {
+      sessionLogThreadId = proofThreadId;
+      sessionLogTurnId = proofTurnMatchesLive ? proofTurnId : null;
+    } else {
+      sessionLogThreadId = null;
+      sessionLogTurnId = null;
+    }
+  } else if (proofThreadMatchesLive) {
+    sessionLogThreadId = proofThreadId;
+    sessionLogTurnId = proofTurnMatchesLive ? proofTurnId : null;
+  } else {
+    sessionLogThreadId = input.proof.session_log_thread_id ?? null;
+    sessionLogTurnId = input.proof.session_log_turn_id ?? null;
+  }
+
+  return {
+    sessionLogThreadId,
+    sessionLogTurnId,
+    sessionLogSessionId: deriveLatestTurnSessionId({
+      threadId: sessionLogThreadId,
+      turnId: sessionLogTurnId
+    }).sessionId
+  };
+}
+
 async function hydrateProviderLinearWorkerProofFromSessionLog(
   proof: ProviderLinearWorkerProof,
   env: NodeJS.ProcessEnv,
@@ -4957,15 +5045,21 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
   let sessionLogObserved = false;
   let observedSessionLogThreadId = proof.session_log_thread_id ?? null;
   let observedSessionLogTurnId = proof.session_log_turn_id ?? null;
+  const allowCompletedBootstrapTurn =
+    shouldAllowCompletedProviderWorkerSessionBootstrapTurn(proof);
   try {
     const delta = await readProviderWorkerSessionLogDelta(tailState);
     if (delta) {
-      const deltaApply = applyProviderWorkerSessionLogDelta(parseState, tailState, delta, env);
+      const deltaApply = applyProviderWorkerSessionLogDelta(parseState, tailState, delta, env, {
+        allowCompletedBootstrapTurn
+      });
       sessionLogObserved = deltaApply.observed || sessionLogObserved;
       observedSessionLogThreadId = deltaApply.observedThreadId ?? observedSessionLogThreadId;
       observedSessionLogTurnId = deltaApply.observedTurnId ?? observedSessionLogTurnId;
     }
-    const tailApply = flushProviderWorkerSessionLogTail(parseState, tailState, env);
+    const tailApply = flushProviderWorkerSessionLogTail(parseState, tailState, env, {
+      allowCompletedBootstrapTurn
+    });
     sessionLogObserved = tailApply.observed || sessionLogObserved;
     observedSessionLogThreadId = tailApply.observedThreadId ?? observedSessionLogThreadId;
     observedSessionLogTurnId = tailApply.observedTurnId ?? observedSessionLogTurnId;
@@ -5010,29 +5104,23 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     parseState.rateLimits !== null &&
     providerWorkerTokenUsageFallsBehindFloor(proofTokenFloor, parseState.tokens);
   const persistedTailState = snapshotProviderWorkerSessionLogTailState(tailState);
-  const sessionLogThreadId =
-    sessionLogObserved ? observedSessionLogThreadId ?? null : proof.session_log_thread_id ?? null;
-  const observedSessionLogTurnCandidate = observedSessionLogTurnId ?? null;
-  const sessionLogTurnId = sessionLogObserved
-    ? liveTurnId && observedSessionLogTurnCandidate === liveTurnId
-      ? observedSessionLogTurnCandidate
-      : null
-    : proof.session_log_turn_id ?? null;
-  const sessionLogSessionId = sessionLogObserved
-    ? deriveLatestTurnSessionId({
-        threadId: sessionLogThreadId,
-        turnId: sessionLogTurnId
-      }).sessionId
-    : proof.session_log_session_id ?? null;
+  const scopedSessionLogIds = selectProviderWorkerScopedSessionLogIds({
+    sessionLogObserved,
+    observedThreadId: observedSessionLogThreadId,
+    observedTurnId: observedSessionLogTurnId,
+    proof,
+    liveThreadId,
+    liveTurnId
+  });
   const hydratedProof: ProviderLinearWorkerProof = {
     ...proof,
     thread_id: liveThreadId,
     latest_turn_id: liveTurnId,
     latest_session_id: session.sessionId,
     latest_session_id_source: session.source,
-    session_log_thread_id: sessionLogThreadId,
-    session_log_turn_id: sessionLogTurnId,
-    session_log_session_id: sessionLogSessionId,
+    session_log_thread_id: scopedSessionLogIds.sessionLogThreadId,
+    session_log_turn_id: scopedSessionLogIds.sessionLogTurnId,
+    session_log_session_id: scopedSessionLogIds.sessionLogSessionId,
     last_event: parseState.lastEvent ?? null,
     last_message: parseState.finalMessage ?? null,
     last_event_at: parseState.lastEventAt ?? null,
@@ -7880,6 +7968,10 @@ export async function runProviderLinearWorker(
               idRewindSignature: null
             }
           : null;
+      const allowCompletedSessionBootstrapTurn =
+        turnNumber === 1 &&
+        previousTurnProof.latest_turn_id === null &&
+        !continueResidentSessionOnBoot;
       const liveSessionTailPromise =
         liveSessionTailState === null
           ? Promise.resolve()
@@ -7915,7 +8007,13 @@ export async function runProviderLinearWorker(
                   const delta = await readProviderWorkerSessionLogDelta(liveSessionTailState);
                   const deltaApply =
                     delta
-                      ? applyProviderWorkerSessionLogDelta(liveParseState, liveSessionTailState, delta, childEnv)
+                      ? applyProviderWorkerSessionLogDelta(
+                          liveParseState,
+                          liveSessionTailState,
+                          delta,
+                          childEnv,
+                          { allowCompletedBootstrapTurn: allowCompletedSessionBootstrapTurn }
+                        )
                       : {
                           changed: false,
                           observed: false,
@@ -7943,7 +8041,12 @@ export async function runProviderLinearWorker(
               }
               const tailApply =
                 liveSessionTailState.path !== null
-                  ? flushProviderWorkerSessionLogTail(liveParseState, liveSessionTailState, childEnv)
+                  ? flushProviderWorkerSessionLogTail(
+                      liveParseState,
+                      liveSessionTailState,
+                      childEnv,
+                      { allowCompletedBootstrapTurn: allowCompletedSessionBootstrapTurn }
+                    )
                   : {
                       changed: false,
                       observed: false,
