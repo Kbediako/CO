@@ -5,6 +5,16 @@ on:
     branches: [main]
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      archive_pr_number:
+        description: Archive automation PR number, when dispatched by archive automation.
+        required: false
+        type: string
+      archive_pr_head_sha:
+        description: Archive automation PR head SHA, when dispatched by archive automation.
+        required: false
+        type: string
 
 jobs:
   core-lane:
@@ -31,13 +41,27 @@ jobs:
         if: ${{ github.event_name == 'pull_request' }}
         run: echo "BASE_SHA=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_ENV"
 
+      - name: Set BASE_SHA from archive PR dispatch
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.archive_pr_number != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.archive_pr_number }}
+        run: |
+          set -euo pipefail
+          BASE_SHA="$(gh api "repos/${{ github.repository }}/pulls/${PR_NUMBER}" --jq '.base.sha')"
+          if [[ -z "${BASE_SHA}" ]]; then
+            echo "::error::Could not resolve base SHA for archive PR #${PR_NUMBER}."
+            exit 1
+          fi
+          echo "BASE_SHA=${BASE_SHA}" >> "$GITHUB_ENV"
+
       - name: Detect downstream simulation scope
         id: downstream-smoke
         shell: bash
         run: |
           set -euo pipefail
           RANGE=""
-          if [[ "${{ github.event_name }}" == "pull_request" ]] && [[ -n "${BASE_SHA:-}" ]]; then
+          if [[ -n "${BASE_SHA:-}" ]]; then
             RANGE="${BASE_SHA}...HEAD"
           elif [[ "${{ github.event.before }}" != "" ]] && [[ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]]; then
             RANGE="${{ github.event.before }}...HEAD"
@@ -61,8 +85,9 @@ jobs:
           fi
 
       - name: Resolve diff-budget override (label + reason)
-        if: ${{ github.event_name == 'pull_request' }}
+        if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.archive_pr_number != '') }}
         env:
+          ARCHIVE_PR_NUMBER: ${{ github.event_name == 'workflow_dispatch' && inputs.archive_pr_number || '' }}
           DIFF_BUDGET_OVERRIDE_LABEL: diff-budget-override
           GITHUB_API_URL: ${{ github.api_url }}
           GITHUB_TOKEN: ${{ github.token }}
@@ -96,14 +121,15 @@ jobs:
 
             const event = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
             let pullRequest = event.pull_request;
-            if (!pullRequest) {
+            const archivePullNumber = Number(process.env.ARCHIVE_PR_NUMBER ?? 0);
+            let pullNumber = Number(pullRequest?.number ?? archivePullNumber ?? 0);
+            if (!pullRequest && pullNumber <= 0) {
               process.exit(0);
             }
 
             const repository = process.env.GITHUB_REPOSITORY;
             const apiBase = process.env.GITHUB_API_URL || 'https://api.github.com';
             const token = process.env.GITHUB_TOKEN;
-            const pullNumber = Number(pullRequest.number ?? 0);
             if (pullNumber > 0 && repository && token) {
               try {
                 pullRequest = await fetchJsonWithTimeout(
@@ -122,6 +148,10 @@ jobs:
                   `Warning: failed to refresh live PR metadata for #${pullNumber}; falling back to event payload (${message}).`
                 );
               }
+            }
+
+            if (!pullRequest) {
+              process.exit(0);
             }
 
             const labels = Array.isArray(pullRequest.labels)
@@ -172,7 +202,7 @@ jobs:
           NODE
 
       - name: Diff budget
-        if: ${{ github.event_name == 'pull_request' }}
+        if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.archive_pr_number != '') }}
         run: node scripts/diff-budget.mjs
 
       - name: Instruction stamp check
