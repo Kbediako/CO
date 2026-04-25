@@ -4564,13 +4564,16 @@ function providerWorkerSessionJsonlLineTimestamp(line: string): string | null {
   if (!parsed) {
     return null;
   }
+  const lineTimestamp = normalizeOptionalString(parsed.timestamp);
+  if (lineTimestamp) {
+    return lineTimestamp;
+  }
   const payload = isRecord(parsed.payload) ? parsed.payload : null;
-  const payloadTimestamp = payload
+  return payload
     ? normalizeOptionalString(payload.timestamp) ??
       normalizeOptionalString(payload.created_at) ??
       normalizeOptionalString(payload.at)
     : null;
-  return payloadTimestamp ?? extractProviderWorkerEventSummary(parsed).at;
 }
 
 function isProviderWorkerSessionBootstrapLineAtOrAfter(
