@@ -6,10 +6,10 @@ This guide is the downstream-safe setup path shipped in the npm package.
 
 - Once per machine: install Codex CLI and authenticate.
 - Once per repo: seed the CO templates, run setup with the repo root so delegation is repo-scoped while bundled skills are installed and DevTools wiring is applied at the machine level, review the generated config, and start using task-scoped runs.
-- CO currently targets Codex CLI `0.124.0`; newer candidates stay evidence-gated in the version policy.
-- Portable generated downstream defaults stay on `gpt-5.4` / `xhigh` because API/cloud portability is not proven and app-server model/list still reports it as `isDefault`.
-- Local ChatGPT-auth `gpt-5.5` / `xhigh` remains marker-backed opt-in only after `codex debug models` verifies current model access.
-- `codex-orchestrator doctor` accepts the marker-backed local `gpt-5.5` opt-in as non-drift only when `codex debug models` verifies current model access, and additive defaults preserve matching prior `gpt-5.5` role files when the top-level config is explicitly opted in.
+- CO-local ChatGPT-auth/appserver posture now uses `gpt-5.5` / `xhigh` on Codex CLI `0.125.0` when live access smoke passes; release-facing cloud/downstream pins remain evidence-gated in the version policy.
+- Portable generated downstream defaults keep `gpt-5.4` / `xhigh` as a fallback when `gpt-5.5`, API/cloud portability, or downstream/no-network access is not proven.
+- Local ChatGPT-auth `gpt-5.5` / `xhigh` is the preferred CO posture after `codex debug models` verifies current model access.
+- `codex-orchestrator doctor` treats `gpt-5.5` as non-drift when `codex debug models` verifies current model access, and additive defaults keep fresh configs on portable fallback values unless `--auth-scope chatgpt` is explicitly requested after live access smoke; compatible prior `gpt-5.5` role files are preserved without requiring extra marker metadata.
 - CO-196 posture lineage remains unchanged: npm is the supported baseline because it is the simplest supported CLI install path, and marketplace packaging is an additive registration path for newer Codex releases. `0.121.0` accepts both `codex marketplace add` and `codex plugin marketplace add`; `0.122.0+` require `codex plugin marketplace add`, and current `0.125.0` also exposes `codex plugin marketplace upgrade` / `remove`.
 
 ## Once per machine

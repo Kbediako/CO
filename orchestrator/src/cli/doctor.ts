@@ -49,8 +49,7 @@ import {
   BASELINE_REVIEW_MODEL,
   BASELINE_REASONING_MINIMUM,
   formatModelDefaultExpectation,
-  isLocalModelOptIn,
-  resolveLocalModelOptIn
+  isLocalModelOptIn
 } from './codexDefaultsSetup.js';
 import { CommandPlanner } from './adapters/CommandPlanner.js';
 import { PipelineResolver } from './services/pipelineResolver.js';
@@ -1115,45 +1114,44 @@ function inspectCodexDefaultsAdvisory(
     };
   }
 
-  const localModelOptIn = resolveLocalModelOptIn(parsed);
+  const model = normalizeOptionalString(readStringValue(parsed.model));
+  const reviewModel = normalizeOptionalString(readStringValue(parsed.review_model));
+  const localModelCandidates = new Set(
+    [model, reviewModel].filter(isLocalModelOptIn)
+  );
   const modelAccess =
-    localModelOptIn === null
+    localModelCandidates.size === 0
       ? {
           status: 'unavailable',
           models: new Set<string>(),
-          detail: 'model access was not checked because no explicit local model opt-in is configured'
+          detail: 'model access was not checked because no local ChatGPT-auth model is configured'
         } satisfies DoctorCodexModelAccess
       : inspectCodexModelAccess(codexBin, env);
-  const localModelOptInVerified =
-    localModelOptIn !== null && modelAccess.status === 'ok' && modelAccess.models.has(localModelOptIn);
-  const localModelOptInUnverified = localModelOptIn !== null && !localModelOptInVerified;
-  if (localModelOptInUnverified) {
+  const verifiedLocalModels = new Set(
+    [...localModelCandidates].filter(
+      (candidate) => modelAccess.status === 'ok' && modelAccess.models.has(candidate)
+    )
+  );
+  const unverifiedLocalModels = [...localModelCandidates].filter(
+    (candidate) => !verifiedLocalModels.has(candidate)
+  );
+  for (const candidate of unverifiedLocalModels) {
     guidance.push(
-      `Configured local model opt-in ${localModelOptIn} is not verified by \`codex debug models\`; rerun local access smoke or remove the opt-in marker before relying on it.`
+      `Configured local ChatGPT-auth model ${candidate} is not verified by \`codex debug models\`; rerun local access smoke or use the portable ${BASELINE_MODEL} fallback for this surface.`
     );
   }
 
-  const model = normalizeOptionalString(readStringValue(parsed.model));
   checks.model.actual = model;
   checks.model.status =
-    model === BASELINE_MODEL || (model === localModelOptIn && localModelOptInVerified) ? 'ok' : 'advisory';
-  if (isLocalModelOptIn(model) && model !== localModelOptIn) {
-    guidance.push(
-      `Config model ${model} looks like a legacy CO-managed default, not a verified local opt-in; rerun \`codex-orchestrator codex defaults --yes\` to migrate it or add the explicit opt-in marker after smoke evidence.`
-    );
-  }
-
-  const reviewModel = normalizeOptionalString(readStringValue(parsed.review_model));
-  checks.review_model.actual = reviewModel;
-  checks.review_model.status =
-    reviewModel === BASELINE_REVIEW_MODEL || (reviewModel === localModelOptIn && localModelOptInVerified)
+    model === BASELINE_MODEL || (isLocalModelOptIn(model) && verifiedLocalModels.has(model))
       ? 'ok'
       : 'advisory';
-  if (isLocalModelOptIn(reviewModel) && reviewModel !== localModelOptIn) {
-    guidance.push(
-      `Config review_model ${reviewModel} looks like a legacy CO-managed default, not a verified local opt-in; rerun \`codex-orchestrator codex defaults --yes\` to migrate it or add the explicit opt-in marker after smoke evidence.`
-    );
-  }
+
+  checks.review_model.actual = reviewModel;
+  checks.review_model.status =
+    reviewModel === BASELINE_REVIEW_MODEL || (isLocalModelOptIn(reviewModel) && verifiedLocalModels.has(reviewModel))
+      ? 'ok'
+      : 'advisory';
 
   const reasoning = normalizeOptionalString(readStringValue(parsed.model_reasoning_effort));
   checks.model_reasoning_effort.actual = reasoning;
@@ -1186,7 +1184,7 @@ function inspectCodexDefaultsAdvisory(
 
   const allChecksOk =
     Object.values(checks).every((check) => check.status === 'ok')
-    && !localModelOptInUnverified
+    && unverifiedLocalModels.length === 0
     && legacyMaxSpawnDepth?.status !== 'advisory';
   return {
     status: allChecksOk ? 'ok' : 'advisory',

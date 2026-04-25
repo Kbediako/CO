@@ -57,7 +57,7 @@ The plugin launcher reads the `codex-orchestrator` marketplace entry in `${CODEX
 
 Re-run the version-appropriate marketplace add command after moving a local-directory source, replacing it, or removing Codex's installed marketplace checkout.
 
-CO-355 only rebaselines marketplace/downstream-smoke compatibility to Codex CLI `0.125.0`. Model/runtime posture remains governed by `docs/guides/codex-version-policy.md` and the CO-351/CO-352 validation lanes, including the requested `gpt-5.5` / app-server direction; this setup page does not settle or override that posture.
+CO-355 only rebaselines marketplace/downstream-smoke compatibility to Codex CLI `0.125.0`. Model/runtime posture remains governed by `docs/guides/codex-version-policy.md` and the CO-351/CO-352 validation lanes: use `gpt-5.5` / `xhigh` for validated local ChatGPT-auth/appserver access, and keep `gpt-5.4` / `xhigh` as the portable fallback when access, API/cloud portability, or downstream/no-network evidence is missing.
 
 ## Rollback / Removal
 
