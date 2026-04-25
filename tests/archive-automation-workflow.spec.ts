@@ -158,7 +158,8 @@ describe('archive automation workflow required checks', () => {
     expect(dispatchStep.run).toContain('--workflow core-lane.yml');
     expect(dispatchStep.run).toContain('--commit "${PR_HEAD_SHA}"');
     expect(dispatchStep.run).toContain('--event workflow_dispatch');
-    expect(dispatchStep.run).toContain('select(.createdAt >= \\"${DISPATCH_STARTED_AT}\\")');
+    expect(dispatchStep.run).not.toContain('DISPATCH_STARTED_AT');
+    expect(dispatchStep.run).not.toContain('createdAt');
     expect(dispatchStep.run).toContain('gh run watch "${RUN_ID}"');
     expect(dispatchStep.run).toContain('gh run view "${RUN_ID}"');
     expect(dispatchStep.run).toContain('set_core_lane_status "success"');
@@ -223,6 +224,35 @@ describe('archive automation workflow required checks', () => {
     expect(run).toContain('exit "${RUN_VIEW_STATUS}"');
   });
 
+  it('waits for a terminal Core Lane conclusion after watch exits', async () => {
+    const workflow = await readWorkflow('.github/workflows/archive-automation-base.yml');
+    const dispatchStep = getStep(workflow, 'archive', 'Dispatch Core Lane for archive PR');
+    const run = dispatchStep.run ?? '';
+
+    const watch = run.indexOf('gh run watch "${RUN_ID}"');
+    const conclusionLoop = run.indexOf('for attempt in $(seq 1 20); do', watch);
+    const runView = run.indexOf('RUN_FIELDS="$(gh run view', conclusionLoop);
+    const conclusionParse = run.indexOf('RUN_CONCLUSION="${RUN_FIELDS%%|*}"', runView);
+    const conclusionBreak = run.indexOf('if [ -n "${RUN_CONCLUSION}" ]; then', conclusionParse);
+    const unknownConclusionStatus = run.indexOf(
+      'set_core_lane_status "error" "Core Lane conclusion unavailable for archive PR #${PR_NUMBER}."'
+    );
+    const successStatus = run.indexOf('set_core_lane_status "success"', unknownConclusionStatus);
+    const failureStatus = run.indexOf('set_core_lane_status "failure"', successStatus);
+
+    expect(watch).toBeGreaterThanOrEqual(0);
+    expect(conclusionLoop).toBeGreaterThan(watch);
+    expect(runView).toBeGreaterThan(conclusionLoop);
+    expect(conclusionParse).toBeGreaterThan(runView);
+    expect(conclusionBreak).toBeGreaterThan(conclusionParse);
+    expect(run).toContain('sleep 30');
+    expect(run).toContain('waiting for terminal conclusion (attempt ${attempt}/20).');
+    expect(unknownConclusionStatus).toBeGreaterThan(conclusionBreak);
+    expect(run).toContain('Core Lane run is not terminal after bounded wait for archive PR');
+    expect(successStatus).toBeGreaterThan(unknownConclusionStatus);
+    expect(failureStatus).toBeGreaterThan(successStatus);
+  });
+
   it('publishes a terminal Core Lane status when dispatched run discovery fails', async () => {
     const workflow = await readWorkflow('.github/workflows/archive-automation-base.yml');
     const dispatchStep = getStep(workflow, 'archive', 'Dispatch Core Lane for archive PR');
@@ -271,6 +301,10 @@ describe('archive automation workflow required checks', () => {
 
     expect(run).toContain('list_matching_run_ids()');
     expect(run).toContain('find_dispatched_run_id()');
+    expect(run).toContain('--json databaseId');
+    expect(run).toContain("--jq '.[].databaseId'");
+    expect(run).not.toContain('DISPATCH_STARTED_AT');
+    expect(run).not.toContain('createdAt');
     expect(baselineCapture).toBeGreaterThan(run.indexOf('set_core_lane_status "pending"'));
     expect(baselineCapture).toBeLessThan(dispatch);
     expect(runDiscovery).toBeGreaterThan(dispatch);

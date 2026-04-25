@@ -225,8 +225,8 @@ jobs:
               --commit "${PR_HEAD_SHA}" \
               --event workflow_dispatch \
               --limit 20 \
-              --json databaseId,createdAt \
-              --jq ".[] | select(.createdAt >= \"${DISPATCH_STARTED_AT}\") | .databaseId" \
+              --json databaseId \
+              --jq '.[].databaseId' \
           }
 
           find_dispatched_run_id() {
@@ -261,7 +261,6 @@ jobs:
           }
 
           ACTIONS_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/workflows/core-lane.yml"
-          DISPATCH_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           set_core_lane_status "pending" "Archive automation dispatched Core Lane." "${ACTIONS_URL}"
 
           # gh workflow run does not return a run id; baseline visible matches so polling watches only a new id.
@@ -328,19 +327,41 @@ jobs:
           set -e
 
           RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}"
-          set +e
-          RUN_FIELDS="$(gh run view "${RUN_ID}" --repo "${GH_REPO}" --json conclusion,url --jq '[.conclusion, .url] | @tsv')"
-          RUN_VIEW_STATUS=$?
-          set -e
+          RUN_CONCLUSION=""
+          for attempt in $(seq 1 20); do
+            set +e
+            RUN_FIELDS="$(gh run view "${RUN_ID}" --repo "${GH_REPO}" --json conclusion,url --jq '(.conclusion // "") + "|" + (.url // "")')"
+            RUN_VIEW_STATUS=$?
+            set -e
 
-          if [ "${RUN_VIEW_STATUS}" -ne 0 ]; then
-            set_core_lane_status "error" "Core Lane run details unavailable for archive PR #${PR_NUMBER}." "${RUN_URL}"
-            echo "::error::Failed to fetch Core Lane run details for archive PR #${PR_NUMBER}; run=${RUN_ID}."
-            exit "${RUN_VIEW_STATUS}"
+            if [ "${RUN_VIEW_STATUS}" -ne 0 ]; then
+              set_core_lane_status "error" "Core Lane run details unavailable for archive PR #${PR_NUMBER}." "${RUN_URL}"
+              echo "::error::Failed to fetch Core Lane run details for archive PR #${PR_NUMBER}; run=${RUN_ID}."
+              exit "${RUN_VIEW_STATUS}"
+            fi
+
+            RUN_CONCLUSION="${RUN_FIELDS%%|*}"
+            VIEW_RUN_URL="${RUN_FIELDS#*|}"
+            RUN_URL="${VIEW_RUN_URL:-${RUN_URL}}"
+
+            if [ -n "${RUN_CONCLUSION}" ]; then
+              break
+            fi
+
+            if [ "${attempt}" -lt 20 ]; then
+              echo "::warning::Core Lane run ${RUN_ID} has no conclusion yet after gh run watch; waiting for terminal conclusion (attempt ${attempt}/20)."
+              sleep 30
+            fi
+          done
+
+          if [ -z "${RUN_CONCLUSION}" ]; then
+            set_core_lane_status "error" "Core Lane conclusion unavailable for archive PR #${PR_NUMBER}." "${RUN_URL:-${ACTIONS_URL}}"
+            echo "::error::Core Lane run is not terminal after bounded wait for archive PR #${PR_NUMBER}; run=${RUN_URL:-${RUN_ID}}."
+            if [ "${WATCH_STATUS}" -ne 0 ]; then
+              exit "${WATCH_STATUS}"
+            fi
+            exit 1
           fi
-
-          IFS=$'\t' read -r RUN_CONCLUSION VIEW_RUN_URL <<< "${RUN_FIELDS}"
-          RUN_URL="${VIEW_RUN_URL:-${RUN_URL}}"
 
           if [ "${RUN_CONCLUSION}" = "success" ]; then
             set_core_lane_status "success" "Core Lane passed for archive PR #${PR_NUMBER}." "${RUN_URL}"
