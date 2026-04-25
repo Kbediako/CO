@@ -269,6 +269,22 @@ export interface ControlProviderOperatorAutopilotTerminalBlockerAdvisoryPayload 
   summary: string;
 }
 
+export interface ControlProviderOperatorAutopilotStatusDatasetBoundsPayload {
+  limit: number;
+  truncated: boolean;
+  omitted_counts: {
+    actions: number;
+    holds: number;
+    pending_actions: number;
+    terminal_blocker_advisories: number;
+    resolved_actions: number;
+    lifecycle_records: number;
+    local_rollout_execution_attempts: number;
+    backlog_promotion_snapshots: number;
+    backlog_promotion_snapshot_retention_records: number;
+  };
+}
+
 export interface ControlProviderOperatorAutopilotLastResultPayload {
   recorded_at: string;
   status: 'disabled' | 'noop' | 'acted' | 'failed';
@@ -283,6 +299,7 @@ export interface ControlProviderOperatorAutopilotLastResultPayload {
   local_rollout_execution_attempts?: ControlProviderOperatorAutopilotLocalRolloutExecutionAttemptPayload[];
   backlog_promotion_snapshots?: ControlProviderOperatorAutopilotBacklogPromotionSnapshotPayload[];
   backlog_promotion_snapshot_retention_records?: ControlProviderOperatorAutopilotBacklogPromotionSnapshotRetentionPayload[];
+  status_dataset_bounds?: ControlProviderOperatorAutopilotStatusDatasetBoundsPayload;
 }
 
 export interface ControlProviderOperatorAutopilotPayload {
@@ -1174,12 +1191,42 @@ export function buildSelectedRunRuntimeFingerprintInput(
                           issue_observed_updated_at: record.issue_observed_updated_at,
                           terminal_state_evidence: record.terminal_state_evidence,
                           force_path_used: record.force_path_used
-                        }))
+                        })),
+                      ...(providerWorkflow.operator_autopilot.last_result.status_dataset_bounds
+                        ? {
+                            status_dataset_bounds: cloneOperatorAutopilotStatusDatasetBounds(
+                              providerWorkflow.operator_autopilot.last_result
+                                .status_dataset_bounds
+                            )
+                          }
+                        : {})
                     }
                   : null
               }
             : null
         }
       : null
+  };
+}
+
+function cloneOperatorAutopilotStatusDatasetBounds(
+  bounds: ControlProviderOperatorAutopilotStatusDatasetBoundsPayload
+): ControlProviderOperatorAutopilotStatusDatasetBoundsPayload {
+  return {
+    limit: bounds.limit,
+    truncated: bounds.truncated,
+    omitted_counts: {
+      actions: bounds.omitted_counts.actions,
+      holds: bounds.omitted_counts.holds,
+      pending_actions: bounds.omitted_counts.pending_actions,
+      terminal_blocker_advisories: bounds.omitted_counts.terminal_blocker_advisories,
+      resolved_actions: bounds.omitted_counts.resolved_actions,
+      lifecycle_records: bounds.omitted_counts.lifecycle_records,
+      local_rollout_execution_attempts:
+        bounds.omitted_counts.local_rollout_execution_attempts,
+      backlog_promotion_snapshots: bounds.omitted_counts.backlog_promotion_snapshots,
+      backlog_promotion_snapshot_retention_records:
+        bounds.omitted_counts.backlog_promotion_snapshot_retention_records
+    }
   };
 }

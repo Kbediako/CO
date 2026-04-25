@@ -16,7 +16,10 @@ import {
   type ProviderOperatorAutopilotResult
 } from './providerOperatorAutopilot.js';
 import { resolveProviderOperatorAutopilotLifecyclePath } from './providerOperatorAutopilotLifecycle.js';
-import { resolveProviderOperatorAutopilotLocalRolloutExecutionPath } from './providerOperatorAutopilotLocalRolloutExecution.js';
+import {
+  resolveProviderOperatorAutopilotLocalRolloutExecutionPath,
+  type ProviderOperatorAutopilotLocalRolloutExecutionConfig
+} from './providerOperatorAutopilotLocalRolloutExecution.js';
 import {
   resolveProviderTerminalCleanupConfig,
   type ProviderTerminalCleanupResult
@@ -27,6 +30,7 @@ import {
 } from './providerWorkerHosts.js';
 import type {
   ControlProviderOperatorAutopilotLastResultPayload,
+  ControlProviderOperatorAutopilotStatusDatasetBoundsPayload,
   ControlProviderTerminalCleanupLastResultPayload,
   ControlProviderWorkflowPayload
 } from './observabilityReadModel.js';
@@ -34,6 +38,7 @@ import type {
 export interface ProviderWorkflowConfigStore {
   bootstrap(): Promise<ControlProviderWorkflowPayload>;
   refresh(): Promise<ControlProviderWorkflowPayload>;
+  refreshStatus?(): Promise<ControlProviderWorkflowPayload>;
   snapshot(): ControlProviderWorkflowPayload;
   getLaunchConfigPath(): Promise<string>;
   recordTerminalCleanupResult(result: ProviderTerminalCleanupResult): void;
@@ -47,14 +52,19 @@ interface CreateProviderWorkflowConfigStoreOptions {
 }
 
 const PROVIDER_WORKFLOW_SNAPSHOT_FILE = 'provider-workflow.last-known-good.json';
+export const OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT = 50;
+export const OPERATOR_AUTOPILOT_STATUS_TEXT_FIELD_LIMIT = 4096;
 
 export function createProviderWorkflowConfigStore(
   createOptions: CreateProviderWorkflowConfigStoreOptions
 ): ProviderWorkflowConfigStore {
   const cloneState = (
     value: ControlProviderWorkflowPayload
+  ): ControlProviderWorkflowPayload => cloneProviderWorkflowPayload(value);
+  const cloneStatusState = (
+    value: ControlProviderWorkflowPayload
   ): ControlProviderWorkflowPayload =>
-    JSON.parse(JSON.stringify(value)) as ControlProviderWorkflowPayload;
+    cloneProviderWorkflowPayload(value, { boundStatusDataset: true });
   const sourcePath = resolveRepoConfigPath(createOptions.env);
   const snapshotPath = join(createOptions.runDir, PROVIDER_WORKFLOW_SNAPSHOT_FILE);
   // This store assumes serialized access from the single-threaded control-host
@@ -143,6 +153,10 @@ export function createProviderWorkflowConfigStore(
 
   async function refresh(): Promise<ControlProviderWorkflowPayload> {
     return cloneState(await runWithReloadLock(() => refreshUnlocked()));
+  }
+
+  async function refreshStatus(): Promise<ControlProviderWorkflowPayload> {
+    return cloneStatusState(await runWithReloadLock(() => refreshUnlocked()));
   }
 
   async function getLaunchConfigPath(): Promise<string> {
@@ -286,6 +300,7 @@ export function createProviderWorkflowConfigStore(
   return {
     bootstrap,
     refresh,
+    refreshStatus,
     snapshot: () => cloneState(state),
     getLaunchConfigPath,
     recordTerminalCleanupResult: (result) => {
@@ -351,7 +366,7 @@ function buildDefaultOperatorAutopilotPayload(
     post_merge_rollout: {
       enabled: config.post_merge_rollout.enabled,
       summary: config.post_merge_rollout.summary,
-      execution: config.post_merge_rollout.execution
+      execution: cloneLocalRolloutExecutionConfig(config.post_merge_rollout.execution)
     },
     audit_path: resolveProviderOperatorAutopilotAuditPath(runDir),
     lifecycle_path: resolveProviderOperatorAutopilotLifecyclePath(runDir),
@@ -423,7 +438,7 @@ function buildOperatorAutopilotPayload(
     post_merge_rollout: {
       enabled: config.post_merge_rollout.enabled,
       summary: config.post_merge_rollout.summary,
-      execution: config.post_merge_rollout.execution
+      execution: cloneLocalRolloutExecutionConfig(config.post_merge_rollout.execution)
     },
     audit_path: resolveProviderOperatorAutopilotAuditPath(runDir),
     lifecycle_path: resolveProviderOperatorAutopilotLifecyclePath(runDir),
@@ -472,15 +487,101 @@ function buildWorkerHostsPayload(metadata: unknown): ControlProviderWorkflowPayl
   return cloneProviderWorkerHostConfigs(resolveProviderWorkerHostConfig(metadata));
 }
 
-function cloneOperatorAutopilotLastResult(
-  result: ControlProviderOperatorAutopilotLastResultPayload
-): ControlProviderOperatorAutopilotLastResultPayload {
+export function cloneProviderWorkflowStatusPayload(
+  payload: ControlProviderWorkflowPayload
+): ControlProviderWorkflowPayload {
+  return cloneProviderWorkflowPayload(payload, { boundStatusDataset: true });
+}
+
+function cloneProviderWorkflowPayload(
+  payload: ControlProviderWorkflowPayload,
+  options: { boundStatusDataset?: boolean } = {}
+): ControlProviderWorkflowPayload {
+  const boundStatusDataset = options.boundStatusDataset === true;
   return {
-    recorded_at: result.recorded_at,
-    status: result.status,
-    summary: result.summary,
-    error: result.error,
-    actions: result.actions.map((action) => ({
+    status: payload.status,
+    pipeline_id: payload.pipeline_id,
+    source_path: payload.source_path,
+    snapshot_path: payload.snapshot_path,
+    last_reload_attempt_at: payload.last_reload_attempt_at,
+    last_success_at: payload.last_success_at,
+    last_error_at: payload.last_error_at,
+    last_error: payload.last_error,
+    terminal_cleanup: payload.terminal_cleanup
+      ? {
+          enabled: payload.terminal_cleanup.enabled,
+          close_attached_pr: {
+            enabled: payload.terminal_cleanup.close_attached_pr.enabled,
+            comment_template: payload.terminal_cleanup.close_attached_pr.comment_template
+          },
+          last_result: payload.terminal_cleanup.last_result
+            ? cloneTerminalCleanupLastResult(payload.terminal_cleanup.last_result)
+            : null
+        }
+      : null,
+    worker_hosts: (payload.worker_hosts ?? []).map((host) => ({
+      ...host,
+      ssh_options: [...host.ssh_options]
+    })),
+    operator_autopilot: payload.operator_autopilot
+      ? {
+          enabled: payload.operator_autopilot.enabled,
+          backlog_promotion: {
+            enabled: payload.operator_autopilot.backlog_promotion.enabled,
+            state_name: payload.operator_autopilot.backlog_promotion.state_name,
+            target_state_name: payload.operator_autopilot.backlog_promotion.target_state_name,
+            snapshot_retention: payload.operator_autopilot.backlog_promotion.snapshot_retention
+              ? {
+                  max_untracked_cycles:
+                    payload.operator_autopilot.backlog_promotion.snapshot_retention.max_untracked_cycles,
+                  terminal_state_types: [
+                    ...payload.operator_autopilot.backlog_promotion.snapshot_retention
+                      .terminal_state_types
+                  ]
+                }
+              : undefined
+          },
+          review_handoff_rework: {
+            enabled: payload.operator_autopilot.review_handoff_rework.enabled,
+            target_state_name: payload.operator_autopilot.review_handoff_rework.target_state_name,
+            excluded_action_required_reasons: [
+              ...payload.operator_autopilot.review_handoff_rework
+                .excluded_action_required_reasons
+            ]
+          },
+          post_merge_rollout: {
+            enabled: payload.operator_autopilot.post_merge_rollout.enabled,
+            summary: payload.operator_autopilot.post_merge_rollout.summary,
+            execution: cloneLocalRolloutExecutionConfig(
+              payload.operator_autopilot.post_merge_rollout
+                .execution as ProviderOperatorAutopilotLocalRolloutExecutionConfig
+            )
+          },
+          audit_path: payload.operator_autopilot.audit_path,
+          lifecycle_path: payload.operator_autopilot.lifecycle_path,
+          execution_path: payload.operator_autopilot.execution_path,
+          last_result: payload.operator_autopilot.last_result
+            ? cloneOperatorAutopilotLastResult(payload.operator_autopilot.last_result, {
+                boundStatusDataset
+              })
+            : null
+        }
+      : null
+  };
+}
+
+function cloneOperatorAutopilotLastResult(
+  result: ControlProviderOperatorAutopilotLastResultPayload,
+  options: { boundStatusDataset?: boolean } = {}
+): ControlProviderOperatorAutopilotLastResultPayload {
+  const boundStatusDataset = options.boundStatusDataset === true;
+  const priorBounds = boundStatusDataset ? result.status_dataset_bounds : undefined;
+  const actions = cloneBoundedStatusDatasetItems(
+    result.actions,
+    'actions',
+    priorBounds,
+    boundStatusDataset,
+    (action) => ({
       kind: action.kind,
       issue_id: action.issue_id,
       issue_identifier: action.issue_identifier,
@@ -498,8 +599,14 @@ function cloneOperatorAutopilotLastResult(
         error: action.transition.error
       },
       action_required_reasons: [...action.action_required_reasons]
-    })),
-    holds: result.holds.map((hold) => ({
+    })
+  );
+  const holds = cloneBoundedStatusDatasetItems(
+    result.holds,
+    'holds',
+    priorBounds,
+    boundStatusDataset,
+    (hold) => ({
       kind: hold.kind,
       issue_id: hold.issue_id,
       issue_identifier: hold.issue_identifier,
@@ -512,8 +619,14 @@ function cloneOperatorAutopilotLastResult(
       reason: hold.reason,
       summary: hold.summary,
       action_required_reasons: [...hold.action_required_reasons]
-    })),
-    pending_actions: result.pending_actions.map((pendingAction) => ({
+    })
+  );
+  const pendingActions = cloneBoundedStatusDatasetItems(
+    result.pending_actions,
+    'pending_actions',
+    undefined,
+    false,
+    (pendingAction) => ({
       kind: pendingAction.kind,
       action_instance_id: pendingAction.action_instance_id,
       issue_id: pendingAction.issue_id,
@@ -528,28 +641,38 @@ function cloneOperatorAutopilotLastResult(
       lifecycle_actor: pendingAction.lifecycle_actor,
       lifecycle_reason: pendingAction.lifecycle_reason,
       lifecycle_recorded_at: pendingAction.lifecycle_recorded_at
-    })),
-    terminal_blocker_advisories: (result.terminal_blocker_advisories ?? []).map(
-      (advisory) => ({
-        kind: advisory.kind,
-        issue_id: advisory.issue_id,
-        issue_identifier: advisory.issue_identifier,
-        issue_state: advisory.issue_state,
-        issue_state_type: advisory.issue_state_type,
-        issue_updated_at: advisory.issue_updated_at,
-        blockers: advisory.blockers.map((blocker) => ({
-          id: blocker.id,
-          identifier: blocker.identifier,
-          state: blocker.state,
-          state_type: blocker.state_type
-        })),
-        canonical_owner_hints: [...advisory.canonical_owner_hints],
-        duplicate_hints: [...advisory.duplicate_hints],
-        recommended_action: advisory.recommended_action,
-        summary: advisory.summary
-      })
-    ),
-    resolved_actions: (result.resolved_actions ?? []).map((resolvedAction) => ({
+    })
+  );
+  const terminalBlockerAdvisories = cloneBoundedStatusDatasetItems(
+    result.terminal_blocker_advisories ?? [],
+    'terminal_blocker_advisories',
+    priorBounds,
+    boundStatusDataset,
+    (advisory) => ({
+      kind: advisory.kind,
+      issue_id: advisory.issue_id,
+      issue_identifier: advisory.issue_identifier,
+      issue_state: advisory.issue_state,
+      issue_state_type: advisory.issue_state_type,
+      issue_updated_at: advisory.issue_updated_at,
+      blockers: advisory.blockers.map((blocker) => ({
+        id: blocker.id,
+        identifier: blocker.identifier,
+        state: blocker.state,
+        state_type: blocker.state_type
+      })),
+      canonical_owner_hints: [...advisory.canonical_owner_hints],
+      duplicate_hints: [...advisory.duplicate_hints],
+      recommended_action: advisory.recommended_action,
+      summary: advisory.summary
+    })
+  );
+  const resolvedActions = cloneBoundedStatusDatasetItems(
+    result.resolved_actions ?? [],
+    'resolved_actions',
+    priorBounds,
+    boundStatusDataset,
+    (resolvedAction) => ({
       kind: resolvedAction.kind,
       action_instance_id: resolvedAction.action_instance_id,
       issue_id: resolvedAction.issue_id,
@@ -564,8 +687,14 @@ function cloneOperatorAutopilotLastResult(
       lifecycle_actor: resolvedAction.lifecycle_actor,
       lifecycle_reason: resolvedAction.lifecycle_reason,
       lifecycle_recorded_at: resolvedAction.lifecycle_recorded_at
-    })),
-    lifecycle_records: (result.lifecycle_records ?? []).map((record) => ({
+    })
+  );
+  const lifecycleRecords = cloneBoundedStatusDatasetItems(
+    result.lifecycle_records ?? [],
+    'lifecycle_records',
+    priorBounds,
+    boundStatusDataset,
+    (record) => ({
       action_instance_id: record.action_instance_id,
       kind: record.kind,
       issue_id: record.issue_id,
@@ -575,38 +704,48 @@ function cloneOperatorAutopilotLastResult(
       reason: record.reason,
       recorded_at: record.recorded_at,
       source: record.source
-    })),
-    local_rollout_execution_attempts: (result.local_rollout_execution_attempts ?? []).map(
-      (attempt) => ({
-        record_kind: attempt.record_kind,
-        action_instance_id: attempt.action_instance_id,
-        action_id: attempt.action_id,
-        issue_id: attempt.issue_id,
-        issue_identifier: attempt.issue_identifier,
-        preflight: {
-          status: attempt.preflight.status,
-          reason: attempt.preflight.reason,
-          checked_at: attempt.preflight.checked_at,
-          summary: attempt.preflight.summary
-        },
-        started_at: attempt.started_at,
-        ended_at: attempt.ended_at,
-        terminal_state: attempt.terminal_state,
-        reason: attempt.reason,
-        summary: attempt.summary,
-        command: {
-          runner: attempt.command.runner,
-          command: attempt.command.command,
-          args: [...attempt.command.args],
-          cwd: attempt.command.cwd,
-          timeout_ms: attempt.command.timeout_ms
-        },
-        exit_code: attempt.exit_code,
-        stdout: attempt.stdout,
-        stderr: attempt.stderr
-      })
-    ),
-    backlog_promotion_snapshots: (result.backlog_promotion_snapshots ?? []).map((snapshot) => ({
+    })
+  );
+  const localRolloutExecutionAttempts = cloneBoundedStatusDatasetItems(
+    result.local_rollout_execution_attempts ?? [],
+    'local_rollout_execution_attempts',
+    priorBounds,
+    boundStatusDataset,
+    (attempt) => ({
+      record_kind: attempt.record_kind,
+      action_instance_id: attempt.action_instance_id,
+      action_id: attempt.action_id,
+      issue_id: attempt.issue_id,
+      issue_identifier: attempt.issue_identifier,
+      preflight: {
+        status: attempt.preflight.status,
+        reason: attempt.preflight.reason,
+        checked_at: attempt.preflight.checked_at,
+        summary: attempt.preflight.summary
+      },
+      started_at: attempt.started_at,
+      ended_at: attempt.ended_at,
+      terminal_state: attempt.terminal_state,
+      reason: attempt.reason,
+      summary: attempt.summary,
+      command: {
+        runner: attempt.command.runner,
+        command: attempt.command.command,
+        args: [...attempt.command.args],
+        cwd: attempt.command.cwd,
+        timeout_ms: attempt.command.timeout_ms
+      },
+      exit_code: attempt.exit_code,
+      stdout: cloneStatusTextField(attempt.stdout, boundStatusDataset),
+      stderr: cloneStatusTextField(attempt.stderr, boundStatusDataset)
+    })
+  );
+  const backlogPromotionSnapshots = cloneBoundedStatusDatasetItems(
+    result.backlog_promotion_snapshots ?? [],
+    'backlog_promotion_snapshots',
+    priorBounds,
+    boundStatusDataset,
+    (snapshot) => ({
       issue_id: snapshot.issue_id,
       issue_identifier: snapshot.issue_identifier,
       target_state: snapshot.target_state,
@@ -614,10 +753,14 @@ function cloneOperatorAutopilotLastResult(
       issue_updated_at: snapshot.issue_updated_at,
       force_path_used: snapshot.force_path_used ?? false,
       untracked_cycles: snapshot.untracked_cycles ?? 0
-    })),
-    backlog_promotion_snapshot_retention_records: (
-      result.backlog_promotion_snapshot_retention_records ?? []
-    ).map((record) => ({
+    })
+  );
+  const backlogPromotionSnapshotRetentionRecords = cloneBoundedStatusDatasetItems(
+    result.backlog_promotion_snapshot_retention_records ?? [],
+    'backlog_promotion_snapshot_retention_records',
+    priorBounds,
+    boundStatusDataset,
+    (record) => ({
       issue_id: record.issue_id,
       issue_identifier: record.issue_identifier,
       target_state: record.target_state,
@@ -636,6 +779,103 @@ function cloneOperatorAutopilotLastResult(
       issue_observed_updated_at: record.issue_observed_updated_at,
       terminal_state_evidence: record.terminal_state_evidence,
       force_path_used: record.force_path_used ?? false
+    })
+  );
+  const statusDatasetBounds = buildStatusDatasetBounds({
+    actions: actions.omitted,
+    holds: holds.omitted,
+    pending_actions: pendingActions.omitted,
+    terminal_blocker_advisories: terminalBlockerAdvisories.omitted,
+    resolved_actions: resolvedActions.omitted,
+    lifecycle_records: lifecycleRecords.omitted,
+    local_rollout_execution_attempts: localRolloutExecutionAttempts.omitted,
+    backlog_promotion_snapshots: backlogPromotionSnapshots.omitted,
+    backlog_promotion_snapshot_retention_records:
+      backlogPromotionSnapshotRetentionRecords.omitted
+  });
+  return {
+    recorded_at: result.recorded_at,
+    status: result.status,
+    summary: result.summary,
+    error: result.error,
+    actions: actions.items,
+    holds: holds.items,
+    pending_actions: pendingActions.items,
+    terminal_blocker_advisories: terminalBlockerAdvisories.items,
+    resolved_actions: resolvedActions.items,
+    lifecycle_records: lifecycleRecords.items,
+    local_rollout_execution_attempts: localRolloutExecutionAttempts.items,
+    backlog_promotion_snapshots: backlogPromotionSnapshots.items,
+    backlog_promotion_snapshot_retention_records: backlogPromotionSnapshotRetentionRecords.items,
+    ...(boundStatusDataset && statusDatasetBounds.truncated
+      ? { status_dataset_bounds: statusDatasetBounds }
+      : {})
+  };
+}
+
+function cloneLocalRolloutExecutionConfig(
+  config: ProviderOperatorAutopilotLocalRolloutExecutionConfig
+): ProviderOperatorAutopilotLocalRolloutExecutionConfig {
+  return {
+    enabled: config.enabled,
+    actions: config.actions.map((action) => ({
+      id: action.id,
+      enabled: action.enabled,
+      order: action.order,
+      runner: action.runner,
+      args: [...action.args],
+      script: action.script,
+      timeout_ms: action.timeout_ms,
+      require_clean_repo: action.require_clean_repo,
+      required_branch: action.required_branch,
+      supported_platforms: [...action.supported_platforms],
+      invalid_supported_platforms: [...action.invalid_supported_platforms],
+      deploy_class: action.deploy_class,
+      deploy_opt_in: action.deploy_opt_in,
+      requires_issue_identifier: action.requires_issue_identifier
     }))
+  };
+}
+
+type StatusDatasetArrayKey =
+  keyof ControlProviderOperatorAutopilotStatusDatasetBoundsPayload['omitted_counts'];
+
+function cloneBoundedStatusDatasetItems<TInput, TOutput>(
+  items: readonly TInput[],
+  key: StatusDatasetArrayKey,
+  priorBounds: ControlProviderOperatorAutopilotStatusDatasetBoundsPayload | undefined,
+  boundStatusDataset: boolean,
+  cloneItem: (item: TInput) => TOutput
+): { items: TOutput[]; omitted: number } {
+  const omittedFromCurrent = boundStatusDataset
+    ? Math.max(0, items.length - OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT)
+    : 0;
+  const priorOmitted = boundStatusDataset ? Math.max(0, priorBounds?.omitted_counts[key] ?? 0) : 0;
+  return {
+    items: (boundStatusDataset ? items.slice(-OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT) : items).map(
+      cloneItem
+    ),
+    omitted: priorOmitted + omittedFromCurrent
+  };
+}
+
+function cloneStatusTextField(value: string | null, boundStatusDataset: boolean): string | null {
+  if (!boundStatusDataset || value === null || value.length <= OPERATOR_AUTOPILOT_STATUS_TEXT_FIELD_LIMIT) {
+    return value;
+  }
+  const omitted = value.length - OPERATOR_AUTOPILOT_STATUS_TEXT_FIELD_LIMIT;
+  return `${value.slice(
+    0,
+    OPERATOR_AUTOPILOT_STATUS_TEXT_FIELD_LIMIT
+  )}\n[truncated ${omitted} chars; full output remains in operator-autopilot execution audit]`;
+}
+
+function buildStatusDatasetBounds(
+  omittedCounts: ControlProviderOperatorAutopilotStatusDatasetBoundsPayload['omitted_counts']
+): ControlProviderOperatorAutopilotStatusDatasetBoundsPayload {
+  return {
+    limit: OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT,
+    truncated: Object.values(omittedCounts).some((count) => count > 0),
+    omitted_counts: omittedCounts
   };
 }

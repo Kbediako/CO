@@ -5,8 +5,14 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { EnvironmentPaths } from '../src/cli/run/environment.js';
-import { createProviderWorkflowConfigStore } from '../src/cli/control/providerWorkflowConfigStore.js';
+import {
+  cloneProviderWorkflowStatusPayload,
+  createProviderWorkflowConfigStore,
+  OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT,
+  OPERATOR_AUTOPILOT_STATUS_TEXT_FIELD_LIMIT
+} from '../src/cli/control/providerWorkflowConfigStore.js';
 import { REPO_CONFIG_PATH_ENV_KEY } from '../src/cli/config/userConfig.js';
+import type { ProviderOperatorAutopilotResult } from '../src/cli/control/providerOperatorAutopilot.js';
 import { logger } from '../src/logger.js';
 
 let workspaceRoot: string;
@@ -221,7 +227,33 @@ describe('providerWorkflowConfigStore', () => {
   });
 
   it('returns defensive copies from its public state accessors', async () => {
-    await writeRepoConfig(buildValidProviderConfig('v1'));
+    const providerConfig = buildValidProviderConfig('v1');
+    const metadata = (providerConfig.pipelines as Array<{ metadata: Record<string, unknown> }>)[0]!
+      .metadata;
+    metadata.operator_autopilot = {
+      ...(metadata.operator_autopilot as Record<string, unknown>),
+      post_merge_rollout: {
+        enabled: true,
+        summary: 'Merge closeout completed; local rollout follow-up may still be required.',
+        execution: {
+          enabled: true,
+          actions: [
+            {
+              id: 'rollout-main',
+              enabled: true,
+              order: 1,
+              runner: 'npm_script',
+              script: 'rollout:main',
+              args: ['--issue', '{{issue.identifier}}'],
+              supported_platforms: ['darwin'],
+              deploy_class: true,
+              deploy_opt_in: true
+            }
+          ]
+        }
+      }
+    };
+    await writeRepoConfig(providerConfig);
     const store = createProviderWorkflowConfigStore({
       env: buildEnv(workspaceRoot),
       runDir: join(workspaceRoot, '.runs', 'local-mcp', 'cli', 'control-host'),
@@ -231,6 +263,12 @@ describe('providerWorkflowConfigStore', () => {
     const bootstrapped = await store.bootstrap();
     bootstrapped.status = 'reload_failed';
     bootstrapped.last_error = 'mutated bootstrap state';
+    const bootstrappedExecution = bootstrapped.operator_autopilot?.post_merge_rollout
+      .execution as {
+      actions: Array<{ args: string[]; supported_platforms: string[] }>;
+    };
+    bootstrappedExecution.actions[0]!.args[0] = 'mutated-bootstrap-arg';
+    bootstrappedExecution.actions[0]!.supported_platforms.push('linux');
 
     expect(store.snapshot()).toMatchObject({
       status: 'ready',
@@ -240,10 +278,25 @@ describe('providerWorkflowConfigStore', () => {
 
     const snapshotted = store.snapshot();
     snapshotted.pipeline_id = 'mutated-pipeline-id';
+    const snapshottedExecution = snapshotted.operator_autopilot?.post_merge_rollout
+      .execution as {
+      actions: Array<{ args: string[]; supported_platforms: string[] }>;
+    };
+    snapshottedExecution.actions[0]!.args.push('mutated-snapshot-arg');
 
     expect(store.snapshot()).toMatchObject({
       status: 'ready',
       pipeline_id: 'provider-linear-worker'
+    });
+    expect(
+      (
+        store.snapshot().operator_autopilot?.post_merge_rollout.execution as {
+          actions: Array<{ args: string[]; supported_platforms: string[] }>;
+        }
+      ).actions[0]
+    ).toMatchObject({
+      args: ['--issue', '{{issue.identifier}}'],
+      supported_platforms: ['darwin']
     });
 
     await writeRepoConfig('{ invalid json');
@@ -624,6 +677,112 @@ describe('providerWorkflowConfigStore', () => {
     ).toBe(true);
   });
 
+  it('bounds operator autopilot last-result history before exposing status snapshots', async () => {
+    await writeRepoConfig(buildValidProviderConfig('v1'));
+    const store = createProviderWorkflowConfigStore({
+      env: buildEnv(workspaceRoot),
+      runDir: join(workspaceRoot, '.runs', 'local-mcp', 'cli', 'control-host'),
+      pipelineId: 'provider-linear-worker'
+    });
+
+    await store.bootstrap();
+    store.recordOperatorAutopilotResult(
+      buildLargeOperatorAutopilotResult(OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT + 25)
+    );
+
+    const operationalLastResult = store.snapshot().operator_autopilot?.last_result;
+    expect(operationalLastResult?.actions).toHaveLength(
+      OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT + 25
+    );
+    expect(operationalLastResult?.backlog_promotion_snapshots).toHaveLength(
+      OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT + 25
+    );
+    expect(operationalLastResult?.status_dataset_bounds).toBeUndefined();
+
+    const lastResult = cloneProviderWorkflowStatusPayload(store.snapshot()).operator_autopilot
+      ?.last_result;
+    expect(lastResult?.actions).toHaveLength(OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT);
+    expect(lastResult?.holds).toHaveLength(OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT);
+    expect(lastResult?.pending_actions).toHaveLength(
+      OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT + 25
+    );
+    expect(lastResult?.terminal_blocker_advisories).toHaveLength(
+      OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT
+    );
+    expect(lastResult?.resolved_actions).toHaveLength(OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT);
+    expect(lastResult?.lifecycle_records).toHaveLength(OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT);
+    expect(lastResult?.local_rollout_execution_attempts).toHaveLength(
+      OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT
+    );
+    expect(lastResult?.backlog_promotion_snapshots).toHaveLength(
+      OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT
+    );
+    expect(lastResult?.backlog_promotion_snapshot_retention_records).toHaveLength(
+      OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT
+    );
+    expect(lastResult?.actions[0]?.issue_identifier).toBe('CO-25');
+    expect(lastResult?.status_dataset_bounds).toEqual({
+      limit: OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT,
+      truncated: true,
+      omitted_counts: {
+        actions: 25,
+        holds: 25,
+        pending_actions: 0,
+        terminal_blocker_advisories: 25,
+        resolved_actions: 25,
+        lifecycle_records: 25,
+        local_rollout_execution_attempts: 25,
+        backlog_promotion_snapshots: 25,
+        backlog_promotion_snapshot_retention_records: 25
+      }
+    });
+
+    const snapshotted = store.snapshot().operator_autopilot?.last_result;
+    expect(snapshotted?.actions).toHaveLength(
+      OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT + 25
+    );
+    const snapshottedStatus = cloneProviderWorkflowStatusPayload(store.snapshot()).operator_autopilot
+      ?.last_result;
+    expect(snapshottedStatus?.status_dataset_bounds?.omitted_counts.actions).toBe(25);
+    expect(snapshottedStatus?.actions).toHaveLength(OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT);
+    expect(snapshottedStatus?.pending_actions).toHaveLength(
+      OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT + 25
+    );
+    expect(
+      snapshottedStatus?.local_rollout_execution_attempts?.[0]?.stdout
+    ).toContain('[truncated ');
+    expect(
+      snapshottedStatus?.local_rollout_execution_attempts?.[0]?.stdout?.length ?? 0
+    ).toBeLessThan(OPERATOR_AUTOPILOT_STATUS_TEXT_FIELD_LIMIT + 120);
+
+    await writeRepoConfig(buildValidProviderConfig('v2'));
+    const refreshed = await store.refresh();
+    expect(refreshed.operator_autopilot?.last_result?.actions).toHaveLength(
+      OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT + 25
+    );
+    expect(refreshed.operator_autopilot?.last_result?.status_dataset_bounds).toBeUndefined();
+    const directStatus = await store.refreshStatus!();
+    expect(directStatus.operator_autopilot?.last_result?.actions).toHaveLength(
+      OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT
+    );
+    expect(directStatus.operator_autopilot?.last_result?.status_dataset_bounds?.omitted_counts).toMatchObject({
+      actions: 25,
+      pending_actions: 0,
+      local_rollout_execution_attempts: 25,
+      backlog_promotion_snapshot_retention_records: 25
+    });
+    const refreshedStatus = cloneProviderWorkflowStatusPayload(refreshed);
+    expect(refreshedStatus.operator_autopilot?.last_result?.status_dataset_bounds?.omitted_counts).toMatchObject({
+      actions: 25,
+      pending_actions: 0,
+      local_rollout_execution_attempts: 25,
+      backlog_promotion_snapshot_retention_records: 25
+    });
+    expect(refreshedStatus.operator_autopilot?.last_result?.actions).toHaveLength(
+      OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT
+    );
+  });
+
   it('retries a failed revision when the config is repaired without metadata change', async () => {
     await writeRepoConfig(buildValidProviderConfig('v1'));
     const store = createProviderWorkflowConfigStore({
@@ -961,5 +1120,167 @@ function buildValidProviderConfig(
         ]
       }
     ]
+  };
+}
+
+function buildLargeOperatorAutopilotResult(count: number): ProviderOperatorAutopilotResult {
+  return {
+    recorded_at: '2026-04-25T18:20:00.000Z',
+    status: 'acted',
+    summary: `Generated ${count} synthetic operator-autopilot records.`,
+    error: null,
+    actions: Array.from({ length: count }, (_, index) => ({
+      kind: 'backlog_promotion',
+      issue_id: `lin-issue-${index}`,
+      issue_identifier: `CO-${index}`,
+      reason: 'backlog_head_promoted',
+      summary: `Promoted CO-${index} to Ready.`,
+      transition: {
+        status: 'transitioned',
+        attempted_at: `2026-04-25T18:${String(index % 60).padStart(2, '0')}:00.000Z`,
+        previous_state: 'Backlog',
+        target_state: 'Ready',
+        issue_state: 'Ready',
+        issue_state_type: 'unstarted',
+        issue_updated_at: `2026-04-25T18:${String(index % 60).padStart(2, '0')}:01.000Z`,
+        force_path_used: index % 2 === 0,
+        error: null
+      },
+      action_required_reasons: []
+    })),
+    holds: Array.from({ length: count }, (_, index) => ({
+      kind: 'review_handoff_rework',
+      issue_id: `lin-hold-${index}`,
+      issue_identifier: `CO-HOLD-${index}`,
+      issue_state: 'In Review',
+      issue_state_type: 'started',
+      issue_updated_at: `2026-04-25T17:${String(index % 60).padStart(2, '0')}:00.000Z`,
+      promotion_attempted_at: null,
+      promotion_issue_updated_at: null,
+      force_path_used: false,
+      reason: 'review_handoff_missing_pr',
+      summary: `Held CO-HOLD-${index}.`,
+      action_required_reasons: ['required_checks_query_failed']
+    })),
+    pending_actions: Array.from({ length: count }, (_, index) => ({
+      kind: 'local_rollout',
+      action_instance_id: `local_rollout:pending-${index}`,
+      issue_id: `lin-pending-${index}`,
+      issue_identifier: `CO-PENDING-${index}`,
+      summary: `Local rollout pending for CO-PENDING-${index}.`,
+      merge_closeout_recorded_at: `2026-04-25T16:${String(index % 60).padStart(2, '0')}:00.000Z`,
+      merge_closeout_reason: 'merged_and_transitioned_done',
+      shared_root_status: 'reconciled',
+      linear_transition_status: 'transitioned',
+      executable_action_ids: [`rollout-${index}`],
+      lifecycle_state: 'pending',
+      lifecycle_actor: null,
+      lifecycle_reason: null,
+      lifecycle_recorded_at: null
+    })),
+    terminal_blocker_advisories: Array.from({ length: count }, (_, index) => ({
+      kind: 'terminal_blocker_cleanup',
+      issue_id: `lin-advisory-${index}`,
+      issue_identifier: `CO-ADVISORY-${index}`,
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: `2026-04-25T15:${String(index % 60).padStart(2, '0')}:00.000Z`,
+      blockers: [
+        {
+          id: `lin-blocker-${index}`,
+          identifier: `CO-BLOCKER-${index}`,
+          state: 'Done',
+          state_type: 'completed'
+        }
+      ],
+      canonical_owner_hints: ['codex-orchestrator:canonical-owner-key=test-owner'],
+      duplicate_hints: [`outbound:duplicate:CO-BLOCKER-${index}:Done`],
+      recommended_action: 'duplicate_cleanup',
+      summary: `Terminal blocker advisory for CO-ADVISORY-${index}.`
+    })),
+    resolved_actions: Array.from({ length: count }, (_, index) => ({
+      kind: 'local_rollout',
+      action_instance_id: `local_rollout:resolved-${index}`,
+      issue_id: `lin-resolved-${index}`,
+      issue_identifier: `CO-RESOLVED-${index}`,
+      summary: `Local rollout resolved for CO-RESOLVED-${index}.`,
+      merge_closeout_recorded_at: `2026-04-25T14:${String(index % 60).padStart(2, '0')}:00.000Z`,
+      merge_closeout_reason: 'merged_and_transitioned_done',
+      shared_root_status: 'reconciled',
+      linear_transition_status: 'transitioned',
+      executable_action_ids: [`rollout-resolved-${index}`],
+      lifecycle_state: 'cleared',
+      lifecycle_actor: 'operator-autopilot',
+      lifecycle_reason: 'completed',
+      lifecycle_recorded_at: `2026-04-25T14:${String(index % 60).padStart(2, '0')}:30.000Z`
+    })),
+    lifecycle_records: Array.from({ length: count }, (_, index) => ({
+      action_instance_id: `local_rollout:lifecycle-${index}`,
+      kind: 'local_rollout',
+      issue_id: `lin-lifecycle-${index}`,
+      issue_identifier: `CO-LIFECYCLE-${index}`,
+      state: 'cleared',
+      actor: 'operator-autopilot',
+      reason: 'completed',
+      recorded_at: `2026-04-25T13:${String(index % 60).padStart(2, '0')}:00.000Z`,
+      source: 'operator-autopilot'
+    })),
+    local_rollout_execution_attempts: Array.from({ length: count }, (_, index) => ({
+      record_kind: 'terminal',
+      action_instance_id: `local_rollout:attempt-${index}`,
+      action_id: `rollout-attempt-${index}`,
+      issue_id: `lin-attempt-${index}`,
+      issue_identifier: `CO-ATTEMPT-${index}`,
+      preflight: {
+        status: 'passed',
+        reason: null,
+        checked_at: `2026-04-25T12:${String(index % 60).padStart(2, '0')}:00.000Z`,
+        summary: 'Preflight passed.'
+      },
+      started_at: `2026-04-25T12:${String(index % 60).padStart(2, '0')}:01.000Z`,
+      ended_at: `2026-04-25T12:${String(index % 60).padStart(2, '0')}:30.000Z`,
+      terminal_state: 'succeeded',
+      reason: null,
+      summary: `Rollout attempt ${index} succeeded.`,
+      command: {
+        runner: 'codex_orchestrator',
+        command: 'codex-orchestrator',
+        args: ['linear', 'local-rollout'],
+        cwd: workspaceRoot,
+        timeout_ms: 900000
+      },
+      exit_code: 0,
+      stdout: 'o'.repeat(OPERATOR_AUTOPILOT_STATUS_TEXT_FIELD_LIMIT + 512),
+      stderr: 'e'.repeat(OPERATOR_AUTOPILOT_STATUS_TEXT_FIELD_LIMIT + 256)
+    })),
+    backlog_promotion_snapshots: Array.from({ length: count }, (_, index) => ({
+      issue_id: `lin-snapshot-${index}`,
+      issue_identifier: `CO-SNAPSHOT-${index}`,
+      target_state: 'Ready',
+      attempted_at: `2026-04-25T11:${String(index % 60).padStart(2, '0')}:00.000Z`,
+      issue_updated_at: `2026-04-25T11:${String(index % 60).padStart(2, '0')}:01.000Z`,
+      force_path_used: false,
+      untracked_cycles: index % 3
+    })),
+    backlog_promotion_snapshot_retention_records: Array.from({ length: count }, (_, index) => ({
+      issue_id: `lin-retention-${index}`,
+      issue_identifier: `CO-RETENTION-${index}`,
+      target_state: 'Ready',
+      attempted_at: `2026-04-25T10:${String(index % 60).padStart(2, '0')}:00.000Z`,
+      issue_updated_at: `2026-04-25T10:${String(index % 60).padStart(2, '0')}:01.000Z`,
+      evaluated_at: `2026-04-25T10:${String(index % 60).padStart(2, '0')}:30.000Z`,
+      decision: 'retained',
+      reason: 'temporarily_untracked',
+      age_ms: 60000 + index,
+      untracked_cycles: index % 3,
+      max_untracked_cycles: 3,
+      issue_state: 'Backlog',
+      issue_state_type: 'backlog',
+      issue_archived_at: null,
+      issue_trashed: null,
+      issue_observed_updated_at: `2026-04-25T10:${String(index % 60).padStart(2, '0')}:01.000Z`,
+      terminal_state_evidence: false,
+      force_path_used: false
+    }))
   };
 }
