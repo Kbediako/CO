@@ -195,7 +195,7 @@ describe('archive automation workflow required checks', () => {
     const run = dispatchStep.run ?? '';
 
     const pendingStatus = run.indexOf('set_core_lane_status "pending"');
-    const runDiscovery = run.indexOf('RUN_ID="$(find_dispatched_run_id)"');
+    const runDiscovery = run.indexOf('CANDIDATE_RUN_ID="$(find_dispatched_run_id)"');
     const discoveryStatusCapture = run.indexOf('RUN_DISCOVERY_STATUS=$?', runDiscovery);
     const terminalErrorStatus = run.indexOf(
       'set_core_lane_status "error" "Core Lane run discovery failed for archive PR #${PR_NUMBER}."',
@@ -205,9 +205,9 @@ describe('archive automation workflow required checks', () => {
       'set_core_lane_status "error" "Dispatched Core Lane run was not found."'
     );
     const guardedDiscovery = [
-      'for _ in $(seq 1 40); do',
+      'for attempt in $(seq 1 40); do',
       '  set +e',
-      '  RUN_ID="$(find_dispatched_run_id)"',
+      '  CANDIDATE_RUN_ID="$(find_dispatched_run_id)"',
       '  RUN_DISCOVERY_STATUS=$?',
       '  set -e'
     ].join('\n');
@@ -221,7 +221,7 @@ describe('archive automation workflow required checks', () => {
     expect(terminalErrorStatus).toBeLessThan(notFoundStatus);
     expect(run).toContain('if [ "${RUN_DISCOVERY_STATUS}" -ne 0 ]; then');
     expect(run).toContain(
-      'Failed to discover dispatched Core Lane run for archive PR #${PR_NUMBER}; gh run list exited ${RUN_DISCOVERY_STATUS}.'
+      'Failed to discover an unambiguous dispatched Core Lane run for archive PR #${PR_NUMBER}; discovery exited ${RUN_DISCOVERY_STATUS}.'
     );
     expect(run).toContain('exit "${RUN_DISCOVERY_STATUS}"');
   });
@@ -233,7 +233,7 @@ describe('archive automation workflow required checks', () => {
 
     const baselineCapture = run.indexOf('BASELINE_RUN_IDS="$(list_matching_run_ids)"');
     const dispatch = run.indexOf('gh workflow run core-lane.yml');
-    const runDiscovery = run.indexOf('RUN_ID="$(find_dispatched_run_id)"');
+    const runDiscovery = run.indexOf('CANDIDATE_RUN_ID="$(find_dispatched_run_id)"');
 
     expect(run).toContain('list_matching_run_ids()');
     expect(run).toContain('find_dispatched_run_id()');
@@ -244,6 +244,29 @@ describe('archive automation workflow required checks', () => {
     expect(run).toContain('candidates+=("${run_id}")');
     expect(run).toContain('Multiple new Core Lane workflow_dispatch runs matched');
     expect(run).not.toContain('| head -n 1');
+  });
+
+  it('does not stop discovery on the first lone post-baseline run candidate', async () => {
+    const workflow = await readWorkflow('.github/workflows/archive-automation-base.yml');
+    const dispatchStep = getStep(workflow, 'archive', 'Dispatch Core Lane for archive PR');
+    const run = dispatchStep.run ?? '';
+
+    const runDiscovery = run.indexOf('CANDIDATE_RUN_ID="$(find_dispatched_run_id)"');
+    const candidateCapture = run.indexOf('RUN_ID="${CANDIDATE_RUN_ID}"', runDiscovery);
+    const discoveryLoopEnd = run.indexOf('done', candidateCapture);
+    const notFoundStatus = run.indexOf(
+      'set_core_lane_status "error" "Dispatched Core Lane run was not found."'
+    );
+
+    expect(runDiscovery).toBeGreaterThan(run.indexOf('gh workflow run core-lane.yml'));
+    expect(candidateCapture).toBeGreaterThan(runDiscovery);
+    expect(discoveryLoopEnd).toBeGreaterThan(candidateCapture);
+    expect(notFoundStatus).toBeGreaterThan(discoveryLoopEnd);
+    expect(run).toContain('for attempt in $(seq 1 40); do');
+    expect(run).toContain('if [ "${attempt}" -lt 40 ]; then');
+    expect(run).toContain('sleep 15');
+    expect(run).not.toContain('if [ -n "${RUN_ID}" ]; then\n    break');
+    expect(run).toContain('Multiple new Core Lane workflow_dispatch runs matched');
   });
 
   it('grants reusable archive callers permission to dispatch Core Lane', async () => {

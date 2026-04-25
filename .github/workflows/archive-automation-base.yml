@@ -275,22 +275,25 @@ jobs:
           fi
 
           RUN_ID=""
-          for _ in $(seq 1 40); do
+          for attempt in $(seq 1 40); do
             set +e
-            RUN_ID="$(find_dispatched_run_id)"
+            CANDIDATE_RUN_ID="$(find_dispatched_run_id)"
             RUN_DISCOVERY_STATUS=$?
             set -e
 
             if [ "${RUN_DISCOVERY_STATUS}" -ne 0 ]; then
               set_core_lane_status "error" "Core Lane run discovery failed for archive PR #${PR_NUMBER}." "${ACTIONS_URL}"
-              echo "::error::Failed to discover dispatched Core Lane run for archive PR #${PR_NUMBER}; gh run list exited ${RUN_DISCOVERY_STATUS}."
+              echo "::error::Failed to discover an unambiguous dispatched Core Lane run for archive PR #${PR_NUMBER}; discovery exited ${RUN_DISCOVERY_STATUS}."
               exit "${RUN_DISCOVERY_STATUS}"
             fi
 
-            if [ -n "${RUN_ID}" ]; then
-              break
+            if [ -n "${CANDIDATE_RUN_ID}" ]; then
+              RUN_ID="${CANDIDATE_RUN_ID}"
             fi
-            sleep 15
+
+            if [ "${attempt}" -lt 40 ]; then
+              sleep 15
+            fi
           done
 
           if [ -z "${RUN_ID}" ]; then
