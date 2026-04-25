@@ -5321,6 +5321,33 @@ function preserveProviderLinearWorkerLaunchReservationLedgerIdentity(
   ) {
     return hydrated;
   }
+  if (hydrated.stale_invalidation_candidate) {
+    return {
+      ...existing,
+      status: hydrated.status,
+      manifest_path: hydrated.manifest_path,
+      artifact_root: hydrated.artifact_root,
+      log_path: hydrated.log_path,
+      summary: hydrated.summary,
+      summary_recorded_at: hydrated.summary_recorded_at,
+      guardrails_required: hydrated.guardrails_required,
+      guardrails_required_source: hydrated.guardrails_required_source,
+      guardrail_command_count: hydrated.guardrail_command_count,
+      lane_workspace_path: hydrated.lane_workspace_path,
+      patch_artifact_path: hydrated.patch_artifact_path,
+      patch_bytes: hydrated.patch_bytes,
+      runtime_mode: hydrated.runtime_mode,
+      runtime_provider: hydrated.runtime_provider,
+      heartbeat_at: hydrated.heartbeat_at,
+      heartbeat_stale_after_seconds: hydrated.heartbeat_stale_after_seconds,
+      runner_pid: hydrated.runner_pid,
+      runner_alive: hydrated.runner_alive,
+      runtime_event: hydrated.runtime_event,
+      runtime_event_at: hydrated.runtime_event_at,
+      stale_invalidation_candidate: hydrated.stale_invalidation_candidate,
+      stale_invalidation_reason: hydrated.stale_invalidation_reason
+    };
+  }
   return existing;
 }
 

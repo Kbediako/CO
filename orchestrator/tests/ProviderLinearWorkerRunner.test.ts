@@ -4959,6 +4959,19 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(refreshed?.child_lanes?.[0]?.summary).toContain('stale invalidation candidate');
     expect(refreshed?.child_lanes?.[0]?.summary).toContain('providerLinearChildLaneRunner pid 4242 is not live');
     expect(refreshed?.child_lanes?.[0]?.summary).toContain('no proof/patch output is present');
+    const ledgerAfterHydration = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_CHILD_LANES_FILENAME), 'utf8')
+    ) as Array<Record<string, unknown>>;
+    expect(ledgerAfterHydration[0]).toMatchObject({
+      run_id: 'launching-docs-packet',
+      status: 'stale_invalidation_candidate',
+      manifest_path: join(matchingChildRunDir, 'manifest.json'),
+      artifact_root: matchingChildRunDir,
+      runtime_mode: 'appserver',
+      runner_pid: 4242,
+      stale_invalidation_candidate: true,
+      stale_invalidation_reason: 'post_startup_no_output_heartbeat_stale_runner_dead'
+    });
     expect(refreshed?.progress).toMatchObject({
       phase: 'child_lane',
       status: 'waiting',
@@ -4966,6 +4979,42 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       recovery_recommendation: 'inspect_child_lane'
     });
     expect(refreshed?.progress?.summary).toContain('stale invalidation candidate');
+
+    await transactProviderLinearWorkerChildLanes(runDir, async (records) => ({
+      records: records.map((record) =>
+        record.stream === 'docs-packet'
+          ? {
+              ...record,
+              decision: 'invalidated',
+              decision_at: '2026-04-17T00:36:10.000Z',
+              decision_reason: 'Parent invalidated child lane output.'
+            }
+          : record
+      ),
+      result: undefined
+    }));
+    const invalidated = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-04-17T00:36:30.000Z',
+      async (path, proof) => await writeFile(path, JSON.stringify(proof, null, 2), 'utf8'),
+      { CODEX_HOME: tempRoot! },
+      {
+        skipSessionLogHydration: true,
+        isProcessAlive: (pid) => pid !== 4242
+      }
+    );
+    expect(invalidated?.child_lanes?.[0]).toMatchObject({
+      run_id: 'launching-docs-packet',
+      status: 'invalidated',
+      decision: 'invalidated',
+      runtime_mode: 'appserver',
+      runner_pid: 4242,
+      stale_invalidation_candidate: true,
+      stale_invalidation_reason: 'post_startup_no_output_heartbeat_stale_runner_dead'
+    });
+    expect(invalidated?.child_lanes?.[0]?.summary).toContain('stale invalidation candidate');
+    expect(invalidated?.child_lanes?.[0]?.summary).toContain('providerLinearChildLaneRunner pid 4242 is not live');
   });
 
   it('backfills appserver session telemetry into refreshed provider proofs', async () => {
