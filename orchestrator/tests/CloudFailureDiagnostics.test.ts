@@ -31,6 +31,36 @@ describe('diagnoseCloudFailure', () => {
       ],
       ['Error: environment env-missing not found', 'configuration', 'environment_not_found'],
       [
+        "Configured CODEX_CLOUD_ENV_ID 'env-credential' is not visible to codex cloud: environment 'env-credential' not found",
+        'configuration',
+        'environment_not_found'
+      ],
+      [
+        'Error: environment env-other not found; forbidden for active account',
+        'credentials',
+        'auth_mismatch'
+      ],
+      [
+        'Error: environment env-other not found; HTTP 400 missing_github_connector_link: GitHub connection not found for user',
+        'credentials',
+        'cloud_connector_auth_drift'
+      ],
+      [
+        'Error: environment env-other not found; cloud execution denied for this branch',
+        'credentials',
+        'cloud_denial'
+      ],
+      [
+        'Error: environment env-other not found; rate limit exceeded',
+        'execution',
+        'quota_rate_limit'
+      ],
+      [
+        'Error: environment env-other not found; network timeout while contacting the endpoint',
+        'connectivity',
+        'network_connectivity'
+      ],
+      [
         "Configured CODEX_CLOUD_ENV_ID 'env-missing' could not be verified by codex cloud before codex cloud exec: HTTP 503 service unavailable",
         'connectivity',
         'network_connectivity'

@@ -233,7 +233,8 @@ function findMatchedCloudFailureRule(
 function maskEnvConfigIdentifierValues(normalizedSignal: string): string {
   return normalizedSignal
     .replace(/\bcodex_cloud_env_id\s+(?:['"][^'"]+['"]|[^\s'"]+)/gu, 'codex_cloud_env_id <env-id>')
-    .replace(/\bcodex cloud env id\s+(?:['"][^'"]+['"]|[^\s'"]+)/gu, 'codex cloud env id <env-id>');
+    .replace(/\bcodex cloud env id\s+(?:['"][^'"]+['"]|[^\s'"]+)/gu, 'codex cloud env id <env-id>')
+    .replace(/\benvironment\s+(?:['"][^'"]+['"]|[^\s'"]+)\s+not\s+found\b/gu, 'environment <env-id> not found');
 }
 
 function hasStrongConnectivityContext(signal: string): boolean {
@@ -257,28 +258,16 @@ function matchCloudFailureRule(signal: string): CloudFailureRule | null {
   const normalized = normalizeCloudFailureSignal(signal);
   const envConfigRule = findCloudFailureRule('env_config');
   if (isEnvironmentNotFoundSignal(signal)) {
+    const specificRule = matchSpecificWrappedFailureRule(signal, lowercase, normalized);
+    if (specificRule) {
+      return specificRule;
+    }
     return findCloudFailureRule('environment_not_found');
   }
   if (envConfigRule && matchesCloudFailureRule(envConfigRule, lowercase, normalized)) {
-    const maskedSignal = maskEnvConfigIdentifierValues(lowercase);
-    for (const diagnosticCategory of [
-      'cloud_connector_auth_drift',
-      'cloud_denial',
-      'auth_mismatch',
-      'quota_rate_limit'
-    ] as const) {
-      const rule = findMatchedCloudFailureRule(diagnosticCategory, maskedSignal);
-      if (rule) {
-        return rule;
-      }
-    }
-    const connectivityRule = findCloudFailureRule('network_connectivity');
-    if (
-      connectivityRule &&
-      matchesCloudFailureRule(connectivityRule, lowercase, normalized) &&
-      hasStrongConnectivityContext(signal)
-    ) {
-      return connectivityRule;
+    const specificRule = matchSpecificWrappedFailureRule(signal, lowercase, normalized);
+    if (specificRule) {
+      return specificRule;
     }
     const envUnavailableRule = findCloudFailureRule('environment_unavailable');
     if (envUnavailableRule && matchesCloudFailureRule(envUnavailableRule, lowercase, normalized)) {
@@ -286,6 +275,34 @@ function matchCloudFailureRule(signal: string): CloudFailureRule | null {
     }
   }
   return CLOUD_FAILURE_RULES.find((rule) => matchesCloudFailureRule(rule, lowercase, normalized)) ?? null;
+}
+
+function matchSpecificWrappedFailureRule(
+  signal: string,
+  lowercase: string,
+  normalized: string
+): CloudFailureRule | null {
+  const maskedSignal = maskEnvConfigIdentifierValues(lowercase);
+  for (const diagnosticCategory of [
+    'cloud_connector_auth_drift',
+    'cloud_denial',
+    'auth_mismatch',
+    'quota_rate_limit'
+  ] as const) {
+    const rule = findMatchedCloudFailureRule(diagnosticCategory, maskedSignal);
+    if (rule) {
+      return rule;
+    }
+  }
+  const connectivityRule = findCloudFailureRule('network_connectivity');
+  if (
+    connectivityRule &&
+    matchesCloudFailureRule(connectivityRule, lowercase, normalized) &&
+    hasStrongConnectivityContext(signal)
+  ) {
+    return connectivityRule;
+  }
+  return null;
 }
 
 function normalizeCloudFailureSignal(signal: string): string {

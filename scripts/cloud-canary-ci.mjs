@@ -69,6 +69,14 @@ function authMismatchDiagnosis() {
   };
 }
 
+function cloudDenialDiagnosis() {
+  return {
+    category: 'credentials',
+    diagnostic_category: 'cloud_denial',
+    guidance: 'Codex Cloud rejected this run; verify the configured cloud environment, branch, and account permission for cloud execution.'
+  };
+}
+
 function quotaRateLimitDiagnosis() {
   return {
     category: 'execution',
@@ -156,6 +164,18 @@ function hasAuthMismatchSignal(normalizedSignal) {
   );
 }
 
+function hasCloudDenialSignal(normalizedSignal) {
+  return (
+    normalizedSignal.includes('cloud denial') ||
+    normalizedSignal.includes('cloud-denial') ||
+    normalizedSignal.includes('cloud_denial') ||
+    normalizedSignal.includes('cloud denied') ||
+    normalizedSignal.includes('not allowed in cloud') ||
+    normalizedSignal.includes('cloud access denied') ||
+    normalizedSignal.includes('cloud execution denied')
+  );
+}
+
 function hasQuotaRateLimitSignal(normalizedSignal) {
   return (
     normalizedSignal.includes('quota_rate_limit') ||
@@ -188,7 +208,8 @@ function hasConnectivityStatusCodeContext(normalizedSignal) {
 function maskEnvConfigIdentifierValues(normalizedSignal) {
   return normalizedSignal
     .replace(/\bcodex_cloud_env_id\s+(?:['"][^'"]+['"]|[^\s'"]+)/gu, 'codex_cloud_env_id <env-id>')
-    .replace(/\bcodex cloud env id\s+(?:['"][^'"]+['"]|[^\s'"]+)/gu, 'codex cloud env id <env-id>');
+    .replace(/\bcodex cloud env id\s+(?:['"][^'"]+['"]|[^\s'"]+)/gu, 'codex cloud env id <env-id>')
+    .replace(/\benvironment\s+(?:['"][^'"]+['"]|[^\s'"]+)\s+not\s+found\b/gu, 'environment <env-id> not found');
 }
 
 function hasStrongConnectivityContext(normalizedSignal) {
@@ -237,14 +258,12 @@ function hasConnectivitySignal(normalizedSignal, { includeStatusCodes = true, re
 export function classifyFailure(signal) {
   const normalized = normalizeFailureSignal(signal);
   const masked = maskEnvConfigIdentifierValues(normalized);
-  if (hasEnvironmentNotFoundSignal(normalized)) {
-    return configuredEnvIssueDiagnosis(
-      'environment_not_found',
-      'CODEX_CLOUD_ENV_ID is configured, but Codex Cloud could not resolve it. Fix the env id or choose an environment visible to this account.'
-    );
-  }
+  const hasEnvironmentNotFound = hasEnvironmentNotFoundSignal(normalized);
   if (hasCloudConnectorAuthDriftSignal(masked)) {
     return cloudConnectorAuthDriftDiagnosis();
+  }
+  if (hasCloudDenialSignal(masked)) {
+    return cloudDenialDiagnosis();
   }
   if (hasAuthMismatchSignal(masked)) {
     return authMismatchDiagnosis();
@@ -255,6 +274,12 @@ export function classifyFailure(signal) {
   const hasEnvConfig = hasEnvConfigSignal(normalized);
   if (hasConnectivitySignal(normalized, { requireStatusContext: hasEnvConfig })) {
     return networkConnectivityDiagnosis();
+  }
+  if (hasEnvironmentNotFound) {
+    return configuredEnvIssueDiagnosis(
+      'environment_not_found',
+      'CODEX_CLOUD_ENV_ID is configured, but Codex Cloud could not resolve it. Fix the env id or choose an environment visible to this account.'
+    );
   }
   if (hasEnvironmentUnavailableSignal(normalized)) {
     return configuredEnvIssueDiagnosis(

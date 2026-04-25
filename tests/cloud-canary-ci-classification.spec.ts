@@ -45,6 +45,26 @@ describe('cloud-canary-ci failure classification', () => {
         'configuration (environment_not_found)'
       ],
       [
+        'Error: environment env-other not found; forbidden for active account',
+        'credentials (auth_mismatch)'
+      ],
+      [
+        'Error: environment env-other not found; HTTP 400 missing_github_connector_link: GitHub connection not found for user',
+        'credentials (cloud_connector_auth_drift)'
+      ],
+      [
+        'Error: environment env-other not found; cloud execution denied for this branch',
+        'credentials (cloud_denial)'
+      ],
+      [
+        'Error: environment env-other not found; rate limit exceeded',
+        'execution (quota_rate_limit)'
+      ],
+      [
+        'Error: environment env-other not found; network timeout while contacting the endpoint',
+        'connectivity (network_connectivity)'
+      ],
+      [
         "Configured CODEX_CLOUD_ENV_ID 'env-503' is not visible to codex cloud: environment 'env-503' not found",
         'configuration (environment_not_found)'
       ],
