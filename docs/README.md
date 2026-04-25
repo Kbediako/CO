@@ -22,11 +22,11 @@ Codex Orchestrator is the coordination layer that glues together Codex-driven ag
 - Codex CLI sync strategy: `docs/guides/upstream-codex-cli-sync.md`.
 
 ## Current Posture
-- Current CO compatibility/adoption target: Codex CLI `0.124.0`.
-- Newer Codex CLI candidates stay evidence-gated in `docs/guides/codex-version-policy.md`.
+- Current CO-local ChatGPT-auth/appserver model posture: `gpt-5.5` / `xhigh` on Codex CLI `0.125.0` when live access smoke passes.
+- Release-facing cloud/downstream pins remain evidence-gated in `docs/guides/codex-version-policy.md`; the exact CO-352 cloud blocker is the configured environment id not found.
 - Current model posture is `gpt-5.5` / `xhigh` when available in ChatGPT-auth Codex sessions; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
-- Portable packaged/generated defaults still seed `gpt-5.4` / `xhigh`; CO-341 validated `gpt-5.5` on this host, while app-server `model/list` still reports `gpt-5.4` as the catalog default and recorded a post-build runtime-mode canary pass (`20/20` per scenario, `ready_for_default_flip=true`).
-- The marker-backed local `gpt-5.5` opt-in is non-drift for `codex-orchestrator doctor` only when `codex debug models` verifies current model access, and additive defaults preserve matching prior `gpt-5.5` role files when the top-level config carries that explicit opt-in.
+- Portable packaged/generated defaults still keep `gpt-5.4` / `xhigh` as fallback values when `gpt-5.5`, API/cloud portability, or downstream/no-network access is not proven.
+- `codex-orchestrator doctor` treats `gpt-5.5` as non-drift when `codex debug models` verifies current model access; additive defaults keep fresh configs on portable fallback values unless `--auth-scope chatgpt` is explicitly requested after live access smoke, and they preserve compatible prior `gpt-5.5` role files without requiring extra marker metadata.
 - Local default runtime is `appserver`; keep `--runtime-mode cli` as break-glass.
 - Full posture and promotion gates live in `docs/guides/codex-version-policy.md`.
 

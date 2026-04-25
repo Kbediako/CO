@@ -218,7 +218,7 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
     }
   }, 15000);
 
-  it('accepts smoke-backed local gpt-5.5 model opt-ins', async () => {
+  it('accepts access-verified local gpt-5.5 models', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
     const originalDebugModelsJson = process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON;
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
@@ -233,9 +233,6 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
           'model = "gpt-5.5"',
           'review_model = "gpt-5.5"',
           'model_reasoning_effort = "xhigh"',
-          '',
-          '[codex_orchestrator]',
-          'local_model_opt_in = "gpt-5.5"',
           '',
           '[agents]',
           'max_threads = 12'
@@ -252,10 +249,10 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
 
       const summary = formatDoctorSummary(result).join('\n');
       expect(summary).toContain(
-        'model: ok (actual: gpt-5.5, expected: gpt-5.4 (or verified local opt-in: gpt-5.5))'
+        'model: ok (actual: gpt-5.5, expected: gpt-5.5 when ChatGPT-auth access is verified (fallback: gpt-5.4))'
       );
       expect(summary).toContain(
-        'review_model: ok (actual: gpt-5.5, expected: gpt-5.4 (or verified local opt-in: gpt-5.5))'
+        'review_model: ok (actual: gpt-5.5, expected: gpt-5.5 when ChatGPT-auth access is verified (fallback: gpt-5.4))'
       );
     } finally {
       if (originalCodexHome === undefined) {
@@ -272,7 +269,7 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
     }
   }, 15000);
 
-  it('flags legacy unmarked gpt-5.5 defaults as advisory', async () => {
+  it('accepts unmarked gpt-5.5 defaults when access is verified', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
     const originalDebugModelsJson = process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON;
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
@@ -295,16 +292,13 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
       );
 
       const result = runDoctor(process.cwd());
-      expect(result.codex_defaults.status).toBe('advisory');
-      expect(result.codex_defaults.checks.model.status).toBe('advisory');
-      expect(result.codex_defaults.checks.review_model.status).toBe('advisory');
+      expect(result.codex_defaults.status).toBe('ok');
+      expect(result.codex_defaults.checks.model.status).toBe('ok');
+      expect(result.codex_defaults.checks.review_model.status).toBe('ok');
 
       const summary = formatDoctorSummary(result).join('\n');
       expect(summary).toContain(
-        'model: advisory (actual: gpt-5.5, expected: gpt-5.4 (or verified local opt-in: gpt-5.5))'
-      );
-      expect(summary).toContain(
-        'Config model gpt-5.5 looks like a legacy CO-managed default, not a verified local opt-in'
+        'model: ok (actual: gpt-5.5, expected: gpt-5.5 when ChatGPT-auth access is verified (fallback: gpt-5.4))'
       );
     } finally {
       if (originalCodexHome === undefined) {
@@ -321,7 +315,7 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
     }
   }, 15000);
 
-  it('flags marked gpt-5.5 opt-ins when model access evidence is missing', async () => {
+  it('flags configured gpt-5.5 models when model access evidence is missing', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
     const originalDebugModelsJson = process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON;
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
@@ -337,9 +331,6 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
           'review_model = "gpt-5.5"',
           'model_reasoning_effort = "xhigh"',
           '',
-          '[codex_orchestrator]',
-          'local_model_opt_in = "gpt-5.5"',
-          '',
           '[agents]',
           'max_threads = 12'
         ].join('\n'),
@@ -353,7 +344,7 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
 
       const summary = formatDoctorSummary(result).join('\n');
       expect(summary).toContain(
-        'Configured local model opt-in gpt-5.5 is not verified by `codex debug models`'
+        'Configured local ChatGPT-auth model gpt-5.5 is not verified by `codex debug models`'
       );
     } finally {
       if (originalCodexHome === undefined) {
@@ -370,7 +361,7 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
     }
   }, 15000);
 
-  it('keeps stale local opt-in markers advisory even when portable defaults are active', async () => {
+  it('ignores stale legacy markers when portable fallback defaults are active', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
     const originalDebugModelsJson = process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON;
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
@@ -396,15 +387,13 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
       );
 
       const result = runDoctor(process.cwd());
-      expect(result.codex_defaults.status).toBe('advisory');
+      expect(result.codex_defaults.status).toBe('ok');
       expect(result.codex_defaults.checks.model.status).toBe('ok');
       expect(result.codex_defaults.checks.review_model.status).toBe('ok');
 
       const summary = formatDoctorSummary(result).join('\n');
-      expect(summary).toContain('Codex defaults advisory: advisory');
-      expect(summary).toContain(
-        'Configured local model opt-in gpt-5.5 is not verified by `codex debug models`'
-      );
+      expect(summary).toContain('Codex defaults advisory: ok');
+      expect(summary).not.toContain('local model opt-in');
     } finally {
       if (originalCodexHome === undefined) {
         delete process.env.CODEX_HOME;
@@ -1336,7 +1325,7 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
       expect(result.codex_defaults.checks.review_model.status).toBe('advisory');
       expect(result.codex_defaults.checks.review_model.actual).toBe('gpt-5.3-codex');
       expect(formatDoctorSummary(result).join('\n')).toContain(
-        'review_model: advisory (actual: gpt-5.3-codex, expected: gpt-5.4 (or verified local opt-in: gpt-5.5))'
+        'review_model: advisory (actual: gpt-5.3-codex, expected: gpt-5.5 when ChatGPT-auth access is verified (fallback: gpt-5.4))'
       );
     } finally {
       if (originalCodexHome === undefined) {

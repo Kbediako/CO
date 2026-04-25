@@ -17,7 +17,7 @@ Current CO policy:
 - Maximum active rolling cohorts: `2`
 - Maximum rolling rows: `300`
 - Eligible doc classes: `Task Packet`, `Task Mirror`, and `Report Only`
-- Declared baseline cohort: `co-175-apr-14-march-14-tasks-1164-1195`
+- Declared baseline cohorts: `co-175-apr-14-march-14-tasks-1164-1195`, `co-343-apr-25-march-25-task-packets-1311-1318`
 - Ineligible docs: Front Door, Public Guide, Repository Guide, Agent Policy, Active Guide, shipped skills, companions, templates, and uncatalogued docs
 
 Eligibility is not class-only. A stale row must match a declared baseline cohort by `last_review`, `cadence_days`, path family, and either task-number range or declared path prefix before it can move from blocking stale failures into rolling debt. This prevents a newly stale feature-lane packet from being hidden just because it is in an eligible doc class and still inside the rolling window.
@@ -265,3 +265,16 @@ CO-343 reproduced the Apr 24 current-main blocker during CO-341 validation:
 
 ### Post-refresh Disposition
 CO-343 re-homes the rolling-freshness owner metadata to live issue `CO-343`, preserves `CO-324` as historical terminal-owner evidence only, and reviews the Apr 24 stale rows directly instead of changing rolling policy. The reviewed disposition is recorded in `docs/findings/co-343-apr-24-docs-freshness-classification.md`; the exact stale spec frontmatters and registry rows are refreshed to `last_review=2026-04-24`.
+
+## Apr 25 Rolling Owner Deferral
+
+### Reproduction / Baseline Findings
+CO-352 replayed onto current `origin/main` on Apr 25 and reproduced a date-boundary freshness blocker unrelated to the CO-352 diff:
+
+- `npm run docs:freshness` reported `38` stale historical task packet/mirror rows with `last_review=2026-03-25`, `cadence_days=30`, `age_days=31`, and `overdue_days=1`.
+- The stale set contains only Task Packet and Task Mirror rows and has `0` missing registry, missing-on-disk, invalid, or uncatalogued rows.
+- `docs:freshness:maintain` reported `blocking_changed_paths=[]`; the current CO-352 diff only prepends its own task snapshot and adds the CO-352 packet/registry entries.
+- The stale lineage is the March 25 historical `1311`-`1318` task-packet/mirror set, not a public-guide, active-guide, agent-policy, skill, template, or current CO-352 packet failure.
+
+### Rolling Disposition
+CO-352 declares `co-343-apr-25-march-25-task-packets-1311-1318` as an in-window rolling cohort under the existing live maintenance owner `CO-343`. This does not refresh `last_review` dates or hide the debt: `docs:freshness` continues to emit the cohort in `rolling_freshness_cohorts`, and CO-343 remains responsible for resolving it by review, archive, reclassification, or a new owner path before the rolling window expires.

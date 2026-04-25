@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 9b88d6ec64a18e1f562e18ec8b332d26c20c31d635d8ed06c1b0ead2f294ced3 -->
+<!-- codex:instruction-stamp 4ba8e94c3428e587ccae7a4fdbec7b075aec54b684187c8caec7994954de080a -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -30,28 +30,30 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - For symbolic collab runs, prefix spawned prompts with `[agent_type:<role>]` on line one so role intent is auditable from JSONL/manifests.
 - For spawned subagents, default to bounded prompts without inherited context; use `fork_context=true` only when a stream explicitly needs prior thread history to avoid prompt bloat/redundancy.
 - Use `gpt-5.5` / `xhigh` as the current operator posture when available in ChatGPT-auth Codex sessions.
-- Portable packaged/generated config still seeds `model = "gpt-5.4"` and `model_reasoning_effort = "xhigh"`; use that path when `gpt-5.5`, API, or cloud portability is unavailable.
-- CO-local `gpt-5.5` use is explicit, marker-backed, and evidence-gated unless a fresh provider lane validates a Codex-suffixed model variant.
+- Portable packaged/generated config still keeps `model = "gpt-5.4"` and `model_reasoning_effort = "xhigh"` as fallback values when `gpt-5.5`, API, or cloud portability is unavailable.
+- CO-local `gpt-5.5` / `xhigh` is the current ChatGPT-auth/appserver posture after CO-352 evidence; use `gpt-5.4` only as a concrete fallback for access failure, cloud/API portability gaps, or downstream/no-network surfaces.
+- CO-352 evaluated the `0.125.0` model-catalog posture and adopted `gpt-5.5` / `xhigh` for validated CO-local appserver surfaces; required cloud execution and bundled/no-network catalog divergence keep only cloud/release pins and the `explorer_fast` file/codebase search only role gated.
 - Set `model_reasoning_effort` to at least `high` (CO default: `xhigh`) so spawned agents inherit high-reasoning behavior unless role overrides change it.
 - Built-in `explorer` now inherits top-level model defaults unless you attach a custom `config_file`; keep an explicit `agents.explorer` entry only when you want a custom description/override, and keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only.
 - Caveat: spark roles are file/codebase search only; use non-spark roles when image inputs are required.
 - Prefer built-ins-first for RLM/collab flows; add custom specialist roles only with a measured benefit, explicit owner, and validation evidence.
 - Set `[agents] max_threads = 12` as the seeded baseline. Keep explicit `max_depth = 4` only when your local Codex parser accepts it; do not treat `max_spawn_depth` as a current CO baseline recommendation.
 - Fallback policy is contingency-only (not routine): use `max_threads = 8` and `max_depth = 2` for constrained/high-risk lanes; use legacy `6/1/1` only as a break-glass profile when an older local parser/runtime still consumes spawn-depth caps.
-- Use an explicit `worker_complex` role (packaged default `gpt-5.4`, `xhigh`; CO-local opt-in `gpt-5.5`, `xhigh` only after marker-backed smoke evidence) for high-risk implementation streams.
-- Use `codex-orchestrator doctor` as an advisory drift check for Codex defaults (model/reasoning/agent baseline); remediation is additive via `codex-orchestrator codex defaults --yes`, with only exact prior CO-managed role baselines auto-migrated unless the top-level config already carries a supported, access-verified local model opt-in.
+- Use an explicit `worker_complex` role (`gpt-5.5`, `xhigh` for current CO-local ChatGPT-auth/appserver work; `gpt-5.4`, `xhigh` only for portable fallback surfaces) for high-risk implementation streams.
+- Use `codex-orchestrator doctor` as an advisory drift check for Codex defaults (model/reasoning/agent baseline); remediation is additive via `codex-orchestrator codex defaults --yes` for portable fallback defaults or `codex-orchestrator codex defaults --auth-scope chatgpt --yes` after live access smoke, with exact prior CO-managed role baselines auto-migrated to the access-verified current ChatGPT-auth posture while preserving unrelated local customization.
 
 ## Codex Version Policy (CO Scope)
-- Current CO compatibility/adoption target is stable Codex CLI `0.124.0`.
+- Current CO-local ChatGPT-auth/appserver model posture is `gpt-5.5` / `xhigh` on Codex CLI `0.125.0` when live access smoke passes; release-facing cloud/downstream pins stay on the explicit promoted candidate recorded in `docs/guides/codex-version-policy.md`.
 - Current `0.124.0` CO-local posture evidence confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, `codex review --help` exposing `[PROMPT]` alongside scoped review flags, live `gpt-5.5` `xhigh` availability, and a post-build runtime-mode canary pass (`20/20` per scenario, `ready_for_default_flip=true`).
+- CO-352 `0.125.0` model-catalog audit adopts `gpt-5.5` / `xhigh` for validated CO-local ChatGPT-auth top-level, delegated, review-wrapper fallback, and appserver/runtime surfaces; required cloud execution still fails with the configured environment id not found, so cloud/release promotion stays blocked by that exact surface blocker.
 - Release-facing downstream-smoke workflows and `cloud-canary` pin the explicit promoted candidate recorded in `docs/guides/codex-version-policy.md`.
 - Current model posture is `gpt-5.5` / `xhigh` when available in ChatGPT-auth Codex sessions; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
-- Portable packaged/generated config still seeds `gpt-5.4` / `xhigh`; use `gpt-5.5` for delegated/review surfaces only after live access smoke plus `[codex_orchestrator] local_model_opt_in = "gpt-5.5"` unless a fresh provider lane validates a Codex-suffixed model variant.
+- Portable packaged/generated config still keeps `gpt-5.4` / `xhigh` as the fallback for unavailable `gpt-5.5`, API/cloud portability gaps, or unproven downstream/no-network contexts; use `gpt-5.5` for delegated/review surfaces after live access smoke unless a fresh provider lane validates a Codex-suffixed model variant.
 - Caveat: app-server `model/list` still reports `gpt-5.4` as `isDefault=true`; CO-341 live app-server `model/list` and live `codex exec` show `gpt-5.5` supports `xhigh` for explicit local configuration, and the bundled debug model catalog may lag the live catalog.
 - Treat residual plugin warnings from CO-341 as local temporary plugin cache warnings unless evidence maps them to CO-owned plugin manifests.
 - Evaluate newer stable/prerelease Codex builds only in explicit, task-scoped CO lanes where evidence is captured under `.runs/<task-id>/` and `out/<task-id>/manual/`.
-- Newer-version adoption remains evidence-gated: no P0/P1 regressions, runtime-mode canary pass, and required cloud canary contract pass.
-- If any required lane fails (or provider/model compatibility regresses), hold/revert and record the decision in `docs/TASKS.md`, `tasks/index.json`, and task checklists.
+- Newer-version cloud/release adoption remains evidence-gated: no P0/P1 regressions, runtime-mode canary pass, and required cloud canary contract pass.
+- If any required lane fails (or provider/model compatibility regresses), hold/revert only the affected surface and record the decision in `docs/TASKS.md`, `tasks/index.json`, and task checklists.
 - For policy details and cadence, follow `docs/guides/codex-version-policy.md`.
 - App-server remains the normal local runtime path, but provider workers still stay on `codex exec` / `codex exec resume` supervision until a separate app-server control seam lands with explicit authority guardrails.
 

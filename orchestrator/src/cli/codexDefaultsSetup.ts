@@ -21,13 +21,14 @@ export type CodexDefaultsAuthScope = 'portable' | 'chatgpt';
 
 export const BASELINE_MODEL = 'gpt-5.4';
 export const BASELINE_REVIEW_MODEL = BASELINE_MODEL;
+export const CURRENT_CHATGPT_MODEL = 'gpt-5.5';
 export const BASELINE_REASONING = 'xhigh';
 export const BASELINE_REASONING_MINIMUM = 'high';
 export const BASELINE_AGENTS = {
   max_threads: 12,
   max_depth: 4
 } as const;
-export const LOCAL_MODEL_OPT_INS = ['gpt-5.5'] as const;
+export const LOCAL_MODEL_OPT_INS = [CURRENT_CHATGPT_MODEL] as const;
 const LOCAL_MODEL_OPT_IN_SET = new Set<string>(LOCAL_MODEL_OPT_INS);
 const CODEX_ORCHESTRATOR_CONFIG_KEY = 'codex_orchestrator';
 const LOCAL_MODEL_OPT_IN_CONFIG_KEY = 'local_model_opt_in';
@@ -356,7 +357,7 @@ function mergeBaselineDefaults(
   next.model = resolveModelDefault(options.topLevelLocalModelOptIn, BASELINE_MODEL);
   next.review_model = resolveModelDefault(options.reviewModelOptIn, BASELINE_REVIEW_MODEL);
   next.model_reasoning_effort = BASELINE_REASONING;
-  applyLocalModelOptInMarker(next, options.topLevelLocalModelOptIn, options.requestedAuthScope);
+  removeLegacyLocalModelOptInMarker(next);
 
   const agents = isRecord(next.agents) ? structuredClone(next.agents as Record<string, unknown>) : {};
   agents.max_threads = BASELINE_AGENTS.max_threads;
@@ -394,9 +395,17 @@ function resolveRequestedLocalModelOptIn(
     return null;
   }
   if (requestedAuthScope === 'chatgpt') {
-    return 'gpt-5.5';
+    return CURRENT_CHATGPT_MODEL;
   }
-  return resolveLocalModelOptIn(existing);
+  const model = readOptionalString(existing.model);
+  const reviewModel = readOptionalString(existing.review_model);
+  if (isLocalModelOptIn(model)) {
+    return model;
+  }
+  if (isLocalModelOptIn(reviewModel)) {
+    return reviewModel;
+  }
+  return null;
 }
 
 function resolveRoleAndReviewLocalModelOptIn(
@@ -406,6 +415,9 @@ function resolveRoleAndReviewLocalModelOptIn(
 ): (typeof LOCAL_MODEL_OPT_INS)[number] | null {
   if (requestedAuthScope === 'portable') {
     return null;
+  }
+  if (topLevelLocalModelOptIn) {
+    return topLevelLocalModelOptIn;
   }
   const reviewModel = readOptionalString(existing.review_model);
   const existingLocalModelOptIn = resolveLocalModelOptIn(existing);
@@ -420,22 +432,12 @@ function readOptionalString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
-function applyLocalModelOptInMarker(
-  next: Record<string, unknown>,
-  localModelOptIn: (typeof LOCAL_MODEL_OPT_INS)[number] | null,
-  requestedAuthScope?: CodexDefaultsAuthScope
-): void {
+function removeLegacyLocalModelOptInMarker(next: Record<string, unknown>): void {
   const existingConfig = isRecord(next[CODEX_ORCHESTRATOR_CONFIG_KEY])
     ? structuredClone(next[CODEX_ORCHESTRATOR_CONFIG_KEY] as Record<string, unknown>)
     : {};
 
-  if (localModelOptIn) {
-    existingConfig[LOCAL_MODEL_OPT_IN_CONFIG_KEY] = localModelOptIn;
-    next[CODEX_ORCHESTRATOR_CONFIG_KEY] = existingConfig;
-    return;
-  }
-
-  if (requestedAuthScope === 'portable' && LOCAL_MODEL_OPT_IN_CONFIG_KEY in existingConfig) {
+  if (LOCAL_MODEL_OPT_IN_CONFIG_KEY in existingConfig) {
     delete existingConfig[LOCAL_MODEL_OPT_IN_CONFIG_KEY];
     if (Object.keys(existingConfig).length > 0) {
       next[CODEX_ORCHESTRATOR_CONFIG_KEY] = existingConfig;
@@ -446,7 +448,7 @@ function applyLocalModelOptInMarker(
 }
 
 export function formatModelDefaultExpectation(baseline: string): string {
-  return `${baseline} (or verified local opt-in: ${LOCAL_MODEL_OPT_INS.join(', ')})`;
+  return `${CURRENT_CHATGPT_MODEL} when ChatGPT-auth access is verified (fallback: ${baseline})`;
 }
 
 function resolveModelDefault(localModelOptIn: (typeof LOCAL_MODEL_OPT_INS)[number] | null, baseline: string): string {

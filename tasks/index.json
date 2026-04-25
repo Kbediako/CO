@@ -1,6 +1,32 @@
 {
   "items": [
     {
+      "id": "20260424-linear-f4469614-cfdf-49a6-a7ff-366f58229816",
+      "title": "CO-352 Codex 0.125 Model-Catalog Posture",
+      "relates_to": "tasks/specs/CO-352-codex-0125-model-catalog-posture.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-24",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-24",
+          "status": "prepared-for-parent-reconciliation",
+          "source_anchor": "ctx:sha256:3cf28c7e9319e4f963d4249bf02c3325281966ef0e16dd3c1954bb03cce49ca2#chunk:c000001",
+          "manifest": ".runs/linear-f4469614-cfdf-49a6-a7ff-366f58229816-docs-packet/cli/2026-04-24T20-45-55-787Z-73fa9234/manifest.json",
+          "summary": "Docs-first packet preserves CO-352 as a Codex CLI 0.125 model-catalog posture validation lane. It rejects promotion from `codex debug models` alone, adopts `gpt-5.5` / `xhigh` for validated CO-local ChatGPT-auth/appserver surfaces, and keeps cloud/release and downstream/no-network blockers scoped to their exact evidence."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/CO-352-codex-0125-model-catalog-posture.md",
+        "task": "tasks/tasks-linear-f4469614-cfdf-49a6-a7ff-366f58229816.md",
+        "agent_task": ".agent/task/linear-f4469614-cfdf-49a6-a7ff-366f58229816.md",
+        "docs": "tasks/specs/CO-352-codex-0125-model-catalog-posture.md"
+      }
+    },
+    {
       "id": "20260424-linear-4c2e0c11-d512-4171-abd4-359cd5957ac6",
       "title": "CO: rebaseline marketplace docs and pack-smoke for Codex 0.125 plugin marketplace commands",
       "relates_to": "tasks/tasks-linear-4c2e0c11-d512-4171-abd4-359cd5957ac6.md",
