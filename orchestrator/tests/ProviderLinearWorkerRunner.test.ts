@@ -6216,8 +6216,6 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         completed_at: '2026-04-17T00:34:41.000Z',
         heartbeat_at: '2026-04-17T00:34:39.000Z',
         heartbeat_stale_after_seconds: 30,
-        runtime_mode: 'appserver',
-        runtime_provider: 'codex',
         artifact_root: matchingChildRunDir,
         log_path: join(matchingChildRunDir, 'runner.ndjson'),
         workspace_path: tempRoot
@@ -6234,6 +6232,8 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         parent_run_id: 'run-child',
         stream: 'docs-packet',
         provider_linear_child_lane_runner_pid: 4242,
+        runtime_mode: 'appserver',
+        runtime_provider: 'codex',
         provider_linear_child_lane_runtime_event: 'codex_exec_completed',
         provider_linear_child_lane_runtime_event_at: '2026-04-17T00:34:40.000Z',
         provider_linear_child_lane_appserver_startup_observed: true,

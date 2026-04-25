@@ -6417,8 +6417,12 @@ async function readProviderLinearWorkerChildLaneManifestCandidate(
     runId,
     manifestArtifactRoot
   );
-  const runtimeMode = normalizeOptionalString(parsed.runtime_mode);
-  const runtimeProvider = normalizeOptionalString(parsed.runtime_provider);
+  const runtimeMode =
+    normalizeOptionalString(runtimeDiagnostics?.runtime_mode) ??
+    normalizeOptionalString(parsed.runtime_mode);
+  const runtimeProvider =
+    normalizeOptionalString(runtimeDiagnostics?.runtime_provider) ??
+    normalizeOptionalString(parsed.runtime_provider);
   const heartbeatAt = normalizeOptionalString(parsed.heartbeat_at);
   const heartbeatStaleAfterSeconds = normalizeOptionalInteger(parsed.heartbeat_stale_after_seconds);
   const rawRunnerPid = normalizeOptionalInteger(
