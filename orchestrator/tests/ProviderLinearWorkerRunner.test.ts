@@ -6888,6 +6888,103 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     });
   });
 
+  it('uses the turn context timestamp when a completed floor line has no timestamp', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          current_turn_started_at: '2026-03-21T09:00:00.100Z',
+          updated_at: '2026-03-21T09:00:00.100Z'
+        }),
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
+    await mkdir(sessionDir, { recursive: true });
+    const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-1.jsonl');
+    await writeFile(
+      sessionLogPath,
+      [
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.000Z',
+          type: 'session_meta',
+          payload: {
+            id: 'thread-1',
+            cwd: tempRoot,
+            initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+          }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.100Z',
+          type: 'turn_context',
+          payload: {
+            turn_id: 'turn-1'
+          }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.150Z',
+          type: 'event_msg',
+          payload: {
+            type: 'token_count',
+            info: {
+              total_token_usage: {
+                input_tokens: 12,
+                output_tokens: 8,
+                total_tokens: 20
+              }
+            }
+          }
+        }),
+        JSON.stringify({
+          type: 'event_msg',
+          payload: {
+            type: 'task_complete',
+            turn_id: 'turn-1'
+          }
+        })
+      ].join('\n'),
+      'utf8'
+    );
+    const sessionTimestamp = new Date('2026-03-21T09:00:05.000Z');
+    await utimes(sessionLogPath, sessionTimestamp, sessionTimestamp);
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:00:10.000Z',
+      async (path, proof) => await writeFile(path, `${JSON.stringify(proof, null, 2)}\n`, 'utf8'),
+      {
+        CODEX_HOME: tempRoot!
+      }
+    );
+
+    expect(refreshed).toMatchObject({
+      thread_id: 'thread-1',
+      latest_turn_id: 'turn-1',
+      latest_session_id: 'thread-1-turn-1',
+      latest_session_id_source: 'derived_from_thread_and_turn',
+      last_event: 'task_complete',
+      last_event_at: '2026-03-21T09:00:00.150Z',
+      current_turn_activity: {
+        event: 'token_count',
+        recorded_at: '2026-03-21T09:00:00.150Z',
+        source: 'session_log_hydration',
+        turn_id: 'turn-1',
+        session_id: 'thread-1-turn-1'
+      },
+      tokens: {
+        input_tokens: 12,
+        output_tokens: 8,
+        total_tokens: 20
+      }
+    });
+  });
+
   it('uses the line timestamp before payload fallback for completed-turn bootstrap floors', async () => {
     const { runDir } = await createManifestRoot();
     const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);

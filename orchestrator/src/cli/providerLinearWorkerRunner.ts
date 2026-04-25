@@ -4533,9 +4533,12 @@ function selectProviderWorkerSessionBootstrapLines(
       return latestSessionMetaIndex >= 0 ? [lines[latestSessionMetaIndex] ?? ''] : [];
     }
     const currentTurnMatchesCompletedLog = currentTurnId !== null && latestTurnId === currentTurnId;
+    const completedLine =
+      latestTurnCompletedIndex >= 0 ? lines[latestTurnCompletedIndex] ?? '' : '';
+    const completedLineHasTimestamp = providerWorkerSessionJsonlLineTimestamp(completedLine) !== null;
     const completedFloorLine =
-      latestTurnCompletedIndex >= 0
-        ? lines[latestTurnCompletedIndex] ?? ''
+      completedLine && completedLineHasTimestamp
+        ? completedLine
         : lines[latestTurnContextIndex] ?? '';
     if (
       !currentTurnMatchesCompletedLog &&
