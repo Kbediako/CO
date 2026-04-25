@@ -4935,8 +4935,12 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
   const persistedTailState = snapshotProviderWorkerSessionLogTailState(tailState);
   const sessionLogThreadId =
     sessionLogObserved ? observedSessionLogThreadId ?? null : proof.session_log_thread_id ?? null;
-  const sessionLogTurnId =
-    sessionLogObserved ? observedSessionLogTurnId ?? null : proof.session_log_turn_id ?? null;
+  const observedSessionLogTurnCandidate = observedSessionLogTurnId ?? null;
+  const sessionLogTurnId = sessionLogObserved
+    ? liveTurnId && observedSessionLogTurnCandidate === liveTurnId
+      ? observedSessionLogTurnCandidate
+      : null
+    : proof.session_log_turn_id ?? null;
   const sessionLogSessionId = sessionLogObserved
     ? deriveLatestTurnSessionId({
         threadId: sessionLogThreadId,

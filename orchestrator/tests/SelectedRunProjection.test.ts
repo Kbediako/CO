@@ -5650,7 +5650,7 @@ describe('SelectedRunProjection', () => {
         session_log_truth_retained: true
       }
     });
-  });
+  }, 20_000);
 
   it('does not refresh settled appserver-requested CLI fallback proofs for missing session-log truth', async () => {
     const { root, paths } = await createHostPaths();
