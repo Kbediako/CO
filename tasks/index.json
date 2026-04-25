@@ -120,6 +120,31 @@
       }
     },
     {
+      "id": "20260425-linear-5d015f15-6a72-4096-bf65-162b85a83080",
+      "title": "CO-367 current-host-unhealthy matcher wording drift",
+      "relates_to": "tasks/specs/linear-5d015f15-6a72-4096-bf65-162b85a83080.md",
+      "risk": "low",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-25",
+      "approvals": {
+        "parent_provider_worker": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-25",
+          "status": "created",
+          "source_anchor": "ctx:sha256:e84202fb7f21807b41c7ad7277361061de8c5c4a7253dc560d87722d58ead25c#chunk:c000001",
+          "summary": "Docs-first packet created for CO-367 current-host-unhealthy matcher wording drift. Scope is limited to hardening isCurrentHostUnhealthyErrorMessage against current attach-shell wording, preserving current-host-unhealthy marker coverage, explicit legacy fallback coverage, focused CoStatusCliShell regression coverage, and CO-363 projection semantics."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-5d015f15-6a72-4096-bf65-162b85a83080.md",
+        "task": "tasks/tasks-linear-5d015f15-6a72-4096-bf65-162b85a83080.md",
+        "agent_task": ".agent/task/linear-5d015f15-6a72-4096-bf65-162b85a83080.md",
+        "docs": "docs/TECH_SPEC-linear-5d015f15-6a72-4096-bf65-162b85a83080.md"
+      }
+    },
+    {
       "id": "20260425-linear-16623322-4b8d-4e12-8f57-688aa5f71a23",
       "title": "CO-363 CO STATUS active issue projection and current-host-unhealthy classification",
       "relates_to": "tasks/specs/linear-16623322-4b8d-4e12-8f57-688aa5f71a23.md",

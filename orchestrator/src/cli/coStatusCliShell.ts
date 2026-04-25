@@ -43,6 +43,13 @@ const LOCAL_DEGRADED_FALLBACK_ALLOWED_VERDICTS = new Set<ProviderControlHostFres
   'degraded'
 ]);
 const LOCAL_DEGRADED_FALLBACK_ALLOWED_FINDING_CODES = new Set(['active_worker_proof_missing']);
+const CURRENT_HOST_UNHEALTHY_MARKER = 'current-host-unhealthy';
+const CURRENT_HOST_UNHEALTHY_STALE_ENDPOINT_FALLBACK =
+  'control-host unavailable; stale endpoint after control-host restart';
+const LEGACY_CURRENT_HOST_UNHEALTHY_STALE_ENDPOINT_FALLBACK =
+  'control-host unavailable; control_endpoint.json has not rotated to a reachable host';
+const CURRENT_HOST_UNHEALTHY_ROTATED_ENDPOINT_FALLBACK =
+  'refreshed control-host endpoint is still unreachable';
 
 type CoStatusDegradedReadReason = 'ui_request_timeout' | 'current_host_unhealthy';
 
@@ -179,11 +186,12 @@ function resolveLocalDegradedReadReason(error: unknown): CoStatusDegradedReadRea
 }
 
 function isCurrentHostUnhealthyErrorMessage(message: string): boolean {
-  return (
-    message.includes('current-host-unhealthy') ||
-    message.includes('control-host unavailable; control_endpoint.json has not rotated to a reachable host') ||
-    message.includes('refreshed control-host endpoint is still unreachable')
-  );
+  return [
+    CURRENT_HOST_UNHEALTHY_MARKER,
+    CURRENT_HOST_UNHEALTHY_STALE_ENDPOINT_FALLBACK,
+    LEGACY_CURRENT_HOST_UNHEALTHY_STALE_ENDPOINT_FALLBACK,
+    CURRENT_HOST_UNHEALTHY_ROTATED_ENDPOINT_FALLBACK
+  ].some((fragment) => message.includes(fragment));
 }
 
 function isEligibleLocalDegradedFallbackFreshnessReport(

@@ -403,6 +403,84 @@ describe('runCoStatusCliShell', () => {
     });
   });
 
+  it('uses degraded json fallback for current attach-shell unhealthy wording without the canonical token', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    await writeControlEndpointArtifacts(runDir, 'http://127.0.0.1:65535');
+    await writeProviderIntakeState(runDir, {
+      claimState: 'running',
+      updatedAtMsAgo: 1_000
+    });
+    const attachErrorMessage = [
+      'control-host unavailable; stale endpoint after control-host restart.',
+      'control_endpoint.json has not rotated to a reachable host.',
+      'Waiting for control_endpoint.json to rotate or rerun co-status attach.'
+    ].join(' ');
+    expect(attachErrorMessage).not.toContain('current-host-unhealthy');
+
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await withMockedAttachDatasetFailure(attachErrorMessage, async ({ runCoStatusCliShell: runWithMockedAttach }) => {
+      await runWithMockedAttach({
+        flags: {
+          format: 'json',
+          'run-dir': runDir
+        },
+        printHelp: vi.fn()
+      });
+    });
+
+    expect(log).toHaveBeenCalledTimes(1);
+    const payload = JSON.parse(String(log.mock.calls[0]?.[0])) as {
+      degraded_read?: {
+        reason?: unknown;
+        source?: unknown;
+      };
+      selected_issue_identifier?: unknown;
+    };
+    expect(payload.degraded_read).toMatchObject({
+      reason: 'current_host_unhealthy',
+      source: 'local_seeded_runtime'
+    });
+    expect(payload.selected_issue_identifier).toBe('CO-296');
+  });
+
+  it('readCoStatusJsonDataset uses degraded fallback for legacy stale-endpoint wording', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    await writeControlEndpointArtifacts(runDir, 'http://127.0.0.1:65535');
+    await writeProviderIntakeState(runDir, {
+      claimState: 'running',
+      updatedAtMsAgo: 1_000
+    });
+    const attachErrorMessage =
+      'control-host unavailable; control_endpoint.json has not rotated to a reachable host. Waiting for control_endpoint.json to rotate or rerun co-status attach.';
+    expect(attachErrorMessage).not.toContain('current-host-unhealthy');
+
+    const payload = await withMockedAttachDatasetFailure(
+      attachErrorMessage,
+      async ({ readCoStatusJsonDataset }) =>
+        await readCoStatusJsonDataset({
+          flags: {
+            format: 'json',
+            'run-dir': runDir
+          }
+        })
+    );
+
+    expect(payload.degraded_read).toMatchObject({
+      reason: 'current_host_unhealthy',
+      source: 'local_seeded_runtime'
+    });
+    expect(payload.selected_issue_identifier).toBe('CO-296');
+  });
+
   it('surfaces every fresh running intake claim during degraded json fallback', async () => {
     const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
     tempDirs.push(root);
@@ -1104,6 +1182,29 @@ async function closeServer(server: http.Server): Promise<void> {
     }
   });
   servers.delete(server);
+}
+
+async function withMockedAttachDatasetFailure<T>(
+  message: string,
+  run: (module: typeof import('../src/cli/coStatusCliShell.js')) => Promise<T>
+): Promise<T> {
+  vi.resetModules();
+  vi.doMock('../src/cli/coStatusAttachCliShell.js', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('../src/cli/coStatusAttachCliShell.js')>();
+    return {
+      ...actual,
+      readUiDatasetWithEndpointRecovery: vi.fn(async () => {
+        throw new Error(message);
+      })
+    };
+  });
+  try {
+    const module = await import('../src/cli/coStatusCliShell.js');
+    return await run(module);
+  } finally {
+    vi.doUnmock('../src/cli/coStatusAttachCliShell.js');
+    vi.resetModules();
+  }
 }
 
 function buildUiPayload(overrides: Record<string, unknown> = {}): Record<string, unknown> {
