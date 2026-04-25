@@ -35,6 +35,7 @@ codex-orchestrator start diagnostics --cloud --target spec-guard
 Preflight validates:
 - Cloud environment id is configured (`CODEX_CLOUD_ENV_ID` or `metadata.cloudEnvId`)
 - Codex CLI is available (`codex --version`)
+- When an environment id is configured: `codex cloud list --env <id> --limit 1 --json` can see the environment before any `codex cloud exec` task submission is attempted
 - If `CODEX_CLOUD_BRANCH` is set: `git` is available and `origin/<branch>` exists
 
 Run the same checks directly without starting a pipeline:
@@ -111,6 +112,8 @@ codex-orchestrator start diagnostics --cloud --target spec-guard
 
 - Missing env id:
   - Set `CODEX_CLOUD_ENV_ID` to a valid cloud environment id.
+- Environment not found / inaccessible:
+  - Run `codex cloud` with the active account and set `CODEX_CLOUD_ENV_ID` to an environment visible to that account before required cloud canaries or promotion gates.
 - Missing branch:
   - Push the branch to origin, or set `CODEX_CLOUD_BRANCH` to an existing remote branch.
 - Codex CLI unavailable:
