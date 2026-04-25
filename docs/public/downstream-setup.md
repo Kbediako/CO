@@ -10,7 +10,7 @@ This guide is the downstream-safe setup path shipped in the npm package.
 - Portable generated downstream defaults stay on `gpt-5.4` / `xhigh` because API/cloud portability is not proven and app-server model/list still reports it as `isDefault`.
 - Local ChatGPT-auth `gpt-5.5` / `xhigh` remains marker-backed opt-in only after `codex debug models` verifies current model access.
 - `codex-orchestrator doctor` accepts the marker-backed local `gpt-5.5` opt-in as non-drift only when `codex debug models` verifies current model access, and additive defaults preserve matching prior `gpt-5.5` role files when the top-level config is explicitly opted in.
-- CO-196 posture lineage remains unchanged: npm is the supported baseline because it is the simplest supported CLI install path, and marketplace packaging is an additive registration path for newer Codex releases. `0.121.0` accepts both `codex marketplace add` and `codex plugin marketplace add`; `0.122.0+` require `codex plugin marketplace add`.
+- CO-196 posture lineage remains unchanged: npm is the supported baseline because it is the simplest supported CLI install path, and marketplace packaging is an additive registration path for newer Codex releases. `0.121.0` accepts both `codex marketplace add` and `codex plugin marketplace add`; `0.122.0+` require `codex plugin marketplace add`, and current `0.125.0` also exposes `codex plugin marketplace upgrade` / `remove`.
 
 ## Once per machine
 
@@ -50,6 +50,7 @@ The shipped marketplace files are:
 - Local-directory add: Run the version-appropriate add command against the repository root that contains those files instead of the npm install directory. `0.121.0` accepts either `codex marketplace add <repository-root>` or `codex plugin marketplace add <repository-root>`; `0.122.0+` require `codex plugin marketplace add <repository-root>`.
 - Git-backed add: Pass a Git identifier or URL such as `owner/repo[@ref]`, an HTTPS Git URL, or an SSH Git URL rather than a local path.
 - When to re-run add: Re-run the same version-appropriate add command if you move or replace a local-directory source, or if you remove Codex's installed marketplace checkout and want to restore the Git-backed install. `0.121.0` documents the add flow under both marketplace paths; `0.122.0+` document local directories plus Git-backed sources under `codex plugin marketplace add --help`.
+- Marketplace updates/removal: On current Codex CLI `0.125.0`, run `codex plugin marketplace upgrade codex-orchestrator` to refresh a Git-backed marketplace checkout when you want Codex to pull a newer source ref. Run `codex plugin marketplace remove codex-orchestrator` to remove the marketplace registration.
 - Debug caveats: The bundled debug catalog can lag runtime posture briefly, and residual plugin warnings are local temporary plugin cache warnings rather than CO posture failures.
 
 ## Rollback and removal
@@ -60,6 +61,7 @@ The shipped marketplace files are:
   ```bash
   codex plugin marketplace remove codex-orchestrator
   ```
+  Use this command on Codex CLI `0.125.0` or newer. On older support lanes, or if the remove command is unavailable, remove the `[marketplaces.codex-orchestrator]` block from `${CODEX_HOME:-~/.codex}/config.toml` manually.
 - Remove the npm install when you no longer want the standalone CLI or when you no longer need it as the marketplace source:
   ```bash
   npm uninstall -g @kbediako/codex-orchestrator

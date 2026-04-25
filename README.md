@@ -44,7 +44,7 @@ Use `codex login --device-auth` when browser login is not available.
 
 ## Plugin Install
 
-The npm CLI install is the baseline. Codex plugin marketplace setup is additive for Codex releases that expose plugin flows:
+The npm CLI install is the baseline. Codex plugin marketplace setup is additive for Codex releases that expose plugin flows. Current Codex CLI `0.125.0` keeps marketplace management under `codex plugin marketplace ...`:
 
 ```bash
 # Codex 0.121.0 accepts either command.
@@ -54,7 +54,7 @@ codex marketplace add "$(npm root -g)/@kbediako/codex-orchestrator"
 codex plugin marketplace add "$(npm root -g)/@kbediako/codex-orchestrator"
 ```
 
-Then open `/plugins` in Codex, install `Codex Orchestrator`, and restart Codex if the plugin is not picked up immediately. Local checkout, Git-backed, and rollback details are in [docs/book/setup.md](docs/book/setup.md).
+For local checkout installs, pass the repository root instead of the npm install directory. For Git-backed installs, pass `owner/repo[@ref]`, an HTTPS Git URL, or an SSH Git URL. Use `codex plugin marketplace upgrade codex-orchestrator` to refresh a Git-backed marketplace checkout and `codex plugin marketplace remove codex-orchestrator` to remove the marketplace registration. Then open `/plugins` in Codex, install `Codex Orchestrator`, and restart Codex if the plugin is not picked up immediately. More local checkout, Git-backed, and rollback details are in [docs/book/setup.md](docs/book/setup.md).
 
 ## Common Commands
 
