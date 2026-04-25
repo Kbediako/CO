@@ -496,6 +496,7 @@ interface ProviderWorkerSessionLogTailState {
   offsetBytes: number;
   trailingText: string;
   bootstrapPending: boolean;
+  idRewindSignature: string | null;
 }
 
 interface ProviderWorkerSessionLogHydrationState {
@@ -504,6 +505,7 @@ interface ProviderWorkerSessionLogHydrationState {
   trailing_text: string;
   bootstrap_pending: boolean;
   proof_signature: string;
+  id_rewind_signature?: string | null;
 }
 
 interface ProviderControlHostManifestTarget {
@@ -4138,6 +4140,7 @@ function resetProviderWorkerSessionLogTailState(state: ProviderWorkerSessionLogT
   state.offsetBytes = 0;
   state.trailingText = '';
   state.bootstrapPending = true;
+  state.idRewindSignature = null;
 }
 
 function normalizeProviderWorkerSessionLogHydrationState(
@@ -4159,7 +4162,8 @@ function normalizeProviderWorkerSessionLogHydrationState(
     offset_bytes: offsetBytes,
     trailing_text: typeof value.trailing_text === 'string' ? value.trailing_text : '',
     bootstrap_pending: typeof value.bootstrap_pending === 'boolean' ? value.bootstrap_pending : true,
-    proof_signature: typeof value.proof_signature === 'string' ? value.proof_signature : ''
+    proof_signature: typeof value.proof_signature === 'string' ? value.proof_signature : '',
+    id_rewind_signature: typeof value.id_rewind_signature === 'string' ? value.id_rewind_signature : null
   };
 }
 
@@ -4172,14 +4176,16 @@ function buildProviderWorkerSessionLogTailState(
       path,
       offsetBytes: 0,
       trailingText: '',
-      bootstrapPending: true
+      bootstrapPending: true,
+      idRewindSignature: null
     };
   }
   return {
     path,
     offsetBytes: hydrationState.offset_bytes,
     trailingText: hydrationState.trailing_text,
-    bootstrapPending: hydrationState.bootstrap_pending
+    bootstrapPending: hydrationState.bootstrap_pending,
+    idRewindSignature: hydrationState.id_rewind_signature ?? null
   };
 }
 
@@ -4189,13 +4195,17 @@ function snapshotProviderWorkerSessionLogTailState(
   if (!state.path) {
     return null;
   }
-  return {
+  const snapshot: ProviderWorkerSessionLogHydrationState = {
     path: state.path,
     offset_bytes: state.offsetBytes,
     trailing_text: state.trailingText,
     bootstrap_pending: state.bootstrapPending,
     proof_signature: ''
   };
+  if (state.idRewindSignature) {
+    snapshot.id_rewind_signature = state.idRewindSignature;
+  }
+  return snapshot;
 }
 
 function selectProviderLinearWorkerCurrentTurnActivity(
@@ -4274,6 +4284,22 @@ function providerLinearWorkerProofNeedsSessionLogIdHydration(
   );
 }
 
+function buildProviderWorkerSessionLogIdHydrationRewindSignature(
+  proof: ProviderLinearWorkerProof
+): string | null {
+  if (!providerLinearWorkerProofNeedsSessionLogIdHydration(proof)) {
+    return null;
+  }
+  return JSON.stringify({
+    thread_id: proof.thread_id ?? null,
+    latest_turn_id: proof.latest_turn_id ?? null,
+    latest_session_id: proof.latest_session_id ?? null,
+    session_log_thread_id: proof.session_log_thread_id ?? null,
+    session_log_turn_id: proof.session_log_turn_id ?? null,
+    session_log_session_id: proof.session_log_session_id ?? null
+  });
+}
+
 async function readProviderWorkerSessionLogDelta(
   state: ProviderWorkerSessionLogTailState
 ): Promise<string> {
@@ -4288,6 +4314,7 @@ async function readProviderWorkerSessionLogDelta(
     state.offsetBytes = 0;
     state.trailingText = '';
     state.bootstrapPending = true;
+    state.idRewindSignature = null;
   }
   const bytesToRead = fileStat.size - state.offsetBytes;
   if (bytesToRead <= 0) {
@@ -4851,14 +4878,16 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
           path: sessionLogPath,
           offsetBytes: fileStat.size,
           trailingText: tailState.trailingText,
-          bootstrapPending: true
+          bootstrapPending: true,
+          idRewindSignature: tailState.idRewindSignature
         };
       } else if (fileStat.size < tailState.offsetBytes) {
         tailState = {
           path: sessionLogPath,
           offsetBytes: 0,
           trailingText: '',
-          bootstrapPending: true
+          bootstrapPending: true,
+          idRewindSignature: null
         };
       } else {
         preserveProofTelemetryFloor = true;
@@ -4869,12 +4898,23 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
       }
     }
   }
-  if (providerLinearWorkerProofNeedsSessionLogIdHydration(proof) && tailState.offsetBytes > 0) {
+  const idHydrationRewindSignature =
+    buildProviderWorkerSessionLogIdHydrationRewindSignature(proof);
+  if (idHydrationRewindSignature === null) {
+    tailState = {
+      ...tailState,
+      idRewindSignature: null
+    };
+  } else if (
+    tailState.offsetBytes > 0 &&
+    tailState.idRewindSignature !== idHydrationRewindSignature
+  ) {
     tailState = {
       path: sessionLogPath,
       offsetBytes: 0,
       trailingText: '',
-      bootstrapPending: true
+      bootstrapPending: true,
+      idRewindSignature: idHydrationRewindSignature
     };
   }
   let sessionLogObserved = false;
@@ -7799,7 +7839,8 @@ export async function runProviderLinearWorker(
               path: null,
               offsetBytes: 0,
               trailingText: '',
-              bootstrapPending: true
+              bootstrapPending: true,
+              idRewindSignature: null
             }
           : null;
       const liveSessionTailPromise =
