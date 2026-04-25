@@ -4,7 +4,7 @@ title: CO Reduce Review Long Tails and Make Review Evidence Accounting Truthful
 status: in_progress
 owner: Codex
 created: 2026-03-24
-last_review: 2026-03-24
+last_review: 2026-04-24
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514.md
@@ -18,6 +18,7 @@ review_notes:
   - 2026-03-24: Large uncommitted review scope is currently advisory-only; this issue explicitly tightens the contract to require scope narrowing or a recorded override.
   - 2026-03-24: Delegation is explicitly overridden for this worker run because subagent spawning is unavailable in-session; the planned patch remains bounded to review runtime/state/accounting, focused docs updates, and targeted regressions.
   - 2026-03-24: docs-review approved the packet on `.runs/linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514/cli/2026-03-24T08-11-34-245Z-b218e257/manifest.json`; the line-budget fix stayed bounded to restoring the active `0963` snapshot and compressing its historical header/update pair by one line instead of archiving an in-progress task.
+  - 2026-04-24: Re-reviewed for CO-343 Apr 24 freshness restoration; the packet remains active historical/operator evidence, so only freshness metadata changed.
 ---
 
 # Technical Specification

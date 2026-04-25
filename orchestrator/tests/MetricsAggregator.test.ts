@@ -417,7 +417,6 @@ describe('metricsAggregator', () => {
     const refreshSummary = 'Linear refresh failed after successful handoff.';
     manifest.pipeline_id = 'provider-linear-worker';
     manifest.pipeline_title = 'Provider Linear Worker';
-    manifest.guardrails_required = false;
     manifest.summary =
       `${refreshSummary}\n` +
       'Guardrail command missing; run "codex-orchestrator start diagnostics --approval-policy never --format json --no-interactive" to capture reviewer diagnostics.';

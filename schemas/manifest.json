@@ -247,6 +247,10 @@
       }
     },
     "guardrails_required": { "type": ["boolean", "null"] },
+    "guardrails_required_source": {
+      "type": ["string", "null"],
+      "enum": ["explicit", "stage_detection", null]
+    },
     "runtime_mode_requested": { "type": "string", "enum": ["cli", "appserver"] },
     "runtime_mode": { "type": "string", "enum": ["cli", "appserver"] },
     "runtime_provider": { "type": "string", "enum": ["CliRuntimeProvider", "AppServerRuntimeProvider"] },

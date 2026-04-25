@@ -4,7 +4,7 @@ title: Coordinator Live Linear Restarted-Issue Intake and Dispatch Consistency
 status: in_progress
 owner: Codex
 created: 2026-03-22
-last_review: 2026-03-22
+last_review: 2026-04-22
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-coordinator-live-linear-restarted-issue-intake-and-dispatch-consistency.md
@@ -17,6 +17,7 @@ review_notes:
   - 2026-03-22: Code-path audit confirmed a latent dispatch-shaping bug even though the current live runtime had already converged. `evaluateTrackerDispatchPilotAsync()` could keep `recommendation.issue_identifier` on the stale selected-run default instead of the live tracked issue, and `createControlRuntimeSnapshot().readDispatchEvaluation()` could propagate that stale identifier to outward traceability. The current live persisted-intake replay symptom is not reproduced.
   - 2026-03-22: `docs-review` succeeded at `.runs/1317-coordinator-live-linear-restarted-issue-intake-and-dispatch-consistency/cli/2026-03-22T04-14-00-475Z-008b6375/manifest.json`; implementation remains bounded to the stale dispatch fallback path only.
   - 2026-03-22: After the patch and full validation floor, the local control host was restarted on rebuilt `dist/`. The restarted host rehydrated `CO-1` into fresh run `2026-03-22T04-46-30-471Z-ba4c6122`, `/api/v1/dispatch` stayed internally consistent on `http://127.0.0.1:63303`, and no final operator Linear flip was needed.
+  - 2026-04-22: CO-300 docs-freshness review rechecked the `1317` packet against current `tasks/index.json` and `docs/TASKS.md`. The packet remains a truthful active historical reference, so the packet/spec registry metadata was refreshed without widening the original implementation scope.
 ---
 
 # Technical Specification

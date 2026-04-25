@@ -10,12 +10,14 @@ The machine-readable policy lives in `docs/docs-catalog.json` under `policies.ro
 
 Current CO policy:
 
-- Owner issue: `CO-175`
+- Owner issue: `CO-343`
+- Exact canonical owner overrides: `canonical_owner_issues[]` may map one `canonical_owner_key` to one live owner issue, such as `CO-320` for `docs_freshness_candidate|doc_class:task_packet|path_family:tasks/tasks-*|last_review:2026-03-23|cadence_days:30`
+- Historical owner lineage: `CO-175` established the Apr 14 baseline, `CO-267` owned the Apr 20/21 maintenance refreshes, `CO-300` owned the Apr 22 reset, and `CO-324` owned the Apr 23 reset; these are now terminal evidence only and must not remain the live maintenance owner after they reach terminal states.
 - Window: `7` days after the normal freshness cadence expires
 - Maximum active rolling cohorts: `2`
 - Maximum rolling rows: `300`
 - Eligible doc classes: `Task Packet`, `Task Mirror`, and `Report Only`
-- Declared baseline cohort: `co-175-apr-14-march-14-tasks-1164-1195`
+- Declared baseline cohorts: `co-175-apr-14-march-14-tasks-1164-1195`, `co-343-apr-25-march-25-task-packets-1311-1318`
 - Ineligible docs: Front Door, Public Guide, Repository Guide, Agent Policy, Active Guide, shipped skills, companions, templates, and uncatalogued docs
 
 Eligibility is not class-only. A stale row must match a declared baseline cohort by `last_review`, `cadence_days`, path family, and either task-number range or declared path prefix before it can move from blocking stale failures into rolling debt. This prevents a newly stale feature-lane packet from being hidden just because it is in an eligible doc class and still inside the rolling window.
@@ -47,6 +49,21 @@ The maintenance report is the machine-readable decision future workers should ci
 - sample paths for changed blockers, candidate rows, and hard stale rows
 
 Provider-worker gates use this decision in `docs-review` and `implementation-gate`. They may pass with `pass_with_owned_rolling_debt` only when the debt is in an eligible historical class, the policy owner issue is present, the rows are still inside the rolling window and caps, `spec-guard` is clean, and the current diff/task packet has no blocking freshness paths. The underlying `docs:freshness` JSON still preserves the raw stale and rolling row evidence.
+
+When the configured owner issue is terminal, `docs:freshness:maintain` must fail closed. Terminal owner metadata is evidence only; the helper must require a new live same-project owner issue instead of reusing a `Done`, `Duplicate`, or `Canceled` owner path.
+
+Exact canonical owner overrides are narrower than the global owner issue. `docs:freshness:maintain` may surface a mapped live owner only when a candidate cohort's `canonical_owner_key` exactly matches an entry in `canonical_owner_issues[]`; unrelated candidate cohorts must keep the configured global owner evidence and remain blocked or independently owned. This keeps duplicate prevention keyed to `codex-orchestrator:canonical-owner-key=...` without broadening a cohort-specific owner into a repo-wide freshness owner.
+
+## Preserved Historical Stub Status
+Some historical task-key stubs remain authoritative because current repo tooling still resolves their canonical task key from that path even after the rest of the historical packet is gone. Those rows should use docs-freshness registry status `preserved_historical_stub`.
+
+Use `preserved_historical_stub` only for intentionally minimal continuity surfaces under `tasks/tasks-*.md` and `.agent/task/*.md`, such as a preserved `tasks/tasks-linear-...md` stub and its matching mirror while that stub is still the authoritative canonical task key surface. The file itself should be an explicit historical continuity stub rather than a full packet, for example with heading `# Historical stub`. While a row is `preserved_historical_stub`:
+
+- `docs:freshness` still validates path and registry metadata, but it does not age the row into ordinary active stale-doc debt.
+- `implementation-docs-archive` must not auto-archive the row through registry-status, retention-age, or line-threshold triggers.
+- the row stays non-archive-eligible until current repo tooling no longer depends on the stub as the authoritative canonical task key surface.
+
+When the stub stops being authoritative, reclassify it to `archived` and let the normal archive flow manage it. Do not use `preserved_historical_stub` for full active packets, ordinary historical docs debt, or as a generic escape hatch from freshness review.
 
 Blocking decisions are fail-closed:
 
@@ -181,3 +198,83 @@ CO-267 reproduced the Apr 20 baseline failure in `out/linear-8f605d1a-e4ec-4acf-
 - `spec-guard --dry-run` separately reported stale active spec frontmatter rows with `last_review=2026-03-20`
 
 The Apr 20 blocking set and the CO-175 rolling cohort were reviewed in `docs/findings/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4-docs-freshness-classification.md` and refreshed instead of weakening freshness gates. CO-267 keeps the rolling policy unchanged, preserves CO-266 terminal-blocker advisory scope, and updates only the reviewed stale registry rows, active spec frontmatter rows, and the CO-175 `1164-1195` rolling cohort rows to `last_review=2026-04-20`.
+
+## Apr 21 Rework Refresh
+
+### Reproduction / Baseline Findings
+After PR #566 had already merged, CO-267 rework reproduced the Apr 21 current-main baseline failure in `out/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/rework-reset/docs-freshness-baseline.json`:
+
+- `37` blocking stale entries
+- `0` rolling cohort entries
+- `0` missing registry rows
+- `0` missing-on-disk rows
+- `0` invalid registry entries
+- `0` uncatalogued docs
+- blocking classes: Task Packet `31`, Task Mirror `6`
+- blocking review cohorts: `2026-01-20` / `90` days (`6` rows) and `2026-03-21` / `30` days (`31` rows)
+- `docs:freshness:maintain` reported `block_policy_over_budget`, owner issue `CO-175`, `37` candidate rows, `12` candidate cohorts, and `blocking_changed_paths=0`
+
+### Post-refresh Disposition
+The Apr 21 blocking set was reviewed in `docs/findings/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4-docs-freshness-classification.md` and refreshed without changing freshness policy, rolling caps, or CO-266 scope. The live set is historical Task Packet and Task Mirror evidence for `0954` and the `1311`-`1316` Symphony publication lineage, so CO-267 updates the reviewed stale registry rows to `last_review=2026-04-21`; `tasks/specs/0954-rlm-orchestrator-validation.md` frontmatter is refreshed for consistency, while `1311`-`1316` spec frontmatter was already current on main.
+
+## Apr 22 Owner Reset and Reviewed Refresh
+
+### Reproduction / Baseline Findings
+CO-300 reproduced the Apr 22 current-main baseline failure in `out/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a/before/docs-freshness.json` and `out/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a/before/docs-freshness-maintenance.json`:
+
+- `16` stale entries
+- `0` rolling cohort entries
+- `0` missing registry rows
+- `0` missing-on-disk rows
+- `0` invalid registry entries
+- `0` uncatalogued docs
+- live debt consisted of the Mar 22 `1317` / `1318` packet-and-mirror cohort, adjacent parity packet docs, and hard-stale `docs/codex-orchestrator-issues.md`
+- the earlier issue-packet snapshot with `6` missing-on-disk rows did not reproduce on current `main`
+- `docs:freshness:maintain` still reported `blocking_changed_paths=[]`, verified configured owner `CO-175` as terminal, and required a new live owner path instead of reusing terminal metadata
+
+### Post-refresh Disposition
+CO-300 re-homed the rolling-freshness owner metadata to live issue `CO-300`, refreshed the reviewed Mar 22 packet/spec rows plus the hard-stale issues guide, and added fail-closed regression coverage so terminal owners cannot be reused as the live maintenance path. Post-fix validation at `out/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a/after/docs-freshness.json` and `out/linear-47c4ff7d-ff57-44b6-9bcd-d09640be140a/after/docs-freshness-maintenance.json` returned `docs:freshness OK` with `0` stale rows and `docs:freshness:maintain=clean`, with owner verification resolved to live `CO-300` while that issue was active.
+
+## Apr 23 Terminal Owner Reset and Reviewed Refresh
+
+### Reproduction / Baseline Findings
+CO-324 reproduced the Apr 23 current-main baseline failure in `out/linear-3c52bf66-f805-4537-8671-ad1dec2f4623/docs-freshness-baseline.json` and `out/linear-3c52bf66-f805-4537-8671-ad1dec2f4623/docs-freshness-maintenance-baseline.json`:
+
+- `31` stale entries
+- `0` rolling cohort entries
+- `0` missing registry rows
+- `0` missing-on-disk rows
+- `0` invalid registry entries
+- `0` uncatalogued docs
+- `27` eligible historical task/report rows from the adjacent `0955`, `1319`-`1321`, and `linear-856c1318-524f-4db3-8d4a-b357ec51c304` families
+- `4` hard-stale Active Guide/reference rows: `docs/guides/collab-vs-mcp.md`, `docs/guides/evaluation-playbook.md`, `docs/reference/metrics-collab-context-rot.md`, and `docs/release-notes-template-addendum.md`
+- `docs:freshness:maintain` reported `blocking_changed_paths=[]`, verified configured owner `CO-300` as terminal `Done`, and required a new live owner path instead of reusing terminal metadata
+
+### Post-refresh Disposition
+CO-324 re-homes the rolling-freshness owner metadata to live issue `CO-324`, preserves `CO-300` as historical terminal-owner evidence only, and reviews the current Apr 23 stale set directly instead of increasing rolling caps or weakening freshness gates. The reviewed disposition is recorded in `docs/findings/linear-3c52bf66-f805-4537-8671-ad1dec2f4623-docs-freshness-classification.md`; the stale rows are refreshed to `last_review=2026-04-23`. CO-321 remains out of scope and its refreshed `tasks/specs` cohort is not modified.
+
+## Apr 24 Terminal Owner Reset and Reviewed Refresh
+
+### Reproduction / Baseline Findings
+CO-343 reproduced the Apr 24 current-main blocker during CO-341 validation:
+
+- `node scripts/spec-guard.mjs --dry-run` printed five stale active-spec failures with `last_review=2026-03-24` while exiting zero.
+- `node scripts/spec-guard.mjs` exited non-zero on the same five specs.
+- `npm run docs:freshness` reported `24` stale task packet/mirror rows and no missing registry, missing-on-disk, invalid, or uncatalogued rows.
+- `docs:freshness:maintain` verified configured owner `CO-324` as terminal `Done` and required a new live owner path.
+
+### Post-refresh Disposition
+CO-343 re-homes the rolling-freshness owner metadata to live issue `CO-343`, preserves `CO-324` as historical terminal-owner evidence only, and reviews the Apr 24 stale rows directly instead of changing rolling policy. The reviewed disposition is recorded in `docs/findings/co-343-apr-24-docs-freshness-classification.md`; the exact stale spec frontmatters and registry rows are refreshed to `last_review=2026-04-24`.
+
+## Apr 25 Rolling Owner Deferral
+
+### Reproduction / Baseline Findings
+CO-352 replayed onto current `origin/main` on Apr 25 and reproduced a date-boundary freshness blocker unrelated to the CO-352 diff:
+
+- `npm run docs:freshness` reported `38` stale historical task packet/mirror rows with `last_review=2026-03-25`, `cadence_days=30`, `age_days=31`, and `overdue_days=1`.
+- The stale set contains only Task Packet and Task Mirror rows and has `0` missing registry, missing-on-disk, invalid, or uncatalogued rows.
+- `docs:freshness:maintain` reported `blocking_changed_paths=[]`; the current CO-352 diff only prepends its own task snapshot and adds the CO-352 packet/registry entries.
+- The stale lineage is the March 25 historical `1311`-`1318` task-packet/mirror set, not a public-guide, active-guide, agent-policy, skill, template, or current CO-352 packet failure.
+
+### Rolling Disposition
+CO-352 declares `co-343-apr-25-march-25-task-packets-1311-1318` as an in-window rolling cohort under the existing live maintenance owner `CO-343`. This does not refresh `last_review` dates or hide the debt: `docs:freshness` continues to emit the cohort in `rolling_freshness_cohorts`, and CO-343 remains responsible for resolving it by review, archive, reclassification, or a new owner path before the rolling window expires.

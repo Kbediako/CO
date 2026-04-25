@@ -4,7 +4,7 @@ import process from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { existsSync } from 'node:fs';
-import { mkdir, open, readFile, readdir, realpath, stat } from 'node:fs/promises';
+import { mkdir, open, readFile, readdir, realpath, rm, stat } from 'node:fs/promises';
 
 import { logger } from '../logger.js';
 import {
@@ -35,7 +35,11 @@ import { readSharedLinearBudgetStatus, type LinearBudgetStatus } from './control
 import {
   classifyProviderLinearWorkerLifecycle,
 } from './control/providerLinearWorkflowStates.js';
-import { readControlHostOwnershipOperatorHint } from './control/controlHostOwnership.js';
+import {
+  readControlHostOwnershipDiagnosticSummary,
+  readControlHostOwnershipOperatorHint,
+  type ControlHostOwnershipPollingPayload
+} from './control/controlHostOwnership.js';
 import {
   PROVIDER_LINEAR_AUDIT_ENV_VAR,
   PROVIDER_LINEAR_PARALLELIZATION_REASONS,
@@ -56,6 +60,12 @@ import {
   PROVIDER_WORKSPACE_ROOT_DIRNAME,
   resolveProviderWorkspacePath
 } from './run/workspacePath.js';
+import {
+  countGuardrailCommands,
+  resolveGuardrailsRequiredForManifest,
+  resolveGuardrailsRequiredSourceForManifest,
+  stripNonApplicableGuardrailSummaryLines
+} from './run/manifest.js';
 import {
   buildRunMemoryPromptLines,
   selectRunMemoryForRole
@@ -108,6 +118,9 @@ const PROVIDER_LINEAR_WORKER_CHILD_LANES_LOCK_FILENAME = `${PROVIDER_LINEAR_WORK
 const PROVIDER_WORKER_DEFAULT_MAX_TURNS = 20;
 const PROVIDER_CONTROL_HOST_REFRESH_PATH = '/api/v1/refresh';
 const PROVIDER_CONTROL_HOST_REFRESH_TIMEOUT_MS = 15_000;
+const PROVIDER_CONTROL_HOST_REFRESH_RETRY_DELAY_MS = 250;
+const PROVIDER_CONTROL_HOST_REFRESH_FAILURE_FILENAME =
+  'provider-control-host-refresh-failure.json';
 const PROVIDER_LINEAR_TRACKED_ISSUE_RATE_LIMIT_MAX_WAIT_MS = 15_000;
 const PROVIDER_LINEAR_TRACKED_ISSUE_RATE_LIMIT_BUCKETS = [
   {
@@ -260,6 +273,19 @@ export interface ProviderLinearWorkerChildLaneRecord {
   artifact_root: string;
   log_path: string | null;
   summary: string | null;
+  guardrails_required?: boolean | null;
+  guardrails_required_source?: string | null;
+  guardrail_command_count?: number | null;
+  runtime_mode?: string | null;
+  runtime_provider?: string | null;
+  heartbeat_at?: string | null;
+  heartbeat_stale_after_seconds?: number | null;
+  runner_pid?: number | null;
+  runner_alive?: boolean | null;
+  runtime_event?: string | null;
+  runtime_event_at?: string | null;
+  stale_invalidation_candidate?: boolean | null;
+  stale_invalidation_reason?: string | null;
   issue_id: string;
   issue_identifier: string;
   workspace_path: string | null;
@@ -273,16 +299,6 @@ export interface ProviderLinearWorkerChildLaneRecord {
   lane_workspace_path: string | null;
   patch_artifact_path: string | null;
   patch_bytes: number | null;
-  runtime_mode?: string | null;
-  runtime_provider?: string | null;
-  heartbeat_at?: string | null;
-  heartbeat_stale_after_seconds?: number | null;
-  runner_pid?: number | null;
-  runner_alive?: boolean | null;
-  runtime_event?: string | null;
-  runtime_event_at?: string | null;
-  stale_invalidation_candidate?: boolean | null;
-  stale_invalidation_reason?: string | null;
   decision: ProviderLinearWorkerChildLaneDecision;
   in_flight_action?: ProviderLinearWorkerChildLaneInFlightAction | null;
   in_flight_started_at?: string | null;
@@ -298,6 +314,7 @@ export type ProviderLinearWorkerDiagnosticCategory =
   | 'cloud_denial'
   | 'guardian_timeout'
   | 'guardian_policy_denial'
+  | 'provider_stdin_bootstrap'
   | 'provider_runtime'
   | 'unknown';
 
@@ -386,6 +403,25 @@ export interface ProviderLinearTrackedIssueError {
   status: number;
   retryable: boolean;
   details?: Record<string, unknown>;
+}
+
+interface ProviderControlHostRefreshFailureDiagnostic {
+  schema_version: 1;
+  reason: 'provider_control_host_refresh_failed';
+  failure_kind: 'refresh_request_timeout' | 'fetch_failed' | 'request_failed';
+  message: string;
+  issue_id: string;
+  issue_identifier: string;
+  owner_status: ProviderLinearWorkerProof['owner_status'];
+  end_reason: string | null;
+  observed_at: string;
+  control_host_run_dir: string;
+  control_host_ownership: ControlHostOwnershipPollingPayload | null;
+  retry: {
+    attempts: number;
+    retried_after_stale_owner_reclaim: boolean;
+    recovered: false;
+  };
 }
 
 export interface ProviderLinearWorkerJsonlParseResult {
@@ -628,6 +664,10 @@ function normalizeOptionalString(value: unknown): string | null {
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeGuardrailsRequiredSource(value: unknown): string | null {
+  return value === 'explicit' || value === 'stage_detection' ? value : null;
 }
 
 function backfillProviderWorkerManifestControlHostProvenance(
@@ -1486,7 +1526,11 @@ function applyProviderLinearWorkerContextEnv(
       env[REPO_CONFIG_PATH_ENV_KEY] = preservedRepoConfigPath;
     } else {
       delete env[REPO_CONFIG_PATH_ENV_KEY];
-      if (inheritedRepoConfigPath) {
+      if (
+        inheritedRepoConfigPath &&
+        (!isProviderLinearWorkerWorkspaceRoot(context.repoRoot) ||
+          !existsSync(join(context.repoRoot, 'codex.orchestrator.json')))
+      ) {
         delete env[REPO_CONFIG_REQUIRED_ENV_KEY];
       }
     }
@@ -1802,10 +1846,12 @@ function buildParallelizationGuidance(helperCommand: string, issueId: string): s
 
 function buildDeterministicMutationSuppressionSection(
   audit: ProviderLinearAuditSummary | null,
-  attemptStartedAt: string | null
+  attemptStartedAt: string | null,
+  issueId: string
 ): string[] {
   const suppressions = deriveDeterministicProviderMutationSuppressions(audit, {
-    recordedAtNotBefore: attemptStartedAt
+    recordedAtNotBefore: attemptStartedAt,
+    issueId
   });
   if (suppressions.length === 0) {
     return [];
@@ -1832,7 +1878,8 @@ export function buildProviderWorkerPrompt(
 ): string {
   const deterministicMutationSuppressions = buildDeterministicMutationSuppressionSection(
     attemptContext.linearAudit ?? null,
-    attemptContext.attemptStartedAt ?? null
+    attemptContext.attemptStartedAt ?? null,
+    issue.id
   );
   const runMemoryPromptLines = buildRunMemoryPromptLines(
     selectRunMemoryForRole({
@@ -3370,6 +3417,29 @@ function hasProviderWorkerQuotaFailureSignal(
   return statusValues.some((value) => quotaFailureStatuses.has(value));
 }
 
+function hasProviderWorkerStdinBootstrapSignal(normalizedSignal: string): boolean {
+  return /\breading\s+additional\s+input\s+from\s+stdin\b/u.test(normalizedSignal);
+}
+
+const PROVIDER_WORKER_STDIN_BOOTSTRAP_DIAGNOSTIC_VALUES = new Set([
+  'provider_stdin_bootstrap',
+  'provider_worker_stdin_bootstrap',
+  'codex_stdin_bootstrap',
+  'stdin_bootstrap',
+  'stdin_bootstrap_failure',
+  'reading_additional_input_from_stdin',
+  'reading_additional_input_stdin',
+  'additional_input_from_stdin'
+]);
+
+const PROVIDER_WORKER_RUNTIME_DIAGNOSTIC_VALUES = new Set([
+  ...PROVIDER_WORKER_STDIN_BOOTSTRAP_DIAGNOSTIC_VALUES,
+  'provider_runtime',
+  'runtime_parity_command_unavailable',
+  'appserver_runtime_error',
+  'codex_exec_error'
+]);
+
 function classifyProviderWorkerFailureDiagnosis(
   input: Record<string, unknown>,
   source: ProviderLinearWorkerCurrentTurnActivitySource
@@ -3393,7 +3463,8 @@ function classifyProviderWorkerFailureDiagnosis(
     observed_at: timestamp
   });
   const structuredCategory = classifyProviderWorkerStructuredDiagnosticCategory(input);
-  if (structuredCategory) {
+  const hasStdinBootstrapSignal = hasProviderWorkerStdinBootstrapSignal(normalizedClassification);
+  if (structuredCategory && structuredCategory !== 'provider_runtime') {
     return build(structuredCategory, providerWorkerDiagnosticGuidance(structuredCategory));
   }
   const guardianTimeoutSignal =
@@ -3470,6 +3541,15 @@ function classifyProviderWorkerFailureDiagnosis(
       'Codex Cloud environment configuration is missing or invalid; set CODEX_CLOUD_ENV_ID or task metadata.'
     );
   }
+  if (hasStdinBootstrapSignal) {
+    return build(
+      'provider_stdin_bootstrap',
+      providerWorkerDiagnosticGuidance('provider_stdin_bootstrap')
+    );
+  }
+  if (structuredCategory) {
+    return build(structuredCategory, providerWorkerDiagnosticGuidance(structuredCategory));
+  }
   if (
     /\b(appserver|provider runtime|runtime parity|codex exec|enoent|websocket|rpc)\b/u.test(
       normalizedClassification
@@ -3501,6 +3581,8 @@ function providerWorkerDiagnosticGuidance(
       return 'Codex Cloud environment configuration is missing or invalid; set CODEX_CLOUD_ENV_ID or task metadata.';
     case 'auth_mismatch':
       return 'The active Codex account/auth profile appears mismatched or unavailable; verify the selected profile/account.';
+    case 'provider_stdin_bootstrap':
+      return 'Codex exited during stdin bootstrap before issue execution; inspect the control-host to provider-linear-worker Codex exec stdin/prompt handoff, not issue-specific content.';
     case 'provider_runtime':
       return 'Provider/runtime execution is implicated; inspect runtime selection and provider command logs.';
     default:
@@ -3585,14 +3667,10 @@ function classifyProviderWorkerStructuredDiagnosticValue(
   ) {
     return 'env_config';
   }
-  if (
-    [
-      'provider_runtime',
-      'runtime_parity_command_unavailable',
-      'appserver_runtime_error',
-      'codex_exec_error'
-    ].includes(normalized)
-  ) {
+  if (PROVIDER_WORKER_RUNTIME_DIAGNOSTIC_VALUES.has(normalized)) {
+    if (PROVIDER_WORKER_STDIN_BOOTSTRAP_DIAGNOSTIC_VALUES.has(normalized)) {
+      return 'provider_stdin_bootstrap';
+    }
     return 'provider_runtime';
   }
   return null;
@@ -4468,6 +4546,9 @@ function resolveProviderLinearWorkerParallelizationFailure(input: {
       issueId: input.proof.issue_id
     }
   ).slice(input.parallelizationDecisionCountBeforeTurn);
+  const currentTurnBoundary =
+    normalizeOptionalString(input.proof.current_turn_started_at) ??
+    normalizeOptionalString(input.proof.attempt_started_at);
   if (currentTurnParallelizationDecisions.length === 0) {
     return {
       endReason: 'parallelization_decision_missing',
@@ -4486,7 +4567,7 @@ function resolveProviderLinearWorkerParallelizationFailure(input: {
   if (parallelization.decision !== 'parallelize_now') {
     if (!hasCurrentTurnChildLaneLaunch(
       input.proof.child_lanes,
-      input.proof.current_turn_started_at
+      currentTurnBoundary
     )) {
       return null;
     }
@@ -4498,7 +4579,7 @@ function resolveProviderLinearWorkerParallelizationFailure(input: {
   }
   if (hasCurrentTurnSuccessfulChildLaneLaunch(
     input.proof.child_lanes,
-    input.proof.current_turn_started_at
+    currentTurnBoundary
   )) {
     return null;
   }
@@ -5113,6 +5194,9 @@ interface ProviderLinearWorkerChildLaneManifestHydrationCandidate {
   laneWorkspacePath: string | null;
   patchArtifactPath: string | null;
   patchBytes: number | null;
+  guardrailsRequired: boolean | null;
+  guardrailsRequiredSource: string | null;
+  guardrailCommandCount: number | null;
   summaryRecordedAt: string | null;
   runtimeMode: string | null;
   runtimeProvider: string | null;
@@ -5327,6 +5411,9 @@ async function hydrateProviderLinearWorkerChildLaneFromActiveManifest(
     log_path: candidate.logPath,
     summary,
     summary_recorded_at: summaryRecordedAt,
+    guardrails_required: candidate.guardrailsRequired,
+    guardrails_required_source: candidate.guardrailsRequiredSource,
+    guardrail_command_count: candidate.guardrailCommandCount,
     lane_workspace_path: candidate.laneWorkspacePath ?? childLane.lane_workspace_path,
     patch_artifact_path: candidate.patchArtifactPath ?? childLane.patch_artifact_path,
     patch_bytes: candidate.patchBytes ?? childLane.patch_bytes,
@@ -5680,7 +5767,8 @@ async function readProviderLinearWorkerChildLaneManifestCandidate(
         ? patchBytes === 0
           ? 'Child lane completed without patch output; waiting for parent ledger decision.'
           : 'Child lane completed; waiting for patch proof metadata.'
-        : normalizeOptionalString(parsed.summary) ?? normalizeOptionalString(parsed.status_detail)
+        : stripNonApplicableGuardrailSummaryLines(parsed, normalizeOptionalString(parsed.summary)) ??
+          normalizeOptionalString(parsed.status_detail)
     );
   return {
     runId,
@@ -5694,6 +5782,9 @@ async function readProviderLinearWorkerChildLaneManifestCandidate(
     laneWorkspacePath: proofMetadata?.laneWorkspacePath ?? null,
     patchArtifactPath: proofMetadata?.patchArtifactPath ?? null,
     patchBytes: proofMetadata?.patchBytes ?? null,
+    guardrailsRequired: resolveGuardrailsRequiredForManifest(parsed),
+    guardrailsRequiredSource: resolveGuardrailsRequiredSourceForManifest(parsed),
+    guardrailCommandCount: countGuardrailCommands(parsed),
     summaryRecordedAt: staleDiagnostic?.observedAt ?? summaryRecordedAt,
     runtimeMode,
     runtimeProvider,
@@ -6124,6 +6215,9 @@ function normalizeProviderLinearWorkerChildLaneRecord(
     artifact_root: artifactRoot,
     log_path: normalizeOptionalString(value.log_path),
     summary: normalizeOptionalString(value.summary),
+    guardrails_required: typeof value.guardrails_required === 'boolean' ? value.guardrails_required : null,
+    guardrails_required_source: normalizeGuardrailsRequiredSource(value.guardrails_required_source),
+    guardrail_command_count: normalizeOptionalInteger(value.guardrail_command_count),
     issue_id: issueId,
     issue_identifier: issueIdentifier,
     workspace_path: normalizeOptionalString(value.workspace_path),
@@ -6227,6 +6321,7 @@ function isLocalProcessAlive(pid: number): boolean {
     return (error as NodeJS.ErrnoException)?.code === 'EPERM';
   }
 }
+
 async function resolveProviderWorkerRunLocation(
   currentManifestPath: string,
 ): Promise<ProviderWorkerRunLocation | null> {
@@ -6509,112 +6604,273 @@ async function requestProviderControlHostRefresh(input: {
     return;
   }
   let controlHostRunDir: string | null = null;
-  try {
-    const manifestTarget = await resolveProviderControlHostManifestPath(
-      input.currentManifestPath,
-      input.env,
-      input.manifest
-    );
-    if (!manifestTarget) {
-      return;
-    }
-    const canonicalRunsRoot = manifestTarget.currentRun.canonicalRunsRoot;
-    const canonicalRunDir = await realpathOrResolveIfMissing(dirname(manifestTarget.manifestPath));
-    controlHostRunDir = canonicalRunDir;
-    const canonicalManifestPath = await realpathOrResolveIfMissing(
-      resolve(canonicalRunDir, basename(manifestTarget.manifestPath))
-    );
-    if (
-      !isPathWithinRoot(canonicalRunDir, canonicalRunsRoot) ||
-      !isPathWithinRoot(canonicalManifestPath, canonicalRunsRoot)
-    ) {
-      throw new Error('control-host manifest path invalid');
-    }
-    const workerTaskId = resolveProviderWorkerTaskId(manifestTarget.currentRun, input.manifest);
-    if (!workerTaskId) {
-      throw new Error('provider task id unavailable');
-    }
-    const controlHostRepoRoot = await resolveProviderControlHostRepoRoot({
-      manifestPath: canonicalManifestPath,
-      workerWorkspacePath: input.repoRoot,
-      taskId: workerTaskId
-    });
-    if (!controlHostRepoRoot) {
-      throw new Error('control-host repo root unavailable');
-    }
-    const allowedBindHosts = await resolveAllowedControlHostBindHosts(controlHostRepoRoot, input.env);
-    const endpointPath = resolve(canonicalRunDir, 'control_endpoint.json');
-    const canonicalEndpointPath = await realpath(endpointPath);
-    if (!isPathWithinRoot(canonicalEndpointPath, canonicalRunDir)) {
-      throw new Error('control endpoint path invalid');
-    }
-    const endpointRaw = await readFile(canonicalEndpointPath, 'utf8');
-    const endpoint = JSON.parse(endpointRaw) as { base_url?: unknown; token_path?: unknown };
-    const baseUrl = validateControlHostBaseUrl(endpoint.base_url, allowedBindHosts);
-    const resolvedTokenPath =
-      typeof endpoint.token_path === 'string' && endpoint.token_path.trim().length > 0
-        ? resolve(canonicalRunDir, endpoint.token_path)
-        : resolve(canonicalRunDir, 'control_auth.json');
-    if (!isPathWithinRoot(resolvedTokenPath, canonicalRunDir)) {
-      throw new Error('control auth path invalid');
-    }
-    const canonicalTokenPath = await realpath(resolvedTokenPath);
-    if (!isPathWithinRoot(canonicalTokenPath, canonicalRunDir)) {
-      throw new Error('control auth path invalid');
-    }
-    const token = await readControlEndpointToken(canonicalTokenPath);
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), PROVIDER_CONTROL_HOST_REFRESH_TIMEOUT_MS);
-    const requestSignal = input.abortSignal
-      ? AbortSignal.any([controller.signal, input.abortSignal])
-      : controller.signal;
+  let attempts = 0;
+  let retriedAfterStaleOwnerReclaim = false;
+  while (attempts < 2) {
+    attempts += 1;
     try {
-      const response = await fetch(new URL(PROVIDER_CONTROL_HOST_REFRESH_PATH, baseUrl), {
-        method: 'POST',
-        redirect: 'error',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-          [CSRF_HEADER]: token
-        },
-        body: JSON.stringify({
-          action: 'refresh',
-          source: 'provider-linear-worker',
-          issue_id: input.proof.issue_id,
-          issue_identifier: input.proof.issue_identifier,
-          owner_status: input.proof.owner_status,
-          end_reason: input.proof.end_reason
-        }),
-        signal: requestSignal
+      controlHostRunDir = await requestProviderControlHostRefreshOnce({
+        currentManifestPath: input.currentManifestPath,
+        env: input.env,
+        manifest: input.manifest,
+        proof: input.proof,
+        repoRoot: input.repoRoot,
+        abortSignal: input.abortSignal
       });
-      const responseBody = await response.text();
-      if (response.status !== 202) {
-        const responseDetail = responseBody.trim();
-        throw new Error(
-          responseDetail
-            ? `refresh request failed with status ${response.status}: ${responseDetail}`
-            : `refresh request failed with status ${response.status}`
-        );
+      if (controlHostRunDir) {
+        try {
+          await rm(join(controlHostRunDir, PROVIDER_CONTROL_HOST_REFRESH_FAILURE_FILENAME), {
+            force: true
+          });
+        } catch (cleanupError) {
+          input.log.warn(
+            `provider-linear-worker could not clear stale ${PROVIDER_CONTROL_HOST_REFRESH_FAILURE_FILENAME} for ${input.proof.issue_identifier}: ${
+              (cleanupError as Error)?.message ?? String(cleanupError)
+            }`
+          );
+        }
       }
-    } finally {
-      clearTimeout(timer);
-    }
-  } catch (error) {
-    if (input.abortSignal?.aborted === true) {
+      return;
+    } catch (error) {
+      if (input.abortSignal?.aborted === true) {
+        return;
+      }
+      const message = getProviderControlHostRefreshFailureMessage(error);
+      controlHostRunDir ??= await resolveProviderControlHostRunDirForDiagnostic({
+        currentManifestPath: input.currentManifestPath,
+        env: input.env,
+        manifest: input.manifest
+      }).catch(() => null);
+      const ownershipDiagnostic = controlHostRunDir
+        ? await readControlHostOwnershipDiagnosticSummary(controlHostRunDir).catch(() => null)
+        : null;
+      if (
+        attempts === 1 &&
+        shouldRetryProviderControlHostRefreshAfterStaleOwnerReclaim(message, ownershipDiagnostic)
+      ) {
+        retriedAfterStaleOwnerReclaim = true;
+        await sleep(PROVIDER_CONTROL_HOST_REFRESH_RETRY_DELAY_MS, undefined, {
+          signal: input.abortSignal
+        }).catch(() => undefined);
+        if (input.abortSignal?.aborted) {
+          return;
+        }
+        continue;
+      }
+      if (controlHostRunDir) {
+        try {
+          await writeProviderControlHostRefreshFailureDiagnostic({
+            runDir: controlHostRunDir,
+            message,
+            issueId: input.proof.issue_id,
+            issueIdentifier: input.proof.issue_identifier,
+            ownerStatus: input.proof.owner_status,
+            endReason: input.proof.end_reason,
+            ownershipDiagnostic,
+            attempts,
+            retriedAfterStaleOwnerReclaim
+          });
+        } catch (persistError) {
+          input.log.warn(
+            `provider-linear-worker could not persist ${PROVIDER_CONTROL_HOST_REFRESH_FAILURE_FILENAME} for ${input.proof.issue_identifier}: ${
+              (persistError as Error)?.message ?? String(persistError)
+            }`
+          );
+        }
+      }
+      const ownershipHint = controlHostRunDir
+        ? await readControlHostOwnershipOperatorHint(controlHostRunDir).catch(() => null)
+        : null;
+      input.log.warn(
+        `provider-linear-worker could not request control-host refresh for ${input.proof.issue_identifier}: ${message}${
+          ownershipHint ? `; ${ownershipHint}` : ''
+        }`
+      );
       return;
     }
-    const message = (error as Error)?.name === 'AbortError'
-      ? 'refresh request timeout'
-      : (error as Error)?.message ?? String(error);
-    const ownershipHint = controlHostRunDir
-      ? await readControlHostOwnershipOperatorHint(controlHostRunDir).catch(() => null)
-      : null;
-    input.log.warn(
-      `provider-linear-worker could not request control-host refresh for ${input.proof.issue_identifier}: ${message}${
-        ownershipHint ? `; ${ownershipHint}` : ''
-      }`
-    );
   }
+}
+
+async function resolveProviderControlHostRunDirForDiagnostic(input: {
+  currentManifestPath: string;
+  env: NodeJS.ProcessEnv;
+  manifest: Record<string, unknown>;
+}): Promise<string | null> {
+  const manifestTarget = await resolveProviderControlHostManifestPath(
+    input.currentManifestPath,
+    input.env,
+    input.manifest
+  );
+  if (!manifestTarget) {
+    return null;
+  }
+  const canonicalRunDir = await realpathOrResolveIfMissing(dirname(manifestTarget.manifestPath));
+  return isPathWithinRoot(canonicalRunDir, manifestTarget.currentRun.canonicalRunsRoot)
+    ? canonicalRunDir
+    : null;
+}
+
+async function requestProviderControlHostRefreshOnce(input: {
+  currentManifestPath: string;
+  env: NodeJS.ProcessEnv;
+  manifest: Record<string, unknown>;
+  proof: ProviderLinearWorkerProof;
+  repoRoot: string;
+  abortSignal?: AbortSignal;
+}): Promise<string | null> {
+  const manifestTarget = await resolveProviderControlHostManifestPath(
+    input.currentManifestPath,
+    input.env,
+    input.manifest
+  );
+  if (!manifestTarget) {
+    return null;
+  }
+  const canonicalRunsRoot = manifestTarget.currentRun.canonicalRunsRoot;
+  const canonicalRunDir = await realpathOrResolveIfMissing(dirname(manifestTarget.manifestPath));
+  const canonicalManifestPath = await realpathOrResolveIfMissing(
+    resolve(canonicalRunDir, basename(manifestTarget.manifestPath))
+  );
+  if (
+    !isPathWithinRoot(canonicalRunDir, canonicalRunsRoot) ||
+    !isPathWithinRoot(canonicalManifestPath, canonicalRunsRoot)
+  ) {
+    throw new Error('control-host manifest path invalid');
+  }
+  const workerTaskId = resolveProviderWorkerTaskId(manifestTarget.currentRun, input.manifest);
+  if (!workerTaskId) {
+    throw new Error('provider task id unavailable');
+  }
+  const controlHostRepoRoot = await resolveProviderControlHostRepoRoot({
+    manifestPath: canonicalManifestPath,
+    workerWorkspacePath: input.repoRoot,
+    taskId: workerTaskId
+  });
+  if (!controlHostRepoRoot) {
+    throw new Error('control-host repo root unavailable');
+  }
+  const allowedBindHosts = await resolveAllowedControlHostBindHosts(controlHostRepoRoot, input.env);
+  const endpointPath = resolve(canonicalRunDir, 'control_endpoint.json');
+  const canonicalEndpointPath = await realpath(endpointPath);
+  if (!isPathWithinRoot(canonicalEndpointPath, canonicalRunDir)) {
+    throw new Error('control endpoint path invalid');
+  }
+  const endpointRaw = await readFile(canonicalEndpointPath, 'utf8');
+  const endpoint = JSON.parse(endpointRaw) as { base_url?: unknown; token_path?: unknown };
+  const baseUrl = validateControlHostBaseUrl(endpoint.base_url, allowedBindHosts);
+  const resolvedTokenPath =
+    typeof endpoint.token_path === 'string' && endpoint.token_path.trim().length > 0
+      ? resolve(canonicalRunDir, endpoint.token_path)
+      : resolve(canonicalRunDir, 'control_auth.json');
+  if (!isPathWithinRoot(resolvedTokenPath, canonicalRunDir)) {
+    throw new Error('control auth path invalid');
+  }
+  const canonicalTokenPath = await realpath(resolvedTokenPath);
+  if (!isPathWithinRoot(canonicalTokenPath, canonicalRunDir)) {
+    throw new Error('control auth path invalid');
+  }
+  const token = await readControlEndpointToken(canonicalTokenPath);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PROVIDER_CONTROL_HOST_REFRESH_TIMEOUT_MS);
+  const requestSignal = input.abortSignal
+    ? AbortSignal.any([controller.signal, input.abortSignal])
+    : controller.signal;
+  try {
+    const response = await fetch(new URL(PROVIDER_CONTROL_HOST_REFRESH_PATH, baseUrl), {
+      method: 'POST',
+      redirect: 'error',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        [CSRF_HEADER]: token
+      },
+      body: JSON.stringify({
+        action: 'refresh',
+        source: 'provider-linear-worker',
+        issue_id: input.proof.issue_id,
+        issue_identifier: input.proof.issue_identifier,
+        owner_status: input.proof.owner_status,
+        end_reason: input.proof.end_reason
+      }),
+      signal: requestSignal
+    });
+    if (response.status !== 202) {
+      const responseBody = await response.text().catch(() => '');
+      const responseDetail = responseBody.trim();
+      throw new Error(
+        responseDetail
+          ? `refresh request failed with status ${response.status}: ${responseDetail}`
+          : `refresh request failed with status ${response.status}`
+      );
+    }
+    return canonicalRunDir;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function getProviderControlHostRefreshFailureMessage(error: unknown): string {
+  return (error as Error)?.name === 'AbortError'
+    ? 'refresh request timeout'
+    : (error as Error)?.message ?? String(error);
+}
+
+function shouldRetryProviderControlHostRefreshAfterStaleOwnerReclaim(
+  message: string,
+  ownershipDiagnostic: ControlHostOwnershipPollingPayload | null
+): boolean {
+  return (
+    ownershipDiagnostic?.reason === 'stale_control_host_owner' &&
+    ownershipDiagnostic.status === 'stale_reclaimed' &&
+    (message === 'refresh request timeout' || message.includes('fetch failed'))
+  );
+}
+
+function classifyProviderControlHostRefreshFailure(
+  message: string
+): ProviderControlHostRefreshFailureDiagnostic['failure_kind'] {
+  if (message === 'refresh request timeout') {
+    return 'refresh_request_timeout';
+  }
+  if (message.includes('fetch failed')) {
+    return 'fetch_failed';
+  }
+  return 'request_failed';
+}
+
+async function writeProviderControlHostRefreshFailureDiagnostic(input: {
+  runDir: string;
+  message: string;
+  issueId: string;
+  issueIdentifier: string;
+  ownerStatus: ProviderLinearWorkerProof['owner_status'];
+  endReason: string | null;
+  ownershipDiagnostic: ControlHostOwnershipPollingPayload | null;
+  attempts: number;
+  retriedAfterStaleOwnerReclaim: boolean;
+}): Promise<void> {
+  const diagnostic: ProviderControlHostRefreshFailureDiagnostic = {
+    schema_version: 1,
+    reason: 'provider_control_host_refresh_failed',
+    failure_kind: classifyProviderControlHostRefreshFailure(input.message),
+    message: input.message,
+    issue_id: input.issueId,
+    issue_identifier: input.issueIdentifier,
+    owner_status: input.ownerStatus,
+    end_reason: input.endReason,
+    observed_at: new Date().toISOString(),
+    control_host_run_dir: input.runDir,
+    control_host_ownership: input.ownershipDiagnostic,
+    retry: {
+      attempts: input.attempts,
+      retried_after_stale_owner_reclaim: input.retriedAfterStaleOwnerReclaim,
+      recovered: false
+    }
+  };
+  await writeJsonAtomic(
+    join(input.runDir, PROVIDER_CONTROL_HOST_REFRESH_FAILURE_FILENAME),
+    diagnostic
+  );
 }
 async function writeProofSnapshot(
   deps: ProviderLinearWorkerDependencies,
@@ -6629,11 +6885,7 @@ async function writeProofSnapshot(
     const childStreams = await readProviderLinearWorkerChildStreams(runDir);
     const childLanes = await readHydratedProviderLinearWorkerChildLanesAndRepairLedger(
       runDir,
-      proof.child_lanes,
-      {
-        now: deps.now,
-        isProcessAlive: isLocalProcessAlive
-      }
+      proof.child_lanes
     );
     const proofWithHydratedSources = {
       ...proof,
@@ -6746,12 +6998,41 @@ export async function refreshProviderLinearWorkerProofSnapshot(
     await writeProviderWorkerSessionLogHydrationState(runDir, proofWithSessionTelemetryResult.hydrationState);
     if (
       options.emitProgressEvent &&
-      JSON.stringify(parsed.progress ?? null) !== JSON.stringify(hydrated.progress ?? null)
+      buildProviderLinearWorkerProgressSemanticSignature(parsed.progress ?? null)
+        !== buildProviderLinearWorkerProgressSemanticSignature(hydrated.progress ?? null)
     ) {
       options.emitProgressEvent(formatProviderLinearWorkerProgressEvent(hydrated));
     }
     return hydrated;
   });
+}
+
+export function buildProviderLinearWorkerProgressSemanticSignature(
+  progress: ProviderLinearWorkerProgressSnapshot | null | undefined
+): string | null {
+  if (!progress) {
+    return null;
+  }
+  // Hydration metadata changes often outnumber operator-visible state changes.
+  return JSON.stringify({
+    phase: progress.phase ?? null,
+    kind: progress.kind ?? null,
+    status: progress.status ?? null,
+    summary: progress.summary ?? null,
+    stall_classification: progress.stall_classification ?? null,
+    stall_reason: progress.stall_reason ?? null,
+    recovery_recommendation: progress.recovery_recommendation ?? null
+  });
+}
+
+export function shouldEmitProviderLinearWorkerProgressSignatureTransition(
+  previousSignature: string | null | undefined,
+  nextSignature: string | null
+): boolean {
+  if (previousSignature === undefined && nextSignature === null) {
+    return false;
+  }
+  return previousSignature !== nextSignature;
 }
 
 function formatProviderLinearWorkerProgressEvent(proof: ProviderLinearWorkerProof): string {
@@ -6847,12 +7128,12 @@ export async function runProviderLinearWorker(
     end_reason: null,
     updated_at: attemptStartedAt
   };
-  let lastProgressSignature: string | null = null;
+  let lastProgressSignature: string | null | undefined = undefined;
 
   const emitSemanticProgressIfChanged = (proof: ProviderLinearWorkerProof): void => {
     const progress = proof.progress ?? null;
-    const signature = progress ? JSON.stringify(progress) : null;
-    if (!signature || signature === lastProgressSignature) {
+    const signature = buildProviderLinearWorkerProgressSemanticSignature(progress);
+    if (!shouldEmitProviderLinearWorkerProgressSignatureTransition(lastProgressSignature, signature)) {
       return;
     }
     lastProgressSignature = signature;
@@ -7238,12 +7519,6 @@ export async function runProviderLinearWorker(
       };
       const previousTurnProof = finalProof;
       const turnStartedAt = deps.now();
-      const parallelizationDecisionCountBeforeTurn = readProviderLinearParallelizationSnapshots(
-        finalProof.linear_audit,
-        {
-          issueId: finalProof.issue_id
-        }
-      ).length;
       finalProof = await writeProofSnapshot(
         deps,
         context.runDir,
@@ -7251,6 +7526,12 @@ export async function runProviderLinearWorker(
         buildProviderLinearWorkerTurnBootstrapProof(finalProof, turnNumber, turnStartedAt),
         childEnv
       );
+      const parallelizationDecisionCountBeforeTurn = readProviderLinearParallelizationSnapshots(
+        finalProof.linear_audit,
+        {
+          issueId: finalProof.issue_id
+        }
+      ).length;
       emitSemanticProgressIfChanged(finalProof);
       const liveSessionTailState: ProviderWorkerSessionLogTailState | null =
         runtimeContext.runtime.selected_mode === 'appserver'

@@ -1,5 +1,7 @@
-# Abetka Mirror Assets (Archived)
+# Abetka Mirror Assets
 
-The mirrored site assets formerly stored here were moved to `.runs/0801-dead-code-pruning/archive/2025-12-08T10-01-24Z/packages/abetkaua/public/` as part of Task 0801 dead-code pruning.
+`packages/abetkaua/public/` is rebuilt on demand and no historical snapshot is tracked in fresh checkouts after Task 0801 dead-code pruning.
 
-Regenerate fresh assets with `npm run mirror:fetch -- --project abetkaua` or copy from the archive path above if you need the prior snapshot.
+- Regenerate fresh assets: `npm run mirror:fetch -- --project abetkaua`
+- Validate the rebuilt mirror: `npm run mirror:check -- --project abetkaua`
+- Serve locally: `npm run mirror:serve -- --project abetkaua --port 4173`

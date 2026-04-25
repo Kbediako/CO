@@ -58,6 +58,7 @@ jobs:
   archive:
     runs-on: ubuntu-latest
     permissions:
+      actions: write
       contents: write
       pull-requests: write
     steps:
@@ -168,6 +169,31 @@ jobs:
           labels: ${{ inputs.pr_labels }}
           branch: ${{ inputs.pr_branch }}
           delete-branch: true
+
+      - name: Dispatch Core Lane for archive PR
+        if: steps.changes.outputs.changed == 'true' && steps.cpr.outputs.pull-request-number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_BRANCH: ${{ inputs.pr_branch }}
+          PR_HEAD_SHA: ${{ steps.cpr.outputs.pull-request-head-sha }}
+          PR_NUMBER: ${{ steps.cpr.outputs.pull-request-number }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${PR_BRANCH}" ] || [ -z "${PR_HEAD_SHA}" ]; then
+            echo "::error::Archive PR branch input or create-pull-request head SHA is missing."
+            exit 1
+          fi
+
+          gh workflow run core-lane.yml \
+            --repo "${GH_REPO}" \
+            --ref "${PR_BRANCH}" \
+            -f "archive_pr_number=${PR_NUMBER}" \
+            -f "archive_pr_branch=${PR_BRANCH}" \
+            -f "archive_pr_head_sha=${PR_HEAD_SHA}"
+
+          echo "Dispatched Core Lane for archive PR #${PR_NUMBER} (${PR_BRANCH} @ ${PR_HEAD_SHA})." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Check auto-merge token
         if: steps.changes.outputs.changed == 'true' && inputs.enable_auto_merge

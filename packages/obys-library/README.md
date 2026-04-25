@@ -1,19 +1,21 @@
 # Obys Library Clone
 
-Pixel-perfect local clone of https://library.obys.agency for HiFi toolkit testing. The prior static payload now lives in `.runs/0801-dead-code-pruning/archive/2025-12-08T10-01-24Z/packages/obys-library/public/`.
+Pixel-perfect local clone of https://library.obys.agency for HiFi toolkit testing. Tracked checkout only retains the mirror configuration, package harness, and a placeholder `public/` README. Task 0801 removed the checked-in static payload; the prior `.runs` archive copy is not a durable repository artifact and should not be restored from ignored local output.
 
 ## Run locally
 
-1. Restore assets from the archive above or re-run the mirror fetch to repopulate `public/`.
-2. `cd packages/obys-library`
-3. `npm start` (shared mirror harness defaults to port 4173, honors `PORT`, CSP flag `MIRROR_CSP=self|strict|off`, and byte-range support for media)
+1. From the repo root, refresh the mirror: `npm run mirror:fetch -- --project obys-library`
+2. Validate the regenerated mirror: `npm run mirror:check -- --project obys-library`
+3. Serve through the shared harness: `npm run mirror:serve -- --project obys-library --port 4173`
 4. Open `http://localhost:4173` for the mirrored experience.
+
+Set `MCP_RUNNER_TASK_ID=<task-id>` before mirror commands when you need manifests routed to a task-scoped local run directory.
 
 ## Structure
 
-- `public/` — mirrored HTML for all routes; currently a README pointer until assets are restored.
-- `mirror.config.json` — origin/routes/rewrites used by the root mirror:fetch + mirror:check scripts.
-- `package.json` — scripts for serving the site; no external dependencies required.
+- `public/` - mirrored HTML for all routes after regeneration; currently a README placeholder.
+- `mirror.config.json` - origin/routes/rewrites used by the root mirror:fetch + mirror:check scripts.
+- `package.json` - scripts for serving the site; no external dependencies required.
 
 ## Notes
 
