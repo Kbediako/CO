@@ -7,7 +7,7 @@ Codex Orchestrator (CO) is a CLI and runtime for Codex-driven pipelines, auditab
 This README tracks the current `main` branch. Published-package users should follow the README and docs for the tag or release they installed.
 
 - Latest package docs: [GitHub releases](https://github.com/Kbediako/CO/releases/latest)
-- Older `v0.1.38` package docs: [README for `v0.1.38`](https://github.com/Kbediako/CO/blob/v0.1.38/README.md)
+- Older `v0.2.0` package docs: [README for `v0.2.0`](https://github.com/Kbediako/CO/blob/v0.2.0/README.md)
 - Detailed source-head docs: [docs/book/README.md](docs/book/README.md)
 
 ## Install

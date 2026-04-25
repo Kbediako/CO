@@ -1,7 +1,49 @@
 {
   "version": 1,
-  "generated_at": "2026-04-25",
+  "generated_at": "2026-04-26",
   "entries": [
+    {
+      "path": ".agent/task/co-361-first-post-v0-2-0-release-prep.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-26",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-co-361-first-post-v0-2-0-release-prep.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-26",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-co-361-first-post-v0-2-0-release-prep.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-26",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-co-361-first-post-v0-2-0-release-prep.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-26",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/co-361-first-post-v0-2-0-release-prep.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-26",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-co-361-first-post-v0-2-0-release-prep.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-26",
+      "cadence_days": 30
+    },
     {
       "path": ".agent/task/linear-12ae0840-e4dc-4181-8db6-2fdf02ef270b.md",
       "owner": "Codex (top-level agent), Review agent",
