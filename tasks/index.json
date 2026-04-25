@@ -15114,11 +15114,7 @@
         "spec": "tasks/specs/linear-co-373-cloudpreflight-flake.md",
         "task": "tasks/tasks-linear-co-373-cloudpreflight-flake.md",
         "agent_task": ".agent/task/linear-co-373-cloudpreflight-flake.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-co-373-cloudpreflight-flake.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-co-373-cloudpreflight-flake.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-co-373-cloudpreflight-flake.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-co-373-cloudpreflight-flake.md"
       }
     }
   ]

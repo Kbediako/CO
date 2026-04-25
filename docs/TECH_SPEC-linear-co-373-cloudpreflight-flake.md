@@ -15,7 +15,7 @@ last_review: 2026-04-25
 - Task checklist: `tasks/tasks-linear-co-373-cloudpreflight-flake.md`
 
 ## Summary
-- Objective: stabilize the CloudPreflight fake Codex CLI harness that is blocking archive/release Core Lane evidence.
+- Objective: stabilize the CloudPreflight fake Codex CLI harness that is blocking archive and release Core Lane evidence.
 - Scope: keep the implementation narrow to `orchestrator/tests/CloudPreflight.test.ts` unless source inspection proves `cloudPreflight.ts` needs a production fix.
 - Validation: focused and CI-shaped CloudPreflight tests, followed by PR Core Lane and archive/release unblock evidence.
 
