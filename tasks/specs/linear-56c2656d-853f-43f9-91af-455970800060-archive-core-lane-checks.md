@@ -38,6 +38,13 @@ See also:
 - No broader docs-freshness or registry policy changes.
 - No secret rotation or GitHub branch-protection mutation.
 
+## Not done if
+- Archive PR heads still lack a `Core Lane` result.
+- Dispatch failures do not fail the archive automation run.
+- The fix only unblocks PR `#637` while future archive PRs can reproduce the missing-check state.
+- Diff budget or downstream-scope checks cannot resolve PR metadata from the archive dispatch inputs.
+- The out-of-scope `CO-362` auto-merge token repair becomes a blocker for producing the required `Core Lane` check.
+
 ## Parity matrix
 | Surface | Current behavior | Target behavior |
 | --- | --- | --- |
