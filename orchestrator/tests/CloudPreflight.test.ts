@@ -208,6 +208,12 @@ describe('buildCloudPreflightRequest', () => {
         expectedMessage: "environment 'env-missing-zero' not found"
       },
       {
+        environmentId: 'env-credential-token',
+        stderr: "Error: environment 'env-credential-token' not found; run codex cloud to list available environments",
+        exitCode: 1,
+        expectedMessage: "environment 'env-credential-token' not found"
+      },
+      {
         environmentId: 'env-long-warning',
         stderr: `${longWarning}\nError: environment 'env-long-warning' not found; run codex cloud to list available environments`,
         exitCode: 1,
@@ -245,5 +251,24 @@ describe('buildCloudPreflightRequest', () => {
       ])
     );
     expect(result.issues.map((issue) => issue.code)).not.toContain('missing_environment');
+  });
+
+  it('classifies requested-env not-found probe failures as unavailable when wrapped auth signals are present', async () => {
+    const { result } = await runCloudPreflightWithCloudList({
+      environmentId: 'env-forbidden',
+      stderr: 'Error: environment env-forbidden not found; forbidden for active account',
+      exitCode: 1
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'environment_unavailable',
+          message: expect.stringContaining('forbidden for active account')
+        })
+      ])
+    );
+    expect(result.issues.map((issue) => issue.code)).not.toContain('environment_not_found');
   });
 });

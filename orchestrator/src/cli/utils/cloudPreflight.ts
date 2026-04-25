@@ -155,10 +155,32 @@ function isEnvironmentNotFoundSignal(signal: string, environmentId: string): boo
   );
 }
 
+function maskCloudPreflightEnvironmentIdentifierValues(signal: string): string {
+  return signal
+    .toLowerCase()
+    .replace(/\benvironment\s+(?:['"][^'"]+['"]|[^\s'"]+)\s+not\s+found\b/gu, 'environment <env-id> not found')
+    .replace(/\bcodex_cloud_env_id\s+(?:['"][^'"]+['"]|[^\s'"]+)/gu, 'codex_cloud_env_id <env-id>')
+    .replace(/\bcodex cloud env id\s+(?:['"][^'"]+['"]|[^\s'"]+)/gu, 'codex cloud env id <env-id>');
+}
+
+function hasWrappedEnvironmentProbeUnavailableSignal(signal: string): boolean {
+  const normalized = maskCloudPreflightEnvironmentIdentifierValues(signal);
+  return (
+    /\b(?:missing[_ -]github[_ -]connector[_ -]link|github connection not found|github connector not found)\b/u.test(normalized) ||
+    /\b(?:cloud denial|cloud-denial|cloud_denial|cloud denied|not allowed in cloud|cloud access denied|cloud execution denied)\b/u.test(normalized) ||
+    /\b(?:forbidden|unauthorized|not logged in|login required|active account|active profile|account mismatch|profile mismatch|invalid token|expired token|token expired|missing token|token missing|api key|auth token|access token|refresh token|bearer token)\b/u.test(normalized) ||
+    /\b(?:rate limit|rate-limit|rate_limited|rate_limit_exceeded|quota|too many requests|usage limit|usage_limit_reached)\b/u.test(normalized) ||
+    /\b(?:enotfound|econn|network|timed out|timeout|502|503|504|bad gateway|service unavailable|gateway timeout)\b/u.test(normalized)
+  );
+}
+
 function buildEnvironmentProbeIssue(environmentId: string, result: CommandResult): CloudPreflightIssue {
   const fullDetail = readCloudPreflightCommandOutput(result);
   const detail = compactCloudPreflightCommandOutput(result);
-  if (isEnvironmentNotFoundSignal(fullDetail, environmentId)) {
+  if (
+    isEnvironmentNotFoundSignal(fullDetail, environmentId) &&
+    !hasWrappedEnvironmentProbeUnavailableSignal(fullDetail)
+  ) {
     return {
       code: 'environment_not_found',
       message:
