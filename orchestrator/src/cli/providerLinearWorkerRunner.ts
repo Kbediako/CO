@@ -467,6 +467,7 @@ interface ProviderWorkerSessionLogTailState {
   offsetBytes: number;
   trailingText: string;
   bootstrapPending: boolean;
+  currentTurnStartedAt?: string | null;
 }
 
 interface ProviderWorkerSessionLogHydrationState {
@@ -4148,21 +4149,25 @@ function normalizeProviderWorkerSessionLogHydrationState(
 
 function buildProviderWorkerSessionLogTailState(
   path: string,
-  hydrationState: ProviderWorkerSessionLogHydrationState | null
+  hydrationState: ProviderWorkerSessionLogHydrationState | null,
+  currentTurnStartedAt: string | null = null
 ): ProviderWorkerSessionLogTailState {
+  const normalizedCurrentTurnStartedAt = normalizeOptionalString(currentTurnStartedAt);
   if (!hydrationState || hydrationState.path !== path) {
     return {
       path,
       offsetBytes: 0,
       trailingText: '',
-      bootstrapPending: true
+      bootstrapPending: true,
+      currentTurnStartedAt: normalizedCurrentTurnStartedAt
     };
   }
   return {
     path,
     offsetBytes: hydrationState.offset_bytes,
     trailingText: hydrationState.trailing_text,
-    bootstrapPending: hydrationState.bootstrap_pending
+    bootstrapPending: hydrationState.bootstrap_pending,
+    currentTurnStartedAt: normalizedCurrentTurnStartedAt
   };
 }
 
@@ -4286,6 +4291,7 @@ function selectProviderWorkerSessionBootstrapLines(
   lines: string[],
   options: {
     requireTurnContext: boolean;
+    currentTurnStartedAt?: string | null;
   } = { requireTurnContext: false }
 ): string[] {
   let latestSessionMetaIndex = -1;
@@ -4322,6 +4328,18 @@ function selectProviderWorkerSessionBootstrapLines(
     return lines;
   }
   if (latestTurnCompleted) {
+    if (
+      isProviderWorkerSessionBootstrapLineAtOrAfter(
+        lines[latestTurnContextIndex] ?? '',
+        options.currentTurnStartedAt ?? null
+      )
+    ) {
+      const bootstrapLines =
+        latestSessionMetaIndex >= 0 && latestSessionMetaIndex < latestTurnContextIndex
+          ? [lines[latestSessionMetaIndex] ?? '']
+          : [];
+      return [...bootstrapLines, ...lines.slice(latestTurnContextIndex)];
+    }
     return latestSessionMetaIndex >= 0 ? [lines[latestSessionMetaIndex] ?? ''] : [];
   }
   const bootstrapLines =
@@ -4329,6 +4347,26 @@ function selectProviderWorkerSessionBootstrapLines(
       ? [lines[latestSessionMetaIndex] ?? '']
       : [];
   return [...bootstrapLines, ...lines.slice(latestTurnContextIndex)];
+}
+
+function providerWorkerSessionJsonlLineTimestamp(line: string): string | null {
+  const parsed = parseProviderWorkerSessionJsonlLine(line);
+  if (!parsed) {
+    return null;
+  }
+  return normalizeOptionalString(parsed.timestamp);
+}
+
+function isProviderWorkerSessionBootstrapLineAtOrAfter(
+  line: string,
+  floorTimestamp: string | null
+): boolean {
+  const normalizedFloor = normalizeOptionalString(floorTimestamp);
+  if (!normalizedFloor) {
+    return false;
+  }
+  const lineTimestamp = providerWorkerSessionJsonlLineTimestamp(line);
+  return lineTimestamp !== null && compareIsoTimestamp(lineTimestamp, normalizedFloor) >= 0;
 }
 
 function applyProviderWorkerSessionLogDelta(
@@ -4347,7 +4385,10 @@ function applyProviderWorkerSessionLogDelta(
   const requireTurnContext = tailState.bootstrapPending && parseState.turnId === null;
   const linesToApply =
     tailState.bootstrapPending && lines.length > 0
-      ? selectProviderWorkerSessionBootstrapLines(lines, { requireTurnContext })
+      ? selectProviderWorkerSessionBootstrapLines(lines, {
+          requireTurnContext,
+          currentTurnStartedAt: tailState.currentTurnStartedAt ?? null
+        })
       : lines;
   let changed = false;
   for (const line of linesToApply) {
@@ -4376,7 +4417,10 @@ function flushProviderWorkerSessionLogTail(
   const shouldBootstrap = tailState.bootstrapPending;
   const requireTurnContext = shouldBootstrap && parseState.turnId === null;
   const trailingLines = shouldBootstrap
-    ? selectProviderWorkerSessionBootstrapLines([trailingLine], { requireTurnContext })
+    ? selectProviderWorkerSessionBootstrapLines([trailingLine], {
+        requireTurnContext,
+        currentTurnStartedAt: tailState.currentTurnStartedAt ?? null
+      })
     : [trailingLine];
   let changed = false;
   for (const line of trailingLines) {
@@ -4690,7 +4734,11 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     parseState.currentTurnActivity = proofCurrentTurnActivity;
     parseState.failureDiagnosis = proof.failure_diagnosis ?? null;
   };
-  let tailState = buildProviderWorkerSessionLogTailState(sessionLogPath, hydrationState);
+  let tailState = buildProviderWorkerSessionLogTailState(
+    sessionLogPath,
+    hydrationState,
+    proof.current_turn_started_at ?? null
+  );
   let preserveProofTelemetryFloor = false;
   if (hydrationState && hydrationState.path === sessionLogPath) {
     const proofSignature = buildProviderWorkerSessionLogHydrationProofSignature(proof);
@@ -4703,14 +4751,16 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
           path: sessionLogPath,
           offsetBytes: fileStat.size,
           trailingText: tailState.trailingText,
-          bootstrapPending: true
+          bootstrapPending: true,
+          currentTurnStartedAt: tailState.currentTurnStartedAt ?? null
         };
       } else if (fileStat.size < tailState.offsetBytes) {
         tailState = {
           path: sessionLogPath,
           offsetBytes: 0,
           trailingText: '',
-          bootstrapPending: true
+          bootstrapPending: true,
+          currentTurnStartedAt: tailState.currentTurnStartedAt ?? null
         };
       } else {
         preserveProofTelemetryFloor = true;
@@ -5378,7 +5428,13 @@ async function hydrateProviderLinearWorkerChildLaneFromActiveManifest(
   }
   const reservationPlaceholder = isProviderLinearWorkerChildLaneReservationPlaceholder(childLane);
   const candidate = reservationPlaceholder
-    ? await findMatchingProviderLinearWorkerChildLaneManifest(parent, childLane, childCliDir, options)
+    ? await findMatchingProviderLinearWorkerChildLaneManifest(
+      parent,
+      childLane,
+      childCliDir,
+      options,
+      priorHydratedChildLane
+    )
     : await readProviderLinearWorkerChildLaneManifestCandidate(
       parent,
       childLane,
@@ -5387,7 +5443,8 @@ async function hydrateProviderLinearWorkerChildLaneFromActiveManifest(
         childLane.manifest_path,
         childLane.workspace_path ?? parent.workspacePath
       ) ?? join(childCliDir, childLane.run_id, 'manifest.json'),
-      options
+      options,
+      priorHydratedChildLane
     );
   if (!candidate) {
     return childLane;
@@ -5620,7 +5677,8 @@ async function findMatchingProviderLinearWorkerChildLaneManifest(
   parent: ProviderLinearWorkerParentManifestHydrationMetadata,
   childLane: ProviderLinearWorkerChildLaneRecord,
   childCliDir: string,
-  options: ProviderLinearWorkerChildLaneHydrationOptions
+  options: ProviderLinearWorkerChildLaneHydrationOptions,
+  priorHydratedChildLane: ProviderLinearWorkerChildLaneRecord | null = null
 ): Promise<ProviderLinearWorkerChildLaneManifestHydrationCandidate | null> {
   let entries: Array<{ isDirectory(): boolean; name: string }>;
   try {
@@ -5637,7 +5695,8 @@ async function findMatchingProviderLinearWorkerChildLaneManifest(
           childLane,
           childCliDir,
           join(childCliDir, entry.name, 'manifest.json'),
-          options
+          options,
+          priorHydratedChildLane
         )
       )
   );
@@ -5654,7 +5713,8 @@ async function readProviderLinearWorkerChildLaneManifestCandidate(
   childLane: ProviderLinearWorkerChildLaneRecord,
   childCliDir: string,
   manifestPath: string,
-  options: ProviderLinearWorkerChildLaneHydrationOptions
+  options: ProviderLinearWorkerChildLaneHydrationOptions,
+  priorHydratedChildLane: ProviderLinearWorkerChildLaneRecord | null = null
 ): Promise<ProviderLinearWorkerChildLaneManifestHydrationCandidate | null> {
   let parsed: unknown;
   try {
@@ -5770,9 +5830,10 @@ async function readProviderLinearWorkerChildLaneManifestCandidate(
   const successfulStatus = isSuccessfulProviderLinearWorkerChildLaneStatus(status);
   const patchBytes = proofMetadata?.patchBytes ?? null;
   const patchReady = Boolean(proofMetadata?.patchArtifactPath && patchBytes !== null && patchBytes > 0);
+  const diagnosticStatus = successfulStatus && !patchReady ? 'in_progress' : status;
   const staleDiagnostic = resolveProviderLinearWorkerChildLanePostStartupNoOutputDiagnostic({
     childLane,
-    status,
+    status: diagnosticStatus,
     runtimeMode,
     heartbeatAt,
     heartbeatStaleAfterSeconds,
@@ -5787,9 +5848,7 @@ async function readProviderLinearWorkerChildLaneManifestCandidate(
   });
   const hydratedStatus = staleDiagnostic
     ? 'stale_invalidation_candidate'
-    : successfulStatus && !patchReady
-      ? 'in_progress'
-      : status;
+    : diagnosticStatus;
   const manifestTimestamp = latestProviderLinearWorkerChildLaneManifestTimestamp(parsed);
   const summaryRecordedAt = providerLinearWorkerChildLaneSummaryRecordedAt(
     parsed,
@@ -5805,10 +5864,22 @@ async function readProviderLinearWorkerChildLaneManifestCandidate(
         : stripNonApplicableGuardrailSummaryLines(parsed, normalizeOptionalString(parsed.summary)) ??
           normalizeOptionalString(parsed.status_detail)
     );
+  const priorStaleSummaryRecordedAt =
+    staleDiagnostic &&
+    priorHydratedChildLane?.stale_invalidation_candidate === true &&
+    priorHydratedChildLane.stale_invalidation_reason === staleDiagnostic.reason
+      ? priorHydratedChildLane.summary_recorded_at
+      : null;
+  const currentStaleSummaryRecordedAt =
+    staleDiagnostic &&
+    childLane.stale_invalidation_candidate === true &&
+    childLane.stale_invalidation_reason === staleDiagnostic.reason
+      ? childLane.summary_recorded_at
+      : null;
   const staleSummaryRecordedAt =
-    staleDiagnostic && childLane.stale_invalidation_candidate === true && childLane.summary === staleDiagnostic.summary
-      ? childLane.summary_recorded_at ?? staleDiagnostic.observedAt
-      : staleDiagnostic?.observedAt ?? null;
+    staleDiagnostic
+      ? currentStaleSummaryRecordedAt ?? priorStaleSummaryRecordedAt ?? staleDiagnostic.observedAt
+      : null;
   return {
     runId,
     status: hydratedStatus,
@@ -7624,7 +7695,8 @@ export async function runProviderLinearWorker(
               path: null,
               offsetBytes: 0,
               trailingText: '',
-              bootstrapPending: true
+              bootstrapPending: true,
+              currentTurnStartedAt: turnStartedAt
             }
           : null;
       const liveSessionTailPromise =

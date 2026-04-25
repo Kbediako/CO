@@ -22,11 +22,7 @@
       "paths": {
         "spec": "tasks/specs/linear-dc23c6fa-5080-4665-89c2-f657983901bd.md",
         "task": "tasks/tasks-linear-dc23c6fa-5080-4665-89c2-f657983901bd.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-dc23c6fa-5080-4665-89c2-f657983901bd.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-dc23c6fa-5080-4665-89c2-f657983901bd.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-dc23c6fa-5080-4665-89c2-f657983901bd.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-dc23c6fa-5080-4665-89c2-f657983901bd.md"
       }
     },
     {

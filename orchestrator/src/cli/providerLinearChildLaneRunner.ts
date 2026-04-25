@@ -1922,27 +1922,35 @@ async function writeProviderLinearChildLaneDiagnostics(
   patch: Record<string, unknown>
 ): Promise<void> {
   const diagnosticsPath = join(context.runDir, PROVIDER_LINEAR_CHILD_LANE_DIAGNOSTICS_FILENAME);
-  let existing: Record<string, unknown> = {};
   try {
-    const parsed = JSON.parse(await readFile(diagnosticsPath, 'utf8')) as unknown;
-    existing = isRecord(parsed) ? parsed : {};
-  } catch {
-    existing = {};
+    let existing: Record<string, unknown> = {};
+    try {
+      const parsed = JSON.parse(await readFile(diagnosticsPath, 'utf8')) as unknown;
+      existing = isRecord(parsed) ? parsed : {};
+    } catch {
+      existing = {};
+    }
+    await writeAtomicFile(
+      diagnosticsPath,
+      `${JSON.stringify({
+        ...existing,
+        issue_id: context.issueId,
+        issue_identifier: context.issueIdentifier,
+        task_id: context.taskId,
+        run_id: context.runId,
+        parent_run_id: context.parentRunId,
+        stream: context.stream,
+        ...patch
+      }, null, 2)}\n`,
+      { ensureDir: true, encoding: 'utf8' }
+    );
+  } catch (error) {
+    logger.warn(
+      `[provider-linear-child-lane-diagnostics] failed to persist ${basename(diagnosticsPath)} at ${diagnosticsPath}: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
   }
-  await writeAtomicFile(
-    diagnosticsPath,
-    `${JSON.stringify({
-      ...existing,
-      issue_id: context.issueId,
-      issue_identifier: context.issueIdentifier,
-      task_id: context.taskId,
-      run_id: context.runId,
-      parent_run_id: context.parentRunId,
-      stream: context.stream,
-      ...patch
-    }, null, 2)}\n`,
-    { ensureDir: true, encoding: 'utf8' }
-  );
 }
 
 function buildFailedChildLaneProof(input: {

@@ -4904,9 +4904,10 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         pipeline_id: 'provider-linear-child-lane',
         issue_id: 'lin-issue-1',
         issue_identifier: 'CO-2',
-        status: 'in_progress',
+        status: 'completed',
         started_at: '2026-04-17T00:34:04.192Z',
         updated_at: '2026-04-17T00:34:30.000Z',
+        completed_at: '2026-04-17T00:34:41.000Z',
         heartbeat_at: '2026-04-17T00:34:39.000Z',
         heartbeat_stale_after_seconds: 30,
         runtime_mode: 'appserver',
@@ -5051,6 +5052,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         issue_id: 'lin-issue-1',
         issue_identifier: 'CO-2',
         attempt_started_at: '2026-03-21T09:00:00.000Z',
+        current_turn_started_at: '2026-03-21T09:00:00.000Z',
         thread_id: 'thread-1',
         latest_turn_id: null,
         latest_session_id: null,
@@ -5082,6 +5084,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       sessionLogPath,
       [
         JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.000Z',
           type: 'session_meta',
           payload: {
             id: 'thread-1',
@@ -5090,12 +5093,14 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
           }
         }),
         JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.050Z',
           type: 'turn_context',
           payload: {
             turn_id: 'turn-1'
           }
         }),
         JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.100Z',
           type: 'event_msg',
           payload: {
             type: 'token_count',
@@ -5116,6 +5121,14 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
                 window_minutes: 10080
               }
             }
+          }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.150Z',
+          type: 'event_msg',
+          payload: {
+            type: 'task_complete',
+            turn_id: 'turn-1'
           }
         })
       ].join('\n'),
@@ -5139,6 +5152,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       latest_turn_id: 'turn-1',
       latest_session_id: 'thread-1-turn-1',
       latest_session_id_source: 'derived_from_thread_and_turn',
+      last_event: 'task_complete',
       tokens: {
         input_tokens: 12,
         output_tokens: 8,
@@ -5154,6 +5168,212 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
           window_minutes: 10080
         }
       }
+    });
+  });
+
+  it('backfills completed current-turn session telemetry when the proof already has the turn id', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          current_turn_started_at: '2026-03-21T09:00:00.000Z',
+          latest_turn_id: 'turn-1',
+          latest_session_id: 'thread-1-turn-1',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          updated_at: '2026-03-21T09:00:00.000Z'
+        }),
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
+    await mkdir(sessionDir, { recursive: true });
+    const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-1.jsonl');
+    await writeFile(
+      sessionLogPath,
+      [
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.000Z',
+          type: 'session_meta',
+          payload: {
+            id: 'thread-1',
+            cwd: tempRoot,
+            initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+          }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.050Z',
+          type: 'turn_context',
+          payload: {
+            turn_id: 'turn-1'
+          }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.100Z',
+          type: 'event_msg',
+          payload: {
+            type: 'token_count',
+            info: {
+              total_token_usage: {
+                input_tokens: 12,
+                output_tokens: 8,
+                total_tokens: 20
+              }
+            },
+            rate_limits: {
+              primary: {
+                used_percent: 12.5,
+                window_minutes: 300
+              }
+            }
+          }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.150Z',
+          type: 'event_msg',
+          payload: {
+            type: 'task_complete',
+            turn_id: 'turn-1'
+          }
+        })
+      ].join('\n'),
+      'utf8'
+    );
+    const sessionTimestamp = new Date('2026-03-21T09:00:05.000Z');
+    await utimes(sessionLogPath, sessionTimestamp, sessionTimestamp);
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:00:10.000Z',
+      async (path, proof) => await writeFile(path, `${JSON.stringify(proof, null, 2)}\n`, 'utf8'),
+      {
+        CODEX_HOME: tempRoot!
+      }
+    );
+
+    expect(refreshed).toMatchObject({
+      thread_id: 'thread-1',
+      latest_turn_id: 'turn-1',
+      latest_session_id: 'thread-1-turn-1',
+      latest_session_id_source: 'derived_from_thread_and_turn',
+      last_event: 'task_complete',
+      tokens: {
+        input_tokens: 12,
+        output_tokens: 8,
+        total_tokens: 20
+      },
+      rate_limits: {
+        primary: {
+          used_percent: 12.5,
+          window_minutes: 300
+        }
+      }
+    });
+  });
+
+  it('does not replay completed session telemetry without a current-turn floor', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const hydrationPath = buildSessionLogHydrationPath(runDir);
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          updated_at: '2026-03-21T09:00:00.000Z'
+        }),
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
+    await mkdir(sessionDir, { recursive: true });
+    const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-1.jsonl');
+    const sessionLog = [
+      JSON.stringify({
+        timestamp: '2026-03-21T09:00:00.000Z',
+        type: 'session_meta',
+        payload: {
+          id: 'thread-1',
+          cwd: tempRoot,
+          initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+        }
+      }),
+      JSON.stringify({
+        timestamp: '2026-03-21T09:00:00.050Z',
+        type: 'turn_context',
+        payload: {
+          turn_id: 'turn-stale'
+        }
+      }),
+      JSON.stringify({
+        timestamp: '2026-03-21T09:00:00.100Z',
+        type: 'event_msg',
+        payload: {
+          type: 'token_count',
+          info: {
+            total_token_usage: {
+              input_tokens: 12,
+              output_tokens: 8,
+              total_tokens: 20
+            }
+          },
+          rate_limits: {
+            primary: {
+              used_percent: 12.5,
+              window_minutes: 300
+            }
+          }
+        }
+      }),
+      JSON.stringify({
+        timestamp: '2026-03-21T09:00:00.150Z',
+        type: 'event_msg',
+        payload: {
+          type: 'task_complete',
+          turn_id: 'turn-stale'
+        }
+      })
+    ].join('\n');
+    await writeFile(sessionLogPath, sessionLog, 'utf8');
+    const sessionTimestamp = new Date('2026-03-21T09:00:05.000Z');
+    await utimes(sessionLogPath, sessionTimestamp, sessionTimestamp);
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:00:10.000Z',
+      async (path, proof) => await writeFile(path, `${JSON.stringify(proof, null, 2)}\n`, 'utf8'),
+      {
+        CODEX_HOME: tempRoot!
+      }
+    );
+    const hydration = await readPersistedSessionLogHydrationState(hydrationPath);
+
+    expect(refreshed).toMatchObject({
+      thread_id: 'thread-1',
+      latest_turn_id: null,
+      latest_session_id: null,
+      latest_session_id_source: null,
+      last_event: 'item.completed',
+      tokens: {
+        input_tokens: null,
+        output_tokens: null,
+        total_tokens: null
+      },
+      rate_limits: null
+    });
+    expect(hydration).toMatchObject({
+      path: sessionLogPath,
+      offset_bytes: Buffer.byteLength(sessionLog, 'utf8'),
+      trailing_text: '',
+      bootstrap_pending: true
     });
   });
 
