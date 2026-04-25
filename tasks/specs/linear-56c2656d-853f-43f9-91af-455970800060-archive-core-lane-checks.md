@@ -53,6 +53,7 @@ See also:
 
 ## Acceptance
 - `core-lane.yml` supports dispatch with archive PR audit inputs.
+- Dispatched `Core Lane` runs validate that the supplied PR number is an open `main` PR on a known archive automation branch and owns the dispatched head SHA, repo, and ref.
 - `archive-automation-base.yml` dispatches Core Lane after a PR is created or updated.
 - Dispatch failure fails the archive automation run.
 - Tests prove the workflow contract.

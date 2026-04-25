@@ -175,14 +175,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          PR_BRANCH: ${{ steps.cpr.outputs.pull-request-branch }}
+          PR_BRANCH: ${{ inputs.pr_branch }}
           PR_HEAD_SHA: ${{ steps.cpr.outputs.pull-request-head-sha }}
           PR_NUMBER: ${{ steps.cpr.outputs.pull-request-number }}
         run: |
           set -euo pipefail
 
           if [ -z "${PR_BRANCH}" ] || [ -z "${PR_HEAD_SHA}" ]; then
-            echo "::error::create-pull-request did not expose the archive PR branch/head SHA."
+            echo "::error::Archive PR branch input or create-pull-request head SHA is missing."
             exit 1
           fi
 
@@ -190,6 +190,7 @@ jobs:
             --repo "${GH_REPO}" \
             --ref "${PR_BRANCH}" \
             -f "archive_pr_number=${PR_NUMBER}" \
+            -f "archive_pr_branch=${PR_BRANCH}" \
             -f "archive_pr_head_sha=${PR_HEAD_SHA}"
 
           echo "Dispatched Core Lane for archive PR #${PR_NUMBER} (${PR_BRANCH} @ ${PR_HEAD_SHA})." >> "$GITHUB_STEP_SUMMARY"
