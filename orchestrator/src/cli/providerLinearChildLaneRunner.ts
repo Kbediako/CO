@@ -14,6 +14,7 @@ import {
   buildEmptyProviderLinearWorkerTokenUsage,
   defaultExecRunner,
   parseProviderLinearWorkerJsonl,
+  PROVIDER_LINEAR_CHILD_LANE_DIAGNOSTICS_FILENAME,
   type ProviderLinearWorkerChildLaneParentSnapshot,
   type ProviderLinearWorkerChildLaneScope,
   type ProviderLinearWorkerTokenUsage
@@ -1916,23 +1917,31 @@ async function writeChildLaneProof(
   await writeFile(join(runDir, PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME), `${JSON.stringify(proof, null, 2)}\n`, 'utf8');
 }
 
-async function updateProviderLinearChildLaneManifestDiagnostics(
+async function writeProviderLinearChildLaneDiagnostics(
   context: ProviderLinearChildLaneContext,
   patch: Record<string, unknown>
 ): Promise<void> {
-  let parsed: Record<string, unknown>;
+  const diagnosticsPath = join(context.runDir, PROVIDER_LINEAR_CHILD_LANE_DIAGNOSTICS_FILENAME);
+  let existing: Record<string, unknown> = {};
   try {
-    parsed = JSON.parse(await readFile(context.manifestPath, 'utf8')) as Record<string, unknown>;
+    const parsed = JSON.parse(await readFile(diagnosticsPath, 'utf8')) as unknown;
+    existing = isRecord(parsed) ? parsed : {};
   } catch {
-    return;
+    existing = {};
   }
-  await writeFile(
-    context.manifestPath,
+  await writeAtomicFile(
+    diagnosticsPath,
     `${JSON.stringify({
-      ...parsed,
+      ...existing,
+      issue_id: context.issueId,
+      issue_identifier: context.issueIdentifier,
+      task_id: context.taskId,
+      run_id: context.runId,
+      parent_run_id: context.parentRunId,
+      stream: context.stream,
       ...patch
     }, null, 2)}\n`,
-    'utf8'
+    { ensureDir: true, encoding: 'utf8' }
   );
 }
 
@@ -1994,7 +2003,7 @@ export async function runProviderLinearChildLane(
   };
   const context = await loadProviderLinearChildLaneContext(env);
   const runnerStartedAt = deps.now();
-  await updateProviderLinearChildLaneManifestDiagnostics(context, {
+  await writeProviderLinearChildLaneDiagnostics(context, {
     provider_linear_child_lane_runner_entrypoint: PROVIDER_LINEAR_CHILD_LANE_RUNNER_ENTRYPOINT,
     provider_linear_child_lane_runner_pid: process.pid,
     provider_linear_child_lane_runner_started_at: runnerStartedAt,
@@ -2009,7 +2018,7 @@ export async function runProviderLinearChildLane(
   try {
     const runtimeContext = await resolveChildLaneRuntimeContext(env, laneWorkspacePath, context.runId);
     logger.info(`[provider-linear-child-lane-runtime] ${formatRuntimeSelectionSummary(runtimeContext.runtime)}`);
-    await updateProviderLinearChildLaneManifestDiagnostics(context, {
+    await writeProviderLinearChildLaneDiagnostics(context, {
       provider_linear_child_lane_runtime_event: 'runtime_selected',
       provider_linear_child_lane_runtime_event_at: deps.now()
     });
@@ -2063,7 +2072,7 @@ export async function runProviderLinearChildLane(
             logger.info(
               `[provider-linear-child-lane-runtime] appserver startup observed via session log ${basename(startupRace.sessionLogPath)}`
             );
-            await updateProviderLinearChildLaneManifestDiagnostics(context, {
+            await writeProviderLinearChildLaneDiagnostics(context, {
               provider_linear_child_lane_runtime_event: 'appserver_startup_observed',
               provider_linear_child_lane_runtime_event_at: deps.now(),
               provider_linear_child_lane_appserver_session_log: basename(startupRace.sessionLogPath)
@@ -2129,7 +2138,7 @@ export async function runProviderLinearChildLane(
     if (!execResult) {
       throw new Error('provider-linear-child-lane completed without an exec result');
     }
-    await updateProviderLinearChildLaneManifestDiagnostics(context, {
+    await writeProviderLinearChildLaneDiagnostics(context, {
       provider_linear_child_lane_runtime_event: 'codex_exec_completed',
       provider_linear_child_lane_runtime_event_at: deps.now(),
       provider_linear_child_lane_exec_exit_code: execResult.exitCode

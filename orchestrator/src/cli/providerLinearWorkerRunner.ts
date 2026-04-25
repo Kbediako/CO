@@ -109,6 +109,7 @@ export const PROVIDER_LINEAR_RESIDENT_SESSION_SEED_ENV =
   'CODEX_ORCHESTRATOR_PROVIDER_RESIDENT_SESSION_SEED';
 export const PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID = 'provider-linear-child-lane';
 export const PROVIDER_LINEAR_CHILD_LANE_RESERVED_SUMMARY = 'Child lane reserved before child run startup.';
+export const PROVIDER_LINEAR_CHILD_LANE_DIAGNOSTICS_FILENAME = 'provider-linear-child-lane-diagnostics.json';
 const PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME = 'provider-linear-child-lane-proof.json';
 const PROVIDER_LINEAR_WORKER_SESSION_LOG_HYDRATION_FILENAME =
   'provider-linear-worker-session-log-hydration.json';
@@ -5725,15 +5726,27 @@ async function readProviderLinearWorkerChildLaneManifestCandidate(
     manifestArtifactRoot,
     workspacePath
   );
+  const runtimeDiagnostics = await readProviderLinearWorkerChildLaneRuntimeDiagnostics(
+    parent,
+    childLane,
+    runId,
+    manifestArtifactRoot
+  );
   const runtimeMode = normalizeOptionalString(parsed.runtime_mode);
   const runtimeProvider = normalizeOptionalString(parsed.runtime_provider);
   const heartbeatAt = normalizeOptionalString(parsed.heartbeat_at);
   const heartbeatStaleAfterSeconds = normalizeOptionalInteger(parsed.heartbeat_stale_after_seconds);
-  const rawRunnerPid = normalizeOptionalInteger(parsed.provider_linear_child_lane_runner_pid);
+  const rawRunnerPid = normalizeOptionalInteger(
+    runtimeDiagnostics?.provider_linear_child_lane_runner_pid ?? parsed.provider_linear_child_lane_runner_pid
+  );
   const runnerPid = rawRunnerPid !== null && rawRunnerPid > 0 ? rawRunnerPid : null;
   const runnerAlive = runnerPid !== null ? options.isProcessAlive(runnerPid) : null;
-  const runtimeEvent = normalizeOptionalString(parsed.provider_linear_child_lane_runtime_event);
-  const runtimeEventAt = normalizeOptionalString(parsed.provider_linear_child_lane_runtime_event_at);
+  const runtimeEvent = normalizeOptionalString(
+    runtimeDiagnostics?.provider_linear_child_lane_runtime_event ?? parsed.provider_linear_child_lane_runtime_event
+  );
+  const runtimeEventAt = normalizeOptionalString(
+    runtimeDiagnostics?.provider_linear_child_lane_runtime_event_at ?? parsed.provider_linear_child_lane_runtime_event_at
+  );
   const successfulStatus = isSuccessfulProviderLinearWorkerChildLaneStatus(status);
   const patchBytes = proofMetadata?.patchBytes ?? null;
   const patchReady = Boolean(proofMetadata?.patchArtifactPath && patchBytes !== null && patchBytes > 0);
@@ -5804,6 +5817,45 @@ interface ProviderLinearWorkerChildLaneProofHydrationMetadata {
   patchArtifactPath: string | null;
   patchBytes: number | null;
   updatedAt: string | null;
+}
+
+async function readProviderLinearWorkerChildLaneRuntimeDiagnostics(
+  parent: ProviderLinearWorkerParentManifestHydrationMetadata,
+  childLane: ProviderLinearWorkerChildLaneRecord,
+  runId: string,
+  artifactRoot: string
+): Promise<Record<string, unknown> | null> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(
+      await readFile(join(artifactRoot, PROVIDER_LINEAR_CHILD_LANE_DIAGNOSTICS_FILENAME), 'utf8')
+    ) as unknown;
+  } catch {
+    return null;
+  }
+  if (!isRecord(parsed)) {
+    return null;
+  }
+  if (
+    normalizeOptionalString(parsed.parent_run_id) !== parent.runId ||
+    normalizeOptionalString(parsed.issue_id) !== childLane.issue_id ||
+    normalizeOptionalString(parsed.issue_identifier) !== childLane.issue_identifier ||
+    normalizeOptionalString(parsed.task_id) !== childLane.task_id ||
+    normalizeOptionalString(parsed.run_id) !== runId
+  ) {
+    return null;
+  }
+  if (parent.issueId && normalizeOptionalString(parsed.issue_id) !== parent.issueId) {
+    return null;
+  }
+  if (parent.issueIdentifier && normalizeOptionalString(parsed.issue_identifier) !== parent.issueIdentifier) {
+    return null;
+  }
+  const stream = normalizeOptionalString(parsed.stream);
+  if (stream && stream !== childLane.stream) {
+    return null;
+  }
+  return parsed;
 }
 
 function resolveProviderLinearWorkerChildLanePostStartupNoOutputDiagnostic(input: {

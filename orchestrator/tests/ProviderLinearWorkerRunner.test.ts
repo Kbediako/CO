@@ -25,6 +25,7 @@ import {
   runProviderLinearWorker,
   shouldEmitProviderLinearWorkerProgressSignatureTransition,
   transactProviderLinearWorkerChildLanes,
+  PROVIDER_LINEAR_CHILD_LANE_DIAGNOSTICS_FILENAME,
   PROVIDER_LINEAR_WORKER_AUDIT_FILENAME,
   PROVIDER_LINEAR_WORKER_CHILD_LANES_FILENAME,
   PROVIDER_LINEAR_WORKER_PROOF_FILENAME,
@@ -4910,12 +4911,24 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         heartbeat_stale_after_seconds: 30,
         runtime_mode: 'appserver',
         runtime_provider: 'codex',
-        provider_linear_child_lane_runner_pid: 4242,
-        provider_linear_child_lane_runtime_event: 'appserver_startup_observed',
-        provider_linear_child_lane_runtime_event_at: '2026-04-17T00:34:12.000Z',
         artifact_root: matchingChildRunDir,
         log_path: join(matchingChildRunDir, 'runner.ndjson'),
         workspace_path: tempRoot
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(matchingChildRunDir, PROVIDER_LINEAR_CHILD_LANE_DIAGNOSTICS_FILENAME),
+      JSON.stringify({
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        task_id: childTaskId,
+        run_id: '2026-04-17T00-34-04-191Z-44a13a0d',
+        parent_run_id: 'run-child',
+        stream: 'docs-packet',
+        provider_linear_child_lane_runner_pid: 4242,
+        provider_linear_child_lane_runtime_event: 'appserver_startup_observed',
+        provider_linear_child_lane_runtime_event_at: '2026-04-17T00:34:12.000Z'
       }),
       'utf8'
     );
