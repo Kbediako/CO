@@ -226,7 +226,7 @@ jobs:
               --event workflow_dispatch \
               --limit 20 \
               --json databaseId \
-              --jq '.[].databaseId' \
+              --jq '.[].databaseId'
           }
 
           find_dispatched_run_id() {
