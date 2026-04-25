@@ -167,6 +167,40 @@ describe('archive automation workflow required checks', () => {
     expect(dispatchStep.run).toContain('Core Lane did not pass');
   });
 
+  it('retries PR-visible Core Lane status writes before failing closed', async () => {
+    const workflow = await readWorkflow('.github/workflows/archive-automation-base.yml');
+    const dispatchStep = getStep(workflow, 'archive', 'Dispatch Core Lane for archive PR');
+    const run = dispatchStep.run ?? '';
+
+    const statusFunctionStart = run.indexOf('set_core_lane_status()');
+    const nextFunctionStart = run.indexOf('list_matching_run_ids()');
+    const statusFunction = run.slice(statusFunctionStart, nextFunctionStart);
+    const retryLoop = statusFunction.indexOf('for attempt in $(seq 1 3); do');
+    const setPlusE = statusFunction.indexOf('set +e', retryLoop);
+    const statusWrite = statusFunction.indexOf('gh api "repos/${GH_REPO}/statuses/${PR_HEAD_SHA}"', setPlusE);
+    const statusCapture = statusFunction.indexOf('status_write_exit=$?', statusWrite);
+    const setE = statusFunction.indexOf('set -e', statusCapture);
+
+    expect(statusFunctionStart).toBeGreaterThanOrEqual(0);
+    expect(nextFunctionStart).toBeGreaterThan(statusFunctionStart);
+    expect(retryLoop).toBeGreaterThanOrEqual(0);
+    expect(setPlusE).toBeGreaterThan(retryLoop);
+    expect(statusWrite).toBeGreaterThan(setPlusE);
+    expect(statusCapture).toBeGreaterThan(statusWrite);
+    expect(setE).toBeGreaterThan(statusCapture);
+    expect(statusFunction).toContain('if [ "${status_write_exit}" -eq 0 ]; then');
+    expect(statusFunction).toContain('return 0');
+    expect(statusFunction).toContain('if [ "${attempt}" -lt 3 ]; then');
+    expect(statusFunction).toContain(
+      'Failed to write Core Lane ${state} status for ${PR_HEAD_SHA} (attempt ${attempt}/3); retrying.'
+    );
+    expect(statusFunction).toContain('sleep 5');
+    expect(statusFunction).toContain(
+      'Failed to write Core Lane ${state} status for ${PR_HEAD_SHA} after 3 attempts.'
+    );
+    expect(statusFunction).toContain('return "${status_write_exit}"');
+  });
+
   it('publishes a terminal Core Lane status when dispatched run details cannot be fetched', async () => {
     const workflow = await readWorkflow('.github/workflows/archive-automation-base.yml');
     const dispatchStep = getStep(workflow, 'archive', 'Dispatch Core Lane for archive PR');

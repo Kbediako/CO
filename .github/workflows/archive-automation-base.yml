@@ -191,12 +191,30 @@ jobs:
             local state="$1"
             local description="$2"
             local target_url="$3"
+            local status_write_exit=0
 
-            gh api "repos/${GH_REPO}/statuses/${PR_HEAD_SHA}" \
-              -f "state=${state}" \
-              -f "context=Core Lane" \
-              -f "description=${description}" \
-              -f "target_url=${target_url}" >/dev/null
+            for attempt in $(seq 1 3); do
+              set +e
+              gh api "repos/${GH_REPO}/statuses/${PR_HEAD_SHA}" \
+                -f "state=${state}" \
+                -f "context=Core Lane" \
+                -f "description=${description}" \
+                -f "target_url=${target_url}" >/dev/null
+              status_write_exit=$?
+              set -e
+
+              if [ "${status_write_exit}" -eq 0 ]; then
+                return 0
+              fi
+
+              if [ "${attempt}" -lt 3 ]; then
+                echo "::warning::Failed to write Core Lane ${state} status for ${PR_HEAD_SHA} (attempt ${attempt}/3); retrying."
+                sleep 5
+              fi
+            done
+
+            echo "::error::Failed to write Core Lane ${state} status for ${PR_HEAD_SHA} after 3 attempts."
+            return "${status_write_exit}"
           }
 
           list_matching_run_ids() {
