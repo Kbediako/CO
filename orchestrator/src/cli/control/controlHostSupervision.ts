@@ -777,9 +777,21 @@ function buildControlHostSupervisionRestartSignature(
   // Quarantine repeated restart churn on the stable active-worker series, not on transient
   // refresh checkpoints that can legitimately drift within one stuck refresh cycle.
   return JSON.stringify({
-    reason: diagnostic.polling.reason ?? diagnostic.polling.last_error ?? null,
+    reason: buildControlHostSupervisionRestartReasonKey(diagnostic.polling),
     worker_series: workerSeries
   });
+}
+
+function buildControlHostSupervisionRestartReasonKey(
+  polling: ControlHostSupervisionPollingDiagnostic
+): string | null {
+  if (isActiveProviderRefreshProbeTimeoutDiagnostic(polling)) {
+    return 'active_provider_refresh_probe_timeout';
+  }
+  if (isProviderRefreshLifecycleRestartRequiredDiagnostic(polling)) {
+    return 'provider_refresh_lifecycle_stuck';
+  }
+  return polling.reason ?? polling.last_error ?? null;
 }
 
 function buildControlHostSupervisionWorkerSeriesKey(

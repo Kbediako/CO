@@ -61,6 +61,17 @@ task_checklists:
   - stdin bootstrap regression
   - provider refresh queue deletion or terminalization during reclaim
 
+## Not Done If
+- A stale owner still appears only as `provider-linear-worker could not request control-host refresh`, `refresh request timeout`, or `fetch failed`.
+- No `control-host-stale-owner.json` artifact exists for stale-owner diagnosis.
+- `control-host-stale-owner.json` omits `owner pid/host/task/run` or `attempted pid/host`.
+- `stale_reclaimed` is recorded but `co-status freshness` / `control-host` freshness still times out or reports stale state without a failure artifact.
+- Persistent refresh failure after reclaim does not write `provider-control-host-refresh-failure.json`.
+- Owner reclaim can run against an active owner or without liveness evidence.
+- Provider refresh queue state is dropped, duplicated, or marked terminal during reclaim.
+- Focused validation does not cover the `CO-351` / `CO-352` / `CO-355` recurrence shape.
+- The implementation is described as CO-41, CO-317-only, a host restart workaround, or stdin bootstrap regression handling.
+
 ## Parity / Alignment Matrix
 - Current truth:
   - the prior CO-330 implementation from PR #624 added one bounded retry after `stale_reclaimed`
@@ -74,7 +85,7 @@ task_checklists:
   - packet and mirrors state that `stale_reclaimed` must be followed by successful provider refresh and `co-status freshness` proof
   - `control-host-stale-owner.json` includes `owner pid/host/task/run` and `attempted pid/host`
   - `provider-control-host-refresh-failure.json` records unrecovered refresh/freshness failures after reclaim
-  - control-host supervision allows one fail-closed timeout restart, then quarantines repeated same-worker `probe_timeout` churn while provider refresh is actively in a `refresh:*` phase before `restart_required`
+  - control-host supervision allows one fail-closed timeout restart, then quarantines repeated same-worker `probe_timeout` churn, while provider refresh is actively in a `refresh:*` phase before `restart_required`
 - Explicitly out-of-scope differences:
   - source/test edits in this child lane
   - `tasks/index.json` or docs-freshness registry edits in this child lane

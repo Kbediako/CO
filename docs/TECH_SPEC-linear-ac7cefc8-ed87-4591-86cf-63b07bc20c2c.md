@@ -24,6 +24,21 @@ This mirror points to the canonical task spec at `tasks/specs/linear-ac7cefc8-ed
 - Nearby wrong interpretations to reject: already owned by `CO-41`, only `CO-317` admission/backfill, generic host restart workaround, stdin bootstrap regression.
 - Explicit non-goals: Linear mutation outside the workpad/state workflow, `tasks/index.json` edits, docs-freshness registry edits, broad control-host restart redesign, provider queue deletion during reclaim.
 
+## Not Done If
+- A stale owner still appears only as `provider-linear-worker could not request control-host refresh`, `refresh request timeout`, or `fetch failed`.
+- `stale_reclaimed` is recorded without provider refresh plus `co-status freshness` / `control-host` freshness proof or an explicit failed-freshness artifact path.
+- `control-host-stale-owner.json` omits `owner pid/host/task/run` or `attempted pid/host`.
+- Persistent refresh failure after reclaim does not write `provider-control-host-refresh-failure.json`.
+- Provider refresh queue state is dropped, duplicated, or falsely marked terminal during reclaim.
+- Focused validation does not cover the `CO-351`, `CO-352`, and `CO-355` recurrence shape.
+
+## Recurrence Parity Matrix
+| Surface | Current Truth | Reference Truth | Target Truth |
+| --- | --- | --- | --- |
+| Owner metadata | PR #624 can report `stale_reclaimed`, but recurrence evidence still shows `stale_control_host_owner` during provider refresh. | Active owners fail closed; stale owners may be reclaimed only after liveness proof. | `control-host-stale-owner.json` includes owner/attempt metadata, stale reason, reclaim result, and freshness follow-up. |
+| Provider refresh | `CO-351`, `CO-352`, and `CO-355` still saw `fetch failed` / `refresh request timeout` after stale-owner handling. | Retryable provider refresh work remains recoverable until a truthful terminal state exists. | Refresh remains retryable/resumable until freshness succeeds or `provider-control-host-refresh-failure.json` records the recurrence. |
+| Supervision | Probe timeout restart churn can rotate the owner while refresh is active before `restart_required`. | First timeout restart remains fail-closed for unknown health. | Repeated same-worker `probe_timeout` churn is quarantined while active provider refresh remains visible. |
+
 ## Acceptance Criteria
 - `stale_control_host_owner` remains distinct from duplicate active owner, provider cooldown, API budget exhaustion, and generic `fetch failed`.
 - `stale_reclaimed` is not terminal success unless the subsequent provider refresh and `co-status freshness` prove the owner is current.

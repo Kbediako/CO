@@ -48,7 +48,7 @@
 2. Refresh the CO-330 PRD, canonical TECH_SPEC, TECH_SPEC mirror, ACTION_PLAN, task checklist, and `.agent` mirror for the recurrence.
 3. Preserve protected terms, rejected interpretations, and acceptance criteria from the Linear issue.
 4. Reproduce/explain why PR #624's single provider refresh retry did not stop the recurrence.
-5. Patch control-host supervision so one fail-closed timeout restart is allowed, then repeated same-worker `probe_timeout` churn is quarantined while provider refresh remains active before `restart_required`.
+5. Patch control-host supervision so one fail-closed timeout restart is allowed, then repeated same-worker `probe_timeout` churn is quarantined, while provider refresh remains active before `restart_required`.
 6. Add focused coverage for the `CO-351` / `CO-352` / `CO-355` active worker series.
 7. Run parent validation, standalone review, and PR handoff gates.
 
@@ -87,5 +87,5 @@
   - Mitigation: parent acceptance must include `co-status freshness` / control-host freshness success or explicit unrecovered failure artifacting.
 
 ## Approvals
-- Docs-first packet refresh: bounded same-issue child lane, 2026-04-25; child patch applied by parent after helper invalidated accept on Linear timestamp staleness.
+- Docs-first packet refresh: bounded same-issue child lane, 2026-04-25; child patch applied by parent after helper invalidated acceptance on Linear timestamp staleness.
 - Parent docs-review / implementation approval: pending.

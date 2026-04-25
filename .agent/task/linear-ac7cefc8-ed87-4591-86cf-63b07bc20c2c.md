@@ -48,7 +48,7 @@
 - [x] Repo stewardship passed. Evidence: `npm run repo:stewardship`.
 - [x] Diff budget passed. Evidence: `node scripts/diff-budget.mjs`.
 - [x] Pack smoke passed after one transient temp cleanup failure and immediate rerun. Evidence: `npm run pack:smoke`.
-- [x] Standalone review addressed one P1 and then returned bounded success with no actionable findings. Evidence: `../../.runs/linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c/cli/2026-04-25T12-02-45-644Z-e115d96f/review/telemetry.json` (`review_outcome=bounded-success`).
+- [x] Standalone review addressed one P1 and then returned bounded success with no actionable findings. Evidence: `.runs/linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c/cli/2026-04-25T12-02-45-644Z-e115d96f/review/telemetry.json` (`review_outcome=bounded-success`).
 - [x] Elegance/minimality pass completed. Evidence: no code simplification patch was needed; registry freshness was parent-owned and refreshed.
 
 ## Progress Log

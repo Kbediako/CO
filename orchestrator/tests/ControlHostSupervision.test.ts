@@ -2175,11 +2175,15 @@ describe('controlHostSupervision shell helpers', () => {
         stuck: false,
         restart_required: false,
         reason: null,
-        last_error: 'fetch failed',
+        last_error: 'refresh request timeout',
         refresh_phase: 'refresh:rehydrate',
         refresh_request_class: 'rehydrate',
         operation_elapsed_ms: 14_000,
         stalled_after_ms: 45_000
+      };
+      const previousActiveRefreshPolling = {
+        ...activeRefreshPolling,
+        last_error: 'fetch failed'
       };
       const recurrenceWorkers = ['CO-351', 'CO-352', 'CO-355'].map((issueIdentifier) => ({
         issue_id: `issue-${issueIdentifier.toLowerCase()}`,
@@ -2228,7 +2232,7 @@ describe('controlHostSupervision shell helpers', () => {
                   retrying: null,
                   max_allowed: null
                 },
-                polling: activeRefreshPolling,
+                polling: previousActiveRefreshPolling,
                 running_workers: recurrenceWorkers
               }
             }
@@ -2245,7 +2249,7 @@ describe('controlHostSupervision shell helpers', () => {
       expect(result.healthy).toBe(true);
       expect(result.reason).toBe('active_worker_probe_timeout_quarantine');
       expect(result.diagnostic?.polling?.restart_required).toBe(false);
-      expect(result.diagnostic?.polling?.last_error).toBe('fetch failed');
+      expect(result.diagnostic?.polling?.last_error).toBe('refresh request timeout');
       expect(result.diagnostic?.polling?.refresh_phase).toBe('refresh:rehydrate');
       expect(result.diagnostic?.running_workers.map((worker) => worker.issue_identifier)).toEqual([
         'CO-351',
