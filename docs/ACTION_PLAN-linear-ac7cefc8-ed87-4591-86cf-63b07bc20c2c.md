@@ -76,7 +76,7 @@
 
 ## Risks & Mitigations
 - Risk: source-0 payload is mistaken for the full issue contract.
-  - Mitigation: packet records that source 0 is recurrence provenance while Linear issue text remains the parent-owned requirements source.
+  - Mitigation: packet records that source 0 is recurrence provenance, while Linear issue text remains the parent-owned requirements source.
 - Risk: PR #624 is mistaken for proof that CO-330 is already complete.
   - Mitigation: packet explicitly states that the single retry was insufficient because provider workers still observed stale owner plus refresh failure and freshness still timed out/staled.
 - Risk: stale-owner recovery is mistaken for generic restart guidance.

@@ -134,7 +134,7 @@ task_checklists:
 
 ## Risks
 - Source payload ambiguity.
-  - Mitigation: this packet records source 0 as recurrence provenance while Linear issue/workpad truth remains parent-owned.
+  - Mitigation: this packet records source 0 as recurrence provenance, while Linear issue/workpad truth remains parent-owned.
 - PR #624 false closure.
   - Mitigation: this packet explicitly says the single retry was insufficient because provider workers still observed stale owner plus refresh failure and freshness staleness.
 - Misclassification as generic restart work.
