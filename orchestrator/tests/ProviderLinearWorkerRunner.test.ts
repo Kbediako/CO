@@ -4967,7 +4967,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       await readFile(join(runDir, PROVIDER_LINEAR_WORKER_CHILD_LANES_FILENAME), 'utf8')
     ) as Array<Record<string, unknown>>;
     expect(ledgerAfterHydration[0]).toMatchObject({
-      run_id: 'launching-docs-packet',
+      run_id: '2026-04-17T00-34-04-191Z-44a13a0d',
       status: 'stale_invalidation_candidate',
       manifest_path: join(matchingChildRunDir, 'manifest.json'),
       artifact_root: matchingChildRunDir,
@@ -4984,6 +4984,23 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       recovery_recommendation: 'inspect_child_lane'
     });
     expect(refreshed?.progress?.summary).toContain('stale invalidation candidate');
+    const rehydrated = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      refreshed,
+      () => '2026-04-17T00:36:05.000Z',
+      async (path, proof) => await writeFile(path, JSON.stringify(proof, null, 2), 'utf8'),
+      { CODEX_HOME: tempRoot! },
+      {
+        skipSessionLogHydration: true,
+        isProcessAlive: (pid) => pid !== 4242
+      }
+    );
+    expect(rehydrated?.child_lanes?.[0]).toMatchObject({
+      run_id: '2026-04-17T00-34-04-191Z-44a13a0d',
+      status: 'stale_invalidation_candidate',
+      artifact_root: matchingChildRunDir,
+      stale_invalidation_reason: 'post_startup_no_output_heartbeat_stale_runner_dead'
+    });
 
     await transactProviderLinearWorkerChildLanes(runDir, async (records) => ({
       records: records.map((record) =>
@@ -5010,7 +5027,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       }
     );
     expect(invalidated?.child_lanes?.[0]).toMatchObject({
-      run_id: 'launching-docs-packet',
+      run_id: '2026-04-17T00-34-04-191Z-44a13a0d',
       status: 'invalidated',
       decision: 'invalidated',
       runtime_mode: 'appserver',
