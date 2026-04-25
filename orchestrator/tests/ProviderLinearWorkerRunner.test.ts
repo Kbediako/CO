@@ -14476,15 +14476,17 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       await vi.waitFor(() => {
         expect(refreshBodies.filter((body) => body.owner_status === 'in_progress')).toHaveLength(2);
       });
-      const queuedRefreshProof = JSON.parse(
-        await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
-      ) as Record<string, unknown>;
-      expect(queuedRefreshProof).toMatchObject({
-        latest_turn_id: 'turn-1',
-        latest_session_id: 'thread-1-turn-1',
-        turn_count: 1,
-        last_message: 'Worker turn updated',
-        owner_status: 'in_progress'
+      await vi.waitFor(async () => {
+        const queuedRefreshProof = JSON.parse(
+          await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+        ) as Record<string, unknown>;
+        expect(queuedRefreshProof).toMatchObject({
+          latest_turn_id: 'turn-1',
+          latest_session_id: 'thread-1-turn-1',
+          turn_count: 1,
+          last_message: 'Worker turn updated',
+          owner_status: 'in_progress'
+        });
       });
 
       allowRunnerToFinishResolve?.();
