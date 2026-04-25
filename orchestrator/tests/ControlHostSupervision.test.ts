@@ -115,14 +115,49 @@ function buildProbeTimeoutDiagnosticFixture() {
   };
 }
 
+function buildProviderIntakeClaimFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    provider: 'linear',
+    provider_key: 'linear:issue-1',
+    issue_id: 'issue-1',
+    issue_identifier: 'CO-225',
+    issue_title: 'Provider worker stays healthy',
+    issue_state: 'In Progress',
+    issue_state_type: 'started',
+    issue_updated_at: '2026-04-21T07:20:00.000Z',
+    task_id: 'linear-issue-1',
+    mapping_source: 'provider_id_fallback',
+    state: 'running',
+    reason: null,
+    accepted_at: '2026-04-21T07:00:00.000Z',
+    updated_at: '2026-04-21T07:21:00.000Z',
+    last_delivery_id: null,
+    last_event: null,
+    last_action: null,
+    last_webhook_timestamp: null,
+    run_id: 'run-1',
+    run_manifest_path: null,
+    worker_host: 'host-a',
+    launch_source: 'control-host',
+    launch_token: null,
+    launch_started_at: '2026-04-21T07:00:00.000Z',
+    retry_queued: false,
+    retry_attempt: null,
+    retry_due_at: null,
+    retry_error: null,
+    ...overrides
+  };
+}
+
 async function writeProviderIntakeStateFixture(
   config: ReturnType<typeof buildControlHostSupervisionConfig>,
-  options: { claimState?: string; polling?: Record<string, unknown> },
+  options: { claimState?: string; polling?: Record<string, unknown>; claims?: Record<string, unknown>[] },
   env: NodeJS.ProcessEnv = {}
 ): Promise<void> {
   const statePath = resolveControlHostSupervisionProviderIntakeStatePath(config, env);
   await mkdir(dirname(statePath), { recursive: true });
   const claimState = options.claimState ?? 'running';
+  const claims = options.claims ?? [buildProviderIntakeClaimFixture({ state: claimState })];
   await writeFile(
     statePath,
     `${JSON.stringify(
@@ -133,38 +168,7 @@ async function writeProviderIntakeStateFixture(
         latest_provider_key: 'linear:issue-1',
         latest_reason: null,
         polling: options.polling ?? buildProbeTimeoutPollingFixture(),
-        claims: [
-          {
-            provider: 'linear',
-            provider_key: 'linear:issue-1',
-            issue_id: 'issue-1',
-            issue_identifier: 'CO-225',
-            issue_title: 'Provider worker stays healthy',
-            issue_state: 'In Progress',
-            issue_state_type: 'started',
-            issue_updated_at: '2026-04-21T07:20:00.000Z',
-            task_id: 'linear-issue-1',
-            mapping_source: 'provider_id_fallback',
-            state: claimState,
-            reason: null,
-            accepted_at: '2026-04-21T07:00:00.000Z',
-            updated_at: '2026-04-21T07:21:00.000Z',
-            last_delivery_id: null,
-            last_event: null,
-            last_action: null,
-            last_webhook_timestamp: null,
-            run_id: 'run-1',
-            run_manifest_path: null,
-            worker_host: 'host-a',
-            launch_source: 'control-host',
-            launch_token: null,
-            launch_started_at: '2026-04-21T07:00:00.000Z',
-            retry_queued: false,
-            retry_attempt: null,
-            retry_due_at: null,
-            retry_error: null
-          }
-        ]
+        claims
       },
       null,
       2
@@ -2147,6 +2151,106 @@ describe('controlHostSupervision shell helpers', () => {
       );
       expect(result.diagnostic?.running_workers.map((worker) => worker.issue_identifier)).toEqual([
         'CO-225'
+      ]);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('quarantines repeated probe timeout churn while provider refresh is active before restart_required', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'co-supervision-timeout-active-refresh-'));
+    try {
+      const config = buildControlHostSupervisionConfig({
+        homeDir: '/Users/tester',
+        cwd: tempRoot,
+        repoRoot: tempRoot,
+        nodePath: '/custom/node',
+        cliEntrypoint: '/opt/codex-orchestrator.js',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        healthIntervalSeconds: 5
+      });
+      const activeRefreshPolling = {
+        ...buildProbeTimeoutPollingFixture(),
+        stuck: false,
+        restart_required: false,
+        reason: null,
+        last_error: 'fetch failed',
+        refresh_phase: 'refresh:rehydrate',
+        refresh_request_class: 'rehydrate',
+        operation_elapsed_ms: 14_000,
+        stalled_after_ms: 45_000
+      };
+      const recurrenceWorkers = ['CO-351', 'CO-352', 'CO-355'].map((issueIdentifier) => ({
+        issue_id: `issue-${issueIdentifier.toLowerCase()}`,
+        issue_identifier: issueIdentifier,
+        state: 'running',
+        display_state: 'In Progress',
+        pid: null,
+        worker_host: 'host-a',
+        session_id: `run-${issueIdentifier.toLowerCase()}`,
+        started_at: '2026-04-21T07:00:00.000Z',
+        last_event_at: '2026-04-21T07:21:00.000Z'
+      }));
+      await writeProviderIntakeStateFixture(config, {
+        polling: activeRefreshPolling,
+        claims: recurrenceWorkers.map((worker) =>
+          buildProviderIntakeClaimFixture({
+            provider_key: `linear:${worker.issue_id}`,
+            issue_id: worker.issue_id,
+            issue_identifier: worker.issue_identifier,
+            issue_title: `${worker.issue_identifier} recurrent refresh worker`,
+            task_id: `linear-${worker.issue_id}`,
+            run_id: worker.session_id,
+            worker_host: worker.worker_host,
+            launch_started_at: worker.started_at,
+            updated_at: worker.last_event_at
+          })
+        )
+      });
+      const restartedAt = new Date().toISOString();
+
+      const result = await probeControlHostHealth(
+        config,
+        {},
+        {
+          restartHistory: [
+            {
+              requested_at: restartedAt,
+              reason: 'probe_timeout',
+              message: 'co-status probe timed out after 5s.',
+              consecutive_unhealthy_samples: 3,
+              child_pid: 4321,
+              diagnostic: {
+                ...buildProbeTimeoutDiagnosticFixture(),
+                counts: {
+                  running: recurrenceWorkers.length,
+                  retrying: null,
+                  max_allowed: null
+                },
+                polling: activeRefreshPolling,
+                running_workers: recurrenceWorkers
+              }
+            }
+          ]
+        },
+        async () => ({
+          exitCode: 1,
+          stdout: '',
+          stderr: 'command timed out after 5000ms',
+          timedOut: true
+        })
+      );
+
+      expect(result.healthy).toBe(true);
+      expect(result.reason).toBe('active_worker_probe_timeout_quarantine');
+      expect(result.diagnostic?.polling?.restart_required).toBe(false);
+      expect(result.diagnostic?.polling?.last_error).toBe('fetch failed');
+      expect(result.diagnostic?.polling?.refresh_phase).toBe('refresh:rehydrate');
+      expect(result.diagnostic?.running_workers.map((worker) => worker.issue_identifier)).toEqual([
+        'CO-351',
+        'CO-352',
+        'CO-355'
       ]);
     } finally {
       await rm(tempRoot, { recursive: true, force: true });

@@ -582,14 +582,12 @@ export function evaluateControlHostSupervisionProbeTimeoutDiagnostic(
   if (!diagnostic || diagnostic.running_workers.length === 0) {
     return null;
   }
-  if (!isProviderRefreshLifecycleRestartRequiredDiagnostic(diagnostic.polling)) {
-    return null;
-  }
   if (!isCurrentControlHostSupervisionPollingDiagnostic(diagnostic.polling, options.minPollingUpdatedAt)) {
     return null;
   }
-  const pollingReason = diagnostic.polling?.reason ?? diagnostic.polling?.last_error ?? null;
-  if (!pollingReason) {
+  const restartRequired = isProviderRefreshLifecycleRestartRequiredDiagnostic(diagnostic.polling);
+  const activeRefresh = isActiveProviderRefreshProbeTimeoutDiagnostic(diagnostic.polling);
+  if (!restartRequired && !activeRefresh) {
     return null;
   }
   if (hasAvailableProviderWorkerCapacity(diagnostic)) {
@@ -645,6 +643,21 @@ function isProviderRefreshLifecycleRestartRequiredDiagnostic(
     polling.reason === 'provider_refresh_lifecycle_stuck' ||
     polling.last_error === 'provider_refresh_lifecycle_stuck'
   );
+}
+
+function isActiveProviderRefreshProbeTimeoutDiagnostic(
+  polling: ControlHostSupervisionPollingDiagnostic | null
+): boolean {
+  if (!polling || polling.checking !== true) {
+    return false;
+  }
+  if (polling.restart_required === true || polling.stuck === true) {
+    return false;
+  }
+  if (polling.reason !== null) {
+    return false;
+  }
+  return polling.refresh_phase?.startsWith('refresh:') === true;
 }
 
 function isCurrentControlHostSupervisionPollingDiagnostic(

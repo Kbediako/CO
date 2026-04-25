@@ -1,11 +1,11 @@
 ---
-id: 20260423-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c
-title: "CO-330 stale control-host owner reclaim and provider refresh retry recovery"
+id: 20260425-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c
+title: "CO-330 reopened stale-owner/provider-refresh recurrence after PR #624"
 relates_to: docs/PRD-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-23
+last_review: 2026-04-25
 related_action_plan: docs/ACTION_PLAN-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md
 task_checklists:
   - tasks/tasks-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md
@@ -16,37 +16,44 @@ task_checklists:
 - TECH_SPEC mirror: `docs/TECH_SPEC-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md`
 - ACTION_PLAN: `docs/ACTION_PLAN-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md`
 - Task checklist: `tasks/tasks-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md`
-- Source anchor: `ctx:sha256:dd72505af8602844d9a722f7d0cac31d98fe08f25d84adb745ed3f979b6c8cf8#chunk:c000001`
+- Source anchor: `ctx:sha256:d14a6cd66c90db64bf91248f6f68d329bf0b540a68b4243aec21a6770b4dce3b#chunk:c000001`
 
 ## Summary
-- Objective: create the docs-first packet and task registration for CO-330 stale control-host owner reclaim and provider refresh retry recovery.
-- Current evidence: parent handoff identifies stale owner recovery as the issue shape and protects the terms `stale_control_host_owner`, `control-host`, `provider-linear-worker could not request control-host refresh`, `refresh request timeout`, `fetch failed`, `control-host-stale-owner.json`, `provider-control-host-refresh-failure.json`, `owner reclaim`, `provider refresh`, and `retry/resumable queue behavior`.
+- Objective: complete the reopened CO-330 stale-owner/provider-refresh recurrence after PR #624 by pairing the docs refresh with a parent-owned supervision fix and regression coverage.
+- Current evidence: the 2026-04-24/2026-04-25 recurrence shows provider workers for `CO-351`, `CO-352`, and `CO-355` still observed `stale_control_host_owner` plus `fetch failed` / `refresh request timeout`, while live `co-status freshness` / `control-host` freshness still timed out or reported stale.
 - Scope:
   - CO-330 PRD, TECH_SPEC, ACTION_PLAN, task checklist, and `.agent` mirror
-  - `tasks/index.json` registration
-  - parent-owned implementation plan for stale-owner artifact, owner reclaim, and provider refresh queue resume behavior
+  - `controlHostSupervision` restart classification and focused tests for the repeated probe-timeout recurrence
 - Constraints:
-  - child lane must not edit source or tests
-  - parent owns Linear state, workpad, PR lifecycle, implementation, and full validation
-  - do not call Linear mutation helpers
-  - do not run full repo validation suites
+  - keep stale-owner artifacting and provider refresh retry behavior from PR #624 intact
+  - do not broaden the fix into generic host restart, provider queue redesign, or admission/backfill work
+  - preserve provider-worker progress while the active worker series remains visible in local provider-intake state
 
 ## Issue-Shaping Contract
-- User-request translation carried forward: CO-330 must diagnose stale control-host owner failures distinctly, write an auditable stale-owner artifact, safely reclaim only stale owners, and keep provider refresh queue work retryable/resumable after reclaim.
+- User-request translation carried forward: CO-330 must diagnose stale control-host owner failures distinctly, write auditable stale-owner and provider-refresh-failure artifacts, safely reclaim only stale owners, verify `co-status freshness`, and keep provider refresh queue work retryable/resumable after reclaim.
 - Protected terms / exact artifact and surface names:
   - `stale_control_host_owner`
+  - `stale_reclaimed`
   - `control-host`
   - `provider-linear-worker could not request control-host refresh`
   - `refresh request timeout`
   - `fetch failed`
   - `control-host-stale-owner.json`
   - `provider-control-host-refresh-failure.json`
+  - `owner pid/host/task/run`
+  - `attempted pid/host`
+  - `co-status freshness`
   - `owner reclaim`
   - `provider refresh`
   - `retry/resumable queue behavior`
+  - `PR #624`
+  - `CO-351`
+  - `CO-352`
+  - `CO-355`
 - Related prior context:
   - `CO-152` stale-owner ownership: reference only as prior owner-safety context
   - `CO-119` refresh-timeout recovery: reference only as prior refresh-timeout recovery context
+  - PR #624: reference only as the single-retry baseline that proved insufficient for this recurrence
 - Nearby wrong interpretations to reject:
   - already owned by `CO-41`
   - only `CO-317` admission/backfill
@@ -56,20 +63,21 @@ task_checklists:
 
 ## Parity / Alignment Matrix
 - Current truth:
-  - the CO-330 packet is absent before this lane
-  - the parent-provided issue shape centers on stale control-host owner recovery during provider refresh request failures
-  - source-0 payload is present in the parent workspace and records run metadata/provenance
+  - the prior CO-330 implementation from PR #624 added one bounded retry after `stale_reclaimed`
+  - the recurrence still shows stale owner plus provider refresh failures in `CO-351`, `CO-352`, and `CO-355`
+  - live `co-status freshness` / `control-host` freshness still timed out or reported stale
 - Reference truth:
   - CO-152 owner metadata protects against duplicate/stale owner hazards and must not be weakened
   - CO-119 refresh-timeout recovery preserves truthful provider-worker progress and stuck lifecycle truth
-  - docs-first packets register canonical specs in `tasks/index.json`
+  - PR #624 is a baseline retry implementation, not sufficient completion for the reopened recurrence
 - Target truth:
-  - CO-330 packet and mirrors are present
-  - stale-owner recovery requirements are clear before source edits begin
-  - `tasks/index.json` links the canonical spec and task checklist
-  - parent can implement focused stale-owner artifact, reclaim, and provider refresh queue resume behavior
+  - packet and mirrors state that `stale_reclaimed` must be followed by successful provider refresh and `co-status freshness` proof
+  - `control-host-stale-owner.json` includes `owner pid/host/task/run` and `attempted pid/host`
+  - `provider-control-host-refresh-failure.json` records unrecovered refresh/freshness failures after reclaim
+  - control-host supervision allows one fail-closed timeout restart, then quarantines repeated same-worker `probe_timeout` churn while provider refresh is actively in a `refresh:*` phase before `restart_required`
 - Explicitly out-of-scope differences:
   - source/test edits in this child lane
+  - `tasks/index.json` or docs-freshness registry edits in this child lane
   - broad CO-152 duplicate-host redesign
   - broad CO-119 refresh route redesign
   - CO-317-only admission/backfill behavior
@@ -77,46 +85,59 @@ task_checklists:
 
 ## Technical Requirements
 - Functional requirements:
-  1. Create the six CO-330 packet/checklist surfaces.
-  2. Link the canonical spec and checklist in `tasks/index.json`.
+  1. Refresh the six CO-330 packet/checklist surfaces for the 2026-04-24/2026-04-25 recurrence.
+  2. Preserve the 2026-04-25 source anchor and parent manifest pointer.
   3. Preserve protected terms and wrong-interpretation guardrails in the packet.
-  4. Define parent-owned implementation requirements for `stale_control_host_owner`, `control-host-stale-owner.json`, `provider-control-host-refresh-failure.json`, owner reclaim, provider refresh, and retry/resumable queue behavior.
-  5. Record source payload provenance for parent reconciliation.
+  4. Treat active provider refresh polling (`checking=true`, `refresh_phase=refresh:*`, no `restart_required`, no current stuck `reason`) as eligible for the same repeated same-worker probe-timeout quarantine used after lifecycle-stuck restarts, even when a historical `last_error` from the previous retry remains.
+  5. State that PR #624's single retry is insufficient acceptance when supervision keeps restarting the control host before the active provider refresh can recover or truthfully fail.
 - Non-functional requirements:
   - concise packet suitable for parent patch export
   - no Linear mutations
   - no full validation suites
   - no edits outside declared file scope
 - Interfaces / contracts:
-  - `tasks/index.json` remains canonical under `items[]`
   - `control-host-stale-owner.json` remains the stale-owner ownership diagnostic artifact
   - `provider-control-host-refresh-failure.json` is the unrecovered retry-failure artifact for CO-330
+  - `co-status freshness` is a required recovery signal
   - provider refresh queue semantics must remain retryable/resumable after safe reclaim
+
+## Acceptance Criteria
+- `stale_control_host_owner` is distinct from duplicate active owner, provider cooldown, API budget exhaustion, and generic `fetch failed`.
+- `stale_reclaimed` is followed by provider refresh plus `co-status freshness` / `control-host` freshness proof before the recurrence is considered recovered.
+- `control-host-stale-owner.json` records `owner pid/host/task/run`, `attempted pid/host`, stale reason, reclaim outcome, and freshness follow-up.
+- Unrecovered `fetch failed` or `refresh request timeout` after reclaim writes `provider-control-host-refresh-failure.json`.
+- Provider refresh queue state is preserved without duplicate launch, dropped work, or false terminal state.
+- Control-host supervision stops repeated same-worker restart churn during active provider refresh before `restart_required`, preserving the active provider workers instead of rotating the owner again, including retries with a retained historical `last_error`.
+- Focused validation covers the reopened recurrence from `CO-351`, `CO-352`, and `CO-355`.
 
 ## Validation Plan
 - Child-lane scoped checks:
-  - JSON parse for `tasks/index.json`
+  - protected-term text check across the six packet files
   - `git diff --name-only`
   - `git status --short`
 - Parent-owned checks:
   - docs-review before implementation
-  - standalone review approval recorded: `bounded-success` (command-intent retry against the user-intent handoff)
-  - focused tests for active owner refusal, stale owner reclaim, stale-owner artifact shape, and provider refresh queue resume behavior
+  - focused tests for repeated probe-timeout churn while provider refresh is active before `restart_required`
+  - explicit regression scenario that keeps `CO-351`, `CO-352`, and `CO-355` visible as active worker series through the quarantine path
   - normal parent validation floor and PR lifecycle
 
 ## Risks
 - Source payload ambiguity.
-  - Mitigation: this packet records that source-0 is run metadata/provenance while the Linear issue text remains the requirements source.
+  - Mitigation: this packet records source 0 as recurrence provenance while Linear issue/workpad truth remains parent-owned.
+- PR #624 false closure.
+  - Mitigation: this packet explicitly says the single retry was insufficient because provider workers still observed stale owner plus refresh failure and freshness staleness.
 - Misclassification as generic restart work.
   - Mitigation: protected wrong interpretations reject generic host restart workaround as the durable fix.
 - Active owner safety regression.
   - Mitigation: parent implementation must fail closed unless liveness evidence proves the recorded owner is stale.
 - Queue state loss.
   - Mitigation: parent implementation must preserve retry/resumable queue behavior through reclaim.
+- Freshness drift after reclaim.
+  - Mitigation: parent acceptance requires `co-status freshness` / control-host freshness success or explicit unrecovered failure artifacting.
 
 ## Completion Criteria
-- CO-330 packet and mirrors exist.
-- `tasks/index.json` includes the CO-330 item and parses as JSON.
+- CO-330 packet and mirrors are refreshed for the recurrence.
 - The packet preserves protected terms and rejects wrong interpretations.
 - Source/test implementation remains untouched by this child lane.
+- `tasks/index.json` and docs-freshness registry remain untouched by this child lane.
 - Parent can proceed with docs-review and implementation from the packet.
