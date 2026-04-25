@@ -306,6 +306,7 @@ jobs:
 
             if [ -n "${CANDIDATE_RUN_ID}" ]; then
               RUN_ID="${CANDIDATE_RUN_ID}"
+              break
             fi
 
             if [ "${attempt}" -lt 40 ]; then
