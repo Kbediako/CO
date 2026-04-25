@@ -15032,6 +15032,23 @@
         "task": "tasks/tasks-linear-dc23c6fa-5080-4665-89c2-f657983901bd.md",
         "docs": "docs/TECH_SPEC-linear-dc23c6fa-5080-4665-89c2-f657983901bd.md"
       }
+    },
+    {
+      "id": "20260425-linear-12ae0840-e4dc-4181-8db6-2fdf02ef270b",
+      "title": "CO: harden cloud preflight command spawn ETXTBSY handling",
+      "relates_to": "tasks/tasks-linear-12ae0840-e4dc-4181-8db6-2fdf02ef270b.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-25",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-12ae0840-e4dc-4181-8db6-2fdf02ef270b.md",
+        "task": "tasks/tasks-linear-12ae0840-e4dc-4181-8db6-2fdf02ef270b.md",
+        "agent_task": ".agent/task/linear-12ae0840-e4dc-4181-8db6-2fdf02ef270b.md",
+        "docs": "docs/TECH_SPEC-linear-12ae0840-e4dc-4181-8db6-2fdf02ef270b.md"
+      }
     }
   ]
 }
