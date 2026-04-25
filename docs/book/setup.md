@@ -38,6 +38,12 @@ codex plugin marketplace add "$(npm root -g)/@kbediako/codex-orchestrator"
 
 For a local checkout, pass the repository root instead of the npm install path. For a Git-backed source, pass `owner/repo[@ref]`, an HTTPS Git URL, or an SSH Git URL. Use `codex marketplace add ...` only on Codex `0.121.0`; use `codex plugin marketplace add ...` on `0.122.0+`.
 
+On current Codex CLI `0.125.0`, refresh a Git-backed marketplace checkout with:
+
+```bash
+codex plugin marketplace upgrade codex-orchestrator
+```
+
 Then open `/plugins` in Codex, install `Codex Orchestrator`, and restart Codex if the plugin does not appear immediately.
 
 The shipped marketplace files are:
@@ -51,13 +57,13 @@ The plugin launcher reads the `codex-orchestrator` marketplace entry in `${CODEX
 
 Re-run the version-appropriate marketplace add command after moving a local-directory source, replacing it, or removing Codex's installed marketplace checkout.
 
-CO currently targets Codex CLI `0.125.0` for local ChatGPT-auth/appserver posture. Use `gpt-5.5` / `xhigh` after live model access is verified; keep `gpt-5.4` / `xhigh` only as the portable fallback when access, API/cloud portability, or downstream/no-network evidence is missing.
+CO-355 only rebaselines marketplace/downstream-smoke compatibility to Codex CLI `0.125.0`. Model/runtime posture remains governed by `docs/guides/codex-version-policy.md` and the CO-351/CO-352 validation lanes: use `gpt-5.5` / `xhigh` for validated local ChatGPT-auth/appserver access, and keep `gpt-5.4` / `xhigh` as the portable fallback when access, API/cloud portability, or downstream/no-network evidence is missing.
 
 ## Rollback / Removal
 
 - Uninstall `Codex Orchestrator` from the Codex plugin browser to remove the plugin.
 - Set the plugin entry in `${CODEX_HOME:-~/.codex}/config.toml` to `enabled = false` to disable without uninstalling.
-- Remove the marketplace registration with `codex plugin marketplace remove codex-orchestrator`, or remove the `[marketplaces.codex-orchestrator]` block from `${CODEX_HOME:-~/.codex}/config.toml` if you need a manual fallback.
+- On Codex CLI `0.125.0` or newer, remove the marketplace registration with `codex plugin marketplace remove codex-orchestrator`; on older support lanes or when that command is unavailable, remove the `[marketplaces.codex-orchestrator]` block from `${CODEX_HOME:-~/.codex}/config.toml` manually.
 - Remove the standalone CLI with:
   ```bash
   npm uninstall -g @kbediako/codex-orchestrator

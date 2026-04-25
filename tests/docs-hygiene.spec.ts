@@ -496,6 +496,183 @@ describe('docs hygiene tooling', () => {
     ).toBeUndefined();
   });
 
+  it('allows a separately rebaselined marketplace compatibility version when the current posture is still present', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-posture-compatibility-version-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['codex-cli-version']
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'docs', 'guides', 'codex-version-policy.md'),
+      [
+        '# Codex Version Policy (CO)',
+        '',
+        '## Current Posture',
+        '- Current CO compatibility/adoption target remains stable Codex CLI `0.117.0` for the current upstream-aligned main baseline.',
+        '- Marketplace/downstream-smoke compatibility is separately rebaselined to Codex CLI `0.125.0` by CO-355.',
+        '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
+        '- Local appserver remains the expected default runtime path after the `CO-22` canary.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      [
+        '# Codex Orchestrator',
+        '',
+        '- Current CO compatibility/adoption target is stable Codex CLI `0.117.0`.',
+        '- Marketplace setup for Codex CLI `0.125.0` uses `codex plugin marketplace add`.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(
+      errors.find((error) => error.file === 'README.md' && error.rule === 'doc-posture-stale')
+    ).toBeUndefined();
+  });
+
+  it('reports a clear error when only compatibility Codex CLI versions are mentioned', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-posture-compatibility-only-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['codex-cli-version']
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'docs', 'guides', 'codex-version-policy.md'),
+      [
+        '# Codex Version Policy (CO)',
+        '',
+        '## Current Posture',
+        '- Current CO compatibility/adoption target remains stable Codex CLI `0.117.0`.',
+        '- Marketplace/downstream-smoke compatibility is separately rebaselined to Codex CLI `0.125.0` by CO-355.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      [
+        '# Codex Orchestrator',
+        '',
+        '- Marketplace setup for Codex CLI `0.125.0` uses `codex plugin marketplace add`.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'doc-posture-stale',
+        reference:
+          'missing current Codex CLI version 0.117.0; mentioned compatibility version(s) 0.125.0'
+      })
+    );
+  });
+
+  it('does not allow historical Codex CLI compatibility versions from policy audit notes', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-posture-history-version-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['codex-cli-version']
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'docs', 'guides', 'codex-version-policy.md'),
+      [
+        '# Codex Version Policy (CO)',
+        '',
+        '## Current Posture',
+        '- Current CO compatibility/adoption target remains stable Codex CLI `0.117.0`.',
+        '- Marketplace/downstream-smoke compatibility is separately rebaselined to Codex CLI `0.125.0` by CO-355.',
+        '',
+        '## Candidate Audit Notes',
+        '- 2026-04-21: CO-268 completed the marketplace follow-up and release-facing downstream-smoke compatibility moved to codex-cli 0.122.0.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      [
+        '# Codex Orchestrator',
+        '',
+        '- Current CO compatibility/adoption target is stable Codex CLI `0.117.0`.',
+        '- Marketplace setup for Codex CLI `0.122.0` uses `codex plugin marketplace add`.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'doc-posture-stale'
+      })
+    );
+  });
+
   it('matches docs catalog entries after normalizing relative and Windows-style paths', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-catalog-normalized-entry-'));
     createdDirs.push(repoRoot);

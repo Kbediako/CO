@@ -27,6 +27,22 @@
       }
     },
     {
+      "id": "20260424-linear-4c2e0c11-d512-4171-abd4-359cd5957ac6",
+      "title": "CO: rebaseline marketplace docs and pack-smoke for Codex 0.125 plugin marketplace commands",
+      "relates_to": "tasks/tasks-linear-4c2e0c11-d512-4171-abd4-359cd5957ac6.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-24",
+      "paths": {
+        "spec": "tasks/specs/linear-4c2e0c11-d512-4171-abd4-359cd5957ac6.md",
+        "task": "tasks/tasks-linear-4c2e0c11-d512-4171-abd4-359cd5957ac6.md",
+        "agent_task": ".agent/task/linear-4c2e0c11-d512-4171-abd4-359cd5957ac6.md",
+        "docs": "docs/TECH_SPEC-linear-4c2e0c11-d512-4171-abd4-359cd5957ac6.md"
+      }
+    },
+    {
       "id": "20260424-linear-267f73e1-6347-496d-ad78-2f4177bfe450",
       "title": "CO-351 Codex CLI 0.125.0 app-server control seam validation",
       "relates_to": "tasks/tasks-linear-267f73e1-6347-496d-ad78-2f4177bfe450.md",
