@@ -6682,17 +6682,17 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       'Child lane completed; waiting for patch proof metadata.'
     );
     expect(lanesByStream.get('dead-missing-runner-start')).toMatchObject({
-      status: 'stale_invalidation_candidate',
+      status: 'in_progress',
       runner_pid: 4245,
       runner_started_at: null,
-      runner_alive: false,
-      runner_identity_status: 'not_live',
-      runner_identity_reason: 'runner_pid_not_live',
-      stale_invalidation_candidate: true,
-      stale_invalidation_reason: 'post_startup_no_output_heartbeat_stale_runner_dead'
+      runner_alive: null,
+      runner_identity_status: 'ambiguous',
+      runner_identity_reason: 'runner_started_at_missing',
+      stale_invalidation_candidate: null,
+      stale_invalidation_reason: null
     });
-    expect(lanesByStream.get('dead-missing-runner-start')?.summary).toContain(
-      'providerLinearChildLaneRunner pid 4245 is not live'
+    expect(lanesByStream.get('dead-missing-runner-start')?.summary).toBe(
+      'Child lane completed; waiting for patch proof metadata.'
     );
     const rehydrated = await refreshProviderLinearWorkerProofSnapshot(
       runDir,
@@ -6725,11 +6725,11 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       runner_command_line_matches: true
     });
     expect(rehydratedLanesByStream.get('dead-missing-runner-start')).toMatchObject({
-      runner_alive: false,
-      runner_identity_status: 'not_live',
-      runner_identity_reason: 'runner_pid_not_live',
-      stale_invalidation_candidate: true,
-      stale_invalidation_reason: 'post_startup_no_output_heartbeat_stale_runner_dead'
+      runner_alive: null,
+      runner_identity_status: 'ambiguous',
+      runner_identity_reason: 'runner_started_at_missing',
+      stale_invalidation_candidate: null,
+      stale_invalidation_reason: null
     });
   });
 
