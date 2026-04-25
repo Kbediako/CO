@@ -409,7 +409,7 @@ function resolveRequestedLocalModelOptIn(
   if (isLocalModelOptIn(reviewModel)) {
     return reviewModel;
   }
-  return CURRENT_CHATGPT_MODEL;
+  return null;
 }
 
 function resolveRoleAndReviewLocalModelOptIn(

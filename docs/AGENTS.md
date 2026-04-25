@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 6345c9a98fa8bfd6b85015954b5b5b5ac9dd574b69735736f87fdd9c1a206d6b -->
+<!-- codex:instruction-stamp 3cd6c9c5f8c8db316398da70e9a545e8e156e28452cc1dd13f6447f990b6e39a -->
 # Repository Agent Guidance
 
 Task-specific historical project blocks were removed from this file in `CO-88`. Use the active task packet under `.agent/task/**` for lane-scoped instructions instead of treating old project ids as repo-wide defaults.
@@ -47,7 +47,7 @@ Task-specific historical project blocks were removed from this file in `CO-88`. 
 - Release-facing downstream-smoke workflows and `cloud-canary` pin the explicit promoted candidate recorded in `docs/guides/codex-version-policy.md`.
 - Current model posture is `gpt-5.5` / `xhigh` when available in ChatGPT-auth Codex sessions; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
 - Portable packaged/generated config still keeps `gpt-5.4` / `xhigh` as the fallback for unavailable `gpt-5.5`, API/cloud portability gaps, or unproven downstream/no-network contexts; use `gpt-5.5` for delegated/review surfaces after live access smoke unless a fresh provider lane validates a Codex-suffixed model variant.
-- `codex-orchestrator doctor` treats `gpt-5.5` as non-drift when `codex debug models` verifies current model access, and `codex-orchestrator codex defaults --yes` writes current ChatGPT-auth/appserver defaults without requiring extra marker metadata.
+- `codex-orchestrator doctor` treats `gpt-5.5` as non-drift when `codex debug models` verifies current model access; `codex-orchestrator codex defaults --yes` keeps fresh configs on portable fallback defaults, and `codex-orchestrator codex defaults --auth-scope chatgpt --yes` writes current ChatGPT-auth/appserver defaults after live access smoke without requiring extra marker metadata.
 - Caveat: app-server `model/list` still reports `gpt-5.4` as `isDefault=true`; CO-341 live app-server `model/list` and live `codex exec` show `gpt-5.5` supports `xhigh` for explicit local configuration, and the bundled debug model catalog may lag the live catalog.
 - CO-352 catalog caveat: local `0.125.0` live catalog lists `gpt-5.3-codex-spark`, but bundled `0.125.0` catalog does not, so downstream/no-network `explorer_fast` file/codebase-search-only posture remains unchanged.
 - Treat residual plugin warnings from CO-341 as local temporary plugin cache warnings unless evidence maps them to CO-owned plugin manifests.
