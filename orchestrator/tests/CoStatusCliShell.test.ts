@@ -129,6 +129,80 @@ describe('runCoStatusCliShell', () => {
     expect(payload).toEqual(buildUiPayload());
   });
 
+  it('does not use degraded local fallback for rotated endpoint auth failures', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    await writeProviderIntakeState(runDir, {
+      claimState: 'running',
+      updatedAtMsAgo: 1_000
+    });
+
+    const refreshedServer = await startUiServer();
+    servers.add(refreshedServer.instance);
+    const staleServer = await startFailingUiServer(async () => {
+      await writeControlEndpointArtifacts(runDir, refreshedServer.baseUrl, 'rotated-bad-token');
+    });
+    servers.add(staleServer.instance);
+    await writeControlEndpointArtifacts(runDir, staleServer.baseUrl);
+
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await expect(
+      runCoStatusCliShell({
+        flags: {
+          format: 'json',
+          'run-dir': runDir
+        },
+        printHelp: vi.fn()
+      })
+    ).rejects.toThrow(/control-host ui auth failed: 401 Unauthorized/u);
+
+    expect(log).not.toHaveBeenCalled();
+    expect(staleServer.requests).toHaveLength(1);
+    expect(refreshedServer.requests).toEqual([
+      {
+        authorization: 'Bearer rotated-bad-token',
+        csrfToken: 'rotated-bad-token'
+      }
+    ]);
+  });
+
+  it('does not use degraded local fallback when endpoint re-resolution fails', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    await writeProviderIntakeState(runDir, {
+      claimState: 'running',
+      updatedAtMsAgo: 1_000
+    });
+
+    const staleServer = await startFailingUiServer(async () => {
+      await writeFile(join(runDir, 'control_endpoint.json'), '{not-json', 'utf8');
+    });
+    servers.add(staleServer.instance);
+    await writeControlEndpointArtifacts(runDir, staleServer.baseUrl);
+
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await expect(
+      runCoStatusCliShell({
+        flags: {
+          format: 'json',
+          'run-dir': runDir
+        },
+        printHelp: vi.fn()
+      })
+    ).rejects.toThrow(/Re-resolving control_endpoint\.json failed/u);
+
+    expect(log).not.toHaveBeenCalled();
+    expect(staleServer.requests).toHaveLength(1);
+  });
+
   it('retries a direct json current-endpoint timeout once when endpoint artifacts do not rotate', async () => {
     const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
     tempDirs.push(root);
@@ -404,6 +478,132 @@ describe('runCoStatusCliShell', () => {
     expect(payload.issues?.map((entry) => entry.issue_identifier)).toEqual(['CO-302', 'CO-299', 'CO-295']);
   });
 
+  it('falls back to active provider-intake projection when the current endpoint is dead without rotation', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    const staleServer = await startUiServer();
+    await closeServer(staleServer.instance);
+    await writeControlEndpointArtifacts(runDir, staleServer.baseUrl);
+    await writeProviderIntakeState(runDir, {
+      claims: [
+        {
+          issueIdentifier: 'CO-345',
+          issueId: 'lin-issue-done',
+          issueTitle: 'Already finished issue',
+          runId: 'provider-run-done',
+          claimState: 'completed',
+          issueState: 'Done',
+          issueStateType: 'completed',
+          reason: 'terminal issue retained in intake history',
+          updatedAtMsAgo: 500
+        },
+        {
+          issueIdentifier: 'CO-330',
+          issueId: 'lin-issue-reopened',
+          issueTitle: 'Reopened stale-owner issue',
+          runId: 'provider-run-reopened',
+          claimState: 'running',
+          issueState: 'In Progress',
+          issueStateType: 'started',
+          reason: 'reopened issue metadata refreshed from provider intake',
+          updatedAtMsAgo: 2_000
+        },
+        {
+          issueIdentifier: 'CO-356',
+          issueId: 'lin-issue-active',
+          issueTitle: 'Active archive automation issue',
+          runId: 'provider-run-active',
+          claimState: 'running',
+          issueState: 'In Progress',
+          issueStateType: 'started',
+          reason: 'active issue remains in provider intake',
+          updatedAtMsAgo: 1_000
+        }
+      ]
+    });
+
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await runCoStatusCliShell({
+      flags: {
+        format: 'json',
+        'run-dir': runDir
+      },
+      printHelp: vi.fn()
+    });
+
+    expect(log).toHaveBeenCalledTimes(1);
+    const rawPayload = String(log.mock.calls[0]?.[0]);
+    expect(rawPayload).toMatch(/current_host_unhealthy/u);
+    const payload = JSON.parse(rawPayload) as {
+      selected_issue_identifier?: unknown;
+      counts?: {
+        running?: unknown;
+        issues?: unknown;
+      };
+      degraded_read?: {
+        reason?: unknown;
+        source?: unknown;
+      };
+      provider_intake?: {
+        active_claim_count?: unknown;
+        active_issue_identifiers?: unknown[];
+        running_issue_identifiers?: unknown[];
+        selected_claim?: {
+          issue_identifier?: unknown;
+          issue_state?: unknown;
+          issue_state_type?: unknown;
+        };
+      };
+      running?: Array<{
+        issue_identifier?: unknown;
+      }>;
+      issues?: Array<{
+        issue_identifier?: unknown;
+        status?: unknown;
+        status_reason?: unknown;
+      }>;
+    };
+
+    expect(payload.degraded_read).toMatchObject({
+      reason: 'current_host_unhealthy',
+      source: 'local_seeded_runtime'
+    });
+    expect(payload.selected_issue_identifier).toBe('CO-356');
+    expect(payload.counts).toMatchObject({
+      running: 2,
+      issues: 2
+    });
+    expect(payload.provider_intake).toMatchObject({
+      active_claim_count: 2,
+      active_issue_identifiers: ['CO-356', 'CO-330'],
+      running_issue_identifiers: ['CO-356', 'CO-330'],
+      selected_claim: {
+        issue_identifier: 'CO-356',
+        issue_state: 'In Progress',
+        issue_state_type: 'started'
+      }
+    });
+    expect(payload.running?.map((entry) => entry.issue_identifier)).toEqual(['CO-356', 'CO-330']);
+    expect(payload.issues?.map((entry) => entry.issue_identifier)).toEqual(['CO-356', 'CO-330']);
+    expect(payload.issues).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'CO-356',
+        status: 'running',
+        status_reason: 'active issue remains in provider intake'
+      }),
+      expect.objectContaining({
+        issue_identifier: 'CO-330',
+        status: 'running',
+        status_reason: 'reopened issue metadata refreshed from provider intake'
+      })
+    ]);
+    expect(payload.issues?.some((entry) => entry.issue_identifier === 'CO-345')).toBe(false);
+  });
+
   it('fails closed when supervisor truth is stale after repeated direct json current-endpoint timeouts', async () => {
     const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
     tempDirs.push(root);
@@ -460,7 +660,7 @@ describe('runCoStatusCliShell', () => {
         printHelp: vi.fn()
       })
     ).rejects.toThrow(
-      /stale endpoint after control-host restart; control-host unavailable; control_endpoint\.json has not rotated to a reachable host\./u
+      /current-host-unhealthy: control_endpoint\.json; control-host unavailable; stale endpoint after control-host restart\. control_endpoint\.json has not rotated to a reachable host\./u
     );
   });
 
@@ -951,14 +1151,17 @@ function buildUiPayload(overrides: Record<string, unknown> = {}): Record<string,
 }
 
 function buildProviderIntakeState(options: {
-  claimState?: 'running' | 'stale';
+  claimState?: 'running' | 'stale' | 'completed';
   updatedAtMsAgo?: number;
   claims?: Array<{
     issueIdentifier: string;
     issueId: string;
     issueTitle: string;
     runId: string;
-    claimState?: 'running' | 'stale';
+    claimState?: 'running' | 'stale' | 'completed';
+    issueState?: string;
+    issueStateType?: string;
+    reason?: string;
     updatedAtMsAgo?: number;
   }>;
 } = {}): Record<string, unknown> {
@@ -982,15 +1185,18 @@ function buildProviderIntakeState(options: {
       return best === null || claimAge < bestAge ? claim : best;
     }, null) ?? claims[0];
   const freshestState = freshestClaim?.claimState ?? claimState;
+  const freshestReason = freshestClaim?.reason
+    ?? (freshestState === 'stale'
+      ? 'supervisor truth stale after ui timeout'
+      : freshestState === 'completed'
+        ? 'terminal issue retained in intake history'
+        : 'provider intake advanced after ui timeout');
   return {
     schema_version: 1,
     updated_at: updatedAt,
     rehydrated_at: null,
     latest_provider_key: `linear:${freshestClaim?.issueId ?? 'lin-issue-1'}`,
-    latest_reason:
-      freshestState === 'stale'
-        ? 'supervisor truth stale after ui timeout'
-        : 'provider intake advanced after ui timeout',
+    latest_reason: freshestReason,
     polling: {
       source: 'provider-intake-state.json',
       last_requested_at: updatedAt,
@@ -1002,22 +1208,26 @@ function buildProviderIntakeState(options: {
     claims: claims.map((claim, index) => {
       const claimUpdatedAtMsAgo = claim.updatedAtMsAgo ?? updatedAtMsAgo;
       const claimUpdatedAt = new Date(Date.now() - claimUpdatedAtMsAgo).toISOString();
+      const state = claim.claimState ?? claimState;
       return {
         provider: 'linear',
         provider_key: `linear:${claim.issueId}`,
         issue_id: claim.issueId,
         issue_identifier: claim.issueIdentifier,
         issue_title: claim.issueTitle,
-        issue_state: 'In Progress',
-        issue_state_type: 'started',
+        issue_state: claim.issueState ?? (state === 'completed' ? 'Done' : 'In Progress'),
+        issue_state_type: claim.issueStateType ?? (state === 'completed' ? 'completed' : 'started'),
         issue_updated_at: new Date(Date.now() - claimUpdatedAtMsAgo - 5_000).toISOString(),
         task_id: 'local-mcp',
         mapping_source: 'provider_id_fallback',
-        state: claim.claimState ?? claimState,
+        state,
         reason:
-          (claim.claimState ?? claimState) === 'stale'
+          claim.reason ??
+          (state === 'stale'
             ? 'supervisor truth stale after ui timeout'
-            : 'provider intake advanced after ui timeout',
+            : state === 'completed'
+              ? 'terminal issue retained in intake history'
+              : 'provider intake advanced after ui timeout'),
         accepted_at: new Date(Date.now() - claimUpdatedAtMsAgo - 60_000).toISOString(),
         updated_at: claimUpdatedAt,
         last_delivery_id: `delivery-${index + 1}`,

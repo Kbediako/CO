@@ -1,6 +1,32 @@
 {
   "items": [
     {
+      "id": "20260425-linear-16623322-4b8d-4e12-8f57-688aa5f71a23",
+      "title": "CO-363 CO STATUS active issue projection and current-host-unhealthy classification",
+      "relates_to": "tasks/specs/linear-16623322-4b8d-4e12-8f57-688aa5f71a23.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-25",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-25",
+          "status": "prepared-for-parent-reconciliation",
+          "source_anchor": "ctx:sha256:c98bd9a7b2ae5c5d558c5f43b9145ac007b6cd61e7aafe81a749db4eac4429e0#chunk:c000001",
+          "manifest": ".runs/linear-16623322-4b8d-4e12-8f57-688aa5f71a23-docs-packet/cli/2026-04-25T01-30-33-657Z-a2ee411b/manifest.json",
+          "summary": "Docs-first packet created for CO-363 active issue projection and current-host-unhealthy classification. It preserves CO STATUS, control-host, co-status --format json, /ui/data.json, control_endpoint.json, provider-intake-state.json, active identifiers and counts, CO-345, CO-356, CO-330, reopened issue metadata, and the host-health versus issue-lifecycle boundary."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-16623322-4b8d-4e12-8f57-688aa5f71a23.md",
+        "task": "tasks/tasks-linear-16623322-4b8d-4e12-8f57-688aa5f71a23.md",
+        "agent_task": ".agent/task/linear-16623322-4b8d-4e12-8f57-688aa5f71a23.md",
+        "docs": "docs/TECH_SPEC-linear-16623322-4b8d-4e12-8f57-688aa5f71a23.md"
+      }
+    },
+    {
       "id": "20260425-linear-7f6b0776-51b8-4f54-b330-b4e359afe829",
       "title": "CO-364 RLM GPT-5.5 Route Posture",
       "relates_to": "tasks/specs/linear-7f6b0776-51b8-4f54-b330-b4e359afe829.md",
