@@ -311,9 +311,12 @@ function renderSummary() {
   elements.retryMeta.textContent =
     counts.retrying > 0 ? 'Retry queue is currently populated' : 'No queued retries';
   elements.tokenTotal.textContent = formatNumber(totals.total_tokens || 0);
-  elements.tokenMeta.textContent = `${formatNumber(totals.input_tokens || 0)} input / ${formatNumber(
-    totals.output_tokens || 0
-  )} output`;
+  const tokenMetaParts = [
+    `${formatNumber(totals.input_tokens || 0)} input`,
+    `${formatNumber(totals.output_tokens || 0)} output`,
+    `${formatNullableNumber(totals.reasoning_output_tokens)} reasoning`
+  ];
+  elements.tokenMeta.textContent = tokenMetaParts.join(' / ');
   elements.runtimeTotal.textContent = formatDuration(totals.seconds_running || 0);
   elements.runtimeMeta.textContent =
     totals.seconds_running > 0 ? 'Combined runtime across current issues' : 'No active runtime yet';
@@ -420,7 +423,8 @@ function renderIssueDetail() {
             ? renderKeyValueGrid([
                 ['Input', formatNullableNumber(issue.tokens.input_tokens)],
                 ['Output', formatNullableNumber(issue.tokens.output_tokens)],
-                ['Total', formatNullableNumber(issue.tokens.total_tokens)]
+                ['Total', formatNullableNumber(issue.tokens.total_tokens)],
+                ['Reasoning', formatNullableNumber(issue.tokens.reasoning_output_tokens)]
               ])
             : '<div class="empty-inline">No token usage available.</div>'
         }

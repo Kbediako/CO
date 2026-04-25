@@ -1013,7 +1013,12 @@ function renderTokensLine(dataset: OperatorDashboardDataset, terminalColumns: nu
       { text: ' | ', color: ANSI_GRAY },
       { text: `out ${formatOptionalCount(dataset.totals.output_tokens)}`, color: ANSI_YELLOW },
       { text: ' | ', color: ANSI_GRAY },
-      { text: `total ${formatOptionalCount(dataset.totals.total_tokens)}`, color: ANSI_YELLOW }
+      { text: `total ${formatOptionalCount(dataset.totals.total_tokens)}`, color: ANSI_YELLOW },
+      { text: ' | ', color: ANSI_GRAY },
+      {
+        text: `reasoning ${formatOptionalCount(dataset.totals.reasoning_output_tokens)}`,
+        color: ANSI_YELLOW
+      }
     ],
     terminalColumns
   );
