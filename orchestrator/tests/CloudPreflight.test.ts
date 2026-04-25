@@ -235,22 +235,36 @@ describe('buildCloudPreflightRequest', () => {
   });
 
   it('classifies configured cloud env probe failures as unavailable when they are not not-found shaped', async () => {
-    const { result } = await runCloudPreflightWithCloudList({
-      environmentId: 'env-forbidden',
-      stderr: 'Error: environment env-other not found; forbidden for active account',
-      exitCode: 1
-    });
+    for (const { environmentId, stderr, expectedMessage } of [
+      {
+        environmentId: 'env-forbidden',
+        stderr: 'Error: environment env-other not found; forbidden for active account',
+        expectedMessage: 'forbidden for active account'
+      },
+      {
+        environmentId: 'env-prod',
+        stderr: 'Error: environment env-prod-old not found',
+        expectedMessage: 'env-prod-old not found'
+      }
+    ] as const) {
+      const { result } = await runCloudPreflightWithCloudList({
+        environmentId,
+        stderr,
+        exitCode: 1
+      });
 
-    expect(result.ok).toBe(false);
-    expect(result.issues).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          code: 'environment_unavailable',
-          message: expect.stringContaining('forbidden for active account')
-        })
-      ])
-    );
-    expect(result.issues.map((issue) => issue.code)).not.toContain('missing_environment');
+      expect(result.ok).toBe(false);
+      expect(result.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'environment_unavailable',
+            message: expect.stringContaining(expectedMessage)
+          })
+        ])
+      );
+      expect(result.issues.map((issue) => issue.code)).not.toContain('missing_environment');
+      expect(result.issues.map((issue) => issue.code)).not.toContain('environment_not_found');
+    }
   });
 
   it('classifies requested-env not-found probe failures as unavailable when wrapped auth signals are present', async () => {

@@ -159,16 +159,21 @@ function compactCloudPreflightCommandOutput(result: CommandResult): string {
   return compactCloudPreflightOutput(redactCloudPreflightOutput(readCloudPreflightCommandOutput(result)));
 }
 
+function escapeRegExpLiteral(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+}
+
 function isEnvironmentNotFoundSignal(signal: string, environmentId: string): boolean {
   const normalized = signal.toLowerCase();
   const normalizedEnvironmentId = environmentId.toLowerCase();
-  const environmentIndex = normalized.indexOf('environment');
-  const environmentIdIndex = normalized.indexOf(normalizedEnvironmentId, Math.max(environmentIndex, 0));
-  const notFoundIndex = normalized.indexOf('not found', Math.max(environmentIdIndex, 0));
-  return (
-    normalized.includes('environment_not_found') ||
-    (environmentIndex >= 0 && environmentIdIndex > environmentIndex && notFoundIndex > environmentIdIndex)
-  );
+  if (normalized.includes('environment_not_found')) {
+    return true;
+  }
+  const escapedEnvironmentId = escapeRegExpLiteral(normalizedEnvironmentId);
+  return new RegExp(
+    `\\benvironment\\s+(?:(["'])${escapedEnvironmentId}\\1|${escapedEnvironmentId})\\s+not\\s+found\\b`,
+    'u'
+  ).test(normalized);
 }
 
 function maskCloudPreflightEnvironmentIdentifierValues(signal: string): string {
