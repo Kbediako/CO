@@ -55,8 +55,8 @@
 - 2026-04-26: Corrected docs packet source traceability to the parent-provided `ctx:sha256:2ad2a0ba5ecbafe9bb0b7cb2875952678949f28fbb367b10bee33ce33466e560#chunk:c000001` source anchor.
 - 2026-04-26: Implemented bounded operator-autopilot status dataset cloning with `status_dataset_bounds` metadata and focused regression coverage.
 - 2026-04-26: Captured baseline timeout/supervisor evidence and synthetic old-vs-bounded hot-path timing/size evidence in `out/linear-612a3dc3-f66f-4ba3-aea9-1282b54d93fe/manual/validation.md`.
-- 2026-04-26: Filed CO-378 for unrelated `docs:check`/`docs:freshness` baseline drift discovered during validation.
-- 2026-04-26: Completed final standalone review (`bounded-success`), elegance pass, full build/lint/test/repo validation, and pack smoke; `docs:check`/`docs:freshness` remain unrelated CO-378 baseline failures.
+- 2026-04-26: Filed CO-378 for unrelated `docs:check`/`docs:freshness` baseline drift discovered before the `origin/main` merge.
+- 2026-04-26: Merged latest `origin/main`; completed final standalone review (`bounded-success`), elegance pass, full build/lint/test/docs/repo validation, and pack smoke. Post-merge `docs:check` and `docs:freshness` pass after registering the CO-376 docs packet.
 
 ## Relevant Files
 - `docs/PRD-linear-612a3dc3-f66f-4ba3-aea9-1282b54d93fe.md`
