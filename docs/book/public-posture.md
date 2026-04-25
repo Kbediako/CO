@@ -2,7 +2,7 @@
 
 ## Stable Compatibility Vs Local Posture
 
-CO's stable compatibility target and release-planning baseline remain `0.124.0`. Codex CLI `0.125.0` is validated only for local ChatGPT-auth/appserver model posture. Cloud execution and release-facing pins remain separately gated by the canonical version policy.
+CO's current release-facing package/downstream-smoke compatibility target is Codex CLI `0.125.0`. Current `gpt-5.5` / `xhigh` local ChatGPT-auth/appserver posture and release-facing package Codex CLI pins are already adopted; cloud execution remains separately gated by the canonical version policy.
 
 Newer stable and prerelease Codex CLI builds remain evidence-gated. The canonical policy is [docs/guides/codex-version-policy.md](../guides/codex-version-policy.md).
 

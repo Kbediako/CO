@@ -1,18 +1,18 @@
-# CO-345 Evidence Book: Codex CLI 0.124.0 Adoption Posture
+# CO-345 Evidence Book: Codex CLI 0.124.0 Adoption Evidence
 
-Scope: CO-345 README/book evidence page. This page documents current `codex-cli 0.124.0` adoption posture against repo evidence and official OpenAI Codex docs. It does not change runtime defaults.
+Scope: CO-345 README/book evidence page. This page preserves the CO-341/CO-345 `codex-cli 0.124.0` adoption step against repo evidence and official OpenAI Codex docs. Current posture has since moved: release-facing package/downstream-smoke compatibility and local ChatGPT-auth/appserver posture now use `0.125.0`, while cloud execution remains separately pinned to `0.124.0`. This page does not change runtime defaults.
 
 ## Bottom Line
 
-CO has adopted Codex CLI `0.124.0` as the current repo compatibility target on `main`.
+CO adopted Codex CLI `0.124.0` as the repo compatibility target during CO-341/CO-345.
 
-That adoption is intentionally narrow. The repo promotes `0.124.0` after CO-341 runtime, cloud, pack-smoke, and review evidence, while keeping packaged/generated model defaults on portable `gpt-5.4` with `model_reasoning_effort = "xhigh"`. Local ChatGPT-auth `gpt-5.5` / `xhigh` is supported only as a marker-backed local opt-in after live smoke; it is not the generic shipped default.
+That adoption was intentionally narrow. It promoted `0.124.0` after CO-341 runtime, cloud, pack-smoke, and review evidence while keeping packaged/generated model defaults on portable `gpt-5.4` with `model_reasoning_effort = "xhigh"`. Local ChatGPT-auth `gpt-5.5` / `xhigh` remained a marker-backed local opt-in rather than the generic shipped default. Current local ChatGPT-auth appserver/model posture, package/downstream-smoke `0.125.0` compatibility, and the cloud-only `0.124.0` candidate split now live in `docs/guides/codex-version-policy.md`.
 
 ## Evidence Boundary
 
 Host-specific absolute paths and local account state stay in the CO-345 task packet, Linear workpad, and run artifacts. This shipped page records the portable adoption decision and the evidence classes without exposing operator-local paths.
 
-## Current Evidence Snapshot
+## Recorded Evidence Snapshot
 
 Commands were run from the issue workspace or the active operator environment during CO-345/CO-341 evidence gathering.
 
@@ -45,7 +45,7 @@ Relevant docs:
 
 | Surface | Current posture on `main` | Classification |
 | --- | --- | --- |
-| Compatibility target | `docs/guides/codex-version-policy.md` names Codex CLI `0.124.0` as the current CO target. | Adopted |
+| Compatibility target | This page records the previous `0.124.0` target evidence; current local ChatGPT-auth appserver/model posture, package/downstream-smoke `0.125.0` compatibility, and the cloud-only `0.124.0` candidate split live in `docs/guides/codex-version-policy.md`. | Historical evidence |
 | Packaged/generated model defaults | `gpt-5.4` with `model_reasoning_effort = "xhigh"`. | Adopted, intentionally portable |
 | Local `gpt-5.5` / `xhigh` | Allowed after live access smoke plus `[codex_orchestrator] local_model_opt_in = "gpt-5.5"`. | Adopted as local opt-in |
 | Generic shipped `gpt-5.5` default | Not promoted because bundled/cloud/API portability remains unproven. | Held |
@@ -57,7 +57,7 @@ Relevant docs:
 
 ## Follow-Up Assessment
 
-CO-345 did not find a new unresolved 0.124.0 adoption blocker that belongs in a follow-up issue.
+CO-345 did not find a new unresolved `0.124.0` adoption blocker that belonged in a follow-up issue.
 
 The meaningful holds are already intentional posture boundaries:
 
@@ -65,4 +65,4 @@ The meaningful holds are already intentional posture boundaries:
 - Do not move provider workers from `codex exec` / `codex exec resume` without a separate governed app-server control seam.
 - Do not treat experimental or under-development feature flags as default CO behavior without task-scoped evidence.
 
-Those holds are policy, not README-cleanup defects.
+Those holds were policy, not README-cleanup defects. Current posture and newer holds are recorded in `docs/guides/codex-version-policy.md`.

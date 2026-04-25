@@ -1,6 +1,6 @@
 {
   "name": "codex-orchestrator",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Codex Orchestrator plugin metadata for the packaged CO runtime.",
   "author": {
     "name": "Kbediako",

@@ -1,6 +1,30 @@
 {
   "items": [
     {
+      "id": "20260426-co-361-first-post-v0-2-0-release-prep",
+      "title": "CO-361 First Post-v0.2.0 Release Prep",
+      "relates_to": "tasks/tasks-co-361-first-post-v0-2-0-release-prep.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-26",
+      "approvals": {
+        "parent_release_worker_audit": {
+          "reviewer": "parent release worker",
+          "date": "2026-04-26",
+          "status": "current-main-audited",
+          "summary": "Clean-worktree audit confirmed the remaining prep scope is the next version bump plus truthful public/package posture wording for the first post-v0.2.0 release."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/co-361-first-post-v0-2-0-release-prep.md",
+        "task": "tasks/tasks-co-361-first-post-v0-2-0-release-prep.md",
+        "agent_task": ".agent/task/co-361-first-post-v0-2-0-release-prep.md",
+        "docs": "docs/TECH_SPEC-co-361-first-post-v0-2-0-release-prep.md"
+      }
+    },
+    {
       "id": "20260425-linear-6255c5dd-7ddf-441e-b726-05798c478821",
       "title": "Fix missing CO-276 docs packet paths blocking docs:check",
       "relates_to": "tasks/tasks-linear-6255c5dd-7ddf-441e-b726-05798c478821.md",
