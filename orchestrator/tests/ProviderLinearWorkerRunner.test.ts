@@ -1993,6 +1993,40 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     });
   });
 
+  it('preserves core token counts on reasoning-only updates', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-1"}',
+        '{"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":100,"output_tokens":20,"total_tokens":120}}}}',
+        '{"type":"turn.completed","usage":{"reasoning_output_tokens":9}}'
+      ].join('\n')
+    );
+
+    expect(parsed.tokens).toEqual({
+      input_tokens: 100,
+      output_tokens: 20,
+      total_tokens: 120,
+      reasoning_output_tokens: 9
+    });
+  });
+
+  it('uses a fresh observed reasoning output token value when the sample includes one', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-1"}',
+        '{"type":"turn.completed","usage":{"input_tokens":100,"output_tokens":20,"reasoning_output_tokens":9}}',
+        '{"type":"notification","payload":{"method":"thread/tokenUsage/updated","params":{"tokenUsage":{"inputTokens":10,"outputTokens":5,"totalTokens":15,"reasoningOutputTokens":3}}},"timestamp":"2026-03-21T09:00:00.100Z"}'
+      ].join('\n')
+    );
+
+    expect(parsed.tokens).toEqual({
+      input_tokens: 10,
+      output_tokens: 5,
+      total_tokens: 15,
+      reasoning_output_tokens: 3
+    });
+  });
+
   it('parses appserver method telemetry into proof event/message semantics', () => {
     const parsed = parseProviderLinearWorkerJsonl(
       [

@@ -2252,14 +2252,12 @@ function mergeProviderWorkerObservedTokenUsage(
   observed: ProviderLinearWorkerTokenUsage
 ): ProviderLinearWorkerTokenUsage {
   const merged: ProviderLinearWorkerTokenUsage = {
-    input_tokens: observed.input_tokens,
-    output_tokens: observed.output_tokens,
-    total_tokens: observed.total_tokens
+    input_tokens: observed.input_tokens ?? current.input_tokens,
+    output_tokens: observed.output_tokens ?? current.output_tokens,
+    total_tokens: observed.total_tokens ?? current.total_tokens
   };
-  const reasoningOutputTokens = maxProviderWorkerNullableNumber(
-    current.reasoning_output_tokens ?? null,
-    observed.reasoning_output_tokens ?? null
-  );
+  const reasoningOutputTokens =
+    observed.reasoning_output_tokens ?? current.reasoning_output_tokens ?? null;
   if (reasoningOutputTokens !== null) {
     merged.reasoning_output_tokens = reasoningOutputTokens;
   }

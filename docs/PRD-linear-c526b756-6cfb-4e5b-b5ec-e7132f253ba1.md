@@ -10,6 +10,14 @@
 - Source payload declared by parent: `.runs/linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1-docs-packet/cli/2026-04-25T07-37-29-958Z-656ef03f/memory/source-0/source.txt`
 - Source payload note: the declared `.runs` path was not present in this child lane workspace at authoring time. This packet is anchored on the parent-provided issue scope, source anchor, and protected terms; the parent lane owns source-payload reconciliation.
 
+## Active Lane Checklist Mirror
+- [x] Canonical task checklist and `.agent/task` mirror track CO-353 subtasks with proof links. Evidence: `tasks/tasks-linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1.md` and `.agent/task/linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1.md`.
+- [x] `provider-linear-worker-proof.json` token parsing preserves `reasoning_output_tokens` and older missing-field behavior. Evidence: `orchestrator/src/cli/providerLinearWorkerRunner.ts` and `orchestrator/tests/ProviderLinearWorkerRunner.test.ts`.
+- [x] Manifest telemetry persists provider reasoning tokens. Evidence: `schemas/manifest.json`, `packages/shared/manifest/types.ts`, `orchestrator/src/cli/services/commandRunner.ts`, and `orchestrator/tests/CommandRunnerEnvPropagation.test.ts`.
+- [x] `ControlTokenUsagePayload` and `codexTotals` expose reasoning-token usage. Evidence: `orchestrator/src/cli/control/observabilityReadModel.ts`, `orchestrator/src/cli/control/controlRuntime.ts`, and `orchestrator/tests/ControlRuntime.test.ts`.
+- [x] `CO STATUS` and the operator dashboard render reasoning-token usage or explicit unavailable state. Evidence: `orchestrator/src/cli/control/controlStatusDashboard.ts`, `packages/orchestrator-status-ui/app.js`, `orchestrator/tests/ControlStatusDashboard.test.ts`, and `orchestrator/tests/SelectedRunPresenter.test.ts`.
+- [x] Review and validation proof is recorded before handoff. Evidence: standalone review telemetry `.runs/linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1/cli/2026-04-25T07-32-47-648Z-9b84420c/review/telemetry.json` and validation entries in `tasks/tasks-linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1.md`.
+
 ## Summary
 - Problem Statement: CO currently carries provider-worker token telemetry through provider proof and control surfaces as input, output, and total tokens. Codex CLI 0.125.0 exposes a more specific completed-turn field, `turn.completed.usage.reasoning_output_tokens`, but CO does not yet preserve that reasoning-token usage as first-class telemetry. Operators therefore cannot audit reasoning-token usage consistently across provider proof, manifests, control/read-model metrics, and status/dashboard output.
 - Desired Outcome: parent implementation adds an additive, backward-compatible reasoning-token telemetry path from Codex CLI 0.125.0 completed-turn usage through provider proof, manifests, control/read-model metrics, and status/dashboard output, while preserving existing input/output/total token semantics and explicit `null` or `n/a` behavior when the field is absent.

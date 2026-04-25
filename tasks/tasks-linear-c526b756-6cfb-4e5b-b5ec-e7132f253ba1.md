@@ -5,6 +5,7 @@
 - Primary PRD: `docs/PRD-linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1.md`
 - TECH_SPEC: `tasks/specs/linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1.md`
 - ACTION_PLAN: `docs/ACTION_PLAN-linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1.md`
+- Agent task mirror: `.agent/task/linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1.md`
 - Docs child-lane manifest: `.runs/linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1-docs-packet/cli/2026-04-25T07-37-29-958Z-656ef03f/manifest.json`
 - Source anchor: `ctx:sha256:4a1b90d4079209b44b35ed390dfc9ddc4b647dbdb70c4633a2907d47cd8aabc3#chunk:c000001`
 
@@ -16,6 +17,7 @@
 - [x] Canonical TECH_SPEC registered in `tasks/index.json` under `items[]`. Evidence: `tasks/index.json`.
 - [x] Freshness entries added for the scoped packet files. Evidence: `docs/docs-freshness-registry.json`.
 - [x] Parent review gate recorded CO-353 findings before handoff. Evidence: manifest-backed standalone review telemetry at `.runs/linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1/cli/2026-04-25T07-32-47-648Z-9b84420c/review/telemetry.json`.
+- [x] Active-lane checklist mirrored in `.agent/task`. Evidence: `.agent/task/linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1.md`.
 
 ## Protected Scope
 - [x] Packet preserves `Codex CLI 0.125.0`.
@@ -55,6 +57,7 @@
 - 2026-04-25: bounded same-issue docs child lane drafted the CO-353 docs-first packet and scoped registry/freshness entries. Implementation, review, validation, Linear state, workpad, and PR lifecycle remain parent-owned.
 - 2026-04-25: scoped child-lane checks passed for protected terms, JSON parsing, and diff whitespace; full repo validation was intentionally not run.
 - 2026-04-25: parent implementation added reasoning-token parsing/preservation, provider proof and manifest persistence, control/read-model propagation, status/dashboard unavailable-state rendering, and focused regression coverage. Manifest-backed standalone review completed with two P2 findings; both were addressed and the focused telemetry suite passed afterward.
+- 2026-04-25: PR feedback follow-up fixed observed-token merge semantics, restored the `paths.docs` field in `tasks/index.json` to a single spec pointer, and added `.agent/task` plus PRD active-lane checklist mirrors.
 
 ## Notes
 - `docs/docs-catalog.json` already classifies `docs/PRD-*`, `docs/ACTION_PLAN-*`, and `tasks/**/*.md` through existing glob patterns, so no catalog entry is required unless a parent guard reports otherwise.
