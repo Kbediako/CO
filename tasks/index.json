@@ -23,11 +23,7 @@
         "spec": "tasks/specs/CO-352-codex-0125-model-catalog-posture.md",
         "task": "tasks/tasks-linear-f4469614-cfdf-49a6-a7ff-366f58229816.md",
         "agent_task": ".agent/task/linear-f4469614-cfdf-49a6-a7ff-366f58229816.md",
-        "docs": {
-          "PRD": "docs/PRD-codex-0125-model-catalog-posture.md",
-          "TECH_SPEC": "tasks/specs/CO-352-codex-0125-model-catalog-posture.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-codex-0125-model-catalog-posture.md"
-        }
+        "docs": "tasks/specs/CO-352-codex-0125-model-catalog-posture.md"
       }
     },
     {
