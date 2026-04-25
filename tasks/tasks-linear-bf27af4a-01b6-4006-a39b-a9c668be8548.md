@@ -27,9 +27,9 @@
 - [x] Docs/template wording updated for conditional `multi_agent_v2` compatibility. - Evidence: child lane `docs-thread-limit-guidance` patch applied.
 
 ### Validation and handoff
-- [x] Targeted doctor/default/init tests pass. - Evidence: `npx vitest run --config vitest.config.core.ts orchestrator/tests/InitTemplates.test.ts orchestrator/tests/CodexDefaultsSetup.test.ts orchestrator/tests/Doctor.test.ts`.
-- [x] Repo guard lane passes or documented blockers/follow-ups exist. - Evidence: build/lint/test/delegation/repo stewardship/diff budget/pack smoke passed; docs blockers documented as CO-370 and existing CO-175 freshness cohort.
-- [x] Manifest-backed standalone review completes. - Evidence: `../../.runs/linear-bf27af4a-01b6-4006-a39b-a9c668be8548/cli/2026-04-25T09-04-25-100Z-c08fa974/review/telemetry.json` reports `status: succeeded`, `review_outcome: bounded-success`.
-- [x] Elegance/minimality pass completes. - Evidence: manual pass after post-fix review kept the shared feature probe narrow, avoided broad RLM parser refactors, preserved static normal templates, and made no follow-up edits.
+- [x] Targeted doctor/default/init tests pass. - Evidence: post-merge `npx vitest run --config vitest.config.core.ts orchestrator/tests/InitTemplates.test.ts orchestrator/tests/CodexDefaultsSetup.test.ts orchestrator/tests/Doctor.test.ts` passed `3` files / `80` tests after the final elegance cleanup.
+- [x] Repo guard lane passes or documented blockers/follow-ups exist. - Evidence: `delegation-guard` OK with `2` subagent manifests; `spec-guard` OK; `npm run build` OK; `npm run lint` OK with the pre-existing `DelegationMcpHealth.test.ts` warnings only; full `npm run test` passed `352` files / `4796` tests before the final unused-wrapper cleanup; `docs:check`, `docs:freshness`, `repo:stewardship`, working-tree `diff-budget`, and `pack:smoke` all passed.
+- [x] Manifest-backed standalone review completes. - Evidence: first review found a P2 target-env feature-probe issue that was fixed; final `../../.runs/linear-bf27af4a-01b6-4006-a39b-a9c668be8548/cli/2026-04-25T09-04-25-100Z-c08fa974/review/telemetry.json` reports `status: succeeded`, `review_outcome: bounded-success` with no emitted actionable findings after the fix.
+- [x] Elegance/minimality pass completes. - Evidence: final manual pass removed the unused `readCodexFeatureFlags` wrapper, kept the shared feature probe narrow, preserved static normal templates, and avoided broader RLM/delegation refactors; targeted tests, build, and lint reran cleanly afterward.
 - [ ] PR is attached to CO-354.
 - [ ] `pr ready-review` drain exits cleanly before `In Review`.

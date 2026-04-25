@@ -37,13 +37,6 @@ export function readCodexFeatureProbe(
   };
 }
 
-export function readCodexFeatureFlags(
-  codexBin: string,
-  env: NodeJS.ProcessEnv = process.env
-): Record<string, boolean> | null {
-  return readCodexFeatureProbe(codexBin, env).flags;
-}
-
 export function codexFeatureProbeRejectsAgentMaxThreads(probe: CodexFeatureProbeResult): boolean {
   const text = `${probe.error ?? ''}\n${probe.stderr}`.toLowerCase();
   const mentionsMaxThreads = /\bagents\.max_threads\b/u.test(text) || /\bmax[_\s-]?threads\b/u.test(text);
