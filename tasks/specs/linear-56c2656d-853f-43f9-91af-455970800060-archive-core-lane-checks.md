@@ -46,6 +46,7 @@ See also:
 - The out-of-scope `CO-362` auto-merge token repair becomes a blocker for producing the required `Core Lane` check.
 
 ## Parity matrix
+
 | Surface | Current behavior | Target behavior |
 | --- | --- | --- |
 | Archive PR creation | Workflow `GITHUB_TOKEN` updates leave native `pull_request` runs approval-required or no-job. | Archive workflow explicitly dispatches `core-lane.yml` on the archive PR branch. |
