@@ -22,7 +22,7 @@ type ArgMap = Record<string, string | boolean>;
 type OutputFormat = 'json' | 'text';
 
 const DEFAULT_ATTACH_REFRESH_INTERVAL_MS = 1_000;
-const DEFAULT_ATTACH_REQUEST_TIMEOUT_MS = 15_000;
+export const DEFAULT_ATTACH_REQUEST_TIMEOUT_MS = 15_000;
 const CSRF_HEADER = 'x-csrf-token';
 type CoStatusAttachRequestErrorKind = 'auth' | 'cancelled' | 'http' | 'network' | 'timeout';
 
@@ -287,11 +287,14 @@ export async function readUiDatasetWithEndpointRecovery(input: {
   getTarget: () => CoStatusAttachTarget;
   setTarget: (target: CoStatusAttachTarget) => void;
   signal?: AbortSignal;
+  requestTimeoutMs?: number;
+  recoverSameEndpointTimeout?: boolean;
 }): Promise<OperatorDashboardDataset> {
   const previousTarget = input.getTarget();
   try {
     return await fetchUiDataset(previousTarget.baseUrl, previousTarget.token, {
-      signal: input.signal
+      signal: input.signal,
+      requestTimeoutMs: input.requestTimeoutMs
     });
   } catch (error) {
     if (isCancelledAttachRequestError(error)) {
@@ -311,7 +314,8 @@ export async function readUiDatasetWithEndpointRecovery(input: {
       input.setTarget(resolvedTarget);
       try {
         return await fetchUiDataset(resolvedTarget.baseUrl, resolvedTarget.token, {
-          signal: input.signal
+          signal: input.signal,
+          requestTimeoutMs: input.requestTimeoutMs
         });
       } catch (retryError) {
         if (isCancelledAttachRequestError(retryError)) {
@@ -320,6 +324,22 @@ export async function readUiDatasetWithEndpointRecovery(input: {
         throw new Error(
           `control-host endpoint rotated from ${previousTarget.baseUrl.toString()} to ${resolvedTarget.baseUrl.toString()}, but the refreshed endpoint is not readable. ${formatAttachRequestFailure(retryError, resolvedTarget, { endpointAlreadyRotated: true })}`
         );
+      }
+    }
+    if (input.recoverSameEndpointTimeout === true && isTimeoutAttachRequestError(error)) {
+      try {
+        return await fetchUiDataset(previousTarget.baseUrl, previousTarget.token, {
+          signal: input.signal,
+          requestTimeoutMs: input.requestTimeoutMs
+        });
+      } catch (retryError) {
+        if (isCancelledAttachRequestError(retryError)) {
+          throw retryError;
+        }
+        if (isTimeoutAttachRequestError(retryError)) {
+          throw new Error(formatSameEndpointTimeoutFailure(retryError, previousTarget));
+        }
+        throw new Error(formatAttachRequestFailure(retryError, previousTarget));
       }
     }
     throw new Error(formatAttachRequestFailure(error, previousTarget));
@@ -337,6 +357,21 @@ function isCancelledAttachRequestError(error: unknown): boolean {
   return error instanceof CoStatusAttachRequestError && error.kind === 'cancelled';
 }
 
+function isTimeoutAttachRequestError(error: unknown): error is CoStatusAttachRequestError {
+  return error instanceof CoStatusAttachRequestError && error.kind === 'timeout';
+}
+
+function formatSameEndpointTimeoutFailure(
+  error: CoStatusAttachRequestError,
+  target: CoStatusAttachTarget
+): string {
+  return [
+    `${error.message}.`,
+    `The current resolved /ui/data.json endpoint at ${target.baseUrl.toString()} timed out again after endpoint re-resolution returned the same endpoint/token; this is a same-endpoint current-endpoint timeout, not stale/dead endpoint ECONNREFUSED recovery or attach restart/rotation.`,
+    'Inspect local control-host polling.stuck, polling.restart_required, and running claim evidence before treating the host as unhealthy.'
+  ].join(' ');
+}
+
 function formatAttachRequestFailure(
   error: unknown,
   target: CoStatusAttachTarget,
@@ -345,9 +380,9 @@ function formatAttachRequestFailure(
   if (error instanceof CoStatusAttachRequestError) {
     if (error.kind === 'network') {
       if (options.endpointAlreadyRotated) {
-        return `${error.message}. The refreshed control-host endpoint is still unreachable; wait for the new host to come up or rerun co-status attach.`;
+        return `current-host-unhealthy: ${error.message}. The refreshed control-host endpoint is still unreachable; wait for the new host to come up or rerun co-status attach.`;
       }
-      return `stale endpoint after control-host restart; control-host unavailable; control_endpoint.json has not rotated to a reachable host. ${error.message}. Waiting for ${resolve(target.runDir, 'control_endpoint.json')} to rotate or rerun co-status attach.`;
+      return `current-host-unhealthy: control_endpoint.json; control-host unavailable; stale endpoint after control-host restart. control_endpoint.json has not rotated to a reachable host. ${error.message}. Waiting for ${resolve(target.runDir, 'control_endpoint.json')} to rotate or rerun co-status attach.`;
     }
     if (error.kind === 'timeout') {
       return `${error.message}. The control-host did not answer before the attach timeout; if restart is in progress, wait for endpoint rotation or rerun co-status attach.`;

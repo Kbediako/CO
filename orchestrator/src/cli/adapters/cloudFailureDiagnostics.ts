@@ -2,6 +2,8 @@ export type CloudFailureCategory = 'configuration' | 'credentials' | 'connectivi
 
 export type CloudFailureDiagnosticCategory =
   | 'env_config'
+  | 'environment_not_found'
+  | 'environment_unavailable'
   | 'auth_mismatch'
   | 'cloud_connector_auth_drift'
   | 'quota_rate_limit'
@@ -92,6 +94,18 @@ const CLOUD_FAILURE_RULES: CloudFailureRule[] = [
   },
   {
     category: 'configuration',
+    diagnostic_category: 'environment_not_found',
+    patterns: ['environment_not_found', 'environment not found', 'is not visible to codex cloud'],
+    guidance: 'CODEX_CLOUD_ENV_ID is configured, but Codex Cloud could not resolve it. Fix the env id or choose an environment visible to this account.'
+  },
+  {
+    category: 'configuration',
+    diagnostic_category: 'environment_unavailable',
+    patterns: ['environment_unavailable', 'could not be verified by codex cloud'],
+    guidance: 'CODEX_CLOUD_ENV_ID is configured, but this account cannot use that environment right now. Verify visibility/permissions and retry.'
+  },
+  {
+    category: 'configuration',
     diagnostic_category: 'env_config',
     patterns: [
       'env config',
@@ -167,6 +181,8 @@ const MACHINE_READABLE_CLOUD_DETAILS = new Set([
   'cloud_denial',
   'cloud_denied',
   'cloud_env_missing',
+  'environment_not_found',
+  'environment_unavailable',
   'cloud_execution_denied',
   'cloud_connector_auth_drift',
   'codex_cloud_env_id',
@@ -185,16 +201,120 @@ const MACHINE_READABLE_CLOUD_DETAILS = new Set([
   'usage_limit_reached'
 ]);
 
+function isEnvironmentNotFoundSignal(signal: string): boolean {
+  const lowercase = signal.toLowerCase();
+  if (/\benvironment_not_found\b/u.test(lowercase)) {
+    return true;
+  }
+  if (!/\benvironment\s+(?:['"][^'"]+['"]|[^\s'"]+)\s+not\s+found\b/u.test(lowercase)) {
+    return false;
+  }
+  return (
+    lowercase.includes('codex_cloud_env_id') ||
+    lowercase.includes('codex cloud env id') ||
+    lowercase.includes('is not visible to codex cloud') ||
+    lowercase.includes('could not be verified by codex cloud')
+  );
+}
+
+function matchesCloudFailureRule(rule: CloudFailureRule, lowercase: string, normalized: string): boolean {
+  return rule.patterns.some((pattern) => {
+    const normalizedPattern = normalizeCloudFailureSignal(pattern);
+    return lowercase.includes(pattern) ||
+      (normalizedPattern.length >= 4 && normalized.includes(normalizedPattern));
+  });
+}
+
+function findCloudFailureRule(diagnosticCategory: CloudFailureDiagnosticCategory): CloudFailureRule | null {
+  return CLOUD_FAILURE_RULES.find((rule) => rule.diagnostic_category === diagnosticCategory) ?? null;
+}
+
+function findMatchedCloudFailureRule(
+  diagnosticCategory: CloudFailureDiagnosticCategory,
+  signal: string
+): CloudFailureRule | null {
+  const rule = findCloudFailureRule(diagnosticCategory);
+  if (!rule) {
+    return null;
+  }
+  const lowercase = signal.toLowerCase();
+  const normalized = normalizeCloudFailureSignal(signal);
+  return matchesCloudFailureRule(rule, lowercase, normalized) ? rule : null;
+}
+
+function maskEnvConfigIdentifierValues(normalizedSignal: string): string {
+  return normalizedSignal
+    .replace(/\bcodex_cloud_env_id\s+(?:['"][^'"]+['"]|[^\s'"]+)/gu, 'codex_cloud_env_id <env-id>')
+    .replace(/\bcodex cloud env id\s+(?:['"][^'"]+['"]|[^\s'"]+)/gu, 'codex cloud env id <env-id>')
+    .replace(/\benvironment\s+(?:['"][^'"]+['"]|[^\s'"]+)\s+not\s+found\b/gu, 'environment <env-id> not found');
+}
+
+function hasStrongConnectivityContext(signal: string): boolean {
+  const normalized = maskEnvConfigIdentifierValues(signal.toLowerCase());
+  return (
+    normalized.includes('enotfound') ||
+    normalized.includes('econn') ||
+    normalized.includes('bad gateway') ||
+    normalized.includes('service unavailable') ||
+    normalized.includes('gateway timeout') ||
+    /\bnetwork\W{0,24}(?:error|failure|unreachable|unavailable|timeout|timed out|connection|connectivity)\b/u.test(normalized) ||
+    /\b(?:request|connection|endpoint|gateway|upstream|service)\W{0,24}(?:timed out|timeout)\b/u.test(normalized) ||
+    /\b(?:timed out|timeout)\W{0,24}(?:(?:while\s+)?(?:contacting|connecting|reaching|calling|waiting)|request|connection|endpoint|gateway|upstream|service|after)\b/u.test(normalized) ||
+    /\b(?:http(?:\s+(?:status|response))?|status|response|upstream|gateway|error|failed|returned)\D{0,16}(?:502|503|504)\b/u.test(normalized) ||
+    /\b(?:502|503|504)\D{0,16}(?:bad gateway|service unavailable|gateway timeout)\b/u.test(normalized)
+  );
+}
+
 function matchCloudFailureRule(signal: string): CloudFailureRule | null {
   const lowercase = signal.toLowerCase();
   const normalized = normalizeCloudFailureSignal(signal);
-  return CLOUD_FAILURE_RULES.find((rule) =>
-    rule.patterns.some((pattern) => {
-      const normalizedPattern = normalizeCloudFailureSignal(pattern);
-      return lowercase.includes(pattern) ||
-        (normalizedPattern.length >= 4 && normalized.includes(normalizedPattern));
-    })
-  ) ?? null;
+  const envConfigRule = findCloudFailureRule('env_config');
+  if (isEnvironmentNotFoundSignal(signal)) {
+    const specificRule = matchSpecificWrappedFailureRule(signal, lowercase, normalized);
+    if (specificRule) {
+      return specificRule;
+    }
+    return findCloudFailureRule('environment_not_found');
+  }
+  if (envConfigRule && matchesCloudFailureRule(envConfigRule, lowercase, normalized)) {
+    const specificRule = matchSpecificWrappedFailureRule(signal, lowercase, normalized);
+    if (specificRule) {
+      return specificRule;
+    }
+    const envUnavailableRule = findCloudFailureRule('environment_unavailable');
+    if (envUnavailableRule && matchesCloudFailureRule(envUnavailableRule, lowercase, normalized)) {
+      return envUnavailableRule;
+    }
+  }
+  return CLOUD_FAILURE_RULES.find((rule) => matchesCloudFailureRule(rule, lowercase, normalized)) ?? null;
+}
+
+function matchSpecificWrappedFailureRule(
+  signal: string,
+  lowercase: string,
+  normalized: string
+): CloudFailureRule | null {
+  const maskedSignal = maskEnvConfigIdentifierValues(lowercase);
+  for (const diagnosticCategory of [
+    'cloud_connector_auth_drift',
+    'cloud_denial',
+    'auth_mismatch',
+    'quota_rate_limit'
+  ] as const) {
+    const rule = findMatchedCloudFailureRule(diagnosticCategory, maskedSignal);
+    if (rule) {
+      return rule;
+    }
+  }
+  const connectivityRule = findCloudFailureRule('network_connectivity');
+  if (
+    connectivityRule &&
+    matchesCloudFailureRule(connectivityRule, lowercase, normalized) &&
+    hasStrongConnectivityContext(signal)
+  ) {
+    return connectivityRule;
+  }
+  return null;
 }
 
 function normalizeCloudFailureSignal(signal: string): string {
@@ -206,8 +326,12 @@ function normalizeCloudFailureSignal(signal: string): string {
     .trim();
 }
 
+function normalizeMachineReadableCloudDetail(signal: string): string {
+  return normalizeCloudFailureSignal(signal).replace(/\s+/gu, '_');
+}
+
 function isMachineReadableCloudDetail(signal: string): boolean {
-  return MACHINE_READABLE_CLOUD_DETAILS.has(normalizeCloudFailureSignal(signal).replace(/\s+/gu, '_'));
+  return MACHINE_READABLE_CLOUD_DETAILS.has(normalizeMachineReadableCloudDetail(signal));
 }
 
 function buildCloudFailureDiagnosis(rule: CloudFailureRule, signal: string): CloudFailureDiagnosis {
@@ -231,6 +355,19 @@ export function diagnoseCloudFailure(options: {
   if (options.statusDetail && isMachineReadableCloudDetail(options.statusDetail)) {
     const statusDetailRule = matchCloudFailureRule(options.statusDetail);
     if (statusDetailRule) {
+      if (
+        normalizeMachineReadableCloudDetail(options.statusDetail) === 'environment_unavailable' &&
+        options.error
+      ) {
+        const errorRule = matchCloudFailureRule(options.error);
+        if (
+          errorRule &&
+          errorRule.diagnostic_category !== 'environment_unavailable' &&
+          errorRule.diagnostic_category !== 'env_config'
+        ) {
+          return buildCloudFailureDiagnosis(errorRule, signal);
+        }
+      }
       return buildCloudFailureDiagnosis(statusDetailRule, signal);
     }
   }

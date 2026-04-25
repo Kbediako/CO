@@ -29,19 +29,21 @@
 
 ## Validation
 - [x] `linear child-stream --pipeline docs-review --format json`. Evidence: `.runs/linear-12ae0840-e4dc-4181-8db6-2fdf02ef270b-docs-review/cli/2026-04-25T14-04-00-828Z-d9da1fa5/manifest.json` (failed on unrelated CO-276 docs:check baseline; fallback review recorded).
-- [x] Focused `CloudPreflight.test.ts` regression run. Evidence: `npm run test:orchestrator -- CloudPreflight.test.ts` (5 tests passed).
+- [x] Focused `CloudPreflight.test.ts` regression run. Evidence: `npm run test:orchestrator -- CloudPreflight.test.ts` passed 12 tests after current-main merge.
 - [x] `node scripts/delegation-guard.mjs`. Evidence: passed with 2 subagent manifests found.
-- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: exited 0; reported pre-existing stale-spec advisory findings.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `Spec guard: OK`.
 - [x] `npm run build`. Evidence: passed.
 - [x] `npm run lint`. Evidence: passed with existing `DelegationMcpHealth.test.ts` `no-explicit-any` warnings.
-- [x] `npm run test`. Evidence: passed 346 test files / 4425 tests.
-- [x] `npm run docs:check`. Evidence: ran and failed on unrelated pre-existing CO-276 missing-path references in `docs/TASKS.md`.
-- [x] `npm run docs:freshness`. Evidence: ran and failed on unrelated pre-existing missing/stale docs registry baseline including CO-276 references.
-- [x] `npm run repo:stewardship`. Evidence: passed with 0 action-required files.
-- [x] `node scripts/diff-budget.mjs`. Evidence: passed after pruning generated child-lane worktree artifacts.
-- [x] Standalone review before review handoff. Evidence: `review/telemetry.json` status `succeeded`, `review_outcome` `bounded-success`; no actionable findings.
-- [x] Explicit elegance/minimality pass before review handoff. Evidence: `out/linear-12ae0840-e4dc-4181-8db6-2fdf02ef270b/manual/20260425T1431Z-elegance-review.md`.
+- [x] `npm run test`. Evidence: passed 352 test files / 4827 tests after current-main merge.
+- [x] `npm run docs:check`. Evidence: passed after current-main merge resolved the earlier CO-276 missing-path baseline.
+- [x] `npm run docs:freshness`. Evidence: passed with 4728 docs / 4731 registry entries and 0 stale docs.
+- [x] `npm run repo:stewardship`. Evidence: passed with 5845 tracked files and 0 action-required files.
+- [x] `node scripts/diff-budget.mjs`. Evidence: passed; local working-tree scope clean and stacked aggregate vs `origin/main` within budget.
+- [x] `PACK_SMOKE_ALLOW_MARKETPLACE_SKIP=1 ... npm run pack:smoke`. Evidence: passed.
+- [x] Standalone review before review handoff. Evidence: `review/telemetry.json` status `succeeded`, `review_outcome` `bounded-success`; current-main retry found no actionable regressions.
+- [x] Explicit elegance/minimality pass before review handoff. Evidence: `out/linear-12ae0840-e4dc-4181-8db6-2fdf02ef270b/manual/20260425T1454Z-elegance-review.md`.
 
 ## Delivery
 - [ ] Open or update a PR, attach it to Linear, and drain automated feedback before any review-state transition.
-- [ ] Merge latest `origin/main` into the branch, refresh the workpad, and stop coding once the issue reaches `In Review` or `Human Review`.
+- [x] Merge latest `origin/main` into the branch. Evidence: merge commit `43660a992`.
+- [ ] Refresh the workpad, open/update the PR, attach it to Linear, drain automated feedback, and stop coding once the issue reaches `In Review` or `Human Review`.
