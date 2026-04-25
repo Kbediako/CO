@@ -2150,7 +2150,64 @@ function hasProviderLinearWorkerProjectionTelemetryGap(
     !proof.latest_turn_id ||
     !proof.latest_session_id ||
     !hasTokens ||
-    proof.rate_limits == null
+    proof.rate_limits == null ||
+    hasProviderLinearWorkerProjectionSessionLogHydrationGap(proof) ||
+    hasProviderLinearWorkerProjectionAppServerSupervisionGap(proof)
+  );
+}
+
+function hasProviderLinearWorkerProjectionAppServerSupervisionGap(
+  proof: ProviderLinearWorkerProof
+): boolean {
+  const selectedRuntimeMode =
+    proof.runtime?.selected_mode ?? proof.auth_provenance?.runtime_mode ?? null;
+  const requestedRuntimeMode = proof.runtime?.requested_mode ?? null;
+  const fallback = proof.runtime?.fallback ?? null;
+  if (
+    selectedRuntimeMode !== 'appserver' &&
+    requestedRuntimeMode !== 'appserver' &&
+    fallback?.from_mode !== 'appserver' &&
+    fallback?.to_mode !== 'appserver'
+  ) {
+    return false;
+  }
+  const supervision = proof.appserver_supervision ?? null;
+  if (!supervision) {
+    return true;
+  }
+  return (
+    supervision.selected_runtime?.selected_mode !== selectedRuntimeMode ||
+    supervision.selected_runtime?.requested_mode !== requestedRuntimeMode ||
+    supervision.thread_id !== proof.thread_id ||
+    supervision.latest_turn_id !== proof.latest_turn_id ||
+    supervision.latest_session_id !== proof.latest_session_id ||
+    supervision.session_log_thread_id !== (proof.session_log_thread_id ?? null) ||
+    supervision.session_log_turn_id !== (proof.session_log_turn_id ?? null) ||
+    supervision.session_log_session_id !== (proof.session_log_session_id ?? null) ||
+    supervision.turn_persistence_status == null ||
+    supervision.pagination_status == null ||
+    supervision.resume_status == null ||
+    supervision.fork_status == null ||
+    supervision.jsonl_truth_retained !== true ||
+    supervision.session_log_truth_retained !== true
+  );
+}
+
+function hasProviderLinearWorkerProjectionSessionLogHydrationGap(
+  proof: ProviderLinearWorkerProof
+): boolean {
+  const runtimeMode =
+    proof.runtime?.selected_mode ?? proof.auth_provenance?.runtime_mode ?? null;
+  if (runtimeMode !== 'appserver') {
+    return false;
+  }
+  if (!proof.thread_id || !proof.latest_turn_id || !proof.latest_session_id) {
+    return false;
+  }
+  return (
+    proof.session_log_thread_id !== proof.thread_id ||
+    proof.session_log_turn_id !== proof.latest_turn_id ||
+    proof.session_log_session_id !== proof.latest_session_id
   );
 }
 

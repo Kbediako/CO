@@ -5371,6 +5371,287 @@ describe('SelectedRunProjection', () => {
     }
   );
 
+  it('hydrates selected appserver proof when only session-log ids are missing', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        started_at: '2026-04-17T00:30:00.000Z',
+        updated_at: '2026-04-17T00:35:00.000Z',
+        workspace_path: root
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(
+        buildProviderLinearWorkerProof({
+          attempt_started_at: '2026-04-17T00:30:00.000Z',
+          current_turn_started_at: '2026-04-17T00:30:01.000Z',
+          thread_id: 'thread-1',
+          latest_turn_id: 'turn-2',
+          latest_session_id: 'thread-1-turn-2',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          session_log_thread_id: null,
+          session_log_turn_id: null,
+          session_log_session_id: null,
+          last_event: 'task_complete',
+          last_message: null,
+          last_event_at: '2026-04-17T00:35:00.000Z',
+          current_turn_activity: {
+            event: 'task_complete',
+            message_or_payload: null,
+            recorded_at: '2026-04-17T00:35:00.000Z',
+            source: 'stdout_jsonl',
+            turn_id: 'turn-2',
+            session_id: 'thread-1-turn-2'
+          },
+          tokens: {
+            input_tokens: 12,
+            output_tokens: 8,
+            total_tokens: 20
+          },
+          rate_limits: {
+            primary: {
+              used_percent: 10,
+              window_minutes: 300
+            },
+            secondary: {
+              used_percent: 20,
+              window_minutes: 10080
+            }
+          },
+          runtime: {
+            requested_mode: 'appserver',
+            selected_mode: 'appserver',
+            provider: 'AppServerRuntimeProvider',
+            runtime_session_id: 'appserver-run-child',
+            fallback: {
+              occurred: false,
+              code: null,
+              reason: null,
+              from_mode: null,
+              to_mode: null,
+              checked_at: '2026-04-17T00:30:00.000Z'
+            }
+          },
+          auth_provenance: {
+            provider_kind: 'codex',
+            runtime_mode: 'appserver',
+            runtime_provider: 'AppServerRuntimeProvider',
+            active_profile_fingerprint: null,
+            active_account_fingerprint: null,
+            cloud_env_id: 'env-appserver-proof',
+            cloud_branch: null,
+            credential_source: null,
+            auth_freshness: 'credential_source_unknown',
+            observed_at: '2026-04-17T00:30:00.000Z',
+            source: 'runtime_env:linear'
+          },
+          owner_phase: 'turn_completed',
+          owner_status: 'in_progress',
+          workspace_path: root,
+          child_lanes: [],
+          updated_at: '2026-04-17T00:35:00.000Z'
+        }),
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const codexHome = join(root, '.codex');
+    const sessionDir = join(codexHome, 'sessions', '2026', '04', '17');
+    await mkdir(sessionDir, { recursive: true });
+    await writeFile(
+      join(sessionDir, 'rollout-2026-04-17T00-30-02-000Z-thread-1.jsonl'),
+      [
+        JSON.stringify({
+          type: 'session_meta',
+          payload: {
+            id: 'thread-1',
+            cwd: root,
+            initial_prompt: 'You are the provider worker for Linear issue CO-2: Autonomous intake handoff'
+          }
+        }),
+        JSON.stringify({
+          type: 'turn_context',
+          payload: {
+            turn_id: 'turn-2'
+          }
+        }),
+        JSON.stringify({
+          timestamp: '2026-04-17T00:35:00.000Z',
+          type: 'event_msg',
+          payload: {
+            type: 'task_complete',
+            turn_id: 'turn-2'
+          }
+        })
+      ].join('\n'),
+      'utf8'
+    );
+
+    const previousCodexHome = process.env.CODEX_HOME;
+    process.env.CODEX_HOME = codexHome;
+    try {
+      const selected = await createProjectionReader(paths, childPaths.manifestPath).buildSelectedRunContext();
+
+      expect(selected?.providerLinearWorkerProof).toMatchObject({
+        session_log_thread_id: 'thread-1',
+        session_log_turn_id: 'turn-2',
+        session_log_session_id: 'thread-1-turn-2',
+        appserver_supervision: {
+          turn_persistence_status: 'proven',
+          turn_persistence_source: 'session_log_hydration',
+          turn_persistence_blocker: null
+        }
+      });
+    } finally {
+      if (previousCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = previousCodexHome;
+      }
+    }
+  });
+
+  it('hydrates selected appserver proof when only supervision proof is missing', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        started_at: '2026-04-17T00:30:00.000Z',
+        updated_at: '2026-04-17T00:35:00.000Z',
+        workspace_path: root
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(
+        buildProviderLinearWorkerProof({
+          attempt_started_at: '2026-04-17T00:30:00.000Z',
+          current_turn_started_at: '2026-04-17T00:30:01.000Z',
+          thread_id: 'thread-1',
+          latest_turn_id: 'turn-2',
+          latest_session_id: 'thread-1-turn-2',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          session_log_thread_id: 'thread-1',
+          session_log_turn_id: 'turn-2',
+          session_log_session_id: 'thread-1-turn-2',
+          turn_count: 1,
+          last_event: 'task_complete',
+          last_message: null,
+          last_event_at: '2026-04-17T00:35:00.000Z',
+          current_turn_activity: {
+            event: 'task_complete',
+            message_or_payload: null,
+            recorded_at: '2026-04-17T00:35:00.000Z',
+            source: 'session_log_hydration',
+            turn_id: 'turn-2',
+            session_id: 'thread-1-turn-2'
+          },
+          tokens: {
+            input_tokens: 12,
+            output_tokens: 8,
+            total_tokens: 20
+          },
+          rate_limits: {
+            primary: {
+              used_percent: 10,
+              window_minutes: 300
+            }
+          },
+          runtime: {
+            requested_mode: 'appserver',
+            selected_mode: 'appserver',
+            provider: 'AppServerRuntimeProvider',
+            runtime_session_id: 'appserver-run-child',
+            fallback: {
+              occurred: false,
+              code: null,
+              reason: null,
+              from_mode: null,
+              to_mode: null,
+              checked_at: '2026-04-17T00:30:00.000Z'
+            }
+          },
+          auth_provenance: {
+            provider_kind: 'codex',
+            runtime_mode: 'appserver',
+            runtime_provider: 'AppServerRuntimeProvider',
+            active_profile_fingerprint: null,
+            active_account_fingerprint: null,
+            cloud_env_id: 'env-appserver-proof',
+            cloud_branch: null,
+            credential_source: null,
+            auth_freshness: 'credential_source_unknown',
+            observed_at: '2026-04-17T00:30:00.000Z',
+            source: 'runtime_env:linear'
+          },
+          appserver_supervision: null,
+          owner_phase: 'turn_completed',
+          owner_status: 'in_progress',
+          workspace_path: root,
+          child_lanes: [],
+          updated_at: '2026-04-17T00:35:00.000Z'
+        }),
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const selected = await createProjectionReader(paths, childPaths.manifestPath).buildSelectedRunContext();
+
+    expect(selected?.providerLinearWorkerProof).toMatchObject({
+      appserver_supervision: {
+        selected_runtime: {
+          selected_mode: 'appserver',
+          runtime_session_id: 'appserver-run-child'
+        },
+        sticky_environment_id: 'env-appserver-proof',
+        sticky_environment_status: 'proven',
+        turn_persistence_status: 'proven',
+        turn_persistence_source: 'session_log_hydration',
+        pagination_status: 'blocked',
+        resume_status: 'not_requested',
+        fork_status: 'blocked',
+        jsonl_truth_retained: true,
+        session_log_truth_retained: true
+      }
+    });
+  });
+
   it('refreshes in-progress provider proofs from session telemetry during projection reads', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {
