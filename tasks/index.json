@@ -15099,6 +15099,27 @@
         "agent_task": ".agent/task/linear-12ae0840-e4dc-4181-8db6-2fdf02ef270b.md",
         "docs": "docs/TECH_SPEC-linear-12ae0840-e4dc-4181-8db6-2fdf02ef270b.md"
       }
+    },
+    {
+      "id": "20260425-linear-co-373-cloudpreflight-flake",
+      "title": "CO-373 CloudPreflight fake Codex CLI test flake stabilization",
+      "relates_to": "tasks/tasks-linear-co-373-cloudpreflight-flake.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-25",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-co-373-cloudpreflight-flake.md",
+        "task": "tasks/tasks-linear-co-373-cloudpreflight-flake.md",
+        "agent_task": ".agent/task/linear-co-373-cloudpreflight-flake.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-co-373-cloudpreflight-flake.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-co-373-cloudpreflight-flake.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-co-373-cloudpreflight-flake.md"
+        }
+      }
     }
   ]
 }
