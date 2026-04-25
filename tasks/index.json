@@ -1,9 +1,61 @@
 {
   "items": [
     {
-      "id": "20260425-linear-dc23c6fa-5080-4665-89c2-f657983901bd",
-      "title": "CO-359 appserver child-lane runtime classification after pack smoke validation stall",
-      "relates_to": "tasks/tasks-linear-dc23c6fa-5080-4665-89c2-f657983901bd.md",
+      "id": "20260425-linear-6b3b8bf4-63fa-44e8-a182-e2e20209aca7",
+      "title": "CO-360 task registry docs pointer TECH_SPEC mirror alignment",
+      "relates_to": "tasks/tasks-linear-6b3b8bf4-63fa-44e8-a182-e2e20209aca7.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-25",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-25",
+          "status": "parent_applied_artifact_after_stale_accept",
+          "manifest": ".runs/linear-6b3b8bf4-63fa-44e8-a182-e2e20209aca7-co369-docs-packet/cli/2026-04-25T09-39-15-489Z-53166d03/manifest.json",
+          "source_anchor": "ctx:sha256:17c72b629ea51d97e5065c3e76d6f4316f93091ecea9e4b15ea7310a08b13aab#chunk:c000001",
+          "summary": "Docs-first packet created for CO-369. The child lane completed successfully and produced a six-file patch; the parent had moved from the stale provider snapshot to current origin/main, so the helper rejected accept as stale and the parent applied the reviewed patch artifact manually. Parent owns the CO-360 mirror/repoint implementation, validation, Linear workpad, PR lifecycle, and closeout."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-6b3b8bf4-63fa-44e8-a182-e2e20209aca7.md",
+        "task": "tasks/tasks-linear-6b3b8bf4-63fa-44e8-a182-e2e20209aca7.md",
+        "agent_task": ".agent/task/linear-6b3b8bf4-63fa-44e8-a182-e2e20209aca7.md",
+        "docs": "docs/TECH_SPEC-linear-6b3b8bf4-63fa-44e8-a182-e2e20209aca7.md"
+      }
+    },
+    {
+      "id": "20260425-linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1",
+      "title": "CO-353 Codex CLI 0.125.0 reasoning-token telemetry",
+      "relates_to": "tasks/tasks-linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-25",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-25",
+          "status": "prepared-for-parent-reconciliation",
+          "manifest": ".runs/linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1-docs-packet/cli/2026-04-25T07-37-29-958Z-656ef03f/manifest.json",
+          "source_anchor": "ctx:sha256:4a1b90d4079209b44b35ed390dfc9ddc4b647dbdb70c4633a2907d47cd8aabc3#chunk:c000001",
+          "summary": "Docs-first packet created for CO-353 Codex CLI 0.125.0 reasoning-token telemetry. It preserves turn.completed.usage.reasoning_output_tokens, reasoning-token usage, provider proof, manifests, control/read-model metrics, and status/dashboard output; parent owns source-payload reconciliation, docs-review, implementation, validation, Linear/workpad state, PR lifecycle, and closeout."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1.md",
+        "task": "tasks/tasks-linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1.md",
+        "agent_task": ".agent/task/linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1.md",
+        "docs": "tasks/specs/linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1.md"
+      }
+    },
+    {
+      "id": "20260425-linear-fd4bf705-11a9-4717-948c-addfb4fa3f83",
+      "title": "CO: repair archive automation auto-merge token",
+      "relates_to": "tasks/tasks-linear-fd4bf705-11a9-4717-948c-addfb4fa3f83.md",
       "risk": "high",
       "owners": [
         "Codex"
@@ -14,15 +66,41 @@
           "reviewer": "bounded same-issue docs child lane",
           "date": "2026-04-25",
           "status": "produced",
-          "manifest": ".runs/linear-dc23c6fa-5080-4665-89c2-f657983901bd-docs-packet/cli/2026-04-25T03-44-14-263Z-48fc482a/manifest.json",
-          "source_anchor": "ctx:sha256:ec738e2d6838b7a07389e50b49cb93adb3d410ead5a7d9e087dd8760c790b635#chunk:c000001",
-          "summary": "Docs-first packet preserves CO-359 as a focused runtime regression/classification lane for providerLinearChildLaneRunner under runtime_mode=appserver. pack-smoke-current-validation-r2 is evidence only: the observed chain is child manifest in_progress after appserver startup, no assistant follow-up, no scoped Vitest, child-lane invalidation, and codex_exit_1. Parent owns runtime classification, implementation, tests, Linear/workpad reconciliation, PR, and merge; non-goals preserve no marketplace command changes, no model posture changes, no broad control-host rewrite, no bypass of same-issue child-lane proof/patch validation, and no weakening of parent-dirty fail-closed behavior."
+          "manifest": ".runs/linear-fd4bf705-11a9-4717-948c-addfb4fa3f83-docs-packet-cli/cli/2026-04-25T06-07-45-642Z-4500fa92/manifest.json",
+          "source_anchor": "ctx:sha256:becfd8cba79308cf736ffb09357d004b9d8b428a1389367239b753c92a9107d6#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-362 as the archive auto-merge credential repair lane for `ARCHIVE_AUTOMERGE_TOKEN`, `tasks-archive-automation`, `implementation-docs-archive-automation`, archive auto-merge, and `401 Bad credentials`; parent owns GitHub secret or permission repair, required `Core Lane` archive PR evidence, auto-merge verification, Linear state, workpad, PR, and merge."
         }
       },
       "paths": {
-        "spec": "tasks/specs/linear-dc23c6fa-5080-4665-89c2-f657983901bd.md",
-        "task": "tasks/tasks-linear-dc23c6fa-5080-4665-89c2-f657983901bd.md",
-        "docs": "docs/TECH_SPEC-linear-dc23c6fa-5080-4665-89c2-f657983901bd.md"
+        "spec": "tasks/specs/linear-fd4bf705-11a9-4717-948c-addfb4fa3f83.md",
+        "task": "tasks/tasks-linear-fd4bf705-11a9-4717-948c-addfb4fa3f83.md",
+        "agent_task": ".agent/task/linear-fd4bf705-11a9-4717-948c-addfb4fa3f83.md",
+        "docs": "docs/TECH_SPEC-linear-fd4bf705-11a9-4717-948c-addfb4fa3f83.md"
+      }
+    },
+    {
+      "id": "20260425-linear-17451947-1b72-4d01-9e3d-86dcaab46c39",
+      "title": "CO-360 provider-worker Codex 0.125 app-server supervision gate",
+      "relates_to": "tasks/tasks-linear-17451947-1b72-4d01-9e3d-86dcaab46c39.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-25",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-25",
+          "status": "parent_applied_artifact",
+          "manifest": ".runs/linear-17451947-1b72-4d01-9e3d-86dcaab46c39-docs-packet/cli/2026-04-25T00-45-42-850Z-ac87a210/manifest.json",
+          "source_anchor": "ctx:sha256:07c7c2fa5d9442a961e0bb4be17721c4884e178304d5767a51417c30e21de227#chunk:c000001",
+          "summary": "Docs-first packet created for CO-360. The packet preserves the provider-worker Codex 0.125 app-server supervision proof gate: configured provider-linear-worker canary under runtime_mode=appserver, sticky environment proof with real environment id or exact fallback blocker, persisted-turn pagination/resume/fork proof or exact fallback blocker, fail-closed codex exec/codex exec resume fallback with machine-readable reasons, manifest/status truth for selected runtime and app-server identifiers, regression coverage, and JSONL/session-log truth retention until parity is proven. The source payload is present in the parent artifact tree; parent reviewed and manually applied the patch artifact after child-lane accept invalidated on a Linear updated_at change."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-17451947-1b72-4d01-9e3d-86dcaab46c39-provider-worker-codex-0125-appserver-supervision-gate.md",
+        "task": "tasks/tasks-linear-17451947-1b72-4d01-9e3d-86dcaab46c39.md",
+        "docs": "docs/TECH_SPEC-linear-17451947-1b72-4d01-9e3d-86dcaab46c39.md"
       }
     },
     {
@@ -14811,9 +14889,9 @@
       }
     },
     {
-      "id": "20260425-linear-fd4bf705-11a9-4717-948c-addfb4fa3f83",
-      "title": "CO: repair archive automation auto-merge token",
-      "relates_to": "tasks/tasks-linear-fd4bf705-11a9-4717-948c-addfb4fa3f83.md",
+      "id": "20260425-linear-dc23c6fa-5080-4665-89c2-f657983901bd",
+      "title": "CO-359 appserver child-lane runtime classification after pack smoke validation stall",
+      "relates_to": "tasks/tasks-linear-dc23c6fa-5080-4665-89c2-f657983901bd.md",
       "risk": "high",
       "owners": [
         "Codex"
@@ -14824,67 +14902,15 @@
           "reviewer": "bounded same-issue docs child lane",
           "date": "2026-04-25",
           "status": "produced",
-          "manifest": ".runs/linear-fd4bf705-11a9-4717-948c-addfb4fa3f83-docs-packet-cli/cli/2026-04-25T06-07-45-642Z-4500fa92/manifest.json",
-          "source_anchor": "ctx:sha256:becfd8cba79308cf736ffb09357d004b9d8b428a1389367239b753c92a9107d6#chunk:c000001",
-          "summary": "Docs-first packet preserves CO-362 as the archive auto-merge credential repair lane for `ARCHIVE_AUTOMERGE_TOKEN`, `tasks-archive-automation`, `implementation-docs-archive-automation`, archive auto-merge, and `401 Bad credentials`; parent owns GitHub secret or permission repair, required `Core Lane` archive PR evidence, auto-merge verification, Linear state, workpad, PR, and merge."
+          "manifest": ".runs/linear-dc23c6fa-5080-4665-89c2-f657983901bd-docs-packet/cli/2026-04-25T03-44-14-263Z-48fc482a/manifest.json",
+          "source_anchor": "ctx:sha256:ec738e2d6838b7a07389e50b49cb93adb3d410ead5a7d9e087dd8760c790b635#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-359 as a focused runtime regression/classification lane for providerLinearChildLaneRunner under runtime_mode=appserver. pack-smoke-current-validation-r2 is evidence only: the observed chain is child manifest in_progress after appserver startup, no assistant follow-up, no scoped Vitest, child-lane invalidation, and codex_exit_1. Parent owns runtime classification, implementation, tests, Linear/workpad reconciliation, PR, and merge; non-goals preserve no marketplace command changes, no model posture changes, no broad control-host rewrite, no bypass of same-issue child-lane proof/patch validation, and no weakening of parent-dirty fail-closed behavior."
         }
       },
       "paths": {
-        "spec": "tasks/specs/linear-fd4bf705-11a9-4717-948c-addfb4fa3f83.md",
-        "task": "tasks/tasks-linear-fd4bf705-11a9-4717-948c-addfb4fa3f83.md",
-        "agent_task": ".agent/task/linear-fd4bf705-11a9-4717-948c-addfb4fa3f83.md",
-        "docs": "docs/TECH_SPEC-linear-fd4bf705-11a9-4717-948c-addfb4fa3f83.md"
-      }
-    },
-    {
-      "id": "20260425-linear-17451947-1b72-4d01-9e3d-86dcaab46c39",
-      "title": "CO-360 provider-worker Codex 0.125 app-server supervision gate",
-      "relates_to": "tasks/tasks-linear-17451947-1b72-4d01-9e3d-86dcaab46c39.md",
-      "risk": "high",
-      "owners": [
-        "Codex"
-      ],
-      "last_review": "2026-04-25",
-      "approvals": {
-        "docs_packet_child_lane": {
-          "reviewer": "bounded same-issue docs child lane",
-          "date": "2026-04-25",
-          "status": "parent_applied_artifact",
-          "manifest": ".runs/linear-17451947-1b72-4d01-9e3d-86dcaab46c39-docs-packet/cli/2026-04-25T00-45-42-850Z-ac87a210/manifest.json",
-          "source_anchor": "ctx:sha256:07c7c2fa5d9442a961e0bb4be17721c4884e178304d5767a51417c30e21de227#chunk:c000001",
-          "summary": "Docs-first packet created for CO-360. The packet preserves the provider-worker Codex 0.125 app-server supervision proof gate: configured provider-linear-worker canary under runtime_mode=appserver, sticky environment proof with real environment id or exact fallback blocker, persisted-turn pagination/resume/fork proof or exact fallback blocker, fail-closed codex exec/codex exec resume fallback with machine-readable reasons, manifest/status truth for selected runtime and app-server identifiers, regression coverage, and JSONL/session-log truth retention until parity is proven. The source payload is present in the parent artifact tree; parent reviewed and manually applied the patch artifact after child-lane accept invalidated on a Linear updated_at change."
-        }
-      },
-      "paths": {
-        "spec": "tasks/specs/linear-17451947-1b72-4d01-9e3d-86dcaab46c39-provider-worker-codex-0125-appserver-supervision-gate.md",
-        "task": "tasks/tasks-linear-17451947-1b72-4d01-9e3d-86dcaab46c39.md",
-        "docs": "tasks/specs/linear-17451947-1b72-4d01-9e3d-86dcaab46c39-provider-worker-codex-0125-appserver-supervision-gate.md"
-      }
-    },
-    {
-      "id": "20260425-linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1",
-      "title": "CO-353 Codex CLI 0.125.0 reasoning-token telemetry",
-      "relates_to": "tasks/tasks-linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1.md",
-      "risk": "high",
-      "owners": [
-        "Codex"
-      ],
-      "last_review": "2026-04-25",
-      "approvals": {
-        "docs_packet_child_lane": {
-          "reviewer": "bounded same-issue docs child lane",
-          "date": "2026-04-25",
-          "status": "prepared-for-parent-reconciliation",
-          "manifest": ".runs/linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1-docs-packet/cli/2026-04-25T07-37-29-958Z-656ef03f/manifest.json",
-          "source_anchor": "ctx:sha256:4a1b90d4079209b44b35ed390dfc9ddc4b647dbdb70c4633a2907d47cd8aabc3#chunk:c000001",
-          "summary": "Docs-first packet created for CO-353 Codex CLI 0.125.0 reasoning-token telemetry. It preserves turn.completed.usage.reasoning_output_tokens, reasoning-token usage, provider proof, manifests, control/read-model metrics, and status/dashboard output; parent owns source-payload reconciliation, docs-review, implementation, validation, Linear/workpad state, PR lifecycle, and closeout."
-        }
-      },
-      "paths": {
-        "spec": "tasks/specs/linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1.md",
-        "task": "tasks/tasks-linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1.md",
-        "agent_task": ".agent/task/linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1.md",
-        "docs": "tasks/specs/linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1.md"
+        "spec": "tasks/specs/linear-dc23c6fa-5080-4665-89c2-f657983901bd.md",
+        "task": "tasks/tasks-linear-dc23c6fa-5080-4665-89c2-f657983901bd.md",
+        "docs": "docs/TECH_SPEC-linear-dc23c6fa-5080-4665-89c2-f657983901bd.md"
       }
     }
   ]
