@@ -254,8 +254,20 @@ jobs:
           WATCH_STATUS=$?
           set -e
 
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}"
+          set +e
           RUN_FIELDS="$(gh run view "${RUN_ID}" --repo "${GH_REPO}" --json conclusion,url --jq '[.conclusion, .url] | @tsv')"
-          IFS=$'\t' read -r RUN_CONCLUSION RUN_URL <<< "${RUN_FIELDS}"
+          RUN_VIEW_STATUS=$?
+          set -e
+
+          if [ "${RUN_VIEW_STATUS}" -ne 0 ]; then
+            set_core_lane_status "error" "Core Lane run details unavailable for archive PR #${PR_NUMBER}." "${RUN_URL}"
+            echo "::error::Failed to fetch Core Lane run details for archive PR #${PR_NUMBER}; run=${RUN_ID}."
+            exit "${RUN_VIEW_STATUS}"
+          fi
+
+          IFS=$'\t' read -r RUN_CONCLUSION VIEW_RUN_URL <<< "${RUN_FIELDS}"
+          RUN_URL="${VIEW_RUN_URL:-${RUN_URL}}"
 
           if [ "${RUN_CONCLUSION}" = "success" ]; then
             set_core_lane_status "success" "Core Lane passed for archive PR #${PR_NUMBER}." "${RUN_URL}"

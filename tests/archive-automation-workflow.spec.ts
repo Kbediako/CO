@@ -167,6 +167,28 @@ describe('archive automation workflow required checks', () => {
     expect(dispatchStep.run).toContain('Core Lane did not pass');
   });
 
+  it('publishes a terminal Core Lane status when dispatched run details cannot be fetched', async () => {
+    const workflow = await readWorkflow('.github/workflows/archive-automation-base.yml');
+    const dispatchStep = getStep(workflow, 'archive', 'Dispatch Core Lane for archive PR');
+    const run = dispatchStep.run ?? '';
+
+    const pendingStatus = run.indexOf('set_core_lane_status "pending"');
+    const runView = run.indexOf('RUN_FIELDS="$(gh run view');
+    const viewStatusCapture = run.indexOf('RUN_VIEW_STATUS=$?');
+    const terminalErrorStatus = run.indexOf(
+      'set_core_lane_status "error" "Core Lane run details unavailable for archive PR #${PR_NUMBER}."'
+    );
+
+    expect(pendingStatus).toBeGreaterThanOrEqual(0);
+    expect(runView).toBeGreaterThan(pendingStatus);
+    expect(viewStatusCapture).toBeGreaterThan(runView);
+    expect(terminalErrorStatus).toBeGreaterThan(viewStatusCapture);
+    expect(run).toContain('RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}"');
+    expect(run).toContain('if [ "${RUN_VIEW_STATUS}" -ne 0 ]; then');
+    expect(run).toContain('Failed to fetch Core Lane run details for archive PR');
+    expect(run).toContain('exit "${RUN_VIEW_STATUS}"');
+  });
+
   it('grants reusable archive callers permission to dispatch Core Lane', async () => {
     const taskArchive = await readWorkflow('.github/workflows/tasks-archive-automation.yml');
     const docsArchive = await readWorkflow('.github/workflows/implementation-docs-archive-automation.yml');
