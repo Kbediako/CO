@@ -212,7 +212,6 @@ function isEnvironmentNotFoundSignal(signal: string): boolean {
   return (
     lowercase.includes('codex_cloud_env_id') ||
     lowercase.includes('codex cloud env id') ||
-    lowercase.includes('codex cloud') ||
     lowercase.includes('is not visible to codex cloud') ||
     lowercase.includes('could not be verified by codex cloud')
   );

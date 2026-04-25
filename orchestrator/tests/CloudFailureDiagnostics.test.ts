@@ -25,11 +25,11 @@ describe('diagnoseCloudFailure', () => {
   it('classifies configured environment probe wrapper signals with precedence', () => {
     const cases = [
       [
-        "Error: environment 'env-missing' not found; run `codex cloud` to list available environments",
+        "Configured CODEX_CLOUD_ENV_ID 'env-missing': Error: environment 'env-missing' not found; run `codex cloud` to list available environments",
         'configuration',
         'environment_not_found'
       ],
-      ['codex cloud: Error: environment env-missing not found', 'configuration', 'environment_not_found'],
+      ['codex cloud env id env-missing: Error: environment env-missing not found', 'configuration', 'environment_not_found'],
       [
         "Configured CODEX_CLOUD_ENV_ID 'env-credential' is not visible to codex cloud: environment 'env-credential' not found",
         'configuration',
@@ -150,7 +150,7 @@ describe('diagnoseCloudFailure', () => {
   it('does not classify generic environment-not-found prose as cloud env config', () => {
     const diagnosis = diagnoseCloudFailure({
       status: 'failed',
-      error: 'Runtime error: environment variable not found',
+      error: 'codex cloud: Runtime error: environment variable not found',
       statusDetail: null
     });
 

@@ -133,7 +133,6 @@ function hasEnvironmentNotFoundSignal(normalizedSignal) {
   return (
     normalizedSignal.includes('codex_cloud_env_id') ||
     normalizedSignal.includes('codex cloud env id') ||
-    normalizedSignal.includes('codex cloud') ||
     normalizedSignal.includes('is not visible to codex cloud') ||
     normalizedSignal.includes('could not be verified by codex cloud')
   );

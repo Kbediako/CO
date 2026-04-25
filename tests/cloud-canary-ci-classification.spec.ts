@@ -109,7 +109,7 @@ describe('cloud-canary-ci failure classification', () => {
   });
 
   it('does not classify generic environment-not-found prose as cloud env config', () => {
-    const diagnosis = classifyFailure('Runtime error: environment variable not found');
+    const diagnosis = classifyFailure('codex cloud: Runtime error: environment variable not found');
 
     expect(formatCloudCanaryFailureClass(diagnosis)).toBe('execution (provider_runtime)');
     expect(diagnosis.diagnostic_category).not.toBe('environment_not_found');
