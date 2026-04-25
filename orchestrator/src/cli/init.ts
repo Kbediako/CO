@@ -1,13 +1,19 @@
-import { copyFile, mkdir, readdir, stat } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, join, relative } from 'node:path';
+import process from 'node:process';
 
+import { resolveCodexHome } from './utils/codexPaths.js';
+import { resolveCodexCliBin } from './utils/codexCli.js';
+import { codexFeatureProbeRejectsAgentMaxThreads, readCodexFeatureProbe } from './utils/codexFeatures.js';
 import { findPackageRoot } from './utils/packageInfo.js';
 
 export interface InitOptions {
   template: string;
   cwd: string;
   force: boolean;
+  env?: NodeJS.ProcessEnv;
 }
 
 export interface InitResult {
@@ -18,10 +24,20 @@ export interface InitResult {
 
 const CODEX_TEMPLATE = 'codex';
 const CODEX_PIPELINE_CONFIG = 'codex.orchestrator.json';
+const CODEX_CONFIG_TEMPLATE = join('.codex', 'config.toml');
+const require = createRequire(import.meta.url);
+let tomlLibrary:
+  | {
+      parse: (source: string) => unknown;
+      stringify: (value: unknown) => string;
+    }
+  | null
+  | undefined;
 
 export async function initCodexTemplates(options: InitOptions): Promise<InitResult> {
   const root = findPackageRoot();
   const templateRoot = join(root, 'templates', options.template);
+  const env = options.env ?? process.env;
   const written: string[] = [];
   const skipped: string[] = [];
 
@@ -32,6 +48,10 @@ export async function initCodexTemplates(options: InitOptions): Promise<InitResu
     skipped
   });
   if (options.template === CODEX_TEMPLATE) {
+    const configPath = join(options.cwd, CODEX_CONFIG_TEMPLATE);
+    if (written.includes(configPath) && await isMultiAgentV2Enabled(env)) {
+      await omitAgentMaxThreads(configPath);
+    }
     await copyTemplateFile(join(root, CODEX_PIPELINE_CONFIG), join(options.cwd, CODEX_PIPELINE_CONFIG), {
       force: options.force,
       written,
@@ -40,6 +60,64 @@ export async function initCodexTemplates(options: InitOptions): Promise<InitResu
   }
 
   return { written, skipped, templateRoot };
+}
+
+async function isMultiAgentV2Enabled(env: NodeJS.ProcessEnv): Promise<boolean> {
+  const featureProbe = readCodexFeatureProbe(resolveCodexCliBin(env), env);
+  if (featureProbe.flags?.multi_agent_v2 === true || codexFeatureProbeRejectsAgentMaxThreads(featureProbe)) {
+    return true;
+  }
+  const configPath = join(resolveCodexHome(env), 'config.toml');
+  if (!existsSync(configPath)) {
+    return false;
+  }
+  const raw = await readFile(configPath, 'utf8');
+  let parsed: unknown;
+  try {
+    parsed = getTomlLibrary().parse(raw);
+  } catch {
+    return false;
+  }
+  if (!isRecord(parsed) || !isRecord(parsed.features)) {
+    return false;
+  }
+  return parsed.features.multi_agent_v2 === true;
+}
+
+async function omitAgentMaxThreads(configPath: string): Promise<void> {
+  const raw = await readFile(configPath, 'utf8');
+  const parsed = getTomlLibrary().parse(raw);
+  if (!isRecord(parsed) || !isRecord(parsed.agents)) {
+    return;
+  }
+  delete parsed.agents.max_threads;
+  await writeFile(configPath, `${getTomlLibrary().stringify(parsed)}\n`, 'utf8');
+}
+
+function getTomlLibrary(): {
+  parse: (source: string) => unknown;
+  stringify: (value: unknown) => string;
+} {
+  if (tomlLibrary) {
+    return tomlLibrary;
+  }
+  if (tomlLibrary === null) {
+    throw new Error('Failed to load @iarna/toml.');
+  }
+  try {
+    tomlLibrary = require('@iarna/toml') as {
+      parse: (source: string) => unknown;
+      stringify: (value: unknown) => string;
+    };
+    return tomlLibrary;
+  } catch (error) {
+    tomlLibrary = null;
+    throw error;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 async function assertDirectory(path: string): Promise<void> {

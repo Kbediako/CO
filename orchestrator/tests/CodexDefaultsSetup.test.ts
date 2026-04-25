@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -16,6 +16,57 @@ const toml = require('@iarna/toml') as {
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(TEST_DIR, '..', '..');
 const ROLE_TEMPLATE_DIR = join(PACKAGE_ROOT, 'templates', 'codex', '.codex', 'agents');
+
+function buildDefaultsEnv(tempHome: string, codexBin = join(tempHome, 'missing-codex')): NodeJS.ProcessEnv {
+  return { CODEX_HOME: tempHome, CODEX_CLI_BIN: codexBin } as NodeJS.ProcessEnv;
+}
+
+async function writeFakeCodexBinary(
+  dir: string,
+  featureLine: string,
+  options: { exitCode?: number; stderr?: string } = {}
+): Promise<string> {
+  const binPath = join(dir, 'codex');
+  const featureOutput = featureLine.length > 0 ? `  printf '%s\n' ${JSON.stringify(featureLine)}` : '';
+  const stderrOutput = options.stderr ? `  printf '%s\n' ${JSON.stringify(options.stderr)} >&2` : '';
+  await writeFile(
+    binPath,
+    [
+      '#!/bin/sh',
+      'if [ "$1" = "features" ] && [ "$2" = "list" ]; then',
+      featureOutput,
+      stderrOutput,
+      `  exit ${options.exitCode ?? 0}`,
+      'fi',
+      'exit 0'
+    ].filter(Boolean).join('\n'),
+    'utf8'
+  );
+  await chmod(binPath, 0o755);
+  return binPath;
+}
+
+async function writeEnvAwareCodexBinary(dir: string): Promise<string> {
+  const binPath = join(dir, 'codex-env-aware');
+  await writeFile(
+    binPath,
+    [
+      '#!/bin/sh',
+      'if [ "$1" = "features" ] && [ "$2" = "list" ]; then',
+      '  if [ -n "$CODEX_HOME" ] && [ -f "$CODEX_HOME/multi-agent-v2.enabled" ]; then',
+      "    printf '%s\\n' 'multi_agent_v2 experimental true'",
+      '  else',
+      "    printf '%s\\n' 'multi_agent_v2 experimental false'",
+      '  fi',
+      '  exit 0',
+      'fi',
+      'exit 0'
+    ].join('\n'),
+    'utf8'
+  );
+  await chmod(binPath, 0o755);
+  return binPath;
+}
 
 async function buildPriorManagedRole(
   fileName: 'worker-complex.toml' | 'awaiter-high.toml'
@@ -78,7 +129,7 @@ describe('runCodexDefaultsSetup', () => {
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-plan-'));
     try {
       const result = await runCodexDefaultsSetup({
-        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+        env: buildDefaultsEnv(tempHome)
       });
 
       expect(result.status).toBe('planned');
@@ -144,7 +195,7 @@ describe('runCodexDefaultsSetup', () => {
 
       const result = await runCodexDefaultsSetup({
         apply: true,
-        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+        env: buildDefaultsEnv(tempHome)
       });
 
       expect(result.status).toBe('applied');
@@ -220,7 +271,7 @@ describe('runCodexDefaultsSetup', () => {
       const result = await runCodexDefaultsSetup({
         apply: true,
         authScope: 'chatgpt',
-        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+        env: buildDefaultsEnv(tempHome)
       });
 
       expect(result.status).toBe('applied');
@@ -250,7 +301,7 @@ describe('runCodexDefaultsSetup', () => {
       const secondResult = await runCodexDefaultsSetup({
         apply: true,
         authScope: 'chatgpt',
-        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+        env: buildDefaultsEnv(tempHome)
       });
 
       expect(secondResult.changes).toEqual(
@@ -282,7 +333,7 @@ describe('runCodexDefaultsSetup', () => {
 
       const plainRerunResult = await runCodexDefaultsSetup({
         apply: true,
-        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+        env: buildDefaultsEnv(tempHome)
       });
 
       expect(plainRerunResult.changes).toEqual(
@@ -336,7 +387,7 @@ describe('runCodexDefaultsSetup', () => {
       const result = await runCodexDefaultsSetup({
         apply: true,
         authScope: 'portable',
-        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+        env: buildDefaultsEnv(tempHome)
       });
 
       expect(result.status).toBe('applied');
@@ -375,7 +426,7 @@ describe('runCodexDefaultsSetup', () => {
 
       const result = await runCodexDefaultsSetup({
         apply: true,
-        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+        env: buildDefaultsEnv(tempHome)
       });
 
       expect(result.status).toBe('applied');
@@ -407,7 +458,7 @@ describe('runCodexDefaultsSetup', () => {
 
       const result = await runCodexDefaultsSetup({
         apply: true,
-        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+        env: buildDefaultsEnv(tempHome)
       });
 
       expect(result.status).toBe('applied');
@@ -448,7 +499,7 @@ describe('runCodexDefaultsSetup', () => {
 
       const result = await runCodexDefaultsSetup({
         apply: true,
-        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+        env: buildDefaultsEnv(tempHome)
       });
 
       expect(result.status).toBe('applied');
@@ -507,7 +558,7 @@ describe('runCodexDefaultsSetup', () => {
 
       const result = await runCodexDefaultsSetup({
         apply: true,
-        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+        env: buildDefaultsEnv(tempHome)
       });
 
       expect(result.changes).toEqual(
@@ -569,7 +620,7 @@ describe('runCodexDefaultsSetup', () => {
 
       const result = await runCodexDefaultsSetup({
         apply: true,
-        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+        env: buildDefaultsEnv(tempHome)
       });
 
       expect(result.changes).toEqual(
@@ -630,7 +681,7 @@ describe('runCodexDefaultsSetup', () => {
 
       const result = await runCodexDefaultsSetup({
         apply: true,
-        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+        env: buildDefaultsEnv(tempHome)
       });
 
       expect(result.changes).toEqual(
@@ -653,7 +704,7 @@ describe('runCodexDefaultsSetup', () => {
       const explicitChatGptRerun = await runCodexDefaultsSetup({
         apply: true,
         authScope: 'chatgpt',
-        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+        env: buildDefaultsEnv(tempHome)
       });
 
       expect(explicitChatGptRerun.changes).toEqual(
@@ -707,7 +758,7 @@ describe('runCodexDefaultsSetup', () => {
 
       const result = await runCodexDefaultsSetup({
         apply: true,
-        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+        env: buildDefaultsEnv(tempHome)
       });
 
       expect(result.changes).toEqual(
@@ -772,7 +823,7 @@ describe('runCodexDefaultsSetup', () => {
       const result = await runCodexDefaultsSetup({
         apply: true,
         force: true,
-        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+        env: buildDefaultsEnv(tempHome)
       });
 
       expect(result.changes).toEqual(
@@ -811,7 +862,7 @@ describe('runCodexDefaultsSetup', () => {
     try {
       const result = await runCodexDefaultsSetup({
         apply: true,
-        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+        env: buildDefaultsEnv(tempHome)
       });
 
       expect(result.status).toBe('applied');
@@ -837,7 +888,7 @@ describe('runCodexDefaultsSetup', () => {
 
       const result = await runCodexDefaultsSetup({
         apply: true,
-        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+        env: buildDefaultsEnv(tempHome)
       });
 
       expect(result.plan.authScope).toBe('portable');
@@ -888,7 +939,7 @@ describe('runCodexDefaultsSetup', () => {
 
       const result = await runCodexDefaultsSetup({
         apply: true,
-        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+        env: buildDefaultsEnv(tempHome)
       });
 
       expect(result.changes).toEqual(
@@ -912,6 +963,167 @@ describe('runCodexDefaultsSetup', () => {
     }
   });
 
+  it('omits max_threads when multi_agent_v2 is enabled in existing config', async () => {
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-multi-agent-v2-'));
+    const configPath = join(tempHome, 'config.toml');
+    try {
+      await writeFile(
+        configPath,
+        [
+          'model = "legacy-model"',
+          '',
+          '[features]',
+          'multi_agent_v2 = true',
+          '',
+          '[agents]',
+          'max_threads = 2',
+          'extra_agent_key = "keep"',
+          ''
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = await runCodexDefaultsSetup({
+        apply: true,
+        env: buildDefaultsEnv(tempHome)
+      });
+
+      expect(result.status).toBe('applied');
+      expect(result.changes).toEqual(
+        expect.arrayContaining([expect.objectContaining({ target: 'config', status: 'updated' })])
+      );
+
+      const parsed = toml.parse(await readFile(configPath, 'utf8')) as {
+        features?: Record<string, unknown>;
+        agents?: Record<string, unknown>;
+      };
+
+      expect(parsed.features?.multi_agent_v2).toBe(true);
+      expect(parsed.agents?.max_threads).toBeUndefined();
+      expect(parsed.agents?.extra_agent_key).toBe('keep');
+      expect(parsed.agents?.worker_complex).toEqual(
+        expect.objectContaining({
+          config_file: './agents/worker-complex.toml'
+        })
+      );
+    } finally {
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('omits max_threads when multi_agent_v2 is enabled by the Codex feature surface', async () => {
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-multi-agent-v2-feature-'));
+    const configPath = join(tempHome, 'config.toml');
+    try {
+      await writeFile(
+        configPath,
+        [
+          'model = "legacy-model"',
+          '',
+          '[agents]',
+          'max_threads = 2',
+          'extra_agent_key = "keep"',
+          ''
+        ].join('\n'),
+        'utf8'
+      );
+      const codexBin = await writeFakeCodexBinary(tempHome, 'multi_agent_v2 experimental true');
+
+      await runCodexDefaultsSetup({
+        apply: true,
+        env: buildDefaultsEnv(tempHome, codexBin)
+      });
+
+      const parsed = toml.parse(await readFile(configPath, 'utf8')) as {
+        agents?: Record<string, unknown>;
+      };
+
+      expect(parsed.agents?.max_threads).toBeUndefined();
+    } finally {
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('uses the target env when probing Codex features during defaults setup', async () => {
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-multi-agent-v2-env-'));
+    const ambientHome = await mkdtemp(join(tmpdir(), 'codex-defaults-multi-agent-v2-ambient-'));
+    const configPath = join(tempHome, 'config.toml');
+    const originalCodexHome = process.env.CODEX_HOME;
+    try {
+      process.env.CODEX_HOME = ambientHome;
+      await writeFile(
+        configPath,
+        [
+          'model = "legacy-model"',
+          '',
+          '[agents]',
+          'max_threads = 2',
+          'extra_agent_key = "keep"',
+          ''
+        ].join('\n'),
+        'utf8'
+      );
+      await writeFile(join(tempHome, 'multi-agent-v2.enabled'), '1\n', 'utf8');
+      const codexBin = await writeEnvAwareCodexBinary(tempHome);
+
+      await runCodexDefaultsSetup({
+        apply: true,
+        env: buildDefaultsEnv(tempHome, codexBin)
+      });
+
+      const parsed = toml.parse(await readFile(configPath, 'utf8')) as {
+        agents?: Record<string, unknown>;
+      };
+
+      expect(parsed.agents?.max_threads).toBeUndefined();
+      expect(parsed.agents?.extra_agent_key).toBe('keep');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+      await rm(ambientHome, { recursive: true, force: true });
+    }
+  });
+
+  it('omits max_threads when Codex rejects the current config before feature flags can be listed', async () => {
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-multi-agent-v2-reject-'));
+    const configPath = join(tempHome, 'config.toml');
+    try {
+      await writeFile(
+        configPath,
+        [
+          '[agents]',
+          'max_threads = 12',
+          'extra_agent_key = "keep"',
+          ''
+        ].join('\n'),
+        'utf8'
+      );
+      const codexBin = await writeFakeCodexBinary(tempHome, '', {
+        exitCode: 1,
+        stderr: 'invalid config: agents.max_threads is rejected when features.multi_agent_v2=true'
+      });
+
+      const result = await runCodexDefaultsSetup({
+        apply: true,
+        env: buildDefaultsEnv(tempHome, codexBin)
+      });
+
+      expect(result.status).toBe('applied');
+      const parsed = toml.parse(await readFile(configPath, 'utf8')) as {
+        agents?: Record<string, unknown>;
+      };
+
+      expect(parsed.agents?.max_threads).toBeUndefined();
+      expect(parsed.agents?.extra_agent_key).toBe('keep');
+    } finally {
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
   it('throws a clear error and skips writes when config TOML is invalid', async () => {
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-invalid-'));
     const configPath = join(tempHome, 'config.toml');
@@ -922,7 +1134,7 @@ describe('runCodexDefaultsSetup', () => {
       await expect(
         runCodexDefaultsSetup({
           apply: true,
-          env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+          env: buildDefaultsEnv(tempHome)
         })
       ).rejects.toThrow(`Failed to parse Codex config TOML at ${configPath}`);
 

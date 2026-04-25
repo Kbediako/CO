@@ -164,14 +164,14 @@ Current `0.125.0` CO-local posture also confirms that:
   - `model = "gpt-5.4"`
   - `review_model = "gpt-5.4"`
   - `model_reasoning_effort = "xhigh"`
-  - `[agents] max_threads = 12` is the seeded baseline; keep explicit `max_depth = 4` only when your local Codex parser accepts it, and treat `max_spawn_depth` as a legacy local override rather than current baseline guidance
+  - For normal `features.multi_agent=true` and older Codex behavior, `[agents] max_threads = 12` is the seeded baseline. For Codex CLI `0.125+` with `features.multi_agent_v2=true`, do not write or recommend `agents.max_threads`; upstream rejects the key, so doctor/default setup must omit it. Keep explicit `max_depth = 4` only when your local Codex parser accepts it, and treat `max_spawn_depth` as a legacy local override rather than current baseline guidance
   - Leave `[agents.explorer]` undefined unless you intentionally want to override built-in explorer behavior.
   - Add optional `[agents.explorer_fast]` for `gpt-5.3-codex-spark` (file/codebase search only).
   - Add optional `[agents.awaiter]` override for `gpt-5.4` + `high` while preserving awaiter instructions.
   - Add `[agents.worker_complex]` for high-risk edits (`gpt-5.4`, `xhigh`).
   - Use `gpt-5.5` for delegated/review surfaces after access smoke validates the local posture; otherwise use the portable `gpt-5.4` fallback defaults.
   - Caveat: app-server `isDefault` may still report `gpt-5.4` even when newer local models are available.
-  - Fallback posture is contingency-only: `8/2` (constrained/high-risk), legacy `6/1/1` break-glass when an older parser/runtime still consumes spawn-depth caps.
+  - Fallback posture is contingency-only and applies only to v1/older configs that still accept thread/depth caps: `8/2` (constrained/high-risk), legacy `6/1/1` break-glass when an older parser/runtime still consumes spawn-depth caps.
   - If native `codex` startup fails with `invalid type: integer ... expected struct AgentRoleToml` under `[agents]`, remove only the live `max_depth` and `max_spawn_depth` keys from `~/.codex/config.toml` and leave the role subtables unchanged.
 
 ## Common failures

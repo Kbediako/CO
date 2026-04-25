@@ -5,6 +5,12 @@ import { join } from 'node:path';
 import process from 'node:process';
 
 import { resolveCodexHome } from './utils/codexPaths.js';
+import { resolveCodexCliBin } from './utils/codexCli.js';
+import {
+  codexFeatureProbeRejectsAgentMaxThreads,
+  readCodexFeatureProbe,
+  type CodexFeatureProbeResult
+} from './utils/codexFeatures.js';
 import { findPackageRoot } from './utils/packageInfo.js';
 import { writeAtomicFile } from '../utils/atomicWrite.js';
 
@@ -151,13 +157,15 @@ export async function runCodexDefaultsSetup(
   const authScope: CodexDefaultsAuthScope = topLevelLocalModelOptIn ? 'chatgpt' : 'portable';
   const plan = buildPlan(env, force, authScope);
   const roleDefinitions = await loadRoleDefinitions();
+  const featureProbe = readCodexFeatureProbe(resolveCodexCliBin(env), env);
   const nextConfig = mergeBaselineDefaults(
     configState.parsed,
     roleDefinitions,
     {
       topLevelLocalModelOptIn,
       reviewModelOptIn: roleAndReviewLocalModelOptIn,
-      requestedAuthScope: options.authScope
+      requestedAuthScope: options.authScope,
+      featureProbe
     }
   );
   const activeRoleDefinitions = buildActiveRoleDefinitions(
@@ -193,7 +201,7 @@ export async function runCodexDefaultsSetup(
       path: plan.configPath,
       status: configState.exists ? 'updated' : 'created',
       detail: configState.exists
-        ? 'Updated CO baseline defaults additively and preserved unrelated keys.'
+        ? 'Updated CO-compatible baseline defaults and preserved unrelated keys.'
         : 'Created config.toml with CO baseline defaults.'
     });
   } else {
@@ -351,6 +359,7 @@ function mergeBaselineDefaults(
     topLevelLocalModelOptIn: (typeof LOCAL_MODEL_OPT_INS)[number] | null;
     reviewModelOptIn: (typeof LOCAL_MODEL_OPT_INS)[number] | null;
     requestedAuthScope?: CodexDefaultsAuthScope;
+    featureProbe: CodexFeatureProbeResult;
   }
 ): Record<string, unknown> {
   const next = structuredClone(existing);
@@ -360,7 +369,11 @@ function mergeBaselineDefaults(
   removeLegacyLocalModelOptInMarker(next);
 
   const agents = isRecord(next.agents) ? structuredClone(next.agents as Record<string, unknown>) : {};
-  agents.max_threads = BASELINE_AGENTS.max_threads;
+  if (isMultiAgentV2Enabled(next, options.featureProbe)) {
+    delete agents.max_threads;
+  } else {
+    agents.max_threads = BASELINE_AGENTS.max_threads;
+  }
 
   for (const role of roleDefinitions) {
     const existingRole = isRecord(agents[role.key])
@@ -654,7 +667,7 @@ function buildPlannedChanges(params: {
     status: configStatus,
     detail: configStatus === 'pending'
       ? params.configExists
-        ? 'Will update CO baseline defaults additively while preserving unrelated keys.'
+        ? 'Will update CO-compatible baseline defaults while preserving unrelated keys.'
         : 'Will create config.toml with CO baseline defaults.'
       : 'CO baseline defaults already present.'
   });
@@ -674,4 +687,24 @@ function buildPlannedChanges(params: {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value) && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
+}
+
+function isMultiAgentV2Enabled(
+  config: Record<string, unknown>,
+  featureProbe: CodexFeatureProbeResult
+): boolean {
+  if (featureProbe.flags?.multi_agent_v2 === true) {
+    return true;
+  }
+  if (codexFeatureProbeRejectsAgentMaxThreads(featureProbe)) {
+    return true;
+  }
+  if (!isRecord(config.features)) {
+    return false;
+  }
+  return readBooleanValue(config.features.multi_agent_v2) === true;
+}
+
+function readBooleanValue(value: unknown): boolean | null {
+  return typeof value === 'boolean' ? value : null;
 }
