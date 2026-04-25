@@ -1,6 +1,52 @@
 {
   "items": [
     {
+      "id": "20260425-linear-6255c5dd-7ddf-441e-b726-05798c478821",
+      "title": "Fix missing CO-276 docs packet paths blocking docs:check",
+      "relates_to": "tasks/tasks-linear-6255c5dd-7ddf-441e-b726-05798c478821.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-25",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-25",
+          "status": "produced-accept-invalidated-applied-after-current-main-rebase",
+          "manifest": ".runs/linear-6255c5dd-7ddf-441e-b726-05798c478821-co370-docs-packet/cli/2026-04-25T12-22-20-829Z-83b9bda9/manifest.json",
+          "source_anchor": "ctx:sha256:f07f76e55455b4f08b706cb17da0724f6980b730e226641dd2fba1421931e7d1#chunk:c000001",
+          "summary": "Docs-first packet created for CO-370. The parent moved the stale workspace onto current origin/main, where the CO-276 packet files already exist through the CO-332/CO-350 repair lineage, then manually applied the reviewed child packet artifact after Linear updated_at made helper accept stale."
+        },
+        "current_main_reconciliation": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-25",
+          "status": "current-main-co276-paths-exist",
+          "summary": "Current origin/main contains the six CO-276 / linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb docs packet files, so CO-370 records and validates that reconciliation without weakening docs:check."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-25",
+          "status": "bounded-success-no-actionable-findings",
+          "telemetry": ".runs/linear-6255c5dd-7ddf-441e-b726-05798c478821/cli/2026-04-25T12-20-18-237Z-75c887f4/review/telemetry.json",
+          "summary": "Initial review P2 reserve-headroom finding was fixed through docs:archive-tasks; rerun completed with no actionable issues. Telemetry records review_outcome=bounded-success with command-intent retry, which is successful bounded completion."
+        },
+        "elegance_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-25",
+          "status": "no-simplification-needed",
+          "artifact": "out/linear-6255c5dd-7ddf-441e-b726-05798c478821/manual/elegance-review.md",
+          "summary": "Diff remains limited to the CO-370 docs packet, registry/freshness registration, and supported docs/TASKS reserve trim."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-6255c5dd-7ddf-441e-b726-05798c478821.md",
+        "task": "tasks/tasks-linear-6255c5dd-7ddf-441e-b726-05798c478821.md",
+        "agent_task": ".agent/task/linear-6255c5dd-7ddf-441e-b726-05798c478821.md",
+        "docs": "docs/TECH_SPEC-linear-6255c5dd-7ddf-441e-b726-05798c478821.md"
+      }
+    },
+    {
       "id": "20260425-linear-6b3b8bf4-63fa-44e8-a182-e2e20209aca7",
       "title": "CO-360 task registry docs pointer TECH_SPEC mirror alignment",
       "relates_to": "tasks/tasks-linear-6b3b8bf4-63fa-44e8-a182-e2e20209aca7.md",
