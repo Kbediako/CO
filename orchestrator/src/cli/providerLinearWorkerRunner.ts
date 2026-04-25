@@ -4564,7 +4564,13 @@ function providerWorkerSessionJsonlLineTimestamp(line: string): string | null {
   if (!parsed) {
     return null;
   }
-  return extractProviderWorkerEventSummary(parsed).at;
+  const payload = isRecord(parsed.payload) ? parsed.payload : null;
+  const payloadTimestamp = payload
+    ? normalizeOptionalString(payload.timestamp) ??
+      normalizeOptionalString(payload.created_at) ??
+      normalizeOptionalString(payload.at)
+    : null;
+  return payloadTimestamp ?? extractProviderWorkerEventSummary(parsed).at;
 }
 
 function isProviderWorkerSessionBootstrapLineAtOrAfter(
@@ -6448,9 +6454,11 @@ async function readProviderLinearWorkerChildLaneManifestCandidate(
       (runtimeEvent === 'appserver_startup_observed' ? runtimeEventAt : null)
   );
   const successfulStatus = isSuccessfulProviderLinearWorkerChildLaneStatus(status);
+  const patchArtifactPath = proofMetadata?.patchArtifactPath ?? null;
   const patchBytes = proofMetadata?.patchBytes ?? null;
-  const patchReady = Boolean(proofMetadata?.patchArtifactPath && patchBytes !== null && patchBytes > 0);
-  const diagnosticStatus = successfulStatus && !patchReady ? 'in_progress' : status;
+  const proofOutputReady = Boolean(patchArtifactPath);
+  const patchReady = Boolean(patchArtifactPath && patchBytes !== null && patchBytes > 0);
+  const diagnosticStatus = successfulStatus && !proofOutputReady ? 'in_progress' : status;
   const staleDiagnostic = resolveProviderLinearWorkerChildLanePostStartupNoOutputDiagnostic({
     childLane,
     status: diagnosticStatus,
@@ -6463,7 +6471,7 @@ async function readProviderLinearWorkerChildLaneManifestCandidate(
     runtimeEventAt,
     appserverStartupObserved,
     appserverStartupObservedAt,
-    patchReady,
+    proofOutputReady,
     now: options.now
   });
   const hydratedStatus = staleDiagnostic
@@ -6510,7 +6518,7 @@ async function readProviderLinearWorkerChildLaneManifestCandidate(
     startedAt,
     updatedAt: manifestTimestamp,
     laneWorkspacePath: proofMetadata?.laneWorkspacePath ?? null,
-    patchArtifactPath: proofMetadata?.patchArtifactPath ?? null,
+    patchArtifactPath,
     patchBytes: proofMetadata?.patchBytes ?? null,
     guardrailsRequired: resolveGuardrailsRequiredForManifest(parsed),
     guardrailsRequiredSource: resolveGuardrailsRequiredSourceForManifest(parsed),
@@ -6589,14 +6597,14 @@ function resolveProviderLinearWorkerChildLanePostStartupNoOutputDiagnostic(input
   runtimeEventAt: string | null;
   appserverStartupObserved: boolean | null;
   appserverStartupObservedAt: string | null;
-  patchReady: boolean;
+  proofOutputReady: boolean;
   now: () => string;
 }): { observedAt: string; reason: string; summary: string } | null {
   if (
     !isActiveLookingProviderLinearWorkerChildLaneStatus(input.status) ||
     input.runtimeMode !== 'appserver' ||
     input.appserverStartupObserved !== true ||
-    input.patchReady
+    input.proofOutputReady
   ) {
     return null;
   }
@@ -6613,7 +6621,7 @@ function resolveProviderLinearWorkerChildLanePostStartupNoOutputDiagnostic(input
   if (nowMs - heartbeatMs <= staleAfterMs) {
     return null;
   }
-  if (input.runnerAlive === true) {
+  if (input.runnerAlive !== false) {
     return null;
   }
   const stream = input.childLane.stream || input.childLane.task_id || input.childLane.run_id;
@@ -6622,9 +6630,7 @@ function resolveProviderLinearWorkerChildLanePostStartupNoOutputDiagnostic(input
       ? `providerLinearChildLaneRunner pid ${input.runnerPid} is not live`
       : 'providerLinearChildLaneRunner pid was not recorded';
   const startupAt = input.appserverStartupObservedAt ?? input.runtimeEventAt ?? 'unknown time';
-  const reason = input.runnerPid !== null
-    ? 'post_startup_no_output_heartbeat_stale_runner_dead'
-    : 'post_startup_no_output_heartbeat_stale_runner_unknown';
+  const reason = 'post_startup_no_output_heartbeat_stale_runner_dead';
   return {
     observedAt: now,
     reason,

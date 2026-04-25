@@ -6353,6 +6353,182 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(invalidated?.child_lanes?.[0]?.summary).toContain('providerLinearChildLaneRunner pid 4242 is not live');
   });
 
+  it('keeps zero-byte proof lanes and unknown-runner lanes out of stale invalidation', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          current_turn_started_at: '2026-04-17T00:30:01.000Z',
+          updated_at: '2026-04-17T00:33:00.000Z'
+        }),
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const childScope = resolveProviderLinearChildLaneScopeContract({
+      files: ['orchestrator/tests/ProviderLinearWorkerRunner.test.ts'],
+      phases: ['tests']
+    });
+    const writeCompletedAppserverLane = async (input: {
+      stream: string;
+      taskId: string;
+      runId: string;
+      runnerPid?: number;
+      patchBytes?: number;
+    }) => {
+      const childCliDir = join(tempRoot!, '.runs', input.taskId, 'cli');
+      const childRunDir = join(childCliDir, input.runId);
+      await mkdir(childRunDir, { recursive: true });
+      await appendProviderLinearWorkerChildLaneRecord(runDir, {
+        stream: input.stream,
+        pipeline_id: 'provider-linear-child-lane',
+        task_id: input.taskId,
+        run_id: `launching-${input.stream}`,
+        status: 'launching',
+        manifest_path: join(childCliDir, `launching-${input.stream}`, 'manifest.json'),
+        artifact_root: join(childCliDir, `launching-${input.stream}`),
+        log_path: null,
+        summary: 'Child lane reserved before child run startup.',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: tempRoot,
+        source_setup: null,
+        launched_at: '2026-04-17T00:34:02.078Z',
+        purpose: 'Validate stale child-lane classification.',
+        instructions: null,
+        scope: childScope,
+        parent_snapshot: {
+          base_sha: null,
+          issue_updated_at: null,
+          issue_state: null,
+          issue_state_type: null,
+          captured_at: '2026-04-17T00:34:02.078Z'
+        },
+        lane_workspace_path: null,
+        patch_artifact_path: null,
+        patch_bytes: null,
+        decision: 'pending',
+        in_flight_action: null,
+        in_flight_started_at: null,
+        decision_at: null,
+        decision_reason: null
+      });
+      await writeFile(
+        join(childRunDir, 'manifest.json'),
+        JSON.stringify({
+          run_id: input.runId,
+          task_id: input.taskId,
+          parent_run_id: 'run-child',
+          pipeline_id: 'provider-linear-child-lane',
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          status: 'completed',
+          started_at: '2026-04-17T00:34:04.192Z',
+          updated_at: '2026-04-17T00:34:30.000Z',
+          completed_at: '2026-04-17T00:34:41.000Z',
+          heartbeat_at: '2026-04-17T00:34:39.000Z',
+          heartbeat_stale_after_seconds: 30,
+          artifact_root: childRunDir,
+          log_path: join(childRunDir, 'runner.ndjson'),
+          workspace_path: tempRoot
+        }),
+        'utf8'
+      );
+      const diagnostics: Record<string, unknown> = {
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        task_id: input.taskId,
+        run_id: input.runId,
+        parent_run_id: 'run-child',
+        stream: input.stream,
+        provider_linear_child_lane_runtime_selected_mode: 'appserver',
+        provider_linear_child_lane_runtime_provider: 'AppServerRuntimeProvider',
+        provider_linear_child_lane_runtime_event: 'codex_exec_completed',
+        provider_linear_child_lane_runtime_event_at: '2026-04-17T00:34:40.000Z',
+        provider_linear_child_lane_appserver_startup_observed: true,
+        provider_linear_child_lane_appserver_startup_observed_at: '2026-04-17T00:34:12.000Z'
+      };
+      if (input.runnerPid !== undefined) {
+        diagnostics.provider_linear_child_lane_runner_pid = input.runnerPid;
+      }
+      await writeFile(
+        join(childRunDir, PROVIDER_LINEAR_CHILD_LANE_DIAGNOSTICS_FILENAME),
+        JSON.stringify(diagnostics),
+        'utf8'
+      );
+      if (input.patchBytes !== undefined) {
+        await writeFile(
+          join(childRunDir, 'provider-linear-child-lane-proof.json'),
+          JSON.stringify({
+            issue_id: 'lin-issue-1',
+            issue_identifier: 'CO-2',
+            task_id: input.taskId,
+            run_id: input.runId,
+            parent_run_id: 'run-child',
+            lane_workspace_path: tempRoot,
+            patch_artifact_path: join(childRunDir, 'provider-linear-child-lane.patch'),
+            patch_bytes: input.patchBytes,
+            updated_at: '2026-04-17T00:34:41.000Z'
+          }),
+          'utf8'
+        );
+      }
+    };
+
+    await writeCompletedAppserverLane({
+      stream: 'noop-proof',
+      taskId: 'linear-lin-issue-1-noop-proof',
+      runId: '2026-04-17T00-34-04-191Z-noop',
+      runnerPid: 4242,
+      patchBytes: 0
+    });
+    await writeCompletedAppserverLane({
+      stream: 'unknown-runner',
+      taskId: 'linear-lin-issue-1-unknown-runner',
+      runId: '2026-04-17T00-34-04-191Z-unknown',
+      patchBytes: undefined
+    });
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-04-17T00:36:00.000Z',
+      async (path, proof) => await writeFile(path, JSON.stringify(proof, null, 2), 'utf8'),
+      { CODEX_HOME: tempRoot! },
+      {
+        skipSessionLogHydration: true,
+        isProcessAlive: (pid) => pid !== 4242
+      }
+    );
+
+    const lanesByStream = new Map((refreshed?.child_lanes ?? []).map((lane) => [lane.stream, lane]));
+    expect(lanesByStream.get('noop-proof')).toMatchObject({
+      status: 'completed',
+      patch_bytes: 0,
+      runner_pid: 4242,
+      runner_alive: false,
+      stale_invalidation_candidate: null,
+      stale_invalidation_reason: null
+    });
+    expect(lanesByStream.get('noop-proof')?.summary).toBe(
+      'Child lane completed without patch output; waiting for parent ledger decision.'
+    );
+    expect(lanesByStream.get('unknown-runner')).toMatchObject({
+      status: 'in_progress',
+      runner_pid: null,
+      runner_alive: null,
+      stale_invalidation_candidate: null,
+      stale_invalidation_reason: null
+    });
+    expect(lanesByStream.get('unknown-runner')?.summary).toBe(
+      'Child lane completed; waiting for patch proof metadata.'
+    );
+  });
+
   it('backfills appserver session telemetry into refreshed provider proofs', async () => {
     const { runDir } = await createManifestRoot();
     const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
@@ -6463,6 +6639,14 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       latest_session_id: 'thread-1-turn-1',
       latest_session_id_source: 'derived_from_thread_and_turn',
       last_event: 'task_complete',
+      last_event_at: '2026-03-21T09:00:00.150Z',
+      current_turn_activity: {
+        event: 'task_complete',
+        recorded_at: '2026-03-21T09:00:00.150Z',
+        source: 'session_log_hydration',
+        turn_id: 'turn-1',
+        session_id: 'thread-1-turn-1'
+      },
       tokens: {
         input_tokens: 12,
         output_tokens: 8,
@@ -6572,6 +6756,14 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       latest_session_id: 'thread-1-turn-1',
       latest_session_id_source: 'derived_from_thread_and_turn',
       last_event: 'task_complete',
+      last_event_at: '2026-03-21T09:00:00.150Z',
+      current_turn_activity: {
+        event: 'task_complete',
+        recorded_at: '2026-03-21T09:00:00.150Z',
+        source: 'session_log_hydration',
+        turn_id: 'turn-1',
+        session_id: 'thread-1-turn-1'
+      },
       tokens: {
         input_tokens: 12,
         output_tokens: 8,
