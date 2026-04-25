@@ -6903,7 +6903,7 @@ async function readLocalProcessPsOutput(
     let completed = false;
     let timedOut = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    const child = spawn('ps', ['-p', String(pid), '-o', outputColumn], {
+    const child = spawn('ps', ['-ww', '-p', String(pid), '-o', outputColumn], {
       stdio: ['ignore', 'pipe', 'pipe']
     });
     const finish = (result: { output: string | null; error: string | null }) => {

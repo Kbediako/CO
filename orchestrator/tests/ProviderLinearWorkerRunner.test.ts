@@ -6551,6 +6551,55 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       patchBytes: undefined
     });
 
+    const inspectProcess = (pid: number) => {
+      if (pid === 4242) {
+        return {
+          alive: false,
+          startedAt: null,
+          commandLine: null,
+          error: null
+        };
+      }
+      if (pid === 4243) {
+        return {
+          alive: true,
+          startedAt: '2026-04-17T00:34:06.000Z',
+          commandLine: 'node /tmp/unrelated-runner.js',
+          error: null
+        };
+      }
+      if (pid === 4244) {
+        return {
+          alive: true,
+          startedAt: '2026-04-17T00:34:04.000Z',
+          commandLine: 'node /repo/dist/orchestrator/src/cli/providerLinearChildLaneRunner.js',
+          error: null
+        };
+      }
+      if (pid === 4246) {
+        return {
+          alive: true,
+          startedAt: '2026-04-17T00:34:06.000Z',
+          commandLine: 'node /repo/dist/orchestrator/src/cli/providerLinearChildLaneRunner.js',
+          error: null
+        };
+      }
+      if (pid === 4245) {
+        return {
+          alive: false,
+          startedAt: null,
+          commandLine: null,
+          error: null
+        };
+      }
+      return {
+        alive: null,
+        startedAt: null,
+        commandLine: null,
+        error: 'unexpected_pid'
+      };
+    };
+
     const refreshed = await refreshProviderLinearWorkerProofSnapshot(
       runDir,
       null,
@@ -6559,54 +6608,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       { CODEX_HOME: tempRoot! },
       {
         skipSessionLogHydration: true,
-        inspectProcess: (pid) => {
-          if (pid === 4242) {
-            return {
-              alive: false,
-              startedAt: null,
-              commandLine: null,
-              error: null
-            };
-          }
-          if (pid === 4243) {
-            return {
-              alive: true,
-              startedAt: '2026-04-17T00:34:06.000Z',
-              commandLine: 'node /tmp/unrelated-runner.js',
-              error: null
-            };
-          }
-          if (pid === 4244) {
-            return {
-              alive: true,
-              startedAt: '2026-04-17T00:34:04.000Z',
-              commandLine: 'node /repo/dist/orchestrator/src/cli/providerLinearChildLaneRunner.js',
-              error: null
-            };
-          }
-          if (pid === 4246) {
-            return {
-              alive: true,
-              startedAt: '2026-04-17T00:34:06.000Z',
-              commandLine: 'node /repo/dist/orchestrator/src/cli/providerLinearChildLaneRunner.js',
-              error: null
-            };
-          }
-          if (pid === 4245) {
-            return {
-              alive: false,
-              startedAt: null,
-              commandLine: null,
-              error: null
-            };
-          }
-          return {
-            alive: null,
-            startedAt: null,
-            commandLine: null,
-            error: 'unexpected_pid'
-          };
-        }
+        inspectProcess
       }
     );
 
@@ -6692,6 +6694,40 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(lanesByStream.get('dead-missing-runner-start')?.summary).toBe(
       'Child lane completed; waiting for patch proof metadata.'
     );
+    const rehydrated = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-04-17T00:36:05.000Z',
+      async (path, proof) => await writeFile(path, JSON.stringify(proof, null, 2), 'utf8'),
+      { CODEX_HOME: tempRoot! },
+      {
+        skipSessionLogHydration: true,
+        inspectProcess
+      }
+    );
+    const rehydratedLanesByStream = new Map((rehydrated?.child_lanes ?? []).map((lane) => [lane.stream, lane]));
+    expect(rehydratedLanesByStream.get('reused-runner-pid')).toMatchObject({
+      runner_identity_status: 'pid_reuse_suspected',
+      runner_identity_reason: 'process_command_line_mismatch',
+      runner_observed_started_at: '2026-04-17T00:34:06.000Z',
+      runner_command_line_matches: false
+    });
+    expect(rehydratedLanesByStream.get('same-command-reused-runner-pid')).toMatchObject({
+      runner_identity_status: 'pid_reuse_suspected',
+      runner_identity_reason: 'process_started_after_recorded_runner_start',
+      runner_observed_started_at: '2026-04-17T00:34:06.000Z',
+      runner_command_line_matches: true
+    });
+    expect(rehydratedLanesByStream.get('missing-runner-start')).toMatchObject({
+      runner_identity_status: 'ambiguous',
+      runner_identity_reason: 'runner_started_at_missing',
+      runner_observed_started_at: '2026-04-17T00:34:04.000Z',
+      runner_command_line_matches: true
+    });
+    expect(rehydratedLanesByStream.get('dead-missing-runner-start')).toMatchObject({
+      runner_identity_status: 'ambiguous',
+      runner_identity_reason: 'runner_started_at_missing'
+    });
   });
 
   it('backfills appserver session telemetry into refreshed provider proofs', async () => {
