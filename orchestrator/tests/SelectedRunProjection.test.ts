@@ -5652,6 +5652,137 @@ describe('SelectedRunProjection', () => {
     });
   });
 
+  it('does not refresh settled appserver-requested CLI fallback proofs for missing session-log truth', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        started_at: '2026-04-17T00:30:00.000Z',
+        updated_at: '2026-04-17T00:35:00.000Z',
+        workspace_path: root
+      }),
+      'utf8'
+    );
+    const fallback = {
+      occurred: true,
+      code: 'appserver-command-unavailable',
+      reason: 'Appserver preflight failed.',
+      from_mode: 'appserver',
+      to_mode: 'cli',
+      checked_at: '2026-04-17T00:30:00.000Z'
+    } as const;
+    const proof = buildProviderLinearWorkerProof({
+      attempt_started_at: '2026-04-17T00:30:00.000Z',
+      current_turn_started_at: '2026-04-17T00:30:01.000Z',
+      thread_id: 'thread-1',
+      latest_turn_id: 'turn-1',
+      latest_session_id: 'thread-1-turn-1',
+      latest_session_id_source: 'derived_from_thread_and_turn',
+      session_log_thread_id: null,
+      session_log_turn_id: null,
+      session_log_session_id: null,
+      turn_count: 1,
+      last_event: 'task_complete',
+      last_message: null,
+      last_event_at: '2026-04-17T00:35:00.000Z',
+      current_turn_activity: {
+        event: 'task_complete',
+        message_or_payload: null,
+        recorded_at: '2026-04-17T00:35:00.000Z',
+        source: 'stdout_jsonl',
+        turn_id: 'turn-1',
+        session_id: 'thread-1-turn-1'
+      },
+      tokens: {
+        input_tokens: 12,
+        output_tokens: 8,
+        total_tokens: 20
+      },
+      rate_limits: {
+        primary: {
+          used_percent: 10,
+          window_minutes: 300
+        }
+      },
+      runtime: {
+        requested_mode: 'appserver',
+        selected_mode: 'cli',
+        provider: 'CliRuntimeProvider',
+        runtime_session_id: null,
+        fallback
+      },
+      appserver_supervision: {
+        selected_runtime: {
+          requested_mode: 'appserver',
+          selected_mode: 'cli',
+          provider: 'CliRuntimeProvider',
+          runtime_session_id: null,
+          fallback
+        },
+        supervision_command: 'codex_exec',
+        appserver_session_id: null,
+        thread_id: 'thread-1',
+        latest_turn_id: 'turn-1',
+        latest_session_id: 'thread-1-turn-1',
+        session_log_thread_id: null,
+        session_log_turn_id: null,
+        session_log_session_id: null,
+        sticky_environment_id: null,
+        sticky_environment_status: 'not_applicable',
+        sticky_environment_blocker: null,
+        turn_persistence_status: 'not_applicable',
+        turn_persistence_source: null,
+        turn_persistence_blocker: null,
+        pagination_status: 'not_applicable',
+        pagination_blocker: null,
+        resume_status: 'not_applicable',
+        resume_source_thread_id: null,
+        resume_observed_thread_id: null,
+        resume_blocker: null,
+        fork_status: 'not_applicable',
+        fork_blocker: null,
+        jsonl_truth_retained: true,
+        session_log_truth_retained: false,
+        updated_at: '2026-04-17T00:35:00.000Z'
+      },
+      owner_phase: 'turn_completed',
+      owner_status: 'in_progress',
+      workspace_path: root,
+      child_lanes: [],
+      progress: null,
+      updated_at: '2026-04-17T00:35:00.000Z'
+    });
+    const proofRaw = JSON.stringify(proof, null, 2);
+    const proofPath = join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    await writeFile(proofPath, proofRaw, 'utf8');
+
+    const selected = await createProjectionReader(paths, childPaths.manifestPath).buildSelectedRunContext();
+
+    expect(selected?.providerLinearWorkerProof?.appserver_supervision).toMatchObject({
+      selected_runtime: {
+        requested_mode: 'appserver',
+        selected_mode: 'cli'
+      },
+      session_log_truth_retained: false,
+      turn_persistence_status: 'not_applicable'
+    });
+    await expect(readFile(proofPath, 'utf8')).resolves.toBe(proofRaw);
+  });
+
   it('refreshes in-progress provider proofs from session telemetry during projection reads', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {

@@ -2175,6 +2175,7 @@ function hasProviderLinearWorkerProjectionAppServerSupervisionGap(
   if (!supervision) {
     return true;
   }
+  const expectedSessionLogTruthRetained = selectedRuntimeMode === 'appserver';
   return (
     supervision.selected_runtime?.selected_mode !== selectedRuntimeMode ||
     supervision.selected_runtime?.requested_mode !== requestedRuntimeMode ||
@@ -2189,7 +2190,7 @@ function hasProviderLinearWorkerProjectionAppServerSupervisionGap(
     supervision.resume_status == null ||
     supervision.fork_status == null ||
     supervision.jsonl_truth_retained !== true ||
-    supervision.session_log_truth_retained !== true
+    supervision.session_log_truth_retained !== expectedSessionLogTruthRetained
   );
 }
 
