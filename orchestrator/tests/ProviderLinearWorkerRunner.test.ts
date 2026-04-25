@@ -4950,6 +4950,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(refreshed?.child_lanes?.[0]).toMatchObject({
       run_id: '2026-04-17T00-34-04-191Z-44a13a0d',
       status: 'stale_invalidation_candidate',
+      summary_recorded_at: '2026-04-17T00:36:00.000Z',
       runtime_mode: 'appserver',
       heartbeat_at: '2026-04-17T00:34:39.000Z',
       runner_pid: 4242,
@@ -4999,6 +5000,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       run_id: '2026-04-17T00-34-04-191Z-44a13a0d',
       status: 'stale_invalidation_candidate',
       artifact_root: matchingChildRunDir,
+      summary_recorded_at: '2026-04-17T00:36:00.000Z',
       stale_invalidation_reason: 'post_startup_no_output_heartbeat_stale_runner_dead'
     });
 

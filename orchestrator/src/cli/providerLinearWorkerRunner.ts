@@ -5805,6 +5805,10 @@ async function readProviderLinearWorkerChildLaneManifestCandidate(
         : stripNonApplicableGuardrailSummaryLines(parsed, normalizeOptionalString(parsed.summary)) ??
           normalizeOptionalString(parsed.status_detail)
     );
+  const staleSummaryRecordedAt =
+    staleDiagnostic && childLane.stale_invalidation_candidate === true && childLane.summary === staleDiagnostic.summary
+      ? childLane.summary_recorded_at ?? staleDiagnostic.observedAt
+      : staleDiagnostic?.observedAt ?? null;
   return {
     runId,
     status: hydratedStatus,
@@ -5820,7 +5824,7 @@ async function readProviderLinearWorkerChildLaneManifestCandidate(
     guardrailsRequired: resolveGuardrailsRequiredForManifest(parsed),
     guardrailsRequiredSource: resolveGuardrailsRequiredSourceForManifest(parsed),
     guardrailCommandCount: countGuardrailCommands(parsed),
-    summaryRecordedAt: staleDiagnostic?.observedAt ?? summaryRecordedAt,
+    summaryRecordedAt: staleSummaryRecordedAt ?? summaryRecordedAt,
     runtimeMode,
     runtimeProvider,
     heartbeatAt,
