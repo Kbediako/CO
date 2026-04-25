@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp cbda96fb79faf8ec4a818149d26926d95a2083e713fdd8156e9f3618f6668f6f -->
+<!-- codex:instruction-stamp 5b560d16510db54bd283c14675f4d55dfde40175c71043a85ae8e9af94daca7f -->
 # Repository Agent Guidance
 
 Task-specific historical project blocks were removed from this file in `CO-88`. Use the active task packet under `.agent/task/**` for lane-scoped instructions instead of treating old project ids as repo-wide defaults.
@@ -46,8 +46,8 @@ Task-specific historical project blocks were removed from this file in `CO-88`. 
 - Current `0.124.0` CO-local posture evidence confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, `codex review --help` exposing `[PROMPT]` alongside scoped review flags, live `gpt-5.5` `xhigh` availability, and a post-build runtime-mode canary pass (`20/20` per scenario, `ready_for_default_flip=true`).
 - Release-facing downstream-smoke workflows and `cloud-canary` pin the explicit promoted candidate recorded in `docs/guides/codex-version-policy.md`.
 - Current model posture is `gpt-5.5` / `xhigh` when available in ChatGPT-auth Codex sessions; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
-- Portable packaged/generated config still keeps `gpt-5.4` / `xhigh` as the fallback for unavailable `gpt-5.5`, API/cloud portability gaps, or unproven downstream/no-network contexts; use `gpt-5.5` for delegated/review surfaces after live access smoke unless a fresh provider lane validates a Codex-suffixed model variant.
-- `codex-orchestrator doctor` treats `gpt-5.5` as non-drift when `codex debug models` verifies current model access, and `codex-orchestrator codex defaults --yes` writes current ChatGPT-auth/appserver defaults without requiring extra marker metadata.
+- Portable packaged/generated config still seeds `gpt-5.4` / `xhigh`; use `gpt-5.5` for delegated/review surfaces only after live access smoke plus `[codex_orchestrator] local_model_opt_in = "gpt-5.5"` unless a fresh provider lane validates a Codex-suffixed model variant.
+- `codex-orchestrator doctor` accepts the marker-backed local `gpt-5.5` opt-in as non-drift only when `codex debug models` verifies current model access, and `codex-orchestrator codex defaults --yes` preserves exact prior `gpt-5.5` role files when the top-level config is explicitly opted in.
 - Caveat: app-server `model/list` still reports `gpt-5.4` as `isDefault=true`; CO-341 live app-server `model/list` and live `codex exec` show `gpt-5.5` supports `xhigh` for explicit local configuration, and the bundled debug model catalog may lag the live catalog.
 - Treat residual plugin warnings from CO-341 as local temporary plugin cache warnings unless evidence maps them to CO-owned plugin manifests.
 - CO may run newer stable/prerelease Codex builds in explicit task-scoped canary lanes only; do not treat them as automatic global defaults.
